@@ -1,6 +1,7 @@
-"""Aldridge Pite — sale-day listings sit behind an 'I agree' click-through.
+"""Aldridge Pite — NC only. Disclaimer page is bypassed via Referer header.
 
-We use Apify rag-web-browser to render the post-disclaimer page for each state.
+Currently empty (verified 2026-04-28); the scraper still runs cheaply via httpx
+and will start producing results when Aldridge re-populates their listings.
 """
 from __future__ import annotations
 
@@ -8,51 +9,72 @@ import re
 from datetime import datetime
 from typing import Iterable
 
-from ...apify_helper import fetch_rendered
+import httpx
+from selectolax.parser import HTMLParser
+
 from ...base_scraper import BaseScraper
+from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
-URLS = (
-    ("https://aldridgepite.com/sale-day-listings-selection/foreclosure-listings-nc/", "NC"),
-    ("https://aldridgepite.com/sale-day-listings-selection/foreclosure-listings-sc/", "SC"),
-)
-ADDR_RE = re.compile(
-    r"(\d+\s+[A-Z][\w .'\-]+(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
-    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\.?)",
-    re.I,
-)
-COUNTY_RE = re.compile(r"\b([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+)?)\s+County\b")
+LISTINGS_URL = "https://aldridgepite.com/sale-day-listings-selection/foreclosure-listings-north-carolina/"
+DISCLAIMER_URL = "https://aldridgepite.com/disclaimer-north-carolina/"
 
 
 class AldridgePite(BaseScraper):
     slug = "law_firms.aldridge_pite"
     name = "Aldridge Pite"
     category = "law_firm"
-    timeout_s = 360.0
+    timeout_s = 120.0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
-        for url, state in URLS:
-            content = await fetch_rendered(url)
-            if not content:
-                continue
-            for line in content.split("\n"):
-                addr_m = ADDR_RE.search(line)
-                if not addr_m:
-                    continue
-                county_m = COUNTY_RE.search(line)
-                out.append(
-                    Listing(
-                        source=self.slug,
-                        source_url=url,
-                        listing_type=ListingType.FORECLOSURE_SALE,
-                        property_kind=PropertyKind.UNKNOWN,
-                        street_address=addr_m.group(1),
-                        state=state,
-                        county=county_m.group(1) if county_m else None,
-                        description=line[:300],
-                        first_seen=datetime.utcnow(),
-                        last_seen=datetime.utcnow(),
-                    )
+        async with client(timeout=30.0) as c:
+            try:
+                r = await c.get(
+                    LISTINGS_URL,
+                    headers={"Referer": DISCLAIMER_URL},
+                    follow_redirects=True,
                 )
+                if r.status_code != 200:
+                    return out
+                html = r.text
+            except httpx.HTTPError:
+                return out
+
+        tree = HTMLParser(html)
+        table = tree.css_first("table.posts-data-table")
+        if not table:
+            return out
+        for tr in table.css("tbody tr"):
+            cells = [td.text(strip=True) for td in tr.css("td")]
+            if len(cells) < 8:
+                continue
+            file_no, addr, city, state, zip_code, county, date_listed, bid_raw = cells[:8]
+            if not addr:
+                continue
+            bid = None
+            bm = re.search(r"\$?\s*([\d,]+(?:\.\d{2})?)", bid_raw or "")
+            if bm:
+                try:
+                    bid = float(bm.group(1).replace(",", ""))
+                except ValueError:
+                    pass
+            out.append(
+                Listing(
+                    source=self.slug,
+                    source_url=LISTINGS_URL,
+                    listing_type=ListingType.FORECLOSURE_SALE,
+                    property_kind=PropertyKind.UNKNOWN,
+                    street_address=addr or None,
+                    city=city or None,
+                    state=(state or "NC").upper(),
+                    zip_code=zip_code or None,
+                    county=(county or "").replace(" County", "") or None,
+                    case_number=file_no or None,
+                    opening_bid=bid,
+                    description=f"Aldridge Pite NC — file {file_no}",
+                    first_seen=datetime.utcnow(),
+                    last_seen=datetime.utcnow(),
+                )
+            )
         return out

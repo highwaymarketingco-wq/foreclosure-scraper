@@ -16,6 +16,7 @@ from .dedupe import dedupe
 from .email_sender import send_digest
 from .enrichment import enrich
 from .enrichment_arcgis import enrich as enrich_gis
+from .enrichment_courts import discover_lis_pendens, enrich_with_court_records
 from .flags import compute_flags
 from .link_validator import validate
 from .models import Listing
@@ -115,6 +116,18 @@ async def run() -> int:
             raw.append(li)
         by_source[slug] = len(listings)
 
+    # Lis pendens discovery — independent search of NC eCourts + SC Public Index
+    # for new foreclosure filings per county (catches early-warning cases that
+    # haven't hit the law-firm trustee calendars yet)
+    try:
+        lp = await discover_lis_pendens()
+        for li in lp:
+            raw.append(li)
+        by_source["courts.lis_pendens_discovery"] = len(lp)
+        log.info("orchestrator.lis_pendens_discovered", count=len(lp))
+    except Exception as exc:  # noqa: BLE001
+        log.warning("orchestrator.lis_pendens_failed", error=str(exc))
+
     log.info("orchestrator.collected", raw=len(raw))
 
     # Filter to scope (counties we care about)
@@ -138,6 +151,14 @@ async def run() -> int:
     # ArcGIS REST. Covers 23 of 25 counties.
     enriched = await enrich_gis(valid)
     log.info("orchestrator.gis_enriched", count=len(enriched))
+
+    # Court records enrichment (NC eCourts + SC Public Index) — fills plaintiff,
+    # defendant, trustee, sale location for any listing that has a case number.
+    try:
+        await enrich_with_court_records(enriched)
+        log.info("orchestrator.courts_enriched", count=len(enriched))
+    except Exception as exc:  # noqa: BLE001
+        log.warning("orchestrator.courts_failed", error=str(exc))
 
     # Zillow per-address detail enrichment (Apify) — fills photos, zestimate,
     # description, plus anything county GIS missed.

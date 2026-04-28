@@ -1,6 +1,8 @@
-"""Brock & Scott — search-foreclosure-sales endpoint. Uses a POST form with state filter.
+"""Brock & Scott — fully scrapeable WordPress + Search & Filter Pro archive.
 
-We try a GET first (some installs accept query params) then fall back to POST.
+Verified URL: /foreclosure-sales/?_sft_foreclosure_state={nc|sc}&sf_paged={N}
+Static HTML, no Cloudflare, no disclaimer, ~10 articles per page.
+NC: 229 listings / 23 pages.  SC: 115 listings / 12 pages.
 """
 from __future__ import annotations
 
@@ -12,110 +14,117 @@ from dateutil import parser as dateparser
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
-from ...http_client import client
+from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 
-SEARCH_URL = "https://www.brockandscott.com/search-foreclosure-sales/"
+BASE = "https://www.brockandscott.com/foreclosure-sales/"
 
 
-def _parse_grid(html: str, state: str, source_slug: str, source_url: str) -> list[Listing]:
-    out: list[Listing] = []
-    tree = HTMLParser(html)
-    table = tree.css_first("table.foreclosure-sales, table.sales-table, table#salesTable") or tree.css_first("table")
-    if not table:
-        return out
-    headers = [h.text(strip=True).lower() for h in table.css("th")]
-    # Find column indices by header text
-    def idx(*candidates: str) -> int | None:
-        for c in candidates:
-            for i, h in enumerate(headers):
-                if c in h:
-                    return i
+def _parse_article(art, state: str, slug: str) -> Listing | None:
+    # Pull state + county from the article class attribute (more robust than text)
+    cls = art.attributes.get("class", "")
+    county_m = re.search(r"foreclosure_county-([a-z\-]+)", cls)
+    state_m = re.search(r"foreclosure_state-([a-z]{2})", cls)
+    county = county_m.group(1).replace("-", " ").title() if county_m else None
+    real_state = (state_m.group(1) if state_m else state).upper()
+
+    # Each .forecol has two <p>: label, value
+    cols = art.css(".forecol")
+    if len(cols) < 6:
         return None
 
-    i_case = idx("case")
-    i_county = idx("county")
-    i_date = idx("sale date", "sale")
-    i_addr = idx("address", "property")
-    i_bid = idx("opening", "bid")
-    i_book = idx("book", "page")
+    def col_value(idx: int) -> str | None:
+        if idx >= len(cols):
+            return None
+        ps = cols[idx].css("p")
+        if len(ps) >= 2:
+            return ps[1].text(strip=True) or None
+        return ps[0].text(strip=True) or None if ps else None
 
-    for row in table.css("tr")[1:]:
-        cells = [c.text(strip=True) for c in row.css("td")]
-        if len(cells) < 4:
-            continue
-        case = cells[i_case] if i_case is not None and i_case < len(cells) else None
-        county = cells[i_county] if i_county is not None and i_county < len(cells) else None
-        addr = cells[i_addr] if i_addr is not None and i_addr < len(cells) else None
-        date_raw = cells[i_date] if i_date is not None and i_date < len(cells) else None
-        bid_raw = cells[i_bid] if i_bid is not None and i_bid < len(cells) else None
+    # Column order: County | Sale Date | State | Court SP # | Case # | Address | Opening Bid | Book/Page
+    sale_date_raw = col_value(1)
+    sp_num = col_value(3)
+    case_num = col_value(4)
+    addr_raw = col_value(5) or ""
+    bid_raw = col_value(6)
+    book_page = col_value(7)
 
-        if not case and not addr:
-            continue
-        sale_date = None
-        if date_raw:
+    # Address is "<street> <city>, <state> <zip>"
+    street = addr_raw
+    city = None
+    zip_code = None
+    m = re.match(r"^(.+?)\s+([A-Za-z .'-]+),\s*([A-Z]{2})\s+(\d{5})", addr_raw)
+    if m:
+        street = m.group(1).strip()
+        city = m.group(2).strip()
+        zip_code = m.group(4).strip()
+
+    sale_date = None
+    if sale_date_raw:
+        try:
+            sale_date = dateparser.parse(sale_date_raw)
+        except (ValueError, TypeError):
+            pass
+
+    bid = None
+    if bid_raw:
+        bm = re.search(r"\$?\s*([\d,]+(?:\.\d{2})?)", bid_raw)
+        if bm:
             try:
-                sale_date = dateparser.parse(date_raw)
-            except (ValueError, TypeError):
+                bid = float(bm.group(1).replace(",", ""))
+            except ValueError:
                 pass
-        bid = None
-        if bid_raw:
-            m = re.search(r"\$?\s*([\d,]+(?:\.\d{2})?)", bid_raw)
-            if m:
-                try:
-                    bid = float(m.group(1).replace(",", ""))
-                except ValueError:
-                    pass
 
-        out.append(
-            Listing(
-                source=source_slug,
-                source_url=source_url,
-                listing_type=ListingType.FORECLOSURE_SALE,
-                property_kind=PropertyKind.UNKNOWN,
-                street_address=addr,
-                state=state,
-                county=(county or "").replace(" County", "") or None,
-                sale_date=sale_date,
-                case_number=case,
-                opening_bid=bid,
-                description=f"Brock & Scott trustee sale ({state})",
-                first_seen=datetime.utcnow(),
-                last_seen=datetime.utcnow(),
-            )
-        )
-    return out
+    # Detail URL (if linked)
+    a = art.css_first("a[href*='/foreclosure-sale/']")
+    detail = a.attributes.get("href") if a else BASE
+
+    desc_bits = [
+        f"SP# {sp_num}" if sp_num else "",
+        f"Book/Page {book_page}" if book_page else "",
+    ]
+    description = " | ".join(b for b in desc_bits if b) or None
+
+    return Listing(
+        source=slug,
+        source_url=detail,
+        listing_type=ListingType.FORECLOSURE_SALE,
+        property_kind=PropertyKind.UNKNOWN,
+        street_address=street,
+        city=city,
+        state=real_state,
+        zip_code=zip_code,
+        county=county,
+        sale_date=sale_date,
+        case_number=case_num,
+        opening_bid=bid,
+        description=description,
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+    )
 
 
 class BrockScott(BaseScraper):
     slug = "law_firms.brock_scott"
     name = "Brock & Scott"
     category = "law_firm"
-    timeout_s = 180.0
+    timeout_s = 360.0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
-        async with client(timeout=45.0) as c:
-            for state in ("NC", "SC"):
-                # Try GET with query string first
+        for state in ("nc", "sc"):
+            for page in range(1, 30):
+                url = f"{BASE}?_sft_foreclosure_state={state}&sf_paged={page}"
                 try:
-                    r = await c.get(SEARCH_URL, params={"state": state, "search_state": state})
-                    html = r.text if r.status_code < 400 else ""
+                    html = await get_text(url, timeout=30.0)
                 except Exception:
-                    html = ""
-                listings = _parse_grid(html, state, self.slug, SEARCH_URL) if html else []
-
-                # Fall back to form POST
-                if not listings:
-                    try:
-                        r = await c.post(
-                            SEARCH_URL,
-                            data={"state": state, "search_state": state, "submit": "Search"},
-                        )
-                        if r.status_code < 400:
-                            listings = _parse_grid(r.text, state, self.slug, SEARCH_URL)
-                    except Exception:
-                        pass
-
-                out.extend(listings)
+                    break
+                tree = HTMLParser(html)
+                articles = tree.css("article.foreclosure_search")
+                if not articles:
+                    break
+                for art in articles:
+                    li = _parse_article(art, state, self.slug)
+                    if li:
+                        out.append(li)
         return out
