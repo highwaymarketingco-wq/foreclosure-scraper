@@ -136,13 +136,9 @@ async def run() -> int:
     enriched = await enrich(valid)
     log.info("orchestrator.enriched", count=len(enriched))
 
-    # Property assessment (condition / ARV / rehab / max-bid)
-    assessments = assess_all(enriched)
-    # Pin assessment values onto each listing's raw payload so the Sheet writer
-    # can render them as dedicated columns.
-    for li, a in zip(enriched, assessments):
-        li.raw["assessment"] = a
-    log.info("orchestrator.assessed", count=len(enriched))
+    # Note: removed heuristic ARV/rehab/condition/max-bid estimates. We now show
+    # only verifiable data (Zestimate, tax assessed value, bid-to-zest %, flags).
+    # The user does their own condition haircut.
 
     # Run summary for Sheet log + email body
     by_state = Counter(li.state for li in enriched if li.state)

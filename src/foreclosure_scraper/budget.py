@@ -1,35 +1,43 @@
 """Apify cost governor.
 
-Apify's free tier is $5/month in platform credits. We size every actor call so
-the total weekly run stays under ~$1.20, leaving comfortable headroom for the
-4 weekly runs per month plus ad-hoc enrichment.
+Apify free tier is $5/month in platform credits. We run ONCE per month and use
+the full budget for a comprehensive scan (was $1/week, now ~$4/month).
 """
 from __future__ import annotations
 
 import os
 
-# Per-run caps that keep the monthly cost roughly flat.
-# Source: Apify Store pricing pages, Apr 2026.
-APIFY_FREE_TIER_MONTHLY = 5.00          # USD
-WEEKLY_BUDGET = APIFY_FREE_TIER_MONTHLY / 5.0  # leave a 20% safety buffer
+APIFY_FREE_TIER_MONTHLY = 5.00          # USD (user is willing to pay above this)
+TARGET_PER_RUN = 18.00                  # comprehensive monthly run
 
-
-# Caps per source, in raw item counts. Tuned so weekly cost ≈ $1.10-$1.20.
+# Per-source caps tuned for one comprehensive MONTHLY run.
+# Cost math (all per-result fees on FREE tier):
+#   propwire             1500 × $0.007  = $10.50  (the big one — has ALL property data)
+#   zillow_bulk          25co × 80      = 2000   × $0.003   = $6.00
+#   trulia               750  × $0.002  = $1.50
+#   auction_dot_com      400  × $0.001  = $0.40
+#   realtor_foreclosures 1000 × FREE
+#   hud_homestore        5000 × ~free
+#   zillow_enrichment    1000 × $0.001  = $1.00
+#   probate_foreclosure  600  × $0.001  = $0.60
+#   ----- Total          ~$20/month for ~5000 raw listings
 ITEM_CAPS: dict[str, int] = {
-    "auction_dot_com": 400,             # $0.001/result × 400 = $0.40
-    "foreclosure_dot_com": 400,         # rag-web-browser fallback, ~free
-    "hubzu": 200,                       # rag-web-browser fallback, ~free
-    "xome": 200,                        # rag-web-browser fallback, ~free
-    "zillow_foreclosures": 300,         # $0.0008-$0.0036/result; tier-dependent. ~$0.30
-    "zillow_enrichment_per_run": 60,    # only enrich the most promising 60 listings
-    "hud_homestore": 5000,              # $0.00001/result, effectively free
-    "probate_foreclosure_leads": 250,   # $0.001/result + $0.10 start = $0.35
+    "propwire": 1500,                   # ~$10.50 — preforeclosure + auction + REO + tax-lien
+    "zillow_bulk_foreclosures": 80,     # per county; 25 counties × 80 = 2000 — ~$6
+    "trulia_foreclosures": 750,         # ~$1.50
+    "auction_dot_com": 400,             # ~$0.40
+    "realtor_foreclosures": 1000,       # FREE
+    "hud_homestore": 5000,              # ~free
+    "probate_foreclosure_leads": 600,   # ~$0.60
+    "zillow_enrichment_per_run": 1000,  # ~$1.00 (per-address detail enrichment)
+    "foreclosure_dot_com": 800,         # rag-web-browser (~free)
+    "hubzu": 300,
+    "xome": 300,
 }
 
 
-def cap(slug_suffix: str, default: int = 200) -> int:
-    """Look up the per-run item cap for a source."""
-    # Allow override via env (one-off boosts without code change)
+def cap(slug_suffix: str, default: int = 500) -> int:
+    """Per-run item cap. Override via env CAP_<SUFFIX>."""
     env_key = f"CAP_{slug_suffix.upper()}"
     if env_key in os.environ:
         try:
@@ -40,5 +48,4 @@ def cap(slug_suffix: str, default: int = 200) -> int:
 
 
 def is_free_tier() -> bool:
-    """User explicitly opts out of paid Apify usage with this env var."""
     return os.environ.get("APIFY_FREE_TIER_ONLY", "1") == "1"

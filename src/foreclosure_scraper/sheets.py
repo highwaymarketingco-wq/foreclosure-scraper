@@ -30,12 +30,10 @@ COLUMNS: list[tuple[str, str]] = [
     ("Parcel ID", "parcel_id"),
     ("Opening Bid", "opening_bid"),
     ("Judgment", "judgment_amount"),
-    ("Est. ARV", "_arv"),
-    ("Est. Rehab", "_rehab"),
-    ("Suggested Max Bid (70%)", "_max_bid"),
-    ("Condition Score", "_condition"),
+    ("Zillow Zestimate (ceiling)", "_zest"),
+    ("Tax Assessed Value", "tax_value"),
+    ("Bid / Zestimate %", "_bid_to_zest"),
     ("Flags", "_flags"),
-    ("Tax Value", "tax_value"),
     ("Bedrooms", "bedrooms"),
     ("Bathrooms", "bathrooms"),
     ("Living SqFt", "living_sqft"),
@@ -60,20 +58,19 @@ COLUMNS: list[tuple[str, str]] = [
 def _to_cell(li: Listing, attr: str) -> str:
     if attr == "_display_address":
         return li.display_address()
-    if attr in ("_arv", "_rehab", "_max_bid", "_condition", "_flags"):
-        a = li.raw.get("assessment", {}) if isinstance(li.raw, dict) else {}
-        v = {
-            "_arv": a.get("arv_estimate"),
-            "_rehab": a.get("rehab_estimate"),
-            "_max_bid": a.get("max_bid_70"),
-            "_condition": a.get("condition_score"),
-            "_flags": ", ".join(a.get("flags", [])[:6]) if a.get("flags") else "",
-        }[attr]
-        if v is None or v == "":
-            return ""
-        if isinstance(v, (int, float)):
-            return str(int(v)) if attr != "_condition" else str(v)
-        return str(v)
+    if attr == "_zest":
+        z = (li.raw.get("zillow") or {}) if isinstance(li.raw, dict) else {}
+        v = z.get("zestimate") or li.market_value
+        return str(int(v)) if v else ""
+    if attr == "_bid_to_zest":
+        z = (li.raw.get("zillow") or {}) if isinstance(li.raw, dict) else {}
+        zest = z.get("zestimate") or li.market_value
+        if zest and li.opening_bid:
+            return f"{(li.opening_bid / zest * 100):.0f}%"
+        return ""
+    if attr == "_flags":
+        flags = li.raw.get("flags") if isinstance(li.raw, dict) else []
+        return ", ".join(flags[:6]) if flags else ""
     val = getattr(li, attr, None)
     if val is None:
         return ""
