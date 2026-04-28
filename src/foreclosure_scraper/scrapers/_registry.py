@@ -16,6 +16,7 @@ _PACKAGES = (
     "foreclosure_scraper.scrapers.counties_nc",
     "foreclosure_scraper.scrapers.newspapers",
     "foreclosure_scraper.scrapers.reo",
+    "foreclosure_scraper.scrapers.city_websites",
 )
 
 
