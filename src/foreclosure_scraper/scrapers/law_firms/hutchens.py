@@ -56,6 +56,13 @@ class Hutchens(BaseScraper):
                 cityzip = _f(cells, 5) or ""
                 book = _f(cells, 6)
                 bid_raw = _f(cells, 7) or ""
+                # Hutchens sometimes writes "Gaston, NC" in the county column — strip state suffix
+                if county:
+                    county = county.replace(" County", "").strip()
+                    for sfx in (", NC", ", SC", ",NC", ",SC"):
+                        if county.upper().endswith(sfx):
+                            county = county[: -len(sfx)].strip()
+                    county = county.split(",")[0].strip()
 
                 if not case and not addr:
                     continue

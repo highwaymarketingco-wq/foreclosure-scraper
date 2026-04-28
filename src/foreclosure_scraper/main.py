@@ -11,11 +11,12 @@ from datetime import datetime, timedelta
 
 import structlog
 
-from .assessment import assess_all
 from .config import RuntimeConfig, in_scope, SCOPE_ZIP_PREFIXES
 from .dedupe import dedupe
 from .email_sender import send_digest
 from .enrichment import enrich
+from .enrichment_arcgis import enrich as enrich_gis
+from .flags import compute_flags
 from .link_validator import validate
 from .models import Listing
 from .scrapers._registry import all_scrapers
@@ -132,13 +133,21 @@ async def run() -> int:
     valid = await validate(deduped, workers=cfg.link_check_workers)
     log.info("orchestrator.valid_links", count=len(valid))
 
-    # Property enrichment
-    enriched = await enrich(valid)
-    log.info("orchestrator.enriched", count=len(enriched))
+    # County GIS enrichment (free, pure HTTP) — fills parcel ID, owner, zoning,
+    # year built, beds/baths, sqft, tax value, last-sale book/page from county
+    # ArcGIS REST. Covers 23 of 25 counties.
+    enriched = await enrich_gis(valid)
+    log.info("orchestrator.gis_enriched", count=len(enriched))
 
-    # Note: removed heuristic ARV/rehab/condition/max-bid estimates. We now show
-    # only verifiable data (Zestimate, tax assessed value, bid-to-zest %, flags).
-    # The user does their own condition haircut.
+    # Zillow per-address detail enrichment (Apify) — fills photos, zestimate,
+    # description, plus anything county GIS missed.
+    enriched = await enrich(enriched)
+    log.info("orchestrator.zillow_enriched", count=len(enriched))
+
+    # Computed flags from enriched data: absentee_owner, high_equity, vacant,
+    # negative_equity, plus keyword flags from descriptions
+    compute_flags(enriched)
+    log.info("orchestrator.flagged", count=len(enriched))
 
     # Run summary for Sheet log + email body
     by_state = Counter(li.state for li in enriched if li.state)
