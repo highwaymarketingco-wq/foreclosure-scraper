@@ -1,6 +1,9 @@
-"""Finkel Law Firm (SC) — publishes upcoming-sales as a monthly PDF.
+"""Finkel Law Firm (SC) — monthly PDF parser.
 
-Two offices, both follow the same format: Webs.pdf gets overwritten in place.
+PDF layout puts the property address at the END of one record and the date+county
+at the TOP of the next, so consecutive records overlap. We anchor on the docket
+number (2024CP3204157 pattern) and reconstruct each block by looking at the
+date line that precedes it and the property address line ABOVE that date line.
 """
 from __future__ import annotations
 
@@ -18,19 +21,20 @@ from ...models import Listing, ListingType, PropertyKind
 PDF_URLS = (
     "https://www.finkellaw.com/images/Webs.pdf",
     "https://www.finkellawcharleston.com/images/Webs.pdf",
-    "https://www.finkellaw.com/documents/Sales.pdf",  # fallback / legacy
 )
 
-# Verified regex against actual Finkel PDF content
-DEFENDANT_RE = re.compile(r"Defendant Name:\s*(.+?)(?=\n[A-Z0-9]|\nTMS|\nProperty)", re.S)
-TMS_RE = re.compile(r"TMS Number:\s*([\w\-\.]+)")
-ADDR_RE = re.compile(r"Property Address:\s*(.+?)(?=\n|Sale Date)", re.S)
-SALE_DATE_RE = re.compile(r"Sale Date:\s*(\d{1,2}/\d{1,2}/\d{4})")
-COUNTY_RE = re.compile(r"County:\s*([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)")
-SALE_TIME_RE = re.compile(r"Sale Date:\s*\d{1,2}/\d{1,2}/\d{4}[\s\S]{0,80}?(\d{1,2}:\d{2}\s*[AP]\.?M\.?)")
-DOCKET_RE = re.compile(r"Docket Number:\s*(\d{4}\s*CP\s*\d{4,9})")
-SALE_LOC_RE = re.compile(r"Sale Location:\s*(.+?)(?=Property Address|Plaintiff|\n[A-Z])", re.S)
-MAX_BID_RE = re.compile(r"Plaintiff (?:Maximum |Max(?:imum)? )?Bid Amount:\s*\$?([\d,]+(?:\.\d{2})?)")
+DOCKET_RE = re.compile(r"\b(\d{4}CP\d{6,9})\b")
+# Date+county concatenated, then time: "05/05/2025Lexington 11:00 A.M"
+DATE_COUNTY_TIME_RE = re.compile(
+    r"^(\d{1,2}/\d{1,2}/\d{4})([A-Z][a-zA-Z]+)\s+(\d{1,2}:\d{2}\s*[AP]\.?M\.?)",
+    re.M,
+)
+ADDRESS_LINE_RE = re.compile(
+    r"^(\d+\s+[A-Z][\w .'\-]+,\s*[A-Za-z .'-]+,\s*SC\s+\d{5})\s*$",
+    re.M,
+)
+DEFENDANTS_RE = re.compile(r"^v\.\s+(.+?)(?=\n[A-Z]|$)", re.M | re.S)
+BID_RE = re.compile(r"^([\d,]+(?:\.\d{2})?)\s*$", re.M)
 
 
 def _extract_pdf_text(data: bytes) -> str:
@@ -45,58 +49,117 @@ def _extract_pdf_text(data: bytes) -> str:
         return ""
 
 
-def _parse_block(block: str, source_url: str, slug: str) -> Listing | None:
-    addr_m = ADDR_RE.search(block)
-    sale_m = SALE_DATE_RE.search(block)
-    if not addr_m and not sale_m:
-        return None
-    sale_date = None
-    if sale_m:
+def _parse(text: str, source_url: str, slug: str) -> list[Listing]:
+    out: list[Listing] = []
+    lines = text.split("\n")
+    n = len(lines)
+
+    # Find every docket-number line index
+    docket_idxs = [i for i, line in enumerate(lines) if DOCKET_RE.search(line)]
+    if not docket_idxs:
+        return out
+
+    for k, di in enumerate(docket_idxs):
+        docket_m = DOCKET_RE.search(lines[di])
+        if not docket_m:
+            continue
+        docket = docket_m.group(1)
+
+        # Find the date+county line above this docket (within a small window)
+        date_idx = None
+        for j in range(max(0, di - 30), di):
+            if DATE_COUNTY_TIME_RE.search(lines[j]):
+                date_idx = j
+        if date_idx is None:
+            continue
+        date_m = DATE_COUNTY_TIME_RE.search(lines[date_idx])
+        date_str, county, time_str = date_m.group(1), date_m.group(2), date_m.group(3)
         try:
-            sale_date = dateparser.parse(sale_m.group(1))
+            sale_date = dateparser.parse(date_str)
         except (ValueError, TypeError):
-            pass
-    addr_text = addr_m.group(1).strip().replace("\n", " ") if addr_m else ""
+            sale_date = None
 
-    # Address line is usually "<street>, <city>, SC <zip>"
-    street = addr_text
-    city = None
-    zip_code = None
-    m = re.match(r"^(.+?),\s*([A-Za-z .'-]+),\s*SC\s+(\d{5})", addr_text)
-    if m:
-        street = m.group(1).strip()
-        city = m.group(2).strip()
-        zip_code = m.group(3).strip()
+        # Property address is the line immediately ABOVE the date line
+        addr_line_idx = date_idx - 1
+        addr_line = lines[addr_line_idx].strip() if addr_line_idx >= 0 else ""
+        addr_m = ADDRESS_LINE_RE.search(addr_line + "\n")
+        if not addr_m:
+            # Walk up further
+            for j in range(date_idx - 1, max(date_idx - 10, -1), -1):
+                if ADDRESS_LINE_RE.search(lines[j] + "\n"):
+                    addr_line = lines[j].strip()
+                    addr_m = ADDRESS_LINE_RE.search(addr_line + "\n")
+                    break
+        if not addr_m:
+            continue
+        full_addr = addr_m.group(1)
+        # Parse "<street>, <city>, SC <zip>"
+        m2 = re.match(r"^(.+?),\s*([A-Za-z .'-]+),\s*SC\s+(\d{5})", full_addr)
+        if not m2:
+            continue
+        street, city, zip_code = m2.group(1).strip(), m2.group(2).strip(), m2.group(3)
 
-    bid = None
-    bm = MAX_BID_RE.search(block)
-    if bm:
-        try:
-            bid = float(bm.group(1).replace(",", ""))
-        except ValueError:
-            pass
+        # Sale location: the text between date line and docket line (cleaned)
+        sale_loc_text = " ".join(lines[date_idx + 1 : di]).strip()
+        sale_loc = re.sub(r"\s+", " ", sale_loc_text)[:400] or None
 
-    return Listing(
-        source=slug,
-        source_url=source_url,
-        listing_type=ListingType.FORECLOSURE_SALE,
-        property_kind=PropertyKind.UNKNOWN,
-        street_address=street,
-        city=city,
-        state="SC",
-        zip_code=zip_code,
-        county=(COUNTY_RE.search(block) or [None, None])[1] if COUNTY_RE.search(block) else None,
-        parcel_id=(TMS_RE.search(block) or [None, None])[1] if TMS_RE.search(block) else None,
-        sale_date=sale_date,
-        sale_time=(SALE_TIME_RE.search(block) or [None, None])[1] if SALE_TIME_RE.search(block) else None,
-        sale_location=(SALE_LOC_RE.search(block).group(1).strip().replace("\n", " ") if SALE_LOC_RE.search(block) else None),
-        case_number=(DOCKET_RE.search(block).group(1).replace(" ", "") if DOCKET_RE.search(block) else None),
-        defendant=(DEFENDANT_RE.search(block).group(1).strip().replace("\n", " ") if DEFENDANT_RE.search(block) else None),
-        opening_bid=bid,
-        plaintiff="Finkel Law Firm (trustee)",  # Finkel is the substitute trustee
-        first_seen=datetime.utcnow(),
-        last_seen=datetime.utcnow(),
-    )
+        # Defendants + plaintiff: the next 3-5 lines after docket
+        defendants = None
+        plaintiff = None
+        bid = None
+        # Look for "v. ..." line
+        for j in range(di + 1, min(di + 6, n)):
+            line = lines[j].strip()
+            if line.startswith("v. "):
+                # Collect multi-line defendants
+                end = j
+                while end + 1 < n and not lines[end + 1].strip().startswith(("PIC ", "Lakeview", "U.S. Bank", "Wells", "Bank ", "Mortgage", "Master", "Capital", "Federal")) and not BID_RE.search(lines[end + 1]) and not lines[end + 1].strip().startswith("County:"):
+                    end += 1
+                    if end - j > 5:
+                        break
+                defendants = " ".join(lines[j : end + 1]).replace("v. ", "").strip()[:300]
+                # Plaintiff line is right after the multi-line defendants
+                if end + 1 < n:
+                    p_line = lines[end + 1].strip()
+                    if p_line and not BID_RE.search(p_line) and not p_line.startswith("County:"):
+                        plaintiff = p_line[:200]
+                break
+
+        # Bid amount: numeric line near the docket
+        for j in range(di + 1, min(di + 12, n)):
+            bm = BID_RE.search(lines[j])
+            if bm:
+                try:
+                    bid = float(bm.group(1).replace(",", ""))
+                    break
+                except ValueError:
+                    pass
+
+        out.append(
+            Listing(
+                source=slug,
+                source_url=source_url,
+                listing_type=ListingType.FORECLOSURE_SALE,
+                property_kind=PropertyKind.UNKNOWN,
+                street_address=street,
+                city=city,
+                state="SC",
+                zip_code=zip_code,
+                county=county,
+                sale_date=sale_date,
+                sale_time=time_str,
+                sale_location=sale_loc,
+                case_number=docket,
+                opening_bid=bid,
+                plaintiff=plaintiff,
+                defendant=defendants,
+                trustee="Finkel Law Firm",
+                description=(sale_loc or "")[:500] or None,
+                first_seen=datetime.utcnow(),
+                last_seen=datetime.utcnow(),
+            )
+        )
+    return out
 
 
 class Finkel(BaseScraper):
@@ -115,12 +178,5 @@ class Finkel(BaseScraper):
             text = _extract_pdf_text(data)
             if not text:
                 continue
-            # Each block starts with "Defendant Name:" — split on that anchor
-            blocks = re.split(r"(?=Defendant Name:)", text)
-            for block in blocks:
-                if "Defendant Name:" not in block:
-                    continue
-                li = _parse_block(block, url, self.slug)
-                if li:
-                    out.append(li)
+            out.extend(_parse(text, url, self.slug))
         return out
