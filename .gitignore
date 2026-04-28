@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+wheels/
+
+# uv
+# (.python-version is committed so CI knows the version)
+
+# Secrets / credentials (NEVER commit these)
+.env
+.env.local
+*.env.local
+service_account.json
+google_credentials.json
+gmail_app_password.txt
+apify_token.txt
+secrets/
+
+# Local artifacts
+data/
+output/
+*.sqlite
+*.db
+*.csv
+*.xlsx
+!tests/fixtures/*.csv
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Logs
+*.log
+logs/

@@ -1,0 +1,55 @@
+name: Weekly Foreclosure Scrape
+
+on:
+  schedule:
+    # Every Monday at 09:00 UTC = 04:00/05:00 ET, before the workday
+    - cron: "0 9 * * 1"
+  workflow_dispatch: {}  # allow manual triggering from the Actions tab
+
+concurrency:
+  group: weekly-scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SHEET_ID: ${{ secrets.SHEET_ID }}
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+      GMAIL_SENDER: ${{ secrets.GMAIL_SENDER }}
+      GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+      EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
+      APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+      APIFY_FREE_TIER_ONLY: "1"
+      LOG_LEVEL: INFO
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Pin Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen || uv sync
+
+      - name: Run scraper
+        run: uv run python -m foreclosure_scraper
+
+      - name: Upload run log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-log-${{ github.run_id }}
+          path: |
+            *.log
+            output/
+          if-no-files-found: ignore
+          retention-days: 30
