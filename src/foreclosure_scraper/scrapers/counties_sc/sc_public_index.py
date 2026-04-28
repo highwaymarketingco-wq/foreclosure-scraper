@@ -1,9 +1,4 @@
-"""SC Judicial Department Public Index — case-level foreclosure search.
-
-We use the per-county case-search portal (sccourts.org/caseSearch) to find recently
-filed foreclosure cases (case type 'CP' with sub-type starting 'Foreclosure').
-The portal is JS-heavy; we delegate to apify/rag-web-browser.
-"""
+"""SC Judicial Public Index — per-county case search via Apify rag-web-browser."""
 from __future__ import annotations
 
 import re
@@ -22,19 +17,21 @@ class SCPublicIndex(BaseScraper):
     slug = "counties_sc.sc_public_index"
     name = "SC Judicial Public Index"
     category = "state_court"
-    timeout_s = 360.0
+    timeout_s = 480.0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
-        for c in SC_COUNTIES:
-            url = (
-                "https://www.sccourts.org/caseSearch/index.cfm?"
-                f"action=index&county={c.name.replace(' ', '+')}&caseType=CP&caseSubType=Foreclosure"
-            )
+        # Per-county Public Index pages — these are the live case search portals
+        for c in SC_COUNTIES[:5]:  # cap to 5 highest-pop counties to keep Apify cost bounded
+            url = f"https://publicindex.sccourts.org/{c.name}/PublicIndex/"
             content = await fetch_rendered(url)
             if not content:
                 continue
+            seen: set[str] = set()
             for case in set(CASE_RE.findall(content)):
+                if case in seen:
+                    continue
+                seen.add(case)
                 out.append(
                     Listing(
                         source=self.slug,

@@ -1,40 +1,63 @@
-"""Buncombe County (NC) tax foreclosure sales."""
+"""Buncombe County (NC) tax foreclosure — JS-rendered map app at taxforeclosures.buncombenc.gov.
+
+We use Apify rag-web-browser to render the page and extract listing URLs / addresses.
+"""
 from __future__ import annotations
 
+import re
+from datetime import datetime
 from typing import Iterable
 
-from selectolax.parser import HTMLParser
-
+from ...apify_helper import fetch_rendered
 from ...base_scraper import BaseScraper
-from ...http_client import get_text
-from ...models import Listing
-from ..law_firms._helpers import parse_blocks
+from ...models import Listing, ListingType, PropertyKind
 
-URLS = (
-    "https://www.buncombecounty.org/governing/depts/tax/foreclosure.aspx",
-    "https://www.buncombecounty.org/governing/depts/tax/foreclosed-properties.aspx",
+START_URL = "https://taxforeclosures.buncombenc.gov/"
+ADDR_RE = re.compile(
+    r"(\d+\s+[A-Z][\w .'\-]+(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
+    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\.?)",
+    re.I,
 )
+PIN_RE = re.compile(r"\bPIN[:#\s]+([0-9]{4,}-[0-9\-]{3,})", re.I)
 
 
 class BuncombeTax(BaseScraper):
     slug = "counties_nc.buncombe_tax"
     name = "Buncombe County (NC) Tax Foreclosures"
     category = "county_tax"
-    timeout_s = 180.0
+    timeout_s = 240.0
 
     async def fetch(self) -> Iterable[Listing]:
+        content = await fetch_rendered(START_URL)
+        if not content:
+            return []
         out: list[Listing] = []
-        for url in URLS:
-            try:
-                html = await get_text(url, timeout=45.0)
-            except Exception:
+        seen: set[str] = set()
+        for line in content.split("\n"):
+            line = line.strip()
+            if len(line) < 10:
                 continue
-            tree = HTMLParser(html)
-            text = tree.body.text(separator="\n") if tree.body else ""
-            for li in parse_blocks(text, source_slug=self.slug, source_url=url):
-                if not li.state:
-                    li.state = "NC"
-                if not li.county:
-                    li.county = "Buncombe"
-                out.append(li)
+            addr_m = ADDR_RE.search(line)
+            pin_m = PIN_RE.search(line)
+            if not (addr_m or pin_m):
+                continue
+            key = (addr_m.group(1) if addr_m else "") + "|" + (pin_m.group(1) if pin_m else "")
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(
+                Listing(
+                    source=self.slug,
+                    source_url=START_URL,
+                    listing_type=ListingType.TAX_SALE,
+                    property_kind=PropertyKind.UNKNOWN,
+                    state="NC",
+                    county="Buncombe",
+                    street_address=addr_m.group(1) if addr_m else None,
+                    parcel_id=pin_m.group(1) if pin_m else None,
+                    description=line[:300],
+                    first_seen=datetime.utcnow(),
+                    last_seen=datetime.utcnow(),
+                )
+            )
         return out

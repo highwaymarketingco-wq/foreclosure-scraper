@@ -50,12 +50,37 @@ def _in_scope(li: Listing) -> bool:
     return False
 
 
+#: Sources where blank sale_date is acceptable — these list ACTIVELY-FOR-SALE
+# inventory, not historical events. For everything else (court rosters, law-firm
+# trustee calendars, tax-sale lists, public notices) we require a parseable date.
+DATELESS_OK_SOURCES = {
+    "national.hud_homestore",
+    "national.fannie_homepath",
+    "national.freddie_homesteps",
+    "national.auction_dot_com",
+    "national.hubzu",
+    "national.xome",
+    "national.foreclosure_dot_com",
+    "national.zillow_foreclosures",
+    "national.bid4assets",
+}
+
+
 def _active_only(li: Listing, horizon_days: int) -> bool:
     """Drop listings whose sale is in the past or > horizon_days out, and any auction marked withdrawn/cancelled."""
-    if li.auction_status and li.auction_status.lower() in {"withdrawn", "cancelled", "canceled", "rescinded"}:
+    if li.auction_status and li.auction_status.lower() in {
+        "withdrawn",
+        "cancelled",
+        "canceled",
+        "rescinded",
+        "sold",
+        "completed",
+    }:
         return False
     if li.sale_date is None:
-        return True  # keep, we don't know yet
+        # For court / law-firm / tax / public-notice sources a missing date almost
+        # always means we scraped a historic roster; drop it.
+        return li.source in DATELESS_OK_SOURCES
     cutoff_past = datetime.utcnow() - timedelta(days=2)  # tiny grace for same-day sales
     cutoff_future = datetime.utcnow() + timedelta(days=horizon_days)
     return cutoff_past <= li.sale_date <= cutoff_future

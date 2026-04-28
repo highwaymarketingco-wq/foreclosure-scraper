@@ -1,7 +1,7 @@
-"""publicnoticesc.com — South Carolina Press Association legal notice aggregator.
+"""publicnoticesc.com — South Carolina Press Association legal-notice aggregator.
 
-Aggregates notices from every newspaper in SC. We search for foreclosure / tax-sale
-notices and yield one Listing per result, scoped to upstate counties.
+Site is Cloudflare-protected; direct curl/httpx hangs the TLS handshake.
+We use Apify rag-web-browser to render search-result pages.
 """
 from __future__ import annotations
 
@@ -10,11 +10,9 @@ from datetime import datetime
 from typing import Iterable
 from urllib.parse import urlencode
 
-from selectolax.parser import HTMLParser
-
+from ...apify_helper import fetch_rendered
 from ...base_scraper import BaseScraper
 from ...config import SC_COUNTIES
-from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 
 BASE = "https://www.publicnoticesc.com"
@@ -23,74 +21,73 @@ QUERIES = (
     "foreclosure",
     "master in equity",
     "tax sale",
-    "tax lien",
     "trustee sale",
-    "sheriff sale",
 )
+
+ADDR_RE = re.compile(
+    r"(\d+\s+[A-Z][\w .'\-]+(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
+    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\.?)",
+    re.I,
+)
+LINK_RE = re.compile(r"https?://[^\s)\]\"']*publicnoticesc\.com/[^\s)\]\"']+", re.I)
 
 
 class PublicNoticeSC(BaseScraper):
     slug = "public_notices.publicnoticesc"
     name = "Public Notice SC (SCPA)"
     category = "public_notice"
-    timeout_s = 240.0
+    timeout_s = 360.0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
-        for county in SC_COUNTIES:
-            for q in QUERIES:
-                params = {
-                    "keyword": q,
-                    "category": "Foreclosures",
-                    "county": county.name,
-                    "lookbackDays": "60",
-                }
+        # We aim for ONE rendered fetch per (county, query) — more than that and
+        # rag-web-browser cost compounds. Limit to 3 highest-yield counties.
+        priority_counties = [c for c in SC_COUNTIES if c.name in ("Greenville", "Spartanburg", "Anderson")]
+        for county in priority_counties:
+            for q in QUERIES[:2]:  # 2 queries per county = 6 total fetches
+                params = {"keyword": q, "category": "Foreclosures", "county": county.name}
                 url = f"{BASE}/Search.aspx?{urlencode(params)}"
-                try:
-                    html = await get_text(url, timeout=30.0, referer=BASE)
-                except Exception:
+                content = await fetch_rendered(url)
+                if not content:
                     continue
-                tree = HTMLParser(html)
-                for card in tree.css("div.notice, article.notice, li.notice, tr.noticeRow"):
-                    a = card.css_first("a[href*='Details.aspx'], a[href*='/notice/']")
-                    if not a:
+                # Parse markdown / extracted text for listing links + addresses
+                seen: set[str] = set()
+                for href in set(LINK_RE.findall(content)):
+                    if href in seen:
                         continue
-                    href = a.attributes.get("href", "")
-                    if href.startswith("/"):
-                        href = f"{BASE}{href}"
-                    title = (a.text(strip=True) or "")[:300]
-                    body = card.text(strip=True)
-                    listing_type = ListingType.FORECLOSURE_SALE
-                    blob = (title + " " + body).lower()
-                    if "tax sale" in blob:
-                        listing_type = ListingType.TAX_SALE
-                    elif "tax lien" in blob:
-                        listing_type = ListingType.TAX_LIEN
-                    elif "sheriff" in blob:
-                        listing_type = ListingType.SHERIFF_SALE
-
-                    addr = None
-                    m = re.search(
-                        r"(\d+\s+[A-Z][\w .'\-]+(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\.?)",
-                        body,
-                        re.I,
-                    )
-                    if m:
-                        addr = m.group(1)
-
+                    if "Search.aspx" in href:
+                        continue
+                    seen.add(href)
                     out.append(
                         Listing(
                             source=self.slug,
-                            source_url=href,
-                            listing_type=listing_type,
+                            source_url=href.rstrip(").,]"),
+                            listing_type=ListingType.FORECLOSURE_SALE,
                             property_kind=PropertyKind.UNKNOWN,
-                            street_address=addr,
                             state="SC",
                             county=county.name,
-                            description=title,
+                            description=f"Public Notice SC — {q} in {county.name} County",
                             first_seen=datetime.utcnow(),
                             last_seen=datetime.utcnow(),
-                            raw={"snippet": body[:800]},
+                        )
+                    )
+                # Also pull addresses from the rendered text
+                for line in content.split("\n"):
+                    addr_m = ADDR_RE.search(line)
+                    if not addr_m:
+                        continue
+                    out.append(
+                        Listing(
+                            source=self.slug,
+                            source_url=url,
+                            listing_type=ListingType.FORECLOSURE_SALE,
+                            property_kind=PropertyKind.UNKNOWN,
+                            state="SC",
+                            county=county.name,
+                            street_address=addr_m.group(1),
+                            description=line[:300],
+                            first_seen=datetime.utcnow(),
+                            last_seen=datetime.utcnow(),
                         )
                     )
         return out

@@ -46,13 +46,21 @@ class AuctionDotCom(BaseScraper):
         for state in ("SC", "NC"):
             run_input = {
                 "startUrls": [
-                    {"url": f"https://www.auction.com/residential/{state}/"},
-                    {"url": f"https://www.auction.com/residential/{state}/?asset_types=Land"},
-                    {"url": f"https://www.auction.com/commercial/{state}/"},
+                    f"https://www.auction.com/residential/{state}/active_lt/online,in_person,remote_bid,offer_af",
+                    f"https://www.auction.com/residential/{state}/active_lt/online,in_person,remote_bid,offer_af/land_pt",
+                    f"https://www.auction.com/commercial/{state}/active_lt/online,in_person,remote_bid,offer_af",
                 ],
+                "propertyCategory": "residential",
                 "propertyState": state,
-                "maxItems": cap("auction_dot_com", default=400) // 2,  # split across 2 states
-                "proxy": {"useApifyProxy": True},
+                "listingType": "active",
+                "assetEventTypes": ["online", "in_person", "remote_bid", "offer"],
+                "searchLimit": 500,
+                "sort": "auction_date_order,resi_sort_v2",
+                "nearbySearch": False,
+                "requiresAggregation": False,
+                "maxItems": cap("auction_dot_com", default=400) // 2,
+                "maxConcurrency": 5,
+                "proxy": {"useApifyProxy": True, "apifyProxyGroups": ["RESIDENTIAL"]},
             }
             items: list[dict] = []
             for actor in self.actor_candidates:
