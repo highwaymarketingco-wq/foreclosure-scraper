@@ -84,26 +84,7 @@ Go to https://github.com/highwaymarketingco-wq/foreclosure-scraper/settings/secr
 | `EMAIL_RECIPIENTS` | `greghhigh@gmail.com,cashrandolphhigh@gmail.com` |
 | `APIFY_TOKEN` | Token from step 3 |
 
-### Activate the weekly workflow (one-time, 30 seconds)
-
-The workflow file lives at [`setup/weekly_workflow.yml`](setup/weekly_workflow.yml). GitHub requires a token scope (`workflow`) to push files inside `.github/workflows/`, so during initial setup:
-
-**Easiest path: copy-paste via the GitHub web UI.**
-1. Open the repo on GitHub → click the **Actions** tab.
-2. Click **set up a workflow yourself** (or **New workflow** → **Set up a workflow yourself**).
-3. Replace the default contents with the entire contents of [`setup/weekly_workflow.yml`](setup/weekly_workflow.yml).
-4. Name the file `weekly.yml` and click **Commit changes**.
-
-**Or, if you'd rather grant the token scope once:**
-```bash
-gh auth switch --user highwaymarketingco-wq
-gh auth refresh -h github.com -s workflow
-git mv setup/weekly_workflow.yml .github/workflows/weekly.yml
-git commit -am "Add weekly cron workflow"
-git push
-```
-
-That's it. The first scheduled run is the next Monday at 9 AM UTC. To test it sooner, go to **Actions → Weekly Foreclosure Scrape → Run workflow**.
+That's it. The workflow at `.github/workflows/weekly.yml` runs every Monday at 9 AM UTC. To test sooner, go to **Actions → Weekly Foreclosure Scrape → Run workflow**.
 
 ---
 
