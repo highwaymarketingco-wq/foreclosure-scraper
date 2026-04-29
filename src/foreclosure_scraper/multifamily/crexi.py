@@ -1,10 +1,12 @@
-"""Crexi multifamily scraper (via Apify).
+"""Crexi multifamily / apartment-complex listings.
 
-Crexi is the #2 commercial RE marketplace and often surfaces inventory that
-LoopNet misses (especially smaller plexes 5-20 units).
+Uses shahidirfan/crexi-property-scraper (99.5% success, $0.001/result).
+Crexi is the #2 commercial RE marketplace and often has inventory LoopNet
+misses, especially smaller plexes (5-20 units).
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Iterable
 
@@ -13,59 +15,104 @@ from ..base_scraper import BaseScraper
 from ..budget import cap
 from ..models import Listing, ListingType, PropertyKind
 
-ACTOR_ID = "natanielsantos/crexi-scraper"
+ACTOR_ID = "shahidirfan/crexi-property-scraper"
 
-SEED_URLS = [
-    "https://www.crexi.com/properties/states/SC/multifamily",
-    "https://www.crexi.com/properties/states/NC/multifamily",
-]
+# Crexi search URLs by state — multifamily property type filter.
+# Crexi exposes ?propertyTypes=Multifamily as a query parameter.
+SEARCH_URLS = {
+    "SC": "https://www.crexi.com/properties?propertyTypes=Multifamily&states=SC&pageSize=60",
+    "NC": "https://www.crexi.com/properties?propertyTypes=Multifamily&states=NC&pageSize=60",
+}
 
 
-def _to_listing(item: dict) -> Listing | None:
+def _num(v):
+    if v is None or v == "":
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    s = re.sub(r"[^\d.]", "", str(v))
+    try:
+        return float(s) if s else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_crexi_item(it: dict) -> Listing | None:
+    if not isinstance(it, dict):
+        return None
+    href = it.get("url") or it.get("link") or it.get("href")
+    if not href:
+        return None
+    if href.startswith("/"):
+        href = f"https://www.crexi.com{href}"
+
+    addr = it.get("address") or {}
+    if isinstance(addr, str):
+        addr_str = addr
+        addr = {}
+    else:
+        addr_str = ""
+
     return Listing(
         source="multifamily.crexi",
-        source_url=item.get("url") or item.get("link") or "",
+        source_url=href,
         listing_type=ListingType.UNKNOWN,
         property_kind=PropertyKind.MULTI_FAMILY,
-        street_address=item.get("address") or item.get("title"),
-        city=item.get("city"),
-        state=(item.get("state") or "").upper()[:2] or None,
-        zip_code=item.get("zip") or item.get("zipCode"),
-        county=item.get("county"),
-        living_sqft=float(item["sqft"]) if item.get("sqft") else None,
-        year_built=int(item["yearBuilt"]) if item.get("yearBuilt") else None,
-        market_value=float(item["price"]) if item.get("price") else None,
-        description=item.get("description"),
+        street_address=addr.get("street") or addr.get("line1") or addr_str or it.get("title"),
+        city=addr.get("city") or it.get("city"),
+        state=(addr.get("state") or it.get("state") or "").upper()[:2] or None,
+        zip_code=addr.get("zip") or addr.get("zipCode") or addr.get("postalCode"),
+        market_value=_num(it.get("price") or it.get("askingPrice")),
+        living_sqft=_num(it.get("buildingSize") or it.get("sqft") or it.get("squareFeet")),
+        year_built=int(it["yearBuilt"]) if it.get("yearBuilt") and str(it["yearBuilt"]).isdigit() else None,
+        description=(str(it.get("description") or it.get("summary") or it.get("title") or ""))[:500] or None,
+        first_seen=datetime.utcnow(),
         last_seen=datetime.utcnow(),
         raw={
-            "units": item.get("units"),
-            "cap_rate": item.get("capRate"),
-            "raw": item,
+            "crexi": {
+                "title": it.get("title") or it.get("name"),
+                "units": it.get("units") or it.get("numberOfUnits"),
+                "cap_rate": it.get("capRate") or it.get("cap_rate"),
+                "noi": it.get("noi"),
+                "broker": it.get("broker") or it.get("brokerName"),
+                "image": it.get("image") or it.get("imageUrl") or it.get("photo"),
+            },
+            "zillow": {
+                # Surface photo on dashboard (same key the frontend reads)
+                "photo": it.get("image") or it.get("imageUrl") or it.get("photo"),
+                "photos": [it.get("image") or it.get("imageUrl") or it.get("photo")]
+                          if (it.get("image") or it.get("imageUrl") or it.get("photo")) else [],
+            },
         },
     )
 
 
 class CrexiMultifamily(BaseScraper):
     slug = "multifamily.crexi"
-    name = "Crexi (multifamily for-sale)"
+    name = "Crexi Multifamily / Apartment Complexes"
     category = "multifamily"
-    expected_min_count = 15
+    expected_min_count = 3
     requires_apify = True
-    timeout_s = 480.0
+    timeout_s = 240.0
 
     async def fetch(self) -> Iterable[Listing]:
-        max_items = cap("crexi_multifamily", 400)
-        items = await run_actor_sync(
-            ACTOR_ID,
-            {
-                "startUrls": [{"url": u} for u in SEED_URLS],
-                "maxItems": max_items,
-            },
-            timeout_s=360,
-        )
+        max_per_state = cap("crexi_multifamily", default=25)
         out: list[Listing] = []
-        for it in items:
-            li = _to_listing(it)
-            if li and li.source_url:
-                out.append(li)
+        for st, url in SEARCH_URLS.items():
+            run_input = {
+                "startUrl": url,
+                "results_wanted": max_per_state,
+                "max_pages": 2,
+                "proxyConfiguration": {"useApifyProxy": False},
+            }
+            items = await run_actor_sync(
+                ACTOR_ID, run_input, timeout_s=180, estimated_cost_usd=0.10
+            )
+            for it in items:
+                li = _parse_crexi_item(it)
+                if li:
+                    # If Crexi didn't return state, infer from search URL
+                    if not li.state:
+                        li.state = st
+                    out.append(li)
         return out

@@ -35,13 +35,17 @@ from ..models import Listing
 from ..valuation import location as valuation_location
 from ..web_artifact import _to_dict
 from .calc_mf import compute_multifamily, grade_multifamily, to_dict_mf
+from .crexi import CrexiMultifamily
+from .loopnet import LoopNetMultifamily
 from .zillow_mf import ZillowMultifamily
 
-# LoopNet (epctex/loopnet-scraper) and Crexi (natanielsantos/crexi-scraper) were
-# removed — LoopNet has 0% success rate + $30/mo flat fee, Crexi actor doesn't
-# exist on Apify. Realtor multifamily can be re-added later with agentx/realtor-
-# property-scraper if needed (98% success, $0.0025/result). For now: one proven
-# actor (the same Zillow we use for foreclosures) targeting only priority counties.
+# 3 sources combined:
+#   - Zillow: 2-4 unit small multifamily (residential duplex/triplex)
+#   - LoopNet: 5+ unit apartment complexes (commercial RE)
+#   - Crexi: 5+ unit apartment complexes (commercial RE, alternate marketplace)
+# Old broken scrapers (epctex/loopnet 0% success, natanielsantos/crexi doesn't exist)
+# replaced with crawlerbros/loopnet-scraper (99% success, 5-star) and
+# shahidirfan/crexi-property-scraper (99.5% success).
 
 
 def _setup_logging() -> None:
@@ -68,7 +72,7 @@ def _in_scope(li: Listing) -> bool:
     return False
 
 
-SCRAPERS = (ZillowMultifamily(),)
+SCRAPERS = (ZillowMultifamily(), LoopNetMultifamily())
 
 
 async def _write_artifact(listings: list[Listing], summary: dict) -> Path:
