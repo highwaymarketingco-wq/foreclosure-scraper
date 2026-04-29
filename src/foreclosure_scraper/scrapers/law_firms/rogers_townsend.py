@@ -46,19 +46,27 @@ def _parse_sc_pdf_with_pdfplumber(data: bytes, slug: str) -> list[Listing]:
     """SC PDF: 7-column tabular list. Use pdfplumber for structured row extraction.
     Columns: County | Street Address | City | Tax Map No. | Sale Date | DJ Demand | Bid
     """
+    import structlog
+    log = structlog.get_logger()
     out: list[Listing] = []
     try:
         pdf = pdfplumber.open(io.BytesIO(data))
-    except Exception:
+        log.info("rt.pdf.open", pages=len(pdf.pages), bytes=len(data))
+    except Exception as exc:
+        log.warning("rt.pdf.open_failed", error=str(exc)[:120], bytes=len(data))
         return out
 
     last_county = None
-    for page in pdf.pages:
+    total_rows = 0
+    for page_idx, page in enumerate(pdf.pages):
         try:
             tables = page.extract_tables() or []
-        except Exception:
+        except Exception as exc:
+            log.warning("rt.pdf.extract_failed", page=page_idx, error=str(exc)[:80])
             continue
+        log.info("rt.pdf.page", page=page_idx, tables=len(tables))
         for table in tables:
+            total_rows += len(table)
             for row in table:
                 if not row or len(row) < 5:
                     continue
@@ -110,6 +118,7 @@ def _parse_sc_pdf_with_pdfplumber(data: bytes, slug: str) -> list[Listing]:
                     )
                 )
     pdf.close()
+    log.info("rt.pdf.parsed", total_rows=total_rows, listings_extracted=len(out))
     return out
 
 
