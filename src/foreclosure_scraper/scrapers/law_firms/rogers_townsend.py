@@ -1,6 +1,6 @@
-"""Rogers Townsend — direct PDF + HTML fetches.
+"""Rogers Townsend — direct PDF + HTML fetches via pdfplumber for structured tables.
 
-SC report: clean PDF table.
+SC report: clean PDF table parsed via pdfplumber.extract_tables().
 NC report: 'NC_Listings.pdf' is actually served as HTML despite the .pdf extension.
 """
 from __future__ import annotations
@@ -10,6 +10,7 @@ import re
 from datetime import datetime
 from typing import Iterable
 
+import pdfplumber
 from dateutil import parser as dateparser
 from selectolax.parser import HTMLParser
 
@@ -41,67 +42,74 @@ def _extract_pdf_text(data: bytes) -> str:
         return ""
 
 
-def _parse_sc_pdf(text: str, slug: str) -> list[Listing]:
-    """SC PDF is a tabular list: County | Address | City | Tax Map | Sale Date | DJ Demand | Bid"""
+def _parse_sc_pdf_with_pdfplumber(data: bytes, slug: str) -> list[Listing]:
+    """SC PDF: 7-column tabular list. Use pdfplumber for structured row extraction.
+    Columns: County | Street Address | City | Tax Map No. | Sale Date | DJ Demand | Bid
+    """
     out: list[Listing] = []
+    try:
+        pdf = pdfplumber.open(io.BytesIO(data))
+    except Exception:
+        return out
+
     last_county = None
-    # Each row is split across newlines; we look for sale-date pattern as the row anchor
-    lines = text.split("\n")
-    for i, line in enumerate(lines):
-        line = line.strip()
-        if not line:
-            continue
-        date_m = DATE_RE.search(line)
-        if not date_m:
-            continue
-        # Sale date found — parse it
+    for page in pdf.pages:
         try:
-            sale_date = dateparser.parse(date_m.group(0))
-        except (ValueError, TypeError):
+            tables = page.extract_tables() or []
+        except Exception:
             continue
+        for table in tables:
+            for row in table:
+                if not row or len(row) < 5:
+                    continue
+                # Skip header row
+                if (row[0] or "").strip().lower() == "county":
+                    continue
+                county = (row[0] or "").strip() or last_county
+                if county:
+                    last_county = county
+                street = (row[1] or "").strip() or None
+                city = (row[2] or "").strip() or None
+                parcel = (row[3] or "").strip() or None
+                date_raw = (row[4] or "").strip()
+                bid_raw = (row[6] or "").strip() if len(row) > 6 else ""
 
-        # Look at a few lines around this for structured data
-        ctx = " | ".join(lines[max(0, i - 4) : i + 2])
-        addr_m = ADDR_RE.search(ctx)
-        parcel_m = PARCEL_RE.search(ctx)
-        # County: first capitalized word at start of context (carries from previous row if blank)
-        county = None
-        for tok in ctx.split():
-            if tok and tok[0].isupper() and tok.isalpha() and len(tok) > 3 and tok not in ("State", "South", "North", "Carolina"):
-                county = tok
-                break
-        if not county:
-            county = last_county
-        else:
-            last_county = county
+                if not date_raw or not street:
+                    continue
 
-        # Bid amount near end of row
-        bid = None
-        bm = re.search(r"\$\s*([\d,]+\.?\d*)", ctx)
-        if bm:
-            try:
-                bid = float(bm.group(1).replace(",", ""))
-            except ValueError:
-                pass
+                sale_date = None
+                try:
+                    sale_date = dateparser.parse(date_raw)
+                except (ValueError, TypeError):
+                    continue
 
-        out.append(
-            Listing(
-                source=slug,
-                source_url=SC_URL,
-                listing_type=ListingType.FORECLOSURE_SALE,
-                property_kind=PropertyKind.UNKNOWN,
-                street_address=addr_m.group(1) if addr_m else None,
-                state="SC",
-                county=county,
-                parcel_id=parcel_m.group(0) if parcel_m else None,
-                sale_date=sale_date,
-                opening_bid=bid,
-                trustee="Rogers Townsend",
-                description=ctx[:400],
-                first_seen=datetime.utcnow(),
-                last_seen=datetime.utcnow(),
-            )
-        )
+                bid = None
+                bm = re.search(r"\$?\s*([\d,]+(?:\.\d{2})?)", bid_raw)
+                if bm and bm.group(1):
+                    try:
+                        bid = float(bm.group(1).replace(",", ""))
+                    except ValueError:
+                        pass
+
+                out.append(
+                    Listing(
+                        source=slug,
+                        source_url=SC_URL,
+                        listing_type=ListingType.FORECLOSURE_SALE,
+                        property_kind=PropertyKind.UNKNOWN,
+                        street_address=street,
+                        city=city,
+                        state="SC",
+                        county=county,
+                        parcel_id=parcel,
+                        sale_date=sale_date,
+                        opening_bid=bid,
+                        trustee="Rogers Townsend",
+                        first_seen=datetime.utcnow(),
+                        last_seen=datetime.utcnow(),
+                    )
+                )
+    pdf.close()
     return out
 
 
@@ -164,11 +172,8 @@ class RogersTownsend(BaseScraper):
             # SC: real PDF
             try:
                 r = await c.get(SC_URL)
-                if r.status_code == 200:
-                    if "pdf" in r.headers.get("content-type", "").lower() or r.content[:4] == b"%PDF":
-                        text = _extract_pdf_text(r.content)
-                        if text:
-                            out.extend(_parse_sc_pdf(text, self.slug))
+                if r.status_code == 200 and r.content[:4] == b"%PDF":
+                    out.extend(_parse_sc_pdf_with_pdfplumber(r.content, self.slug))
             except Exception:
                 pass
             # NC: served as HTML even though .pdf extension
