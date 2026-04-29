@@ -1,4 +1,20 @@
-"""Spartanburg County SC Master in Equity — direct PDF View ID 3392."""
+"""Spartanburg County SC Master in Equity — PDF roster from county Document Center.
+
+The county updates `/DocumentCenter/View/3392` each month with the upcoming
+sale roster (PDF). Each row has:
+  - Status column (Final / Def. Sale / blank=active)
+  - Case # (e.g. "25-3616")
+  - Attorney firm
+  - Plaintiff (lender)
+  - Defendant (current owner)
+  - Bid amount + winning bidder (when sold)
+  - Cancellation marker ("√")
+  - Property address (next line, indented)
+
+We use pdfplumber rather than pypdf because pypdf flattens multi-column tables
+and we lose row boundaries — verified locally that pdfplumber.extract_tables()
+recovers all 25-30 rows per monthly PDF.
+"""
 from __future__ import annotations
 
 import io
@@ -20,7 +36,8 @@ PDF_URLS = (
 CASE_RE = re.compile(r"\b\d{2,4}-\d{3,5}\b")
 ADDR_RE = re.compile(
     r"(\d+\s+[A-Z][\w .'\-]+(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
-    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\.?)",
+    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy|"
+    r"Real)\.?)",
     re.I,
 )
 SALE_DATE_RE = re.compile(
@@ -29,18 +46,112 @@ SALE_DATE_RE = re.compile(
     re.I,
 )
 BID_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
+CANCEL_RE = re.compile(r"(√|✓|cancelled|withdrawn|WD\b)", re.I)
 
 
-def _extract_pdf_text(data: bytes) -> str:
+def _parse_pdf_tables(data: bytes, source_url: str) -> list[Listing]:
+    """Use pdfplumber.extract_tables() — preserves the 9-column row structure:
+       [#, Status, Case#, Attorney, Plaintiff, Defendant+Address, Bid, BidBy, Cancelled]
+    """
+    out: list[Listing] = []
     try:
-        from pypdf import PdfReader
+        import pdfplumber
     except ImportError:
-        return ""
+        return out
     try:
-        reader = PdfReader(io.BytesIO(data))
-        return "\n".join((p.extract_text() or "") for p in reader.pages)
+        with pdfplumber.open(io.BytesIO(data)) as pdf:
+            full_text = "\n".join((p.extract_text() or "") for p in pdf.pages)
+            doc_sale_date = None
+            sd_m = SALE_DATE_RE.search(full_text)
+            if sd_m:
+                try:
+                    doc_sale_date = dateparser.parse(sd_m.group(1))
+                except (ValueError, TypeError):
+                    pass
+
+            today = datetime.utcnow()
+            horizon = today + timedelta(days=120)
+            cutoff = today - timedelta(days=2)
+            if doc_sale_date and not (cutoff <= doc_sale_date <= horizon):
+                return []
+
+            seen: set[str] = set()
+            for page in pdf.pages:
+                for table in page.extract_tables() or []:
+                    for row in table:
+                        if not row or len(row) < 7:
+                            continue
+                        # Skip header row
+                        joined = " ".join(c or "" for c in row).lower()
+                        if "case #" in joined or "attorney" in joined and "plaintiff" in joined:
+                            continue
+                        # Detect cancelled marker in any cell
+                        if any("√" in (c or "") or "✓" in (c or "") for c in row):
+                            continue
+
+                        # Status, Case#, Attorney, Plaintiff, Defendant+Addr, Bid, BidBy
+                        status = (row[1] or "").strip()
+                        case = (row[2] or "").strip()
+                        attorney = (row[3] or "").strip()
+                        plaintiff = (row[4] or "").strip()
+                        def_addr = (row[5] or "").strip()
+                        bid_str = (row[6] or "").strip() if len(row) > 6 else ""
+
+                        if not case or not CASE_RE.search(case):
+                            continue
+                        case_clean = CASE_RE.search(case).group(0)
+                        if case_clean in seen:
+                            continue
+                        seen.add(case_clean)
+
+                        # Defendant column = "Last, First\n<address>"
+                        defendant = None
+                        address = None
+                        if def_addr:
+                            lines = def_addr.split("\n")
+                            defendant = lines[0].strip() if lines else None
+                            if len(lines) > 1:
+                                address = lines[1].strip()
+                                # Address may include city: "144 Southland Ave., Boiling Springs"
+                                # Keep full string; downstream GIS enrichment handles the city.
+
+                        bid = None
+                        bm = BID_RE.search(bid_str)
+                        if bm:
+                            try:
+                                bid = float(bm.group(1).replace(",", ""))
+                            except ValueError:
+                                pass
+
+                        out.append(
+                            Listing(
+                                source="counties_sc.spartanburg_master_in_equity",
+                                source_url=source_url,
+                                listing_type=ListingType.FORECLOSURE_SALE,
+                                property_kind=PropertyKind.UNKNOWN,
+                                street_address=address,
+                                state="SC",
+                                county="Spartanburg",
+                                case_number=case_clean,
+                                plaintiff=plaintiff or None,
+                                defendant=defendant,
+                                sale_date=doc_sale_date,
+                                opening_bid=bid,
+                                description=def_addr[:500],
+                                auction_status=status.lower() if status else "active",
+                                first_seen=datetime.utcnow(),
+                                last_seen=datetime.utcnow(),
+                                raw={"spartanburg_pdf": {
+                                    "status": status,
+                                    "attorney": attorney,
+                                    "bid_by": (row[7] or "").strip() if len(row) > 7 else None,
+                                    "doc_sale_date": doc_sale_date.isoformat() if doc_sale_date else None,
+                                }},
+                            )
+                        )
     except Exception:
-        return ""
+        pass
+    return out
 
 
 class SpartanburgMasterInEquity(BaseScraper):
@@ -52,82 +163,13 @@ class SpartanburgMasterInEquity(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
-        today = datetime.utcnow()
-        horizon = today + timedelta(days=120)
-        cutoff = today - timedelta(days=2)
-
         async with client(timeout=45.0) as c:
             for url in PDF_URLS:
                 try:
-                    r = await c.get(url)
+                    r = await c.get(url, headers={"User-Agent": "Mozilla/5.0"})
                     if r.status_code != 200 or r.content[:4] != b"%PDF":
                         continue
-                    text = _extract_pdf_text(r.content)
                 except Exception:
                     continue
-                if not text:
-                    continue
-
-                # Document-level sale date
-                doc_sale_date = None
-                sd_m = SALE_DATE_RE.search(text)
-                if sd_m:
-                    try:
-                        doc_sale_date = dateparser.parse(sd_m.group(1))
-                    except (ValueError, TypeError):
-                        pass
-
-                # Detect "cancelled" rows: column with a check mark or "WD" annotation
-                cancelled_indicator = re.compile(r"(✓|cancelled|withdrawn|WD\b)", re.I)
-
-                # Each row anchored on case number
-                chunks = re.split(r"(?=\b\d{2,4}-\d{3,5}\b)", text)
-                for chunk in chunks:
-                    chunk = chunk.strip()
-                    if len(chunk) < 30:
-                        continue
-                    if cancelled_indicator.search(chunk):
-                        continue
-                    case_m = CASE_RE.search(chunk)
-                    if not case_m:
-                        continue
-                    addr_m = ADDR_RE.search(chunk)
-
-                    # Plaintiff v. Defendant
-                    plaintiff = defendant = None
-                    pvd = re.search(r"([A-Z][\w &.,'-]{3,80}?)\s+v\.\s+([A-Z][\w &.,'-]{3,80})", chunk)
-                    if pvd:
-                        plaintiff = pvd.group(1).strip()
-                        defendant = pvd.group(2).strip().split("\n")[0]
-
-                    bid = None
-                    bm = BID_RE.search(chunk)
-                    if bm:
-                        try:
-                            bid = float(bm.group(1).replace(",", ""))
-                        except ValueError:
-                            pass
-
-                    if doc_sale_date and not (cutoff <= doc_sale_date <= horizon):
-                        continue
-
-                    out.append(
-                        Listing(
-                            source=self.slug,
-                            source_url=url,
-                            listing_type=ListingType.FORECLOSURE_SALE,
-                            property_kind=PropertyKind.UNKNOWN,
-                            street_address=addr_m.group(1) if addr_m else None,
-                            state="SC",
-                            county="Spartanburg",
-                            case_number=case_m.group(0),
-                            plaintiff=plaintiff,
-                            defendant=defendant,
-                            sale_date=doc_sale_date,
-                            opening_bid=bid,
-                            description=chunk[:500],
-                            first_seen=datetime.utcnow(),
-                            last_seen=datetime.utcnow(),
-                        )
-                    )
+                out.extend(_parse_pdf_tables(r.content, url))
         return out
