@@ -17,6 +17,7 @@ from .email_sender import send_digest
 from .enrichment import enrich
 from .enrichment_arcgis import enrich as enrich_gis
 from .enrichment_courts import discover_lis_pendens, enrich_with_court_records
+from .enrichment_geocode import enrich as enrich_geocode
 from .flags import compute_flags
 from .link_validator import validate
 from .models import Listing
@@ -182,6 +183,13 @@ async def run() -> int:
     # negative_equity, plus keyword flags from descriptions
     compute_flags(enriched)
     log.info("orchestrator.flagged", count=len(enriched))
+
+    # Geocoding fallback — fills lat/lng for any listing the county GIS didn't
+    # return geometry for. Rate-limited per Nominatim's policy.
+    try:
+        await enrich_geocode(enriched)
+    except Exception:
+        log.error("geocode.failed", traceback=traceback.format_exc())
 
     # Census ACS location enrichment (free, dedup'd by ZIP) — fills neighborhood
     # signals for the location grade (median HH income, home value, owner pct).

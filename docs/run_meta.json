@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-04-29T02:46:47.282331Z",
+  "run_time": "2026-04-29T03:04:00.073150Z",
   "total": 204,
   "by_source": {
     "national.auction_dot_com": 0,
@@ -37,8 +37,8 @@
     "courts.lis_pendens_discovery": 0
   },
   "by_state": {
-    "NC": 89,
-    "SC": 115
+    "SC": 115,
+    "NC": 89
   },
   "by_county_top": [
     [
@@ -94,11 +94,11 @@
       3
     ],
     [
-      "Cabarrus, NC",
+      "Iredell, NC",
       3
     ],
     [
-      "Iredell, NC",
+      "Cabarrus, NC",
       3
     ]
   ],

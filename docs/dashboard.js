@@ -258,10 +258,16 @@ function renderCards() {
     .map((l, i) => {
       const g = getGrade(l);
       const c = getCalc(l) || {};
-      const photo =
-        l.raw && l.raw.zillow && l.raw.zillow.photo
-          ? `<div class="card-img" style="background-image:url('${l.raw.zillow.photo}')"></div>`
-          : `<div class="card-img no-photo">🏠</div>`;
+      // Photo: prefer Zillow photo, fall back to OSM static map at the listing's coords
+      let photo;
+      if (l.raw && l.raw.zillow && l.raw.zillow.photo) {
+        photo = `<div class="card-img" style="background-image:url('${l.raw.zillow.photo}')"></div>`;
+      } else if (l.latitude && l.longitude) {
+        const staticUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${l.latitude},${l.longitude}&zoom=17&size=400x250&markers=${l.latitude},${l.longitude},red-pushpin`;
+        photo = `<div class="card-img" style="background-image:url('${staticUrl}')"></div>`;
+      } else {
+        photo = `<div class="card-img no-photo">🏠</div>`;
+      }
       const meta = [];
       if (l.bedrooms) meta.push(`${l.bedrooms} bd`);
       if (l.bathrooms) meta.push(`${l.bathrooms} ba`);

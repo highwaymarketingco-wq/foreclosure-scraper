@@ -218,7 +218,11 @@ async def _arcgis_query(
     street: str,
     house_no: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Run an address LIKE query, auto-detecting the address field if needed."""
+    """Run an address LIKE query, auto-detecting the address field if needed.
+
+    Returns list of dicts with both 'attributes' and a derived '_centroid' (lat,lng)
+    when geometry is available.
+    """
     if not addr_field:
         addr_field = await _detect_addr_field(c, base_url)
     if not addr_field:
@@ -237,7 +241,8 @@ async def _arcgis_query(
         params = {
             "where": where,
             "outFields": "*",
-            "returnGeometry": "false",
+            "returnGeometry": "true",          # need centroid for map markers
+            "outSR": "4326",                    # request WGS84 lat/lng directly
             "resultRecordCount": "8",
             "f": "json",
         }
@@ -248,9 +253,24 @@ async def _arcgis_query(
             data = r.json()
             if "error" in data:
                 continue
-            features = [f.get("attributes", {}) for f in data.get("features", [])]
-            if features:
-                return features
+            out: list[dict[str, Any]] = []
+            for f in data.get("features", []):
+                attrs = dict(f.get("attributes", {}) or {})
+                # Centroid from polygon rings or point geometry
+                geom = f.get("geometry") or {}
+                cx = cy = None
+                if "x" in geom and "y" in geom:
+                    cx, cy = geom["x"], geom["y"]
+                elif geom.get("rings"):
+                    pts = [p for ring in geom["rings"] for p in ring]
+                    if pts:
+                        cx = sum(p[0] for p in pts) / len(pts)
+                        cy = sum(p[1] for p in pts) / len(pts)
+                if cx is not None and cy is not None:
+                    attrs["_centroid"] = (cy, cx)  # (lat, lng) — outSR=4326 returns lng,lat
+                out.append(attrs)
+            if out:
+                return out
         except (httpx.HTTPError, ValueError):
             continue
     return []
@@ -269,6 +289,15 @@ def _apply_attrs(li: Listing, attrs: dict[str, Any]) -> int:
         if cur in (None, "", 0):
             setattr(li, field, val)
             filled += 1
+
+    # Coordinates (centroid of parcel polygon if we got geometry)
+    centroid = attrs.get("_centroid")
+    if centroid and not li.latitude and not li.longitude:
+        try:
+            li.latitude, li.longitude = float(centroid[0]), float(centroid[1])
+            filled += 2
+        except (ValueError, TypeError):
+            pass
 
     parcel_id = _pick(attrs, FIELD_ALIASES["parcel_id"])
     if parcel_id:
