@@ -12,6 +12,9 @@ import structlog
 log = structlog.get_logger()
 
 
+DASHBOARD_URL = "https://highwaymarketingco-wq.github.io/foreclosure-scraper/"
+
+
 def _summary_html(sheet_url: str, run_summary: dict) -> str:
     by_source = run_summary.get("by_source", {})
     by_state = run_summary.get("by_state", {})
@@ -35,30 +38,38 @@ def _summary_html(sheet_url: str, run_summary: dict) -> str:
         for c, n in by_county_top
     )
 
+    sheet_link = f'<a href="{sheet_url}" style="color:#1a4d2e;text-decoration:none">Open in Google Sheet →</a>' if sheet_url else ""
     return f"""
 <html>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; color:#222">
-<h2 style="color:#1a4d2e">Weekly Foreclosure Listings</h2>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; color:#222; max-width:680px;margin:0 auto;padding:20px;">
+<h2 style="color:#1a4d2e">Foreclosure Listings — {datetime.utcnow().strftime('%B %Y')}</h2>
 <p>Run completed {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}.</p>
-<p><strong>{total}</strong> active listings this week ({new_count} new since last run).</p>
-<p><a href="{sheet_url}" style="background:#1a4d2e;color:#fff;padding:10px 18px;text-decoration:none;border-radius:4px;display:inline-block">Open Listings Sheet</a></p>
-
-<h3>By State</h3>
+<p style="font-size:18px"><strong>{total}</strong> active listings across upstate SC + western NC.</p>
+<p>
+  <a href="{DASHBOARD_URL}" style="background:#1a4d2e;color:#fff;padding:14px 22px;text-decoration:none;border-radius:6px;display:inline-block;font-weight:600;font-size:15px">
+    🏠 Open the live dashboard
+  </a>
+</p>
+<p style="color:#888;font-size:12px;margin-top:8px">
+  Filterable, mappable, with photos. Bookmark the link — it updates each month.
+  {sheet_link}
+</p>
+<hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+<h3 style="color:#1a4d2e">By State</h3>
 <table style="border-collapse:collapse;border:1px solid #ddd">{rows_state}</table>
 
-<h3>Top Counties</h3>
+<h3 style="color:#1a4d2e">Top Counties</h3>
 <table style="border-collapse:collapse;border:1px solid #ddd">{rows_county}</table>
 
-<h3>By Source</h3>
+<h3 style="color:#1a4d2e">By Source</h3>
 <table style="border-collapse:collapse;border:1px solid #ddd">{rows_source}</table>
 
 <p style="color:#888;font-size:12px;margin-top:24px">
-Auto-generated. Every link in the Sheet was reachability-checked at run time.
+Auto-generated. Every link in the dashboard was reachability-checked at run time. Data is public record.
 </p>
 </body>
 </html>
 """
-
 
 def send_digest(
     *,

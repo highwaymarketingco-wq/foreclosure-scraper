@@ -22,6 +22,7 @@ from .link_validator import validate
 from .models import Listing
 from .scrapers._registry import all_scrapers
 from .sheets import write_listings
+from .web_artifact import write_artifact
 
 
 def _setup_logging() -> None:
@@ -207,6 +208,13 @@ async def run() -> int:
         "source_status": source_status,
         "notes": f"horizon={cfg.sale_horizon_days}d, scrapers={len(scrapers)}, regressions={len(regressions)}",
     }
+
+    # Web artifact — always write, even when Sheets/Email secrets are missing.
+    # GitHub Actions then commits docs/ back to the repo, GitHub Pages serves it.
+    try:
+        write_artifact(enriched, summary)
+    except Exception:
+        log.error("web_artifact.failed", traceback=traceback.format_exc())
 
     # Sheets + Email — guarded so a missing secret doesn't kill the rest of the run
     sheet_url = ""

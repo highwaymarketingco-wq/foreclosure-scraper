@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Foreclosure Listings — Upstate SC + Western NC</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏠</text></svg>">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <span class="brand-logo">🏠</span>
+    <div>
+      <h1>Foreclosure Listings</h1>
+      <div class="subtitle">Upstate SC <span class="dot">·</span> Western NC <span class="dot">·</span> <span id="last-updated">loading…</span></div>
+    </div>
+  </div>
+  <div class="brand-meta">
+    <span class="badge" id="total-badge">— total</span>
+    <span class="badge" id="active-badge">— active sales</span>
+  </div>
+</header>
+
+<section class="stats">
+  <div class="stat"><div class="stat-num" id="stat-total">—</div><div class="stat-lbl">total listings</div></div>
+  <div class="stat"><div class="stat-num" id="stat-sc">—</div><div class="stat-lbl">SC</div></div>
+  <div class="stat"><div class="stat-num" id="stat-nc">—</div><div class="stat-lbl">NC</div></div>
+  <div class="stat"><div class="stat-num" id="stat-with-bid">—</div><div class="stat-lbl">with bid</div></div>
+  <div class="stat"><div class="stat-num" id="stat-with-photos">—</div><div class="stat-lbl">with property data</div></div>
+  <div class="stat"><div class="stat-num" id="stat-sources">—</div><div class="stat-lbl">sources</div></div>
+</section>
+
+<section class="filters">
+  <div class="filter-group">
+    <label>Search</label>
+    <input type="text" id="search" placeholder="address, county, owner, case #, plaintiff…" />
+  </div>
+  <div class="filter-group">
+    <label>State</label>
+    <select id="filter-state">
+      <option value="">All</option>
+      <option value="SC">SC</option>
+      <option value="NC">NC</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>County</label>
+    <select id="filter-county"><option value="">All counties</option></select>
+  </div>
+  <div class="filter-group">
+    <label>Type</label>
+    <select id="filter-type">
+      <option value="">All types</option>
+      <option value="foreclosure_sale">Foreclosure sale</option>
+      <option value="auction">Auction</option>
+      <option value="tax_sale">Tax sale</option>
+      <option value="lis_pendens">Lis pendens</option>
+      <option value="reo">REO / bank-owned</option>
+      <option value="sheriff_sale">Sheriff sale</option>
+      <option value="tax_lien">Tax lien</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Sale within</label>
+    <select id="filter-window">
+      <option value="">Any time</option>
+      <option value="14">Next 2 weeks</option>
+      <option value="30">Next 30 days</option>
+      <option value="60">Next 60 days</option>
+      <option value="90">Next 90 days</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>View</label>
+    <div class="view-toggle">
+      <button class="view-btn active" data-view="table">Table</button>
+      <button class="view-btn" data-view="map">Map</button>
+      <button class="view-btn" data-view="cards">Cards</button>
+    </div>
+  </div>
+</section>
+
+<main>
+  <div id="view-table" class="view active">
+    <div class="result-bar">
+      <span id="result-count">Loading…</span>
+      <button id="export-csv" class="btn-link">Export filtered as CSV</button>
+    </div>
+    <div class="table-wrap">
+      <table id="listings-table">
+        <thead><tr>
+          <th data-sort="sale_date">Sale Date</th>
+          <th data-sort="state">St</th>
+          <th data-sort="county">County</th>
+          <th data-sort="street_address">Address</th>
+          <th data-sort="city">City</th>
+          <th data-sort="listing_type">Type</th>
+          <th data-sort="opening_bid" class="num">Opening Bid</th>
+          <th data-sort="market_value" class="num">Zestimate</th>
+          <th data-sort="tax_value" class="num">Tax Value</th>
+          <th data-sort="bedrooms" class="num">Beds</th>
+          <th data-sort="bathrooms" class="num">Baths</th>
+          <th data-sort="living_sqft" class="num">SqFt</th>
+          <th data-sort="year_built" class="num">Year</th>
+          <th data-sort="case_number">Case #</th>
+          <th data-sort="source">Source</th>
+        </tr></thead>
+        <tbody id="listings-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="view-map" class="view">
+    <div id="map"></div>
+  </div>
+
+  <div id="view-cards" class="view">
+    <div id="cards-grid"></div>
+  </div>
+</main>
+
+<aside id="detail-panel" class="hidden">
+  <div class="detail-header">
+    <button class="close-btn" id="close-detail">×</button>
+    <h2 id="d-title">—</h2>
+    <div class="address-line" id="d-address">—</div>
+  </div>
+  <div class="detail-body">
+    <div class="detail-grid" id="d-grid"></div>
+    <div id="d-photos" class="photos"></div>
+    <div id="d-map" class="mini-map"></div>
+    <div class="detail-section">
+      <h3>Source link</h3>
+      <a id="d-source-url" target="_blank" rel="noopener">Open original listing →</a>
+    </div>
+    <div class="detail-section" id="d-flags-section" style="display:none">
+      <h3>Flags</h3>
+      <div id="d-flags"></div>
+    </div>
+    <div class="detail-section" id="d-court-section" style="display:none">
+      <h3>Court record</h3>
+      <div id="d-court"></div>
+    </div>
+    <div class="detail-section" id="d-gis-section" style="display:none">
+      <h3>County records</h3>
+      <div id="d-gis"></div>
+    </div>
+  </div>
+</aside>
+
+<footer>
+  <div>Updated each month from <strong id="run-source-count">—</strong> public sources. Data is public record.</div>
+  <div>Sources include county Master in Equity, Register of Deeds, NC eCourts, SC Public Index, Auction.com, HUD, law-firm trustee calendars, and newspaper legal notices.</div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="dashboard.js"></script>
+
+</body>
+</html>
