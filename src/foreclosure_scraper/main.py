@@ -182,8 +182,13 @@ async def run() -> int:
 
     # Zillow per-address detail enrichment (Apify) — fills photos, zestimate,
     # description, plus anything county GIS missed.
-    enriched = await enrich(enriched)
-    log.info("orchestrator.zillow_enriched", count=len(enriched))
+    # Wrap in try/except so a Zillow enrichment crash doesn't lose the listings
+    # we already collected + GIS-enriched (the artifact write is downstream).
+    try:
+        enriched = await enrich(enriched)
+        log.info("orchestrator.zillow_enriched", count=len(enriched))
+    except Exception:
+        log.error("zillow_enrich.failed", traceback=traceback.format_exc())
 
     # Computed flags from enriched data: absentee_owner, high_equity, vacant,
     # negative_equity, plus keyword flags from descriptions

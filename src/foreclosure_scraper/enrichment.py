@@ -225,7 +225,10 @@ async def enrich(listings: list[Listing]) -> list[Listing]:
         and li.zip_code or (li.city and li.state)
         and li.property_kind not in (PropertyKind.LAND,)  # land has no Zillow detail anyway
     ]
-    candidates.sort(key=lambda li: (-(li.opening_bid or 0), li.sale_date or 0))
+    # Sort: highest bid first, then soonest sale date. Use datetime.min for missing
+    # dates so the sort is stable across date/None mix.
+    from datetime import datetime as _dt
+    candidates.sort(key=lambda li: (-(li.opening_bid or 0), li.sale_date or _dt.max))
     candidates = candidates[:budget]
 
     if not candidates or not token:
