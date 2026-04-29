@@ -1,16 +1,15 @@
 {
-  "run_time": "2026-04-29T02:20:29.302180Z",
-  "total": 1,
+  "run_time": "2026-04-29T02:39:05.045162Z",
+  "total": 4,
   "by_source": {
-    "test": 1
+    "test.fixture": 4
   },
   "by_state": {
-    "NC": 1
+    "SC": 1,
+    "NC": 3
   },
   "by_county_top": [],
-  "source_status": {
-    "test": "OK (1)"
-  },
+  "source_status": {},
   "regressions": [],
   "errors": [],
   "notes": ""

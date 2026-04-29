@@ -25,6 +25,10 @@ RAW_KEEP = {
                "livingArea", "lotSize", "taxAssessedValue", "description", "photo", "photos"),
     "flags": "*",
     "assessment": "*",
+    "calc": "*",      # ARV / rehab / max_bid / ROI / cash-on-cash
+    "grade": "*",     # A-F per-dimension + overall
+    "location": ("median_household_income", "median_home_value",
+                 "owner_occupied_pct", "unemployment_pct"),
 }
 
 

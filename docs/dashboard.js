@@ -3,13 +3,18 @@
 let LISTINGS = [];
 let META = {};
 let filtered = [];
-let sortKey = "sale_date";
-let sortDir = "asc";
+let sortKey = "_grade";
+let sortDir = "desc";  // best grades first
 let map = null;
 let mapMarkers = null;
 let detailMap = null;
 
 const $ = (id) => document.getElementById(id);
+
+// Helpers to read calc + grade
+const getGrade = (l) => (l.raw && l.raw.grade) || null;
+const getCalc = (l) => (l.raw && l.raw.calc) || null;
+const gradeOrder = { A: 5, B: 4, C: 3, D: 2, F: 1 };
 
 // ------------- Load data -----------------------------------------------------
 async function loadData() {
@@ -38,14 +43,30 @@ async function loadData() {
 // ------------- Stats ---------------------------------------------------------
 function fillStats() {
   $("stat-total").textContent = LISTINGS.length;
-  $("stat-sc").textContent = LISTINGS.filter((l) => l.state === "SC").length;
-  $("stat-nc").textContent = LISTINGS.filter((l) => l.state === "NC").length;
-  $("stat-with-bid").textContent = LISTINGS.filter((l) => l.opening_bid).length;
-  $("stat-with-photos").textContent = LISTINGS.filter((l) => l.year_built || l.bedrooms || l.living_sqft).length;
+  const byGrade = { A: 0, B: 0, C: 0, D: 0, F: 0 };
+  let posRoi = 0, withBid = 0;
+  LISTINGS.forEach((l) => {
+    const g = getGrade(l);
+    if (g && g.overall) byGrade[g.overall] = (byGrade[g.overall] || 0) + 1;
+    const c = getCalc(l);
+    if (c && c.roi_pct != null && c.roi_pct > 0) posRoi += 1;
+    if (l.opening_bid) withBid += 1;
+  });
+  $("stat-a").textContent = byGrade.A;
+  $("stat-b").textContent = byGrade.B;
+  $("stat-c").textContent = byGrade.C;
+  $("stat-positive-roi").textContent = posRoi;
+  $("stat-with-bid").textContent = withBid;
   const sources = new Set(LISTINGS.map((l) => l.source).filter(Boolean));
   $("stat-sources").textContent = sources.size;
+
   $("total-badge").textContent = `${LISTINGS.length} total`;
-  $("active-badge").textContent = `${LISTINGS.filter((l) => l.sale_date).length} with sale dates`;
+  $("active-badge").textContent = `${withBid} priced`;
+  if (byGrade.A > 0) {
+    const a = $("a-grade-badge");
+    a.style.display = "inline-block";
+    a.textContent = `${byGrade.A} A-grade`;
+  }
   $("last-updated").textContent = META.run_time
     ? `Updated ${new Date(META.run_time).toLocaleString()}`
     : "Updated recently";
@@ -66,7 +87,7 @@ function initFilters() {
       sel.appendChild(opt);
     });
 
-  ["search", "filter-state", "filter-county", "filter-type", "filter-window"].forEach((id) =>
+  ["search", "filter-state", "filter-county", "filter-type", "filter-grade", "filter-window", "filter-roi"].forEach((id) =>
     $(id).addEventListener("input", applyFilters),
   );
 
@@ -99,12 +120,27 @@ function initFilters() {
 }
 
 // ------------- Filtering + sorting ------------------------------------------
+function getSortValue(l, k) {
+  if (k === "_grade") {
+    const g = getGrade(l);
+    return g ? g.overall_score || gradeOrder[g.overall] || 0 : -1;
+  }
+  if (k === "_arv") return (getCalc(l) || {}).arv_expected || 0;
+  if (k === "_rehab") return (getCalc(l) || {}).rehab_expected || 0;
+  if (k === "_max_bid") return (getCalc(l) || {}).max_bid_70 || 0;
+  if (k === "_roi") return (getCalc(l) || {}).roi_pct;
+  return l[k];
+}
+
 function applyFilters() {
   const q = $("search").value.toLowerCase();
   const st = $("filter-state").value;
   const co = $("filter-county").value;
   const ty = $("filter-type").value;
+  const minGrade = $("filter-grade").value;
+  const minGradeRank = minGrade ? gradeOrder[minGrade] : 0;
   const win = parseInt($("filter-window").value);
+  const minRoi = $("filter-roi").value === "" ? null : parseFloat($("filter-roi").value);
   const now = Date.now();
   const wmax = win ? now + win * 86400000 : 0;
 
@@ -115,6 +151,16 @@ function applyFilters() {
     if (win && l.sale_date) {
       const d = Date.parse(l.sale_date);
       if (isNaN(d) || d < now || d > wmax) return false;
+    }
+    if (minGradeRank) {
+      const g = getGrade(l);
+      const r = g && g.overall ? gradeOrder[g.overall] : 0;
+      if (r < minGradeRank) return false;
+    }
+    if (minRoi !== null) {
+      const c = getCalc(l);
+      const r = c ? c.roi_pct : null;
+      if (r == null || r < minRoi) return false;
     }
     if (q) {
       const blob = [
@@ -128,9 +174,10 @@ function applyFilters() {
   });
 
   filtered.sort((a, b) => {
-    let av = a[sortKey], bv = b[sortKey];
-    if (av == null) av = sortDir === "asc" ? "￿" : "";
-    if (bv == null) bv = sortDir === "asc" ? "￿" : "";
+    let av = getSortValue(a, sortKey);
+    let bv = getSortValue(b, sortKey);
+    if (av == null) av = sortDir === "asc" ? Infinity : -Infinity;
+    if (bv == null) bv = sortDir === "asc" ? Infinity : -Infinity;
     if (typeof av === "string") av = av.toLowerCase();
     if (typeof bv === "string") bv = bv.toLowerCase();
     if (av < bv) return sortDir === "asc" ? -1 : 1;
@@ -143,7 +190,7 @@ function applyFilters() {
   $("result-count").textContent = `${filtered.length} of ${LISTINGS.length} listings`;
 }
 
-// ------------- Table render --------------------------------------------------
+// ------------- Format helpers ------------------------------------------------
 function fmtMoney(v) { return v ? "$" + Math.round(v).toLocaleString() : ""; }
 function fmtNum(v) { return v == null ? "" : v; }
 function fmtDate(v) {
@@ -151,19 +198,34 @@ function fmtDate(v) {
   const d = new Date(v);
   return isNaN(d) ? v : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
 }
+function fmtPct(v) { return v == null ? "" : `${v.toFixed(1)}%`; }
 function fmtType(t) {
   const cls = t || "unknown";
   const label = (t || "unknown").replace(/_/g, " ");
   return `<span class="type-pill type-${cls}">${label}</span>`;
 }
+function gradeBadge(g) {
+  if (!g || !g.overall) return `<span class="grade-badge F" style="opacity:0.4">—</span>`;
+  return `<span class="grade-badge ${g.overall}">${g.overall}</span>`;
+}
+function roiCell(roi) {
+  if (roi == null) return "";
+  const cls = roi > 0 ? "roi-pos" : "roi-neg";
+  return `<span class="${cls}">${roi.toFixed(1)}%</span>`;
+}
 
+// ------------- Table render --------------------------------------------------
 function renderTable() {
   const tb = $("listings-tbody");
   tb.innerHTML = filtered
-    .slice(0, 600)
-    .map(
-      (l, i) => `
-    <tr data-id="${i}">
+    .slice(0, 800)
+    .map((l, i) => {
+      const g = getGrade(l) || {};
+      const c = getCalc(l) || {};
+      const rowClass = g.overall ? `row-${g.overall}` : "";
+      return `
+    <tr class="${rowClass}" data-id="${i}">
+      <td>${gradeBadge(g)}</td>
       <td>${fmtDate(l.sale_date)}</td>
       <td>${l.state || ""}</td>
       <td>${l.county || ""}</td>
@@ -171,18 +233,18 @@ function renderTable() {
       <td>${l.city || ""}</td>
       <td>${fmtType(l.listing_type)}</td>
       <td class="num">${fmtMoney(l.opening_bid)}</td>
-      <td class="num">${fmtMoney(l.market_value)}</td>
-      <td class="num">${fmtMoney(l.tax_value)}</td>
+      <td class="num">${fmtMoney(c.arv_expected)}</td>
+      <td class="num">${fmtMoney(c.rehab_expected)}</td>
+      <td class="num">${fmtMoney(c.max_bid_70)}</td>
+      <td class="num">${roiCell(c.roi_pct)}</td>
       <td class="num">${fmtNum(l.bedrooms)}</td>
       <td class="num">${fmtNum(l.bathrooms)}</td>
       <td class="num">${l.living_sqft ? Math.round(l.living_sqft).toLocaleString() : ""}</td>
       <td class="num">${l.year_built || ""}</td>
       <td>${l.case_number || ""}</td>
-      <td>${(l.source || "").replace(/^[a-z_]+\./, "")}</td>
-    </tr>`,
-    )
+    </tr>`;
+    })
     .join("");
-
   tb.querySelectorAll("tr").forEach((tr) =>
     tr.addEventListener("click", () => openDetail(filtered[parseInt(tr.dataset.id)])),
   );
@@ -194,6 +256,8 @@ function renderCards() {
   grid.innerHTML = filtered
     .slice(0, 200)
     .map((l, i) => {
+      const g = getGrade(l);
+      const c = getCalc(l) || {};
       const photo =
         l.raw && l.raw.zillow && l.raw.zillow.photo
           ? `<div class="card-img" style="background-image:url('${l.raw.zillow.photo}')"></div>`
@@ -204,18 +268,23 @@ function renderCards() {
       if (l.living_sqft) meta.push(`${Math.round(l.living_sqft).toLocaleString()} sqft`);
       if (l.year_built) meta.push(`${l.year_built}`);
       if (l.acreage) meta.push(`${l.acreage} ac`);
+      const roi = c.roi_pct;
+      const roiCls = roi == null ? "" : roi > 0 ? "roi-pos" : "roi-neg";
       return `
       <div class="card" data-id="${i}">
+        ${g ? `<div class="card-grade-corner">${gradeBadge(g)}</div>` : ""}
         ${photo}
         <div class="card-body">
           <div class="card-addr">${l.street_address || "(address pending)"}</div>
           <div class="card-loc">${l.city || ""}${l.city ? ", " : ""}${l.county || "?"} County, ${l.state || ""}</div>
           <div class="card-meta">
             ${fmtType(l.listing_type)}
-            ${l.opening_bid ? `<span>${fmtMoney(l.opening_bid)}</span>` : ""}
+            ${l.opening_bid ? `<span>Bid ${fmtMoney(l.opening_bid)}</span>` : ""}
+            ${c.arv_expected ? `<span>ARV ${fmtMoney(c.arv_expected)}</span>` : ""}
             ${l.sale_date ? `<span>${fmtDate(l.sale_date)}</span>` : ""}
             ${meta.length ? `<span>${meta.join(" · ")}</span>` : ""}
           </div>
+          ${roi != null ? `<div class="card-roi ${roiCls}">ROI ${roi.toFixed(1)}%${c.cash_on_cash_pct != null ? ` · CoC ${c.cash_on_cash_pct.toFixed(0)}%` : ""}</div>` : ""}
         </div>
       </div>`;
     })
@@ -230,7 +299,7 @@ function initMap() {
   if (!map) {
     map = L.map("map").setView([35.0, -82.0], 7);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '© OpenStreetMap',
+      attribution: "© OpenStreetMap",
       maxZoom: 19,
     }).addTo(map);
   } else {
@@ -238,10 +307,23 @@ function initMap() {
   }
   if (mapMarkers) map.removeLayer(mapMarkers);
   mapMarkers = L.layerGroup();
-  filtered.forEach((l, i) => {
+  filtered.forEach((l) => {
     if (!l.latitude || !l.longitude) return;
-    const m = L.marker([l.latitude, l.longitude]);
-    m.bindTooltip(`${l.street_address || ""}<br>${fmtMoney(l.opening_bid) || "(no bid)"}<br>${fmtDate(l.sale_date) || ""}`);
+    const g = getGrade(l) || {};
+    const c = getCalc(l) || {};
+    const color = g.overall === "A" ? "#1a7f37" : g.overall === "B" ? "#5b8d3a" : g.overall === "C" ? "#b8860b" : g.overall === "D" ? "#b8540c" : "#b22a2a";
+    const m = L.circleMarker([l.latitude, l.longitude], {
+      radius: 8,
+      color: color,
+      fillColor: color,
+      fillOpacity: 0.7,
+      weight: 2,
+    });
+    m.bindTooltip(
+      `<strong>${g.overall || "—"}</strong> · ${l.street_address || ""}<br>` +
+      `Bid: ${fmtMoney(l.opening_bid) || "(no bid)"}<br>` +
+      `${c.roi_pct != null ? `ROI: ${c.roi_pct.toFixed(1)}%` : ""}`,
+    );
     m.on("click", () => openDetail(l));
     mapMarkers.addLayer(m);
   });
@@ -251,16 +333,93 @@ function initMap() {
 // ------------- Detail panel ---------------------------------------------------
 function openDetail(l) {
   if (!l) return;
+  const g = getGrade(l);
+  const c = getCalc(l);
+
   $("d-title").textContent = `${l.listing_type ? l.listing_type.replace(/_/g, " ") : "Listing"} — ${l.county || ""} County`;
   $("d-address").textContent = [l.street_address, l.city, l.state, l.zip_code].filter(Boolean).join(", ");
 
+  // Grade block
+  if (g && g.overall) {
+    $("d-grade-block").innerHTML = `
+      <div class="grade-circle ${g.overall}">${g.overall}</div>
+      <div class="grade-sub">
+        <div class="grade-sub-item"><span class="gs-letter">${g.financial}</span><span class="gs-label">Fin</span></div>
+        <div class="grade-sub-item"><span class="gs-letter">${g.property}</span><span class="gs-label">Prop</span></div>
+        <div class="grade-sub-item"><span class="gs-letter">${g.location}</span><span class="gs-label">Loc</span></div>
+        <div class="grade-sub-item"><span class="gs-letter">${g.risk}</span><span class="gs-label">Risk</span></div>
+      </div>`;
+    $("d-grade-section").style.display = "block";
+    $("d-grade-rationale").innerHTML = (g.rationale || []).map((r, i) => {
+      const labels = ["Financial", "Property", "Location", "Risk"];
+      return `<div class="rationale-row"><span class="icon">•</span><span><strong>${labels[i] || "Note"}:</strong> ${r}</span></div>`;
+    }).join("");
+  } else {
+    $("d-grade-block").innerHTML = "";
+    $("d-grade-section").style.display = "none";
+  }
+
+  // Investor calculator
+  if (c) {
+    const rows = [];
+    if (c.arv_expected) {
+      rows.push(`
+        <div class="calc-row">
+          <div class="lbl">Est. ARV</div>
+          <div>
+            <div class="val big">${fmtMoney(c.arv_expected)}</div>
+            <div class="calc-range">range: <b>${fmtMoney(c.arv_low)}</b> – <b>${fmtMoney(c.arv_high)}</b></div>
+          </div>
+        </div>`);
+    }
+    if (c.rehab_expected != null) {
+      rows.push(`
+        <div class="calc-row">
+          <div class="lbl">Est. Rehab</div>
+          <div>
+            <div class="val">${fmtMoney(c.rehab_expected)}</div>
+            <div class="calc-range">tier: <b>${c.rehab_tier || "—"}</b> · range: <b>${fmtMoney(c.rehab_low)}</b> – <b>${fmtMoney(c.rehab_high)}</b></div>
+          </div>
+        </div>`);
+    }
+    if (l.opening_bid) {
+      rows.push(`<div class="calc-row"><div class="lbl">Opening Bid</div><div class="val big">${fmtMoney(l.opening_bid)}</div></div>`);
+    }
+    if (c.max_bid_70 != null) {
+      rows.push(`<div class="calc-row"><div class="lbl">Max Bid (70% rule)</div><div class="val big">${fmtMoney(c.max_bid_70)}</div></div>`);
+    }
+    if (c.bid_to_arv_pct != null) {
+      rows.push(`<div class="calc-row"><div class="lbl">Bid / ARV</div><div class="val">${c.bid_to_arv_pct.toFixed(1)}%</div></div>`);
+    }
+    if (c.total_investment != null) {
+      rows.push(`<div class="calc-row"><div class="lbl">Total Investment</div><div class="val">${fmtMoney(c.total_investment)}</div></div>`);
+    }
+    if (c.estimated_profit != null) {
+      const cls = c.estimated_profit > 0 ? "pos" : "neg";
+      rows.push(`<div class="calc-row"><div class="lbl">Est. Profit</div><div class="val big ${cls}">${fmtMoney(c.estimated_profit)}</div></div>`);
+    }
+    if (c.roi_pct != null) {
+      const cls = c.roi_pct > 0 ? "pos" : "neg";
+      rows.push(`<div class="calc-row"><div class="lbl">ROI</div><div class="val big ${cls}">${c.roi_pct.toFixed(1)}%</div></div>`);
+    }
+    if (c.cash_on_cash_pct != null) {
+      const cls = c.cash_on_cash_pct > 0 ? "pos" : "neg";
+      rows.push(`<div class="calc-row"><div class="lbl">Cash-on-Cash</div><div class="val ${cls}">${c.cash_on_cash_pct.toFixed(1)}%</div></div>`);
+    }
+    rows.push(`<div class="calc-row"><div class="lbl">Confidence</div><div class="val"><span class="confidence-pill confidence-${c.confidence || "LOW"}">${c.confidence || "LOW"}</span></div></div>`);
+    if (c.notes && c.notes.length) {
+      rows.push(`<div class="calc-notes">${c.notes.map((n) => "• " + n).join("<br>")}</div>`);
+    }
+    $("d-calc").innerHTML = rows.join("");
+  } else {
+    $("d-calc").innerHTML = "<em>Calculator data not available — listing missing key fields.</em>";
+  }
+
+  // Property details
   const fields = [
     ["Sale Date", fmtDate(l.sale_date)],
     ["Sale Time", l.sale_time || ""],
     ["Sale Location", l.sale_location || ""],
-    ["Opening Bid", fmtMoney(l.opening_bid)],
-    ["Judgment", fmtMoney(l.judgment_amount)],
-    ["Zestimate", fmtMoney(l.market_value)],
     ["Tax Value", fmtMoney(l.tax_value)],
     ["Parcel ID", l.parcel_id || ""],
     ["Year Built", l.year_built || ""],
@@ -272,14 +431,11 @@ function openDetail(l) {
     ["Property Kind", l.property_kind || ""],
     ["Auction Status", l.auction_status || ""],
   ].filter(([_, v]) => v);
-
   $("d-grid").innerHTML = fields.map(([k, v]) => `<div class="lbl">${k}</div><div class="val">${v}</div>`).join("");
 
-  // Photos (Zillow)
+  // Photos
   const photos = (l.raw && l.raw.zillow && l.raw.zillow.photos) || [];
-  $("d-photos").innerHTML = photos.length
-    ? photos.slice(0, 6).map((p) => `<img src="${p}" loading="lazy">`).join("")
-    : "";
+  $("d-photos").innerHTML = photos.length ? photos.slice(0, 6).map((p) => `<img src="${p}" loading="lazy">`).join("") : "";
 
   // Mini map
   if (l.latitude && l.longitude) {
@@ -297,22 +453,6 @@ function openDetail(l) {
   $("d-source-url").href = l.source_url || "#";
   $("d-source-url").textContent = l.source_url || "(no link)";
 
-  // Flags
-  const flags = (l.raw && l.raw.flags) || [];
-  if (flags.length) {
-    $("d-flags-section").style.display = "block";
-    $("d-flags").innerHTML = flags
-      .map((f) => {
-        const cls =
-          /vacant|fire|tear|condemned|hoarder|gutted|foundation/.test(f) ? "neg" :
-          /renovated|updated|move-in|turnkey|new /.test(f) ? "pos" : "";
-        return `<span class="flag-pill ${cls}">${f}</span>`;
-      })
-      .join("");
-  } else {
-    $("d-flags-section").style.display = "none";
-  }
-
   // Court
   const court = [
     ["Case Number", l.case_number],
@@ -327,7 +467,7 @@ function openDetail(l) {
     $("d-court-section").style.display = "none";
   }
 
-  // GIS / county records
+  // GIS
   const gis = (l.raw && l.raw.gis) || null;
   if (gis) {
     $("d-gis-section").style.display = "block";
@@ -347,16 +487,61 @@ function openDetail(l) {
     $("d-gis-section").style.display = "none";
   }
 
+  // Location (Census)
+  const loc = (l.raw && l.raw.location) || null;
+  if (loc && (loc.median_household_income || loc.median_home_value)) {
+    $("d-location-section").style.display = "block";
+    const rows = [];
+    if (loc.median_household_income) rows.push(`<div><strong>Median HH Income:</strong> ${fmtMoney(loc.median_household_income)}</div>`);
+    if (loc.median_home_value) rows.push(`<div><strong>Median Home Value (ZIP):</strong> ${fmtMoney(loc.median_home_value)}</div>`);
+    if (loc.owner_occupied_pct != null) rows.push(`<div><strong>Owner-occupied:</strong> ${loc.owner_occupied_pct.toFixed(1)}%</div>`);
+    if (loc.unemployment_pct != null) rows.push(`<div><strong>Unemployment:</strong> ${loc.unemployment_pct.toFixed(1)}%</div>`);
+    $("d-location").innerHTML = rows.join("");
+  } else {
+    $("d-location-section").style.display = "none";
+  }
+
+  // Flags
+  const flags = (l.raw && l.raw.flags) || [];
+  if (flags.length) {
+    $("d-flags-section").style.display = "block";
+    $("d-flags").innerHTML = flags
+      .map((f) => {
+        const cls =
+          /vacant|fire|tear|condemned|hoarder|gutted|foundation|structural|negative_equity/.test(f) ? "neg" :
+          /renovated|updated|move-in|turnkey|new |high_equity/.test(f) ? "pos" : "";
+        return `<span class="flag-pill ${cls}">${f.replace(/_/g, " ")}</span>`;
+      })
+      .join("");
+  } else {
+    $("d-flags-section").style.display = "none";
+  }
+
   $("detail-panel").classList.remove("hidden");
 }
 
 // ------------- CSV export -----------------------------------------------------
 function exportCsv() {
-  const cols = ["sale_date","state","county","street_address","city","zip_code","listing_type","opening_bid","market_value","tax_value","bedrooms","bathrooms","living_sqft","year_built","acreage","zoning","case_number","plaintiff","defendant","trustee","source","source_url"];
+  const cols = [
+    "grade_overall", "grade_financial", "grade_property", "grade_location", "grade_risk",
+    "sale_date", "state", "county", "street_address", "city", "zip_code", "listing_type",
+    "opening_bid", "arv_expected", "rehab_expected", "max_bid_70", "roi_pct", "cash_on_cash_pct",
+    "bedrooms", "bathrooms", "living_sqft", "year_built", "acreage", "zoning",
+    "case_number", "plaintiff", "defendant", "trustee", "source", "source_url",
+  ];
   const rows = [cols.join(",")];
   filtered.forEach((l) => {
-    rows.push(cols.map((c) => {
-      let v = l[c];
+    const g = getGrade(l) || {};
+    const c = getCalc(l) || {};
+    const row = {
+      grade_overall: g.overall, grade_financial: g.financial, grade_property: g.property,
+      grade_location: g.location, grade_risk: g.risk,
+      arv_expected: c.arv_expected, rehab_expected: c.rehab_expected,
+      max_bid_70: c.max_bid_70, roi_pct: c.roi_pct, cash_on_cash_pct: c.cash_on_cash_pct,
+      ...l,
+    };
+    rows.push(cols.map((k) => {
+      let v = row[k];
       if (v == null) v = "";
       v = String(v).replace(/"/g, '""');
       return /[",\n]/.test(v) ? `"${v}"` : v;

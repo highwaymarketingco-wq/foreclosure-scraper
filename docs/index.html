@@ -20,16 +20,18 @@
   </div>
   <div class="brand-meta">
     <span class="badge" id="total-badge">— total</span>
-    <span class="badge" id="active-badge">— active sales</span>
+    <span class="badge" id="active-badge">— active</span>
+    <span class="badge grade-A" id="a-grade-badge" style="display:none">— A-grade</span>
   </div>
 </header>
 
 <section class="stats">
   <div class="stat"><div class="stat-num" id="stat-total">—</div><div class="stat-lbl">total listings</div></div>
-  <div class="stat"><div class="stat-num" id="stat-sc">—</div><div class="stat-lbl">SC</div></div>
-  <div class="stat"><div class="stat-num" id="stat-nc">—</div><div class="stat-lbl">NC</div></div>
-  <div class="stat"><div class="stat-num" id="stat-with-bid">—</div><div class="stat-lbl">with bid</div></div>
-  <div class="stat"><div class="stat-num" id="stat-with-photos">—</div><div class="stat-lbl">with property data</div></div>
+  <div class="stat"><div class="stat-num grade-A-text" id="stat-a">—</div><div class="stat-lbl">A grade</div></div>
+  <div class="stat"><div class="stat-num grade-B-text" id="stat-b">—</div><div class="stat-lbl">B grade</div></div>
+  <div class="stat"><div class="stat-num grade-C-text" id="stat-c">—</div><div class="stat-lbl">C grade</div></div>
+  <div class="stat"><div class="stat-num" id="stat-positive-roi">—</div><div class="stat-lbl">positive ROI</div></div>
+  <div class="stat"><div class="stat-num" id="stat-with-bid">—</div><div class="stat-lbl">with opening bid</div></div>
   <div class="stat"><div class="stat-num" id="stat-sources">—</div><div class="stat-lbl">sources</div></div>
 </section>
 
@@ -64,6 +66,16 @@
     </select>
   </div>
   <div class="filter-group">
+    <label>Min Grade</label>
+    <select id="filter-grade">
+      <option value="">Any grade</option>
+      <option value="A">A only</option>
+      <option value="B">B and above</option>
+      <option value="C">C and above</option>
+      <option value="D">D and above</option>
+    </select>
+  </div>
+  <div class="filter-group">
     <label>Sale within</label>
     <select id="filter-window">
       <option value="">Any time</option>
@@ -71,6 +83,16 @@
       <option value="30">Next 30 days</option>
       <option value="60">Next 60 days</option>
       <option value="90">Next 90 days</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Min ROI</label>
+    <select id="filter-roi">
+      <option value="">Any</option>
+      <option value="40">40%+ (excellent)</option>
+      <option value="25">25%+ (strong)</option>
+      <option value="10">10%+ (decent)</option>
+      <option value="0">Positive only</option>
     </select>
   </div>
   <div class="filter-group">
@@ -92,21 +114,23 @@
     <div class="table-wrap">
       <table id="listings-table">
         <thead><tr>
+          <th data-sort="_grade">Grade</th>
           <th data-sort="sale_date">Sale Date</th>
           <th data-sort="state">St</th>
           <th data-sort="county">County</th>
           <th data-sort="street_address">Address</th>
           <th data-sort="city">City</th>
           <th data-sort="listing_type">Type</th>
-          <th data-sort="opening_bid" class="num">Opening Bid</th>
-          <th data-sort="market_value" class="num">Zestimate</th>
-          <th data-sort="tax_value" class="num">Tax Value</th>
-          <th data-sort="bedrooms" class="num">Beds</th>
-          <th data-sort="bathrooms" class="num">Baths</th>
+          <th data-sort="opening_bid" class="num">Bid</th>
+          <th data-sort="_arv" class="num">Est. ARV</th>
+          <th data-sort="_rehab" class="num">Est. Rehab</th>
+          <th data-sort="_max_bid" class="num">Max Bid (70%)</th>
+          <th data-sort="_roi" class="num">ROI</th>
+          <th data-sort="bedrooms" class="num">Bd</th>
+          <th data-sort="bathrooms" class="num">Ba</th>
           <th data-sort="living_sqft" class="num">SqFt</th>
           <th data-sort="year_built" class="num">Year</th>
           <th data-sort="case_number">Case #</th>
-          <th data-sort="source">Source</th>
         </tr></thead>
         <tbody id="listings-tbody"></tbody>
       </table>
@@ -125,28 +149,63 @@
 <aside id="detail-panel" class="hidden">
   <div class="detail-header">
     <button class="close-btn" id="close-detail">×</button>
+    <div class="detail-grade-block" id="d-grade-block"></div>
     <h2 id="d-title">—</h2>
     <div class="address-line" id="d-address">—</div>
   </div>
   <div class="detail-body">
-    <div class="detail-grid" id="d-grid"></div>
-    <div id="d-photos" class="photos"></div>
-    <div id="d-map" class="mini-map"></div>
+    <!-- Investor calculator -->
+    <div class="detail-section calc-block">
+      <h3>Investor Calculator</h3>
+      <div id="d-calc"></div>
+    </div>
+
+    <!-- Grade rationale -->
+    <div class="detail-section" id="d-grade-section">
+      <h3>Grade Rationale</h3>
+      <div id="d-grade-rationale"></div>
+    </div>
+
+    <!-- Property details -->
     <div class="detail-section">
-      <h3>Source link</h3>
+      <h3>Property</h3>
+      <div class="detail-grid" id="d-grid"></div>
+    </div>
+
+    <!-- Photos -->
+    <div id="d-photos" class="photos"></div>
+
+    <!-- Mini map -->
+    <div id="d-map" class="mini-map"></div>
+
+    <!-- Source link -->
+    <div class="detail-section">
+      <h3>Source</h3>
       <a id="d-source-url" target="_blank" rel="noopener">Open original listing →</a>
     </div>
+
+    <!-- Court -->
+    <div class="detail-section" id="d-court-section" style="display:none">
+      <h3>Court Record</h3>
+      <div id="d-court"></div>
+    </div>
+
+    <!-- County records -->
+    <div class="detail-section" id="d-gis-section" style="display:none">
+      <h3>County Records</h3>
+      <div id="d-gis"></div>
+    </div>
+
+    <!-- Location data -->
+    <div class="detail-section" id="d-location-section" style="display:none">
+      <h3>Neighborhood (Census ACS)</h3>
+      <div id="d-location"></div>
+    </div>
+
+    <!-- Flags -->
     <div class="detail-section" id="d-flags-section" style="display:none">
       <h3>Flags</h3>
       <div id="d-flags"></div>
-    </div>
-    <div class="detail-section" id="d-court-section" style="display:none">
-      <h3>Court record</h3>
-      <div id="d-court"></div>
-    </div>
-    <div class="detail-section" id="d-gis-section" style="display:none">
-      <h3>County records</h3>
-      <div id="d-gis"></div>
     </div>
   </div>
 </aside>
@@ -154,6 +213,7 @@
 <footer>
   <div>Updated each month from <strong id="run-source-count">—</strong> public sources. Data is public record.</div>
   <div>Sources include county Master in Equity, Register of Deeds, NC eCourts, SC Public Index, Auction.com, HUD, law-firm trustee calendars, and newspaper legal notices.</div>
+  <div style="margin-top:8px;font-style:italic;color:#999">Grades are computed from heuristics + public data; not investment advice. Always verify before bidding.</div>
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

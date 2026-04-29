@@ -22,6 +22,9 @@ from .link_validator import validate
 from .models import Listing
 from .scrapers._registry import all_scrapers
 from .sheets import write_listings
+from .valuation import calc as valuation_calc
+from .valuation import grading as valuation_grading
+from .valuation import location as valuation_location
 from .web_artifact import write_artifact
 
 
@@ -179,6 +182,26 @@ async def run() -> int:
     # negative_equity, plus keyword flags from descriptions
     compute_flags(enriched)
     log.info("orchestrator.flagged", count=len(enriched))
+
+    # Census ACS location enrichment (free, dedup'd by ZIP) — fills neighborhood
+    # signals for the location grade (median HH income, home value, owner pct).
+    try:
+        await valuation_location.enrich(enriched)
+    except Exception:
+        log.error("location.failed", traceback=traceback.format_exc())
+
+    # Investor calculator + A-F grades per listing.
+    for li in enriched:
+        try:
+            c = valuation_calc.compute(li)
+            g = valuation_grading.grade(li, c)
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            li.raw["calc"] = valuation_calc.to_dict(c)
+            li.raw["grade"] = valuation_grading.to_dict(g)
+        except Exception:
+            log.warning("valuation.failed", source_url=li.source_url)
+    log.info("orchestrator.graded", count=len(enriched))
 
     # Run summary for Sheet log + email body
     by_state = Counter(li.state for li in enriched if li.state)
