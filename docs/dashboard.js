@@ -9,6 +9,11 @@ let map = null;
 let mapMarkers = null;
 let detailMap = null;
 
+// Active dataset: "foreclosure" | "multifamily"
+let DATASET = "foreclosure";
+// Cache so toggling is instant after first load
+const DS_CACHE = { foreclosure: null, multifamily: null };
+
 const $ = (id) => document.getElementById(id);
 
 // Helpers to read calc + grade
@@ -17,27 +22,98 @@ const getCalc = (l) => (l.raw && l.raw.calc) || null;
 const gradeOrder = { A: 5, B: 4, C: 3, D: 2, F: 1 };
 
 // ------------- Load data -----------------------------------------------------
-async function loadData() {
+async function loadDataset(name) {
+  // Already loaded — restore from cache
+  if (DS_CACHE[name]) {
+    LISTINGS = DS_CACHE[name].listings;
+    META = DS_CACHE[name].meta;
+    DATASET = name;
+    refreshDatasetUI();
+    initFilters();
+    applyFilters();
+    fillStats();
+    return;
+  }
+
   try {
-    const [listingsRes, metaRes] = await Promise.all([
-      fetch(`listings.json?t=${Date.now()}`),
-      fetch(`run_meta.json?t=${Date.now()}`),
-    ]);
-    if (!listingsRes.ok) throw new Error("listings.json missing");
-    LISTINGS = await listingsRes.json();
-    META = metaRes.ok ? await metaRes.json() : {};
+    if (name === "multifamily") {
+      const r = await fetch(`multifamily.json?t=${Date.now()}`);
+      if (!r.ok) throw new Error("multifamily.json missing");
+      const data = await r.json();
+      LISTINGS = data.listings || [];
+      META = {
+        run_time: data.run_time,
+        total: data.total,
+        by_source: data.by_source,
+        by_state: data.by_state,
+        by_county_top: data.by_county_top,
+      };
+    } else {
+      const [listingsRes, metaRes] = await Promise.all([
+        fetch(`listings.json?t=${Date.now()}`),
+        fetch(`run_meta.json?t=${Date.now()}`),
+      ]);
+      if (!listingsRes.ok) throw new Error("listings.json missing");
+      LISTINGS = await listingsRes.json();
+      META = metaRes.ok ? await metaRes.json() : {};
+    }
+    DS_CACHE[name] = { listings: LISTINGS, meta: META };
   } catch (e) {
     LISTINGS = [];
     META = {};
-    document.body.insertAdjacentHTML(
-      "afterbegin",
-      `<div style="background:#ffd2dc;color:#b22a2a;padding:14px 28px;text-align:center;">
-       Could not load listings — first run hasn't finished yet, or network error. Reload in a few minutes.</div>`,
-    );
+    if (name === "foreclosure") {
+      document.body.insertAdjacentHTML(
+        "afterbegin",
+        `<div style="background:#ffd2dc;color:#b22a2a;padding:14px 28px;text-align:center;">
+         Could not load listings — first run hasn't finished yet, or network error. Reload in a few minutes.</div>`,
+      );
+    }
   }
+  DATASET = name;
+  refreshDatasetUI();
   initFilters();
   applyFilters();
   fillStats();
+}
+
+function refreshDatasetUI() {
+  const isMF = DATASET === "multifamily";
+  const title = $("dataset-title");
+  if (title) title.textContent = isMF ? "Multifamily Listings" : "Foreclosure Listings";
+  document.querySelectorAll(".ds-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.ds === DATASET);
+  });
+}
+
+// Pre-fetch counts for both datasets so the toggle pills show real numbers
+async function preloadDatasetCounts() {
+  try {
+    const r = await fetch(`multifamily.json?t=${Date.now()}`);
+    if (r.ok) {
+      const d = await r.json();
+      const el = $("ds-mf-count");
+      if (el) el.textContent = d.total || 0;
+    }
+  } catch (e) { /* silent */ }
+  try {
+    const r = await fetch(`run_meta.json?t=${Date.now()}`);
+    if (r.ok) {
+      const d = await r.json();
+      const el = $("ds-fc-count");
+      if (el) el.textContent = d.total || 0;
+    }
+  } catch (e) { /* silent */ }
+}
+
+async function loadData() {
+  await Promise.all([loadDataset("foreclosure"), preloadDatasetCounts()]);
+  // Wire toggle buttons
+  document.querySelectorAll(".ds-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const target = btn.dataset.ds;
+      if (target && target !== DATASET) loadDataset(target);
+    });
+  });
 }
 
 // ------------- Stats ---------------------------------------------------------
