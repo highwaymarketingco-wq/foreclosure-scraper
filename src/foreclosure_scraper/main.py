@@ -106,15 +106,24 @@ async def run() -> int:
     raw: list[Listing] = []
     by_source: Counter = Counter()
     errors: list[str] = []
+    regressions: list[str] = []
+    expected = {s.slug: s.expected_min_count for s in scrapers}
     for slug, listings in results:
-        if not listings:
+        n = len(listings)
+        by_source[slug] = n
+        if n == 0:
             errors.append(slug)
             continue
+        # Regression detection: source's expected_min_count not met
+        if n < expected.get(slug, 0):
+            regressions.append(f"{slug}: got {n}, expected ≥ {expected[slug]}")
         for li in listings:
             if not li.source:
                 li.source = slug
             raw.append(li)
-        by_source[slug] = len(listings)
+
+    if regressions:
+        log.warning("orchestrator.regressions", count=len(regressions), regressions=regressions)
 
     # Lis pendens discovery — independent search of NC eCourts + SC Public Index
     # for new foreclosure filings per county (catches early-warning cases that
@@ -173,6 +182,20 @@ async def run() -> int:
     # Run summary for Sheet log + email body
     by_state = Counter(li.state for li in enriched if li.state)
     by_county = Counter(f"{li.county}, {li.state}" for li in enriched if li.county and li.state)
+    # Build per-source status: working / empty (verified) / regressed / Apify-blocked
+    apify_required = {s.slug for s in scrapers if getattr(s, "requires_apify", False)}
+    source_status = {}
+    for slug in expected:
+        n = by_source.get(slug, 0)
+        if n > 0:
+            source_status[slug] = f"OK ({n})"
+        elif slug in apify_required:
+            source_status[slug] = "APIFY-BLOCKED"
+        elif expected[slug] == 0:
+            source_status[slug] = "EMPTY (verified)"
+        else:
+            source_status[slug] = f"REGRESSED (expected ≥ {expected[slug]})"
+
     summary = {
         "total": len(enriched),
         "new_this_week": len(enriched),  # placeholder until we wire historical compare
@@ -180,7 +203,9 @@ async def run() -> int:
         "by_county_top": by_county.most_common(15),
         "by_source": dict(by_source),
         "errors": errors,
-        "notes": f"horizon={cfg.sale_horizon_days}d, scrapers={len(scrapers)}",
+        "regressions": regressions,
+        "source_status": source_status,
+        "notes": f"horizon={cfg.sale_horizon_days}d, scrapers={len(scrapers)}, regressions={len(regressions)}",
     }
 
     # Sheets + Email — guarded so a missing secret doesn't kill the rest of the run
