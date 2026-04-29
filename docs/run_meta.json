@@ -1,8 +1,8 @@
 {
-  "run_time": "2026-04-29T06:49:38.190633Z",
-  "total": 205,
+  "run_time": "2026-04-29T07:57:42.866549Z",
+  "total": 220,
   "by_source": {
-    "national.auction_dot_com": 550,
+    "national.auction_dot_com": 583,
     "national.bid4assets": 4,
     "national.fannie_homepath": 0,
     "national.foreclosure_dot_com": 0,
@@ -33,13 +33,17 @@
     "counties_sc.sc_public_index": 0,
     "counties_sc.spartanburg_master_in_equity": 33,
     "counties_nc.buncombe_tax": 1,
+    "counties_nc.cleveland_tax": 6,
+    "counties_nc.henderson_tax": 15,
     "counties_nc.mecklenburg_tax": 0,
+    "counties_nc.polk_tax": 2,
+    "counties_nc.rutherford_tax": 11,
     "city_websites.search": 0,
     "courts.lis_pendens_discovery": 0
   },
   "by_state": {
-    "NC": 80,
-    "SC": 125
+    "SC": 125,
+    "NC": 95
   },
   "by_county_top": [
     [
@@ -59,6 +63,10 @@
       20
     ],
     [
+      "Henderson, NC",
+      19
+    ],
+    [
       "Gaston, NC",
       15
     ],
@@ -71,19 +79,15 @@
       7
     ],
     [
-      "Pickens, SC",
-      5
-    ],
-    [
       "Cherokee, SC",
       5
     ],
     [
-      "Rutherford, NC",
-      4
+      "Pickens, SC",
+      5
     ],
     [
-      "Henderson, NC",
+      "Rutherford, NC",
       4
     ],
     [
@@ -104,7 +108,7 @@
     ]
   ],
   "source_status": {
-    "national.auction_dot_com": "OK (550)",
+    "national.auction_dot_com": "OK (583)",
     "national.bid4assets": "OK (4)",
     "national.fannie_homepath": "APIFY-BLOCKED",
     "national.foreclosure_dot_com": "APIFY-BLOCKED",
@@ -135,7 +139,11 @@
     "counties_sc.sc_public_index": "EMPTY (verified)",
     "counties_sc.spartanburg_master_in_equity": "OK (33)",
     "counties_nc.buncombe_tax": "OK (1)",
+    "counties_nc.cleveland_tax": "OK (6)",
+    "counties_nc.henderson_tax": "OK (15)",
     "counties_nc.mecklenburg_tax": "EMPTY (verified)",
+    "counties_nc.polk_tax": "OK (2)",
+    "counties_nc.rutherford_tax": "OK (11)",
     "city_websites.search": "EMPTY (verified)"
   },
   "regressions": [],
@@ -159,5 +167,5 @@
     "counties_nc.mecklenburg_tax",
     "city_websites.search"
   ],
-  "notes": "horizon=120d, scrapers=33, regressions=0"
+  "notes": "horizon=120d, scrapers=37, regressions=0"
 }
