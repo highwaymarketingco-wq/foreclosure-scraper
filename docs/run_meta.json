@@ -1,50 +1,21 @@
 {
   "run_time": "2026-04-29T17:17:30.758294Z",
-  "total": 218,
+  "total": 497,
   "by_source": {
-    "national.auction_dot_com": 0,
-    "national.bid4assets": 4,
-    "national.fannie_homepath": 0,
-    "national.foreclosure_dot_com": 0,
-    "national.freddie_homesteps": 0,
-    "national.hubzu": 0,
-    "national.hud_homestore": 0,
-    "national.probate_foreclosure_leads": 0,
-    "national.propwire": 0,
-    "national.realtor_foreclosures": 0,
-    "national.trulia": 0,
-    "national.xome": 0,
-    "national.zillow_bulk": 0,
-    "national.zillow_foreclosures": 0,
-    "public_notices.ncnotices": 0,
-    "public_notices.publicnoticesc": 0,
-    "law_firms.aldridge_pite": 0,
-    "law_firms.bell_carrington": 65,
-    "law_firms.brock_scott": 316,
-    "law_firms.finkel": 8,
-    "law_firms.hutchens": 356,
-    "law_firms.korn": 0,
-    "law_firms.mcmichael_taylor_gray": 0,
-    "law_firms.rogers_townsend": 27,
+    "law_firms.bell_carrington": 20,
+    "law_firms.brock_scott": 46,
+    "law_firms.hutchens": 87,
+    "law_firms.rogers_townsend": 2,
     "counties_sc.anderson_master_in_equity": 14,
-    "counties_sc.greenville_master_in_equity": 91,
-    "counties_sc.pickens_master_in_equity": 0,
-    "counties_sc.sc_flc": 17,
-    "counties_sc.sc_public_index": 0,
     "counties_sc.spartanburg_master_in_equity": 18,
-    "counties_nc.buncombe_tax": 1,
-    "counties_nc.cleveland_tax": 6,
+    "counties_sc.greenville_master_in_equity": 16,
     "counties_nc.henderson_tax": 15,
-    "counties_nc.mecklenburg_tax": 0,
-    "counties_nc.polk_tax": 2,
-    "counties_nc.rutherford_tax": 11,
-    "newspapers.hendersonville_lightning": 5,
-    "city_websites.search": 0,
-    "courts.lis_pendens_discovery": 0
+    "national.propwire": 154,
+    "national.zillow_bulk": 125
   },
   "by_state": {
-    "SC": 116,
-    "NC": 102
+    "SC": 234,
+    "NC": 263
   },
   "by_county_top": [
     [
@@ -57,7 +28,7 @@
     ],
     [
       "Anderson, SC",
-      30
+      31
     ],
     [
       "Greenville, SC",
@@ -76,19 +47,23 @@
       10
     ],
     [
+      "Pickens, SC",
+      7
+    ],
+    [
       "Buncombe, NC",
       7
     ],
     [
-      "Pickens, SC",
-      6
+      "Union, NC",
+      7
     ],
     [
       "Cherokee, SC",
       5
     ],
     [
-      "Union, NC",
+      "Iredell, NC",
       5
     ],
     [
@@ -101,10 +76,6 @@
     ],
     [
       "Cleveland, NC",
-      3
-    ],
-    [
-      "Cabarrus, NC",
       3
     ]
   ],
@@ -135,7 +106,7 @@
     "law_firms.rogers_townsend": "OK (27)",
     "counties_sc.anderson_master_in_equity": "OK (14)",
     "counties_sc.greenville_master_in_equity": "OK (91)",
-    "counties_sc.pickens_master_in_equity": "REGRESSED (expected ≥ 1)",
+    "counties_sc.pickens_master_in_equity": "REGRESSED (expected \u2265 1)",
     "counties_sc.sc_flc": "OK (17)",
     "counties_sc.sc_public_index": "EMPTY (verified)",
     "counties_sc.spartanburg_master_in_equity": "OK (18)",
