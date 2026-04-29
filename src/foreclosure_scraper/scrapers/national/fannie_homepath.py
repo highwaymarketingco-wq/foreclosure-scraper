@@ -16,6 +16,7 @@ API = "https://www.homepath.com/api/properties/search"
 
 class FannieHomePath(BaseScraper):
     slug = "national.fannie_homepath"
+    requires_apify = True
     name = "Fannie Mae HomePath"
     category = "national_reo"
 

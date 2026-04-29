@@ -19,6 +19,7 @@ LINK_RE = re.compile(r"https?://www\.hubzu\.com/(?:property|home)/[^\s)\]\"']+",
 
 class Hubzu(BaseScraper):
     slug = "national.hubzu"
+    requires_apify = True
     name = "Hubzu"
     category = "national_auction"
     timeout_s = 240.0

@@ -27,6 +27,8 @@ EVENT_TYPE_MAP = {
 
 class ProbateForeclosureLeads(BaseScraper):
     slug = "national.probate_foreclosure_leads"
+    requires_apify = True
+    expected_min_count = 20
     name = "Probate/Foreclosure/Tax-Sale Leads (national open data)"
     category = "national_aggregator"
     timeout_s = 360.0

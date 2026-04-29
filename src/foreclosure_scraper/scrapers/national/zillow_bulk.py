@@ -39,13 +39,18 @@ def _kind(home_type: str | None) -> PropertyKind:
 
 class ZillowBulkForeclosures(BaseScraper):
     slug = "national.zillow_bulk"
+    requires_apify = True
+    expected_min_count = 50
     name = "Zillow Bulk Foreclosure Search"
     category = "national_aggregator"
     timeout_s = 720.0
 
     async def fetch(self) -> Iterable[Listing]:
-        # One search per county for granular geographic coverage
-        locations = [f"{c.name} County, {c.state}" for c in ALL_COUNTIES]
+        # The actor expects "City ST" format (no "County", no comma between city and state).
+        # Live probe confirmed: "Greenville County, SC" -> 0 results, "Greenville SC" -> 14 results.
+        # We hit each county SEAT (the largest city in the county) which gives the actor's
+        # location resolver something it can geocode. The dedupe + scope filter trims to our 25-county footprint.
+        locations = [f"{c.seat} {c.state}" for c in ALL_COUNTIES]
         run_input = {
             "locations": locations,
             "propertyType": "forSale",
@@ -56,10 +61,20 @@ class ZillowBulkForeclosures(BaseScraper):
         }
         items = await run_actor_sync(ACTOR, run_input, timeout_s=600)
         out: list[Listing] = []
-        for it in items:
+        for wrapped in items:
+            # Probe-confirmed shape: {rawData: {property: {...}, resultType: ...}, scrapedAt, location}
+            # The real Zillow payload lives at wrapped.rawData.property
+            if not isinstance(wrapped, dict):
+                continue
+            raw = wrapped.get("rawData") if isinstance(wrapped.get("rawData"), dict) else wrapped
+            it = raw.get("property") if isinstance(raw.get("property"), dict) else raw
+            if not isinstance(it, dict):
+                continue
             href = it.get("hdpUrl") or it.get("detailUrl") or it.get("url")
             if href and href.startswith("/"):
                 href = f"https://www.zillow.com{href}"
+            if not href and it.get("zpid"):
+                href = f"https://www.zillow.com/homedetails/{it['zpid']}_zpid/"
             if not href:
                 continue
 
@@ -74,6 +89,15 @@ class ZillowBulkForeclosures(BaseScraper):
             elif "reo" in tag or "bank" in tag:
                 ltype = ListingType.REO
 
+            # price/zestimate/taxAssessedValue can be nested {value, pricePerSquareFoot}
+            def _num(v):
+                if isinstance(v, dict):
+                    v = v.get("value")
+                try:
+                    return float(v) if v is not None else None
+                except (TypeError, ValueError):
+                    return None
+
             out.append(
                 Listing(
                     source=self.slug,
@@ -84,15 +108,15 @@ class ZillowBulkForeclosures(BaseScraper):
                     city=addr.get("city") or it.get("city"),
                     state=addr.get("state") or it.get("state"),
                     zip_code=addr.get("zipcode") or it.get("zipcode"),
-                    opening_bid=it.get("price") or it.get("listPrice"),
-                    market_value=it.get("zestimate"),
-                    tax_value=it.get("taxAssessedValue"),
+                    opening_bid=_num(it.get("price") or it.get("listPrice")),
+                    market_value=_num(it.get("zestimate")),
+                    tax_value=_num(it.get("taxAssessedValue")),
                     bedrooms=it.get("bedrooms") or it.get("beds"),
                     bathrooms=it.get("bathrooms") or it.get("baths"),
-                    living_sqft=it.get("livingArea") or it.get("livingAreaValue"),
+                    living_sqft=_num(it.get("livingArea") or it.get("livingAreaValue")),
                     year_built=it.get("yearBuilt"),
-                    lot_size_sqft=it.get("lotSize") or it.get("lotAreaValue"),
-                    description=(it.get("description") or "")[:500] or None,
+                    lot_size_sqft=_num(it.get("lotSize") or it.get("lotAreaValue")),
+                    description=(str(it.get("description")) if it.get("description") else "")[:500] or None,
                     latitude=it.get("latitude"),
                     longitude=it.get("longitude"),
                     first_seen=datetime.utcnow(),
@@ -100,7 +124,23 @@ class ZillowBulkForeclosures(BaseScraper):
                     raw={"zillow_bulk": {k: it.get(k) for k in (
                         "zpid", "homeType", "homeStatus", "yearBuilt", "bedrooms", "bathrooms",
                         "livingArea", "lotSize", "zestimate", "taxAssessedValue",
-                    ) if k in it}},
+                    ) if k in it}, "zillow": {
+                        # Front-end dashboard reads raw.zillow.photo first
+                        "photo": (
+                            (it.get("media") or {}).get("propertyPhotoLinks", {}).get("highResolutionLink")
+                            or (it.get("media") or {}).get("thirdPartyPhotoLinks", {}).get("streetViewLink")
+                        ),
+                        "photos": [
+                            (it.get("media") or {}).get("propertyPhotoLinks", {}).get("highResolutionLink"),
+                        ] if it.get("media") else [],
+                        "zpid": it.get("zpid"),
+                        "homeType": it.get("homeType"),
+                        "zestimate": it.get("zestimate"),
+                        "yearBuilt": it.get("yearBuilt"),
+                        "bedrooms": it.get("bedrooms"),
+                        "bathrooms": it.get("bathrooms"),
+                        "livingArea": it.get("livingArea"),
+                    }},
                 )
             )
         return out

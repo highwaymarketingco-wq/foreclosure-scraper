@@ -18,6 +18,7 @@ LINK_RE = re.compile(r"https?://www\.xome\.com/auctions/[A-Z]{2}/[A-Za-z\-]+/[^\
 
 class Xome(BaseScraper):
     slug = "national.xome"
+    requires_apify = True
     name = "Xome"
     category = "national_auction"
     timeout_s = 240.0

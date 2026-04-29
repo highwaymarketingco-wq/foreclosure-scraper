@@ -26,6 +26,7 @@ from .sheets import write_listings
 from .valuation import calc as valuation_calc
 from .valuation import grading as valuation_grading
 from .valuation import location as valuation_location
+from .valuation import rentcast as valuation_rentcast
 from .web_artifact import write_artifact
 
 
@@ -69,7 +70,12 @@ DATELESS_OK_SOURCES = {
     "national.xome",
     "national.foreclosure_dot_com",
     "national.zillow_foreclosures",
+    "national.zillow_bulk",
     "national.bid4assets",
+    "national.propwire",       # preforeclosure leads: NOD filed but sale not yet scheduled
+    "national.trulia",
+    "national.realtor_foreclosures",
+    "national.probate_foreclosure_leads",
 }
 
 
@@ -198,6 +204,15 @@ async def run() -> int:
     except Exception:
         log.error("location.failed", traceback=traceback.format_exc())
 
+    # Per-county Register of Deeds enrichment — recorded mortgage history,
+    # lis pendens, satisfactions, lien-position computation. Free, pure-HTTP
+    # for the 4 vendors I've adapted (CCHS / Aumentum / Cott / Kofile).
+    try:
+        from .rod import enrich as rod_enrich
+        await rod_enrich.enrich_all(enriched)
+    except Exception:
+        log.error("rod.failed", traceback=traceback.format_exc())
+
     # Investor calculator + A-F grades per listing.
     for li in enriched:
         try:
@@ -210,6 +225,20 @@ async def run() -> int:
         except Exception:
             log.warning("valuation.failed", source_url=li.source_url)
     log.info("orchestrator.graded", count=len(enriched))
+
+    # RentCast AVM cross-check on top-N listings (authoritative AVM + comparables).
+    # Only fires when RENTCAST_API_KEY is set.
+    # Free tier (50 calls/mo) → 25 listings × 2 calls each.
+    # Foundation tier ($74/mo, 1000 calls) → 100 listings × ~10 calls each.
+    try:
+        rc_top_n = int(os.environ.get("RENTCAST_TOP_N", "25"))
+        rc_summary = await valuation_rentcast.enrich_top_n(enriched, top_n=rc_top_n)
+        if rc_summary.get("matched", 0) > 0:
+            for li in enriched:
+                valuation_rentcast.update_grade_with_rentcast(li)
+            log.info("orchestrator.rentcast_blended", **rc_summary)
+    except Exception:
+        log.error("rentcast.failed", traceback=traceback.format_exc())
 
     # Run summary for Sheet log + email body
     by_state = Counter(li.state for li in enriched if li.state)

@@ -13,6 +13,8 @@ from ...models import Listing, ListingType, PropertyKind
 
 class ForeclosureDotCom(BaseScraper):
     slug = "national.foreclosure_dot_com"
+    requires_apify = True
+    expected_min_count = 50
     name = "Foreclosure.com"
     category = "national_aggregator"
     timeout_s = 360.0

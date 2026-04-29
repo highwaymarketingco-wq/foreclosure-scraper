@@ -13,6 +13,7 @@ API = "https://www.homesteps.com/api/property/search"
 
 class FreddieHomeSteps(BaseScraper):
     slug = "national.freddie_homesteps"
+    requires_apify = True
     name = "Freddie Mac HomeSteps"
     category = "national_reo"
 
