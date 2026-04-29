@@ -30,6 +30,16 @@ class BaseScraper(ABC):
     #: If True, scraper is skipped automatically on errors instead of failing the run.
     optional: bool = True
 
+    #: Minimum expected listings per run. If a run returns fewer than this AND
+    #: a previous run returned more, treat as a regression (flag in run report).
+    #: Set to 0 for sources that legitimately return 0 sometimes (e.g. annual
+    #: tax sales, currently-empty firms).
+    expected_min_count: int = 0
+
+    #: True if this scraper is known to require Apify (rag-web-browser or paid actor).
+    #: Used for skip-when-budget-exhausted and run-report categorization.
+    requires_apify: bool = False
+
     @abstractmethod
     async def fetch(self) -> Iterable[Listing]:
         """Yield Listing objects. Implementations may be async generators or return lists."""

@@ -24,6 +24,7 @@ class AldridgePite(BaseScraper):
     slug = "law_firms.aldridge_pite"
     name = "Aldridge Pite"
     category = "law_firm"
+    requires_apify = True
     timeout_s = 120.0
 
     async def fetch(self) -> Iterable[Listing]:

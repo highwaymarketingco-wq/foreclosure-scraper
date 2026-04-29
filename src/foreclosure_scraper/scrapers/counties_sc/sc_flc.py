@@ -18,28 +18,28 @@ from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 
 # Each SC county's tax collector hosts its own tax sale page. URL patterns vary.
+# URLs verified via 2026-04-28 audit. Sources where the original URL was a 404
+# wrapper page are replaced; sites known to be down or returning 500 are kept
+# but expected to fail until restored.
 COUNTY_TAX_URLS: dict[str, tuple[str, ...]] = {
     "Greenville": (
-        "https://www.greenvillecounty.org/TaxCollector/TaxSale.aspx",
-        "https://www.greenvillecounty.org/ForfeitedLand/",
+        "http://www.greenvillecounty.org/appsAS400/Taxsale/",  # real (the .aspx URL is a 404 wrapper)
     ),
     "Spartanburg": (
-        "https://www.spartanburgcounty.org/325/Tax-Sale-Information",
-        "https://www.spartanburgcounty.org/430/Forfeited-Land-Commission",
+        "https://www.spartanburgcounty.gov/216/Tax-Collector",
     ),
     "Anderson": (
-        "https://www.andersoncountysc.org/treasurer/tax-sale/",
-        "https://www.andersoncountysc.org/forfeited-land-commission/",
+        "https://www.andersoncountysc.org/departments-a-z/treasurer/",
     ),
     "Pickens": (
         "https://www.pickenscountysc.gov/treasurer/tax-sale",
-        "https://www.pickenscountysc.gov/forfeited-land-commission",
     ),
     "Oconee": (
-        "https://www.oconeesc.com/treasurer/tax-sale",
-        "https://www.oconeesc.com/forfeited-land-commission",
+        "https://oconeesc.com/Departments/A-E/Delinquent-Tax-Collector",  # currently 500; retained for retry
     ),
-    "Cherokee": ("https://www.cherokeecountysc.gov/treasurer/tax-sale",),
+    "Cherokee": (
+        "https://cherokeecountysc.gov/delinquent-tax/",
+    ),
     "Union": ("https://www.countyofunion.com/treasurer/tax-sale",),
     "Laurens": ("https://www.co.laurens.sc.us/treasurer/tax-sale",),
     "Abbeville": ("https://www.abbevillecountysc.com/treasurer/tax-sale",),
