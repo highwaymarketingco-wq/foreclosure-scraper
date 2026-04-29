@@ -1,8 +1,4 @@
-"""Spartanburg County (SC) Master in Equity — new .gov domain + PDF roster.
-
-The actual upcoming-sales list lives in the most recent PDF inside DocumentCenter/Index/114.
-We fetch the index, find the latest PDF link, parse rows from it.
-"""
+"""Spartanburg County SC Master in Equity — direct PDF View ID 3392."""
 from __future__ import annotations
 
 import io
@@ -11,26 +7,28 @@ from datetime import datetime, timedelta
 from typing import Iterable
 
 from dateutil import parser as dateparser
-from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
-from ...http_client import get_bytes, get_text
+from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
-INDEX_URL = "https://www.spartanburgcounty.gov/313/Foreclosure-Sale"
-DOC_INDEX = "https://www.spartanburgcounty.gov/DocumentCenter/Index/114"
+PDF_URLS = (
+    "https://www.spartanburgcounty.gov/DocumentCenter/View/3392/Sale-Results",
+    "https://www.spartanburgcounty.gov/DocumentCenter/View/11824/Deficiency-Sale",
+)
 
-CASE_RE = re.compile(r"\b\d{2,4}-CP-\d{2}-\d{4,6}\b", re.I)
+CASE_RE = re.compile(r"\b\d{2,4}-\d{3,5}\b")
 ADDR_RE = re.compile(
     r"(\d+\s+[A-Z][\w .'\-]+(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
     r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\.?)",
     re.I,
 )
-DATE_RE = re.compile(
-    r"\b(?:\d{1,2}/\d{1,2}/\d{2,4}|"
-    r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4})\b",
+SALE_DATE_RE = re.compile(
+    r"(?:Re-?Bid Date|Sale Date|Master[''']s Sale)\s*[:—-]?\s*"
+    r"((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4})",
     re.I,
 )
+BID_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
 
 
 def _extract_pdf_text(data: bytes) -> str:
@@ -45,87 +43,91 @@ def _extract_pdf_text(data: bytes) -> str:
         return ""
 
 
-def _parse_rows(text: str, source_url: str, slug: str) -> list[Listing]:
-    today = datetime.utcnow()
-    horizon = today + timedelta(days=120)
-    cutoff = today - timedelta(days=2)
-    out: list[Listing] = []
-    # Each property block tends to start with a case number
-    chunks = re.split(r"(?=\b\d{2,4}-CP-\d{2}-)", text)
-    for chunk in chunks:
-        chunk = chunk.strip()
-        if len(chunk) < 30:
-            continue
-        case_m = CASE_RE.search(chunk)
-        if not case_m:
-            continue
-        addr_m = ADDR_RE.search(chunk)
-        date_m = DATE_RE.search(chunk)
-        sale_date = None
-        if date_m:
-            try:
-                sale_date = dateparser.parse(date_m.group(0))
-            except (ValueError, TypeError):
-                pass
-        if sale_date and not (cutoff <= sale_date <= horizon):
-            continue  # active-only
-        out.append(
-            Listing(
-                source=slug,
-                source_url=source_url,
-                listing_type=ListingType.FORECLOSURE_SALE,
-                property_kind=PropertyKind.UNKNOWN,
-                street_address=addr_m.group(1) if addr_m else None,
-                state="SC",
-                county="Spartanburg",
-                case_number=case_m.group(0),
-                sale_date=sale_date,
-                description=chunk[:500],
-                first_seen=datetime.utcnow(),
-                last_seen=datetime.utcnow(),
-            )
-        )
-    return out
-
-
 class SpartanburgMasterInEquity(BaseScraper):
     slug = "counties_sc.spartanburg_master_in_equity"
     name = "Spartanburg County (SC) Master in Equity"
     category = "county_court"
-    timeout_s = 180.0
+    timeout_s = 90.0
+    expected_min_count = 5
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
-        # Walk the document-center index for the latest "Foreclosure Sale List" PDF
-        try:
-            idx_html = await get_text(DOC_INDEX, timeout=45.0)
-        except Exception:
-            return out
+        today = datetime.utcnow()
+        horizon = today + timedelta(days=120)
+        cutoff = today - timedelta(days=2)
 
-        tree = HTMLParser(idx_html)
-        pdf_links: list[str] = []
-        for a in tree.css("a[href*='/DocumentCenter/View/']"):
-            href = a.attributes.get("href", "")
-            if not href:
-                continue
-            full = href if href.startswith("http") else "https://www.spartanburgcounty.gov" + href
-            label = (a.text(strip=True) or "").lower()
-            if any(k in label for k in ("sale list", "foreclosure", "roster")):
-                pdf_links.append(full)
-        # If nothing labeled, take the most-recent ~3 View links
-        if not pdf_links:
-            pdf_links = [
-                ("https://www.spartanburgcounty.gov" + a.attributes.get("href", ""))
-                for a in tree.css("a[href*='/DocumentCenter/View/']")
-            ][:3]
+        async with client(timeout=45.0) as c:
+            for url in PDF_URLS:
+                try:
+                    r = await c.get(url)
+                    if r.status_code != 200 or r.content[:4] != b"%PDF":
+                        continue
+                    text = _extract_pdf_text(r.content)
+                except Exception:
+                    continue
+                if not text:
+                    continue
 
-        for pdf_url in pdf_links[:5]:
-            try:
-                data = await get_bytes(pdf_url, timeout=60.0)
-            except Exception:
-                continue
-            text = _extract_pdf_text(data)
-            if not text:
-                continue
-            out.extend(_parse_rows(text, pdf_url, self.slug))
+                # Document-level sale date
+                doc_sale_date = None
+                sd_m = SALE_DATE_RE.search(text)
+                if sd_m:
+                    try:
+                        doc_sale_date = dateparser.parse(sd_m.group(1))
+                    except (ValueError, TypeError):
+                        pass
+
+                # Detect "cancelled" rows: column with a check mark or "WD" annotation
+                cancelled_indicator = re.compile(r"(✓|cancelled|withdrawn|WD\b)", re.I)
+
+                # Each row anchored on case number
+                chunks = re.split(r"(?=\b\d{2,4}-\d{3,5}\b)", text)
+                for chunk in chunks:
+                    chunk = chunk.strip()
+                    if len(chunk) < 30:
+                        continue
+                    if cancelled_indicator.search(chunk):
+                        continue
+                    case_m = CASE_RE.search(chunk)
+                    if not case_m:
+                        continue
+                    addr_m = ADDR_RE.search(chunk)
+
+                    # Plaintiff v. Defendant
+                    plaintiff = defendant = None
+                    pvd = re.search(r"([A-Z][\w &.,'-]{3,80}?)\s+v\.\s+([A-Z][\w &.,'-]{3,80})", chunk)
+                    if pvd:
+                        plaintiff = pvd.group(1).strip()
+                        defendant = pvd.group(2).strip().split("\n")[0]
+
+                    bid = None
+                    bm = BID_RE.search(chunk)
+                    if bm:
+                        try:
+                            bid = float(bm.group(1).replace(",", ""))
+                        except ValueError:
+                            pass
+
+                    if doc_sale_date and not (cutoff <= doc_sale_date <= horizon):
+                        continue
+
+                    out.append(
+                        Listing(
+                            source=self.slug,
+                            source_url=url,
+                            listing_type=ListingType.FORECLOSURE_SALE,
+                            property_kind=PropertyKind.UNKNOWN,
+                            street_address=addr_m.group(1) if addr_m else None,
+                            state="SC",
+                            county="Spartanburg",
+                            case_number=case_m.group(0),
+                            plaintiff=plaintiff,
+                            defendant=defendant,
+                            sale_date=doc_sale_date,
+                            opening_bid=bid,
+                            description=chunk[:500],
+                            first_seen=datetime.utcnow(),
+                            last_seen=datetime.utcnow(),
+                        )
+                    )
         return out

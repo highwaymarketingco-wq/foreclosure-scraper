@@ -1,143 +1,131 @@
-"""Mecklenburg County (NC) tax foreclosure — Kania Law Firm publishes the upcoming list
-on a county-specific sub-page.
+"""Mecklenburg County NC tax foreclosures via Kania Law Firm AJAX endpoint.
+
+Page renders a Ninja Tables widget that calls admin-ajax.php with a nonce
+scraped from the page HTML. We replicate the AJAX flow directly.
 """
 from __future__ import annotations
 
 import re
 from datetime import datetime
+from html import unescape
 from typing import Iterable
 
 from dateutil import parser as dateparser
-from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
-from ...http_client import get_text
+from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
-# The Kania site lists each NC county under tax-foreclosures/<county>-county-nc/
-COUNTY_URLS = {
-    "Mecklenburg": "https://kanialawfirm.com/tax-foreclosures/mecklenburg-county-nc/",
-    "Davidson": "https://kanialawfirm.com/tax-foreclosures/davidson-county-nc/",
-    # Index page that may surface other counties Kania handles
-}
-INDEX_URL = "https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/"
+PAGE_URL = "https://kanialawfirm.com/tax-foreclosures-mecklenburg-county/foreclosure-listings/"
+AJAX_URL = "https://kanialawfirm.com/wp-admin/admin-ajax.php"
+
+NONCE_RE = re.compile(r'"nonce":"([a-f0-9]+)"')
+TABLE_ID_RE = re.compile(r'"tableId":(\d+)')
 
 ADDR_RE = re.compile(
     r"(\d+\s+[A-Z][\w .'\-]+(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
     r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\.?)",
     re.I,
 )
-DATE_RE = re.compile(
-    r"\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b",
-    re.I,
-)
-PARCEL_RE = re.compile(r"\b(?:parcel|tax id|tax pin|pin)\b[:#\s]+([A-Z0-9\-\.]{6,})", re.I)
-
-
-def _parse_county_page(html: str, county: str, url: str, slug: str) -> list[Listing]:
-    out: list[Listing] = []
-    tree = HTMLParser(html)
-    # Each foreclosure tends to be its own card / table row — try tables first
-    for tbl in tree.css("table"):
-        for row in tbl.css("tr"):
-            text = row.text(separator=" | ", strip=True)
-            if len(text) < 30:
-                continue
-            addr_m = ADDR_RE.search(text)
-            date_m = DATE_RE.search(text)
-            parcel_m = PARCEL_RE.search(text)
-            if not (addr_m or parcel_m):
-                continue
-            sale_date = None
-            if date_m:
-                try:
-                    sale_date = dateparser.parse(date_m.group(0))
-                except (ValueError, TypeError):
-                    pass
-            out.append(
-                Listing(
-                    source=slug,
-                    source_url=url,
-                    listing_type=ListingType.TAX_SALE,
-                    property_kind=PropertyKind.UNKNOWN,
-                    state="NC",
-                    county=county,
-                    street_address=addr_m.group(1) if addr_m else None,
-                    parcel_id=parcel_m.group(1) if parcel_m else None,
-                    sale_date=sale_date,
-                    description=f"Kania Law tax foreclosure ({county} Co. NC) — {text[:200]}",
-                    first_seen=datetime.utcnow(),
-                    last_seen=datetime.utcnow(),
-                )
-            )
-    # Fallback: scan text blocks with addresses + dates
-    if not out:
-        body = tree.body.text(separator="\n") if tree.body else ""
-        for chunk in re.split(r"\n{2,}", body):
-            chunk = chunk.strip()
-            addr_m = ADDR_RE.search(chunk)
-            date_m = DATE_RE.search(chunk)
-            if not addr_m or not date_m:
-                continue
-            try:
-                sale_date = dateparser.parse(date_m.group(0))
-            except (ValueError, TypeError):
-                continue
-            out.append(
-                Listing(
-                    source=slug,
-                    source_url=url,
-                    listing_type=ListingType.TAX_SALE,
-                    property_kind=PropertyKind.UNKNOWN,
-                    state="NC",
-                    county=county,
-                    street_address=addr_m.group(1),
-                    sale_date=sale_date,
-                    description=chunk[:300],
-                    first_seen=datetime.utcnow(),
-                    last_seen=datetime.utcnow(),
-                )
-            )
-    return out
+PARCEL_RE = re.compile(r"\b(\d{5,10})\b")
 
 
 class MecklenburgTaxForeclosures(BaseScraper):
     slug = "counties_nc.mecklenburg_tax"
-    name = "Kania Law NC Tax Foreclosures"
+    name = "Kania Law NC Tax Foreclosures (Mecklenburg)"
     category = "county_tax"
-    timeout_s = 240.0
+    timeout_s = 90.0
+    expected_min_count = 0  # often empty between auction cycles
 
     async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
-        # Direct county pages
-        for county, url in COUNTY_URLS.items():
+        async with client(timeout=30.0) as c:
             try:
-                html = await get_text(url, timeout=45.0)
+                r = await c.get(PAGE_URL)
+                if r.status_code != 200:
+                    return []
+                page_html = r.text
             except Exception:
-                continue
-            out.extend(_parse_county_page(html, county, url, self.slug))
+                return []
 
-        # Discover any additional NC counties published on the index page
-        try:
-            idx_html = await get_text(INDEX_URL, timeout=45.0)
-        except Exception:
-            return out
-        tree = HTMLParser(idx_html)
-        for a in tree.css("a[href*='-county-nc']"):
-            href = a.attributes.get("href", "")
-            if not href:
-                continue
-            if href.startswith("/"):
-                href = "https://kanialawfirm.com" + href
-            m = re.search(r"/([a-z\-]+)-county-nc/?", href, re.I)
-            if not m:
-                continue
-            county = m.group(1).replace("-", " ").title()
-            if county in COUNTY_URLS:
-                continue  # already fetched
+            nonce_m = NONCE_RE.search(page_html)
+            table_m = TABLE_ID_RE.search(page_html)
+            if not nonce_m or not table_m:
+                return []
+            nonce = nonce_m.group(1)
+            table_id = table_m.group(1)
+
             try:
-                page = await get_text(href, timeout=45.0)
+                r = await c.get(
+                    AJAX_URL,
+                    params={
+                        "action": "wp_ajax_ninja_tables_public_action",
+                        "table_id": table_id,
+                        "target_action": "get-all-data",
+                        "default_sorting": "old_first",
+                        "skip_rows": "0",
+                        "limit_rows": "0",
+                        "ninja_table_public_nonce": nonce,
+                    },
+                    headers={
+                        "X-Requested-With": "XMLHttpRequest",
+                        "Referer": PAGE_URL,
+                    },
+                )
+                if r.status_code != 200:
+                    return []
+                data = r.json()
             except Exception:
+                return []
+
+        if not isinstance(data, list):
+            return []
+
+        out: list[Listing] = []
+        for row in data:
+            county = (row.get("county") or "").replace(" County", "").strip()
+            if county.lower() != "mecklenburg":
                 continue
-            out.extend(_parse_county_page(page, county, href, self.slug))
+            sale_raw = row.get("saledate") or ""
+            sale_date = None
+            if sale_raw:
+                try:
+                    sale_date = dateparser.parse(sale_raw)
+                except (ValueError, TypeError):
+                    pass
+
+            addr_html = row.get("addressparcel") or ""
+            addr_text = unescape(re.sub(r"<[^>]+>", " ", addr_html))
+            addr_m = ADDR_RE.search(addr_text)
+            parcel_m = PARCEL_RE.search(addr_text)
+
+            bid = None
+            for k in ("openingbid", "currentbid"):
+                v = row.get(k)
+                if v:
+                    bm = re.search(r"\$?\s*([\d,]+(?:\.\d{2})?)", str(v))
+                    if bm:
+                        try:
+                            bid = float(bm.group(1).replace(",", ""))
+                            break
+                        except ValueError:
+                            pass
+
+            out.append(
+                Listing(
+                    source=self.slug,
+                    source_url=PAGE_URL,
+                    listing_type=ListingType.TAX_SALE,
+                    property_kind=PropertyKind.UNKNOWN,
+                    street_address=addr_m.group(1) if addr_m else None,
+                    state="NC",
+                    county="Mecklenburg",
+                    parcel_id=parcel_m.group(1) if parcel_m else None,
+                    sale_date=sale_date,
+                    opening_bid=bid,
+                    case_number=row.get("courtfile"),
+                    description=addr_text[:300],
+                    first_seen=datetime.utcnow(),
+                    last_seen=datetime.utcnow(),
+                )
+            )
         return out
