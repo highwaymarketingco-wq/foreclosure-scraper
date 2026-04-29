@@ -1,32 +1,33 @@
 {
-  "run_time": "2026-04-29T03:04:00.073150Z",
-  "total": 204,
+  "run_time": "2026-04-29T06:49:38.190633Z",
+  "total": 205,
   "by_source": {
-    "national.auction_dot_com": 0,
+    "national.auction_dot_com": 550,
     "national.bid4assets": 4,
     "national.fannie_homepath": 0,
     "national.foreclosure_dot_com": 0,
     "national.freddie_homesteps": 0,
     "national.hubzu": 0,
-    "national.hud_homestore": 0,
+    "national.hud_homestore": 15,
     "national.probate_foreclosure_leads": 0,
-    "national.propwire": 0,
+    "national.propwire": 1250,
     "national.realtor_foreclosures": 0,
     "national.trulia": 0,
     "national.xome": 0,
-    "national.zillow_bulk": 0,
+    "national.zillow_bulk": 181,
     "national.zillow_foreclosures": 0,
     "public_notices.ncnotices": 0,
     "public_notices.publicnoticesc": 0,
     "law_firms.aldridge_pite": 0,
     "law_firms.bell_carrington": 62,
-    "law_firms.brock_scott": 324,
+    "law_firms.brock_scott": 318,
     "law_firms.finkel": 8,
     "law_firms.hutchens": 362,
     "law_firms.korn": 0,
     "law_firms.mcmichael_taylor_gray": 0,
     "law_firms.rogers_townsend": 27,
     "counties_sc.anderson_master_in_equity": 14,
+    "counties_sc.greenville_master_in_equity": 91,
     "counties_sc.pickens_master_in_equity": 0,
     "counties_sc.sc_flc": 17,
     "counties_sc.sc_public_index": 0,
@@ -37,8 +38,8 @@
     "courts.lis_pendens_discovery": 0
   },
   "by_state": {
-    "SC": 115,
-    "NC": 89
+    "NC": 80,
+    "SC": 125
   },
   "by_county_top": [
     [
@@ -47,11 +48,15 @@
     ],
     [
       "Mecklenburg, NC",
-      36
+      32
     ],
     [
       "Anderson, SC",
-      30
+      26
+    ],
+    [
+      "Greenville, SC",
+      20
     ],
     [
       "Gaston, NC",
@@ -67,26 +72,18 @@
     ],
     [
       "Pickens, SC",
-      6
+      5
     ],
     [
       "Cherokee, SC",
       5
     ],
     [
-      "Greenville, SC",
-      5
-    ],
-    [
-      "Union, NC",
-      5
-    ],
-    [
-      "Henderson, NC",
+      "Rutherford, NC",
       4
     ],
     [
-      "Rutherford, NC",
+      "Henderson, NC",
       4
     ],
     [
@@ -94,40 +91,45 @@
       3
     ],
     [
-      "Iredell, NC",
+      "Cabarrus, NC",
       3
     ],
     [
-      "Cabarrus, NC",
+      "Union, NC",
       3
+    ],
+    [
+      "Cleveland, NC",
+      2
     ]
   ],
   "source_status": {
-    "national.auction_dot_com": "EMPTY (verified)",
+    "national.auction_dot_com": "OK (550)",
     "national.bid4assets": "OK (4)",
-    "national.fannie_homepath": "EMPTY (verified)",
-    "national.foreclosure_dot_com": "EMPTY (verified)",
-    "national.freddie_homesteps": "EMPTY (verified)",
-    "national.hubzu": "EMPTY (verified)",
-    "national.hud_homestore": "EMPTY (verified)",
-    "national.probate_foreclosure_leads": "EMPTY (verified)",
-    "national.propwire": "EMPTY (verified)",
-    "national.realtor_foreclosures": "EMPTY (verified)",
-    "national.trulia": "EMPTY (verified)",
-    "national.xome": "EMPTY (verified)",
-    "national.zillow_bulk": "EMPTY (verified)",
+    "national.fannie_homepath": "APIFY-BLOCKED",
+    "national.foreclosure_dot_com": "APIFY-BLOCKED",
+    "national.freddie_homesteps": "APIFY-BLOCKED",
+    "national.hubzu": "APIFY-BLOCKED",
+    "national.hud_homestore": "OK (15)",
+    "national.probate_foreclosure_leads": "APIFY-BLOCKED",
+    "national.propwire": "OK (1250)",
+    "national.realtor_foreclosures": "APIFY-BLOCKED",
+    "national.trulia": "APIFY-BLOCKED",
+    "national.xome": "APIFY-BLOCKED",
+    "national.zillow_bulk": "OK (181)",
     "national.zillow_foreclosures": "EMPTY (verified)",
     "public_notices.ncnotices": "EMPTY (verified)",
     "public_notices.publicnoticesc": "EMPTY (verified)",
     "law_firms.aldridge_pite": "APIFY-BLOCKED",
     "law_firms.bell_carrington": "OK (62)",
-    "law_firms.brock_scott": "OK (324)",
+    "law_firms.brock_scott": "OK (318)",
     "law_firms.finkel": "OK (8)",
     "law_firms.hutchens": "OK (362)",
     "law_firms.korn": "APIFY-BLOCKED",
     "law_firms.mcmichael_taylor_gray": "APIFY-BLOCKED",
     "law_firms.rogers_townsend": "OK (27)",
     "counties_sc.anderson_master_in_equity": "OK (14)",
+    "counties_sc.greenville_master_in_equity": "OK (91)",
     "counties_sc.pickens_master_in_equity": "REGRESSED (expected ≥ 1)",
     "counties_sc.sc_flc": "OK (17)",
     "counties_sc.sc_public_index": "EMPTY (verified)",
@@ -138,18 +140,14 @@
   },
   "regressions": [],
   "errors": [
-    "national.auction_dot_com",
     "national.fannie_homepath",
     "national.foreclosure_dot_com",
     "national.freddie_homesteps",
     "national.hubzu",
-    "national.hud_homestore",
     "national.probate_foreclosure_leads",
-    "national.propwire",
     "national.realtor_foreclosures",
     "national.trulia",
     "national.xome",
-    "national.zillow_bulk",
     "national.zillow_foreclosures",
     "public_notices.ncnotices",
     "public_notices.publicnoticesc",
@@ -161,5 +159,5 @@
     "counties_nc.mecklenburg_tax",
     "city_websites.search"
   ],
-  "notes": "horizon=120d, scrapers=32, regressions=0"
+  "notes": "horizon=120d, scrapers=33, regressions=0"
 }
