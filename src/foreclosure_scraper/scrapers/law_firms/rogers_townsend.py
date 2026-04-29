@@ -176,26 +176,43 @@ class RogersTownsend(BaseScraper):
     expected_min_count = 10
 
     async def fetch(self) -> Iterable[Listing]:
+        import structlog
+        log = structlog.get_logger()
         out: list[Listing] = []
         async with client(timeout=45.0) as c:
             # SC: real PDF
             try:
                 r = await c.get(SC_URL)
+                magic = r.content[:8]
+                log.info(
+                    "rt.fetch.sc",
+                    status=r.status_code,
+                    bytes=len(r.content),
+                    magic=magic.hex(),
+                    is_pdf=(magic[:4] == b"%PDF"),
+                    content_type=r.headers.get("content-type", ""),
+                )
                 if r.status_code == 200 and r.content[:4] == b"%PDF":
                     out.extend(_parse_sc_pdf_with_pdfplumber(r.content, self.slug))
-            except Exception:
-                pass
+            except Exception as exc:
+                log.warning("rt.fetch.sc.error", error=str(exc)[:120])
             # NC: served as HTML even though .pdf extension
             try:
                 r = await c.get(NC_URL)
+                ct = r.headers.get("content-type", "").lower()
+                magic = r.content[:8]
+                log.info(
+                    "rt.fetch.nc",
+                    status=r.status_code,
+                    bytes=len(r.content),
+                    magic=magic.hex(),
+                    content_type=ct,
+                )
                 if r.status_code == 200:
-                    ct = r.headers.get("content-type", "").lower()
                     if "html" in ct or r.content[:6].lower().startswith(b"<!doct"):
                         out.extend(_parse_nc_html(r.text, self.slug))
                     elif r.content[:4] == b"%PDF":
-                        text = _extract_pdf_text(r.content)
-                        if text:
-                            out.extend(_parse_sc_pdf(text, self.slug))  # same parser shape works
-            except Exception:
-                pass
+                        out.extend(_parse_sc_pdf_with_pdfplumber(r.content, self.slug))
+            except Exception as exc:
+                log.warning("rt.fetch.nc.error", error=str(exc)[:120])
         return out
