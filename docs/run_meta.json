@@ -1,8 +1,8 @@
 {
-  "run_time": "2026-04-29T07:57:42.866549Z",
-  "total": 220,
+  "run_time": "2026-04-29T14:07:09.280939Z",
+  "total": 505,
   "by_source": {
-    "national.auction_dot_com": 583,
+    "national.auction_dot_com": 562,
     "national.bid4assets": 4,
     "national.fannie_homepath": 0,
     "national.foreclosure_dot_com": 0,
@@ -12,17 +12,17 @@
     "national.probate_foreclosure_leads": 0,
     "national.propwire": 1250,
     "national.realtor_foreclosures": 0,
-    "national.trulia": 0,
+    "national.trulia": 227,
     "national.xome": 0,
-    "national.zillow_bulk": 181,
+    "national.zillow_bulk": 176,
     "national.zillow_foreclosures": 0,
     "public_notices.ncnotices": 0,
     "public_notices.publicnoticesc": 0,
     "law_firms.aldridge_pite": 0,
-    "law_firms.bell_carrington": 62,
-    "law_firms.brock_scott": 318,
+    "law_firms.bell_carrington": 61,
+    "law_firms.brock_scott": 319,
     "law_firms.finkel": 8,
-    "law_firms.hutchens": 362,
+    "law_firms.hutchens": 357,
     "law_firms.korn": 0,
     "law_firms.mcmichael_taylor_gray": 0,
     "law_firms.rogers_townsend": 27,
@@ -38,12 +38,12 @@
     "counties_nc.mecklenburg_tax": 0,
     "counties_nc.polk_tax": 2,
     "counties_nc.rutherford_tax": 11,
-    "city_websites.search": 0,
+    "city_websites.search": 4,
     "courts.lis_pendens_discovery": 0
   },
   "by_state": {
-    "SC": 125,
-    "NC": 95
+    "SC": 247,
+    "NC": 258
   },
   "by_county_top": [
     [
@@ -52,15 +52,15 @@
     ],
     [
       "Mecklenburg, NC",
-      32
+      34
     ],
     [
       "Anderson, SC",
-      26
+      30
     ],
     [
       "Greenville, SC",
-      20
+      21
     ],
     [
       "Henderson, NC",
@@ -79,16 +79,24 @@
       7
     ],
     [
-      "Cherokee, SC",
+      "Pickens, SC",
+      6
+    ],
+    [
+      "Union, NC",
       5
     ],
     [
-      "Pickens, SC",
+      "Cherokee, SC",
       5
     ],
     [
       "Rutherford, NC",
       4
+    ],
+    [
+      "Iredell, NC",
+      3
     ],
     [
       "Laurens, SC",
@@ -97,18 +105,10 @@
     [
       "Cabarrus, NC",
       3
-    ],
-    [
-      "Union, NC",
-      3
-    ],
-    [
-      "Cleveland, NC",
-      2
     ]
   ],
   "source_status": {
-    "national.auction_dot_com": "OK (583)",
+    "national.auction_dot_com": "OK (562)",
     "national.bid4assets": "OK (4)",
     "national.fannie_homepath": "APIFY-BLOCKED",
     "national.foreclosure_dot_com": "APIFY-BLOCKED",
@@ -118,17 +118,17 @@
     "national.probate_foreclosure_leads": "APIFY-BLOCKED",
     "national.propwire": "OK (1250)",
     "national.realtor_foreclosures": "APIFY-BLOCKED",
-    "national.trulia": "APIFY-BLOCKED",
+    "national.trulia": "OK (227)",
     "national.xome": "APIFY-BLOCKED",
-    "national.zillow_bulk": "OK (181)",
+    "national.zillow_bulk": "OK (176)",
     "national.zillow_foreclosures": "EMPTY (verified)",
     "public_notices.ncnotices": "EMPTY (verified)",
     "public_notices.publicnoticesc": "EMPTY (verified)",
     "law_firms.aldridge_pite": "APIFY-BLOCKED",
-    "law_firms.bell_carrington": "OK (62)",
-    "law_firms.brock_scott": "OK (318)",
+    "law_firms.bell_carrington": "OK (61)",
+    "law_firms.brock_scott": "OK (319)",
     "law_firms.finkel": "OK (8)",
-    "law_firms.hutchens": "OK (362)",
+    "law_firms.hutchens": "OK (357)",
     "law_firms.korn": "APIFY-BLOCKED",
     "law_firms.mcmichael_taylor_gray": "APIFY-BLOCKED",
     "law_firms.rogers_townsend": "OK (27)",
@@ -144,7 +144,7 @@
     "counties_nc.mecklenburg_tax": "EMPTY (verified)",
     "counties_nc.polk_tax": "OK (2)",
     "counties_nc.rutherford_tax": "OK (11)",
-    "city_websites.search": "EMPTY (verified)"
+    "city_websites.search": "OK (4)"
   },
   "regressions": [],
   "errors": [
@@ -154,7 +154,6 @@
     "national.hubzu",
     "national.probate_foreclosure_leads",
     "national.realtor_foreclosures",
-    "national.trulia",
     "national.xome",
     "national.zillow_foreclosures",
     "public_notices.ncnotices",
@@ -164,8 +163,7 @@
     "law_firms.mcmichael_taylor_gray",
     "counties_sc.pickens_master_in_equity",
     "counties_sc.sc_public_index",
-    "counties_nc.mecklenburg_tax",
-    "city_websites.search"
+    "counties_nc.mecklenburg_tax"
   ],
   "notes": "horizon=120d, scrapers=37, regressions=0"
 }
