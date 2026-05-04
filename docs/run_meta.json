@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-05-04T09:19:16.812885Z",
-  "total": 622,
+  "run_time": "2026-05-04T10:39:19.027037Z",
+  "total": 862,
   "by_source": {
     "national.auction_dot_com": 0,
     "national.bid4assets": 4,
@@ -8,7 +8,7 @@
     "national.foreclosure_dot_com": 0,
     "national.freddie_homesteps": 0,
     "national.homeharvest": 18,
-    "national.distressed": 427,
+    "national.distressed": 429,
     "national.hubzu": 0,
     "national.hud_homestore": 0,
     "national.probate_foreclosure_leads": 0,
@@ -32,13 +32,16 @@
     "counties_sc.pickens_master_in_equity": 0,
     "counties_sc.sc_flc": 17,
     "counties_sc.sc_public_index": 0,
+    "counties_sc.sc_public_index_lis_pendens": 261,
     "counties_sc.spartanburg_master_in_equity": 18,
     "counties_nc.buncombe_tax": 2,
     "counties_nc.cleveland_tax": 6,
     "counties_nc.henderson_tax": 15,
     "counties_nc.mecklenburg_tax": 0,
+    "counties_nc.nc_ecourts_lis_pendens": 553,
     "counties_nc.polk_tax": 2,
     "counties_nc.rutherford_tax": 11,
+    "counties.nod_discovery": 0,
     "counties.sitemap_walker": 31,
     "newspapers.daily_courier": 1,
     "newspapers.hendersonville_lightning": 5,
@@ -48,57 +51,61 @@
     "courts.lis_pendens_discovery": 0
   },
   "by_state": {
-    "NC": 396,
-    "SC": 226
+    "SC": 485,
+    "NC": 377
   },
   "by_county_top": [
     [
       "Mecklenburg, NC",
-      197
+      180
     ],
     [
       "Spartanburg, SC",
-      82
+      180
     ],
     [
       "Anderson, SC",
-      80
+      159
     ],
     [
-      "Henderson, NC",
-      39
+      "Cherokee, SC",
+      46
     ],
     [
       "Gaston, NC",
       39
     ],
     [
-      "Cherokee, SC",
-      26
+      "Henderson, NC",
+      38
+    ],
+    [
+      "Laurens, SC",
+      38
+    ],
+    [
+      "Pickens, SC",
+      30
     ],
     [
       "Buncombe, NC",
       23
     ],
     [
+      "Oconee, SC",
+      20
+    ],
+    [
       "Cleveland, NC",
-      19
+      18
     ],
     [
       "Lincoln, NC",
       13
     ],
     [
-      "Pickens, SC",
-      11
-    ],
-    [
       "Rutherford, NC",
       11
-    ],
-    [
-      "Laurens, SC",
-      10
     ],
     [
       "McDowell, NC",
@@ -107,10 +114,6 @@
     [
       "Union, SC",
       9
-    ],
-    [
-      "Burke, NC",
-      7
     ]
   ],
   "source_status": {
@@ -120,7 +123,7 @@
     "national.foreclosure_dot_com": "APIFY-BLOCKED",
     "national.freddie_homesteps": "APIFY-BLOCKED",
     "national.homeharvest": "OK (18)",
-    "national.distressed": "OK (427)",
+    "national.distressed": "OK (429)",
     "national.hubzu": "APIFY-BLOCKED",
     "national.hud_homestore": "EMPTY (verified)",
     "national.probate_foreclosure_leads": "APIFY-BLOCKED",
@@ -144,13 +147,16 @@
     "counties_sc.pickens_master_in_equity": "REGRESSED (expected ≥ 1)",
     "counties_sc.sc_flc": "OK (17)",
     "counties_sc.sc_public_index": "EMPTY (verified)",
+    "counties_sc.sc_public_index_lis_pendens": "OK (261)",
     "counties_sc.spartanburg_master_in_equity": "OK (18)",
     "counties_nc.buncombe_tax": "OK (2)",
     "counties_nc.cleveland_tax": "OK (6)",
     "counties_nc.henderson_tax": "OK (15)",
     "counties_nc.mecklenburg_tax": "EMPTY (verified)",
+    "counties_nc.nc_ecourts_lis_pendens": "OK (553)",
     "counties_nc.polk_tax": "OK (2)",
     "counties_nc.rutherford_tax": "OK (11)",
+    "counties.nod_discovery": "REGRESSED (expected ≥ 1)",
     "counties.sitemap_walker": "OK (31)",
     "newspapers.daily_courier": "OK (1)",
     "newspapers.hendersonville_lightning": "OK (5)",
@@ -181,9 +187,10 @@
     "counties_sc.pickens_master_in_equity",
     "counties_sc.sc_public_index",
     "counties_nc.mecklenburg_tax",
+    "counties.nod_discovery",
     "newspapers.shelby_star",
     "newspapers.tryon_bulletin",
     "city_websites.search"
   ],
-  "notes": "horizon=120d, scrapers=43, regressions=0"
+  "notes": "horizon=120d, scrapers=46, regressions=0"
 }

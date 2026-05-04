@@ -31,7 +31,9 @@ RAW_KEEP = {
                  "owner_occupied_pct", "unemployment_pct"),
     "comps": "*",                     # 3 sold comps per listing (HomeHarvest)
     "rent_comps": "*",                # 3 rent comps per listing (HomeHarvest)
+    "comps_note": "*",                # explanation when no like-for-like found
     "comp_median_ppsf": "*",
+    "condition_tier": "*",            # move_in_ready / cosmetic / major / gut
     "rent_median_ppsf": "*",
     "estimated_monthly_rent": "*",
     "rod_docs": "*",                  # ROD recorded documents (deeds, mortgages, satisfactions)

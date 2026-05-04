@@ -7,7 +7,7 @@ The form must POST __VIEWSTATE + __EVENTVALIDATION + name fields.
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Iterable
 
 from dateutil import parser as dateparser
@@ -21,6 +21,35 @@ AUMENTUM_COUNTIES = {
     ("NC", "Buncombe"): "https://registerofdeeds.buncombecounty.org/External/LandRecords/protected/v4",
     ("NC", "Gaston"): "https://deeds.gastongov.com/external/LandRecords/protected/v4",
 }
+
+# Document-type labels Aumentum's SrchDocType.aspx exposes for NC ROD.
+# Aumentum stores both a short code and a free-text label; we POST the label
+# in the doc-type listbox and post-filter by keyword.
+AUMENTUM_NOD_DOC_TYPES = (
+    "NOTICE OF FORECLOSURE SALE",
+    "NOTICE OF SALE",
+    "NOTICE OF DEFAULT",
+    "LIS PENDENS",
+    "NOTICE OF HEARING",
+    "FORECLOSURE",
+)
+
+NOD_KEYWORDS = (
+    "NOTICE OF FORECLOSURE",
+    "NOTICE OF DEFAULT",
+    "NOTICE OF SALE",
+    "LIS PENDENS",
+    "NOS",
+    "NOD",
+    "FORECLOSURE SALE",
+)
+
+
+def _is_nod(doc_type: str | None) -> bool:
+    if not doc_type:
+        return False
+    s = doc_type.upper()
+    return any(kw in s for kw in NOD_KEYWORDS)
 
 
 def _extract_hidden(html: str, field: str) -> str:
@@ -128,3 +157,92 @@ async def search_by_name(state: str, county: str, name: str, max_docs: int = 50)
         return []
 
     return _parse_grid(r2.text, county, state)[:max_docs]
+
+
+async def discover_recent_nods(
+    state: str,
+    county: str,
+    days_back: int = 60,
+    max_docs: int = 100,
+) -> list[RodDoc]:
+    """Aumentum recent-recordings sweep filtered by NOD-style doc types.
+
+    Strategy: hit SrchDocType.aspx (the doc-type-driven search form) and POST
+    one doc-type at a time across our NOD label set, with a recorded-date
+    range of [today-days_back, today]. Aumentum sometimes silently ignores
+    the doc-type filter, so we still post-filter by keyword.
+    """
+    if (state, county) not in AUMENTUM_COUNTIES:
+        return []
+    base = AUMENTUM_COUNTIES[(state, county)]
+    form_url = f"{base}/SrchDocType.aspx"
+    fallback_url = f"{base}/SrchName.aspx"
+    today = datetime.utcnow()
+    from_date = today - timedelta(days=max(1, days_back))
+
+    out: list[RodDoc] = []
+    seen: set[tuple[str | None, str | None, str | None]] = set()
+
+    def _accept(rows: list[RodDoc]) -> bool:
+        added_any = False
+        for d in rows:
+            if not _is_nod(d.doc_type):
+                continue
+            if d.recorded_date and d.recorded_date < from_date:
+                continue
+            key = (d.book, d.page, (d.instrument_no or "").upper())
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(d)
+            added_any = True
+            if len(out) >= max_docs:
+                return True
+        return added_any
+
+    try:
+        async with client(timeout=30.0) as c:
+            r = await c.get(form_url)
+            if r.status_code != 200:
+                # Some installs only expose SrchDate.aspx — fall through
+                r = await c.get(fallback_url)
+                if r.status_code != 200:
+                    return []
+                form_url = fallback_url
+
+            html = r.text
+            viewstate = _extract_hidden(html, "__VIEWSTATE")
+            generator = _extract_hidden(html, "__VIEWSTATEGENERATOR")
+            event_val = _extract_hidden(html, "__EVENTVALIDATION")
+            if not viewstate:
+                return []
+
+            for doc_label in AUMENTUM_NOD_DOC_TYPES:
+                data = {
+                    "__VIEWSTATE": viewstate,
+                    "__VIEWSTATEGENERATOR": generator,
+                    "__EVENTVALIDATION": event_val,
+                    "ctl00$cphMain$ddlDocType": doc_label,
+                    "ctl00$cphMain$lstDocType": doc_label,
+                    "ctl00$cphMain$txtFromDate": from_date.strftime("%m/%d/%Y"),
+                    "ctl00$cphMain$txtThroughDate": today.strftime("%m/%d/%Y"),
+                    "ctl00$cphMain$txtFromRecordDate": from_date.strftime("%m/%d/%Y"),
+                    "ctl00$cphMain$txtThroughRecordDate": today.strftime("%m/%d/%Y"),
+                    "ctl00$cphMain$btnSearch": "Search",
+                }
+                try:
+                    r2 = await c.post(form_url, data=data, headers={"Referer": form_url})
+                except Exception:
+                    continue
+                if r2.status_code != 200:
+                    continue
+                rows = _parse_grid(r2.text, county, state)
+                if _accept(rows) and len(out) >= max_docs:
+                    return out[:max_docs]
+                # Refresh viewstate from response for next post
+                viewstate = _extract_hidden(r2.text, "__VIEWSTATE") or viewstate
+                generator = _extract_hidden(r2.text, "__VIEWSTATEGENERATOR") or generator
+                event_val = _extract_hidden(r2.text, "__EVENTVALIDATION") or event_val
+    except Exception:
+        return out[:max_docs]
+    return out[:max_docs]

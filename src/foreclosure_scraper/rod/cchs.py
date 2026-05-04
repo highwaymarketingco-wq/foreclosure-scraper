@@ -7,7 +7,7 @@ The form accepts grantor/grantee name params and returns an HTML table.
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Iterable
 from urllib.parse import urlencode
 
@@ -23,6 +23,29 @@ CCHS_COUNTIES = {
     ("NC", "Cleveland"): "clevelandnc",
 }
 
+# CCHS exposes a "Doctype" param that maps to short codes. Most installs
+# accept "FOR" (foreclosure) or take the human label literally; we try a
+# few candidates and merge results, then post-filter on doc_type to be safe.
+NOD_DOC_TYPE_CODES = ("FOR", "NFS", "NOS", "NOD", "LP", "ALL")
+
+# What we consider a "NOD-like" recorded document after parsing.
+NOD_KEYWORDS = (
+    "NOTICE OF FORECLOSURE",
+    "NOTICE OF DEFAULT",
+    "NOTICE OF SALE",
+    "LIS PENDENS",
+    "NOS",
+    "NOD",
+    "FORECLOSURE SALE",
+)
+
+
+def _is_nod(doc_type: str | None) -> bool:
+    if not doc_type:
+        return False
+    s = doc_type.upper()
+    return any(kw in s for kw in NOD_KEYWORDS)
+
 
 def _build_url(county_slug: str, name: str) -> str:
     base = f"https://us5.courthousecomputersystems.com/{county_slug}/searchonline.asp"
@@ -32,6 +55,24 @@ def _build_url(county_slug: str, name: str) -> str:
         "FromDate": (datetime.utcnow().replace(year=datetime.utcnow().year - 30)).strftime("%m/%d/%Y"),
         "ThroughDate": datetime.utcnow().strftime("%m/%d/%Y"),
         "Doctype": "ALL",
+    }
+    return f"{base}?{urlencode(params)}"
+
+
+def _build_doctype_url(
+    county_slug: str,
+    doctype: str,
+    from_date: datetime,
+    through_date: datetime,
+) -> str:
+    """Recent-recordings sweep filtered by document type code."""
+    base = f"https://us5.courthousecomputersystems.com/{county_slug}/searchonline.asp"
+    params = {
+        "nm1": "",
+        "nm2": "",
+        "FromDate": from_date.strftime("%m/%d/%Y"),
+        "ThroughDate": through_date.strftime("%m/%d/%Y"),
+        "Doctype": doctype,
     }
     return f"{base}?{urlencode(params)}"
 
@@ -99,3 +140,52 @@ async def search_by_name(state: str, county: str, name: str, max_docs: int = 50)
     except Exception:
         return []
     return _parse_results(html, county, state)[:max_docs]
+
+
+async def discover_recent_nods(
+    state: str,
+    county: str,
+    days_back: int = 60,
+    max_docs: int = 100,
+) -> list[RodDoc]:
+    """Sweep recent recordings in a CCHS county for NOD/NOS/Lis Pendens docs.
+
+    CCHS supports a `Doctype` URL param. We try a small set of plausible
+    codes (FOR / NFS / NOS / NOD / LP) and finally fall back to ALL with a
+    post-hoc keyword filter, since not every county install honors the
+    short codes the same way.
+    """
+    if (state, county) not in CCHS_COUNTIES:
+        return []
+    slug = CCHS_COUNTIES[(state, county)]
+    today = datetime.utcnow()
+    from_date = today - timedelta(days=max(1, days_back))
+
+    out: list[RodDoc] = []
+    seen: set[tuple[str | None, str | None, str | None]] = set()
+    try:
+        async with client(timeout=30.0) as c:
+            for code in NOD_DOC_TYPE_CODES:
+                url = _build_doctype_url(slug, code, from_date, today)
+                try:
+                    r = await c.get(url)
+                except Exception:
+                    continue
+                if r.status_code != 200:
+                    continue
+                rows = _parse_results(r.text, county, state)
+                for d in rows:
+                    if not _is_nod(d.doc_type):
+                        continue
+                    if d.recorded_date and d.recorded_date < from_date:
+                        continue
+                    key = (d.book, d.page, (d.doc_type or "").upper())
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    out.append(d)
+                    if len(out) >= max_docs:
+                        return out
+    except Exception:
+        return out
+    return out[:max_docs]

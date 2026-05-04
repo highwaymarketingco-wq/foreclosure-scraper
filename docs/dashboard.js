@@ -637,8 +637,57 @@ function openDetail(l) {
     $("d-location-section").style.display = "none";
   }
 
-  // Flags
+  // ----- Quick badges (TOP of detail panel, no scroll) -----
+  // Condition tier + flags + flood + critical signals all visible immediately
   const flags = (l.raw && l.raw.flags) || [];
+  const condTier = (l.raw && l.raw.condition_tier) || null;
+  const flood = (l.raw && l.raw.flood) || {};
+  const calc = (l.raw && l.raw.calc) || {};
+  const grade = (l.raw && l.raw.grade) || {};
+
+  const condLabel = {
+    "move_in_ready": { label: "Move-in ready", cls: "pos" },
+    "cosmetic":      { label: "Cosmetic work", cls: "warn-light" },
+    "major":         { label: "Major rehab",   cls: "warn" },
+    "gut":           { label: "Gut / tear-down", cls: "neg" },
+  };
+
+  const badges = [];
+
+  // Condition tier first — most-important investor signal
+  if (condTier && condLabel[condTier]) {
+    const c = condLabel[condTier];
+    badges.push(`<span class="qbadge ${c.cls}">${c.label}</span>`);
+  }
+
+  // ARV / max bid / ROI summary chips
+  if (calc.arv_expected) {
+    badges.push(`<span class="qbadge info">ARV ~$${Number(calc.arv_expected).toLocaleString()}</span>`);
+  }
+  if (calc.max_bid_70) {
+    badges.push(`<span class="qbadge info">Max bid (70%) $${Number(calc.max_bid_70).toLocaleString()}</span>`);
+  }
+  if (calc.roi_pct != null) {
+    const cls = calc.roi_pct > 25 ? "pos" : calc.roi_pct > 10 ? "warn-light" : "neg";
+    badges.push(`<span class="qbadge ${cls}">ROI ${calc.roi_pct.toFixed(0)}%</span>`);
+  }
+
+  // Flood
+  if (flood.in_sfha) {
+    badges.push(`<span class="qbadge neg">⚠ Flood zone ${flood.zone || "AE"}</span>`);
+  }
+
+  // Property flags as colored chips
+  flags.forEach((f) => {
+    const cls =
+      /vacant|fire|tear|condemned|hoarder|gutted|foundation|structural|negative_equity/.test(f) ? "neg" :
+      /renovated|updated|move-in|turnkey|new |high_equity/.test(f) ? "pos" : "warn-light";
+    badges.push(`<span class="qbadge ${cls}">${f.replace(/_/g, " ")}</span>`);
+  });
+
+  $("d-quick-badges").innerHTML = badges.join("");
+
+  // Keep the bottom flags section in sync (legacy — for users who scroll)
   if (flags.length) {
     $("d-flags-section").style.display = "block";
     $("d-flags").innerHTML = flags

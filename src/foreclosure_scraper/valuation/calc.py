@@ -56,11 +56,26 @@ class Calc:
 
 
 def _condition_to_tier(li: Listing) -> str:
-    """Pick rehab tier from year built + flags."""
-    flags = (li.raw or {}).get("flags", []) if isinstance(li.raw, dict) else []
-    flag_blob = " ".join(flags).lower()
+    """Pick rehab tier from condition_tier (set by enrichment_comps), flags, year built.
 
-    # Hard signals
+    Maps the four-tier condition (move_in_ready / cosmetic / major / gut)
+    to the five-tier rehab cost table (cosmetic / light / moderate / heavy / gut).
+    """
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    cond = raw.get("condition_tier")
+    cond_map = {
+        "move_in_ready": "cosmetic",
+        "cosmetic": "light",
+        "major": "moderate",
+        "gut": "gut",
+    }
+    if cond and cond in cond_map:
+        return cond_map[cond]
+
+    # Fallback: legacy flags-based detection
+    flags = raw.get("flags", []) if isinstance(raw, dict) else []
+    flag_blob = " ".join(flags).lower() if isinstance(flags, list) else ""
+
     if any(k in flag_blob for k in ("tear down", "fire damage", "uninhabitable", "condemned", "gutted")):
         return "gut"
     if any(k in flag_blob for k in ("foundation", "structural", "termite", "no power", "no water")):
@@ -72,7 +87,6 @@ def _condition_to_tier(li: Listing) -> str:
     if any(k in flag_blob for k in ("renovated", "remodeled", "move-in", "turnkey", "new roof", "new hvac")):
         return "cosmetic"
 
-    # Age-based default
     yb = li.year_built
     if yb:
         age = datetime.utcnow().year - yb
@@ -83,7 +97,6 @@ def _condition_to_tier(li: Listing) -> str:
         if age >= 25:
             return "light"
         return "cosmetic"
-    # Unknown age, unknown flags → assume moderate
     return "moderate"
 
 
@@ -152,6 +165,25 @@ def compute(li: Listing) -> Calc:
     expected, low, high, arv_conf, arv_notes = _arv_signals(li)
     out.arv_low, out.arv_expected, out.arv_high = low, expected, high
     out.notes.extend(arv_notes)
+
+    # ---- ARV sanity check vs listing price ------------------------------
+    # If the listing has an opening_bid AND it's a clean for-sale listing
+    # (HomeHarvest / Realtor sources), the bid IS the asking price and ARV
+    # should not be wildly different. Flag suspect ARVs.
+    if (out.arv_expected and li.opening_bid and li.opening_bid > 0
+            and li.source in ("national.homeharvest", "national.distressed",
+                              "national.realtor_foreclosures")):
+        ratio = out.arv_expected / li.opening_bid
+        if ratio < 0.6 or ratio > 1.6:
+            # ARV implausibly off from listing price — fall back to listing price
+            out.notes.append(
+                f"ARV (${out.arv_expected:,.0f}) was {ratio:.1f}× listing price "
+                f"(${li.opening_bid:,.0f}); using listing price as ARV anchor"
+            )
+            out.arv_expected = float(li.opening_bid)
+            out.arv_low = round(li.opening_bid * 0.90, -2)
+            out.arv_high = round(li.opening_bid * 1.10, -2)
+            arv_conf = "MEDIUM"
 
     # ---- Rehab range ----------------------------------------------------
     if li.property_kind == PropertyKind.LAND:

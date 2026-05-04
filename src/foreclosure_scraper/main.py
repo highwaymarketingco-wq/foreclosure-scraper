@@ -20,7 +20,7 @@ from .enrichment_courts import discover_lis_pendens, enrich_with_court_records
 from .enrichment_geocode import enrich as enrich_geocode
 from .flags import compute_flags
 from .link_validator import validate
-from .models import Listing
+from .models import Listing, PropertyKind
 from .scrapers._registry import all_scrapers
 from .sheets import write_listings
 from .valuation import calc as valuation_calc
@@ -78,7 +78,43 @@ DATELESS_OK_SOURCES = {
     "national.probate_foreclosure_leads",
     "national.homeharvest",    # actively-listed-with-agent foreclosures (no sale date until auction)
     "national.distressed",     # motivated-seller / cash-only / estate-sale / as-is hits
+    "counties_sc.sc_public_index_lis_pendens",  # filed but no sale date yet
+    "counties_nc.nc_ecourts_lis_pendens",       # NC Tyler portal civil-side filings
+    "counties.nod_discovery",                   # ROD-discovered NOD recordings
 }
+
+
+def _flip_candidate(li: Listing) -> bool:
+    """Filter out listings that aren't realistic flip candidates for upstate
+    SC + WNC investors. Drops:
+      - SFR / condo / townhouse priced > $750k UNLESS lot is >2 acres
+      - Anything priced > $1.5M (excluded outright; super-luxury isn't our scope)
+
+    KEEPS regardless of price:
+      - Multi-family (apartment complexes have their own value calc)
+      - Land (priced by acreage, not size)
+      - Properties without an opening_bid (unknown, don't drop blindly)
+    """
+    bid = li.opening_bid
+    if not bid or bid <= 0:
+        return True  # unknown price; keep
+
+    # Hard cap — nothing > $1.5M
+    if bid > 1_500_000:
+        return False
+
+    # Multi-family + land bypass
+    if li.property_kind in (PropertyKind.MULTI_FAMILY, PropertyKind.LAND):
+        return True
+
+    # SFR/condo/townhouse > $750k requires acreage justification
+    if bid > 750_000:
+        lot = li.lot_size_sqft
+        if lot and lot >= 2 * 43_560:  # 2+ acres
+            return True
+        return False
+
+    return True
 
 
 def _active_only(li: Listing, horizon_days: int) -> bool:
@@ -96,9 +132,14 @@ def _active_only(li: Listing, horizon_days: int) -> bool:
         # For court / law-firm / tax / public-notice sources a missing date almost
         # always means we scraped a historic roster; drop it.
         return li.source in DATELESS_OK_SOURCES
+    # Normalize sale_date to naive UTC (some scrapers return offset-aware
+    # datetimes from dateutil parsing; we compare against utcnow() which is naive).
+    sale = li.sale_date
+    if sale.tzinfo is not None:
+        sale = sale.replace(tzinfo=None)
     cutoff_past = datetime.utcnow() - timedelta(days=2)  # tiny grace for same-day sales
     cutoff_future = datetime.utcnow() + timedelta(days=horizon_days)
-    return cutoff_past <= li.sale_date <= cutoff_future
+    return cutoff_past <= sale <= cutoff_future
 
 
 async def run() -> int:
@@ -159,6 +200,13 @@ async def run() -> int:
     # Active only
     active = [li for li in in_area if _active_only(li, cfg.sale_horizon_days)]
     log.info("orchestrator.active", count=len(active), pruned=len(in_area) - len(active))
+
+    # Flip-candidate filter — drop super-luxury SFR (>$750k without 2+ acres,
+    # and anything >$1.5M outright). Multi-family + land bypass.
+    flip_able = [li for li in active if _flip_candidate(li)]
+    log.info("orchestrator.flip_filtered", count=len(flip_able),
+             pruned=len(active) - len(flip_able))
+    active = flip_able
 
     # Dedupe across sources
     deduped = dedupe(active)

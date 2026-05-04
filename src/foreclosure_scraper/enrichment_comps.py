@@ -1,33 +1,40 @@
 """Comp finder + property-data backfill via HomeHarvest sold listings.
 
-For every foreclosure listing on the dashboard, this enrichment:
-  1. Backfills missing sqft / beds / baths / year_built / lot_sqft from
-     HomeHarvest's per-address property record
-  2. Attaches 3 nearest sold comps that match by zip + sqft + beds
-  3. Computes price-per-sqft from those comps so the calculator + grade can
-     use real local market values, not statewide averages
+Like-for-like comp matching for accurate ARV and cash-flow analysis. The matcher
+filters by:
+  1. Property kind (single-family / condo / townhouse / multi-family / land /
+     manufactured) — never compares across kinds
+  2. Style/quality bucket (manufactured-vs-stick-built; new-build vs vintage)
+  3. Year built within ±15 years (era proxy for build quality / systems age)
+  4. Living sqft within ±20% (size band)
+  5. Bed count exact (±0; bedrooms drive resale and rent dollars)
+  6. Same ZIP first; relax to same city only if zip-pool is too thin
+
+Plus rent comps via the same matcher, and condition-tier inference from
+description text (move-in / cosmetic / major / gut). The condition tier feeds
+the calculator's rehab estimate so a "needs full reno" listing isn't priced
+the same as a "move-in ready" one.
 
 Cost: $0. HomeHarvest hits Realtor.com's public API directly.
-
-Strategy: pull all sold properties (past 180d) for each county seat ONCE per
-run, build an in-memory pool keyed by ZIP, then look up each listing in O(1).
 """
 from __future__ import annotations
 
 import asyncio
+import re
 from concurrent.futures import ThreadPoolExecutor
-from typing import Iterable
+from typing import Optional
 
 import structlog
 
 from .config import ALL_COUNTIES
-from .models import Listing
+from .models import Listing, PropertyKind
 
 log = structlog.get_logger()
 
 
+# ---- Pools (sold + rent) ---------------------------------------------------
+
 def _sold_pool_for_seat(seat: str, state: str) -> list[dict]:
-    """Sync HomeHarvest pull of sold properties for one county seat."""
     try:
         from homeharvest import scrape_property
     except ImportError:
@@ -47,7 +54,6 @@ def _sold_pool_for_seat(seat: str, state: str) -> list[dict]:
 
 
 def _rent_pool_for_seat(seat: str, state: str) -> list[dict]:
-    """Pull rentals for cash-flow comps (free via HomeHarvest)."""
     try:
         from homeharvest import scrape_property
     except ImportError:
@@ -66,26 +72,6 @@ def _rent_pool_for_seat(seat: str, state: str) -> list[dict]:
         return []
 
 
-def _by_address_lookup(street: str, city: str, state: str, zip_code: str | None = None) -> dict | None:
-    """Single-property lookup by full address. Used for backfill when a foreclosure
-    came from a courthouse roster (case# + address but no specs)."""
-    try:
-        from homeharvest import scrape_property
-    except ImportError:
-        return None
-    try:
-        # Try the address as a single-location query
-        loc = f"{street}, {city}, {state}"
-        if zip_code:
-            loc = f"{loc} {zip_code}"
-        df = scrape_property(location=loc, listing_type="for_sale")
-        if df is not None and len(df) > 0:
-            return df.iloc[0].to_dict()
-    except Exception:
-        pass
-    return None
-
-
 def _num(v):
     try:
         if v is None or (isinstance(v, float) and (v != v)):
@@ -95,112 +81,65 @@ def _num(v):
         return None
 
 
-def _pick_3_comps(target: Listing, sold_pool: list[dict],
-                   pools_by_state: dict | None = None) -> list[dict]:
-    """Pick 3 best comps for the target foreclosure with cascading fallback.
+# ---- Property-kind classification ------------------------------------------
 
-    Fallback chain (always returns 3 if pool has any properties at all):
-      1. Same ZIP code
-      2. Same city + state
-      3. Same county-pool (any property in this county)
-      4. Same state (cross-county pool from pools_by_state)
+def _classify_kind(row: dict | Listing) -> str:
+    """Bucket a HomeHarvest row OR a Listing into one of:
+       sfr | condo | townhouse | multi | land | manufactured | unknown"""
+    if isinstance(row, Listing):
+        # Use Listing's own classification
+        pk = row.property_kind
+        if pk == PropertyKind.SINGLE_FAMILY:
+            return "sfr"
+        if pk == PropertyKind.CONDO:
+            return "condo"
+        if pk == PropertyKind.TOWNHOUSE:
+            return "townhouse"
+        if pk == PropertyKind.MULTI_FAMILY:
+            return "multi"
+        if pk == PropertyKind.LAND:
+            return "land"
+        if pk == PropertyKind.MOBILE:
+            return "manufactured"
+        # Fall through to text heuristic when UNKNOWN
+        text_blob = " ".join(filter(None, [
+            row.description or "",
+            (row.raw or {}).get("style", ""),
+        ])).lower()
+    else:
+        # HomeHarvest dict row
+        style = str(row.get("style") or "").lower()
+        if "manufactured" in style or "mobile" in style:
+            return "manufactured"
+        if "single" in style:
+            return "sfr"
+        if "condo" in style:
+            return "condo"
+        if "town" in style:
+            return "townhouse"
+        if "multi" in style or "duplex" in style or "triplex" in style or "fourplex" in style:
+            return "multi"
+        if "land" in style or "lot" in style or "vacant" in style:
+            return "land"
+        text_blob = " ".join(str(row.get(k) or "") for k in ("text", "description", "style")).lower()
 
-    Within candidates: prefer ±25% sqft, ±1 beds, most recent sold date.
-    Tags each comp with `match_quality` so the dashboard can show confidence.
+    # Text heuristics
+    if any(k in text_blob for k in ("manufactured home", "mobile home", "double wide", "single wide", "doublewide", "singlewide")):
+        return "manufactured"
+    if any(k in text_blob for k in ("vacant land", "raw land", "buildable lot", "build site")):
+        return "land"
+    if any(k in text_blob for k in ("condominium", "condo unit")):
+        return "condo"
+    if "townhouse" in text_blob or "townhome" in text_blob:
+        return "townhouse"
+    if any(k in text_blob for k in ("duplex", "triplex", "fourplex", "multi-family", "multifamily", "5+ units")):
+        return "multi"
+    return "unknown"
 
-    Returns up to 3 dicts: {address, sold_price, sold_date, sqft, beds, baths, $/sqft, match_quality}
-    """
-    target_zip = (target.zip_code or "").strip()
-    target_city = (target.city or "").strip().lower()
-    target_state = (target.state or "").strip().upper()
-    target_sqft = target.living_sqft
-    target_beds = target.bedrooms
 
-    match_quality = "broad"
-
-    # Stage 1: ZIP-exact match
-    candidates: list[dict] = []
-    if target_zip:
-        candidates = [s for s in sold_pool if (str(s.get("zip_code") or "").strip()) == target_zip]
-        if candidates:
-            match_quality = "zip"
-
-    # Stage 2: city+state match
-    if not candidates and target_city:
-        candidates = [s for s in sold_pool
-                      if (str(s.get("city") or "").strip().lower()) == target_city
-                      and (str(s.get("state") or "").strip().upper()) == target_state]
-        if candidates:
-            match_quality = "city"
-
-    # Stage 3: same county-pool (any property in the supplied sold_pool)
-    if not candidates and sold_pool:
-        candidates = list(sold_pool)
-        match_quality = "county"
-
-    # Stage 4: cross-county within same state (last resort)
-    if not candidates and pools_by_state and target_state:
-        candidates = pools_by_state.get(target_state, [])
-        match_quality = "state"
-
-    if not candidates:
-        return []
-
-    # Stage 2: sqft band ±25% if target has sqft
-    if target_sqft and len(candidates) > 5:
-        lo, hi = target_sqft * 0.75, target_sqft * 1.25
-        sqft_filt = [s for s in candidates if s.get("sqft") and lo <= float(s["sqft"]) <= hi]
-        if len(sqft_filt) >= 3:
-            candidates = sqft_filt
-
-    # Stage 3: bed band ±1 if target has beds
-    if target_beds and len(candidates) > 5:
-        lo, hi = target_beds - 1, target_beds + 1
-        bed_filt = [s for s in candidates
-                    if s.get("beds") is not None and lo <= float(s["beds"]) <= hi]
-        if len(bed_filt) >= 3:
-            candidates = bed_filt
-
-    # Sort by sold_date desc (most recent first), then by sqft proximity
-    def score(s):
-        sold_date = str(s.get("last_sold_date") or "")
-        # ISO date sorts naturally; missing dates last
-        date_key = sold_date or "0000-00-00"
-        sqft_diff = abs(float(s.get("sqft") or 0) - (target_sqft or 0))
-        return (-1 * (date_key,), sqft_diff)
-
-    try:
-        candidates.sort(key=lambda s: (str(s.get("last_sold_date") or "0000"), -1), reverse=True)
-    except Exception:
-        pass
-
-    out: list[dict] = []
-    for s in candidates[:3]:
-        sold_price = _num(s.get("sold_price")) or _num(s.get("list_price"))
-        sqft = _num(s.get("sqft"))
-        out.append({
-            "address": str(s.get("street") or s.get("formatted_address") or "").strip(),
-            "city": s.get("city"),
-            "zip": s.get("zip_code"),
-            "sold_price": sold_price,
-            "sold_date": str(s.get("last_sold_date") or "") or None,
-            "sqft": sqft,
-            "beds": _num(s.get("beds")),
-            "baths": _num(s.get("full_baths")),
-            "year_built": int(s["year_built"]) if s.get("year_built") and str(s["year_built"]).replace(".0", "").isdigit() else None,
-            "price_per_sqft": round(sold_price / sqft, 2) if sold_price and sqft else None,
-            "url": s.get("property_url"),
-            "match_quality": match_quality,  # "zip" | "city" | "county" | "state" | "broad"
-        })
-    return out
-
+# ---- Spec backfill (best-effort match by exact street) ---------------------
 
 def _backfill_property_data(li: Listing, sold_pool: list[dict]) -> None:
-    """Try to find this listing's specs in the sold pool by address match.
-    A foreclosure that recently sold (or was listed and pulled) might appear
-    in HomeHarvest with full sqft/beds/baths even though our courthouse
-    roster only had the address.
-    """
     if not (li.street_address and (li.zip_code or li.city)):
         return
     target_street = li.street_address.strip().lower()
@@ -208,7 +147,7 @@ def _backfill_property_data(li: Listing, sold_pool: list[dict]) -> None:
         s_street = str(s.get("street") or "").strip().lower()
         if not s_street:
             continue
-        if s_street == target_street or (s_street and s_street in target_street) or (target_street and target_street in s_street):
+        if s_street == target_street or s_street in target_street or target_street in s_street:
             if li.living_sqft is None and s.get("sqft"):
                 li.living_sqft = _num(s.get("sqft"))
             if li.bedrooms is None and s.get("beds"):
@@ -222,49 +161,169 @@ def _backfill_property_data(li: Listing, sold_pool: list[dict]) -> None:
             return
 
 
-def _pick_3_rent_comps(target: Listing, rent_pool: list[dict],
-                        rent_pools_by_state: dict | None = None) -> list[dict]:
-    """Pick 3 best rent comps with cascading fallback (zip -> city -> county -> state)."""
+# ---- Strict comp matcher ---------------------------------------------------
+
+SQFT_BAND_PCT = 0.20    # ±20% of subject sqft
+YEAR_BAND = 15          # ±15 years
+BED_BAND_EXACT = True   # bedrooms must match exactly
+LAND_LOT_BAND_PCT = 0.50  # for land, ±50% acreage tolerance
+
+
+def _within_band(value: float, target: float, pct: float) -> bool:
+    if not value or not target:
+        return False
+    return target * (1 - pct) <= value <= target * (1 + pct)
+
+
+def _filter_by_kind(pool: list[dict], target_kind: str) -> list[dict]:
+    """Keep only same-kind properties from the pool."""
+    if target_kind == "unknown":
+        # No kind info on subject — return SFR pool (most common, safest default)
+        target_kind = "sfr"
+    out: list[dict] = []
+    for p in pool:
+        pk = _classify_kind(p)
+        if pk == target_kind:
+            out.append(p)
+        # SFR ↔ townhouse interchangeable when one is unknown
+        elif target_kind == "sfr" and pk == "townhouse":
+            out.append(p)
+    return out
+
+
+def _pick_3_comps(target: Listing, sold_pool: list[dict]) -> list[dict]:
+    """Strict like-for-like comp matcher. Refuses to mix kinds.
+
+    Returns up to 3 dicts. If pool can't produce a like-for-like match, returns
+    fewer (or zero) — better to show "not enough comps" than misleading comps.
+    """
+    target_kind = _classify_kind(target)
+    target_zip = (target.zip_code or "").strip()
+    target_city = (target.city or "").strip().lower()
+    target_state = (target.state or "").strip().upper()
+    target_sqft = target.living_sqft
+    target_beds = target.bedrooms
+    target_year = target.year_built
+    target_lot = target.lot_size_sqft
+
+    # Stage 1: same kind only
+    kind_pool = _filter_by_kind(sold_pool, target_kind)
+    if not kind_pool:
+        return []
+    match_quality = "kind"
+
+    # Stage 2: zip-match within same kind
+    zip_pool = [s for s in kind_pool if str(s.get("zip_code") or "").strip() == target_zip] if target_zip else []
+    pool = zip_pool if zip_pool else kind_pool
+    if zip_pool:
+        match_quality = "zip+kind"
+    elif target_city:
+        city_pool = [s for s in kind_pool
+                     if str(s.get("city") or "").strip().lower() == target_city
+                     and str(s.get("state") or "").strip().upper() == target_state]
+        if city_pool:
+            pool = city_pool
+            match_quality = "city+kind"
+
+    # Stage 3 (LAND ONLY): match by lot acreage band — sqft is meaningless for raw land
+    if target_kind == "land" and target_lot:
+        lot_filt = [s for s in pool
+                    if s.get("lot_sqft") and _within_band(float(s["lot_sqft"]), target_lot, LAND_LOT_BAND_PCT)]
+        if lot_filt:
+            pool = lot_filt
+            match_quality += "+lot"
+
+    # Stage 4 (NON-LAND): sqft band
+    if target_kind != "land" and target_sqft:
+        sqft_filt = [s for s in pool
+                     if s.get("sqft") and _within_band(float(s["sqft"]), target_sqft, SQFT_BAND_PCT)]
+        if len(sqft_filt) >= 3:
+            pool = sqft_filt
+            match_quality += "+sqft"
+
+    # Stage 5 (NON-LAND): beds exact
+    if target_kind not in ("land", "multi") and target_beds:
+        bed_filt = [s for s in pool
+                    if s.get("beds") is not None and float(s["beds"]) == target_beds]
+        if len(bed_filt) >= 3:
+            pool = bed_filt
+            match_quality += "+beds"
+
+    # Stage 6: year ±15
+    if target_year:
+        yr_filt = [s for s in pool
+                   if s.get("year_built") and abs(float(s["year_built"]) - target_year) <= YEAR_BAND]
+        if len(yr_filt) >= 3:
+            pool = yr_filt
+            match_quality += "+era"
+
+    # Sort by recency
+    try:
+        pool.sort(key=lambda s: str(s.get("last_sold_date") or "0000"), reverse=True)
+    except Exception:
+        pass
+
+    out: list[dict] = []
+    for s in pool[:3]:
+        sold_price = _num(s.get("sold_price")) or _num(s.get("list_price"))
+        sqft = _num(s.get("sqft"))
+        out.append({
+            "address": str(s.get("street") or s.get("formatted_address") or "").strip(),
+            "city": s.get("city"),
+            "zip": s.get("zip_code"),
+            "sold_price": sold_price,
+            "sold_date": str(s.get("last_sold_date") or "") or None,
+            "sqft": sqft,
+            "lot_sqft": _num(s.get("lot_sqft")),
+            "beds": _num(s.get("beds")),
+            "baths": _num(s.get("full_baths")),
+            "year_built": int(s["year_built"]) if s.get("year_built") and str(s["year_built"]).replace(".0", "").isdigit() else None,
+            "kind": _classify_kind(s),
+            "price_per_sqft": round(sold_price / sqft, 2) if sold_price and sqft else None,
+            "url": s.get("property_url"),
+            "match_quality": match_quality,
+        })
+    return out
+
+
+def _pick_3_rent_comps(target: Listing, rent_pool: list[dict]) -> list[dict]:
+    """Strict rent-comp matcher: same kind + zip + sqft band + beds."""
+    target_kind = _classify_kind(target)
+    if target_kind == "land":
+        return []  # land doesn't rent
+
+    kind_pool = _filter_by_kind(rent_pool, target_kind)
+    if not kind_pool:
+        return []
+
     target_zip = (target.zip_code or "").strip()
     target_city = (target.city or "").strip().lower()
     target_state = (target.state or "").strip().upper()
     target_sqft = target.living_sqft
     target_beds = target.bedrooms
 
-    match_quality = "broad"
-    candidates: list[dict] = []
-    if target_zip:
-        candidates = [s for s in rent_pool if str(s.get("zip_code") or "").strip() == target_zip]
-        if candidates:
-            match_quality = "zip"
-    if not candidates and target_city:
-        candidates = [s for s in rent_pool
-                      if str(s.get("city") or "").strip().lower() == target_city
-                      and str(s.get("state") or "").strip().upper() == target_state]
-        if candidates:
-            match_quality = "city"
-    if not candidates and rent_pool:
-        candidates = list(rent_pool)
-        match_quality = "county"
-    if not candidates and rent_pools_by_state and target_state:
-        candidates = rent_pools_by_state.get(target_state, [])
-        match_quality = "state"
-    if not candidates:
-        return []
+    pool = ([s for s in kind_pool if str(s.get("zip_code") or "").strip() == target_zip]
+            if target_zip else [])
+    if not pool and target_city:
+        pool = [s for s in kind_pool
+                if str(s.get("city") or "").strip().lower() == target_city
+                and str(s.get("state") or "").strip().upper() == target_state]
+    if not pool:
+        return []  # don't fall back — rent varies too much across counties
 
-    if target_beds and len(candidates) > 5:
-        bed_filt = [s for s in candidates
-                    if s.get("beds") is not None and abs(float(s["beds"]) - target_beds) <= 1]
+    if target_beds:
+        bed_filt = [s for s in pool
+                    if s.get("beds") is not None and float(s["beds"]) == target_beds]
         if len(bed_filt) >= 3:
-            candidates = bed_filt
-    if target_sqft and len(candidates) > 5:
-        lo, hi = target_sqft * 0.75, target_sqft * 1.25
-        sqft_filt = [s for s in candidates if s.get("sqft") and lo <= float(s["sqft"]) <= hi]
+            pool = bed_filt
+    if target_sqft:
+        sqft_filt = [s for s in pool
+                     if s.get("sqft") and _within_band(float(s["sqft"]), target_sqft, SQFT_BAND_PCT)]
         if len(sqft_filt) >= 3:
-            candidates = sqft_filt
+            pool = sqft_filt
 
     out: list[dict] = []
-    for s in candidates[:3]:
+    for s in pool[:3]:
         rent = _num(s.get("list_price"))
         sqft = _num(s.get("sqft"))
         out.append({
@@ -277,23 +336,101 @@ def _pick_3_rent_comps(target: Listing, rent_pool: list[dict],
             "baths": _num(s.get("full_baths")),
             "rent_per_sqft": round(rent / sqft, 2) if rent and sqft else None,
             "url": s.get("property_url"),
-            "match_quality": match_quality,
         })
     return out
 
 
+# ---- Condition tier inference ---------------------------------------------
+
+CONDITION_PATTERNS = {
+    "move_in_ready": re.compile(
+        r"\b(move[\s\-]?in\s+ready|recently\s+(?:renovated|updated|remodeled)|"
+        r"new\s+(?:roof|hvac|kitchen|bath)|fully\s+(?:renovated|updated)|"
+        r"pristine|turn[\s\-]?key|like\s+new)\b", re.I),
+    "cosmetic": re.compile(
+        r"\b(needs\s+(?:cosmetic|minor)\s+(?:work|updates|TLC)|"
+        r"some\s+(?:cosmetic|minor)\s+(?:work|TLC)|paint|carpet)\b", re.I),
+    "major": re.compile(
+        r"\b(needs\s+(?:major|substantial|significant)\s+(?:work|repairs)|"
+        r"fixer[\s\-]?upper|handyman\s+special|investor\s+special|"
+        r"as[\s\-]?is(?:\s+condition)?|cash\s+only|"
+        r"needs\s+TLC|requires\s+(?:work|repair))\b", re.I),
+    "gut": re.compile(
+        r"\b(complete\s+(?:gut|renovation)|tear[\s\-]?down|knockdown|"
+        r"shell\s+only|down\s+to\s+studs|fire[\s\-]?damaged|"
+        r"condemned|uninhabitable)\b", re.I),
+}
+
+# Default condition by year-built bucket when no description signals
+DEFAULT_CONDITION_BY_AGE = {
+    # newer than 5 years → move-in ready unless told otherwise
+    "new":     "move_in_ready",     # built within 5 years
+    "modern":  "move_in_ready",     # 5-25 years
+    "vintage": "cosmetic",          # 25-50 years
+    "older":   "major",             # 50-80 years
+    "ancient": "gut",               # 80+ years
+}
+
+
+def _condition_tier(li: Listing) -> str:
+    """Return one of: move_in_ready, cosmetic, major, gut.
+
+    Strongest signal first: explicit description keywords. Falls back to
+    age-based default when description is silent. Distressed-source listings
+    default at least to 'cosmetic' (motivated seller is a tell).
+    """
+    parts: list[str] = []
+    if li.description:
+        parts.append(str(li.description))
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    distressed = raw.get("distressed") or {}
+    kw = distressed.get("matched_keywords") if isinstance(distressed, dict) else None
+    if isinstance(kw, list):
+        parts.append(" ".join(str(k) for k in kw))
+    elif isinstance(kw, str):
+        parts.append(kw)
+    text = " ".join(parts)
+
+    # Most-severe-first match
+    for tier in ("gut", "major", "cosmetic", "move_in_ready"):
+        if CONDITION_PATTERNS[tier].search(text):
+            return tier
+
+    # Default by age
+    yb = li.year_built
+    if yb:
+        from datetime import datetime as _dt
+        age = _dt.utcnow().year - yb
+        if age < 5:
+            return "move_in_ready"
+        if age < 25:
+            return "move_in_ready"
+        if age < 50:
+            return "cosmetic"
+        if age < 80:
+            return "major"
+        return "gut"
+
+    # Distressed source → at least cosmetic
+    if li.source in ("national.distressed", "national.propwire"):
+        return "cosmetic"
+
+    return "cosmetic"  # safe middle
+
+
+# ---- Main enrichment -------------------------------------------------------
+
 async def enrich_with_comps(listings: list[Listing]) -> None:
     """Pull sold + rent pools per priority county-seat and attach:
-       - 3 sold comps (for ARV calculation)
-       - 3 rent comps (for cash-flow + cap rate)
+       - 3 sold comps (kind+zip+sqft+beds+era matched)
+       - 3 rent comps (kind+zip+beds+sqft matched)
        - Spec backfill (sqft, beds, baths, year)
-    All free via HomeHarvest direct.
+       - Condition tier (move_in / cosmetic / major / gut)
     """
     if not listings:
         return
     log.info("comps.start", count=len(listings))
 
-    # Pull sold + rent pools for all counties in parallel
     loop = asyncio.get_event_loop()
     with ThreadPoolExecutor(max_workers=6) as pool:
         sold_futs = [loop.run_in_executor(pool, _sold_pool_for_seat, c.seat, c.state) for c in ALL_COUNTIES]
@@ -310,62 +447,66 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
             sold_pools[(c.state, c.name)] = sr
         if isinstance(rr, list):
             rent_pools[(c.state, c.name)] = rr
-    # Cross-county state pools (last-resort fallback so EVERY listing can get 3 comps)
-    sold_by_state: dict[str, list[dict]] = {}
-    rent_by_state: dict[str, list[dict]] = {}
-    for (st, _county), pool in sold_pools.items():
-        sold_by_state.setdefault(st, []).extend(pool)
-    for (st, _county), pool in rent_pools.items():
-        rent_by_state.setdefault(st, []).extend(pool)
     total_sold = sum(len(p) for p in sold_pools.values())
     total_rent = sum(len(p) for p in rent_pools.values())
     log.info("comps.pools_built", counties=len(sold_pools),
              total_sold=total_sold, total_rent=total_rent)
 
     matched_sold = matched_rent = backfilled = 0
+    cond_counts = {"move_in_ready": 0, "cosmetic": 0, "major": 0, "gut": 0}
+
     for li in listings:
-        # Even if county/state are sparse, still try via state-pool fallback
         sold_pool = sold_pools.get((li.state, li.county)) if (li.county and li.state) else None
         rent_pool = rent_pools.get((li.state, li.county)) if (li.county and li.state) else None
 
-        # Backfill specs first using the most-relevant pool we have
+        # Spec backfill from same-county sold pool
         before = (li.living_sqft, li.bedrooms, li.bathrooms)
         if sold_pool:
             _backfill_property_data(li, sold_pool)
-        elif li.state and li.state in sold_by_state:
-            _backfill_property_data(li, sold_by_state[li.state])
         after = (li.living_sqft, li.bedrooms, li.bathrooms)
         if before != after:
             backfilled += 1
 
-        # Sold comps with cascading fallback to state-pool
-        comps = _pick_3_comps(li, sold_pool or [], pools_by_state=sold_by_state)
-        if comps:
-            if not isinstance(li.raw, dict):
-                li.raw = {}
-            li.raw["comps"] = comps
-            ppsf = [c["price_per_sqft"] for c in comps if c.get("price_per_sqft")]
-            if ppsf:
-                ppsf.sort()
-                li.raw["comp_median_ppsf"] = ppsf[len(ppsf) // 2]
-            matched_sold += 1
+        # Condition tier
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        tier = _condition_tier(li)
+        li.raw["condition_tier"] = tier
+        cond_counts[tier] = cond_counts.get(tier, 0) + 1
 
-        # Rent comps with cascading fallback to state-pool
-        rents = _pick_3_rent_comps(li, rent_pool or [], rent_pools_by_state=rent_by_state)
-        if rents:
-            if not isinstance(li.raw, dict):
-                li.raw = {}
-            li.raw["rent_comps"] = rents
-            rpsf = [r["rent_per_sqft"] for r in rents if r.get("rent_per_sqft")]
-            if rpsf:
-                rpsf.sort()
-                li.raw["rent_median_ppsf"] = rpsf[len(rpsf) // 2]
-            monthly = [r["rent_per_month"] for r in rents if r.get("rent_per_month")]
-            if monthly:
-                monthly.sort()
-                li.raw["estimated_monthly_rent"] = monthly[len(monthly) // 2]
-            matched_rent += 1
+        # Sold comps (strict like-for-like; may return fewer than 3 or zero)
+        if sold_pool:
+            comps = _pick_3_comps(li, sold_pool)
+            if comps:
+                li.raw["comps"] = comps
+                ppsf = [c["price_per_sqft"] for c in comps if c.get("price_per_sqft")]
+                if ppsf:
+                    ppsf.sort()
+                    li.raw["comp_median_ppsf"] = ppsf[len(ppsf) // 2]
+                matched_sold += 1
+            else:
+                li.raw["comps_note"] = (
+                    f"no like-for-like comps in same kind ({_classify_kind(li)}) "
+                    f"+ same zip/city pool"
+                )
+
+        # Rent comps (strict; same kind + zip)
+        if rent_pool:
+            rents = _pick_3_rent_comps(li, rent_pool)
+            if rents:
+                li.raw["rent_comps"] = rents
+                rpsf = [r["rent_per_sqft"] for r in rents if r.get("rent_per_sqft")]
+                if rpsf:
+                    rpsf.sort()
+                    median_rpsf = rpsf[len(rpsf) // 2]
+                    li.raw["rent_median_ppsf"] = median_rpsf
+                    # Sanity-bound the per-sqft estimate
+                    median_rpsf = max(0.50, min(3.50, median_rpsf))
+                    if li.living_sqft:
+                        # Estimate rent from per-sqft (more reliable than absolute median)
+                        li.raw["estimated_monthly_rent"] = round(median_rpsf * li.living_sqft, -1)
+                matched_rent += 1
 
     log.info("comps.done", listings=len(listings),
              sold_matched=matched_sold, rent_matched=matched_rent,
-             backfilled=backfilled)
+             backfilled=backfilled, conditions=cond_counts)

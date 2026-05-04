@@ -276,3 +276,66 @@ footer div { margin-bottom: 4px; }
 .comps-table tr:last-child td { border-bottom: none; }
 .comps-table a { color: var(--accent); text-decoration: none; }
 .comps-table a:hover { text-decoration: underline; }
+
+/* === Quick badges at top of detail panel === */
+.quick-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.18);
+}
+.qbadge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.20);
+  color: white;
+  white-space: nowrap;
+}
+.qbadge.pos {
+  background: rgba(46, 160, 67, 0.95);
+  color: white;
+}
+.qbadge.neg {
+  background: rgba(207, 34, 46, 0.95);
+  color: white;
+}
+.qbadge.warn {
+  background: rgba(255, 145, 0, 0.95);
+  color: white;
+}
+.qbadge.warn-light {
+  background: rgba(212, 167, 44, 0.95);
+  color: white;
+}
+.qbadge.info {
+  background: rgba(40, 92, 165, 0.95);
+  color: white;
+}
+
+/* Listing-card / table flag chips */
+.card-flags {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: calc(100% - 16px);
+}
+.card-flag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  text-transform: uppercase;
+}
+.card-flag.pos { background: rgba(46, 160, 67, 0.95); }
+.card-flag.neg { background: rgba(207, 34, 46, 0.95); }
+.card-flag.warn { background: rgba(255, 145, 0, 0.95); }
