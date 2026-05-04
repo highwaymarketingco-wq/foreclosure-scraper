@@ -292,6 +292,18 @@ async def run() -> int:
     except Exception:
         log.error("bk_property.failed", traceback=traceback.format_exc())
 
+    # NC eCourts case-status check via Tyler portal (Scrapling/Playwright).
+    # Tags listings.raw.nc_case_status with current docket state — pending,
+    # sold (recent sale), upset_bid (in 10-day window), confirmed, dismissed.
+    # Heavy: each case takes a few seconds to render; capped to top 100 cases
+    # prioritized by recent sale_date. Disable with NC_CASE_STATUS_OFF=1.
+    if not os.environ.get("NC_CASE_STATUS_OFF"):
+        try:
+            from .enrichment_nc_case_status import enrich_with_nc_case_status
+            await enrich_with_nc_case_status(enriched)
+        except Exception:
+            log.error("nc_case_status.failed", traceback=traceback.format_exc())
+
     # Bankruptcy cross-reference — for every existing listing whose defendant
     # matches a recent NC/SC bankruptcy filing, tag raw.bankruptcy with the
     # chapter/court/date/docket. Free with CourtListener token. Strong pre-

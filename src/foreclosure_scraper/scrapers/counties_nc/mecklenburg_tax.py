@@ -1,131 +1,96 @@
-"""Mecklenburg County NC tax foreclosures via Kania Law Firm AJAX endpoint.
+"""Mecklenburg County NC tax foreclosures via RBC Wealth Management page.
 
-Page renders a Ninja Tables widget that calls admin-ajax.php with a nonce
-scraped from the page HTML. We replicate the AJAX flow directly.
+The Kania Law Firm page was deprecated. RBC Wealth Management now publishes
+the Mecklenburg tax foreclosure list (legal counsel relationship) at
+https://www.rbcwb.com/tax-foreclosure-listings/.
+
+Page renders the data as plain HTML <tr> rows — no AJAX/JS needed.
+Columns: Defendant | Address | ZIP | Parcel | Case# | Sale Date | (link)
 """
 from __future__ import annotations
 
 import re
 from datetime import datetime
-from html import unescape
 from typing import Iterable
 
 from dateutil import parser as dateparser
+from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
-from ...http_client import client
+from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 
-PAGE_URL = "https://kanialawfirm.com/tax-foreclosures-mecklenburg-county/foreclosure-listings/"
-AJAX_URL = "https://kanialawfirm.com/wp-admin/admin-ajax.php"
-
-NONCE_RE = re.compile(r'"nonce":"([a-f0-9]+)"')
-TABLE_ID_RE = re.compile(r'"tableId":(\d+)')
-
-ADDR_RE = re.compile(
-    r"(\d+\s+[A-Z][\w .'\-]+(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
-    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\.?)",
-    re.I,
-)
-PARCEL_RE = re.compile(r"\b(\d{5,10})\b")
+URL = "https://www.rbcwb.com/tax-foreclosure-listings/"
 
 
-class MecklenburgTaxForeclosures(BaseScraper):
+def _parse_sale_date(text: str) -> datetime | None:
+    if not text or "no sale" in text.lower():
+        return None
+    try:
+        return dateparser.parse(text, fuzzy=True)
+    except (ValueError, TypeError):
+        return None
+
+
+class MecklenburgTax(BaseScraper):
     slug = "counties_nc.mecklenburg_tax"
-    name = "Kania Law NC Tax Foreclosures (Mecklenburg)"
+    name = "Mecklenburg County (NC) — Tax Foreclosures (RBC)"
     category = "county_tax"
-    timeout_s = 90.0
-    expected_min_count = 0  # often empty between auction cycles
+    timeout_s = 60.0
+    expected_min_count = 5
 
     async def fetch(self) -> Iterable[Listing]:
-        async with client(timeout=30.0) as c:
-            try:
-                r = await c.get(PAGE_URL)
-                if r.status_code != 200:
-                    return []
-                page_html = r.text
-            except Exception:
-                return []
-
-            nonce_m = NONCE_RE.search(page_html)
-            table_m = TABLE_ID_RE.search(page_html)
-            if not nonce_m or not table_m:
-                return []
-            nonce = nonce_m.group(1)
-            table_id = table_m.group(1)
-
-            try:
-                r = await c.get(
-                    AJAX_URL,
-                    params={
-                        "action": "wp_ajax_ninja_tables_public_action",
-                        "table_id": table_id,
-                        "target_action": "get-all-data",
-                        "default_sorting": "old_first",
-                        "skip_rows": "0",
-                        "limit_rows": "0",
-                        "ninja_table_public_nonce": nonce,
-                    },
-                    headers={
-                        "X-Requested-With": "XMLHttpRequest",
-                        "Referer": PAGE_URL,
-                    },
-                )
-                if r.status_code != 200:
-                    return []
-                data = r.json()
-            except Exception:
-                return []
-
-        if not isinstance(data, list):
+        try:
+            html = await get_text(URL, timeout=30.0)
+        except Exception:
             return []
-
+        tree = HTMLParser(html)
+        rows = tree.css("tr")
         out: list[Listing] = []
-        for row in data:
-            county = (row.get("county") or "").replace(" County", "").strip()
-            if county.lower() != "mecklenburg":
+        for row in rows:
+            cells = [c.text(strip=True) for c in row.css("td")]
+            if len(cells) < 5:
                 continue
-            sale_raw = row.get("saledate") or ""
-            sale_date = None
-            if sale_raw:
-                try:
-                    sale_date = dateparser.parse(sale_raw)
-                except (ValueError, TypeError):
-                    pass
+            defendant, addr, zip_code, parcel, case_no = cells[:5]
+            sale_text = cells[5] if len(cells) > 5 else ""
 
-            addr_html = row.get("addressparcel") or ""
-            addr_text = unescape(re.sub(r"<[^>]+>", " ", addr_html))
-            addr_m = ADDR_RE.search(addr_text)
-            parcel_m = PARCEL_RE.search(addr_text)
+            # Skip header rows
+            if defendant.lower() in ("defendant", "name", ""):
+                continue
+            # Need at least an address or parcel
+            if not addr or len(addr) < 4:
+                continue
 
-            bid = None
-            for k in ("openingbid", "currentbid"):
-                v = row.get(k)
-                if v:
-                    bm = re.search(r"\$?\s*([\d,]+(?:\.\d{2})?)", str(v))
-                    if bm:
-                        try:
-                            bid = float(bm.group(1).replace(",", ""))
-                            break
-                        except ValueError:
-                            pass
+            # Address format: street + optional unit. Pull street.
+            street = re.sub(r"\s+", " ", addr).strip()
+            if street.lower().startswith("vacant lot"):
+                kind = PropertyKind.LAND
+            else:
+                kind = PropertyKind.UNKNOWN
+
+            sale_date = _parse_sale_date(sale_text)
 
             out.append(
                 Listing(
                     source=self.slug,
-                    source_url=PAGE_URL,
+                    source_url=URL,
                     listing_type=ListingType.TAX_SALE,
-                    property_kind=PropertyKind.UNKNOWN,
-                    street_address=addr_m.group(1) if addr_m else None,
+                    property_kind=kind,
                     state="NC",
                     county="Mecklenburg",
-                    parcel_id=parcel_m.group(1) if parcel_m else None,
+                    street_address=street,
+                    zip_code=zip_code.strip()[:5] if zip_code and zip_code.strip().isdigit() else None,
+                    parcel_id=parcel.strip() if parcel and len(parcel.strip()) >= 5 else None,
+                    case_number=case_no.strip() if case_no else None,
+                    defendant=defendant.strip()[:200],
                     sale_date=sale_date,
-                    opening_bid=bid,
-                    case_number=row.get("courtfile"),
-                    description=addr_text[:300],
+                    description=f"Mecklenburg tax foreclosure — Case {case_no} ({sale_text or 'no sale date set'})",
                     first_seen=datetime.utcnow(),
                     last_seen=datetime.utcnow(),
+                    raw={"mecklenburg_tax": {
+                        "sale_text": sale_text,
+                        "publisher": "RBC Wealth Management (NC tax counsel)",
+                    }},
                 )
             )
         return out

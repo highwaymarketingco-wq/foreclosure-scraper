@@ -114,7 +114,7 @@ def _infer_property_kind(attrs: dict[str, Any]) -> PropertyKind | None:
     if "TOWNHOUSE" in blob or "TOWNHOME" in blob:
         return PropertyKind.TOWNHOUSE
     if "MANUFACTURED" in blob or "MOBILE" in blob:
-        return PropertyKind.MANUFACTURED
+        return PropertyKind.MOBILE
     if "COMMERCIAL" in blob or "INDUSTRIAL" in blob or "RETAIL" in blob or "OFFICE" in blob:
         return PropertyKind.COMMERCIAL
 
