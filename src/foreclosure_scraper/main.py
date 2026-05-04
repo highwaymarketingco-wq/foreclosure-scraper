@@ -393,6 +393,25 @@ async def run() -> int:
     except Exception:
         log.error("building_permits.failed", traceback=traceback.format_exc())
 
+    # NC SOS LLC dissolution check — for listings with LLC/Inc defendants,
+    # check NC Secretary of State for dissolved/suspended status. Capped
+    # at 50 unique names/run; each Scrapling render is ~15-30s. Disable
+    # via SOS_DISSOLUTION_OFF=1.
+    if not os.environ.get("SOS_DISSOLUTION_OFF"):
+        try:
+            from .enrichment_sos_dissolution import enrich_with_sos_dissolution
+            await enrich_with_sos_dissolution(enriched)
+        except Exception:
+            log.error("sos_dissolution.failed", traceback=traceback.format_exc())
+
+    # Expanded rent comps — for listings without strict like-for-like comps,
+    # broaden to zip-level for-rent pool. Free via HomeHarvest.
+    try:
+        from .enrichment_rent_comps_extra import enrich_with_extra_rent_comps
+        await enrich_with_extra_rent_comps(enriched)
+    except Exception:
+        log.error("rent_comps_extra.failed", traceback=traceback.format_exc())
+
     # Investor calculator + A-F grades per listing.
     for li in enriched:
         try:

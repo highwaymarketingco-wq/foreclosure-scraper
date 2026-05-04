@@ -58,13 +58,33 @@ class PickensMasterInEquity(BaseScraper):
         today = datetime.utcnow()
 
         async with client(timeout=45.0) as c:
-            # Step 1: Load the listing page to seed cookies
+            # Step 1: Load the listing page to seed cookies. If direct httpx
+            # returns a JS-shell, fall back to Scrapling stealth.
+            html = ""
             try:
                 r = await c.get(PAGE_URL)
-                if r.status_code != 200:
-                    return out
-                html = r.text
+                if r.status_code == 200:
+                    html = r.text
             except Exception:
+                pass
+
+            # If no PDF links visible in the direct fetch, try Scrapling
+            if html and "pdf" not in html.lower():
+                html = ""
+            if not html:
+                try:
+                    from scrapling.fetchers import StealthyFetcher
+                    result = await StealthyFetcher.async_fetch(
+                        PAGE_URL, headless=True, network_idle=True, timeout=60000,
+                    )
+                    body = getattr(result, "body", b"")
+                    html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
+                except ImportError:
+                    return out
+                except Exception:
+                    return out
+
+            if not html:
                 return out
 
             tree = HTMLParser(html)
@@ -89,12 +109,16 @@ class PickensMasterInEquity(BaseScraper):
                     full = "https://www.co.pickens.sc.us/departments/master_in_equity/" + href
                 pdf_links.append((full, sale_d))
 
-            # Pick the latest PDF that's in the future (or within last 30 days)
-            future_pdfs = [(u, d) for u, d in pdf_links if d and d >= today - timedelta(days=30)]
+            # Pick the latest PDF — Pickens posts past sale results too,
+            # so accept anything within the last 365 days (covers their full
+            # publishing cadence — typically monthly).
+            future_pdfs = [(u, d) for u, d in pdf_links if d and d >= today - timedelta(days=365)]
             if not future_pdfs:
-                # Fallback: try the first PDF link regardless
-                future_pdfs = pdf_links[:1]
+                # Last resort: try the most recent few PDFs by URL ordering
+                future_pdfs = pdf_links[:5]
             future_pdfs.sort(key=lambda x: x[1] or today, reverse=True)
+            # Cap at top 6 (covers ~6 months of monthly rosters)
+            future_pdfs = future_pdfs[:6]
 
             for url, sale_d in future_pdfs[:3]:
                 try:

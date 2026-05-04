@@ -55,6 +55,10 @@ RAW_KEEP = {
     "sc_tax_delinquent": "*",         # SC delinquent tax / pre-tax-sale tag
     "building_permits": "*",          # recent permits = positive, stale open = negative
     "bid4assets": "*",                # auction-site raw payload
+    "sos_status": "*",                # NC SOS LLC dissolution status (when defendant is LLC)
+    "rent_comps_extra": "*",          # broader rent comp pool when strict was empty
+    "rent_median_ppsf_extra": "*",
+    "estimated_monthly_rent_extra": "*",
     "schools": "*",                   # GreatSchools per-address ratings (when key set)
     "walk_score": "*",                # Walk Score per-address (when key set)
 }
