@@ -107,10 +107,18 @@ def write_listings(
         ws = sh.add_worksheet(title="Listings", rows="2000", cols=str(len(COLUMNS)))
 
     rows: list[list[str]] = [[label for label, _ in COLUMNS]]
-    listings_list = sorted(
-        list(listings),
-        key=lambda li: (li.sale_date or datetime.max, li.state or "", li.county or ""),
-    )
+
+    def _sort_key(li: Listing) -> tuple:
+        # Normalize sale_date to tz-naive so we can mix listings from sources
+        # that emit tz-aware datetimes (e.g. ones parsed via dateutil with TZ
+        # info) with sources that emit naive datetimes. Without this, sorted()
+        # raises "can't compare offset-naive and offset-aware datetimes".
+        sd = li.sale_date
+        if sd is not None and getattr(sd, "tzinfo", None) is not None:
+            sd = sd.replace(tzinfo=None)
+        return (sd or datetime.max, li.state or "", li.county or "")
+
+    listings_list = sorted(list(listings), key=_sort_key)
     for li in listings_list:
         rows.append([_to_cell(li, attr) for _, attr in COLUMNS])
 
