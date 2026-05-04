@@ -396,20 +396,20 @@ def _condition_tier(li: Listing) -> str:
         if CONDITION_PATTERNS[tier].search(text):
             return tier
 
-    # Default by age
+    # Default by age — DO NOT auto-tag "gut" purely on age. Gut requires
+    # explicit signals (fire damage, condemned, complete-gut text). Old
+    # homes default to "major" rehab; only the description triggers gut.
     yb = li.year_built
     if yb:
         from datetime import datetime as _dt
         age = _dt.utcnow().year - yb
-        if age < 5:
+        if age < 10:
             return "move_in_ready"
-        if age < 25:
-            return "move_in_ready"
-        if age < 50:
+        if age < 30:
             return "cosmetic"
-        if age < 80:
-            return "major"
-        return "gut"
+        if age < 60:
+            return "cosmetic"  # 30-60y still mostly cosmetic absent text signals
+        return "major"           # 60+y default major (was overzealous gut)
 
     # Distressed source → at least cosmetic
     if li.source in ("national.distressed", "national.propwire"):

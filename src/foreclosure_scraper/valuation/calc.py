@@ -53,6 +53,10 @@ class Calc:
     bid_to_arv_pct: float | None = None
     confidence: str = "LOW"
     notes: list[str] | None = None
+    # Investor framing — what's the deal status at the listed/asking price?
+    deal_status: str | None = None         # GREAT / OK / NEGOTIATE / PASS
+    deal_message: str | None = None        # human-readable explanation
+    haircut_needed: float | None = None    # $ user needs to negotiate down to flip
 
 
 def _condition_to_tier(li: Listing) -> str:
@@ -247,6 +251,40 @@ def compute(li: Listing) -> Calc:
     if li.tax_value:
         score += 1
     out.confidence = "HIGH" if score >= 5 else "MEDIUM" if score >= 3 else "LOW"
+
+    # ---- Deal status: investor's actionable verdict ----------------------
+    # Frames the listing in terms a flipper actually decides on:
+    #   GREAT       — listing price is below the 70% rule max bid (rare, snap-up)
+    #   OK          — listing price right at max bid (margin OK, do diligence)
+    #   NEGOTIATE   — listing price above max bid; specifies haircut needed
+    #   PASS        — math doesn't work even at $0 acquisition
+    if out.max_bid_70 is not None and bid is not None and bid > 0:
+        if out.max_bid_70 <= 0:
+            out.deal_status = "PASS"
+            out.deal_message = (
+                f"Math doesn't work — ARV ${out.arv_expected or 0:,.0f} minus "
+                f"rehab ${out.rehab_expected or 0:,.0f} leaves no margin even at $0 acquisition."
+            )
+        elif bid <= out.max_bid_70 * 0.95:
+            out.deal_status = "GREAT"
+            out.deal_message = (
+                f"List ${bid:,.0f} is below max viable bid ${out.max_bid_70:,.0f}. "
+                f"Solid margin if specs are accurate — verify."
+            )
+        elif bid <= out.max_bid_70 * 1.05:
+            out.deal_status = "OK"
+            out.deal_message = (
+                f"List ${bid:,.0f} is right at max viable bid ${out.max_bid_70:,.0f}. "
+                f"Tight but workable — do diligence."
+            )
+        else:
+            out.haircut_needed = round(bid - out.max_bid_70, -2)
+            out.deal_status = "NEGOTIATE"
+            out.deal_message = (
+                f"List ${bid:,.0f} is ${out.haircut_needed:,.0f} above max viable "
+                f"bid ${out.max_bid_70:,.0f}. Negotiate down or pass."
+            )
+
     return out
 
 

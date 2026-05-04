@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-05-04T10:39:19.027037Z",
+  "run_time": "2026-05-04T13:24:39.773171Z",
   "total": 862,
   "by_source": {
     "national.auction_dot_com": 0,
@@ -8,7 +8,7 @@
     "national.foreclosure_dot_com": 0,
     "national.freddie_homesteps": 0,
     "national.homeharvest": 18,
-    "national.distressed": 429,
+    "national.distressed": 427,
     "national.hubzu": 0,
     "national.hud_homestore": 0,
     "national.probate_foreclosure_leads": 0,
@@ -21,10 +21,10 @@
     "public_notices.ncnotices": 0,
     "public_notices.publicnoticesc": 0,
     "law_firms.aldridge_pite": 0,
-    "law_firms.bell_carrington": 73,
+    "law_firms.bell_carrington": 70,
     "law_firms.brock_scott": 311,
     "law_firms.finkel": 8,
-    "law_firms.hutchens": 361,
+    "law_firms.hutchens": 360,
     "law_firms.korn": 0,
     "law_firms.mcmichael_taylor_gray": 0,
     "law_firms.rogers_townsend": 27,
@@ -32,13 +32,13 @@
     "counties_sc.pickens_master_in_equity": 0,
     "counties_sc.sc_flc": 17,
     "counties_sc.sc_public_index": 0,
-    "counties_sc.sc_public_index_lis_pendens": 261,
+    "counties_sc.sc_public_index_lis_pendens": 270,
     "counties_sc.spartanburg_master_in_equity": 18,
     "counties_nc.buncombe_tax": 2,
     "counties_nc.cleveland_tax": 6,
     "counties_nc.henderson_tax": 15,
     "counties_nc.mecklenburg_tax": 0,
-    "counties_nc.nc_ecourts_lis_pendens": 553,
+    "counties_nc.nc_ecourts_lis_pendens": 550,
     "counties_nc.polk_tax": 2,
     "counties_nc.rutherford_tax": 11,
     "counties.nod_discovery": 0,
@@ -51,17 +51,17 @@
     "courts.lis_pendens_discovery": 0
   },
   "by_state": {
-    "SC": 485,
-    "NC": 377
+    "SC": 487,
+    "NC": 375
   },
   "by_county_top": [
     [
       "Mecklenburg, NC",
-      180
+      178
     ],
     [
       "Spartanburg, SC",
-      180
+      173
     ],
     [
       "Anderson, SC",
@@ -96,6 +96,10 @@
       20
     ],
     [
+      "Union, SC",
+      18
+    ],
+    [
       "Cleveland, NC",
       18
     ],
@@ -110,10 +114,6 @@
     [
       "McDowell, NC",
       10
-    ],
-    [
-      "Union, SC",
-      9
     ]
   ],
   "source_status": {
@@ -123,7 +123,7 @@
     "national.foreclosure_dot_com": "APIFY-BLOCKED",
     "national.freddie_homesteps": "APIFY-BLOCKED",
     "national.homeharvest": "OK (18)",
-    "national.distressed": "OK (429)",
+    "national.distressed": "OK (427)",
     "national.hubzu": "APIFY-BLOCKED",
     "national.hud_homestore": "EMPTY (verified)",
     "national.probate_foreclosure_leads": "APIFY-BLOCKED",
@@ -136,10 +136,10 @@
     "public_notices.ncnotices": "EMPTY (verified)",
     "public_notices.publicnoticesc": "EMPTY (verified)",
     "law_firms.aldridge_pite": "APIFY-BLOCKED",
-    "law_firms.bell_carrington": "OK (73)",
+    "law_firms.bell_carrington": "OK (70)",
     "law_firms.brock_scott": "OK (311)",
     "law_firms.finkel": "OK (8)",
-    "law_firms.hutchens": "OK (361)",
+    "law_firms.hutchens": "OK (360)",
     "law_firms.korn": "APIFY-BLOCKED",
     "law_firms.mcmichael_taylor_gray": "APIFY-BLOCKED",
     "law_firms.rogers_townsend": "OK (27)",
@@ -147,13 +147,13 @@
     "counties_sc.pickens_master_in_equity": "REGRESSED (expected ≥ 1)",
     "counties_sc.sc_flc": "OK (17)",
     "counties_sc.sc_public_index": "EMPTY (verified)",
-    "counties_sc.sc_public_index_lis_pendens": "OK (261)",
+    "counties_sc.sc_public_index_lis_pendens": "OK (270)",
     "counties_sc.spartanburg_master_in_equity": "OK (18)",
     "counties_nc.buncombe_tax": "OK (2)",
     "counties_nc.cleveland_tax": "OK (6)",
     "counties_nc.henderson_tax": "OK (15)",
     "counties_nc.mecklenburg_tax": "EMPTY (verified)",
-    "counties_nc.nc_ecourts_lis_pendens": "OK (553)",
+    "counties_nc.nc_ecourts_lis_pendens": "OK (550)",
     "counties_nc.polk_tax": "OK (2)",
     "counties_nc.rutherford_tax": "OK (11)",
     "counties.nod_discovery": "REGRESSED (expected ≥ 1)",

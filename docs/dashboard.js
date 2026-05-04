@@ -654,7 +654,22 @@ function openDetail(l) {
 
   const badges = [];
 
-  // Condition tier first — most-important investor signal
+  // Deal status FIRST — actionable investor verdict
+  const dealStatusMap = {
+    "GREAT":     { label: "GREAT deal", cls: "pos" },
+    "OK":        { label: "OK at list",  cls: "warn-light" },
+    "NEGOTIATE": { label: "NEGOTIATE",   cls: "warn" },
+    "PASS":      { label: "PASS",        cls: "neg" },
+  };
+  if (calc.deal_status && dealStatusMap[calc.deal_status]) {
+    const s = dealStatusMap[calc.deal_status];
+    badges.push(`<span class="qbadge ${s.cls}" title="${calc.deal_message || ''}">${s.label}</span>`);
+  }
+  if (calc.haircut_needed && calc.haircut_needed > 0) {
+    badges.push(`<span class="qbadge warn">Haircut needed: $${Number(calc.haircut_needed).toLocaleString()}</span>`);
+  }
+
+  // Condition tier — most-important property signal
   if (condTier && condLabel[condTier]) {
     const c = condLabel[condTier];
     badges.push(`<span class="qbadge ${c.cls}">${c.label}</span>`);
