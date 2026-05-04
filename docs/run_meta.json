@@ -195,7 +195,7 @@
   ],
   "notes": "horizon=120d, scrapers=46, regressions=0",
   "bankruptcy_delta": {
-    "run_time": "2026-05-04T19:11:14.035440Z",
+    "run_time": "2026-05-04T20:25:05.891636Z",
     "listings_tagged": 0,
     "new_listings_added": 600,
     "scraper_total": 600
