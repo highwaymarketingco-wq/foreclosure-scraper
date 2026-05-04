@@ -269,6 +269,18 @@ async def run() -> int:
     except Exception:
         log.error("rod.failed", traceback=traceback.format_exc())
 
+    # Address backfill — for listings that have defendant + county but no
+    # street_address (SC Public Index lis pendens, NC eCourts, courthouse
+    # rolls without address columns), look the property up by owner name
+    # in the same county GIS we use for address-based enrichment. Free,
+    # pure-HTTP. Only writes when the match is confident (single result
+    # OR a unique multi-token match).
+    try:
+        from .enrichment_address_backfill import enrich_addresses_from_owner
+        await enrich_addresses_from_owner(enriched)
+    except Exception:
+        log.error("address_backfill.failed", traceback=traceback.format_exc())
+
     # Bankruptcy cross-reference — for every existing listing whose defendant
     # matches a recent NC/SC bankruptcy filing, tag raw.bankruptcy with the
     # chapter/court/date/docket. Free with CourtListener token. Strong pre-

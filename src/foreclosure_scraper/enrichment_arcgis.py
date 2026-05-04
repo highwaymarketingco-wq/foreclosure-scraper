@@ -104,8 +104,11 @@ NC_GIS: dict[str, dict[str, Any]] = {
 # ---- Field-name normalization ----------------------------------------------------
 
 FIELD_ALIASES = {
+    # NOTE: DEEDBK was historically in this list but it's the DEED BOOK number,
+    # not a parcel identifier. Multiple parcels recorded in the same book all
+    # get the same value, which then poisons the dedupe key. Removed.
     "parcel_id": ("PIN", "TMS", "REID", "PARCELNUMBER", "parno", "pinnum",
-                  "MAPNUMBER", "pid", "PARID", "DEEDBK", "pid_long"),
+                  "MAPNUMBER", "pid", "PARID", "pid_long", "PARNO"),
     "owner_name": ("OwnerName", "OWNAM1", "Owner1", "PROPERTY_OWNER",
                    "full_owner_name", "owner", "ownname", "NAME1", "OWNER_NAME",
                    "Name1", "Name", "OWNER", "NAMECO"),
@@ -299,9 +302,17 @@ def _apply_attrs(li: Listing, attrs: dict[str, Any]) -> int:
         except (ValueError, TypeError):
             pass
 
-    parcel_id = _pick(attrs, FIELD_ALIASES["parcel_id"])
-    if parcel_id:
-        maybe("parcel_id", str(parcel_id).strip())
+    # Only write parcel_id when we're confident in the address match. A wrong
+    # parcel_id silently corrupts the dedupe key (which prefers parcel over
+    # address) and can cause unrelated listings to merge.
+    if attrs.get("_match_confident"):
+        parcel_id = _pick(attrs, FIELD_ALIASES["parcel_id"])
+        if parcel_id:
+            pid = str(parcel_id).strip()
+            # Reject obviously-wrong values (single digits, deed-book-style
+            # 4-digit ints, etc.) — real APNs have meaningful structure.
+            if len(pid) >= 5 and not pid.isspace():
+                maybe("parcel_id", pid)
 
     if not li.zoning:
         z = _pick(attrs, FIELD_ALIASES["zoning"])
@@ -448,11 +459,17 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
             counts["matched"] += 1
             # Pick the best-looking record (one with the most matching house_no)
             best = results[0]
+            confident = len(results) == 1  # single hit = fairly confident
             if house_no:
                 for r in results:
                     if str(_pick(r, ("STRNUM", "HouseNumber", "ADDRNO", "house_num"))).strip() == house_no:
                         best = r
+                        confident = True  # house_no matched explicitly
                         break
+            # Stash confidence on the chosen result so _apply_attrs can be picky
+            # about which fields to write. Specifically: parcel_id only when
+            # confident, since a wrong parcel_id corrupts the dedupe key.
+            best["_match_confident"] = confident
             counts["fields_filled"] += _apply_attrs(li, best)
 
     async with client(timeout=20.0) as c:

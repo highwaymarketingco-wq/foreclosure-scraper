@@ -741,6 +741,19 @@ function openDetail(l) {
     badges.push(`<span class="qbadge neg">⚠ Flood zone ${flood.zone || "AE"}</span>`);
   }
 
+  // NC Upset bid window — sale already happened in last 10 days but no
+  // confirmation yet. Anyone can submit a 5%+ upset bid until window closes.
+  // Computed: NC + sale_date in last 10 days.
+  if (l.state === "NC" && l.sale_date) {
+    const sd = Date.parse(l.sale_date);
+    const now = Date.now();
+    const tenDaysAgo = now - 10 * 86400000;
+    if (!isNaN(sd) && sd > tenDaysAgo && sd <= now) {
+      const daysLeft = Math.max(0, 10 - Math.floor((now - sd) / 86400000));
+      badges.push(`<span class="qbadge warn" title="NC 10-day upset bid window. Anyone can submit a 5%+ higher bid at the courthouse until the deadline.">⏱ Upset bid period (${daysLeft}d left)</span>`);
+    }
+  }
+
   // Bankruptcy cross-reference — HIGH-PRIORITY signal: defendant on this
   // foreclosure also has a recent NC/SC bankruptcy filing. Ch.13 = trying to
   // stop the sale via automatic stay. Ch.7 = liquidation, property gets sold.
