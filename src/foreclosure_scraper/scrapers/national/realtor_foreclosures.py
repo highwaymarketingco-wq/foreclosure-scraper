@@ -1,27 +1,44 @@
-"""Realtor.com foreclosure listings via the FREE dz_omar/realtor-scraper actor.
+"""Realtor.com foreclosure listings via HomeHarvest (free, no Apify).
 
-Realtor.com lets you filter foreclosures via a URL pattern. Returns full property
-details (beds/baths/sqft/year built/photos/status) so we don't even need to enrich.
+HomeHarvest scrapes Realtor.com directly via their public API.
+This scraper hits state-wide queries with foreclosure=True filter to catch
+listings that aren't in our priority counties but might still be relevant
+(neighboring metros, large land, etc.).
+
+Free, no Apify dependency.
 """
 from __future__ import annotations
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Iterable
 
-from dateutil import parser as dateparser
+import structlog
 
-from ...apify_helper import run_actor_sync
 from ...base_scraper import BaseScraper
-from ...budget import cap
 from ...models import Listing, ListingType, PropertyKind
 
-ACTOR = "dz_omar/realtor-scraper"
+log = structlog.get_logger()
+
+# Top metros likely to have foreclosure listings beyond our priority counties
+SEARCH_LOCATIONS = (
+    "Charlotte, NC",
+    "Asheville, NC",
+    "Hickory, NC",
+    "Greensboro, NC",
+    "Raleigh, NC",
+    "Greenville, SC",
+    "Columbia, SC",
+    "Charleston, SC",
+    "Spartanburg, SC",
+)
 
 
-def _kind(pt: str | None) -> PropertyKind:
-    if not pt:
+def _kind(style: str | None) -> PropertyKind:
+    if not style:
         return PropertyKind.UNKNOWN
-    s = pt.lower()
+    s = style.lower()
     if "single" in s:
         return PropertyKind.SINGLE_FAMILY
     if "condo" in s:
@@ -32,126 +49,143 @@ def _kind(pt: str | None) -> PropertyKind:
         return PropertyKind.MULTI_FAMILY
     if "land" in s or "lot" in s:
         return PropertyKind.LAND
-    if "commercial" in s:
-        return PropertyKind.COMMERCIAL
     if "mobile" in s or "manufactured" in s:
         return PropertyKind.MOBILE
+    if "commercial" in s:
+        return PropertyKind.COMMERCIAL
     return PropertyKind.UNKNOWN
 
 
-# Realtor.com foreclosure filter URL — verified working 2026:
-#   /realestateandhomes-search/<location>/show-foreclosure  (SINGULAR, no trailing 's')
-# Live probe: `show-foreclosure` returns items with flags.is_foreclosure=true.
-# `show-foreclosures` (plural) silently returns regular for-sale listings.
-# `type-foreclosure` and `?status=foreclosure` also do not filter.
-START_URLS = [
-    {"url": "https://www.realtor.com/realestateandhomes-search/South-Carolina/show-foreclosure"},
-    {"url": "https://www.realtor.com/realestateandhomes-search/North-Carolina/show-foreclosure"},
-]
+def _to_listing(row, slug: str) -> Listing | None:
+    url = row.get("property_url") or row.get("permalink")
+    if not url:
+        return None
+    status_raw = (row.get("status") or "").lower()
+    mls_status = (row.get("mls_status") or "").lower()
+
+    is_foreclosure = (
+        "foreclos" in status_raw or "foreclos" in mls_status
+        or row.get("foreclosure") is True
+        or row.get("is_foreclosure") is True
+    )
+    is_auction = "auction" in status_raw or "auction" in mls_status
+    if not is_foreclosure and not is_auction:
+        return None
+
+    if is_auction:
+        ltype = ListingType.AUCTION
+    elif "reo" in status_raw or "bank" in status_raw:
+        ltype = ListingType.REO
+    else:
+        ltype = ListingType.FORECLOSURE_SALE
+
+    primary = row.get("primary_photo")
+    alt = row.get("alt_photos") or ""
+    photos: list[str] = []
+    if primary and not (isinstance(primary, float) and primary != primary):
+        photos.append(str(primary))
+    if isinstance(alt, str) and alt:
+        photos.extend([p.strip() for p in alt.split(",") if p.strip()][:5])
+
+    def _f(v):
+        if v in (None, "") or (isinstance(v, float) and v != v):
+            return None
+        try:
+            return float(v)
+        except (ValueError, TypeError):
+            return None
+
+    return Listing(
+        source=slug,
+        source_url=url,
+        listing_type=ltype,
+        property_kind=_kind(row.get("style") or row.get("property_type")),
+        street_address=row.get("street") or row.get("full_street_line"),
+        city=row.get("city"),
+        state=row.get("state"),
+        zip_code=str(row.get("zip_code") or "")[:5] or None,
+        county=(row.get("county") or "").replace(" County", "") or None,
+        opening_bid=_f(row.get("list_price")),
+        bedrooms=_f(row.get("beds")),
+        bathrooms=_f(row.get("full_baths")),
+        living_sqft=_f(row.get("sqft")),
+        year_built=int(row["year_built"]) if row.get("year_built") and str(row["year_built"]).isdigit() else None,
+        latitude=_f(row.get("latitude")),
+        longitude=_f(row.get("longitude")),
+        description=(row.get("text") or "")[:500] or None,
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+        raw={
+            "realtor": {
+                "status": row.get("status"),
+                "mls_status": row.get("mls_status"),
+                "list_date": str(row.get("list_date") or ""),
+                "agent": row.get("agent"),
+            },
+            "zillow": {
+                "photo": photos[0] if photos else None,
+                "photos": photos[:6],
+            },
+            "images": {"real": photos[:6]} if photos else {},
+        },
+    )
+
+
+def _scrape_location(loc: str, slug: str) -> list[Listing]:
+    try:
+        from homeharvest import scrape_property
+    except ImportError:
+        return []
+    out: list[Listing] = []
+    seen_urls: set[str] = set()
+    # Try foreclosure + auction filters
+    for listing_type in ("for_sale",):
+        for foreclosure in (True,):
+            try:
+                df = scrape_property(
+                    location=loc,
+                    listing_type=listing_type,
+                    foreclosure=foreclosure,
+                    past_days=180,
+                )
+            except Exception:
+                continue
+            if df is None or len(df) == 0:
+                continue
+            for _, row in df.iterrows():
+                d = row.to_dict()
+                li = _to_listing(d, slug)
+                if li and li.source_url not in seen_urls:
+                    seen_urls.add(li.source_url)
+                    out.append(li)
+    return out
 
 
 class RealtorForeclosures(BaseScraper):
     slug = "national.realtor_foreclosures"
-    requires_apify = True
-    expected_min_count = 30
-    name = "Realtor.com Foreclosures"
+    name = "Realtor.com Foreclosures (HomeHarvest)"
     category = "national_aggregator"
-    timeout_s = 540.0
+    expected_min_count = 0
+    requires_apify = False
+    timeout_s = 360.0
 
     async def fetch(self) -> Iterable[Listing]:
-        run_input = {
-            "startUrls": START_URLS,
-            "maxResults": cap("realtor_foreclosures", default=1000),
-            "proxyConfiguration": {"useApifyProxy": True, "apifyProxyGroups": ["RESIDENTIAL"]},
-        }
-        items = await run_actor_sync(ACTOR, run_input, timeout_s=480)
+        loop = asyncio.get_event_loop()
         out: list[Listing] = []
-        for it in items:
-            # Probe-confirmed: items have `href`, `location` (nested w/ address), `flags`,
-            # `list_price`, `description`, `last_update_date`, `details`, `estimates`.
-            # Drop any that don't carry the foreclosure flag (in case the URL filter slipped).
-            flags = it.get("flags") if isinstance(it.get("flags"), dict) else {}
-            is_foreclosure = bool(flags.get("is_foreclosure") or flags.get("is_short_sale"))
-            href = it.get("href") or it.get("url") or it.get("rdc_web_url") or it.get("propertyUrl")
-            if not href:
-                continue
-            if href.startswith("/"):
-                href = f"https://www.realtor.com{href}"
-            # Skip non-foreclosures (the URL filter sometimes leaks regular listings)
-            status_lower = (it.get("status") or "").lower()
-            if not is_foreclosure and "foreclos" not in status_lower:
-                continue
-
-            location = it.get("location") if isinstance(it.get("location"), dict) else {}
-            addr = location.get("address") if isinstance(location.get("address"), dict) else (it.get("address") or {})
-            if not isinstance(addr, dict):
-                addr = {}
-
-            sale_date = None
-            for k in ("auction_date", "saleDate", "auctionDate"):
-                if it.get(k):
-                    try:
-                        sale_date = dateparser.parse(str(it[k]))
-                        break
-                    except (ValueError, TypeError):
-                        pass
-
-            list_price = it.get("list_price") or it.get("price")
-            tag = (it.get("status") or "").lower()
-            ltype = ListingType.FORECLOSURE_SALE
-            if "auction" in tag:
-                ltype = ListingType.AUCTION
-            elif "reo" in tag or "bank" in tag:
-                ltype = ListingType.REO
-            elif "pre" in tag and "foreclos" in tag:
-                ltype = ListingType.LIS_PENDENS
-
-            details = it.get("details") if isinstance(it.get("details"), dict) else {}
-            beds = it.get("beds") or details.get("beds")
-            baths = it.get("baths") or details.get("baths") or details.get("baths_consolidated")
-            sqft = it.get("sqft") or details.get("sqft") or (it.get("building_size") or {}).get("size")
-            year_built = it.get("year_built") or details.get("year_built")
-            lot_sqft = details.get("lot_sqft") or (it.get("lot_size") or {}).get("size")
-            coords = location.get("coordinate") if isinstance(location.get("coordinate"), dict) else {}
-
-            # description sometimes comes as a dict {text, ...}, sometimes a string
-            desc_raw = it.get("description")
-            if isinstance(desc_raw, dict):
-                desc_raw = desc_raw.get("text") or desc_raw.get("value") or ""
-            desc = (str(desc_raw) if desc_raw else "")[:500] or None
-
-            out.append(
-                Listing(
-                    source=self.slug,
-                    source_url=href,
-                    listing_type=ltype,
-                    property_kind=_kind(it.get("type") or it.get("prop_type") or details.get("type")),
-                    street_address=addr.get("line") or addr.get("street") or it.get("street_address"),
-                    city=addr.get("city"),
-                    state=addr.get("state_code") or addr.get("state"),
-                    zip_code=addr.get("postal_code") or addr.get("zip"),
-                    county=(addr.get("county") or "").replace(" County", "") or None,
-                    sale_date=sale_date,
-                    opening_bid=list_price,
-                    bedrooms=beds,
-                    bathrooms=baths,
-                    living_sqft=sqft,
-                    year_built=year_built,
-                    lot_size_sqft=lot_sqft,
-                    description=desc,
-                    auction_status=it.get("status"),
-                    latitude=coords.get("lat"),
-                    longitude=coords.get("lon"),
-                    first_seen=datetime.utcnow(),
-                    last_seen=datetime.utcnow(),
-                    raw={"realtor": {k: it.get(k) for k in (
-                        "type", "year_built", "beds", "baths", "sqft", "list_price",
-                        "list_date", "status", "auction_date", "tax_history",
-                        "photo_count", "estimates", "flags", "open_houses",
-                    ) if k in it}, "zillow": {  # dashboard reads photos under zillow key
-                        "photo": (it.get("photos") or [{}])[0].get("href") if isinstance(it.get("photos"), list) and it.get("photos") else None,
-                        "photos": [p.get("href") for p in (it.get("photos") or []) if isinstance(p, dict) and p.get("href")][:6],
-                    }},
-                )
+        seen: set[str] = set()
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            results = await asyncio.gather(
+                *(loop.run_in_executor(pool, _scrape_location, loc, self.slug)
+                  for loc in SEARCH_LOCATIONS),
+                return_exceptions=True,
             )
+        for res in results:
+            if isinstance(res, Exception):
+                continue
+            for li in res:
+                if li.source_url not in seen:
+                    seen.add(li.source_url)
+                    out.append(li)
+        log.info("realtor_foreclosures.done", count=len(out),
+                 locations=len(SEARCH_LOCATIONS))
         return out
