@@ -412,6 +412,15 @@ async def run() -> int:
     except Exception:
         log.error("rent_comps_extra.failed", traceback=traceback.format_exc())
 
+    # Property kind backfill — guarantee 100% non-UNKNOWN coverage. Runs
+    # LAST so it can use every other signal (description, structure data,
+    # GIS, etc.). Cascade: description → structure → listing_type → source.
+    try:
+        from .enrichment_property_kind import enrich_property_kind
+        enrich_property_kind(enriched)
+    except Exception:
+        log.error("property_kind.failed", traceback=traceback.format_exc())
+
     # Investor calculator + A-F grades per listing.
     for li in enriched:
         try:
