@@ -53,6 +53,8 @@ RAW_KEEP = {
     "fema_repetitive_loss": "*",      # NFIP multiple-loss properties (much stronger than flood zone alone)
     "code_enforcement": "*",          # City open code violations (Charlotte 311 etc.)
     "sc_tax_delinquent": "*",         # SC delinquent tax / pre-tax-sale tag
+    "building_permits": "*",          # recent permits = positive, stale open = negative
+    "bid4assets": "*",                # auction-site raw payload
     "schools": "*",                   # GreatSchools per-address ratings (when key set)
     "walk_score": "*",                # Walk Score per-address (when key set)
 }

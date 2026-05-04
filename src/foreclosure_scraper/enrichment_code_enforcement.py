@@ -29,6 +29,7 @@ log = structlog.get_logger()
 
 
 # City open-data endpoints — public ArcGIS FeatureServer queries.
+# Discovered via each city's open-data portal (data.<city>.gov / ArcGIS Hub).
 CITY_ENDPOINTS = {
     "Charlotte": {
         "url": "https://services5.arcgis.com/86gdKBxZf7GIt2Or/arcgis/rest/services/Code_Enforcement_Cases/FeatureServer/0/query",
@@ -37,6 +38,8 @@ CITY_ENDPOINTS = {
         "status_fields": ("Status", "CaseStatus", "STATUS"),
         "date_fields": ("OpenDate", "CASE_DATE", "DateOpened"),
     },
+    # Add more as their endpoints are confirmed; many city-of-* portals
+    # change FeatureServer URLs annually so this is best-effort.
 }
 
 

@@ -385,6 +385,14 @@ async def run() -> int:
     except Exception:
         log.error("code_enforcement.failed", traceback=traceback.format_exc())
 
+    # Building permits — recent permits = active investment, stale 3+ year
+    # open permits = abandoned project. Free ArcGIS REST per city.
+    try:
+        from .enrichment_building_permits import enrich_with_building_permits
+        await enrich_with_building_permits(enriched)
+    except Exception:
+        log.error("building_permits.failed", traceback=traceback.format_exc())
+
     # Investor calculator + A-F grades per listing.
     for li in enriched:
         try:
