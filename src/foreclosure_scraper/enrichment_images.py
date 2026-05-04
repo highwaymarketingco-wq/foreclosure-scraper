@@ -1,18 +1,21 @@
-"""Ensure 100% image coverage: every listing gets either a real photo
-(from Zillow / Realtor / HomeHarvest) or a free OpenStreetMap static-map
-of the property location, plus an optional Mapillary street-level photo.
+"""Multi-source image stack so every listing has Vision-usable imagery.
 
-Free sources used:
-  - OpenStreetMap static map via Wikimedia tile servers (no API key required)
-  - Mapillary public images API (no API key for /search; rate-limited but
-    sufficient for our 200-listing monthly run)
+For every geocoded listing we attach:
+  raw.images.real      — list of real listing photos (HomeHarvest, Realtor)
+  raw.images.aerial    — Esri World Imagery aerial (free, no key)
+  raw.images.street    — Mapillary user-contributed street-level (free)
+  raw.images.map       — OSM static-map fallback
+  raw.images.primary   — best image (real > street > aerial > map)
+  raw.zillow.photo     — alias of primary so dashboard frontend reads it
 
-Output: every listing.raw.zillow.photo gets populated (real or map fallback)
-plus listing.raw.images = {"primary", "map", "street"} dict for the dashboard.
+Goal: 100% have aerial + map (always works with lat/lng), ~30-50% pick up
+street-level via Mapillary, ~30% have real listing photos. Stack feeds
+Claude Vision condition assessment with 1-3 images per listing.
 """
 from __future__ import annotations
 
 import asyncio
+import math
 from typing import Optional
 
 import httpx
@@ -23,105 +26,110 @@ from .models import Listing
 log = structlog.get_logger()
 
 
-# Wikimedia OSM tile-rendering: free, no key, 4096px max — way bigger than we need.
-# Format: https://maps.wikimedia.org/img/osm-intl,<zoom>,<lat>,<lon>,<size>.png
-def _osm_static_map_url(lat: float, lon: float, zoom: int = 17, size: str = "600x400") -> str:
-    return f"https://maps.wikimedia.org/img/osm-intl,{zoom},{lat:.6f},{lon:.6f},{size}.png"
+# ---- Aerial (Esri World Imagery — free, no key) ----------------------------
+
+def _aerial_url_for_point(lat: float, lon: float, zoom: int = 19) -> str:
+    """Esri World Imagery tile URL — high-res aerial, public, no key."""
+    # Convert lat/lon to slippy-map tile XY
+    n = 2 ** zoom
+    x = int((lon + 180) / 360 * n)
+    y = int((1 - math.log(math.tan(math.radians(lat)) + 1 / math.cos(math.radians(lat))) / math.pi) / 2 * n)
+    return f"https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{zoom}/{y}/{x}"
 
 
-# Static-Maps from staticmap.openstreetmap.de (free, no key)
-def _osm_de_static_map_url(lat: float, lon: float, zoom: int = 17) -> str:
+def _osm_static_map_url(lat: float, lon: float, zoom: int = 17) -> str:
     return (f"https://staticmap.openstreetmap.de/staticmap.php?"
             f"center={lat:.6f},{lon:.6f}&zoom={zoom}&size=600x400&maptype=mapnik"
             f"&markers={lat:.6f},{lon:.6f},red-dot")
 
 
-async def _mapillary_image_for_point(c: httpx.AsyncClient, lat: float, lon: float) -> Optional[str]:
-    """Find the closest Mapillary user-contributed street photo to (lat, lon).
+# ---- Mapillary street-level (free public API, no key for /search) ----------
 
-    Free public API; no key for the search endpoint with reasonable rate.
-    Returns a thumbnail URL or None.
+async def _mapillary_image(c: httpx.AsyncClient, lat: float, lon: float) -> Optional[str]:
+    """Find closest Mapillary user-contributed street photo to (lat, lon).
+    Returns thumbnail URL or None.
     """
     try:
-        # 200m bounding box around the point
-        delta = 0.002  # ~200m at our latitudes
+        delta = 0.002  # ~200m
         bbox = f"{lon - delta},{lat - delta},{lon + delta},{lat + delta}"
         r = await c.get(
             "https://graph.mapillary.com/images",
-            params={
-                "fields": "id,thumb_1024_url",
-                "bbox": bbox,
-                "limit": 1,
-            },
-            headers={"Accept": "application/json"},
+            params={"fields": "thumb_1024_url", "bbox": bbox, "limit": 1},
             timeout=8.0,
         )
         if r.status_code != 200:
             return None
-        data = r.json()
-        items = data.get("data") or []
-        if not items:
-            return None
-        return items[0].get("thumb_1024_url")
+        items = (r.json().get("data") or [])
+        if items:
+            return items[0].get("thumb_1024_url")
     except Exception:
         return None
+    return None
 
 
-async def enrich_with_images(listings: list[Listing], use_mapillary: bool = False) -> None:
-    """Ensure every listing has a fallback image. Adds:
-       raw.images.map           — OSM static map (always set when lat/lng known)
-       raw.images.street        — Mapillary street view (when use_mapillary=True)
-       raw.images.primary       — best image (real photo > street view > map)
-       raw.zillow.photo         — set to images.primary if not already set
+# ---- Main enrichment -------------------------------------------------------
 
-    Mapillary off by default since it adds 200ms/listing and the OSM map fallback
-    already gives the dashboard 100% visual coverage.
+async def enrich_with_images(listings: list[Listing], use_mapillary: bool = True) -> None:
+    """Attach a layered image stack to every listing. Goal: 100% Vision-usable
+    imagery for downstream condition assessment.
     """
     if not listings:
         return
 
-    set_count = 0
-    map_count = 0
-    street_count = 0
+    real_count = aerial_count = street_count = 0
+
+    sem = asyncio.Semaphore(8)
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as c:
-        for li in listings:
+
+        async def attach(li: Listing) -> None:
+            nonlocal real_count, aerial_count, street_count
             if not isinstance(li.raw, dict):
                 li.raw = {}
             zillow = li.raw.setdefault("zillow", {})
             images = li.raw.setdefault("images", {})
 
-            existing_photo = zillow.get("photo") or (zillow.get("photos") or [None])[0]
+            # Real listing photos (HomeHarvest sets these)
+            existing_photos = []
+            if zillow.get("photos"):
+                existing_photos = [p for p in zillow["photos"] if p]
+            elif zillow.get("photo"):
+                existing_photos = [zillow["photo"]]
+            if existing_photos:
+                images["real"] = existing_photos
+                real_count += 1
 
-            # Map fallback (always available if we have lat/lng)
+            # Aerial + map fallbacks (always work if lat/lng known)
             if li.latitude and li.longitude:
-                images["map"] = _osm_de_static_map_url(li.latitude, li.longitude)
-                images.setdefault("map_alt", _osm_static_map_url(li.latitude, li.longitude))
-                map_count += 1
+                images["aerial"] = _aerial_url_for_point(li.latitude, li.longitude)
+                images["map"] = _osm_static_map_url(li.latitude, li.longitude)
+                aerial_count += 1
 
-            # Optional street-level photo via Mapillary
-            if use_mapillary and li.latitude and li.longitude and not existing_photo:
-                street = await _mapillary_image_for_point(c, li.latitude, li.longitude)
-                if street:
-                    images["street"] = street
-                    street_count += 1
+                if use_mapillary:
+                    async with sem:
+                        street = await _mapillary_image(c, li.latitude, li.longitude)
+                    if street:
+                        images["street"] = street
+                        street_count += 1
 
-            # Pick best image: real photo > street > map
+            # Pick best primary: real photo first, then street, then aerial, then map
             primary = (
-                existing_photo
+                (existing_photos[0] if existing_photos else None)
                 or images.get("street")
+                or images.get("aerial")
                 or images.get("map")
             )
             if primary:
                 images["primary"] = primary
                 if not zillow.get("photo"):
                     zillow["photo"] = primary
-                set_count += 1
+
+        await asyncio.gather(*(attach(li) for li in listings))
 
     log.info(
         "images.enrich.done",
         listings=len(listings),
-        with_image=set_count,
-        with_map=map_count,
-        with_street=street_count,
+        real=real_count,
+        aerial=aerial_count,
+        street=street_count,
     )

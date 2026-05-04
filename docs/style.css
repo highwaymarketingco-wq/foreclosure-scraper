@@ -339,3 +339,42 @@ footer div { margin-bottom: 4px; }
 .card-flag.pos { background: rgba(46, 160, 67, 0.95); }
 .card-flag.neg { background: rgba(207, 34, 46, 0.95); }
 .card-flag.warn { background: rgba(255, 145, 0, 0.95); }
+
+/* === Vision condition report === */
+.vision-summary {
+  font-size: 14px;
+  padding: 10px 12px;
+  background: var(--accent-soft);
+  border-radius: 6px;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+.vision-meta {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 6px 0;
+}
+.vision-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 8px 0;
+  font-size: 12px;
+}
+.vision-flags span {
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(0,0,0,0.05);
+}
+.vision-flags.red span { background: rgba(207, 34, 46, 0.10); color: var(--danger); }
+.vision-flags.green span { background: rgba(46, 160, 67, 0.10); color: var(--success); }
+.vision-obs {
+  margin-top: 10px;
+  font-size: 13px;
+}
+.vision-row {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+.vision-row:last-child { border-bottom: none; }
+.vision-row strong { color: var(--accent); text-transform: capitalize; }

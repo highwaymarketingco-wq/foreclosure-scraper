@@ -56,3 +56,4 @@ playwright/.cache/
 # Logs
 *.log
 logs/
+.secrets/

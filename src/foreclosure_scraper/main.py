@@ -277,6 +277,15 @@ async def run() -> int:
     except Exception:
         log.error("comps.failed", traceback=traceback.format_exc())
 
+    # Claude Vision condition assessment — overrides regex/age tier with
+    # actual photo evidence when ANTHROPIC_API_KEY is set. Costs ~$0.01-0.03
+    # per listing depending on photo count. Skipped silently when no key.
+    try:
+        from .enrichment_vision import enrich_with_vision
+        await enrich_with_vision(enriched)
+    except Exception:
+        log.error("vision.failed", traceback=traceback.format_exc())
+
     # Image fallback — ensure 100% have at least an OSM static-map of the address
     # (free, no API key). Real Zillow/Realtor photos win when present.
     try:

@@ -73,13 +73,14 @@ def _to_listing(row, county_name: str | None = None) -> Listing | None:
         except (TypeError, ValueError):
             return None
 
-    photos_str = row.get("primary_photo") or ""
     photos: list[str] = []
-    if photos_str and not (isinstance(photos_str, float) and photos_str != photos_str):
-        photos.append(str(photos_str))
+    primary = row.get("primary_photo") or ""
+    if primary and not (isinstance(primary, float) and primary != primary):
+        photos.append(str(primary))
     extra_photos = row.get("alt_photos") or ""
     if isinstance(extra_photos, str) and extra_photos:
-        photos.extend(extra_photos.split(", ")[:5])
+        # alt_photos is comma-separated; keep up to 5 more (6 total max)
+        photos.extend([p.strip() for p in extra_photos.split(",") if p.strip()][:5])
 
     return Listing(
         source="national.homeharvest",

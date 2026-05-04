@@ -519,6 +519,33 @@ function openDetail(l) {
   const photos = (l.raw && l.raw.zillow && l.raw.zillow.photos) || [];
   $("d-photos").innerHTML = photos.length ? photos.slice(0, 6).map((p) => `<img src="${p}" loading="lazy">`).join("") : "";
 
+  // ----- Vision condition report -----
+  const vision = (l.raw && l.raw.vision) || null;
+  if (vision && (vision.condition_tier || vision.vision_summary)) {
+    $("d-vision-section").style.display = "block";
+    const obs = vision.observations || {};
+    const reds = (vision.red_flags || []).filter(Boolean);
+    const goods = (vision.positive_signs || []).filter(Boolean);
+    const condSrc = (l.raw && l.raw.condition_source) || "";
+    const psfRange = (vision.rehab_psf_low && vision.rehab_psf_high)
+      ? `Vision rehab estimate: <strong>$${vision.rehab_psf_low}-$${vision.rehab_psf_high}/sqft</strong>` : "";
+
+    const obsRows = Object.entries(obs).filter(([_, v]) => v && String(v).trim()).map(([k, v]) =>
+      `<div class="vision-row"><strong>${k.replace(/_/g, ' ')}:</strong> ${v}</div>`
+    ).join("");
+
+    $("d-vision").innerHTML = `
+      <div class="vision-summary"><strong>${vision.vision_summary || ""}</strong></div>
+      ${condSrc ? `<div class="vision-meta">Source: ${condSrc} (${vision.confidence || "—"} confidence)</div>` : ""}
+      ${psfRange ? `<div class="vision-meta">${psfRange}</div>` : ""}
+      ${reds.length ? `<div class="vision-flags red">⚠ ${reds.map(r => `<span>${r}</span>`).join(" · ")}</div>` : ""}
+      ${goods.length ? `<div class="vision-flags green">✓ ${goods.map(g => `<span>${g}</span>`).join(" · ")}</div>` : ""}
+      ${obsRows ? `<div class="vision-obs">${obsRows}</div>` : ""}
+    `;
+  } else {
+    $("d-vision-section").style.display = "none";
+  }
+
   // Mini map
   if (l.latitude && l.longitude) {
     setTimeout(() => {

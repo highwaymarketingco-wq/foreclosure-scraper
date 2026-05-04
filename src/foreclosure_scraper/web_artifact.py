@@ -34,6 +34,8 @@ RAW_KEEP = {
     "comps_note": "*",                # explanation when no like-for-like found
     "comp_median_ppsf": "*",
     "condition_tier": "*",            # move_in_ready / cosmetic / major / gut
+    "condition_source": "*",          # "vision-HIGH" / "vision-MEDIUM" / regex/age default
+    "vision": "*",                    # full Claude Vision condition report
     "rent_median_ppsf": "*",
     "estimated_monthly_rent": "*",
     "rod_docs": "*",                  # ROD recorded documents (deeds, mortgages, satisfactions)
