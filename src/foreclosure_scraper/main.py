@@ -293,6 +293,25 @@ async def run() -> int:
     except Exception:
         log.error("bk_property.failed", traceback=traceback.format_exc())
 
+    # Parcel-id / PIN / REID lookup — for tax foreclosures that publish parcel
+    # numbers but not street addresses. Queries the same county GIS we already
+    # use, but matches by parcel field. Falls back to subdivision+lot synthesis
+    # when the GIS has "0 NO ADDRESS ASSIGNED" (undeveloped lots).
+    try:
+        from .enrichment_parcel_lookup import enrich_with_parcel_lookup
+        await enrich_with_parcel_lookup(enriched)
+    except Exception:
+        log.error("parcel_lookup.failed", traceback=traceback.format_exc())
+
+    # Aggressive cross-county owner-name search — last resort for listings
+    # still without an address. Tries every county GIS in the state + a
+    # fuzzy partial-token match in the stated county.
+    try:
+        from .enrichment_aggressive_address import enrich_with_aggressive_address
+        await enrich_with_aggressive_address(enriched)
+    except Exception:
+        log.error("aggressive_address.failed", traceback=traceback.format_exc())
+
     # NC eCourts case-status check via Tyler portal (Scrapling/Playwright).
     # Tags listings.raw.nc_case_status with current docket state — pending,
     # sold (recent sale), upset_bid (in 10-day window), confirmed, dismissed.
