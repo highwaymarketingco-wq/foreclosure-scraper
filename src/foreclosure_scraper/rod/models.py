@@ -70,11 +70,16 @@ DOC_BUCKETS: dict[str, str] = {
     "SATISFACTION": "satisfaction",
     "RELEASE": "satisfaction",
     "CANCELLATION": "satisfaction",
-    # Lis pendens / NOS
+    # Lis pendens / NOS / NOD (pre-foreclosure trigger)
     "LIS PENDENS": "lis_pendens",
     "LP": "lis_pendens",
     "NOTICE OF SALE": "notice_of_sale",
     "NOS": "notice_of_sale",
+    "NOTICE OF DEFAULT": "notice_of_default",
+    "NOD": "notice_of_default",
+    "NOTICE OF FORECLOSURE": "notice_of_default",
+    "NOTICE OF FORECLOSURE SALE": "notice_of_sale",
+    "DEFAULT NOTICE": "notice_of_default",
     # Assignments
     "ASSIGN": "assignment",
     "ASSIGNMENT": "assignment",

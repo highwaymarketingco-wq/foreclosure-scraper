@@ -27,7 +27,8 @@ dependencies = [
     "feedparser>=6.0",
     "trafilatura>=1.12",
     "homeharvest>=0.8.18",
-    "scrapling>=0.4.7",
+    "scrapling[fetchers]>=0.4.7",
+    "curl-cffi>=0.15.0",
 ]
 
 [project.scripts]

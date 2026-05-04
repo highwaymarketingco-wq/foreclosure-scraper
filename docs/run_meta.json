@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-05-04T08:23:13.146412Z",
-  "total": 187,
+  "run_time": "2026-05-04T08:51:49.553693Z",
+  "total": 188,
   "by_source": {
     "national.auction_dot_com": 0,
     "national.bid4assets": 4,
@@ -39,13 +39,16 @@
     "counties_nc.polk_tax": 2,
     "counties_nc.rutherford_tax": 11,
     "counties.sitemap_walker": 31,
+    "newspapers.daily_courier": 1,
     "newspapers.hendersonville_lightning": 5,
+    "newspapers.shelby_star": 0,
+    "newspapers.tryon_bulletin": 0,
     "city_websites.search": 0,
     "courts.lis_pendens_discovery": 0
   },
   "by_state": {
-    "SC": 83,
-    "NC": 104
+    "NC": 105,
+    "SC": 83
   },
   "by_county_top": [
     [
@@ -81,11 +84,11 @@
       6
     ],
     [
-      "Rowan, NC",
-      4
+      "Rutherford, NC",
+      5
     ],
     [
-      "Rutherford, NC",
+      "Rowan, NC",
       4
     ],
     [
@@ -147,7 +150,10 @@
     "counties_nc.polk_tax": "OK (2)",
     "counties_nc.rutherford_tax": "OK (11)",
     "counties.sitemap_walker": "OK (31)",
+    "newspapers.daily_courier": "OK (1)",
     "newspapers.hendersonville_lightning": "OK (5)",
+    "newspapers.shelby_star": "REGRESSED (expected ≥ 1)",
+    "newspapers.tryon_bulletin": "REGRESSED (expected ≥ 1)",
     "city_websites.search": "EMPTY (verified)"
   },
   "regressions": [],
@@ -173,7 +179,9 @@
     "counties_sc.pickens_master_in_equity",
     "counties_sc.sc_public_index",
     "counties_nc.mecklenburg_tax",
+    "newspapers.shelby_star",
+    "newspapers.tryon_bulletin",
     "city_websites.search"
   ],
-  "notes": "horizon=120d, scrapers=39, regressions=0"
+  "notes": "horizon=120d, scrapers=42, regressions=0"
 }

@@ -63,6 +63,23 @@ async def enrich_one(li: Listing) -> None:
     li.raw["rod_docs"] = [d.to_dict() for d in docs[:25]]
     li.raw["lien_priority"] = pos.to_dict()
 
+    # NOD detection — flag if this owner has a Notice of Default recorded.
+    # NOD is the FIRST step in NC foreclosure (filed 60-180 days before sale).
+    # If we see one for the defendant, this is a confirmed pre-sale signal.
+    from .models import DOC_BUCKETS, normalize_doc_type
+    nod_docs = [d for d in docs
+                if DOC_BUCKETS.get(normalize_doc_type(d.doc_type)) in ("notice_of_default", "notice_of_sale", "lis_pendens")]
+    if nod_docs:
+        nod_docs.sort(key=lambda d: d.recorded_date or __import__("datetime").datetime.min, reverse=True)
+        li.raw["nod"] = {
+            "found": True,
+            "type": DOC_BUCKETS.get(normalize_doc_type(nod_docs[0].doc_type), "unknown"),
+            "recorded_date": nod_docs[0].recorded_date.isoformat() if nod_docs[0].recorded_date else None,
+            "book_page": f"{nod_docs[0].book or '?'}/{nod_docs[0].page or '?'}",
+            "instrument_no": nod_docs[0].instrument_no,
+            "all_count": len(nod_docs),
+        }
+
 
 async def enrich_all(listings: list[Listing], concurrency: int = 4) -> None:
     """Enrich every listing whose county is supported. Bounded concurrency."""

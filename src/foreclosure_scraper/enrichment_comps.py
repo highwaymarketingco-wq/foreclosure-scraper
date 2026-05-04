@@ -95,36 +95,56 @@ def _num(v):
         return None
 
 
-def _pick_3_comps(target: Listing, sold_pool: list[dict]) -> list[dict]:
-    """Pick 3 best comps for the target foreclosure.
+def _pick_3_comps(target: Listing, sold_pool: list[dict],
+                   pools_by_state: dict | None = None) -> list[dict]:
+    """Pick 3 best comps for the target foreclosure with cascading fallback.
 
-    Match criteria (in order):
-      1. Same ZIP code (or city if no ZIP)
-      2. Within ±25% sqft (if both have sqft)
-      3. Same bed count ±1 (if both have beds)
-      4. Sorted by recency, then sqft proximity
+    Fallback chain (always returns 3 if pool has any properties at all):
+      1. Same ZIP code
+      2. Same city + state
+      3. Same county-pool (any property in this county)
+      4. Same state (cross-county pool from pools_by_state)
 
-    Returns up to 3 dicts with: {address, sold_price, sold_date, sqft, beds, baths, $/sqft}
+    Within candidates: prefer ±25% sqft, ±1 beds, most recent sold date.
+    Tags each comp with `match_quality` so the dashboard can show confidence.
+
+    Returns up to 3 dicts: {address, sold_price, sold_date, sqft, beds, baths, $/sqft, match_quality}
     """
-    if not sold_pool:
-        return []
-
     target_zip = (target.zip_code or "").strip()
     target_city = (target.city or "").strip().lower()
+    target_state = (target.state or "").strip().upper()
     target_sqft = target.living_sqft
     target_beds = target.bedrooms
 
-    # Stage 1: zip-match (fall back to city if no zip)
+    match_quality = "broad"
+
+    # Stage 1: ZIP-exact match
+    candidates: list[dict] = []
     if target_zip:
         candidates = [s for s in sold_pool if (str(s.get("zip_code") or "").strip()) == target_zip]
-    else:
+        if candidates:
+            match_quality = "zip"
+
+    # Stage 2: city+state match
+    if not candidates and target_city:
         candidates = [s for s in sold_pool
-                      if (str(s.get("city") or "").strip().lower()) == target_city]
+                      if (str(s.get("city") or "").strip().lower()) == target_city
+                      and (str(s.get("state") or "").strip().upper()) == target_state]
+        if candidates:
+            match_quality = "city"
+
+    # Stage 3: same county-pool (any property in the supplied sold_pool)
+    if not candidates and sold_pool:
+        candidates = list(sold_pool)
+        match_quality = "county"
+
+    # Stage 4: cross-county within same state (last resort)
+    if not candidates and pools_by_state and target_state:
+        candidates = pools_by_state.get(target_state, [])
+        match_quality = "state"
 
     if not candidates:
-        # Last resort: city-level if zip-match failed
-        candidates = [s for s in sold_pool
-                      if (str(s.get("city") or "").strip().lower()) == target_city]
+        return []
 
     # Stage 2: sqft band ±25% if target has sqft
     if target_sqft and len(candidates) > 5:
@@ -170,6 +190,7 @@ def _pick_3_comps(target: Listing, sold_pool: list[dict]) -> list[dict]:
             "year_built": int(s["year_built"]) if s.get("year_built") and str(s["year_built"]).replace(".0", "").isdigit() else None,
             "price_per_sqft": round(sold_price / sqft, 2) if sold_price and sqft else None,
             "url": s.get("property_url"),
+            "match_quality": match_quality,  # "zip" | "city" | "county" | "state" | "broad"
         })
     return out
 
@@ -201,21 +222,36 @@ def _backfill_property_data(li: Listing, sold_pool: list[dict]) -> None:
             return
 
 
-def _pick_3_rent_comps(target: Listing, rent_pool: list[dict]) -> list[dict]:
-    """Pick 3 best rent comps. Same matching strategy as sold."""
-    if not rent_pool:
-        return []
+def _pick_3_rent_comps(target: Listing, rent_pool: list[dict],
+                        rent_pools_by_state: dict | None = None) -> list[dict]:
+    """Pick 3 best rent comps with cascading fallback (zip -> city -> county -> state)."""
     target_zip = (target.zip_code or "").strip()
     target_city = (target.city or "").strip().lower()
+    target_state = (target.state or "").strip().upper()
     target_sqft = target.living_sqft
     target_beds = target.bedrooms
 
-    candidates = ([s for s in rent_pool if str(s.get("zip_code") or "").strip() == target_zip]
-                  if target_zip
-                  else [s for s in rent_pool if str(s.get("city") or "").strip().lower() == target_city])
-    if not candidates:
+    match_quality = "broad"
+    candidates: list[dict] = []
+    if target_zip:
+        candidates = [s for s in rent_pool if str(s.get("zip_code") or "").strip() == target_zip]
+        if candidates:
+            match_quality = "zip"
+    if not candidates and target_city:
         candidates = [s for s in rent_pool
-                      if str(s.get("city") or "").strip().lower() == target_city]
+                      if str(s.get("city") or "").strip().lower() == target_city
+                      and str(s.get("state") or "").strip().upper() == target_state]
+        if candidates:
+            match_quality = "city"
+    if not candidates and rent_pool:
+        candidates = list(rent_pool)
+        match_quality = "county"
+    if not candidates and rent_pools_by_state and target_state:
+        candidates = rent_pools_by_state.get(target_state, [])
+        match_quality = "state"
+    if not candidates:
+        return []
+
     if target_beds and len(candidates) > 5:
         bed_filt = [s for s in candidates
                     if s.get("beds") is not None and abs(float(s["beds"]) - target_beds) <= 1]
@@ -241,6 +277,7 @@ def _pick_3_rent_comps(target: Listing, rent_pool: list[dict]) -> list[dict]:
             "baths": _num(s.get("full_baths")),
             "rent_per_sqft": round(rent / sqft, 2) if rent and sqft else None,
             "url": s.get("property_url"),
+            "match_quality": match_quality,
         })
     return out
 
@@ -273,6 +310,13 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
             sold_pools[(c.state, c.name)] = sr
         if isinstance(rr, list):
             rent_pools[(c.state, c.name)] = rr
+    # Cross-county state pools (last-resort fallback so EVERY listing can get 3 comps)
+    sold_by_state: dict[str, list[dict]] = {}
+    rent_by_state: dict[str, list[dict]] = {}
+    for (st, _county), pool in sold_pools.items():
+        sold_by_state.setdefault(st, []).extend(pool)
+    for (st, _county), pool in rent_pools.items():
+        rent_by_state.setdefault(st, []).extend(pool)
     total_sold = sum(len(p) for p in sold_pools.values())
     total_rent = sum(len(p) for p in rent_pools.values())
     log.info("comps.pools_built", counties=len(sold_pools),
@@ -280,46 +324,47 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
 
     matched_sold = matched_rent = backfilled = 0
     for li in listings:
-        if not (li.county and li.state):
-            continue
+        # Even if county/state are sparse, still try via state-pool fallback
+        sold_pool = sold_pools.get((li.state, li.county)) if (li.county and li.state) else None
+        rent_pool = rent_pools.get((li.state, li.county)) if (li.county and li.state) else None
 
-        sold_pool = sold_pools.get((li.state, li.county))
-        rent_pool = rent_pools.get((li.state, li.county))
-
+        # Backfill specs first using the most-relevant pool we have
+        before = (li.living_sqft, li.bedrooms, li.bathrooms)
         if sold_pool:
-            before = (li.living_sqft, li.bedrooms, li.bathrooms)
             _backfill_property_data(li, sold_pool)
-            after = (li.living_sqft, li.bedrooms, li.bathrooms)
-            if before != after:
-                backfilled += 1
+        elif li.state and li.state in sold_by_state:
+            _backfill_property_data(li, sold_by_state[li.state])
+        after = (li.living_sqft, li.bedrooms, li.bathrooms)
+        if before != after:
+            backfilled += 1
 
-            comps = _pick_3_comps(li, sold_pool)
-            if comps:
-                if not isinstance(li.raw, dict):
-                    li.raw = {}
-                li.raw["comps"] = comps
-                ppsf = [c["price_per_sqft"] for c in comps if c.get("price_per_sqft")]
-                if ppsf:
-                    ppsf.sort()
-                    li.raw["comp_median_ppsf"] = ppsf[len(ppsf) // 2]
-                matched_sold += 1
+        # Sold comps with cascading fallback to state-pool
+        comps = _pick_3_comps(li, sold_pool or [], pools_by_state=sold_by_state)
+        if comps:
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            li.raw["comps"] = comps
+            ppsf = [c["price_per_sqft"] for c in comps if c.get("price_per_sqft")]
+            if ppsf:
+                ppsf.sort()
+                li.raw["comp_median_ppsf"] = ppsf[len(ppsf) // 2]
+            matched_sold += 1
 
-        if rent_pool:
-            rents = _pick_3_rent_comps(li, rent_pool)
-            if rents:
-                if not isinstance(li.raw, dict):
-                    li.raw = {}
-                li.raw["rent_comps"] = rents
-                rpsf = [r["rent_per_sqft"] for r in rents if r.get("rent_per_sqft")]
-                if rpsf:
-                    rpsf.sort()
-                    li.raw["rent_median_ppsf"] = rpsf[len(rpsf) // 2]
-                # Estimate monthly rent for subject by median × subject sqft
-                monthly = [r["rent_per_month"] for r in rents if r.get("rent_per_month")]
-                if monthly:
-                    monthly.sort()
-                    li.raw["estimated_monthly_rent"] = monthly[len(monthly) // 2]
-                matched_rent += 1
+        # Rent comps with cascading fallback to state-pool
+        rents = _pick_3_rent_comps(li, rent_pool or [], rent_pools_by_state=rent_by_state)
+        if rents:
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            li.raw["rent_comps"] = rents
+            rpsf = [r["rent_per_sqft"] for r in rents if r.get("rent_per_sqft")]
+            if rpsf:
+                rpsf.sort()
+                li.raw["rent_median_ppsf"] = rpsf[len(rpsf) // 2]
+            monthly = [r["rent_per_month"] for r in rents if r.get("rent_per_month")]
+            if monthly:
+                monthly.sort()
+                li.raw["estimated_monthly_rent"] = monthly[len(monthly) // 2]
+            matched_rent += 1
 
     log.info("comps.done", listings=len(listings),
              sold_matched=matched_sold, rent_matched=matched_rent,

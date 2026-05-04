@@ -227,6 +227,22 @@ async def run() -> int:
     except Exception:
         log.error("comps.failed", traceback=traceback.format_exc())
 
+    # Image fallback — ensure 100% have at least an OSM static-map of the address
+    # (free, no API key). Real Zillow/Realtor photos win when present.
+    try:
+        from .enrichment_images import enrich_with_images
+        await enrich_with_images(enriched, use_mapillary=False)
+    except Exception:
+        log.error("images.failed", traceback=traceback.format_exc())
+
+    # FEMA flood-zone tag — free public NFHL API, marks SFHA (high-risk) zones
+    # so grade can dock points and the calculator can include flood insurance.
+    try:
+        from .enrichment_flood import enrich_with_flood
+        await enrich_with_flood(enriched)
+    except Exception:
+        log.error("flood.failed", traceback=traceback.format_exc())
+
     # Investor calculator + A-F grades per listing.
     for li in enriched:
         try:
