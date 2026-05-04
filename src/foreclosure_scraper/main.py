@@ -81,6 +81,7 @@ DATELESS_OK_SOURCES = {
     "counties_sc.sc_public_index_lis_pendens",  # filed but no sale date yet
     "counties_nc.nc_ecourts_lis_pendens",       # NC Tyler portal civil-side filings
     "counties.nod_discovery",                   # ROD-discovered NOD recordings
+    "national.courtlistener_bankruptcy",        # Ch 7/11/13 federal bankruptcy filings
 }
 
 
@@ -268,6 +269,16 @@ async def run() -> int:
     except Exception:
         log.error("rod.failed", traceback=traceback.format_exc())
 
+    # Bankruptcy cross-reference — for every existing listing whose defendant
+    # matches a recent NC/SC bankruptcy filing, tag raw.bankruptcy with the
+    # chapter/court/date/docket. Free with CourtListener token. Strong pre-
+    # foreclosure signal: Ch.13 = trying to stop the sale, Ch.7 = liquidation.
+    try:
+        from .enrichment_bankruptcy import enrich_with_bankruptcy
+        await enrich_with_bankruptcy(enriched)
+    except Exception:
+        log.error("bankruptcy.failed", traceback=traceback.format_exc())
+
     # Comp finder + property-spec backfill — pulls 180-day sold pool per county
     # from HomeHarvest (free), backfills missing sqft/beds/baths/year, attaches
     # 3 comparable sales per listing matched by zip + sqft + beds.
@@ -285,6 +296,16 @@ async def run() -> int:
         await enrich_with_vision(enriched)
     except Exception:
         log.error("vision.failed", traceback=traceback.format_exc())
+
+    # Per-address photo gallery enrichment — for listings that came from
+    # courthouse / law-firm / sitemap sources WITHOUT photos, look up the
+    # same address on HomeHarvest's for_sale/pending/sold endpoints to pull
+    # rich Realtor.com galleries (primary + up to 5 alts). Free.
+    try:
+        from .enrichment_photos import enrich_with_address_photos
+        await enrich_with_address_photos(enriched)
+    except Exception:
+        log.error("photos.failed", traceback=traceback.format_exc())
 
     # Image fallback — ensure 100% have at least an OSM static-map of the address
     # (free, no API key). Real Zillow/Realtor photos win when present.

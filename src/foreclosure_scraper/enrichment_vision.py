@@ -30,8 +30,9 @@ log = structlog.get_logger()
 
 
 VISION_MODEL = "claude-sonnet-4-5-20250929"
-MAX_PHOTOS_PER_LISTING = 3   # 1 real + aerial + street if available
-MAX_TOKENS = 800
+MAX_PHOTOS_PER_LISTING = 7   # up to 5 real + aerial + street
+MAX_REAL_PHOTOS = 5          # how many of the listing photos to send
+MAX_TOKENS = 1000            # bumped to fit richer multi-photo observations
 # Concurrency configurable so the retry pass can throttle harder than the main run
 CONCURRENCY = int(os.environ.get("VISION_CONCURRENCY", "4"))
 INTER_CALL_DELAY = float(os.environ.get("VISION_INTER_CALL_DELAY", "0.0"))
@@ -116,7 +117,7 @@ def _select_image_urls(li: Listing) -> list[str]:
     urls: list[str] = []
     real = images.get("real") or []
     if isinstance(real, list):
-        urls.extend([u for u in real[:2] if u])  # up to 2 real photos
+        urls.extend([u for u in real[:MAX_REAL_PHOTOS] if u])
     elif isinstance(real, str) and real:
         urls.append(real)
     # Legacy fallback: pull from raw.zillow.photo(s) if images.real not set yet
@@ -124,7 +125,7 @@ def _select_image_urls(li: Listing) -> list[str]:
         zillow = raw.get("zillow") or {}
         z_photos = zillow.get("photos") or []
         if isinstance(z_photos, list) and z_photos:
-            urls.extend([u for u in z_photos[:2] if u])
+            urls.extend([u for u in z_photos[:MAX_REAL_PHOTOS] if u])
         elif zillow.get("photo"):
             urls.append(zillow["photo"])
     if len(urls) < MAX_PHOTOS_PER_LISTING and images.get("street"):

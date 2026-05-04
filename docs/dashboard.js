@@ -299,13 +299,22 @@ function renderTable() {
       const g = getGrade(l) || {};
       const c = getCalc(l) || {};
       const rowClass = g.overall ? `row-${g.overall}` : "";
+      // Bankruptcy listings have no address — show debtor name + chapter so
+      // they're identifiable in the table view. Cross-ref hits get a 🏛 prefix.
+      const isBkSource = l.source === "national.courtlistener_bankruptcy";
+      const cl = isBkSource ? (l.raw && l.raw.courtlistener) || {} : null;
+      const bkXref = !isBkSource && l.raw && l.raw.bankruptcy ? l.raw.bankruptcy : null;
+      const addrCell = isBkSource
+        ? `🏛 ${cl.chapter && cl.chapter !== "?" ? `Ch.${cl.chapter} ` : ""}${(l.defendant || "Bankruptcy filing").slice(0, 60)}`
+        : `${bkXref ? "🏛 " : ""}${l.street_address || ""}`;
+      const dateCell = isBkSource && cl && cl.date_filed ? cl.date_filed : fmtDate(l.sale_date);
       return `
     <tr class="${rowClass}" data-id="${i}">
       <td>${gradeBadge(g)}</td>
-      <td>${fmtDate(l.sale_date)}</td>
+      <td>${dateCell}</td>
       <td>${l.state || ""}</td>
       <td>${l.county || ""}</td>
-      <td>${l.street_address || ""}</td>
+      <td>${addrCell}</td>
       <td>${l.city || ""}</td>
       <td>${fmtType(l.listing_type)}</td>
       <td class="num">${fmtMoney(l.opening_bid)}</td>
@@ -334,9 +343,15 @@ function renderCards() {
     .map((l, i) => {
       const g = getGrade(l);
       const c = getCalc(l) || {};
+      const isBkSource = l.source === "national.courtlistener_bankruptcy";
+      const bkXref = !isBkSource && l.raw && l.raw.bankruptcy ? l.raw.bankruptcy : null;
+      const cl = isBkSource ? (l.raw && l.raw.courtlistener) || {} : null;
       // Photo: prefer Zillow photo, fall back to OSM static map at the listing's coords
       let photo;
-      if (l.raw && l.raw.zillow && l.raw.zillow.photo) {
+      if (isBkSource) {
+        // Bankruptcy listings have no property — use a court-themed placeholder
+        photo = `<div class="card-img no-photo" style="background:linear-gradient(135deg,#1a365d,#2c5282);color:#fff;font-size:48px">🏛</div>`;
+      } else if (l.raw && l.raw.zillow && l.raw.zillow.photo) {
         photo = `<div class="card-img" style="background-image:url('${l.raw.zillow.photo}')"></div>`;
       } else if (l.latitude && l.longitude) {
         const staticUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${l.latitude},${l.longitude}&zoom=17&size=400x250&markers=${l.latitude},${l.longitude},red-pushpin`;
@@ -352,13 +367,20 @@ function renderCards() {
       if (l.acreage) meta.push(`${l.acreage} ac`);
       const roi = c.roi_pct;
       const roiCls = roi == null ? "" : roi > 0 ? "roi-pos" : "roi-neg";
+      // Bankruptcy listings: show debtor + chapter as the "address"
+      const cardAddr = isBkSource
+        ? `🏛 ${cl && cl.chapter && cl.chapter !== "?" ? `Ch.${cl.chapter}` : "Bankruptcy"} · ${(l.defendant || "filing").slice(0, 50)}`
+        : `${bkXref ? "🏛 " : ""}${l.street_address || "(address pending)"}`;
+      const cardLoc = isBkSource
+        ? `${cl && cl.court ? cl.court.toUpperCase() : ""} · ${l.state || ""} · Filed ${cl && cl.date_filed || "?"}`
+        : `${l.city || ""}${l.city ? ", " : ""}${l.county || "?"} County, ${l.state || ""}`;
       return `
       <div class="card" data-id="${i}">
         ${g ? `<div class="card-grade-corner">${gradeBadge(g)}</div>` : ""}
         ${photo}
         <div class="card-body">
-          <div class="card-addr">${l.street_address || "(address pending)"}</div>
-          <div class="card-loc">${l.city || ""}${l.city ? ", " : ""}${l.county || "?"} County, ${l.state || ""}</div>
+          <div class="card-addr">${cardAddr}</div>
+          <div class="card-loc">${cardLoc}</div>
           <div class="card-meta">
             ${fmtType(l.listing_type)}
             ${l.opening_bid ? `<span>Bid ${fmtMoney(l.opening_bid)}</span>` : ""}
@@ -717,6 +739,26 @@ function openDetail(l) {
   // Flood
   if (flood.in_sfha) {
     badges.push(`<span class="qbadge neg">⚠ Flood zone ${flood.zone || "AE"}</span>`);
+  }
+
+  // Bankruptcy cross-reference — HIGH-PRIORITY signal: defendant on this
+  // foreclosure also has a recent NC/SC bankruptcy filing. Ch.13 = trying to
+  // stop the sale via automatic stay. Ch.7 = liquidation, property gets sold.
+  const bk = (l.raw && l.raw.bankruptcy) || null;
+  if (bk) {
+    const ch = bk.chapter && bk.chapter !== "?" ? `Ch.${bk.chapter} ` : "";
+    const dt = bk.date_filed ? ` ${bk.date_filed}` : "";
+    const cls = bk.chapter === "13" ? "neg" : bk.chapter === "7" ? "warn" : "warn-light";
+    const tip = `${(bk.case_name || '').replace(/"/g, '')} | ${(bk.docket_number || '').replace(/"/g, '')} | ${(bk.court || '').toUpperCase()}`;
+    badges.push(`<span class="qbadge ${cls}" title="${tip}">🏛 ${ch}BANKRUPTCY${dt}</span>`);
+  }
+
+  // Bankruptcy source listing (discovery — debtor name only, no address)
+  if (l.source === "national.courtlistener_bankruptcy") {
+    const cl = (l.raw && l.raw.courtlistener) || {};
+    const ch = cl.chapter && cl.chapter !== "?" ? `Ch.${cl.chapter} ` : "";
+    const cls = cl.chapter === "13" ? "neg" : cl.chapter === "7" ? "warn" : "warn-light";
+    badges.push(`<span class="qbadge ${cls}">🏛 ${ch}Bankruptcy filing</span>`);
   }
 
   // Property flags as colored chips

@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-05-04T14:52:33.768701Z",
-  "total": 584,
+  "run_time": "2026-05-04T18:55:37.876364Z",
+  "total": 1299,
   "by_source": {
     "national.auction_dot_com": 0,
     "national.bid4assets": 4,
@@ -8,7 +8,7 @@
     "national.foreclosure_dot_com": 0,
     "national.freddie_homesteps": 0,
     "national.homeharvest": 18,
-    "national.distressed": 413,
+    "national.distressed": 431,
     "national.hubzu": 0,
     "national.hud_homestore": 0,
     "national.probate_foreclosure_leads": 0,
@@ -21,43 +21,44 @@
     "public_notices.ncnotices": 0,
     "public_notices.publicnoticesc": 0,
     "law_firms.aldridge_pite": 0,
-    "law_firms.bell_carrington": 70,
-    "law_firms.brock_scott": 311,
+    "law_firms.bell_carrington": 71,
+    "law_firms.brock_scott": 312,
     "law_firms.finkel": 8,
-    "law_firms.hutchens": 360,
+    "law_firms.hutchens": 357,
     "law_firms.korn": 0,
     "law_firms.mcmichael_taylor_gray": 0,
-    "law_firms.rogers_townsend": 27,
+    "law_firms.rogers_townsend": 35,
     "counties_sc.anderson_master_in_equity": 14,
     "counties_sc.pickens_master_in_equity": 0,
     "counties_sc.sc_flc": 17,
     "counties_sc.sc_public_index": 0,
-    "counties_sc.sc_public_index_lis_pendens": 0,
+    "counties_sc.sc_public_index_lis_pendens": 112,
     "counties_sc.spartanburg_master_in_equity": 18,
     "counties_nc.buncombe_tax": 2,
     "counties_nc.cleveland_tax": 6,
     "counties_nc.henderson_tax": 15,
     "counties_nc.mecklenburg_tax": 0,
-    "counties_nc.nc_ecourts_lis_pendens": 542,
+    "counties_nc.nc_ecourts_lis_pendens": 543,
     "counties_nc.polk_tax": 2,
     "counties_nc.rutherford_tax": 11,
     "counties.nod_discovery": 0,
     "counties.sitemap_walker": 31,
-    "newspapers.daily_courier": 0,
+    "newspapers.daily_courier": 1,
     "newspapers.hendersonville_lightning": 5,
     "newspapers.shelby_star": 0,
     "newspapers.tryon_bulletin": 0,
     "city_websites.search": 0,
-    "courts.lis_pendens_discovery": 0
+    "courts.lis_pendens_discovery": 0,
+    "national.courtlistener_bankruptcy": 600
   },
   "by_state": {
-    "NC": 361,
-    "SC": 223
+    "SC": 317,
+    "NC": 382
   },
   "by_county_top": [
     [
       "Mecklenburg, NC",
-      180
+      182
     ],
     [
       "Spartanburg, SC",
@@ -65,7 +66,11 @@
     ],
     [
       "Anderson, SC",
-      79
+      81
+    ],
+    [
+      "Cherokee, SC",
+      46
     ],
     [
       "Gaston, NC",
@@ -76,44 +81,40 @@
       38
     ],
     [
-      "Cherokee, SC",
-      26
+      "Laurens, SC",
+      38
+    ],
+    [
+      "Pickens, SC",
+      31
     ],
     [
       "Buncombe, NC",
       23
     ],
     [
+      "Oconee, SC",
+      20
+    ],
+    [
+      "Cleveland, NC",
+      19
+    ],
+    [
+      "Union, SC",
+      18
+    ],
+    [
       "Lincoln, NC",
       13
     ],
     [
-      "Pickens, SC",
-      10
-    ],
-    [
-      "Laurens, SC",
-      10
-    ],
-    [
       "Rutherford, NC",
-      10
+      11
     ],
     [
       "McDowell, NC",
       10
-    ],
-    [
-      "Union, SC",
-      9
-    ],
-    [
-      "Burke, NC",
-      7
-    ],
-    [
-      "Union, NC",
-      6
     ]
   ],
   "source_status": {
@@ -123,7 +124,7 @@
     "national.foreclosure_dot_com": "APIFY-BLOCKED",
     "national.freddie_homesteps": "APIFY-BLOCKED",
     "national.homeharvest": "OK (18)",
-    "national.distressed": "OK (413)",
+    "national.distressed": "OK (431)",
     "national.hubzu": "APIFY-BLOCKED",
     "national.hud_homestore": "EMPTY (verified)",
     "national.probate_foreclosure_leads": "APIFY-BLOCKED",
@@ -136,32 +137,32 @@
     "public_notices.ncnotices": "EMPTY (verified)",
     "public_notices.publicnoticesc": "EMPTY (verified)",
     "law_firms.aldridge_pite": "APIFY-BLOCKED",
-    "law_firms.bell_carrington": "OK (70)",
-    "law_firms.brock_scott": "OK (311)",
+    "law_firms.bell_carrington": "OK (71)",
+    "law_firms.brock_scott": "OK (312)",
     "law_firms.finkel": "OK (8)",
-    "law_firms.hutchens": "OK (360)",
+    "law_firms.hutchens": "OK (357)",
     "law_firms.korn": "APIFY-BLOCKED",
     "law_firms.mcmichael_taylor_gray": "APIFY-BLOCKED",
-    "law_firms.rogers_townsend": "OK (27)",
+    "law_firms.rogers_townsend": "OK (35)",
     "counties_sc.anderson_master_in_equity": "OK (14)",
-    "counties_sc.pickens_master_in_equity": "REGRESSED (expected \u2265 1)",
+    "counties_sc.pickens_master_in_equity": "REGRESSED (expected ≥ 1)",
     "counties_sc.sc_flc": "OK (17)",
     "counties_sc.sc_public_index": "EMPTY (verified)",
-    "counties_sc.sc_public_index_lis_pendens": "REGRESSED (expected \u2265 5)",
+    "counties_sc.sc_public_index_lis_pendens": "OK (112)",
     "counties_sc.spartanburg_master_in_equity": "OK (18)",
     "counties_nc.buncombe_tax": "OK (2)",
     "counties_nc.cleveland_tax": "OK (6)",
     "counties_nc.henderson_tax": "OK (15)",
     "counties_nc.mecklenburg_tax": "EMPTY (verified)",
-    "counties_nc.nc_ecourts_lis_pendens": "OK (542)",
+    "counties_nc.nc_ecourts_lis_pendens": "OK (543)",
     "counties_nc.polk_tax": "OK (2)",
     "counties_nc.rutherford_tax": "OK (11)",
-    "counties.nod_discovery": "REGRESSED (expected \u2265 1)",
+    "counties.nod_discovery": "REGRESSED (expected ≥ 1)",
     "counties.sitemap_walker": "OK (31)",
-    "newspapers.daily_courier": "REGRESSED (expected \u2265 1)",
+    "newspapers.daily_courier": "OK (1)",
     "newspapers.hendersonville_lightning": "OK (5)",
-    "newspapers.shelby_star": "REGRESSED (expected \u2265 1)",
-    "newspapers.tryon_bulletin": "REGRESSED (expected \u2265 1)",
+    "newspapers.shelby_star": "REGRESSED (expected ≥ 1)",
+    "newspapers.tryon_bulletin": "REGRESSED (expected ≥ 1)",
     "city_websites.search": "EMPTY (verified)"
   },
   "regressions": [],
@@ -186,18 +187,17 @@
     "law_firms.mcmichael_taylor_gray",
     "counties_sc.pickens_master_in_equity",
     "counties_sc.sc_public_index",
-    "counties_sc.sc_public_index_lis_pendens",
     "counties_nc.mecklenburg_tax",
     "counties.nod_discovery",
-    "newspapers.daily_courier",
     "newspapers.shelby_star",
     "newspapers.tryon_bulletin",
     "city_websites.search"
   ],
   "notes": "horizon=120d, scrapers=46, regressions=0",
-  "vision_retry": {
-    "attempted": 218,
-    "succeeded": 218,
-    "failed": 0
+  "bankruptcy_delta": {
+    "run_time": "2026-05-04T19:01:45.952782Z",
+    "listings_tagged": 7,
+    "new_listings_added": 600,
+    "scraper_total": 600
   }
 }

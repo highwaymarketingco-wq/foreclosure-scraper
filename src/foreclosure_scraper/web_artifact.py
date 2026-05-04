@@ -45,6 +45,8 @@ RAW_KEEP = {
     "images": "*",                    # {primary, map, street} fallback image map
     "flood": "*",                     # FEMA flood-zone tag {zone, in_sfha, ...}
     "nod": "*",                       # ROD-discovered Notice of Default
+    "bankruptcy": "*",                # CourtListener bankruptcy match on defendant name
+    "courtlistener": "*",             # raw bankruptcy docket data when emitted as a listing
     "distressed": "*",                # HomeHarvest distressed-keyword matches
     "epa": "*",                       # EPA ECHO environmental hazards
     "crime": "*",                     # FBI UCR / per-zip crime stats
