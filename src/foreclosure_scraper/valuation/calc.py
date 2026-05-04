@@ -90,20 +90,44 @@ def _condition_to_tier(li: Listing) -> str:
 def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None, str, list[str]]:
     """Return (low, expected, high, confidence, notes) for ARV.
 
-    Best signal: Zillow zestimate (real Zestimate per address).
-    Fallback: tax_value × 1.25 (assessed values lag market).
-    Worst:    opening_bid × 2.4 (foreclosures often run ~40% of ARV at the floor).
+    Best signal: 3 zip-matched comps × subject sqft (TRUE comp-based ARV).
+    Next:        Zillow zestimate (per-address Zestimate).
+    Fallback:    tax_value × 1.25 (assessed values lag market).
+    Worst:       opening_bid × 2.4 (foreclosures often run ~40% of ARV at the floor).
 
     Range = expected ± 15%.
     """
     notes: list[str] = []
-    z = (li.raw or {}).get("zillow", {}) if isinstance(li.raw, dict) else {}
-    zest = z.get("zestimate") or li.market_value
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    comps = raw.get("comps") or []
+    comp_ppsf = raw.get("comp_median_ppsf")
 
+    # Tier 1: comp-based ARV (HIGHEST confidence)
+    if comps and comp_ppsf and li.living_sqft:
+        expected = float(comp_ppsf) * float(li.living_sqft)
+        notes.append(
+            f"ARV from {len(comps)} zip-matched sold comps × subject sqft "
+            f"(${comp_ppsf:,.0f}/sqft × {li.living_sqft:,.0f} sqft)"
+        )
+        # Range: low = 25th percentile $/sqft, high = 75th percentile
+        ppsfs = sorted(c["price_per_sqft"] for c in comps if c.get("price_per_sqft"))
+        if len(ppsfs) >= 3:
+            low_ppsf = ppsfs[0]
+            high_ppsf = ppsfs[-1]
+            low = round(low_ppsf * li.living_sqft, -2)
+            high = round(high_ppsf * li.living_sqft, -2)
+        else:
+            low = round(expected * 0.90, -2)
+            high = round(expected * 1.10, -2)
+        return round(expected, -2), low, high, "HIGH", notes
+
+    # Tier 2: Zillow zestimate
+    z = raw.get("zillow", {}) if isinstance(raw, dict) else {}
+    zest = z.get("zestimate") or li.market_value
     if zest and zest > 0:
         expected = float(zest)
         notes.append(f"ARV from Zillow Zestimate ({zest:,.0f})")
-        confidence = "MEDIUM"  # zestimates are ±5-20% off real comps
+        confidence = "MEDIUM"
     elif li.tax_value and li.tax_value > 0:
         expected = float(li.tax_value) * 1.25
         notes.append(f"ARV from tax-assessed × 1.25 ({li.tax_value:,.0f} × 1.25)")

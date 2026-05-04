@@ -535,6 +535,60 @@ function openDetail(l) {
   $("d-source-url").href = l.source_url || "#";
   $("d-source-url").textContent = l.source_url || "(no link)";
 
+  // Sold Comps (HomeHarvest comp finder)
+  const comps = (l.raw && l.raw.comps) || [];
+  if (comps.length) {
+    $("d-comps-section").style.display = "block";
+    const compHeader = (l.raw && l.raw.comp_median_ppsf)
+      ? `<div class="comp-summary">Median: <strong>$${Number(l.raw.comp_median_ppsf).toFixed(0)}/sqft</strong></div>`
+      : "";
+    $("d-comps").innerHTML = compHeader + `
+      <table class="comps-table">
+        <thead><tr><th>Address</th><th>Sold</th><th>Date</th><th>SqFt</th><th>Bd/Ba</th><th>$/SqFt</th></tr></thead>
+        <tbody>
+        ${comps.map(c => `
+          <tr>
+            <td>${c.url ? `<a href="${c.url}" target="_blank">${c.address || "—"}</a>` : (c.address || "—")}</td>
+            <td>${c.sold_price ? `$${Number(c.sold_price).toLocaleString()}` : "—"}</td>
+            <td>${c.sold_date ? c.sold_date.slice(0,10) : "—"}</td>
+            <td>${c.sqft ? Number(c.sqft).toLocaleString() : "—"}</td>
+            <td>${c.beds ?? "—"}/${c.baths ?? "—"}</td>
+            <td>${c.price_per_sqft ? `$${Number(c.price_per_sqft).toFixed(0)}` : "—"}</td>
+          </tr>
+        `).join("")}
+        </tbody>
+      </table>`;
+  } else {
+    $("d-comps-section").style.display = "none";
+  }
+
+  // Rent Comps
+  const rents = (l.raw && l.raw.rent_comps) || [];
+  if (rents.length) {
+    $("d-rent-section").style.display = "block";
+    const est = l.raw && l.raw.estimated_monthly_rent;
+    const header = est
+      ? `<div class="comp-summary">Estimated rent: <strong>$${Number(est).toLocaleString()}/mo</strong></div>`
+      : "";
+    $("d-rent").innerHTML = header + `
+      <table class="comps-table">
+        <thead><tr><th>Address</th><th>Rent</th><th>SqFt</th><th>Bd/Ba</th><th>$/SqFt</th></tr></thead>
+        <tbody>
+        ${rents.map(r => `
+          <tr>
+            <td>${r.url ? `<a href="${r.url}" target="_blank">${r.address || "—"}</a>` : (r.address || "—")}</td>
+            <td>${r.rent_per_month ? `$${Number(r.rent_per_month).toLocaleString()}` : "—"}</td>
+            <td>${r.sqft ? Number(r.sqft).toLocaleString() : "—"}</td>
+            <td>${r.beds ?? "—"}/${r.baths ?? "—"}</td>
+            <td>${r.rent_per_sqft ? `$${Number(r.rent_per_sqft).toFixed(2)}` : "—"}</td>
+          </tr>
+        `).join("")}
+        </tbody>
+      </table>`;
+  } else {
+    $("d-rent-section").style.display = "none";
+  }
+
   // Court
   const court = [
     ["Case Number", l.case_number],

@@ -26,12 +26,8 @@ from ...models import Listing, ListingType, PropertyKind
 
 # (state, county, city, domain) — covers every city seat plus major suburbs
 CITIES: tuple[tuple[str, str, str, str], ...] = (
+    # Greenville/Greenwood/Newberry/Abbeville removed per scope narrowing 2026-05.
     # SC
-    ("SC", "Greenville", "Greenville", "greenvillesc.gov"),
-    ("SC", "Greenville", "Greer", "cityofgreer.org"),
-    ("SC", "Greenville", "Mauldin", "mauldincitysc.com"),
-    ("SC", "Greenville", "Simpsonville", "simpsonville.com"),
-    ("SC", "Greenville", "Travelers Rest", "travelersrestsc.com"),
     ("SC", "Spartanburg", "Spartanburg", "cityofspartanburg.org"),
     ("SC", "Spartanburg", "Boiling Springs", "boilingspringssc.org"),
     ("SC", "Spartanburg", "Inman", "cityofinmansc.org"),
@@ -49,9 +45,6 @@ CITIES: tuple[tuple[str, str, str, str], ...] = (
     ("SC", "Union", "Union", "cityofunionsc.org"),
     ("SC", "Laurens", "Laurens", "cityoflaurenssc.com"),
     ("SC", "Laurens", "Clinton", "cityofclintonsc.com"),
-    ("SC", "Abbeville", "Abbeville", "cityofabbeville.org"),
-    ("SC", "Greenwood", "Greenwood", "cityofgreenwoodsc.com"),
-    ("SC", "Newberry", "Newberry", "cityofnewberry.com"),
     # NC
     ("NC", "Mecklenburg", "Charlotte", "charlottenc.gov"),
     ("NC", "Mecklenburg", "Davidson", "townofdavidson.org"),

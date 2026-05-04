@@ -245,3 +245,34 @@ footer div { margin-bottom: 4px; }
   background: var(--surface);
   border: 1px solid var(--border);
 }
+
+/* === Comps tables === */
+.comp-summary {
+  font-size: 14px;
+  color: var(--accent);
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background: var(--accent-soft);
+  border-radius: 6px;
+}
+.comps-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.comps-table th {
+  text-align: left;
+  padding: 6px 8px;
+  background: var(--bg);
+  color: var(--muted);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+.comps-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+.comps-table tr:last-child td { border-bottom: none; }
+.comps-table a { color: var(--accent); text-decoration: none; }
+.comps-table a:hover { text-decoration: underline; }

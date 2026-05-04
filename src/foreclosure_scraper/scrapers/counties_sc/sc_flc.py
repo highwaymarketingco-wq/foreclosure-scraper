@@ -22,9 +22,7 @@ from ...models import Listing, ListingType, PropertyKind
 # wrapper page are replaced; sites known to be down or returning 500 are kept
 # but expected to fail until restored.
 COUNTY_TAX_URLS: dict[str, tuple[str, ...]] = {
-    "Greenville": (
-        "http://www.greenvillecounty.org/appsAS400/Taxsale/",  # real (the .aspx URL is a 404 wrapper)
-    ),
+    # Greenville/Greenwood/Newberry/Abbeville removed per scope narrowing 2026-05.
     "Spartanburg": (
         "https://www.spartanburgcounty.gov/216/Tax-Collector",
     ),
@@ -42,9 +40,6 @@ COUNTY_TAX_URLS: dict[str, tuple[str, ...]] = {
     ),
     "Union": ("https://www.countyofunion.com/treasurer/tax-sale",),
     "Laurens": ("https://www.co.laurens.sc.us/treasurer/tax-sale",),
-    "Abbeville": ("https://www.abbevillecountysc.com/treasurer/tax-sale",),
-    "Greenwood": ("https://www.greenwoodsc.gov/treasurer/tax-sale",),
-    "Newberry": ("https://www.newberrycounty.net/treasurer/tax-sale",),
 }
 
 PARCEL_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}-\d{3}\.\d{3}\b|\b[A-Z0-9]{3,5}-\d{2}-\d{2,4}-\d{3,4}\b")

@@ -29,6 +29,15 @@ RAW_KEEP = {
     "grade": "*",     # A-F per-dimension + overall
     "location": ("median_household_income", "median_home_value",
                  "owner_occupied_pct", "unemployment_pct"),
+    "comps": "*",                     # 3 sold comps per listing (HomeHarvest)
+    "rent_comps": "*",                # 3 rent comps per listing (HomeHarvest)
+    "comp_median_ppsf": "*",
+    "rent_median_ppsf": "*",
+    "estimated_monthly_rent": "*",
+    "rod_docs": "*",                  # ROD recorded documents (deeds, mortgages, satisfactions)
+    "lien_priority": "*",             # senior/junior liens + super-priority warnings
+    "propwire": "*",                  # equity, owner, last sale (when present)
+    "loopnet": "*",                   # multifamily-specific cap rate, units, etc.
 }
 
 

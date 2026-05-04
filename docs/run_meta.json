@@ -1,21 +1,51 @@
 {
-  "run_time": "2026-04-29T17:17:30.758294Z",
-  "total": 497,
+  "run_time": "2026-05-04T08:23:13.146412Z",
+  "total": 187,
   "by_source": {
-    "law_firms.bell_carrington": 20,
-    "law_firms.brock_scott": 46,
-    "law_firms.hutchens": 87,
-    "law_firms.rogers_townsend": 2,
+    "national.auction_dot_com": 0,
+    "national.bid4assets": 4,
+    "national.fannie_homepath": 0,
+    "national.foreclosure_dot_com": 0,
+    "national.freddie_homesteps": 0,
+    "national.homeharvest": 18,
+    "national.hubzu": 0,
+    "national.hud_homestore": 0,
+    "national.probate_foreclosure_leads": 0,
+    "national.propwire": 0,
+    "national.realtor_foreclosures": 0,
+    "national.trulia": 0,
+    "national.xome": 0,
+    "national.zillow_bulk": 0,
+    "national.zillow_foreclosures": 0,
+    "public_notices.ncnotices": 0,
+    "public_notices.publicnoticesc": 0,
+    "law_firms.aldridge_pite": 0,
+    "law_firms.bell_carrington": 73,
+    "law_firms.brock_scott": 311,
+    "law_firms.finkel": 8,
+    "law_firms.hutchens": 361,
+    "law_firms.korn": 0,
+    "law_firms.mcmichael_taylor_gray": 0,
+    "law_firms.rogers_townsend": 27,
     "counties_sc.anderson_master_in_equity": 14,
+    "counties_sc.pickens_master_in_equity": 0,
+    "counties_sc.sc_flc": 17,
+    "counties_sc.sc_public_index": 0,
     "counties_sc.spartanburg_master_in_equity": 18,
-    "counties_sc.greenville_master_in_equity": 16,
+    "counties_nc.buncombe_tax": 2,
+    "counties_nc.cleveland_tax": 6,
     "counties_nc.henderson_tax": 15,
-    "national.propwire": 154,
-    "national.zillow_bulk": 125
+    "counties_nc.mecklenburg_tax": 0,
+    "counties_nc.polk_tax": 2,
+    "counties_nc.rutherford_tax": 11,
+    "counties.sitemap_walker": 31,
+    "newspapers.hendersonville_lightning": 5,
+    "city_websites.search": 0,
+    "courts.lis_pendens_discovery": 0
   },
   "by_state": {
-    "SC": 234,
-    "NC": 263
+    "SC": 83,
+    "NC": 104
   },
   "by_county_top": [
     [
@@ -28,46 +58,38 @@
     ],
     [
       "Anderson, SC",
-      31
-    ],
-    [
-      "Greenville, SC",
-      21
+      30
     ],
     [
       "Henderson, NC",
-      19
+      18
     ],
     [
       "Gaston, NC",
-      15
-    ],
-    [
-      "Aiken, SC",
-      10
-    ],
-    [
-      "Pickens, SC",
-      7
+      14
     ],
     [
       "Buncombe, NC",
       7
     ],
     [
-      "Union, NC",
-      7
-    ],
-    [
       "Cherokee, SC",
-      5
+      6
     ],
     [
-      "Iredell, NC",
-      5
+      "Union, NC",
+      6
+    ],
+    [
+      "Rowan, NC",
+      4
     ],
     [
       "Rutherford, NC",
+      4
+    ],
+    [
+      "Cabarrus, NC",
       4
     ],
     [
@@ -75,7 +97,15 @@
       3
     ],
     [
+      "Greenville, SC",
+      3
+    ],
+    [
       "Cleveland, NC",
+      3
+    ],
+    [
+      "Pickens, SC",
       3
     ]
   ],
@@ -85,6 +115,7 @@
     "national.fannie_homepath": "APIFY-BLOCKED",
     "national.foreclosure_dot_com": "APIFY-BLOCKED",
     "national.freddie_homesteps": "APIFY-BLOCKED",
+    "national.homeharvest": "OK (18)",
     "national.hubzu": "APIFY-BLOCKED",
     "national.hud_homestore": "EMPTY (verified)",
     "national.probate_foreclosure_leads": "APIFY-BLOCKED",
@@ -97,25 +128,25 @@
     "public_notices.ncnotices": "EMPTY (verified)",
     "public_notices.publicnoticesc": "EMPTY (verified)",
     "law_firms.aldridge_pite": "APIFY-BLOCKED",
-    "law_firms.bell_carrington": "OK (65)",
-    "law_firms.brock_scott": "OK (316)",
+    "law_firms.bell_carrington": "OK (73)",
+    "law_firms.brock_scott": "OK (311)",
     "law_firms.finkel": "OK (8)",
-    "law_firms.hutchens": "OK (356)",
+    "law_firms.hutchens": "OK (361)",
     "law_firms.korn": "APIFY-BLOCKED",
     "law_firms.mcmichael_taylor_gray": "APIFY-BLOCKED",
     "law_firms.rogers_townsend": "OK (27)",
     "counties_sc.anderson_master_in_equity": "OK (14)",
-    "counties_sc.greenville_master_in_equity": "OK (91)",
-    "counties_sc.pickens_master_in_equity": "REGRESSED (expected \u2265 1)",
+    "counties_sc.pickens_master_in_equity": "REGRESSED (expected ≥ 1)",
     "counties_sc.sc_flc": "OK (17)",
     "counties_sc.sc_public_index": "EMPTY (verified)",
     "counties_sc.spartanburg_master_in_equity": "OK (18)",
-    "counties_nc.buncombe_tax": "OK (1)",
+    "counties_nc.buncombe_tax": "OK (2)",
     "counties_nc.cleveland_tax": "OK (6)",
     "counties_nc.henderson_tax": "OK (15)",
     "counties_nc.mecklenburg_tax": "EMPTY (verified)",
     "counties_nc.polk_tax": "OK (2)",
     "counties_nc.rutherford_tax": "OK (11)",
+    "counties.sitemap_walker": "OK (31)",
     "newspapers.hendersonville_lightning": "OK (5)",
     "city_websites.search": "EMPTY (verified)"
   },
@@ -144,5 +175,5 @@
     "counties_nc.mecklenburg_tax",
     "city_websites.search"
   ],
-  "notes": "horizon=120d, scrapers=38, regressions=0"
+  "notes": "horizon=120d, scrapers=39, regressions=0"
 }

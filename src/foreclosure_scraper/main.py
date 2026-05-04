@@ -218,6 +218,15 @@ async def run() -> int:
     except Exception:
         log.error("rod.failed", traceback=traceback.format_exc())
 
+    # Comp finder + property-spec backfill — pulls 180-day sold pool per county
+    # from HomeHarvest (free), backfills missing sqft/beds/baths/year, attaches
+    # 3 comparable sales per listing matched by zip + sqft + beds.
+    try:
+        from .enrichment_comps import enrich_with_comps
+        await enrich_with_comps(enriched)
+    except Exception:
+        log.error("comps.failed", traceback=traceback.format_exc())
+
     # Investor calculator + A-F grades per listing.
     for li in enriched:
         try:

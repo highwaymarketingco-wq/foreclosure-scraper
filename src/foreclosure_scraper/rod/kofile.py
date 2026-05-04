@@ -1,4 +1,6 @@
-"""Kofile PublicSearch — Greenville, Oconee, Greenwood SC.
+"""Kofile PublicSearch — Oconee SC (only).
+
+Greenville + Greenwood dropped per scope narrowing 2026-05.
 
 Web app with bot-protected backend. Free read but blocks raw curl. We hit the
 internal API endpoint with a real-browser-style request; if blocked, the
@@ -17,9 +19,7 @@ from ..http_client import client
 from .models import RodDoc, normalize_doc_type
 
 KOFILE_COUNTIES = {
-    ("SC", "Greenville"): "greenville.sc.publicsearch.us",
     ("SC", "Oconee"): "oconee.sc.publicsearch.us",
-    ("SC", "Greenwood"): "greenwood.sc.publicsearch.us",
 }
 
 

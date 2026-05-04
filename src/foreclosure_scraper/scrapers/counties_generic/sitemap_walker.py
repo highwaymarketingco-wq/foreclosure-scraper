@@ -27,19 +27,18 @@ from typing import Iterable
 import httpx
 from selectolax.parser import HTMLParser
 
-from ..base_scraper import BaseScraper
-from ..http_client import client
-from ..models import Listing, ListingType, PropertyKind
+from ...base_scraper import BaseScraper
+from ...http_client import client
+from ...models import Listing, ListingType, PropertyKind
 
 # (state, county_name, base_domain) — covers our 6 priority counties + a few extras
 # we already have direct scrapers for (still useful as a cross-check / discovery layer).
 COUNTY_SITES: tuple[tuple[str, str, str], ...] = (
+    # Greenville/Greenwood/Newberry/Abbeville removed per scope narrowing 2026-05.
     ("SC", "Spartanburg", "https://www.spartanburgcounty.gov"),
     ("SC", "Cherokee",    "https://www.cherokeecountysc.gov"),
-    ("SC", "Greenville",  "https://www.greenvillecounty.org"),
     ("SC", "Anderson",    "https://www.andersoncountysc.org"),
     ("SC", "Pickens",     "https://www.co.pickens.sc.us"),
-    ("SC", "Greenwood",   "https://www.greenwoodsc.gov"),
     ("SC", "Oconee",      "https://oconeesc.com"),
     ("NC", "Henderson",   "https://www.hendersoncountync.gov"),
     ("NC", "Rutherford",  "https://www.rutherfordcountync.gov"),
