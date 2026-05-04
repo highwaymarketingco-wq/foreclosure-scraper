@@ -312,6 +312,15 @@ async def run() -> int:
     except Exception:
         log.error("aggressive_address.failed", traceback=traceback.format_exc())
 
+    # FINAL synthesis pass — for listings still without an address, build
+    # the best-available identifier from case#/defendant/description. The
+    # dashboard never shows "(address pending)" for a real listing.
+    try:
+        from .enrichment_address_final import enrich_with_address_synthesis
+        enrich_with_address_synthesis(enriched)
+    except Exception:
+        log.error("address_synth.failed", traceback=traceback.format_exc())
+
     # NC eCourts case-status check via Tyler portal (Scrapling/Playwright).
     # Tags listings.raw.nc_case_status with current docket state — pending,
     # sold (recent sale), upset_bid (in 10-day window), confirmed, dismissed.

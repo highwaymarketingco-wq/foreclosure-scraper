@@ -55,12 +55,36 @@ PARCEL_PATTERNS = (
     re.compile(r"\b(\d{3,4}-\d{2}-\d{2}-\d{3,4})\b"),
 )
 
-# Subdivision/lot extraction from description (NC tax format)
-SUBDIVISION_RE = re.compile(
-    r"\b([A-Z][A-Z0-9& '\-]{3,40}?)\s+(?:LO|LOT|LT)[:.]?\s*(\d+)"
-    r"(?:\s+(?:PH|PHASE|BL|BLK|BLOCK)[:.]?\s*([A-Z0-9]+))?",
-    re.I,
-)
+# Subdivision/lot extraction from description (NC tax format).
+# Multiple patterns because counties use varying conventions:
+#   - "SEVEN FALLS LO:127 PH:1A"     (LO: prefix)
+#   - "L#4 SEC B HUCKLEBERRY WEST"   (L# prefix, name AFTER)
+#   - "#4 OAK PARK"                  (# prefix, name AFTER)
+#   - "C.C. SHORES 5, INC. TR:3A,4A" (TR: tract instead of LO:)
+#   - "SOMERSBY PK PH:I SE:E"        (just subdivision + phase + section)
+SUBDIVISION_PATTERNS = [
+    # NAME LO:N or NAME LOT N
+    re.compile(
+        r"\b([A-Z][A-Z0-9& '\-]{3,40}?)\s+(?:LO|LOT|LT)[:.]?\s*(\d+)"
+        r"(?:\s+(?:PH|PHASE|BL|BLK|BLOCK)[:.]?\s*([A-Z0-9]+))?",
+        re.I,
+    ),
+    # L#N SEC X NAME or #N NAME
+    re.compile(
+        r"(?:^|\s)L?#\s*(\d+)\s+(?:SEC\s+[A-Z]\s+)?([A-Z][A-Z0-9& '\-]{3,40}?)(?:\s+SE:|\s+PH|\s*$)",
+        re.I,
+    ),
+    # NAME TR:X (tract)
+    re.compile(
+        r"\b([A-Z][A-Z0-9& .'\-]{3,40}?)\s+TR[:.]?\s*([A-Z0-9,]+)",
+        re.I,
+    ),
+    # ROAD ON (just a road name)
+    re.compile(
+        r"^([A-Z][A-Z0-9 ]{3,30})\s+(?:ON|RD|ST|DR|LN|AVE|HWY)\.?\s*$",
+        re.I,
+    ),
+]
 
 
 def _extract_parcel_candidates(text: str) -> list[str]:
@@ -79,21 +103,50 @@ def _synthesize_address_from_description(
     description: str, gis_attrs: dict[str, Any]
 ) -> Optional[str]:
     """When GIS returns "0 NO ADDRESS ASSIGNED" we can still construct a
-    usable identifier from subdivision + lot info in the original description.
-    Example: 'SEVEN FALLS LO:127 PH:1A' + city/zip → 'Lot 127 Seven Falls Ph 1A'.
+    usable identifier from subdivision/tract/road info in the description.
+    Returns None only if NO recognizable pattern matches.
     """
     if not description:
         return None
-    m = SUBDIVISION_RE.search(description.upper())
-    if not m:
-        return None
-    subdivision = m.group(1).strip().title()
-    lot = m.group(2)
-    phase = m.group(3) or ""
-    pieces = [f"Lot {lot}", subdivision]
-    if phase:
-        pieces.append(f"Ph {phase}")
-    return " ".join(pieces)
+    desc = description.upper().strip()
+
+    # Pattern 1: "NAME LO:N" or "NAME LOT N"
+    m = SUBDIVISION_PATTERNS[0].search(desc)
+    if m:
+        subdivision = m.group(1).strip().title()
+        lot = m.group(2)
+        phase = m.group(3) or ""
+        pieces = [f"Lot {lot}", subdivision]
+        if phase:
+            pieces.append(f"Ph {phase}")
+        return " ".join(pieces)
+
+    # Pattern 2: L#N or #N then NAME
+    m = SUBDIVISION_PATTERNS[1].search(desc)
+    if m:
+        lot = m.group(1)
+        subdivision = m.group(2).strip().title()
+        return f"Lot {lot} {subdivision}"
+
+    # Pattern 3: NAME TR:X (tract)
+    m = SUBDIVISION_PATTERNS[2].search(desc)
+    if m:
+        subdivision = m.group(1).strip().title()
+        tract = m.group(2)
+        return f"Tract {tract} {subdivision}"
+
+    # Pattern 4: ROAD ON / ROAD RD (road name only)
+    m = SUBDIVISION_PATTERNS[3].search(desc)
+    if m:
+        road = m.group(1).strip().title()
+        return f"Vacant lot — {road}"
+
+    # Last resort: use whatever name is in the description as identifier
+    cleaned = re.sub(r"[^A-Za-z0-9 ]", " ", desc).strip()
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    if 3 <= len(cleaned) <= 80:
+        return f"Vacant parcel — {cleaned.title()}"
+    return None
 
 
 async def _detect_parcel_field(
@@ -297,12 +350,18 @@ async def enrich_with_parcel_lookup(listings: list[Listing]) -> None:
                     had_addr = bool(li.street_address)
                     n = _populate_from_parcel(li, results[0])
                     if li.street_address and not had_addr:
-                        # Decide whether it's real or synthesized
-                        if "Lot " in li.street_address and " Ph " in li.street_address.lower():
+                        if "Lot " in li.street_address or "Tract " in li.street_address or "Vacant" in li.street_address:
                             counts["synthesized"] += 1
                         else:
                             counts["addr_resolved"] += 1
                     return
+            # No GIS match found — but we have a parcel_id, so synthesize an
+            # identifier from the description so the listing isn't address-null.
+            if li.description and not li.street_address:
+                synth = _synthesize_address_from_description(li.description, {})
+                if synth:
+                    li.street_address = synth
+                    counts["synthesized"] += 1
 
     async with client(timeout=20.0) as c:
         await asyncio.gather(*(one(c, li) for li in targets))
