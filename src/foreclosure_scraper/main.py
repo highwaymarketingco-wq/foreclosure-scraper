@@ -82,6 +82,7 @@ DATELESS_OK_SOURCES = {
     "counties_nc.nc_ecourts_lis_pendens",       # NC Tyler portal civil-side filings
     "counties.nod_discovery",                   # ROD-discovered NOD recordings
     "national.courtlistener_bankruptcy",        # Ch 7/11/13 federal bankruptcy filings
+    "counties_sc.sc_tax_delinquent",            # delinquent property tax / pre-tax-sale
 }
 
 
@@ -365,6 +366,24 @@ async def run() -> int:
         await enrich_with_environmental(enriched)
     except Exception:
         log.error("environmental.failed", traceback=traceback.format_exc())
+
+    # FEMA repetitive flood loss — beyond basic flood zone, this catches
+    # structures with multiple historical claims (much stronger distress
+    # signal). Free OpenFEMA API.
+    try:
+        from .enrichment_fema_repetitive_loss import enrich_with_fema_repetitive_loss
+        await enrich_with_fema_repetitive_loss(enriched)
+    except Exception:
+        log.error("fema_repetitive_loss.failed", traceback=traceback.format_exc())
+
+    # Code enforcement violations — Charlotte 311 + other city open-data
+    # portals. Active open violations are direct distress signal. Free
+    # ArcGIS REST endpoints.
+    try:
+        from .enrichment_code_enforcement import enrich_with_code_enforcement
+        await enrich_with_code_enforcement(enriched)
+    except Exception:
+        log.error("code_enforcement.failed", traceback=traceback.format_exc())
 
     # Investor calculator + A-F grades per listing.
     for li in enriched:

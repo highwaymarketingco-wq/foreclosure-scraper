@@ -50,6 +50,9 @@ RAW_KEEP = {
     "distressed": "*",                # HomeHarvest distressed-keyword matches
     "epa": "*",                       # EPA ECHO environmental hazards
     "crime": "*",                     # FBI UCR / per-zip crime stats
+    "fema_repetitive_loss": "*",      # NFIP multiple-loss properties (much stronger than flood zone alone)
+    "code_enforcement": "*",          # City open code violations (Charlotte 311 etc.)
+    "sc_tax_delinquent": "*",         # SC delinquent tax / pre-tax-sale tag
     "schools": "*",                   # GreatSchools per-address ratings (when key set)
     "walk_score": "*",                # Walk Score per-address (when key set)
 }
