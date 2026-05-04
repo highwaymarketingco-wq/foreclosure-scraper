@@ -46,6 +46,16 @@ def _load_token() -> Optional[str]:
     return None
 
 
+_BUSINESS_STOPWORDS = {
+    "llc", "inc", "corp", "corporation", "co", "company", "ltd", "limited",
+    "lp", "llp", "lc", "pa", "pllc", "pllp", "associates", "associate",
+    "group", "groups", "holdings", "holding", "properties", "property",
+    "investments", "investment", "partners", "partnership", "ventures",
+    "venture", "enterprises", "enterprise", "trust", "trustee", "trustees",
+    "bank", "banks", "fund", "funds", "capital", "the", "and",
+}
+
+
 def _normalize_name(name: str) -> str:
     """Strip honorifics + sufixes, lowercase, collapse whitespace, drop punctuation."""
     if not name:
@@ -62,8 +72,18 @@ def _normalize_name(name: str) -> str:
 
 
 def _name_tokens(name: str) -> set[str]:
+    """Tokens of length >= 3 that are NOT generic business stopwords.
+    Without the stopword filter, every "Smith Holdings LLC" matches every
+    "Anderson Holdings LLC" via the (holdings, llc) pair — pure noise.
+    """
     n = _normalize_name(name)
-    return {t for t in n.split() if len(t) >= 3}
+    return {t for t in n.split() if len(t) >= 3 and t not in _BUSINESS_STOPWORDS}
+
+
+def _is_business_name(name: str) -> bool:
+    """Heuristic: does the original (un-stopworded) name look like a business?"""
+    n = _normalize_name(name)
+    return any(tok in _BUSINESS_STOPWORDS for tok in n.split())
 
 
 async def _fetch_chapter(c, docket: dict, token: str) -> str:
@@ -135,7 +155,11 @@ async def enrich_with_bankruptcy(listings: list[Listing]) -> None:
     # Build a defendant-name -> listing index for fast lookup. Skip listings
     # that are themselves bankruptcy filings — they'd match themselves and
     # create noise; the source field already says "bankruptcy".
-    by_token: dict[frozenset, list[Listing]] = {}
+    #
+    # We also store the FULL distinctive-token set per listing so we can
+    # require strict subset overlap downstream (avoids "Smith Holdings LLC"
+    # matching "Anderson Holdings LLC" via shared business stopwords).
+    by_token: dict[frozenset, list[tuple[Listing, frozenset]]] = {}
     for li in listings:
         if not li.defendant:
             continue
@@ -144,10 +168,11 @@ async def enrich_with_bankruptcy(listings: list[Listing]) -> None:
         toks = _name_tokens(li.defendant)
         if len(toks) < 2:
             continue
+        toks_frozen = frozenset(toks)
         # Index by every 2-token subset to catch first+last matches
         from itertools import combinations
         for combo in combinations(sorted(toks), 2):
-            by_token.setdefault(frozenset(combo), []).append(li)
+            by_token.setdefault(frozenset(combo), []).append((li, toks_frozen))
 
     if not by_token:
         log.info("bankruptcy.no_named_defendants")
@@ -172,17 +197,29 @@ async def enrich_with_bankruptcy(listings: list[Listing]) -> None:
                 if len(f_toks) < 2:
                     continue
 
-                # Find any listing whose defendant tokens overlap with this filing's.
-                # Lazily fetch chapter only when we hit a real match — most filings
-                # don't match anything, so we save 99% of API calls this way.
+                # Find any listing whose defendant tokens overlap with this
+                # filing's STRICTLY: every distinctive token of the listing's
+                # defendant must appear in the filing's case_name. This kills
+                # the false positives where "Smith Holdings LLC" was matching
+                # "Anderson Holdings LLC" via just two stopword tokens.
+                #
+                # Lazily fetch chapter only when we hit a real match — most
+                # filings don't match anything, so we save ~99% of API calls.
                 from itertools import combinations
+                f_toks_frozen = frozenset(f_toks)
                 hit_listings: set[int] = set()
                 hit_lis_for_chapter: list[Listing] = []
                 for combo in combinations(sorted(f_toks), 2):
                     key = frozenset(combo)
                     if key in by_token:
-                        for li in by_token[key]:
+                        for li, li_toks in by_token[key]:
                             if id(li) in hit_listings:
+                                continue
+                            # STRICT subset check: every distinctive token of
+                            # the foreclosure defendant must appear in the
+                            # bankruptcy case_name. This eliminates the LLC-
+                            # token noise without missing real matches.
+                            if not li_toks.issubset(f_toks_frozen):
                                 continue
                             hit_listings.add(id(li))
                             if not isinstance(li.raw, dict):
@@ -206,7 +243,7 @@ async def enrich_with_bankruptcy(listings: list[Listing]) -> None:
                         "date_filed": f.get("date_filed"),
                         "chapter": chapter,
                         "absolute_url": f.get("absolute_url"),
-                        "match_strategy": "name_tokens",
+                        "match_strategy": "strict_subset",
                     }
                 matched += len(hit_lis_for_chapter)
 
