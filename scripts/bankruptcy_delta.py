@@ -23,6 +23,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from foreclosure_scraper.enrichment_bankruptcy import enrich_with_bankruptcy  # noqa: E402
+from foreclosure_scraper.enrichment_bankruptcy_property import (  # noqa: E402
+    enrich_bankruptcy_property,
+)
 from foreclosure_scraper.models import Listing  # noqa: E402
 from foreclosure_scraper.scrapers.national.courtlistener_bankruptcy import (  # noqa: E402
     CourtListenerBankruptcy,
@@ -92,6 +95,18 @@ async def main() -> int:
             seen.add(k)
             added += 1
     _print(f"merged: {added} new listings added (skipped {len(new_listings) - added} dupes)")
+
+    # 2b. Bankruptcy property lookup — for every BK listing, scan county GIS
+    #     by debtor name to recover address + property specs. Without this,
+    #     BK listings are just "Mary Lee Harrell, Ch.7" with no property info.
+    _print("running bankruptcy property lookup (debtor name → county GIS)...")
+    await enrich_bankruptcy_property(listings)
+    bk_with_addr = sum(
+        1
+        for li in listings
+        if li.source == "national.courtlistener_bankruptcy" and li.street_address
+    )
+    _print(f"bk-property: {bk_with_addr} bankruptcy listings now have addresses")
 
     # 3. Rewrite listings.json with the same trim logic the orchestrator uses.
     _print("rewriting listings.json...")

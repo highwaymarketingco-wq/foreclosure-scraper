@@ -170,6 +170,42 @@ def compute(li: Listing) -> Calc:
     out.arv_low, out.arv_expected, out.arv_high = low, expected, high
     out.notes.extend(arv_notes)
 
+    # ---- Vision-based ARV adjustment ------------------------------------
+    # Subject's photo-derived condition tier is what the rehab will need to
+    # *overcome*. Comps are average retail-sold properties — typically already
+    # at "cosmetic-or-better" finish. If subject is gut/major, even after
+    # full rehab the result is "renovated SFR" not "premium tear-out-and-
+    # rebuild," so it sells at average comp pricing, not above. If subject
+    # is move_in_ready, post-rehab is barely-touched-premium and tends to
+    # sell *above* comp median.
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    vision_tier = raw.get("condition_tier")
+    vision_conf = (raw.get("condition_source") or "").lower()
+    if (out.arv_expected and vision_tier
+            and vision_conf.startswith("vision-")
+            and arv_conf == "HIGH"):
+        # Multipliers calibrated to flipper-Carolina market behavior.
+        # Only apply when ARV is comp-grounded (HIGH confidence) AND vision
+        # confidence is HIGH/MEDIUM. We don't want to compound noise.
+        adj_map = {
+            "move_in_ready": 1.05,   # post-rehab premium
+            "cosmetic":      1.00,   # neutral, matches comp median
+            "major":         0.95,   # slight haircut, full rehab won't equal premium
+            "gut":           0.88,   # bigger haircut, structural risks remain
+        }
+        adj = adj_map.get(vision_tier)
+        if adj and adj != 1.0:
+            old_expected = out.arv_expected
+            out.arv_expected = round(out.arv_expected * adj, -2)
+            out.arv_low = round((out.arv_low or 0) * adj, -2) or None
+            out.arv_high = round((out.arv_high or 0) * adj, -2) or None
+            pct = (adj - 1.0) * 100
+            out.notes.append(
+                f"Vision-adjusted ARV by {pct:+.0f}% (subject tier='{vision_tier}', "
+                f"comp median assumes cosmetic-tier finish): "
+                f"${old_expected:,.0f} → ${out.arv_expected:,.0f}"
+            )
+
     # ---- ARV sanity check vs listing price ------------------------------
     # If the listing has an opening_bid AND it's a clean for-sale listing
     # (HomeHarvest / Realtor sources), the bid IS the asking price and ARV
@@ -199,13 +235,34 @@ def compute(li: Listing) -> Calc:
         sqft = li.living_sqft
         if not sqft:
             sqft = 1500 if li.property_kind in (PropertyKind.SINGLE_FAMILY, PropertyKind.UNKNOWN) else 1000
-        lo_psf, mid_psf, hi_psf = REHAB_TIERS[tier]
-        out.rehab_low = round(lo_psf * sqft, -2)
-        out.rehab_expected = round(mid_psf * sqft, -2)
-        out.rehab_high = round(hi_psf * sqft, -2)
-        out.notes.append(
-            f"Rehab tier '{tier}' on {sqft:,.0f} sqft = {lo_psf}-{hi_psf}/sqft"
-        )
+
+        # Photo-grounded rehab $/sqft from Vision wins over generic tier ranges
+        # when both Vision tier and Vision rehab_psf range are HIGH-confidence.
+        # Vision's psf reflects what the photos actually show — boarded windows,
+        # missing roof shingles, peeling exterior — which the generic tier
+        # buckets can't capture.
+        vision = (raw.get("vision") or {}) if isinstance(raw, dict) else {}
+        v_psf_low = vision.get("rehab_psf_low")
+        v_psf_high = vision.get("rehab_psf_high")
+        v_conf = (vision.get("confidence") or "").upper()
+        if (v_psf_low and v_psf_high and v_conf in ("HIGH", "MEDIUM")
+                and 1 <= v_psf_low <= v_psf_high <= 300):
+            v_psf_mid = (v_psf_low + v_psf_high) / 2
+            out.rehab_low = round(v_psf_low * sqft, -2)
+            out.rehab_expected = round(v_psf_mid * sqft, -2)
+            out.rehab_high = round(v_psf_high * sqft, -2)
+            out.notes.append(
+                f"Rehab from Vision photos: ${v_psf_low}-${v_psf_high}/sqft "
+                f"× {sqft:,.0f} sqft (Vision conf={v_conf}, tier='{tier}')"
+            )
+        else:
+            lo_psf, mid_psf, hi_psf = REHAB_TIERS[tier]
+            out.rehab_low = round(lo_psf * sqft, -2)
+            out.rehab_expected = round(mid_psf * sqft, -2)
+            out.rehab_high = round(hi_psf * sqft, -2)
+            out.notes.append(
+                f"Rehab tier '{tier}' on {sqft:,.0f} sqft = {lo_psf}-{hi_psf}/sqft"
+            )
 
     # ---- Max bid (70% rule, expected case) ------------------------------
     if out.arv_expected:

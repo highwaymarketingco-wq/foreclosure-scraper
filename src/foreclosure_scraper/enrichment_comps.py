@@ -482,6 +482,16 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
                 ppsf = [c["price_per_sqft"] for c in comps if c.get("price_per_sqft")]
                 if ppsf:
                     ppsf.sort()
+                    # Tear-down filter: drop bottom-quintile $/sqft comps when
+                    # we have 4+ data points. Comps that sold for outlier-low
+                    # $/sqft are typically as-is/distressed sales, not retail
+                    # comps — they understate ARV for a renovated subject.
+                    if len(ppsf) >= 4:
+                        median = ppsf[len(ppsf) // 2]
+                        # Drop anything <50% of median (clearly distressed sale)
+                        clean_ppsf = [p for p in ppsf if p >= median * 0.50]
+                        if len(clean_ppsf) >= 3:
+                            ppsf = clean_ppsf
                     li.raw["comp_median_ppsf"] = ppsf[len(ppsf) // 2]
                 matched_sold += 1
             else:

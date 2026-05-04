@@ -169,7 +169,14 @@ async def _query_by_owner(
 
 def _populate_from_attrs(li: Listing, attrs: dict[str, Any]) -> int:
     """Fill the missing-address fields from a GIS record. Conservative:
-    only writes when the field is currently empty."""
+    only writes when the field is currently empty.
+
+    Also writes parcel_id (with confidence flag), property specs, and
+    infers property_kind from zoning/structure when we can.
+    """
+    from .enrichment_arcgis import _apply_attrs
+    from .models import PropertyKind
+
     filled = 0
 
     site = _pick(attrs, FIELD_ALIASES["site_address"])
@@ -207,7 +214,73 @@ def _populate_from_attrs(li: Listing, attrs: dict[str, Any]) -> int:
             filled += 1
         gis["owner_match_strategy"] = "name_search"
 
+    # Reuse the standard arcgis attr application for the property specs
+    # (year_built, sqft, beds, baths, tax_value, parcel_id with confidence).
+    # We're at this code path because owner-name was a confident match.
+    attrs.setdefault("_match_confident", True)
+    filled += _apply_attrs(li, attrs)
+
+    # Best-effort property_kind inference from zoning + structure fields
+    if not li.property_kind or li.property_kind == PropertyKind.UNKNOWN:
+        kind = _infer_property_kind(attrs)
+        if kind:
+            li.property_kind = kind
+            filled += 1
+
     return filled
+
+
+def _infer_property_kind(attrs: dict[str, Any]):
+    """Guess property_kind from GIS zoning/structure fields.
+
+    Uses a blob of zoning + land-use-ish fields, plus living_sqft + acreage
+    heuristics. Returns a PropertyKind or None if nothing distinctive.
+    """
+    from .models import PropertyKind
+
+    z = (_pick(attrs, FIELD_ALIASES["zoning"]) or "").upper()
+    living = _pick(attrs, FIELD_ALIASES["living_sqft"])
+    try:
+        living_f = float(living) if living else 0.0
+    except (TypeError, ValueError):
+        living_f = 0.0
+    acreage = _pick(attrs, FIELD_ALIASES["acreage"])
+    try:
+        acres_f = float(acreage) if acreage else 0.0
+    except (TypeError, ValueError):
+        acres_f = 0.0
+
+    use = ""
+    norm_keys = {k.lower(): k for k in attrs.keys()}
+    for k in ("LAND_USE", "LandUse", "USE_DESC", "PROP_CLASS", "PROPCLASS",
+              "PROPERTY_CLASS", "PROPERTY_TYPE", "PROPTYPE", "BLDG_USE",
+              "BUILDING_USE", "DESCRIPT", "PROP_DESC"):
+        if k.lower() in norm_keys:
+            v = attrs.get(norm_keys[k.lower()])
+            if v:
+                use = str(v).upper()
+                break
+
+    blob = f"{z} {use}"
+
+    if "MULTI" in blob or "APARTMENT" in blob or "DUPLEX" in blob or "TRIPLEX" in blob:
+        return PropertyKind.MULTI_FAMILY
+    if "CONDO" in blob:
+        return PropertyKind.CONDO
+    if "TOWNHOUSE" in blob or "TOWNHOME" in blob:
+        return PropertyKind.TOWNHOUSE
+    if "MANUFACTURED" in blob or "MOBILE" in blob:
+        return PropertyKind.MANUFACTURED
+    if ("COMMERCIAL" in blob or "INDUSTRIAL" in blob or "RETAIL" in blob
+            or "OFFICE" in blob):
+        return PropertyKind.COMMERCIAL
+    # Pure land: zero/low building sqft + meaningful acreage
+    if living_f < 100 and acres_f >= 0.05:
+        return PropertyKind.LAND
+    # Standard SFR — has a building of meaningful size
+    if living_f >= 400:
+        return PropertyKind.SINGLE_FAMILY
+    return None
 
 
 async def enrich_addresses_from_owner(
@@ -228,7 +301,7 @@ async def enrich_addresses_from_owner(
     ]
     if not targets:
         log.info("addr_backfill.no_targets")
-        return
+        return  # bankruptcy listings handled by enrich_bankruptcy_property below
 
     log.info("addr_backfill.start", target_count=len(targets), of_total=len(listings))
 

@@ -281,6 +281,17 @@ async def run() -> int:
     except Exception:
         log.error("address_backfill.failed", traceback=traceback.format_exc())
 
+    # Bankruptcy property lookup — for every CourtListener bankruptcy listing,
+    # search the county GIS by debtor name across all counties in the BK
+    # court's footprint to recover address + property specs. Without this,
+    # bankruptcy listings have only a debtor name + court + chapter and
+    # nothing flows downstream (no photos, no comps, no ARV).
+    try:
+        from .enrichment_bankruptcy_property import enrich_bankruptcy_property
+        await enrich_bankruptcy_property(enriched)
+    except Exception:
+        log.error("bk_property.failed", traceback=traceback.format_exc())
+
     # Bankruptcy cross-reference — for every existing listing whose defendant
     # matches a recent NC/SC bankruptcy filing, tag raw.bankruptcy with the
     # chapter/court/date/docket. Free with CourtListener token. Strong pre-
