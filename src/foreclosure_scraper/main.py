@@ -76,6 +76,8 @@ DATELESS_OK_SOURCES = {
     "national.trulia",
     "national.realtor_foreclosures",
     "national.probate_foreclosure_leads",
+    "national.homeharvest",    # actively-listed-with-agent foreclosures (no sale date until auction)
+    "national.distressed",     # motivated-seller / cash-only / estate-sale / as-is hits
 }
 
 
@@ -242,6 +244,14 @@ async def run() -> int:
         await enrich_with_flood(enriched)
     except Exception:
         log.error("flood.failed", traceback=traceback.format_exc())
+
+    # EPA ECHO + (optional) FBI crime data — environmental hazards within 1 mi
+    # and county-level crime stats. Both free; FBI requires a free api.data.gov key.
+    try:
+        from .enrichment_environmental import enrich_with_environmental
+        await enrich_with_environmental(enriched)
+    except Exception:
+        log.error("environmental.failed", traceback=traceback.format_exc())
 
     # Investor calculator + A-F grades per listing.
     for li in enriched:

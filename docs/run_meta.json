@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-05-04T08:51:49.553693Z",
-  "total": 188,
+  "run_time": "2026-05-04T09:19:16.812885Z",
+  "total": 622,
   "by_source": {
     "national.auction_dot_com": 0,
     "national.bid4assets": 4,
@@ -8,6 +8,7 @@
     "national.foreclosure_dot_com": 0,
     "national.freddie_homesteps": 0,
     "national.homeharvest": 18,
+    "national.distressed": 427,
     "national.hubzu": 0,
     "national.hud_homestore": 0,
     "national.probate_foreclosure_leads": 0,
@@ -47,69 +48,69 @@
     "courts.lis_pendens_discovery": 0
   },
   "by_state": {
-    "NC": 105,
-    "SC": 83
+    "NC": 396,
+    "SC": 226
   },
   "by_county_top": [
     [
-      "Spartanburg, SC",
-      37
+      "Mecklenburg, NC",
+      197
     ],
     [
-      "Mecklenburg, NC",
-      34
+      "Spartanburg, SC",
+      82
     ],
     [
       "Anderson, SC",
-      30
+      80
     ],
     [
       "Henderson, NC",
-      18
+      39
     ],
     [
       "Gaston, NC",
-      14
-    ],
-    [
-      "Buncombe, NC",
-      7
+      39
     ],
     [
       "Cherokee, SC",
-      6
+      26
     ],
     [
-      "Union, NC",
-      6
-    ],
-    [
-      "Rutherford, NC",
-      5
-    ],
-    [
-      "Rowan, NC",
-      4
-    ],
-    [
-      "Cabarrus, NC",
-      4
-    ],
-    [
-      "Laurens, SC",
-      3
-    ],
-    [
-      "Greenville, SC",
-      3
+      "Buncombe, NC",
+      23
     ],
     [
       "Cleveland, NC",
-      3
+      19
+    ],
+    [
+      "Lincoln, NC",
+      13
     ],
     [
       "Pickens, SC",
-      3
+      11
+    ],
+    [
+      "Rutherford, NC",
+      11
+    ],
+    [
+      "Laurens, SC",
+      10
+    ],
+    [
+      "McDowell, NC",
+      10
+    ],
+    [
+      "Union, SC",
+      9
+    ],
+    [
+      "Burke, NC",
+      7
     ]
   ],
   "source_status": {
@@ -119,6 +120,7 @@
     "national.foreclosure_dot_com": "APIFY-BLOCKED",
     "national.freddie_homesteps": "APIFY-BLOCKED",
     "national.homeharvest": "OK (18)",
+    "national.distressed": "OK (427)",
     "national.hubzu": "APIFY-BLOCKED",
     "national.hud_homestore": "EMPTY (verified)",
     "national.probate_foreclosure_leads": "APIFY-BLOCKED",
@@ -183,5 +185,5 @@
     "newspapers.tryon_bulletin",
     "city_websites.search"
   ],
-  "notes": "horizon=120d, scrapers=42, regressions=0"
+  "notes": "horizon=120d, scrapers=43, regressions=0"
 }

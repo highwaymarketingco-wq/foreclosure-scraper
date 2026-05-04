@@ -41,6 +41,11 @@ RAW_KEEP = {
     "images": "*",                    # {primary, map, street} fallback image map
     "flood": "*",                     # FEMA flood-zone tag {zone, in_sfha, ...}
     "nod": "*",                       # ROD-discovered Notice of Default
+    "distressed": "*",                # HomeHarvest distressed-keyword matches
+    "epa": "*",                       # EPA ECHO environmental hazards
+    "crime": "*",                     # FBI UCR / per-zip crime stats
+    "schools": "*",                   # GreatSchools per-address ratings (when key set)
+    "walk_score": "*",                # Walk Score per-address (when key set)
 }
 
 
