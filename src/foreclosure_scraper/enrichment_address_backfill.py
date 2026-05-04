@@ -181,8 +181,19 @@ def _populate_from_attrs(li: Listing, attrs: dict[str, Any]) -> int:
 
     site = _pick(attrs, FIELD_ALIASES["site_address"])
     if site and not li.street_address:
-        li.street_address = str(site).strip()
-        filled += 1
+        site_str = str(site).strip()
+        # Filter out GIS placeholder strings (counties use these for parcels
+        # without a registered address — e.g. raw land, easements, ROW)
+        site_upper = site_str.upper()
+        is_placeholder = (
+            "NO ADDRESS" in site_upper
+            or site_upper in ("UNKNOWN", "NONE", "N/A", "TBD", "0")
+            or site_upper.startswith("0 NO ")
+            or site_str.strip() in ("", "0")
+        )
+        if not is_placeholder:
+            li.street_address = site_str
+            filled += 1
 
     city = _pick(attrs, FIELD_ALIASES["city"])
     if city and not li.city:

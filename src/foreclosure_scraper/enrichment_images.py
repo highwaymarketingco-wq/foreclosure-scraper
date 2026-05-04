@@ -99,8 +99,12 @@ async def enrich_with_images(listings: list[Listing], use_mapillary: bool = True
                 images["real"] = existing_photos
                 real_count += 1
 
-            # Aerial + map fallbacks (always work if lat/lng known)
-            if li.latitude and li.longitude:
+            # Aerial + map fallbacks (always work if lat/lng known) — but
+            # ONLY when we have a real street_address. Without an address,
+            # lat/lng is typically a county-centroid fallback, which would
+            # cause many unrelated listings to share the same aerial tile
+            # (same coords → same tile URL → same image cross-applied).
+            if li.latitude and li.longitude and li.street_address:
                 images["aerial"] = _aerial_url_for_point(li.latitude, li.longitude)
                 images["map"] = _osm_static_map_url(li.latitude, li.longitude)
                 aerial_count += 1

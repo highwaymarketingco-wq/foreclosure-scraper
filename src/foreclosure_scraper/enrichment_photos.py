@@ -24,10 +24,54 @@ from .models import Listing
 log = structlog.get_logger()
 
 
+import re as _re
+
+
+def _addr_signature(street: str | None) -> tuple[str, str]:
+    """Return (house_number, normalized_street_keyword) for verification.
+    Two listings match if both house number AND street keyword agree."""
+    if not street:
+        return ("", "")
+    s = street.strip().lower()
+    m = _re.match(r"^\s*(\d+)\s*", s)
+    house = m.group(1) if m else ""
+    # Normalize: drop leading number, drop directional + common suffixes
+    s = _re.sub(r"^\d+\s*", "", s)
+    s = _re.sub(
+        r"\b(n|s|e|w|ne|nw|se|sw|north|south|east|west|"
+        r"st|street|rd|road|ave|avenue|dr|drive|ln|lane|"
+        r"ct|court|blvd|boulevard|hwy|highway|pl|place|way|trl|trail|"
+        r"pkwy|parkway|cir|circle|terr|terrace|hl|hill)\b\.?",
+        "", s,
+    )
+    s = _re.sub(r"[^a-z0-9 ]", " ", s)
+    tokens = [t for t in s.split() if len(t) > 2]
+    keyword = max(tokens, key=len, default="")
+    return (house, keyword)
+
+
+def _addresses_match(requested_street: str, returned_street: str) -> bool:
+    """Verify HomeHarvest returned the property we actually asked for.
+    Avoids the silent-mismatch bug where HomeHarvest returns a NEAR address
+    and we apply its photo to an unrelated listing.
+    """
+    if not requested_street or not returned_street:
+        return False
+    rh, rk = _addr_signature(requested_street)
+    sh, sk = _addr_signature(returned_street)
+    # Both house number AND street keyword must match
+    if rh and sh and rh != sh:
+        return False
+    if rk and sk and rk != sk and rk not in sk and sk not in rk:
+        return False
+    return True
+
+
 def _by_address_lookup(street: str, city: str, state: str, zip_code: str | None = None) -> Optional[dict]:
     """Look up a single address on HomeHarvest. Tries for_sale first
     (might be re-listed), then sold (most recent). Returns the row dict
-    with primary_photo + alt_photos if found.
+    with primary_photo + alt_photos if found AND its address actually
+    matches the requested street.
     """
     try:
         from homeharvest import scrape_property
@@ -51,13 +95,19 @@ def _by_address_lookup(street: str, city: str, state: str, zip_code: str | None 
                 )
                 if df is None or len(df) == 0:
                     continue
-                # Take the first row that has photos
+                # Verify each returned row's address matches what we asked
+                # for. HomeHarvest sometimes returns near-matches when the
+                # exact address isn't listed — without this check we'd apply
+                # the wrong property's photo to multiple unrelated listings.
                 for _, row in df.iterrows():
                     d = row.to_dict()
                     primary = d.get("primary_photo")
-                    alt = d.get("alt_photos") or ""
-                    if primary and not (isinstance(primary, float) and primary != primary):
-                        return d
+                    if not primary or (isinstance(primary, float) and primary != primary):
+                        continue
+                    returned_street = d.get("street") or d.get("full_street_line") or ""
+                    if not _addresses_match(street, returned_street):
+                        continue
+                    return d
             except Exception:
                 continue
     return None
