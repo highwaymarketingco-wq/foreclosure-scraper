@@ -104,19 +104,43 @@ async def _search_one(query: str) -> list[Listing]:
     # ncnotices result cards — try multiple structures
     cards = tree.css(
         "div.search-result, div.result, article.notice, "
-        "tr.searchResultRow, div[class*='notice']"
+        "tr.searchResultRow, div[class*='notice'], div.NoticeContainer, "
+        "div.publicNoticeResult"
     )
     if not cards:
-        # Fallback: any element with notice-style content (paragraphs containing
-        # 'foreclosure' + addresses)
-        cards = [p for p in tree.css("p, li, div") if "foreclos" in p.text().lower()][:200]
+        # Fallback: paragraphs/divs containing both "foreclosure" AND an address
+        # pattern (cuts noise like search-bar copy)
+        addr_re = re.compile(
+            r"\d+\s+[A-Z][\w .'-]+(?:Road|Rd|Street|St|Drive|Dr|Avenue|Ave|"
+            r"Lane|Ln|Court|Ct|Way|Place|Pl|Boulevard|Blvd)",
+            re.I,
+        )
+        cards = [
+            p for p in tree.css("p, li, div, td")
+            if "foreclos" in p.text().lower() and addr_re.search(p.text())
+        ][:100]
 
     for card in cards:
         text = card.text(strip=True)
-        if not text or len(text) < 50:
+        if not text or len(text) < 80:
             continue
-        # Skip nav/footer text
-        if any(s in text.lower() for s in ("login", "subscribe", "navigation menu")):
+        # Tighter noise filter: skip if matches obvious UI text patterns
+        lower = text.lower()
+        if any(s in lower for s in (
+            "login", "subscribe", "navigation menu", "search results",
+            "12 months are available", "use the search", "sort by",
+            "filter by", "select a category", "page of",
+        )):
+            continue
+        # Must contain at least one foreclosure-relevant keyword AND an address
+        if not any(k in lower for k in ("foreclosure", "trustee sale", "tax foreclosure", "tax sale", "upset bid")):
+            continue
+        addr_check = re.search(
+            r"\d+\s+[A-Z][\w .'-]+(?:Road|Rd|Street|St|Drive|Dr|Avenue|Ave|"
+            r"Lane|Ln|Court|Ct|Way|Place|Pl|Boulevard|Blvd)",
+            text, re.I,
+        )
+        if not addr_check:
             continue
 
         a = card.css_first("a[href]")

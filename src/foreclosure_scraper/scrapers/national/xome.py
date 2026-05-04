@@ -17,8 +17,13 @@ from ...models import Listing, ListingType, PropertyKind
 log = structlog.get_logger()
 
 URLS = (
-    ("NC", "https://www.xome.com/realestate/NC/L-All"),
-    ("SC", "https://www.xome.com/realestate/SC/L-All"),
+    # Xome lists by city, not state. Hit our footprint metros + auctions page.
+    ("NC", "https://www.xome.com/auctions/NC"),
+    ("SC", "https://www.xome.com/auctions/SC"),
+    ("NC", "https://www.xome.com/realestate/NC/Charlotte"),
+    ("NC", "https://www.xome.com/realestate/NC/Asheville"),
+    ("SC", "https://www.xome.com/realestate/SC/Greenville"),
+    ("SC", "https://www.xome.com/realestate/SC/Spartanburg"),
 )
 
 
