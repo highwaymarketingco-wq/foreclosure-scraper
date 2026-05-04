@@ -24,11 +24,13 @@ class AldridgePite(BaseScraper):
     slug = "law_firms.aldridge_pite"
     name = "Aldridge Pite"
     category = "law_firm"
-    requires_apify = True
-    timeout_s = 120.0
+    requires_apify = False  # Uses direct httpx, falls back to Scrapling
+    timeout_s = 240.0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
+        # First: direct httpx with referer (cheapest path)
+        html = ""
         async with client(timeout=30.0) as c:
             try:
                 r = await c.get(
@@ -36,14 +38,40 @@ class AldridgePite(BaseScraper):
                     headers={"Referer": DISCLAIMER_URL},
                     follow_redirects=True,
                 )
-                if r.status_code != 200:
-                    return out
-                html = r.text
+                if r.status_code == 200:
+                    html = r.text
             except httpx.HTTPError:
+                pass
+
+        # If direct returned no table content, try Scrapling stealth (handles
+        # any JS-rendered disclaimer modal / cookie wall)
+        if html and "posts-data-table" not in html:
+            html = ""
+        if not html:
+            try:
+                from scrapling.fetchers import StealthyFetcher
+                async def page_action(page):
+                    try:
+                        await page.wait_for_selector("table.posts-data-table, table tbody tr",
+                                                     timeout=30000)
+                    except Exception:
+                        pass
+                result = await StealthyFetcher.async_fetch(
+                    LISTINGS_URL, headless=True, network_idle=True,
+                    timeout=120000, page_action=page_action,
+                )
+                body = getattr(result, "body", b"")
+                html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
+            except ImportError:
+                return out
+            except Exception:
                 return out
 
+        if not html:
+            return out
+
         tree = HTMLParser(html)
-        table = tree.css_first("table.posts-data-table")
+        table = tree.css_first("table.posts-data-table") or tree.css_first("table tbody")
         if not table:
             return out
         for tr in table.css("tbody tr"):

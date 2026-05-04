@@ -20,7 +20,7 @@ class McMichaelTaylorGray(BaseScraper):
     slug = "law_firms.mcmichael_taylor_gray"
     name = "McMichael Taylor Gray"
     category = "law_firm"
-    requires_apify = True
+    requires_apify = False
     timeout_s = 180.0
 
     async def fetch(self) -> Iterable[Listing]:

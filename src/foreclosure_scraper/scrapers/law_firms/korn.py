@@ -20,7 +20,7 @@ class Korn(BaseScraper):
     slug = "law_firms.korn"
     name = "Korn Law Firm"
     category = "law_firm"
-    requires_apify = True
+    requires_apify = False
     timeout_s = 180.0
 
     async def fetch(self) -> Iterable[Listing]:
