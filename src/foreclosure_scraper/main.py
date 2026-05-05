@@ -312,6 +312,9 @@ async def run() -> int:
     except Exception:
         log.error("aggressive_address.failed", traceback=traceback.format_exc())
 
+    # Capture per-enrichment stats for the per-run health artifact.
+    enrichment_stats: dict[str, dict] = {}
+
     # SC lis-pendens GIS resolver — for any SC lis-pendens still on a
     # placeholder address, decode the authoritative venue county from the
     # case-number prefix (SC Code §15-11-10 venue rule) and confidently
@@ -320,7 +323,8 @@ async def run() -> int:
     # any source that mistags SC lis pendens). Free, pure-HTTP, idempotent.
     try:
         from .enrichment_lis_pendens_resolver import enrich_lis_pendens_addresses
-        await enrich_lis_pendens_addresses(enriched)
+        s = await enrich_lis_pendens_addresses(enriched)
+        if s: enrichment_stats["lis_pendens_resolver"] = s
     except Exception:
         log.error("lis_pendens_resolver.failed", traceback=traceback.format_exc())
 
@@ -332,7 +336,8 @@ async def run() -> int:
     # only to raw blob for human review.
     try:
         from .enrichment_parcel_reverse_geo import enrich_parcel_reverse_geo
-        await enrich_parcel_reverse_geo(enriched)
+        s = await enrich_parcel_reverse_geo(enriched)
+        if s: enrichment_stats["parcel_reverse_geo"] = s
     except Exception:
         log.error("parcel_reverse_geo.failed", traceback=traceback.format_exc())
 
@@ -489,7 +494,8 @@ async def run() -> int:
     # a "mortgage balance remaining" proxy. Pure-Python, no I/O.
     try:
         from .enrichment_judgment_amount import enrich_judgment_amount
-        enrich_judgment_amount(enriched)
+        s = enrich_judgment_amount(enriched)
+        if s: enrichment_stats["judgment_amount"] = s
     except Exception:
         log.error("judgment_amount.failed", traceback=traceback.format_exc())
 
@@ -502,6 +508,8 @@ async def run() -> int:
     try:
         from .validation import validate as validate_listings
         validation_stats = validate_listings(enriched)
+        if validation_stats:
+            enrichment_stats["validation"] = validation_stats
         log.info("orchestrator.validated", **validation_stats)
     except Exception:
         log.error("validation.failed", traceback=traceback.format_exc())
@@ -577,6 +585,22 @@ async def run() -> int:
         write_artifact(enriched, summary)
     except Exception:
         log.error("web_artifact.failed", traceback=traceback.format_exc())
+
+    # Per-source health JSON — committed alongside listings.json each run
+    # so an investor (or alerting hook) can see at a glance which sources
+    # are OK, which are blocked, and which actually regressed.
+    try:
+        from pathlib import Path
+        from .run_health import write_health_artifact
+        health_path = Path(__file__).resolve().parent.parent.parent / "docs" / "run_health.json"
+        write_health_artifact(
+            out_path=health_path,
+            summary=summary,
+            enrichment_stats=enrichment_stats,
+        )
+        log.info("orchestrator.health_artifact", path=str(health_path))
+    except Exception:
+        log.error("run_health.failed", traceback=traceback.format_exc())
 
     # Sheets + Email — guarded so a missing secret doesn't kill the rest of the run
     sheet_url = ""
