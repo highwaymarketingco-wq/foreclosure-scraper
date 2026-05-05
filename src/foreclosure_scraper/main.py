@@ -489,6 +489,17 @@ async def run() -> int:
     except Exception:
         log.error("property_kind.failed", traceback=traceback.format_exc())
 
+    # RECAP document body fetch — pull the actual motion PDFs (plain text)
+    # from CourtListener for adversary-proceeding listings (lift-stay,
+    # §363 sale). Adds raw.recap.plain_text which the judgment_amount
+    # enrichment text-mines for property address + lender balance.
+    try:
+        from .enrichment_recap_document import enrich_recap_documents
+        s = await enrich_recap_documents(enriched)
+        if s: enrichment_stats["recap_documents"] = s
+    except Exception:
+        log.error("recap_documents.failed", traceback=traceback.format_exc())
+
     # Judgment-amount text mining — extract the lender's judgment dollar
     # figure from notice text we already scraped. Investor uses this as
     # a "mortgage balance remaining" proxy. Pure-Python, no I/O.
