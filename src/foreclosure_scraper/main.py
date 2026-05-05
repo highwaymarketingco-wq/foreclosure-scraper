@@ -312,6 +312,18 @@ async def run() -> int:
     except Exception:
         log.error("aggressive_address.failed", traceback=traceback.format_exc())
 
+    # SC lis-pendens GIS resolver — for any SC lis-pendens still on a
+    # placeholder address, decode the authoritative venue county from the
+    # case-number prefix (SC Code §15-11-10 venue rule) and confidently
+    # match against SCDOT GIS by defendant name. Also re-tags county
+    # whenever case# disagrees with current tag (defense-in-depth against
+    # any source that mistags SC lis pendens). Free, pure-HTTP, idempotent.
+    try:
+        from .enrichment_lis_pendens_resolver import enrich_lis_pendens_addresses
+        await enrich_lis_pendens_addresses(enriched)
+    except Exception:
+        log.error("lis_pendens_resolver.failed", traceback=traceback.format_exc())
+
     # SC/NC case-detail scrape — for lis pendens listings whose address is
     # still a synthesized "Lis Pendens" placeholder, render the case detail
     # page on the public court portal and extract the real property address.
