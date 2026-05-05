@@ -38,6 +38,7 @@ import structlog
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
+from ...enrichment_lis_pendens_resolver import SC_COUNTY_BY_CODE
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -51,6 +52,18 @@ COUNTIES = (
     "Union",
     "Laurens",
 )
+
+
+def _county_from_case(case_number: str) -> str | None:
+    """Decode the case-venue county from the SC Common Pleas case-number
+    prefix (YYYY-CP-CC-NNNNN). SC Code §15-11-10 ties venue to the
+    property's county, so this is authoritative."""
+    if not case_number:
+        return None
+    m = CASE_RE_DASHED.match(case_number)
+    if not m:
+        return None
+    return SC_COUNTY_BY_CODE.get(m.group(2))
 
 # Search filter knobs (encoded in the dropdown option values exactly as the
 # page emits them — note the trailing spaces are real and must be preserved).
@@ -345,21 +358,33 @@ def _parse_results(html: str, county: str) -> list[Listing]:
             else ""
         )
 
+        # Authoritative county is what the case-number encodes (SC §15-11-10
+        # ties venue to property situs). Belt-and-suspenders: log if the
+        # county we queried disagrees with the case#-decoded one.
+        case_county = _county_from_case(case_number)
+        listing_county = case_county or county
+        if case_county and case_county != county:
+            log.warning(
+                "scpi.county_mismatch",
+                queried=county, case_county=case_county,
+                case=case_number,
+            )
+
         out.append(
             Listing(
                 source="counties_sc.sc_public_index_lis_pendens",
-                source_url=_county_url(county) + f"CaseDetails.aspx?CaseNum={case_number}",
+                source_url=_county_url(listing_county) + f"CaseDetails.aspx?CaseNum={case_number}",
                 listing_type=ListingType.LIS_PENDENS,
                 property_kind=PropertyKind.UNKNOWN,
                 state="SC",
-                county=county,
+                county=listing_county,
                 case_number=case_number,
                 plaintiff=plaintiff,
                 defendant=defendant,
                 sale_date=None,
                 description=(
                     f"SC Public Index Common Pleas foreclosure case "
-                    f"{case_number} ({county} County) "
+                    f"{case_number} ({listing_county} County) "
                     f"filed {filed_date.strftime('%Y-%m-%d') if filed_date else 'unknown'}"
                     + (f" - {plaintiff} VS {defendant}" if plaintiff and defendant else "")
                 )[:500],
