@@ -312,6 +312,17 @@ async def run() -> int:
     except Exception:
         log.error("aggressive_address.failed", traceback=traceback.format_exc())
 
+    # SC/NC case-detail scrape — for lis pendens listings whose address is
+    # still a synthesized "Lis Pendens" placeholder, render the case detail
+    # page on the public court portal and extract the real property address.
+    # Scrapling stealth, ~20-40s per case. Disable via CASE_DETAIL_OFF=1.
+    if not os.environ.get("CASE_DETAIL_OFF"):
+        try:
+            from .enrichment_case_detail import enrich_case_detail_addresses
+            await enrich_case_detail_addresses(enriched)
+        except Exception:
+            log.error("case_detail.failed", traceback=traceback.format_exc())
+
     # FINAL synthesis pass — for listings still without an address, build
     # the best-available identifier from case#/defendant/description. The
     # dashboard never shows "(address pending)" for a real listing.
