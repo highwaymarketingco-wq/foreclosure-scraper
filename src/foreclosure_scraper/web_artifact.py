@@ -38,6 +38,9 @@ RAW_KEEP = {
     "vision": "*",                    # full Claude Vision condition report
     "rent_median_ppsf": "*",
     "estimated_monthly_rent": "*",
+    "data_quality": "*",              # investor-facing caveats: synthetic_address / no_sqft / low_arv_confidence
+    "parcel_resolution": "*",         # parcel + centroid reverse-geo (Cleveland NC / Cherokee SC fallback)
+    "lis_pendens_resolution": "*",    # SC lis-pendens GIS resolver provenance
     "rod_docs": "*",                  # ROD recorded documents (deeds, mortgages, satisfactions)
     "lien_priority": "*",             # senior/junior liens + super-priority warnings
     "propwire": "*",                  # equity, owner, last sale (when present)

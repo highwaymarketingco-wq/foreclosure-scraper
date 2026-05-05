@@ -514,6 +514,16 @@ async def run() -> int:
     except Exception:
         log.error("validation.failed", traceback=traceback.format_exc())
 
+    # Data-quality flag enrichment — runs after validation so the flags
+    # reflect post-validation state (e.g. cross-state county nulled).
+    # Surfaces investor-facing caveats in raw.data_quality.
+    try:
+        from .enrichment_data_quality import enrich_data_quality
+        s = enrich_data_quality(enriched)
+        if s: enrichment_stats["data_quality"] = s
+    except Exception:
+        log.error("data_quality.failed", traceback=traceback.format_exc())
+
     # Investor calculator + A-F grades per listing.
     for li in enriched:
         try:
