@@ -484,6 +484,15 @@ async def run() -> int:
     except Exception:
         log.error("property_kind.failed", traceback=traceback.format_exc())
 
+    # Judgment-amount text mining — extract the lender's judgment dollar
+    # figure from notice text we already scraped. Investor uses this as
+    # a "mortgage balance remaining" proxy. Pure-Python, no I/O.
+    try:
+        from .enrichment_judgment_amount import enrich_judgment_amount
+        enrich_judgment_amount(enriched)
+    except Exception:
+        log.error("judgment_amount.failed", traceback=traceback.format_exc())
+
     # Pre-write data validation gate — runs BEFORE valuation so the
     # calculator sees validated inputs. Catches recurring data-quality
     # bugs at a single chokepoint: state/county mismatch, casing fixes
