@@ -48,4 +48,5 @@ dev = [
     "pytest-asyncio>=0.23",
     "ruff>=0.5",
     "mypy>=1.10",
+    "pyyaml>=6.0.3",
 ]

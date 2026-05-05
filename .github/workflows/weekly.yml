@@ -1,14 +1,21 @@
 name: Weekly Foreclosure Scrape
 
 on:
+  # Every Tuesday at 09:00 UTC. Cron ‘0 9 * * 2’ = Tue 04:00/05:00 ET,
+  # before the investor workday. (Comment said "Monday" historically;
+  # the cron is and always has been Tuesday — comment now matches.)
   schedule:
-    # Every Monday at 09:00 UTC = 04:00/05:00 ET, before the workday
     - cron: "0 9 * * 2"
   workflow_dispatch: {}  # allow manual triggering from the Actions tab
 
 concurrency:
   group: weekly-scrape
   cancel-in-progress: false
+
+permissions:
+  # Required so the workflow can commit docs/listings.json back to the repo
+  # (GitHub Pages serves that file as the live dashboard data feed).
+  contents: write
 
 jobs:
   scrape:
@@ -22,11 +29,20 @@ jobs:
       EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
       APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
       APIFY_FREE_TIER_ONLY: "1"
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      COURTLISTENER_TOKEN: ${{ secrets.COURTLISTENER_TOKEN }}
+      RENTCAST_API_KEY: ${{ secrets.RENTCAST_API_KEY }}
+      FORECLOSURE_DOT_COM_USER: ${{ secrets.FORECLOSURE_DOT_COM_USER }}
+      FORECLOSURE_DOT_COM_PASS: ${{ secrets.FORECLOSURE_DOT_COM_PASS }}
       LOG_LEVEL: INFO
       PYTHONUNBUFFERED: "1"
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Need full history so the publish step can push a new commit.
+          fetch-depth: 0
+          persist-credentials: true
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v3
@@ -40,8 +56,52 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen || uv sync
 
+      - name: Install Playwright browsers (for Scrapling stealth fetchers)
+        run: |
+          uv run python -m playwright install chromium --with-deps || true
+
       - name: Run scraper
+        id: run
         run: uv run python -m foreclosure_scraper
+        # Don't fail the publish step just because one scraper threw.
+        continue-on-error: true
+
+      - name: Verify run produced an artifact
+        # Hard-fail the workflow if listings.json wasn't written —
+        # the orchestrator should always emit one even with empty data.
+        run: |
+          test -f docs/listings.json || { echo "::error::docs/listings.json missing"; exit 1; }
+          echo "listings size: $(wc -c < docs/listings.json) bytes"
+          if [ -f docs/run_health.json ]; then
+            echo "run_health size: $(wc -c < docs/run_health.json) bytes"
+          fi
+
+      - name: Publish dashboard data back to repo
+        run: |
+          set -eu
+          if git diff --quiet docs/; then
+            echo "No changes in docs/ — skipping commit"
+            exit 0
+          fi
+          git config user.name "foreclosure-scraper-bot"
+          git config user.email "actions@github.com"
+          git add docs/listings.json docs/run_health.json 2>/dev/null || true
+          git commit -m "weekly: refresh dashboard data ($(date -u +%Y-%m-%d))" || {
+            echo "Nothing to commit"
+            exit 0
+          }
+          # Retry push up to 3 times in case of concurrent commits.
+          for attempt in 1 2 3; do
+            if git push origin HEAD:${{ github.ref_name }}; then
+              echo "Pushed on attempt $attempt"
+              exit 0
+            fi
+            echo "Push failed (attempt $attempt) — pulling rebase and retrying"
+            git pull --rebase origin ${{ github.ref_name }} || true
+            sleep $((attempt * 2))
+          done
+          echo "::error::Failed to publish dashboard data after 3 attempts"
+          exit 1
 
       - name: Upload run log
         if: always()
@@ -51,5 +111,32 @@ jobs:
           path: |
             *.log
             output/
+            docs/run_health.json
           if-no-files-found: ignore
-          retention-days: 30
+          retention-days: 90
+
+      - name: Surface regressions in workflow summary
+        if: always()
+        run: |
+          if [ -f docs/run_health.json ]; then
+            echo "### Run health" >> $GITHUB_STEP_SUMMARY
+            uv run python - <<'PY' >> $GITHUB_STEP_SUMMARY
+          import json, pathlib
+          h = json.loads(pathlib.Path("docs/run_health.json").read_text())
+          print(f"**Total listings:** {h['totals']['total_listings']}")
+          print()
+          regs = h.get("regressions") or []
+          if regs:
+              print("⚠️ **Regressions:**")
+              for r in regs:
+                  print(f"- {r}")
+              print()
+          high_sev = [s for s in h.get("sources", []) if s.get("severity", 0) >= 2]
+          if high_sev:
+              print("**Sources needing attention:**")
+              print("| source | status | count |")
+              print("| --- | --- | --- |")
+              for s in high_sev:
+                  print(f"| `{s['source']}` | {s['status']} | {s['count']} |")
+          PY
+          fi
