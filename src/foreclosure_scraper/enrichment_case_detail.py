@@ -44,7 +44,10 @@ ADDR_RE = re.compile(
     r"(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
     r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|"
     r"Parkway|Pkwy|Terrace|Terr)\.?(?:\s*,\s*[A-Z][a-zA-Z .'\-]+)?"
-    r"(?:\s*,?\s*(?:NC|SC))?\s*\d{5}?)",
+    # \d{0,5} — zip is optional. Was \d{5}? which is exactly 5 digits
+    # (the ? is a lazy quantifier on the {5} count, NOT a make-optional
+    # marker), causing the regex to fail on any address without a zip.
+    r"(?:\s*,?\s*(?:NC|SC))?\s*\d{0,5})",
     re.I,
 )
 
