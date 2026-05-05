@@ -18,9 +18,16 @@ START_URLS = (
 
 class Korn(BaseScraper):
     slug = "law_firms.korn"
-    name = "Korn Law Firm"
+    name = "Korn Law Firm (JS-rendered)"
     category = "law_firm"
     requires_apify = False
+    # Korn's /sales/ and /foreclosure-sales/ pages are JS-rendered SPAs;
+    # plain httpx gets only "Click here to enter". Future fix is Scrapling
+    # stealth (the pattern in SC Public Index would adapt). Until then
+    # mark requires_render so the run summary classifies as RENDER-REQUIRED
+    # rather than REGRESSED.
+    requires_render = True
+    expected_min_count = 0
     timeout_s = 180.0
 
     async def fetch(self) -> Iterable[Listing]:

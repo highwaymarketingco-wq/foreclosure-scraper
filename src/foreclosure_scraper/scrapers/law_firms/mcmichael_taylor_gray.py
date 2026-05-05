@@ -18,9 +18,13 @@ START_URLS = (
 
 class McMichaelTaylorGray(BaseScraper):
     slug = "law_firms.mcmichael_taylor_gray"
-    name = "McMichael Taylor Gray"
+    name = "McMichael Taylor Gray (AJAX-loaded)"
     category = "law_firm"
     requires_apify = False
+    # MTG's /foreclosure-sales/ page renders "Loading..." until an AJAX
+    # call populates the listings table. Plain httpx misses everything.
+    requires_render = True
+    expected_min_count = 0
     timeout_s = 180.0
 
     async def fetch(self) -> Iterable[Listing]:

@@ -22,9 +22,15 @@ DISCLAIMER_URL = "https://aldridgepite.com/disclaimer-north-carolina/"
 
 class AldridgePite(BaseScraper):
     slug = "law_firms.aldridge_pite"
-    name = "Aldridge Pite"
+    name = "Aldridge Pite (disclaimer-gated)"
     category = "law_firm"
     requires_apify = False  # Uses direct httpx, falls back to Scrapling
+    # The referer-bypass technique stopped working as of 2026-04-28; the
+    # disclaimer page now requires a session cookie set by an explicit
+    # Accept POST. Until that's wired, classify as RENDER-REQUIRED so
+    # the run summary doesn't alert weekly.
+    requires_render = True
+    expected_min_count = 0
     timeout_s = 240.0
 
     async def fetch(self) -> Iterable[Listing]:
