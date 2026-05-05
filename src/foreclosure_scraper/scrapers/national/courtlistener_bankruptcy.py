@@ -199,6 +199,16 @@ class CourtListenerBankruptcy(BaseScraper):
         # with chapter lookup on every docket. Cap mostly to bound runtime.
         MAX_CHAPTER_LOOKUPS = 2000
 
+        # Dedup tracker — CourtListener pagination occasionally returns the
+        # same docket twice (cursor-based with overlap on edits, plus we
+        # query bankruptcy_information sub-resources separately). Without
+        # this guard the audit measured 181 duplicate case_numbers per run.
+        # Key is (court, docket_no) — same docket# across different courts
+        # is legitimate and must NOT be deduped (NCWB 26-02017 is a
+        # different case from NCEB 26-02017).
+        seen_keys: set[tuple[str, str]] = set()
+        dedup_dropped = 0
+
         async with client(timeout=20.0) as c:
             for court in COURTS:
                 dockets = await _fetch_court(c, court, token)
@@ -209,6 +219,14 @@ class CourtListenerBankruptcy(BaseScraper):
                     docket_no = d.get("docket_number") or ""
                     if not case_name and not docket_no:
                         continue
+
+                    # Skip duplicates within the same scrape pass.
+                    if docket_no:
+                        key = (court, docket_no.strip())
+                        if key in seen_keys:
+                            dedup_dropped += 1
+                            continue
+                        seen_keys.add(key)
 
                     # Try to recover state+county from case name (rare hit; mostly None)
                     state_match, county_match = _county_from_text(case_name)
@@ -265,5 +283,6 @@ class CourtListenerBankruptcy(BaseScraper):
             courts=len(COURTS),
             lookback_days=LOOKBACK_DAYS,
             chapter_api_lookups=chapter_lookups,
+            dedup_dropped=dedup_dropped,
         )
         return out
