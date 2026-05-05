@@ -17,6 +17,10 @@ class ListingType(str, Enum):
     AUCTION = "auction"
     SHERIFF_SALE = "sheriff_sale"
     HOA_SALE = "hoa_sale"
+    # DISTRESSED = motivated-seller / as-is / cash-only listings flagged via
+    # description keywords on Realtor.com. Pre-foreclosure signal that hasn't
+    # yet entered formal foreclosure proceedings.
+    DISTRESSED = "distressed"
     UNKNOWN = "unknown"
 
 

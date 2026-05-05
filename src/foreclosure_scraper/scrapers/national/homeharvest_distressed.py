@@ -88,8 +88,13 @@ def _to_listing(row: dict, county: str, matches: list[str]) -> Listing | None:
     elif "estate" in matches_str or "heir" in matches_str or "probate" in matches_str:
         ltype = ListingType.LIS_PENDENS  # treat probate as pre-sale signal
     else:
-        # as-is / cash only / motivated — distressed but not foreclosure
-        ltype = ListingType.UNKNOWN
+        # As-is / cash only / motivated seller — distressed but not yet at
+        # foreclosure stage. Tagged as DISTRESSED (post-MLS pre-foreclosure)
+        # rather than UNKNOWN so the dashboard shows a meaningful type.
+        # ListingType.UNKNOWN was rendering as "unknown" in the UI which
+        # confused users — these are real distressed listings, just not
+        # in formal foreclosure proceedings yet.
+        ltype = ListingType.DISTRESSED if hasattr(ListingType, "DISTRESSED") else ListingType.LIS_PENDENS
 
     style = (row.get("style") or "").lower()
     kind = PropertyKind.UNKNOWN

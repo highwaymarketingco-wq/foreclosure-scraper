@@ -516,6 +516,8 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 .type-lis_pendens      { background: var(--pill-lp-bg); color: var(--pill-lp-fg); }
 .type-reo              { background: var(--pill-re-bg); color: var(--pill-re-fg); }
 .type-sheriff_sale     { background: var(--pill-sh-bg); color: var(--pill-sh-fg); }
+.type-hoa_sale         { background: var(--pill-sh-bg); color: var(--pill-sh-fg); }
+.type-distressed       { background: var(--pill-lp-bg); color: var(--pill-lp-fg); }
 .type-unknown          { background: var(--pill-uk-bg); color: var(--pill-uk-fg); }
 
 /* === Map view === */
