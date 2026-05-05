@@ -232,27 +232,28 @@ async def enrich_with_aggressive_address(listings: list[Listing]) -> None:
         async with sem:
             counts["queried"] += 1
 
-            # Tier A: scan all counties in state
-            attrs = await _aggressive_owner_search(c, li, cache)
-            if attrs:
-                # Override the listing's tagged county to the matched one ONLY
-                # when the case number does not authoritatively encode a county.
-                # SC lis pendens case numbers (YYYY-CP-CC-NNNNN) and similar
-                # NC case formats already pin the correct venue/county; a same-
-                # name match in a different county GIS is almost always a wrong
-                # person and must not rewrite the case's county.
-                if (
-                    attrs.get("_matched_county")
-                    and not li.street_address
-                    and not _case_pins_county(li)
-                ):
-                    li.county = attrs["_matched_county"]
-                _populate_from_attrs(li, attrs)
-                if li.street_address:
-                    counts["all_state_match"] += 1
-                    return
+            # If the case number authoritatively pins the property's county
+            # (SC lis pendens case numbers always do — venue follows situs by
+            # statute), skip the cross-county scan entirely. A same-name owner
+            # match in any other county is by definition the wrong person /
+            # wrong parcel for this case. The previous-tier address_backfill
+            # enrichment already searched the pinned county; if it didn't
+            # match there, no amount of scanning *other* counties helps.
+            case_pinned = _case_pins_county(li)
 
-            # Tier B: fuzzy partial match in stated county
+            # Tier A: scan all counties in state — skipped when case-pinned
+            if not case_pinned:
+                attrs = await _aggressive_owner_search(c, li, cache)
+                if attrs:
+                    if attrs.get("_matched_county") and not li.street_address:
+                        li.county = attrs["_matched_county"]
+                    _populate_from_attrs(li, attrs)
+                    if li.street_address:
+                        counts["all_state_match"] += 1
+                        return
+
+            # Tier B: fuzzy partial match in stated county (always safe — same
+            # county as the listing's case-pinned or scraper-assigned tag)
             attrs = await _fuzzy_partial_search(c, li, cache)
             if attrs:
                 _populate_from_attrs(li, attrs)
