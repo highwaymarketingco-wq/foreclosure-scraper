@@ -47,6 +47,38 @@ from .models import Listing
 log = structlog.get_logger()
 
 
+# SC case# prefix → county. Authoritative for venue.
+_SC_COUNTY_BY_CODE = {
+    "01": "Abbeville", "02": "Aiken", "03": "Allendale", "04": "Anderson",
+    "05": "Bamberg", "06": "Barnwell", "07": "Beaufort", "08": "Berkeley",
+    "09": "Calhoun", "10": "Charleston", "11": "Cherokee", "12": "Chester",
+    "13": "Chesterfield", "14": "Clarendon", "15": "Colleton", "16": "Darlington",
+    "17": "Dillon", "18": "Dorchester", "19": "Edgefield", "20": "Fairfield",
+    "21": "Florence", "22": "Georgetown", "23": "Greenville", "24": "Greenwood",
+    "25": "Hampton", "26": "Horry", "27": "Jasper", "28": "Kershaw",
+    "29": "Lancaster", "30": "Laurens", "31": "Lee", "32": "Lexington",
+    "33": "Marion", "34": "Marlboro", "35": "McCormick", "36": "Newberry",
+    "37": "Oconee", "38": "Orangeburg", "39": "Pickens", "40": "Richland",
+    "41": "Saluda", "42": "Spartanburg", "43": "Sumter", "44": "Union",
+    "45": "Williamsburg", "46": "York",
+}
+
+_SC_CASE_RE = re.compile(r"(\d{4})-CP-(\d{2})-\d+")
+
+
+def _case_pins_county(li: Listing) -> bool:
+    """Return True when the listing's case number authoritatively encodes a
+    county (so any same-name GIS match in a different county must not rewrite
+    li.county). Currently covers SC Common Pleas case numbers."""
+    if not li.case_number:
+        return False
+    if li.state == "SC":
+        m = _SC_CASE_RE.match(li.case_number.strip())
+        if m and m.group(2) in _SC_COUNTY_BY_CODE:
+            return True
+    return False
+
+
 def _all_county_endpoints_for_state(state: str) -> list[tuple[str, str]]:
     """Return (county_name, base_url) for every GIS we have for this state."""
     out: list[tuple[str, str]] = []
@@ -203,9 +235,17 @@ async def enrich_with_aggressive_address(listings: list[Listing]) -> None:
             # Tier A: scan all counties in state
             attrs = await _aggressive_owner_search(c, li, cache)
             if attrs:
-                # Override county to the matched one (since the listing's stated
-                # county was wrong or insufficient)
-                if attrs.get("_matched_county") and not li.street_address:
+                # Override the listing's tagged county to the matched one ONLY
+                # when the case number does not authoritatively encode a county.
+                # SC lis pendens case numbers (YYYY-CP-CC-NNNNN) and similar
+                # NC case formats already pin the correct venue/county; a same-
+                # name match in a different county GIS is almost always a wrong
+                # person and must not rewrite the case's county.
+                if (
+                    attrs.get("_matched_county")
+                    and not li.street_address
+                    and not _case_pins_county(li)
+                ):
                     li.county = attrs["_matched_county"]
                 _populate_from_attrs(li, attrs)
                 if li.street_address:
