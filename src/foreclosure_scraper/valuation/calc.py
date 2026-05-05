@@ -72,10 +72,20 @@ class Calc:
     bid_to_arv_pct: float | None = None
     confidence: str = "LOW"
     notes: list[str] | None = None
-    # Investor framing — what's the deal status at the listed/asking price?
+    # Flip framing — what's the deal status at the listed/asking price?
     deal_status: str | None = None         # GREAT / OK / NEGOTIATE / PASS
     deal_message: str | None = None        # human-readable explanation
     haircut_needed: float | None = None    # $ user needs to negotiate down to flip
+    # Buy-and-hold framing — for investors who'd rent rather than flip.
+    # Computed when rent comp data is available (raw.rent_median_ppsf).
+    monthly_rent_est: float | None = None
+    annual_gross_rent: float | None = None
+    noi_annual: float | None = None        # NOI = 50% of gross (industry rule)
+    cap_rate_pct: float | None = None      # NOI / acquisition cost
+    monthly_cashflow_est: float | None = None  # after PITI debt service
+    hold_status: str | None = None         # GREAT / OK / NEGOTIATE / PASS
+    hold_message: str | None = None
+    one_pct_rule: bool | None = None       # rent ≥ 1% of total acq cost
 
 
 def _condition_to_tier(li: Listing) -> str:
@@ -456,6 +466,65 @@ def compute(li: Listing) -> Calc:
             out.deal_message = (
                 f"List ${bid:,.0f} is ${out.haircut_needed:,.0f} above max viable "
                 f"bid ${out.max_bid_70:,.0f}. Negotiate down or pass."
+            )
+
+    # ---- Buy-and-hold (rental) verdict ----------------------------------
+    # An investor not interested in flipping wants to know: at this bid,
+    # what's the cap rate and monthly cashflow if I held it as a rental?
+    # Standard 50% rule: NOI = 50% of gross rent (covers vacancy, property
+    # mgmt, insurance, taxes, maintenance, capex reserve).
+    rent_psf = raw.get("rent_median_ppsf") if isinstance(raw, dict) else None
+    if (rent_psf and li.living_sqft and bid and bid > 0
+            and li.property_kind not in (PropertyKind.LAND,)):
+        monthly_rent = float(rent_psf) * float(li.living_sqft)
+        out.monthly_rent_est = round(monthly_rent, 0)
+        out.annual_gross_rent = round(monthly_rent * 12, 0)
+        out.noi_annual = round(out.annual_gross_rent * 0.50, 0)
+        # Total acquisition for cap rate: bid + rehab + closing fees.
+        # Holding/selling fees don't apply to a hold strategy.
+        rehab = out.rehab_expected or 0
+        acq_total = bid + rehab + bid * CLOSING_PCT
+        if acq_total > 0:
+            out.cap_rate_pct = round((out.noi_annual / acq_total) * 100, 1)
+        # Monthly cashflow vs. PITI on a 25%-down 30-yr mortgage @ 7.5%.
+        # (Hard-money holding cost in the flip path is too short-term to
+        # use for hold; this is permanent-financing economics.)
+        loan_amt = bid * (1 - DOWN_PCT)
+        # 30-yr fixed at 7.5% APR → monthly P&I ≈ loan × 0.006992
+        piti_monthly = loan_amt * 0.006992
+        # Add taxes + insurance estimate: 1.5% of bid annually
+        piti_monthly += (bid * 0.015) / 12
+        cashflow = (out.noi_annual / 12) - piti_monthly
+        out.monthly_cashflow_est = round(cashflow, 0)
+        # 1% rule: monthly rent ≥ 1% of PURCHASE PRICE (conventional usage —
+        # investors apply this against the offer/bid, not all-in cost).
+        out.one_pct_rule = monthly_rent >= bid * 0.01
+
+        # Verdict: cap-rate-driven (NOI / acq).
+        # 10%+ cap = exceptional; 8% = good; 6% = market; <5% = thin
+        cr = out.cap_rate_pct or 0
+        if cr >= 10 and out.monthly_cashflow_est > 0:
+            out.hold_status = "GREAT"
+            out.hold_message = (
+                f"Cap rate {cr:.1f}% with ${out.monthly_cashflow_est:.0f}/mo cashflow. "
+                f"Strong rental in this market."
+            )
+        elif cr >= 7 and out.monthly_cashflow_est > 0:
+            out.hold_status = "OK"
+            out.hold_message = (
+                f"Cap rate {cr:.1f}% — market-rate rental. Cashflow ${out.monthly_cashflow_est:.0f}/mo."
+            )
+        elif cr >= 5:
+            out.hold_status = "NEGOTIATE"
+            out.hold_message = (
+                f"Cap rate {cr:.1f}% is thin. Monthly cashflow "
+                f"${out.monthly_cashflow_est:.0f}/mo at this bid; "
+                f"would need a price cut to clear hurdle."
+            )
+        else:
+            out.hold_status = "PASS"
+            out.hold_message = (
+                f"Cap rate {cr:.1f}% — won't pencil as a rental at this bid."
             )
 
     return out
