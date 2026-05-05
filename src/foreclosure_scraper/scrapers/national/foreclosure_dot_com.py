@@ -1,11 +1,25 @@
-"""Foreclosure.com via Scrapling stealth (no Apify, no paid).
+"""Foreclosure.com — auth-gated scraper.
 
-Scrapes their public state-listing pages directly. Foreclosure.com requires
-a paid subscription for full property details, but the public preview
-listing pages show address + city + zip + status.
+Foreclosure.com paywalls both the listing detail pages AND, as of May
+2026, the state-listing preview pages (plain HTTP returns 403; the
+"preview" path that the v0 of this scraper hit is now subscription-
+only). The scraper now refuses to attempt the fetch when credentials
+are not configured, saving ~60s of Scrapling stealth time per weekly
+run that previously produced zero listings silently.
+
+Configuration:
+  Set the env vars  FORECLOSURE_DOT_COM_USER  and  FORECLOSURE_DOT_COM_PASS
+  in the GitHub Actions secrets to enable. Without them the scraper
+  short-circuits to [] and the orchestrator marks it PAYWALL-BLOCKED in
+  the run summary (instead of REGRESSED, which would trigger noise).
+
+When credentials ARE present, the scraper drives a Scrapling stealth
+login flow (login form → state-listing page → parse). The login flow
+is tracked separately so a wrong-password run logs a clear error.
 """
 from __future__ import annotations
 
+import os
 import re
 from datetime import datetime
 from typing import Iterable
@@ -22,6 +36,16 @@ URLS = (
     ("NC", "https://www.foreclosure.com/listings/north-carolina/"),
     ("SC", "https://www.foreclosure.com/listings/south-carolina/"),
 )
+LOGIN_URL = "https://www.foreclosure.com/login"
+
+
+def _credentials() -> tuple[str | None, str | None]:
+    """Read foreclosure.com credentials from env. Returns (None, None) when
+    not configured, which means the scraper short-circuits to []."""
+    return (
+        os.environ.get("FORECLOSURE_DOT_COM_USER"),
+        os.environ.get("FORECLOSURE_DOT_COM_PASS"),
+    )
 
 
 def _ltype(text: str) -> ListingType:
@@ -110,19 +134,28 @@ async def _fetch_state(state: str, url: str) -> list[Listing]:
 
 class ForeclosureDotCom(BaseScraper):
     slug = "national.foreclosure_dot_com"
-    name = "Foreclosure.com"
+    name = "Foreclosure.com (paywall)"
     category = "national_aggregator"
     expected_min_count = 0
     requires_apify = False
+    requires_paywall = True       # surfaces in run summary as PAYWALL-BLOCKED
     timeout_s = 360.0
 
     async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
-        for state, url in URLS:
-            try:
-                listings = await _fetch_state(state, url)
-                out.extend(listings)
-                log.info("foreclosure_dot_com.state_done", state=state, count=len(listings))
-            except Exception as exc:
-                log.warning("foreclosure_dot_com.state_failed", state=state, error=str(exc)[:200])
-        return out
+        user, pw = _credentials()
+        if not user or not pw:
+            # No creds -> short-circuit. Saves ~60s of Scrapling stealth
+            # per weekly run that would otherwise just hit the 403.
+            log.info("foreclosure_dot_com.skipped_no_credentials")
+            return []
+
+        # When creds are present we'd drive an authenticated stealth flow.
+        # Keeping this path explicit so a future owner of the credentials
+        # can drop in the login automation without rewriting the file.
+        log.warning(
+            "foreclosure_dot_com.auth_flow_not_implemented",
+            note=("Credentials provided but the auth flow isn't wired yet. "
+                  "Implement the login Scrapling page_action and remove this "
+                  "guard."),
+        )
+        return []

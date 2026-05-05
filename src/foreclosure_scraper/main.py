@@ -536,13 +536,18 @@ async def run() -> int:
     # Run summary for Sheet log + email body
     by_state = Counter(li.state for li in enriched if li.state)
     by_county = Counter(f"{li.county}, {li.state}" for li in enriched if li.county and li.state)
-    # Build per-source status: working / empty (verified) / regressed / Apify-blocked
+    # Build per-source status: working / empty (verified) / regressed /
+    # apify-blocked / paywall-blocked. The blocked statuses are
+    # acknowledged failure modes (no alert) versus REGRESSED (alert).
     apify_required = {s.slug for s in scrapers if getattr(s, "requires_apify", False)}
+    paywall_required = {s.slug for s in scrapers if getattr(s, "requires_paywall", False)}
     source_status = {}
     for slug in expected:
         n = by_source.get(slug, 0)
         if n > 0:
             source_status[slug] = f"OK ({n})"
+        elif slug in paywall_required:
+            source_status[slug] = "PAYWALL-BLOCKED"
         elif slug in apify_required:
             source_status[slug] = "APIFY-BLOCKED"
         elif expected[slug] == 0:
