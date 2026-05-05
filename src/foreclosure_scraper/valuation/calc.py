@@ -28,12 +28,31 @@ REHAB_TIERS = {
     "gut":       (110, 160, 220), # near-tear-down
 }
 
+# Manufactured / mobile homes are far cheaper to rehab per sqft than stick-built:
+# vinyl skirting, single-pane windows, cosmetic-grade fixtures throughout.
+MOBILE_REHAB_TIERS = {
+    "cosmetic": (3,   8,   15),
+    "light":    (10,  20,  30),
+    "moderate": (20,  35,  55),
+    "heavy":    (40,  60,  80),
+    "gut":      (70,  100, 140),
+}
+
 CLOSING_PCT = 0.04        # buyer-side closing (title, recording, attorney)
 SELLING_PCT = 0.07        # 6% commission + 1% misc
 HOLDING_RATE_MONTH = 0.005  # ~6% APR / 12 mo of bid value
 HOLDING_MONTHS = 6
 DOWN_PCT = 0.25           # cash down for cash-on-cash
 LOAN_RATE_MONTH = 0.008   # 9.5% APR (hard money) / 12
+
+# Sources where opening_bid is a retail asking price (and therefore a useful
+# ARV sanity-check). For everything else (auctions, lis pendens, REO floors,
+# law-firm foreclosure sales) the bid is a discount-to-ARV floor — clamping
+# ARV to bid would silently kill the entire flip thesis.
+RETAIL_PRICE_SOURCES = {
+    "national.homeharvest",
+    "national.realtor_foreclosures",
+}
 
 
 @dataclass
@@ -64,9 +83,11 @@ def _condition_to_tier(li: Listing) -> str:
 
     Maps the four-tier condition (move_in_ready / cosmetic / major / gut)
     to the five-tier rehab cost table (cosmetic / light / moderate / heavy / gut).
+    Reads condition_tier from raw.vision.condition_tier first (Vision-grounded,
+    most accurate), then raw.condition_tier (legacy enrichment_comps mirror).
     """
     raw = li.raw if isinstance(li.raw, dict) else {}
-    cond = raw.get("condition_tier")
+    cond = (raw.get("vision") or {}).get("condition_tier") or raw.get("condition_tier")
     cond_map = {
         "move_in_ready": "cosmetic",
         "cosmetic": "light",
@@ -104,6 +125,63 @@ def _condition_to_tier(li: Listing) -> str:
     return "moderate"
 
 
+def _acreage_for(li: Listing) -> float | None:
+    """Best-available acreage value for a listing, in acres."""
+    if li.acreage and li.acreage > 0:
+        return float(li.acreage)
+    if li.lot_size_sqft and li.lot_size_sqft > 0:
+        return float(li.lot_size_sqft) / 43560.0
+    return None
+
+
+def _land_arv(li: Listing) -> tuple[float | None, float | None, float | None, str, list[str]]:
+    """Land-specific ARV path. Comps come pre-filtered by lot acreage band
+    (±50% in enrichment_comps), so use sold_price ÷ acreage to get $/acre,
+    then apply to the subject's acreage. No living_sqft involvement.
+    """
+    notes: list[str] = []
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    comps = raw.get("comps") or []
+    subj_ac = _acreage_for(li)
+
+    # Tier 1: $/acre from land comps × subject acreage
+    if comps and subj_ac:
+        ppa_list = []
+        for c in comps:
+            sp = c.get("sold_price")
+            lot = c.get("lot_sqft")
+            if sp and lot and lot > 0:
+                ppa = float(sp) / (float(lot) / 43560.0)
+                ppa_list.append(ppa)
+        ppa_list.sort()
+        if len(ppa_list) >= 2:
+            mid = ppa_list[len(ppa_list) // 2]
+            low_ppa = ppa_list[0]
+            high_ppa = ppa_list[-1]
+            expected = round(mid * subj_ac, -2)
+            low = round(low_ppa * subj_ac, -2)
+            high = round(high_ppa * subj_ac, -2)
+            notes.append(
+                f"ARV from {len(ppa_list)} land comps × {subj_ac:.2f} ac "
+                f"(${mid:,.0f}/ac median; range ${low_ppa:,.0f}-${high_ppa:,.0f}/ac)"
+            )
+            return expected, low, high, "HIGH", notes
+
+    # Tier 2: tax-assessed × 1.10 (land is assessed closer to market than improved)
+    if li.tax_value and li.tax_value > 0:
+        expected = round(float(li.tax_value) * 1.10, -2)
+        notes.append(f"Land ARV from tax-assessed × 1.10 ({li.tax_value:,.0f})")
+        return expected, round(expected * 0.85, -2), round(expected * 1.15, -2), "LOW", notes
+
+    # Tier 3: bid × 1.5 (land foreclosures discount less than improved)
+    if li.opening_bid and li.opening_bid > 0:
+        expected = round(float(li.opening_bid) * 1.5, -2)
+        notes.append(f"Land ARV proxy from bid × 1.5 ({li.opening_bid:,.0f})")
+        return expected, round(expected * 0.7, -2), round(expected * 1.3, -2), "LOW", notes
+
+    return None, None, None, "LOW", ["Insufficient land data for ARV"]
+
+
 def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None, str, list[str]]:
     """Return (low, expected, high, confidence, notes) for ARV.
 
@@ -112,8 +190,11 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
     Fallback:    tax_value × 1.25 (assessed values lag market).
     Worst:       opening_bid × 2.4 (foreclosures often run ~40% of ARV at the floor).
 
-    Range = expected ± 15%.
+    Range = expected ± 15%. Land takes a separate $/acre path (_land_arv).
     """
+    if li.property_kind == PropertyKind.LAND:
+        return _land_arv(li)
+
     notes: list[str] = []
     raw = li.raw if isinstance(li.raw, dict) else {}
     comps = raw.get("comps") or []
