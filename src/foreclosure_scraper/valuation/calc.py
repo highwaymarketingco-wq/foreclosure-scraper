@@ -288,34 +288,67 @@ def compute(li: Listing) -> Calc:
             )
 
     # ---- ARV sanity check vs listing price ------------------------------
-    # If the listing has an opening_bid AND it's a clean for-sale listing
-    # (HomeHarvest / Realtor sources), the bid IS the asking price and ARV
-    # should not be wildly different. Flag suspect ARVs.
+    # Two failure modes the guard exists to catch:
+    #
+    #  (a) ratio < 0.6  → comp-implied ARV is *less* than the asking price.
+    #      Almost always a bad-comp problem (wrong zip cluster, wrong
+    #      property type, bid is the actual market). Anchor to listing.
+    #
+    #  (b) ratio > 1.6  → comp-implied ARV is way more than the asking
+    #      price. For distressed/foreclosure inventory this is exactly
+    #      the flip thesis we WANT to see. We do NOT anchor in this
+    #      direction — that would silently kill every real deal.
+    #
+    # Therefore the guard only fires on (a), and only for retail-priced
+    # sources where the listing is genuinely an asking price (HomeHarvest
+    # active for-sale, Realtor foreclosure REO list price).
     if (out.arv_expected and li.opening_bid and li.opening_bid > 0
-            and li.source in ("national.homeharvest", "national.distressed",
-                              "national.realtor_foreclosures")):
+            and li.source in RETAIL_PRICE_SOURCES):
         ratio = out.arv_expected / li.opening_bid
-        if ratio < 0.6 or ratio > 1.6:
-            # ARV implausibly off from listing price — fall back to listing price
+        if ratio < 0.6:
             out.notes.append(
                 f"ARV (${out.arv_expected:,.0f}) was {ratio:.1f}× listing price "
-                f"(${li.opening_bid:,.0f}); using listing price as ARV anchor"
+                f"(${li.opening_bid:,.0f}) — comps appear too low; anchoring ARV "
+                f"to listing price as a floor."
             )
             out.arv_expected = float(li.opening_bid)
             out.arv_low = round(li.opening_bid * 0.90, -2)
             out.arv_high = round(li.opening_bid * 1.10, -2)
             arv_conf = "MEDIUM"
+        elif ratio > 1.6:
+            # Don't rewrite ARV — but record the wide gap so the dashboard /
+            # investor can see it's a high-discount listing (potential flip).
+            out.notes.append(
+                f"Listing price (${li.opening_bid:,.0f}) is {1/ratio*100:.0f}% of "
+                f"comp-grounded ARV (${out.arv_expected:,.0f}) — high-discount "
+                f"signal; preserved for investor review."
+            )
 
     # ---- Rehab range ----------------------------------------------------
     if li.property_kind == PropertyKind.LAND:
         out.rehab_tier = "land"
         out.rehab_low = out.rehab_expected = out.rehab_high = 0.0
+    elif not li.living_sqft and li.property_kind != PropertyKind.MULTI_FAMILY:
+        # Refuse to invent a sqft. Without sqft we cannot compute a rehab
+        # range that's meaningful, so we don't compute one. The grade
+        # pipeline downstream sees rehab_expected == None and treats it as
+        # "data missing" rather than as a confident estimate. Multi-family
+        # is exempt because their valuation runs per-unit, not per-sqft.
+        out.rehab_tier = "unknown"
+        out.notes.append(
+            "Rehab not estimated: living_sqft missing. Confidence cannot "
+            "be assigned without a building size."
+        )
     else:
         tier = _condition_to_tier(li)
         out.rehab_tier = tier
-        sqft = li.living_sqft
-        if not sqft:
-            sqft = 1500 if li.property_kind in (PropertyKind.SINGLE_FAMILY, PropertyKind.UNKNOWN) else 1000
+        sqft = li.living_sqft or 1000  # multi-family fallback (per-unit avg)
+
+        # Mobile / manufactured homes use a much cheaper rehab tier table
+        # (vinyl skirting, single-pane windows, cosmetic-grade fixtures).
+        # Generic SFR rehab cost overstates by 30-50% on these.
+        is_mobile = li.property_kind == PropertyKind.MOBILE
+        tier_table = MOBILE_REHAB_TIERS if is_mobile else REHAB_TIERS
 
         # Photo-grounded rehab $/sqft from Vision wins over generic tier ranges
         # when both Vision tier and Vision rehab_psf range are HIGH-confidence.
@@ -337,12 +370,14 @@ def compute(li: Listing) -> Calc:
                 f"× {sqft:,.0f} sqft (Vision conf={v_conf}, tier='{tier}')"
             )
         else:
-            lo_psf, mid_psf, hi_psf = REHAB_TIERS[tier]
+            lo_psf, mid_psf, hi_psf = tier_table[tier]
             out.rehab_low = round(lo_psf * sqft, -2)
             out.rehab_expected = round(mid_psf * sqft, -2)
             out.rehab_high = round(hi_psf * sqft, -2)
+            kind_tag = "mobile" if is_mobile else "standard"
             out.notes.append(
-                f"Rehab tier '{tier}' on {sqft:,.0f} sqft = {lo_psf}-{hi_psf}/sqft"
+                f"Rehab tier '{tier}' ({kind_tag}) on {sqft:,.0f} sqft "
+                f"= ${lo_psf}-${hi_psf}/sqft"
             )
 
     # ---- Max bid (70% rule, expected case) ------------------------------
