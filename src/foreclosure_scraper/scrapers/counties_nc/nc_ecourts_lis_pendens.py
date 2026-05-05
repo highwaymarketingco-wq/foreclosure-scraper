@@ -219,7 +219,10 @@ class NCECourtsLisPendens(BaseScraper):
     optional = True
 
     # Days back to search (matches user spec: last 60 days)
-    LOOKBACK_DAYS = 60
+    # 90-day window — NC trustee sales typically have a 30-day notice
+    # period plus a 10-day upset bid window; 60 days missed sales that
+    # were filed 60-90 days ago and are still in their upset bid period.
+    LOOKBACK_DAYS = 90
     # Page size on each request
     PAGE_SIZE = 200
     # Cap total pages we'll pull across a run (safety against runaway pagination)
@@ -284,6 +287,22 @@ class NCECourtsLisPendens(BaseScraper):
 
             log.info("nc_ecourts.fetched", total_hits=len(all_hits))
 
+        # Diagnostic: count cause-of-action types BEFORE filtering. Helps
+        # identify when NCAOC adds new foreclosure-relevant cause codes
+        # that we're silently dropping. Surfaces in logs each weekly run.
+        from collections import Counter
+        cause_counts = Counter(
+            (h.get("causeOfActionDesc") or "(blank)") for h in all_hits
+        )
+        log.info(
+            "nc_ecourts.cause_distribution",
+            unique_causes=len(cause_counts),
+            top=dict(cause_counts.most_common(15)),
+            covered=sorted(c for c in cause_counts if c in FORECLOSURE_CAUSES),
+            uncovered_top=[c for c, _ in cause_counts.most_common(20)
+                           if c not in FORECLOSURE_CAUSES][:10],
+        )
+
         # Step 3: convert hits to listings, filtering to foreclosure-relevant causes
         listings: list[Listing] = []
         seen_keys: set[str] = set()
@@ -303,7 +322,7 @@ class NCECourtsLisPendens(BaseScraper):
             listings.append(listing)
 
         log.info("nc_ecourts.parsed", listings=len(listings),
-                 raw_hits=len(all_hits))
+                 raw_hits=len(all_hits), lookback_days=self.LOOKBACK_DAYS)
         return listings
 
 
