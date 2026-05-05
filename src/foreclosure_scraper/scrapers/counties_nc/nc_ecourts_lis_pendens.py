@@ -55,10 +55,24 @@ APP_BASE = "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/"
 
 # 14 target counties — Tyler indexes them as "<County> District Court" / "<County> Superior Court"
 TARGET_COUNTIES = [
+    # Original WNC + Charlotte metro footprint
     "Rutherford", "Cleveland", "Henderson", "Polk", "Gaston", "Mecklenburg",
     "Buncombe", "Transylvania", "McDowell", "Lincoln", "Madison", "Yancey",
     "Mitchell", "Burke",
+    # High-volume NC foreclosure metros added 2026-05 per source-coverage
+    # research. Each has its own ROD + clerk of court SP docket; the
+    # statewide eCourts judgment search picks up filings from all of them.
+    "Wake", "Forsyth", "Guilford", "Durham", "Cumberland", "New Hanover",
+    "Alamance", "Iredell", "Cabarrus", "Union", "Onslow", "Pitt", "Johnston",
 ]
+
+
+# NC Upset Bid window per NCGS §45-21.27: 10 calendar days from sale.
+# Sales whose orderedDate falls within (today - 10 days) are still in the
+# upset-bid window and thus actionable for an investor wanting to upset
+# the high bid. This is a tag, not a filter — the scraper still emits
+# the listing either way.
+UPSET_BID_WINDOW_DAYS = 10
 
 # Causes of action we consider foreclosure-relevant. CV - Lis Pendens is a
 # direct hit; the lien types are precursors / adjacent (HOA liens routinely
@@ -169,6 +183,21 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
         except (ValueError, TypeError):
             ordered_date = None
 
+    # Upset-bid window detection (NCGS §45-21.27 — 10 calendar days from
+    # the date of sale). When ordered_date is recent we tag the listing
+    # so the investor can prioritize cases still actionable.
+    in_upset_bid_window = False
+    if ordered_date is not None:
+        # Normalize to naive UTC for comparison with utcnow()
+        od_naive = ordered_date.replace(tzinfo=None) if ordered_date.tzinfo else ordered_date
+        days_since = (datetime.utcnow() - od_naive).days
+        if 0 <= days_since <= UPSET_BID_WINDOW_DAYS:
+            in_upset_bid_window = True
+            # Compute the upset-bid deadline date for the investor.
+            # No need to handle weekends per statute — the window runs
+            # in calendar days and only the deadline-day filing time
+            # matters (handled by the clerk of court).
+
     # Pick listing type: explicit lis pendens vs lien
     if "Lis Pendens" in cause:
         listing_type = ListingType.LIS_PENDENS
@@ -182,6 +211,11 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
     # is a best-effort breadcrumb.
     source_url = f"{APP_BASE}#/search?caseNumber={case_number}"
 
+    raw_blob: dict = {}
+    if in_upset_bid_window:
+        # Compute deadline (orderedDate + 10 days). Floor to day for clarity.
+        deadline = od_naive + timedelta(days=UPSET_BID_WINDOW_DAYS)
+
     return Listing(
         source=slug,
         source_url=source_url,
@@ -193,19 +227,30 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
         plaintiff=plaintiff,
         defendant=defendant,
         sale_date=ordered_date,
+        upset_bid_deadline=(deadline if in_upset_bid_window else None),
         description=f"{cause} judgment in {location}: {case_number}",
         first_seen=datetime.utcnow(),
         last_seen=datetime.utcnow(),
-        raw={"nc_ecourts": {
-            "cause": cause,
-            "judgmentType": hit.get("judgmentType"),
-            "civilJudgmentStatus": hit.get("civilJudgmentStatus"),
-            "caseCategoryKey": hit.get("caseCategoryKey"),
-            "caseID": hit.get("caseID"),
-            "judgmentId": hit.get("judgmentId"),
-            "orderedDate": od,
-            "location": location,
-        }},
+        raw={
+            "nc_ecourts": {
+                "cause": cause,
+                "judgmentType": hit.get("judgmentType"),
+                "civilJudgmentStatus": hit.get("civilJudgmentStatus"),
+                "caseCategoryKey": hit.get("caseCategoryKey"),
+                "caseID": hit.get("caseID"),
+                "judgmentId": hit.get("judgmentId"),
+                "orderedDate": od,
+                "location": location,
+            },
+            **({"upset_bid": {
+                "in_window": True,
+                "window_days": UPSET_BID_WINDOW_DAYS,
+                "deadline_iso": deadline.isoformat(),
+                "days_remaining": max(0, UPSET_BID_WINDOW_DAYS - (
+                    datetime.utcnow() - od_naive).days),
+                "statute": "NCGS §45-21.27",
+            }} if in_upset_bid_window else {}),
+        },
     )
 
 
