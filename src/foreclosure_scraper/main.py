@@ -324,6 +324,18 @@ async def run() -> int:
     except Exception:
         log.error("lis_pendens_resolver.failed", traceback=traceback.format_exc())
 
+    # Parcel-centroid reverse-geocode — for listings that confidently
+    # matched a parcel via owner-name search but the county GIS has no
+    # situs field (Cleveland NC, Cherokee SC, etc.), reverse-geocode the
+    # centroid via Nominatim and annotate raw.parcel_resolution. Result is
+    # APPROXIMATE (nearest-road snap) — never written to street_address,
+    # only to raw blob for human review.
+    try:
+        from .enrichment_parcel_reverse_geo import enrich_parcel_reverse_geo
+        await enrich_parcel_reverse_geo(enriched)
+    except Exception:
+        log.error("parcel_reverse_geo.failed", traceback=traceback.format_exc())
+
     # SC/NC case-detail scrape — for lis pendens listings whose address is
     # still a synthesized "Lis Pendens" placeholder, render the case detail
     # page on the public court portal and extract the real property address.
