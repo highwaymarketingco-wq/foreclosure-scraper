@@ -484,6 +484,19 @@ async def run() -> int:
     except Exception:
         log.error("property_kind.failed", traceback=traceback.format_exc())
 
+    # Pre-write data validation gate — runs BEFORE valuation so the
+    # calculator sees validated inputs. Catches recurring data-quality
+    # bugs at a single chokepoint: state/county mismatch, casing fixes
+    # (Mcdowell → McDowell), invalid parcel_id formats, opening_bid=0,
+    # tax_value < $5k for non-land, sqft / year / beds / baths out of
+    # range, and comps with bad sold_price or wrong property_kind.
+    try:
+        from .validation import validate as validate_listings
+        validation_stats = validate_listings(enriched)
+        log.info("orchestrator.validated", **validation_stats)
+    except Exception:
+        log.error("validation.failed", traceback=traceback.format_exc())
+
     # Investor calculator + A-F grades per listing.
     for li in enriched:
         try:
