@@ -51,7 +51,12 @@ class PickensMasterInEquity(BaseScraper):
     name = "Pickens County (SC) Master in Equity"
     category = "county_court"
     timeout_s = 120.0
-    expected_min_count = 1
+    # Pickens publishes monthly rosters as PDFs. They legitimately have
+    # months with no active sales — verified 2026-05-06 with the live
+    # "MAY 2026 -NO ACTIVE SALES" PDF. expected_min_count=0 prevents
+    # false REGRESSED alerts on dry months; a real regression here looks
+    # like a code-level error (PDF parser broken), not an empty count.
+    expected_min_count = 0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []

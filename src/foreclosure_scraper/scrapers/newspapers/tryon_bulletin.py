@@ -100,7 +100,10 @@ class TryonBulletinForeclosures(BaseScraper):
     name = "Tryon Daily Bulletin Legal Notices (Polk NC)"
     category = "newspaper_legal"
     requires_apify = False
-    expected_min_count = 1
+    # Polk NC has weeks with zero foreclosure-related notices in the
+    # Tryon Bulletin. Real regression here = URL discovery breaks; an
+    # empty count is genuine data, not a scraper failure.
+    expected_min_count = 0
     timeout_s = 30.0
 
     async def fetch(self) -> Iterable[Listing]:

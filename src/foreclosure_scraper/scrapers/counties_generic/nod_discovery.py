@@ -112,7 +112,12 @@ class NODDiscovery(BaseScraper):
     slug = "counties.nod_discovery"
     name = "ROD-driven NOD / NOS / Lis Pendens discovery"
     category = "county_court"
-    expected_min_count = 1
+    # NOD discovery is opportunistic across multiple county ROD vendors;
+    # weeks with zero matches are normal (small counties don't always
+    # file in the lookback window). Real regression here = a county's
+    # ROD index becomes unreachable, which fires structural log warnings
+    # separately. Empty count alone shouldn't cry wolf.
+    expected_min_count = 0
     requires_apify = False
     timeout_s = 600.0
 

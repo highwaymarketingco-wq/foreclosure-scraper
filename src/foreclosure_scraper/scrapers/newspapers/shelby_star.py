@@ -86,7 +86,12 @@ class ShelbyStarForeclosures(BaseScraper):
     name = "The Shelby Star Legal Classifieds (Cleveland NC)"
     category = "newspaper_legal"
     requires_apify = False
-    expected_min_count = 1
+    # Newspaper legal-notices pages have weeks with zero foreclosure
+    # filings (confirmed 2026-05-06: shelbystar.com/public-notices/
+    # returned 200 with just a navigation mention). 0-count is data
+    # reality, not a scraper failure. Real regression here = candidate
+    # URL list 404s entirely.
+    expected_min_count = 0
     timeout_s = 30.0
 
     async def fetch(self) -> Iterable[Listing]:
