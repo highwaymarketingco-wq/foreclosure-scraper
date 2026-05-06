@@ -1,0 +1,176 @@
+name: Patch — re-run specific scrapers + merge into docs/listings.json
+
+# Manually-triggered targeted patch. Use when ONE OR MORE specific
+# scrapers were silently dropping listings (e.g. NC eCourts before
+# 1bf92a9), the bug is now fixed, and you want the missing listings
+# backfilled NOW without paying 60-90 min for a full weekly run.
+#
+# What it does:
+#   * Loads the current docs/listings.json
+#   * Re-runs ONLY the requested scraper slugs (or --all-fixed default)
+#   * Filters their output through _in_scope / _active_only / _flip_candidate
+#   * Runs address-finding enrichment chain on the new listings
+#     (county GIS, court records, address backfill, parcel lookup,
+#     aggressive cross-county owner search, lis-pendens GIS resolver,
+#     parcel reverse-geo, address synth)
+#   * Runs property_kind, judgment_amount, validation, data_quality
+#   * Computes calc + grade per listing
+#   * Merges with existing listings via Listing.merge() (existing wins
+#     on non-null, new fills gaps), then re-dedupes for fuzzy overlap
+#   * Writes back docs/listings.json + appends "rerun_scrapers" entry
+#     to docs/run_health.json
+#
+# What it does NOT do (deferred to next weekly run):
+#   * Vision (Anthropic-paid)
+#   * RentCast AVM (paid above free tier)
+#   * HomeHarvest comps + photos (slow)
+#   * Scrapling-rendered detail pages (NC case status, SOS dissolution,
+#     Pickens MIE PDFs)
+#   * Code enforcement / building permits / flood / EPA / FEMA
+#
+# Cost: $0 — Apify gated by APIFY_FREE_TIER_ONLY=1. No Vision/RentCast.
+# Runtime: ~25-40 min depending on how many slugs are run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      slugs:
+        description: 'Space-separated scraper slugs (e.g. "counties_nc.nc_ecourts_lis_pendens"). Leave blank for --all-fixed.'
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  # Don't let this collide with the weekly run — they both push to docs/.
+  group: weekly-scrape
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      # Same secrets the weekly run uses (some enrichments need them):
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+      APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+      APIFY_FREE_TIER_ONLY: "1"
+      COURTLISTENER_TOKEN: ${{ secrets.COURTLISTENER_TOKEN }}
+      LOG_LEVEL: INFO
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Pin Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen || uv sync
+
+      - name: Run patch
+        run: |
+          if [ -n "${{ inputs.slugs }}" ]; then
+            uv run python scripts/patch_run_scrapers.py ${{ inputs.slugs }}
+          else
+            uv run python scripts/patch_run_scrapers.py --all-fixed
+          fi
+
+      - name: Verify docs/listings.json still exists + is non-empty
+        run: |
+          test -f docs/listings.json || { echo "::error::docs/listings.json missing after patch"; exit 1; }
+          size=$(wc -c < docs/listings.json)
+          echo "Patched listings size: $size bytes"
+          test "$size" -gt 1000 || { echo "::error::listings.json too small ($size bytes)"; exit 1; }
+
+      - name: Backup listings to artifact (always, before publish)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: patched-listings-${{ github.run_id }}
+          path: |
+            docs/listings.json
+            docs/run_health.json
+          retention-days: 90
+
+      - name: Publish patched dashboard data back to repo
+        run: |
+          set -eu
+          git config user.name "foreclosure-scraper-bot"
+          git config user.email "actions@github.com"
+          git fetch origin "${{ github.ref_name }}" || true
+          # Stash listings so a hard reset doesn't blow them away.
+          mkdir -p /tmp/published
+          cp docs/listings.json /tmp/published/listings.json
+          [ -f docs/run_health.json ] && cp docs/run_health.json /tmp/published/run_health.json
+          git reset --hard "origin/${{ github.ref_name }}"
+          mv /tmp/published/listings.json docs/listings.json
+          [ -f /tmp/published/run_health.json ] && mv /tmp/published/run_health.json docs/run_health.json
+          if git diff --quiet docs/; then
+            echo "No changes in docs/ vs latest origin — skipping commit"
+            exit 0
+          fi
+          git add docs/listings.json docs/run_health.json 2>/dev/null || true
+          git commit -m "patch: re-run scrapers ($(date -u +%Y-%m-%d-%H%M))" || {
+            echo "Nothing to commit"
+            exit 0
+          }
+          # Same 5-attempt fetch+reset+retry pattern as weekly.yml so
+          # concurrent commits don't lose this push.
+          for attempt in 1 2 3 4 5; do
+            if git push origin "HEAD:${{ github.ref_name }}"; then
+              echo "Pushed on attempt $attempt"
+              exit 0
+            fi
+            echo "Push failed (attempt $attempt) — re-syncing with origin"
+            cp docs/listings.json /tmp/published/listings.json
+            [ -f docs/run_health.json ] && cp docs/run_health.json /tmp/published/run_health.json
+            git fetch origin "${{ github.ref_name }}"
+            git reset --hard "origin/${{ github.ref_name }}"
+            mv /tmp/published/listings.json docs/listings.json
+            [ -f /tmp/published/run_health.json ] && mv /tmp/published/run_health.json docs/run_health.json
+            if git diff --quiet docs/; then
+              echo "After re-sync: no diff vs latest origin — done"
+              exit 0
+            fi
+            git add docs/listings.json docs/run_health.json 2>/dev/null || true
+            git commit -m "patch: re-run scrapers ($(date -u +%Y-%m-%d-%H%M))" || true
+            sleep $((attempt * 3))
+          done
+          echo "::error::Failed to publish patched data after 5 attempts; artifact still downloadable from run page (patched-listings-${{ github.run_id }})"
+          exit 1
+
+      - name: Surface patch summary
+        if: always()
+        run: |
+          if [ -f docs/run_health.json ]; then
+            uv run python - <<'PY' >> $GITHUB_STEP_SUMMARY
+          import json, pathlib
+          h = json.loads(pathlib.Path("docs/run_health.json").read_text())
+          patches = h.get("patches") or []
+          rerun = [p for p in patches if p.get("kind") == "rerun_scrapers"]
+          if rerun:
+              p = rerun[-1]
+              print("### Scraper re-run patch")
+              print(f"**Applied at:** {p.get('applied_at')}")
+              print(f"**Slugs re-run:** {', '.join(p.get('scraper_slugs') or [])}")
+              print(f"**Raw per slug:**")
+              for slug, n in (p.get('raw_per_slug') or {}).items():
+                  print(f"  - `{slug}`: {n}")
+              print(f"**After filter chain:** {p.get('filtered_kept')}")
+              print(f"**Merged into existing:** {p.get('merged_into_existing')}")
+              print(f"**Added new:** {p.get('added_new')}")
+              print(f"**Total after patch:** {p.get('total_listings_after_patch')}")
+              print(f"**Valuation failures:** {p.get('valuation_failures')}")
+          PY
+          fi
