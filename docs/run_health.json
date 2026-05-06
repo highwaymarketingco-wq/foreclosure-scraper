@@ -1,0 +1,471 @@
+{
+  "generated_at": "2026-05-06T01:48:32.192122+00:00",
+  "totals": {
+    "total_listings": 841,
+    "by_state": {
+      "SC": 455,
+      "NC": 386
+    }
+  },
+  "sources": [
+    {
+      "source": "counties.nod_discovery",
+      "count": 0,
+      "status": "REGRESSED (expected \u2265 1)",
+      "severity": 3
+    },
+    {
+      "source": "counties_sc.pickens_master_in_equity",
+      "count": 0,
+      "status": "REGRESSED (expected \u2265 1)",
+      "severity": 3
+    },
+    {
+      "source": "newspapers.shelby_star",
+      "count": 0,
+      "status": "REGRESSED (expected \u2265 1)",
+      "severity": 3
+    },
+    {
+      "source": "newspapers.tryon_bulletin",
+      "count": 0,
+      "status": "REGRESSED (expected \u2265 1)",
+      "severity": 3
+    },
+    {
+      "source": "counties_nc.nc_rod_substitute_trustee",
+      "count": 0,
+      "status": "RENDER-REQUIRED (Scrapling stealth not wired)",
+      "severity": 2
+    },
+    {
+      "source": "law_firms.aldridge_pite",
+      "count": 0,
+      "status": "RENDER-REQUIRED (Scrapling stealth not wired)",
+      "severity": 2
+    },
+    {
+      "source": "law_firms.korn",
+      "count": 0,
+      "status": "RENDER-REQUIRED (Scrapling stealth not wired)",
+      "severity": 2
+    },
+    {
+      "source": "law_firms.mcmichael_taylor_gray",
+      "count": 0,
+      "status": "RENDER-REQUIRED (Scrapling stealth not wired)",
+      "severity": 2
+    },
+    {
+      "source": "reo.vrm_va_reo",
+      "count": 0,
+      "status": "RENDER-REQUIRED (Scrapling stealth not wired)",
+      "severity": 2
+    },
+    {
+      "source": "national.foreclosure_dot_com",
+      "count": 0,
+      "status": "PAYWALL-BLOCKED",
+      "severity": 1
+    },
+    {
+      "source": "city_websites.charlotte_demolition",
+      "count": 29,
+      "status": "OK (29)",
+      "severity": 0
+    },
+    {
+      "source": "city_websites.search",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "counties.sitemap_walker",
+      "count": 31,
+      "status": "OK (31)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.buncombe_tax",
+      "count": 2,
+      "status": "OK (2)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.cleveland_tax",
+      "count": 5,
+      "status": "OK (5)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.durham_tax",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.forsyth_tax",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.guilford_tax",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.henderson_tax",
+      "count": 15,
+      "status": "OK (15)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.mecklenburg_tax",
+      "count": 22,
+      "status": "OK (22)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.nc_ecourts_lis_pendens",
+      "count": 582,
+      "status": "OK (582)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.new_hanover_tax",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.polk_tax",
+      "count": 2,
+      "status": "OK (2)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.rutherford_tax",
+      "count": 11,
+      "status": "OK (11)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.wake_tax",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "counties_sc.anderson_master_in_equity",
+      "count": 14,
+      "status": "OK (14)",
+      "severity": 0
+    },
+    {
+      "source": "counties_sc.sc_courtrosters",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "counties_sc.sc_flc",
+      "count": 18,
+      "status": "OK (18)",
+      "severity": 0
+    },
+    {
+      "source": "counties_sc.sc_public_index",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "counties_sc.sc_public_index_lis_pendens",
+      "count": 251,
+      "status": "OK (251)",
+      "severity": 0
+    },
+    {
+      "source": "counties_sc.sc_tax_delinquent",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "counties_sc.spartanburg_master_in_equity",
+      "count": 22,
+      "status": "OK (22)",
+      "severity": 0
+    },
+    {
+      "source": "courts.lis_pendens_discovery",
+      "count": 0,
+      "status": "(no status)",
+      "severity": 0
+    },
+    {
+      "source": "law_firms.bell_carrington",
+      "count": 58,
+      "status": "OK (58)",
+      "severity": 0
+    },
+    {
+      "source": "law_firms.brock_scott",
+      "count": 317,
+      "status": "OK (317)",
+      "severity": 0
+    },
+    {
+      "source": "law_firms.finkel",
+      "count": 8,
+      "status": "OK (8)",
+      "severity": 0
+    },
+    {
+      "source": "law_firms.hutchens",
+      "count": 348,
+      "status": "OK (348)",
+      "severity": 0
+    },
+    {
+      "source": "law_firms.rogers_townsend",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "national.auction_dot_com",
+      "count": 28,
+      "status": "OK (28)",
+      "severity": 0
+    },
+    {
+      "source": "national.bid4assets",
+      "count": 4,
+      "status": "OK (4)",
+      "severity": 0
+    },
+    {
+      "source": "national.courtlistener_adversary",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "national.courtlistener_bankruptcy",
+      "count": 600,
+      "status": "OK (600)",
+      "severity": 0
+    },
+    {
+      "source": "national.courtlistener_civil",
+      "count": 2,
+      "status": "OK (2)",
+      "severity": 0
+    },
+    {
+      "source": "national.distressed",
+      "count": 435,
+      "status": "OK (435)",
+      "severity": 0
+    },
+    {
+      "source": "national.fannie_homepath",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "national.freddie_homesteps",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "national.homeharvest",
+      "count": 17,
+      "status": "OK (17)",
+      "severity": 0
+    },
+    {
+      "source": "national.hubzu",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "national.hud_homestore",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "national.probate_foreclosure_leads",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "national.propwire",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "national.realtor_foreclosures",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "national.trulia",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "national.xome",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "national.zillow_bulk",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "national.zillow_foreclosures",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "newspapers.daily_courier",
+      "count": 2,
+      "status": "OK (2)",
+      "severity": 0
+    },
+    {
+      "source": "newspapers.hendersonville_lightning",
+      "count": 5,
+      "status": "OK (5)",
+      "severity": 0
+    },
+    {
+      "source": "public_notices.ncnotices",
+      "count": 5,
+      "status": "OK (5)",
+      "severity": 0
+    },
+    {
+      "source": "public_notices.publicnoticesc",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "reo.treasury_seized",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "reo.usda_rd",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    }
+  ],
+  "regressions": [],
+  "errors": [
+    "national.courtlistener_adversary",
+    "national.fannie_homepath",
+    "national.foreclosure_dot_com",
+    "national.freddie_homesteps",
+    "national.hubzu",
+    "national.hud_homestore",
+    "national.probate_foreclosure_leads",
+    "national.propwire",
+    "national.realtor_foreclosures",
+    "national.trulia",
+    "national.xome",
+    "national.zillow_bulk",
+    "national.zillow_foreclosures",
+    "public_notices.publicnoticesc",
+    "law_firms.aldridge_pite",
+    "law_firms.korn",
+    "law_firms.mcmichael_taylor_gray",
+    "law_firms.rogers_townsend",
+    "counties_sc.pickens_master_in_equity",
+    "counties_sc.sc_courtrosters",
+    "counties_sc.sc_public_index",
+    "counties_sc.sc_tax_delinquent",
+    "counties_nc.durham_tax",
+    "counties_nc.forsyth_tax",
+    "counties_nc.guilford_tax",
+    "counties_nc.nc_rod_substitute_trustee",
+    "counties_nc.new_hanover_tax",
+    "counties_nc.wake_tax",
+    "counties.nod_discovery",
+    "newspapers.shelby_star",
+    "newspapers.tryon_bulletin",
+    "reo.treasury_seized",
+    "reo.usda_rd",
+    "reo.vrm_va_reo",
+    "city_websites.search"
+  ],
+  "enrichments": {
+    "lis_pendens_resolver": {
+      "queried": 82,
+      "address_filled": 18,
+      "parcel_only": 6,
+      "ambiguous": 11,
+      "no_match": 47,
+      "retagged_county": 0,
+      "no_layer": 12,
+      "fiduciary_skipped": 1
+    },
+    "parcel_reverse_geo": {
+      "queried": 30,
+      "annotated": 30,
+      "no_match": 0
+    },
+    "recap_documents": {
+      "queried": 0,
+      "annotated": 0
+    },
+    "judgment_amount": {
+      "scanned": 841,
+      "matched": 0,
+      "already_set": 0
+    },
+    "validation": {
+      "county_normalized": 1,
+      "county_nulled_cross_state": 0,
+      "parcel_nulled_too_short": 63,
+      "parcel_nulled_bad_pattern": 0,
+      "opening_bid_zeroed": 42,
+      "opening_bid_too_large": 0,
+      "tax_value_too_low": 4,
+      "tax_value_too_large": 0,
+      "sqft_out_of_range": 0,
+      "year_built_out_of_range": 0,
+      "bedrooms_out_of_range": 0,
+      "bathrooms_out_of_range": 0,
+      "comps_dropped_price": 2,
+      "comps_dropped_kind_mismatch": 102
+    },
+    "data_quality": {
+      "synthetic_address": 77,
+      "approximate_address": 30,
+      "low_arv_confidence": 0,
+      "no_sqft": 293,
+      "no_address": 0
+    }
+  }
+}
