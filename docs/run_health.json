@@ -466,5 +466,112 @@
       "no_address": 0,
       "exceptions": 0
     }
-  }
+  },
+  "patches": [
+    {
+      "kind": "rerun_scrapers",
+      "applied_at": "2026-05-06T20:40:33.611004+00:00",
+      "scraper_slugs": [
+        "counties_nc.buncombe_tax",
+        "counties_nc.cleveland_tax",
+        "counties_nc.durham_tax",
+        "counties_nc.forsyth_tax",
+        "counties_nc.guilford_tax",
+        "counties_nc.henderson_tax",
+        "counties_nc.nc_ecourts_lis_pendens",
+        "counties_nc.new_hanover_tax",
+        "counties_nc.polk_tax",
+        "counties_nc.rutherford_tax",
+        "counties_nc.wake_tax"
+      ],
+      "raw_per_slug": {
+        "counties_nc.buncombe_tax": 2,
+        "counties_nc.cleveland_tax": 5,
+        "counties_nc.durham_tax": 0,
+        "counties_nc.forsyth_tax": 13,
+        "counties_nc.guilford_tax": 0,
+        "counties_nc.henderson_tax": 15,
+        "counties_nc.nc_ecourts_lis_pendens": 571,
+        "counties_nc.new_hanover_tax": 4,
+        "counties_nc.polk_tax": 2,
+        "counties_nc.rutherford_tax": 11,
+        "counties_nc.wake_tax": 4
+      },
+      "filtered_kept": 595,
+      "merged_into_existing": 28,
+      "added_new": 567,
+      "total_listings_after_patch": 2616,
+      "valuation_failures": 0,
+      "enrichment_stats": {
+        "enrich_gis": "ok",
+        "enrich_courts": "ok",
+        "compute_flags": "ok",
+        "geocode": "ok",
+        "location": "ok",
+        "rod": "ok",
+        "address_backfill": "ok",
+        "bk_property": "ok",
+        "parcel_lookup": "ok",
+        "aggressive_address": "ok",
+        "lis_pendens_resolver": {
+          "queried": 0,
+          "address_filled": 0,
+          "ambiguous": 0,
+          "no_match": 0,
+          "retagged_county": 0,
+          "parcel_only": 0
+        },
+        "parcel_reverse_geo": {
+          "queried": 92,
+          "annotated": 92,
+          "no_match": 0
+        },
+        "address_synth": "ok",
+        "property_kind": "ok",
+        "judgment_amount": {
+          "scanned": 595,
+          "matched": 0,
+          "already_set": 0
+        },
+        "validation": {
+          "county_normalized": 0,
+          "county_nulled_cross_state": 0,
+          "parcel_nulled_too_short": 9,
+          "parcel_nulled_bad_pattern": 0,
+          "opening_bid_zeroed": 0,
+          "opening_bid_too_large": 0,
+          "tax_value_too_low": 0,
+          "tax_value_too_large": 0,
+          "sqft_out_of_range": 0,
+          "year_built_out_of_range": 0,
+          "bedrooms_out_of_range": 0,
+          "bathrooms_out_of_range": 0,
+          "comps_dropped_price": 0,
+          "comps_dropped_kind_mismatch": 0,
+          "validation_exceptions": 0
+        },
+        "data_quality": {
+          "synthetic_address": 563,
+          "approximate_address": 92,
+          "low_arv_confidence": 0,
+          "no_sqft": 559,
+          "no_address": 0,
+          "exceptions": 0
+        },
+        "upset_bid": {
+          "scanned": 595,
+          "tagged_in_window": 0,
+          "tag_cleared_outside_window": 0,
+          "no_sale_date": 571,
+          "non_nc": 0
+        }
+      },
+      "upset_bid_post_merge": {
+        "scanned": 2616,
+        "tagged_in_window": 3,
+        "tag_cleared_outside_window": 0
+      },
+      "note": "enrich_upset_bid re-run on merged set; 3 NC listings actionable in upset-bid window per NCGS \u00a745-21.27"
+    }
+  ]
 }
