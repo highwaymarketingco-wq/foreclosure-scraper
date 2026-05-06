@@ -8,7 +8,7 @@ from ...models import Listing
 from ._nc_tax_helper import fetch_county_tax_listings
 
 
-URL = "https://www.co.forsyth.nc.us/tax/foreclosure.aspx"
+URL = "https://www.co.forsyth.nc.us/tax/foreclosure_prop.aspx"
 
 
 class ForsythTaxForeclosure(BaseScraper):
