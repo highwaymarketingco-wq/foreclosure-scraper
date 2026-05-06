@@ -51,11 +51,26 @@ log = structlog.get_logger()
 
 
 def _in_scope(li: Listing) -> bool:
+    if li.source in SCOPE_BYPASS_SOURCES:
+        return True
     if in_scope(li.county, li.state):
         return True
     if li.zip_code and any(li.zip_code.startswith(p) for p in SCOPE_ZIP_PREFIXES):
         return True
     return False
+
+
+#: Sources where the listing's `state` is reliable but `county` and `zip` are
+# typically unset at scrape time (CourtListener bankruptcy / civil / adversary
+# only get county after enrichment). Without bypass, ~600 NC + SC bankruptcy
+# listings get filtered before the bk_property enrichment can fill in their
+# county. Investors want full state-wide coverage of distressed-debt signals,
+# not just the 21 in-scope-county footprint.
+SCOPE_BYPASS_SOURCES = {
+    "national.courtlistener_bankruptcy",
+    "national.courtlistener_civil",
+    "national.courtlistener_adversary",
+}
 
 
 #: Sources where blank sale_date is acceptable — these list ACTIVELY-FOR-SALE
@@ -392,19 +407,14 @@ async def run() -> int:
     except Exception:
         log.error("comps.failed", traceback=traceback.format_exc())
 
-    # Claude Vision condition assessment — overrides regex/age tier with
-    # actual photo evidence when ANTHROPIC_API_KEY is set. Costs ~$0.01-0.03
-    # per listing depending on photo count. Skipped silently when no key.
-    try:
-        from .enrichment_vision import enrich_with_vision
-        await enrich_with_vision(enriched)
-    except Exception:
-        log.error("vision.failed", traceback=traceback.format_exc())
-
     # Per-address photo gallery enrichment — for listings that came from
     # courthouse / law-firm / sitemap sources WITHOUT photos, look up the
     # same address on HomeHarvest's for_sale/pending/sold endpoints to pull
     # rich Realtor.com galleries (primary + up to 5 alts). Free.
+    # MUST run before Vision so the condition assessment sees all photos —
+    # otherwise Vision sees only the primary, returns more pessimistic tiers
+    # (Marietta St case: 1-photo Vision = 'gut' / $161k rehab vs 6-photo
+    #  Vision = 'major' / $63k rehab).
     try:
         from .enrichment_photos import enrich_with_address_photos
         await enrich_with_address_photos(enriched)
@@ -413,11 +423,23 @@ async def run() -> int:
 
     # Image fallback — ensure 100% have at least an OSM static-map of the address
     # (free, no API key). Real Zillow/Realtor photos win when present.
+    # Runs before Vision so raw.images.real (the list Vision reads from) is
+    # populated with the full Realtor gallery, not just the primary.
     try:
         from .enrichment_images import enrich_with_images
         await enrich_with_images(enriched, use_mapillary=False)
     except Exception:
         log.error("images.failed", traceback=traceback.format_exc())
+
+    # Claude Vision condition assessment — overrides regex/age tier with
+    # actual photo evidence when ANTHROPIC_API_KEY is set. Costs ~$0.01-0.03
+    # per listing depending on photo count. Skipped silently when no key.
+    # Runs AFTER photos+images so it sees the full 5-6 photo gallery.
+    try:
+        from .enrichment_vision import enrich_with_vision
+        await enrich_with_vision(enriched)
+    except Exception:
+        log.error("vision.failed", traceback=traceback.format_exc())
 
     # FEMA flood-zone tag — free public NFHL API, marks SFHA (high-risk) zones
     # so grade can dock points and the calculator can include flood insurance.
