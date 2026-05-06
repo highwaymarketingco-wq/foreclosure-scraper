@@ -28,7 +28,7 @@ from foreclosure_scraper.models import Listing, ListingType, PropertyKind
 def test_photos_runs_before_vision():
     src = inspect.getsource(orchestrator.run)
     photos_idx = src.find("enrich_with_address_photos(enriched)")
-    vision_idx = src.find("enrich_with_vision(enriched)")
+    vision_idx = src.find("enrich_with_vision(enriched")
     assert photos_idx > 0, "enrich_with_address_photos no longer called"
     assert vision_idx > 0, "enrich_with_vision no longer called"
     assert photos_idx < vision_idx, (
@@ -41,7 +41,7 @@ def test_photos_runs_before_vision():
 def test_images_runs_before_vision():
     src = inspect.getsource(orchestrator.run)
     images_idx = src.find("enrich_with_images(enriched")
-    vision_idx = src.find("enrich_with_vision(enriched)")
+    vision_idx = src.find("enrich_with_vision(enriched")
     assert images_idx > 0
     assert vision_idx > 0
     assert images_idx < vision_idx, (

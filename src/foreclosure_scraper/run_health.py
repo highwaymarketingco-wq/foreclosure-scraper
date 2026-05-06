@@ -71,6 +71,7 @@ def _severity(status: str) -> int:
     """Higher = more attention needed.
        3 = REGRESSED (alert)
        2 = render-required / no creds (action item)
+       2 = CARRYOVER (stale prior-run data — needs investigation)
        1 = blocked (acknowledged failure)
        0 = OK / empty (verified)
     """
@@ -79,6 +80,11 @@ def _severity(status: str) -> int:
     s = status.upper()
     if s.startswith("REGRESSED"):
         return 3
+    if s.startswith("CARRYOVER"):
+        # Carryover is a soft regression: data exists for the dashboard
+        # via last-known-good replay, but the source itself failed this
+        # run. Surface above blocked-but-OK so it gets eyes.
+        return 2
     if "RENDER-REQUIRED" in s:
         return 2
     if "PAYWALL-BLOCKED" in s or "APIFY-BLOCKED" in s:

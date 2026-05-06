@@ -224,6 +224,40 @@ async def run() -> int:
     except Exception as exc:  # noqa: BLE001
         log.warning("orchestrator.lis_pendens_failed", error=str(exc))
 
+    # Last-known-good carryover — for any source that produced ≥3 listings
+    # last week but 0 this week (anti-bot escalation, scheduled maintenance,
+    # transient 5xx), replay the prior listings tagged stale=True so the
+    # dashboard never goes blank. Carryover listings flow through filter +
+    # dedupe normally; if a fresh scrape supersedes them next run, dedupe
+    # picks the fresher record. Carryover skipped for sources whose zero
+    # is acknowledged (paywall/apify/render-blocked).
+    try:
+        from .carryover import carryover_for_zeroed_sources
+        skip_for_carryover = {
+            *(s.slug for s in scrapers if getattr(s, "requires_apify", False)),
+            *(s.slug for s in scrapers if getattr(s, "requires_paywall", False)),
+            *(s.slug for s in scrapers if getattr(s, "requires_render", False)),
+        }
+        carried, carry_stats = carryover_for_zeroed_sources(
+            by_source_now=dict(by_source),
+            expected_min=expected,
+            skip_slugs=skip_for_carryover,
+        )
+        if carried:
+            log.warning(
+                "orchestrator.carryover_applied",
+                listings=len(carried),
+                sources=carry_stats,
+            )
+            for li in carried:
+                raw.append(li)
+                # Track in by_source under a synthetic slug suffix so
+                # source_status can mark them visibly stale in run_health.
+                by_source[li.source or "carryover"] += 1
+    except Exception:
+        log.error("carryover.failed", traceback=traceback.format_exc())
+        carry_stats = {}
+
     log.info("orchestrator.collected", raw=len(raw))
 
     # Filter to scope (counties we care about)
@@ -451,9 +485,15 @@ async def run() -> int:
     # actual photo evidence when ANTHROPIC_API_KEY is set. Costs ~$0.01-0.03
     # per listing depending on photo count. Skipped silently when no key.
     # Runs AFTER photos+images so it sees the full 5-6 photo gallery.
+    #
+    # Budget guard: VISION_MAX_LISTINGS env caps the number of API calls.
+    # Default 600 ≈ $12-18 max per run (Sonnet 4.5 pricing). Without this
+    # cap, an unexpected listing-count spike could blow past the Anthropic
+    # spend budget for the week before anyone notices.
     try:
         from .enrichment_vision import enrich_with_vision
-        await enrich_with_vision(enriched)
+        vision_cap = int(os.environ.get("VISION_MAX_LISTINGS", "600"))
+        await enrich_with_vision(enriched, max_listings=vision_cap)
     except Exception:
         log.error("vision.failed", traceback=traceback.format_exc())
 
@@ -613,7 +653,13 @@ async def run() -> int:
     source_status = {}
     for slug in expected:
         n = by_source.get(slug, 0)
-        if n > 0:
+        carried_n = (carry_stats or {}).get(slug, 0)
+        if carried_n > 0 and n == carried_n:
+            # All "listings" for this slug came from the prior run — fresh
+            # scrape returned zero. Surface it visibly so on-call knows the
+            # data is stale, not real-world dry.
+            source_status[slug] = f"CARRYOVER ({carried_n} stale from prior run)"
+        elif n > 0:
             source_status[slug] = f"OK ({n})"
         elif slug in paywall_required:
             source_status[slug] = "PAYWALL-BLOCKED"

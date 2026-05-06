@@ -126,56 +126,65 @@ def enrich_property_kind(listings: list[Listing]) -> None:
         "fallback_sfr": 0,
     }
 
+    counts["exceptions"] = 0
     for li in listings:
-        # Skip if already classified (anything other than UNKNOWN/None)
-        if li.property_kind and li.property_kind != PropertyKind.UNKNOWN:
-            counts["already_classified"] += 1
-            continue
+        try:
+            # Skip if already classified (anything other than UNKNOWN/None)
+            if li.property_kind and li.property_kind != PropertyKind.UNKNOWN:
+                counts["already_classified"] += 1
+                continue
 
-        # Tier 1: description text
-        kind = _classify_from_text(li.description or "")
-        if kind:
-            li.property_kind = kind
-            counts["from_description"] += 1
-            continue
+            # Tier 1: description text
+            kind = _classify_from_text(li.description or "")
+            if kind:
+                li.property_kind = kind
+                counts["from_description"] += 1
+                continue
 
-        # Tier 1.5: also try the raw zillow description / case_name
-        raw = li.raw if isinstance(li.raw, dict) else {}
-        zillow_desc = ""
-        z = raw.get("zillow") or {}
-        if isinstance(z, dict):
-            zillow_desc = z.get("description") or ""
-        kind = _classify_from_text(zillow_desc)
-        if kind:
-            li.property_kind = kind
-            counts["from_description"] += 1
-            continue
+            # Tier 1.5: also try the raw zillow description / case_name
+            raw = li.raw if isinstance(li.raw, dict) else {}
+            zillow_desc = ""
+            z = raw.get("zillow") or {}
+            if isinstance(z, dict):
+                zillow_desc = z.get("description") or ""
+            kind = _classify_from_text(zillow_desc)
+            if kind:
+                li.property_kind = kind
+                counts["from_description"] += 1
+                continue
 
-        # Tier 2: structure data
-        kind = _classify_from_structure(li)
-        if kind:
-            li.property_kind = kind
-            counts["from_structure"] += 1
-            continue
+            # Tier 2: structure data
+            kind = _classify_from_structure(li)
+            if kind:
+                li.property_kind = kind
+                counts["from_structure"] += 1
+                continue
 
-        # Tier 3: listing-type heuristics
-        kind = _classify_from_listing_type(li)
-        if kind:
-            li.property_kind = kind
-            counts["from_listing_type"] += 1
-            continue
+            # Tier 3: listing-type heuristics
+            kind = _classify_from_listing_type(li)
+            if kind:
+                li.property_kind = kind
+                counts["from_listing_type"] += 1
+                continue
 
-        # Tier 4: source-specific defaults
-        kind = _classify_from_source(li)
-        if kind:
-            li.property_kind = kind
-            counts["from_source"] += 1
-            continue
+            # Tier 4: source-specific defaults
+            kind = _classify_from_source(li)
+            if kind:
+                li.property_kind = kind
+                counts["from_source"] += 1
+                continue
 
-        # Absolute final fallback: SFR. Per user requirement no listing
-        # may carry property_kind=UNKNOWN. Most-likely default for
-        # foreclosure / distressed-property leads is single-family.
-        li.property_kind = PropertyKind.SINGLE_FAMILY
-        counts["fallback_sfr"] = counts.get("fallback_sfr", 0) + 1
+            # Absolute final fallback: SFR. Per user requirement no listing
+            # may carry property_kind=UNKNOWN. Most-likely default for
+            # foreclosure / distressed-property leads is single-family.
+            li.property_kind = PropertyKind.SINGLE_FAMILY
+            counts["fallback_sfr"] = counts.get("fallback_sfr", 0) + 1
+        except Exception as exc:  # noqa: BLE001
+            counts["exceptions"] += 1
+            log.warning(
+                "property_kind.per_listing_failed",
+                source=getattr(li, "source", None),
+                error=str(exc),
+            )
 
     log.info("property_kind.done", **counts)

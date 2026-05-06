@@ -84,38 +84,47 @@ def enrich_data_quality(listings: list[Listing]) -> dict:
         "low_arv_confidence": 0,
         "no_sqft": 0,
         "no_address": 0,
+        "exceptions": 0,
     }
     for li in listings:
-        flags: list[str] = []
+        try:
+            flags: list[str] = []
 
-        if _is_synthetic_address(li):
-            flags.append("synthetic_address")
-            stats["synthetic_address"] += 1
-        elif not (li.street_address or "").strip():
-            flags.append("no_address")
-            stats["no_address"] += 1
+            if _is_synthetic_address(li):
+                flags.append("synthetic_address")
+                stats["synthetic_address"] += 1
+            elif not (li.street_address or "").strip():
+                flags.append("no_address")
+                stats["no_address"] += 1
 
-        if _is_approximate_address(li):
-            flags.append("approximate_address")
-            stats["approximate_address"] += 1
+            if _is_approximate_address(li):
+                flags.append("approximate_address")
+                stats["approximate_address"] += 1
 
-        if not li.living_sqft and (li.property_kind and li.property_kind.value != "land"):
-            flags.append("no_sqft")
-            stats["no_sqft"] += 1
+            if not li.living_sqft and (li.property_kind and li.property_kind.value != "land"):
+                flags.append("no_sqft")
+                stats["no_sqft"] += 1
 
-        arv_conf = _arv_confidence(li)
-        if arv_conf == "LOW":
-            flags.append("low_arv_confidence")
-            stats["low_arv_confidence"] += 1
+            arv_conf = _arv_confidence(li)
+            if arv_conf == "LOW":
+                flags.append("low_arv_confidence")
+                stats["low_arv_confidence"] += 1
 
-        # Always write — even an empty list signals "no caveats".
-        if not isinstance(li.raw, dict):
-            li.raw = {}
-        li.raw["data_quality"] = {
-            "flags": flags,
-            "arv_confidence": arv_conf,
-            "summary": _summary_text(flags),
-        }
+            # Always write — even an empty list signals "no caveats".
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            li.raw["data_quality"] = {
+                "flags": flags,
+                "arv_confidence": arv_conf,
+                "summary": _summary_text(flags),
+            }
+        except Exception as exc:  # noqa: BLE001
+            stats["exceptions"] += 1
+            log.warning(
+                "data_quality.per_listing_failed",
+                source=getattr(li, "source", None),
+                error=str(exc),
+            )
 
     log.info("data_quality.done", **stats)
     return stats

@@ -294,7 +294,13 @@ def _validate_comps(li: Listing, stats: dict) -> None:
 
 def validate(listings: list[Listing]) -> dict:
     """Apply all validation gates in-place. Returns a stats dict suitable
-    for the run summary."""
+    for the run summary.
+
+    Per-listing isolation: each listing is validated inside try/except.
+    A malformed record can't poison validation for the rest of the batch
+    (the original implementation would short-circuit the loop on the first
+    bad listing; downstream calc/grade then ran on un-validated data).
+    """
     stats = {
         "county_normalized": 0,
         "county_nulled_cross_state": 0,
@@ -310,11 +316,21 @@ def validate(listings: list[Listing]) -> dict:
         "bathrooms_out_of_range": 0,
         "comps_dropped_price": 0,
         "comps_dropped_kind_mismatch": 0,
+        "validation_exceptions": 0,
     }
     for li in listings:
-        _validate_state_county(li, stats)
-        _validate_parcel_id(li, stats)
-        _validate_numeric_bounds(li, stats)
-        _validate_comps(li, stats)
+        try:
+            _validate_state_county(li, stats)
+            _validate_parcel_id(li, stats)
+            _validate_numeric_bounds(li, stats)
+            _validate_comps(li, stats)
+        except Exception as exc:  # noqa: BLE001
+            stats["validation_exceptions"] += 1
+            log.warning(
+                "validation.per_listing_failed",
+                source=getattr(li, "source", None),
+                source_url=getattr(li, "source_url", None),
+                error=str(exc),
+            )
     log.info("validation.done", **stats)
     return stats

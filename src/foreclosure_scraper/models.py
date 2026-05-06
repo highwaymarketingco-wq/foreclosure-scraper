@@ -92,12 +92,21 @@ class Listing(BaseModel):
     raw: dict[str, Any] = Field(default_factory=dict)
 
     def dedupe_key(self) -> str:
-        """Stable key used to de-duplicate across sources."""
-        if self.parcel_id:
+        """Stable key used to de-duplicate across sources.
+
+        Each candidate key is strip-checked: a whitespace-only parcel_id /
+        case_number / address would otherwise produce a degenerate key like
+        'parcel:NC:' that collides every such listing into one bucket.
+        Dedupe runs before validation, so we can't rely on validation to
+        clean these — must guard here.
+        """
+        if self.parcel_id and self.parcel_id.strip():
             return f"parcel:{self.state or ''}:{self.parcel_id.strip().upper()}"
-        if self.street_address and self.zip_code:
+        if (self.street_address and self.street_address.strip()
+                and self.zip_code and self.zip_code.strip()):
             return f"addr:{self.street_address.strip().lower()}|{self.zip_code.strip()}"
-        if self.case_number and self.county:
+        if (self.case_number and self.case_number.strip()
+                and self.county and self.county.strip()):
             return f"case:{self.state or ''}:{self.county.lower()}:{self.case_number.strip().upper()}"
         return f"url:{self.source_url}"
 
