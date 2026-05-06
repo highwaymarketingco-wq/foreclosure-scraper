@@ -88,6 +88,7 @@ from foreclosure_scraper.validation import validate as validate_listings
 from foreclosure_scraper.enrichment_data_quality import enrich_data_quality
 from foreclosure_scraper.enrichment_judgment_amount import enrich_judgment_amount
 from foreclosure_scraper.enrichment_property_kind import enrich_property_kind
+from foreclosure_scraper.enrichment_upset_bid import enrich_upset_bid
 
 log = structlog.get_logger()
 
@@ -343,6 +344,18 @@ async def _run_address_enrichments(new_listings: list[Listing]) -> dict:
         log.error("patch_run.data_quality_failed",
                   traceback=traceback.format_exc())
         stats["data_quality"] = "failed"
+
+    # NC upset-bid window tagging (NCGS §45-21.27, ~14 days from sale).
+    # Pure-Python, idempotent. Reads sale_date set by the law-firm /
+    # county-tax / auction-site scrapers; tags raw.upset_bid + sets
+    # upset_bid_deadline for any NC listing 0-14 days post-sale.
+    try:
+        s = enrich_upset_bid(new_listings)
+        stats["upset_bid"] = s
+    except Exception:
+        log.error("patch_run.upset_bid_failed",
+                  traceback=traceback.format_exc())
+        stats["upset_bid"] = "failed"
 
     return stats
 

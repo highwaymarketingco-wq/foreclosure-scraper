@@ -67,12 +67,18 @@ TARGET_COUNTIES = [
 ]
 
 
-# NC Upset Bid window per NCGS §45-21.27: 10 calendar days from sale.
-# Sales whose orderedDate falls within (today - 10 days) are still in the
-# upset-bid window and thus actionable for an investor wanting to upset
-# the high bid. This is a tag, not a filter — the scraper still emits
-# the listing either way.
-UPSET_BID_WINDOW_DAYS = 10
+# NC Upset Bid window: NCGS §45-21.27 gives 10 days from filing of the
+# report of sale (§45-21.26 requires the report to be filed within 5 days
+# after the sale), so the practical window measured from sale_date is up
+# to 15 calendar days; investors typically use 14 as the operational
+# threshold. Note this scraper queries Tyler Odyssey's judgment search
+# whose orderedDate is the JUDGMENT date, not the sale date — recent
+# orderedDate doesn't reliably mean a recent sale, which is why
+# enrichment_upset_bid.py is the authoritative tagger (it works off
+# sale_date, not orderedDate). This constant is preserved here for any
+# legacy callers but the actual upset-bid logic now lives in
+# enrich_upset_bid.
+UPSET_BID_WINDOW_DAYS = 14
 
 # Causes of action we consider foreclosure-relevant. CV - Lis Pendens is a
 # direct hit; the lien types are precursors / adjacent (HOA liens routinely

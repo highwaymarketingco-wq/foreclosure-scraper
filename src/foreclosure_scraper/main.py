@@ -151,7 +151,7 @@ def _flip_candidate(li: Listing) -> bool:
 
 
 def _active_only(li: Listing, horizon_days: int) -> bool:
-    """Drop listings whose sale is in the past or > horizon_days out, and any auction marked withdrawn/cancelled."""
+    """Drop listings whose sale is too far past or > horizon_days out, and any auction marked withdrawn/cancelled."""
     if li.auction_status and li.auction_status.lower() in {
         "withdrawn",
         "cancelled",
@@ -170,7 +170,15 @@ def _active_only(li: Listing, horizon_days: int) -> bool:
     sale = li.sale_date
     if sale.tzinfo is not None:
         sale = sale.replace(tzinfo=None)
-    cutoff_past = datetime.utcnow() - timedelta(days=2)  # tiny grace for same-day sales
+    # State-aware past cutoff: NC's upset-bid period (NCGS §45-21.27) is
+    # 10 days from the trustee's filing of the report of sale, and §45-21.26
+    # gives 5 days from sale to file the report — so the practical window
+    # from sale_date is up to 15 days. We use 14 as the operational threshold.
+    # Without this grace, we strand the strongest actionable signal an
+    # investor can chase. Default 2-day grace for other states; SC also
+    # gets 14 (its §29-3-680 confirmation window is even longer).
+    past_grace_days = 14 if li.state in ("NC", "SC") else 2
+    cutoff_past = datetime.utcnow() - timedelta(days=past_grace_days)
     cutoff_future = datetime.utcnow() + timedelta(days=horizon_days)
     return cutoff_past <= sale <= cutoff_future
 
@@ -612,6 +620,20 @@ async def run() -> int:
         if s: enrichment_stats["data_quality"] = s
     except Exception:
         log.error("data_quality.failed", traceback=traceback.format_exc())
+
+    # Upset-bid window tagging (NCGS §45-21.27) — for every NC listing
+    # whose sale_date is in the past 0-10 calendar days, attach
+    # raw.upset_bid + upset_bid_deadline. Pure-Python, idempotent.
+    # Runs AFTER validation/data_quality so it sees the cleaned-up
+    # sale_date, BEFORE calc/grade so the valuation pass can read the
+    # upset-bid signal (e.g. higher confidence on recent comp matching).
+    try:
+        from .enrichment_upset_bid import enrich_upset_bid
+        s = enrich_upset_bid(enriched)
+        if s:
+            enrichment_stats["upset_bid"] = s
+    except Exception:
+        log.error("upset_bid.failed", traceback=traceback.format_exc())
 
     # Investor calculator + A-F grades per listing.
     for li in enriched:
