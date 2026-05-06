@@ -216,6 +216,16 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
         # Compute deadline (orderedDate + 10 days). Floor to day for clarity.
         deadline = od_naive + timedelta(days=UPSET_BID_WINDOW_DAYS)
 
+    # Critical: orderedDate is the JUDGMENT date (when the lis pendens or
+    # lien was entered), NOT a future sale date. Setting it as sale_date
+    # caused every NC eCourts listing to fail _active_only's 120-day-
+    # forward horizon — Run #16 produced 571 listings here, all silently
+    # dropped before reaching docs/listings.json. The fix: leave sale_date
+    # None (DATELESS_OK_SOURCES already handles this for nc_ecourts) and
+    # store the judgment date in raw.nc_ecourts.orderedDate where the
+    # dashboard / enrichment can find it without it gating the active
+    # filter. For upset-bid-window listings the actual sale happened ON
+    # orderedDate (we keep upset_bid_deadline + raw.upset_bid for that).
     return Listing(
         source=slug,
         source_url=source_url,
@@ -226,7 +236,7 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
         case_number=case_number,
         plaintiff=plaintiff,
         defendant=defendant,
-        sale_date=ordered_date,
+        sale_date=None,
         upset_bid_deadline=(deadline if in_upset_bid_window else None),
         description=f"{cause} judgment in {location}: {case_number}",
         first_seen=datetime.utcnow(),
@@ -240,6 +250,7 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
                 "caseID": hit.get("caseID"),
                 "judgmentId": hit.get("judgmentId"),
                 "orderedDate": od,
+                "ordered_date_iso": ordered_date.isoformat() if ordered_date else None,
                 "location": location,
             },
             **({"upset_bid": {
@@ -249,6 +260,7 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
                 "days_remaining": max(0, UPSET_BID_WINDOW_DAYS - (
                     datetime.utcnow() - od_naive).days),
                 "statute": "NCGS §45-21.27",
+                "sale_occurred_on_iso": ordered_date.isoformat() if ordered_date else None,
             }} if in_upset_bid_window else {}),
         },
     )

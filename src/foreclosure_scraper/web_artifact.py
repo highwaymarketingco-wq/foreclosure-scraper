@@ -64,6 +64,11 @@ RAW_KEEP = {
     "estimated_monthly_rent_extra": "*",
     "schools": "*",                   # GreatSchools per-address ratings (when key set)
     "walk_score": "*",                # Walk Score per-address (when key set)
+    "nc_ecourts": "*",                # NC Tyler Odyssey judgment-search row
+    "upset_bid": "*",                 # NCGS §45-21.27 10-day upset-bid window
+    "nc_case_status": "*",            # NC eCourts case status (pending/sold/upset)
+    "carryover": "*",                 # Last-known-good replay marker
+    "filed_date": "*",                # Generic file-date for lis pendens / liens
 }
 
 
