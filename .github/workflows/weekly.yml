@@ -80,31 +80,72 @@ jobs:
             echo "run_health size: $(wc -c < docs/run_health.json) bytes"
           fi
 
+      - name: Backup listings to artifact (always, before publish)
+        # Belt-and-suspenders: upload the freshly-generated listings.json
+        # BEFORE the publish step runs so concurrent-push conflicts can't
+        # cause us to lose ~3 hours of orchestrator work the way Run #14
+        # did. If publish ultimately fails, this artifact is still
+        # downloadable from the run page for 90 days.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: listings-${{ github.run_id }}
+          path: |
+            docs/listings.json
+            docs/run_health.json
+          retention-days: 90
+
       - name: Publish dashboard data back to repo
         run: |
           set -eu
-          if git diff --quiet docs/; then
-            echo "No changes in docs/ — skipping commit"
-            exit 0
-          fi
+          # Always start fresh: stash any local changes (none expected),
+          # then ensure we're up to date with origin before staging the
+          # new docs/. This avoids non-fast-forward errors when other
+          # commits landed during the long scraper run.
           git config user.name "foreclosure-scraper-bot"
           git config user.email "actions@github.com"
+          git fetch origin "${{ github.ref_name }}" || true
+          # Stash listings so a hard reset doesn't blow them away.
+          mkdir -p /tmp/published
+          cp docs/listings.json /tmp/published/listings.json
+          [ -f docs/run_health.json ] && cp docs/run_health.json /tmp/published/run_health.json
+          # Move HEAD to the latest origin so we apply our docs on top.
+          git reset --hard "origin/${{ github.ref_name }}"
+          # Restore the freshly-generated docs files.
+          mv /tmp/published/listings.json docs/listings.json
+          [ -f /tmp/published/run_health.json ] && mv /tmp/published/run_health.json docs/run_health.json
+          if git diff --quiet docs/; then
+            echo "No changes in docs/ vs latest origin — skipping commit"
+            exit 0
+          fi
           git add docs/listings.json docs/run_health.json 2>/dev/null || true
           git commit -m "weekly: refresh dashboard data ($(date -u +%Y-%m-%d))" || {
             echo "Nothing to commit"
             exit 0
           }
-          # Retry push up to 3 times in case of concurrent commits.
-          for attempt in 1 2 3; do
-            if git push origin HEAD:${{ github.ref_name }}; then
+          # Retry push up to 5 times in case of concurrent commits.
+          # Each retry: re-fetch, reset to origin, re-apply our docs commit.
+          for attempt in 1 2 3 4 5; do
+            if git push origin "HEAD:${{ github.ref_name }}"; then
               echo "Pushed on attempt $attempt"
               exit 0
             fi
-            echo "Push failed (attempt $attempt) — pulling rebase and retrying"
-            git pull --rebase origin ${{ github.ref_name }} || true
-            sleep $((attempt * 2))
+            echo "Push failed (attempt $attempt) — re-syncing with origin"
+            cp docs/listings.json /tmp/published/listings.json
+            [ -f docs/run_health.json ] && cp docs/run_health.json /tmp/published/run_health.json
+            git fetch origin "${{ github.ref_name }}"
+            git reset --hard "origin/${{ github.ref_name }}"
+            mv /tmp/published/listings.json docs/listings.json
+            [ -f /tmp/published/run_health.json ] && mv /tmp/published/run_health.json docs/run_health.json
+            if git diff --quiet docs/; then
+              echo "After re-sync: no diff vs latest origin (someone else published) — done"
+              exit 0
+            fi
+            git add docs/listings.json docs/run_health.json 2>/dev/null || true
+            git commit -m "weekly: refresh dashboard data ($(date -u +%Y-%m-%d))" || true
+            sleep $((attempt * 3))
           done
-          echo "::error::Failed to publish dashboard data after 3 attempts"
+          echo "::error::Failed to publish dashboard data after 5 attempts; artifact still downloadable from run page (listings-${{ github.run_id }})"
           exit 1
 
       - name: Upload run log

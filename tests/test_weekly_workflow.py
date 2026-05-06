@@ -70,6 +70,43 @@ def test_workflow_uploads_run_log_artifact():
     assert upload.get("if") == "always()", "log upload must run even on failure"
 
 
+def test_workflow_backs_up_listings_before_publish():
+    """The 2026-05-06 incident: Run #14 finished its scrape work, wrote
+    docs/listings.json on the runner, but the publish step failed due to
+    a git conflict. The listings.json was on ephemeral runner storage
+    only (not in the run-log artifact), so ~3 hours of work was lost.
+    This step uploads listings.json BEFORE publish so a publish failure
+    can never lose the data again."""
+    y = _load()
+    steps = y["jobs"]["scrape"]["steps"]
+    backup = next((s for s in steps
+                   if "Backup listings to artifact" in s.get("name", "")), None)
+    assert backup is not None, "no listings-backup step before publish"
+    assert backup.get("if") == "always()"
+    # Must run BEFORE the publish step
+    publish_idx = next(i for i, s in enumerate(steps)
+                       if "Publish dashboard data" in s.get("name", ""))
+    backup_idx = steps.index(backup)
+    assert backup_idx < publish_idx, "backup must run BEFORE publish"
+
+
+def test_workflow_publish_handles_concurrent_commits():
+    """The publish step must survive other commits landing during the run
+    (the Run #14 failure mode). Strategy: re-fetch + reset + re-apply
+    docs commit on each retry, with at least 5 attempts."""
+    y = _load()
+    steps = y["jobs"]["scrape"]["steps"]
+    publish = next((s for s in steps
+                    if "Publish dashboard data" in s.get("name", "")), None)
+    assert publish is not None
+    cmd = publish.get("run", "")
+    assert "git fetch origin" in cmd
+    assert "git reset --hard" in cmd
+    # At least 5 retry attempts
+    for n in ("1", "2", "3", "4", "5"):
+        assert n in cmd, f"retry attempt {n} not present"
+
+
 def test_workflow_passes_required_secrets_as_env():
     """The audit identified missing env wiring for ANTHROPIC_API_KEY,
     COURTLISTENER_TOKEN, RENTCAST_API_KEY, FORECLOSURE_DOT_COM_*. These
