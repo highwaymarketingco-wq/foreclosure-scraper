@@ -205,7 +205,38 @@ async def _fuzzy_partial_search(
 
 
 async def enrich_with_aggressive_address(listings: list[Listing]) -> None:
-    """Last-resort address recovery."""
+    """Last-resort address recovery — HARD-CAPPED.
+
+    Cost math that motivates the caps below:
+      For each unaddressed listing, this enrichment hits every county GIS
+      in the listing's state (NC=14 counties, SC=46 counties), and for each
+      county runs 3 owner-name search permutations (multi-token, reversed,
+      single-longest-token). With 100+ unaddressed listings × 46 SC layers
+      × 3 permutations = 13,800+ HTTP queries. Even at 0.5s each that's
+      almost 2 hours, and many GIS endpoints take 1-3s.
+
+      Run #16 hit this exact failure mode: aggressive_address ran 3h 21m
+      on a single step before user cancelled. There was no wall-clock
+      cap, no per-listing timeout, no max-targets cap.
+
+    Caps now enforced:
+      * MAX_TARGETS — at most this many listings get the aggressive
+        treatment per run (highest-priority by sale_date / opening_bid).
+      * WALL_CLOCK_LIMIT_S — total wall-clock budget for this enrichment.
+        On expiry, every in-flight task is cancelled cleanly and the
+        pipeline moves on; partial successes are kept.
+      * PER_LISTING_TIMEOUT_S — single listing can't burn more than this.
+
+    Tunable via env vars: AGGRESSIVE_ADDR_MAX_TARGETS,
+    AGGRESSIVE_ADDR_WALL_CLOCK_S, AGGRESSIVE_ADDR_PER_LISTING_S.
+    """
+    import os
+    from datetime import datetime as _dt
+
+    MAX_TARGETS = int(os.environ.get("AGGRESSIVE_ADDR_MAX_TARGETS", "30"))
+    WALL_CLOCK_LIMIT_S = float(os.environ.get("AGGRESSIVE_ADDR_WALL_CLOCK_S", "480"))
+    PER_LISTING_TIMEOUT_S = float(os.environ.get("AGGRESSIVE_ADDR_PER_LISTING_S", "30"))
+
     targets = [
         li for li in listings
         if not li.street_address
@@ -217,7 +248,29 @@ async def enrich_with_aggressive_address(listings: list[Listing]) -> None:
         log.info("aggressive_addr.no_targets")
         return
 
-    log.info("aggressive_addr.start", target_count=len(targets))
+    # Prioritize: soonest-sale-date first, then highest opening_bid. The
+    # cap is a budget, so we want the listings most likely to matter.
+    targets.sort(key=lambda li: (
+        li.sale_date or _dt.max,
+        -(li.opening_bid or 0.0),
+    ))
+
+    total_targets = len(targets)
+    if len(targets) > MAX_TARGETS:
+        log.warning(
+            "aggressive_addr.target_cap_applied",
+            had=len(targets), keeping=MAX_TARGETS,
+            note="prioritized by soonest-sale and highest-bid",
+        )
+        targets = targets[:MAX_TARGETS]
+
+    log.info(
+        "aggressive_addr.start",
+        target_count=len(targets),
+        of_total=total_targets,
+        wall_clock_limit_s=WALL_CLOCK_LIMIT_S,
+        per_listing_timeout_s=PER_LISTING_TIMEOUT_S,
+    )
 
     sem = asyncio.Semaphore(4)
     cache: dict[str, Optional[str]] = {}
@@ -226,44 +279,85 @@ async def enrich_with_aggressive_address(listings: list[Listing]) -> None:
         "all_state_match": 0,
         "fuzzy_partial_match": 0,
         "no_match": 0,
+        "per_listing_timeout": 0,
+        "wall_clock_cancelled": 0,
     }
 
     async def one(c: httpx.AsyncClient, li: Listing) -> None:
         async with sem:
             counts["queried"] += 1
-
-            # If the case number authoritatively pins the property's county
-            # (SC lis pendens case numbers always do — venue follows situs by
-            # statute), skip the cross-county scan entirely. A same-name owner
-            # match in any other county is by definition the wrong person /
-            # wrong parcel for this case. The previous-tier address_backfill
-            # enrichment already searched the pinned county; if it didn't
-            # match there, no amount of scanning *other* counties helps.
-            case_pinned = _case_pins_county(li)
-
-            # Tier A: scan all counties in state — skipped when case-pinned
-            if not case_pinned:
-                attrs = await _aggressive_owner_search(c, li, cache)
-                if attrs:
-                    if attrs.get("_matched_county") and not li.street_address:
-                        li.county = attrs["_matched_county"]
-                    _populate_from_attrs(li, attrs)
-                    if li.street_address:
-                        counts["all_state_match"] += 1
-                        return
-
-            # Tier B: fuzzy partial match in stated county (always safe — same
-            # county as the listing's case-pinned or scraper-assigned tag)
-            attrs = await _fuzzy_partial_search(c, li, cache)
-            if attrs:
-                _populate_from_attrs(li, attrs)
-                if li.street_address:
-                    counts["fuzzy_partial_match"] += 1
-                    return
-
-            counts["no_match"] += 1
+            try:
+                # Per-listing timeout: each listing gets at most this much
+                # wall-clock budget. Without this, ONE slow GIS could
+                # monopolize the run (and they often do — SCDOT's MapServer
+                # 4 has been observed at 30+s per query during business
+                # hours).
+                await asyncio.wait_for(
+                    _run_one_listing(c, li, cache, counts),
+                    timeout=PER_LISTING_TIMEOUT_S,
+                )
+            except asyncio.TimeoutError:
+                counts["per_listing_timeout"] += 1
+                log.debug(
+                    "aggressive_addr.per_listing_timeout",
+                    case=li.case_number, defendant=li.defendant,
+                )
+            except asyncio.CancelledError:
+                counts["wall_clock_cancelled"] += 1
+                raise
 
     async with client(timeout=20.0) as c:
-        await asyncio.gather(*(one(c, li) for li in targets))
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*(one(c, li) for li in targets)),
+                timeout=WALL_CLOCK_LIMIT_S,
+            )
+        except asyncio.TimeoutError:
+            log.warning(
+                "aggressive_addr.wall_clock_exceeded",
+                limit_s=WALL_CLOCK_LIMIT_S,
+                queried_so_far=counts["queried"],
+                completed=counts["all_state_match"] + counts["fuzzy_partial_match"],
+            )
 
     log.info("aggressive_addr.done", **counts)
+
+
+async def _run_one_listing(
+    c: httpx.AsyncClient,
+    li: Listing,
+    cache: dict[str, Optional[str]],
+    counts: dict[str, int],
+) -> None:
+    """Single-listing body extracted so it can be wrapped with a per-listing
+    timeout cleanly."""
+    # If the case number authoritatively pins the property's county
+    # (SC lis pendens case numbers always do — venue follows situs by
+    # statute), skip the cross-county scan entirely. A same-name owner
+    # match in any other county is by definition the wrong person /
+    # wrong parcel for this case. The previous-tier address_backfill
+    # enrichment already searched the pinned county; if it didn't
+    # match there, no amount of scanning *other* counties helps.
+    case_pinned = _case_pins_county(li)
+
+    # Tier A: scan all counties in state — skipped when case-pinned
+    if not case_pinned:
+        attrs = await _aggressive_owner_search(c, li, cache)
+        if attrs:
+            if attrs.get("_matched_county") and not li.street_address:
+                li.county = attrs["_matched_county"]
+            _populate_from_attrs(li, attrs)
+            if li.street_address:
+                counts["all_state_match"] += 1
+                return
+
+    # Tier B: fuzzy partial match in stated county (always safe — same
+    # county as the listing's case-pinned or scraper-assigned tag)
+    attrs = await _fuzzy_partial_search(c, li, cache)
+    if attrs:
+        _populate_from_attrs(li, attrs)
+        if li.street_address:
+            counts["fuzzy_partial_match"] += 1
+            return
+
+    counts["no_match"] += 1
