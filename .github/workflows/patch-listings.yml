@@ -1,0 +1,109 @@
+name: Patch listings (re-Vision + recompute, no full pipeline)
+
+# Manually-triggered targeted patch. Use this when the most-recent
+# weekly run finished but specific listings have stale data (most often:
+# Vision was rate-limited or out of credits when those listings were
+# processed, so they kept their pre-fix condition_tier).
+#
+# Runs in ~10-20 minutes vs. ~2 hours for a full pipeline.
+#
+# What it does:
+#   * Loads the current docs/listings.json
+#   * Re-runs Vision on listings whose stored _n_photos < current photo
+#     count (the Marietta-style "Vision saw only 1 photo, returned 'gut'
+#     when the property has 6 photos and would've returned 'major'").
+#   * Re-runs validation gate (state↔county, parcel, comp, numeric bounds)
+#   * Re-runs calc + grade + data_quality on every listing
+#   * Re-runs judgment_amount text-mining
+#   * Writes back docs/listings.json + appends a "patches" entry to
+#     docs/run_health.json
+#   * Commits and pushes back to the branch
+#
+# Cost: only Vision API calls (~$0.01-0.03 per re-Vision; typically <$10).
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      LOG_LEVEL: INFO
+      PYTHONUNBUFFERED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Pin Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen || uv sync
+
+      - name: Run patch
+        run: uv run python scripts/patch_listings.py
+
+      - name: Verify patch produced an artifact
+        run: |
+          test -f docs/listings.json || { echo "::error::docs/listings.json missing after patch"; exit 1; }
+          echo "Patched listings size: $(wc -c < docs/listings.json) bytes"
+
+      - name: Publish patched dashboard data back to repo
+        run: |
+          set -eu
+          if git diff --quiet docs/; then
+            echo "No changes in docs/ — patch had no effect"
+            exit 0
+          fi
+          git config user.name "foreclosure-scraper-bot"
+          git config user.email "actions@github.com"
+          git add docs/listings.json docs/run_health.json 2>/dev/null || true
+          git commit -m "patch: refresh stale Vision + recompute calc ($(date -u +%Y-%m-%d-%H%M))" || {
+            echo "Nothing to commit"
+            exit 0
+          }
+          for attempt in 1 2 3; do
+            if git push origin HEAD:${{ github.ref_name }}; then
+              echo "Pushed on attempt $attempt"
+              exit 0
+            fi
+            git pull --rebase origin ${{ github.ref_name }} || true
+            sleep $((attempt * 2))
+          done
+          echo "::error::Failed to publish patched data after 3 attempts"
+          exit 1
+
+      - name: Surface patch summary in workflow summary
+        if: always()
+        run: |
+          if [ -f docs/run_health.json ]; then
+            uv run python - <<'PY' >> $GITHUB_STEP_SUMMARY
+          import json, pathlib
+          h = json.loads(pathlib.Path("docs/run_health.json").read_text())
+          patches = h.get("patches") or []
+          if patches:
+              p = patches[-1]
+              print("### Patch applied")
+              print(f"**Applied at:** {p.get('applied_at')}")
+              print(f"**Listings after patch:** {p.get('total_listings_after_patch')}")
+              print(f"**Vision:** {p.get('vision')}")
+              print(f"**Validation:** {p.get('validation')}")
+              print(f"**Data quality:** {p.get('data_quality')}")
+          else:
+              print("### Patch ran but produced no entry")
+          PY
+          fi

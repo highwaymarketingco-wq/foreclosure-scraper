@@ -467,5 +467,46 @@
       "no_sqft": 293,
       "no_address": 0
     }
-  }
+  },
+  "patches": [
+    {
+      "applied_at": "2026-05-06T03:50:34.073907+00:00",
+      "vision": {
+        "queried": 0,
+        "overrides": 0,
+        "cost_estimate_usd": 0,
+        "skipped_no_key": 544
+      },
+      "validation": {
+        "county_normalized": 0,
+        "county_nulled_cross_state": 0,
+        "parcel_nulled_too_short": 0,
+        "parcel_nulled_bad_pattern": 0,
+        "opening_bid_zeroed": 0,
+        "opening_bid_too_large": 0,
+        "tax_value_too_low": 0,
+        "tax_value_too_large": 0,
+        "sqft_out_of_range": 0,
+        "year_built_out_of_range": 0,
+        "bedrooms_out_of_range": 0,
+        "bathrooms_out_of_range": 0,
+        "comps_dropped_price": 0,
+        "comps_dropped_kind_mismatch": 0
+      },
+      "data_quality": {
+        "synthetic_address": 77,
+        "approximate_address": 30,
+        "low_arv_confidence": 156,
+        "no_sqft": 293,
+        "no_address": 0
+      },
+      "judgment_amount": {
+        "scanned": 841,
+        "matched": 0,
+        "already_set": 0
+      },
+      "valuation_failures": 0,
+      "total_listings_after_patch": 841
+    }
+  ]
 }
