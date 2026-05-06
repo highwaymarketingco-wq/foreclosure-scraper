@@ -98,6 +98,22 @@ DATELESS_OK_SOURCES = {
     "counties.nod_discovery",                   # ROD-discovered NOD recordings
     "national.courtlistener_bankruptcy",        # Ch 7/11/13 federal bankruptcy filings
     "counties_sc.sc_tax_delinquent",            # delinquent property tax / pre-tax-sale
+    # 2026-05 expansion — new sources added in this PR. Without these
+    # entries, _active_only would drop their listings whenever sale_date
+    # is missing (which is most of the time for monthly/annual cadence).
+    "counties_sc.sc_courtrosters",                # SC MIE rosters (monthly)
+    "counties_nc.wake_tax",                       # annual tax-foreclosure auctions
+    "counties_nc.forsyth_tax",
+    "counties_nc.guilford_tax",
+    "counties_nc.new_hanover_tax",
+    "counties_nc.durham_tax",
+    "counties_nc.nc_rod_substitute_trustee",      # ROD substitute-trustee deed filings
+    "reo.usda_rd",                                # USDA Rural Development resale REO
+    "reo.treasury_seized",                        # Treasury seized real property
+    "reo.vrm_va_reo",                             # VRM Properties (VA REO)
+    "city_websites.charlotte_demolition",         # demolition orders (distress signal)
+    "national.courtlistener_civil",               # federal civil real-property cases
+    "national.courtlistener_adversary",           # CL bankruptcy lift-stay / 363 sale
 }
 
 
