@@ -12,7 +12,7 @@ from typing import Any
 
 import structlog
 
-from .budget import actor_cost, ensure_budget
+from .budget import actor_cost, ensure_budget, is_free_tier
 from .http_client import client
 
 log = structlog.get_logger()
@@ -53,6 +53,15 @@ async def run_actor_sync(
         log.warning("apify.no_token", actor=actor_id)
         return []
     cost = estimated_cost_usd if estimated_cost_usd is not None else actor_cost(actor_id)
+    # Hard off-switch: APIFY_FREE_TIER_ONLY=1 means "no paid Apify calls,
+    # period" — independent of plan-credit remaining. The workflow sets this
+    # by default; without this gate, ensure_budget() only blocks once credit
+    # is nearly exhausted, allowing rag-web-browser to flood at $0.10/call
+    # for the first ~290 court-record / city-site / SC-public-index lookups
+    # before any cap fires. Free actors (cost=0) still allowed through.
+    if cost > 0 and is_free_tier():
+        log.warning("apify.skipped_free_tier", actor=actor_id, cost=cost)
+        return []
     if not await ensure_budget(cost, token=token):
         log.warning("apify.skipped_budget", actor=actor_id, cost=cost)
         return []
