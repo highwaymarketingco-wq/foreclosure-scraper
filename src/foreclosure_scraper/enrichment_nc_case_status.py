@@ -50,6 +50,44 @@ STATUS_MAP = [
 ]
 
 
+# Sold-price patterns observed in NC eCourts docket text. Tyler displays
+# Order Confirming Sale / Report of Sale entries with the hammer price
+# inline. Patterns ordered most-specific first.
+SOLD_PRICE_PATTERNS = [
+    # "high bid of $123,456.78" / "high bid: $X"
+    re.compile(r"high\s+bid(?:\s+of)?\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "sold to ABC LLC for $X" / "sold for $X"
+    re.compile(r"sold\s+(?:to\s+[^$\n]{1,80}?\s+)?for\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "purchase price $X" / "purchased for $X"
+    re.compile(r"purchas(?:e\s+price|ed\s+for)\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "amount of $X" near "confirm" / "report of sale"
+    re.compile(r"(?:confirm[a-z]*|report\s+of\s+sale)[^\n$]{0,80}\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "successful bid $X" / "winning bid $X"
+    re.compile(r"(?:successful|winning)\s+bid\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "Sale Price: $X"
+    re.compile(r"sale\s+price\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+]
+
+
+def _extract_sold_price(text: str) -> Optional[float]:
+    """Pull a credible hammer price from rendered case-detail text.
+    Returns None when no pattern matches or the value is implausible
+    (<$100 or >$10M)."""
+    if not text:
+        return None
+    for pat in SOLD_PRICE_PATTERNS:
+        m = pat.search(text)
+        if not m:
+            continue
+        try:
+            v = float(m.group(1).replace(",", ""))
+        except ValueError:
+            continue
+        if 100 <= v <= 10_000_000:
+            return v
+    return None
+
+
 def _normalize_status(text: str) -> Optional[str]:
     if not text:
         return None
@@ -132,6 +170,14 @@ async def _check_case(case_number: str) -> Optional[dict]:
     info["in_upset_bid_window"] = status == "upset_bid" or (
         status == "sold" and last_event and _within_10_days(last_event[0])
     )
+
+    # Hammer price: extract from the docket text when status indicates a
+    # sale already happened (sold / confirmed / upset_bid). Routes the
+    # listing into the sold-comp pool if a price was found.
+    if status in ("sold", "confirmed", "upset_bid"):
+        sold_price = _extract_sold_price(html)
+        if sold_price is not None:
+            info["sold_price"] = sold_price
     return info
 
 
@@ -190,7 +236,8 @@ async def enrich_with_nc_case_status(
     log.info("nc_case_status.start", target_count=len(targets))
 
     sem = asyncio.Semaphore(concurrency)
-    counts = {"checked": 0, "tagged": 0, "in_upset_bid": 0}
+    counts = {"checked": 0, "tagged": 0, "in_upset_bid": 0,
+              "sold_price_extracted": 0, "promoted_to_sold_comp": 0}
 
     async def one(li: Listing) -> None:
         async with sem:
@@ -204,6 +251,32 @@ async def enrich_with_nc_case_status(
             counts["tagged"] += 1
             if info.get("in_upset_bid_window"):
                 counts["in_upset_bid"] += 1
+
+            # Hammer-price promotion: if the case-detail page surfaced a
+            # sold price AND the case is in a sale-completed state, tag
+            # raw.actual_sold_price + set sale_date so the orchestrator's
+            # post-enrichment "promote to sold pool" pass can route this
+            # listing into the foreclosure_sold_comps pool.
+            sold_price = info.get("sold_price")
+            if sold_price and info.get("status") in ("sold", "confirmed", "upset_bid"):
+                li.raw["actual_sold_price"] = sold_price
+                counts["sold_price_extracted"] += 1
+                # Set sale_date from last_event_date so the comp pool
+                # has the right anchor (vs whatever sale_date the
+                # original lis pendens scraper assigned).
+                last_date = info.get("last_event_date")
+                if last_date:
+                    for fmt in ("%m/%d/%Y", "%m/%d/%y"):
+                        try:
+                            li.sale_date = datetime.strptime(last_date, fmt)
+                            break
+                        except ValueError:
+                            continue
+                # Mark for promotion logging
+                li.raw.setdefault("nc_case_status", {})[
+                    "promoted_to_sold_comp"
+                ] = True
+                counts["promoted_to_sold_comp"] += 1
 
     await asyncio.gather(*(one(li) for li in targets))
     log.info("nc_case_status.done", **counts)

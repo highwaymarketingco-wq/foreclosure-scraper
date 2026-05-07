@@ -682,6 +682,32 @@ async def run() -> int:
     # Match active listings to sold-pool comps (per-county, like-for-like
     # by property_kind / beds / sqft). Each matched listing gets
     # raw.foreclosure_sold_comps + raw.foreclosure_sold_comp_summary.
+    # Promote-to-sold-pool pass: any active listing whose enrichment
+    # surfaced raw.actual_sold_price (e.g. NC eCourts case-status detected
+    # an Order Confirming Sale with hammer price) should move from the
+    # active pipeline into the sold-comp pool BEFORE the matcher runs.
+    # Without this pass, those listings would carry an actual_sold_price
+    # that nothing else uses since they're still in `enriched`.
+    try:
+        promoted = []
+        kept_enriched = []
+        for li in enriched:
+            raw = li.raw if isinstance(li.raw, dict) else {}
+            if isinstance(raw.get("actual_sold_price"), (int, float)) \
+                    and raw.get("nc_case_status", {}).get("promoted_to_sold_comp"):
+                promoted.append(li)
+            else:
+                kept_enriched.append(li)
+        if promoted:
+            log.info("orchestrator.promoted_to_sold_pool",
+                     count=len(promoted),
+                     reason="nc_case_status surfaced hammer price on Order Confirming Sale")
+            enriched = kept_enriched
+            sold_pool = sold_pool + promoted
+    except Exception:
+        log.error("promote_to_sold_pool.failed",
+                  traceback=traceback.format_exc())
+
     try:
         from .enrichment_foreclosure_sold_comps import (
             enrich_foreclosure_sold_comps,
