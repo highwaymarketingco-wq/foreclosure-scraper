@@ -33,6 +33,87 @@ MONTH_HEADER_RE = re.compile(
     re.I,
 )
 
+# Sold-price patterns commonly used in SC MIE results PDFs. Order
+# matters — most-specific first.
+SOLD_PRICE_PATTERNS = [
+    # "High Bid: $45,000" / "high bid of $45,000"
+    re.compile(r"high\s+bid(?:\s+of)?\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "Sold for $45,000" / "Sold to XYZ LLC for $45,000" — the buyer
+    # can be multi-word, so we match anything up to "for $" non-greedily,
+    # but cap the gap to ~80 chars so we don't bridge across cases.
+    re.compile(r"sold\s+(?:to\s+[^$\n]{1,80}?\s+)?for\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "Final Bid: $45,000"
+    re.compile(r"final\s+bid\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "Bid Amount: $45,000" / "Successful Bid: $45,000"
+    re.compile(r"(?:successful\s+)?bid\s+amount\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "Sale Price: $45,000"
+    re.compile(r"sale\s+price\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
+    # "$45,000 SOLD" — money-amount immediately followed by SOLD keyword
+    re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)\s+SOLD\b", re.I),
+]
+
+# Phrases indicating an upset bid was filed (Pickens results sometimes
+# show successive upset bids; we want the FINAL one).
+UPSET_BID_RE = re.compile(
+    r"(?:upset|upset\s+bid|advanced\s+bid)\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)",
+    re.I,
+)
+
+# Result-status words. If the chunk has "WITHDRAWN" / "POSTPONED" /
+# "DISMISSED" we don't trust the sold price (no actual sale happened).
+NON_SALE_STATUS_RE = re.compile(
+    r"\b(WITHDRAWN|POSTPONED|DISMISSED|RESCINDED|CANCELLED|CANCELED|"
+    r"NO\s+SALE|NOT\s+SOLD|NO\s+BID)\b",
+    re.I,
+)
+
+
+def _is_results_pdf(url: str, label: str = "") -> bool:
+    """RESULTS PDFs report past sales (with sold prices). Upcoming-sale
+    rosters list scheduled sales with opening bids only. The link label
+    + URL fragment both reliably mark RESULTS PDFs at Pickens."""
+    haystack = f"{url} {label}".upper()
+    return "RESULTS" in haystack
+
+
+def _extract_sold_price(chunk: str) -> tuple[float | None, str]:
+    """Parse the highest credible sold-price figure from a Pickens
+    RESULTS-PDF chunk. Prefers explicit upset-bid (final hammer) over
+    the initial bid when multiple amounts appear in the same chunk.
+
+    Returns (price, source_pattern_name). Price is None when:
+      * No matching pattern found
+      * Chunk has a NON_SALE_STATUS marker (withdrawn/postponed/etc.)
+      * Parsed amount is implausible (<$100 or >$10M)
+    """
+    if NON_SALE_STATUS_RE.search(chunk):
+        return None, "non_sale_status"
+
+    # Upset bids are always the final word — prefer them when present.
+    upset_amounts = []
+    for m in UPSET_BID_RE.finditer(chunk):
+        try:
+            upset_amounts.append(float(m.group(1).replace(",", "")))
+        except ValueError:
+            continue
+    if upset_amounts:
+        amt = max(upset_amounts)  # final upset is the largest
+        if 100 <= amt <= 10_000_000:
+            return amt, "upset_bid"
+
+    for pat in SOLD_PRICE_PATTERNS:
+        m = pat.search(chunk)
+        if not m:
+            continue
+        try:
+            amt = float(m.group(1).replace(",", ""))
+        except ValueError:
+            continue
+        if 100 <= amt <= 10_000_000:
+            return amt, pat.pattern[:30]
+
+    return None, "no_match"
+
 
 def _extract_pdf_text(data: bytes) -> str:
     try:
@@ -125,7 +206,9 @@ class PickensMasterInEquity(BaseScraper):
             # Cap at top 6 (covers ~6 months of monthly rosters)
             future_pdfs = future_pdfs[:6]
 
-            for url, sale_d in future_pdfs[:3]:
+            # Track which PDFs are RESULTS (past sales w/ prices) vs upcoming
+            # rosters. Carries through to the chunk loop so we can tag listings.
+            for url, sale_d in future_pdfs[:6]:  # bumped 3 -> 6 so we get more results PDFs
                 try:
                     r = await c.get(url, headers={"Referer": PAGE_URL})
                     if r.status_code != 200 or not r.content[:4] == b"%PDF":
@@ -135,6 +218,8 @@ class PickensMasterInEquity(BaseScraper):
                     continue
                 if not text:
                     continue
+
+                is_results = _is_results_pdf(url)
 
                 # Extract a per-document sale date from the PDF header if any
                 doc_date = sale_d
@@ -155,6 +240,19 @@ class PickensMasterInEquity(BaseScraper):
                     if not case_m:
                         continue
                     addr_m = ADDR_RE.search(chunk)
+
+                    # RESULTS-PDF specifics: extract sold price + tag as
+                    # foreclosure-sale RESULT (already past, in the sold pool).
+                    sold_price = None
+                    sold_source_pattern = None
+                    raw_extras: dict = {}
+                    if is_results:
+                        sold_price, sold_source_pattern = _extract_sold_price(chunk)
+                        if sold_price is not None:
+                            raw_extras["actual_sold_price"] = sold_price
+                            raw_extras["sold_price_pattern"] = sold_source_pattern
+                            raw_extras["sale_result_pdf"] = url
+
                     out.append(
                         Listing(
                             source=self.slug,
@@ -166,9 +264,20 @@ class PickensMasterInEquity(BaseScraper):
                             county="Pickens",
                             case_number=case_m.group(0),
                             sale_date=doc_date,
+                            opening_bid=sold_price,  # also surface as opening_bid so calc/dashboard reads it
                             description=chunk[:500],
                             first_seen=datetime.utcnow(),
                             last_seen=datetime.utcnow(),
+                            raw=(
+                                {
+                                    # actual_sold_price at top level so
+                                    # enrichment_foreclosure_sold_comps reads it
+                                    # via _opening_or_judgment.
+                                    "actual_sold_price": raw_extras["actual_sold_price"],
+                                    "pickens_mie": raw_extras,
+                                }
+                                if raw_extras else {}
+                            ),
                         )
                     )
         return out

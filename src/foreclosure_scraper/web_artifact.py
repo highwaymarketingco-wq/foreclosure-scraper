@@ -73,6 +73,10 @@ RAW_KEEP = {
     "geo_attribution": "*",           # 'state-only' marker for unattributed BK listings
     "foreclosure_sold_comps": "*",    # Per-listing like-for-like recently-sold foreclosure comps
     "foreclosure_sold_comp_summary": "*",  # County-level sold-comp rollup
+    "actual_sold_price": "*",         # Real hammer price (Pickens MIE results PDFs etc.)
+    "pickens_mie": "*",               # Pickens MIE results PDF parse provenance
+    "anderson_mie_results": "*",      # Anderson MIE Sale-Results parse provenance
+    "spartanburg_pdf": "*",           # Spartanburg MIE PDF parse provenance (now includes is_results_pdf)
 }
 
 

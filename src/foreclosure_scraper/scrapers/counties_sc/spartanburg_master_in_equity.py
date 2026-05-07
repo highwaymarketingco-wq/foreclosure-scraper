@@ -49,6 +49,14 @@ BID_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
 CANCEL_RE = re.compile(r"(√|✓|cancelled|withdrawn|WD\b)", re.I)
 
 
+def _is_results_pdf(url: str) -> bool:
+    """The 3392/Sale-Results and 11824/Deficiency-Sale PDFs are RESULTS
+    PDFs — past-sale data with hammer prices. Other monthly roster PDFs
+    are upcoming."""
+    return ("sale-results" in url.lower() or
+            "deficiency-sale" in url.lower())
+
+
 def _parse_pdf_tables(data: bytes, source_url: str) -> list[Listing]:
     """Use pdfplumber.extract_tables() — preserves the 9-column row structure:
        [#, Status, Case#, Attorney, Plaintiff, Defendant+Address, Bid, BidBy, Cancelled]
@@ -58,6 +66,7 @@ def _parse_pdf_tables(data: bytes, source_url: str) -> list[Listing]:
         import pdfplumber
     except ImportError:
         return out
+    is_results = _is_results_pdf(source_url)
     try:
         with pdfplumber.open(io.BytesIO(data)) as pdf:
             full_text = "\n".join((p.extract_text() or "") for p in pdf.pages)
@@ -69,9 +78,18 @@ def _parse_pdf_tables(data: bytes, source_url: str) -> list[Listing]:
                 except (ValueError, TypeError):
                     pass
 
+            # Date-window check: upcoming sales must be within the 120-day
+            # forward horizon. RESULTS PDFs (Sale-Results.pdf,
+            # Deficiency-Sale.pdf) report past sales — accept up to 180
+            # days back so they reach the foreclosure_sold_comps pool.
+            # Without this branch the scraper was silently emptying the
+            # results PDFs and we never saw the hammer prices.
             today = datetime.utcnow()
             horizon = today + timedelta(days=120)
-            cutoff = today - timedelta(days=2)
+            if is_results:
+                cutoff = today - timedelta(days=180)
+            else:
+                cutoff = today - timedelta(days=2)
             if doc_sale_date and not (cutoff <= doc_sale_date <= horizon):
                 return []
 
@@ -123,6 +141,21 @@ def _parse_pdf_tables(data: bytes, source_url: str) -> list[Listing]:
                             except ValueError:
                                 pass
 
+                        # Build raw payload — when this is a RESULTS PDF
+                        # AND we captured a bid, surface as actual_sold_price
+                        # at top level so enrichment_foreclosure_sold_comps
+                        # treats it as confirmed hammer price (not just an
+                        # opening-bid floor).
+                        raw_payload = {"spartanburg_pdf": {
+                            "status": status,
+                            "attorney": attorney,
+                            "bid_by": (row[7] or "").strip() if len(row) > 7 else None,
+                            "doc_sale_date": doc_sale_date.isoformat() if doc_sale_date else None,
+                            "is_results_pdf": is_results,
+                        }}
+                        if is_results and bid is not None:
+                            raw_payload["actual_sold_price"] = bid
+
                         out.append(
                             Listing(
                                 source="counties_sc.spartanburg_master_in_equity",
@@ -141,12 +174,7 @@ def _parse_pdf_tables(data: bytes, source_url: str) -> list[Listing]:
                                 auction_status=status.lower() if status else "active",
                                 first_seen=datetime.utcnow(),
                                 last_seen=datetime.utcnow(),
-                                raw={"spartanburg_pdf": {
-                                    "status": status,
-                                    "attorney": attorney,
-                                    "bid_by": (row[7] or "").strip() if len(row) > 7 else None,
-                                    "doc_sale_date": doc_sale_date.isoformat() if doc_sale_date else None,
-                                }},
+                                raw=raw_payload,
                             )
                         )
     except Exception:
