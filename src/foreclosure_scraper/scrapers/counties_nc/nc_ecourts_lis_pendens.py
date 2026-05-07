@@ -53,17 +53,21 @@ log = structlog.get_logger()
 SERVICE_URL = "https://portal-nc.tylertech.cloud/app/NCJudgmentSearchService/search"
 APP_BASE = "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/"
 
-# 14 target counties — Tyler indexes them as "<County> District Court" / "<County> Superior Court"
+# Target counties for the eCourts judgment search. Must mirror
+# config.NC_COUNTIES — Tyler indexes them as "<County> District Court" /
+# "<County> Superior Court". 2026-05-07: pruned the eastern-NC
+# expansion (Wake / Forsyth / Guilford / Durham / Cumberland / Alamance /
+# Iredell / Cabarrus / Union NC / Pitt / Johnston) per user direction —
+# those counties are 1.5-4 hours east of the upstate-SC / WNC target
+# corridor. Brunswick added per user key list (coastal NC, with
+# New Hanover + Onslow).
 TARGET_COUNTIES = [
-    # Original WNC + Charlotte metro footprint
+    # WNC mountains + foothills + Charlotte metro
     "Rutherford", "Cleveland", "Henderson", "Polk", "Gaston", "Mecklenburg",
     "Buncombe", "Transylvania", "McDowell", "Lincoln", "Madison", "Yancey",
     "Mitchell", "Burke",
-    # High-volume NC foreclosure metros added 2026-05 per source-coverage
-    # research. Each has its own ROD + clerk of court SP docket; the
-    # statewide eCourts judgment search picks up filings from all of them.
-    "Wake", "Forsyth", "Guilford", "Durham", "Cumberland", "New Hanover",
-    "Alamance", "Iredell", "Cabarrus", "Union", "Onslow", "Pitt", "Johnston",
+    # User-key coastal NC counties (Wilmington area + Onslow)
+    "New Hanover", "Brunswick", "Onslow",
 ]
 
 

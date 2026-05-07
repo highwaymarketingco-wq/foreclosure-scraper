@@ -580,6 +580,92 @@
         "address_nulled": 9,
         "no_case_decode": 1798
       }
+    },
+    {
+      "kind": "scope_rollback",
+      "applied_at": "2026-05-07T03:50:39.679528Z",
+      "note": "2026-05-07 \u2014 pruned eastern-NC scope per user direction. Removed Wake/Forsyth/Guilford/Durham/Cumberland/Alamance/Iredell/Cabarrus/Union NC/Pitt/Johnston from NC_COUNTIES + nc_ecourts TARGET_COUNTIES. Brunswick added.",
+      "dropped_count": 843,
+      "kept_count": 1773,
+      "dropped_top_counties": [
+        [
+          [
+            "Wake",
+            "NC"
+          ],
+          190
+        ],
+        [
+          [
+            "Guilford",
+            "NC"
+          ],
+          141
+        ],
+        [
+          [
+            "Cumberland",
+            "NC"
+          ],
+          138
+        ],
+        [
+          [
+            "Forsyth",
+            "NC"
+          ],
+          110
+        ],
+        [
+          [
+            "Durham",
+            "NC"
+          ],
+          81
+        ],
+        [
+          [
+            "Johnston",
+            "NC"
+          ],
+          42
+        ],
+        [
+          [
+            "Iredell",
+            "NC"
+          ],
+          42
+        ],
+        [
+          [
+            "Pitt",
+            "NC"
+          ],
+          37
+        ],
+        [
+          [
+            "Alamance",
+            "NC"
+          ],
+          28
+        ],
+        [
+          [
+            "Union",
+            "NC"
+          ],
+          17
+        ],
+        [
+          [
+            "Cabarrus",
+            "NC"
+          ],
+          17
+        ]
+      ]
     }
   ]
 }

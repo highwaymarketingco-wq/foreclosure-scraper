@@ -99,11 +99,12 @@ log = structlog.get_logger()
 # the commit that landed the fix.
 KNOWN_FIXED = (
     "counties_nc.nc_ecourts_lis_pendens",   # 1bf92a9: sale_date=None fix
-    "counties_nc.wake_tax",                 # 3ee745c: paragraph parser
-    "counties_nc.forsyth_tax",              # 3ee745c
+    # Tax-foreclosure scrapers paired with the paragraph-fallback parser
+    # in 3ee745c. Only the ones whose counties are still in scope after
+    # the 2026-05-07 eastern-NC scope rollback are listed here — Wake /
+    # Forsyth / Guilford / Durham tax pages are scraped pointlessly if
+    # their listings will fail _in_scope.
     "counties_nc.new_hanover_tax",          # 3ee745c
-    "counties_nc.guilford_tax",             # 3ee745c (URL needs Blazor)
-    "counties_nc.durham_tax",               # 3ee745c (genuinely empty)
     "counties_nc.buncombe_tax",             # 3ee745c
     "counties_nc.cleveland_tax",            # 3ee745c
     "counties_nc.henderson_tax",            # 3ee745c

@@ -46,14 +46,21 @@ def test_upset_bid_window_constant():
     assert UPSET_BID_WINDOW_DAYS == 14
 
 
-def test_target_counties_includes_high_volume_metros():
-    """Audit added Wake, Forsyth, Guilford, Durham, Cumberland, New
-    Hanover for foreclosure-volume coverage."""
-    for c in ("Wake", "Forsyth", "Guilford", "Durham", "Cumberland", "New Hanover"):
+def test_target_counties_match_user_territory():
+    """2026-05-07 scope: WNC mountains/foothills + Charlotte metro + the
+    user's coastal-NC keys (New Hanover, Brunswick, Onslow). Eastern-NC
+    expansion (Wake / Forsyth / Guilford / etc.) was pruned because the
+    user doesn't invest there."""
+    # User-key NC counties in scope:
+    for c in ("Mecklenburg", "Buncombe", "Henderson", "Gaston", "Cleveland",
+              "Rutherford", "Polk", "Transylvania",
+              "New Hanover", "Brunswick", "Onslow"):
         assert c in TARGET_COUNTIES, f"{c} missing from TARGET_COUNTIES"
-    # Original WNC counties still present
-    for c in ("Mecklenburg", "Buncombe", "Henderson"):
-        assert c in TARGET_COUNTIES
+    # Eastern-NC counties NOT in scope:
+    for c in ("Wake", "Forsyth", "Guilford", "Durham", "Cumberland"):
+        assert c not in TARGET_COUNTIES, (
+            f"{c} should have been removed from TARGET_COUNTIES on 2026-05-07"
+        )
 
 
 def test_recent_sale_flagged_in_upset_bid_window():

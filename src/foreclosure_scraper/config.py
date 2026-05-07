@@ -27,7 +27,13 @@ SC_COUNTIES: tuple[County, ...] = (
 )
 
 NC_COUNTIES: tuple[County, ...] = (
-    # Original WNC + Charlotte-metro footprint
+    # WNC mountains + foothills + Charlotte-metro footprint. Scope is
+    # the upstate-SC / WNC corridor where the user actually invests.
+    # The 2026-05 broad NC expansion (Wake / Forsyth / Guilford / Durham /
+    # Cumberland / Alamance / Iredell / Cabarrus / Union NC / Pitt /
+    # Johnston) was rolled back 2026-05-07 — those counties are 1.5-4
+    # hours east of the target territory and produce ~890 dashboard
+    # listings per week that aren't actionable for the user.
     County("Rutherford", "NC", "37161", "Rutherfordton"),
     County("Cleveland", "NC", "37045", "Shelby"),
     County("Henderson", "NC", "37089", "Hendersonville"),
@@ -42,25 +48,13 @@ NC_COUNTIES: tuple[County, ...] = (
     County("Yancey", "NC", "37199", "Burnsville"),
     County("Mitchell", "NC", "37121", "Bakersville"),
     County("Burke", "NC", "37023", "Morganton"),
-    # 2026-05 expansion — the 13 high-volume NC counties also queried by
-    # the NC eCourts judgment-search scraper. Without these in scope,
-    # listings from Wake / Forsyth / Guilford / Durham / etc. would fail
-    # _in_scope and silently drop. Trade-off: enrichment_comps and
-    # homeharvest scrapers now also query these for sold/rent pools
-    # (~26 more HomeHarvest queries per weekly run).
-    County("Wake", "NC", "37183", "Raleigh"),
-    County("Forsyth", "NC", "37067", "Winston-Salem"),
-    County("Guilford", "NC", "37081", "Greensboro"),
-    County("Durham", "NC", "37063", "Durham"),
-    County("Cumberland", "NC", "37051", "Fayetteville"),
+    # User-key coastal NC counties (Wilmington area + Onslow). Far from
+    # the WNC core but explicitly in the user's target list — Brunswick
+    # is in scope even when no scraper produced any listings this week,
+    # so when one does, _in_scope passes them through.
     County("New Hanover", "NC", "37129", "Wilmington"),
-    County("Alamance", "NC", "37001", "Graham"),
-    County("Iredell", "NC", "37097", "Statesville"),
-    County("Cabarrus", "NC", "37025", "Concord"),
-    County("Union", "NC", "37179", "Monroe"),
+    County("Brunswick", "NC", "37019", "Bolivia"),
     County("Onslow", "NC", "37133", "Jacksonville"),
-    County("Pitt", "NC", "37147", "Greenville"),
-    County("Johnston", "NC", "37101", "Smithfield"),
 )
 
 ALL_COUNTIES: tuple[County, ...] = SC_COUNTIES + NC_COUNTIES
