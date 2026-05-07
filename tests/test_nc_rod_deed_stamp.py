@@ -11,9 +11,7 @@ the per-vendor Permitium search-form flow is wired.
 """
 from __future__ import annotations
 
-from foreclosure_scraper.scrapers.counties_nc.nc_rod_substitute_trustee import (
-    _sold_price_from_stamp,
-)
+from foreclosure_scraper.rod.deed_stamp import sold_price_from_stamp as _sold_price_from_stamp
 
 
 def test_explicit_consideration_preferred():

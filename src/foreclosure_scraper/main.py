@@ -167,6 +167,41 @@ def _flip_candidate(li: Listing) -> bool:
             return True
         return False
 
+
+# Common SC MIE address abbreviations — kept here so the city-splitter
+# resolves them to canonical city names that match Realtor.com.
+_SOLD_POOL_CITY_ALIASES = {
+    "Sptbg.": "Spartanburg", "Sptbg": "Spartanburg", "Sbg.": "Spartanburg",
+    "Greenwd.": "Greenwood", "Greenwd": "Greenwood",
+    "Henderson.": "Hendersonville", "Hendsv.": "Hendersonville",
+    "WS": "Winston-Salem",
+}
+
+
+def _split_embedded_city(listings: list[Listing]) -> None:
+    """Split city out of street_address for sold-pool listings whose
+    city is embedded in the address string ('248 Sweetie Way, Sptbg., SC').
+
+    Mutates listings in place. The MIE PDF parsers carry the full address
+    line from the PDF unsplit; this helper unblocks the downstream
+    HomeHarvest-by-address lookup which requires li.city set.
+    """
+    for li in listings:
+        if li.city or not li.street_address or "," not in li.street_address:
+            continue
+        parts = [p.strip() for p in li.street_address.split(",")]
+        if len(parts) < 2:
+            continue
+        # parts[0] = street, parts[1] = city candidate, parts[2:] = state/zip noise
+        candidate = parts[1]
+        # Skip if it's a 2-letter state code (e.g. "123 Main St, SC")
+        if len(candidate) == 2 and candidate.isupper():
+            continue
+        city = _SOLD_POOL_CITY_ALIASES.get(candidate, candidate)
+        if 2 <= len(city) <= 30:
+            li.street_address = parts[0]
+            li.city = city
+
     return True
 
 
@@ -577,6 +612,24 @@ async def run() -> int:
                 await enrich_addresses_from_owner(sold_pool)
             except Exception:
                 log.error("sold_pool.addr_backfill_failed",
+                          traceback=traceback.format_exc())
+            # County GIS — fills sqft/beds/baths/year/parcel by parcel or
+            # address. Free (no API key). Without this, comp_dict's
+            # beds/baths/sqft fields stay empty for many SC results-PDF
+            # listings since SC MIE PDFs don't carry property specs.
+            try:
+                await enrich_gis(sold_pool)
+            except Exception:
+                log.error("sold_pool.gis_failed",
+                          traceback=traceback.format_exc())
+            # SC MIE PDFs put city inside street_address ("248 Sweetie Way,
+            # Sptbg., SC") with li.city=None — that blocks HomeHarvest's
+            # by-address lookup which requires city + state. Split it out
+            # before photos.
+            try:
+                _split_embedded_city(sold_pool)
+            except Exception:
+                log.error("sold_pool.city_split_failed",
                           traceback=traceback.format_exc())
             # Pull a Realtor.com gallery for each sold comp's address.
             try:
