@@ -1,35 +1,38 @@
 name: Patch — re-run specific scrapers + merge into docs/listings.json
 
-# Manually-triggered targeted patch. Use when ONE OR MORE specific
-# scrapers were silently dropping listings (e.g. NC eCourts before
-# 1bf92a9), the bug is now fixed, and you want the missing listings
-# backfilled NOW without paying 60-90 min for a full weekly run.
+# Manually-triggered targeted patch. Same secrets + network env as the
+# weekly run, but only does the high-impact subset: scrapers + sold-pool
+# enrichment (GIS / photos / Vision) + NC eCourts case-status (Order
+# Confirming Sale detection) + comp matcher. Skips RentCast / flood /
+# EPA / permits / etc.
+#
+# Use when:
+#   * A scraper bug-fix shipped and you want the missing listings
+#     backfilled NOW without paying 60-90 min for a full weekly run.
+#   * You want NC sold comps populated from the rod-vendor + NC
+#     eCourts paths that don't run in the dev sandbox.
+#   * You want Vision condition tier on every sold comp's primary
+#     photo — only this workflow has the ANTHROPIC_API_KEY.
 #
 # What it does:
-#   * Loads the current docs/listings.json
+#   * Loads docs/listings.json + docs/foreclosure_sold_pool.json
 #   * Re-runs ONLY the requested scraper slugs (or --all-fixed default)
-#   * Filters their output through _in_scope / _active_only / _flip_candidate
-#   * Runs address-finding enrichment chain on the new listings
-#     (county GIS, court records, address backfill, parcel lookup,
-#     aggressive cross-county owner search, lis-pendens GIS resolver,
-#     parcel reverse-geo, address synth)
-#   * Runs property_kind, judgment_amount, validation, data_quality
-#   * Computes calc + grade per listing
-#   * Merges with existing listings via Listing.merge() (existing wins
-#     on non-null, new fills gaps), then re-dedupes for fuzzy overlap
-#   * Writes back docs/listings.json + appends "rerun_scrapers" entry
-#     to docs/run_health.json
+#   * Partitions output: active listings vs sold-pool candidates
+#   * Active: filter chain + address enrichments + calc/grade
+#   * Sold pool: GIS + city-split + HomeHarvest photos + Vision +
+#     validate + county_pin + property_kind
+#   * Merges new active into existing active, new sold into existing
+#     sold pool (Listing.merge + dedupe)
+#   * Runs NC eCourts case-status enrichment on the merged active set
+#     (Tyler Odyssey docket detail) — when Order Confirming Sale shows
+#     a hammer price, the listing is promoted to the sold pool
+#   * Comp matcher: like-for-like county / kind / beds±1 / sqft±40%
+#   * Upset-bid window tagging
+#   * Writes back BOTH files + appends a patch entry to run_health.json
 #
-# What it does NOT do (deferred to next weekly run):
-#   * Vision (Anthropic-paid)
-#   * RentCast AVM (paid above free tier)
-#   * HomeHarvest comps + photos (slow)
-#   * Scrapling-rendered detail pages (NC case status, SOS dissolution,
-#     Pickens MIE PDFs)
-#   * Code enforcement / building permits / flood / EPA / FEMA
-#
-# Cost: $0 — Apify gated by APIFY_FREE_TIER_ONLY=1. No Vision/RentCast.
-# Runtime: ~25-40 min depending on how many slugs are run.
+# Cost: ~$2-12 in Vision (capped by SOLD_POOL_VISION_MAX_LISTINGS=100).
+# Apify gated by APIFY_FREE_TIER_ONLY=1 — no paid Apify calls.
+# Runtime: ~15-35 min depending on number of slugs.
 
 on:
   workflow_dispatch:
@@ -57,6 +60,17 @@ jobs:
       APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
       APIFY_FREE_TIER_ONLY: "1"
       COURTLISTENER_TOKEN: ${{ secrets.COURTLISTENER_TOKEN }}
+      # Anthropic Vision — fires on sold-comp listings that have photos,
+      # filling raw.condition_tier + raw.vision so the comp popout shows
+      # 'gut' / 'major' / 'cosmetic' / 'move_in_ready' alongside hammer
+      # price. Capped at SOLD_POOL_VISION_MAX_LISTINGS=100 per run.
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      VISION_MAX_LISTINGS: "0"          # patch run skips active-listing Vision
+      SOLD_POOL_VISION_MAX_LISTINGS: "100"
+      # NC eCourts case-status (Tyler Odyssey docket parser) — capped per
+      # run since each case takes 5-15s of Scrapling render time.
+      PATCH_NC_CASE_STATUS: "1"
+      PATCH_NC_CASE_STATUS_CAP: "60"
       LOG_LEVEL: INFO
       PYTHONUNBUFFERED: "1"
 
@@ -77,6 +91,10 @@ jobs:
 
       - name: Install dependencies
         run: uv sync --frozen || uv sync
+
+      - name: Install Playwright Chromium (for Scrapling stealth fetchers)
+        run: |
+          uv run python -m playwright install chromium --with-deps || true
 
       - name: Run patch
         run: |

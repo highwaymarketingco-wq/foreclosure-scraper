@@ -110,6 +110,16 @@ KNOWN_FIXED = (
     "counties_nc.henderson_tax",            # 3ee745c
     "counties_nc.polk_tax",                 # 3ee745c
     "counties_nc.rutherford_tax",           # 3ee745c
+    "counties_nc.brunswick_tax",            # 11e00d4: Brunswick scraper added
+    # Sold-comp sources — added 2026-05-07
+    "counties_sc.spartanburg_master_in_equity",  # 92752da: sold-price extraction
+    "counties_sc.anderson_master_in_equity",     # 92752da
+    "counties_sc.pickens_master_in_equity",      # 92752da
+    "counties_nc.nc_rod_substitute_trustee",     # 7d3f1c1: Trustee's Deed Upon Sale post-sale sweep
+    # SC Public Index lis pendens — Scrapling-only, captures lis pendens
+    # for SC counties with active filings each week
+    "counties_sc.sc_public_index_lis_pendens",
+    "counties_sc.sc_courtrosters",
 )
 
 
@@ -445,12 +455,13 @@ async def main() -> int:
         return 1
 
     listings_path = ROOT / "docs" / "listings.json"
+    sold_pool_path = ROOT / "docs" / "foreclosure_sold_pool.json"
     run_health_path = ROOT / "docs" / "run_health.json"
     if not listings_path.exists():
         log.error("patch_run.no_listings_file", path=str(listings_path))
         return 1
 
-    # Hydrate existing
+    # Hydrate existing active listings
     raw_data = json.loads(listings_path.read_text())
     existing: list[Listing] = []
     skipped = 0
@@ -462,6 +473,19 @@ async def main() -> int:
         existing.append(li)
     log.info("patch_run.loaded_existing",
              live=len(existing), skipped=skipped)
+
+    # Hydrate existing sold pool (separate file). May not exist yet.
+    existing_sold: list[Listing] = []
+    if sold_pool_path.exists():
+        try:
+            sold_data = json.loads(sold_pool_path.read_text())
+            for d in sold_data:
+                li = _hydrate_listing(d)
+                if li is not None:
+                    existing_sold.append(li)
+            log.info("patch_run.loaded_sold_pool", count=len(existing_sold))
+        except (ValueError, json.JSONDecodeError):
+            pass
 
     # Resolve scrapers
     scrapers, not_found = _select_scrapers(target_slugs)
@@ -490,43 +514,181 @@ async def main() -> int:
         log.warning("patch_run.zero_new_listings")
         return 0
 
-    # Filter chain (matches main.py)
-    cfg = RuntimeConfig.from_env()
-    new_filtered = _filter_pipeline(new_raw, cfg)
-    log.info("patch_run.after_filter",
-             kept=len(new_filtered), dropped=len(new_raw) - len(new_filtered))
+    # Partition: sold pool vs active candidates (mirrors main.py orchestrator)
+    from foreclosure_scraper.enrichment_foreclosure_sold_comps import (
+        is_sold_pool_candidate, enrich_foreclosure_sold_comps,
+    )
+    new_sold_raw = [li for li in new_raw if is_sold_pool_candidate(li)]
+    new_active_raw = [li for li in new_raw if not is_sold_pool_candidate(li)]
+    log.info("patch_run.partitioned",
+             new_active=len(new_active_raw), new_sold=len(new_sold_raw))
 
-    # Run the enrichment chain on new listings only (existing already
-    # had it last week)
+    # Filter chain on active (matches main.py)
+    cfg = RuntimeConfig.from_env()
+    new_filtered = _filter_pipeline(new_active_raw, cfg)
+    # Sold pool only needs scope check (already past sales)
+    new_sold = [li for li in new_sold_raw if _in_scope(li)]
+    log.info("patch_run.after_filter",
+             active_kept=len(new_filtered), sold_kept=len(new_sold))
+
+    # Address enrichments on new active listings
     enrichment_stats = await _run_address_enrichments(new_filtered)
 
-    # Calc + grade
+    # ---- Sold-pool mini-pipeline (mirrors main.py's sold pool branch) ----
+    if new_sold:
+        log.info("patch_run.sold_pool_enrich_start", count=len(new_sold))
+        # Address backfill
+        try:
+            from foreclosure_scraper.enrichment_address_backfill import (
+                enrich_addresses_from_owner,
+            )
+            await enrich_addresses_from_owner(new_sold)
+        except Exception:
+            log.error("patch_run.sold_addr_backfill_failed",
+                      traceback=traceback.format_exc())
+        # County GIS for sqft/beds/baths
+        try:
+            from foreclosure_scraper.enrichment_arcgis import enrich as _gis
+            await _gis(new_sold)
+        except Exception:
+            log.error("patch_run.sold_gis_failed",
+                      traceback=traceback.format_exc())
+        # SC MIE addresses bake city into street_address; split out so
+        # HomeHarvest's by-address lookup can fire.
+        try:
+            from foreclosure_scraper.main import _split_embedded_city
+            _split_embedded_city(new_sold)
+        except Exception:
+            log.error("patch_run.sold_city_split_failed",
+                      traceback=traceback.format_exc())
+        # HomeHarvest photos
+        try:
+            from foreclosure_scraper.enrichment_photos import (
+                enrich_with_address_photos,
+            )
+            await enrich_with_address_photos(new_sold)
+        except Exception:
+            log.error("patch_run.sold_photos_failed",
+                      traceback=traceback.format_exc())
+        # OSM map fallback
+        try:
+            from foreclosure_scraper.enrichment_images import enrich_with_images
+            await enrich_with_images(new_sold, use_mapillary=False)
+        except Exception:
+            log.error("patch_run.sold_images_failed",
+                      traceback=traceback.format_exc())
+        # Vision condition assessment — separate budget so it can't eat
+        # active-listing Vision spend on a parallel run.
+        try:
+            from foreclosure_scraper.enrichment_vision import (
+                enrich_with_vision as _ev,
+            )
+            sold_vision_cap = int(os.environ.get(
+                "SOLD_POOL_VISION_MAX_LISTINGS", "100"
+            ))
+            await _ev(new_sold, max_listings=sold_vision_cap)
+        except Exception:
+            log.error("patch_run.sold_vision_failed",
+                      traceback=traceback.format_exc())
+        # Validate / county_pin / property_kind
+        try:
+            validate_listings(new_sold)
+            enforce_case_pinned_county(new_sold)
+            enrich_property_kind(new_sold)
+        except Exception:
+            pass
+        log.info("patch_run.sold_pool_enrich_done")
+
+    # Calc + grade for new active
     valuation_failures = _calc_and_grade(new_filtered)
     log.info("patch_run.valuation",
              ok=len(new_filtered) - valuation_failures,
              failures=valuation_failures)
 
-    # Merge with existing, then re-dedupe (catches fuzzy address overlaps)
+    # Merge new active into existing active (dedupe-merge), then dedupe
     merged_all, merge_stats = _merge_into_existing(existing, new_filtered)
-    final = dedupe(merged_all)
+    final_active = dedupe(merged_all)
+
+    # Merge sold pools (existing + new)
+    sold_merged, sold_merge_stats = _merge_into_existing(existing_sold, new_sold)
+    final_sold = dedupe(sold_merged)
+
     log.info(
         "patch_run.merged",
-        added=merge_stats["added"],
-        merged_into_existing=merge_stats["merged"],
-        before_dedupe=len(merged_all),
-        after_dedupe=len(final),
-        net_change=len(final) - len(existing),
+        active_added=merge_stats["added"],
+        active_merged=merge_stats["merged"],
+        active_final=len(final_active),
+        sold_added=sold_merge_stats["added"],
+        sold_merged=sold_merge_stats["merged"],
+        sold_final=len(final_sold),
+        net_change=len(final_active) - len(existing),
     )
+
+    # ---- NC eCourts case-status enrichment (Order Confirming Sale detection) ----
+    # Runs on the FULL active set so existing listings can be promoted to
+    # the sold pool when Tyler's docket shows their case is now confirmed
+    # at sale.
+    if os.environ.get("PATCH_NC_CASE_STATUS", "1") == "1":
+        try:
+            from foreclosure_scraper.enrichment_nc_case_status import (
+                enrich_with_nc_case_status,
+            )
+            nc_cap = int(os.environ.get("PATCH_NC_CASE_STATUS_CAP", "50"))
+            await enrich_with_nc_case_status(
+                final_active, concurrency=2, max_check=nc_cap,
+            )
+        except Exception:
+            log.error("patch_run.nc_case_status_failed",
+                      traceback=traceback.format_exc())
+
+    # Promote to sold pool: any active listing where case-status surfaced
+    # raw.actual_sold_price + promoted_to_sold_comp moves to the sold pool.
+    promoted = []
+    kept_active = []
+    for li in final_active:
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        if (isinstance(raw.get("actual_sold_price"), (int, float))
+                and raw.get("nc_case_status", {}).get("promoted_to_sold_comp")):
+            promoted.append(li)
+        else:
+            kept_active.append(li)
+    if promoted:
+        log.info("patch_run.promoted_to_sold_pool", count=len(promoted))
+        final_active = kept_active
+        final_sold = final_sold + promoted
+
+    # Run the comp matcher
+    try:
+        s = enrich_foreclosure_sold_comps(final_active, final_sold)
+        log.info("patch_run.sold_comps_match", **s)
+    except Exception:
+        log.error("patch_run.sold_comps_match_failed",
+                  traceback=traceback.format_exc())
+
+    # Upset-bid tagging
+    try:
+        from foreclosure_scraper.enrichment_upset_bid import enrich_upset_bid
+        ub_stats = enrich_upset_bid(final_active)
+        log.info("patch_run.upset_bid_post_merge", **ub_stats)
+    except Exception:
+        log.error("patch_run.upset_bid_failed",
+                  traceback=traceback.format_exc())
 
     if args.dry_run:
         log.info("patch_run.dry_run_done")
         return 0
 
-    # Write back
-    out_data = [li.model_dump(mode="json") for li in final]
-    listings_path.write_text(json.dumps(out_data, indent=2, default=str))
-    log.info("patch_run.wrote_listings",
-             path=str(listings_path), count=len(out_data))
+    # Write back BOTH files
+    listings_path.write_text(
+        json.dumps([li.model_dump(mode="json") for li in final_active],
+                   indent=2, default=str)
+    )
+    sold_pool_path.write_text(
+        json.dumps([li.model_dump(mode="json") for li in final_sold],
+                   indent=2, default=str)
+    )
+    log.info("patch_run.wrote",
+             active=len(final_active), sold_pool=len(final_sold))
 
     # Patch entry in run_health
     health: dict = {}
@@ -540,10 +702,13 @@ async def main() -> int:
         "applied_at": datetime.now(timezone.utc).isoformat(),
         "scraper_slugs": sorted(target_slugs),
         "raw_per_slug": per_slug_raw,
-        "filtered_kept": len(new_filtered),
-        "merged_into_existing": merge_stats["merged"],
-        "added_new": merge_stats["added"],
-        "total_listings_after_patch": len(out_data),
+        "active_kept": len(new_filtered),
+        "sold_pool_kept": len(new_sold),
+        "promoted_to_sold_via_case_status": len(promoted),
+        "active_added_new": merge_stats["added"],
+        "active_merged_into_existing": merge_stats["merged"],
+        "active_final": len(final_active),
+        "sold_pool_final": len(final_sold),
         "valuation_failures": valuation_failures,
         "enrichment_stats": enrichment_stats,
     })
