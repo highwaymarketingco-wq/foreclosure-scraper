@@ -28,6 +28,41 @@ CCHS_COUNTIES = {
 # few candidates and merge results, then post-filter on doc_type to be safe.
 NOD_DOC_TYPE_CODES = ("FOR", "NFS", "NOS", "NOD", "LP", "ALL")
 
+# POST-sale recording codes — these are the documents that transfer
+# property to the foreclosure-auction winner. CCHS short codes vary by
+# install; we try common ones and post-filter on keyword.
+POST_SALE_DOC_TYPE_CODES = ("TD", "STD", "FD", "TRD", "CD", "DEED", "ALL")
+
+POST_SALE_KEYWORDS = (
+    "TRUSTEE",
+    "FORECLOSURE DEED",
+    "COMMISSIONER",
+    "POWER OF SALE",
+)
+
+
+def _is_post_sale(doc_type: str | None) -> bool:
+    if not doc_type:
+        return False
+    s = doc_type.upper()
+    return any(kw in s for kw in POST_SALE_KEYWORDS)
+
+
+_MONEY_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
+
+
+def _money(s: str | None) -> float | None:
+    if not s:
+        return None
+    m = _MONEY_RE.search(s)
+    if not m:
+        return None
+    try:
+        v = float(m.group(1).replace(",", ""))
+    except ValueError:
+        return None
+    return v if 0 < v <= 50_000_000 else None
+
 # What we consider a "NOD-like" recorded document after parsing.
 NOD_KEYWORDS = (
     "NOTICE OF FORECLOSURE",
@@ -109,6 +144,14 @@ def _parse_results(html: str, county: str, state: str) -> list[RodDoc]:
         if len(name_cells) >= 2:
             grantee = name_cells[1][:200]
 
+        # CCHS sometimes shows a Consideration / Amount column with a
+        # dollar value. Catch ANY $-prefixed cell — the largest is most
+        # likely the consideration on a Trustee's Deed (vs incidental
+        # transfer-tax amounts).
+        amounts = [_money(c) for c in cells if "$" in (c or "")]
+        amounts = [a for a in amounts if a is not None]
+        consideration = max(amounts) if amounts else None
+
         out.append(
             RodDoc(
                 county=county,
@@ -119,6 +162,7 @@ def _parse_results(html: str, county: str, state: str) -> list[RodDoc]:
                 page=page,
                 grantor=grantor,
                 grantee=grantee,
+                consideration_amount=consideration,
                 raw={"row": " | ".join(cells)[:400]},
             )
         )
@@ -178,6 +222,53 @@ async def discover_recent_nods(
                     if not _is_nod(d.doc_type):
                         continue
                     if d.recorded_date and d.recorded_date < from_date:
+                        continue
+                    key = (d.book, d.page, (d.doc_type or "").upper())
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    out.append(d)
+                    if len(out) >= max_docs:
+                        return out
+    except Exception:
+        return out
+    return out[:max_docs]
+
+
+async def discover_recent_sold_recordings(
+    state: str,
+    county: str,
+    days_back: int = 90,
+    max_docs: int = 100,
+) -> list[RodDoc]:
+    """CCHS sweep for POST-sale recordings (Trustee's Deed Upon Sale and
+    equivalents). Same URL pattern as discover_recent_nods but with
+    POST_SALE_DOC_TYPE_CODES + post-sale keyword filter."""
+    if (state, county) not in CCHS_COUNTIES:
+        return []
+    slug = CCHS_COUNTIES[(state, county)]
+    today = datetime.utcnow()
+    from_date = today - timedelta(days=max(1, days_back))
+
+    out: list[RodDoc] = []
+    seen: set[tuple[str | None, str | None, str | None]] = set()
+    try:
+        async with client(timeout=30.0) as c:
+            for code in POST_SALE_DOC_TYPE_CODES:
+                url = _build_doctype_url(slug, code, from_date, today)
+                try:
+                    r = await c.get(url)
+                except Exception:
+                    continue
+                if r.status_code != 200:
+                    continue
+                rows = _parse_results(r.text, county, state)
+                for d in rows:
+                    if not _is_post_sale(d.doc_type):
+                        continue
+                    if d.recorded_date and d.recorded_date < from_date:
+                        continue
+                    if d.consideration_amount is None:
                         continue
                     key = (d.book, d.page, (d.doc_type or "").upper())
                     if key in seen:

@@ -72,46 +72,46 @@ SOURCES: list[tuple[str, object, str]] = [
     ("Cleveland", cchs,    "cchs"),
 ]
 
-LOOKBACK_DAYS = 60
+LOOKBACK_DAYS = 60                    # PRE-sale (NOD/NOS) sweep window
+POST_SALE_LOOKBACK_DAYS = 90          # POST-sale (Trustee's Deed) sweep window
 MAX_DOCS_PER_COUNTY = 80
 
 
-def _doc_to_listing(doc: RodDoc, vendor_label: str) -> Listing:
-    """Convert a RodDoc into a Listing for the foreclosure pipeline."""
-    # Case-number-style identifier: prefer instrument#, then book/page
-    case_id = None
-    if doc.instrument_no:
-        case_id = f"INST-{doc.instrument_no}"
-    elif doc.book and doc.page:
-        case_id = f"BK{doc.book}-PG{doc.page}"
-
-    # Source URL: link back to the vendor's search page so the investor
-    # can pull the actual recorded document (signature page + deed of
-    # trust details). Best-effort — the vendor module knows the host.
-    source_url = "https://www.nccourts.gov/"
+def _vendor_search_url(vendor_label: str, county: str) -> str:
     if vendor_label == "aumentum":
-        host = aumentum.AUMENTUM_COUNTIES.get(("NC", doc.county))
+        host = aumentum.AUMENTUM_COUNTIES.get(("NC", county))
         if host:
-            source_url = host.rstrip("/") + "/SrchName.aspx"
+            return host.rstrip("/") + "/SrchName.aspx"
     elif vendor_label == "cott":
-        host = cott.COTT_COUNTIES.get(("NC", doc.county))
+        host = cott.COTT_COUNTIES.get(("NC", county))
         if host:
-            source_url = host.rstrip("/") + "/SrchName.aspx"
+            return host.rstrip("/") + "/SrchName.aspx"
     elif vendor_label == "cchs":
-        slug = cchs.CCHS_COUNTIES.get(("NC", doc.county))
+        slug = cchs.CCHS_COUNTIES.get(("NC", county))
         if slug:
-            source_url = (
-                f"https://us5.courthousecomputersystems.com/{slug}/searchonline.asp"
-            )
+            return f"https://us5.courthousecomputersystems.com/{slug}/searchonline.asp"
+    return "https://www.nccourts.gov/"
 
+
+def _case_id_from_doc(doc: RodDoc) -> str | None:
+    if doc.instrument_no:
+        return f"INST-{doc.instrument_no}"
+    if doc.book and doc.page:
+        return f"BK{doc.book}-PG{doc.page}"
+    return None
+
+
+def _doc_to_listing(doc: RodDoc, vendor_label: str) -> Listing:
+    """Convert a PRE-sale recording (NOD / Notice of Sale / Lis Pendens)
+    into a LIS_PENDENS Listing — early-warning lead, not a sold comp."""
     return Listing(
         source="counties_nc.nc_rod_substitute_trustee",
-        source_url=source_url,
+        source_url=_vendor_search_url(vendor_label, doc.county),
         listing_type=ListingType.LIS_PENDENS,
         property_kind=PropertyKind.UNKNOWN,
         state="NC",
         county=doc.county,
-        case_number=case_id,
+        case_number=_case_id_from_doc(doc),
         defendant=doc.grantor,
         plaintiff=doc.grantee,
         first_seen=datetime.utcnow(),
@@ -126,8 +126,50 @@ def _doc_to_listing(doc: RodDoc, vendor_label: str) -> Listing:
                 "instrument_no": doc.instrument_no,
                 "grantor": doc.grantor,
                 "grantee": doc.grantee,
+                "kind": "pre_sale",
             },
         },
+    )
+
+
+def _sold_doc_to_listing(doc: RodDoc, vendor_label: str) -> Listing:
+    """Convert a POST-sale recording (Trustee's Deed Upon Sale or
+    equivalent) into a FORECLOSURE_SALE Listing with confirmed
+    hammer price. Goes into the foreclosure_sold_comps pool."""
+    sold_price = doc.consideration_amount
+    raw_payload = {
+        "nc_rod": {
+            "vendor": vendor_label,
+            "doc_type": doc.doc_type,
+            "recorded_date": doc.recorded_date.isoformat() if doc.recorded_date else None,
+            "book": doc.book,
+            "page": doc.page,
+            "instrument_no": doc.instrument_no,
+            "grantor": doc.grantor,
+            "grantee": doc.grantee,
+            "kind": "post_sale",
+            "excise_tax_stamp": doc.excise_tax_stamp,
+        },
+    }
+    if sold_price is not None:
+        # Top-level so enrichment_foreclosure_sold_comps reads it as
+        # the confirmed hammer price (not opening-bid floor).
+        raw_payload["actual_sold_price"] = sold_price
+    return Listing(
+        source="counties_nc.nc_rod_substitute_trustee",
+        source_url=_vendor_search_url(vendor_label, doc.county),
+        listing_type=ListingType.FORECLOSURE_SALE,
+        property_kind=PropertyKind.UNKNOWN,
+        state="NC",
+        county=doc.county,
+        case_number=_case_id_from_doc(doc),
+        defendant=doc.grantor,        # Borrower / former owner
+        plaintiff=doc.grantee,        # Auction winner / lender
+        sale_date=doc.recorded_date,  # Recording date ≈ sale date (within days)
+        opening_bid=sold_price,       # Surface as opening_bid for grading
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+        raw=raw_payload,
     )
 
 
@@ -147,32 +189,62 @@ class NCRodSubstituteTrustee(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
-        per_county: dict[str, int] = {}
+        per_county_pre: dict[str, int] = {}
+        per_county_post: dict[str, int] = {}
         for county, vendor, vendor_label in SOURCES:
+            # PRE-sale sweep (Notice of Sale, Substitute Trustee Deed
+            # appointment, Lis Pendens) → LIS_PENDENS leads
             try:
-                docs = await vendor.discover_recent_nods(
+                pre_docs = await vendor.discover_recent_nods(
                     state="NC", county=county,
                     days_back=LOOKBACK_DAYS,
                     max_docs=MAX_DOCS_PER_COUNTY,
                 )
             except Exception as exc:  # noqa: BLE001
                 log.warning(
-                    "nc_rod.vendor_failed",
+                    "nc_rod.vendor_pre_failed",
                     county=county, vendor=vendor_label,
                     error=str(exc)[:200],
                 )
-                continue
-            per_county[f"{county}/{vendor_label}"] = len(docs)
-            for d in docs:
-                # Vendor sometimes returns the wrong county (when a search
-                # fans out across vendor's whole tenant); enforce.
+                pre_docs = []
+            per_county_pre[f"{county}/{vendor_label}"] = len(pre_docs)
+            for d in pre_docs:
                 if d.county and d.county != county:
                     d.county = county
                 out.append(_doc_to_listing(d, vendor_label))
 
+            # POST-sale sweep (Trustee's Deed Upon Sale and equivalents)
+            # → FORECLOSURE_SALE listings with confirmed hammer prices,
+            # routed into the sold-comps pool.
+            try:
+                post_docs = await vendor.discover_recent_sold_recordings(
+                    state="NC", county=county,
+                    days_back=POST_SALE_LOOKBACK_DAYS,
+                    max_docs=MAX_DOCS_PER_COUNTY,
+                )
+            except AttributeError:
+                # Vendor module hasn't grown discover_recent_sold_recordings yet.
+                # Aumentum + Cott + CCHS all have it as of 2026-05-07f; this is
+                # defensive against future module additions.
+                post_docs = []
+            except Exception as exc:  # noqa: BLE001
+                log.warning(
+                    "nc_rod.vendor_post_failed",
+                    county=county, vendor=vendor_label,
+                    error=str(exc)[:200],
+                )
+                post_docs = []
+            per_county_post[f"{county}/{vendor_label}"] = len(post_docs)
+            for d in post_docs:
+                if d.county and d.county != county:
+                    d.county = county
+                out.append(_sold_doc_to_listing(d, vendor_label))
+
         log.info(
             "nc_rod.done",
-            total=len(out), per_county=per_county,
+            total=len(out),
+            pre_sale_per_county=per_county_pre,
+            post_sale_per_county=per_county_post,
             counties_searched=len(SOURCES),
         )
         return out

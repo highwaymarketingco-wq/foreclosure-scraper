@@ -18,7 +18,9 @@ class RodDoc:
     page: str | None = None
     grantor: str | None = None
     grantee: str | None = None
-    amount: float | None = None
+    amount: float | None = None              # generic numeric column from grid (varies by vendor)
+    consideration_amount: float | None = None  # sold/sale price ('Trustee's Deed Upon Sale')
+    excise_tax_stamp: float | None = None      # NC: $1 stamp per $500 of consideration
     instrument_no: str | None = None
     parcel_id: str | None = None
     notes: str | None = None
@@ -52,12 +54,26 @@ class LienPosition:
 
 # Doc-type taxonomy -> bucket
 DOC_BUCKETS: dict[str, str] = {
-    # Conveyances
+    # Conveyances (ordered general -> specific intentionally; the
+    # normalize function checks longer keys before shorter so post-sale
+    # variants like "TRUSTEES DEED UPON SALE" don't collapse to "DEED")
     "DEED": "deed",
     "DT": "mortgage",        # Deed of Trust (NC) = mortgage equivalent
     "MORT": "mortgage",
     "MORTGAGE": "mortgage",
     "DEED OF TRUST": "mortgage",
+    # Post-sale (foreclosure-auction-completed) recordings — keep the
+    # original wording so _is_post_sale predicates work downstream.
+    "TRUSTEES DEED UPON SALE": "post_sale_deed",
+    "TRUSTEE'S DEED UPON SALE": "post_sale_deed",
+    "TRUSTEES DEED": "post_sale_deed",
+    "TRUSTEE'S DEED": "post_sale_deed",
+    "SUBSTITUTE TRUSTEES DEED": "post_sale_deed",
+    "SUBSTITUTE TRUSTEE'S DEED": "post_sale_deed",
+    "FORECLOSURE DEED": "post_sale_deed",
+    "DEED UNDER POWER OF SALE": "post_sale_deed",
+    "COMMISSIONERS DEED": "post_sale_deed",
+    "COMMISSIONER'S DEED": "post_sale_deed",
     # Liens
     "LIEN": "lien",
     "JUDGMENT": "lien",
@@ -87,14 +103,21 @@ DOC_BUCKETS: dict[str, str] = {
 
 
 def normalize_doc_type(raw: str | None) -> str:
+    """Map a raw recorder-of-deeds doc-type label to a canonical key.
+
+    Substring matching prefers LONGER bucket keys first so that
+    'TRUSTEES DEED UPON SALE' doesn't collapse to plain 'DEED'. The
+    return value is the matched canonical key (still uppercase, still
+    contains the word 'TRUSTEE' for post-sale predicates downstream)."""
     if not raw:
         return "UNKNOWN"
     s = raw.strip().upper()
-    # First try exact bucket match
+    # Exact match wins
     if s in DOC_BUCKETS:
         return s
-    # Substring match for variants
-    for k in DOC_BUCKETS:
+    # Longest-first substring match — protects against generic-key
+    # capture (DEED, TAX, LIEN) over more-specific variants.
+    for k in sorted(DOC_BUCKETS, key=len, reverse=True):
         if k in s:
             return k
     return s

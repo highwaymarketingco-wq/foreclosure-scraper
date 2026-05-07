@@ -34,6 +34,24 @@ AUMENTUM_NOD_DOC_TYPES = (
     "FORECLOSURE",
 )
 
+# POST-sale recording labels — these are recorded AFTER the foreclosure
+# auction completes, with deed-tax stamps that encode the hammer price
+# (NC charges $1 excise tax per $500 of consideration). Each is the
+# document that transfers title from the trustee/borrower to the
+# winning bidder.
+AUMENTUM_POST_SALE_DOC_TYPES = (
+    "TRUSTEES DEED UPON SALE",
+    "TRUSTEE'S DEED UPON SALE",
+    "TRUSTEES DEED",
+    "TRUSTEE'S DEED",
+    "SUBSTITUTE TRUSTEES DEED",
+    "SUBSTITUTE TRUSTEE'S DEED",
+    "FORECLOSURE DEED",
+    "DEED UNDER POWER OF SALE",
+    "COMMISSIONER'S DEED",
+    "COMMISSIONERS DEED",
+)
+
 NOD_KEYWORDS = (
     "NOTICE OF FORECLOSURE",
     "NOTICE OF DEFAULT",
@@ -44,12 +62,31 @@ NOD_KEYWORDS = (
     "FORECLOSURE SALE",
 )
 
+# Keywords that identify a post-sale (already-completed-auction) recording.
+# Used to filter the grid response since Aumentum sometimes ignores the
+# doc-type filter and returns everything in the date range.
+POST_SALE_KEYWORDS = (
+    "TRUSTEE",   # catches Trustee's Deed / Substitute Trustees Deed / Trustees Deed Upon Sale
+    "FORECLOSURE DEED",
+    "COMMISSIONER",  # Commissioner's Deed (less common but used in some NC counties)
+    "POWER OF SALE",
+)
+
 
 def _is_nod(doc_type: str | None) -> bool:
     if not doc_type:
         return False
     s = doc_type.upper()
     return any(kw in s for kw in NOD_KEYWORDS)
+
+
+def _is_post_sale(doc_type: str | None) -> bool:
+    """True for recordings that transfer title to the foreclosure auction
+    winner — Trustee's Deed Upon Sale and equivalents."""
+    if not doc_type:
+        return False
+    s = doc_type.upper()
+    return any(kw in s for kw in POST_SALE_KEYWORDS)
 
 
 def _extract_hidden(html: str, field: str) -> str:
@@ -92,6 +129,21 @@ def _parse_grid(html: str, county: str, state: str) -> list[RodDoc]:
         grantor = col(row, "grantor")
         grantee = col(row, "grantee")
         instrument_no = col(row, "instrument", "doc#", "doc no")
+        # Amount columns vary by tenant. Aumentum exposes some combination
+        # of: "Consideration", "Excise Tax", "Tax Stamp", "Amount". Try
+        # all common labels — we keep both raw consideration (sale price)
+        # and the stamp value separately when both are available.
+        consideration_str = col(row, "consideration", "sale price")
+        stamp_str = col(row, "excise tax", "tax stamp", "stamp", "stamps")
+        amount_str = col(row, "amount", "doc amount")
+
+        consideration = _money(consideration_str)
+        stamp = _money(stamp_str)
+        # Derive consideration from stamp when only the stamp is shown
+        # (NC: $1 stamp per $500 consideration).
+        if consideration is None and stamp is not None:
+            consideration = stamp * 500.0
+        amt = _money(amount_str)
 
         out.append(
             RodDoc(
@@ -104,9 +156,30 @@ def _parse_grid(html: str, county: str, state: str) -> list[RodDoc]:
                 grantor=grantor[:200] or None,
                 grantee=grantee[:200] or None,
                 instrument_no=instrument_no or None,
+                amount=amt,
+                consideration_amount=consideration,
+                excise_tax_stamp=stamp,
             )
         )
     return out
+
+
+_MONEY_RE = re.compile(r"\$?\s*([\d,]+(?:\.\d{2})?)")
+
+
+def _money(s: str | None) -> float | None:
+    """Parse a dollar-amount string like '$45,000.00' or '7.50' into float.
+    Returns None for empty / unparseable input or implausible values."""
+    if not s:
+        return None
+    m = _MONEY_RE.search(s)
+    if not m:
+        return None
+    try:
+        v = float(m.group(1).replace(",", ""))
+    except ValueError:
+        return None
+    return v if 0 < v <= 50_000_000 else None
 
 
 async def search_by_name(state: str, county: str, name: str, max_docs: int = 50) -> list[RodDoc]:
@@ -240,6 +313,101 @@ async def discover_recent_nods(
                 if _accept(rows) and len(out) >= max_docs:
                     return out[:max_docs]
                 # Refresh viewstate from response for next post
+                viewstate = _extract_hidden(r2.text, "__VIEWSTATE") or viewstate
+                generator = _extract_hidden(r2.text, "__VIEWSTATEGENERATOR") or generator
+                event_val = _extract_hidden(r2.text, "__EVENTVALIDATION") or event_val
+    except Exception:
+        return out[:max_docs]
+    return out[:max_docs]
+
+
+async def discover_recent_sold_recordings(
+    state: str,
+    county: str,
+    days_back: int = 90,
+    max_docs: int = 100,
+) -> list[RodDoc]:
+    """Sweep AUMENTUM_POST_SALE_DOC_TYPES (Trustee's Deed Upon Sale and
+    equivalents) — these are the recordings that transfer the property
+    from the trustee to the auction winner. Each carries a deed-tax
+    stamp from which we recover the hammer price (NC: stamp × 500 =
+    consideration).
+
+    Mirrors discover_recent_nods structure but with post-sale doc types
+    + post-sale filter predicate. Default lookback 90 days (vs 60 for
+    NOD) to give the foreclosure_sold_comps pool a richer history.
+    """
+    if (state, county) not in AUMENTUM_COUNTIES:
+        return []
+    base = AUMENTUM_COUNTIES[(state, county)]
+    form_url = f"{base}/SrchDocType.aspx"
+    fallback_url = f"{base}/SrchName.aspx"
+    today = datetime.utcnow()
+    from_date = today - timedelta(days=max(1, days_back))
+
+    out: list[RodDoc] = []
+    seen: set[tuple[str | None, str | None, str | None]] = set()
+
+    def _accept(rows: list[RodDoc]) -> bool:
+        added_any = False
+        for d in rows:
+            if not _is_post_sale(d.doc_type):
+                continue
+            if d.recorded_date and d.recorded_date < from_date:
+                continue
+            # Drop recordings with no sold-price signal — they're not
+            # useful as comps. (Some Trustee's Deeds are recorded for
+            # corrective / re-execution reasons without consideration.)
+            if d.consideration_amount is None and d.excise_tax_stamp is None:
+                continue
+            key = (d.book, d.page, (d.instrument_no or "").upper())
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(d)
+            added_any = True
+            if len(out) >= max_docs:
+                return True
+        return added_any
+
+    try:
+        async with client(timeout=30.0) as c:
+            r = await c.get(form_url)
+            if r.status_code != 200:
+                r = await c.get(fallback_url)
+                if r.status_code != 200:
+                    return []
+                form_url = fallback_url
+
+            html = r.text
+            viewstate = _extract_hidden(html, "__VIEWSTATE")
+            generator = _extract_hidden(html, "__VIEWSTATEGENERATOR")
+            event_val = _extract_hidden(html, "__EVENTVALIDATION")
+            if not viewstate:
+                return []
+
+            for doc_label in AUMENTUM_POST_SALE_DOC_TYPES:
+                data = {
+                    "__VIEWSTATE": viewstate,
+                    "__VIEWSTATEGENERATOR": generator,
+                    "__EVENTVALIDATION": event_val,
+                    "ctl00$cphMain$ddlDocType": doc_label,
+                    "ctl00$cphMain$lstDocType": doc_label,
+                    "ctl00$cphMain$txtFromDate": from_date.strftime("%m/%d/%Y"),
+                    "ctl00$cphMain$txtThroughDate": today.strftime("%m/%d/%Y"),
+                    "ctl00$cphMain$txtFromRecordDate": from_date.strftime("%m/%d/%Y"),
+                    "ctl00$cphMain$txtThroughRecordDate": today.strftime("%m/%d/%Y"),
+                    "ctl00$cphMain$btnSearch": "Search",
+                }
+                try:
+                    r2 = await c.post(form_url, data=data, headers={"Referer": form_url})
+                except Exception:
+                    continue
+                if r2.status_code != 200:
+                    continue
+                rows = _parse_grid(r2.text, county, state)
+                if _accept(rows) and len(out) >= max_docs:
+                    return out[:max_docs]
                 viewstate = _extract_hidden(r2.text, "__VIEWSTATE") or viewstate
                 generator = _extract_hidden(r2.text, "__VIEWSTATEGENERATOR") or generator
                 event_val = _extract_hidden(r2.text, "__EVENTVALIDATION") or event_val
