@@ -66,6 +66,12 @@ def _in_scope(li: Listing) -> bool:
                 li.state.upper()) in SCOPE_DENY_COUNTIES_NORMALIZED:
             return False
     if li.source in SCOPE_BYPASS_SOURCES:
+        # State-level signal (typically CourtListener BK with no county yet).
+        # Tag it so dashboard can group / filter the 'state-only' bucket.
+        if not (li.county and li.county.strip()):
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            li.raw["geo_attribution"] = "state-only"
         return True
     if in_scope(li.county, li.state):
         return True

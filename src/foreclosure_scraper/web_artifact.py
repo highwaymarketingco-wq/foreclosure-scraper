@@ -70,6 +70,7 @@ RAW_KEEP = {
     "carryover": "*",                 # Last-known-good replay marker
     "filed_date": "*",                # Generic file-date for lis pendens / liens
     "county_pin": "*",                # Case#-encoded venue county correction
+    "geo_attribution": "*",           # 'state-only' marker for unattributed BK listings
 }
 
 

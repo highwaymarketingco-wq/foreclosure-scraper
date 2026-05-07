@@ -15,9 +15,12 @@ class County:
 
 
 SC_COUNTIES: tuple[County, ...] = (
-    # Scope narrowed (per user 2026-05): drop Greenville, Newberry, Abbeville,
-    # Greenwood. Nothing south of Newberry, nothing around Augusta.
+    # Upstate SC corridor. 2026-05-07c restored Greenville per user
+    # direction (it was in the 2026-05a "narrow" pruning, but the user
+    # confirmed Greenville is wanted — sc_courtrosters already targets
+    # it, so adding it back unblocks that scraper's listings).
     County("Spartanburg", "SC", "45083", "Spartanburg"),
+    County("Greenville",  "SC", "45045", "Greenville"),
     County("Anderson", "SC", "45007", "Anderson"),
     County("Pickens", "SC", "45077", "Pickens"),
     County("Oconee", "SC", "45073", "Walhalla"),
@@ -82,11 +85,35 @@ def in_scope(county_name: str | None, state: str | None) -> bool:
 # covers Abbeville SC). User direction 2026-05-07: explicitly drop
 # these even though they'd otherwise sneak in via the zip fallback.
 SCOPE_DENY_COUNTIES: tuple[tuple[str, str], ...] = (
+    # 2026-05-07b — Charlotte + adjacent WNC pruning
     ("Mecklenburg", "NC"),  # Charlotte — out of user's flip target
     ("Madison", "NC"),
     ("Yancey", "NC"),
     ("Haywood", "NC"),
     ("Abbeville", "SC"),
+    # 2026-05-07d — eastern NC counties pruned in rollback A but
+    # leaking back in via SCOPE_BYPASS_SOURCES (CourtListener
+    # bankruptcy/civil/adversary, which skip county checks). Run #16
+    # forensics found 20 Cabarrus + 19 Union NC + 4 Rowan + 3 Iredell
+    # + 1 Swain BK listings showing on the dashboard despite their
+    # counties not being in NC_COUNTIES. Explicit deny plugs that.
+    ("Wake", "NC"),
+    ("Forsyth", "NC"),
+    ("Guilford", "NC"),
+    ("Durham", "NC"),
+    ("Cumberland", "NC"),
+    ("Alamance", "NC"),
+    ("Iredell", "NC"),
+    ("Cabarrus", "NC"),
+    ("Union", "NC"),
+    ("Pitt", "NC"),
+    ("Johnston", "NC"),
+    ("Rowan", "NC"),
+    ("Swain", "NC"),
+    # SC counties south of Newberry / around Augusta — never were in
+    # SC_COUNTIES but BK / lis pendens leak via the 296 zip prefix.
+    ("Newberry", "SC"),
+    ("Greenwood", "SC"),
 )
 # Pre-normalized for fast lookup in in_scope() + main._in_scope.
 SCOPE_DENY_COUNTIES_NORMALIZED: frozenset[tuple[str, str]] = frozenset(
@@ -105,6 +132,10 @@ SCOPE_ZIP_PREFIXES: tuple[str, ...] = (
     # NC western piedmont + WNC mountains: Asheville/Hendersonville/Charlotte
     # corridor + Gaston/Cleveland/Rutherford/Polk
     "280", "281", "282", "287", "288",
+    # NC coastal — user-key Brunswick/New Hanover/Onslow. Without 284,
+    # HomeHarvest distressed listings tagged only by zip (no county
+    # field) failed _in_scope. 284 = Wilmington/Brunswick/Pender/Sampson.
+    "284",
 )
 
 
