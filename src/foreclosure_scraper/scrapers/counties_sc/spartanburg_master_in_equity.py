@@ -41,8 +41,19 @@ ADDR_RE = re.compile(
     re.I,
 )
 SALE_DATE_RE = re.compile(
-    r"(?:Re-?Bid Date|Sale Date|Master[''']s Sale)\s*[:—-]?\s*"
+    r"(?:Re-?Bid Date|Sale Date|Master[‘’‛'ʼ]s Sale)\s*[:—–-]?\s*"
     r"((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4})",
+    re.I,
+)
+# Spartanburg results PDFs put the actual auction date BEFORE the
+# 'Master's Sale' phrase: "May 4, 2026 Master's Sale". The PDF uses a
+# curly apostrophe (’) so the regex must include both ASCII '
+# and ‘-’ right-single-quote. Pattern lets us prefer the
+# actual auction date over the Re-Bid Date (upset-bid window deadline)
+# for results PDFs.
+MASTERS_SALE_DATE_RE = re.compile(
+    r"((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{4})"
+    r"\s+Master[‘’‛'ʼ]s Sale",
     re.I,
 )
 BID_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
@@ -71,12 +82,24 @@ def _parse_pdf_tables(data: bytes, source_url: str) -> list[Listing]:
         with pdfplumber.open(io.BytesIO(data)) as pdf:
             full_text = "\n".join((p.extract_text() or "") for p in pdf.pages)
             doc_sale_date = None
-            sd_m = SALE_DATE_RE.search(full_text)
-            if sd_m:
-                try:
-                    doc_sale_date = dateparser.parse(sd_m.group(1))
-                except (ValueError, TypeError):
-                    pass
+            # For RESULTS PDFs, prefer the actual Master's Sale date
+            # (when the hammer fell) over the Re-Bid Date (upset-bid
+            # window deadline). Investors need the comp anchored to
+            # the actual sale event.
+            if is_results:
+                ms = MASTERS_SALE_DATE_RE.search(full_text)
+                if ms:
+                    try:
+                        doc_sale_date = dateparser.parse(ms.group(1))
+                    except (ValueError, TypeError):
+                        pass
+            if doc_sale_date is None:
+                sd_m = SALE_DATE_RE.search(full_text)
+                if sd_m:
+                    try:
+                        doc_sale_date = dateparser.parse(sd_m.group(1))
+                    except (ValueError, TypeError):
+                        pass
 
             # Date-window check: upcoming sales must be within the 120-day
             # forward horizon. RESULTS PDFs (Sale-Results.pdf,

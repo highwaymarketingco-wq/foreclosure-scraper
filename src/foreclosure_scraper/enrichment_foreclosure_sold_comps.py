@@ -147,10 +147,26 @@ FORECLOSURE_SALE_SOURCES = frozenset({
 
 def is_sold_pool_candidate(li: Listing,
                            now: datetime | None = None) -> bool:
-    """True if this listing should join the sold-comp pool — sale_date
-    in the past 0-180 days from a real foreclosure-sale source."""
+    """True if this listing should join the sold-comp pool. Two paths:
+
+    1. Strong signal: ``raw.actual_sold_price`` is set — the scraper has
+       confirmed an actual hammer price (Pickens / Anderson / Spartanburg
+       results PDFs, NC ROD Trustee's Deed Upon Sale recordings). These
+       qualify regardless of sale_date timing because the price-set event
+       has already happened — the only nuance is whether the legal sale
+       has been finalized (post upset-bid window).
+
+    2. Heuristic signal: sale_date is in the past 0-180 days AND the
+       source is a real foreclosure-sale source (law-firm trustee, county
+       MIE, county tax-foreclosure, auction.com). The opening_bid is
+       used as a sold-price proxy.
+    """
     if li.source not in FORECLOSURE_SALE_SOURCES:
         return False
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    if isinstance(raw.get("actual_sold_price"), (int, float)):
+        # Confirmed hammer price — accept regardless of sale_date timing.
+        return True
     sd = _naive_utc(li.sale_date)
     if sd is None:
         return False
