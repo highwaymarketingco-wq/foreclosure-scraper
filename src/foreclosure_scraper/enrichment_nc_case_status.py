@@ -101,6 +101,13 @@ def _normalize_status(text: str) -> Optional[str]:
 async def _check_case(case_number: str) -> Optional[dict]:
     """Hit the Tyler portal for one case# and parse current status.
 
+    Tyler's Smart Search Dashboard URL (/Portal/Home/Dashboard/29) only
+    accepts requests with a session established by navigating from
+    /Portal/. Direct GET returns 405 Method Not Allowed (observed in
+    the 2026-05-07 patch run logs). Workaround: land at /Portal/ root,
+    click the 'Smart Search' button to navigate (server-side establishes
+    session state), then drive the search form.
+
     Returns dict with status info, or None on failure.
     """
     try:
@@ -108,33 +115,106 @@ async def _check_case(case_number: str) -> Optional[dict]:
     except ImportError:
         return None
 
-    # Tyler search-by-case URL pattern
-    search_url = f"{PORTAL_BASE}/Home/WorkspaceMode?p=29"
+    # Land at the Portal root — server returns 200 + a link to
+    # /Home/Dashboard/29 (Smart Search). Clicking it establishes the
+    # session state Tyler requires.
+    landing_url = f"{PORTAL_BASE}/"
 
     async def page_action(page):
         try:
-            # Type into the case-number search box. Selectors may need tuning
-            # if the Angular template changes — wrap in try/except.
-            await page.wait_for_selector("input[name='caseNumber'], input[id*='Case'], #caseNumber", timeout=15000)
-            sel = "input[name='caseNumber'], input[id*='Case'], #caseNumber"
-            await page.fill(sel, case_number)
-            # Submit form
-            for btn_sel in ("button[type='submit']", "input[type='submit']", "button.search"):
+            # Step 1: Click the Smart Search button on the landing page
+            # to navigate to Dashboard/29 with proper session state.
+            for sel in (
+                'a[href*="/Home/Dashboard/29"]',
+                'a:has-text("Smart Search")',
+                'a:has-text("Search")',
+            ):
+                try:
+                    await page.click(sel, timeout=8000)
+                    break
+                except Exception:
+                    continue
+            await page.wait_for_load_state("networkidle", timeout=20000)
+
+            # Step 2: Some Tyler installs have a sub-navigation to a
+            # 'Case Search' tab from the dashboard. Try clicking it; if
+            # not present, the search form is already on Dashboard/29.
+            for sel in (
+                'a:has-text("Case Search")',
+                'button:has-text("Case Search")',
+                '[data-search-type="caseNumber"]',
+                'a[href*="CaseSearch"]',
+            ):
+                try:
+                    await page.click(sel, timeout=4000)
+                    await page.wait_for_load_state("networkidle", timeout=10000)
+                    break
+                except Exception:
+                    continue
+
+            # Step 3: Fill the case-number input. Tyler's selector varies
+            # across tenants — try several common patterns.
+            input_selectors = (
+                "input[name='caseNumber']",
+                "input[id*='Case']",
+                "#caseNumber",
+                "input[placeholder*='ase' i]",
+                "input[name*='case' i]",
+            )
+            filled = False
+            for sel in input_selectors:
+                try:
+                    await page.wait_for_selector(sel, timeout=8000)
+                    await page.fill(sel, case_number)
+                    filled = True
+                    break
+                except Exception:
+                    continue
+            if not filled:
+                return
+
+            # Step 4: Submit. Tyler accepts Enter on the field, but
+            # also try explicit search-button clicks as fallback.
+            try:
+                await page.press(input_selectors[0], "Enter")
+            except Exception:
+                pass
+            for btn_sel in (
+                "button[type='submit']",
+                "input[type='submit']",
+                "button.search",
+                "button:has-text('Search')",
+            ):
                 try:
                     await page.click(btn_sel, timeout=3000)
                     break
                 except Exception:
                     continue
-            await page.wait_for_load_state("networkidle", timeout=20000)
+            await page.wait_for_load_state("networkidle", timeout=25000)
+
+            # Step 5: If there's a results-row link to the case, click
+            # through to the case-detail page where docket entries (and
+            # confirmation orders + hammer prices) actually live.
+            for sel in (
+                f'a:has-text("{case_number}")',
+                "table.search-results tr:first-of-type a",
+                "table tr td:first-of-type a",
+            ):
+                try:
+                    await page.click(sel, timeout=5000)
+                    await page.wait_for_load_state("networkidle", timeout=20000)
+                    break
+                except Exception:
+                    continue
         except Exception:
             pass
 
     try:
         result = await StealthyFetcher.async_fetch(
-            search_url,
+            landing_url,
             headless=True,
             network_idle=True,
-            timeout=60000,
+            timeout=90000,
             page_action=page_action,
         )
     except Exception as exc:
