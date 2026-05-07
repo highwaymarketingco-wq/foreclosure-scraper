@@ -115,48 +115,227 @@ def _sold_price_from_stamp(text: str) -> Optional[float]:
     return None
 
 
+def _parse_permitium_results_html(html: str, county: str,
+                                  source_url: str,
+                                  doc_type: str) -> list[Listing]:
+    """Parse a Permitium recording-search results HTML page.
+
+    Permitium's results UI varies by tenant configuration, but the
+    common pattern is:
+      * Each recording = one row in a results table OR a result card div
+      * Per-row data: instrument#, recorded date, parties (grantor/
+        grantee), document type, book/page
+      * Trustee's Deed Upon Sale rows include a deed-tax stamp value
+        in a 'consideration' / 'excise tax' field, from which we
+        derive sold price (NC charges $1 per $500 consideration).
+
+    We use selectolax for fast HTML parsing + multiple selector
+    fallbacks since Permitium's HTML structure varies. Best-effort.
+    """
+    out: list[Listing] = []
+    try:
+        from selectolax.parser import HTMLParser
+    except ImportError:
+        return out
+
+    tree = HTMLParser(html)
+
+    # Collect candidate "row" elements via the most common Permitium
+    # structures. Falls through fallbacks until something hits.
+    candidates: list = []
+    for selector in (
+        "table.results-table tbody tr",
+        "table.search-results tbody tr",
+        "table[id*='results'] tbody tr",
+        "tr.result-row",
+        "div.result-card, div.recording-row",
+        "div[class*='result-item']",
+        # Last-resort: ANY tr in any table on the page (filtered downstream)
+        "table tbody tr",
+    ):
+        candidates = tree.css(selector)
+        if candidates:
+            log.info(
+                "nc_rod.permitium_rows_found",
+                county=county, selector=selector, count=len(candidates),
+                doc_type=doc_type,
+            )
+            break
+
+    if not candidates:
+        log.info(
+            "nc_rod.permitium_no_rows", county=county,
+            note="No table/card rows matched any common Permitium selector. "
+                 "Inspect nc_rod.permitium_landing log to see actual structure.",
+        )
+        return out
+
+    # Per-row extraction. Combine the row's text and run regex against it
+    # — robust to varying cell layouts since we just need: case#/instrument
+    # ref, date, parties, money fields.
+    instrument_re = re.compile(r"\b(?:Inst(?:rument)?|Doc(?:ument)?)\s*#?\s*[:=]?\s*(\d{6,})", re.I)
+    book_page_re = re.compile(r"\b[Bb]ook\s*(\d+)[\s/,]+[Pp]age\s*(\d+)", re.I)
+    party_re = re.compile(r"\b(?:Grantor|Defendant|Borrower)\s*[:=]?\s*([A-Z][\w &.,'\-]{2,80})", re.I)
+
+    for node in candidates:
+        try:
+            row_text = (node.text(separator=" ", strip=True) or "").strip()
+        except Exception:
+            continue
+        if len(row_text) < 20:
+            continue
+
+        # Filter: this row must mention the doc type we care about
+        # (Substitute Trustee Deed / Notice of Sale / Trustee's Deed
+        # Upon Sale). Skips header rows + unrelated documents on the
+        # page.
+        dt_lower = doc_type.lower()
+        if dt_lower not in row_text.lower() and not any(
+            k in row_text.lower() for k in (
+                "substitute trustee", "notice of sale", "trustee's deed",
+                "trustees deed", "claim of lien",
+            )
+        ):
+            continue
+
+        # Date — look for a date pattern in the row
+        date_m = DATE_RE.search(row_text)
+        recorded_date: datetime | None = None
+        if date_m:
+            try:
+                from dateutil import parser as _dp
+                recorded_date = _dp.parse(date_m.group(1), fuzzy=True)
+            except (ValueError, TypeError):
+                pass
+
+        # Sold price (only meaningful for Trustee's Deed Upon Sale)
+        sold_price = _sold_price_from_stamp(row_text)
+        is_post_sale = (
+            "trustee" in row_text.lower() and "deed" in row_text.lower()
+            and ("upon sale" in row_text.lower() or sold_price is not None)
+        )
+
+        # Parties / debtor name
+        defendant = None
+        pm = party_re.search(row_text)
+        if pm:
+            defendant = pm.group(1).strip()[:200]
+
+        # Instrument or book/page identifier — used as case_number proxy
+        case_id = None
+        im = instrument_re.search(row_text)
+        if im:
+            case_id = f"INST-{im.group(1)}"
+        else:
+            bm = book_page_re.search(row_text)
+            if bm:
+                case_id = f"BK{bm.group(1)}-PG{bm.group(2)}"
+
+        if not (recorded_date or sold_price or case_id):
+            continue  # nothing useful extracted
+
+        raw_payload: dict = {
+            "nc_rod_permitium": {
+                "vendor": "permitium",
+                "doc_type": doc_type,
+                "raw_row_excerpt": row_text[:400],
+                "recorded_date_iso": (recorded_date.isoformat()
+                                       if recorded_date else None),
+                "is_post_sale": is_post_sale,
+            },
+        }
+        if sold_price is not None:
+            # Top-level so enrichment_foreclosure_sold_comps reads it as
+            # confirmed hammer price.
+            raw_payload["actual_sold_price"] = sold_price
+
+        out.append(Listing(
+            source="counties_nc.nc_rod_substitute_trustee",
+            source_url=source_url,
+            listing_type=ListingType.FORECLOSURE_SALE,
+            property_kind=PropertyKind.UNKNOWN,
+            state="NC",
+            county=county,
+            case_number=case_id,
+            defendant=defendant,
+            sale_date=recorded_date if is_post_sale else None,
+            opening_bid=sold_price,
+            description=row_text[:500],
+            first_seen=datetime.utcnow(),
+            last_seen=datetime.utcnow(),
+            raw=raw_payload,
+        ))
+
+    log.info(
+        "nc_rod.permitium_extracted",
+        county=county, doc_type=doc_type,
+        candidates=len(candidates), parsed=len(out),
+    )
+    return out
+
+
 async def _scrapling_search_permitium(
-    portal_url: str, doc_type: str, days_back: int = 60,
+    portal_url: str, doc_type: str, county: str, days_back: int = 60,
 ) -> tuple[str, list[Listing]]:
     """Drive a Permitium recording-search portal and return (raw_html,
     listings). Returns ("", []) when Scrapling not available or portal
     unreachable. Logs diagnostic info on every path so the first CI run
-    surfaces the actual page structure."""
+    surfaces the actual page structure even when parsing fails."""
     try:
         from scrapling.fetchers import StealthyFetcher
     except ImportError:
         log.warning("nc_rod.scrapling_missing", portal=portal_url)
         return "", []
-    try:
-        # Attempt 1: load search-form page with network-idle wait.
-        result = await StealthyFetcher.async_fetch(
-            portal_url,
-            headless=True,
-            network_idle=True,
-            timeout=60000,
-        )
-    except Exception as exc:  # noqa: BLE001
-        log.warning("nc_rod.permitium_fetch_failed",
-                    portal=portal_url, error=str(exc)[:200])
+
+    # Try the search-results URL directly (some Permitium tenants accept
+    # query-string filters); fall back to the landing page if 404.
+    search_url = (
+        f"{portal_url.rstrip('/')}/searches/results?"
+        f"document_type={doc_type.replace(' ', '+')}&"
+        f"date_from={(datetime.utcnow() - timedelta(days=days_back)).strftime('%Y-%m-%d')}&"
+        f"date_to={datetime.utcnow().strftime('%Y-%m-%d')}"
+    )
+
+    html = ""
+    for url_attempt in (search_url, portal_url):
+        try:
+            result = await StealthyFetcher.async_fetch(
+                url_attempt,
+                headless=True,
+                network_idle=True,
+                timeout=90000,
+            )
+            body = getattr(result, "body", b"")
+            html_attempt = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
+            if html_attempt and len(html_attempt) > 1000:
+                html = html_attempt
+                log.info(
+                    "nc_rod.permitium_landing",
+                    portal=portal_url, attempted=url_attempt,
+                    html_bytes=len(html),
+                    has_search_form=("<form" in html.lower() and "search" in html.lower()),
+                    has_results_table=("<table" in html.lower() and "<tr" in html.lower()),
+                    has_doc_type_filter="document_type" in html.lower() or "doc_type" in html.lower(),
+                )
+                break
+        except Exception as exc:  # noqa: BLE001
+            log.warning(
+                "nc_rod.permitium_fetch_failed",
+                portal=portal_url, attempted=url_attempt,
+                error=str(exc)[:200],
+            )
+            continue
+
+    if not html:
         return "", []
 
-    body = getattr(result, "body", b"")
-    html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
-    log.info(
-        "nc_rod.permitium_landing",
-        portal=portal_url, html_bytes=len(html),
-        has_search_form=("<form" in html.lower() and "search" in html.lower()),
-        has_results_table=("<table" in html.lower() and "<tr" in html.lower()),
-        has_doc_type_filter="document_type" in html.lower() or "doc_type" in html.lower(),
-    )
     if os.environ.get("NC_ROD_DEBUG"):
-        log.debug("nc_rod.html_excerpt", excerpt=html[:2000])
+        log.debug("nc_rod.html_excerpt", excerpt=html[:3000])
 
-    # Future: drive the search form with page_action — set doc_type
-    # filter, set date range to past `days_back`, click Search, wait
-    # for results table, parse rows. Implementation pending the first
-    # CI run's diagnostic logs that reveal the actual selectors.
-    return html, []
+    listings = _parse_permitium_results_html(
+        html, county=county, source_url=portal_url, doc_type=doc_type,
+    )
+    return html, listings
 
 
 class NCRodSubstituteTrustee(BaseScraper):
@@ -182,6 +361,7 @@ class NCRodSubstituteTrustee(BaseScraper):
                     html, listings = await _scrapling_search_permitium(
                         portal_url=portal_url,
                         doc_type=doc_type,
+                        county=county,
                         days_back=60,
                     )
                     out.extend(listings)
