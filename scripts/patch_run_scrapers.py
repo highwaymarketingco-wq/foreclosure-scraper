@@ -120,6 +120,16 @@ KNOWN_FIXED = (
     # for SC counties with active filings each week
     "counties_sc.sc_public_index_lis_pendens",
     "counties_sc.sc_courtrosters",
+    # Law-firm trustee scrapers — these produce sale_dates in the past
+    # 0-14 days (auctions just held), which is the only source that
+    # populates the upset-bid window. Without them in --all-fixed,
+    # tagged_in_window=0 in patch runs even though the code is correct.
+    # The 4 listed below have been working scrapers (vs Korn / Aldridge /
+    # McMichael / Rogers Townsend which are still RENDER-REQUIRED skeletons).
+    "law_firms.brock_scott",
+    "law_firms.hutchens",
+    "law_firms.bell_carrington",
+    "law_firms.finkel",
 )
 
 
