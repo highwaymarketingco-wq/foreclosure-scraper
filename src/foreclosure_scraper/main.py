@@ -434,6 +434,23 @@ async def run() -> int:
     except Exception:
         log.error("address_synth.failed", traceback=traceback.format_exc())
 
+    # Enforce case-pinned county AFTER all address-finding enrichments.
+    # NC + SC venue rules require foreclosure cases to be filed in the
+    # county where the property is located (NCGS §45-21.2, SC Code §15-11-10),
+    # so the case# encodes the authoritative county. Cross-county defendant-
+    # name GIS matches earlier in the chain can overwrite county AND fill
+    # a wrong-county street_address — Run #16 forensics found 15 NC eCourts
+    # listings tagged with the wrong county. This module re-tags county and
+    # nulls a real-looking but wrong-county street_address so investors don't
+    # drive to the wrong property.
+    try:
+        from .enrichment_county_pin import enforce_case_pinned_county
+        s = enforce_case_pinned_county(enriched)
+        if s:
+            enrichment_stats["county_pin"] = s
+    except Exception:
+        log.error("county_pin.failed", traceback=traceback.format_exc())
+
     # NC eCourts case-status check via Tyler portal (Scrapling/Playwright).
     # Tags listings.raw.nc_case_status with current docket state — pending,
     # sold (recent sale), upset_bid (in 10-day window), confirmed, dismissed.

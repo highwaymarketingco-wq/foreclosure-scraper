@@ -85,6 +85,7 @@ from foreclosure_scraper.valuation import calc as valuation_calc
 from foreclosure_scraper.valuation import grading as valuation_grading
 from foreclosure_scraper.valuation import location as valuation_location
 from foreclosure_scraper.validation import validate as validate_listings
+from foreclosure_scraper.enrichment_county_pin import enforce_case_pinned_county
 from foreclosure_scraper.enrichment_data_quality import enrich_data_quality
 from foreclosure_scraper.enrichment_judgment_amount import enrich_judgment_amount
 from foreclosure_scraper.enrichment_property_kind import enrich_property_kind
@@ -307,6 +308,18 @@ async def _run_address_enrichments(new_listings: list[Listing]) -> dict:
         log.error("patch_run.addr_synth_failed",
                   traceback=traceback.format_exc())
         stats["address_synth"] = "failed"
+
+    # Enforce case-pinned county on the new listings AFTER all address
+    # enrichments. Catches the cross-county GIS-overwrite bug where
+    # earlier enrichments mistagged county based on a same-name match
+    # in a different county. Pure-Python.
+    try:
+        s = enforce_case_pinned_county(new_listings)
+        stats["county_pin"] = s
+    except Exception:
+        log.error("patch_run.county_pin_failed",
+                  traceback=traceback.format_exc())
+        stats["county_pin"] = "failed"
 
     # Property kind backfill (must precede validation/calc which read
     # property_kind for kind-specific logic)

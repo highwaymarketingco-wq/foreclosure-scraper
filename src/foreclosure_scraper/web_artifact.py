@@ -69,6 +69,7 @@ RAW_KEEP = {
     "nc_case_status": "*",            # NC eCourts case status (pending/sold/upset)
     "carryover": "*",                 # Last-known-good replay marker
     "filed_date": "*",                # Generic file-date for lis pendens / liens
+    "county_pin": "*",                # Case#-encoded venue county correction
 }
 
 

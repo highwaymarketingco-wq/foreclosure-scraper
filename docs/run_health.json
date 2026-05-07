@@ -571,7 +571,15 @@
         "tagged_in_window": 3,
         "tag_cleared_outside_window": 0
       },
-      "note": "enrich_upset_bid re-run on merged set; 3 NC listings actionable in upset-bid window per NCGS \u00a745-21.27"
+      "note": "enrich_upset_bid re-run on merged set; 3 NC listings actionable in upset-bid window per NCGS \u00a745-21.27",
+      "county_pin_post_hoc": {
+        "scanned": 2616,
+        "case_pinned": 818,
+        "already_correct": 803,
+        "retagged_county": 15,
+        "address_nulled": 9,
+        "no_case_decode": 1798
+      }
     }
   ]
 }

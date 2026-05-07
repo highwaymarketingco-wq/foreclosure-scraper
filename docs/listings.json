@@ -381240,15 +381240,15 @@
     "source_url": "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/#/search?caseNumber=26M000113-640",
     "listing_type": "tax_lien",
     "property_kind": "land",
-    "street_address": "564   HICKORY AIRPORT RD",
+    "street_address": null,
     "city": null,
     "state": "NC",
     "zip_code": null,
-    "county": "Burke",
-    "parcel_id": "2783738049",
+    "county": "New Hanover",
+    "parcel_id": null,
     "legal_description": null,
-    "latitude": 35.740724141886496,
-    "longitude": -81.40043236124879,
+    "latitude": null,
+    "longitude": null,
     "sale_date": null,
     "sale_time": null,
     "sale_location": null,
@@ -381327,6 +381327,14 @@
           "Burke County, NC \u2014 smaller market",
           "tax sale \u2014 buyer takes subject to other liens"
         ]
+      },
+      "county_pin": {
+        "original_county": "Burke",
+        "pinned_to": "New Hanover",
+        "case_number": "26M000113-640",
+        "statute": "NCGS \u00a745-21.2",
+        "address_nulled": true,
+        "original_address_was": "564   HICKORY AIRPORT RD"
       }
     }
   },
@@ -381442,15 +381450,15 @@
     "source_url": "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/#/search?caseNumber=26M000486-910",
     "listing_type": "tax_lien",
     "property_kind": "land",
-    "street_address": "220 HOSPITAL DR",
+    "street_address": null,
     "city": null,
     "state": "NC",
     "zip_code": null,
-    "county": "Polk",
+    "county": "Wake",
     "parcel_id": null,
     "legal_description": null,
-    "latitude": 35.23763188036696,
-    "longitude": -82.21440647279158,
+    "latitude": null,
+    "longitude": null,
     "sale_date": null,
     "sale_time": null,
     "sale_location": null,
@@ -381529,6 +381537,14 @@
           "Polk County, NC \u2014 smaller market",
           "tax sale \u2014 buyer takes subject to other liens"
         ]
+      },
+      "county_pin": {
+        "original_county": "Polk",
+        "pinned_to": "Wake",
+        "case_number": "26M000486-910",
+        "statute": "NCGS \u00a745-21.2",
+        "address_nulled": true,
+        "original_address_was": "220 HOSPITAL DR"
       }
     }
   },
@@ -381800,15 +381816,15 @@
     "source_url": "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/#/search?caseNumber=26M000107-310",
     "listing_type": "tax_lien",
     "property_kind": "land",
-    "street_address": "2311 PEA RIDGE RD",
+    "street_address": null,
     "city": null,
     "state": "NC",
     "zip_code": null,
-    "county": "Polk",
+    "county": "Durham",
     "parcel_id": null,
     "legal_description": null,
-    "latitude": 35.29905293762549,
-    "longitude": -82.08842134495498,
+    "latitude": null,
+    "longitude": null,
     "sale_date": null,
     "sale_time": null,
     "sale_location": null,
@@ -381887,6 +381903,14 @@
           "Polk County, NC \u2014 smaller market",
           "tax sale \u2014 buyer takes subject to other liens"
         ]
+      },
+      "county_pin": {
+        "original_county": "Polk",
+        "pinned_to": "Durham",
+        "case_number": "26M000107-310",
+        "statute": "NCGS \u00a745-21.2",
+        "address_nulled": true,
+        "original_address_was": "2311 PEA RIDGE RD"
       }
     }
   },
@@ -382830,7 +382854,7 @@
     "city": null,
     "state": "NC",
     "zip_code": null,
-    "county": "Mecklenburg",
+    "county": "Guilford",
     "parcel_id": "11911314",
     "legal_description": null,
     "latitude": 35.220081554927376,
@@ -382923,6 +382947,14 @@
           "Mecklenburg County, NC \u2014 high-demand metro",
           "tax sale \u2014 buyer takes subject to other liens"
         ]
+      },
+      "county_pin": {
+        "original_county": "Mecklenburg",
+        "pinned_to": "Guilford",
+        "case_number": "26M000218-400",
+        "statute": "NCGS \u00a745-21.2",
+        "address_nulled": false,
+        "original_address_was": null
       }
     }
   },
@@ -382935,7 +382967,7 @@
     "city": "Rosman",
     "state": "NC",
     "zip_code": null,
-    "county": "Transylvania",
+    "county": "Guilford",
     "parcel_id": "8552-75-3997-000",
     "legal_description": null,
     "latitude": 35.13460891035263,
@@ -383033,6 +383065,14 @@
           "Transylvania County, NC \u2014 smaller market",
           "tax sale \u2014 buyer takes subject to other liens"
         ]
+      },
+      "county_pin": {
+        "original_county": "Transylvania",
+        "pinned_to": "Guilford",
+        "case_number": "26M000221-400",
+        "statute": "NCGS \u00a745-21.2",
+        "address_nulled": false,
+        "original_address_was": null
       }
     }
   },
@@ -383142,7 +383182,7 @@
     "city": null,
     "state": "NC",
     "zip_code": null,
-    "county": "Mecklenburg",
+    "county": "Union",
     "parcel_id": "11134399",
     "legal_description": null,
     "latitude": 35.25927797603154,
@@ -383235,6 +383275,14 @@
           "Mecklenburg County, NC \u2014 high-demand metro",
           "tax sale \u2014 buyer takes subject to other liens"
         ]
+      },
+      "county_pin": {
+        "original_county": "Mecklenburg",
+        "pinned_to": "Union",
+        "case_number": "26M000131-890",
+        "statute": "NCGS \u00a745-21.2",
+        "address_nulled": false,
+        "original_address_was": null
       }
     }
   },
@@ -383441,7 +383489,7 @@
     "city": null,
     "state": "NC",
     "zip_code": null,
-    "county": "Mecklenburg",
+    "county": "McDowell",
     "parcel_id": "04108110",
     "legal_description": null,
     "latitude": 35.674,
@@ -383536,6 +383584,14 @@
           "Mecklenburg County, NC \u2014 high-demand metro",
           "no major flags"
         ]
+      },
+      "county_pin": {
+        "original_county": "Mecklenburg",
+        "pinned_to": "McDowell",
+        "case_number": "26M000014-580",
+        "statute": "NCGS \u00a745-21.2",
+        "address_nulled": false,
+        "original_address_was": null
       }
     }
   },
@@ -383544,15 +383600,15 @@
     "source_url": "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/#/search?caseNumber=26M000046-120",
     "listing_type": "tax_lien",
     "property_kind": "land",
-    "street_address": "1709 BLUEBIRD DR",
-    "city": "FLAT ROCK BR",
+    "street_address": null,
+    "city": null,
     "state": "NC",
     "zip_code": null,
-    "county": "Henderson",
-    "parcel_id": "9577372938",
+    "county": "Cabarrus",
+    "parcel_id": null,
     "legal_description": null,
-    "latitude": 35.289430647753264,
-    "longitude": -82.44129486907397,
+    "latitude": null,
+    "longitude": null,
     "sale_date": null,
     "sale_time": null,
     "sale_location": null,
@@ -383631,6 +383687,14 @@
           "Henderson County, NC \u2014 established market",
           "tax sale \u2014 buyer takes subject to other liens"
         ]
+      },
+      "county_pin": {
+        "original_county": "Henderson",
+        "pinned_to": "Cabarrus",
+        "case_number": "26M000046-120",
+        "statute": "NCGS \u00a745-21.2",
+        "address_nulled": true,
+        "original_address_was": "1709 BLUEBIRD DR"
       }
     }
   },
@@ -383639,15 +383703,15 @@
     "source_url": "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/#/search?caseNumber=26M000125-330",
     "listing_type": "tax_lien",
     "property_kind": "land",
-    "street_address": "4261   SOUTH FORK AVE",
+    "street_address": null,
     "city": null,
     "state": "NC",
     "zip_code": null,
-    "county": "Burke",
-    "parcel_id": "2771078177",
+    "county": "Forsyth",
+    "parcel_id": null,
     "legal_description": null,
-    "latitude": 35.69574544346181,
-    "longitude": -81.45583144599506,
+    "latitude": null,
+    "longitude": null,
     "sale_date": null,
     "sale_time": null,
     "sale_location": null,
@@ -383726,6 +383790,14 @@
           "Burke County, NC \u2014 smaller market",
           "tax sale \u2014 buyer takes subject to other liens"
         ]
+      },
+      "county_pin": {
+        "original_county": "Burke",
+        "pinned_to": "Forsyth",
+        "case_number": "26M000125-330",
+        "statute": "NCGS \u00a745-21.2",
+        "address_nulled": true,
+        "original_address_was": "4261   SOUTH FORK AVE"
       }
     }
   },
@@ -383734,15 +383806,15 @@
     "source_url": "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/#/search?caseNumber=26M000776-910",
     "listing_type": "tax_lien",
     "property_kind": "land",
-    "street_address": "304 CHADWICK AVE",
-    "city": "HENDERSONVILLE",
+    "street_address": null,
+    "city": null,
     "state": "NC",
     "zip_code": null,
-    "county": "Henderson",
-    "parcel_id": "9568935675",
+    "county": "Wake",
+    "parcel_id": null,
     "legal_description": null,
-    "latitude": 35.30456846734565,
-    "longitude": -82.4541856948773,
+    "latitude": null,
+    "longitude": null,
     "sale_date": null,
     "sale_time": null,
     "sale_location": null,
@@ -383821,6 +383893,14 @@
           "Henderson County, NC \u2014 established market",
           "tax sale \u2014 buyer takes subject to other liens"
         ]
+      },
+      "county_pin": {
+        "original_county": "Henderson",
+        "pinned_to": "Wake",
+        "case_number": "26M000776-910",
+        "statute": "NCGS \u00a745-21.2",
+        "address_nulled": true,
+        "original_address_was": "304 CHADWICK AVE"
       }
     }
   },
@@ -384130,15 +384210,15 @@
     "source_url": "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/#/search?caseNumber=26M000759-590",
     "listing_type": "tax_lien",
     "property_kind": "land",
-    "street_address": "CONTUCK LN",
+    "street_address": null,
     "city": null,
     "state": "NC",
     "zip_code": null,
-    "county": "Polk",
+    "county": "Mecklenburg",
     "parcel_id": null,
     "legal_description": null,
-    "latitude": 35.227,
-    "longitude": -80.843,
+    "latitude": null,
+    "longitude": null,
     "sale_date": null,
     "sale_time": null,
     "sale_location": null,
@@ -384217,6 +384297,14 @@
           "Polk County, NC \u2014 smaller market",
           "tax sale \u2014 buyer takes subject to other liens"
         ]
+      },
+      "county_pin": {
+        "original_county": "Polk",
+        "pinned_to": "Mecklenburg",
+        "case_number": "26M000759-590",
+        "statute": "NCGS \u00a745-21.2",
+        "address_nulled": true,
+        "original_address_was": "CONTUCK LN"
       }
     }
   },
@@ -384225,15 +384313,15 @@
     "source_url": "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/#/search?caseNumber=26M000776-590",
     "listing_type": "tax_lien",
     "property_kind": "land",
-    "street_address": "113 BUNCOMBE ST",
-    "city": "HENDERSONVILLE",
+    "street_address": null,
+    "city": null,
     "state": "NC",
     "zip_code": null,
-    "county": "Henderson",
-    "parcel_id": "9568675201",
+    "county": "Mecklenburg",
+    "parcel_id": null,
     "legal_description": null,
-    "latitude": 35.227,
-    "longitude": -80.843,
+    "latitude": null,
+    "longitude": null,
     "sale_date": null,
     "sale_time": null,
     "sale_location": null,
@@ -384312,6 +384400,14 @@
           "Henderson County, NC \u2014 established market",
           "tax sale \u2014 buyer takes subject to other liens"
         ]
+      },
+      "county_pin": {
+        "original_county": "Henderson",
+        "pinned_to": "Mecklenburg",
+        "case_number": "26M000776-590",
+        "statute": "NCGS \u00a745-21.2",
+        "address_nulled": true,
+        "original_address_was": "113 BUNCOMBE ST"
       }
     }
   },
@@ -384411,7 +384507,7 @@
     "city": null,
     "state": "NC",
     "zip_code": null,
-    "county": "Mecklenburg",
+    "county": "Forsyth",
     "parcel_id": "01909203",
     "legal_description": null,
     "latitude": 35.39904334840267,
@@ -384506,6 +384602,14 @@
           "Mecklenburg County, NC \u2014 high-demand metro",
           "no major flags"
         ]
+      },
+      "county_pin": {
+        "original_county": "Mecklenburg",
+        "pinned_to": "Forsyth",
+        "case_number": "26M000128-330",
+        "statute": "NCGS \u00a745-21.2",
+        "address_nulled": false,
+        "original_address_was": null
       }
     }
   },
@@ -384518,7 +384622,7 @@
     "city": "Greenville",
     "state": "NC",
     "zip_code": null,
-    "county": "Transylvania",
+    "county": "Durham",
     "parcel_id": "8534-32-7703-000",
     "legal_description": null,
     "latitude": 35.17870115055611,
@@ -384618,6 +384722,14 @@
           "Transylvania County, NC \u2014 smaller market",
           "no major flags"
         ]
+      },
+      "county_pin": {
+        "original_county": "Transylvania",
+        "pinned_to": "Durham",
+        "case_number": "26M000133-310",
+        "statute": "NCGS \u00a745-21.2",
+        "address_nulled": false,
+        "original_address_was": null
       }
     }
   },
@@ -384835,15 +384947,15 @@
     "source_url": "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/#/search?caseNumber=26M000091-500",
     "listing_type": "tax_lien",
     "property_kind": "single_family",
-    "street_address": "Pacheco Kelly Jean",
-    "city": "Brevard",
+    "street_address": null,
+    "city": null,
     "state": "NC",
     "zip_code": null,
-    "county": "Transylvania",
-    "parcel_id": "8583-23-7552-000",
+    "county": "Johnston",
+    "parcel_id": null,
     "legal_description": null,
-    "latitude": 35.158219583522076,
-    "longitude": -82.73892343538883,
+    "latitude": null,
+    "longitude": null,
     "sale_date": null,
     "sale_time": null,
     "sale_location": null,
@@ -384923,6 +385035,14 @@
           "Transylvania County, NC \u2014 smaller market",
           "tax sale \u2014 buyer takes subject to other liens"
         ]
+      },
+      "county_pin": {
+        "original_county": "Transylvania",
+        "pinned_to": "Johnston",
+        "case_number": "26M000091-500",
+        "statute": "NCGS \u00a745-21.2",
+        "address_nulled": true,
+        "original_address_was": "Pacheco Kelly Jean"
       }
     }
   },
