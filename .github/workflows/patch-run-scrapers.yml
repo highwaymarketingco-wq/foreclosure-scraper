@@ -60,11 +60,15 @@ jobs:
       APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
       APIFY_FREE_TIER_ONLY: "1"
       COURTLISTENER_TOKEN: ${{ secrets.COURTLISTENER_TOKEN }}
-      # Anthropic Vision — fires on sold-comp listings that have photos,
-      # filling raw.condition_tier + raw.vision so the comp popout shows
-      # 'gut' / 'major' / 'cosmetic' / 'move_in_ready' alongside hammer
-      # price. Capped at SOLD_POOL_VISION_MAX_LISTINGS=100 per run.
+      # Vision provider — defaults to 'anthropic'. Set repo variable
+      # VISION_PROVIDER=gemini to flip to Gemini 2.0 Flash (free at 1500
+      # req/day on gemini-2.0-flash-exp; mint key at
+      # https://aistudio.google.com/apikey then add as GEMINI_API_KEY
+      # secret). Both providers fill the same raw.vision +
+      # raw.condition_tier shape so the comp popout works either way.
+      VISION_PROVIDER: ${{ vars.VISION_PROVIDER || 'anthropic' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       VISION_MAX_LISTINGS: "0"          # patch run skips active-listing Vision
       SOLD_POOL_VISION_MAX_LISTINGS: "100"
       # NC eCourts case-status (Tyler Odyssey docket parser) — capped per
