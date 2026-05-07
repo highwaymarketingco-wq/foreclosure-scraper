@@ -44,39 +44,19 @@ log = structlog.get_logger()
 
 # Per-county configuration. Document-type values are the actual filter
 # strings each portal accepts — verified from the indexer dropdown
-# options as of May 2026.
+# options as of May 2026. 2026-05-07 scope rollback: dropped Mecklenburg
+# / Wake / Durham portals; only Buncombe (in user's WNC core scope)
+# remains. Portal configs for the dropped counties are preserved here
+# in code comments below for future re-activation if scope changes.
+#
+# DEACTIVATED PORTALS (kept as comments for fast re-activation):
+#   Mecklenburg: https://meckrod.manatron.com/RealEstate/SearchEntry.aspx (manatron)
+#     doc_types: SUBSTITUTE TRUSTEE DEED, NOTICE OF SALE, CLAIM OF LIEN, TRUSTEES DEED
+#   Wake: https://services.wakegov.com/booksweb/PublicFreeMonitorSearch.aspx (aumentum)
+#     doc_types: SUBSTITUTE TRUSTEE DEED, NOTICE OF SALE, CLAIM OF LIEN
+#   Durham: https://rod-public.dconc.gov/Search.aspx (aumentum)
+#     doc_types: SUBSTITUTE TRUSTEE DEED, NOTICE OF SALE, CLAIM OF LIEN
 COUNTY_PORTALS: dict[str, dict] = {
-    "Mecklenburg": {
-        "url": "https://meckrod.manatron.com/",
-        "search_path": "/RealEstate/SearchEntry.aspx",
-        "doc_types": [
-            "SUBSTITUTE TRUSTEE DEED",
-            "NOTICE OF SALE",
-            "CLAIM OF LIEN",
-            "TRUSTEES DEED",
-        ],
-        "vendor": "manatron",
-    },
-    "Wake": {
-        "url": "https://services.wakegov.com/booksweb/",
-        "search_path": "/PublicFreeMonitorSearch.aspx",
-        "doc_types": [
-            "SUBSTITUTE TRUSTEE DEED",
-            "NOTICE OF SALE",
-            "CLAIM OF LIEN",
-        ],
-        "vendor": "aumentum",
-    },
-    "Durham": {
-        "url": "https://rod-public.dconc.gov/",
-        "search_path": "/Search.aspx",
-        "doc_types": [
-            "SUBSTITUTE TRUSTEE DEED",
-            "NOTICE OF SALE",
-            "CLAIM OF LIEN",
-        ],
-        "vendor": "aumentum",
-    },
     "Buncombe": {
         "url": "https://buncombe-recordings.permitium.com/",
         "search_path": "/searches/new",

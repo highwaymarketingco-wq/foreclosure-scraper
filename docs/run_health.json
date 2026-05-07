@@ -666,6 +666,50 @@
           17
         ]
       ]
+    },
+    {
+      "kind": "scope_rollback_b",
+      "applied_at": "2026-05-07T04:02:52.858935Z",
+      "note": "2026-05-07b \u2014 pruned Mecklenburg/Madison/Yancey from NC_COUNTIES + added Haywood NC + Abbeville SC to SCOPE_DENY_COUNTIES (overrides zip-prefix + bypass-source paths)",
+      "dropped_count": 399,
+      "kept_count": 1374,
+      "dropped_top_counties": [
+        [
+          [
+            "Mecklenburg",
+            "NC"
+          ],
+          385
+        ],
+        [
+          [
+            "Madison",
+            "NC"
+          ],
+          6
+        ],
+        [
+          [
+            "Yancey",
+            "NC"
+          ],
+          5
+        ],
+        [
+          [
+            "Haywood",
+            "NC"
+          ],
+          2
+        ],
+        [
+          [
+            "Abbeville",
+            "SC"
+          ],
+          1
+        ]
+      ]
     }
   ]
 }

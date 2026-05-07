@@ -29,29 +29,24 @@ SC_COUNTIES: tuple[County, ...] = (
 NC_COUNTIES: tuple[County, ...] = (
     # WNC mountains + foothills + Charlotte-metro footprint. Scope is
     # the upstate-SC / WNC corridor where the user actually invests.
-    # The 2026-05 broad NC expansion (Wake / Forsyth / Guilford / Durham /
-    # Cumberland / Alamance / Iredell / Cabarrus / Union NC / Pitt /
-    # Johnston) was rolled back 2026-05-07 — those counties are 1.5-4
-    # hours east of the target territory and produce ~890 dashboard
-    # listings per week that aren't actionable for the user.
+    # Iteration history:
+    #   2026-05-07a — pruned 11 eastern-NC counties (Wake/Forsyth/
+    #     Guilford/Durham/Cumberland/Alamance/Iredell/Cabarrus/Union/
+    #     Pitt/Johnston). Too far east of WNC.
+    #   2026-05-07b — pruned 3 more (Mecklenburg, Madison, Yancey).
+    #     Mecklenburg = Charlotte, dropped per user direction.
     County("Rutherford", "NC", "37161", "Rutherfordton"),
     County("Cleveland", "NC", "37045", "Shelby"),
     County("Henderson", "NC", "37089", "Hendersonville"),
     County("Polk", "NC", "37149", "Columbus"),
     County("Gaston", "NC", "37071", "Gastonia"),
-    County("Mecklenburg", "NC", "37119", "Charlotte"),
     County("Buncombe", "NC", "37021", "Asheville"),
     County("Transylvania", "NC", "37175", "Brevard"),
     County("McDowell", "NC", "37111", "Marion"),
     County("Lincoln", "NC", "37109", "Lincolnton"),
-    County("Madison", "NC", "37115", "Marshall"),
-    County("Yancey", "NC", "37199", "Burnsville"),
     County("Mitchell", "NC", "37121", "Bakersville"),
     County("Burke", "NC", "37023", "Morganton"),
-    # User-key coastal NC counties (Wilmington area + Onslow). Far from
-    # the WNC core but explicitly in the user's target list — Brunswick
-    # is in scope even when no scraper produced any listings this week,
-    # so when one does, _in_scope passes them through.
+    # User-key coastal NC counties (Wilmington area + Onslow).
     County("New Hanover", "NC", "37129", "Wilmington"),
     County("Brunswick", "NC", "37019", "Bolivia"),
     County("Onslow", "NC", "37133", "Jacksonville"),
@@ -65,11 +60,38 @@ COUNTY_BY_KEY: dict[str, County] = {
 
 
 def in_scope(county_name: str | None, state: str | None) -> bool:
-    """Return True if a (county, state) pair is one we track."""
+    """Return True if a (county, state) pair is one we track.
+
+    Deny set takes precedence over the allow list AND the zip-prefix
+    fallback (in main._in_scope) — listings in these counties never
+    appear regardless of how they were attributed.
+    """
     if not county_name or not state:
         return False
-    key = f"{state.upper()}-{county_name.lower().replace(' county', '').strip()}"
+    norm = county_name.lower().replace(" county", "").strip()
+    state_u = state.upper()
+    if (norm.title(), state_u) in SCOPE_DENY_COUNTIES_NORMALIZED:
+        return False
+    key = f"{state_u}-{norm}"
     return key in COUNTY_BY_KEY
+
+
+# Counties where listings should NEVER appear, even when they came from
+# a SCOPE_BYPASS source (CourtListener bankruptcy/civil/adversary) or
+# matched on SCOPE_ZIP_PREFIXES (e.g. 287xx covers Haywood NC, 296xx
+# covers Abbeville SC). User direction 2026-05-07: explicitly drop
+# these even though they'd otherwise sneak in via the zip fallback.
+SCOPE_DENY_COUNTIES: tuple[tuple[str, str], ...] = (
+    ("Mecklenburg", "NC"),  # Charlotte — out of user's flip target
+    ("Madison", "NC"),
+    ("Yancey", "NC"),
+    ("Haywood", "NC"),
+    ("Abbeville", "SC"),
+)
+# Pre-normalized for fast lookup in in_scope() + main._in_scope.
+SCOPE_DENY_COUNTIES_NORMALIZED: frozenset[tuple[str, str]] = frozenset(
+    (c, s) for c, s in SCOPE_DENY_COUNTIES
+)
 
 
 # ZIP code prefixes commonly inside our scope. Used as a fallback

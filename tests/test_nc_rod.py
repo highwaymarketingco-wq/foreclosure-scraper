@@ -15,8 +15,12 @@ from foreclosure_scraper.scrapers.counties_nc.nc_rod_substitute_trustee import (
 )
 
 
-def test_covers_4_target_counties():
-    expected = {"Mecklenburg", "Wake", "Durham", "Buncombe"}
+def test_covers_buncombe_only_after_scope_rollback():
+    """2026-05-07b scope rollback: Mecklenburg + Wake + Durham portals
+    deactivated when those counties were dropped from NC_COUNTIES.
+    Only Buncombe remains in scope. Original portals are preserved
+    as code comments for fast re-activation."""
+    expected = {"Buncombe"}
     assert set(COUNTY_PORTALS) == expected
 
 

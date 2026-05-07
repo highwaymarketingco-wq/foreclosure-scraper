@@ -58,23 +58,33 @@ def test_nc_ecourts_targets_all_in_scope():
 
 def test_in_scope_works_for_kept_counties():
     """Spot-check the NC counties currently in the user's target territory.
-    The 2026-05-07 scope rollback removed Wake / Forsyth / Guilford /
-    Durham / Cumberland / Alamance / Cabarrus / Iredell / Pitt / Johnston /
-    Union NC — those are 1.5-4h east of the upstate-SC / WNC corridor."""
-    for county in ("Henderson", "Buncombe", "Mecklenburg", "Gaston",
-                   "Cleveland", "New Hanover", "Brunswick", "Onslow"):
+    The 2026-05-07 scope rollbacks (a + b) removed eastern NC + Charlotte
+    + Madison/Yancey. WNC core + coastal NC keys remain."""
+    for county in ("Henderson", "Buncombe", "Gaston", "Cleveland", "Rutherford",
+                   "Polk", "Transylvania", "Burke", "McDowell", "Lincoln",
+                   "New Hanover", "Brunswick", "Onslow"):
         assert in_scope(county, "NC"), f"NC county {county} should be in scope"
 
 
-def test_dropped_eastern_counties_no_longer_in_scope():
-    """The 11 eastern NC counties pruned 2026-05-07 must NOT pass _in_scope
-    so we stop pulling 890 listings/run from outside the user's territory."""
+def test_dropped_counties_no_longer_in_scope():
+    """All counties pruned across 2026-05-07a (eastern NC) + 2026-05-07b
+    (Charlotte + Madison/Yancey + Haywood/Abbeville denylist) must NOT
+    pass _in_scope so we stop pulling them through any path."""
+    # 2026-05-07a — eastern NC
     for county in ("Wake", "Forsyth", "Guilford", "Durham", "Cumberland",
                    "Alamance", "Iredell", "Cabarrus", "Pitt", "Johnston"):
         assert not in_scope(county, "NC"), (
             f"NC county {county} was dropped from scope but in_scope still "
             f"returns True"
         )
+    # 2026-05-07b — Charlotte + adjacent WNC pruning
+    for county in ("Mecklenburg", "Madison", "Yancey", "Haywood"):
+        assert not in_scope(county, "NC"), (
+            f"NC county {county} was dropped from scope but in_scope still "
+            f"returns True"
+        )
+    # SC: Abbeville is on the deny list (already not in SC_COUNTIES)
+    assert not in_scope("Abbeville", "SC")
 
 
 def test_county_count_matches_ecourts_target_count():

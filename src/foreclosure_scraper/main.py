@@ -11,7 +11,12 @@ from datetime import datetime, timedelta
 
 import structlog
 
-from .config import RuntimeConfig, in_scope, SCOPE_ZIP_PREFIXES
+from .config import (
+    RuntimeConfig,
+    SCOPE_DENY_COUNTIES_NORMALIZED,
+    SCOPE_ZIP_PREFIXES,
+    in_scope,
+)
 from .dedupe import dedupe
 from .email_sender import send_digest
 from .enrichment import enrich
@@ -51,6 +56,15 @@ log = structlog.get_logger()
 
 
 def _in_scope(li: Listing) -> bool:
+    # Deny set takes precedence over EVERY other scope path. Without this,
+    # a listing tagged with a denied county still gets through via the zip-
+    # prefix fallback (288/287/296 cover Haywood NC, Mecklenburg NC,
+    # Abbeville SC etc.) or via SCOPE_BYPASS_SOURCES (CourtListener
+    # bankruptcy/civil/adversary). Explicit deny wins.
+    if li.county and li.state:
+        if (li.county.replace(" County", "").strip().title(),
+                li.state.upper()) in SCOPE_DENY_COUNTIES_NORMALIZED:
+            return False
     if li.source in SCOPE_BYPASS_SOURCES:
         return True
     if in_scope(li.county, li.state):
