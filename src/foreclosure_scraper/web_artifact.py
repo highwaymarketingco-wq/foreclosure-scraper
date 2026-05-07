@@ -71,6 +71,8 @@ RAW_KEEP = {
     "filed_date": "*",                # Generic file-date for lis pendens / liens
     "county_pin": "*",                # Case#-encoded venue county correction
     "geo_attribution": "*",           # 'state-only' marker for unattributed BK listings
+    "foreclosure_sold_comps": "*",    # Per-listing like-for-like recently-sold foreclosure comps
+    "foreclosure_sold_comp_summary": "*",  # County-level sold-comp rollup
 }
 
 

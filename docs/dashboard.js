@@ -611,6 +611,55 @@ function openDetail(l) {
     $("d-comps-section").style.display = "none";
   }
 
+  // Foreclosure-sold comps — recently-finished foreclosure sales in
+  // the same county, like-for-like by property kind / beds / sqft.
+  // Internal max-bid signal; rendered as nested data on the popout
+  // (these are NEVER shown as their own listings on the main grid).
+  const fcComps = (l.raw && l.raw.foreclosure_sold_comps) || [];
+  const fcSummary = (l.raw && l.raw.foreclosure_sold_comp_summary) || null;
+  if (fcComps.length) {
+    $("d-fc-comps-section").style.display = "block";
+    const summaryParts = [];
+    if (fcSummary) {
+      if (fcSummary.median_sold_price) {
+        summaryParts.push(`Median sold: <strong>$${Number(fcSummary.median_sold_price).toLocaleString()}</strong>`);
+      }
+      if (fcSummary.median_price_per_sqft) {
+        summaryParts.push(`<strong>$${Number(fcSummary.median_price_per_sqft).toFixed(0)}/sqft</strong>`);
+      }
+      if (fcSummary.range_low && fcSummary.range_high) {
+        summaryParts.push(`Range: $${Number(fcSummary.range_low).toLocaleString()}–$${Number(fcSummary.range_high).toLocaleString()}`);
+      }
+      summaryParts.push(`<span class="muted">${fcComps.length} comp${fcComps.length === 1 ? '' : 's'} from past ${fcSummary.lookback_days}d in ${fcSummary.county}</span>`);
+    }
+    const header = summaryParts.length
+      ? `<div class="comp-summary">${summaryParts.join(' · ')}</div>`
+      : "";
+    $("d-fc-comps").innerHTML = header + `
+      <table class="comps-table">
+        <thead><tr><th>Address</th><th>Sold</th><th>Date</th><th>SqFt</th><th>Bd/Ba</th><th>Condition</th><th>Photo</th></tr></thead>
+        <tbody>
+        ${fcComps.map(c => `
+          <tr>
+            <td>${c.source_url ? `<a href="${c.source_url}" target="_blank" rel="noopener">${c.address || "—"}</a>` : (c.address || "—")}</td>
+            <td>${c.sold_price ? `$${Number(c.sold_price).toLocaleString()}${c.actual_sold_price_known ? '' : '*'}` : "—"}</td>
+            <td>${c.sold_date ? c.sold_date.slice(0,10) : "—"}</td>
+            <td>${c.living_sqft ? Number(c.living_sqft).toLocaleString() : "—"}</td>
+            <td>${c.beds ?? "—"}/${c.baths ?? "—"}</td>
+            <td>${c.condition_tier ? `${c.condition_tier}${c.vision_confidence ? ' (' + c.vision_confidence + ')' : ''}` : "—"}</td>
+            <td>${c.primary_photo_url ? `<a href="${c.primary_photo_url}" target="_blank" rel="noopener">📷${c.photo_count > 1 ? ' ×' + c.photo_count : ''}</a>` : "—"}</td>
+          </tr>
+        `).join("")}
+        </tbody>
+      </table>
+      <div class="muted" style="font-size:0.85em;margin-top:0.5em">
+        * = opening bid / judgment amount used (actual hammer price not surfaced by source).
+        Comps matched by county + property kind + beds±1 + sqft±40% within last ${fcSummary?.lookback_days || 180}d.
+      </div>`;
+  } else {
+    $("d-fc-comps-section").style.display = "none";
+  }
+
   // Rent Comps
   const rents = (l.raw && l.raw.rent_comps) || [];
   if (rents.length) {

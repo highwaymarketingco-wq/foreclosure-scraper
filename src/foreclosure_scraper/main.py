@@ -288,9 +288,27 @@ async def run() -> int:
 
     log.info("orchestrator.collected", raw=len(raw))
 
-    # Filter to scope (counties we care about)
-    in_area = [li for li in raw if _in_scope(li)]
-    log.info("orchestrator.in_scope", count=len(in_area), pruned=len(raw) - len(in_area))
+    # Partition: recently-finished foreclosure sales (180-day past window
+    # from real foreclosure-sale sources — law-firm trustees, county MIE,
+    # county tax, auction.com) are routed to a SEPARATE pool used as
+    # max-bid comp signal. These never appear as listings on the dashboard
+    # main grid; they only surface as nested data on per-listing card
+    # popouts via raw.foreclosure_sold_comps. The active pipeline stays
+    # focused on actionable inventory.
+    from .enrichment_foreclosure_sold_comps import is_sold_pool_candidate
+    sold_pool_raw = [li for li in raw if is_sold_pool_candidate(li)]
+    active_raw = [li for li in raw if li not in set(id(x) for x in sold_pool_raw)
+                  ] if False else [li for li in raw if not is_sold_pool_candidate(li)]
+    log.info("orchestrator.partitioned",
+             active=len(active_raw), sold_pool=len(sold_pool_raw))
+
+    # Filter to scope (counties we care about) — applies to both partitions
+    in_area = [li for li in active_raw if _in_scope(li)]
+    log.info("orchestrator.in_scope", count=len(in_area),
+             pruned=len(active_raw) - len(in_area))
+    sold_pool = [li for li in sold_pool_raw if _in_scope(li)]
+    log.info("orchestrator.sold_pool_in_scope",
+             count=len(sold_pool), pruned=len(sold_pool_raw) - len(sold_pool))
 
     # Active only
     active = [li for li in in_area if _active_only(li, cfg.sale_horizon_days)]
@@ -542,6 +560,86 @@ async def run() -> int:
     except Exception:
         log.error("vision.failed", traceback=traceback.format_exc())
 
+    # ---- Sold-comp pool enrichment (parallel mini-pipeline) ----
+    # The sold pool runs through a STRIPPED pipeline: address-backfill
+    # so we know the property, photos+images so Vision has something to
+    # see, Vision (capped) so each comp shows current condition. We
+    # skip flood/EPA/permits/RentCast/HomeHarvest-comps-of-comps —
+    # diminishing returns for a comp signal.
+    if sold_pool:
+        try:
+            log.info("sold_pool.enrich_start", count=len(sold_pool))
+            # Address backfill so we know which property each sold comp is.
+            try:
+                from .enrichment_address_backfill import (
+                    enrich_addresses_from_owner,
+                )
+                await enrich_addresses_from_owner(sold_pool)
+            except Exception:
+                log.error("sold_pool.addr_backfill_failed",
+                          traceback=traceback.format_exc())
+            # Pull a Realtor.com gallery for each sold comp's address.
+            try:
+                from .enrichment_photos import enrich_with_address_photos
+                await enrich_with_address_photos(sold_pool)
+            except Exception:
+                log.error("sold_pool.photos_failed",
+                          traceback=traceback.format_exc())
+            # OSM map fallback.
+            try:
+                from .enrichment_images import enrich_with_images
+                await enrich_with_images(sold_pool, use_mapillary=False)
+            except Exception:
+                log.error("sold_pool.images_failed",
+                          traceback=traceback.format_exc())
+            # Vision condition assessment — separate (smaller) cap from
+            # the active pipeline so sold-comp Vision can't cannibalize
+            # active-listing Vision budget.
+            try:
+                from .enrichment_vision import enrich_with_vision as _ev
+                sold_vision_cap = int(os.environ.get(
+                    "SOLD_POOL_VISION_MAX_LISTINGS", "100"
+                ))
+                await _ev(sold_pool, max_listings=sold_vision_cap)
+            except Exception:
+                log.error("sold_pool.vision_failed",
+                          traceback=traceback.format_exc())
+            # Validate (county/parcel hygiene), county_pin (case# auth),
+            # property_kind (so kind-group matching works downstream).
+            try:
+                from .validation import validate as _vl
+                _vl(sold_pool)
+            except Exception:
+                pass
+            try:
+                from .enrichment_county_pin import enforce_case_pinned_county
+                enforce_case_pinned_county(sold_pool)
+            except Exception:
+                pass
+            try:
+                from .enrichment_property_kind import enrich_property_kind
+                enrich_property_kind(sold_pool)
+            except Exception:
+                pass
+            log.info("sold_pool.enrich_done", count=len(sold_pool))
+        except Exception:
+            log.error("sold_pool.enrich_outer_failed",
+                      traceback=traceback.format_exc())
+
+    # Match active listings to sold-pool comps (per-county, like-for-like
+    # by property_kind / beds / sqft). Each matched listing gets
+    # raw.foreclosure_sold_comps + raw.foreclosure_sold_comp_summary.
+    try:
+        from .enrichment_foreclosure_sold_comps import (
+            enrich_foreclosure_sold_comps,
+        )
+        s = enrich_foreclosure_sold_comps(enriched, sold_pool)
+        if s:
+            enrichment_stats["foreclosure_sold_comps"] = s
+    except Exception:
+        log.error("foreclosure_sold_comps.failed",
+                  traceback=traceback.format_exc())
+
     # FEMA flood-zone tag — free public NFHL API, marks SFHA (high-risk) zones
     # so grade can dock points and the calculator can include flood insurance.
     try:
@@ -749,6 +847,27 @@ async def run() -> int:
         write_artifact(enriched, summary)
     except Exception:
         log.error("web_artifact.failed", traceback=traceback.format_exc())
+
+    # Sold-comp pool — separate file so the dashboard's main grid never
+    # shows past-sale "listings". The card popout still reads
+    # raw.foreclosure_sold_comps which travels with the active listing.
+    # This separate file is for power-users / future analytics.
+    try:
+        import json as _json
+        from pathlib import Path as _Path
+        from .web_artifact import _to_dict as _slim
+        sold_path = _Path(__file__).resolve().parent.parent.parent / \
+            "docs" / "foreclosure_sold_pool.json"
+        sold_payload = [_slim(li) for li in sold_pool]
+        sold_path.write_text(
+            _json.dumps(sold_payload, ensure_ascii=False, default=str),
+            encoding="utf-8",
+        )
+        log.info("orchestrator.sold_pool_written",
+                 path=str(sold_path), count=len(sold_payload))
+    except Exception:
+        log.error("sold_pool_write.failed",
+                  traceback=traceback.format_exc())
 
     # Per-source health JSON — committed alongside listings.json each run
     # so an investor (or alerting hook) can see at a glance which sources
