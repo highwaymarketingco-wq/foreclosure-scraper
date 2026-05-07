@@ -71,9 +71,15 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       VISION_MAX_LISTINGS: "0"          # patch run skips active-listing Vision
       SOLD_POOL_VISION_MAX_LISTINGS: "100"
-      # NC eCourts case-status (Tyler Odyssey docket parser) — capped per
-      # run since each case takes 5-15s of Scrapling render time.
-      PATCH_NC_CASE_STATUS: "1"
+      # NC eCourts case-status (Tyler Odyssey docket parser) — currently
+      # gated OFF because Tyler's /Portal/ 302-redirects unauthenticated
+      # GETs to /Home/Dashboard/29, which only accepts POST (returns 405
+      # GET-not-allowed; verified runs #1 + #2 on 2026-05-07). Until we
+      # ship a working Playwright-driven session establishment, the
+      # post-sale ROD path (Trustee's Deed Upon Sale) is the primary
+      # hammer-price source and produces sold comps directly. Flip
+      # PATCH_NC_CASE_STATUS=1 to re-enable once a fix lands.
+      PATCH_NC_CASE_STATUS: "0"
       PATCH_NC_CASE_STATUS_CAP: "60"
       LOG_LEVEL: INFO
       PYTHONUNBUFFERED: "1"
