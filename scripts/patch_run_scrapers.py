@@ -639,17 +639,19 @@ async def main() -> int:
         net_change=len(final_active) - len(existing),
     )
 
-    # ---- NC case-status enrichment (sale-date heuristic + ROD cross-ref) ----
-    # Pure compute — sale_date math + index lookup against the post-sale
-    # ROD pool to flag confirmed sales. The legacy Tyler portal scraper
-    # was retired (AWS WAF blocked all non-browser GETs); the heuristic
-    # path is free, deterministic, and runs every patch.
+    # ---- NC case-status enrichment (Tyler-auth path + heuristic fallback) ----
+    # Stage 1: authenticated Tyler scrape (NC_ECOURTS_USERNAME/PASSWORD must
+    # be set as workflow secrets). Pulls up to NC_ECOURTS_AUTH_CAP cases.
+    # Stage 2: heuristic sale-date + ROD cross-ref runs on whatever Tyler
+    # didn't tag. Pure compute, free, deterministic.
     if os.environ.get("PATCH_NC_CASE_STATUS", "1") == "1":
         try:
             from foreclosure_scraper.enrichment_nc_case_status import (
-                enrich_with_nc_case_status,
+                enrich_with_nc_case_status_dispatched,
             )
-            enrich_with_nc_case_status(final_active, sold_pool=final_sold)
+            await enrich_with_nc_case_status_dispatched(
+                final_active, sold_pool=final_sold,
+            )
         except Exception:
             log.error("patch_run.nc_case_status_failed",
                       traceback=traceback.format_exc())

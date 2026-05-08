@@ -524,15 +524,20 @@ async def run() -> int:
     except Exception:
         log.error("county_pin.failed", traceback=traceback.format_exc())
 
-    # NC case-status: heuristic sale-date math + Trustee's Deed cross-
-    # reference (no network — Tyler portal sits behind AWS WAF that blocks
-    # all non-browser traffic, see commit history). Tags raw.nc_case_status
-    # with status (scheduled/upset_bid/pending_confirmation/confirmed) and
-    # in_upset_bid_window flag. Disable with NC_CASE_STATUS_OFF=1.
+    # NC case-status: two-stage dispatch.
+    #   Stage 1 (when NC_ECOURTS_USERNAME/PASSWORD set): authenticated
+    #     Tyler portal scrape via WS-Fed login. Up to NC_ECOURTS_AUTH_CAP
+    #     cases (default 50). Tags raw.nc_case_status with full docket
+    #     detail (status, last_event, sold_price, in_upset_bid_window).
+    #   Stage 2 (always runs): heuristic sale-date math + Trustee's Deed
+    #     cross-ref. Fills any listings Tyler didn't tag. Pure compute.
+    # Disable both with NC_CASE_STATUS_OFF=1.
     if not os.environ.get("NC_CASE_STATUS_OFF"):
         try:
-            from .enrichment_nc_case_status import enrich_with_nc_case_status
-            enrich_with_nc_case_status(enriched, sold_pool=sold_pool)
+            from .enrichment_nc_case_status import (
+                enrich_with_nc_case_status_dispatched,
+            )
+            await enrich_with_nc_case_status_dispatched(enriched, sold_pool=sold_pool)
         except Exception:
             log.error("nc_case_status.failed", traceback=traceback.format_exc())
 

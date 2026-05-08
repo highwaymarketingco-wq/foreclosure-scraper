@@ -71,12 +71,16 @@ jobs:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       VISION_MAX_LISTINGS: "0"          # patch run skips active-listing Vision
       SOLD_POOL_VISION_MAX_LISTINGS: "100"
-      # NC case-status: heuristic sale-date math + Trustee's Deed cross-
-      # ref against the post-sale ROD pool. Pure compute, no Tyler portal
-      # (AWS WAF on portal-nc.tylertech.cloud blocks all non-browser GETs;
-      # verified via curl 2026-05-08 — `x-amzn-waf-action: captcha`).
-      # Tags raw.nc_case_status with status + in_upset_bid_window flag.
+      # NC case-status: two-stage dispatch.
+      # Stage 1 (auth): when NC_ECOURTS_USERNAME/PASSWORD are set, drive
+      # Tyler's WS-Fed login flow + scrape case dockets. Verified-account
+      # session cookies pass the WAF's bot challenge.
+      # Stage 2 (heuristic): sale-date math + Trustee's Deed cross-ref
+      # for any listing Tyler didn't tag.
       PATCH_NC_CASE_STATUS: "1"
+      NC_ECOURTS_USERNAME: ${{ secrets.NC_ECOURTS_USERNAME }}
+      NC_ECOURTS_PASSWORD: ${{ secrets.NC_ECOURTS_PASSWORD }}
+      NC_ECOURTS_AUTH_CAP: "50"
       LOG_LEVEL: INFO
       PYTHONUNBUFFERED: "1"
 

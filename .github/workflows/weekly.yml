@@ -37,6 +37,11 @@ jobs:
       VISION_PROVIDER: ${{ vars.VISION_PROVIDER || 'anthropic' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      # NC eCourts authenticated case-status — drives Tyler WS-Fed login
+      # to bypass AWS WAF. Caps at NC_ECOURTS_AUTH_CAP cases per run.
+      NC_ECOURTS_USERNAME: ${{ secrets.NC_ECOURTS_USERNAME }}
+      NC_ECOURTS_PASSWORD: ${{ secrets.NC_ECOURTS_PASSWORD }}
+      NC_ECOURTS_AUTH_CAP: "100"
       COURTLISTENER_TOKEN: ${{ secrets.COURTLISTENER_TOKEN }}
       RENTCAST_API_KEY: ${{ secrets.RENTCAST_API_KEY }}
       FORECLOSURE_DOT_COM_USER: ${{ secrets.FORECLOSURE_DOT_COM_USER }}

@@ -1,33 +1,40 @@
-"""NC foreclosure case-status enrichment — heuristic-based.
+"""NC foreclosure case-status enrichment.
 
-Replaces the broken Tyler Odyssey portal scraper (commit 27d1bdd attempted
-to navigate from /Portal/ to bypass a 405; runs #1 + #2 confirmed AWS WAF
-on portal-nc.tylertech.cloud is presenting a CAPTCHA challenge to all
-non-browser requests, including Scrapling/Playwright stealth, with
-`x-amzn-waf-action: captcha` in the response headers).
+Two paths, dispatched at runtime:
 
-All 100 NC counties share that single Tyler portal — there's no per-county
-alternative court website. But we don't actually need Tyler:
+  1. **Authenticated Tyler path** (enrichment_nc_case_status_tyler.py) —
+     when NC_ECOURTS_USERNAME + NC_ECOURTS_PASSWORD env vars are set,
+     drive a verified-account login through Tyler's WS-Fed flow, then
+     query each case's docket for status + hammer price + last event.
+     This is the canonical source — Order Confirming Sale lands here
+     before the Trustee's Deed records.
 
-  1. **Sale-date heuristic** — NCGS §45-21.27 says the upset-bid window
-     runs 10 days from the sale; allowing 1-3 days for clerk filing,
-     14 days is the conservative cutoff. Pure date math, no network.
+  2. **Heuristic fallback** — sale-date math (NCGS §45-21.27) plus a
+     cross-reference against the post-sale ROD pool (Trustee's Deed
+     Upon Sale). Pure compute, no network. Always runs for any
+     listings the authenticated path didn't tag.
 
-  2. **Trustee's Deed cross-reference** — when a Trustee's Deed Upon Sale
-     is recorded in the ROD for a foreclosure (already captured by
-     scrapers/counties_nc/nc_rod_substitute_trustee.py), that IS the
-     legal confirmation. Deed-delivered = sale confirmed.
+Tyler's portal-nc.tylertech.cloud sits behind AWS WAF that blocks
+unauthenticated bots (verified 2026-05-08 with `x-amzn-waf-action: captcha`
+in response headers). With a verified account, session cookies pass
+the WAF's verified-human check.
+
+All 100 NC counties share that single Tyler portal — there's no per-
+county alternative court website.
 
 Tags listing.raw["nc_case_status"] = {
     "status": "scheduled" | "upset_bid" | "pending_confirmation" | "confirmed",
     "in_upset_bid_window": bool,
     "upset_bid_deadline": ISO date or None,
-    "method": "sale_date_heuristic" | "trustee_deed_match",
+    "method": "tyler_authenticated" | "sale_date_heuristic" | "trustee_deed_match",
     "checked_at": ISO timestamp,
+    # Authenticated path only:
+    "last_event_date" / "last_event_text" / "sold_price": ...
 }
 """
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -139,11 +146,11 @@ def enrich_with_nc_case_status(
     listings: list[Listing],
     sold_pool: Optional[list[Listing]] = None,
 ) -> None:
-    """For NC foreclosure listings, infer current case status from
-    sale_date + cross-reference against the post-sale ROD pool.
+    """Heuristic-only path: sale_date math + Trustee's Deed cross-ref.
 
-    Synchronous, network-free, deterministic. Replaces the previous Tyler
-    Odyssey portal scraper which AWS WAF blocked (see module docstring).
+    Synchronous, network-free. Always safe to call. The authenticated
+    Tyler path is wrapped in `enrich_with_nc_case_status_dispatched`
+    (async) which calls this as a fallback.
 
     sold_pool is optional; when provided, listings with a recorded
     Trustee's Deed at the same address are tagged status='confirmed' with
@@ -215,14 +222,55 @@ def enrich_with_nc_case_status(
     log.info("nc_case_status.done", **counts)
 
 
-# Backwards-compat shim: legacy callers pass concurrency=, max_check=
-# kwargs from when this was async + Tyler-driven. New impl ignores them.
+async def enrich_with_nc_case_status_dispatched(
+    listings: list[Listing],
+    sold_pool: Optional[list[Listing]] = None,
+) -> None:
+    """Two-stage dispatch.
+
+    Stage 1: if NC_ECOURTS_USERNAME + NC_ECOURTS_PASSWORD are set, run
+    the authenticated Tyler scraper on up to NC_ECOURTS_AUTH_CAP
+    listings (default 50). This catches the highest-priority cases
+    with full docket detail (status / hammer price / last event).
+
+    Stage 2: heuristic + ROD cross-ref runs on ALL listings (including
+    the ones Tyler tagged — heuristic only writes when nothing's there
+    yet so it doesn't overwrite Tyler's richer data).
+    """
+    tyler_tagged = 0
+    if os.environ.get("NC_ECOURTS_USERNAME") and os.environ.get("NC_ECOURTS_PASSWORD"):
+        try:
+            from .enrichment_nc_case_status_tyler import (
+                enrich_with_nc_case_status_authenticated,
+            )
+            tyler_tagged = await enrich_with_nc_case_status_authenticated(listings)
+        except Exception as exc:
+            log.warning("nc_case_status.tyler_path_failed", error=str(exc)[:200])
+
+    # Heuristic always runs — fills gaps Tyler didn't reach. Skips
+    # any listing that already has nc_case_status from Tyler.
+    targets_for_heuristic = [
+        li for li in listings
+        if not (isinstance(li.raw, dict) and li.raw.get("nc_case_status"))
+    ]
+    if targets_for_heuristic:
+        enrich_with_nc_case_status(targets_for_heuristic, sold_pool=sold_pool)
+
+    log.info(
+        "nc_case_status.dispatched_done",
+        tyler_tagged=tyler_tagged,
+        heuristic_targets=len(targets_for_heuristic),
+    )
+
+
+# Backwards-compat: orchestrator + patch_run call enrich_with_nc_case_status
+# but we now want them to use the dispatched (auth-aware) version. Keep
+# the sync helper for callers that want pure-heuristic explicitly.
 async def enrich_with_nc_case_status_legacy_async(
     listings: list[Listing],
     concurrency: int = 2,
     max_check: int = 100,
     sold_pool: Optional[list[Listing]] = None,
 ) -> None:
-    """Async wrapper kept for orchestrator compatibility — internal logic
-    is now synchronous heuristic compute."""
-    enrich_with_nc_case_status(listings, sold_pool=sold_pool)
+    """Async wrapper kept for orchestrator compatibility."""
+    await enrich_with_nc_case_status_dispatched(listings, sold_pool=sold_pool)
