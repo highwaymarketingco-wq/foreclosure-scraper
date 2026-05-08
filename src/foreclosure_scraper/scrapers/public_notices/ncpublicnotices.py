@@ -22,6 +22,8 @@ cross-reference against tax records.
 """
 from __future__ import annotations
 
+import os
+import pathlib
 import re
 from datetime import datetime
 from typing import Iterable
@@ -35,6 +37,39 @@ from ...models import Listing, ListingType, PropertyKind
 log = structlog.get_logger()
 
 BASE = "https://www.ncnotices.com/"
+
+# Debug HTML dumps land here. Picked up by the patch-run-scrapers
+# workflow as a build artifact (`debug-html-{run_id}`) so we can
+# inspect the actual rendered HTML when the parser returns 0 listings.
+# Set NCNOTICES_DEBUG_DUMP=0 to disable.
+DEBUG_DUMP_DIR = pathlib.Path(
+    os.environ.get("NCNOTICES_DEBUG_DUMP_DIR", "debug")
+)
+DEBUG_DUMP_ENABLED = os.environ.get("NCNOTICES_DEBUG_DUMP", "1") == "1"
+
+
+def _dump_html_for_debug(html: str, query: str, category: str, url: str) -> None:
+    """Save the raw HTML response to debug/ when the parser returns 0
+    listings with substantial body. Triggered only on the failure-but-
+    not-empty path so we collect signal, not noise."""
+    if not DEBUG_DUMP_ENABLED or not html or len(html) < 1000:
+        return
+    try:
+        DEBUG_DUMP_DIR.mkdir(parents=True, exist_ok=True)
+        safe_query = re.sub(r"[^A-Za-z0-9_-]", "_", query)[:50]
+        ts = datetime.utcnow().strftime("%Y%m%dT%H%M%S")
+        out = DEBUG_DUMP_DIR / f"ncnotices_{category}_{safe_query}_{ts}.html"
+        # Prepend a comment so we know which URL this came from.
+        out.write_text(
+            f"<!-- query={query!r} category={category!r} url={url!r} -->\n{html}",
+            encoding="utf-8",
+        )
+        log.info(
+            "ncnotices.html_dumped",
+            path=str(out), query=query, category=category, size=len(html),
+        )
+    except Exception as exc:
+        log.warning("ncnotices.html_dump_fail", error=str(exc)[:200])
 
 # Each tuple = (query_string, category). Category drives classifier
 # + relevance filter strictness.
@@ -274,6 +309,8 @@ async def _search_one(query: str, category: str) -> list[Listing]:
         # help and would 3x the runtime budget. (Empty page < 5KB suggests
         # WAF block / 503; keep trying alternates.)
         if len(html or "") > 5000:
+            # Save HTML so we can inspect what the parser missed
+            _dump_html_for_debug(html, query, category, url)
             return []
 
     return []

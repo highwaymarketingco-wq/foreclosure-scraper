@@ -139,6 +139,19 @@ jobs:
             docs/run_health.json
           retention-days: 90
 
+      # Upload any debug HTML dumps written by scrapers that produced
+      # 0 listings with substantial HTML. ncnotices is the current
+      # producer; future scrapers can also drop into debug/ for the
+      # same artifact treatment.
+      - name: Upload debug HTML artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-html-${{ github.run_id }}
+          path: debug/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Publish patched dashboard data back to repo
         run: |
           set -eu

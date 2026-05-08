@@ -173,6 +173,54 @@ def test_parse_empty_returns_empty_list():
     assert _parse_results_html("", query="x", category="foreclosure") == []
 
 
+# ---- HTML debug dump ----
+
+
+def test_dump_html_writes_file_when_enabled(tmp_path, monkeypatch):
+    """When the parser misses on substantial HTML, _dump_html_for_debug
+    should save the body for offline inspection."""
+    monkeypatch.setenv("NCNOTICES_DEBUG_DUMP", "1")
+    monkeypatch.setenv("NCNOTICES_DEBUG_DUMP_DIR", str(tmp_path))
+    # Re-import the module so the env-derived module-globals re-evaluate.
+    import importlib
+    from foreclosure_scraper.scrapers.public_notices import ncpublicnotices
+    importlib.reload(ncpublicnotices)
+
+    html = "<html>" + ("x" * 5000) + "</html>"
+    ncpublicnotices._dump_html_for_debug(html, "notice to creditors", "probate", "https://example.com/x")
+    files = list(tmp_path.glob("ncnotices_probate_*.html"))
+    assert len(files) == 1
+    body = files[0].read_text(encoding="utf-8")
+    assert "query='notice to creditors'" in body
+    assert "category='probate'" in body
+    assert "x" * 100 in body  # body content preserved
+
+
+def test_dump_html_skips_short_bodies(tmp_path, monkeypatch):
+    """Sub-1KB responses are noise (WAF blocks, 503s); don't dump."""
+    monkeypatch.setenv("NCNOTICES_DEBUG_DUMP", "1")
+    monkeypatch.setenv("NCNOTICES_DEBUG_DUMP_DIR", str(tmp_path))
+    import importlib
+    from foreclosure_scraper.scrapers.public_notices import ncpublicnotices
+    importlib.reload(ncpublicnotices)
+
+    ncpublicnotices._dump_html_for_debug("tiny", "x", "foreclosure", "https://example.com/y")
+    assert list(tmp_path.glob("*.html")) == []
+
+
+def test_dump_html_disabled_by_env(tmp_path, monkeypatch):
+    """NCNOTICES_DEBUG_DUMP=0 disables the dump entirely."""
+    monkeypatch.setenv("NCNOTICES_DEBUG_DUMP", "0")
+    monkeypatch.setenv("NCNOTICES_DEBUG_DUMP_DIR", str(tmp_path))
+    import importlib
+    from foreclosure_scraper.scrapers.public_notices import ncpublicnotices
+    importlib.reload(ncpublicnotices)
+
+    html = "<html>" + ("x" * 5000) + "</html>"
+    ncpublicnotices._dump_html_for_debug(html, "x", "foreclosure", "https://example.com/y")
+    assert list(tmp_path.glob("*.html")) == []
+
+
 def test_parse_dedupes_by_named_party():
     """Two probate cards for the same estate (same name + county)
     should emit one listing."""
