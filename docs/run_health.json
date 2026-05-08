@@ -828,6 +828,132 @@
           "non_nc": 255
         }
       }
+    },
+    {
+      "kind": "rerun_scrapers",
+      "applied_at": "2026-05-08T05:17:26.898047+00:00",
+      "scraper_slugs": [
+        "counties_nc.brunswick_tax",
+        "counties_nc.buncombe_tax",
+        "counties_nc.cleveland_tax",
+        "counties_nc.henderson_tax",
+        "counties_nc.nc_ecourts_lis_pendens",
+        "counties_nc.nc_rod_substitute_trustee",
+        "counties_nc.new_hanover_tax",
+        "counties_nc.polk_tax",
+        "counties_nc.rutherford_tax",
+        "counties_sc.anderson_master_in_equity",
+        "counties_sc.pickens_master_in_equity",
+        "counties_sc.sc_courtrosters",
+        "counties_sc.sc_public_index_lis_pendens",
+        "counties_sc.spartanburg_master_in_equity",
+        "law_firms.bell_carrington",
+        "law_firms.brock_scott",
+        "law_firms.finkel",
+        "law_firms.hutchens"
+      ],
+      "raw_per_slug": {
+        "law_firms.bell_carrington": 60,
+        "law_firms.brock_scott": 359,
+        "law_firms.finkel": 8,
+        "law_firms.hutchens": 353,
+        "counties_sc.anderson_master_in_equity": 5,
+        "counties_sc.pickens_master_in_equity": 0,
+        "counties_sc.sc_courtrosters": 0,
+        "counties_sc.sc_public_index_lis_pendens": 254,
+        "counties_sc.spartanburg_master_in_equity": 22,
+        "counties_nc.brunswick_tax": 0,
+        "counties_nc.buncombe_tax": 2,
+        "counties_nc.cleveland_tax": 5,
+        "counties_nc.henderson_tax": 15,
+        "counties_nc.nc_ecourts_lis_pendens": 352,
+        "counties_nc.nc_rod_substitute_trustee": 0,
+        "counties_nc.new_hanover_tax": 4,
+        "counties_nc.polk_tax": 2,
+        "counties_nc.rutherford_tax": 11
+      },
+      "active_kept": 728,
+      "sold_pool_kept": 46,
+      "promoted_to_sold_via_case_status": 0,
+      "active_added_new": 47,
+      "active_merged_into_existing": 681,
+      "active_final": 1666,
+      "sold_pool_final": 52,
+      "valuation_failures": 0,
+      "enrichment_stats": {
+        "enrich_gis": "ok",
+        "enrich_courts": "ok",
+        "compute_flags": "ok",
+        "geocode": "ok",
+        "location": "ok",
+        "rod": "ok",
+        "address_backfill": "ok",
+        "bk_property": "ok",
+        "parcel_lookup": "ok",
+        "aggressive_address": "ok",
+        "lis_pendens_resolver": {
+          "queried": 86,
+          "address_filled": 19,
+          "parcel_only": 7,
+          "ambiguous": 12,
+          "no_match": 48,
+          "retagged_county": 0,
+          "no_layer": 13,
+          "fiduciary_skipped": 1
+        },
+        "parcel_reverse_geo": {
+          "queried": 44,
+          "annotated": 44,
+          "no_match": 0
+        },
+        "address_synth": "ok",
+        "county_pin": {
+          "scanned": 728,
+          "case_pinned": 610,
+          "already_correct": 610,
+          "retagged_county": 0,
+          "address_nulled": 0,
+          "no_case_decode": 118
+        },
+        "property_kind": "ok",
+        "judgment_amount": {
+          "scanned": 728,
+          "matched": 0,
+          "already_set": 0
+        },
+        "validation": {
+          "county_normalized": 1,
+          "county_nulled_cross_state": 0,
+          "parcel_nulled_too_short": 45,
+          "parcel_nulled_bad_pattern": 0,
+          "opening_bid_zeroed": 63,
+          "opening_bid_too_large": 0,
+          "tax_value_too_low": 2,
+          "tax_value_too_large": 0,
+          "sqft_out_of_range": 0,
+          "year_built_out_of_range": 0,
+          "bedrooms_out_of_range": 0,
+          "bathrooms_out_of_range": 0,
+          "comps_dropped_price": 0,
+          "comps_dropped_kind_mismatch": 0,
+          "validation_exceptions": 0
+        },
+        "data_quality": {
+          "synthetic_address": 406,
+          "approximate_address": 44,
+          "low_arv_confidence": 0,
+          "no_sqft": 599,
+          "no_address": 0,
+          "exceptions": 0
+        },
+        "upset_bid": {
+          "scanned": 728,
+          "tagged_in_window": 0,
+          "tag_cleared_outside_window": 0,
+          "no_sale_date": 352,
+          "non_nc": 298
+        }
+      }
     }
   ]
 }
