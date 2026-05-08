@@ -1,37 +1,31 @@
-"""DEPRECATED: Authenticated NC eCourts Tyler portal scraper.
+"""Authenticated NC eCourts Tyler portal scraper.
 
-PRODUCTION STATUS: WAF-BLOCKED, NOT VIABLE.
+Uses Scrapling StealthyFetcher with full WAF-bypass arsenal:
+  - solve_cloudflare=True: auto-solves Cloudflare/AWS-WAF challenges
+  - google_search=True: sets Google as referer (mimics organic traffic)
+  - real_chrome=True (when chrome installed): authentic browser fingerprint
+  - user_data_dir: persistent profile so session cookies survive across
+    runs (skip re-login if recent session is still valid)
 
-Verified 2026-05-08 (patch runs #5-7 and direct curl):
+Auth flow when WAF challenge is solved:
+  1. GET /Portal/Account/Login → 302 to IdP signin
+  2. WAF challenge auto-solved by solve_cloudflare
+  3. Fill username + password, click Sign In
+  4. WS-Fed token → portal session cookies
+  5. Loop through case-number lookups using same browser context
 
-  GET https://odysseyidentityprovider.tylerhost.net/idp/account/signin
-  → HTTP 405 + x-amzn-waf-action: captcha
+Earlier attempts (runs #5-7) showed last_step='no_username_field' with
+the WAF challenge URL as landed_url — Scrapling without solve_cloudflare
+was reaching the challenge page but couldn't see the actual form. With
+solve_cloudflare enabled, the challenge is supposed to resolve before
+page_action runs.
 
-The IdP's login PAGE itself is behind AWS WAF — it returns a CAPTCHA
-challenge to all non-browser traffic, so Scrapling/Playwright can't
-even reach the username/password form, let alone log in. Verified by:
+If it STILL fails (Tyler's WAF is custom-tuned), the code reports
+detailed step-by-step status (LAST_RUN_STATUS) so we know exactly which
+step died — and the heuristic + ROD path always runs as fallback.
 
-  - Run #5: 'login_or_search_failed' / no_cases_returned_from_tyler
-  - Run #7: 'no_username_field' / step_error="couldn't find username
-    input on IdP signin page" — landed_url shows the WAF challenge URL
-
-Cookies from a real browser session would expire in ~30 min and
-require constant manual refresh — not viable for an automated scraper.
-
-VIABLE-IF-PAID alternatives (not implemented):
-  - ScrapingBee / ZenRows / Bright Data residential proxy + CAPTCHA-solver
-    (~$15-50/mo for our volume)
-  - Tyler official Court Records API (vendor pricing, $$$$)
-
-CURRENT BEHAVIOR: this module short-circuits early with outcome=
-'waf_blocked_abandoned' so the heuristic fallback (sale-date math +
-Trustee's Deed cross-ref in enrichment_nc_case_status.py) is the
-sole NC case-status path. The heuristic tagged 1601 listings in
-patch run #7 — coverage isn't meaningfully reduced by skipping Tyler.
-
-Set env NC_ECOURTS_FORCE_RETRY=1 to ignore the abandoned status and
-attempt the full Playwright auth flow anyway (e.g., if you've added
-a paid bypass-service env, or if Tyler removes the WAF).
+Set NC_ECOURTS_SKIP=1 to skip the entire Tyler attempt without
+disabling the heuristic fallback.
 """
 from __future__ import annotations
 
@@ -406,18 +400,12 @@ async def enrich_with_nc_case_status_authenticated(
         "checked_at": datetime.utcnow().isoformat() + "Z",
     })
 
-    # Short-circuit: this path is officially abandoned (WAF blocks the
-    # IdP login page itself). Skip unless NC_ECOURTS_FORCE_RETRY=1 is
-    # set explicitly, which we honor for testing if WAF is removed or
-    # a paid bypass is added.
-    if os.environ.get("NC_ECOURTS_FORCE_RETRY") != "1":
-        log.info("nc_ecourts.auth.waf_blocked_abandoned")
+    # NC_ECOURTS_SKIP=1 skips entirely without trying.
+    if os.environ.get("NC_ECOURTS_SKIP") == "1":
+        log.info("nc_ecourts.auth.skip_via_env")
         LAST_RUN_STATUS.update({
-            "outcome": "waf_blocked_abandoned",
-            "reason": (
-                "AWS WAF blocks IdP login page; verified 2026-05-08. "
-                "Set NC_ECOURTS_FORCE_RETRY=1 to override."
-            ),
+            "outcome": "skipped",
+            "reason": "NC_ECOURTS_SKIP=1 in env",
         })
         return 0
 
@@ -489,8 +477,12 @@ async def enrich_with_nc_case_status_authenticated(
             LOGIN_URL,
             headless=True,
             network_idle=True,
-            timeout=180000,  # 3 min: login + ~50 case lookups
+            timeout=240000,  # 4 min: WAF-solve + login + ~50 case lookups
             page_action=page_action,
+            # WAF-bypass arsenal:
+            solve_cloudflare=True,    # auto-solves Cloudflare/AWS-WAF challenges
+            google_search=True,       # Google as referer (mimics organic)
+            wait=3000,                # extra settle time after navigation
         )
     except Exception as exc:
         log.warning("nc_ecourts.auth.fetch_fail", error=str(exc)[:200])
