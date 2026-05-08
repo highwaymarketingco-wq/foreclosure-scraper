@@ -188,25 +188,27 @@ async def _search_one(query: str, category: str) -> list[Listing]:
         return []
 
     async def page_action(page):
-        # ncnotices.com is ASP.NET WebForms; verified 2026-05-08 via
-        # WebFetch that controls live under ctl00$ContentPlaceHolder1$as1$*
-        # namespace ("as1" = AdvancedSearch1 placeholder). The reset
-        # button is ctl00$ContentPlaceHolder1$as1$btnReset, so the
-        # search button is the matching ...$btnSearch.
+        # ncnotices.com production HTML inspection (2026-05-08 dump):
+        #   keyword input id = ctl00_ContentPlaceHolder1_as1_txtSearch
+        #   search button   = ctl00_ContentPlaceHolder1_as1_btnGo (NOT btnSearch)
+        #   reset button    = ctl00_ContentPlaceHolder1_as1_btnReset
+        #   results panel   = ctl00_ContentPlaceHolder1_WSExtendedGridNP1_updateWSGrid
+        #   empty-state msg = "Please use the Advanced Search Menu to find public notices."
+        # URL ?keyword= param does NOT auto-trigger search; the form has to
+        # be submitted via __doPostBack on btnGo. The keyword input has an
+        # onkeypress that calls WebForm_FireDefaultButton on btnGo, so
+        # pressing Enter on the input triggers the postback.
         try:
             await page.wait_for_load_state("networkidle", timeout=20000)
         except Exception:
             pass
 
-        # Fill keyword input. ASP.NET ID is rendered with underscores,
-        # name is rendered with $; try both shapes.
+        # Fill keyword input — exact ID from production dump
         filled = False
         keyword_selectors = (
-            "input[id$='_txtKeyword']",
-            "input[name$='$txtKeyword']",
-            "input[id*='Keyword' i]",
-            "input[name*='Keyword' i]",
-            "input[type='search']",
+            "input#ctl00_ContentPlaceHolder1_as1_txtSearch",
+            "input[id$='_txtSearch']",
+            "input[name$='$txtSearch']",
             "input[id*='txtSearch' i]",
         )
         for sel in keyword_selectors:
@@ -217,57 +219,56 @@ async def _search_one(query: str, category: str) -> list[Listing]:
             except Exception:
                 continue
         if not filled:
-            try:
-                await page.locator("input[type='text']").first.fill(query)
-                filled = True
-            except Exception:
-                pass
-        if not filled:
             return
 
-        # Click the search button. ASP.NET WebForms requires the actual
-        # btnSearch click (or its __doPostBack invocation) — pressing
-        # Enter is unreliable.
-        clicked = False
-        button_selectors = (
-            "input[id$='_btnSearch']",
-            "input[name$='$btnSearch']",
-            "input[id*='btnSearch' i]",
-            "input[type='submit'][value*='earch' i]",
-            "a[id$='_btnSearch']",
-            "a[href*='btnSearch']",
-        )
-        for sel in button_selectors:
-            try:
-                await page.click(sel, timeout=4000)
-                clicked = True
-                break
-            except Exception:
-                continue
-        # Last-resort: invoke __doPostBack directly with the canonical
-        # control name (verified from the production page's reset link).
-        if not clicked:
+        # Submit via Enter on the input (triggers WebForm_FireDefaultButton
+        # → __doPostBack on btnGo). Fall back to clicking btnGo directly.
+        submitted = False
+        try:
+            await page.press(
+                "input#ctl00_ContentPlaceHolder1_as1_txtSearch", "Enter"
+            )
+            submitted = True
+        except Exception:
+            pass
+        if not submitted:
+            for sel in (
+                "#ctl00_ContentPlaceHolder1_as1_btnGo",
+                "input[id$='_btnGo']",
+                "input[name$='$btnGo']",
+            ):
+                try:
+                    await page.click(sel, timeout=4000)
+                    submitted = True
+                    break
+                except Exception:
+                    continue
+        if not submitted:
             try:
                 await page.evaluate(
-                    "() => __doPostBack('ctl00$ContentPlaceHolder1$as1$btnSearch','')"
+                    "() => __doPostBack('ctl00$ContentPlaceHolder1$as1$btnGo','')"
                 )
-                clicked = True
             except Exception:
                 pass
 
-        # Wait for #searchResults to populate. The empty initial state
-        # has placeholder text 'Please use the Advanced Search Menu';
-        # we wait until the div has actual content (>500 bytes).
+        # Wait for the actual result panel content to change away from
+        # the empty-state placeholder. We watch the lblEmptyDataText span
+        # (which IS the empty-state) — when it's gone or the panel grows
+        # past the empty-state size (~200 chars), results have rendered.
+        empty_msg = "Please use the Advanced Search Menu"
         try:
             await page.wait_for_function(
-                "() => { const r = document.getElementById('searchResults');"
-                " return r && r.innerHTML && r.innerHTML.length > 500; }",
+                f"""() => {{
+                    const p = document.getElementById('ctl00_ContentPlaceHolder1_WSExtendedGridNP1_updateWSGrid');
+                    if (!p) return false;
+                    const html = p.innerHTML || '';
+                    return html.length > 1000 && !html.includes({empty_msg!r});
+                }}""",
                 timeout=30000,
             )
         except Exception:
             pass
 
-        # Final settle for any AJAX-loaded content
         try:
             await page.wait_for_load_state("networkidle", timeout=15000)
         except Exception:
@@ -325,11 +326,28 @@ def _parse_results_html(html: str, query: str, category: str) -> list[Listing]:
     rules = _CATEGORY_RULES.get(category, {})
     require_address = rules.get("require_address", True)
 
-    cards = tree.css(
-        "div.search-result, div.result, article.notice, "
-        "tr.searchResultRow, div[class*='notice'], div.NoticeContainer, "
-        "div.publicNoticeResult"
-    )
+    # Production ncnotices.com renders results inside the
+    # WSExtendedGridNP1_updateWSGrid panel. Result-card classes seen
+    # there include `searchResultRow`/`pnlResult`/etc. Empty-state
+    # has class `pnlInfo` with the "Please use Advanced Search" text.
+    grid_panel = tree.css_first("#ctl00_ContentPlaceHolder1_WSExtendedGridNP1_updateWSGrid")
+    cards = []
+    if grid_panel is not None:
+        # Within the result panel: <tr> rows are the most likely result
+        # containers (ASP.NET GridView default). Also try the variants
+        # other templates use.
+        cards = grid_panel.css(
+            "tr.searchResultRow, tr[class*='Row'], "
+            "div.searchResultRow, div.publicNoticeResult, "
+            "div.NoticeContainer, div[class*='notice'], "
+            "li.searchResultRow"
+        )
+    if not cards:
+        cards = tree.css(
+            "div.search-result, div.result, article.notice, "
+            "tr.searchResultRow, div[class*='notice'], div.NoticeContainer, "
+            "div.publicNoticeResult"
+        )
     if not cards:
         # Fallback: paragraphs/divs containing category-relevant content
         addr_re = re.compile(
