@@ -232,30 +232,37 @@ async def _search_one(query: str, category: str) -> list[Listing]:
         except Exception:
             pass
 
-    try:
-        # Try direct URL with keyword param first (works on many WebForms
-        # search pages even when JS is delayed)
-        url = f"{BASE}Default.aspx?keyword={query.replace(' ', '+')}"
-        result = await StealthyFetcher.async_fetch(
-            url, headless=True, network_idle=True, timeout=180000,
-            page_action=page_action,
+    # Try multiple landing URL shapes — different ncnotices.com
+    # deployments respond to different param names + paths.
+    candidate_urls = [
+        f"{BASE}Search.aspx?keyword={query.replace(' ', '+')}",
+        f"{BASE}Default.aspx?keyword={query.replace(' ', '+')}",
+        BASE,  # form-fill fallback
+    ]
+
+    for url in candidate_urls:
+        try:
+            result = await StealthyFetcher.async_fetch(
+                url, headless=True, network_idle=True, timeout=180000,
+                page_action=page_action,
+            )
+        except Exception as exc:
+            log.warning("ncnotices.fetch_fail", query=query, url=url, error=str(exc)[:200])
+            continue
+
+        body = getattr(result, "body", b"")
+        html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
+        listings = _parse_results_html(html, query, category) if html else []
+        log.info(
+            "ncnotices.attempt_done",
+            query=query, category=category,
+            url=url, html_size=len(html), listings=len(listings),
         )
-    except Exception as exc:
-        log.warning("ncnotices.fetch_fail", query=query, error=str(exc)[:200])
-        return []
+        if listings:
+            return listings
 
-    body = getattr(result, "body", b"")
-    html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
-    if not html:
-        return []
-
-    listings = _parse_results_html(html, query, category)
-    log.info(
-        "ncnotices.parse_done",
-        query=query, category=category,
-        html_size=len(html), listings=len(listings),
-    )
-    return listings
+    # All URL shapes returned 0 results
+    return []
 
 
 def _parse_results_html(html: str, query: str, category: str) -> list[Listing]:

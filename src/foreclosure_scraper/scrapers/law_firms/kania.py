@@ -64,15 +64,18 @@ KNOWN_KANIA_COUNTIES = (
 
 
 def _per_county_urls() -> tuple[str, ...]:
-    """Build candidate per-county sub-page URLs. Kania often uses
-    `/tax-foreclosures-charlotte/` for Mecklenburg or `/buncombe-county/`
-    for Buncombe. Try both shapes."""
+    """Build candidate per-county sub-page URLs. Kania uses
+    `/tax-foreclosures-charlotte/foreclosures/` shape for Mecklenburg.
+    Limited to the 5 highest-volume counties to avoid Cloudflare
+    rate-limiting from a 72-URL flood (which would defeat the bypass)."""
+    high_volume_counties = (
+        "Mecklenburg", "Buncombe", "Henderson", "Cleveland", "Rutherford",
+    )
     out: list[str] = []
-    for c in KNOWN_KANIA_COUNTIES:
+    for c in high_volume_counties:
         slug = c.lower().replace(" ", "-")
         out.extend([
             f"https://kanialawfirm.com/tax-foreclosures/{slug}/",
-            f"https://kanialawfirm.com/tax-foreclosures/{slug}-county/",
             f"https://kanialawfirm.com/tax-foreclosures-{slug}/foreclosures/",
         ])
     return tuple(out)
@@ -113,13 +116,15 @@ def _county_from_text(text: str) -> Optional[str]:
 
 def _looks_like_listing(text: str) -> bool:
     """Heuristic: a chunk of text is a listing if it has at least 2 of:
-    (parcel/case/PIN, $-amount, address, county-name, date).
+    (parcel/case/PIN, $-amount, address, county-name, date) AND isn't a
+    super-long blob (>2000 chars = page chrome / footer / sidebar).
 
-    This is intentionally loose — Kania's HTML across counties is
-    inconsistent, so we'd rather over-match in the parser and let the
-    downstream filter chain (county scope, _active_only) drop bad rows.
+    Looser variant: $-amount + (parcel OR case OR address) is enough.
+    Kania's per-county pages sometimes list one property as a card with
+    just bid + address + parcel — no county name (it's implied by the
+    page URL).
     """
-    if not text or len(text) < 30:
+    if not text or len(text) < 30 or len(text) > 2000:
         return False
     has_money = bool(BARE_BID_RE.search(text))
     has_parcel = bool(PARCEL_RE.search(text) or LOOSE_PARCEL_RE.search(text))
@@ -127,6 +132,10 @@ def _looks_like_listing(text: str) -> bool:
     has_addr = bool(ADDR_RE.search(text))
     has_county = bool(_county_from_text(text))
     has_date = bool(DATE_RE.search(text))
+    # Strong signal: $-amount + at least one identifier
+    if has_money and (has_parcel or has_case or has_addr):
+        return True
+    # Otherwise need 2 of 6
     score = sum([has_money, has_parcel, has_case, has_addr, has_county, has_date])
     return score >= 2
 

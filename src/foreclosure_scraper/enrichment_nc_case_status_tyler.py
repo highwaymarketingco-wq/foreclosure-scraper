@@ -115,19 +115,29 @@ async def _drive_login_and_search(
 
     Returns dict mapping case_number → parsed info (status / sold_price /
     last_event). Cases that error out are simply absent from the result.
+
+    Side-effect: updates LAST_RUN_STATUS at each milestone so we can see
+    exactly where the flow died (visible in run_health.json next run).
     """
     out: dict[str, dict] = {}
 
     # Step 1: Land at portal — Tyler's WS-Fed wrapper redirects to IdP login
+    LAST_RUN_STATUS["last_step"] = "landing_login_url"
     try:
         await page.goto(LOGIN_URL, wait_until="networkidle", timeout=45000)
     except Exception as exc:
         log.warning("nc_ecourts.auth.land_fail", error=str(exc)[:200])
+        LAST_RUN_STATUS.update({
+            "last_step": "land_failed",
+            "step_error": str(exc)[:200],
+            "landed_url": None,
+        })
         return out
 
-    # Step 2: Fill credentials on the IdP signin page. Tyler IdP uses
-    # standard ASP.NET Identity field names — Username / Password / Sign In
-    # button — but selectors vary across IdP versions. Try several.
+    LAST_RUN_STATUS["landed_url"] = page.url[:200]
+
+    # Step 2: Fill credentials on the IdP signin page.
+    LAST_RUN_STATUS["last_step"] = "filling_username"
     user_filled = False
     for sel in (
         'input[name="Username"]',
@@ -144,9 +154,14 @@ async def _drive_login_and_search(
         except Exception:
             continue
     if not user_filled:
-        log.warning("nc_ecourts.auth.no_username_field")
+        log.warning("nc_ecourts.auth.no_username_field", landed_url=page.url[:200])
+        LAST_RUN_STATUS.update({
+            "last_step": "no_username_field",
+            "step_error": "couldn't find username input on IdP signin page",
+        })
         return out
 
+    LAST_RUN_STATUS["last_step"] = "filling_password"
     pwd_filled = False
     for sel in (
         'input[name="Password"]',
@@ -161,10 +176,14 @@ async def _drive_login_and_search(
             continue
     if not pwd_filled:
         log.warning("nc_ecourts.auth.no_password_field")
+        LAST_RUN_STATUS.update({
+            "last_step": "no_password_field",
+            "step_error": "couldn't find password input",
+        })
         return out
 
-    # Step 3: Submit the form. Try Enter key first (works on most IdP
-    # forms); fall back to clicking submit buttons.
+    # Step 3: Submit the form.
+    LAST_RUN_STATUS["last_step"] = "submitting_login"
     try:
         await page.press('input[type="password"]', "Enter")
     except Exception:
@@ -182,29 +201,47 @@ async def _drive_login_and_search(
 
     # Step 4: Wait for redirect chain back to portal (WS-Fed bounces
     # through several URLs). Check we land on a portal-NC URL.
+    LAST_RUN_STATUS["last_step"] = "waiting_portal_redirect"
     try:
         await page.wait_for_load_state("networkidle", timeout=30000)
     except Exception:
         pass
     cur = page.url
+    LAST_RUN_STATUS["post_login_url"] = cur[:200]
     if "portal-nc.tylertech.cloud" not in cur:
         log.warning("nc_ecourts.auth.redirect_fail", landed_at=cur[:200])
+        LAST_RUN_STATUS.update({
+            "last_step": "redirect_fail",
+            "step_error": f"after login, landed at {cur[:120]} not portal-nc",
+        })
         return out
 
     log.info("nc_ecourts.auth.success", landed_at=cur[:120])
+    LAST_RUN_STATUS.update({
+        "last_step": "login_succeeded",
+        "step_error": None,
+    })
 
-    # Step 5: Loop through cases. Tyler's Smart Search Dashboard accepts
-    # case-number searches via a single input. Re-navigate to the search
-    # page for each case (cheaper than maintaining stateful filters).
+    # Step 5: Loop through cases.
+    LAST_RUN_STATUS["last_step"] = "querying_cases"
+    cases_attempted = 0
+    cases_with_data = 0
     for case_number in case_numbers:
+        cases_attempted += 1
         try:
             info = await _query_one_case(page, case_number)
             if info:
                 out[case_number] = info
+                cases_with_data += 1
         except Exception as exc:
             log.debug("nc_ecourts.case_fail", case=case_number, error=str(exc)[:120])
             continue
 
+    LAST_RUN_STATUS.update({
+        "last_step": "case_loop_done",
+        "cases_attempted": cases_attempted,
+        "cases_with_data": cases_with_data,
+    })
     return out
 
 

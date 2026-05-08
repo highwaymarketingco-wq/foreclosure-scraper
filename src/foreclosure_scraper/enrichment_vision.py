@@ -45,11 +45,13 @@ ANTHROPIC_VISION_MODEL = "claude-sonnet-4-5-20250929"
 # Legacy alias kept for any external imports
 VISION_MODEL = ANTHROPIC_VISION_MODEL
 
-# Gemini settings — gemini-2.0-flash-exp is FREE at 1500 req/day; the stable
-# gemini-2.0-flash is paid but cheap (~$0.0001/listing for our token shape).
-# Override via GEMINI_VISION_MODEL env if quota or pricing changes.
+# Gemini settings — gemini-2.5-flash is the current stable Vision-capable
+# model (the older gemini-2.0-flash-exp was retired by Google and now
+# returns 404 from the v1beta API). Override via GEMINI_VISION_MODEL env
+# if pricing or availability changes. Pricing as of 2026-05:
+#   $0.075/Mtok input, $0.30/Mtok output (Tier 1 free quota: 1500 RPD).
 GEMINI_VISION_MODEL = os.environ.get(
-    "GEMINI_VISION_MODEL", "gemini-2.0-flash-exp"
+    "GEMINI_VISION_MODEL", "gemini-2.5-flash"
 )
 
 MAX_PHOTOS_PER_LISTING = 7   # up to 5 real + aerial + street
