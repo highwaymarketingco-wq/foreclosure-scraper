@@ -524,15 +524,15 @@ async def run() -> int:
     except Exception:
         log.error("county_pin.failed", traceback=traceback.format_exc())
 
-    # NC eCourts case-status check via Tyler portal (Scrapling/Playwright).
-    # Tags listings.raw.nc_case_status with current docket state — pending,
-    # sold (recent sale), upset_bid (in 10-day window), confirmed, dismissed.
-    # Heavy: each case takes a few seconds to render; capped to top 100 cases
-    # prioritized by recent sale_date. Disable with NC_CASE_STATUS_OFF=1.
+    # NC case-status: heuristic sale-date math + Trustee's Deed cross-
+    # reference (no network — Tyler portal sits behind AWS WAF that blocks
+    # all non-browser traffic, see commit history). Tags raw.nc_case_status
+    # with status (scheduled/upset_bid/pending_confirmation/confirmed) and
+    # in_upset_bid_window flag. Disable with NC_CASE_STATUS_OFF=1.
     if not os.environ.get("NC_CASE_STATUS_OFF"):
         try:
             from .enrichment_nc_case_status import enrich_with_nc_case_status
-            await enrich_with_nc_case_status(enriched)
+            enrich_with_nc_case_status(enriched, sold_pool=sold_pool)
         except Exception:
             log.error("nc_case_status.failed", traceback=traceback.format_exc())
 

@@ -1,362 +1,228 @@
-"""NC eCourts case-status enrichment via Tyler Odyssey portal.
+"""NC foreclosure case-status enrichment — heuristic-based.
 
-For each NC foreclosure listing with a case_number, query the public
-case-search portal and tag the listing with current case status:
-  - "pending" — sale scheduled but not yet held
-  - "sold" — sale held, awaiting upset bid period or confirmation
-  - "upset_bid" — currently in 10-day upset bid window
-  - "confirmed" — sale confirmed, deed delivery pending
-  - "dismissed" — case dismissed (settlement, payment, etc.)
+Replaces the broken Tyler Odyssey portal scraper (commit 27d1bdd attempted
+to navigate from /Portal/ to bypass a 405; runs #1 + #2 confirmed AWS WAF
+on portal-nc.tylertech.cloud is presenting a CAPTCHA challenge to all
+non-browser requests, including Scrapling/Playwright stealth, with
+`x-amzn-waf-action: captcha` in the response headers).
 
-Tyler portal blocks direct HTTP — uses Scrapling's StealthyFetcher
-(camoufox/Playwright stealth) to render the page and extract status.
+All 100 NC counties share that single Tyler portal — there's no per-county
+alternative court website. But we don't actually need Tyler:
 
-Free, covers ALL 100 NC counties via single endpoint.
+  1. **Sale-date heuristic** — NCGS §45-21.27 says the upset-bid window
+     runs 10 days from the sale; allowing 1-3 days for clerk filing,
+     14 days is the conservative cutoff. Pure date math, no network.
+
+  2. **Trustee's Deed cross-reference** — when a Trustee's Deed Upon Sale
+     is recorded in the ROD for a foreclosure (already captured by
+     scrapers/counties_nc/nc_rod_substitute_trustee.py), that IS the
+     legal confirmation. Deed-delivered = sale confirmed.
 
 Tags listing.raw["nc_case_status"] = {
-    "status": <one of above>,
-    "last_event_date": ISO date,
-    "last_event_text": brief description,
+    "status": "scheduled" | "upset_bid" | "pending_confirmation" | "confirmed",
     "in_upset_bid_window": bool,
     "upset_bid_deadline": ISO date or None,
+    "method": "sale_date_heuristic" | "trustee_deed_match",
     "checked_at": ISO timestamp,
 }
 """
 from __future__ import annotations
 
-import asyncio
-import re
 from datetime import datetime, timedelta
 from typing import Optional
 
 import structlog
 
-from .models import Listing
+from .models import Listing, ListingType
 
 log = structlog.get_logger()
 
 
-PORTAL_BASE = "https://portal-nc.tylertech.cloud/Portal"
-SEARCH_URL = f"{PORTAL_BASE}/Home/Dashboard/29"
+# NCGS §45-21.27: 10-day statutory upset-bid window. Adding 4 days of
+# clerk-filing slack means listings within 14 days of sale_date are still
+# treated as in-window (could yet be upset by a higher bidder).
+UPSET_BID_DAYS = 14
 
 
-# Case-status text → normalized state machine
-STATUS_MAP = [
-    (r"\bdismissed\b|\bdismiss\b", "dismissed"),
-    (r"\bconfirmed\b|\border confirming sale\b", "confirmed"),
-    (r"\bupset bid\b", "upset_bid"),
-    (r"\bsold\b|\breport of sale\b", "sold"),
-    (r"\bpending\b|\bscheduled\b", "pending"),
-]
-
-
-# Sold-price patterns observed in NC eCourts docket text. Tyler displays
-# Order Confirming Sale / Report of Sale entries with the hammer price
-# inline. Patterns ordered most-specific first.
-SOLD_PRICE_PATTERNS = [
-    # "high bid of $123,456.78" / "high bid: $X"
-    re.compile(r"high\s+bid(?:\s+of)?\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
-    # "sold to ABC LLC for $X" / "sold for $X"
-    re.compile(r"sold\s+(?:to\s+[^$\n]{1,80}?\s+)?for\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
-    # "purchase price $X" / "purchased for $X"
-    re.compile(r"purchas(?:e\s+price|ed\s+for)\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
-    # "amount of $X" near "confirm" / "report of sale"
-    re.compile(r"(?:confirm[a-z]*|report\s+of\s+sale)[^\n$]{0,80}\$\s*([\d,]+(?:\.\d{2})?)", re.I),
-    # "successful bid $X" / "winning bid $X"
-    re.compile(r"(?:successful|winning)\s+bid\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
-    # "Sale Price: $X"
-    re.compile(r"sale\s+price\s*[:=]?\s*\$\s*([\d,]+(?:\.\d{2})?)", re.I),
-]
-
-
-def _extract_sold_price(text: str) -> Optional[float]:
-    """Pull a credible hammer price from rendered case-detail text.
-    Returns None when no pattern matches or the value is implausible
-    (<$100 or >$10M)."""
-    if not text:
+def _to_naive(dt: Optional[datetime]) -> Optional[datetime]:
+    if dt is None:
         return None
-    for pat in SOLD_PRICE_PATTERNS:
-        m = pat.search(text)
-        if not m:
-            continue
-        try:
-            v = float(m.group(1).replace(",", ""))
-        except ValueError:
-            continue
-        if 100 <= v <= 10_000_000:
-            return v
-    return None
+    if hasattr(dt, "tzinfo") and dt.tzinfo:
+        return dt.replace(tzinfo=None)
+    return dt
 
 
-def _normalize_status(text: str) -> Optional[str]:
-    if not text:
+def _status_from_sale_date(sale_date: Optional[datetime], now: datetime) -> Optional[dict]:
+    """Pure-function status inference from sale_date alone. Returns None
+    if sale_date is unknown."""
+    if not sale_date:
         return None
-    t = text.lower()
-    for pattern, status in STATUS_MAP:
-        if re.search(pattern, t):
-            return status
-    return None
+    sale_date = _to_naive(sale_date)
+    days_diff = (now - sale_date).days
 
+    if days_diff < 0:
+        # Sale hasn't happened yet
+        return {
+            "status": "scheduled",
+            "in_upset_bid_window": False,
+            "upset_bid_deadline": None,
+            "days_since_sale": days_diff,
+            "method": "sale_date_heuristic",
+        }
 
-async def _check_case(case_number: str) -> Optional[dict]:
-    """Hit the Tyler portal for one case# and parse current status.
+    deadline = sale_date + timedelta(days=UPSET_BID_DAYS)
 
-    Tyler's Smart Search Dashboard URL (/Portal/Home/Dashboard/29) only
-    accepts requests with a session established by navigating from
-    /Portal/. Direct GET returns 405 Method Not Allowed (observed in
-    the 2026-05-07 patch run logs). Workaround: land at /Portal/ root,
-    click the 'Smart Search' button to navigate (server-side establishes
-    session state), then drive the search form.
+    if days_diff <= UPSET_BID_DAYS:
+        return {
+            "status": "upset_bid",
+            "in_upset_bid_window": True,
+            "upset_bid_deadline": deadline.date().isoformat(),
+            "days_since_sale": days_diff,
+            "method": "sale_date_heuristic",
+        }
 
-    Returns dict with status info, or None on failure.
-    """
-    try:
-        from scrapling.fetchers import StealthyFetcher
-    except ImportError:
-        return None
+    if days_diff <= 30:
+        return {
+            "status": "pending_confirmation",
+            "in_upset_bid_window": False,
+            "upset_bid_deadline": deadline.date().isoformat(),
+            "days_since_sale": days_diff,
+            "method": "sale_date_heuristic",
+        }
 
-    # Land at the Portal root — server returns 200 + a link to
-    # /Home/Dashboard/29 (Smart Search). Clicking it establishes the
-    # session state Tyler requires.
-    landing_url = f"{PORTAL_BASE}/"
-
-    async def page_action(page):
-        try:
-            # Step 1: Click the Smart Search button on the landing page
-            # to navigate to Dashboard/29 with proper session state.
-            for sel in (
-                'a[href*="/Home/Dashboard/29"]',
-                'a:has-text("Smart Search")',
-                'a:has-text("Search")',
-            ):
-                try:
-                    await page.click(sel, timeout=8000)
-                    break
-                except Exception:
-                    continue
-            await page.wait_for_load_state("networkidle", timeout=20000)
-
-            # Step 2: Some Tyler installs have a sub-navigation to a
-            # 'Case Search' tab from the dashboard. Try clicking it; if
-            # not present, the search form is already on Dashboard/29.
-            for sel in (
-                'a:has-text("Case Search")',
-                'button:has-text("Case Search")',
-                '[data-search-type="caseNumber"]',
-                'a[href*="CaseSearch"]',
-            ):
-                try:
-                    await page.click(sel, timeout=4000)
-                    await page.wait_for_load_state("networkidle", timeout=10000)
-                    break
-                except Exception:
-                    continue
-
-            # Step 3: Fill the case-number input. Tyler's selector varies
-            # across tenants — try several common patterns.
-            input_selectors = (
-                "input[name='caseNumber']",
-                "input[id*='Case']",
-                "#caseNumber",
-                "input[placeholder*='ase' i]",
-                "input[name*='case' i]",
-            )
-            filled = False
-            for sel in input_selectors:
-                try:
-                    await page.wait_for_selector(sel, timeout=8000)
-                    await page.fill(sel, case_number)
-                    filled = True
-                    break
-                except Exception:
-                    continue
-            if not filled:
-                return
-
-            # Step 4: Submit. Tyler accepts Enter on the field, but
-            # also try explicit search-button clicks as fallback.
-            try:
-                await page.press(input_selectors[0], "Enter")
-            except Exception:
-                pass
-            for btn_sel in (
-                "button[type='submit']",
-                "input[type='submit']",
-                "button.search",
-                "button:has-text('Search')",
-            ):
-                try:
-                    await page.click(btn_sel, timeout=3000)
-                    break
-                except Exception:
-                    continue
-            await page.wait_for_load_state("networkidle", timeout=25000)
-
-            # Step 5: If there's a results-row link to the case, click
-            # through to the case-detail page where docket entries (and
-            # confirmation orders + hammer prices) actually live.
-            for sel in (
-                f'a:has-text("{case_number}")',
-                "table.search-results tr:first-of-type a",
-                "table tr td:first-of-type a",
-            ):
-                try:
-                    await page.click(sel, timeout=5000)
-                    await page.wait_for_load_state("networkidle", timeout=20000)
-                    break
-                except Exception:
-                    continue
-        except Exception:
-            pass
-
-    try:
-        result = await StealthyFetcher.async_fetch(
-            landing_url,
-            headless=True,
-            network_idle=True,
-            timeout=90000,
-            page_action=page_action,
-        )
-    except Exception as exc:
-        log.debug("nc_case_status.fetch_fail", case=case_number, error=str(exc)[:200])
-        return None
-
-    body = getattr(result, "body", b"")
-    html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
-    if not html or len(html) < 1000:
-        return None
-
-    # Look for case-status text in the rendered page
-    # Tyler portals typically show case events in a table with dates + descriptions
-    events = re.findall(
-        r"(\d{1,2}/\d{1,2}/\d{2,4})\s*[\-:]?\s*([A-Z][\w \-,/.()&'\"]{8,200})",
-        html,
-    )
-    last_event = events[0] if events else None
-
-    # Determine overall status from the page text blob
-    status = _normalize_status(html)
-    if not status:
-        return None
-
-    info: dict = {
-        "status": status,
-        "checked_at": datetime.utcnow().isoformat() + "Z",
+    return {
+        "status": "confirmed",
+        "in_upset_bid_window": False,
+        "upset_bid_deadline": deadline.date().isoformat(),
+        "days_since_sale": days_diff,
+        "method": "sale_date_heuristic",
     }
-    if last_event:
-        info["last_event_date"] = last_event[0]
-        info["last_event_text"] = last_event[1].strip()[:200]
-
-    info["in_upset_bid_window"] = status == "upset_bid" or (
-        status == "sold" and last_event and _within_10_days(last_event[0])
-    )
-
-    # Hammer price: extract from the docket text when status indicates a
-    # sale already happened (sold / confirmed / upset_bid). Routes the
-    # listing into the sold-comp pool if a price was found.
-    if status in ("sold", "confirmed", "upset_bid"):
-        sold_price = _extract_sold_price(html)
-        if sold_price is not None:
-            info["sold_price"] = sold_price
-    return info
 
 
-def _within_10_days(date_str: str) -> bool:
-    for fmt in ("%m/%d/%Y", "%m/%d/%y"):
-        try:
-            d = datetime.strptime(date_str, fmt)
-            return (datetime.utcnow() - d).days < 10
-        except ValueError:
+def _norm_addr_key(li: Listing) -> Optional[str]:
+    """Cheap key for cross-referencing active listing against post-sale
+    ROD recording. street + zip is good enough for same-jurisdiction
+    matches — fancy fuzzy-match would be overkill here."""
+    if not li.street_address:
+        return None
+    s = li.street_address.upper().strip()
+    z = (li.zip_code or "").strip()[:5]
+    if not z:
+        return None
+    return f"{s}|{z}"
+
+
+def _build_trustee_deed_index(sold_pool: list[Listing]) -> dict[str, Listing]:
+    """Index post-sale ROD recordings (Trustee's Deed Upon Sale) by
+    address+zip for O(1) cross-reference against active listings."""
+    idx: dict[str, Listing] = {}
+    for li in sold_pool:
+        # Only deeds we sourced from the post-sale ROD sweep — these are
+        # the ones with raw.actual_sold_price already populated.
+        if li.state != "NC":
             continue
-    return False
+        if not (isinstance(li.raw, dict) and li.raw.get("actual_sold_price")):
+            continue
+        key = _norm_addr_key(li)
+        if not key:
+            continue
+        # Keep most-recent recording when duplicates exist
+        existing = idx.get(key)
+        if existing and existing.sale_date and li.sale_date:
+            if _to_naive(existing.sale_date) > _to_naive(li.sale_date):
+                continue
+        idx[key] = li
+    return idx
 
 
-async def enrich_with_nc_case_status(
-    listings: list[Listing], concurrency: int = 2, max_check: int = 100
+def enrich_with_nc_case_status(
+    listings: list[Listing],
+    sold_pool: Optional[list[Listing]] = None,
 ) -> None:
-    """For NC foreclosure listings with case_number, look up case status on
-    the Tyler portal. Concurrency capped low to be polite to the portal.
+    """For NC foreclosure listings, infer current case status from
+    sale_date + cross-reference against the post-sale ROD pool.
 
-    max_check caps the number of cases looked up per run since each takes
-    several seconds (Playwright render + form submit).
+    Synchronous, network-free, deterministic. Replaces the previous Tyler
+    Odyssey portal scraper which AWS WAF blocked (see module docstring).
+
+    sold_pool is optional; when provided, listings with a recorded
+    Trustee's Deed at the same address are tagged status='confirmed' with
+    method='trustee_deed_match' (overrides the pure-date heuristic).
     """
     targets = [
         li
         for li in listings
         if li.state == "NC"
-        and li.case_number
+        and li.listing_type
+        in (ListingType.FORECLOSURE_SALE, ListingType.LIS_PENDENS, ListingType.SHERIFF_SALE)
         and li.source not in ("national.courtlistener_bankruptcy",)
     ]
-
-    # Prioritize: listings with sale_date in the past 30 days are MOST useful
-    # for upset-bid detection. Future-scheduled ones don't help yet.
-    def _priority(li: Listing) -> tuple:
-        if li.sale_date:
-            d = li.sale_date if hasattr(li.sale_date, "tzinfo") else None
-            if d and d.tzinfo:
-                d = d.replace(tzinfo=None)
-            now = datetime.utcnow()
-            if d:
-                days_ago = (now - d).days
-                # 0-10 days: highest priority (upset bid window)
-                if 0 <= days_ago <= 10:
-                    return (0, days_ago)
-                # 10-30 days: high (recent sales)
-                if 10 < days_ago <= 30:
-                    return (1, days_ago)
-        return (2, 0)
-
-    targets.sort(key=_priority)
-    targets = targets[:max_check]
 
     if not targets:
         log.info("nc_case_status.no_targets")
         return
 
-    log.info("nc_case_status.start", target_count=len(targets))
+    deed_index = _build_trustee_deed_index(sold_pool or [])
+    now = datetime.utcnow()
+    counts = {
+        "scanned": 0,
+        "tagged": 0,
+        "in_upset_bid": 0,
+        "trustee_deed_matched": 0,
+        "no_sale_date": 0,
+    }
+    log.info(
+        "nc_case_status.start",
+        target_count=len(targets),
+        trustee_deed_index_size=len(deed_index),
+    )
 
-    sem = asyncio.Semaphore(concurrency)
-    counts = {"checked": 0, "tagged": 0, "in_upset_bid": 0,
-              "sold_price_extracted": 0, "promoted_to_sold_comp": 0}
+    for li in targets:
+        counts["scanned"] += 1
 
-    async def one(li: Listing) -> None:
-        async with sem:
-            info = await _check_case(li.case_number)
-            counts["checked"] += 1
-            if not info:
-                return
-            if not isinstance(li.raw, dict):
-                li.raw = {}
-            li.raw["nc_case_status"] = info
-            counts["tagged"] += 1
-            if info.get("in_upset_bid_window"):
-                counts["in_upset_bid"] += 1
+        # Path 1: cross-reference against recorded Trustee's Deeds (highest
+        # confidence — deed-recorded means the sale was legally confirmed)
+        info: Optional[dict] = None
+        key = _norm_addr_key(li)
+        if key and key in deed_index:
+            deed = deed_index[key]
+            info = {
+                "status": "confirmed",
+                "in_upset_bid_window": False,
+                "upset_bid_deadline": None,
+                "method": "trustee_deed_match",
+                "trustee_deed_sale_date": _to_naive(deed.sale_date).date().isoformat() if deed.sale_date else None,
+                "trustee_deed_price": (deed.raw or {}).get("actual_sold_price"),
+            }
+            counts["trustee_deed_matched"] += 1
 
-            # Hammer-price promotion: if the case-detail page surfaced a
-            # sold price AND the case is in a sale-completed state, tag
-            # raw.actual_sold_price + set sale_date so the orchestrator's
-            # post-enrichment "promote to sold pool" pass can route this
-            # listing into the foreclosure_sold_comps pool.
-            sold_price = info.get("sold_price")
-            if sold_price and info.get("status") in ("sold", "confirmed", "upset_bid"):
-                li.raw["actual_sold_price"] = sold_price
-                counts["sold_price_extracted"] += 1
-                # Set sale_date from last_event_date so the comp pool
-                # has the right anchor (vs whatever sale_date the
-                # original lis pendens scraper assigned).
-                last_date = info.get("last_event_date")
-                if last_date:
-                    for fmt in ("%m/%d/%Y", "%m/%d/%y"):
-                        try:
-                            li.sale_date = datetime.strptime(last_date, fmt)
-                            break
-                        except ValueError:
-                            continue
-                # Mark for promotion logging
-                li.raw.setdefault("nc_case_status", {})[
-                    "promoted_to_sold_comp"
-                ] = True
-                counts["promoted_to_sold_comp"] += 1
+        # Path 2: pure sale_date heuristic
+        if info is None:
+            info = _status_from_sale_date(li.sale_date, now)
+            if info is None:
+                counts["no_sale_date"] += 1
+                continue
 
-    await asyncio.gather(*(one(li) for li in targets))
+        info["checked_at"] = now.isoformat() + "Z"
+
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["nc_case_status"] = info
+        counts["tagged"] += 1
+        if info.get("in_upset_bid_window"):
+            counts["in_upset_bid"] += 1
+
     log.info("nc_case_status.done", **counts)
+
+
+# Backwards-compat shim: legacy callers pass concurrency=, max_check=
+# kwargs from when this was async + Tyler-driven. New impl ignores them.
+async def enrich_with_nc_case_status_legacy_async(
+    listings: list[Listing],
+    concurrency: int = 2,
+    max_check: int = 100,
+    sold_pool: Optional[list[Listing]] = None,
+) -> None:
+    """Async wrapper kept for orchestrator compatibility — internal logic
+    is now synchronous heuristic compute."""
+    enrich_with_nc_case_status(listings, sold_pool=sold_pool)

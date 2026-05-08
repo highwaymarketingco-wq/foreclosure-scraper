@@ -634,19 +634,17 @@ async def main() -> int:
         net_change=len(final_active) - len(existing),
     )
 
-    # ---- NC eCourts case-status enrichment (Order Confirming Sale detection) ----
-    # Runs on the FULL active set so existing listings can be promoted to
-    # the sold pool when Tyler's docket shows their case is now confirmed
-    # at sale.
+    # ---- NC case-status enrichment (sale-date heuristic + ROD cross-ref) ----
+    # Pure compute — sale_date math + index lookup against the post-sale
+    # ROD pool to flag confirmed sales. The legacy Tyler portal scraper
+    # was retired (AWS WAF blocked all non-browser GETs); the heuristic
+    # path is free, deterministic, and runs every patch.
     if os.environ.get("PATCH_NC_CASE_STATUS", "1") == "1":
         try:
             from foreclosure_scraper.enrichment_nc_case_status import (
                 enrich_with_nc_case_status,
             )
-            nc_cap = int(os.environ.get("PATCH_NC_CASE_STATUS_CAP", "50"))
-            await enrich_with_nc_case_status(
-                final_active, concurrency=2, max_check=nc_cap,
-            )
+            enrich_with_nc_case_status(final_active, sold_pool=final_sold)
         except Exception:
             log.error("patch_run.nc_case_status_failed",
                       traceback=traceback.format_exc())
