@@ -1225,6 +1225,150 @@
         },
         "heuristic_targets": 1602
       }
+    },
+    {
+      "kind": "rerun_scrapers",
+      "applied_at": "2026-05-08T17:25:29.127709+00:00",
+      "scraper_slugs": [
+        "counties_nc.brunswick_tax",
+        "counties_nc.buncombe_tax",
+        "counties_nc.cleveland_tax",
+        "counties_nc.henderson_tax",
+        "counties_nc.nc_ecourts_lis_pendens",
+        "counties_nc.nc_rod_substitute_trustee",
+        "counties_nc.new_hanover_tax",
+        "counties_nc.polk_tax",
+        "counties_nc.rutherford_tax",
+        "counties_sc.anderson_master_in_equity",
+        "counties_sc.pickens_master_in_equity",
+        "counties_sc.sc_courtrosters",
+        "counties_sc.sc_public_index_lis_pendens",
+        "counties_sc.spartanburg_master_in_equity",
+        "law_firms.bell_carrington",
+        "law_firms.brock_scott",
+        "law_firms.finkel",
+        "law_firms.hutchens",
+        "law_firms.kania",
+        "public_notices.ncnotices"
+      ],
+      "raw_per_slug": {
+        "public_notices.ncnotices": 0,
+        "law_firms.bell_carrington": 54,
+        "law_firms.brock_scott": 358,
+        "law_firms.finkel": 8,
+        "law_firms.hutchens": 352,
+        "law_firms.kania": 6,
+        "counties_sc.anderson_master_in_equity": 5,
+        "counties_sc.pickens_master_in_equity": 0,
+        "counties_sc.sc_courtrosters": 0,
+        "counties_sc.sc_public_index_lis_pendens": 256,
+        "counties_sc.spartanburg_master_in_equity": 22,
+        "counties_nc.brunswick_tax": 0,
+        "counties_nc.buncombe_tax": 2,
+        "counties_nc.cleveland_tax": 5,
+        "counties_nc.henderson_tax": 15,
+        "counties_nc.nc_ecourts_lis_pendens": 344,
+        "counties_nc.nc_rod_substitute_trustee": 0,
+        "counties_nc.new_hanover_tax": 4,
+        "counties_nc.polk_tax": 2,
+        "counties_nc.rutherford_tax": 11
+      },
+      "active_kept": 723,
+      "sold_pool_kept": 44,
+      "promoted_to_sold_via_case_status": 0,
+      "active_added_new": 9,
+      "active_merged_into_existing": 714,
+      "active_final": 1685,
+      "sold_pool_final": 50,
+      "valuation_failures": 0,
+      "enrichment_stats": {
+        "enrich_gis": "ok",
+        "enrich_courts": "ok",
+        "compute_flags": "ok",
+        "geocode": "ok",
+        "location": "ok",
+        "rod": "ok",
+        "address_backfill": "ok",
+        "bk_property": "ok",
+        "parcel_lookup": "ok",
+        "aggressive_address": "ok",
+        "lis_pendens_resolver": {
+          "queried": 86,
+          "address_filled": 19,
+          "parcel_only": 7,
+          "ambiguous": 12,
+          "no_match": 48,
+          "retagged_county": 0,
+          "no_layer": 13,
+          "fiduciary_skipped": 1
+        },
+        "parcel_reverse_geo": {
+          "queried": 52,
+          "annotated": 52,
+          "no_match": 0
+        },
+        "address_synth": "ok",
+        "county_pin": {
+          "scanned": 723,
+          "case_pinned": 604,
+          "already_correct": 604,
+          "retagged_county": 0,
+          "address_nulled": 0,
+          "no_case_decode": 119
+        },
+        "property_kind": "ok",
+        "judgment_amount": {
+          "scanned": 723,
+          "matched": 0,
+          "already_set": 0
+        },
+        "validation": {
+          "county_normalized": 1,
+          "county_nulled_cross_state": 0,
+          "parcel_nulled_too_short": 45,
+          "parcel_nulled_bad_pattern": 0,
+          "opening_bid_zeroed": 64,
+          "opening_bid_too_large": 0,
+          "tax_value_too_low": 2,
+          "tax_value_too_large": 0,
+          "sqft_out_of_range": 0,
+          "year_built_out_of_range": 0,
+          "bedrooms_out_of_range": 0,
+          "bathrooms_out_of_range": 0,
+          "comps_dropped_price": 0,
+          "comps_dropped_kind_mismatch": 0,
+          "validation_exceptions": 0
+        },
+        "data_quality": {
+          "synthetic_address": 399,
+          "approximate_address": 52,
+          "low_arv_confidence": 0,
+          "no_sqft": 586,
+          "no_address": 0,
+          "exceptions": 0
+        },
+        "upset_bid": {
+          "scanned": 723,
+          "tagged_in_window": 0,
+          "tag_cleared_outside_window": 0,
+          "no_sale_date": 344,
+          "non_nc": 300
+        }
+      },
+      "nc_case_status": {
+        "tyler_tagged": 0,
+        "tyler_status": {
+          "outcome": "login_or_search_failed",
+          "reason": "no_cases_returned_from_tyler",
+          "tagged": 0,
+          "targets": 50,
+          "checked_at": "2026-05-08T17:24:44.546933Z",
+          "last_step": "no_username_field",
+          "landed_url": "https://odysseyidentityprovider.tylerhost.net/idp/account/signin?ReturnUrl=%2fidp%2fissue%2fwsfed%3fwa%3dwsignin1.0%26wtrealm%3dhttps%253a%252f%252fportal-nc.tylertech.cloud%252fPortal%252f%26wctx%3dr",
+          "step_error": "couldn't find username input on IdP signin page"
+        },
+        "heuristic_targets": 1601
+      }
     }
   ]
 }
