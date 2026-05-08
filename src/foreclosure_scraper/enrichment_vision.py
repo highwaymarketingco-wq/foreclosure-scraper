@@ -45,16 +45,16 @@ ANTHROPIC_VISION_MODEL = "claude-sonnet-4-5-20250929"
 # Legacy alias kept for any external imports
 VISION_MODEL = ANTHROPIC_VISION_MODEL
 
-# Gemini settings — gemini-1.5-flash chosen for free-tier headroom.
-# Verified pricing/quota 2026-05-08:
-#   gemini-1.5-flash: 15 RPM / 1M TPM / 1500 RPD (free tier — fits us)
-#   gemini-2.5-flash: 10 RPM /  250 RPD (free tier — too tight; we hit
-#                                        429 RESOURCE_EXHAUSTED in run #6)
-#   gemini-2.0-flash-exp: deprecated, returns 404
-# Override via GEMINI_VISION_MODEL env. Paid tier on any of these has
-# 2000 RPM / no daily cap.
+# Gemini settings — 'gemini-2.0-flash' is the current stable, vision-
+# capable model that exists in the v1beta API as of 2026-05.
+# Verified retired/404'ing names (do NOT use):
+#   - gemini-2.0-flash-exp (deprecated 2025)
+#   - gemini-1.5-flash      (deprecated 2026; v1beta removed it)
+# Free-tier limits 2.0-flash: 15 RPM / 1500 RPD / 1M TPM. Works for us.
+# 2.5-flash exists but free tier is 10 RPM / 250 RPD which we already
+# blew through in run #6.
 GEMINI_VISION_MODEL = os.environ.get(
-    "GEMINI_VISION_MODEL", "gemini-1.5-flash"
+    "GEMINI_VISION_MODEL", "gemini-2.0-flash"
 )
 
 MAX_PHOTOS_PER_LISTING = 7   # up to 5 real + aerial + street
