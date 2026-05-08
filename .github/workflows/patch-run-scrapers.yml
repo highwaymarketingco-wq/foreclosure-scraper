@@ -41,6 +41,14 @@ on:
         description: 'Space-separated scraper slugs (e.g. "counties_nc.nc_ecourts_lis_pendens"). Leave blank for --all-fixed.'
         required: false
         default: ""
+      runner:
+        description: 'Where to run. self-hosted = your laptop (residential IP — needed for Tyler eCourts). ubuntu-latest = GitHub cloud (datacenter IP — Tyler will be WAF-blocked).'
+        required: false
+        default: "ubuntu-latest"
+        type: choice
+        options:
+          - ubuntu-latest
+          - self-hosted
 
 permissions:
   contents: write
@@ -52,7 +60,7 @@ concurrency:
 
 jobs:
   patch:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 90
     env:
       # Same secrets the weekly run uses (some enrichments need them):
