@@ -21,6 +21,18 @@ class ListingType(str, Enum):
     # description keywords on Realtor.com. Pre-foreclosure signal that hasn't
     # yet entered formal foreclosure proceedings.
     DISTRESSED = "distressed"
+    # DIVORCE_NOTICE = service-by-publication divorce summons published
+    # in NC Press Association legal notices. Motivated-seller signal —
+    # contested divorces often force a property sale to divide assets.
+    DIVORCE_NOTICE = "divorce_notice"
+    # PROBATE_NOTICE = legally-required Notice to Creditors / Estate
+    # filings published when an estate opens. Heirs typically want
+    # to liquidate property fast (avoid carrying costs, split inheritance).
+    PROBATE_NOTICE = "probate_notice"
+    # ESTATE_LEAD = derived from obituary cross-reference: deceased
+    # name matched against tax-record owner names. Property may not
+    # yet be in formal probate but heirs are likely the new owners.
+    ESTATE_LEAD = "estate_lead"
     UNKNOWN = "unknown"
 
 

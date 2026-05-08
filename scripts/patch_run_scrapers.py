@@ -135,6 +135,12 @@ KNOWN_FIXED = (
     # Asheville / Charlotte regions. Cloudflare-protected, falls back
     # to Scrapling stealth when plain GET 503s.
     "law_firms.kania",
+    # NC public legal notices via ncnotices.com — added probate (Notice
+    # to Creditors / Estate-of) + divorce (service-by-publication
+    # summons) query sets on top of the existing foreclosure queries.
+    # Captures the high-distress subset of probate + divorce leads
+    # legally required to publish in newspapers of record.
+    "public_notices.ncnotices",
 )
 
 
@@ -655,6 +661,25 @@ async def main() -> int:
         except Exception:
             log.error("patch_run.nc_case_status_failed",
                       traceback=traceback.format_exc())
+
+    # Relationship-deed detection — derive PROBATE_NOTICE + DIVORCE_NOTICE
+    # leads from ROD recordings (executor's deeds, post-divorce
+    # quitclaims). Free signal from existing ROD scrapes; appends to
+    # the active pool.
+    try:
+        from foreclosure_scraper.enrichment_relationship_deeds import (
+            enrich_with_relationship_deeds,
+        )
+        derived_leads = enrich_with_relationship_deeds(
+            final_active, sold_pool=final_sold,
+        )
+        if derived_leads:
+            final_active = final_active + derived_leads
+            log.info("patch_run.relationship_deeds_added",
+                     count=len(derived_leads))
+    except Exception:
+        log.error("patch_run.relationship_deeds_failed",
+                  traceback=traceback.format_exc())
 
     # Promote to sold pool: any active listing where case-status surfaced
     # raw.actual_sold_price + promoted_to_sold_comp moves to the sold pool.

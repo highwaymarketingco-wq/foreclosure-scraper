@@ -134,6 +134,15 @@ DATELESS_OK_SOURCES = {
     "city_websites.charlotte_demolition",         # demolition orders (distress signal)
     "national.courtlistener_civil",               # federal civil real-property cases
     "national.courtlistener_adversary",           # CL bankruptcy lift-stay / 363 sale
+    # ncnotices.com — legal notices in NC newspapers (foreclosure +
+    # divorce + probate categories). Service-by-publication divorces
+    # and Notice-to-Creditors probate notices typically have no sale_date.
+    "public_notices.ncnotices",
+    # Relationship-deeds enrichment — derives PROBATE_NOTICE / DIVORCE_NOTICE
+    # listings from ROD recordings (executor's deeds, quitclaim + $0
+    # divorce transfers). These are leads, not auctions — no sale_date.
+    "derived.probate_deed",
+    "derived.divorce_deed",
 }
 
 
@@ -550,6 +559,23 @@ async def run() -> int:
         await enrich_with_bankruptcy(enriched)
     except Exception:
         log.error("bankruptcy.failed", traceback=traceback.format_exc())
+
+    # Relationship-deed detection — scan ROD pool (active + sold) for
+    # executor's-deed / quitclaim-divorce patterns. Emits new
+    # PROBATE_NOTICE / DIVORCE_NOTICE listings into the active pool.
+    # Free derivation from existing ROD scrapes.
+    try:
+        from .enrichment_relationship_deeds import enrich_with_relationship_deeds
+        derived_leads = enrich_with_relationship_deeds(
+            enriched, sold_pool=sold_pool,
+        )
+        if derived_leads:
+            enriched = enriched + derived_leads
+            log.info("relationship_deeds.added_to_active",
+                     count=len(derived_leads))
+    except Exception:
+        log.error("relationship_deeds.failed",
+                  traceback=traceback.format_exc())
 
     # Comp finder + property-spec backfill — pulls 180-day sold pool per county
     # from HomeHarvest (free), backfills missing sqft/beds/baths/year, attaches
