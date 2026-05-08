@@ -153,21 +153,25 @@ async def _search_one(query: str, category: str) -> list[Listing]:
         return []
 
     async def page_action(page):
+        # ncnotices.com is ASP.NET WebForms; verified 2026-05-08 via
+        # WebFetch that controls live under ctl00$ContentPlaceHolder1$as1$*
+        # namespace ("as1" = AdvancedSearch1 placeholder). The reset
+        # button is ctl00$ContentPlaceHolder1$as1$btnReset, so the
+        # search button is the matching ...$btnSearch.
         try:
             await page.wait_for_load_state("networkidle", timeout=20000)
         except Exception:
             pass
 
-        # Try multiple selectors for the keyword input — ASP.NET WebForms
-        # generates IDs like ctl00_ContentPlaceHolder1_txtKeyword
+        # Fill keyword input. ASP.NET ID is rendered with underscores,
+        # name is rendered with $; try both shapes.
         filled = False
         keyword_selectors = (
+            "input[id$='_txtKeyword']",
+            "input[name$='$txtKeyword']",
             "input[id*='Keyword' i]",
-            "input[id*='keyword' i]",
             "input[name*='Keyword' i]",
-            "input[name*='keyword' i]",
             "input[type='search']",
-            "input[placeholder*='earch' i]",
             "input[id*='txtSearch' i]",
         )
         for sel in keyword_selectors:
@@ -183,52 +187,54 @@ async def _search_one(query: str, category: str) -> list[Listing]:
                 filled = True
             except Exception:
                 pass
+        if not filled:
+            return
 
-        if filled:
-            # Click the search button (NOT Enter — ASP.NET WebForms often
-            # ignores keypresses; needs an explicit __doPostBack)
-            clicked = False
-            for sel in (
-                "input[id*='btnSearch' i]",
-                "input[id*='Search'][type='submit']",
-                "input[type='submit'][value*='earch' i]",
-                "button[id*='btnSearch' i]",
-                "button[type='submit']",
-                "input[type='submit']",
-            ):
-                try:
-                    await page.click(sel, timeout=4000)
-                    clicked = True
-                    break
-                except Exception:
-                    continue
-            if not clicked:
-                try:
-                    await page.keyboard.press("Enter")
-                except Exception:
-                    pass
-
-        # Wait for results to populate. ncnotices.com renders results into
-        # #searchResults; we also accept any element matching common
-        # result-card selectors.
-        result_selectors = (
-            "#searchResults *",
-            "div.NoticeContainer",
-            "div.searchResultRow",
-            "tr.searchResultRow",
-            "div.publicNoticeResult",
-            "div.notice-result",
+        # Click the search button. ASP.NET WebForms requires the actual
+        # btnSearch click (or its __doPostBack invocation) — pressing
+        # Enter is unreliable.
+        clicked = False
+        button_selectors = (
+            "input[id$='_btnSearch']",
+            "input[name$='$btnSearch']",
+            "input[id*='btnSearch' i]",
+            "input[type='submit'][value*='earch' i]",
+            "a[id$='_btnSearch']",
+            "a[href*='btnSearch']",
         )
-        for sel in result_selectors:
+        for sel in button_selectors:
             try:
-                await page.wait_for_selector(sel, timeout=20000)
+                await page.click(sel, timeout=4000)
+                clicked = True
                 break
             except Exception:
                 continue
+        # Last-resort: invoke __doPostBack directly with the canonical
+        # control name (verified from the production page's reset link).
+        if not clicked:
+            try:
+                await page.evaluate(
+                    "() => __doPostBack('ctl00$ContentPlaceHolder1$as1$btnSearch','')"
+                )
+                clicked = True
+            except Exception:
+                pass
 
-        # Final settle — let any AJAX rendering finish
+        # Wait for #searchResults to populate. The empty initial state
+        # has placeholder text 'Please use the Advanced Search Menu';
+        # we wait until the div has actual content (>500 bytes).
         try:
-            await page.wait_for_load_state("networkidle", timeout=20000)
+            await page.wait_for_function(
+                "() => { const r = document.getElementById('searchResults');"
+                " return r && r.innerHTML && r.innerHTML.length > 500; }",
+                timeout=30000,
+            )
+        except Exception:
+            pass
+
+        # Final settle for any AJAX-loaded content
+        try:
+            await page.wait_for_load_state("networkidle", timeout=15000)
         except Exception:
             pass
 

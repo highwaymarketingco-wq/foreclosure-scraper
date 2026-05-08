@@ -1,29 +1,37 @@
-"""Authenticated NC eCourts Tyler portal scraper.
+"""DEPRECATED: Authenticated NC eCourts Tyler portal scraper.
 
-The WAF-blocked /Portal/Home/Dashboard/29 endpoint becomes accessible
-when we present session cookies from a verified-account login. The auth
-flow is WS-Federation:
+PRODUCTION STATUS: WAF-BLOCKED, NOT VIABLE.
 
-  1. GET /Portal/Account/Login → 302 to odysseyidentityprovider.tylerhost.net
-  2. POST credentials to IdP signin form
-  3. IdP returns WS-Fed token + redirects back to /Portal/
-  4. Portal sets session cookies (".ASPXAUTH" et al)
-  5. Subsequent /Home/Dashboard/29 requests carry these cookies and
-     pass the WAF's verified-human check
+Verified 2026-05-08 (patch runs #5-7 and direct curl):
 
-We drive the entire flow in a single Playwright session via Scrapling's
-StealthyFetcher (one login → many case lookups). Falls back to the
-heuristic path silently when login fails so the run still produces a
-result.
+  GET https://odysseyidentityprovider.tylerhost.net/idp/account/signin
+  → HTTP 405 + x-amzn-waf-action: captcha
 
-Credentials are read from env (NEVER hardcode):
-  NC_ECOURTS_USERNAME, NC_ECOURTS_PASSWORD
+The IdP's login PAGE itself is behind AWS WAF — it returns a CAPTCHA
+challenge to all non-browser traffic, so Scrapling/Playwright can't
+even reach the username/password form, let alone log in. Verified by:
 
-Output dict shape mirrors the heuristic enrichment so downstream code
-(comp matcher, dashboard popouts) is path-agnostic. Adds:
-  - method = "tyler_authenticated"
-  - last_event_date / last_event_text from the docket
-  - sold_price (when Order Confirming Sale carries the hammer price)
+  - Run #5: 'login_or_search_failed' / no_cases_returned_from_tyler
+  - Run #7: 'no_username_field' / step_error="couldn't find username
+    input on IdP signin page" — landed_url shows the WAF challenge URL
+
+Cookies from a real browser session would expire in ~30 min and
+require constant manual refresh — not viable for an automated scraper.
+
+VIABLE-IF-PAID alternatives (not implemented):
+  - ScrapingBee / ZenRows / Bright Data residential proxy + CAPTCHA-solver
+    (~$15-50/mo for our volume)
+  - Tyler official Court Records API (vendor pricing, $$$$)
+
+CURRENT BEHAVIOR: this module short-circuits early with outcome=
+'waf_blocked_abandoned' so the heuristic fallback (sale-date math +
+Trustee's Deed cross-ref in enrichment_nc_case_status.py) is the
+sole NC case-status path. The heuristic tagged 1601 listings in
+patch run #7 — coverage isn't meaningfully reduced by skipping Tyler.
+
+Set env NC_ECOURTS_FORCE_RETRY=1 to ignore the abandoned status and
+attempt the full Playwright auth flow anyway (e.g., if you've added
+a paid bypass-service env, or if Tyler removes the WAF).
 """
 from __future__ import annotations
 
@@ -397,6 +405,21 @@ async def enrich_with_nc_case_status_authenticated(
         "targets": 0,
         "checked_at": datetime.utcnow().isoformat() + "Z",
     })
+
+    # Short-circuit: this path is officially abandoned (WAF blocks the
+    # IdP login page itself). Skip unless NC_ECOURTS_FORCE_RETRY=1 is
+    # set explicitly, which we honor for testing if WAF is removed or
+    # a paid bypass is added.
+    if os.environ.get("NC_ECOURTS_FORCE_RETRY") != "1":
+        log.info("nc_ecourts.auth.waf_blocked_abandoned")
+        LAST_RUN_STATUS.update({
+            "outcome": "waf_blocked_abandoned",
+            "reason": (
+                "AWS WAF blocks IdP login page; verified 2026-05-08. "
+                "Set NC_ECOURTS_FORCE_RETRY=1 to override."
+            ),
+        })
+        return 0
 
     username = os.environ.get("NC_ECOURTS_USERNAME")
     password = os.environ.get("NC_ECOURTS_PASSWORD")

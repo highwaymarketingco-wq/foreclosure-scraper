@@ -164,40 +164,38 @@ def test_parse_case_detail_returns_none_for_no_status():
 # ---- dispatch behavior ----
 
 @pytest.mark.asyncio
-async def test_dispatch_no_creds_returns_zero(monkeypatch):
-    """When NC_ECOURTS_USERNAME/PASSWORD are missing, function should
-    log + return 0 without attempting browser launch."""
+async def test_dispatch_default_is_waf_abandoned(monkeypatch):
+    """As of 2026-05-08, Tyler's IdP itself is WAF-blocked. Default
+    behavior is to short-circuit with outcome='waf_blocked_abandoned'
+    rather than waste 60s/run failing through the form-fill flow."""
+    monkeypatch.delenv("NC_ECOURTS_FORCE_RETRY", raising=False)
+    monkeypatch.setenv("NC_ECOURTS_USERNAME", "test@example.com")
+    monkeypatch.setenv("NC_ECOURTS_PASSWORD", "testpass")
+    from foreclosure_scraper.enrichment_nc_case_status_tyler import (
+        get_last_run_status,
+    )
+    out = await enrich_with_nc_case_status_authenticated([])
+    assert out == 0
+    status = get_last_run_status()
+    assert status["outcome"] == "waf_blocked_abandoned"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_force_retry_overrides_abandon(monkeypatch):
+    """NC_ECOURTS_FORCE_RETRY=1 overrides the abandon flag for testing
+    when WAF is removed or paid bypass is wired up."""
+    monkeypatch.setenv("NC_ECOURTS_FORCE_RETRY", "1")
     monkeypatch.delenv("NC_ECOURTS_USERNAME", raising=False)
     monkeypatch.delenv("NC_ECOURTS_PASSWORD", raising=False)
-    out = await enrich_with_nc_case_status_authenticated([])
-    assert out == 0
-
-
-@pytest.mark.asyncio
-async def test_dispatch_no_targets_returns_zero(monkeypatch):
-    """Empty listings list = 0 tagged, no browser launch."""
-    monkeypatch.setenv("NC_ECOURTS_USERNAME", "test@example.com")
-    monkeypatch.setenv("NC_ECOURTS_PASSWORD", "testpass")
-    out = await enrich_with_nc_case_status_authenticated([])
-    assert out == 0
-
-
-@pytest.mark.asyncio
-async def test_dispatch_skips_listings_without_case_number(monkeypatch):
-    """Listings without case_number can't be queried — skip them all,
-    return 0 (and don't attempt a browser launch)."""
-    from foreclosure_scraper.models import Listing, ListingType
-    monkeypatch.setenv("NC_ECOURTS_USERNAME", "test@example.com")
-    monkeypatch.setenv("NC_ECOURTS_PASSWORD", "testpass")
-    li = Listing(
-        source="counties_nc.test",
-        source_url="https://example.com",
-        state="NC",
-        listing_type=ListingType.LIS_PENDENS,
-        case_number=None,
+    from foreclosure_scraper.enrichment_nc_case_status_tyler import (
+        get_last_run_status,
     )
-    out = await enrich_with_nc_case_status_authenticated([li])
+    out = await enrich_with_nc_case_status_authenticated([])
     assert out == 0
+    status = get_last_run_status()
+    # With FORCE_RETRY but no creds, falls through to no_credentials_in_env
+    assert status["outcome"] == "skipped"
+    assert "no_credentials_in_env" in (status["reason"] or "")
 
 
 # ---- two-stage dispatch in enrichment_nc_case_status ----

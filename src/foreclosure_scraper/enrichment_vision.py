@@ -45,21 +45,27 @@ ANTHROPIC_VISION_MODEL = "claude-sonnet-4-5-20250929"
 # Legacy alias kept for any external imports
 VISION_MODEL = ANTHROPIC_VISION_MODEL
 
-# Gemini settings — gemini-2.5-flash is the current stable Vision-capable
-# model (the older gemini-2.0-flash-exp was retired by Google and now
-# returns 404 from the v1beta API). Override via GEMINI_VISION_MODEL env
-# if pricing or availability changes. Pricing as of 2026-05:
-#   $0.075/Mtok input, $0.30/Mtok output (Tier 1 free quota: 1500 RPD).
+# Gemini settings — gemini-1.5-flash chosen for free-tier headroom.
+# Verified pricing/quota 2026-05-08:
+#   gemini-1.5-flash: 15 RPM / 1M TPM / 1500 RPD (free tier — fits us)
+#   gemini-2.5-flash: 10 RPM /  250 RPD (free tier — too tight; we hit
+#                                        429 RESOURCE_EXHAUSTED in run #6)
+#   gemini-2.0-flash-exp: deprecated, returns 404
+# Override via GEMINI_VISION_MODEL env. Paid tier on any of these has
+# 2000 RPM / no daily cap.
 GEMINI_VISION_MODEL = os.environ.get(
-    "GEMINI_VISION_MODEL", "gemini-2.5-flash"
+    "GEMINI_VISION_MODEL", "gemini-1.5-flash"
 )
 
 MAX_PHOTOS_PER_LISTING = 7   # up to 5 real + aerial + street
 MAX_REAL_PHOTOS = 5          # how many of the listing photos to send
-MAX_TOKENS = 1000            # bumped to fit richer multi-photo observations
-# Concurrency configurable so the retry pass can throttle harder than the main run
-CONCURRENCY = int(os.environ.get("VISION_CONCURRENCY", "4"))
-INTER_CALL_DELAY = float(os.environ.get("VISION_INTER_CALL_DELAY", "0.0"))
+# 2000 tokens needed for multi-photo observations: 1000 was truncating
+# the structured JSON output mid-key, causing parse_fail in run #6.
+MAX_TOKENS = 2000
+# Free-tier-safe defaults: 1 in-flight + 6s delay = 10 RPM. Override
+# both via env when on a paid tier with higher limits.
+CONCURRENCY = int(os.environ.get("VISION_CONCURRENCY", "1"))
+INTER_CALL_DELAY = float(os.environ.get("VISION_INTER_CALL_DELAY", "6.0"))
 
 
 SYSTEM_PROMPT = """You are an experienced real-estate flipper assessing renovation needs from listing photos and aerial views. You make accurate cost-aware judgments grounded in what the photos actually show, not optimistic guesses.
