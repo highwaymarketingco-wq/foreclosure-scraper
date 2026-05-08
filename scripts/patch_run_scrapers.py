@@ -650,14 +650,17 @@ async def main() -> int:
     # be set as workflow secrets). Pulls up to NC_ECOURTS_AUTH_CAP cases.
     # Stage 2: heuristic sale-date + ROD cross-ref runs on whatever Tyler
     # didn't tag. Pure compute, free, deterministic.
+    nc_case_status_summary: dict = {}
     if os.environ.get("PATCH_NC_CASE_STATUS", "1") == "1":
         try:
             from foreclosure_scraper.enrichment_nc_case_status import (
+                DISPATCHED_LAST_STATUS,
                 enrich_with_nc_case_status_dispatched,
             )
             await enrich_with_nc_case_status_dispatched(
                 final_active, sold_pool=final_sold,
             )
+            nc_case_status_summary = dict(DISPATCHED_LAST_STATUS)
         except Exception:
             log.error("patch_run.nc_case_status_failed",
                       traceback=traceback.format_exc())
@@ -751,6 +754,9 @@ async def main() -> int:
         "sold_pool_final": len(final_sold),
         "valuation_failures": valuation_failures,
         "enrichment_stats": enrichment_stats,
+        # Tyler-auth visibility — see enrichment_nc_case_status_tyler.LAST_RUN_STATUS
+        # Surfaces outcome/reason/tagged so the user can see if login worked.
+        "nc_case_status": nc_case_status_summary,
     })
     run_health_path.write_text(json.dumps(health, indent=2, default=str))
     log.info("patch_run.done")

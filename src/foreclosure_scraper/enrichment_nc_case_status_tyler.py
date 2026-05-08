@@ -326,23 +326,59 @@ def _parse_case_detail_html(html: str) -> Optional[dict]:
     return info
 
 
+# Module-level last-run status — surfaced in run_health.json by the
+# orchestrator so we can see auth success/failure per run.
+LAST_RUN_STATUS: dict = {
+    "outcome": "not_attempted",
+    "reason": None,
+    "tagged": 0,
+    "targets": 0,
+    "checked_at": None,
+}
+
+
+def get_last_run_status() -> dict:
+    """Return a copy of the most recent auth-path run status. Used by
+    orchestrator + patch_run to fold into run_health.json."""
+    return dict(LAST_RUN_STATUS)
+
+
 async def enrich_with_nc_case_status_authenticated(
     listings: list[Listing], max_cases: Optional[int] = None
 ) -> int:
     """Authenticated Tyler path. Returns number of listings tagged.
     Returns 0 (and logs) when creds are missing or login fails.
     Caller is responsible for falling back to the heuristic path.
+
+    Side effect: updates LAST_RUN_STATUS so the orchestrator can surface
+    the outcome in run_health.json (visible in workflow summary).
     """
+    LAST_RUN_STATUS.update({
+        "outcome": "not_attempted",
+        "reason": None,
+        "tagged": 0,
+        "targets": 0,
+        "checked_at": datetime.utcnow().isoformat() + "Z",
+    })
+
     username = os.environ.get("NC_ECOURTS_USERNAME")
     password = os.environ.get("NC_ECOURTS_PASSWORD")
     if not username or not password:
         log.info("nc_ecourts.auth.no_creds")
+        LAST_RUN_STATUS.update({
+            "outcome": "skipped",
+            "reason": "no_credentials_in_env",
+        })
         return 0
 
     try:
         from scrapling.fetchers import StealthyFetcher
     except ImportError:
         log.warning("nc_ecourts.auth.scrapling_missing")
+        LAST_RUN_STATUS.update({
+            "outcome": "skipped",
+            "reason": "scrapling_not_installed",
+        })
         return 0
 
     targets = [
@@ -371,8 +407,10 @@ async def enrich_with_nc_case_status_authenticated(
     cap = max_cases if max_cases is not None else DEFAULT_CAP
     targets = targets[:cap]
 
+    LAST_RUN_STATUS["targets"] = len(targets)
     if not targets:
         log.info("nc_ecourts.auth.no_targets")
+        LAST_RUN_STATUS.update({"outcome": "no_targets"})
         return 0
 
     log.info("nc_ecourts.auth.start", target_count=len(targets))
@@ -396,6 +434,10 @@ async def enrich_with_nc_case_status_authenticated(
         )
     except Exception as exc:
         log.warning("nc_ecourts.auth.fetch_fail", error=str(exc)[:200])
+        LAST_RUN_STATUS.update({
+            "outcome": "fetch_exception",
+            "reason": str(exc)[:200],
+        })
         return 0
 
     tagged = 0
@@ -425,4 +467,12 @@ async def enrich_with_nc_case_status_authenticated(
                         continue
 
     log.info("nc_ecourts.auth.done", tagged=tagged, of=len(targets))
+    LAST_RUN_STATUS.update({
+        "outcome": "ok" if tagged > 0 else "login_or_search_failed",
+        "tagged": tagged,
+        "reason": (
+            "no_cases_returned_from_tyler" if tagged == 0
+            else None
+        ),
+    })
     return tagged

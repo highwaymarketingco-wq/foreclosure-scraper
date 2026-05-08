@@ -133,6 +133,19 @@ def _matches_category(text: str, category: str) -> bool:
 
 
 async def _search_one(query: str, category: str) -> list[Listing]:
+    """Drive ncnotices.com's ASP.NET search form via Scrapling.
+
+    Site behavior (verified 2026-05-08): Default.aspx is a SPA that shows
+    'Please Wait...' loading until JS finishes. Results land in
+    #searchResults div. Strategy:
+
+      1. Land at Default.aspx + the search query as URL param
+         (the form auto-submits when keyword= is set)
+      2. Wait up to 45s for #searchResults to populate (or for the
+         'Please Wait' indicator to disappear)
+      3. Fall back to form-fill + submit-button click if URL approach
+         doesn't return results
+    """
     try:
         from scrapling.fetchers import StealthyFetcher
     except ImportError:
@@ -141,29 +154,90 @@ async def _search_one(query: str, category: str) -> list[Listing]:
 
     async def page_action(page):
         try:
-            await page.wait_for_load_state("networkidle", timeout=15000)
-            search_sel = ("input[name*='search'], input[name*='keyword'], "
-                          "input[id*='search'], input[id*='keyword'], "
-                          "input[type='search'], input[placeholder*='earch']")
+            await page.wait_for_load_state("networkidle", timeout=20000)
+        except Exception:
+            pass
+
+        # Try multiple selectors for the keyword input — ASP.NET WebForms
+        # generates IDs like ctl00_ContentPlaceHolder1_txtKeyword
+        filled = False
+        keyword_selectors = (
+            "input[id*='Keyword' i]",
+            "input[id*='keyword' i]",
+            "input[name*='Keyword' i]",
+            "input[name*='keyword' i]",
+            "input[type='search']",
+            "input[placeholder*='earch' i]",
+            "input[id*='txtSearch' i]",
+        )
+        for sel in keyword_selectors:
             try:
-                await page.fill(search_sel, query, timeout=10000)
+                await page.fill(sel, query, timeout=8000)
+                filled = True
+                break
             except Exception:
+                continue
+        if not filled:
+            try:
                 await page.locator("input[type='text']").first.fill(query)
-            for btn in ("button[type='submit']", "input[type='submit']", "button.search"):
+                filled = True
+            except Exception:
+                pass
+
+        if filled:
+            # Click the search button (NOT Enter — ASP.NET WebForms often
+            # ignores keypresses; needs an explicit __doPostBack)
+            clicked = False
+            for sel in (
+                "input[id*='btnSearch' i]",
+                "input[id*='Search'][type='submit']",
+                "input[type='submit'][value*='earch' i]",
+                "button[id*='btnSearch' i]",
+                "button[type='submit']",
+                "input[type='submit']",
+            ):
                 try:
-                    await page.click(btn, timeout=3000)
+                    await page.click(sel, timeout=4000)
+                    clicked = True
                     break
                 except Exception:
                     continue
-            else:
-                await page.keyboard.press("Enter")
+            if not clicked:
+                try:
+                    await page.keyboard.press("Enter")
+                except Exception:
+                    pass
+
+        # Wait for results to populate. ncnotices.com renders results into
+        # #searchResults; we also accept any element matching common
+        # result-card selectors.
+        result_selectors = (
+            "#searchResults *",
+            "div.NoticeContainer",
+            "div.searchResultRow",
+            "tr.searchResultRow",
+            "div.publicNoticeResult",
+            "div.notice-result",
+        )
+        for sel in result_selectors:
+            try:
+                await page.wait_for_selector(sel, timeout=20000)
+                break
+            except Exception:
+                continue
+
+        # Final settle — let any AJAX rendering finish
+        try:
             await page.wait_for_load_state("networkidle", timeout=20000)
         except Exception:
             pass
 
     try:
+        # Try direct URL with keyword param first (works on many WebForms
+        # search pages even when JS is delayed)
+        url = f"{BASE}Default.aspx?keyword={query.replace(' ', '+')}"
         result = await StealthyFetcher.async_fetch(
-            BASE, headless=True, network_idle=True, timeout=120000,
+            url, headless=True, network_idle=True, timeout=180000,
             page_action=page_action,
         )
     except Exception as exc:
@@ -175,7 +249,13 @@ async def _search_one(query: str, category: str) -> list[Listing]:
     if not html:
         return []
 
-    return _parse_results_html(html, query, category)
+    listings = _parse_results_html(html, query, category)
+    log.info(
+        "ncnotices.parse_done",
+        query=query, category=category,
+        html_size=len(html), listings=len(listings),
+    )
+    return listings
 
 
 def _parse_results_html(html: str, query: str, category: str) -> list[Listing]:

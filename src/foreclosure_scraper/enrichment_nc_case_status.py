@@ -238,14 +238,18 @@ async def enrich_with_nc_case_status_dispatched(
     yet so it doesn't overwrite Tyler's richer data).
     """
     tyler_tagged = 0
+    tyler_status: dict = {"outcome": "not_attempted", "reason": "creds_missing"}
     if os.environ.get("NC_ECOURTS_USERNAME") and os.environ.get("NC_ECOURTS_PASSWORD"):
         try:
             from .enrichment_nc_case_status_tyler import (
                 enrich_with_nc_case_status_authenticated,
+                get_last_run_status,
             )
             tyler_tagged = await enrich_with_nc_case_status_authenticated(listings)
+            tyler_status = get_last_run_status()
         except Exception as exc:
             log.warning("nc_case_status.tyler_path_failed", error=str(exc)[:200])
+            tyler_status = {"outcome": "exception", "reason": str(exc)[:200]}
 
     # Heuristic always runs — fills gaps Tyler didn't reach. Skips
     # any listing that already has nc_case_status from Tyler.
@@ -260,7 +264,24 @@ async def enrich_with_nc_case_status_dispatched(
         "nc_case_status.dispatched_done",
         tyler_tagged=tyler_tagged,
         heuristic_targets=len(targets_for_heuristic),
+        tyler_status=tyler_status,
     )
+    # Stash on a module-level dict so caller (orchestrator / patch) can
+    # surface it in run_health.json.
+    DISPATCHED_LAST_STATUS.update({
+        "tyler_tagged": tyler_tagged,
+        "tyler_status": tyler_status,
+        "heuristic_targets": len(targets_for_heuristic),
+    })
+
+
+# Module-level last-dispatch summary; orchestrator + patch_run read this
+# to fold into run_health.json after the call returns.
+DISPATCHED_LAST_STATUS: dict = {
+    "tyler_tagged": 0,
+    "tyler_status": {"outcome": "not_attempted", "reason": "never_called"},
+    "heuristic_targets": 0,
+}
 
 
 # Backwards-compat: orchestrator + patch_run call enrich_with_nc_case_status
