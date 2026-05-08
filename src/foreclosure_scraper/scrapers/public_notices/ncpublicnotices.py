@@ -240,10 +240,11 @@ async def _search_one(query: str, category: str) -> list[Listing]:
         BASE,  # form-fill fallback
     ]
 
+    last_html_size = 0
     for url in candidate_urls:
         try:
             result = await StealthyFetcher.async_fetch(
-                url, headless=True, network_idle=True, timeout=180000,
+                url, headless=True, network_idle=True, timeout=90000,
                 page_action=page_action,
             )
         except Exception as exc:
@@ -253,15 +254,22 @@ async def _search_one(query: str, category: str) -> list[Listing]:
         body = getattr(result, "body", b"")
         html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
         listings = _parse_results_html(html, query, category) if html else []
+        last_html_size = max(last_html_size, len(html or ""))
         log.info(
             "ncnotices.attempt_done",
             query=query, category=category,
             url=url, html_size=len(html), listings=len(listings),
         )
+        # Short-circuit on success
         if listings:
             return listings
+        # Short-circuit on substantial HTML — means the URL loaded a real
+        # page, just no results for this query. Trying alternate URLs won't
+        # help and would 3x the runtime budget. (Empty page < 5KB suggests
+        # WAF block / 503; keep trying alternates.)
+        if len(html or "") > 5000:
+            return []
 
-    # All URL shapes returned 0 results
     return []
 
 
