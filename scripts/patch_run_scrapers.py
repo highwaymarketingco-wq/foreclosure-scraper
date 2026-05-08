@@ -130,6 +130,11 @@ KNOWN_FIXED = (
     "law_firms.hutchens",
     "law_firms.bell_carrington",
     "law_firms.finkel",
+    # Kania Law Firm — NC tax-foreclosure auctions across ~24 western
+    # NC counties. Single largest source of tax-sale listings in the
+    # Asheville / Charlotte regions. Cloudflare-protected, falls back
+    # to Scrapling stealth when plain GET 503s.
+    "law_firms.kania",
 )
 
 
