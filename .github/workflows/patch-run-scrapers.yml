@@ -89,6 +89,11 @@ jobs:
       NC_ECOURTS_USERNAME: ${{ secrets.NC_ECOURTS_USERNAME }}
       NC_ECOURTS_PASSWORD: ${{ secrets.NC_ECOURTS_PASSWORD }}
       NC_ECOURTS_AUTH_CAP: "50"
+      # CapSolver API key (capsolver.com). Solves the AWS WAF challenge
+      # in front of Tyler's IdP login page so we can reach the real
+      # username/password form. ~$0.001 per solve, ~$0.20/week at our
+      # volume. Without this, Tyler auth fails at last_step='waf_challenge_detected'.
+      CAPSOLVER_API_KEY: ${{ secrets.CAPSOLVER_API_KEY }}
       LOG_LEVEL: INFO
       PYTHONUNBUFFERED: "1"
 

@@ -138,6 +138,61 @@ async def _drive_login_and_search(
 
     LAST_RUN_STATUS["landed_url"] = page.url[:200]
 
+    # Step 1b: Detect AWS WAF challenge. The challenge page lacks our
+    # expected username field, so before declaring failure, try to solve
+    # the WAF via CapSolver (when CAPSOLVER_API_KEY is set).
+    waf_challenge_detected = False
+    try:
+        # WAF challenge pages are short (< 2KB), have no form inputs,
+        # and contain 'awswaf' / 'captcha' markers in the body.
+        body_text = await page.content()
+        if (len(body_text) < 5000 and
+                ("awswaf" in body_text.lower() or "captcha" in body_text.lower())):
+            waf_challenge_detected = True
+        # Also: if no <input type=password>, the real form didn't render
+        try:
+            await page.wait_for_selector('input[type="password"]', timeout=2000)
+        except Exception:
+            waf_challenge_detected = True
+    except Exception:
+        pass
+
+    if waf_challenge_detected:
+        LAST_RUN_STATUS["last_step"] = "waf_challenge_detected"
+        log.info("nc_ecourts.auth.waf_challenge_detected", url=page.url[:200])
+
+        from .enrichment_capsolver import solve_aws_waf
+        token = await solve_aws_waf(page.url)
+        if not token:
+            LAST_RUN_STATUS.update({
+                "last_step": "waf_solve_failed",
+                "step_error": "CapSolver returned no token (no api key, low balance, or solve failure)",
+            })
+            return out
+
+        # Inject the WAF token cookie + reload the page. The aws-waf-token
+        # cookie unlocks the real signin form behind the challenge.
+        try:
+            await page.context.add_cookies([{
+                "name": "aws-waf-token",
+                "value": token,
+                "domain": ".tylerhost.net",
+                "path": "/",
+                "httpOnly": False,
+                "secure": True,
+                "sameSite": "None",
+            }])
+            await page.reload(wait_until="networkidle", timeout=45000)
+            LAST_RUN_STATUS["last_step"] = "waf_solved_reloaded"
+            LAST_RUN_STATUS["landed_url"] = page.url[:200]
+            log.info("nc_ecourts.auth.waf_solved", url=page.url[:200])
+        except Exception as exc:
+            LAST_RUN_STATUS.update({
+                "last_step": "waf_cookie_inject_failed",
+                "step_error": str(exc)[:200],
+            })
+            return out
+
     # Step 2: Fill credentials on the IdP signin page.
     LAST_RUN_STATUS["last_step"] = "filling_username"
     user_filled = False
