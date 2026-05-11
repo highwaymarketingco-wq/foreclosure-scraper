@@ -394,9 +394,7 @@ def _parse_results_html(html: str, query: str, category: str) -> list[Listing]:
             continue
 
         a = card.css_first("a[href]")
-        href = (a.attributes.get("href", "") if a else "") or BASE
-        if href.startswith("/"):
-            href = f"https://www.ncnotices.com{href}"
+        raw_href = a.attributes.get("href", "") if a else ""
 
         county_m = COUNTY_RE.search(text)
         county = county_m.group(1).title() if county_m else None
@@ -410,6 +408,25 @@ def _parse_results_html(html: str, query: str, category: str) -> list[Listing]:
         if sig in seen:
             continue
         seen.add(sig)
+
+        # Construct source_url. H4 FIX (2026-05-08): cards without
+        # their own <a href> previously all fell back to BASE, which
+        # made every linkless card share an identical source_url. The
+        # downstream dedupe_key 'url:' fallback then collapsed them
+        # all into a single Frankenstein listing. Now each card gets a
+        # unique fragment-suffixed URL (BASE#<sig>) so source_url is
+        # actually distinct per notice.
+        if raw_href:
+            href = raw_href if raw_href.startswith("http") else (
+                f"https://www.ncnotices.com{raw_href}"
+                if raw_href.startswith("/") else f"{BASE}{raw_href}"
+            )
+        else:
+            # Fragment-based synthetic URL — anchor only, never requested
+            # but makes source_url unique per card.
+            import hashlib
+            sig_hash = hashlib.md5(sig.encode("utf-8")).hexdigest()[:12]
+            href = f"{BASE}#notice-{category}-{sig_hash}"
 
         raw_blob = {
             "ncnotices": {

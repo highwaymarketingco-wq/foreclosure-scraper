@@ -221,6 +221,44 @@ def test_dump_html_disabled_by_env(tmp_path, monkeypatch):
     assert list(tmp_path.glob("*.html")) == []
 
 
+def test_h4_linkless_cards_get_unique_urls():
+    """H4 fix: cards without their own <a href> must get unique
+    synthetic source_url so dedupe_key() doesn't collapse them all
+    into a single 'url:BASE' bucket."""
+    html = """
+    <html><body>
+    <div class="search-result"><p>Notice to Creditors. Estate of JOHN ALBERT SMITH, late of Buncombe County. Executor must receive claims by May 15.</p></div>
+    <div class="search-result"><p>Notice to Creditors. Estate of MARY JONES, late of Rutherford County. Personal representative claims by June 1.</p></div>
+    <div class="search-result"><p>Notice to Creditors. Estate of WILLIAM BROWN, late of Polk County. Administrator deadline July 1.</p></div>
+    </body></html>
+    """
+    out = _parse_results_html(html, query="notice to creditors", category="probate")
+    assert len(out) == 3
+    urls = {li.source_url for li in out}
+    # Three distinct synthetic URLs, NOT all the same BASE
+    assert len(urls) == 3, f"All 3 cards should have unique URLs; got: {urls}"
+    # All start with the BASE + fragment
+    for u in urls:
+        assert "ncnotices.com" in u
+        assert "#notice-" in u
+
+
+def test_h4_real_href_preserved():
+    """When the card DOES have an <a href>, use it (not the synthetic
+    fallback)."""
+    html = """
+    <html><body>
+    <div class="search-result">
+      <p>Notice to Creditors. Estate of JOHN SMITH, late of Buncombe County. Executor claims by May 15.</p>
+      <a href="/notices/123">View notice</a>
+    </div>
+    </body></html>
+    """
+    out = _parse_results_html(html, query="notice to creditors", category="probate")
+    assert len(out) == 1
+    assert out[0].source_url == "https://www.ncnotices.com/notices/123"
+
+
 def test_parse_dedupes_by_named_party():
     """Two probate cards for the same estate (same name + county)
     should emit one listing."""
