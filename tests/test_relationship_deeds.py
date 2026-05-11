@@ -137,13 +137,15 @@ def test_at_least_six_quitclaim_keywords():
 
 # ---- enrich_with_relationship_deeds integration ----
 
-def test_enrich_emits_probate_lead_with_address():
+def test_enrich_emits_probate_lead_when_source_in_sold_pool():
+    """H5 fix: probate signal from SOLD POOL → emit derived active
+    listing so the lead surfaces on the dashboard."""
     rod = _li(
         raw={"doc_type": "EXECUTOR'S DEED"},
         street_address="123 Main St",
         zip_code="28801",
     )
-    new = enrich_with_relationship_deeds([rod])
+    new = enrich_with_relationship_deeds([], sold_pool=[rod])
     assert len(new) == 1
     lead = new[0]
     assert lead.listing_type == ListingType.PROBATE_NOTICE
@@ -153,7 +155,23 @@ def test_enrich_emits_probate_lead_with_address():
     assert rod.raw["relationship_signal"]["kind"] == "probate"
 
 
-def test_enrich_emits_divorce_lead_with_address():
+def test_enrich_skips_emit_when_source_already_in_active():
+    """H5 fix: probate signal from a listing ALREADY in the active
+    pool → tag in-place only, don't emit a derived copy (which would
+    have been a duplicate of the source ROD record on the dashboard)."""
+    rod = _li(
+        raw={"doc_type": "EXECUTOR'S DEED"},
+        street_address="123 Main St",
+        zip_code="28801",
+    )
+    new = enrich_with_relationship_deeds([rod])
+    # No new listing emitted (would duplicate the source)
+    assert len(new) == 0
+    # But the source is still tagged in-place
+    assert rod.raw["relationship_signal"]["kind"] == "probate"
+
+
+def test_enrich_emits_divorce_lead_when_source_in_sold_pool():
     rod = _li(
         raw={
             "doc_type": "QUITCLAIM DEED",
@@ -164,7 +182,7 @@ def test_enrich_emits_divorce_lead_with_address():
         street_address="456 Oak Ave",
         zip_code="28805",
     )
-    new = enrich_with_relationship_deeds([rod])
+    new = enrich_with_relationship_deeds([], sold_pool=[rod])
     assert len(new) == 1
     lead = new[0]
     assert lead.listing_type == ListingType.DIVORCE_NOTICE
@@ -186,7 +204,8 @@ def test_enrich_skips_recordings_without_address():
 
 
 def test_enrich_dedupes_same_address_county():
-    """Two ROD recordings at the same address should emit one lead."""
+    """Two ROD recordings at the same address (both in sold pool)
+    should emit one lead, not two."""
     rod1 = _li(
         raw={"doc_type": "EXECUTOR'S DEED"},
         street_address="100 Pine Rd",
@@ -197,7 +216,7 @@ def test_enrich_dedupes_same_address_county():
         street_address="100 Pine Rd",
         zip_code="28704",
     )
-    new = enrich_with_relationship_deeds([rod1, rod2])
+    new = enrich_with_relationship_deeds([], sold_pool=[rod1, rod2])
     assert len(new) == 1
 
 

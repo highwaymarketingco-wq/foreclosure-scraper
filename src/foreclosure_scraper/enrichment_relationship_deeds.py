@@ -146,6 +146,12 @@ def enrich_with_relationship_deeds(
     to the active pool). Existing listings are mutated in-place to add
     raw["relationship_signal"].
     """
+    # H5 FIX (2026-05-08): track which pool each listing came from so
+    # we only emit derived listings for SOLD POOL matches (those need
+    # surfacing into the active pool to be visible). For listings
+    # already in the active pool, the in-place tag is enough — emitting
+    # a derived copy was creating a duplicate of every probate ROD record.
+    active_ids = {id(li) for li in (listings or [])}
     pool: list[Listing] = []
     pool.extend(listings or [])
     pool.extend(sold_pool or [])
@@ -157,6 +163,7 @@ def enrich_with_relationship_deeds(
         "divorce_tagged": 0,
         "probate_emitted": 0,
         "divorce_emitted": 0,
+        "emit_skipped_already_in_active": 0,
     }
     seen_keys: set[str] = set()
 
@@ -186,6 +193,17 @@ def enrich_with_relationship_deeds(
                 "tagged_at": datetime.utcnow().isoformat() + "Z",
             }
             counts["divorce_tagged"] += 1
+
+        # H5: when the source is ALREADY in the active pool, the in-place
+        # tag (above) is sufficient — the dashboard reads
+        # raw.relationship_signal to surface the lead. Emitting a separate
+        # PROBATE_NOTICE/DIVORCE_NOTICE listing at the same address would
+        # be a duplicate (same parcel, same street, same county, just
+        # different listing_type). Only emit for sold-pool sources, where
+        # the signal otherwise wouldn't surface in the active pool.
+        if id(li) in active_ids:
+            counts["emit_skipped_already_in_active"] += 1
+            continue
 
         # Emit a new active-pool listing pointing at the same property
         # but tagged as the lead-type. Dedup on address+county.
