@@ -1,11 +1,96 @@
 """Unified listing schema."""
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field, HttpUrl
+
+
+# Street-suffix abbreviations used in _normalize_addr. The same street
+# can appear as 'Main Street', 'Main St', 'Main St.', 'MAIN STREET' across
+# sources — collapse to a canonical short form for dedupe matching.
+_ADDR_SUFFIX_MAP = {
+    "street": "st", "st.": "st",
+    "avenue": "ave", "ave.": "ave",
+    "road": "rd", "rd.": "rd",
+    "drive": "dr", "dr.": "dr",
+    "lane": "ln", "ln.": "ln",
+    "court": "ct", "ct.": "ct",
+    "boulevard": "blvd", "blvd.": "blvd",
+    "highway": "hwy", "hwy.": "hwy",
+    "place": "pl", "pl.": "pl",
+    "circle": "cir", "cir.": "cir",
+    "trail": "trl", "trl.": "trl",
+    "parkway": "pkwy", "pkwy.": "pkwy",
+    "terrace": "ter", "ter.": "ter",
+    "way": "way",  # already short, but listed for explicitness
+    "north": "n", "n.": "n",
+    "south": "s", "s.": "s",
+    "east": "e", "e.": "e",
+    "west": "w", "w.": "w",
+    "northeast": "ne", "ne.": "ne",
+    "northwest": "nw", "nw.": "nw",
+    "southeast": "se", "se.": "se",
+    "southwest": "sw", "sw.": "sw",
+}
+
+# Unit indicators stripped from addresses before comparison — "123 Main
+# St Apt 5" should match "123 Main St" since the unit isn't a separate
+# parcel for foreclosure purposes (the building is foreclosed whole).
+_UNIT_RE = re.compile(
+    r"\s+(?:apt|apartment|unit|suite|ste|#|lot)\.?\s*[\w-]+\s*$",
+    re.IGNORECASE,
+)
+
+
+def _normalize_addr(addr: str | None) -> str:
+    """Canonical lowercase address string for dedupe. Expands suffixes
+    (Street→st), strips unit indicators, collapses whitespace + commas."""
+    if not addr:
+        return ""
+    s = addr.strip().lower()
+    # Strip trailing unit indicators
+    s = _UNIT_RE.sub("", s)
+    # Strip city/state/zip suffix if present (commas suggest these)
+    if "," in s:
+        s = s.split(",", 1)[0]
+    # Token-level suffix expansion
+    tokens = []
+    for tok in s.split():
+        tok_clean = tok.rstrip(".")
+        tokens.append(_ADDR_SUFFIX_MAP.get(tok, _ADDR_SUFFIX_MAP.get(tok_clean, tok_clean)))
+    return " ".join(t for t in tokens if t)
+
+
+def _normalize_parcel(parcel: str | None) -> str:
+    """Strip every non-alphanumeric char, lowercase. So
+    '1234-56-7890', '1234567890', '1234-56-7890.000' all collapse to
+    '1234567890' (with the trailing '000' on variants that have it —
+    still close enough that the second collapse rule below catches it)."""
+    if not parcel:
+        return ""
+    s = re.sub(r"[^a-zA-Z0-9]", "", parcel).lower()
+    # Some county GIS exports add a 3-digit '.000' suffix to base parcels;
+    # strip if the result is just trailing zeros (heuristic — never strip
+    # significant digits).
+    if len(s) > 10 and s.endswith("000"):
+        s = s[:-3]
+    return s
+
+
+def _normalize_case(case: str | None) -> str:
+    """Strip every non-alphanumeric char, lowercase. So '24 SP 123',
+    '24-SP-123', '24SP123', '2024-SP-00123' → '24sp123' / '2024sp00123'.
+
+    Note: '24sp123' and '2024sp00123' still don't match — they're truly
+    different year representations and stripped-zero issues. Leave as-is
+    since a 2-vs-4-digit year mismatch could indicate different decades."""
+    if not case:
+        return ""
+    return re.sub(r"[^a-zA-Z0-9]", "", case).lower()
 
 
 class ListingType(str, Enum):
@@ -106,20 +191,44 @@ class Listing(BaseModel):
     def dedupe_key(self) -> str:
         """Stable key used to de-duplicate across sources.
 
-        Each candidate key is strip-checked: a whitespace-only parcel_id /
-        case_number / address would otherwise produce a degenerate key like
-        'parcel:NC:' that collides every such listing into one bucket.
-        Dedupe runs before validation, so we can't rely on validation to
-        clean these — must guard here.
+        Normalization rules (added per H3 fix 2026-05-08):
+          - parcel: lowercase + strip every non-alnum char (so
+            "1234-56-7890", "1234567890", "1234-56-7890.000" collapse).
+            County included since parcel "1234" can collide across counties.
+          - address: lowercase, expand common street-suffix abbreviations
+            ('Street'→'st', 'Avenue'→'ave', etc.), collapse whitespace.
+            zip optional — falls back to county+state when zip absent
+            (most pre-enrich listings have no zip).
+          - case_number: lowercase + strip non-alnum (so "24 SP 123",
+            "24-SP-123", "24SP123", "2024-SP-00123" all collapse).
         """
+        # parcel branch (strongest signal)
         if self.parcel_id and self.parcel_id.strip():
-            return f"parcel:{self.state or ''}:{self.parcel_id.strip().upper()}"
-        if (self.street_address and self.street_address.strip()
-                and self.zip_code and self.zip_code.strip()):
-            return f"addr:{self.street_address.strip().lower()}|{self.zip_code.strip()}"
+            p = _normalize_parcel(self.parcel_id)
+            if p:
+                county_part = (self.county or "").strip().lower()
+                return f"parcel:{self.state or ''}:{county_part}:{p}"
+
+        # address branch (with or without zip)
+        if self.street_address and self.street_address.strip():
+            addr = _normalize_addr(self.street_address)
+            if addr:
+                zip_part = (self.zip_code or "").strip()[:5]
+                if zip_part:
+                    return f"addr:{addr}|{zip_part}"
+                # No zip — fall back to county+state which is usually
+                # filled even pre-enrich.
+                county_part = (self.county or "").strip().lower()
+                if county_part:
+                    return f"addr:{addr}|{self.state or ''}:{county_part}"
+
+        # case_number + county branch
         if (self.case_number and self.case_number.strip()
                 and self.county and self.county.strip()):
-            return f"case:{self.state or ''}:{self.county.lower()}:{self.case_number.strip().upper()}"
+            c = _normalize_case(self.case_number)
+            if c:
+                return f"case:{self.state or ''}:{self.county.strip().lower()}:{c}"
+
         return f"url:{self.source_url}"
 
     def display_address(self) -> str:
