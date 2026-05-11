@@ -176,6 +176,14 @@ def _flip_candidate(li: Listing) -> bool:
             return True
         return False
 
+    # H2 FIX (2026-05-08): default to KEEP for the most common branch
+    # — bid in [1, 750_000] for SFR/condo/townhouse. Previously this
+    # function fell off the end with no return, implicitly returning
+    # None (falsy) → the orchestrator silently dropped every priced-SFR
+    # ≤ $750k listing. The bread-and-butter flip pool. Massive silent
+    # data loss until this fix.
+    return True
+
 
 # Common SC MIE address abbreviations — kept here so the city-splitter
 # resolves them to canonical city names that match Realtor.com.
