@@ -533,6 +533,23 @@ async def run() -> int:
     except Exception:
         log.error("county_pin.failed", traceback=traceback.format_exc())
 
+    # H1 FIX (post-enrich dedupe): the initial dedupe() at line 369 ran
+    # before parcel_id / zip_code / street_address / county were filled
+    # by the enrichment chain above. Cross-source duplicates (same
+    # property scraped by nc_ecourts + brock_scott + ROD) all missed
+    # their merge because dedupe_key() fell through to the 'url:' branch.
+    # Re-running dedupe now — after county_pin nailed the county, after
+    # parcel_lookup filled parcel_id, after lis_pendens_resolver filled
+    # street_address — gives the key the data it needs to actually merge.
+    pre_dedupe2_count = len(enriched)
+    enriched = dedupe(enriched)
+    log.info(
+        "orchestrator.dedupe2",
+        before=pre_dedupe2_count,
+        after=len(enriched),
+        collapsed=pre_dedupe2_count - len(enriched),
+    )
+
     # NC case-status: two-stage dispatch.
     #   Stage 1 (when NC_ECOURTS_USERNAME/PASSWORD set): authenticated
     #     Tyler portal scrape via WS-Fed login. Up to NC_ECOURTS_AUTH_CAP
