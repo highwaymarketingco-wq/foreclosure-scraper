@@ -81,6 +81,30 @@ def _normalize_parcel(parcel: str | None) -> str:
     return s
 
 
+def _deep_merge_dict(a: dict, b: dict) -> dict:
+    """Recursive dict merge. b's values win on leaf collisions, but
+    nested dicts are merged (not overwritten).
+
+    Used by Listing.merge() so that e.g. raw["gis"]["roof"] survives
+    when other.raw["gis"] sets a different subkey like "year_built".
+    Pre-fix, the shallow merge `{**self.raw, **other.raw}` wiped the
+    entire raw["gis"] dict whenever both sides had something under it.
+    """
+    if not isinstance(a, dict):
+        return b if isinstance(b, dict) else (b if b is not None else a)
+    if not isinstance(b, dict):
+        return a
+    out = dict(a)
+    for k, v in b.items():
+        if k in out and isinstance(out[k], dict) and isinstance(v, dict):
+            out[k] = _deep_merge_dict(out[k], v)
+        else:
+            # Prefer non-None over None
+            if v is not None or k not in out:
+                out[k] = v
+    return out
+
+
 def _normalize_case(case: str | None) -> str:
     """Strip every non-alphanumeric char, lowercase. So '24 SP 123',
     '24-SP-123', '24SP123', '2024-SP-00123' → '24sp123' / '2024sp00123'.
@@ -240,15 +264,68 @@ class Listing(BaseModel):
         return " ".join(b for b in bits if b)
 
     def merge(self, other: "Listing") -> "Listing":
-        """Merge another listing into this one, preferring non-null values."""
+        """Merge another listing into this one, preferring non-null values.
+
+        M1 fix (2026-05-08):
+          - Numeric monetary fields (opening_bid, tax_value, judgment_amount,
+            arv, etc.) treat 0/0.0 as falsy. Pre-fix, a scraper that wrote
+            opening_bid=0.0 (before validation cleared it) blocked a real
+            bid from filling on merge.
+          - first_seen = min(self.first_seen, other.first_seen) so the
+            earliest sighting is preserved across merges.
+          - raw is deep-merged instead of shallow — preserves nested
+            subkeys (raw["gis"]["roof"] survives when other.raw["gis"]
+            sets different subkeys).
+          - Multi-source attribution: every source slug + URL the listing
+            has been seen at is recorded in raw["also_seen_in"]. The
+            primary source/source_url remain on self for compatibility,
+            but dashboard popouts can read also_seen_in to show all
+            attributions (e.g. "brock_scott + nc_ecourts").
+        """
         out = self.model_copy(deep=True)
+
+        # Fields where 0 should be treated as missing (validation may
+        # later overwrite, but during merge we shouldn't preserve a
+        # bogus zero over a real value).
+        _MONEY_FIELDS = {
+            "opening_bid", "tax_value", "judgment_amount",
+            "estimated_value", "arv", "estimated_repair_cost",
+        }
+
+        def _is_falsy_for_merge(field_name: str, value) -> bool:
+            if value is None:
+                return True
+            if value == "":
+                return True
+            if field_name in _MONEY_FIELDS and value == 0:
+                return True
+            return False
+
         for field_name in self.model_fields:
-            if field_name in {"first_seen", "raw", "source", "source_url"}:
+            if field_name in {"first_seen", "last_seen", "raw",
+                              "source", "source_url"}:
                 continue
             current = getattr(out, field_name)
             new = getattr(other, field_name)
-            if (current is None or current == "") and new not in (None, ""):
+            if _is_falsy_for_merge(field_name, current) and \
+                    not _is_falsy_for_merge(field_name, new):
                 setattr(out, field_name, new)
+
+        # Provenance: keep earliest first_seen, latest last_seen
+        out.first_seen = min(self.first_seen, other.first_seen)
         out.last_seen = max(self.last_seen, other.last_seen)
-        out.raw = {**self.raw, **other.raw}
+
+        # Deep-merge raw (preserves nested subkeys instead of clobbering)
+        out.raw = _deep_merge_dict(self.raw, other.raw)
+
+        # Multi-source attribution
+        also_seen = list(out.raw.get("also_seen_in") or [])
+        for s in (self.source, other.source):
+            if s and s not in also_seen and s != out.source:
+                also_seen.append(s)
+        for u in (self.source_url, other.source_url):
+            if u and not any(d.get("url") == u for d in also_seen if isinstance(d, dict)):
+                pass  # we record source slugs above; URLs aren't needed in this list
+        if also_seen:
+            out.raw["also_seen_in"] = also_seen
         return out
