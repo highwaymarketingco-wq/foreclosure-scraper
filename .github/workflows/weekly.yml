@@ -36,7 +36,15 @@ jobs:
       # Vision provider switch — see patch-run-scrapers.yml for details.
       VISION_PROVIDER: ${{ vars.VISION_PROVIDER || 'anthropic' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # GEMINI_API_KEY supports multi-account rotation: comma-separated
+      # list ("key1,key2,key3") or numbered GEMINI_API_KEY_1..N secrets.
+      # Each account has its own 1500 RPD free-tier quota on
+      # gemini-2.0-flash — N keys × 1500 = your daily ceiling at $0.
+      # On 429 quota errors, the client auto-rotates to the next key.
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+      GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
+      GEMINI_API_KEY_4: ${{ secrets.GEMINI_API_KEY_4 }}
       # NC eCourts authenticated case-status — drives Tyler WS-Fed login
       # to bypass AWS WAF. Caps at NC_ECOURTS_AUTH_CAP cases per run.
       NC_ECOURTS_USERNAME: ${{ secrets.NC_ECOURTS_USERNAME }}

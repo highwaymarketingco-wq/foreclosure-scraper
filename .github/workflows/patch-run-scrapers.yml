@@ -76,7 +76,11 @@ jobs:
       # raw.condition_tier shape so the comp popout works either way.
       VISION_PROVIDER: ${{ vars.VISION_PROVIDER || 'anthropic' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # Multi-account Gemini key rotation — see weekly.yml comment.
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+      GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
+      GEMINI_API_KEY_4: ${{ secrets.GEMINI_API_KEY_4 }}
       VISION_MAX_LISTINGS: "0"          # patch run skips active-listing Vision
       SOLD_POOL_VISION_MAX_LISTINGS: "100"
       # NC case-status: two-stage dispatch.
