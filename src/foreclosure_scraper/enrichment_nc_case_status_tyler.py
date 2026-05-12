@@ -537,7 +537,10 @@ async def enrich_with_nc_case_status_authenticated(
             # WAF-bypass arsenal:
             solve_cloudflare=True,    # auto-solves Cloudflare/AWS-WAF challenges
             google_search=True,       # Google as referer (mimics organic)
-            wait=3000,                # extra settle time after navigation
+            wait=5000,                # 5s settle so Scrapling 0.4.8's updated
+                                       # browser fingerprints have time to
+                                       # establish before the page reads them
+            retries=2,                # retry once on transient WAF/network blips
         )
     except Exception as exc:
         log.warning("nc_ecourts.auth.fetch_fail", error=str(exc)[:200])
