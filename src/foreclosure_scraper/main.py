@@ -377,6 +377,20 @@ async def run() -> int:
     deduped = dedupe(active)
     log.info("orchestrator.deduped", count=len(deduped), pruned=len(active) - len(deduped))
 
+    # Pulled-sale detection (dad's #6): listings that existed last week
+    # but didn't show up this run get tagged raw['pulled_sale'] with
+    # presumed_withdrawn=True and kept on the dashboard for up to 4
+    # consecutive misses before being dropped. NC + SC trustees PULL
+    # ~half of all scheduled foreclosure sales before they auction
+    # (BK, settlement, refinance, postponement). Without this, those
+    # silently disappear from the dashboard.
+    try:
+        from .enrichment_pulled_sales import enrich_with_pulled_sales
+        deduped, pulled_stats = enrich_with_pulled_sales(deduped)
+        log.info("orchestrator.pulled_sales", **pulled_stats)
+    except Exception:
+        log.error("pulled_sales.failed", traceback=traceback.format_exc())
+
     # Link reachability — drop any listing whose URL is dead
     valid = await validate(deduped, workers=cfg.link_check_workers)
     log.info("orchestrator.valid_links", count=len(valid))

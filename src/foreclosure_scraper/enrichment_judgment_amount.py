@@ -140,18 +140,37 @@ def _texts_to_search(li: Listing) -> list[str]:
 
 def enrich_judgment_amount(listings: list[Listing]) -> dict:
     """Populate li.judgment_amount from already-available text. Pure-Python,
-    no I/O. Returns a stats dict for the run summary."""
-    stats = {"scanned": 0, "matched": 0, "already_set": 0}
+    no I/O. Returns a stats dict for the run summary.
+
+    Diagnostic: tracks WHY matches fail (no text vs text-but-no-pattern-match)
+    so we know whether to enhance scrapers (need more text) or patterns
+    (need broader regex).
+    """
+    stats = {
+        "scanned": 0, "matched": 0, "already_set": 0,
+        "no_text": 0, "text_no_match": 0,
+        "by_source_matched": {},
+    }
     for li in listings:
         if li.judgment_amount is not None and li.judgment_amount > 0:
             stats["already_set"] += 1
             continue
         stats["scanned"] += 1
-        for text in _texts_to_search(li):
+        texts = _texts_to_search(li)
+        if not texts:
+            stats["no_text"] += 1
+            continue
+        matched = False
+        for text in texts:
             amt = _extract_from_text(text)
             if amt is not None:
                 li.judgment_amount = round(amt, 2)
                 stats["matched"] += 1
+                src = li.source or "unknown"
+                stats["by_source_matched"][src] = stats["by_source_matched"].get(src, 0) + 1
+                matched = True
                 break
+        if not matched:
+            stats["text_no_match"] += 1
     log.info("judgment_amount.done", **stats)
     return stats
