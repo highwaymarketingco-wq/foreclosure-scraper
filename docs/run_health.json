@@ -1,43 +1,13 @@
 {
-  "generated_at": "2026-05-06T19:31:54.223249+00:00",
+  "generated_at": "2026-05-12T14:10:59.104026+00:00",
   "totals": {
-    "total_listings": 2067,
+    "total_listings": 1347,
     "by_state": {
-      "NC": 1404,
-      "SC": 663
+      "NC": 830,
+      "SC": 517
     }
   },
   "sources": [
-    {
-      "source": "counties.nod_discovery",
-      "count": 0,
-      "status": "REGRESSED (expected \u2265 1)",
-      "severity": 3
-    },
-    {
-      "source": "counties_sc.pickens_master_in_equity",
-      "count": 0,
-      "status": "REGRESSED (expected \u2265 1)",
-      "severity": 3
-    },
-    {
-      "source": "newspapers.shelby_star",
-      "count": 0,
-      "status": "REGRESSED (expected \u2265 1)",
-      "severity": 3
-    },
-    {
-      "source": "newspapers.tryon_bulletin",
-      "count": 0,
-      "status": "REGRESSED (expected \u2265 1)",
-      "severity": 3
-    },
-    {
-      "source": "counties_nc.nc_rod_substitute_trustee",
-      "count": 0,
-      "status": "RENDER-REQUIRED (Scrapling stealth not wired)",
-      "severity": 2
-    },
     {
       "source": "law_firms.aldridge_pite",
       "count": 0,
@@ -81,9 +51,21 @@
       "severity": 0
     },
     {
+      "source": "counties.nod_discovery",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
       "source": "counties.sitemap_walker",
       "count": 31,
       "status": "OK (31)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.brunswick_tax",
+      "count": 0,
+      "status": "EMPTY (verified)",
       "severity": 0
     },
     {
@@ -106,8 +88,8 @@
     },
     {
       "source": "counties_nc.forsyth_tax",
-      "count": 13,
-      "status": "OK (13)",
+      "count": 12,
+      "status": "OK (12)",
       "severity": 0
     },
     {
@@ -130,8 +112,14 @@
     },
     {
       "source": "counties_nc.nc_ecourts_lis_pendens",
-      "count": 571,
-      "status": "OK (571)",
+      "count": 337,
+      "status": "OK (337)",
+      "severity": 0
+    },
+    {
+      "source": "counties_nc.nc_rod_substitute_trustee",
+      "count": 0,
+      "status": "EMPTY (verified)",
       "severity": 0
     },
     {
@@ -160,8 +148,14 @@
     },
     {
       "source": "counties_sc.anderson_master_in_equity",
-      "count": 14,
-      "status": "OK (14)",
+      "count": 5,
+      "status": "OK (5)",
+      "severity": 0
+    },
+    {
+      "source": "counties_sc.pickens_master_in_equity",
+      "count": 0,
+      "status": "EMPTY (verified)",
       "severity": 0
     },
     {
@@ -184,8 +178,8 @@
     },
     {
       "source": "counties_sc.sc_public_index_lis_pendens",
-      "count": 257,
-      "status": "OK (257)",
+      "count": 237,
+      "status": "OK (237)",
       "severity": 0
     },
     {
@@ -208,14 +202,14 @@
     },
     {
       "source": "law_firms.bell_carrington",
-      "count": 58,
-      "status": "OK (58)",
+      "count": 54,
+      "status": "OK (54)",
       "severity": 0
     },
     {
       "source": "law_firms.brock_scott",
-      "count": 293,
-      "status": "OK (293)",
+      "count": 355,
+      "status": "OK (355)",
       "severity": 0
     },
     {
@@ -268,8 +262,8 @@
     },
     {
       "source": "national.distressed",
-      "count": 868,
-      "status": "OK (868)",
+      "count": 362,
+      "status": "OK (362)",
       "severity": 0
     },
     {
@@ -286,8 +280,8 @@
     },
     {
       "source": "national.homeharvest",
-      "count": 36,
-      "status": "OK (36)",
+      "count": 20,
+      "status": "OK (20)",
       "severity": 0
     },
     {
@@ -346,8 +340,8 @@
     },
     {
       "source": "newspapers.daily_courier",
-      "count": 2,
-      "status": "OK (2)",
+      "count": 1,
+      "status": "OK (1)",
       "severity": 0
     },
     {
@@ -357,9 +351,21 @@
       "severity": 0
     },
     {
+      "source": "newspapers.shelby_star",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "newspapers.tryon_bulletin",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
       "source": "public_notices.ncnotices",
-      "count": 14,
-      "status": "OK (14)",
+      "count": 6,
+      "status": "OK (6)",
       "severity": 0
     },
     {
@@ -405,6 +411,7 @@
     "counties_sc.sc_courtrosters",
     "counties_sc.sc_public_index",
     "counties_sc.sc_tax_delinquent",
+    "counties_nc.brunswick_tax",
     "counties_nc.durham_tax",
     "counties_nc.guilford_tax",
     "counties_nc.nc_rod_substitute_trustee",
@@ -418,542 +425,76 @@
   ],
   "enrichments": {
     "lis_pendens_resolver": {
-      "queried": 90,
-      "address_filled": 17,
+      "queried": 77,
+      "address_filled": 16,
       "parcel_only": 6,
-      "ambiguous": 16,
-      "no_match": 51,
+      "ambiguous": 9,
+      "no_match": 46,
       "retagged_county": 0,
-      "no_layer": 13,
+      "no_layer": 14,
       "fiduciary_skipped": 1
     },
     "parcel_reverse_geo": {
-      "queried": 123,
-      "annotated": 123,
+      "queried": 143,
+      "annotated": 143,
       "no_match": 0
+    },
+    "county_pin": {
+      "scanned": 1347,
+      "case_pinned": 578,
+      "already_correct": 578,
+      "retagged_county": 0,
+      "address_nulled": 0,
+      "no_case_decode": 769
+    },
+    "foreclosure_sold_comps": {
+      "active": 1347,
+      "pool": 43,
+      "matched": 110,
+      "no_county_match": 488,
+      "no_kind_match": 330,
+      "no_match_at_all": 30
     },
     "recap_documents": {
       "queried": 0,
       "annotated": 0
     },
     "judgment_amount": {
-      "scanned": 2067,
+      "scanned": 1347,
       "matched": 0,
       "already_set": 0
     },
     "validation": {
       "county_normalized": 1,
       "county_nulled_cross_state": 0,
-      "parcel_nulled_too_short": 72,
+      "parcel_nulled_too_short": 57,
       "parcel_nulled_bad_pattern": 0,
-      "opening_bid_zeroed": 115,
+      "opening_bid_zeroed": 65,
       "opening_bid_too_large": 0,
-      "tax_value_too_low": 6,
+      "tax_value_too_low": 3,
       "tax_value_too_large": 0,
-      "sqft_out_of_range": 0,
+      "sqft_out_of_range": 1,
       "year_built_out_of_range": 0,
       "bedrooms_out_of_range": 0,
       "bathrooms_out_of_range": 0,
-      "comps_dropped_price": 4,
-      "comps_dropped_kind_mismatch": 108,
+      "comps_dropped_price": 0,
+      "comps_dropped_kind_mismatch": 66,
       "validation_exceptions": 0
     },
     "data_quality": {
-      "synthetic_address": 92,
-      "approximate_address": 29,
+      "synthetic_address": 392,
+      "approximate_address": 46,
       "low_arv_confidence": 0,
-      "no_sqft": 1030,
+      "no_sqft": 1028,
       "no_address": 0,
       "exceptions": 0
+    },
+    "upset_bid": {
+      "scanned": 1347,
+      "tagged_in_window": 2,
+      "tag_cleared_outside_window": 0,
+      "no_sale_date": 750,
+      "non_nc": 517
     }
-  },
-  "patches": [
-    {
-      "kind": "rerun_scrapers",
-      "applied_at": "2026-05-06T20:40:33.611004+00:00",
-      "scraper_slugs": [
-        "counties_nc.buncombe_tax",
-        "counties_nc.cleveland_tax",
-        "counties_nc.durham_tax",
-        "counties_nc.forsyth_tax",
-        "counties_nc.guilford_tax",
-        "counties_nc.henderson_tax",
-        "counties_nc.nc_ecourts_lis_pendens",
-        "counties_nc.new_hanover_tax",
-        "counties_nc.polk_tax",
-        "counties_nc.rutherford_tax",
-        "counties_nc.wake_tax"
-      ],
-      "raw_per_slug": {
-        "counties_nc.buncombe_tax": 2,
-        "counties_nc.cleveland_tax": 5,
-        "counties_nc.durham_tax": 0,
-        "counties_nc.forsyth_tax": 13,
-        "counties_nc.guilford_tax": 0,
-        "counties_nc.henderson_tax": 15,
-        "counties_nc.nc_ecourts_lis_pendens": 571,
-        "counties_nc.new_hanover_tax": 4,
-        "counties_nc.polk_tax": 2,
-        "counties_nc.rutherford_tax": 11,
-        "counties_nc.wake_tax": 4
-      },
-      "filtered_kept": 595,
-      "merged_into_existing": 28,
-      "added_new": 567,
-      "total_listings_after_patch": 2616,
-      "valuation_failures": 0,
-      "enrichment_stats": {
-        "enrich_gis": "ok",
-        "enrich_courts": "ok",
-        "compute_flags": "ok",
-        "geocode": "ok",
-        "location": "ok",
-        "rod": "ok",
-        "address_backfill": "ok",
-        "bk_property": "ok",
-        "parcel_lookup": "ok",
-        "aggressive_address": "ok",
-        "lis_pendens_resolver": {
-          "queried": 0,
-          "address_filled": 0,
-          "ambiguous": 0,
-          "no_match": 0,
-          "retagged_county": 0,
-          "parcel_only": 0
-        },
-        "parcel_reverse_geo": {
-          "queried": 92,
-          "annotated": 92,
-          "no_match": 0
-        },
-        "address_synth": "ok",
-        "property_kind": "ok",
-        "judgment_amount": {
-          "scanned": 595,
-          "matched": 0,
-          "already_set": 0
-        },
-        "validation": {
-          "county_normalized": 0,
-          "county_nulled_cross_state": 0,
-          "parcel_nulled_too_short": 9,
-          "parcel_nulled_bad_pattern": 0,
-          "opening_bid_zeroed": 0,
-          "opening_bid_too_large": 0,
-          "tax_value_too_low": 0,
-          "tax_value_too_large": 0,
-          "sqft_out_of_range": 0,
-          "year_built_out_of_range": 0,
-          "bedrooms_out_of_range": 0,
-          "bathrooms_out_of_range": 0,
-          "comps_dropped_price": 0,
-          "comps_dropped_kind_mismatch": 0,
-          "validation_exceptions": 0
-        },
-        "data_quality": {
-          "synthetic_address": 563,
-          "approximate_address": 92,
-          "low_arv_confidence": 0,
-          "no_sqft": 559,
-          "no_address": 0,
-          "exceptions": 0
-        },
-        "upset_bid": {
-          "scanned": 595,
-          "tagged_in_window": 0,
-          "tag_cleared_outside_window": 0,
-          "no_sale_date": 571,
-          "non_nc": 0
-        }
-      },
-      "upset_bid_post_merge": {
-        "scanned": 2616,
-        "tagged_in_window": 3,
-        "tag_cleared_outside_window": 0
-      },
-      "note": "enrich_upset_bid re-run on merged set; 3 NC listings actionable in upset-bid window per NCGS \u00a745-21.27",
-      "county_pin_post_hoc": {
-        "scanned": 2616,
-        "case_pinned": 818,
-        "already_correct": 803,
-        "retagged_county": 15,
-        "address_nulled": 9,
-        "no_case_decode": 1798
-      }
-    },
-    {
-      "kind": "scope_rollback",
-      "applied_at": "2026-05-07T03:50:39.679528Z",
-      "note": "2026-05-07 \u2014 pruned eastern-NC scope per user direction. Removed Wake/Forsyth/Guilford/Durham/Cumberland/Alamance/Iredell/Cabarrus/Union NC/Pitt/Johnston from NC_COUNTIES + nc_ecourts TARGET_COUNTIES. Brunswick added.",
-      "dropped_count": 843,
-      "kept_count": 1773,
-      "dropped_top_counties": [
-        [
-          [
-            "Wake",
-            "NC"
-          ],
-          190
-        ],
-        [
-          [
-            "Guilford",
-            "NC"
-          ],
-          141
-        ],
-        [
-          [
-            "Cumberland",
-            "NC"
-          ],
-          138
-        ],
-        [
-          [
-            "Forsyth",
-            "NC"
-          ],
-          110
-        ],
-        [
-          [
-            "Durham",
-            "NC"
-          ],
-          81
-        ],
-        [
-          [
-            "Johnston",
-            "NC"
-          ],
-          42
-        ],
-        [
-          [
-            "Iredell",
-            "NC"
-          ],
-          42
-        ],
-        [
-          [
-            "Pitt",
-            "NC"
-          ],
-          37
-        ],
-        [
-          [
-            "Alamance",
-            "NC"
-          ],
-          28
-        ],
-        [
-          [
-            "Union",
-            "NC"
-          ],
-          17
-        ],
-        [
-          [
-            "Cabarrus",
-            "NC"
-          ],
-          17
-        ]
-      ]
-    },
-    {
-      "kind": "scope_rollback_b",
-      "applied_at": "2026-05-07T04:02:52.858935Z",
-      "note": "2026-05-07b \u2014 pruned Mecklenburg/Madison/Yancey from NC_COUNTIES + added Haywood NC + Abbeville SC to SCOPE_DENY_COUNTIES (overrides zip-prefix + bypass-source paths)",
-      "dropped_count": 399,
-      "kept_count": 1374,
-      "dropped_top_counties": [
-        [
-          [
-            "Mecklenburg",
-            "NC"
-          ],
-          385
-        ],
-        [
-          [
-            "Madison",
-            "NC"
-          ],
-          6
-        ],
-        [
-          [
-            "Yancey",
-            "NC"
-          ],
-          5
-        ],
-        [
-          [
-            "Haywood",
-            "NC"
-          ],
-          2
-        ],
-        [
-          [
-            "Abbeville",
-            "SC"
-          ],
-          1
-        ]
-      ]
-    },
-    {
-      "kind": "rerun_scrapers",
-      "applied_at": "2026-05-07T18:25:45.449109+00:00",
-      "scraper_slugs": [
-        "counties_nc.brunswick_tax",
-        "counties_nc.buncombe_tax",
-        "counties_nc.cleveland_tax",
-        "counties_nc.henderson_tax",
-        "counties_nc.nc_ecourts_lis_pendens",
-        "counties_nc.nc_rod_substitute_trustee",
-        "counties_nc.new_hanover_tax",
-        "counties_nc.polk_tax",
-        "counties_nc.rutherford_tax",
-        "counties_sc.anderson_master_in_equity",
-        "counties_sc.pickens_master_in_equity",
-        "counties_sc.sc_courtrosters",
-        "counties_sc.sc_public_index_lis_pendens",
-        "counties_sc.spartanburg_master_in_equity"
-      ],
-      "raw_per_slug": {
-        "counties_sc.anderson_master_in_equity": 5,
-        "counties_sc.pickens_master_in_equity": 0,
-        "counties_sc.sc_courtrosters": 0,
-        "counties_sc.sc_public_index_lis_pendens": 255,
-        "counties_sc.spartanburg_master_in_equity": 22,
-        "counties_nc.brunswick_tax": 0,
-        "counties_nc.buncombe_tax": 2,
-        "counties_nc.cleveland_tax": 5,
-        "counties_nc.henderson_tax": 15,
-        "counties_nc.nc_ecourts_lis_pendens": 350,
-        "counties_nc.nc_rod_substitute_trustee": 0,
-        "counties_nc.new_hanover_tax": 4,
-        "counties_nc.polk_tax": 2,
-        "counties_nc.rutherford_tax": 11
-      },
-      "active_kept": 609,
-      "sold_pool_kept": 33,
-      "promoted_to_sold_via_case_status": 0,
-      "active_added_new": 18,
-      "active_merged_into_existing": 591,
-      "active_final": 1625,
-      "sold_pool_final": 39,
-      "valuation_failures": 0,
-      "enrichment_stats": {
-        "enrich_gis": "ok",
-        "enrich_courts": "ok",
-        "compute_flags": "ok",
-        "geocode": "ok",
-        "location": "ok",
-        "rod": "ok",
-        "address_backfill": "ok",
-        "bk_property": "ok",
-        "parcel_lookup": "ok",
-        "aggressive_address": "ok",
-        "lis_pendens_resolver": {
-          "queried": 87,
-          "address_filled": 19,
-          "parcel_only": 7,
-          "ambiguous": 12,
-          "no_match": 49,
-          "retagged_county": 0,
-          "no_layer": 13,
-          "fiduciary_skipped": 1
-        },
-        "parcel_reverse_geo": {
-          "queried": 53,
-          "annotated": 53,
-          "no_match": 0
-        },
-        "address_synth": "ok",
-        "county_pin": {
-          "scanned": 609,
-          "case_pinned": 609,
-          "already_correct": 609,
-          "retagged_county": 0,
-          "address_nulled": 0,
-          "no_case_decode": 0
-        },
-        "property_kind": "ok",
-        "judgment_amount": {
-          "scanned": 609,
-          "matched": 0,
-          "already_set": 0
-        },
-        "validation": {
-          "county_normalized": 0,
-          "county_nulled_cross_state": 0,
-          "parcel_nulled_too_short": 41,
-          "parcel_nulled_bad_pattern": 0,
-          "opening_bid_zeroed": 0,
-          "opening_bid_too_large": 0,
-          "tax_value_too_low": 2,
-          "tax_value_too_large": 0,
-          "sqft_out_of_range": 0,
-          "year_built_out_of_range": 0,
-          "bedrooms_out_of_range": 0,
-          "bathrooms_out_of_range": 0,
-          "comps_dropped_price": 0,
-          "comps_dropped_kind_mismatch": 0,
-          "validation_exceptions": 0
-        },
-        "data_quality": {
-          "synthetic_address": 406,
-          "approximate_address": 53,
-          "low_arv_confidence": 0,
-          "no_sqft": 501,
-          "no_address": 0,
-          "exceptions": 0
-        },
-        "upset_bid": {
-          "scanned": 609,
-          "tagged_in_window": 0,
-          "tag_cleared_outside_window": 0,
-          "no_sale_date": 350,
-          "non_nc": 255
-        }
-      }
-    },
-    {
-      "kind": "rerun_scrapers",
-      "applied_at": "2026-05-07T20:17:41.267517+00:00",
-      "scraper_slugs": [
-        "counties_nc.brunswick_tax",
-        "counties_nc.buncombe_tax",
-        "counties_nc.cleveland_tax",
-        "counties_nc.henderson_tax",
-        "counties_nc.nc_ecourts_lis_pendens",
-        "counties_nc.nc_rod_substitute_trustee",
-        "counties_nc.new_hanover_tax",
-        "counties_nc.polk_tax",
-        "counties_nc.rutherford_tax",
-        "counties_sc.anderson_master_in_equity",
-        "counties_sc.pickens_master_in_equity",
-        "counties_sc.sc_courtrosters",
-        "counties_sc.sc_public_index_lis_pendens",
-        "counties_sc.spartanburg_master_in_equity",
-        "law_firms.bell_carrington",
-        "law_firms.brock_scott",
-        "law_firms.finkel",
-        "law_firms.hutchens"
-      ],
-      "raw_per_slug": {
-        "law_firms.bell_carrington": 60,
-        "law_firms.brock_scott": 342,
-        "law_firms.finkel": 8,
-        "law_firms.hutchens": 351,
-        "counties_sc.anderson_master_in_equity": 5,
-        "counties_sc.pickens_master_in_equity": 0,
-        "counties_sc.sc_courtrosters": 0,
-        "counties_sc.sc_public_index_lis_pendens": 255,
-        "counties_sc.spartanburg_master_in_equity": 22,
-        "counties_nc.brunswick_tax": 0,
-        "counties_nc.buncombe_tax": 2,
-        "counties_nc.cleveland_tax": 5,
-        "counties_nc.henderson_tax": 15,
-        "counties_nc.nc_ecourts_lis_pendens": 353,
-        "counties_nc.nc_rod_substitute_trustee": 0,
-        "counties_nc.new_hanover_tax": 4,
-        "counties_nc.polk_tax": 2,
-        "counties_nc.rutherford_tax": 11
-      },
-      "active_kept": 728,
-      "sold_pool_kept": 46,
-      "promoted_to_sold_via_case_status": 0,
-      "active_added_new": 44,
-      "active_merged_into_existing": 684,
-      "active_final": 1661,
-      "sold_pool_final": 52,
-      "valuation_failures": 0,
-      "enrichment_stats": {
-        "enrich_gis": "ok",
-        "enrich_courts": "ok",
-        "compute_flags": "ok",
-        "geocode": "ok",
-        "location": "ok",
-        "rod": "ok",
-        "address_backfill": "ok",
-        "bk_property": "ok",
-        "parcel_lookup": "ok",
-        "aggressive_address": "ok",
-        "lis_pendens_resolver": {
-          "queried": 87,
-          "address_filled": 19,
-          "parcel_only": 7,
-          "ambiguous": 12,
-          "no_match": 49,
-          "retagged_county": 0,
-          "no_layer": 13,
-          "fiduciary_skipped": 1
-        },
-        "parcel_reverse_geo": {
-          "queried": 53,
-          "annotated": 53,
-          "no_match": 0
-        },
-        "address_synth": "ok",
-        "county_pin": {
-          "scanned": 728,
-          "case_pinned": 612,
-          "already_correct": 612,
-          "retagged_county": 0,
-          "address_nulled": 0,
-          "no_case_decode": 116
-        },
-        "property_kind": "ok",
-        "judgment_amount": {
-          "scanned": 728,
-          "matched": 0,
-          "already_set": 0
-        },
-        "validation": {
-          "county_normalized": 1,
-          "county_nulled_cross_state": 0,
-          "parcel_nulled_too_short": 45,
-          "parcel_nulled_bad_pattern": 0,
-          "opening_bid_zeroed": 61,
-          "opening_bid_too_large": 0,
-          "tax_value_too_low": 2,
-          "tax_value_too_large": 0,
-          "sqft_out_of_range": 0,
-          "year_built_out_of_range": 0,
-          "bedrooms_out_of_range": 0,
-          "bathrooms_out_of_range": 0,
-          "comps_dropped_price": 0,
-          "comps_dropped_kind_mismatch": 0,
-          "validation_exceptions": 0
-        },
-        "data_quality": {
-          "synthetic_address": 409,
-          "approximate_address": 53,
-          "low_arv_confidence": 0,
-          "no_sqft": 592,
-          "no_address": 0,
-          "exceptions": 0
-        },
-        "upset_bid": {
-          "scanned": 728,
-          "tagged_in_window": 0,
-          "tag_cleared_outside_window": 0,
-          "no_sale_date": 353,
-          "non_nc": 297
-        }
-      }
-    }
-  ]
+  }
 }
