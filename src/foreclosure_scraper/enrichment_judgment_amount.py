@@ -40,36 +40,73 @@ _AMOUNT = r"\$\s*([\d,]+(?:\.\d+)?(?:\s*[Mm]illion)?)"
 # ("the outstanding principal balance is $X", "principal sum due of $Y")
 # since the legal-notice prose varies. Order: most-specific first.
 _JUDGMENT_PATTERNS = [
+    # "judgment amount [of] $X" / "judgment sum [of] $X" / "judgment in the (total) amount of $X"
+    # The "of" between "amount" and "$X" is optional — both phrasings appear.
     re.compile(
-        rf"judgment\s+(?:amount|sum|in\s+the\s+(?:total\s+)?amount\s+of)\s*[:=]?\s*{_AMOUNT}",
+        rf"judgment\s+(?:amount|sum)(?:\s+of)?\s*[:=]?\s*{_AMOUNT}",
         re.I,
     ),
+    re.compile(
+        rf"judgment\s+in\s+the\s+(?:total\s+)?amount\s+of\s*[:=]?\s*{_AMOUNT}",
+        re.I,
+    ),
+    # "pursuant to a/that/the judgment ... in the amount of $X" — multi-line
     re.compile(
         rf"pursuant\s+to\s+(?:a|that\s+certain|the)\s+judgment.{{0,80}}?in\s+the\s+(?:total\s+)?amount\s+of\s+{_AMOUNT}",
         re.I | re.S,
     ),
+    # "money judgment ... in the (total) amount of $X" (NC notice variant)
+    re.compile(
+        rf"money\s+judgment.{{0,80}}?(?:in\s+the\s+(?:total\s+)?amount\s+of|of)\s+{_AMOUNT}",
+        re.I | re.S,
+    ),
+    # Common "outstanding..." / "balance due" / "principal sum/balance" phrasings
     re.compile(
         rf"(?:total\s+amount\s+due|outstanding\s+(?:principal\s+)?balance|"
         rf"outstanding\s+principal|outstanding\s+indebtedness|"
-        rf"principal\s+(?:sum|balance)|balance\s+due)\b.{{0,40}}?{_AMOUNT}",
+        rf"unpaid\s+(?:principal\s+)?balance|unpaid\s+principal|"
+        rf"principal\s+(?:sum|balance)|balance\s+(?:due|owed|owing))\b.{{0,40}}?{_AMOUNT}",
         re.I,
     ),
+    # "indebtedness" / "amount owing" / "debt secured"
     re.compile(
         rf"(?:indebtedness|amount\s+owing|debt\s+secured)\b.{{0,40}}?{_AMOUNT}",
         re.I,
     ),
+    # "foreclosure judgment" / "deficiency judgment" with attached amount
     re.compile(
         rf"(?:foreclosure\s+judgment|deficiency\s+judgment)\s*[:=]?\s*{_AMOUNT}",
         re.I,
     ),
+    # NC notice variant: "evidenced by ... promissory note in the (original)
+    # principal (amount/sum) of $X"
+    re.compile(
+        rf"promissory\s+note\b.{{0,60}}?(?:original\s+)?principal\s+(?:amount|sum)\s+of\s+{_AMOUNT}",
+        re.I | re.S,
+    ),
+    # NC notice variant: "secured by ... in the original principal amount of $X"
+    re.compile(
+        rf"original\s+principal\s+(?:amount|sum)\s+of\s+{_AMOUNT}",
+        re.I,
+    ),
+    # "the sum of $X" when paired with judgment/note/balance context
+    # within the surrounding 60 chars
+    re.compile(
+        rf"(?:judgment|debt|note|loan|principal)\b[^\n$]{{0,60}}?the\s+sum\s+of\s+{_AMOUNT}",
+        re.I,
+    ),
 ]
 
-# Phrases that, when nearby, indicate the amount is NOT the judgment (sale
-# price, opening bid, asking, etc.). Used to filter false positives.
+# Phrases that, when nearby, indicate the amount is NOT the judgment.
+# Tightened scope: only reject when the non-judgment phrase appears
+# IMMEDIATELY before the amount (within 30 chars). The previous 80-char
+# window was killing valid matches like "opening bid will not be less
+# than the judgment amount of $X" where "opening bid" sits 50+ chars
+# before the judgment phrase.
 _NON_JUDGMENT_NEAR = re.compile(
-    r"\b(opening\s+bid|sale\s+price|asking|listing\s+price|reserve\s+price|"
-    r"appraised\s+value|tax\s+value|assessed\s+value|earnest\s+money|"
-    r"deposit\b)",
+    r"\b(opening\s+bid|sale\s+price|asking\s+price|listing\s+price|"
+    r"reserve\s+price|appraised\s+value|tax\s+value|assessed\s+value|"
+    r"earnest\s+money|deposit\s+(?:of|amount))\b",
     re.I,
 )
 
@@ -100,13 +137,15 @@ def _extract_from_text(text: str) -> Optional[float]:
         m = pat.search(text)
         if not m:
             continue
-        # Reject only when the BEFORE-context (the 80 chars leading up to
-        # the matched phrase) talks about sale price / opening bid /
-        # asking. The judgment context already won the precedence battle
-        # by matching first; we just guard against the case where the
-        # pattern matched inside a sentence that was actually about
-        # something else ("...for opening bid see judgment...").
-        window_start = max(0, m.start() - 80)
+        # Reject only when the BEFORE-context (the 30 chars IMMEDIATELY
+        # leading up to the matched amount) talks about sale price /
+        # opening bid / asking. Previous 80-char window was too wide
+        # and killed valid matches like "opening bid will not be less
+        # than the judgment amount of $X" where "opening bid" sits
+        # 50+ chars before the judgment phrase. Tightened to 30 chars
+        # so only adjacent context (e.g., "the opening bid of $X")
+        # triggers rejection.
+        window_start = max(0, m.start() - 30)
         ctx_before = text[window_start:m.start()]
         if _NON_JUDGMENT_NEAR.search(ctx_before):
             continue

@@ -43,6 +43,14 @@ jobs:
       NC_ECOURTS_PASSWORD: ${{ secrets.NC_ECOURTS_PASSWORD }}
       NC_ECOURTS_AUTH_CAP: "100"
       CAPSOLVER_API_KEY: ${{ secrets.CAPSOLVER_API_KEY }}
+      # Skip-trace (homeowner contact for short-sale outreach). Default
+      # 'none' = disabled. Set repo variable SKIP_TRACE_PROVIDER to
+      # 'tax_records_only' (FREE, GIS mailing-address diff) or
+      # 'batchskiptracing' (PAID, ~$0.05-0.20/lead) to enable. Paid
+      # providers require SKIP_TRACE_API_KEY secret.
+      SKIP_TRACE_PROVIDER: ${{ vars.SKIP_TRACE_PROVIDER || 'none' }}
+      SKIP_TRACE_API_KEY: ${{ secrets.SKIP_TRACE_API_KEY }}
+      SKIP_TRACE_MAX_PER_RUN: ${{ vars.SKIP_TRACE_MAX_PER_RUN || '100' }}
       COURTLISTENER_TOKEN: ${{ secrets.COURTLISTENER_TOKEN }}
       RENTCAST_API_KEY: ${{ secrets.RENTCAST_API_KEY }}
       FORECLOSURE_DOT_COM_USER: ${{ secrets.FORECLOSURE_DOT_COM_USER }}

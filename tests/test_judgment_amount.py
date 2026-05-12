@@ -140,3 +140,54 @@ def test_enrich_no_match_leaves_field_none():
     li = _li(description="Foreclosure sale on the steps of the Spartanburg County Courthouse.")
     enrich_judgment_amount([li])
     assert li.judgment_amount is None
+
+
+# ---- broadened patterns (2026-05-12 follow-up) ------------------------------
+# Patch run #10 reported text_no_match=729 — too many real notices weren't
+# matching. These tests pin the new phrasings the broadened patterns accept.
+
+def test_judgment_amount_of_X_phrasing():
+    """Real NC notice: 'The judgment amount of $X was entered.'
+    Previous patterns required colon/equals or 'in the amount of';
+    plain 'amount of $X' was missing."""
+    text = "Pursuant to a judgment entered, the trustee will offer for sale. The judgment amount of $125,750.00 was entered against the defendant."
+    assert _extract_from_text(text) == 125_750.00
+
+
+def test_judgment_after_opening_bid_phrase():
+    """'opening bid will not be less than the judgment amount of $X' —
+    previously the 80-char before-context filter killed this match.
+    Tightened to 30 chars so only adjacent context triggers rejection."""
+    text = "The opening bid will not be less than the judgment amount of $85,000.00."
+    assert _extract_from_text(text) == 85_000.00
+
+
+def test_money_judgment_in_amount_of():
+    """NC notice variant: 'a money judgment in the amount of $X'"""
+    text = "a money judgment in the amount of $340,000 was entered against John Smith."
+    assert _extract_from_text(text) == 340_000.0
+
+
+def test_promissory_note_original_principal_amount():
+    """NC notice often includes the original loan amount via promissory
+    note — proxies as judgment when no judgment-specific amount appears."""
+    text = "NOTICE: evidenced by that certain Promissory Note in the original principal amount of $215,000.00 dated July 15, 2018."
+    assert _extract_from_text(text) == 215_000.00
+
+
+def test_unpaid_principal_balance():
+    text = "The unpaid principal balance is $92,450.12 as of the date hereof."
+    assert _extract_from_text(text) == 92_450.12
+
+
+def test_sale_price_alone_still_rejected():
+    """We still don't want to capture sale price as judgment."""
+    text = "The sale price was $50,000."
+    assert _extract_from_text(text) is None
+
+
+def test_opening_bid_directly_before_amount_rejected():
+    """Adjacent 'Opening bid: $X' should NOT be treated as judgment —
+    the 30-char before-context filter catches this case."""
+    text = "Opening bid: $10,000 starting amount for the auction."
+    assert _extract_from_text(text) is None
