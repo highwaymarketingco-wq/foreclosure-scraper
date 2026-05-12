@@ -73,6 +73,12 @@ jobs:
         run: |
           uv run python -m playwright install chromium --with-deps || true
 
+      - name: Update Scrapling browsers + fingerprints
+        # 0.4.8 ships updated browsers/fingerprints that bypass WAF
+        # challenges more reliably (Tyler eCourts auth in particular).
+        run: |
+          uv run scrapling install --force || true
+
       - name: Run scraper
         id: run
         run: uv run python -m foreclosure_scraper
