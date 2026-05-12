@@ -130,6 +130,17 @@ KNOWN_FIXED = (
     "law_firms.hutchens",
     "law_firms.bell_carrington",
     "law_firms.finkel",
+    # Kania Law Firm — NC tax-foreclosure auctions across ~24 western
+    # NC counties. Single largest source of tax-sale listings in the
+    # Asheville / Charlotte regions. Cloudflare-protected, falls back
+    # to Scrapling stealth when plain GET 503s.
+    "law_firms.kania",
+    # NC public legal notices via ncnotices.com — added probate (Notice
+    # to Creditors / Estate-of) + divorce (service-by-publication
+    # summons) query sets on top of the existing foreclosure queries.
+    # Captures the high-distress subset of probate + divorce leads
+    # legally required to publish in newspapers of record.
+    "public_notices.ncnotices",
 )
 
 
@@ -634,22 +645,44 @@ async def main() -> int:
         net_change=len(final_active) - len(existing),
     )
 
-    # ---- NC eCourts case-status enrichment (Order Confirming Sale detection) ----
-    # Runs on the FULL active set so existing listings can be promoted to
-    # the sold pool when Tyler's docket shows their case is now confirmed
-    # at sale.
+    # ---- NC case-status enrichment (Tyler-auth path + heuristic fallback) ----
+    # Stage 1: authenticated Tyler scrape (NC_ECOURTS_USERNAME/PASSWORD must
+    # be set as workflow secrets). Pulls up to NC_ECOURTS_AUTH_CAP cases.
+    # Stage 2: heuristic sale-date + ROD cross-ref runs on whatever Tyler
+    # didn't tag. Pure compute, free, deterministic.
+    nc_case_status_summary: dict = {}
     if os.environ.get("PATCH_NC_CASE_STATUS", "1") == "1":
         try:
             from foreclosure_scraper.enrichment_nc_case_status import (
-                enrich_with_nc_case_status,
+                DISPATCHED_LAST_STATUS,
+                enrich_with_nc_case_status_dispatched,
             )
-            nc_cap = int(os.environ.get("PATCH_NC_CASE_STATUS_CAP", "50"))
-            await enrich_with_nc_case_status(
-                final_active, concurrency=2, max_check=nc_cap,
+            await enrich_with_nc_case_status_dispatched(
+                final_active, sold_pool=final_sold,
             )
+            nc_case_status_summary = dict(DISPATCHED_LAST_STATUS)
         except Exception:
             log.error("patch_run.nc_case_status_failed",
                       traceback=traceback.format_exc())
+
+    # Relationship-deed detection — derive PROBATE_NOTICE + DIVORCE_NOTICE
+    # leads from ROD recordings (executor's deeds, post-divorce
+    # quitclaims). Free signal from existing ROD scrapes; appends to
+    # the active pool.
+    try:
+        from foreclosure_scraper.enrichment_relationship_deeds import (
+            enrich_with_relationship_deeds,
+        )
+        derived_leads = enrich_with_relationship_deeds(
+            final_active, sold_pool=final_sold,
+        )
+        if derived_leads:
+            final_active = final_active + derived_leads
+            log.info("patch_run.relationship_deeds_added",
+                     count=len(derived_leads))
+    except Exception:
+        log.error("patch_run.relationship_deeds_failed",
+                  traceback=traceback.format_exc())
 
     # Promote to sold pool: any active listing where case-status surfaced
     # raw.actual_sold_price + promoted_to_sold_comp moves to the sold pool.
@@ -721,6 +754,9 @@ async def main() -> int:
         "sold_pool_final": len(final_sold),
         "valuation_failures": valuation_failures,
         "enrichment_stats": enrichment_stats,
+        # Tyler-auth visibility — see enrichment_nc_case_status_tyler.LAST_RUN_STATUS
+        # Surfaces outcome/reason/tagged so the user can see if login worked.
+        "nc_case_status": nc_case_status_summary,
     })
     run_health_path.write_text(json.dumps(health, indent=2, default=str))
     log.info("patch_run.done")

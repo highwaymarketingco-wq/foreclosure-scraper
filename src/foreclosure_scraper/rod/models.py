@@ -99,6 +99,23 @@ DOC_BUCKETS: dict[str, str] = {
     # Assignments
     "ASSIGN": "assignment",
     "ASSIGNMENT": "assignment",
+    # Probate-driven recordings (estate is settling, heirs may want to sell)
+    "EXECUTORS DEED": "probate_deed",
+    "EXECUTOR'S DEED": "probate_deed",
+    "ADMINISTRATORS DEED": "probate_deed",
+    "ADMINISTRATOR'S DEED": "probate_deed",
+    "PERSONAL REPRESENTATIVES DEED": "probate_deed",
+    "PERSONAL REPRESENTATIVE'S DEED": "probate_deed",
+    "DEVISE": "probate_deed",
+    "AFFIDAVIT OF HEIRS": "probate_deed",
+    "WILL": "probate_deed",
+    # Divorce-driven recordings: deed dividing marital property
+    "DIVORCE DECREE": "divorce_deed",
+    "DECREE OF DIVORCE": "divorce_deed",
+    "EQUITABLE DISTRIBUTION": "divorce_deed",
+    "QUITCLAIM DEED": "quitclaim",
+    "QUIT CLAIM DEED": "quitclaim",
+    "QC DEED": "quitclaim",
 }
 
 

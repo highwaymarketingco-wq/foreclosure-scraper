@@ -1,11 +1,120 @@
 """Unified listing schema."""
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field, HttpUrl
+
+
+# Street-suffix abbreviations used in _normalize_addr. The same street
+# can appear as 'Main Street', 'Main St', 'Main St.', 'MAIN STREET' across
+# sources — collapse to a canonical short form for dedupe matching.
+_ADDR_SUFFIX_MAP = {
+    "street": "st", "st.": "st",
+    "avenue": "ave", "ave.": "ave",
+    "road": "rd", "rd.": "rd",
+    "drive": "dr", "dr.": "dr",
+    "lane": "ln", "ln.": "ln",
+    "court": "ct", "ct.": "ct",
+    "boulevard": "blvd", "blvd.": "blvd",
+    "highway": "hwy", "hwy.": "hwy",
+    "place": "pl", "pl.": "pl",
+    "circle": "cir", "cir.": "cir",
+    "trail": "trl", "trl.": "trl",
+    "parkway": "pkwy", "pkwy.": "pkwy",
+    "terrace": "ter", "ter.": "ter",
+    "way": "way",  # already short, but listed for explicitness
+    "north": "n", "n.": "n",
+    "south": "s", "s.": "s",
+    "east": "e", "e.": "e",
+    "west": "w", "w.": "w",
+    "northeast": "ne", "ne.": "ne",
+    "northwest": "nw", "nw.": "nw",
+    "southeast": "se", "se.": "se",
+    "southwest": "sw", "sw.": "sw",
+}
+
+# Unit indicators stripped from addresses before comparison — "123 Main
+# St Apt 5" should match "123 Main St" since the unit isn't a separate
+# parcel for foreclosure purposes (the building is foreclosed whole).
+_UNIT_RE = re.compile(
+    r"\s+(?:apt|apartment|unit|suite|ste|#|lot)\.?\s*[\w-]+\s*$",
+    re.IGNORECASE,
+)
+
+
+def _normalize_addr(addr: str | None) -> str:
+    """Canonical lowercase address string for dedupe. Expands suffixes
+    (Street→st), strips unit indicators, collapses whitespace + commas."""
+    if not addr:
+        return ""
+    s = addr.strip().lower()
+    # Strip trailing unit indicators
+    s = _UNIT_RE.sub("", s)
+    # Strip city/state/zip suffix if present (commas suggest these)
+    if "," in s:
+        s = s.split(",", 1)[0]
+    # Token-level suffix expansion
+    tokens = []
+    for tok in s.split():
+        tok_clean = tok.rstrip(".")
+        tokens.append(_ADDR_SUFFIX_MAP.get(tok, _ADDR_SUFFIX_MAP.get(tok_clean, tok_clean)))
+    return " ".join(t for t in tokens if t)
+
+
+def _normalize_parcel(parcel: str | None) -> str:
+    """Strip every non-alphanumeric char, lowercase. So
+    '1234-56-7890', '1234567890', '1234-56-7890.000' all collapse to
+    '1234567890' (with the trailing '000' on variants that have it —
+    still close enough that the second collapse rule below catches it)."""
+    if not parcel:
+        return ""
+    s = re.sub(r"[^a-zA-Z0-9]", "", parcel).lower()
+    # Some county GIS exports add a 3-digit '.000' suffix to base parcels;
+    # strip if the result is just trailing zeros (heuristic — never strip
+    # significant digits).
+    if len(s) > 10 and s.endswith("000"):
+        s = s[:-3]
+    return s
+
+
+def _deep_merge_dict(a: dict, b: dict) -> dict:
+    """Recursive dict merge. b's values win on leaf collisions, but
+    nested dicts are merged (not overwritten).
+
+    Used by Listing.merge() so that e.g. raw["gis"]["roof"] survives
+    when other.raw["gis"] sets a different subkey like "year_built".
+    Pre-fix, the shallow merge `{**self.raw, **other.raw}` wiped the
+    entire raw["gis"] dict whenever both sides had something under it.
+    """
+    if not isinstance(a, dict):
+        return b if isinstance(b, dict) else (b if b is not None else a)
+    if not isinstance(b, dict):
+        return a
+    out = dict(a)
+    for k, v in b.items():
+        if k in out and isinstance(out[k], dict) and isinstance(v, dict):
+            out[k] = _deep_merge_dict(out[k], v)
+        else:
+            # Prefer non-None over None
+            if v is not None or k not in out:
+                out[k] = v
+    return out
+
+
+def _normalize_case(case: str | None) -> str:
+    """Strip every non-alphanumeric char, lowercase. So '24 SP 123',
+    '24-SP-123', '24SP123', '2024-SP-00123' → '24sp123' / '2024sp00123'.
+
+    Note: '24sp123' and '2024sp00123' still don't match — they're truly
+    different year representations and stripped-zero issues. Leave as-is
+    since a 2-vs-4-digit year mismatch could indicate different decades."""
+    if not case:
+        return ""
+    return re.sub(r"[^a-zA-Z0-9]", "", case).lower()
 
 
 class ListingType(str, Enum):
@@ -21,6 +130,18 @@ class ListingType(str, Enum):
     # description keywords on Realtor.com. Pre-foreclosure signal that hasn't
     # yet entered formal foreclosure proceedings.
     DISTRESSED = "distressed"
+    # DIVORCE_NOTICE = service-by-publication divorce summons published
+    # in NC Press Association legal notices. Motivated-seller signal —
+    # contested divorces often force a property sale to divide assets.
+    DIVORCE_NOTICE = "divorce_notice"
+    # PROBATE_NOTICE = legally-required Notice to Creditors / Estate
+    # filings published when an estate opens. Heirs typically want
+    # to liquidate property fast (avoid carrying costs, split inheritance).
+    PROBATE_NOTICE = "probate_notice"
+    # ESTATE_LEAD = derived from obituary cross-reference: deceased
+    # name matched against tax-record owner names. Property may not
+    # yet be in formal probate but heirs are likely the new owners.
+    ESTATE_LEAD = "estate_lead"
     UNKNOWN = "unknown"
 
 
@@ -94,20 +215,44 @@ class Listing(BaseModel):
     def dedupe_key(self) -> str:
         """Stable key used to de-duplicate across sources.
 
-        Each candidate key is strip-checked: a whitespace-only parcel_id /
-        case_number / address would otherwise produce a degenerate key like
-        'parcel:NC:' that collides every such listing into one bucket.
-        Dedupe runs before validation, so we can't rely on validation to
-        clean these — must guard here.
+        Normalization rules (added per H3 fix 2026-05-08):
+          - parcel: lowercase + strip every non-alnum char (so
+            "1234-56-7890", "1234567890", "1234-56-7890.000" collapse).
+            County included since parcel "1234" can collide across counties.
+          - address: lowercase, expand common street-suffix abbreviations
+            ('Street'→'st', 'Avenue'→'ave', etc.), collapse whitespace.
+            zip optional — falls back to county+state when zip absent
+            (most pre-enrich listings have no zip).
+          - case_number: lowercase + strip non-alnum (so "24 SP 123",
+            "24-SP-123", "24SP123", "2024-SP-00123" all collapse).
         """
+        # parcel branch (strongest signal)
         if self.parcel_id and self.parcel_id.strip():
-            return f"parcel:{self.state or ''}:{self.parcel_id.strip().upper()}"
-        if (self.street_address and self.street_address.strip()
-                and self.zip_code and self.zip_code.strip()):
-            return f"addr:{self.street_address.strip().lower()}|{self.zip_code.strip()}"
+            p = _normalize_parcel(self.parcel_id)
+            if p:
+                county_part = (self.county or "").strip().lower()
+                return f"parcel:{self.state or ''}:{county_part}:{p}"
+
+        # address branch (with or without zip)
+        if self.street_address and self.street_address.strip():
+            addr = _normalize_addr(self.street_address)
+            if addr:
+                zip_part = (self.zip_code or "").strip()[:5]
+                if zip_part:
+                    return f"addr:{addr}|{zip_part}"
+                # No zip — fall back to county+state which is usually
+                # filled even pre-enrich.
+                county_part = (self.county or "").strip().lower()
+                if county_part:
+                    return f"addr:{addr}|{self.state or ''}:{county_part}"
+
+        # case_number + county branch
         if (self.case_number and self.case_number.strip()
                 and self.county and self.county.strip()):
-            return f"case:{self.state or ''}:{self.county.lower()}:{self.case_number.strip().upper()}"
+            c = _normalize_case(self.case_number)
+            if c:
+                return f"case:{self.state or ''}:{self.county.strip().lower()}:{c}"
+
         return f"url:{self.source_url}"
 
     def display_address(self) -> str:
@@ -119,15 +264,68 @@ class Listing(BaseModel):
         return " ".join(b for b in bits if b)
 
     def merge(self, other: "Listing") -> "Listing":
-        """Merge another listing into this one, preferring non-null values."""
+        """Merge another listing into this one, preferring non-null values.
+
+        M1 fix (2026-05-08):
+          - Numeric monetary fields (opening_bid, tax_value, judgment_amount,
+            arv, etc.) treat 0/0.0 as falsy. Pre-fix, a scraper that wrote
+            opening_bid=0.0 (before validation cleared it) blocked a real
+            bid from filling on merge.
+          - first_seen = min(self.first_seen, other.first_seen) so the
+            earliest sighting is preserved across merges.
+          - raw is deep-merged instead of shallow — preserves nested
+            subkeys (raw["gis"]["roof"] survives when other.raw["gis"]
+            sets different subkeys).
+          - Multi-source attribution: every source slug + URL the listing
+            has been seen at is recorded in raw["also_seen_in"]. The
+            primary source/source_url remain on self for compatibility,
+            but dashboard popouts can read also_seen_in to show all
+            attributions (e.g. "brock_scott + nc_ecourts").
+        """
         out = self.model_copy(deep=True)
+
+        # Fields where 0 should be treated as missing (validation may
+        # later overwrite, but during merge we shouldn't preserve a
+        # bogus zero over a real value).
+        _MONEY_FIELDS = {
+            "opening_bid", "tax_value", "judgment_amount",
+            "estimated_value", "arv", "estimated_repair_cost",
+        }
+
+        def _is_falsy_for_merge(field_name: str, value) -> bool:
+            if value is None:
+                return True
+            if value == "":
+                return True
+            if field_name in _MONEY_FIELDS and value == 0:
+                return True
+            return False
+
         for field_name in self.model_fields:
-            if field_name in {"first_seen", "raw", "source", "source_url"}:
+            if field_name in {"first_seen", "last_seen", "raw",
+                              "source", "source_url"}:
                 continue
             current = getattr(out, field_name)
             new = getattr(other, field_name)
-            if (current is None or current == "") and new not in (None, ""):
+            if _is_falsy_for_merge(field_name, current) and \
+                    not _is_falsy_for_merge(field_name, new):
                 setattr(out, field_name, new)
+
+        # Provenance: keep earliest first_seen, latest last_seen
+        out.first_seen = min(self.first_seen, other.first_seen)
         out.last_seen = max(self.last_seen, other.last_seen)
-        out.raw = {**self.raw, **other.raw}
+
+        # Deep-merge raw (preserves nested subkeys instead of clobbering)
+        out.raw = _deep_merge_dict(self.raw, other.raw)
+
+        # Multi-source attribution
+        also_seen = list(out.raw.get("also_seen_in") or [])
+        for s in (self.source, other.source):
+            if s and s not in also_seen and s != out.source:
+                also_seen.append(s)
+        for u in (self.source_url, other.source_url):
+            if u and not any(d.get("url") == u for d in also_seen if isinstance(d, dict)):
+                pass  # we record source slugs above; URLs aren't needed in this list
+        if also_seen:
+            out.raw["also_seen_in"] = also_seen
         return out

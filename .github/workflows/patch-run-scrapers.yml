@@ -41,6 +41,14 @@ on:
         description: 'Space-separated scraper slugs (e.g. "counties_nc.nc_ecourts_lis_pendens"). Leave blank for --all-fixed.'
         required: false
         default: ""
+      runner:
+        description: 'Where to run. self-hosted = your laptop (residential IP — needed for Tyler eCourts). ubuntu-latest = GitHub cloud (datacenter IP — Tyler will be WAF-blocked).'
+        required: false
+        default: "ubuntu-latest"
+        type: choice
+        options:
+          - ubuntu-latest
+          - self-hosted
 
 permissions:
   contents: write
@@ -52,7 +60,7 @@ concurrency:
 
 jobs:
   patch:
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
     timeout-minutes: 90
     env:
       # Same secrets the weekly run uses (some enrichments need them):
@@ -60,17 +68,32 @@ jobs:
       APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
       APIFY_FREE_TIER_ONLY: "1"
       COURTLISTENER_TOKEN: ${{ secrets.COURTLISTENER_TOKEN }}
-      # Anthropic Vision — fires on sold-comp listings that have photos,
-      # filling raw.condition_tier + raw.vision so the comp popout shows
-      # 'gut' / 'major' / 'cosmetic' / 'move_in_ready' alongside hammer
-      # price. Capped at SOLD_POOL_VISION_MAX_LISTINGS=100 per run.
+      # Vision provider — defaults to 'anthropic'. Set repo variable
+      # VISION_PROVIDER=gemini to flip to Gemini 2.0 Flash (free at 1500
+      # req/day on gemini-2.0-flash-exp; mint key at
+      # https://aistudio.google.com/apikey then add as GEMINI_API_KEY
+      # secret). Both providers fill the same raw.vision +
+      # raw.condition_tier shape so the comp popout works either way.
+      VISION_PROVIDER: ${{ vars.VISION_PROVIDER || 'anthropic' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       VISION_MAX_LISTINGS: "0"          # patch run skips active-listing Vision
       SOLD_POOL_VISION_MAX_LISTINGS: "100"
-      # NC eCourts case-status (Tyler Odyssey docket parser) — capped per
-      # run since each case takes 5-15s of Scrapling render time.
+      # NC case-status: two-stage dispatch.
+      # Stage 1 (auth): when NC_ECOURTS_USERNAME/PASSWORD are set, drive
+      # Tyler's WS-Fed login flow + scrape case dockets. Verified-account
+      # session cookies pass the WAF's bot challenge.
+      # Stage 2 (heuristic): sale-date math + Trustee's Deed cross-ref
+      # for any listing Tyler didn't tag.
       PATCH_NC_CASE_STATUS: "1"
-      PATCH_NC_CASE_STATUS_CAP: "60"
+      NC_ECOURTS_USERNAME: ${{ secrets.NC_ECOURTS_USERNAME }}
+      NC_ECOURTS_PASSWORD: ${{ secrets.NC_ECOURTS_PASSWORD }}
+      NC_ECOURTS_AUTH_CAP: "50"
+      # CapSolver API key (capsolver.com). Solves the AWS WAF challenge
+      # in front of Tyler's IdP login page so we can reach the real
+      # username/password form. ~$0.001 per solve, ~$0.20/week at our
+      # volume. Without this, Tyler auth fails at last_step='waf_challenge_detected'.
+      CAPSOLVER_API_KEY: ${{ secrets.CAPSOLVER_API_KEY }}
       LOG_LEVEL: INFO
       PYTHONUNBUFFERED: "1"
 
@@ -120,6 +143,19 @@ jobs:
             docs/listings.json
             docs/run_health.json
           retention-days: 90
+
+      # Upload any debug HTML dumps written by scrapers that produced
+      # 0 listings with substantial HTML. ncnotices is the current
+      # producer; future scrapers can also drop into debug/ for the
+      # same artifact treatment.
+      - name: Upload debug HTML artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-html-${{ github.run_id }}
+          path: debug/
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Publish patched dashboard data back to repo
         run: |

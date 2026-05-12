@@ -134,6 +134,15 @@ DATELESS_OK_SOURCES = {
     "city_websites.charlotte_demolition",         # demolition orders (distress signal)
     "national.courtlistener_civil",               # federal civil real-property cases
     "national.courtlistener_adversary",           # CL bankruptcy lift-stay / 363 sale
+    # ncnotices.com — legal notices in NC newspapers (foreclosure +
+    # divorce + probate categories). Service-by-publication divorces
+    # and Notice-to-Creditors probate notices typically have no sale_date.
+    "public_notices.ncnotices",
+    # Relationship-deeds enrichment — derives PROBATE_NOTICE / DIVORCE_NOTICE
+    # listings from ROD recordings (executor's deeds, quitclaim + $0
+    # divorce transfers). These are leads, not auctions — no sale_date.
+    "derived.probate_deed",
+    "derived.divorce_deed",
 }
 
 
@@ -166,6 +175,14 @@ def _flip_candidate(li: Listing) -> bool:
         if lot and lot >= 2 * 43_560:  # 2+ acres
             return True
         return False
+
+    # H2 FIX (2026-05-08): default to KEEP for the most common branch
+    # — bid in [1, 750_000] for SFR/condo/townhouse. Previously this
+    # function fell off the end with no return, implicitly returning
+    # None (falsy) → the orchestrator silently dropped every priced-SFR
+    # ≤ $750k listing. The bread-and-butter flip pool. Massive silent
+    # data loss until this fix.
+    return True
 
 
 # Common SC MIE address abbreviations — kept here so the city-splitter
@@ -360,6 +377,20 @@ async def run() -> int:
     deduped = dedupe(active)
     log.info("orchestrator.deduped", count=len(deduped), pruned=len(active) - len(deduped))
 
+    # Pulled-sale detection (dad's #6): listings that existed last week
+    # but didn't show up this run get tagged raw['pulled_sale'] with
+    # presumed_withdrawn=True and kept on the dashboard for up to 4
+    # consecutive misses before being dropped. NC + SC trustees PULL
+    # ~half of all scheduled foreclosure sales before they auction
+    # (BK, settlement, refinance, postponement). Without this, those
+    # silently disappear from the dashboard.
+    try:
+        from .enrichment_pulled_sales import enrich_with_pulled_sales
+        deduped, pulled_stats = enrich_with_pulled_sales(deduped)
+        log.info("orchestrator.pulled_sales", **pulled_stats)
+    except Exception:
+        log.error("pulled_sales.failed", traceback=traceback.format_exc())
+
     # Link reachability — drop any listing whose URL is dead
     valid = await validate(deduped, workers=cfg.link_check_workers)
     log.info("orchestrator.valid_links", count=len(valid))
@@ -524,15 +555,37 @@ async def run() -> int:
     except Exception:
         log.error("county_pin.failed", traceback=traceback.format_exc())
 
-    # NC eCourts case-status check via Tyler portal (Scrapling/Playwright).
-    # Tags listings.raw.nc_case_status with current docket state — pending,
-    # sold (recent sale), upset_bid (in 10-day window), confirmed, dismissed.
-    # Heavy: each case takes a few seconds to render; capped to top 100 cases
-    # prioritized by recent sale_date. Disable with NC_CASE_STATUS_OFF=1.
+    # H1 FIX (post-enrich dedupe): the initial dedupe() at line 369 ran
+    # before parcel_id / zip_code / street_address / county were filled
+    # by the enrichment chain above. Cross-source duplicates (same
+    # property scraped by nc_ecourts + brock_scott + ROD) all missed
+    # their merge because dedupe_key() fell through to the 'url:' branch.
+    # Re-running dedupe now — after county_pin nailed the county, after
+    # parcel_lookup filled parcel_id, after lis_pendens_resolver filled
+    # street_address — gives the key the data it needs to actually merge.
+    pre_dedupe2_count = len(enriched)
+    enriched = dedupe(enriched)
+    log.info(
+        "orchestrator.dedupe2",
+        before=pre_dedupe2_count,
+        after=len(enriched),
+        collapsed=pre_dedupe2_count - len(enriched),
+    )
+
+    # NC case-status: two-stage dispatch.
+    #   Stage 1 (when NC_ECOURTS_USERNAME/PASSWORD set): authenticated
+    #     Tyler portal scrape via WS-Fed login. Up to NC_ECOURTS_AUTH_CAP
+    #     cases (default 50). Tags raw.nc_case_status with full docket
+    #     detail (status, last_event, sold_price, in_upset_bid_window).
+    #   Stage 2 (always runs): heuristic sale-date math + Trustee's Deed
+    #     cross-ref. Fills any listings Tyler didn't tag. Pure compute.
+    # Disable both with NC_CASE_STATUS_OFF=1.
     if not os.environ.get("NC_CASE_STATUS_OFF"):
         try:
-            from .enrichment_nc_case_status import enrich_with_nc_case_status
-            await enrich_with_nc_case_status(enriched)
+            from .enrichment_nc_case_status import (
+                enrich_with_nc_case_status_dispatched,
+            )
+            await enrich_with_nc_case_status_dispatched(enriched, sold_pool=sold_pool)
         except Exception:
             log.error("nc_case_status.failed", traceback=traceback.format_exc())
 
@@ -545,6 +598,23 @@ async def run() -> int:
         await enrich_with_bankruptcy(enriched)
     except Exception:
         log.error("bankruptcy.failed", traceback=traceback.format_exc())
+
+    # Relationship-deed detection — scan ROD pool (active + sold) for
+    # executor's-deed / quitclaim-divorce patterns. Emits new
+    # PROBATE_NOTICE / DIVORCE_NOTICE listings into the active pool.
+    # Free derivation from existing ROD scrapes.
+    try:
+        from .enrichment_relationship_deeds import enrich_with_relationship_deeds
+        derived_leads = enrich_with_relationship_deeds(
+            enriched, sold_pool=sold_pool,
+        )
+        if derived_leads:
+            enriched = enriched + derived_leads
+            log.info("relationship_deeds.added_to_active",
+                     count=len(derived_leads))
+    except Exception:
+        log.error("relationship_deeds.failed",
+                  traceback=traceback.format_exc())
 
     # Comp finder + property-spec backfill — pulls 180-day sold pool per county
     # from HomeHarvest (free), backfills missing sqft/beds/baths/year, attaches
