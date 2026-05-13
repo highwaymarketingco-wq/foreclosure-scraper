@@ -33,12 +33,28 @@ import os
 import re
 from datetime import datetime, timedelta
 from typing import Optional
+from urllib.parse import urlparse
 
 import structlog
 
 from .models import Listing
 
 log = structlog.get_logger()
+
+
+def _dump_debug_html(label: str, content: str) -> None:
+    """Write a debug HTML snapshot under debug/ so the workflow's
+    'Upload debug HTML artifacts' step picks it up. Don't write under
+    docs/ — that gets `git reset --hard`-ed by the publish step.
+    """
+    try:
+        import pathlib
+        p = pathlib.Path("debug") / f"tyler_{label}.html"
+        p.parent.mkdir(exist_ok=True)
+        p.write_text(content)
+        log.info("nc_ecourts.debug_dump", label=label, path=str(p), bytes=len(content))
+    except Exception as exc:
+        log.warning("nc_ecourts.debug_dump_fail", label=label, error=str(exc)[:120])
 
 
 PORTAL_BASE = "https://portal-nc.tylertech.cloud/Portal"
@@ -246,6 +262,32 @@ async def _drive_login_and_search(
             break
         except Exception:
             continue
+
+    # The Odyssey signin form has an "I have read and agree to the Terms
+    # of Use" checkbox that gates the Sign In button. Without checking it,
+    # clicking Sign In does nothing and the page never navigates (run
+    # 25825123671 stayed on the signin URL post-submit because of this).
+    LAST_RUN_STATUS["last_step"] = "checking_tos"
+    tos_checked = False
+    for sel in (
+        'input[type="checkbox"][name*="terms" i]',
+        'input[type="checkbox"][id*="terms" i]',
+        'input[type="checkbox"][name*="agree" i]',
+        'input[type="checkbox"]',  # last-resort fallback — there's usually only one
+    ):
+        try:
+            box = page.locator(sel).first
+            if await box.count() > 0 and not (await box.is_checked()):
+                await box.check(timeout=5000)
+                tos_checked = True
+                break
+            elif await box.count() > 0:
+                # already checked (shouldn't happen on a fresh load but ok)
+                tos_checked = True
+                break
+        except Exception:
+            continue
+    log.info("nc_ecourts.auth.tos_check", checked=tos_checked)
     if not pwd_filled:
         log.warning("nc_ecourts.auth.no_password_field")
         LAST_RUN_STATUS.update({
@@ -256,20 +298,33 @@ async def _drive_login_and_search(
 
     # Step 3: Submit the form.
     LAST_RUN_STATUS["last_step"] = "submitting_login"
+    # Dump signin page state right before clicking submit, so if it
+    # doesn't navigate we can see what the form actually looked like.
     try:
-        await page.press('input[type="password"]', "Enter")
+        _dump_debug_html("pre_submit", await page.content())
     except Exception:
-        for btn in (
-            'button[type="submit"]',
-            'input[type="submit"]',
-            'button:has-text("Sign In")',
-            'button:has-text("Login")',
-        ):
-            try:
-                await page.click(btn, timeout=4000)
-                break
-            except Exception:
-                continue
+        pass
+    submit_clicked = False
+    for btn in (
+        'button:has-text("Sign In")',
+        'button:has-text("Login")',
+        'button[type="submit"]',
+        'input[type="submit"]',
+    ):
+        try:
+            await page.click(btn, timeout=4000)
+            submit_clicked = True
+            break
+        except Exception:
+            continue
+    if not submit_clicked:
+        # Last-ditch: pressing Enter in the password field
+        try:
+            await page.press('input[type="password"]', "Enter")
+            submit_clicked = True
+        except Exception:
+            pass
+    log.info("nc_ecourts.auth.submit_click", ok=submit_clicked)
 
     # Step 4: Wait for redirect chain back to portal (WS-Fed bounces
     # through several URLs). Check we land on a portal-NC URL.
@@ -280,11 +335,21 @@ async def _drive_login_and_search(
         pass
     cur = page.url
     LAST_RUN_STATUS["post_login_url"] = cur[:200]
-    if "portal-nc.tylertech.cloud" not in cur:
-        log.warning("nc_ecourts.auth.redirect_fail", landed_at=cur[:200])
+    # Check hostname only — substring match falsely passed when the IdP
+    # signin URL contained `portal-nc.tylertech.cloud` as the URL-encoded
+    # ReturnUrl param (run 25825123671). We're past auth ONLY if the
+    # actual host is portal-nc, not when the host is the IdP and the
+    # portal URL is buried inside a query parameter.
+    host = urlparse(cur).netloc.lower()
+    if "portal-nc.tylertech.cloud" not in host:
+        log.warning("nc_ecourts.auth.redirect_fail", landed_at=cur[:200], host=host)
+        try:
+            _dump_debug_html("post_submit", await page.content())
+        except Exception:
+            pass
         LAST_RUN_STATUS.update({
             "last_step": "redirect_fail",
-            "step_error": f"after login, landed at {cur[:120]} not portal-nc",
+            "step_error": f"after login, host={host} (expected portal-nc.tylertech.cloud); landed at {cur[:120]}",
         })
         return out
 
@@ -332,8 +397,10 @@ async def _query_one_case(page, case_number: str, debug_dump: bool = False) -> O
         if not debug_dump:
             return
         try:
-            import pathlib, time
-            p = pathlib.Path("docs") / f"tyler_debug_{case_number.replace('/','_')}_{label}.html"
+            import pathlib
+            # Write under debug/ (artifact-uploaded) NOT docs/ (nuked by
+            # publish step's git reset --hard).
+            p = pathlib.Path("debug") / f"tyler_case_{case_number.replace('/','_')}_{label}.html"
             p.parent.mkdir(exist_ok=True)
             p.write_text(html_or_page_text)
             log.info("nc_ecourts.case.dump_saved", case=case_number, label=label, path=str(p), bytes=len(html_or_page_text))
