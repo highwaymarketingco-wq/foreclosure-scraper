@@ -1,0 +1,48 @@
+{
+  "data": {
+    "results": {
+      "content": [
+        {
+          "lotNumberStr": "75612345",
+          "mkn": "PORSCHE",
+          "mmd": "911 CARRERA S",
+          "lcy": 2016,
+          "fv": "WP0AB2A98GS123456",
+          "orr": 42500,
+          "td": "SALVAGE",
+          "yn": "FL - PUNTA GORDA SOUTH",
+          "lurl": "https://copart.example/img/75612345.jpg",
+          "dynamicLotDetails": {
+            "currentBid": 12500,
+            "buyItNowPrice": null,
+            "runAndDriveYn": "Y"
+          }
+        },
+        {
+          "lotNumberStr": "75612999",
+          "mkn": "PORSCHE",
+          "mmd": "CAYENNE",
+          "lcy": 2018,
+          "td": "SALVAGE",
+          "dynamicLotDetails": {"currentBid": 8000}
+        },
+        {
+          "lotNumberStr": "75613001",
+          "mkn": "PORSCHE",
+          "mmd": "CAYMAN",
+          "lcy": 2015,
+          "td": "REBUILT",
+          "dynamicLotDetails": {"currentBid": 18000, "runAndDriveYn": "N"}
+        },
+        {
+          "lotNumberStr": "75613444",
+          "mkn": "PORSCHE",
+          "mmd": "BOXSTER",
+          "lcy": 2014,
+          "td": "PARTS ONLY",
+          "dynamicLotDetails": {"currentBid": 3000}
+        }
+      ]
+    }
+  }
+}

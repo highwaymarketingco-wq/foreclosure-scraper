@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cheap Porsches — 2014+ under $45k or salvage/rebuilt</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏁</text></svg>">
+<style>
+  :root {
+    --bg: #0d0d10;
+    --fg: #f4f4f5;
+    --muted: #8a8a92;
+    --card: #17171b;
+    --card-border: #25252b;
+    --accent: #ffcc00;          /* Porsche racing yellow */
+    --salvage: #ff5577;
+    --rebuilt: #ff9933;
+    --clean: #5ab57c;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
+         background: var(--bg); color: var(--fg); line-height: 1.45; }
+  header { padding: 28px 32px 12px; border-bottom: 1px solid var(--card-border);
+           background: linear-gradient(180deg, #1a1a20 0%, var(--bg) 100%); }
+  h1 { margin: 0 0 4px; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+  h1 .accent { color: var(--accent); }
+  .sub { color: var(--muted); font-size: 14px; }
+  .toolbar { display: flex; gap: 12px; flex-wrap: wrap; padding: 16px 32px;
+             border-bottom: 1px solid var(--card-border); align-items: center; }
+  .toolbar input, .toolbar select {
+    background: var(--card); color: var(--fg); border: 1px solid var(--card-border);
+    border-radius: 6px; padding: 8px 12px; font-size: 14px; font-family: inherit;
+  }
+  .toolbar input { min-width: 220px; }
+  .toolbar label { color: var(--muted); font-size: 12px; text-transform: uppercase;
+                    letter-spacing: 0.04em; }
+  .stat { margin-left: auto; color: var(--muted); font-size: 13px; }
+  .stat b { color: var(--accent); font-size: 18px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+          gap: 18px; padding: 24px 32px 64px; }
+  .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 10px;
+          overflow: hidden; display: flex; flex-direction: column;
+          transition: transform 80ms ease, border-color 80ms ease; }
+  .card:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .thumb { aspect-ratio: 4/3; background: #000 50% / cover no-repeat;
+           border-bottom: 1px solid var(--card-border); position: relative; }
+  .thumb .src { position: absolute; top: 8px; left: 8px;
+                background: rgba(0,0,0,0.7); color: #fff; padding: 3px 8px;
+                font-size: 11px; border-radius: 4px; letter-spacing: 0.04em; }
+  .thumb .status { position: absolute; top: 8px; right: 8px;
+                   padding: 3px 8px; font-size: 11px; font-weight: 700;
+                   border-radius: 4px; color: #000; }
+  .status-salvage { background: var(--salvage); color: #fff; }
+  .status-rebuilt { background: var(--rebuilt); color: #000; }
+  .status-clean { background: var(--clean); color: #fff; }
+  .status-unknown { display: none; }
+  .body { padding: 14px 16px 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .price { font-size: 22px; font-weight: 800; color: var(--accent); }
+  .price .label { font-size: 11px; color: var(--muted); font-weight: 500;
+                  text-transform: uppercase; margin-right: 6px; letter-spacing: 0.05em; }
+  .title { font-size: 15px; font-weight: 600; color: var(--fg); margin: 2px 0; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .meta span { margin-right: 12px; }
+  .open { margin-top: auto; padding-top: 10px; }
+  .open a { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600; }
+  .open a:hover { text-decoration: underline; }
+  .empty { padding: 64px 32px; text-align: center; color: var(--muted); }
+  .empty code { background: var(--card); padding: 2px 6px; border-radius: 4px; }
+  footer { padding: 16px 32px; color: var(--muted); font-size: 12px;
+           border-top: 1px solid var(--card-border); }
+  footer a { color: var(--muted); }
+  @media (max-width: 600px) {
+    header, .toolbar, .grid, footer { padding-left: 16px; padding-right: 16px; }
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Cheap <span class="accent">Porsches</span></h1>
+  <div class="sub">
+    2014–current model years, under $45k <em>or</em> rebuilt/salvage title.
+    Excludes Panamera, Cayenne, Macan.
+  </div>
+</header>
+
+<div class="toolbar">
+  <input id="q" placeholder="Search title, model, location…" autocomplete="off">
+  <label>Source <select id="filterSource"><option value="">all</option></select></label>
+  <label>Title <select id="filterStatus">
+    <option value="">all</option>
+    <option value="clean">clean</option>
+    <option value="rebuilt">rebuilt</option>
+    <option value="salvage">salvage</option>
+    <option value="unknown">unknown</option>
+  </select></label>
+  <label>Sort <select id="sortBy">
+    <option value="price_asc">price ↑</option>
+    <option value="price_desc">price ↓</option>
+    <option value="year_desc">year ↓</option>
+    <option value="mileage_asc">mileage ↑</option>
+  </select></label>
+  <div class="stat"><b id="count">0</b> matching listings · last refresh <span id="updated">—</span></div>
+</div>
+
+<div id="grid" class="grid"></div>
+
+<div id="empty" class="empty" style="display:none">
+  No listings loaded yet. Run<br>
+  <code>uv run porsche-scraper --out-dir docs</code><br>
+  (or wait for the GitHub Actions cron) and refresh.
+</div>
+
+<footer>
+  Source data: <a href="porsche.json">porsche.json</a> · <a href="porsche.csv">porsche.csv</a> ·
+  Built by <a href="https://github.com/highwaymarketingco-wq/foreclosure-scraper">porsche_scraper</a>.
+  Bot-protected sites (BaT, C&amp;B, Autotrader, IAAI, salvage brokers, etc.) only return data when
+  the scrape runs from a non-datacenter IP or with a proxy configured — see the package README.
+</footer>
+
+<script>
+(async function () {
+  const grid = document.getElementById('grid');
+  const empty = document.getElementById('empty');
+  const countEl = document.getElementById('count');
+  const updatedEl = document.getElementById('updated');
+  const qEl = document.getElementById('q');
+  const sourceEl = document.getElementById('filterSource');
+  const statusEl = document.getElementById('filterStatus');
+  const sortEl = document.getElementById('sortBy');
+
+  let listings = [];
+  try {
+    const r = await fetch('porsche.json?t=' + Date.now());
+    listings = await r.json();
+  } catch (e) {
+    empty.style.display = 'block';
+    return;
+  }
+
+  if (!Array.isArray(listings) || listings.length === 0) {
+    empty.style.display = 'block';
+    return;
+  }
+
+  // Build source dropdown.
+  const sources = [...new Set(listings.map(l => l.source))].sort();
+  for (const s of sources) {
+    const o = document.createElement('option');
+    o.value = s; o.textContent = s;
+    sourceEl.appendChild(o);
+  }
+
+  // Use first_seen as the freshness signal.
+  const latest = listings
+    .map(l => l.first_seen)
+    .filter(Boolean)
+    .sort()
+    .pop();
+  if (latest) {
+    const d = new Date(latest);
+    updatedEl.textContent = d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+  }
+
+  function effPrice(l) {
+    return (l.price_usd ?? l.current_bid_usd ?? null);
+  }
+  function fmtPrice(v) {
+    return v == null ? '—' : '$' + Math.round(v).toLocaleString();
+  }
+  function fmtMileage(v) {
+    return v == null ? '? mi' : v.toLocaleString() + ' mi';
+  }
+
+  function render() {
+    const q = qEl.value.trim().toLowerCase();
+    const fSource = sourceEl.value;
+    const fStatus = statusEl.value;
+    const sortBy = sortEl.value;
+
+    let out = listings.filter(l => {
+      if (fSource && l.source !== fSource) return false;
+      if (fStatus && (l.title_status || 'unknown') !== fStatus) return false;
+      if (q) {
+        const hay = (l.title + ' ' + (l.model || '') + ' ' + (l.location || '')).toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    out.sort((a, b) => {
+      if (sortBy === 'price_asc')  return (effPrice(a) ?? 1e12) - (effPrice(b) ?? 1e12);
+      if (sortBy === 'price_desc') return (effPrice(b) ?? -1)   - (effPrice(a) ?? -1);
+      if (sortBy === 'year_desc')  return (b.year || 0) - (a.year || 0);
+      if (sortBy === 'mileage_asc') return (a.mileage ?? 1e9) - (b.mileage ?? 1e9);
+      return 0;
+    });
+
+    countEl.textContent = out.length;
+    grid.innerHTML = '';
+    for (const l of out) grid.appendChild(card(l));
+  }
+
+  function card(l) {
+    const div = document.createElement('div');
+    div.className = 'card';
+    const status = l.title_status || 'unknown';
+    const ep = effPrice(l);
+    const isBid = l.price_usd == null && l.current_bid_usd != null;
+    div.innerHTML = `
+      <div class="thumb" style="background-image:url('${l.photo_url || ''}')">
+        <span class="src">${l.source}</span>
+        <span class="status status-${status}">${status}</span>
+      </div>
+      <div class="body">
+        <div class="price"><span class="label">${isBid ? 'Bid' : 'Price'}</span>${fmtPrice(ep)}</div>
+        <div class="title">${l.title || '(untitled)'}</div>
+        <div class="meta">
+          ${l.year ? `<span>${l.year}</span>` : ''}
+          ${l.mileage ? `<span>${fmtMileage(l.mileage)}</span>` : ''}
+          ${l.location ? `<span>${l.location}</span>` : ''}
+        </div>
+        <div class="open"><a href="${l.source_url}" target="_blank" rel="noopener">View listing →</a></div>
+      </div>
+    `;
+    return div;
+  }
+
+  for (const el of [qEl, sourceEl, statusEl, sortEl]) el.addEventListener('input', render);
+  render();
+})();
+</script>
+</body>
+</html>
