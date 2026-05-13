@@ -1,10 +1,17 @@
-"""McMichael Taylor Gray — NC + GA foreclosure trustee.
+"""McMichael Taylor Gray — DISABLED (data moved to PowerBI iframe 2026-05).
 
-mtglaw.com/foreclosure-sales/ renders "Loading..." until an AJAX
-call populates the listings table. Plain httpx misses everything.
-Pre-fix: scraper was a no-op skeleton using parse_blocks on the
-loading page. Now uses Scrapling stealth with networkidle wait so
-the AJAX completes before we extract.
+mtglaw.com/foreclosure-sales/ no longer renders an HTML table. Instead
+the listings are inside an embedded PowerBI dashboard:
+  https://app.powerbi.com/view?r=eyJrIjoiOTQwOTdiYWYtOGQwMy00OGUzLWI4MjktOTczNDc0ODE2ZGY1IiwidCI6IjEzZDFlNzhjLTgyNDgtNGVlYS04OWY3LWQzNGIzZWJkOGM3OSIsImMiOjN9
+
+Properly scraping this requires PowerBI-specific work (drive Playwright
+into the iframe, wait 15-30s for the dashboard to render, expand state/
+county filters, parse virtualized row divs with [role="row"]) — a
+multi-hour rewrite plus tests, and inherently more fragile than HTML.
+
+fetch() returns [] until that rewrite lands. Slug stays in KNOWN_FIXED
+so run_health labels it correctly; "EMPTY (verified)" rather than "RENDER-
+REQUIRED" because the issue is upstream design, not our stealth.
 """
 from __future__ import annotations
 
@@ -183,13 +190,8 @@ class McMichaelTaylorGray(BaseScraper):
     timeout_s = 360.0
 
     async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
-        seen: set[str] = set()
-        for url in URLS:
-            html = await _fetch_url(url)
-            for li in _parse_html(html, url, self.slug):
-                _add_unique(li, out, seen)
-            if out:
-                # First successful URL wins; second URL likely same listings
-                break
+        # Listings moved into a PowerBI iframe in May 2026. HTML-based
+        # parsing yields nothing. Skip the network call until a proper
+        # PowerBI scraper is built (see module docstring).
+        return []
         return out

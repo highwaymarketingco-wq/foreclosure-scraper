@@ -1,16 +1,18 @@
-"""Aldridge Pite — NC + SC foreclosure trustee.
+"""Aldridge Pite — NC foreclosure trustee.
 
-Disclaimer-gated: aldridgepite.com requires clicking "I Agree" on a
-state-specific disclaimer page before the listings table renders.
-Pre-fix, the scraper tried httpx with Referer header (bypass that
-stopped working ~2026-04-28). Now uses Scrapling stealth and drives
-the disclaimer modal click.
+Disclaimer-gated: aldridgepite.com requires clicking "I Agree" on the
+NC disclaimer page before the listings table renders. Uses Scrapling
+stealth and drives the disclaimer modal click.
 
 Sites:
   NC: /sale-day-listings-selection/foreclosure-listings-north-carolina/
-  SC: /sale-day-listings-selection/foreclosure-listings-south-carolina/
-Disclaimer pages live at /disclaimer-{state}/ — clicking I-Agree sets
+Disclaimer page: /disclaimer-north-carolina/ — clicking I-Agree sets
 a session cookie that unlocks the listings page.
+
+SC support removed 2026-05-13: every variant of the SC URL
+(/sale-day-listings-selection/foreclosure-listings-south-carolina/,
+/disclaimer-south-carolina/, /disclaimer-sc/, etc.) now 404s.
+Aldridge appears to have exited the SC market.
 """
 from __future__ import annotations
 
@@ -25,7 +27,6 @@ from ...models import Listing, ListingType, PropertyKind
 
 URLS = (
     ("https://aldridgepite.com/sale-day-listings-selection/foreclosure-listings-north-carolina/", "NC"),
-    ("https://aldridgepite.com/sale-day-listings-selection/foreclosure-listings-south-carolina/", "SC"),
 )
 
 
@@ -142,7 +143,7 @@ class AldridgePite(BaseScraper):
     requires_apify = False
     requires_render = True
     expected_min_count = 0
-    timeout_s = 480.0  # 2 states × ~180s each + slack
+    timeout_s = 240.0  # NC only (~180s + slack) since SC URL is dead
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
