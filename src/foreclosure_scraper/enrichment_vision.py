@@ -45,16 +45,19 @@ ANTHROPIC_VISION_MODEL = "claude-sonnet-4-5-20250929"
 # Legacy alias kept for any external imports
 VISION_MODEL = ANTHROPIC_VISION_MODEL
 
-# Gemini settings — 'gemini-2.0-flash' is the current stable, vision-
-# capable model that exists in the v1beta API as of 2026-05.
+# Gemini settings — Google zeroed out gemini-2.0-flash's free tier on
+# 2026-05-12 (quota metric returns limit: 0 for new and existing keys),
+# so the default is now gemini-2.5-flash which still has free quota
+# (10 RPM / 250 RPD / 250K TPM per account). With 3-account rotation
+# that's 750 RPD effective — enough for a 633-call weekly run + small
+# patch reruns. If quota gets tight, override to gemini-2.5-flash-lite
+# (15 RPM / 1000 RPD per account ≈ 3000 RPD across 3 keys, lower quality).
 # Verified retired/404'ing names (do NOT use):
-#   - gemini-2.0-flash-exp (deprecated 2025)
+#   - gemini-2.0-flash      (free tier zeroed 2026-05-12)
+#   - gemini-2.0-flash-exp  (deprecated 2025)
 #   - gemini-1.5-flash      (deprecated 2026; v1beta removed it)
-# Free-tier limits 2.0-flash: 15 RPM / 1500 RPD / 1M TPM. Works for us.
-# 2.5-flash exists but free tier is 10 RPM / 250 RPD which we already
-# blew through in run #6.
 GEMINI_VISION_MODEL = os.environ.get(
-    "GEMINI_VISION_MODEL", "gemini-2.0-flash"
+    "GEMINI_VISION_MODEL", "gemini-2.5-flash"
 )
 
 MAX_PHOTOS_PER_LISTING = 7   # up to 5 real + aerial + street
