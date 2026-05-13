@@ -127,7 +127,12 @@ async def solve_waf_via_browser(page) -> bool:
     back-to-back puzzles — AWS WAF on portal-nc serves 3-5 in a row when
     it's suspicious of the client (verified 2026-05-13).
     """
-    MAX_PUZZLES = 8
+    # AWS WAF on portal-nc serves an escalating number of puzzles when
+    # the source IP looks suspicious (GitHub Actions runner IPs definitely
+    # do). Verified 2026-05-13: 1 puzzle on a "good" run, 8+ on a "bad"
+    # run with answers all correct. 20 covers worst observed without
+    # exhausting the 4-min StealthyFetcher timeout (20 × ~4s = 80s).
+    MAX_PUZZLES = 20
 
     # Click "Begin" if visible
     try:
