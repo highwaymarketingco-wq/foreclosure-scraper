@@ -893,6 +893,23 @@ async def run() -> int:
     except Exception:
         log.error("judgment_amount.failed", traceback=traceback.format_exc())
 
+    # Detail-page fetcher for judgment_amount (dad's #5, follow-up to
+    # patch run #11 diagnostic showing text_no_match=717/717). Pure
+    # text-mining can't find the judgment amount because law-firm
+    # scrapers only capture table-cell summaries, not the full Notice
+    # of Sale text. This step fetches the detail page (URL already
+    # in source_url) for listings still missing judgment_amount and
+    # re-runs the extractor on the fetched text. Capped at 200
+    # fetches/run, prioritized by imminent sale_date.
+    try:
+        from .enrichment_judgment_detail import (
+            enrich_judgment_amount_via_detail_pages,
+        )
+        s = await enrich_judgment_amount_via_detail_pages(enriched)
+        if s: enrichment_stats["judgment_amount_detail"] = s
+    except Exception:
+        log.error("judgment_detail.failed", traceback=traceback.format_exc())
+
     # Pre-write data validation gate — runs BEFORE valuation so the
     # calculator sees validated inputs. Catches recurring data-quality
     # bugs at a single chokepoint: state/county mismatch, casing fixes
