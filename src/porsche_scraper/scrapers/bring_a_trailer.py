@@ -1,21 +1,21 @@
-"""Bring a Trailer — Porsche auctions (live + recently completed).
+"""Bring a Trailer — Porsche auctions.
 
-BaT lists Porsche auctions under https://bringatrailer.com/porsche/ with
-sub-paths per model (911, 718, cayman, boxster, …). Each model page is
-paginated /page/2/, /page/3/ ….
+Each model index page (e.g. `/porsche/911/`) renders `.listing-card` DOM
+nodes server-side; we parse those directly. The embedded JS used to also
+expose `auctionsCompletedInitialData`, but BaT moved that behind a REST
+endpoint (`/wp-json/bringatrailer/1.0/data/listings-filter`) so HTML
+parsing is the simpler current path.
 
-The listings grid embeds a JS variable `auctionsCompletedInitialData` (a
-JSON array of objects with sold price, year, model, image, link, etc.)
-in a `<script>` tag - we use that as the primary parser. We avoid the
-model paths that are excluded (cayenne, macan, panamera).
+We crawl a curated list of model paths to keep the request count down
+and to naturally exclude Cayenne / Panamera / Macan at the URL level.
+The master `/porsche/` index page covers anything we miss.
 
-BaT sits behind Cloudflare; we use the stealth (curl-cffi) transport.
+BaT sits behind Cloudflare — use the stealth (curl-cffi) transport and a
+residential proxy at scale.
 """
 from __future__ import annotations
 
-import json
 import logging
-import re
 from typing import Iterable
 from urllib.parse import urljoin
 
@@ -36,140 +36,95 @@ log = logging.getLogger(__name__)
 
 BASE = "https://bringatrailer.com"
 
-# We only crawl model paths we care about. BaT's category slugs.
+# Model index paths we crawl. Cayenne / Macan / Panamera intentionally
+# excluded. Some are sub-categories (`911-gt3`) inside the broader page,
+# but BaT lists them as their own indexes too. 404s are non-fatal — BaT
+# occasionally renames categories.
 PORSCHE_MODEL_PATHS = (
+    "/porsche/",
     "/porsche/911/",
-    "/porsche/718-cayman/",
     "/porsche/cayman/",
-    "/porsche/718-boxster/",
     "/porsche/boxster/",
-    "/porsche/944/",
     "/porsche/928/",
     "/porsche/924/",
+    "/porsche/944/",
     "/porsche/968/",
-)
-
-_AUCTION_DATA_RE = re.compile(
-    r"auctionsCompletedInitialData\s*=\s*(\[.*?\]);", re.DOTALL
-)
-_ACTIVE_DATA_RE = re.compile(
-    r"(?:activeAuctionData|featured_listings)\s*=\s*(\[.*?\]);", re.DOTALL
+    "/porsche/914/",
 )
 
 
-def _extract_embedded(html: str) -> list[dict]:
-    out: list[dict] = []
-    for pattern in (_AUCTION_DATA_RE, _ACTIVE_DATA_RE):
-        m = pattern.search(html)
-        if not m:
-            continue
-        try:
-            arr = json.loads(m.group(1))
-        except json.JSONDecodeError:
-            continue
-        if isinstance(arr, list):
-            out.extend(d for d in arr if isinstance(d, dict))
-    return out
+def _bid_or_sold_price(card) -> tuple[float | None, float | None]:
+    """Return (current_bid, sold_price). Sold pages use "Sold for: $X"."""
+    label_node = card.css_first(".bid-label")
+    amount_node = card.css_first(".bid-formatted")
+    if not amount_node:
+        return None, None
+    amount = parse_price(amount_node.text(strip=True))
+    label = (label_node.text(strip=True) if label_node else "").lower()
+    if "sold" in label:
+        return None, amount
+    return amount, None
 
 
-def _listing_from_embedded(d: dict) -> Listing | None:
-    url = d.get("url") or d.get("permalink")
-    title = d.get("title") or d.get("name") or ""
-    if not url or not title:
+def _listing_from_card(card) -> Listing | None:
+    link = card.css_first("h3 a[href]") or card.css_first("a.image-overlay[href]")
+    if not link:
         return None
-    url = urljoin(BASE, url)
-    year = d.get("year") or parse_year(title)
-    try:
-        year = int(year) if year else None
-    except (TypeError, ValueError):
-        year = parse_year(title)
-    # BaT uses "current_bid", "sold_price", "amount" depending on state.
-    price = (
-        parse_price(d.get("current_bid"))
-        or parse_price(d.get("sold_price"))
-        or parse_price(d.get("amount"))
-    )
-    miles = parse_miles(d.get("mileage") or d.get("odometer"))
-    image = None
-    if isinstance(d.get("images"), list) and d["images"]:
-        first = d["images"][0]
-        image = first if isinstance(first, str) else first.get("url")
-    image = image or d.get("image") or d.get("thumbnail")
+    href = link.attributes.get("href")
+    if not href or "/listing/" not in href:
+        return None
+    title = link.text(strip=True) or link.attributes.get("title") or ""
+    img = card.css_first(".thumbnail img")
+    excerpt_node = card.css_first(".item-excerpt")
+    excerpt = excerpt_node.text(strip=True) if excerpt_node else ""
+    current_bid, sold_price = _bid_or_sold_price(card)
+    miles = parse_miles(excerpt)  # BaT excerpts often contain "X-mile" or "X,XXX-Mile"
+    listing_id = card.attributes.get("data-listing_id") or href.rstrip("/").split("/")[-1]
+    title_status = infer_title_status(title + " " + excerpt)
     listing = Listing(
         source="bring_a_trailer",
-        source_url=url,
-        listing_id=str(d.get("id") or d.get("ID") or url),
+        source_url=urljoin(BASE, href),
+        listing_id=str(listing_id),
         title=title,
-        year=year,
-        model=d.get("model"),
-        current_bid_usd=price,
+        year=parse_year(title),
+        current_bid_usd=current_bid,
+        price_usd=sold_price,  # Sold-for treated as price_usd for filter purposes.
         mileage=miles,
-        location=d.get("location") or d.get("seller_location"),
-        photo_url=image,
-        title_status=infer_title_status(title + " " + (d.get("excerpt") or "")),
+        photo_url=(img.attributes.get("src") or img.attributes.get("data-src")) if img else None,
+        title_status=title_status,
         seller_type="auction",
-        raw={"bat": d},
     )
-    listing.drivable = infer_drivable(listing.title, listing.title_status)
+    listing.drivable = infer_drivable(title + " " + excerpt, title_status)
     return listing
 
 
-def _listings_from_html(html: str) -> Iterable[Listing]:
-    tree = HTMLParser(html)
-    for card in tree.css(".listing-card, article.auction-item"):
-        a = card.css_first(".content-title a") or card.css_first("a[href]")
-        if not a:
-            continue
-        href = a.attributes.get("href")
-        if not href:
-            continue
-        title = a.text(strip=True)
-        bid = card.css_first(".bid-formatted") or card.css_first(".td-price")
-        loc = card.css_first(".item-location") or card.css_first(".listing-card-subheading")
-        img = card.css_first("img")
-        listing = Listing(
-            source="bring_a_trailer",
-            source_url=urljoin(BASE, href),
-            title=title,
-            year=parse_year(title),
-            current_bid_usd=parse_price(bid.text(strip=True)) if bid else None,
-            location=loc.text(strip=True) if loc else None,
-            photo_url=(img.attributes.get("data-src") or img.attributes.get("src")) if img else None,
-            title_status=infer_title_status(title),
-            seller_type="auction",
-        )
-        listing.drivable = infer_drivable(listing.title, listing.title_status)
-        yield listing
-
-
 def parse_index_page(html: str) -> list[Listing]:
-    """Parse one BaT model-index page. Tries embedded JSON, then HTML."""
+    """Parse one BaT model-index page into Listings."""
+    tree = HTMLParser(html)
     seen: set[str] = set()
     out: list[Listing] = []
-    for d in _extract_embedded(html):
-        listing = _listing_from_embedded(d)
-        if listing and listing.source_url not in seen:
-            seen.add(listing.source_url)
-            out.append(listing)
-    if out:
-        return out
-    for listing in _listings_from_html(html):
-        if listing.source_url not in seen:
-            seen.add(listing.source_url)
-            out.append(listing)
+    for card in tree.css(".listing-card"):
+        listing = _listing_from_card(card)
+        if not listing or not listing.title:
+            continue
+        if listing.source_url in seen:
+            continue
+        seen.add(listing.source_url)
+        out.append(listing)
     return out
 
 
 class BringATrailerScraper(BaseScraper):
     slug = "bring_a_trailer"
     name = "Bring a Trailer"
-    timeout_s = 180.0
+    timeout_s = 240.0
 
     def __init__(self, *, max_pages_per_model: int = 3):
         self.max_pages_per_model = max_pages_per_model
 
     async def fetch(self) -> list[Listing]:
         out: list[Listing] = []
+        seen: set[str] = set()
         for path in PORSCHE_MODEL_PATHS:
             for page in range(1, self.max_pages_per_model + 1):
                 url = urljoin(BASE, path) if page == 1 else urljoin(BASE, f"{path}page/{page}/")
@@ -178,8 +133,10 @@ class BringATrailerScraper(BaseScraper):
                 except Exception as exc:  # noqa: BLE001
                     log.warning("bat %s page %d failed: %s", path, page, exc)
                     break
-                listings = parse_index_page(html)
-                if not listings:
-                    break
-                out.extend(listings)
+                page_listings = parse_index_page(html)
+                fresh = [l for l in page_listings if l.source_url not in seen]
+                if not fresh:
+                    break  # End of pagination or duplicate page.
+                seen.update(l.source_url for l in fresh)
+                out.extend(fresh)
         return out

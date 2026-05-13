@@ -164,6 +164,18 @@ def test_parse_miles_handles_units():
     assert parse_miles(None) is None
 
 
+def test_parse_miles_bat_k_mile_pattern():
+    # BaT excerpts use "24k-Mile" / "6,000-Mile"
+    assert parse_miles("24k-Mile 2016 Porsche 911") == 24_000
+    assert parse_miles("55,000-Mile") == 55_000
+
+
+def test_parse_miles_ignores_prose_without_unit():
+    # Mileage extraction must NOT concatenate year + listing-id digits
+    # from a free-prose excerpt when no "mi"/"miles" token is present.
+    assert parse_miles("This 2024 Porsche 911 GT3 R Rennsport is the 7th of 77 examples built") is None
+
+
 def test_parse_year():
     assert parse_year("2016 Porsche 911 Carrera") == 2016
     assert parse_year("Porsche") is None

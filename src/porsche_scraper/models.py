@@ -58,7 +58,13 @@ NON_DRIVABLE_KEYWORDS = (
 
 
 _YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
-_MILES_RE = re.compile(r"([\d,]+)\s*(?:mi|miles|mile|k\b)", re.IGNORECASE)
+# Order matters: "k-mile" / "k-Mile" must match before bare "mile".
+_MILES_RE = re.compile(
+    r"([\d][\d,]*)\s*-?\s*(k-mile|k-miles|k\s*mi|k\s*miles|mi\b|miles?\b|mile\b)",
+    re.IGNORECASE,
+)
+# Matches a bare numeric-only string like "85,000" or "85000".
+_BARE_NUM_RE = re.compile(r"^[\d,]+$")
 _PRICE_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
 
 
@@ -83,20 +89,31 @@ def parse_price(text: str | None) -> float | None:
 
 
 def parse_miles(text: str | None) -> int | None:
+    """Extract a mileage value from free text.
+
+    Only commits if we either see a unit token ("mi", "miles", "k-mile", etc.)
+    or the input is a bare numeric string. Free prose with multiple digit
+    groups but no unit returns None — otherwise we'd concatenate
+    year + listing-id digits into a bogus mileage.
+    """
     if text is None:
         return None
     if isinstance(text, (int, float)):
         return int(text)
     s = str(text).strip().lower()
+    if not s:
+        return None
     m = _MILES_RE.search(s)
-    if not m:
-        digits = re.sub(r"[^\d]", "", s)
-        return int(digits) if digits else None
-    num = m.group(1).replace(",", "")
-    val = float(num)
-    if "k" in s and val < 1000:  # "85k mi"
-        val *= 1000
-    return int(val)
+    if m:
+        num = m.group(1).replace(",", "")
+        unit = m.group(2)
+        val = float(num)
+        if "k" in unit and val < 1000:  # "85k-mile"
+            val *= 1000
+        return int(val)
+    if _BARE_NUM_RE.match(s):
+        return int(s.replace(",", ""))
+    return None
 
 
 def infer_title_status(text: str | None) -> TitleStatus:
