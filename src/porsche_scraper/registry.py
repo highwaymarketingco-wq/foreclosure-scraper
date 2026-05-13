@@ -164,9 +164,23 @@ ALL_SCRAPERS: list[tuple[str, Callable[[int, int | None], BaseScraper]]] = [
 ]
 
 
-# Scrapers off by default — need auth (FB cookie) or are slow & lossy
-# enough that you only want them in targeted runs.
-DEFAULT_OFF: set[str] = {"fb_marketplace", "craigslist"}
+# Scrapers off by default. Three buckets:
+#   - need auth (fb_marketplace = FB_USER_COOKIE)
+#   - slow / lossy (craigslist = per-city fan-out)
+#   - bot-blocked from datacenter IPs (the 5 salvage aggregators added in
+#     PR #18 — correctly architected but all five sites consistently
+#     403/503 from GitHub-Actions and similar cloud egress. Run them via
+#     `sf_crawl.py` from a residential IP, or set PROXY_URL to a
+#     residential proxy, then opt back in via --include-off.)
+DEFAULT_OFF: set[str] = {
+    "fb_marketplace",
+    "craigslist",
+    "bid_cars",
+    "carfast",
+    "autoauctionspy",
+    "cargurus_salvage",
+    "ebay_salvage",
+}
 
 
 def build_scrapers(
