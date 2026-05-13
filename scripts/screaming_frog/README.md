@@ -1,9 +1,25 @@
 # Screaming Frog → Porsche Dashboard
 
-Run Screaming Frog SEO Spider locally, export the crawl as CSV, hand it
-to `scripts/import_sf_csv.py`, and the dashboard rebuilds with everything
-SF saw from your home/office IP — no datacenter blocks, no per-site
-parser maintenance.
+Two ways to drive this:
+
+1. **Automated**: `.github/workflows/porsche-refresh.yml` runs SF on a
+   GitHub Actions runner using your licence, opens a PR with the
+   refreshed dashboard. **One-time setup** — add two secrets:
+
+   Go to https://github.com/highwaymarketingco-wq/foreclosure-scraper/settings/secrets/actions
+   and add:
+
+   | Secret | Value |
+   |---|---|
+   | `SF_LICENCE_USERNAME` | Your Screaming Frog account email/username |
+   | `SF_LICENCE_KEY` | Your Screaming Frog licence key |
+
+   After that, the workflow runs on a cron (Tue + Fri 09:00 UTC by
+   default — edit the `cron:` line) or via *Actions → Porsche
+   dashboard refresh → Run workflow*. It opens a PR; you click merge.
+
+2. **Manual**: run SF locally and let `scripts/sf_crawl.py` chain it
+   into the importer. Details below.
 
 ## TL;DR — one-command flow (headless SF)
 
