@@ -342,11 +342,36 @@ async def _drive_login_and_search(
     # portal URL is buried inside a query parameter.
     host = urlparse(cur).netloc.lower()
     if "portal-nc.tylertech.cloud" not in host:
-        log.warning("nc_ecourts.auth.redirect_fail", landed_at=cur[:200], host=host)
+        # Parse the page to see WHY we're still on the IdP. Tyler returns
+        # "Sign in was unsuccessful. Invalid Email or password." on bad
+        # creds, with the form re-rendered. Surface that distinctly so the
+        # user can tell "creds invalid" from "page didn't navigate".
+        invalid_creds = False
+        try:
+            page_text = (await page.content()).lower()
+            if "invalid email or password" in page_text or "sign in was unsuccessful" in page_text:
+                invalid_creds = True
+        except Exception:
+            pass
         try:
             _dump_debug_html("post_submit", await page.content())
         except Exception:
             pass
+        if invalid_creds:
+            log.warning(
+                "nc_ecourts.auth.invalid_credentials",
+                hint="Tyler rejected NC_ECOURTS_USERNAME/PASSWORD secrets",
+            )
+            LAST_RUN_STATUS.update({
+                "last_step": "invalid_credentials",
+                "step_error": (
+                    "Tyler signin returned 'Invalid Email or password'. "
+                    "The NC_ECOURTS_USERNAME/NC_ECOURTS_PASSWORD GH Secrets "
+                    "need to be set to valid portal-nc.tylertech.cloud creds."
+                ),
+            })
+            return out
+        log.warning("nc_ecourts.auth.redirect_fail", landed_at=cur[:200], host=host)
         LAST_RUN_STATUS.update({
             "last_step": "redirect_fail",
             "step_error": f"after login, host={host} (expected portal-nc.tylertech.cloud); landed at {cur[:120]}",
