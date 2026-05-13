@@ -1,0 +1,173 @@
+name: Porsche dashboard refresh
+
+# Runs Screaming Frog headless on a GitHub Actions runner against the
+# preset list in scripts/sf_crawl.py, then commits the refreshed
+# docs/porsche.json / .csv (PR-style so branch protection on main stays
+# intact). Once merged, GitHub Pages publishes the new dashboard.
+#
+# REQUIRED SECRETS — add at:
+#   https://github.com/highwaymarketingco-wq/foreclosure-scraper/settings/secrets/actions
+#
+#   SF_LICENCE_USERNAME — your Screaming Frog account email/username
+#   SF_LICENCE_KEY      — your Screaming Frog licence key
+#
+# (UK spelling matches Screaming Frog's own field names — the env vars
+# below use _LICENCE_ to mirror.)
+
+on:
+  schedule:
+    # Every Tuesday + Friday 09:00 UTC. Edit / add cron lines to taste.
+    - cron: "0 9 * * 2,5"
+  workflow_dispatch:
+    inputs:
+      sites:
+        description: "Space-separated preset slugs, or 'all'"
+        required: false
+        default: "all"
+      allow_unknown_price:
+        description: "Keep listings with no discovered price (e.g. Elferspot)"
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: porsche-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SF_LICENCE_USERNAME: ${{ secrets.SF_LICENCE_USERNAME }}
+      SF_LICENCE_KEY: ${{ secrets.SF_LICENCE_KEY }}
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Sanity-check secrets are present
+        run: |
+          if [ -z "$SF_LICENCE_USERNAME" ] || [ -z "$SF_LICENCE_KEY" ]; then
+            echo "::error::SF_LICENCE_USERNAME and SF_LICENCE_KEY secrets are not set."
+            echo "Add them under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          echo "Both SF secrets present (length only): "
+          echo "  SF_LICENCE_USERNAME: ${#SF_LICENCE_USERNAME} chars"
+          echo "  SF_LICENCE_KEY:      ${#SF_LICENCE_KEY} chars"
+
+      - name: Install Screaming Frog SEO Spider (headless deps)
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          set -euo pipefail
+          # Screaming Frog's official deb. The URL pattern is stable across
+          # minor versions; latest is fetched via the redirect.
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends \
+            xvfb wget curl ca-certificates fonts-dejavu-core \
+            openjdk-21-jre-headless
+          curl -fsSL -o /tmp/sf.deb https://download.screamingfrog.co.uk/products/seo-spider/screamingfrogseospider_latest_all.deb
+          sudo apt-get install -y --no-install-recommends /tmp/sf.deb
+          which screamingfrogseospider
+          screamingfrogseospider --version || true
+
+      - name: Write SF licence file from secrets
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.ScreamingFrogSEOSpider"
+          # SF reads its licence from a plain-text file (two lines:
+          # username then key). Filename varies by version — write both
+          # commonly-seen names so we cover the active major.
+          for f in licence.txt license.txt spider.licence spider.license; do
+            cat > "$HOME/.ScreamingFrogSEOSpider/$f" <<EOF
+          $SF_LICENCE_USERNAME
+          $SF_LICENCE_KEY
+          EOF
+          done
+          chmod 600 "$HOME/.ScreamingFrogSEOSpider/"*
+
+      - name: Set up uv + Python
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: latest
+          enable-cache: true
+
+      - name: Pin Python 3.12
+        run: uv python install 3.12
+
+      - name: Install Python deps
+        run: uv sync --frozen || uv sync
+
+      - name: Install Patchright Chromium (used by porsche_scraper enrichers)
+        run: uv run patchright install chromium
+
+      - name: Run SF crawl + enrich + import (Xvfb-wrapped for safety)
+        env:
+          SITES: ${{ github.event.inputs.sites || 'all' }}
+          ALLOW_UNKNOWN_PRICE: ${{ github.event.inputs.allow_unknown_price || 'true' }}
+        run: |
+          set -euo pipefail
+          ARGS=()
+          if [ "$SITES" = "all" ]; then
+            ARGS+=(--all)
+          else
+            for s in $SITES; do ARGS+=("$s"); done
+          fi
+          if [ "$ALLOW_UNKNOWN_PRICE" = "true" ]; then
+            ARGS+=(--allow-unknown-price)
+          fi
+          # SF needs a display server even in headless mode for some
+          # rendering plugins; Xvfb provides a virtual one for free.
+          xvfb-run -a -- uv run python scripts/sf_crawl.py "${ARGS[@]}"
+
+      - name: Open a PR with the refreshed dashboard
+        id: open_pr
+        run: |
+          set -euo pipefail
+          if git diff --quiet docs/porsche.json docs/porsche.csv; then
+            echo "No changes in docs/ — skipping PR."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          STAMP=$(date -u +%Y-%m-%d-%H%M)
+          BRANCH="bot/porsche-refresh-$STAMP"
+          git config user.name  "porsche-scraper-bot"
+          git config user.email "actions@github.com"
+          git checkout -b "$BRANCH"
+          git add docs/porsche.json docs/porsche.csv
+          git commit -m "porsche: refresh from SF crawl ($STAMP)"
+          git push --set-upstream origin "$BRANCH"
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open PR via GitHub CLI
+        if: steps.open_pr.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base main \
+            --head "${{ steps.open_pr.outputs.branch }}" \
+            --title "porsche: refresh dashboard from SF crawl" \
+            --body "Automated refresh from .github/workflows/porsche-refresh.yml. Merge to publish the updated dashboard at https://highwaymarketingco-wq.github.io/foreclosure-scraper/porsche.html"
+
+      - name: Upload SF logs (debug)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sf-crawl-logs-${{ github.run_id }}
+          path: |
+            /tmp/sf-porsche-*/**/*.csv
+            /tmp/sf-porsche-*/**/*.log
+            ~/.ScreamingFrogSEOSpider/logs/*.log
+          retention-days: 7
+          if-no-files-found: ignore

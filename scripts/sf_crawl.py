@@ -57,8 +57,11 @@ Drop hand-saved `.seospiderconfig` files at
 from __future__ import annotations
 
 import argparse
+import asyncio
+import csv
 import dataclasses
 import datetime as dt
+import json
 import os
 import platform
 import shutil
@@ -68,6 +71,8 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "src"))
+
 CONFIG_DIR = REPO_ROOT / "scripts" / "screaming_frog" / "configs"
 IMPORTER = REPO_ROOT / "scripts" / "import_sf_csv.py"
 
@@ -263,14 +268,108 @@ def run_site(preset: SitePreset, binary: str, work_root: Path) -> list[Path]:
     return csvs
 
 
-def run_import(csvs: list[Path], allow_unknown_price: bool) -> None:
+def _extract_urls_from_sf_csv(path: Path) -> list[str]:
+    """Pull the URL column (SF calls it 'Address') from any SF export CSV."""
+    urls: list[str] = []
+    with path.open(newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        if not reader.fieldnames:
+            return urls
+        addr_col = next(
+            (c for c in reader.fieldnames if c.lower().strip() in ("address", "url")),
+            None,
+        )
+        if not addr_col:
+            return urls
+        for row in reader:
+            u = (row.get(addr_col) or "").strip()
+            if u.startswith("http"):
+                urls.append(u)
+    return urls
+
+
+async def _enrich_urls(urls: list[str], concurrency: int) -> list[dict]:
+    """Run per-source detail-page parsers (from the user's IP) and return
+    a list of dicts ready to write as an importer-compatible CSV row.
+    """
+    from porsche_scraper.sf_enrichers import enrich  # local import — sys.path patched
+
+    sem = asyncio.Semaphore(concurrency)
+
+    async def one(u):
+        async with sem:
+            try:
+                listing = await enrich(u)
+            except Exception:  # noqa: BLE001
+                return None
+            if listing is None:
+                return None
+            return {
+                "URL":          listing.source_url,
+                "Source":       listing.source,
+                "Year":         listing.year or "",
+                "Model":        listing.model or "",
+                "Trim":         listing.trim or "",
+                "Price":        listing.price_usd or "",
+                "Bid":          listing.current_bid_usd or "",
+                "Mileage":      listing.mileage or "",
+                "Location":     listing.location or "",
+                "Title Status": listing.title_status.value if listing.title_status else "",
+                "VIN":          listing.vin or "",
+                "Image":        listing.photo_url or "",
+                "Title 1":      listing.title or "",
+            }
+
+    results = await asyncio.gather(*(one(u) for u in urls))
+    return [r for r in results if r is not None]
+
+
+def _write_enriched_csv(rows: list[dict], path: Path) -> None:
+    if not rows:
+        return
+    cols = list(rows[0].keys())
+    with path.open("w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=cols)
+        w.writeheader()
+        for r in rows:
+            w.writerow(r)
+
+
+def run_import(
+    csvs: list[Path],
+    allow_unknown_price: bool,
+    *,
+    enrich: bool,
+    enrich_concurrency: int,
+    work_root: Path,
+) -> None:
     if not csvs:
         print("  nothing to import")
         return
-    cmd = ["uv", "run", "python", str(IMPORTER), *map(str, csvs)]
+
+    import_paths = list(csvs)
+
+    if enrich:
+        urls: set[str] = set()
+        for c in csvs:
+            urls.update(_extract_urls_from_sf_csv(c))
+        urls_l = sorted(urls)
+        print(f"\n  enriching {len(urls_l)} URLs via detail-page fetches "
+              f"(concurrency={enrich_concurrency}) …")
+        rows = asyncio.run(_enrich_urls(urls_l, enrich_concurrency))
+        enriched_csv = work_root / "_enriched.csv"
+        _write_enriched_csv(rows, enriched_csv)
+        if rows:
+            print(f"  → {len(rows)} listings enriched ({enriched_csv})")
+            # Prefer the enriched data — it has prices.
+            import_paths = [enriched_csv]
+        else:
+            print("  → enrichment produced 0 rows; falling back to raw SF CSVs")
+
+    cmd = ["uv", "run", "python", str(IMPORTER), *map(str, import_paths)]
     if allow_unknown_price:
         cmd.append("--allow-unknown-price")
-    print(f"\n  importing {len(csvs)} CSV(s) into docs/porsche.json …")
+    print(f"\n  importing {len(import_paths)} CSV(s) into docs/porsche.json …")
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)
 
 
@@ -304,6 +403,10 @@ def main(argv: list[str] | None = None) -> int:
                    help="Keep listings with no discovered price (e.g. Elferspot)")
     p.add_argument("--keep-output", action="store_true",
                    help="Don't delete the SF temp output folder after import")
+    p.add_argument("--no-enrich", action="store_true",
+                   help="Skip the detail-page enrichment step (faster, fewer prices)")
+    p.add_argument("--enrich-concurrency", type=int, default=8,
+                   help="How many detail pages to fetch in parallel (default 8)")
     args = p.parse_args(argv)
 
     if args.list:
@@ -335,7 +438,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  ⚠ {slug} failed: {exc}")
             continue
 
-    run_import(all_csvs, allow_unknown_price=args.allow_unknown_price)
+    run_import(
+        all_csvs,
+        allow_unknown_price=args.allow_unknown_price,
+        enrich=not args.no_enrich,
+        enrich_concurrency=args.enrich_concurrency,
+        work_root=work_root,
+    )
     if args.push:
         maybe_push()
 
