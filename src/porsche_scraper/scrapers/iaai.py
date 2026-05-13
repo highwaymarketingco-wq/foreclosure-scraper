@@ -1,31 +1,28 @@
 """IAA (iaai.com) — salvage / rebuilt-title Porsches.
 
-IAA's search backend accepts JSON POSTs:
+IAA's old `POST /Search/GetVehicleSearchResults` JSON endpoint was
+retired (returns 404). The current live URL is the SEO-friendly
+`/Vehiclelisting/<Make>` route, which server-renders 100+ vehicle
+cards as `<a href="/VehicleDetail/<stock>~US">` links plus an inline
+`data-vehicleids='[{"Id":"..."}]'` JSON blob on `#searchHistory`.
 
-    POST https://www.iaai.com/Search/GetVehicleSearchResults
-    Body: {"Keyword":"porsche","Year":[2014,2030],
-            "BuyNowPrice":[0,45000],"PageSize":100,"PageNumber":N}
-
-Response: { Vehicles: [...] }. Each entry has Year, Make, Model,
-CurrentBid, BuyNowPrice, Odometer, BranchName, StockNumber,
-VehicleDetailsUrl, LargeImage, LossType, PrimaryDamage, SaleTitleType,
-RunAndDrive ("Yes"/"No"/None).
-
-IAA sits behind Imperva so stealth transport + proxies are recommended.
+curl-cffi `chrome124` impersonation gets through Imperva on this
+route — no challenge, just a plain 200.
 """
 from __future__ import annotations
 
+import json
 import logging
+import re
 
 from selectolax.parser import HTMLParser
 
 from ..base import BaseScraper
-from ..http_client import fetch_json, fetch_rendered
+from ..http_client import fetch_text_stealth
 from ..models import (
     Listing,
     TitleStatus,
     infer_drivable,
-    infer_title_status,
     parse_miles,
     parse_price,
     parse_year,
@@ -34,7 +31,7 @@ from ..models import (
 log = logging.getLogger(__name__)
 
 BASE = "https://www.iaai.com"
-SEARCH_URL = f"{BASE}/Search/GetVehicleSearchResults"
+LISTING_URL = f"{BASE}/Vehiclelisting/Porsche"
 EXCLUDED_MODELS_UPPER = ("PANAMERA", "CAYENNE", "MACAN")
 
 
@@ -64,53 +61,87 @@ def _drivable(v: dict, status: TitleStatus, title: str) -> bool | None:
     return infer_drivable(title, status)
 
 
-def _vehicle_to_listing(v: dict) -> Listing | None:
-    model = (v.get("Model") or "").strip()
-    if model.upper() in EXCLUDED_MODELS_UPPER:
-        return None
-    stock = v.get("StockNumber") or v.get("Stock") or v.get("Id")
-    if not stock:
-        return None
-    detail = v.get("VehicleDetailsUrl") or f"/VehicleDetail/{stock}~US"
-    url = detail if detail.startswith("http") else f"{BASE}{detail}"
-    title = " ".join(filter(None, [str(v.get("Year") or ""), "Porsche", model]))
-    status = _title_status(v.get("SaleTitleType") or v.get("TitleType"))
-    listing = Listing(
-        source="iaai",
-        source_url=url,
-        listing_id=str(stock),
-        vin=v.get("VIN") or v.get("Vin"),
-        title=title,
-        year=int(v["Year"]) if str(v.get("Year") or "").isdigit() else None,
-        model=model or None,
-        price_usd=parse_price(v.get("BuyNowPrice")),
-        current_bid_usd=parse_price(v.get("CurrentBid")),
-        mileage=parse_miles(v.get("Odometer")),
-        location=v.get("BranchName") or v.get("Branch"),
-        photo_url=v.get("LargeImage") or v.get("ThumbnailImage"),
-        title_status=status,
-        seller_type="salvage_auction",
-        raw={"iaai": v},
-    )
-    listing.drivable = _drivable(v, status, title)
-    return listing
+# IAA's listing page server-renders each vehicle as a thumbnail anchor
+# (`<a href="/VehicleDetail/<stock>~US">`) wrapped around a "View All
+# Images" button whose onclick carries the structured vehicle data:
+#
+#   ImageModalClicked(salvageId, stockId, maskedVin, branchId, year,
+#                     make, model, trim, hasFullSet)
+#
+# Price + mileage + title-status are loaded by a separate JS call that
+# fires after page load, so they're NOT in the initial HTML. We harvest
+# what's available (year, model, trim, VIN-prefix) and tag the listing
+# as `salvage_auction` so the dashboard treats it as a salvage signal
+# even when an asking price hasn't been posted yet.
+_IMAGE_MODAL_RE = re.compile(
+    r"ImageModalClicked\("
+    r"'(?P<salvage>\d+)',\s*"
+    r"'(?P<stock>\d+)~[A-Z]+',\s*"
+    r"'(?P<vin>[^']+)',\s*"
+    r"'(?P<branch>\d+)',\s*"
+    r"'(?P<year>\d{4})',\s*"
+    r"'(?P<make>[^']+)',\s*"
+    r"'(?P<model>[^']*)',\s*"
+    r"'(?P<trim>[^']*)'"
+)
 
 
-def parse_search_response(payload: dict) -> list[Listing]:
+def parse_listing_page(html: str) -> list[Listing]:
+    """Parse the server-rendered /Vehiclelisting/Porsche page.
+
+    Anchors on the `ImageModalClicked(...)` call attached to each card's
+    "View All Images" button — that's where the structured vehicle data
+    lives. The page only renders 100 cards per request (no traditional
+    pagination); for deeper coverage we'd need to hit a backend AJAX
+    endpoint, which is currently undocumented.
+    """
     out: list[Listing] = []
     seen: set[str] = set()
-    for v in (payload or {}).get("Vehicles") or []:
-        listing = _vehicle_to_listing(v)
-        if listing and listing.listing_id not in seen:
-            seen.add(listing.listing_id)
-            out.append(listing)
+    for m in _IMAGE_MODAL_RE.finditer(html):
+        stock = m.group("stock")
+        if stock in seen:
+            continue
+        seen.add(stock)
+        model = (m.group("model") or "").strip().title()
+        trim = (m.group("trim") or "").strip().title()
+        # Substring-match — IAA uses "Cayenne Coupe", "Cayenne Hybrid"
+        # variants that would slip past an exact-equals check.
+        if any(em in model.upper() for em in EXCLUDED_MODELS_UPPER):
+            continue
+        try:
+            year = int(m.group("year"))
+        except (TypeError, ValueError):
+            continue
+        title_parts = [str(year), "Porsche", model]
+        if trim and trim.lower() not in ("none", "", " "):
+            title_parts.append(trim)
+        title = " ".join(p for p in title_parts if p)
+        url = f"{BASE}/VehicleDetail/{stock}~US"
+        listing = Listing(
+            source="iaai",
+            source_url=url,
+            listing_id=stock,
+            vin=m.group("vin") if "*" not in m.group("vin") else None,
+            title=title,
+            year=year,
+            model=model or None,
+            trim=trim or None,
+            # IAA is a salvage auction — default tier is SALVAGE. Detail
+            # pages confirm clean/rebuilt/parts-only on a per-lot basis;
+            # we don't have that here, but defaulting to SALVAGE keeps
+            # the project-tier dashboard accurate.
+            title_status=TitleStatus.SALVAGE,
+            seller_type="salvage_auction",
+        )
+        listing.drivable = infer_drivable(title, listing.title_status)
+        out.append(listing)
     return out
 
 
 class IaaiScraper(BaseScraper):
     slug = "iaai"
     name = "IAA (salvage)"
-    timeout_s = 180.0
+    timeout_s = 120.0
 
     def __init__(self, *, year_min: int = 2014, year_max: int = 2030, max_pages: int = 5):
         self.year_min = year_min
@@ -118,73 +149,12 @@ class IaaiScraper(BaseScraper):
         self.max_pages = max_pages
 
     async def fetch(self) -> list[Listing]:
-        """Try JSON endpoint first; fall back to rendered HTML."""
-        out = await self._fetch_json()
-        if out:
-            return out
-        return await self._fetch_html()
-
-    async def _fetch_json(self) -> list[Listing]:
-        out: list[Listing] = []
-        for page in range(1, self.max_pages + 1):
-            body = {"Keyword": "porsche", "Year": [self.year_min, self.year_max],
-                    "PageSize": 100, "PageNumber": page,
-                    "SortColumn": "AuctionDate", "SortDirection": "Asc"}
-            try:
-                payload = await fetch_json(
-                    SEARCH_URL, method="POST", json_body=body, timeout=45,
-                    headers={"Accept": "application/json", "Content-Type": "application/json",
-                             "Origin": BASE, "Referer": f"{BASE}/Search?Keyword=porsche"},
-                )
-            except Exception as exc:  # noqa: BLE001
-                log.info("iaai json page %d: %s", page, exc)
-                return out
-            listings = parse_search_response(payload)
-            if not listings:
-                break
-            out.extend(listings)
-        return out
-
-    async def _fetch_html(self) -> list[Listing]:
-        out: list[Listing] = []
-        seen: set[str] = set()
-        for page in range(1, self.max_pages + 1):
-            url = (f"{BASE}/Search?Keyword=porsche"
-                   f"&Year={self.year_min}-{self.year_max}&page={page}")
-            try:
-                html = await fetch_rendered(
-                    url, timeout=90,
-                    wait_for_selector="a[href*='/VehicleDetail/']",
-                )
-            except Exception as exc:  # noqa: BLE001
-                log.warning("iaai html page %d: %s", page, exc)
-                break
-            tree = HTMLParser(html)
-            anchors = tree.css("a[href*='/VehicleDetail/']")
-            if not anchors:
-                break
-            for a in anchors:
-                href = a.attributes.get("href") or ""
-                full = href if href.startswith("http") else f"{BASE}{href}"
-                if full in seen:
-                    continue
-                seen.add(full)
-                title = a.text(strip=True)
-                if not title or "porsche" not in title.lower():
-                    continue
-                if any(em in title.upper() for em in EXCLUDED_MODELS_UPPER):
-                    continue
-                listing = Listing(
-                    source="iaai",
-                    source_url=full,
-                    listing_id=full.rstrip("/").rsplit("/", 1)[-1].split("~")[0],
-                    title=title,
-                    year=parse_year(title),
-                    title_status=_title_status(title) or TitleStatus.SALVAGE,
-                    seller_type="salvage_auction",
-                )
-                if listing.title_status == TitleStatus.UNKNOWN:
-                    listing.title_status = TitleStatus.SALVAGE
-                listing.drivable = infer_drivable(title, listing.title_status)
-                out.append(listing)
-        return out
+        try:
+            html = await fetch_text_stealth(
+                LISTING_URL, timeout=45, impersonate="chrome124"
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning("iaai fetch failed: %s", exc)
+            return []
+        listings = parse_listing_page(html)
+        return [l for l in listings if l.year is None or l.year >= self.year_min]

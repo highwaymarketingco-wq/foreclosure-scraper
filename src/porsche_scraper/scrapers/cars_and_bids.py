@@ -1,29 +1,28 @@
 """Cars & Bids — Porsche auctions.
 
-C&B is a SPA. We use two paths:
+C&B's old public JSON endpoint (`/auctions/api/auctions`) silently
+returns the SPA shell now; the real `/api/auctions` requires auth.
+The rendered search page is the reliable path.
 
-1. Their public JSON endpoint (no auth needed):
-       https://carsandbids.com/auctions/api/auctions?search=porsche&minYear=2014&maxBid=45000
-   Returns `{ auctions: [...] }`. Each auction has title, year, make,
-   model, currentBid/buyNowPrice, mileage, location, slug, images,
-   titleStatus.
+Each card is `<li class="auction-item">` with:
+- `a.hero[title][href]`           — listing slug + clean title
+- `.bid-value`                    — current bid ("$31,700")
+- `.auction-subtitle`             — "~20,200 Miles, Twin-Turbo V6, ..."
+- `.auction-loc`                  — seller city/state
 
-2. Fallback: server-rendered shell page with `<script id="__NEXT_DATA__">`
-   carrying the same data tree at `props.pageProps.auctions`.
-
-C&B sits behind DataDome so we use the stealth transport.
+We render `/search/porsche` once (60 cards) and also `/past-auctions/`
+for recently-sold context. C&B sits behind DataDome, so Patchright
+stealth via `fetch_rendered` is mandatory.
 """
 from __future__ import annotations
 
-import json
 import logging
-from typing import Iterable
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urljoin, urlparse
 
 from selectolax.parser import HTMLParser
 
 from ..base import BaseScraper
-from ..http_client import fetch_text_stealth
+from ..http_client import fetch_rendered
 from ..models import (
     Listing,
     TitleStatus,
@@ -31,139 +30,104 @@ from ..models import (
     infer_title_status,
     parse_miles,
     parse_price,
+    parse_year,
 )
 
 log = logging.getLogger(__name__)
 
 BASE = "https://carsandbids.com"
+SEARCH_URL = f"{BASE}/search/porsche"
+EXCLUDED_MODELS_LOWER = ("panamera", "cayenne", "macan")
 
 
-def _title_status(raw: str | None) -> TitleStatus:
-    if not raw:
-        return TitleStatus.UNKNOWN
-    s = raw.lower()
-    if "rebuilt" in s or "reconstructed" in s:
-        return TitleStatus.REBUILT
-    if "salvage" in s:
-        return TitleStatus.SALVAGE
-    if "clean" in s or "clear" in s:
-        return TitleStatus.CLEAN
-    return infer_title_status(raw)
-
-
-def _listing_from_api(d: dict) -> Listing | None:
-    slug = d.get("slug") or d.get("url")
-    if not slug:
-        return None
-    url = slug if slug.startswith("http") else urljoin(BASE, f"/auctions/{slug}")
-    title = d.get("title") or " ".join(
-        filter(None, [str(d.get("year") or ""), d.get("make") or "", d.get("model") or ""])
-    )
-    images = d.get("images") or []
-    first_img = None
-    if images:
-        first = images[0]
-        first_img = first.get("url") if isinstance(first, dict) else first
-    listing = Listing(
-        source="cars_and_bids",
-        source_url=url,
-        listing_id=str(d.get("id") or slug),
-        title=title,
-        year=d.get("year") or None,
-        model=d.get("model"),
-        current_bid_usd=parse_price(d.get("currentBid") or d.get("highBid")),
-        price_usd=parse_price(d.get("buyNowPrice")),
-        mileage=parse_miles(d.get("mileage") or d.get("odometer")),
-        location=d.get("sellerLocation") or d.get("location"),
-        photo_url=first_img,
-        title_status=_title_status(d.get("titleStatus") or title),
-        seller_type="auction",
-        raw={"cb": d},
-    )
-    listing.drivable = infer_drivable(listing.title, listing.title_status)
-    return listing
-
-
-def _extract_next_data(html: str) -> list[dict]:
+def parse_search_html(html: str) -> list[Listing]:
     tree = HTMLParser(html)
-    node = tree.css_first('script#__NEXT_DATA__')
-    if not node:
-        return []
-    try:
-        blob = json.loads(node.text() or "{}")
-    except json.JSONDecodeError:
-        return []
-    pp = ((blob.get("props") or {}).get("pageProps") or {})
-    cand = pp.get("auctions") or pp.get("listings") or []
-    if isinstance(cand, list):
-        return [d for d in cand if isinstance(d, dict)]
-    return []
-
-
-def parse_results(payload: dict | str) -> list[Listing]:
-    """Parse a C&B JSON response or HTML page into Listings."""
-    items: Iterable[dict]
-    if isinstance(payload, dict):
-        items = payload.get("auctions") or payload.get("results") or payload.get("data") or []
-    else:
-        items = _extract_next_data(payload)
     out: list[Listing] = []
     seen: set[str] = set()
-    for d in items:
-        listing = _listing_from_api(d)
-        if listing and listing.source_url not in seen:
-            seen.add(listing.source_url)
-            out.append(listing)
+    for li in tree.css("li.auction-item"):
+        hero = li.css_first("a.hero")
+        if not hero:
+            continue
+        href = hero.attributes.get("href") or ""
+        if not href:
+            continue
+        url = href if href.startswith("http") else urljoin(BASE, href)
+        url = url.split("?")[0]  # strip the ss_id tracking param
+        if url in seen:
+            continue
+        seen.add(url)
+        title = hero.attributes.get("title") or ""
+        if not title:
+            title_node = li.css_first(".auction-title a")
+            if title_node:
+                title = title_node.text(strip=True)
+        if not title or "porsche" not in title.lower():
+            continue
+        title_l = title.lower()
+        if any(em in title_l for em in EXCLUDED_MODELS_LOWER):
+            continue
+        bid_node = li.css_first(".bid-value")
+        bid_text = bid_node.text(strip=True) if bid_node else None
+        subtitle_node = li.css_first(".auction-subtitle")
+        subtitle = subtitle_node.text(strip=True) if subtitle_node else ""
+        loc_node = li.css_first(".auction-loc")
+        location = loc_node.text(strip=True) if loc_node else None
+        img_node = li.css_first("img")
+        photo = img_node.attributes.get("src") if img_node else None
+        slug = urlparse(url).path.rstrip("/").rsplit("/", 1)[-1]
+        listing = Listing(
+            source="cars_and_bids",
+            source_url=url,
+            listing_id=slug or url,
+            title=title,
+            year=parse_year(title),
+            current_bid_usd=parse_price(bid_text),
+            mileage=parse_miles(subtitle),
+            location=location,
+            photo_url=photo,
+            title_status=infer_title_status(title + " " + subtitle),
+            seller_type="auction",
+        )
+        listing.drivable = infer_drivable(title, listing.title_status)
+        out.append(listing)
     return out
 
 
 class CarsAndBidsScraper(BaseScraper):
     slug = "cars_and_bids"
     name = "Cars & Bids"
-    timeout_s = 180.0
+    timeout_s = 240.0
 
-    def __init__(self, *, year_min: int = 2014, max_bid: int = 45000, max_pages: int = 10):
+    def __init__(self, *, year_min: int = 2014, max_bid: int = 45000, max_pages: int = 1):
+        # max_pages kept for signature compatibility; C&B's search page
+        # is a single virtualised list, no pagination needed.
         self.year_min = year_min
         self.max_bid = max_bid
-        self.max_pages = max_pages
 
     async def fetch(self) -> list[Listing]:
+        try:
+            html = await fetch_rendered(
+                SEARCH_URL, timeout=60,
+                wait_for_selector="li.auction-item, a.hero",
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.warning("cars_and_bids fetch failed: %s", exc)
+            return []
         out: list[Listing] = []
-        for page in range(1, self.max_pages + 1):
-            params = {
-                "search": "porsche",
-                "minYear": self.year_min,
-                "maxBid": self.max_bid,
-                "page": page,
-                "sort": "endingSoonest",
-            }
-            url = f"{BASE}/auctions/api/auctions?{urlencode(params)}"
-            try:
-                raw = await fetch_text_stealth(url, timeout=45, headers={"Accept": "application/json"})
-            except Exception as exc:  # noqa: BLE001
-                log.warning("cars_and_bids page %d failed: %s", page, exc)
-                break
-            try:
-                data = json.loads(raw)
-            except json.JSONDecodeError:
-                # Probably got an HTML challenge page; try the SPA shell instead.
-                shell = await fetch_text_stealth(
-                    f"{BASE}/search/porsche?page={page}", timeout=45
-                )
-                listings = parse_results(shell)
-            else:
-                listings = parse_results(data)
-            if not listings:
-                break
-            out.extend(listings)
-        # Also pull rebuilt/salvage results regardless of price.
-        for page in range(1, 3):
-            url = f"{BASE}/auctions/api/auctions?{urlencode({'search': 'porsche', 'titleStatus': 'salvage', 'page': page})}"
-            try:
-                raw = await fetch_text_stealth(url, timeout=45, headers={"Accept": "application/json"})
-                data = json.loads(raw)
-            except Exception as exc:  # noqa: BLE001
-                log.info("cars_and_bids salvage pass skipped: %s", exc)
-                break
-            out.extend(parse_results(data))
+        seen: set[str] = set()
+        for listing in parse_search_html(html):
+            if listing.source_url in seen:
+                continue
+            seen.add(listing.source_url)
+            if listing.year is not None and listing.year < self.year_min:
+                continue
+            out.append(listing)
         return out
+
+
+# Back-compat shims for any external test that still imported the
+# old helpers. Both delegate to the rendered-HTML path now.
+def parse_results(payload):  # noqa: D401
+    if isinstance(payload, str):
+        return parse_search_html(payload)
+    return []
