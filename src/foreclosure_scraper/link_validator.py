@@ -60,6 +60,12 @@ async def _check_one(c: httpx.AsyncClient, url: str) -> tuple[str, int | None]:
     """
     if any(h in url for h in KNOWN_ANTI_BOT_HOSTS):
         return "skipped", None
+    # Relative URLs (e.g. CourtListener "/docket/.../") have no scheme.
+    # httpx + httpcore raise plain ValueError on these, which bubbles up
+    # through asyncio.gather and brings down the entire weekly orchestrator
+    # before vision/Tyler/email run. Treat schemeless URLs as unreachable.
+    if not (url.startswith("http://") or url.startswith("https://")):
+        return "unreachable", None
     try:
         r = await c.head(url, follow_redirects=True, timeout=15.0)
         if r.status_code == 405:
@@ -76,7 +82,7 @@ async def _check_one(c: httpx.AsyncClient, url: str) -> tuple[str, int | None]:
         if 500 <= status < 600:
             return "server", status
         return "other", status
-    except (httpx.HTTPError, httpx.InvalidURL):
+    except (httpx.HTTPError, httpx.InvalidURL, ValueError):
         return "unreachable", None
 
 
