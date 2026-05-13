@@ -82,6 +82,18 @@ from .scrapers.general_classifieds import (
 from .scrapers.classiccars_sitemap import ClassicCarsSitemapScraper
 from .scrapers.elferspot_sitemap import ElferspotSitemapScraper
 
+# Porsche Approved CPO (official Porsche dealer inventory)
+from .scrapers.porsche_cpo import PorscheCPOScraper
+
+# Salvage aggregators — Copart/IAA mirrors + dealer salvage filters
+from .scrapers.salvage_aggregators import (
+    make_autoauctionspy,
+    make_bid_cars,
+    make_cargurus_salvage,
+    make_carfast,
+    make_ebay_salvage,
+)
+
 # Peer-to-peer (off by default)
 from .scrapers.peer_to_peer import CraigslistScraper, FacebookMarketplaceScraper
 
@@ -141,6 +153,14 @@ ALL_SCRAPERS: list[tuple[str, Callable[[int, int | None], BaseScraper]]] = [
     # Sitemap-driven (high-volume URL discovery)
     ("elferspot_sitemap", lambda y, p: ElferspotSitemapScraper(year_min=y)),
     ("classiccars_sitemap", lambda y, p: ClassicCarsSitemapScraper(year_min=y)),
+    # Porsche Approved CPO (official Porsche-dealer inventory)
+    ("porsche_cpo", lambda y, p: PorscheCPOScraper()),
+    # Salvage aggregators — Copart/IAA mirrors + dealer salvage-title filters
+    ("bid_cars",         lambda y, p: make_bid_cars()),
+    ("carfast",          lambda y, p: make_carfast()),
+    ("autoauctionspy",   lambda y, p: make_autoauctionspy()),
+    ("cargurus_salvage", lambda y, p: make_cargurus_salvage()),
+    ("ebay_salvage",     lambda y, p: make_ebay_salvage()),
 ]
 
 
