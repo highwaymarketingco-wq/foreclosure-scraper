@@ -222,14 +222,11 @@ def _build_sf_command(
     binary: str, preset: SitePreset, out_dir: Path, config: Path | None
 ) -> list[str]:
     # SF 23.3's CLI is intentionally minimal: --max-urls and --include
-    # are *.seospiderconfig* settings, NOT CLI flags. Passing them on the
-    # command line returns `FATAL - Unrecognized option`. We apply both
-    # filters in Python (_extract_urls_from_sf_csv) after SF dumps its CSV.
-    #
-    # `--accept-license` (US spelling — SF uses it on the CLI despite the
-    # UK "licence" elsewhere) opts into the EULA without the GUI prompt.
-    # Required for first-run headless on a fresh machine.
-    cmd = [binary, "--headless", "--accept-license",
+    # and --accept-license are NOT real CLI flags despite my prior
+    # guesses. Each guess produces `FATAL - Unrecognized option`. EULA
+    # acceptance lives in the spider.config that the workflow pre-writes;
+    # max-urls / include are applied Python-side post-export.
+    cmd = [binary, "--headless",
            "--save-crawl", "--output-folder", str(out_dir)]
     if config and config.exists():
         cmd += ["--config", str(config)]
