@@ -26,7 +26,7 @@ from urllib.parse import urljoin
 from selectolax.parser import HTMLParser
 
 from ..base import BaseScraper
-from ..http_client import fetch_text
+from ..http_client import fetch_text, fetch_text_stealth
 from ..models import (
     Listing,
     infer_drivable,
@@ -40,13 +40,27 @@ log = logging.getLogger(__name__)
 
 BASE = "https://www.cars.com"
 
+# Target only the wanted models. Cars.com's `models[]=` is an inclusive
+# whitelist — using it naturally drops Cayenne/Panamera/Macan that
+# otherwise dominate "Porsche" search hits in the budget range.
+WANTED_MODEL_SLUGS = (
+    "porsche-911",
+    "porsche-718_cayman",
+    "porsche-cayman",
+    "porsche-718_boxster",
+    "porsche-boxster",
+    "porsche-918_spyder",
+)
+
 
 def _build_url(
-    *, year_min: int, price_max: int | None, page: int, page_size: int = 100
+    *, year_min: int, price_max: int | None, page: int, page_size: int = 100,
+    models: tuple[str, ...] = WANTED_MODEL_SLUGS,
 ) -> str:
     parts = [
         "stock_type=used",
         "makes[]=porsche",
+        *[f"models[]={m}" for m in models],
         f"year_min={year_min}",
         f"page_size={page_size}",
         f"page={page}",
@@ -131,6 +145,54 @@ def _listing_from_jsonld(v: dict) -> Listing | None:
 _CARD_SELECTOR = ".vehicle-card"
 
 
+def _listing_from_fuse_card(card) -> Listing | None:
+    """Parse a `<fuse-card data-vehicle-details='{...}'>` element.
+
+    Cars.com (as of 2026-05) renders each result as a fuse-card web
+    component with the full listing record JSON-encoded in this attribute.
+    """
+    details_raw = card.attributes.get("data-vehicle-details")
+    if not details_raw:
+        return None
+    try:
+        d = json.loads(details_raw)
+    except json.JSONDecodeError:
+        return None
+    listing_id = d.get("listingId") or card.attributes.get("data-listing-id")
+    if not listing_id:
+        return None
+    url = urljoin(BASE, f"/vehicledetail/{listing_id}/")
+    year = d.get("year")
+    try:
+        year = int(year) if year else None
+    except (TypeError, ValueError):
+        year = None
+    model = d.get("model") or ""
+    trim = d.get("trim") or ""
+    make = d.get("make") or "Porsche"
+    title = " ".join(filter(None, [str(year or ""), make, model, trim])).strip()
+    seller = d.get("seller") or {}
+    listing = Listing(
+        source="cars_com",
+        source_url=url,
+        listing_id=str(listing_id),
+        vin=d.get("vin"),
+        title=title,
+        year=year,
+        model=model or None,
+        trim=trim or None,
+        price_usd=parse_price(d.get("price")),
+        mileage=parse_miles(d.get("mileage")),
+        location=seller.get("zip"),
+        photo_url=d.get("primaryThumbnail"),
+        title_status=infer_title_status(title),
+        seller_type="dealer",
+        raw={"cars_com": d},
+    )
+    listing.drivable = infer_drivable(listing.title, listing.title_status)
+    return listing
+
+
 def _listing_from_card(card) -> Listing | None:
     a = card.css_first("a.vehicle-card-link") or card.css_first("a[href*='/vehicledetail/']")
     if not a:
@@ -174,11 +236,21 @@ def _listing_from_card(card) -> Listing | None:
 def parse_results_html(html: str) -> list[Listing]:
     """Parse one cars.com search-results page into Listings.
 
-    Tries JSON-LD first, then falls back to HTML selectors. The HTML
-    fallback is important when cars.com A/B tests new templates.
+    Order of fallbacks:
+      1. <fuse-card data-vehicle-details='{...}'>  (current 2026-05 markup)
+      2. JSON-LD ItemList of Vehicle objects (older template)
+      3. .vehicle-card HTML selectors (oldest template)
     """
+    tree = HTMLParser(html)
     seen_urls: set[str] = set()
     out: list[Listing] = []
+    for card in tree.css("fuse-card[data-vehicle-details]"):
+        listing = _listing_from_fuse_card(card)
+        if listing and listing.source_url not in seen_urls:
+            seen_urls.add(listing.source_url)
+            out.append(listing)
+    if out:
+        return out
     for v in _extract_jsonld(html):
         listing = _listing_from_jsonld(v)
         if listing and listing.source_url not in seen_urls:
@@ -186,7 +258,6 @@ def parse_results_html(html: str) -> list[Listing]:
             out.append(listing)
     if out:
         return out
-    tree = HTMLParser(html)
     for card in tree.css(_CARD_SELECTOR):
         listing = _listing_from_card(card)
         if listing and listing.source_url not in seen_urls:
@@ -206,6 +277,7 @@ def _total_pages(html: str) -> int:
 class CarsComScraper(BaseScraper):
     slug = "cars_com"
     name = "Cars.com"
+    timeout_s = 480.0  # Up from 120s — Scrapling fallback can take 30s/page.
 
     def __init__(self, *, year_min: int = 2014, price_max: int | None = 45000, max_pages: int = 20):
         self.year_min = year_min
@@ -228,9 +300,14 @@ class CarsComScraper(BaseScraper):
             url = _build_url(year_min=self.year_min, price_max=price_max, page=page) + extra
             try:
                 html = await fetch_text(url, timeout=45)
-            except Exception as exc:  # noqa: BLE001
-                log.warning("cars_com page %d failed: %s", page, exc)
-                break
+            except Exception as exc_plain:  # noqa: BLE001
+                # Cars.com rate-limits with 503; retry through curl-cffi + Scrapling.
+                log.info("cars_com page %d plain fetch failed (%s) — trying stealth", page, exc_plain)
+                try:
+                    html = await fetch_text_stealth(url, timeout=45, fallback_to_render=True)
+                except Exception as exc_stealth:  # noqa: BLE001
+                    log.warning("cars_com page %d both fetchers failed: %s", page, exc_stealth)
+                    break
             if page == 1:
                 total = _total_pages(html)
             page_listings = parse_results_html(html)
