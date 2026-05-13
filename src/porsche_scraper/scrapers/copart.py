@@ -17,14 +17,18 @@ from __future__ import annotations
 
 import logging
 
+from selectolax.parser import HTMLParser
+
 from ..base import BaseScraper
-from ..http_client import fetch_json
+from ..http_client import fetch_json, fetch_rendered
 from ..models import (
     Listing,
     TitleStatus,
     infer_drivable,
+    infer_title_status,
     parse_miles,
     parse_price,
+    parse_year,
 )
 
 log = logging.getLogger(__name__)
@@ -122,6 +126,15 @@ class CopartScraper(BaseScraper):
         self.max_pages = max_pages
 
     async def fetch(self) -> list[Listing]:
+        """Try Solr JSON first; fall back to Scrapling-rendered HTML when
+        the Solr endpoint rejects us (it does as of 2026-05).
+        """
+        out = await self._fetch_solr()
+        if out:
+            return out
+        return await self._fetch_html()
+
+    async def _fetch_solr(self) -> list[Listing]:
         out: list[Listing] = []
         for page in range(self.max_pages):
             body = {
@@ -131,29 +144,74 @@ class CopartScraper(BaseScraper):
                     "LCY": [f"{self.year_min}..{self.year_max}"],
                 },
                 "sort": ["auction_date_utc asc"],
-                "page": page,
-                "size": 100,
-                "watchListOnly": False,
-                "freeFormSearch": False,
+                "page": page, "size": 100,
+                "watchListOnly": False, "freeFormSearch": False,
             }
             try:
                 payload = await fetch_json(
-                    SEARCH_URL,
-                    method="POST",
-                    json_body=body,
-                    timeout=45,
-                    headers={
-                        "Accept": "application/json",
-                        "Content-Type": "application/json",
-                        "Origin": BASE,
-                        "Referer": f"{BASE}/lotSearchResults?free=true&query=porsche",
-                    },
+                    SEARCH_URL, method="POST", json_body=body, timeout=45,
+                    headers={"Accept": "application/json", "Content-Type": "application/json",
+                             "Origin": BASE,
+                             "Referer": f"{BASE}/lotSearchResults?free=true&query=porsche"},
                 )
             except Exception as exc:  # noqa: BLE001
-                log.warning("copart page %d failed: %s", page, exc)
-                break
+                log.info("copart solr page %d: %s", page, exc)
+                return out
+            if payload.get("returnCode") not in (0, None):
+                log.info("copart solr blocked: %s", payload.get("returnCodeDesc"))
+                return out
             listings = parse_solr_response(payload)
             if not listings:
                 break
             out.extend(listings)
+        return out
+
+    async def _fetch_html(self) -> list[Listing]:
+        out: list[Listing] = []
+        seen: set[str] = set()
+        for page in range(self.max_pages):
+            url = (f"{BASE}/lotSearchResults/?free=true&query=porsche"
+                   f"&from={self.year_min}&to={self.year_max}&page={page}")
+            try:
+                html = await fetch_rendered(
+                    url, timeout=90,
+                    wait_for_selector="a[href*='/lot/']",
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning("copart html page %d: %s", page, exc)
+                break
+            tree = HTMLParser(html)
+            anchors = tree.css("a[href*='/lot/']")
+            if not anchors:
+                break
+            for a in anchors:
+                href = a.attributes.get("href") or ""
+                if "/lot/" not in href:
+                    continue
+                full = href if href.startswith("http") else f"{BASE}{href}"
+                if full in seen:
+                    continue
+                seen.add(full)
+                # The slug carries year+model: /lot/12345678/salvage-2015-porsche-911-...
+                slug = href.rstrip("/").rsplit("/", 1)[-1].lower()
+                if any(em in slug for em in ("panamera", "cayenne", "macan")):
+                    continue
+                title = a.text(strip=True)
+                if not title or "porsche" not in title.lower():
+                    # The label might be empty (icon-only anchor); use slug.
+                    if "porsche" not in slug:
+                        continue
+                    title = slug.replace("-", " ").replace("salvage ", "").title()
+                listing = Listing(
+                    source="copart",
+                    source_url=full,
+                    listing_id=href.rstrip("/").rsplit("/")[-2],
+                    title=title,
+                    year=parse_year(title) or parse_year(slug),
+                    title_status=(infer_title_status(slug) if "salvage" in slug or "rebuilt" in slug
+                                  else TitleStatus.SALVAGE),
+                    seller_type="salvage_auction",
+                )
+                listing.drivable = infer_drivable(title, listing.title_status)
+                out.append(listing)
         return out

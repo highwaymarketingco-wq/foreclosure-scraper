@@ -20,7 +20,7 @@ from urllib.parse import urlencode
 from selectolax.parser import HTMLParser
 
 from ..base import BaseScraper
-from ..http_client import fetch_text
+from ..http_client import fetch_rendered, fetch_text
 from ..models import (
     Listing,
     infer_drivable,
@@ -94,6 +94,8 @@ class AutoTempestScraper(BaseScraper):
         self.radius = radius
 
     async def fetch(self) -> list[Listing]:
+        # AutoTempest streams results in via XHR after page load — the bare
+        # HTML response is just a shell. Use Scrapling to get the rendered DOM.
         params = {
             "make": "porsche",
             "minyear": self.year_min,
@@ -104,7 +106,10 @@ class AutoTempestScraper(BaseScraper):
             params["maxprice"] = self.price_max
         url = f"{BASE}/results?{urlencode(params)}"
         try:
-            html = await fetch_text(url, timeout=45)
+            html = await fetch_rendered(
+                url, timeout=90,
+                wait_for_selector=".result-item, .listing-card, [class*='result']",
+            )
         except Exception as exc:  # noqa: BLE001
             log.warning("autotempest failed: %s", exc)
             return []

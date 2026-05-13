@@ -1,5 +1,747 @@
 [
   {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/774cd522-5d4c-46fc-b303-483ba3c10c49/",
+    "listing_id": "774cd522-5d4c-46fc-b303-483ba3c10c49",
+    "title": "2019 Porsche 718 Boxster Roadster 2D",
+    "year": 2019,
+    "make": "Porsche",
+    "model": "718 Boxster",
+    "trim": "Roadster 2D",
+    "price_usd": 38900.0,
+    "current_bid_usd": null,
+    "mileage": 93659,
+    "location": "68066",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/eb18a1af-d1f7-5e9f-919a-b28476fb03c3/e31d6f13-fc6b-4e86-ab57-8f9dbfb28a5a/QzYt31Y6DZZv2Fj3kQOLgS5Ldjs.jpg",
+    "vin": "WP0CA2A88KS210072",
+    "first_seen": "2026-05-13T03:41:27.070880Z",
+    "raw": {
+      "cars_com": {
+        "trim": "Roadster 2D",
+        "make": "Porsche",
+        "metadata": {
+          "page_number": 1,
+          "position_on_page": 1
+        },
+        "year": "2019",
+        "model": "718 Boxster",
+        "vin": "WP0CA2A88KS210072",
+        "mileage": "93659",
+        "msrp": "0",
+        "price": "38900",
+        "bodyStyle": "Convertible",
+        "fuelType": "Gasoline",
+        "stockType": "Used",
+        "seller": {
+          "zip": "68066",
+          "customerId": "eb18a1af-d1f7-5e9f-919a-b28476fb03c3"
+        },
+        "trid": "meyosr9q7Ftmow7PwUAa8q",
+        "listingId": "774cd522-5d4c-46fc-b303-483ba3c10c49",
+        "cpoIndicator": false,
+        "deliveryType": "shippable",
+        "financingType": "pre-qual",
+        "initialCohort": null,
+        "isaContext": "STANDARD_SHIPPABLE",
+        "primaryThumbnail": "https://platform.cstatic-images.com/in/v2/eb18a1af-d1f7-5e9f-919a-b28476fb03c3/e31d6f13-fc6b-4e86-ab57-8f9dbfb28a5a/QzYt31Y6DZZv2Fj3kQOLgS5Ldjs.jpg",
+        "searchScore": 0.4754753,
+        "shipPrice": 399
+      }
+    }
+  },
+  {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/3dcc2e7e-7ca0-4011-bded-2c92fc67b41a/",
+    "listing_id": "3dcc2e7e-7ca0-4011-bded-2c92fc67b41a",
+    "title": "2016 Porsche Boxster",
+    "year": 2016,
+    "make": "Porsche",
+    "model": "Boxster",
+    "trim": null,
+    "price_usd": 39750.0,
+    "current_bid_usd": null,
+    "mileage": 51617,
+    "location": "46036",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/a84a6aa5-510d-5a7e-a296-342e9aa21d89/918ecf37-d7f3-490b-a148-10bc0c49312a/RK4ktPiS_ayGl66iucfMI0iV2wg.jpg",
+    "vin": "WP0CA2A85GS120692",
+    "first_seen": "2026-05-13T03:41:27.070970Z",
+    "raw": {
+      "cars_com": {
+        "trim": null,
+        "make": "Porsche",
+        "metadata": {
+          "page_number": 1,
+          "position_on_page": 2
+        },
+        "year": "2016",
+        "model": "Boxster",
+        "vin": "WP0CA2A85GS120692",
+        "mileage": "51617",
+        "msrp": "0",
+        "price": "39750",
+        "bodyStyle": "Convertible",
+        "fuelType": "Gasoline",
+        "stockType": "Used",
+        "seller": {
+          "zip": "46036",
+          "customerId": "a84a6aa5-510d-5a7e-a296-342e9aa21d89"
+        },
+        "trid": "meyosr9q7Ftmow7PwUAa8q",
+        "listingId": "3dcc2e7e-7ca0-4011-bded-2c92fc67b41a",
+        "cpoIndicator": false,
+        "deliveryType": "shippable",
+        "financingType": "pre-qual",
+        "initialCohort": null,
+        "isaContext": "STANDARD_SHIPPABLE",
+        "primaryThumbnail": "https://platform.cstatic-images.com/in/v2/a84a6aa5-510d-5a7e-a296-342e9aa21d89/918ecf37-d7f3-490b-a148-10bc0c49312a/RK4ktPiS_ayGl66iucfMI0iV2wg.jpg",
+        "searchScore": 0.21131684,
+        "shipPrice": 792
+      }
+    }
+  },
+  {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/2c3788d6-8238-433f-9ec1-adffa575d9de/",
+    "listing_id": "2c3788d6-8238-433f-9ec1-adffa575d9de",
+    "title": "2014 Porsche Cayman",
+    "year": 2014,
+    "make": "Porsche",
+    "model": "Cayman",
+    "trim": null,
+    "price_usd": 43995.0,
+    "current_bid_usd": null,
+    "mileage": 68389,
+    "location": "75067",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/43127910-c97c-4fff-90e6-f3fdb6130dc9/0H1koswL5eEOrnB3ic8CBU3weV4.jpg",
+    "vin": "WP0AA2A8XEK173361",
+    "first_seen": "2026-05-13T03:41:27.071024Z",
+    "raw": {
+      "cars_com": {
+        "trim": null,
+        "make": "Porsche",
+        "metadata": {
+          "page_number": 1,
+          "position_on_page": 3
+        },
+        "year": "2014",
+        "model": "Cayman",
+        "vin": "WP0AA2A8XEK173361",
+        "mileage": "68389",
+        "msrp": "0",
+        "price": "43995",
+        "bodyStyle": "Coupe",
+        "fuelType": "Gasoline",
+        "stockType": "Used",
+        "seller": {
+          "zip": "75067",
+          "customerId": "3334d918-7d74-555d-9e4f-5f9e6c9f008a"
+        },
+        "trid": "meyosr9q7Ftmow7PwUAa8q",
+        "listingId": "2c3788d6-8238-433f-9ec1-adffa575d9de",
+        "cpoIndicator": false,
+        "deliveryType": null,
+        "financingType": "pre-qual",
+        "initialCohort": null,
+        "isaContext": "STANDARD",
+        "primaryThumbnail": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/43127910-c97c-4fff-90e6-f3fdb6130dc9/0H1koswL5eEOrnB3ic8CBU3weV4.jpg",
+        "searchScore": null,
+        "shipPrice": null
+      }
+    }
+  },
+  {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/2a96e73d-f8d8-4e83-93f9-9fd0801584e4/",
+    "listing_id": "2a96e73d-f8d8-4e83-93f9-9fd0801584e4",
+    "title": "2016 Porsche Boxster Black Edition",
+    "year": 2016,
+    "make": "Porsche",
+    "model": "Boxster",
+    "trim": "Black Edition",
+    "price_usd": 42101.0,
+    "current_bid_usd": null,
+    "mileage": 22291,
+    "location": "75078",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/755797b5-18d6-5d96-b5e2-28ee6fa65909/b69a6f4b-fb6d-4d86-ab81-f2981c55fac4/Kt2pn3VmHNOBNmR_t-gtE1YZkIU.jpg",
+    "vin": "WP0CA2A81GS120155",
+    "first_seen": "2026-05-13T03:41:27.071071Z",
+    "raw": {
+      "cars_com": {
+        "trim": "Black Edition",
+        "make": "Porsche",
+        "metadata": {
+          "page_number": 1,
+          "position_on_page": 4
+        },
+        "year": "2016",
+        "model": "Boxster",
+        "vin": "WP0CA2A81GS120155",
+        "mileage": "22291",
+        "msrp": "0",
+        "price": "42101",
+        "bodyStyle": "Convertible",
+        "fuelType": "Gasoline",
+        "stockType": "Used",
+        "seller": {
+          "zip": "75078",
+          "customerId": "755797b5-18d6-5d96-b5e2-28ee6fa65909"
+        },
+        "trid": "meyosr9q7Ftmow7PwUAa8q",
+        "listingId": "2a96e73d-f8d8-4e83-93f9-9fd0801584e4",
+        "cpoIndicator": false,
+        "deliveryType": null,
+        "financingType": "pre-qual",
+        "initialCohort": null,
+        "isaContext": "STANDARD",
+        "primaryThumbnail": "https://platform.cstatic-images.com/in/v2/755797b5-18d6-5d96-b5e2-28ee6fa65909/b69a6f4b-fb6d-4d86-ab81-f2981c55fac4/Kt2pn3VmHNOBNmR_t-gtE1YZkIU.jpg",
+        "searchScore": null,
+        "shipPrice": null
+      }
+    }
+  },
+  {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/8a831548-72e0-48d5-9643-d8881a5e6b50/",
+    "listing_id": "8a831548-72e0-48d5-9643-d8881a5e6b50",
+    "title": "2015 Porsche Cayman Base",
+    "year": 2015,
+    "make": "Porsche",
+    "model": "Cayman",
+    "trim": "Base",
+    "price_usd": 26499.0,
+    "current_bid_usd": null,
+    "mileage": 134809,
+    "location": "45036",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/6d32d7b8-e8ab-5d9a-8b5e-86e890b6d934/754e3d3f-3701-41ec-b0cd-53ed6a83d3c3/D-VHzIasMw2AEusBlCygSpmgxyE.jpg",
+    "vin": "WP0AA2A8XFK160370",
+    "first_seen": "2026-05-13T03:41:27.071119Z",
+    "raw": {
+      "cars_com": {
+        "trim": "Base",
+        "make": "Porsche",
+        "metadata": {
+          "page_number": 1,
+          "position_on_page": 5
+        },
+        "year": "2015",
+        "model": "Cayman",
+        "vin": "WP0AA2A8XFK160370",
+        "mileage": "134809",
+        "msrp": null,
+        "price": "26499",
+        "bodyStyle": "Coupe",
+        "fuelType": "Gasoline",
+        "stockType": "Used",
+        "seller": {
+          "zip": "45036",
+          "customerId": "6d32d7b8-e8ab-5d9a-8b5e-86e890b6d934"
+        },
+        "trid": "meyosr9q7Ftmow7PwUAa8q",
+        "listingId": "8a831548-72e0-48d5-9643-d8881a5e6b50",
+        "cpoIndicator": false,
+        "deliveryType": null,
+        "financingType": "pre-qual",
+        "initialCohort": null,
+        "isaContext": "STANDARD",
+        "primaryThumbnail": "https://platform.cstatic-images.com/in/v2/6d32d7b8-e8ab-5d9a-8b5e-86e890b6d934/754e3d3f-3701-41ec-b0cd-53ed6a83d3c3/D-VHzIasMw2AEusBlCygSpmgxyE.jpg",
+        "searchScore": null,
+        "shipPrice": null
+      }
+    }
+  },
+  {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/d75cef05-ed1b-4044-bb0e-a8e738c2cbab/",
+    "listing_id": "d75cef05-ed1b-4044-bb0e-a8e738c2cbab",
+    "title": "2016 Porsche Boxster Base",
+    "year": 2016,
+    "make": "Porsche",
+    "model": "Boxster",
+    "trim": "Base",
+    "price_usd": 36981.0,
+    "current_bid_usd": null,
+    "mileage": 51577,
+    "location": "75234",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/9c471491-7905-5228-a4fc-abf4e2a4958e/8cdf76e3-3b36-414a-a59a-6ff6290d2da5/blH-iDCgWs61iDhynwk_RpmlUvY.jpg",
+    "vin": "WP0CA2A80GS120583",
+    "first_seen": "2026-05-13T03:41:27.071167Z",
+    "raw": {
+      "cars_com": {
+        "trim": "Base",
+        "make": "Porsche",
+        "metadata": {
+          "page_number": 1,
+          "position_on_page": 6
+        },
+        "year": "2016",
+        "model": "Boxster",
+        "vin": "WP0CA2A80GS120583",
+        "mileage": "51577",
+        "msrp": "0",
+        "price": "36981",
+        "bodyStyle": "Convertible",
+        "fuelType": "Gasoline",
+        "stockType": "Used",
+        "seller": {
+          "zip": "75234",
+          "customerId": "9c471491-7905-5228-a4fc-abf4e2a4958e"
+        },
+        "trid": "meyosr9q7Ftmow7PwUAa8q",
+        "listingId": "d75cef05-ed1b-4044-bb0e-a8e738c2cbab",
+        "cpoIndicator": false,
+        "deliveryType": null,
+        "financingType": "unavailable",
+        "initialCohort": null,
+        "isaContext": "STANDARD",
+        "primaryThumbnail": "https://platform.cstatic-images.com/in/v2/9c471491-7905-5228-a4fc-abf4e2a4958e/8cdf76e3-3b36-414a-a59a-6ff6290d2da5/blH-iDCgWs61iDhynwk_RpmlUvY.jpg",
+        "searchScore": null,
+        "shipPrice": null
+      }
+    }
+  },
+  {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/fce3bee4-b7c0-4042-9793-dfd0644430eb/",
+    "listing_id": "fce3bee4-b7c0-4042-9793-dfd0644430eb",
+    "title": "2017 Porsche 718 Boxster S",
+    "year": 2017,
+    "make": "Porsche",
+    "model": "718 Boxster",
+    "trim": "S",
+    "price_usd": 44587.0,
+    "current_bid_usd": null,
+    "mileage": 63397,
+    "location": "60559",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/158cae50-b317-51e4-9c28-65699862cd8a/afd6bc1f-be61-471f-9b06-ed0e95e6f0a0/Bk2G52rgQ4ppG37HUuQR2J377jE.jpg",
+    "vin": "WP0CB2A80HS241466",
+    "first_seen": "2026-05-13T03:41:27.071212Z",
+    "raw": {
+      "cars_com": {
+        "trim": "S",
+        "make": "Porsche",
+        "metadata": {
+          "page_number": 1,
+          "position_on_page": 7
+        },
+        "year": "2017",
+        "model": "718 Boxster",
+        "vin": "WP0CB2A80HS241466",
+        "mileage": "63397",
+        "msrp": "0",
+        "price": "44587",
+        "bodyStyle": "Convertible",
+        "fuelType": "Gasoline",
+        "stockType": "Used",
+        "seller": {
+          "zip": "60559",
+          "customerId": "158cae50-b317-51e4-9c28-65699862cd8a"
+        },
+        "trid": "meyosr9q7Ftmow7PwUAa8q",
+        "listingId": "fce3bee4-b7c0-4042-9793-dfd0644430eb",
+        "cpoIndicator": false,
+        "deliveryType": null,
+        "financingType": "pre-qual",
+        "initialCohort": null,
+        "isaContext": "STANDARD",
+        "primaryThumbnail": "https://platform.cstatic-images.com/in/v2/158cae50-b317-51e4-9c28-65699862cd8a/afd6bc1f-be61-471f-9b06-ed0e95e6f0a0/Bk2G52rgQ4ppG37HUuQR2J377jE.jpg",
+        "searchScore": null,
+        "shipPrice": null
+      }
+    }
+  },
+  {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/2611869d-3572-4fff-9762-2e2a38542644/",
+    "listing_id": "2611869d-3572-4fff-9762-2e2a38542644",
+    "title": "2019 Porsche 718 Cayman Base (M6)",
+    "year": 2019,
+    "make": "Porsche",
+    "model": "718 Cayman",
+    "trim": "Base (M6)",
+    "price_usd": 44995.0,
+    "current_bid_usd": null,
+    "mileage": 91292,
+    "location": "75067",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/8a1ee75a-0b58-44b6-8086-c16894f9492b/2DZXGelv-3nIcveBQjgJynhz5O4.jpg",
+    "vin": "WP0AA2A83KS260823",
+    "first_seen": "2026-05-13T03:41:27.071275Z",
+    "raw": {
+      "cars_com": {
+        "trim": "Base (M6)",
+        "make": "Porsche",
+        "metadata": {
+          "page_number": 1,
+          "position_on_page": 8
+        },
+        "year": "2019",
+        "model": "718 Cayman",
+        "vin": "WP0AA2A83KS260823",
+        "mileage": "91292",
+        "msrp": "0",
+        "price": "44995",
+        "bodyStyle": "Coupe",
+        "fuelType": "Gasoline",
+        "stockType": "Used",
+        "seller": {
+          "zip": "75067",
+          "customerId": "3334d918-7d74-555d-9e4f-5f9e6c9f008a"
+        },
+        "trid": "meyosr9q7Ftmow7PwUAa8q",
+        "listingId": "2611869d-3572-4fff-9762-2e2a38542644",
+        "cpoIndicator": false,
+        "deliveryType": null,
+        "financingType": "pre-qual",
+        "initialCohort": null,
+        "isaContext": "STANDARD",
+        "primaryThumbnail": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/8a1ee75a-0b58-44b6-8086-c16894f9492b/2DZXGelv-3nIcveBQjgJynhz5O4.jpg",
+        "searchScore": null,
+        "shipPrice": null
+      }
+    }
+  },
+  {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/fe7e2b8e-acce-4c15-91fe-ea692cf14cec/",
+    "listing_id": "fe7e2b8e-acce-4c15-91fe-ea692cf14cec",
+    "title": "2014 Porsche Cayman",
+    "year": 2014,
+    "make": "Porsche",
+    "model": "Cayman",
+    "trim": null,
+    "price_usd": 42995.0,
+    "current_bid_usd": null,
+    "mileage": 96173,
+    "location": "75067",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/036e689b-4752-4e72-8154-981efd4db5ea/7xyiSu7nV3OmWhh-Aw4NA_qCohc.jpg",
+    "vin": "WP0AA2A86EK170358",
+    "first_seen": "2026-05-13T03:41:27.071408Z",
+    "raw": {
+      "cars_com": {
+        "trim": null,
+        "make": "Porsche",
+        "metadata": {
+          "page_number": 1,
+          "position_on_page": 9
+        },
+        "year": "2014",
+        "model": "Cayman",
+        "vin": "WP0AA2A86EK170358",
+        "mileage": "96173",
+        "msrp": "0",
+        "price": "42995",
+        "bodyStyle": "Coupe",
+        "fuelType": "Gasoline",
+        "stockType": "Used",
+        "seller": {
+          "zip": "75067",
+          "customerId": "3334d918-7d74-555d-9e4f-5f9e6c9f008a"
+        },
+        "trid": "meyosr9q7Ftmow7PwUAa8q",
+        "listingId": "fe7e2b8e-acce-4c15-91fe-ea692cf14cec",
+        "cpoIndicator": false,
+        "deliveryType": null,
+        "financingType": "pre-qual",
+        "initialCohort": null,
+        "isaContext": "STANDARD",
+        "primaryThumbnail": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/036e689b-4752-4e72-8154-981efd4db5ea/7xyiSu7nV3OmWhh-Aw4NA_qCohc.jpg",
+        "searchScore": null,
+        "shipPrice": null
+      }
+    }
+  },
+  {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/0f30efe3-a08e-44b3-ad18-fb82eb3f7f2c/",
+    "listing_id": "0f30efe3-a08e-44b3-ad18-fb82eb3f7f2c",
+    "title": "2014 Porsche Cayman Base",
+    "year": 2014,
+    "make": "Porsche",
+    "model": "Cayman",
+    "trim": "Base",
+    "price_usd": 42995.0,
+    "current_bid_usd": null,
+    "mileage": 92895,
+    "location": "75067",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/fdbf5de8-7a37-48d4-9000-e3872248db1d/8YoOaIC50FaSUonacYgDArXxOww.jpg",
+    "vin": "WP0AA2A88EK170393",
+    "first_seen": "2026-05-13T03:41:27.071491Z",
+    "raw": {
+      "cars_com": {
+        "trim": "Base",
+        "make": "Porsche",
+        "metadata": {
+          "page_number": 1,
+          "position_on_page": 10
+        },
+        "year": "2014",
+        "model": "Cayman",
+        "vin": "WP0AA2A88EK170393",
+        "mileage": "92895",
+        "msrp": "0",
+        "price": "42995",
+        "bodyStyle": "Coupe",
+        "fuelType": "Gasoline",
+        "stockType": "Used",
+        "seller": {
+          "zip": "75067",
+          "customerId": "3334d918-7d74-555d-9e4f-5f9e6c9f008a"
+        },
+        "trid": "meyosr9q7Ftmow7PwUAa8q",
+        "listingId": "0f30efe3-a08e-44b3-ad18-fb82eb3f7f2c",
+        "cpoIndicator": false,
+        "deliveryType": null,
+        "financingType": "pre-qual",
+        "initialCohort": null,
+        "isaContext": "STANDARD",
+        "primaryThumbnail": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/fdbf5de8-7a37-48d4-9000-e3872248db1d/8YoOaIC50FaSUonacYgDArXxOww.jpg",
+        "searchScore": null,
+        "shipPrice": null
+      }
+    }
+  },
+  {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/c2f9ed99-575b-41c2-b9c0-8606f7a85189/",
+    "listing_id": "c2f9ed99-575b-41c2-b9c0-8606f7a85189",
+    "title": "2015 Porsche Cayman S",
+    "year": 2015,
+    "make": "Porsche",
+    "model": "Cayman",
+    "trim": "S",
+    "price_usd": 43995.0,
+    "current_bid_usd": null,
+    "mileage": 96405,
+    "location": "75067",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/88c683b2-f1b5-441e-a075-6b1b00f88b52/7A313BeOws03Rt52EVIJhLI6SSQ.jpg",
+    "vin": "WP0AB2A82FK183851",
+    "first_seen": "2026-05-13T03:41:27.071577Z",
+    "raw": {
+      "cars_com": {
+        "trim": "S",
+        "make": "Porsche",
+        "metadata": {
+          "page_number": 1,
+          "position_on_page": 11
+        },
+        "year": "2015",
+        "model": "Cayman",
+        "vin": "WP0AB2A82FK183851",
+        "mileage": "96405",
+        "msrp": "0",
+        "price": "43995",
+        "bodyStyle": "Coupe",
+        "fuelType": "Gasoline",
+        "stockType": "Used",
+        "seller": {
+          "zip": "75067",
+          "customerId": "3334d918-7d74-555d-9e4f-5f9e6c9f008a"
+        },
+        "trid": "meyosr9q7Ftmow7PwUAa8q",
+        "listingId": "c2f9ed99-575b-41c2-b9c0-8606f7a85189",
+        "cpoIndicator": false,
+        "deliveryType": null,
+        "financingType": "pre-qual",
+        "initialCohort": null,
+        "isaContext": "STANDARD",
+        "primaryThumbnail": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/88c683b2-f1b5-441e-a075-6b1b00f88b52/7A313BeOws03Rt52EVIJhLI6SSQ.jpg",
+        "searchScore": null,
+        "shipPrice": null
+      }
+    }
+  },
+  {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/7e227122-85f4-47e2-bb46-1ba6b94ada13/",
+    "listing_id": "7e227122-85f4-47e2-bb46-1ba6b94ada13",
+    "title": "2014 Porsche Cayman S",
+    "year": 2014,
+    "make": "Porsche",
+    "model": "Cayman",
+    "trim": "S",
+    "price_usd": 43995.0,
+    "current_bid_usd": null,
+    "mileage": 85151,
+    "location": "75067",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/5ce37df0-4128-4def-851b-8055a9f84150/M3wTK6yFTC09TfTU_c3uiwd7J98.jpg",
+    "vin": "WP0AB2A8XEK193137",
+    "first_seen": "2026-05-13T03:41:27.071655Z",
+    "raw": {
+      "cars_com": {
+        "trim": "S",
+        "make": "Porsche",
+        "metadata": {
+          "page_number": 1,
+          "position_on_page": 12
+        },
+        "year": "2014",
+        "model": "Cayman",
+        "vin": "WP0AB2A8XEK193137",
+        "mileage": "85151",
+        "msrp": "0",
+        "price": "43995",
+        "bodyStyle": "Coupe",
+        "fuelType": "Gasoline",
+        "stockType": "Used",
+        "seller": {
+          "zip": "75067",
+          "customerId": "3334d918-7d74-555d-9e4f-5f9e6c9f008a"
+        },
+        "trid": "meyosr9q7Ftmow7PwUAa8q",
+        "listingId": "7e227122-85f4-47e2-bb46-1ba6b94ada13",
+        "cpoIndicator": false,
+        "deliveryType": null,
+        "financingType": "pre-qual",
+        "initialCohort": null,
+        "isaContext": "STANDARD",
+        "primaryThumbnail": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/5ce37df0-4128-4def-851b-8055a9f84150/M3wTK6yFTC09TfTU_c3uiwd7J98.jpg",
+        "searchScore": null,
+        "shipPrice": null
+      }
+    }
+  },
+  {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/e71b25f0-bc6e-4532-8bd7-e5c180b1bc4b/",
+    "listing_id": "e71b25f0-bc6e-4532-8bd7-e5c180b1bc4b",
+    "title": "2015 Porsche Cayman Base",
+    "year": 2015,
+    "make": "Porsche",
+    "model": "Cayman",
+    "trim": "Base",
+    "price_usd": 43990.0,
+    "current_bid_usd": null,
+    "mileage": 55090,
+    "location": "47150",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/3ad59070-01de-5a67-8eaf-f072103a4b59/6b7127a6-472c-4561-a147-5965ee805d2d/CwRGCcPeWYZLP5B8AErLTzcVJFE.jpg",
+    "vin": "WP0AA2A80FK160474",
+    "first_seen": "2026-05-13T03:41:27.071758Z",
+    "raw": {
+      "cars_com": {
+        "trim": "Base",
+        "make": "Porsche",
+        "metadata": {
+          "page_number": 1,
+          "position_on_page": 13
+        },
+        "year": "2015",
+        "model": "Cayman",
+        "vin": "WP0AA2A80FK160474",
+        "mileage": "55090",
+        "msrp": "0",
+        "price": "43990",
+        "bodyStyle": "Coupe",
+        "fuelType": "Gasoline",
+        "stockType": "Used",
+        "seller": {
+          "zip": "47150",
+          "customerId": "3ad59070-01de-5a67-8eaf-f072103a4b59"
+        },
+        "trid": "meyosr9q7Ftmow7PwUAa8q",
+        "listingId": "e71b25f0-bc6e-4532-8bd7-e5c180b1bc4b",
+        "cpoIndicator": false,
+        "deliveryType": null,
+        "financingType": "pre-qual",
+        "initialCohort": null,
+        "isaContext": "STANDARD",
+        "primaryThumbnail": "https://platform.cstatic-images.com/in/v2/3ad59070-01de-5a67-8eaf-f072103a4b59/6b7127a6-472c-4561-a147-5965ee805d2d/CwRGCcPeWYZLP5B8AErLTzcVJFE.jpg",
+        "searchScore": null,
+        "shipPrice": null
+      }
+    }
+  },
+  {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/02fd13eb-02f8-4695-ac09-afbce264a0f3/",
+    "listing_id": "02fd13eb-02f8-4695-ac09-afbce264a0f3",
+    "title": "2014 Porsche Cayman",
+    "year": 2014,
+    "make": "Porsche",
+    "model": "Cayman",
+    "trim": null,
+    "price_usd": 42995.0,
+    "current_bid_usd": null,
+    "mileage": 56241,
+    "location": "75067",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/b091beb0-d196-49c4-b8ae-7b854351bbb4/IY6sET_b2jEZu91uAL70Beljysk.jpg",
+    "vin": "WP0AA2A84EK173100",
+    "first_seen": "2026-05-13T03:41:27.071813Z",
+    "raw": {
+      "cars_com": {
+        "trim": null,
+        "make": "Porsche",
+        "metadata": {
+          "page_number": 1,
+          "position_on_page": 14
+        },
+        "year": "2014",
+        "model": "Cayman",
+        "vin": "WP0AA2A84EK173100",
+        "mileage": "56241",
+        "msrp": "0",
+        "price": "42995",
+        "bodyStyle": "Coupe",
+        "fuelType": "Gasoline",
+        "stockType": "Used",
+        "seller": {
+          "zip": "75067",
+          "customerId": "3334d918-7d74-555d-9e4f-5f9e6c9f008a"
+        },
+        "trid": "meyosr9q7Ftmow7PwUAa8q",
+        "listingId": "02fd13eb-02f8-4695-ac09-afbce264a0f3",
+        "cpoIndicator": false,
+        "deliveryType": null,
+        "financingType": "pre-qual",
+        "initialCohort": null,
+        "isaContext": "STANDARD",
+        "primaryThumbnail": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/b091beb0-d196-49c4-b8ae-7b854351bbb4/IY6sET_b2jEZu91uAL70Beljysk.jpg",
+        "searchScore": null,
+        "shipPrice": null
+      }
+    }
+  },
+  {
     "source": "bring_a_trailer",
     "source_url": "https://bringatrailer.com/listing/2021-porsche-718-cayman-7/",
     "listing_id": "113348030",
@@ -17,7 +759,7 @@
     "drivable": null,
     "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/04/2021_porsche_718-cayman_20260419-rhp_9633-copy-64044.jpg?resize=470%2C318",
     "vin": null,
-    "first_seen": "2026-05-13T03:07:40.115366Z",
+    "first_seen": "2026-05-13T03:41:25.991836Z",
     "raw": {}
   },
   {
@@ -38,7 +780,7 @@
     "drivable": null,
     "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/04/2022_porsche_718-spyder_20260422_222941176_ios-95931.jpg?resize=470%2C318",
     "vin": null,
-    "first_seen": "2026-05-13T03:07:40.115473Z",
+    "first_seen": "2026-05-13T03:41:25.991974Z",
     "raw": {}
   },
   {
@@ -59,7 +801,7 @@
     "drivable": null,
     "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/04/2014_porsche_cayman-s_img_5977-27147.jpeg?resize=470%2C318",
     "vin": null,
-    "first_seen": "2026-05-13T03:07:40.119321Z",
+    "first_seen": "2026-05-13T03:41:25.995698Z",
     "raw": {}
   },
   {
@@ -80,7 +822,7 @@
     "drivable": null,
     "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/04/2016_porsche_911-targa-4-gts_2016_porsche_911-targa-4-gts_ff9412a4-972c-496a-a7b8-372aa0c0c505-wwB6tK-96798-96799-scaled.jpg?resize=470%2C318",
     "vin": null,
-    "first_seen": "2026-05-13T03:07:40.122041Z",
+    "first_seen": "2026-05-13T03:41:25.998172Z",
     "raw": {}
   },
   {
@@ -101,7 +843,7 @@
     "drivable": null,
     "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/05/2021_porsche_911-carrera-coupe_img_3174-48832.jpeg?resize=470%2C318",
     "vin": null,
-    "first_seen": "2026-05-13T03:07:40.122691Z",
+    "first_seen": "2026-05-13T03:41:25.998776Z",
     "raw": {}
   }
 ]

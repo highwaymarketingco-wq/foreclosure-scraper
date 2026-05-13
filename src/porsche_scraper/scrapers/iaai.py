@@ -17,14 +17,18 @@ from __future__ import annotations
 
 import logging
 
+from selectolax.parser import HTMLParser
+
 from ..base import BaseScraper
-from ..http_client import fetch_json
+from ..http_client import fetch_json, fetch_rendered
 from ..models import (
     Listing,
     TitleStatus,
     infer_drivable,
+    infer_title_status,
     parse_miles,
     parse_price,
+    parse_year,
 )
 
 log = logging.getLogger(__name__)
@@ -114,34 +118,73 @@ class IaaiScraper(BaseScraper):
         self.max_pages = max_pages
 
     async def fetch(self) -> list[Listing]:
+        """Try JSON endpoint first; fall back to rendered HTML."""
+        out = await self._fetch_json()
+        if out:
+            return out
+        return await self._fetch_html()
+
+    async def _fetch_json(self) -> list[Listing]:
         out: list[Listing] = []
         for page in range(1, self.max_pages + 1):
-            body = {
-                "Keyword": "porsche",
-                "Year": [self.year_min, self.year_max],
-                "PageSize": 100,
-                "PageNumber": page,
-                "SortColumn": "AuctionDate",
-                "SortDirection": "Asc",
-            }
+            body = {"Keyword": "porsche", "Year": [self.year_min, self.year_max],
+                    "PageSize": 100, "PageNumber": page,
+                    "SortColumn": "AuctionDate", "SortDirection": "Asc"}
             try:
                 payload = await fetch_json(
-                    SEARCH_URL,
-                    method="POST",
-                    json_body=body,
-                    timeout=45,
-                    headers={
-                        "Accept": "application/json",
-                        "Content-Type": "application/json",
-                        "Origin": BASE,
-                        "Referer": f"{BASE}/Search?Keyword=porsche",
-                    },
+                    SEARCH_URL, method="POST", json_body=body, timeout=45,
+                    headers={"Accept": "application/json", "Content-Type": "application/json",
+                             "Origin": BASE, "Referer": f"{BASE}/Search?Keyword=porsche"},
                 )
             except Exception as exc:  # noqa: BLE001
-                log.warning("iaai page %d failed: %s", page, exc)
-                break
+                log.info("iaai json page %d: %s", page, exc)
+                return out
             listings = parse_search_response(payload)
             if not listings:
                 break
             out.extend(listings)
+        return out
+
+    async def _fetch_html(self) -> list[Listing]:
+        out: list[Listing] = []
+        seen: set[str] = set()
+        for page in range(1, self.max_pages + 1):
+            url = (f"{BASE}/Search?Keyword=porsche"
+                   f"&Year={self.year_min}-{self.year_max}&page={page}")
+            try:
+                html = await fetch_rendered(
+                    url, timeout=90,
+                    wait_for_selector="a[href*='/VehicleDetail/']",
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning("iaai html page %d: %s", page, exc)
+                break
+            tree = HTMLParser(html)
+            anchors = tree.css("a[href*='/VehicleDetail/']")
+            if not anchors:
+                break
+            for a in anchors:
+                href = a.attributes.get("href") or ""
+                full = href if href.startswith("http") else f"{BASE}{href}"
+                if full in seen:
+                    continue
+                seen.add(full)
+                title = a.text(strip=True)
+                if not title or "porsche" not in title.lower():
+                    continue
+                if any(em in title.upper() for em in EXCLUDED_MODELS_UPPER):
+                    continue
+                listing = Listing(
+                    source="iaai",
+                    source_url=full,
+                    listing_id=full.rstrip("/").rsplit("/", 1)[-1].split("~")[0],
+                    title=title,
+                    year=parse_year(title),
+                    title_status=_title_status(title) or TitleStatus.SALVAGE,
+                    seller_type="salvage_auction",
+                )
+                if listing.title_status == TitleStatus.UNKNOWN:
+                    listing.title_status = TitleStatus.SALVAGE
+                listing.drivable = infer_drivable(title, listing.title_status)
+                out.append(listing)
         return out
