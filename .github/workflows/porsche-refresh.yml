@@ -89,7 +89,9 @@ jobs:
             sudo dpkg -i /tmp/sf.deb || \
             (sudo apt-get install -fy && sudo dpkg -i /tmp/sf.deb)
           which screamingfrogseospider
-          dpkg -L screamingfrogseospider | grep -E 'bin/|jar$' | head -20
+          # `head -20` closes its stdin → SIGPIPE on grep → pipefail kills the
+          # step. `|| true` keeps this diagnostic line from failing the run.
+          dpkg -L screamingfrogseospider | grep -E 'bin/|jar$' | head -20 || true
 
       - name: Write SF licence file from secrets
         run: |
