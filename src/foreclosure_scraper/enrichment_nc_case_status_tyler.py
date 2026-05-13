@@ -161,37 +161,52 @@ async def _drive_login_and_search(
         LAST_RUN_STATUS["last_step"] = "waf_challenge_detected"
         log.info("nc_ecourts.auth.waf_challenge_detected", url=page.url[:200])
 
-        from .enrichment_capsolver import solve_aws_waf
-        token = await solve_aws_waf(page.url)
-        if not token:
+        # Primary path: free OSS browser-driven solver using Gemini for
+        # image recognition (uses the GEMINI_API_KEY_* keys already wired
+        # for vision). No paid CAPTCHA service required.
+        from .enrichment_waf_oss import solve_waf_via_browser
+        solved = await solve_waf_via_browser(page)
+
+        # Fallback path: CapSolver token-injection (only if CAPSOLVER_API_KEY
+        # is set in env and the OSS browser solve failed).
+        if not solved and os.environ.get("CAPSOLVER_API_KEY"):
+            log.info("nc_ecourts.auth.waf_oss_failed_trying_capsolver")
+            from .enrichment_capsolver import solve_aws_waf
+            token = await solve_aws_waf(page.url)
+            if token:
+                try:
+                    await page.context.add_cookies([{
+                        "name": "aws-waf-token",
+                        "value": token,
+                        "domain": ".tylerhost.net",
+                        "path": "/",
+                        "httpOnly": False,
+                        "secure": True,
+                        "sameSite": "None",
+                    }])
+                    await page.reload(wait_until="networkidle", timeout=45000)
+                    solved = True
+                except Exception as exc:
+                    LAST_RUN_STATUS.update({
+                        "last_step": "waf_cookie_inject_failed",
+                        "step_error": str(exc)[:200],
+                    })
+                    return out
+
+        if not solved:
             LAST_RUN_STATUS.update({
                 "last_step": "waf_solve_failed",
-                "step_error": "CapSolver returned no token (no api key, low balance, or solve failure)",
+                "step_error": (
+                    "Browser-driven OSS solve failed. "
+                    "Check GEMINI_API_KEY_* secrets are set + 2.5-flash has quota. "
+                    "Set CAPSOLVER_API_KEY as a paid fallback if this keeps failing."
+                ),
             })
             return out
 
-        # Inject the WAF token cookie + reload the page. The aws-waf-token
-        # cookie unlocks the real signin form behind the challenge.
-        try:
-            await page.context.add_cookies([{
-                "name": "aws-waf-token",
-                "value": token,
-                "domain": ".tylerhost.net",
-                "path": "/",
-                "httpOnly": False,
-                "secure": True,
-                "sameSite": "None",
-            }])
-            await page.reload(wait_until="networkidle", timeout=45000)
-            LAST_RUN_STATUS["last_step"] = "waf_solved_reloaded"
-            LAST_RUN_STATUS["landed_url"] = page.url[:200]
-            log.info("nc_ecourts.auth.waf_solved", url=page.url[:200])
-        except Exception as exc:
-            LAST_RUN_STATUS.update({
-                "last_step": "waf_cookie_inject_failed",
-                "step_error": str(exc)[:200],
-            })
-            return out
+        LAST_RUN_STATUS["last_step"] = "waf_solved_reloaded"
+        LAST_RUN_STATUS["landed_url"] = page.url[:200]
+        log.info("nc_ecourts.auth.waf_solved", url=page.url[:200])
 
     # Step 2: Fill credentials on the IdP signin page.
     LAST_RUN_STATUS["last_step"] = "filling_username"
