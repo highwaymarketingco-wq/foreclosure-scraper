@@ -123,10 +123,11 @@ async def solve_waf_via_browser(page) -> bool:
     """Drive the AWS WAF CAPTCHA UI on the currently-loaded page.
 
     Returns True if the challenge was solved (aws-waf-token cookie is now
-    set in page.context); False on any failure. Handles up to 3 back-to-
-    back puzzles (AWS WAF will sometimes serve a second one).
+    set in page.context); False on any failure. Handles up to MAX_PUZZLES
+    back-to-back puzzles — AWS WAF on portal-nc serves 3-5 in a row when
+    it's suspicious of the client (verified 2026-05-13).
     """
-    MAX_PUZZLES = 3
+    MAX_PUZZLES = 8
 
     # Click "Begin" if visible
     try:
