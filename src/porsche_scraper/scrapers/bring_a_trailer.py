@@ -66,6 +66,27 @@ def _bid_or_sold_price(card) -> tuple[float | None, float | None]:
     return amount, None
 
 
+import re
+
+# BaT slugs for whole-car listings always start with a 4-digit year:
+#   "2016-porsche-cayman-s-109", "1989-porsche-911-carrera-coupe-7"
+# Accessory / memorabilia / parts listings don't:
+#   "wheels-541", "porsche-bbs-rs-wheels-2", "memorabilia-34", "literature-61".
+_VEHICLE_SLUG_RE = re.compile(r"^(?:19|20)\d{2}-")
+
+
+def _is_vehicle_listing(href: str, title: str) -> bool:
+    """Return True when this BaT card looks like a whole car (not parts/lit/art)."""
+    if not href:
+        return False
+    slug = href.rstrip("/").rsplit("/", 1)[-1].lower()
+    if not _VEHICLE_SLUG_RE.match(slug):
+        return False
+    if "porsche" not in title.lower():
+        return False
+    return True
+
+
 def _listing_from_card(card) -> Listing | None:
     link = card.css_first("h3 a[href]") or card.css_first("a.image-overlay[href]")
     if not link:
@@ -74,6 +95,8 @@ def _listing_from_card(card) -> Listing | None:
     if not href or "/listing/" not in href:
         return None
     title = link.text(strip=True) or link.attributes.get("title") or ""
+    if not _is_vehicle_listing(href, title):
+        return None
     img = card.css_first(".thumbnail img")
     excerpt_node = card.css_first(".item-excerpt")
     excerpt = excerpt_node.text(strip=True) if excerpt_node else ""
