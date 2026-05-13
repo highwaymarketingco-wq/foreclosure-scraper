@@ -16,6 +16,13 @@ Three transports — all free, no API keys required:
   Use for SPAs that need a real browser (GovDeals, PublicSurplus,
   GSA Auctions, Hagerty, CollectingCars, Mecum, Hemmings, etc.).
 
+- `fetch_rendered_pydoll` — PyDoll CDP-direct alternative to Patchright.
+  Some sites (Hagerty, Collecting Cars, autotrader.com, etc.) detect
+  Patchright's residual `navigator.webdriver` leak and serve empty
+  pages. PyDoll connects to Chromium over raw CDP and bypasses those
+  fingerprint heuristics. Same Chromium binary as Patchright — we just
+  reuse the one Patchright already installed.
+
 Both stealth layers are free; only PROXY_URL is needed if you want to
 route traffic through a residential proxy.
 
@@ -276,3 +283,97 @@ async def fetch_rendered(
     except Exception as exc:  # noqa: BLE001
         log.info("scrapling render failed for %s: %s", url, exc)
     raise RuntimeError(f"render failed for {url}")
+
+
+def _find_chromium_binary() -> str | None:
+    """Locate the Chromium binary Patchright/Playwright installed.
+
+    Returns the first match from the standard Playwright cache layout,
+    or None if not found. PyDoll's default search path is
+    /usr/bin/google-chrome which isn't present on most CI runners — but
+    Patchright/Playwright drop a full Chromium under either
+    /opt/pw-browsers (the workflow uses this via PLAYWRIGHT_BROWSERS_PATH)
+    or ~/.cache/ms-playwright.
+    """
+    import glob
+    candidates: list[str] = []
+    if env_path := os.environ.get("PYDOLL_CHROMIUM"):
+        candidates.append(env_path)
+    for root in ("/opt/pw-browsers", os.path.expanduser("~/.cache/ms-playwright")):
+        # Prefer full chrome over chrome_headless_shell.
+        candidates.extend(sorted(
+            glob.glob(f"{root}/chromium-*/chrome-linux*/chrome"),
+            reverse=True,  # newest first
+        ))
+    candidates.extend(("/usr/bin/google-chrome", "/usr/bin/chromium-browser",
+                       "/usr/bin/chromium"))
+    for path in candidates:
+        if path and os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return None
+
+
+async def fetch_rendered_pydoll(
+    url: str,
+    *,
+    timeout: float = 90.0,
+    wait_for_selector: str | None = None,
+    wait_extra_seconds: float = 3.0,
+) -> str:
+    """JS-rendered fetch via PyDoll (raw CDP, no Playwright).
+
+    Use for sites where Patchright is detected and served an empty
+    page — PyDoll's CDP-direct approach bypasses fingerprint heuristics
+    that look for Playwright's residual automation markers.
+    """
+    try:
+        from pydoll.browser import Chrome
+        from pydoll.browser.options import ChromiumOptions
+    except ImportError:
+        raise RuntimeError("pydoll-python not installed") from None
+    binary = _find_chromium_binary()
+    if not binary:
+        raise RuntimeError(
+            "no Chromium binary found for PyDoll — install Playwright/"
+            "Patchright Chromium or set PYDOLL_CHROMIUM env var"
+        )
+    opts = ChromiumOptions()
+    opts.binary_location = binary
+    opts.headless = True
+    opts.start_timeout = 30  # default 10s isn't enough on slow CI runners
+    for arg in (
+        "--no-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--disable-blink-features=AutomationControlled",
+        "--ignore-certificate-errors",
+        "--ignore-ssl-errors",
+        "--disable-features=IsolateOrigins,site-per-process",
+    ):
+        opts.add_argument(arg)
+    proxy = os.environ.get("PROXY_URL")
+    if proxy:
+        opts.add_argument(f"--proxy-server={proxy}")
+    try:
+        async with Chrome(options=opts) as browser:
+            tab = await browser.start()
+            await tab.go_to(url, timeout=int(timeout))
+            if wait_for_selector:
+                # Best-effort wait. PyDoll's `query` returns the element
+                # once available; ignore failures and fall through to
+                # the static sleep below.
+                try:
+                    await tab.query(wait_for_selector, timeout=int(min(timeout, 15)))
+                except Exception:  # noqa: BLE001
+                    pass
+            if wait_extra_seconds:
+                await asyncio.sleep(wait_extra_seconds)
+            html = await tab.page_source
+            if html and len(html) > 500:
+                return html
+            raise RuntimeError(
+                f"pydoll render returned {len(html or '')} bytes for {url}"
+            )
+    except Exception as exc:  # noqa: BLE001
+        log.info("pydoll render failed for %s: %s", url, exc)
+        raise

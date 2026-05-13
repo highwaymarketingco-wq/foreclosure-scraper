@@ -18,7 +18,7 @@ from urllib.parse import urljoin
 from selectolax.parser import HTMLParser
 
 from ..base import BaseScraper
-from ..http_client import fetch_rendered, fetch_text_stealth
+from ..http_client import fetch_rendered, fetch_rendered_pydoll, fetch_text_stealth
 from ..models import (
     Listing,
     infer_drivable,
@@ -42,6 +42,10 @@ class SiteConfig:
     price_selectors: tuple[str, ...]
     mileage_selectors: tuple[str, ...] = ()
     location_selectors: tuple[str, ...] = ()
+    # Optional: when the link element wraps the whole card (timer + bid +
+    # photo + title smushed together), point at a dedicated title node
+    # instead. We still take the href from `title_selectors`.
+    title_text_selectors: tuple[str, ...] = ()
     max_pages: int = 5
     # If True, parse __NEXT_DATA__ JSON instead of DOM.
     use_next_data: bool = False
@@ -50,6 +54,10 @@ class SiteConfig:
     # heavy-Cloudflare sites (CollectingCars, AutoHunter, BroadArrow).
     use_render: bool = False
     render_wait_selector: str | None = None
+    # If True, render via PyDoll's CDP-direct path instead of Patchright.
+    # Use for sites that detect Patchright's residual automation markers
+    # (Hagerty, etc.). Only consulted when use_render is True.
+    use_pydoll: bool = False
 
 
 def _first_text(card, selectors: Iterable[str]) -> str | None:
@@ -95,7 +103,12 @@ def _listing_from_card(card, config: SiteConfig) -> Listing | None:
     if not href:
         return None
     url = urljoin(config.base, href)
-    title = link.text(strip=True) or link.attributes.get("title") or ""
+    title = (
+        _first_text(card, config.title_text_selectors)
+        or link.text(strip=True)
+        or link.attributes.get("title")
+        or ""
+    )
     price = parse_price(_first_text(card, config.price_selectors))
     miles = parse_miles(_first_text(card, config.mileage_selectors))
     loc = _first_text(card, config.location_selectors)
@@ -176,15 +189,30 @@ CONFIGS: dict[str, SiteConfig] = {
             "https://www.hagerty.com/marketplace/search"
             "?type=auctions&make=Porsche&forSale=true&page={page}"
         ),
-        card_selectors=("[data-testid='auction-card']", ".auction-card", "article[class*='card']"),
+        card_selectors=(
+            "[data-testid^='listing-card-']",
+            "[data-testid='auction-card']",
+            ".auction-card",
+            "article[class*='card']",
+        ),
         title_selectors=("a[href*='/marketplace/auction/']", "h2 a", "h3 a"),
+        # Card title text comes from this element instead of the link
+        # text — the link wraps the whole card (timer + bid + photo +
+        # title), so .text() would smush them together.
+        title_text_selectors=("h4[class*='ListingCard__info-title']",),
         price_selectors=("[data-testid='current-bid']", ".price", ".current-bid"),
         mileage_selectors=("[data-testid='mileage']", ".mileage"),
         location_selectors=("[data-testid='location']", ".location"),
-        use_next_data=True,
-        next_data_path=("props", "pageProps", "results"),
+        # __NEXT_DATA__ on Hagerty lives in an Apollo cache (keys like
+        # "AuctionVehicleSearchNode:{...}") rather than a flat results
+        # list, so we skip it and rely on DOM parsing of listing cards.
+        use_next_data=False,
         use_render=True,
         render_wait_selector="a[href*='/marketplace/auction/']",
+        # Patchright was returning empty pages here — Hagerty's bot
+        # check trips on Playwright's residual automation markers.
+        # PyDoll's CDP-direct render gets through.
+        use_pydoll=True,
     ),
     "collecting_cars": SiteConfig(
         slug="collecting_cars",
@@ -277,7 +305,12 @@ class EnthusiastAuctionScraper(BaseScraper):
                 year_min=self.year_min, price_max=self.price_max, page=page
             )
             try:
-                if self.config.use_render:
+                if self.config.use_render and self.config.use_pydoll:
+                    html = await fetch_rendered_pydoll(
+                        url, timeout=90,
+                        wait_for_selector=self.config.render_wait_selector,
+                    )
+                elif self.config.use_render:
                     html = await fetch_rendered(
                         url, timeout=90,
                         wait_for_selector=self.config.render_wait_selector,
