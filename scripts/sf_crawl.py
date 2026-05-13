@@ -239,7 +239,7 @@ def _build_sf_command(
     exports = ["Internal:All"]
     if config and config.exists():
         exports.append("Custom Extraction:All")
-    cmd += ["--bulk-export", ",".join(exports), "--export-format", "csv"]
+    cmd += ["--export-tabs", ",".join(exports), "--export-format", "csv"]
     cmd += ["--overwrite"]
     return cmd
 
