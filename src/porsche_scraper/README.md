@@ -117,9 +117,12 @@ These two are **excluded by default**; enable with `--include-off` or
 1. Run the scraper alone: `uv run porsche-scraper --only <slug> -vv`
 2. If it returns 0 rows, save the HTML the site actually serves and
    compare against the selectors in the scraper module.
-3. Bot-protected sites (🔴): set `PROXY_URL=http://user:pass@host:port`
-   to a residential proxy. If still blocked, swap to a Playwright-stealth
-   fetcher (the `scrapling[fetchers]` dep is already installed).
+3. Bot-protected sites (🔴): the scraper already opts into Scrapling
+   (`use_render=True`); that drives a real headless Chromium that solves
+   Cloudflare/AWS-WAF automatically. If the site still blocks you,
+   add `PROXY_URL=http://user:pass@host:port` (any residential proxy
+   service — even free trial ones — will do). Patchright must be
+   initialized once: `uv run patchright install chromium`.
 
 ## Quick start
 
@@ -136,13 +139,21 @@ default. The CLI also prints the top-10 cheapest finds.
 
 ## Environment variables
 
+All optional. The scraper runs entirely on **free** tooling out of the
+box (curl-cffi TLS impersonation + Scrapling headless Chromium). The
+vars below are just hooks for advanced setups.
+
 | Var | Purpose |
 |-----|---------|
 | `PROXY_URL` | `http://user:pass@host:port` residential proxy for bot-protected sites. |
-| `EBAY_OAUTH_TOKEN` | If set, the eBay scraper uses the Browse API instead of HTML scraping. |
+| `EBAY_OAUTH_TOKEN` | If set, the eBay scraper uses the Browse API (free tier, no cost). |
 | `FB_USER_COOKIE` | Logged-in FB cookie string; required for `fb_marketplace`. |
 | `CRAIGSLIST_CITIES` | Comma-separated CL subdomains; defaults to 20 large US cities. |
 | `EUR_TO_USD` | Override the Elferspot price conversion rate (default 1.08). |
+
+**No paid services required** — Apify / CapSolver / ScrapingBee / ZenRows
+are intentionally excluded. If you hit a site that the free stack can't
+crack, file a bug rather than adding a paid dependency.
 
 ## Adding a new site
 
