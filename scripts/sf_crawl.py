@@ -225,7 +225,12 @@ def _build_sf_command(
     # are *.seospiderconfig* settings, NOT CLI flags. Passing them on the
     # command line returns `FATAL - Unrecognized option`. We apply both
     # filters in Python (_extract_urls_from_sf_csv) after SF dumps its CSV.
-    cmd = [binary, "--headless", "--save-crawl", "--output-folder", str(out_dir)]
+    #
+    # `--accept-license` (US spelling — SF uses it on the CLI despite the
+    # UK "licence" elsewhere) opts into the EULA without the GUI prompt.
+    # Required for first-run headless on a fresh machine.
+    cmd = [binary, "--headless", "--accept-license",
+           "--save-crawl", "--output-folder", str(out_dir)]
     if config and config.exists():
         cmd += ["--config", str(config)]
     if preset.crawl_mode == "sitemap":

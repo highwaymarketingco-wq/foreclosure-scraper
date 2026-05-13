@@ -93,25 +93,36 @@ jobs:
           # step. `|| true` keeps this diagnostic line from failing the run.
           dpkg -L screamingfrogseospider | grep -E 'bin/|jar$' | head -20 || true
 
-      - name: Write SF licence file from secrets
+      - name: Write SF licence file + accept EULA
         run: |
           set -euo pipefail
           mkdir -p "$HOME/.ScreamingFrogSEOSpider"
-          # SF reads its licence from a plain-text file (two lines:
-          # username then key). Filename varies by version — write both
-          # commonly-seen names so we cover the active major.
+          # Licence — multiple filename variants cover SF major versions.
           for f in licence.txt license.txt spider.licence spider.license; do
             cat > "$HOME/.ScreamingFrogSEOSpider/$f" <<EOF
           $SF_LICENCE_USERNAME
           $SF_LICENCE_KEY
           EOF
           done
+          # SF 23 also blocks headless launch on EULA acceptance. Pre-write
+          # the spider.config with every plausible EULA-accepted key name.
+          cat > "$HOME/.ScreamingFrogSEOSpider/spider.config" <<'EOF'
+          eulaAccepted=true
+          eulaAcceptedVersion=15
+          eula.accepted=true
+          eula.accepted.version=15
+          lastEulaAcceptedVersion=15
+          licenceAgreed=15
+          licenceAgreedVersion=15
+          EOF
           chmod 600 "$HOME/.ScreamingFrogSEOSpider/"*
           ls -la "$HOME/.ScreamingFrogSEOSpider/"
-          echo "--- first line of each licence file (username only, no key) ---"
-          for f in "$HOME/.ScreamingFrogSEOSpider/"*; do
-            head -n 1 "$f" | sed 's/./*/g' | tr -d '\n' | head -c 30
-            echo "  ($(basename "$f"))"
+          echo "--- spider.config ---"
+          cat "$HOME/.ScreamingFrogSEOSpider/spider.config"
+          echo "--- first line of each licence file (redacted) ---"
+          for f in licence.txt license.txt spider.licence spider.license; do
+            head -n 1 "$HOME/.ScreamingFrogSEOSpider/$f" | sed 's/./*/g' | tr -d '\n' | head -c 30
+            echo "  ($f)"
           done
 
       - name: Verify SF binary is functional
