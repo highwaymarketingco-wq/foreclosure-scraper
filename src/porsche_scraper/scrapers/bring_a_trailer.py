@@ -101,6 +101,10 @@ def _listing_from_card(card) -> Listing | None:
     excerpt_node = card.css_first(".item-excerpt")
     excerpt = excerpt_node.text(strip=True) if excerpt_node else ""
     current_bid, sold_price = _bid_or_sold_price(card)
+    # "For sale" filter: drop completed auctions (sold or unsold). Only
+    # keep entries with an active current bid — those are still buyable.
+    if sold_price is not None or current_bid is None:
+        return None
     miles = parse_miles(excerpt)  # BaT excerpts often contain "X-mile" or "X,XXX-Mile"
     listing_id = card.attributes.get("data-listing_id") or href.rstrip("/").split("/")[-1]
     title_status = infer_title_status(title + " " + excerpt)
@@ -111,7 +115,6 @@ def _listing_from_card(card) -> Listing | None:
         title=title,
         year=parse_year(title),
         current_bid_usd=current_bid,
-        price_usd=sold_price,  # Sold-for treated as price_usd for filter purposes.
         mileage=miles,
         photo_url=(img.attributes.get("src") or img.attributes.get("data-src")) if img else None,
         title_status=title_status,

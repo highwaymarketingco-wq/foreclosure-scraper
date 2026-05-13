@@ -54,6 +54,14 @@
   .status-rebuilt { background: var(--rebuilt); color: #000; }
   .status-clean { background: var(--clean); color: #fff; }
   .status-unknown { display: none; }
+  /* Project-tier badge — bottom-left of thumbnail. */
+  .tier { position: absolute; bottom: 8px; left: 8px;
+          padding: 3px 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
+          border-radius: 4px; text-transform: uppercase; }
+  .tier-salvage  { background: var(--salvage); color: #fff; }
+  .tier-rebuilt  { background: var(--rebuilt); color: #000; }
+  .tier-damaged  { background: #d4a017; color: #000; }
+  .tier-clean    { background: rgba(255,255,255,0.12); color: var(--muted); }
   .body { padding: 14px 16px 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
   .price { font-size: 22px; font-weight: 800; color: var(--accent); }
   .price .label { font-size: 11px; color: var(--muted); font-weight: 500;
@@ -87,6 +95,14 @@
 
 <div class="toolbar">
   <input id="q" placeholder="Search title, model, location…" autocomplete="off">
+  <label>Tier <select id="filterTier">
+    <option value="">all</option>
+    <option value="projects">projects only (salvage / rebuilt / damaged)</option>
+    <option value="salvage">salvage</option>
+    <option value="rebuilt">rebuilt</option>
+    <option value="damaged">damaged / needs work</option>
+    <option value="clean">clean</option>
+  </select></label>
   <label>Source <select id="filterSource"><option value="">all</option></select></label>
   <label>Title <select id="filterStatus">
     <option value="">all</option>
@@ -126,6 +142,7 @@
   const countEl = document.getElementById('count');
   const updatedEl = document.getElementById('updated');
   const qEl = document.getElementById('q');
+  const tierEl = document.getElementById('filterTier');
   const sourceEl = document.getElementById('filterSource');
   const statusEl = document.getElementById('filterStatus');
   const sortEl = document.getElementById('sortBy');
@@ -173,13 +190,22 @@
     return v == null ? '? mi' : v.toLocaleString() + ' mi';
   }
 
+  const TIER_ORDER = { salvage: 0, rebuilt: 1, damaged: 2, clean: 3 };
+
   function render() {
     const q = qEl.value.trim().toLowerCase();
+    const fTier = tierEl.value;
     const fSource = sourceEl.value;
     const fStatus = statusEl.value;
     const sortBy = sortEl.value;
 
     let out = listings.filter(l => {
+      const tier = l.project_tier || 'clean';
+      if (fTier === 'projects') {
+        if (!['salvage','rebuilt','damaged'].includes(tier)) return false;
+      } else if (fTier && fTier !== tier) {
+        return false;
+      }
       if (fSource && l.source !== fSource) return false;
       if (fStatus && (l.title_status || 'unknown') !== fStatus) return false;
       if (q) {
@@ -190,7 +216,10 @@
     });
 
     out.sort((a, b) => {
-      // Always surface priced listings first, regardless of secondary sort.
+      // Tier first (projects before clean), then priced before unpriced.
+      const ta = TIER_ORDER[a.project_tier ?? 'clean'] ?? 9;
+      const tb = TIER_ORDER[b.project_tier ?? 'clean'] ?? 9;
+      if (ta !== tb) return ta - tb;
       const pa = effPrice(a), pb = effPrice(b);
       if (pa == null && pb != null) return 1;
       if (pa != null && pb == null) return -1;
@@ -210,12 +239,14 @@
     const div = document.createElement('div');
     div.className = 'card';
     const status = l.title_status || 'unknown';
+    const tier = l.project_tier || 'clean';
     const ep = effPrice(l);
     const isBid = l.price_usd == null && l.current_bid_usd != null;
     div.innerHTML = `
       <div class="thumb" style="background-image:url('${l.photo_url || ''}')">
         <span class="src">${l.source}</span>
         <span class="status status-${status}">${status}</span>
+        <span class="tier tier-${tier}">${tier}</span>
       </div>
       <div class="body">
         <div class="price"><span class="label">${ep == null ? 'Price' : (isBid ? 'Bid' : 'Price')}</span>${ep == null ? '<span style="color:var(--muted);font-size:14px;font-weight:500">click to view</span>' : fmtPrice(ep)}</div>
@@ -231,7 +262,7 @@
     return div;
   }
 
-  for (const el of [qEl, sourceEl, statusEl, sortEl]) el.addEventListener('input', render);
+  for (const el of [qEl, tierEl, sourceEl, statusEl, sortEl]) el.addEventListener('input', render);
   render();
 })();
 </script>

@@ -25,10 +25,10 @@ on:
         required: false
         default: "all"
       allow_unknown_price:
-        description: "Keep listings with no discovered price (e.g. Elferspot)"
+        description: "Keep listings without a discovered price (Elferspot 'request quote' etc). Default false — dashboard shows only actively-priced for-sale listings."
         type: boolean
         required: false
-        default: true
+        default: false
 
 permissions:
   contents: write
@@ -154,7 +154,7 @@ jobs:
       - name: Run SF crawl + enrich + import (Xvfb-wrapped for safety)
         env:
           SITES: ${{ github.event.inputs.sites || 'all' }}
-          ALLOW_UNKNOWN_PRICE: ${{ github.event.inputs.allow_unknown_price || 'true' }}
+          ALLOW_UNKNOWN_PRICE: ${{ github.event.inputs.allow_unknown_price || 'false' }}
         run: |
           set -euo pipefail
           ARGS=()
