@@ -647,7 +647,7 @@
     },
     {
       "kind": "rerun_scrapers",
-      "applied_at": "2026-05-13T05:46:02.152150+00:00",
+      "applied_at": "2026-05-13T06:08:11.226595+00:00",
       "scraper_slugs": [
         "counties_nc.brunswick_tax",
         "counties_nc.buncombe_tax",
@@ -674,7 +674,7 @@
         "public_notices.ncnotices"
       ],
       "raw_per_slug": {
-        "public_notices.ncnotices": 42,
+        "public_notices.ncnotices": 40,
         "law_firms.aldridge_pite": 0,
         "law_firms.bell_carrington": 59,
         "law_firms.brock_scott": 356,
@@ -698,12 +698,12 @@
         "counties_nc.polk_tax": 2,
         "counties_nc.rutherford_tax": 11
       },
-      "active_kept": 729,
+      "active_kept": 727,
       "sold_pool_kept": 46,
       "promoted_to_sold_via_case_status": 0,
-      "active_added_new": 23,
-      "active_merged_into_existing": 706,
-      "active_final": 1405,
+      "active_added_new": 22,
+      "active_merged_into_existing": 705,
+      "active_final": 1404,
       "sold_pool_final": 52,
       "valuation_failures": 0,
       "enrichment_stats": {
@@ -728,26 +728,26 @@
           "fiduciary_skipped": 1
         },
         "parcel_reverse_geo": {
-          "queried": 38,
-          "annotated": 38,
+          "queried": 39,
+          "annotated": 39,
           "no_match": 0
         },
         "address_synth": "ok",
         "county_pin": {
-          "scanned": 729,
+          "scanned": 727,
           "case_pinned": 571,
           "already_correct": 571,
           "retagged_county": 0,
           "address_nulled": 0,
-          "no_case_decode": 158
+          "no_case_decode": 156
         },
         "property_kind": "ok",
         "judgment_amount": {
-          "scanned": 729,
+          "scanned": 727,
           "matched": 0,
           "already_set": 0,
           "no_text": 9,
-          "text_no_match": 720,
+          "text_no_match": 718,
           "by_source_matched": {}
         },
         "validation": {
@@ -768,18 +768,18 @@
           "validation_exceptions": 0
         },
         "data_quality": {
-          "synthetic_address": 390,
-          "approximate_address": 38,
+          "synthetic_address": 388,
+          "approximate_address": 39,
           "low_arv_confidence": 0,
-          "no_sqft": 595,
+          "no_sqft": 592,
           "no_address": 0,
           "exceptions": 0
         },
         "upset_bid": {
-          "scanned": 729,
+          "scanned": 727,
           "tagged_in_window": 0,
           "tag_cleared_outside_window": 0,
-          "no_sale_date": 336,
+          "no_sale_date": 334,
           "non_nc": 297
         }
       },
@@ -790,12 +790,12 @@
           "reason": "no_cases_returned_from_tyler",
           "tagged": 0,
           "targets": 50,
-          "checked_at": "2026-05-13T05:45:51.085217Z",
+          "checked_at": "2026-05-13T06:08:00.129083Z",
           "last_step": "waf_solve_failed",
           "landed_url": "https://odysseyidentityprovider.tylerhost.net/idp/account/signin?ReturnUrl=%2fidp%2fissue%2fwsfed%3fwa%3dwsignin1.0%26wtrealm%3dhttps%253a%252f%252fportal-nc.tylertech.cloud%252fPortal%252f%26wctx%3dr",
           "step_error": "CapSolver returned no token (no api key, low balance, or solve failure)"
         },
-        "heuristic_targets": 1322
+        "heuristic_targets": 1321
       }
     }
   ]
