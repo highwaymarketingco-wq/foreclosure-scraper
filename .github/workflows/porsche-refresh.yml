@@ -69,16 +69,27 @@ jobs:
           DEBIAN_FRONTEND: noninteractive
         run: |
           set -euo pipefail
-          # Screaming Frog's official deb. The URL pattern is stable across
-          # minor versions; latest is fetched via the redirect.
           sudo apt-get update -y
           sudo apt-get install -y --no-install-recommends \
             xvfb wget curl ca-certificates fonts-dejavu-core \
             openjdk-21-jre-headless
-          curl -fsSL -o /tmp/sf.deb https://download.screamingfrog.co.uk/products/seo-spider/screamingfrogseospider_latest_all.deb
-          sudo apt-get install -y --no-install-recommends /tmp/sf.deb
+          # The "latest" file isn't a fixed URL — scrape the download page
+          # for the most recent .deb, fall back to a hard-coded version.
+          DL_URL=$(curl -fsSL https://www.screamingfrog.co.uk/seo-spider/ \
+            | grep -oE 'https://download\.screamingfrog\.co\.uk/products/seo-spider/screamingfrogseospider_[0-9.]+_all\.deb' \
+            | head -1 || true)
+          if [ -z "$DL_URL" ]; then
+            echo "Couldn't auto-discover SF .deb URL; falling back to pinned version 21.6"
+            DL_URL="https://download.screamingfrog.co.uk/products/seo-spider/screamingfrogseospider_21.6_all.deb"
+          fi
+          echo "Downloading: $DL_URL"
+          curl -fL -o /tmp/sf.deb "$DL_URL"
+          ls -lh /tmp/sf.deb
+          sudo apt-get install -y --no-install-recommends /tmp/sf.deb || \
+            sudo dpkg -i /tmp/sf.deb || \
+            (sudo apt-get install -fy && sudo dpkg -i /tmp/sf.deb)
           which screamingfrogseospider
-          screamingfrogseospider --version || true
+          dpkg -L screamingfrogseospider | grep -E 'bin/|jar$' | head -20
 
       - name: Write SF licence file from secrets
         run: |
@@ -94,6 +105,21 @@ jobs:
           EOF
           done
           chmod 600 "$HOME/.ScreamingFrogSEOSpider/"*
+          ls -la "$HOME/.ScreamingFrogSEOSpider/"
+          echo "--- first line of each licence file (username only, no key) ---"
+          for f in "$HOME/.ScreamingFrogSEOSpider/"*; do
+            head -n 1 "$f" | sed 's/./*/g' | tr -d '\n' | head -c 30
+            echo "  ($(basename "$f"))"
+          done
+
+      - name: Verify SF binary is functional
+        run: |
+          set -euo pipefail
+          which screamingfrogseospider
+          echo "--- screamingfrogseospider --help (first 40 lines) ---"
+          xvfb-run -a -- screamingfrogseospider --help 2>&1 | head -40 || true
+          echo "--- version ---"
+          xvfb-run -a -- screamingfrogseospider --version 2>&1 | head -5 || true
 
       - name: Set up uv + Python
         uses: astral-sh/setup-uv@v3

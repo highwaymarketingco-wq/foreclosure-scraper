@@ -258,13 +258,21 @@ def run_site(preset: SitePreset, binary: str, work_root: Path) -> list[Path]:
     print(f"│  include: {preset.include_regex or '(none)'}")
     print(f"│  config:  {'(none)' if not config.exists() else config}")
     print(f"│  out:     {out_dir}")
-    print(f"└── running: {' '.join(cmd[:4])} … {cmd[-1]}")
+    print(f"└── running: {' '.join(cmd)}")
     try:
-        subprocess.run(cmd, check=True)
-    except subprocess.CalledProcessError as exc:
-        print(f"  ⚠ SF exited {exc.returncode} — checking for partial output anyway")
+        result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+    except FileNotFoundError as exc:
+        print(f"  ✗ SF binary not executable: {exc}")
+        return []
+    # Always echo SF's output so the CI log shows what it actually did.
+    if result.stdout:
+        print(result.stdout)
+    if result.stderr:
+        print("STDERR:", result.stderr, file=sys.stderr)
+    if result.returncode != 0:
+        print(f"  ⚠ SF exited {result.returncode}")
     csvs = _find_csvs(out_dir)
-    print(f"  → exported CSVs: {len(csvs)}")
+    print(f"  → exported CSVs from {preset.slug}: {len(csvs)}")
     return csvs
 
 
