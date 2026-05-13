@@ -190,9 +190,13 @@
     });
 
     out.sort((a, b) => {
-      if (sortBy === 'price_asc')  return (effPrice(a) ?? 1e12) - (effPrice(b) ?? 1e12);
-      if (sortBy === 'price_desc') return (effPrice(b) ?? -1)   - (effPrice(a) ?? -1);
-      if (sortBy === 'year_desc')  return (b.year || 0) - (a.year || 0);
+      // Always surface priced listings first, regardless of secondary sort.
+      const pa = effPrice(a), pb = effPrice(b);
+      if (pa == null && pb != null) return 1;
+      if (pa != null && pb == null) return -1;
+      if (sortBy === 'price_asc')   return (pa ?? 1e12) - (pb ?? 1e12);
+      if (sortBy === 'price_desc')  return (pb ?? -1)   - (pa ?? -1);
+      if (sortBy === 'year_desc')   return (b.year || 0) - (a.year || 0);
       if (sortBy === 'mileage_asc') return (a.mileage ?? 1e9) - (b.mileage ?? 1e9);
       return 0;
     });
@@ -214,7 +218,7 @@
         <span class="status status-${status}">${status}</span>
       </div>
       <div class="body">
-        <div class="price"><span class="label">${isBid ? 'Bid' : 'Price'}</span>${fmtPrice(ep)}</div>
+        <div class="price"><span class="label">${ep == null ? 'Price' : (isBid ? 'Bid' : 'Price')}</span>${ep == null ? '<span style="color:var(--muted);font-size:14px;font-weight:500">click to view</span>' : fmtPrice(ep)}</div>
         <div class="title">${l.title || '(untitled)'}</div>
         <div class="meta">
           ${l.year ? `<span>${l.year}</span>` : ''}

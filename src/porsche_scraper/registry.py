@@ -78,6 +78,10 @@ from .scrapers.general_classifieds import (
     HemmingsScraper,
 )
 
+# Sitemap-driven (high-volume URL discovery)
+from .scrapers.classiccars_sitemap import ClassicCarsSitemapScraper
+from .scrapers.elferspot_sitemap import ElferspotSitemapScraper
+
 # Peer-to-peer (off by default)
 from .scrapers.peer_to_peer import CraigslistScraper, FacebookMarketplaceScraper
 
@@ -134,6 +138,9 @@ ALL_SCRAPERS: list[tuple[str, Callable[[int, int | None], BaseScraper]]] = [
     # Peer-to-peer (off by default)
     ("fb_marketplace", lambda y, p: FacebookMarketplaceScraper(year_min=y, price_max=p or 45000)),
     ("craigslist", lambda y, p: CraigslistScraper(year_min=y, price_max=p or 45000)),
+    # Sitemap-driven (high-volume URL discovery)
+    ("elferspot_sitemap", lambda y, p: ElferspotSitemapScraper(year_min=y)),
+    ("classiccars_sitemap", lambda y, p: ClassicCarsSitemapScraper(year_min=y)),
 ]
 
 
