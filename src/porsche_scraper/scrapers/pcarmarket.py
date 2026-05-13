@@ -1,15 +1,23 @@
 """PCARMARKET — Porsche-focused online auctions + fixed-price marketplace.
 
-URLs:
-- Auctions:   https://www.pcarmarket.com/auctions?search=porsche&status=active
-- Marketplace: https://www.pcarmarket.com/marketplace?search=porsche
+PCARMARKET rebuilt the search-results page as a Vite SPA: the main
+grid is client-fetched and never lands in the static HTML, but the
+server still renders a 24-item sidebar of related auctions in the SEO
+shell. Each sidebar entry is a single `<a href="/auction/<slug>">` whose
+text follows the pattern:
 
-Server-rendered HTML (Symfony). Cards: `.auction-list-item` / `.car-tile`.
-Sits behind a light Cloudflare layer — uses the stealth transport.
+    "<title> — <status> $<price>"
+
+We harvest the sidebar items as a low-effort first pass. The full
+inventory is in `https://www.pcarmarket.com/sitemap.xml` (28k URLs);
+hooking that up is left for future work.
+
+Sits behind a light Cloudflare layer — curl-cffi `chrome124` is enough.
 """
 from __future__ import annotations
 
 import logging
+import re
 from urllib.parse import urljoin
 
 from selectolax.parser import HTMLParser
@@ -28,79 +36,88 @@ from ..models import (
 log = logging.getLogger(__name__)
 
 BASE = "https://www.pcarmarket.com"
+SEARCH_PATHS = (
+    "/auctions?search=porsche&status=active",
+    "/auctions?search=porsche&status=ended",
+    "/marketplace?search=porsche",
+)
+EXCLUDED_MODELS_LOWER = ("panamera", "cayenne", "macan")
 
-
-def _listing_from_card(card) -> Listing | None:
-    link = card.css_first(".auction-title a") or card.css_first("h3 a") or card.css_first("a[href*='/auction/']")
-    if not link:
-        return None
-    href = link.attributes.get("href")
-    if not href:
-        return None
-    url = urljoin(BASE, href)
-    title = link.text(strip=True)
-    bid_node = card.css_first(".current-bid .amount") or card.css_first(".current-bid") or card.css_first(".price")
-    img = card.css_first("img")
-    reserve_node = card.css_first(".reserve-status")
-    miles_node = card.css_first(".car-tile-mileage") or card.css_first(".mileage")
-    loc_node = card.css_first(".car-tile-location") or card.css_first(".location")
-    listing = Listing(
-        source="pcarmarket",
-        source_url=url,
-        title=title,
-        year=parse_year(title),
-        current_bid_usd=parse_price(bid_node.text(strip=True)) if bid_node else None,
-        mileage=parse_miles(miles_node.text(strip=True)) if miles_node else None,
-        location=loc_node.text(strip=True) if loc_node else None,
-        photo_url=(img.attributes.get("src") or img.attributes.get("data-src")) if img else None,
-        title_status=infer_title_status(title + " " + (reserve_node.text(strip=True) if reserve_node else "")),
-        seller_type="auction",
-    )
-    listing.drivable = infer_drivable(title, listing.title_status)
-    return listing
+# Title/status/price are jammed into a single anchor text. The em-dash
+# `—` (or hyphen "-" fallback) separates the title from the status +
+# price suffix.
+_ANCHOR_SUFFIX_RE = re.compile(r"\s*[—-]\s*(\w+)\s+\$([\d,]+)\s*$")
 
 
 def parse_results_html(html: str) -> list[Listing]:
     tree = HTMLParser(html)
     out: list[Listing] = []
     seen: set[str] = set()
-    for sel in (".auction-list-item", ".car-tile", "div[class*='auction-list']"):
-        cards = tree.css(sel)
-        if cards:
-            break
-    else:
-        cards = []
-    for card in cards:
-        listing = _listing_from_card(card)
-        if listing and listing.source_url not in seen:
-            seen.add(listing.source_url)
-            out.append(listing)
+    for a in tree.css('a[href*="/auction/"]'):
+        href = a.attributes.get("href") or ""
+        if not href:
+            continue
+        url = urljoin(BASE, href.split("?")[0])
+        if url in seen:
+            continue
+        anchor_text = a.text(strip=True)
+        if not anchor_text or "porsche" not in anchor_text.lower():
+            continue
+        if any(em in anchor_text.lower() for em in EXCLUDED_MODELS_LOWER):
+            continue
+        seen.add(url)
+        # Strip the trailing "— Active $40,000" so the title is clean.
+        title = anchor_text
+        status_word = None
+        price_text = None
+        m = _ANCHOR_SUFFIX_RE.search(anchor_text)
+        if m:
+            status_word = m.group(1)
+            price_text = m.group(2)
+            title = anchor_text[: m.start()].strip()
+        listing = Listing(
+            source="pcarmarket",
+            source_url=url,
+            listing_id=url.rstrip("/").rsplit("/", 1)[-1],
+            title=title,
+            year=parse_year(title),
+            current_bid_usd=parse_price(price_text),
+            mileage=parse_miles(title),
+            title_status=infer_title_status(title),
+            seller_type="auction",
+            raw={"pcarmarket": {"status": status_word}} if status_word else {},
+        )
+        listing.drivable = infer_drivable(title, listing.title_status)
+        out.append(listing)
     return out
 
 
 class PCarMarketScraper(BaseScraper):
     slug = "pcarmarket"
     name = "PCARMARKET"
+    timeout_s = 120.0
 
     def __init__(self, *, max_pages: int = 5):
+        # max_pages kept for signature compatibility — pagination on
+        # the sidebar is unsupported, so a single fetch per path covers
+        # whatever the SEO shell renders.
         self.max_pages = max_pages
 
     async def fetch(self) -> list[Listing]:
         out: list[Listing] = []
-        for path in (
-            "/auctions?search=porsche&status=active",
-            "/auctions?search=porsche&status=ended",
-            "/marketplace?search=porsche",
-        ):
-            for page in range(1, self.max_pages + 1):
-                url = urljoin(BASE, path) + f"&page={page}"
-                try:
-                    html = await fetch_text_stealth(url, timeout=60)
-                except Exception as exc:  # noqa: BLE001
-                    log.warning("pcarmarket %s page %d: %s", path, page, exc)
-                    break
-                listings = parse_results_html(html)
-                if not listings:
-                    break
-                out.extend(listings)
+        seen: set[str] = set()
+        for path in SEARCH_PATHS:
+            url = urljoin(BASE, path)
+            try:
+                html = await fetch_text_stealth(
+                    url, timeout=45, impersonate="chrome124"
+                )
+            except Exception as exc:  # noqa: BLE001
+                log.warning("pcarmarket %s: %s", path, exc)
+                continue
+            for listing in parse_results_html(html):
+                if listing.source_url in seen:
+                    continue
+                seen.add(listing.source_url)
+                out.append(listing)
         return out

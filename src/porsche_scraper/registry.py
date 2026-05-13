@@ -164,17 +164,23 @@ ALL_SCRAPERS: list[tuple[str, Callable[[int, int | None], BaseScraper]]] = [
 ]
 
 
-# Scrapers off by default. Three buckets:
+# Scrapers off by default. Four buckets:
 #   - need auth (fb_marketplace = FB_USER_COOKIE)
 #   - slow / lossy (craigslist = per-city fan-out)
-#   - bot-blocked from datacenter IPs (the 5 salvage aggregators added in
-#     PR #18 — correctly architected but all five sites consistently
-#     403/503 from GitHub-Actions and similar cloud egress. Run them via
-#     `sf_crawl.py` from a residential IP, or set PROXY_URL to a
-#     residential proxy, then opt back in via --include-off.)
+#   - bot-blocked aggregators from datacenter IPs (the 5 salvage
+#     aggregators added in PR #18 — correctly architected but all five
+#     sites consistently 403/503 from GitHub-Actions and similar cloud
+#     egress)
+#   - copart: hard-blocked by Imperva/Incapsula on every transport
+#     (httpx, curl-cffi chrome124, Patchright stealth) from any
+#     datacenter IP. Cannot be unblocked without a residential proxy.
+#
+# Run any of these via `sf_crawl.py` from a residential IP, or set
+# PROXY_URL to a residential proxy, then opt back in via --include-off.
 DEFAULT_OFF: set[str] = {
     "fb_marketplace",
     "craigslist",
+    "copart",
     "bid_cars",
     "carfast",
     "autoauctionspy",
