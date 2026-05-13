@@ -353,20 +353,167 @@ def _build_anthropic_client():
     return client, _assess_one_anthropic
 
 
+def _parse_gemini_keys() -> list[str]:
+    """Collect every Gemini API key available, in order to try them.
+
+    Supports two env-var styles for multi-account quota rotation:
+      - GEMINI_API_KEY: a single key OR a comma-separated list
+        (e.g. "key1,key2,key3"). Whitespace stripped per key.
+      - GEMINI_API_KEY_1, GEMINI_API_KEY_2, ... : numbered env vars,
+        scanned in order until the first gap. Useful when you don't
+        want to commas-pack a long string.
+
+    Empty/None values are dropped. Duplicates preserved (caller decides).
+    """
+    keys: list[str] = []
+    primary = os.environ.get("GEMINI_API_KEY") or ""
+    for part in primary.split(","):
+        k = part.strip()
+        if k:
+            keys.append(k)
+    # Numbered fallbacks
+    i = 1
+    while True:
+        v = os.environ.get(f"GEMINI_API_KEY_{i}")
+        if not v:
+            break
+        v = v.strip()
+        if v and v not in keys:
+            keys.append(v)
+        i += 1
+    return keys
+
+
+class GeminiRotatingClient:
+    """Wraps multiple Gemini API keys, rotating to the next key when
+    one returns 429 RESOURCE_EXHAUSTED. Each key has its own daily
+    free-tier quota (1500 RPD on gemini-2.0-flash), so 4 keys = 6000
+    RPD effective ceiling at $0 cost.
+
+    Behavior:
+      - Starts on key[0]. Builds a lazy client per key on first use.
+      - On 429 from generate_content, marks the current key 'exhausted',
+        switches to next available key, retries the request once.
+      - When ALL keys are exhausted, returns None (assess_fn handles it
+        like a normal API error).
+      - Exhausted state is in-process only — doesn't persist across runs.
+        That's fine; each daily run gets a fresh quota for each key.
+    """
+
+    def __init__(self, keys: list[str]):
+        from google import genai
+        self._genai = genai
+        self._keys = list(keys)
+        self._exhausted: set[int] = set()
+        self._clients: dict[int, object] = {}
+        self._idx = 0
+
+    @property
+    def num_keys(self) -> int:
+        return len(self._keys)
+
+    def _current_client(self):
+        """Return the client for the current key idx, building if needed."""
+        if self._idx not in self._clients:
+            self._clients[self._idx] = self._genai.Client(api_key=self._keys[self._idx])
+        return self._clients[self._idx]
+
+    def _rotate(self) -> bool:
+        """Mark current key exhausted, advance to next non-exhausted.
+        Returns True if a fresh key is available, False if all spent."""
+        self._exhausted.add(self._idx)
+        for offset in range(1, self.num_keys + 1):
+            candidate = (self._idx + offset) % self.num_keys
+            if candidate not in self._exhausted:
+                self._idx = candidate
+                log.info(
+                    "vision.gemini.rotated_key",
+                    new_idx=self._idx,
+                    exhausted_count=len(self._exhausted),
+                    total_keys=self.num_keys,
+                )
+                return True
+        return False
+
+    # The .aio.models.generate_content path is what _assess_one_gemini
+    # uses. We expose a compatible attribute chain so the call site
+    # doesn't need to know we're rotating: client.aio.models.generate_content(...)
+
+    class _ModelsProxy:
+        def __init__(self, parent: "GeminiRotatingClient"):
+            self._parent = parent
+
+        async def generate_content(self, **kwargs):
+            # Try up to num_keys times: each 429 rotates + retries.
+            tries = 0
+            last_exc: Optional[Exception] = None
+            while tries < self._parent.num_keys:
+                tries += 1
+                client = self._parent._current_client()
+                try:
+                    return await client.aio.models.generate_content(**kwargs)
+                except Exception as exc:
+                    last_exc = exc
+                    msg = str(exc).lower()
+                    # 429 / quota / resource_exhausted → rotate, retry
+                    is_quota = (
+                        "429" in msg
+                        or "resource_exhausted" in msg
+                        or "quota" in msg
+                        or "exceeded" in msg
+                    )
+                    if not is_quota:
+                        # Some other API error — don't burn through keys
+                        raise
+                    rotated = self._parent._rotate()
+                    if not rotated:
+                        log.warning(
+                            "vision.gemini.all_keys_exhausted",
+                            keys=self._parent.num_keys,
+                        )
+                        raise
+            # Should not reach — defensive
+            if last_exc:
+                raise last_exc
+
+    class _AioProxy:
+        def __init__(self, parent: "GeminiRotatingClient"):
+            self.models = GeminiRotatingClient._ModelsProxy(parent)
+
+    @property
+    def aio(self):
+        # Build lazily so attribute access doesn't fail if construction
+        # somehow happens with 0 keys.
+        return GeminiRotatingClient._AioProxy(self)
+
+
 def _build_gemini_client():
     """Set up Gemini client. Returns (client, assess_fn) or (None, None).
-    Uses the supported google-genai SDK; the old google-generativeai
-    package is deprecated."""
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        log.warning("vision.no_api_key", provider="gemini", hint="set GEMINI_API_KEY (mint at https://aistudio.google.com/apikey)")
+
+    Supports multi-key rotation: when GEMINI_API_KEY is comma-separated
+    (or numbered GEMINI_API_KEY_N env vars are set), the returned client
+    rotates between keys on 429. Each Gemini account has its own daily
+    free-tier quota (1500 RPD on gemini-2.0-flash), so 4 keys yield
+    ~6000 RPD effective cap at $0.
+    """
+    keys = _parse_gemini_keys()
+    if not keys:
+        log.warning("vision.no_api_key", provider="gemini", hint="set GEMINI_API_KEY (mint at https://aistudio.google.com/apikey) — single key, comma-separated list, or numbered GEMINI_API_KEY_1/2/3")
         return None, None
     try:
-        from google import genai
+        from google import genai  # noqa: F401
     except ImportError:
         log.warning("vision.sdk_missing", provider="gemini", hint="pip install google-genai")
         return None, None
-    client = genai.Client(api_key=api_key)
+    if len(keys) == 1:
+        # Fast path — single key, plain client, no rotation overhead.
+        from google import genai
+        client = genai.Client(api_key=keys[0])
+        log.info("vision.gemini.client_built", keys=1, rotation=False)
+        return client, _assess_one_gemini
+    # Multi-key rotation
+    client = GeminiRotatingClient(keys)
+    log.info("vision.gemini.client_built", keys=len(keys), rotation=True)
     return client, _assess_one_gemini
 
 

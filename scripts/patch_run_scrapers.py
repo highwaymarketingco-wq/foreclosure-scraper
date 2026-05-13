@@ -130,6 +130,13 @@ KNOWN_FIXED = (
     "law_firms.hutchens",
     "law_firms.bell_carrington",
     "law_firms.finkel",
+    # Newly-wired RENDER-REQUIRED firms (2026-05-12 PR #2). Scrapling
+    # stealth + state-specific click-throughs (disclaimer modal /
+    # splash entry / AJAX wait). Adds Polk/Mecklenburg NC coverage
+    # that wasn't being captured by the 4 working firms above.
+    "law_firms.aldridge_pite",
+    "law_firms.korn",
+    "law_firms.mcmichael_taylor_gray",
     # Kania Law Firm — NC tax-foreclosure auctions across ~24 western
     # NC counties. Single largest source of tax-sale listings in the
     # Asheville / Charlotte regions. Cloudflare-protected, falls back

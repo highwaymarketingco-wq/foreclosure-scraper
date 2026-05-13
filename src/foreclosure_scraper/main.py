@@ -616,6 +616,19 @@ async def run() -> int:
         log.error("relationship_deeds.failed",
                   traceback=traceback.format_exc())
 
+    # Skip-trace (dad's #7): homeowner contact info for short-sale outreach.
+    # Provider-pluggable via SKIP_TRACE_PROVIDER env:
+    #   - "none" (default): disabled, no API calls
+    #   - "tax_records_only": FREE, reads GIS mailing address (absentee detector)
+    #   - "batchskiptracing" / etc.: PAID, $0.05-0.20/lead
+    # Cap via SKIP_TRACE_MAX_PER_RUN (default 100), prioritized by sale_date
+    # proximity so the imminent-sale leads always get traced first.
+    try:
+        from .enrichment_skip_trace import enrich_with_skip_trace
+        await enrich_with_skip_trace(enriched)
+    except Exception:
+        log.error("skip_trace.failed", traceback=traceback.format_exc())
+
     # Comp finder + property-spec backfill — pulls 180-day sold pool per county
     # from HomeHarvest (free), backfills missing sqft/beds/baths/year, attaches
     # 3 comparable sales per listing matched by zip + sqft + beds.

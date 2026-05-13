@@ -76,7 +76,11 @@ jobs:
       # raw.condition_tier shape so the comp popout works either way.
       VISION_PROVIDER: ${{ vars.VISION_PROVIDER || 'anthropic' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # Multi-account Gemini key rotation — see weekly.yml comment.
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+      GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
+      GEMINI_API_KEY_4: ${{ secrets.GEMINI_API_KEY_4 }}
       VISION_MAX_LISTINGS: "0"          # patch run skips active-listing Vision
       SOLD_POOL_VISION_MAX_LISTINGS: "100"
       # NC case-status: two-stage dispatch.
@@ -94,6 +98,11 @@ jobs:
       # username/password form. ~$0.001 per solve, ~$0.20/week at our
       # volume. Without this, Tyler auth fails at last_step='waf_challenge_detected'.
       CAPSOLVER_API_KEY: ${{ secrets.CAPSOLVER_API_KEY }}
+      # Skip-trace (dad's #7): homeowner contact info. Default 'none'.
+      # Repo variable SKIP_TRACE_PROVIDER picks the provider.
+      SKIP_TRACE_PROVIDER: ${{ vars.SKIP_TRACE_PROVIDER || 'none' }}
+      SKIP_TRACE_API_KEY: ${{ secrets.SKIP_TRACE_API_KEY }}
+      SKIP_TRACE_MAX_PER_RUN: ${{ vars.SKIP_TRACE_MAX_PER_RUN || '100' }}
       LOG_LEVEL: INFO
       PYTHONUNBUFFERED: "1"
 
