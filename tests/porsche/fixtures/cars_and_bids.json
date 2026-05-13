@@ -1,0 +1,40 @@
+{
+  "auctions": [
+    {
+      "id": "abc1",
+      "slug": "2014-porsche-boxster-base",
+      "title": "2014 Porsche Boxster Base",
+      "year": 2014,
+      "make": "Porsche",
+      "model": "Boxster",
+      "currentBid": 22500,
+      "mileage": 58000,
+      "sellerLocation": "Austin, TX",
+      "titleStatus": "Clean",
+      "images": [{"url": "https://media.carsandbids.com/abc1.jpg"}]
+    },
+    {
+      "id": "abc2",
+      "slug": "2017-porsche-cayenne-platinum",
+      "title": "2017 Porsche Cayenne Platinum",
+      "year": 2017,
+      "make": "Porsche",
+      "model": "Cayenne",
+      "currentBid": 25000,
+      "mileage": 62000,
+      "titleStatus": "Clean"
+    },
+    {
+      "id": "abc3",
+      "slug": "2018-porsche-911-rebuilt",
+      "title": "2018 Porsche 911 Carrera - Rebuilt",
+      "year": 2018,
+      "make": "Porsche",
+      "model": "911",
+      "currentBid": 55000,
+      "mileage": 12000,
+      "titleStatus": "Rebuilt",
+      "sellerLocation": "Phoenix, AZ"
+    }
+  ]
+}
