@@ -125,14 +125,16 @@ jobs:
             echo "  ($f)"
           done
 
-      - name: Verify SF binary is functional
+      - name: Verify SF binary is functional + dump FULL --help
         run: |
           set -euo pipefail
           which screamingfrogseospider
-          echo "--- screamingfrogseospider --help (first 40 lines) ---"
-          xvfb-run -a -- screamingfrogseospider --help 2>&1 | head -40 || true
-          echo "--- version ---"
-          xvfb-run -a -- screamingfrogseospider --version 2>&1 | head -5 || true
+          echo "--- screamingfrogseospider --help (FULL output, looking for EULA/accept flags) ---"
+          xvfb-run -a -- screamingfrogseospider --help 2>&1 | head -400 || true
+          echo "--- grep for accept/eula/licence/agree flags ---"
+          xvfb-run -a -- screamingfrogseospider --help 2>&1 \
+            | grep -iE -- '--accept|--eula|--licence|--license|--agree|EULA|agreement' \
+            || echo "(no obvious EULA flag in --help)"
 
       - name: Set up uv + Python
         uses: astral-sh/setup-uv@v3
