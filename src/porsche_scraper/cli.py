@@ -50,6 +50,10 @@ def _parser() -> argparse.ArgumentParser:
         "--allow-unknown-price", action="store_true",
         help="Keep listings with no price (default drops them when title isn't salvage/rebuilt).",
     )
+    p.add_argument(
+        "--include-off", action="store_true",
+        help="Include scrapers that are off by default (fb_marketplace, craigslist).",
+    )
     p.add_argument("--verbose", "-v", action="count", default=0)
     p.add_argument("--list-scrapers", action="store_true")
     return p
@@ -70,6 +74,7 @@ def main(argv: list[str] | None = None) -> int:
         price_max=args.price_max,
         only=args.only,
         skip=args.skip,
+        include_off_by_default=args.include_off,
     )
     if not scrapers:
         print("no scrapers selected", file=sys.stderr)
