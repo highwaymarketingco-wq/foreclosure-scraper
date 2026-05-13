@@ -359,9 +359,9 @@ def _parse_gemini_keys() -> list[str]:
     Supports two env-var styles for multi-account quota rotation:
       - GEMINI_API_KEY: a single key OR a comma-separated list
         (e.g. "key1,key2,key3"). Whitespace stripped per key.
-      - GEMINI_API_KEY_1, GEMINI_API_KEY_2, ... : numbered env vars,
-        scanned in order until the first gap. Useful when you don't
-        want to commas-pack a long string.
+      - GEMINI_API_KEY_1, GEMINI_API_KEY_2, ... GEMINI_API_KEY_10 :
+        numbered env vars. Gaps are skipped so callers can leave _1
+        empty and set _2/_3 only (matches the workflow yaml pattern).
 
     Empty/None values are dropped. Duplicates preserved (caller decides).
     """
@@ -371,16 +371,10 @@ def _parse_gemini_keys() -> list[str]:
         k = part.strip()
         if k:
             keys.append(k)
-    # Numbered fallbacks
-    i = 1
-    while True:
-        v = os.environ.get(f"GEMINI_API_KEY_{i}")
-        if not v:
-            break
-        v = v.strip()
+    for i in range(1, 11):
+        v = (os.environ.get(f"GEMINI_API_KEY_{i}") or "").strip()
         if v and v not in keys:
             keys.append(v)
-        i += 1
     return keys
 
 
