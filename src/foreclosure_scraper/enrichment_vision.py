@@ -62,9 +62,11 @@ GEMINI_VISION_MODEL = os.environ.get(
 
 MAX_PHOTOS_PER_LISTING = 7   # up to 5 real + aerial + street
 MAX_REAL_PHOTOS = 5          # how many of the listing photos to send
-# 2000 tokens needed for multi-photo observations: 1000 was truncating
-# the structured JSON output mid-key, causing parse_fail in run #6.
-MAX_TOKENS = 2000
+# 4000 tokens: gemini-2.5-flash is wordier than 2.0-flash and 2000 was
+# truncating the JSON mid-observation in ~17% of calls (parse_fail in
+# run on 2026-05-13). 4000 covers the longest observed responses with
+# room to spare. Still well inside the 250K TPM free-tier cap.
+MAX_TOKENS = 4000
 # Free-tier-safe defaults: 1 in-flight + 6s delay = 10 RPM. Override
 # both via env when on a paid tier with higher limits.
 CONCURRENCY = int(os.environ.get("VISION_CONCURRENCY", "1"))
