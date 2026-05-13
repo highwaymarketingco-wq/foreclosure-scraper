@@ -1103,6 +1103,159 @@
         },
         "heuristic_targets": 1320
       }
+    },
+    {
+      "kind": "rerun_scrapers",
+      "applied_at": "2026-05-13T07:50:02.095633+00:00",
+      "scraper_slugs": [
+        "counties_nc.brunswick_tax",
+        "counties_nc.buncombe_tax",
+        "counties_nc.cleveland_tax",
+        "counties_nc.henderson_tax",
+        "counties_nc.nc_ecourts_lis_pendens",
+        "counties_nc.nc_rod_substitute_trustee",
+        "counties_nc.new_hanover_tax",
+        "counties_nc.polk_tax",
+        "counties_nc.rutherford_tax",
+        "counties_sc.anderson_master_in_equity",
+        "counties_sc.pickens_master_in_equity",
+        "counties_sc.sc_courtrosters",
+        "counties_sc.sc_public_index_lis_pendens",
+        "counties_sc.spartanburg_master_in_equity",
+        "law_firms.aldridge_pite",
+        "law_firms.bell_carrington",
+        "law_firms.brock_scott",
+        "law_firms.finkel",
+        "law_firms.hutchens",
+        "law_firms.kania",
+        "law_firms.korn",
+        "law_firms.mcmichael_taylor_gray",
+        "public_notices.ncnotices"
+      ],
+      "raw_per_slug": {
+        "public_notices.ncnotices": 40,
+        "law_firms.aldridge_pite": 0,
+        "law_firms.bell_carrington": 59,
+        "law_firms.brock_scott": 356,
+        "law_firms.finkel": 8,
+        "law_firms.hutchens": 362,
+        "law_firms.kania": 6,
+        "law_firms.korn": 0,
+        "law_firms.mcmichael_taylor_gray": 0,
+        "counties_sc.anderson_master_in_equity": 5,
+        "counties_sc.pickens_master_in_equity": 0,
+        "counties_sc.sc_courtrosters": 0,
+        "counties_sc.sc_public_index_lis_pendens": 238,
+        "counties_sc.spartanburg_master_in_equity": 22,
+        "counties_nc.brunswick_tax": 0,
+        "counties_nc.buncombe_tax": 2,
+        "counties_nc.cleveland_tax": 5,
+        "counties_nc.henderson_tax": 15,
+        "counties_nc.nc_ecourts_lis_pendens": 329,
+        "counties_nc.nc_rod_substitute_trustee": 0,
+        "counties_nc.new_hanover_tax": 4,
+        "counties_nc.polk_tax": 2,
+        "counties_nc.rutherford_tax": 11
+      },
+      "active_kept": 729,
+      "sold_pool_kept": 46,
+      "promoted_to_sold_via_case_status": 0,
+      "active_added_new": 11,
+      "active_merged_into_existing": 718,
+      "active_final": 1407,
+      "sold_pool_final": 52,
+      "valuation_failures": 0,
+      "enrichment_stats": {
+        "enrich_gis": "ok",
+        "enrich_courts": "ok",
+        "compute_flags": "ok",
+        "geocode": "ok",
+        "location": "ok",
+        "rod": "ok",
+        "address_backfill": "ok",
+        "bk_property": "ok",
+        "parcel_lookup": "ok",
+        "aggressive_address": "ok",
+        "lis_pendens_resolver": {
+          "queried": 76,
+          "address_filled": 16,
+          "parcel_only": 5,
+          "ambiguous": 9,
+          "no_match": 46,
+          "retagged_county": 0,
+          "no_layer": 14,
+          "fiduciary_skipped": 1
+        },
+        "parcel_reverse_geo": {
+          "queried": 45,
+          "annotated": 45,
+          "no_match": 0
+        },
+        "address_synth": "ok",
+        "county_pin": {
+          "scanned": 729,
+          "case_pinned": 571,
+          "already_correct": 571,
+          "retagged_county": 0,
+          "address_nulled": 0,
+          "no_case_decode": 158
+        },
+        "property_kind": "ok",
+        "judgment_amount": {
+          "scanned": 729,
+          "matched": 0,
+          "already_set": 0,
+          "no_text": 9,
+          "text_no_match": 720,
+          "by_source_matched": {}
+        },
+        "validation": {
+          "county_normalized": 1,
+          "county_nulled_cross_state": 0,
+          "parcel_nulled_too_short": 50,
+          "parcel_nulled_bad_pattern": 0,
+          "opening_bid_zeroed": 66,
+          "opening_bid_too_large": 0,
+          "tax_value_too_low": 2,
+          "tax_value_too_large": 0,
+          "sqft_out_of_range": 0,
+          "year_built_out_of_range": 0,
+          "bedrooms_out_of_range": 0,
+          "bathrooms_out_of_range": 0,
+          "comps_dropped_price": 0,
+          "comps_dropped_kind_mismatch": 0,
+          "validation_exceptions": 0
+        },
+        "data_quality": {
+          "synthetic_address": 390,
+          "approximate_address": 45,
+          "low_arv_confidence": 0,
+          "no_sqft": 587,
+          "no_address": 0,
+          "exceptions": 0
+        },
+        "upset_bid": {
+          "scanned": 729,
+          "tagged_in_window": 0,
+          "tag_cleared_outside_window": 0,
+          "no_sale_date": 336,
+          "non_nc": 297
+        }
+      },
+      "nc_case_status": {
+        "tyler_tagged": 0,
+        "tyler_status": {
+          "outcome": "login_or_search_failed",
+          "reason": "no_cases_returned_from_tyler",
+          "tagged": 0,
+          "targets": 50,
+          "checked_at": "2026-05-13T07:49:51.437863Z",
+          "last_step": "waf_solve_failed",
+          "landed_url": "https://odysseyidentityprovider.tylerhost.net/idp/account/signin?ReturnUrl=%2fidp%2fissue%2fwsfed%3fwa%3dwsignin1.0%26wtrealm%3dhttps%253a%252f%252fportal-nc.tylertech.cloud%252fPortal%252f%26wctx%3dr",
+          "step_error": "CapSolver returned no token (no api key, low balance, or solve failure)"
+        },
+        "heuristic_targets": 1322
+      }
     }
   ]
 }
