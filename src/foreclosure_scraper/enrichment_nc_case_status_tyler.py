@@ -59,7 +59,26 @@ def _dump_debug_html(label: str, content: str) -> None:
 
 PORTAL_BASE = "https://portal-nc.tylertech.cloud/Portal"
 LOGIN_URL = f"{PORTAL_BASE}/Account/Login"
+# Anonymous Smart Search dashboard — no login required. The Portal
+# requires a CAPTCHA every ~5 min but our enrichment_waf_oss solver
+# handles that for free. Confirmed working anonymously 2026-05-13.
 SEARCH_URL = f"{PORTAL_BASE}/Home/Dashboard/29"
+
+# NC court case numbers look like '08CR084048-910' (year + type letters
+# + sequence + suffix). Anything without letters is almost certainly a
+# CourtListener docket ID, which Tyler won't find. The FC01-style suffix
+# (e.g. '25-19516-FC01') is internal scraper notation, not Tyler's.
+_NC_CASE_RE = re.compile(r"^\d{1,4}[A-Z]{1,4}\d{3,}", re.IGNORECASE)
+
+
+def _looks_like_nc_court_case(s: str) -> bool:
+    """Pattern test for NC court case# (letters between digits).
+    Normalizes whitespace so '23 CVD 5678' is treated the same as '23CVD5678'.
+    """
+    if not s:
+        return False
+    normalized = re.sub(r"\s+", "", s.strip())
+    return bool(_NC_CASE_RE.match(normalized))
 
 # Concurrency = 1 (single browser session, sequential case lookups) since
 # we share one auth context. Cap defaults to 50 cases per run to stay
@@ -121,6 +140,275 @@ def _within_n_days(date_str: str, n: int) -> bool:
         except ValueError:
             continue
     return False
+
+
+async def _drive_anonymous_search(
+    page,
+    case_numbers: list[str],
+) -> dict[str, dict]:
+    """Anonymous Tyler portal search — no login required.
+
+    Goes to Smart Search, solves the AWS WAF Captcha (~ every 5 min), and
+    queries each case# in sequence. Skips case#s that don't match the
+    NC court format (e.g. CourtListener docket IDs).
+
+    Returns dict mapping case_number → parsed info. Cases that error
+    out or have no results are simply absent from the result.
+    """
+    out: dict[str, dict] = {}
+
+    # Step 1: Land on Smart Search. May get WAF-challenged.
+    LAST_RUN_STATUS["last_step"] = "landing_search_url"
+    try:
+        await page.goto(SEARCH_URL, wait_until="networkidle", timeout=45000)
+    except Exception as exc:
+        log.warning("nc_ecourts.search.land_fail", error=str(exc)[:200])
+        LAST_RUN_STATUS.update({
+            "last_step": "land_failed",
+            "step_error": str(exc)[:200],
+        })
+        return out
+
+    LAST_RUN_STATUS["landed_url"] = page.url[:200]
+
+    # Step 1b: Detect + solve WAF challenge if present.
+    waf_present = False
+    try:
+        body = (await page.content()).lower()
+        if "let's confirm you are human" in body or "awswaf" in body:
+            waf_present = True
+        # also if the search input isn't there, WAF is interposing
+        try:
+            await page.wait_for_selector('#caseCriteria_SearchCriteria', timeout=2000)
+        except Exception:
+            waf_present = waf_present or True
+    except Exception:
+        pass
+
+    if waf_present:
+        LAST_RUN_STATUS["last_step"] = "waf_challenge_detected"
+        log.info("nc_ecourts.search.waf_challenge_detected", url=page.url[:200])
+        from .enrichment_waf_oss import solve_waf_via_browser
+        solved = await solve_waf_via_browser(page)
+        if not solved and os.environ.get("CAPSOLVER_API_KEY"):
+            log.info("nc_ecourts.search.waf_oss_failed_trying_capsolver")
+            from .enrichment_capsolver import solve_aws_waf
+            token = await solve_aws_waf(page.url)
+            if token:
+                try:
+                    await page.context.add_cookies([{
+                        "name": "aws-waf-token",
+                        "value": token,
+                        "domain": ".tylerhost.net",
+                        "path": "/",
+                        "httpOnly": False,
+                        "secure": True,
+                        "sameSite": "None",
+                    }])
+                    await page.reload(wait_until="networkidle", timeout=45000)
+                    solved = True
+                except Exception as exc:
+                    log.warning("nc_ecourts.search.waf_cookie_fail", error=str(exc)[:200])
+        if not solved:
+            LAST_RUN_STATUS.update({
+                "last_step": "waf_solve_failed",
+                "step_error": "Browser-driven OSS solve failed; set CAPSOLVER_API_KEY as paid fallback if needed.",
+            })
+            try:
+                _dump_debug_html("anon_waf_fail", await page.content())
+            except Exception:
+                pass
+            return out
+        log.info("nc_ecourts.search.waf_solved", url=page.url[:200])
+
+    # Step 2: Wait for the search form. If it doesn't appear, we're not
+    # on the right page.
+    try:
+        await page.wait_for_selector('#caseCriteria_SearchCriteria', timeout=15000)
+    except Exception as exc:
+        log.warning("nc_ecourts.search.no_form", error=str(exc)[:160], url=page.url[:200])
+        try:
+            _dump_debug_html("anon_no_form", await page.content())
+        except Exception:
+            pass
+        LAST_RUN_STATUS.update({
+            "last_step": "search_form_missing",
+            "step_error": "Smart Search input not visible after WAF clear",
+        })
+        return out
+
+    LAST_RUN_STATUS["last_step"] = "search_form_ready"
+    log.info("nc_ecourts.search.form_ready")
+
+    # Step 3: Loop through cases. Only those with NC-court-shaped numbers.
+    cases_attempted = 0
+    cases_with_data = 0
+    cases_skipped_bad_format = 0
+    for case_number in case_numbers:
+        if not _looks_like_nc_court_case(case_number):
+            cases_skipped_bad_format += 1
+            continue
+        cases_attempted += 1
+        dump = cases_attempted <= 2
+        try:
+            info = await _query_one_case_anonymous(page, case_number, debug_dump=dump)
+            if info:
+                out[case_number] = info
+                cases_with_data += 1
+        except Exception as exc:
+            log.debug("nc_ecourts.case_fail", case=case_number, error=str(exc)[:120])
+            continue
+
+    LAST_RUN_STATUS.update({
+        "last_step": "case_loop_done",
+        "cases_attempted": cases_attempted,
+        "cases_with_data": cases_with_data,
+        "cases_skipped_bad_format": cases_skipped_bad_format,
+        "step_error": None,
+    })
+    log.info(
+        "nc_ecourts.search.loop_done",
+        attempted=cases_attempted,
+        with_data=cases_with_data,
+        skipped_bad_format=cases_skipped_bad_format,
+    )
+    return out
+
+
+async def _query_one_case_anonymous(page, case_number: str, debug_dump: bool = False) -> Optional[dict]:
+    """Search Smart Search for one case#, click into the result, parse."""
+    # Always start from the Smart Search form. The page is sticky-state,
+    # so navigating back to SEARCH_URL guarantees a clean form.
+    try:
+        await page.goto(SEARCH_URL, wait_until="networkidle", timeout=30000)
+    except Exception as exc:
+        log.info("nc_ecourts.case.goto_fail", case=case_number, error=str(exc)[:160])
+        return None
+
+    # If a new WAF challenge popped (~5 min intervals), solve it
+    try:
+        body = (await page.content()).lower()
+        if "let's confirm you are human" in body:
+            from .enrichment_waf_oss import solve_waf_via_browser
+            log.info("nc_ecourts.case.waf_refresh", case=case_number)
+            if not await solve_waf_via_browser(page):
+                return None
+    except Exception:
+        pass
+
+    # Wait for the input
+    try:
+        await page.wait_for_selector('#caseCriteria_SearchCriteria', timeout=10000)
+    except Exception:
+        log.info("nc_ecourts.case.no_form", case=case_number)
+        return None
+
+    # Fill via JS (more reliable than .fill on this form) + dispatch
+    # input/change events so the framework's state updates.
+    try:
+        await page.evaluate(
+            """(v) => {
+                const e = document.querySelector('#caseCriteria_SearchCriteria');
+                e.value = v;
+                e.dispatchEvent(new Event('input', {bubbles: true}));
+                e.dispatchEvent(new Event('change', {bubbles: true}));
+            }""",
+            case_number,
+        )
+    except Exception as exc:
+        log.info("nc_ecourts.case.fill_fail", case=case_number, error=str(exc)[:160])
+        return None
+
+    # Click Submit
+    submitted = False
+    for sel in (
+        'button:has-text("Submit")',
+        'input[type="submit"][value="Submit"]',
+        'button[type="submit"]',
+    ):
+        try:
+            await page.click(sel, timeout=4000)
+            submitted = True
+            break
+        except Exception:
+            continue
+    if not submitted:
+        try:
+            await page.press('#caseCriteria_SearchCriteria', "Enter")
+            submitted = True
+        except Exception:
+            pass
+    if not submitted:
+        log.info("nc_ecourts.case.no_submit_button", case=case_number)
+        return None
+
+    # Wait for results to load — there's a "Loading, please wait..."
+    # state that takes 10-20s before the result table renders.
+    try:
+        await page.wait_for_selector(
+            'table, .case-list, :text("No cases match your search")',
+            timeout=30000,
+        )
+    except Exception:
+        log.info("nc_ecourts.case.results_timeout", case=case_number)
+        if debug_dump:
+            try:
+                _dump_debug_html(f"case_{case_number.replace('/','_')}_timeout", await page.content())
+            except Exception:
+                pass
+        return None
+
+    # Quick early-out for empty results
+    page_text = (await page.content()).lower()
+    if "no cases match your search" in page_text:
+        log.info("nc_ecourts.case.no_results", case=case_number)
+        return None
+
+    if debug_dump:
+        try:
+            _dump_debug_html(f"case_{case_number.replace('/','_')}_results", await page.content())
+        except Exception:
+            pass
+
+    # Click into the first case-number link in the result table.
+    clicked = None
+    for sel in (
+        f'a:has-text("{case_number}")',
+        "table a[href*='Case']",
+        "table tbody tr a",
+    ):
+        try:
+            await page.click(sel, timeout=5000)
+            await page.wait_for_load_state("networkidle", timeout=20000)
+            clicked = sel
+            break
+        except Exception:
+            continue
+    if not clicked:
+        log.info("nc_ecourts.case.no_detail_link", case=case_number)
+        return None
+    log.info("nc_ecourts.case.detail_loaded", case=case_number, url=page.url[:200])
+
+    try:
+        html = await page.content()
+    except Exception as exc:
+        log.info("nc_ecourts.case.content_fail", case=case_number, error=str(exc)[:160])
+        return None
+
+    if not html or len(html) < 1000:
+        log.info("nc_ecourts.case.html_too_short", case=case_number, length=len(html or ""))
+        return None
+
+    if debug_dump:
+        try:
+            _dump_debug_html(f"case_{case_number.replace('/','_')}_detail", html)
+        except Exception:
+            pass
+
+    parsed = _parse_case_detail_html(html)
+    if parsed is None:
+        log.info("nc_ecourts.case.parse_fail", case=case_number, html_length=len(html))
+    return parsed
 
 
 async def _drive_login_and_search(
@@ -638,15 +926,13 @@ async def enrich_with_nc_case_status_authenticated(
         })
         return 0
 
+    # Anonymous Smart Search works without credentials — no longer
+    # required since 2026-05-13 (anonymous flow + OSS WAF solver).
+    # Kept the env-read for backward compat in case someone wants to
+    # use the old login path in the future.
     username = os.environ.get("NC_ECOURTS_USERNAME")
     password = os.environ.get("NC_ECOURTS_PASSWORD")
-    if not username or not password:
-        log.info("nc_ecourts.auth.no_creds")
-        LAST_RUN_STATUS.update({
-            "outcome": "skipped",
-            "reason": "no_credentials_in_env",
-        })
-        return 0
+    use_anonymous = os.environ.get("NC_ECOURTS_USE_ANONYMOUS", "1") == "1"
 
     try:
         from scrapling.fetchers import StealthyFetcher
@@ -697,13 +983,27 @@ async def enrich_with_nc_case_status_authenticated(
     # Closure dict captured by page_action
     captured: dict[str, dict] = {}
 
-    async def page_action(page):
-        result = await _drive_login_and_search(page, username, password, case_numbers)
-        captured.update(result)
+    if use_anonymous:
+        async def page_action(page):
+            result = await _drive_anonymous_search(page, case_numbers)
+            captured.update(result)
+        fetch_url = SEARCH_URL
+    else:
+        if not username or not password:
+            log.info("nc_ecourts.auth.no_creds_for_authenticated")
+            LAST_RUN_STATUS.update({
+                "outcome": "skipped",
+                "reason": "anonymous_disabled_but_no_credentials",
+            })
+            return 0
+        async def page_action(page):
+            result = await _drive_login_and_search(page, username, password, case_numbers)
+            captured.update(result)
+        fetch_url = LOGIN_URL
 
     try:
         await StealthyFetcher.async_fetch(
-            LOGIN_URL,
+            fetch_url,
             headless=True,
             network_idle=True,
             timeout=240000,  # 4 min: WAF-solve + login + ~50 case lookups
