@@ -91,44 +91,81 @@ class FacebookMarketplaceScraper(BaseScraper):
 
 
 _FB_LISTING_RE = re.compile(r'"listing_id":"(\d+)"')
+_FB_CONTEXT_LOOKAHEAD = 4096
+_FB_CONTEXT_LOOKBEHIND = 1024
+
+
+def _fb_unescape(s: str) -> str:
+    if not s:
+        return ""
+    try:
+        return s.encode("utf-8").decode("unicode_escape").encode("latin-1").decode("utf-8", "replace")
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        return s
 
 
 def parse_fb_html(html: str) -> Iterable[Listing]:
-    """Parse FB Marketplace's embedded JSON. Best-effort.
+    """Parse FB Marketplace's embedded Relay JSON dumps. Best-effort.
 
-    FB serializes marketplace listings via Relay store dumps in script tags;
-    a complete parser would walk those dumps. This implementation extracts
-    the visible listing-id + the human-readable price/title/image strings
-    that appear alongside them, which covers the discovery use case (find
-    interesting listings; click through to FB for full detail).
+    Anchors on `"listing_id":"<digits>"` and harvests the surrounding fields.
+    FB ships Porsche listings via `RelayPrefetchedStreamCache` inside
+    script tags. Regex over a wide context window beats trying to
+    round-trip the whole dump.
     """
-    # Pull all listing_ids and the surrounding context window (price, title).
     seen: set[str] = set()
     for m in _FB_LISTING_RE.finditer(html):
         lid = m.group(1)
         if lid in seen:
             continue
         seen.add(lid)
-        # Walk ~2 KB around the match for nearby title/price/image strings.
-        start = max(0, m.start() - 400)
-        end = min(len(html), m.end() + 1500)
+        start = max(0, m.start() - _FB_CONTEXT_LOOKBEHIND)
+        end = min(len(html), m.end() + _FB_CONTEXT_LOOKAHEAD)
         chunk = html[start:end]
-        title_m = re.search(r'"marketplace_listing_title":"([^"]+)"', chunk)
-        price_m = re.search(r'"listing_price":\{"amount":"([\d.]+)"', chunk)
-        image_m = re.search(r'"primary_listing_photo":\{[^}]*"image":\{"uri":"([^"]+)"', chunk)
-        loc_m = re.search(r'"location":\{[^}]*"reverse_geocode":\{"city_page":\{"display_name":"([^"]+)"', chunk)
-        title = (title_m.group(1) if title_m else "").encode().decode("unicode_escape")
+
+        title_m = re.search(r'"marketplace_listing_title":"([^"\\]*(?:\\.[^"\\]*)*)"', chunk)
+        price_m = (
+            re.search(r'"listing_price":\{"amount":"([\d.]+)"', chunk)
+            or re.search(r'"formatted_price":\{[^}]*"text":"\$([\d,.]+)"', chunk)
+        )
+        image_m = (
+            re.search(r'"primary_listing_photo":\{[^}]*?"image":\{"uri":"([^"]+)"', chunk)
+            or re.search(r'"primary_photo_url":"([^"]+)"', chunk)
+        )
+        loc_m = (
+            re.search(
+                r'"location":\{[^}]*?"reverse_geocode":\{[^}]*?'
+                r'"city_page":\{[^}]*?"display_name":"([^"]+)"',
+                chunk,
+            )
+            or re.search(r'"location_text":\{"text":"([^"]+)"', chunk)
+        )
+        mileage_m = (
+            re.search(r'"mileage":\{"value":(\d+)', chunk)
+            or re.search(r'"odometer":\{"value":(\d+)', chunk)
+        )
+        year_m = re.search(r'"year":(\d{4})', chunk)
+        vin_m = re.search(r'"vin":"([A-HJ-NPR-Z0-9]{17})"', chunk)
+
+        title = _fb_unescape(title_m.group(1) if title_m else "")
         if "porsche" not in title.lower():
             continue
+        if any(em in title.lower() for em in ("panamera", "cayenne", "macan")):
+            continue
+
+        year_val = int(year_m.group(1)) if year_m else parse_year(title)
+        mileage_val = parse_miles(mileage_m.group(1)) if mileage_m else parse_miles(title)
+        price_val = parse_price(price_m.group(1)) if price_m else None
         listing = Listing(
             source="fb_marketplace",
             source_url=f"https://www.facebook.com/marketplace/item/{lid}/",
             listing_id=lid,
+            vin=vin_m.group(1) if vin_m else None,
             title=title,
-            year=parse_year(title),
-            price_usd=float(price_m.group(1)) if price_m else None,
+            year=year_val,
+            mileage=mileage_val,
+            price_usd=price_val,
             location=(loc_m.group(1) if loc_m else None),
-            photo_url=image_m.group(1).encode().decode("unicode_escape") if image_m else None,
+            photo_url=_fb_unescape(image_m.group(1)) if image_m else None,
             title_status=infer_title_status(title),
             seller_type="private",
         )
