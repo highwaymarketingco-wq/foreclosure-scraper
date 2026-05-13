@@ -136,6 +136,7 @@ KNOWN_FIXED = (
     # that wasn't being captured by the 4 working firms above.
     "law_firms.aldridge_pite",
     "law_firms.korn",
+    "law_firms.korn_pydoll",  # A/B variant — same target, pydoll instead of Scrapling
     "law_firms.mcmichael_taylor_gray",
     # Kania Law Firm — NC tax-foreclosure auctions across ~24 western
     # NC counties. Single largest source of tax-sale listings in the
@@ -378,6 +379,20 @@ async def _run_address_enrichments(new_listings: list[Listing]) -> dict:
         log.error("patch_run.judgment_amount_failed",
                   traceback=traceback.format_exc())
         stats["judgment_amount"] = "failed"
+
+    # Judgment-amount detail-page fetcher — for listings where pure
+    # text-mining didn't find a match, fetch the law-firm detail page
+    # and re-run the extractor on the fetched text.
+    try:
+        from foreclosure_scraper.enrichment_judgment_detail import (
+            enrich_judgment_amount_via_detail_pages,
+        )
+        s = await enrich_judgment_amount_via_detail_pages(new_listings)
+        stats["judgment_amount_detail"] = s
+    except Exception:
+        log.error("patch_run.judgment_amount_detail_failed",
+                  traceback=traceback.format_exc())
+        stats["judgment_amount_detail"] = "failed"
 
     # Pre-write validation gate
     try:
