@@ -221,24 +221,23 @@ def _detect_sf_binary() -> str:
 def _build_sf_command(
     binary: str, preset: SitePreset, out_dir: Path, config: Path | None
 ) -> list[str]:
+    # SF 23.3's CLI is intentionally minimal: --max-urls and --include
+    # are *.seospiderconfig* settings, NOT CLI flags. Passing them on the
+    # command line returns `FATAL - Unrecognized option`. We apply both
+    # filters in Python (_extract_urls_from_sf_csv) after SF dumps its CSV.
     cmd = [binary, "--headless", "--save-crawl", "--output-folder", str(out_dir)]
     if config and config.exists():
         cmd += ["--config", str(config)]
     if preset.crawl_mode == "sitemap":
         cmd += ["--crawl-sitemap", preset.seed]
     elif preset.crawl_mode == "list":
-        # Caller would supply a URL list file via the seed path.
         cmd += ["--crawl-list", preset.seed]
     else:
         cmd += ["--crawl", preset.seed]
-    # Bulk exports — Internal:All always; Custom Extraction:All if config sets extractors.
     exports = ["Internal:All"]
     if config and config.exists():
         exports.append("Custom Extraction:All")
     cmd += ["--bulk-export", ",".join(exports), "--export-format", "csv"]
-    cmd += ["--max-urls", str(preset.max_urls)]
-    if preset.include_regex:
-        cmd += ["--include", preset.include_regex]
     cmd += ["--overwrite"]
     return cmd
 
@@ -276,8 +275,20 @@ def run_site(preset: SitePreset, binary: str, work_root: Path) -> list[Path]:
     return csvs
 
 
-def _extract_urls_from_sf_csv(path: Path) -> list[str]:
-    """Pull the URL column (SF calls it 'Address') from any SF export CSV."""
+def _extract_urls_from_sf_csv(path: Path, preset: "SitePreset | None" = None) -> list[str]:
+    """Pull the URL column (SF calls it 'Address') from any SF export CSV.
+
+    SF 23.3 has no `--include` or `--max-urls` CLI flag, so we apply
+    both filters here (using the SitePreset that produced this CSV).
+    """
+    import re as _re
+
+    include_re = (
+        _re.compile(preset.include_regex)
+        if preset and preset.include_regex
+        else None
+    )
+    cap = preset.max_urls if preset else 10_000
     urls: list[str] = []
     with path.open(newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
@@ -291,9 +302,24 @@ def _extract_urls_from_sf_csv(path: Path) -> list[str]:
             return urls
         for row in reader:
             u = (row.get(addr_col) or "").strip()
-            if u.startswith("http"):
-                urls.append(u)
+            if not u.startswith("http"):
+                continue
+            if include_re and not include_re.search(u):
+                continue
+            urls.append(u)
+            if len(urls) >= cap:
+                break
     return urls
+
+
+def _preset_for_csv(path: Path) -> "SitePreset | None":
+    """SF dumps each site's CSV under work_root/<preset.slug>/ so we map
+    the CSV back to its preset by the parent directory name."""
+    parent_name = path.parent.name
+    for preset in PRESETS.values():
+        if preset.slug == parent_name:
+            return preset
+    return None
 
 
 async def _enrich_urls(urls: list[str], concurrency: int) -> list[dict]:
@@ -360,7 +386,8 @@ def run_import(
     if enrich:
         urls: set[str] = set()
         for c in csvs:
-            urls.update(_extract_urls_from_sf_csv(c))
+            preset = _preset_for_csv(c)
+            urls.update(_extract_urls_from_sf_csv(c, preset))
         urls_l = sorted(urls)
         print(f"\n  enriching {len(urls_l)} URLs via detail-page fetches "
               f"(concurrency={enrich_concurrency}) …")
