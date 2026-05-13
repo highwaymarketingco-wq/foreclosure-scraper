@@ -370,22 +370,30 @@ async def _query_one_case_anonymous(page, case_number: str, debug_dump: bool = F
         except Exception:
             pass
 
-    # Click into the first case-number link in the result table.
-    clicked = None
-    for sel in (
-        f'a:has-text("{case_number}")',
-        "table a[href*='Case']",
-        "table tbody tr a",
-    ):
-        try:
-            await page.click(sel, timeout=5000)
-            await page.wait_for_load_state("networkidle", timeout=20000)
-            clicked = sel
-            break
-        except Exception:
-            continue
-    if not clicked:
+    # Click into the case detail. Tyler renders the detail link as
+    #   <a class="caseLink" href="#" data-url="/app/RegisterOfActions/?id=...">
+    # The href is # so a normal .click() doesn't navigate. Read data-url
+    # off the matching link and goto() it directly. Anonymous access
+    # works because the URL embeds &isAuthenticated=False&mode=portalembed.
+    detail_url = await page.evaluate(
+        """(caseNum) => {
+            const links = [...document.querySelectorAll('a.caseLink, a[data-url]')];
+            // Prefer exact-match on title (Tyler sets title=caseNumber)
+            const exact = links.find(a => (a.getAttribute('title') || '').trim() === caseNum);
+            const pick = exact || links[0];
+            return pick ? pick.getAttribute('data-url') : null;
+        }""",
+        case_number,
+    )
+    if not detail_url:
         log.info("nc_ecourts.case.no_detail_link", case=case_number)
+        return None
+    if detail_url.startswith("/"):
+        detail_url = "https://portal-nc.tylertech.cloud" + detail_url
+    try:
+        await page.goto(detail_url, wait_until="networkidle", timeout=20000)
+    except Exception as exc:
+        log.info("nc_ecourts.case.detail_goto_fail", case=case_number, error=str(exc)[:160])
         return None
     log.info("nc_ecourts.case.detail_loaded", case=case_number, url=page.url[:200])
 
