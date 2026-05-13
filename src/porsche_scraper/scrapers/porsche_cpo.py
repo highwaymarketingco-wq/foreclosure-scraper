@@ -130,7 +130,35 @@ def _listing_from_dict(d: dict) -> Listing | None:
 
 
 _VEHICLE_HREF_RE = re.compile(r"/us/en-US/details/[\w-]+")
-_PRICE_RE = re.compile(r"\$\s*([\d,]+)")
+# Tight $-regex: same lesson as models._PRICE_RE — match valid thousands
+# only, not greedy digit-and-comma runs that would merge price + mileage.
+_PRICE_RE = re.compile(
+    r"\$\s*(\d{1,3}(?:,\d{3})+(?:\.\d{2})?|\d+(?:\.\d{2})?)"
+)
+
+
+def _per_listing_card(anchor):
+    """Climb up from a `/details/` anchor to its enclosing per-listing card.
+
+    Walks up while the parent contains AT MOST ONE `/details/` link. The
+    moment the parent contains two or more, we'd be entering a shared
+    container (results grid, hero banner, page main) and would
+    incorrectly attribute the same text to every card.
+
+    Fixes the bug where every detail anchor's text was inherited from
+    one shared ancestor — all cards came back with the same template
+    "Porsche Sound" / $107,670 row.
+    """
+    card = anchor
+    for _ in range(10):
+        parent = card.parent if card else None
+        if parent is None:
+            break
+        sibling_details = parent.css("a[href*='/details/']") if parent else []
+        if len(sibling_details) > 1:
+            return card
+        card = parent
+    return card
 
 
 def _listings_from_html_fallback(html: str) -> list[Listing]:
@@ -148,20 +176,23 @@ def _listings_from_html_fallback(html: str) -> list[Listing]:
         if url in seen:
             continue
         seen.add(url)
-        # Climb up to the surrounding result card and harvest text.
-        card = a
-        for _ in range(4):
-            if card is None:
-                break
-            card = card.parent
-        if card is None:
-            card = a
+        # Per-listing card boundary — see _per_listing_card.
+        card = _per_listing_card(a)
         title = (a.text(strip=True) or "")
+        card_text = card.text(strip=True) if card else ""
+        # Reject anchors that aren't real listings (nav, hero CTAs, promo
+        # blocks). A real listing card mentions a wanted Porsche model
+        # name AND has a year or a $-price somewhere.
+        text_l = (title + " " + card_text).lower()
+        has_model = any(m in text_l for m in ("911", "cayman", "boxster", "718"))
+        has_year = parse_year(title) is not None or parse_year(card_text) is not None
+        price_m = _PRICE_RE.search(card_text)
+        if not has_model:
+            continue
+        if not has_year and not price_m:
+            continue
         if "porsche" not in title.lower():
             title = "Porsche " + title
-        # Find price/mileage in the card's text.
-        card_text = card.text(strip=True) if card else ""
-        price_m = _PRICE_RE.search(card_text)
         listing = Listing(
             source="porsche_cpo",
             source_url=url,

@@ -65,7 +65,14 @@ _MILES_RE = re.compile(
 )
 # Matches a bare numeric-only string like "85,000" or "85000".
 _BARE_NUM_RE = re.compile(r"^[\d,]+$")
-_PRICE_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
+# Tight US-dollar regex: matches standard thousands formatting only
+# (`XXX` or `X,XXX` or `XX,XXX,XXX`), not arbitrary runs of digits-
+# and-commas. Without this, "$84,99538,000" — a price + mileage smushed
+# together by DOM .text() concatenation — would match as one huge
+# captured "price" of $8,499,538,000.
+_PRICE_RE = re.compile(
+    r"\$\s*(\d{1,3}(?:,\d{3})+(?:\.\d{2})?|\d+(?:\.\d{2})?)"
+)
 
 
 def parse_year(text: str | None) -> int | None:
