@@ -5,34 +5,87 @@ to `scripts/import_sf_csv.py`, and the dashboard rebuilds with everything
 SF saw from your home/office IP — no datacenter blocks, no per-site
 parser maintenance.
 
-## TL;DR
+## TL;DR — one-command flow (headless SF)
 
 ```bash
-# After SF finishes crawling and you've exported a CSV:
-uv run python scripts/import_sf_csv.py ~/Downloads/cars_com.csv ~/Downloads/elferspot.csv
+# Single site
+uv run python scripts/sf_crawl.py cars_com
 
-# Commit the refreshed dashboard data:
-git add docs/porsche.json docs/porsche.csv
-git commit -m "porsche: refresh from SF crawl"
-git push    # Pages redeploys in ~60s
+# Multiple
+uv run python scripts/sf_crawl.py cars_com bring_a_trailer classiccars
+
+# Everything, then commit + push so Pages updates
+uv run python scripts/sf_crawl.py --all --push
+
+# Includes Elferspot etc. where price is hidden behind "request quote":
+uv run python scripts/sf_crawl.py --all --push --allow-unknown-price
 ```
 
-The importer merges new rows into the existing `docs/porsche.json` (de-
-duped by VIN, then by (source, listing_id), then by URL hash). Pass
-`--no-merge` to start fresh.
+`scripts/sf_crawl.py` discovers your SF binary (or honour `SF_BINARY`
+env var), drives the crawl with the right per-site seed URL +
+include-regex, then pipes the export through the importer.
 
-## Per-site setup
+Binary auto-detection paths:
+- Linux: `/usr/bin/screamingfrogseospider` or `which screamingfrogseospider`
+- macOS: `/Applications/Screaming Frog SEO Spider.app/Contents/MacOS/ScreamingFrogSEOSpiderLauncher`
+- Windows: `%ProgramFiles%\Screaming Frog SEO Spider\ScreamingFrogSEOSpiderCli.exe`
 
-Screaming Frog needs three things per site:
+Set `SF_BINARY=/path/to/screamingfrogseospider` to override.
 
-1. **Crawl seed** — the sitemap URL (cheapest) or the search URL
-2. **Mode** — Spider (HTML pages) for sites without sitemaps; List for
-   sitemap-driven crawls
-3. **Custom Extraction rules** — CSS or XPath selectors that pull
-   price/year/model/etc. into named columns
+Run `uv run python scripts/sf_crawl.py --list` to see the presets:
+
+| Preset | Seed | Mode |
+|---|---|---|
+| `cars_com` | cars.com search URL (911/Cayman/Boxster filtered server-side) | spider |
+| `bring_a_trailer` | bringatrailer.com/porsche/ | spider |
+| `classiccars` | classiccars.com sitemap-index | sitemap |
+| `elferspot` | elferspot.com sitemap-index | sitemap |
+| `hemmings` | hemmings.com Porsche search | spider |
+| `carsforsale` | carsforsale.com sitemap-index | sitemap |
+| `copart` | copart-sitemaps.com sitemap-index | sitemap |
+| `iaai` | iaai.com sitemap-index | sitemap |
+| `autobidmaster` | autobidmaster.com sitemap-index | sitemap |
+| `carsandbids` | carsandbids.com sitemap | sitemap |
+
+## Lower-level: bring-your-own CSV
+
+If you ran the SF GUI manually and have a CSV already:
+
+```bash
+uv run python scripts/import_sf_csv.py ~/Downloads/cars_com.csv [more.csv ...]
+git add docs/porsche.json docs/porsche.csv
+git commit -m "porsche: refresh from SF" && git push
+```
+
+The importer merges new rows into the existing `docs/porsche.json`
+(de-duped by VIN → (source, listing_id) → URL hash). Pass `--no-merge`
+to start fresh.
+
+## Custom extractors (optional, big wins for price)
+
+Without a config the wrapper still gets URL + page title + meta tags
+from SF — enough to extract year + model from URL slugs on the
+sitemap-friendly sites (cars.com, BaT, ClassicCars, Elferspot,
+CarsForSale, Copart).
+
+To get **price + mileage + image** baked into the SF export instead of
+needing a second-pass detail fetch, drop a per-site config at
+`scripts/screaming_frog/configs/<preset>.seospiderconfig`. The wrapper
+passes it via `--config` automatically.
+
+Two ways to create one:
+
+1. **GUI on any machine** — open SF, set Custom Extraction rules per
+   the per-site selector tables below, File → Configuration → Save As.
+   Commit the file to the repo so headless invocations on other
+   machines reuse it.
+2. **Hand-write the XML** — SF's `.seospiderconfig` is XML; you can
+   compose a minimal version with just the `<custom-extraction>` block.
+
+## Per-site selector reference
 
 The importer recognises these column names (case-insensitive — see the
-`COLUMN_ALIASES` table in the script):
+`COLUMN_ALIASES` table in `scripts/import_sf_csv.py`):
 
 | Field        | Aliases                                       |
 |--------------|-----------------------------------------------|
