@@ -300,8 +300,11 @@ async def _drive_login_and_search(
     cases_with_data = 0
     for case_number in case_numbers:
         cases_attempted += 1
+        # Dump first 2 cases' DOM to docs/ as artifacts so we can debug
+        # selector regressions without having to add new logging every time.
+        dump = cases_attempted <= 2
         try:
-            info = await _query_one_case(page, case_number)
+            info = await _query_one_case(page, case_number, debug_dump=dump)
             if info:
                 out[case_number] = info
                 cases_with_data += 1
@@ -317,14 +320,40 @@ async def _drive_login_and_search(
     return out
 
 
-async def _query_one_case(page, case_number: str) -> Optional[dict]:
-    """Search Tyler for one case# and parse its detail page."""
+async def _query_one_case(page, case_number: str, debug_dump: bool = False) -> Optional[dict]:
+    """Search Tyler for one case# and parse its detail page.
+
+    Returns parsed dict on success, None on any failure. Every failure
+    reason is logged (debug level by default so we don't drown the
+    success path); pass debug_dump=True to also save the post-search HTML
+    to docs/tyler_debug_<case>.html for selector debugging.
+    """
+    def _dump(label: str, html_or_page_text: str = "") -> None:
+        if not debug_dump:
+            return
+        try:
+            import pathlib, time
+            p = pathlib.Path("docs") / f"tyler_debug_{case_number.replace('/','_')}_{label}.html"
+            p.parent.mkdir(exist_ok=True)
+            p.write_text(html_or_page_text)
+            log.info("nc_ecourts.case.dump_saved", case=case_number, label=label, path=str(p), bytes=len(html_or_page_text))
+        except Exception as exc:
+            log.warning("nc_ecourts.case.dump_fail", case=case_number, label=label, error=str(exc)[:120])
+
     try:
         await page.goto(SEARCH_URL, wait_until="networkidle", timeout=30000)
-    except Exception:
+    except Exception as exc:
+        log.info("nc_ecourts.case.goto_fail", case=case_number, error=str(exc)[:200], url=SEARCH_URL)
         return None
+    log.info("nc_ecourts.case.landed", case=case_number, url=page.url[:200])
+    if debug_dump:
+        try:
+            _dump("landed", await page.content())
+        except Exception:
+            pass
 
     # Optional: click a "Case Search" sub-tab if Tyler split it out
+    clicked_subtab = None
     for sel in (
         'a:has-text("Case Search")',
         'button:has-text("Case Search")',
@@ -333,65 +362,103 @@ async def _query_one_case(page, case_number: str) -> Optional[dict]:
         try:
             await page.click(sel, timeout=3000)
             await page.wait_for_load_state("networkidle", timeout=8000)
+            clicked_subtab = sel
             break
         except Exception:
             continue
+    log.info("nc_ecourts.case.subtab", case=case_number, clicked=clicked_subtab, url=page.url[:200])
 
     # Fill case# input — selector varies across Tyler tenants
-    filled = False
+    filled_sel = None
     for sel in (
         'input[name="caseNumber"]',
         'input[id*="Case"]',
         '#caseNumber',
         'input[placeholder*="ase" i]',
+        'input[name*="case" i]',
+        'input[type="text"]',
     ):
         try:
             await page.wait_for_selector(sel, timeout=6000)
             await page.fill(sel, case_number)
-            filled = True
+            filled_sel = sel
             break
         except Exception:
             continue
-    if not filled:
+    if not filled_sel:
+        log.warning("nc_ecourts.case.no_search_input", case=case_number, url=page.url[:200])
+        if debug_dump:
+            try:
+                _dump("no_input", await page.content())
+            except Exception:
+                pass
         return None
+    log.info("nc_ecourts.case.filled_search", case=case_number, selector=filled_sel)
 
     # Submit
+    submitted = False
     try:
-        await page.press('input[name="caseNumber"]', "Enter")
+        await page.press(filled_sel, "Enter")
+        submitted = True
     except Exception:
-        for btn in ('button[type="submit"]', 'input[type="submit"]'):
+        for btn in ('button[type="submit"]', 'input[type="submit"]', 'button:has-text("Search")'):
             try:
                 await page.click(btn, timeout=3000)
+                submitted = True
                 break
             except Exception:
                 continue
+    log.info("nc_ecourts.case.submitted", case=case_number, ok=submitted)
     try:
         await page.wait_for_load_state("networkidle", timeout=20000)
     except Exception:
         pass
 
+    # Save the search-results page HTML before clicking through
+    if debug_dump:
+        try:
+            _dump("results", await page.content())
+        except Exception:
+            pass
+
     # Click into the result row to load case-detail (where docket lives)
+    clicked_detail = None
     for sel in (
         f'a:has-text("{case_number}")',
         "table.search-results tr:first-of-type a",
         "table tr td:first-of-type a",
+        "a.caseLink",
+        "a[href*='Case']",
     ):
         try:
             await page.click(sel, timeout=4000)
             await page.wait_for_load_state("networkidle", timeout=15000)
+            clicked_detail = sel
             break
         except Exception:
             continue
+    log.info("nc_ecourts.case.clicked_detail", case=case_number, selector=clicked_detail, url=page.url[:200])
 
     # Extract page content
     try:
         html = await page.content()
-    except Exception:
+    except Exception as exc:
+        log.info("nc_ecourts.case.content_fail", case=case_number, error=str(exc)[:160])
         return None
     if not html or len(html) < 1000:
+        log.info("nc_ecourts.case.html_too_short", case=case_number, length=len(html or ""))
+        if debug_dump:
+            _dump("detail_short", html or "<empty>")
         return None
+    if debug_dump:
+        _dump("detail", html)
 
-    return _parse_case_detail_html(html)
+    parsed = _parse_case_detail_html(html)
+    if parsed is None:
+        log.info("nc_ecourts.case.parse_fail", case=case_number, html_length=len(html))
+        if debug_dump:
+            _dump("parse_fail", html)
+    return parsed
 
 
 def _parse_case_detail_html(html: str) -> Optional[dict]:
