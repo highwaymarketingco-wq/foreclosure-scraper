@@ -30,7 +30,11 @@ import structlog
 log = structlog.get_logger()
 
 
-GEMINI_MODEL = os.environ.get("WAF_GEMINI_MODEL", "gemini-2.5-flash")
+# Default to 2.5-flash-lite for WAF solves: 1000 RPD per account vs
+# 250 for 2.5-flash, and the 3x3 grid CAPTCHA is well within flash-lite's
+# recognition ability (verified 2026-05-13). The vision pipeline that
+# describes property condition still uses the full 2.5-flash for quality.
+GEMINI_MODEL = os.environ.get("WAF_GEMINI_MODEL", "gemini-2.5-flash-lite")
 GEMINI_TIMEOUT_S = 30.0
 
 
