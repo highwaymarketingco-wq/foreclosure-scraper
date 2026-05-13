@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 
 class TitleStatus(str, Enum):
@@ -191,6 +191,36 @@ class Listing(BaseModel):
     def effective_price(self) -> float | None:
         """Best-available price signal: BIN/asking price, else current bid."""
         return self.price_usd if self.price_usd is not None else self.current_bid_usd
+
+    @computed_field
+    @property
+    def project_tier(self) -> str:
+        """Bucket the listing into a project-worthiness tier for the dashboard.
+
+        - "salvage"  — salvage / flood / parts-only title  (cheapest, most work)
+        - "rebuilt"  — rebuilt / reconstructed title       (paperwork done, drives)
+        - "damaged"  — clean title but description mentions damage / project /
+                      light damage / theft recovery / hail / non-running
+        - "clean"    — no damage signal (showroom condition)
+        """
+        s = (self.title or "").lower()
+        if self.title_status in (TitleStatus.SALVAGE, TitleStatus.PARTS_ONLY,
+                                  TitleStatus.FLOOD, TitleStatus.LEMON):
+            return "salvage"
+        if self.title_status == TitleStatus.REBUILT:
+            return "rebuilt"
+        damaged_keywords = (
+            "salvage", "rebuilt", "reconstructed", "project", "needs", "damage",
+            "damaged", "hail", "theft", "theft recovery", "light damage",
+            "front-end", "rear-end", "side impact", "rolled", "burned",
+            "fire", "flood", "water", "non-running", "non running",
+            "blown", "seized", "tlc", "as-is", "as is", "no reserve",
+            "rough", "barn find", "estate sale", "mechanic special",
+            "parts car", "for parts", "shell",
+        )
+        if any(k in s for k in damaged_keywords):
+            return "damaged"
+        return "clean"
 
     def dedupe_key(self) -> str:
         """Stable hash across sources for dedupe.

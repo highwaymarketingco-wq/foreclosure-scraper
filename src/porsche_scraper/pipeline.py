@@ -49,4 +49,11 @@ async def run_all(
     log.info("after dedupe: %d", len(deduped))
     filtered = filter_listings(deduped, criteria)
     log.info("after filter: %d match criteria", len(filtered))
+    # Sort projects (salvage / rebuilt / damaged) before clean cars, then
+    # cheaper-within-tier first so the dashboard surfaces fixers up top.
+    tier_order = {"salvage": 0, "rebuilt": 1, "damaged": 2, "clean": 3}
+    filtered.sort(key=lambda l: (
+        tier_order.get(l.project_tier, 9),
+        l.effective_price if l.effective_price is not None else 1e12,
+    ))
     return filtered

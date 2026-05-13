@@ -9,6 +9,7 @@ from .models import Listing
 
 
 CSV_FIELDS = (
+    "project_tier",
     "source",
     "year",
     "model",
