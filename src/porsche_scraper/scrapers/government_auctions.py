@@ -16,7 +16,7 @@ from urllib.parse import urlencode, urljoin
 from selectolax.parser import HTMLParser
 
 from ..base import BaseScraper
-from ..http_client import fetch_json, fetch_text, fetch_text_stealth
+from ..http_client import fetch_json, fetch_rendered, fetch_text, fetch_text_stealth
 from ..models import (
     Listing,
     infer_drivable,
@@ -42,24 +42,70 @@ class GsaAuctionsScraper(BaseScraper):
 
     async def fetch(self) -> list[Listing]:
         out: list[Listing] = []
+        # Try the JSON API first; if the path 404s, fall back to rendered HTML.
+        api_ok = True
         for page in range(1, self.max_pages + 1):
-            url = (
-                f"{self.BASE}/api/v1/listings?"
-                f"{urlencode({'keyword': 'porsche', 'category': 'Vehicles', 'page': page})}"
-            )
-            try:
-                data = await fetch_json(url, timeout=30, headers={"Accept": "application/json"})
-            except Exception as exc:  # noqa: BLE001
-                log.warning("gsa_auctions page %d: %s", page, exc)
-                break
-            items = data.get("listings") or data.get("results") or data.get("data") or []
-            if not items:
-                break
-            for d in items:
-                listing = self._listing(d)
-                if listing:
-                    out.append(listing)
+            if api_ok:
+                url = (
+                    f"{self.BASE}/api/v1/listings?"
+                    f"{urlencode({'keyword': 'porsche', 'category': 'Vehicles', 'page': page})}"
+                )
+                try:
+                    data = await fetch_json(
+                        url, timeout=30, headers={"Accept": "application/json"}
+                    )
+                    items = data.get("listings") or data.get("results") or data.get("data") or []
+                    if items:
+                        for d in items:
+                            listing = self._listing(d)
+                            if listing:
+                                out.append(listing)
+                        continue
+                    if page == 1:
+                        api_ok = False  # API exists but empty — try HTML.
+                    else:
+                        break
+                except Exception as exc:  # noqa: BLE001
+                    log.info("gsa_auctions API page %d failed: %s — trying HTML", page, exc)
+                    api_ok = False
+            if not api_ok:
+                url = f"{self.BASE}/auctions/search?keyword=porsche&page={page}"
+                try:
+                    html = await fetch_rendered(
+                        url, timeout=90,
+                        wait_for_selector="a[href*='/listing/'], .listing-card",
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("gsa_auctions HTML page %d: %s", page, exc)
+                    break
+                tree = HTMLParser(html)
+                cards = tree.css(".listing-card, a[href*='/listing/']")
+                if not cards:
+                    break
+                for c in cards:
+                    a = c.css_first("a") if c.tag != "a" else c
+                    if not a:
+                        continue
+                    href = a.attributes.get("href") or ""
+                    if not href:
+                        continue
+                    title = a.text(strip=True)
+                    if "porsche" not in title.lower():
+                        continue
+                    out.append(self._listing_from_html(title, href))
         return out
+
+    def _listing_from_html(self, title: str, href: str) -> Listing:
+        listing = Listing(
+            source=self.slug,
+            source_url=urljoin(self.BASE, href),
+            title=title,
+            year=parse_year(title),
+            title_status=infer_title_status(title),
+            seller_type="government",
+        )
+        listing.drivable = infer_drivable(title, listing.title_status)
+        return listing
 
     def _listing(self, d: dict) -> Listing | None:
         title = d.get("title") or d.get("name") or ""
@@ -97,6 +143,10 @@ class GovSiteConfig:
     price_selectors: tuple[str, ...]
     location_selectors: tuple[str, ...] = ()
     use_stealth: bool = False
+    # If True the page is a JS-rendered SPA — go straight to Scrapling.
+    use_render: bool = False
+    # Optional selector to wait for after the page loads (Scrapling only).
+    render_wait_selector: str | None = None
     max_pages: int = 5
 
 
@@ -105,15 +155,21 @@ CONFIGS: dict[str, GovSiteConfig] = {
         slug="govdeals",
         name="GovDeals",
         base="https://www.govdeals.com",
+        # GovDeals is now an Angular SPA — search?keyword=… replaces the legacy index.cfm path.
         search_url_template=(
-            "https://www.govdeals.com/index.cfm?fa=Main.AdvSearchResultsNew"
-            "&kWord=porsche&kWordSelect=2&category=10&timing=bySimple"
-            "&searchPg=Category&pageNumber={page}"
+            "https://www.govdeals.com/search?keyword=porsche&category=Vehicles&page={page}"
         ),
-        card_selectors=("tr.assetSearchResult", ".assetSearchResult", "div.search-result"),
-        title_selectors=("a.title-link", "a[href*='/asset/']", "h3 a"),
-        price_selectors=(".current-bid", ".bid-amount", ".price"),
-        location_selectors=(".location",),
+        card_selectors=(
+            "div[data-testid='asset-card']", ".asset-card", "div.asset",
+            "tr.assetSearchResult", "div[class*='asset']",
+        ),
+        title_selectors=(
+            "a[data-testid='asset-title']", "a.asset-title", "a[href*='/asset/']", "h3 a",
+        ),
+        price_selectors=(".current-bid", "[data-testid='current-bid']", ".bid-amount", ".price"),
+        location_selectors=(".location", "[data-testid='location']"),
+        use_render=True,
+        render_wait_selector="a[href*='/asset/'], .asset-card, [data-testid='asset-card']",
     ),
     "public_surplus": GovSiteConfig(
         slug="public_surplus",
@@ -123,10 +179,15 @@ CONFIGS: dict[str, GovSiteConfig] = {
             "https://www.publicsurplus.com/sms/browse/search"
             "?keyword=porsche&catId=8&page={page}"
         ),
-        card_selectors=("table.list-auction tr", ".auction-row", "tr[class*='auction']"),
-        title_selectors=("a.auction-title", "a[href*='/auction/']"),
+        card_selectors=(
+            "table.list-auction tr", ".auction-row", "tr[class*='auction']",
+            "div.auction-listing",
+        ),
+        title_selectors=("a.auction-title", "a[href*='/auction']", "h3 a"),
         price_selectors=(".amount", ".current-bid"),
         location_selectors=(".location",),
+        use_render=True,
+        render_wait_selector="a[href*='/auction'], .auction-row",
     ),
     "property_room": GovSiteConfig(
         slug="property_room",
@@ -237,11 +298,18 @@ class GovHtmlScraper(BaseScraper):
     async def fetch(self) -> list[Listing]:
         out: list[Listing] = []
         seen: set[str] = set()
-        fetcher = fetch_text_stealth if self.config.use_stealth else fetch_text
         for page in range(1, self.config.max_pages + 1):
             url = self.config.search_url_template.format(page=page)
             try:
-                html = await fetcher(url, timeout=60)
+                if self.config.use_render:
+                    html = await fetch_rendered(
+                        url, timeout=90,
+                        wait_for_selector=self.config.render_wait_selector,
+                    )
+                elif self.config.use_stealth:
+                    html = await fetch_text_stealth(url, timeout=60)
+                else:
+                    html = await fetch_text(url, timeout=60)
             except Exception as exc:  # noqa: BLE001
                 log.warning("%s page %d: %s", self.slug, page, exc)
                 break

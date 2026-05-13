@@ -1,14 +1,30 @@
 """HTTP fetching helpers.
 
-Two transports are exposed:
-- `fetch_text` uses plain httpx (HTTP/2, gzip) for simple sites (cars.com,
-  eBay, AutoTempest).
-- `fetch_text_stealth` uses curl-cffi when available to impersonate a real
-  browser TLS fingerprint (BringATrailer, CarsAndBids, AutoTrader,
-  CarsForSale). Falls back to httpx if curl_cffi isn't installed.
+Three transports are exposed:
+
+- `fetch_text` — plain httpx (HTTP/2, gzip). For friendly sites (cars.com,
+  eBay HTML, AutoTempest, GovDeals static HTML).
+
+- `fetch_text_stealth` — layered fallback:
+    1. curl-cffi browser-impersonation (TLS+JA3)
+    2. Scrapling StealthyFetcher (Cloudflare/AWS-WAF auto-solve + JS render)
+    3. Apify rag-web-browser actor (paid; only if APIFY_TOKEN set)
+  Use for sites with TLS-fingerprint or light Cloudflare challenges
+  (BringATrailer, CarsAndBids, AutoTrader, CarsForSale, salvage brokers).
+
+- `fetch_rendered` — goes straight to Scrapling StealthyFetcher
+  (skips curl-cffi which can't render JS). Use for SPAs that need a
+  real browser to render results (GovDeals, PublicSurplus, GSA Auctions,
+  Hagerty, CollectingCars, Mecum, Hemmings, etc.).
 
 A user can supply PROXY_URL via env to route requests through a residential
-proxy. This is required at scale for the bot-protected sites.
+proxy. For heavy bot-protected sites this is still recommended even with
+Scrapling.
+
+Env vars:
+- PROXY_URL          — http(s) or SOCKS5 proxy
+- APIFY_TOKEN        — enables Apify rendering fallback
+- CAPSOLVER_API_KEY  — enables AWS WAF token solving (rare; opt-in per call)
 """
 from __future__ import annotations
 
@@ -122,19 +138,11 @@ async def fetch_json(
         return r.json()
 
 
-async def fetch_text_stealth(
-    url: str,
-    *,
-    timeout: float = 45.0,
-    headers: dict | None = None,
-    impersonate: str = "chrome120",
+async def _curl_cffi_fetch(
+    url: str, *, timeout: float, headers: dict | None, impersonate: str
 ) -> str:
-    """Fetch via curl-cffi browser-impersonation (TLS+JA3). Falls back to httpx."""
-    try:
-        from curl_cffi.requests import AsyncSession  # type: ignore
-    except ImportError:
-        log.warning("curl_cffi unavailable; falling back to httpx for %s", url)
-        return await fetch_text(url, timeout=timeout, headers=headers)
+    """curl-cffi browser-impersonation (TLS+JA3). Raises on failure."""
+    from curl_cffi.requests import AsyncSession  # type: ignore
 
     proxy = os.environ.get("PROXY_URL") or None
     h = _base_headers(headers)
@@ -155,4 +163,149 @@ async def fetch_text_stealth(
         except Exception as exc:  # noqa: BLE001
             last_exc = exc
             await asyncio.sleep(1.5 * (attempt + 1))
-    raise last_exc or RuntimeError("stealth fetch failed")
+    raise last_exc or RuntimeError("curl-cffi fetch failed")
+
+
+async def _scrapling_fetch(
+    url: str,
+    *,
+    timeout: float,
+    wait_for_selector: str | None,
+    solve_cloudflare: bool,
+) -> str:
+    """Scrapling StealthyFetcher — runs a real Chromium under the hood."""
+    from scrapling.fetchers import StealthyFetcher  # type: ignore
+
+    page_action = None
+    if wait_for_selector:
+        async def page_action(page):  # type: ignore[no-redef]
+            try:
+                await page.wait_for_selector(wait_for_selector, timeout=15000)
+            except Exception:
+                pass
+            try:
+                # Scroll to trigger any lazy-loaded cards.
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await page.wait_for_timeout(1500)
+            except Exception:
+                pass
+
+    result = await StealthyFetcher.async_fetch(
+        url,
+        headless=True,
+        network_idle=True,
+        timeout=int(timeout * 1000),
+        page_action=page_action,
+        solve_cloudflare=solve_cloudflare,
+        google_search=True,
+        wait=2000,
+        retries=1,
+    )
+    body = getattr(result, "body", b"") if result else b""
+    if isinstance(body, bytes):
+        return body.decode("utf-8", errors="replace")
+    return str(body or "")
+
+
+async def _apify_render(url: str) -> str:
+    """Apify rag-web-browser fallback. Only runs if APIFY_TOKEN is set.
+
+    Reuses the foreclosure_scraper.apify_helper module since they're in
+    the same repo and that helper already has cost gating + retries.
+    """
+    token = os.environ.get("APIFY_TOKEN")
+    if not token:
+        return ""
+    try:
+        from foreclosure_scraper.apify_helper import fetch_rendered  # type: ignore
+    except ImportError:
+        return ""
+    try:
+        return await fetch_rendered(url, token=token)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("apify render failed for %s: %s", url, exc)
+        return ""
+
+
+async def fetch_text_stealth(
+    url: str,
+    *,
+    timeout: float = 45.0,
+    headers: dict | None = None,
+    impersonate: str = "chrome120",
+    fallback_to_render: bool = False,
+) -> str:
+    """Layered stealth fetch.
+
+    Order: curl-cffi → (optional) Scrapling → (optional) Apify.
+
+    Defaults to curl-cffi only. Sites that get blocked at the TLS layer
+    should pass `fallback_to_render=True` or use `fetch_rendered`
+    directly. Falling back to Scrapling is expensive (~10-30s per URL),
+    so avoid it for sites where curl-cffi normally succeeds.
+    """
+    try:
+        return await _curl_cffi_fetch(
+            url, timeout=timeout, headers=headers, impersonate=impersonate
+        )
+    except ImportError:
+        log.info("curl_cffi unavailable; trying plain httpx")
+        try:
+            return await fetch_text(url, timeout=timeout, headers=headers)
+        except Exception:
+            pass  # Fall through to render below.
+    except Exception as curl_exc:
+        log.info("curl-cffi failed for %s: %s — trying scrapling", url, curl_exc)
+
+    if not fallback_to_render:
+        raise RuntimeError(f"stealth fetch failed for {url}")
+
+    try:
+        rendered = await _scrapling_fetch(
+            url, timeout=timeout * 2, wait_for_selector=None, solve_cloudflare=True
+        )
+        if rendered and len(rendered) > 500:
+            return rendered
+    except ImportError:
+        log.info("scrapling not installed")
+    except Exception as exc:  # noqa: BLE001
+        log.info("scrapling failed for %s: %s", url, exc)
+
+    apify_md = await _apify_render(url)
+    if apify_md:
+        return apify_md
+
+    raise RuntimeError(f"all stealth layers failed for {url}")
+
+
+async def fetch_rendered(
+    url: str,
+    *,
+    timeout: float = 90.0,
+    wait_for_selector: str | None = None,
+    solve_cloudflare: bool = True,
+) -> str:
+    """Force a JS-rendered fetch via Scrapling StealthyFetcher.
+
+    Use this for SPAs where curl-cffi returns only an empty shell
+    (GovDeals, PublicSurplus, GSA, Hagerty, Mecum, etc.). Falls back to
+    Apify if Scrapling is unavailable or fails.
+    """
+    try:
+        html = await _scrapling_fetch(
+            url,
+            timeout=timeout,
+            wait_for_selector=wait_for_selector,
+            solve_cloudflare=solve_cloudflare,
+        )
+        if html and len(html) > 500:
+            return html
+    except ImportError:
+        log.info("scrapling not installed; trying apify")
+    except Exception as exc:  # noqa: BLE001
+        log.info("scrapling render failed for %s: %s", url, exc)
+
+    apify_md = await _apify_render(url)
+    if apify_md:
+        return apify_md
+    raise RuntimeError(f"render layers failed for {url}")

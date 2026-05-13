@@ -18,7 +18,7 @@ from urllib.parse import urljoin
 from selectolax.parser import HTMLParser
 
 from ..base import BaseScraper
-from ..http_client import fetch_text_stealth
+from ..http_client import fetch_rendered, fetch_text_stealth
 from ..models import (
     Listing,
     infer_drivable,
@@ -42,6 +42,10 @@ class HouseConfig:
     estimate_selectors: tuple[str, ...]
     location_selectors: tuple[str, ...] = ()
     max_pages: int = 5
+    # Live-auction houses all sit behind DataDome / Imperva / Cloudflare —
+    # default to Scrapling rendering. Set False to use plain stealth httpx.
+    use_render: bool = True
+    render_wait_selector: str | None = None
 
 
 CONFIGS: dict[str, HouseConfig] = {
@@ -173,7 +177,13 @@ class LiveCollectorScraper(BaseScraper):
         for page in range(1, self.config.max_pages + 1):
             url = self.config.search_url_template.format(page=page)
             try:
-                html = await fetch_text_stealth(url, timeout=60)
+                if self.config.use_render:
+                    html = await fetch_rendered(
+                        url, timeout=90,
+                        wait_for_selector=self.config.render_wait_selector,
+                    )
+                else:
+                    html = await fetch_text_stealth(url, timeout=60)
             except Exception as exc:  # noqa: BLE001
                 log.warning("%s page %d: %s", self.slug, page, exc)
                 break

@@ -18,7 +18,7 @@ from urllib.parse import urljoin
 from selectolax.parser import HTMLParser
 
 from ..base import BaseScraper
-from ..http_client import fetch_text_stealth
+from ..http_client import fetch_rendered, fetch_text_stealth
 from ..models import (
     Listing,
     infer_drivable,
@@ -46,6 +46,10 @@ class SiteConfig:
     # If True, parse __NEXT_DATA__ JSON instead of DOM.
     use_next_data: bool = False
     next_data_path: tuple[str, ...] = ()
+    # If True, fetch via Scrapling (real browser). Required for SPAs and
+    # heavy-Cloudflare sites (CollectingCars, AutoHunter, BroadArrow).
+    use_render: bool = False
+    render_wait_selector: str | None = None
 
 
 def _first_text(card, selectors: Iterable[str]) -> str | None:
@@ -179,6 +183,8 @@ CONFIGS: dict[str, SiteConfig] = {
         location_selectors=("[data-testid='location']", ".location"),
         use_next_data=True,
         next_data_path=("props", "pageProps", "results"),
+        use_render=True,
+        render_wait_selector="a[href*='/marketplace/auction/']",
     ),
     "collecting_cars": SiteConfig(
         slug="collecting_cars",
@@ -192,6 +198,8 @@ CONFIGS: dict[str, SiteConfig] = {
         price_selectors=(".auction-card__bid", ".current-bid", ".price"),
         mileage_selectors=(".auction-card__mileage", ".mileage"),
         location_selectors=(".auction-card__location", ".location"),
+        use_render=True,
+        render_wait_selector=".auction-card, a[href*='/for-sale/']",
     ),
     "themarket": SiteConfig(
         # themarket.bonhams.com migrated to themarket.co.uk in 2025.
@@ -220,6 +228,8 @@ CONFIGS: dict[str, SiteConfig] = {
         price_selectors=(".listing-card__price", ".current-bid", ".price"),
         mileage_selectors=(".listing-card__mileage",),
         location_selectors=(".listing-card__location",),
+        use_render=True,
+        render_wait_selector=".listing-card, a[href*='/auction/']",
     ),
     "broad_arrow": SiteConfig(
         slug="broad_arrow",
@@ -231,6 +241,8 @@ CONFIGS: dict[str, SiteConfig] = {
         card_selectors=(".lot-card", ".auction-lot", "article.lot"),
         title_selectors=(".lot-card__title a", "h3 a", "a[href*='/lots/']"),
         price_selectors=(".lot-card__estimate", ".estimate", ".price"),
+        use_render=True,
+        render_wait_selector=".lot-card, a[href*='/lots/']",
     ),
     "iconic_auctioneers": SiteConfig(
         # Silverstone Auctions rebranded to Iconic Auctioneers.
@@ -265,7 +277,13 @@ class EnthusiastAuctionScraper(BaseScraper):
                 year_min=self.year_min, price_max=self.price_max, page=page
             )
             try:
-                html = await fetch_text_stealth(url, timeout=60)
+                if self.config.use_render:
+                    html = await fetch_rendered(
+                        url, timeout=90,
+                        wait_for_selector=self.config.render_wait_selector,
+                    )
+                else:
+                    html = await fetch_text_stealth(url, timeout=60)
             except Exception as exc:  # noqa: BLE001
                 log.warning("%s page %d: %s", self.slug, page, exc)
                 break
