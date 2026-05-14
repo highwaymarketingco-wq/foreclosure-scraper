@@ -135,6 +135,7 @@ KNOWN_FIXED = (
     # splash entry / AJAX wait). Adds Polk/Mecklenburg NC coverage
     # that wasn't being captured by the 4 working firms above.
     "law_firms.aldridge_pite",
+    "law_firms.aldridge_pite_pydoll",  # A/B variant — same NC target, pydoll instead of Scrapling
     "law_firms.korn",
     "law_firms.korn_pydoll",  # A/B variant — same target, pydoll instead of Scrapling
     "law_firms.mcmichael_taylor_gray",
