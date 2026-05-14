@@ -60,22 +60,22 @@ def _to_listing(row, slug: str) -> Listing | None:
     url = row.get("property_url") or row.get("permalink")
     if not url:
         return None
+    # HomeHarvest's `foreclosure=True` is a server-side filter — every row
+    # in the returned dataframe is already a foreclosure. The `status` /
+    # `mls_status` fields don't always say "foreclosure" (they reflect the
+    # generic MLS state: FOR_SALE / Active / Pending / Sold). Trust the
+    # upstream filter; only classify the ltype using the available hints.
     status_raw = (row.get("status") or "").lower()
     mls_status = (row.get("mls_status") or "").lower()
+    text_blob = (row.get("text") or "").lower()
+    combined = f"{status_raw} {mls_status} {text_blob}"
 
-    is_foreclosure = (
-        "foreclos" in status_raw or "foreclos" in mls_status
-        or row.get("foreclosure") is True
-        or row.get("is_foreclosure") is True
-    )
-    is_auction = "auction" in status_raw or "auction" in mls_status
-    if not is_foreclosure and not is_auction:
-        return None
-
-    if is_auction:
+    if "auction" in combined:
         ltype = ListingType.AUCTION
-    elif "reo" in status_raw or "bank" in status_raw:
+    elif "reo" in combined or "bank owned" in combined or "bank-owned" in combined:
         ltype = ListingType.REO
+    elif "pre-foreclosure" in combined or "pre foreclosure" in combined or "lis pendens" in combined:
+        ltype = ListingType.LIS_PENDENS
     else:
         ltype = ListingType.FORECLOSURE_SALE
 

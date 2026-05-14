@@ -15,13 +15,57 @@ get enriched downstream by GIS + court records.
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 from datetime import datetime
 from typing import Iterable
 
+import structlog
+from selectolax.parser import HTMLParser
+
 from ...apify_helper import fetch_rendered
 from ...base_scraper import BaseScraper
+from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
+
+log = structlog.get_logger()
+
+_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 "
+    "(KHTML, like Gecko) Version/17.5 Safari/605.1.15"
+)
+
+
+async def _fetch_plain(url: str) -> str:
+    """Plain HTTP GET, returns body text. Used for city sites that don't
+    need JS rendering (most WordPress/CMS sites)."""
+    try:
+        async with client(timeout=15.0) as c:
+            r = await c.get(url, headers={"User-Agent": _USER_AGENT},
+                            follow_redirects=True)
+    except Exception:
+        return ""
+    if r.status_code != 200 or len(r.text) < 200:
+        return ""
+    # Extract text from the HTML to mimic what fetch_rendered would give us.
+    try:
+        tree = HTMLParser(r.text)
+        body = tree.body
+        return body.text(separator="\n") if body is not None else r.text
+    except Exception:
+        return r.text
+
+
+async def _fetch_city_page(url: str) -> str:
+    """Fetch a city-site page. Tries plain HTTP first (fast, free); falls
+    back to Apify rag-web-browser only when plain HTTP returns nothing
+    AND APIFY_TOKEN is set."""
+    text = await _fetch_plain(url)
+    if text:
+        return text
+    if os.environ.get("APIFY_TOKEN"):
+        return await fetch_rendered(url)
+    return ""
 
 
 # (state, county, city, domain) — covers every city seat plus major suburbs
@@ -95,8 +139,9 @@ QUERIES = (
 )
 
 ADDR_RE = re.compile(
-    r"(\d+\s+[A-Z][\w .'\-]+(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
-    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\.?)",
+    r"(\b\d{1,6}\s+[A-Z][\w .'\-]{1,80}?\b(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|"
+    r"Avenue|Ave|Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|"
+    r"Trail|Trl|Parkway|Pkwy)\.?)(?=[\s,.\n]|$)",
     re.I,
 )
 DATE_RE = re.compile(
@@ -119,7 +164,7 @@ class CityWebsites(BaseScraper):
         async def search_one(state: str, county: str, city: str, domain: str, query: str) -> None:
             search_url = f"https://{domain}/?s={query.replace(' ', '+')}"
             async with sem:
-                content = await fetch_rendered(search_url)
+                content = await _fetch_city_page(search_url)
                 if not content or len(content) < 200:
                     return
                 # Find all distinct addresses + page mentions

@@ -1,17 +1,26 @@
-"""McMichael Taylor Gray — DISABLED (data moved to PowerBI iframe 2026-05).
+"""McMichael Taylor Gray — PowerBI iframe (NC + SC).
 
-mtglaw.com/foreclosure-sales/ no longer renders an HTML table. Instead
-the listings are inside an embedded PowerBI dashboard:
+mtglaw.com/foreclosure-sales/ embeds a public PowerBI dashboard at
   https://app.powerbi.com/view?r=eyJrIjoiOTQwOTdiYWYtOGQwMy00OGUzLWI4MjktOTczNDc0ODE2ZGY1IiwidCI6IjEzZDFlNzhjLTgyNDgtNGVlYS04OWY3LWQzNGIzZWJkOGM3OSIsImMiOjN9
 
-Properly scraping this requires PowerBI-specific work (drive Playwright
-into the iframe, wait 15-30s for the dashboard to render, expand state/
-county filters, parse virtualized row divs with [role="row"]) — a
-multi-hour rewrite plus tests, and inherently more fragile than HTML.
+We scrape that URL directly (skipping the host page). The dashboard has a
+state slicer (AL/FL/GA/MD/NC/NY/SC/TN/VA) and a virtualized data table.
+Strategy: click NC, mouse-wheel-scroll the table until stagnant, collect
+unique [role=row] tuples. Repeat for SC. Parse the row layout into
+Listings.
 
-fetch() returns [] until that rewrite lands. Slug stays in KNOWN_FIXED
-so run_health labels it correctly; "EMPTY (verified)" rather than "RENDER-
-REQUIRED" because the issue is upstream design, not our stealth.
+Row layout (verified 2026-05-14):
+  cells[0] "Select Row" (button text)
+  cells[1] state code (NC, SC, ...)
+  cells[2] county
+  cells[3] sale_date (m/d/yyyy) or blank
+  cells[4] MTG internal file#
+  cells[5] NC SP case# (e.g. "25 SP000484-000") or blank for non-NC
+  cells[6] full address ("STREET, CITY, STATE, ZIP")
+  cells[7] bid ("$X") or blank
+
+If the iframe layout changes (new column order, slicer aria-labels), the
+NC click or row-cell index will silently miss — return 0 and log a warning.
 """
 from __future__ import annotations
 
@@ -20,178 +29,201 @@ from datetime import datetime
 from typing import Iterable
 
 from dateutil import parser as dateparser
-from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
-from ._helpers import (
-    ADDR_RE,
-    COUNTY_RE,
-    DATE_RE,
-    PARCEL_RE,
-    parse_blocks,
+
+POWERBI_URL = (
+    "https://app.powerbi.com/view?r=eyJrIjoiOTQwOTdiYWYtOGQwMy00OGUzLWI4MjktOTczNDc0ODE2ZGY1Ii"
+    "widCI6IjEzZDFlNzhjLTgyNDgtNGVlYS04OWY3LWQzNGIzZWJkOGM3OSIsImMiOjN9"
 )
 
-URLS = (
-    "https://www.mtglaw.com/foreclosure-sales/",
-    "https://www.mtglaw.com/sales/",
+ADDR_TAIL_RE = re.compile(
+    r"^(.*?),\s*([A-Za-z .'-]+?),?\s+([A-Z]{2}),?\s+(\d{5})(?:-\d{4})?\s*$"
 )
-
-# Opening bid pattern for MTG listings
-BID_RE = re.compile(
-    r"(?:opening|minimum|starting)?\s*bid[:\s]*\$\s*([\d,]+(?:\.\d{2})?)",
-    re.I,
-)
-BARE_BID_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
-# State indicator — MTG works NC + GA only, ignore other states
-STATE_RE = re.compile(r"\b(NC|GA|SC)\b")
+BID_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
 
 
-async def _fetch_url(url: str) -> str:
-    """Scrapling stealth fetch with AJAX-completion wait."""
-    try:
-        from scrapling.fetchers import StealthyFetcher
-    except ImportError:
-        return ""
-
-    async def page_action(page):
-        # Wait for any indicator that the AJAX listing-load completed.
-        # MTG uses various table/list templates across redesigns; try a
-        # broad set then settle on networkidle.
-        for sel in (
-            "table tbody tr",
-            "div.listings",
-            "div.foreclosure-listing",
-            ".sales-listing",
-        ):
-            try:
-                await page.wait_for_selector(sel, timeout=15000)
-                break
-            except Exception:
-                continue
-        try:
-            await page.wait_for_load_state("networkidle", timeout=20000)
-        except Exception:
-            pass
-
-    try:
-        result = await StealthyFetcher.async_fetch(
-            url, headless=True, network_idle=True,
-            timeout=180000, page_action=page_action,
-            solve_cloudflare=True,
-        )
-        body = getattr(result, "body", b"")
-        return body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
-    except Exception:
-        return ""
-
-
-def _parse_html(html: str, url: str, slug: str) -> list[Listing]:
-    if not html or len(html) < 1000:
-        return []
-    tree = HTMLParser(html)
-    out: list[Listing] = []
-    seen: set[str] = set()
-
-    # Path A: structured table rows
-    for table in tree.css("table"):
-        for row in table.css("tr"):
-            text = row.text(separator=" ", strip=True)
-            if not text or len(text) < 30:
-                continue
-            li = _parse_chunk(text, url, slug)
-            if li and _add_unique(li, out, seen):
-                continue
-
-    # Path B: list/card divs
-    if not out:
-        for sel in ("div.listings li", "div.foreclosure-listing", ".sales-listing", "li.sale"):
-            for node in tree.css(sel):
-                text = node.text(separator=" ", strip=True)
-                li = _parse_chunk(text, url, slug)
-                if li:
-                    _add_unique(li, out, seen)
-
-    # Path C: text-block fallback
-    if not out:
-        body = tree.body
-        if body:
-            text = body.text(separator="\n")
-            for li in parse_blocks(text, source_slug=slug, source_url=url):
-                li.listing_type = ListingType.FORECLOSURE_SALE
-                _add_unique(li, out, seen)
-    return out
-
-
-def _parse_chunk(text: str, url: str, slug: str) -> Listing | None:
-    addr_m = ADDR_RE.search(text)
-    if not addr_m:
+def _parse_row(cells: list[str], slug: str) -> Listing | None:
+    """Convert one [role=row] tuple into a Listing. Drop rows where the
+    address doesn't parse as US-format STREET, CITY, ST, ZIP."""
+    if len(cells) < 7:
         return None
-    county_m = COUNTY_RE.search(text)
-    date_m = DATE_RE.search(text)
-    parcel_m = PARCEL_RE.search(text)
-    state_m = STATE_RE.search(text)
-    bid_m = BID_RE.search(text) or BARE_BID_RE.search(text)
-
-    # MTG works NC + GA only — skip listings clearly from other states
-    state = state_m.group(1) if state_m else "NC"
-    if state not in ("NC", "SC", "GA"):
+    state = (cells[1] or "").strip().upper()
+    if state not in ("NC", "SC"):
         return None
+    county = (cells[2] or "").strip().replace(" County", "") or None
+    if county:
+        # PowerBI emits "Guilford-Forsyth" composites — split, keep the first
+        county = county.split("-")[0].strip().title()
+    raw_date = (cells[3] or "").strip()
+    file_no = (cells[4] or "").strip() or None
+    sp_no = (cells[5] or "").strip() or None
+    addr_raw = (cells[6] or "").strip()
+    bid_raw = (cells[7] if len(cells) > 7 else "").strip()
+
+    if not addr_raw:
+        return None
+    m = ADDR_TAIL_RE.match(addr_raw)
+    street = city = zip_code = None
+    if m:
+        street, city, _state_addr, zip_code = m.group(1), m.group(2), m.group(3), m.group(4)
+    else:
+        street = addr_raw  # let downstream parser try
 
     sale_date = None
-    if date_m:
+    if raw_date:
         try:
-            sale_date = dateparser.parse(date_m.group(0))
+            sale_date = dateparser.parse(raw_date)
         except (ValueError, TypeError):
-            pass
+            sale_date = None
 
     bid = None
-    if bid_m:
-        try:
-            bid = float(bid_m.group(1).replace(",", ""))
-            if not (100 <= bid <= 5_000_000):
-                bid = None
-        except ValueError:
-            pass
+    if bid_raw:
+        bm = BID_RE.search(bid_raw)
+        if bm:
+            try:
+                v = float(bm.group(1).replace(",", ""))
+                if 100 <= v <= 5_000_000:
+                    bid = v
+            except ValueError:
+                pass
 
+    # NC SP case# is the legally-identifying number; prefer it for case_number,
+    # fall back to MTG's internal file#.
+    case_number = sp_no or file_no
     return Listing(
         source=slug,
-        source_url=url,
+        source_url=POWERBI_URL,
         listing_type=ListingType.FORECLOSURE_SALE,
         property_kind=PropertyKind.UNKNOWN,
         state=state,
-        county=county_m.group(1) if county_m else None,
-        street_address=addr_m.group(1),
+        county=county,
+        street_address=street,
+        city=city,
+        zip_code=zip_code,
         sale_date=sale_date,
-        parcel_id=parcel_m.group(1) if parcel_m else None,
+        case_number=case_number,
         opening_bid=bid,
-        description=f"McMichael Taylor Gray trustee sale: {text[:200]}",
+        description=f"MTG Law trustee sale: {state} {county or ''} {file_no or ''}".strip(),
         first_seen=datetime.utcnow(),
         last_seen=datetime.utcnow(),
+        raw={"mtg_file": file_no, "sp_case": sp_no} if (file_no or sp_no) else None,
     )
 
 
-def _add_unique(li: Listing, out: list, seen: set[str]) -> bool:
-    key = (li.street_address or "").upper() + "|" + (li.county or "")
-    if key.strip("|") in seen:
-        return False
-    seen.add(key.strip("|"))
-    out.append(li)
-    return True
+async def _fetch_filtered_state(state: str) -> list[list[str]]:
+    """Drive PowerBI: load, click state slicer, mouse-wheel-scroll the
+    virtualized table to load all rows. Returns the raw cell tuples.
+    Empty list on any failure (parser handles []).
+    """
+    try:
+        from scrapling.fetchers import StealthyFetcher
+    except ImportError:
+        return []
+
+    captured: dict[str, list[list[str]]] = {"rows": []}
+
+    async def page_action(page):
+        try:
+            await page.wait_for_selector('div[role="row"]', timeout=60000)
+        except Exception:
+            return
+        # PowerBI mounts the visuals progressively — give the table a beat
+        # after first-row to finish laying out the slicer.
+        await page.wait_for_timeout(15000)
+
+        # Click the state-code option in the State slicer
+        ok = await page.evaluate(
+            """(state) => {
+                const els = [...document.querySelectorAll('div[role="option"]')];
+                for (const e of els) {
+                    if (e.getAttribute('aria-label') === state) {
+                        e.scrollIntoView({block: 'center'});
+                        e.click();
+                        return true;
+                    }
+                }
+                return false;
+            }""",
+            state,
+        )
+        if not ok:
+            return
+        await page.wait_for_timeout(4000)
+
+        bbox = await page.evaluate(
+            """() => {
+                const vcs = [...document.querySelectorAll('.visualContainer, .modernVisualOverlay')];
+                for (const v of vcs) {
+                    if ((v.innerText || '').includes('Select Row')) {
+                        const r = v.getBoundingClientRect();
+                        return {x: r.x, y: r.y, w: r.width, h: r.height};
+                    }
+                }
+                return null;
+            }"""
+        )
+        if not bbox:
+            return
+        cx = bbox["x"] + bbox["w"] / 2
+        cy = bbox["y"] + bbox["h"] / 2
+
+        seen: set[tuple[str, ...]] = set()
+        stagnant = 0
+        for _ in range(80):  # cap loops; each is ~450ms = ~36s max
+            rows = await page.evaluate(
+                """() => {
+                    return [...document.querySelectorAll('div[role="row"]')]
+                        .map(r => [...r.querySelectorAll('[role=rowheader],[role=gridcell]')]
+                            .map(c => c.innerText.trim()))
+                        .filter(c => c.length > 1);
+                }"""
+            )
+            before = len(seen)
+            for r in rows:
+                seen.add(tuple(r))
+            if len(seen) == before:
+                stagnant += 1
+            else:
+                stagnant = 0
+            if stagnant >= 4:
+                break
+            await page.mouse.move(cx, cy)
+            await page.mouse.wheel(0, 600)
+            await page.wait_for_timeout(450)
+
+        captured["rows"] = [list(r) for r in seen]
+
+    try:
+        await StealthyFetcher.async_fetch(
+            POWERBI_URL,
+            headless=True,
+            network_idle=False,
+            timeout=300000,
+            page_action=page_action,
+            solve_cloudflare=False,
+        )
+    except Exception:
+        return []
+    return captured["rows"]
 
 
 class McMichaelTaylorGray(BaseScraper):
     slug = "law_firms.mcmichael_taylor_gray"
-    name = "McMichael Taylor Gray (AJAX-rendered, stealth)"
+    name = "McMichael Taylor Gray (PowerBI iframe, stealth)"
     category = "law_firm"
     requires_apify = False
     requires_render = True
     expected_min_count = 0
-    timeout_s = 360.0
+    timeout_s = 720.0  # NC + SC = 2x ~5-min PowerBI loads
 
     async def fetch(self) -> Iterable[Listing]:
-        # Listings moved into a PowerBI iframe in May 2026. HTML-based
-        # parsing yields nothing. Skip the network call until a proper
-        # PowerBI scraper is built (see module docstring).
-        return []
+        out: list[Listing] = []
+        for state in ("NC", "SC"):
+            rows = await _fetch_filtered_state(state)
+            for cells in rows:
+                li = _parse_row(cells, self.slug)
+                if li is not None:
+                    out.append(li)
         return out

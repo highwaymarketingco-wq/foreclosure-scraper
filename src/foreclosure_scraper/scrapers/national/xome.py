@@ -1,6 +1,25 @@
-"""Xome auctions via Scrapling stealth (no Apify).
+"""Xome auctions via Scrapling stealth.
 
-REO + foreclosure auctions. SPA. Scrapling stealth handles rendering.
+Xome's `/auctions/bank-owned/{ST}` state-filtered URL renders only an
+empty state-landing shell — no real listings. The unfiltered
+`/auctions/bank-owned` and `/auctions/foreclosure-homes` pages DO render
+~200 real cards across all states; we filter to NC + SC post-fetch.
+
+Card structure (verified 2026-05-14):
+  <div class="srp-property-card"
+       listingkey="{id}"
+       detail-href="/auctions/{slug}-{id}"
+       listing-lat="..."  listing-lng="...">
+    .property-bidding $price
+    .bank-type / .auction-type (REO / Auction / etc.)
+    <span id="streetAddress-{id}">...
+    <span id="city-{id}">...
+    <span id="stateOrProvinceCode-{id}">{ST}
+    + bare <span>{zip}
+
+There are typically ~5-30 NC/SC cards across the bank-owned + foreclosure
+pages. Far smaller than Zillow/Realtor but unique inventory (Xome is
+Mr. Cooper's auction arm).
 """
 from __future__ import annotations
 
@@ -17,36 +36,100 @@ from ...models import Listing, ListingType, PropertyKind
 log = structlog.get_logger()
 
 URLS = (
-    # Xome lists by city, not state. Hit our footprint metros + auctions page.
-    ("NC", "https://www.xome.com/auctions/NC"),
-    ("SC", "https://www.xome.com/auctions/SC"),
-    ("NC", "https://www.xome.com/realestate/NC/Charlotte"),
-    ("NC", "https://www.xome.com/realestate/NC/Asheville"),
-    ("SC", "https://www.xome.com/realestate/SC/Greenville"),
-    ("SC", "https://www.xome.com/realestate/SC/Spartanburg"),
+    "https://www.xome.com/auctions/bank-owned",
+    "https://www.xome.com/auctions/foreclosure-homes",
+    "https://www.xome.com/auctions/foreclosuresales",
 )
 
-
-def _kind(label: str | None) -> PropertyKind:
-    if not label:
-        return PropertyKind.UNKNOWN
-    s = label.lower()
-    if "single" in s:
-        return PropertyKind.SINGLE_FAMILY
-    if "condo" in s:
-        return PropertyKind.CONDO
-    if "town" in s:
-        return PropertyKind.TOWNHOUSE
-    if "multi" in s:
-        return PropertyKind.MULTI_FAMILY
-    if "mobile" in s:
-        return PropertyKind.MOBILE
-    if "land" in s:
-        return PropertyKind.LAND
-    return PropertyKind.UNKNOWN
+PRICE_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
 
 
-async def _fetch_state(state: str, url: str) -> list[Listing]:
+def _ltype(text: str) -> ListingType:
+    s = (text or "").lower()
+    if "bank owned" in s or "reo" in s:
+        return ListingType.REO
+    if "foreclosure" in s and "pre" not in s:
+        return ListingType.FORECLOSURE_SALE
+    if "pre-foreclosure" in s or "pre foreclosure" in s:
+        return ListingType.LIS_PENDENS
+    return ListingType.AUCTION  # default — Xome is auction-first
+
+
+def _parse_card(card, slug: str) -> Listing | None:
+    attrs = card.attributes or {}
+    listing_id = (attrs.get("listingkey") or "").strip() or None
+    detail_href = (attrs.get("detail-href") or "").strip()
+    if not listing_id or not detail_href:
+        return None
+    lat = attrs.get("listing-lat")
+    lng = attrs.get("listing-lng")
+
+    street_node = card.css_first(f"#streetAddress-{listing_id}")
+    city_node = card.css_first(f"#city-{listing_id}")
+    state_node = card.css_first(f"#stateOrProvinceCode-{listing_id}")
+    if street_node is None or state_node is None:
+        return None
+    state = (state_node.text(strip=True) or "").strip().upper()
+    if state not in ("NC", "SC"):
+        return None
+
+    street = street_node.text(strip=True) or None
+    if not street:
+        return None
+    city = city_node.text(strip=True) if city_node else None
+
+    # ZIP — the bare <span> after stateOrProvinceCode
+    zip_code = None
+    addr_block = card.css_first("address")
+    if addr_block is not None:
+        m = re.search(r"\b(\d{5})\b", addr_block.text())
+        zip_code = m.group(1) if m else None
+
+    # Price
+    price = None
+    price_node = card.css_first(".property-bidding")
+    if price_node is not None:
+        pm = PRICE_RE.search(price_node.text())
+        if pm:
+            try:
+                price = float(pm.group(1).replace(",", ""))
+            except ValueError:
+                price = None
+
+    # Listing type from bank-type / auction-type chips
+    type_chip_text = ""
+    for sel in (".bank-type", ".auction-type", ".property-auction-type"):
+        n = card.css_first(sel)
+        if n is not None:
+            type_chip_text += " " + n.text()
+
+    def _flt(v):
+        try:
+            return float(v) if v else None
+        except (TypeError, ValueError):
+            return None
+
+    return Listing(
+        source=slug,
+        source_url=f"https://www.xome.com{detail_href}",
+        listing_type=_ltype(type_chip_text),
+        property_kind=PropertyKind.UNKNOWN,
+        state=state,
+        city=city,
+        zip_code=zip_code,
+        street_address=street,
+        case_number=f"xome-{listing_id}",
+        latitude=_flt(lat),
+        longitude=_flt(lng),
+        opening_bid=price,
+        description=(type_chip_text or "Xome auction").strip(),
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+        raw={"xome_listing_id": listing_id},
+    )
+
+
+async def _fetch_page(url: str, slug: str) -> list[Listing]:
     try:
         from scrapling.fetchers import StealthyFetcher
     except ImportError:
@@ -54,10 +137,12 @@ async def _fetch_state(state: str, url: str) -> list[Listing]:
 
     async def page_action(page):
         try:
-            await page.wait_for_selector(
-                "[class*='property-card'], [class*='listing'], a[href*='/listing/'], article",
-                timeout=30000,
-            )
+            await page.wait_for_selector(".srp-property-card", timeout=30000)
+        except Exception:
+            pass
+        # Trigger lazy load via scrolling — Xome appears to render all cards
+        # server-side but we wait just in case
+        try:
             await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
             await page.wait_for_timeout(2000)
         except Exception:
@@ -65,92 +150,51 @@ async def _fetch_state(state: str, url: str) -> list[Listing]:
 
     try:
         result = await StealthyFetcher.async_fetch(
-            url, headless=True, network_idle=True, timeout=120000,
-            page_action=page_action,
+            url, headless=True, network_idle=False, timeout=120000,
+            page_action=page_action, solve_cloudflare=False,
         )
     except Exception as exc:
-        log.warning("xome.fetch_fail", state=state, error=str(exc)[:200])
+        log.warning("xome.fetch_failed", url=url, error=str(exc)[:200])
         return []
-
     body = getattr(result, "body", b"")
     html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
     if not html or len(html) < 5000:
         return []
-
-    out: list[Listing] = []
-    seen: set[str] = set()
     tree = HTMLParser(html)
-
-    for card in tree.css("[class*='property-card'], [class*='listing-card'], article"):
+    out: list[Listing] = []
+    for card in tree.css(".srp-property-card"):
         try:
-            link_node = card.css_first("a[href*='/listing/']") or card.css_first("a[href]")
-            link = (link_node.attributes.get("href", "") if link_node else "") or url
-            if link and not link.startswith("http"):
-                link = f"https://www.xome.com{link}"
-            if link in seen:
-                continue
-            seen.add(link)
-
-            addr_node = card.css_first("[class*='address']")
-            price_node = card.css_first("[class*='price']")
-            kind_node = card.css_first("[class*='type']")
-
-            addr = addr_node.text(strip=True) if addr_node else ""
-            if not addr or len(addr) < 8:
-                continue
-            m = re.match(r"^(.+?),\s*([A-Za-z .'-]+),\s*([A-Z]{2})\s*(\d{5})?", addr)
-            if not m:
-                continue
-            street, city, st, z = m.group(1), m.group(2).strip(), m.group(3), m.group(4)
-            if st != state:
-                continue
-
-            price = None
-            if price_node:
-                pm = re.search(r"\$([\d,]+)", price_node.text(strip=True))
-                if pm:
-                    try:
-                        price = float(pm.group(1).replace(",", ""))
-                    except ValueError:
-                        pass
-
-            out.append(
-                Listing(
-                    source="national.xome",
-                    source_url=link,
-                    listing_type=ListingType.AUCTION,
-                    property_kind=_kind(kind_node.text(strip=True) if kind_node else None),
-                    street_address=street,
-                    city=city,
-                    state=st,
-                    zip_code=z,
-                    opening_bid=price,
-                    first_seen=datetime.utcnow(),
-                    last_seen=datetime.utcnow(),
-                    raw={"xome": {}},
-                )
-            )
+            li = _parse_card(card, slug)
         except Exception:
             continue
-
+        if li is not None:
+            out.append(li)
     return out
 
 
 class Xome(BaseScraper):
     slug = "national.xome"
-    name = "Xome"
+    name = "Xome (REO + foreclosure auctions, NC + SC)"
     category = "national_auction"
     expected_min_count = 0
     requires_apify = False
+    requires_render = True
     timeout_s = 360.0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
-        for state, url in URLS:
+        seen: set[str] = set()
+        for url in URLS:
             try:
-                listings = await _fetch_state(state, url)
-                out.extend(listings)
-                log.info("xome.state_done", state=state, count=len(listings))
+                rows = await _fetch_page(url, self.slug)
             except Exception as exc:
-                log.warning("xome.state_failed", state=state, error=str(exc)[:200])
+                log.warning("xome.page_failed", url=url, error=str(exc)[:200])
+                continue
+            for li in rows:
+                k = li.case_number or li.source_url
+                if k in seen:
+                    continue
+                seen.add(k)
+                out.append(li)
+            log.info("xome.page_done", url=url, kept=len(rows))
         return out

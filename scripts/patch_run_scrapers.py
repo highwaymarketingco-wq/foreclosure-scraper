@@ -153,6 +153,39 @@ KNOWN_FIXED = (
 )
 
 
+# Local-only refresh set. These are the scrapers that GitHub Actions runners
+# either can't run (anti-bot / Cloudflare / WAF blocks datacenter IPs) or that
+# benefit from residential IPs (Tyler / NC eCourts). Plus a batch of
+# long-shot probes that cost nothing to retry. Run from a residential
+# connection via `uv run python scripts/patch_run_scrapers.py --tier2`.
+TIER2_LOCAL = (
+    # Anti-bot / render-required
+    "law_firms.aldridge_pite",
+    "law_firms.korn",
+    "law_firms.mcmichael_taylor_gray",
+    "reo.vrm_va_reo",
+    "national.foreclosure_dot_com",
+    "city_websites.search",
+    "national.fannie_homepath",
+    "national.freddie_homesteps",
+    "national.hud_homestore",
+    # Long-shot probes (mostly 0, no cost to retry)
+    "national.zillow_foreclosures",
+    "national.zillow_bulk",
+    "national.trulia",
+    "national.realtor_foreclosures",
+    "national.hubzu",
+    "national.xome",
+    "national.propwire",
+    "national.probate_foreclosure_leads",
+    "counties.nod_discovery",
+    "counties_sc.sc_tax_delinquent",
+    # Better on residential IP (Tyler case-status enrichment auto-runs
+    # when NC_ECOURTS_USERNAME/PASSWORD are set in .env).
+    "counties_nc.nc_ecourts_lis_pendens",
+)
+
+
 LT_MAP = {lt.value: lt for lt in ListingType}
 PK_MAP = {pk.value: pk for pk in PropertyKind}
 
@@ -481,6 +514,12 @@ async def main() -> int:
         help=f"Re-run all known-fixed scrapers ({len(KNOWN_FIXED)} sources)",
     )
     parser.add_argument(
+        "--tier2", action="store_true",
+        help=f"Re-run local-only tier2 set ({len(TIER2_LOCAL)} sources): "
+             "anti-bot / render-required / long-shot probes that need a "
+             "residential IP.",
+    )
+    parser.add_argument(
         "--parallel", type=int, default=4,
         help="Max scrapers to run concurrently (default 4)",
     )
@@ -492,6 +531,8 @@ async def main() -> int:
 
     if args.all_fixed:
         target_slugs = set(KNOWN_FIXED)
+    elif args.tier2:
+        target_slugs = set(TIER2_LOCAL)
     elif args.slugs:
         target_slugs = set(args.slugs)
     else:

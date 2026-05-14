@@ -1,33 +1,33 @@
-"""Foreclosure.com — auth-gated scraper.
+"""Foreclosure.com — public preview scrape (no auth).
 
-Foreclosure.com paywalls both the listing detail pages AND, as of May
-2026, the state-listing preview pages (plain HTTP returns 403; the
-"preview" path that the v0 of this scraper hit is now subscription-
-only). The scraper now refuses to attempt the fetch when credentials
-are not configured, saving ~60s of Scrapling stealth time per weekly
-run that previously produced zero listings silently.
+Foreclosure.com paywalls the listing detail pages, but the state-listings
+preview pages embed structured JSON-LD (CollectionPage → ItemList → list
+of RealEstateListing items) that the public free tier exposes. Street
+NUMBERS are masked ("Moore Dr" instead of "1234 Moore Dr") but city,
+state, ZIP, lat/lng, beds/baths/sqft, and the foreclosure.com listing ID
+are all present — useful as a lead/feed-style signal that downstream
+enrichment can resolve to a full address via the parcel/geo cross-ref.
 
-Configuration:
-  Set the env vars  FORECLOSURE_DOT_COM_USER  and  FORECLOSURE_DOT_COM_PASS
-  in the GitHub Actions secrets to enable. Without them the scraper
-  short-circuits to [] and the orchestrator marks it PAYWALL-BLOCKED in
-  the run summary (instead of REGRESSED, which would trigger noise).
+Pagination is `?pg=N` (1-indexed). Each page has 10 items. We cap at 30
+pages/state by default (PAGES_CAP env var to override) — 300 listings is
+plenty for residential lead-gen, and avoids hammering the site.
 
-When credentials ARE present, the scraper drives a Scrapling stealth
-login flow (login form → state-listing page → parse). The login flow
-is tracked separately so a wrong-password run logs a clear error.
+If FORECLOSURE_DOT_COM_USER/PASS are set, the future authenticated path
+would unlock full addresses. That auth flow isn't wired yet; for now the
+public preview is the only path.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 from datetime import datetime
 from typing import Iterable
 
 import structlog
-from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
+from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -36,126 +36,143 @@ URLS = (
     ("NC", "https://www.foreclosure.com/listings/north-carolina/"),
     ("SC", "https://www.foreclosure.com/listings/south-carolina/"),
 )
-LOGIN_URL = "https://www.foreclosure.com/login"
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 "
+        "(KHTML, like Gecko) Version/17.5 Safari/605.1.15"
+    ),
+}
+JSONLD_RE = re.compile(
+    r"<script[^>]*application/ld\+json[^>]*>(.*?)</script>",
+    re.S | re.I,
+)
+LID_RE = re.compile(r"/(\d+)_lid\b")
 
 
-def _credentials() -> tuple[str | None, str | None]:
-    """Read foreclosure.com credentials from env. Returns (None, None) when
-    not configured, which means the scraper short-circuits to []."""
-    return (
-        os.environ.get("FORECLOSURE_DOT_COM_USER"),
-        os.environ.get("FORECLOSURE_DOT_COM_PASS"),
+def _node_to_listing(node: dict, state: str, slug: str) -> Listing | None:
+    item = node.get("item") if isinstance(node, dict) else None
+    if not isinstance(item, dict) or item.get("@type") != "RealEstateListing":
+        return None
+    url = item.get("url") or ""
+    lid_match = LID_RE.search(url)
+    listing_id = lid_match.group(1) if lid_match else None
+    offered = (item.get("offers") or {}).get("itemOffered") or {}
+    addr = offered.get("address") or {}
+    region = (addr.get("addressRegion") or "").strip().upper()
+    if region != state:
+        return None
+    street = (addr.get("streetAddress") or "").strip() or None
+    city = (addr.get("addressLocality") or "").strip() or None
+    zip_code = (addr.get("postalCode") or "").strip() or None
+    geo = offered.get("geo") or {}
+    lat = geo.get("latitude")
+    lng = geo.get("longitude")
+
+    beds = offered.get("numberOfBedrooms")
+    baths = offered.get("numberOfBathroomsTotal")
+    floor = offered.get("floorSize") or {}
+    sqft = None
+    if floor.get("unitCode", "").upper() == "SQFT":
+        try:
+            sqft = int(floor.get("value"))
+        except (TypeError, ValueError):
+            sqft = None
+
+    return Listing(
+        source=slug,
+        source_url=url,
+        listing_type=ListingType.FORECLOSURE_SALE,
+        property_kind=PropertyKind.SINGLE_FAMILY
+            if offered.get("@type") == "SingleFamilyResidence"
+            else PropertyKind.UNKNOWN,
+        state=region,
+        city=city,
+        zip_code=zip_code,
+        street_address=street,
+        case_number=f"fc-{listing_id}" if listing_id else None,
+        latitude=lat if isinstance(lat, (int, float)) else None,
+        longitude=lng if isinstance(lng, (int, float)) else None,
+        description=item.get("name") or f"Foreclosure.com listing {listing_id}",
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+        raw={
+            "fc_listing_id": listing_id,
+            "beds": beds,
+            "baths": baths,
+            "sqft": sqft,
+            "anonymized_address": True,  # street number masked by paywall
+        },
     )
 
 
-def _ltype(text: str) -> ListingType:
-    t = (text or "").lower()
-    if "auction" in t:
-        return ListingType.AUCTION
-    if "reo" in t or "bank" in t:
-        return ListingType.REO
-    if "pre" in t:
-        return ListingType.LIS_PENDENS
-    return ListingType.FORECLOSURE_SALE
-
-
-async def _fetch_state(state: str, url: str) -> list[Listing]:
-    try:
-        from scrapling.fetchers import StealthyFetcher
-    except ImportError:
-        return []
-
-    async def page_action(page):
-        try:
-            await page.wait_for_selector(
-                "[class*='listing'], [class*='property'], a[href*='/listing/']",
-                timeout=30000,
-            )
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            await page.wait_for_timeout(2000)
-        except Exception:
-            pass
-
-    try:
-        result = await StealthyFetcher.async_fetch(
-            url, headless=True, network_idle=True, timeout=120000,
-            page_action=page_action,
-        )
-    except Exception as exc:
-        log.warning("foreclosure_dot_com.fetch_fail", state=state, error=str(exc)[:200])
-        return []
-
-    body = getattr(result, "body", b"")
-    html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
-    if not html or len(html) < 5000:
-        return []
-
+def _extract_listings(html: str, state: str, slug: str) -> list[Listing]:
     out: list[Listing] = []
-    seen: set[str] = set()
-    tree = HTMLParser(html)
-    for card in tree.css("[class*='listing-card'], [class*='property-card'], article, tr"):
-        try:
-            addr_node = card.css_first("[class*='address']") or card.css_first("td")
-            addr = addr_node.text(strip=True) if addr_node else ""
-            if not addr or len(addr) < 8:
-                continue
-            m = re.match(r"^(.+?),\s*([A-Za-z .'-]+),\s*([A-Z]{2})\s*(\d{5})?", addr)
-            if not m:
-                continue
-            street, city, st, z = m.group(1), m.group(2).strip(), m.group(3), m.group(4)
-            if st != state:
-                continue
-            link_node = card.css_first("a[href*='/listing/']") or card.css_first("a[href]")
-            link = (link_node.attributes.get("href", "") if link_node else "") or url
-            if link and not link.startswith("http"):
-                link = f"https://www.foreclosure.com{link}"
-            if link in seen:
-                continue
-            seen.add(link)
-            status_node = card.css_first("[class*='status']")
-            status = status_node.text(strip=True) if status_node else ""
-            out.append(
-                Listing(
-                    source="national.foreclosure_dot_com",
-                    source_url=link,
-                    listing_type=_ltype(status),
-                    property_kind=PropertyKind.UNKNOWN,
-                    street_address=street, city=city, state=st, zip_code=z,
-                    auction_status=status or None,
-                    first_seen=datetime.utcnow(),
-                    last_seen=datetime.utcnow(),
-                    raw={"foreclosure_dot_com": {"status": status}},
-                )
-            )
-        except Exception:
+    for m in JSONLD_RE.finditer(html):
+        body = m.group(1).strip()
+        if not body:
             continue
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError:
+            continue
+        graph = data.get("@graph", []) if isinstance(data, dict) else []
+        for cp in graph:
+            if not isinstance(cp, dict) or cp.get("@type") != "CollectionPage":
+                continue
+            item_list = (cp.get("mainEntity") or {}).get("itemListElement") or []
+            for node in item_list:
+                li = _node_to_listing(node, state, slug)
+                if li is not None:
+                    out.append(li)
+    return out
+
+
+async def _fetch_state(state: str, base_url: str, slug: str, pages_cap: int) -> list[Listing]:
+    out: list[Listing] = []
+    seen_ids: set[str] = set()
+    async with client(timeout=30.0) as c:
+        for page in range(1, pages_cap + 1):
+            url = base_url if page == 1 else f"{base_url}?pg={page}"
+            try:
+                r = await c.get(url, headers=HEADERS, follow_redirects=True)
+            except Exception as exc:
+                log.warning("foreclosure_dot_com.fetch_failed",
+                            state=state, page=page, error=str(exc)[:200])
+                break
+            if r.status_code != 200 or len(r.text) < 5000:
+                break
+            listings = _extract_listings(r.text, state, slug)
+            new_this_page = 0
+            for li in listings:
+                key = li.case_number or li.source_url
+                if key in seen_ids:
+                    continue
+                seen_ids.add(key)
+                out.append(li)
+                new_this_page += 1
+            if new_this_page == 0:
+                break
+    log.info("foreclosure_dot_com.state_done", state=state, count=len(out))
     return out
 
 
 class ForeclosureDotCom(BaseScraper):
     slug = "national.foreclosure_dot_com"
-    name = "Foreclosure.com (paywall)"
+    name = "Foreclosure.com (public preview, anonymized addresses)"
     category = "national_aggregator"
     expected_min_count = 0
     requires_apify = False
-    requires_paywall = True       # surfaces in run summary as PAYWALL-BLOCKED
-    timeout_s = 360.0
+    requires_paywall = True  # full address still gated; flag for surfacing
+    timeout_s = 240.0
 
     async def fetch(self) -> Iterable[Listing]:
-        user, pw = _credentials()
-        if not user or not pw:
-            # No creds -> short-circuit. Saves ~60s of Scrapling stealth
-            # per weekly run that would otherwise just hit the 403.
-            log.info("foreclosure_dot_com.skipped_no_credentials")
-            return []
-
-        # When creds are present we'd drive an authenticated stealth flow.
-        # Keeping this path explicit so a future owner of the credentials
-        # can drop in the login automation without rewriting the file.
-        log.warning(
-            "foreclosure_dot_com.auth_flow_not_implemented",
-            note=("Credentials provided but the auth flow isn't wired yet. "
-                  "Implement the login Scrapling page_action and remove this "
-                  "guard."),
-        )
-        return []
+        pages_cap = int(os.environ.get("FORECLOSURE_DOT_COM_PAGES", "30"))
+        out: list[Listing] = []
+        for state, url in URLS:
+            try:
+                out.extend(await _fetch_state(state, url, self.slug, pages_cap))
+            except Exception as exc:
+                log.warning("foreclosure_dot_com.state_failed",
+                            state=state, error=str(exc)[:200])
+        log.info("foreclosure_dot_com.done", total=len(out))
+        return out

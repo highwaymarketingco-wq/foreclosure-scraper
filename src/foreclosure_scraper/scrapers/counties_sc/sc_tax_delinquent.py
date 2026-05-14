@@ -14,6 +14,18 @@ Coverage:
 Why this matters: properties on the delinquent-tax list become next year's
 tax sale candidates. 6-12 months of lead time vs scraping the auction roster.
 
+KNOWN ISSUES (2026-05-14):
+  - Spartanburg, Laurens URLs return 404 (CivicEngage CMS migration)
+  - Cherokee returns 403 (Cloudflare)
+  - Union DNS-fails
+  - Pickens only links to post-sale RESULT PDFs (not pre-sale delinquent)
+  - Anderson / Oconee return HTML but no current delinquent-tax tables
+Net effect: this scraper currently returns 0 between sale cycles. URLs
+should be re-probed each July/August when counties publish that year's
+delinquent list. The text-fallback extraction (PARCEL_SC_RE + ADDR_RE)
+will pick up any TMS-tagged property the moment a real delinquent PDF is
+linked, even if the column layout differs from expected.
+
 Free, pure HTTP (no Apify, no spend).
 """
 from __future__ import annotations
@@ -65,11 +77,47 @@ COUNTY_URLS: dict[str, list[str]] = {
 
 
 ADDR_RE = re.compile(
-    r"(\d+\s+[A-Z][\w .'\-]+(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
-    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\.?)",
+    r"(\b\d{1,6}\s+[A-Z][\w .'\-]{1,80}?\b(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|"
+    r"Avenue|Ave|Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|"
+    r"Trail|Trl|Parkway|Pkwy)\.?)(?=[\s,.\n]|$)",
     re.I,
 )
 PARCEL_SC_RE = re.compile(r"\b\d{3}-\d{2}-\d{2}-\d{3,4}\b")  # SC TMS pattern
+
+
+def _extract_from_text(text: str, county: str, source_url: str) -> list["Listing"]:
+    """Fallback when table-based PDF extraction fails: scan the raw page text
+    for SC TMS parcel numbers + nearby addresses. One Listing per parcel.
+    Misses owner / amount but at least captures the property identity."""
+    out: list[Listing] = []
+    seen_parcels: set[str] = set()
+    for m in PARCEL_SC_RE.finditer(text):
+        parcel = m.group(0)
+        if parcel in seen_parcels:
+            continue
+        seen_parcels.add(parcel)
+        # Look for an address within +/- 200 chars of the parcel
+        start = max(0, m.start() - 200)
+        end = min(len(text), m.end() + 200)
+        addr_m = ADDR_RE.search(text[start:end])
+        addr = addr_m.group(1).strip() if addr_m else None
+        out.append(
+            Listing(
+                source="counties_sc.sc_tax_delinquent",
+                source_url=source_url,
+                listing_type=ListingType.TAX_SALE,
+                property_kind=PropertyKind.UNKNOWN,
+                state="SC",
+                county=county,
+                street_address=addr,
+                parcel_id=parcel,
+                description=f"SC delinquent tax candidate ({county}) — parcel {parcel}",
+                first_seen=datetime.utcnow(),
+                last_seen=datetime.utcnow(),
+                raw={"sc_tax_delinquent": {"source": source_url, "extraction": "text_fallback"}},
+            )
+        )
+    return out
 
 
 def _classify_lines(text: str) -> ListingType:
@@ -90,8 +138,14 @@ async def _scrape_pdf(c, url: str, county: str) -> list[Listing]:
         except ImportError:
             return []
         out: list[Listing] = []
+        text_pages: list[str] = []
         with pdfplumber.open(io.BytesIO(r.content)) as pdf:
             for page in pdf.pages:
+                # Collect text for fallback extraction
+                try:
+                    text_pages.append(page.extract_text() or "")
+                except Exception:
+                    pass
                 # Try table extraction first
                 for tbl in page.extract_tables() or []:
                     if not tbl or len(tbl) < 2:
@@ -149,6 +203,13 @@ async def _scrape_pdf(c, url: str, county: str) -> list[Listing]:
                                 }},
                             )
                         )
+        # Fallback: if table-based extraction returned nothing, scan the raw
+        # page text for SC TMS parcels + nearby addresses. Misses owner /
+        # amount but at least captures the property identity, which is the
+        # primary signal for downstream enrichment.
+        if not out and text_pages:
+            full_text = "\n".join(text_pages)
+            out.extend(_extract_from_text(full_text, county, url))
         return out
     except Exception as exc:
         log.debug("sc_tax_delinquent.pdf_fail", county=county, url=url, error=str(exc)[:200])

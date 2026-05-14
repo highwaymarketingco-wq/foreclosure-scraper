@@ -10,6 +10,13 @@ the same downstream dedupe / dashboard.
 This complements `counties.sitemap_walker` (which walks county.gov pages
 for already-scheduled sales) by surfacing the upstream pre-foreclosure
 trigger event.
+
+KNOWN ISSUE (2026-05-14): CCHS migrated all `/searchonline.asp` endpoints to
+a new iframe-based app at `/{county}NCNW/application.asp`. The cchs.py
+adapter has not been updated yet, so Burke / Lincoln / Cleveland return 0.
+Other vendors (Aumentum, Cott, Kofile) may have similar issues but haven't
+been individually verified post-migration. Until adapters are rewritten,
+this scraper returns 0 across all counties without crashing.
 """
 from __future__ import annotations
 

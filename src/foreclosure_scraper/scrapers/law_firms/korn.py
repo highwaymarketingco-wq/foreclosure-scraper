@@ -1,10 +1,11 @@
-"""Korn Law Firm — DEAD (domain parked 2026-05-13).
+"""Korn Law Firm — DEAD (domain parked).
 
 The kornlawfirm.com domain no longer hosts the firm's website. Both
-/foreclosure-sales/ and /sales/ now 301-redirect to ron.mamma.com
-ad-parking landing pages (verified 2026-05-13 via browser). The scraper
-is intentionally retained as a stub so the slug stays known but skipped;
-fetch() returns [] without doing network work.
+/foreclosure-sales/ and /sales/ serve a FingerprintJS parking shim that
+redirects to a domain-ad service (ron.mamma.com on 2026-05-13,
+yfdabv11.com on 2026-05-14). The scraper is intentionally retained as a
+stub so the slug stays known but skipped; fetch() returns [] without
+doing network work.
 
 If the firm ever republishes (new domain or restored site), revert this
 commit to get the working stealth/parser logic back.

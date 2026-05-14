@@ -57,10 +57,23 @@ async def _fetch_state(url: str) -> str:
                 break
             except Exception:
                 continue
-        # Wait for the listings table to render
+        # The listings come from a WP Posts-Table-Pro plugin (DataTables,
+        # serverSide:false) that POSTs to /wp-admin/admin-ajax.php on load
+        # and inserts rows client-side. The empty placeholder row
+        # ("No data available in table.") renders immediately, so we
+        # can't just wait for `tbody tr` — that matches the placeholder
+        # and returns before the data lands. Wait for a row with >=4
+        # cells (the real layout has 8: title/addr/city/state/zip/county/
+        # date/bid). If admin-ajax 500s, this times out and we fall back
+        # to whatever rendered (typically 0).
         try:
-            await page.wait_for_selector(
-                "table.posts-data-table, table tbody tr",
+            await page.wait_for_function(
+                """() => {
+                    const t = document.querySelector('table.posts-data-table tbody');
+                    if (!t) return false;
+                    return Array.from(t.querySelectorAll('tr'))
+                        .some(r => r.querySelectorAll('td').length >= 4);
+                }""",
                 timeout=20000,
             )
         except Exception:
