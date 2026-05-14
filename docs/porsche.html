@@ -81,6 +81,16 @@
   .price { font-size: 22px; font-weight: 800; color: var(--accent); }
   .price .label { font-size: 11px; color: var(--muted); font-weight: 500;
                   text-transform: uppercase; margin-right: 6px; letter-spacing: 0.05em; }
+  /* Sold listings: dim the displayed number so it doesn't read as a real
+     sale comp, and surface the caveat directly below it. */
+  .price.price-sold { color: var(--muted); font-weight: 700;
+                      text-decoration: line-through;
+                      text-decoration-thickness: 1px;
+                      text-decoration-color: rgba(138, 138, 146, 0.4); }
+  .price.price-sold .label { color: var(--muted); }
+  .sold-note { font-size: 10px; color: var(--muted); font-weight: 400;
+               text-transform: uppercase; letter-spacing: 0.04em;
+               margin-top: 2px; opacity: 0.7; text-decoration: none; }
   .title { font-size: 15px; font-weight: 600; color: var(--fg); margin: 2px 0; }
   .meta { color: var(--muted); font-size: 13px; }
   .meta span { margin-right: 12px; }
@@ -294,6 +304,11 @@
     const tier = l.project_tier || 'clean';
     const ep = effPrice(l);
     const isBid = l.price_usd == null && l.current_bid_usd != null;
+    // Sold = sale_date is in the past. Their displayed price is the last
+    // public bid before close, NOT the final hammer price (Copart hides
+    // the close number behind dealer login). Surface this clearly so the
+    // dashboard isn't mistaken for a sale-comps source.
+    const isSold = l.sale_date && new Date(l.sale_date).getTime() < Date.now();
     // Sale-end date: render as live countdown ("3d 4h"/"2h 18m 04s") if
     // in the future, else as the absolute date. Listings without
     // sale_date (most non-auction sources) just hide the badge.
@@ -314,7 +329,13 @@
         ${saleBadge}
       </div>
       <div class="body">
-        <div class="price"><span class="label">${ep == null ? 'Price' : (isBid ? 'Bid' : 'Price')}</span>${ep == null ? '<span style="color:var(--muted);font-size:14px;font-weight:500">click to view</span>' : fmtPrice(ep)}</div>
+        <div class="price${isSold ? ' price-sold' : ''}">
+          <span class="label">${ep == null ? 'Price' : (isSold ? 'Last bid' : (isBid ? 'Bid' : 'Price'))}</span>
+          ${ep == null
+            ? '<span style="color:var(--muted);font-size:14px;font-weight:500">click to view</span>'
+            : `<span${isSold ? ' title="Last public bid before close. Copart hides final hammer prices behind dealer login — actual sale price may be higher."' : ''}>${fmtPrice(ep)}</span>`}
+          ${isSold ? '<div class="sold-note">final price not public</div>' : ''}
+        </div>
         <div class="title">${l.title || '(untitled)'}</div>
         <div class="meta">
           ${l.year ? `<span>${l.year}</span>` : ''}
