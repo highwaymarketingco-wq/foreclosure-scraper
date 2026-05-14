@@ -92,6 +92,7 @@ def _lot_to_listing(d: dict) -> Listing | None:
         source="copart",
         source_url=url,
         listing_id=str(lot_no),
+        lot_number=str(lot_no),
         vin=d.get("fv") or d.get("vin"),
         title=title,
         year=int(d["lcy"]) if str(d.get("lcy") or "").isdigit() else None,
@@ -319,10 +320,12 @@ class CopartScraper(BaseScraper):
                 year = parse_year(title) or parse_year(slug)
                 if year and year < self.year_min:
                     continue
+                lot_no = href.rstrip("/").rsplit("/")[-2]
                 listing = Listing(
                     source="copart",
                     source_url=full,
-                    listing_id=href.rstrip("/").rsplit("/")[-2],
+                    listing_id=lot_no,
+                    lot_number=lot_no,
                     title=title,
                     year=year,
                     model=model,

@@ -27,7 +27,7 @@ from urllib.parse import urljoin
 from selectolax.parser import HTMLParser
 
 from ..base import BaseScraper
-from ..http_client import fetch_text_stealth
+from ..http_client import fetch_rendered, fetch_text_stealth
 from ..models import (
     Listing,
     infer_drivable,
@@ -88,35 +88,45 @@ CONFIGS: dict[str, SiteConfig] = {
         title_status_selectors=(".lot-info-title-doc", ".title-doc"),
     ),
     "abetter_bid": SiteConfig(
+        # Verified 2026-05-14: real URL is /en/car-finder/type-automobiles/
+        # make-porsche; the old /cars/porsche/ 404s. Card class is
+        # .car-card; title is .car-card__header-title; URL format
+        # /en/{LOT_NUMBER}-{year}-porsche-{model}.
+        # Selectolax doesn't support CSS4 :has() / :contains(), so we
+        # match details by class only — the parser elsewhere extracts
+        # specific fields with text regex on the matched node.
         slug="abetter_bid",
         name="A Better Bid",
         base="https://abetter.bid",
         search_url=(
-            "https://abetter.bid/cars/porsche/"
-            "?price_to={price_max}&year_from={year_min}&page={page}"
+            "https://abetter.bid/en/car-finder/type-automobiles/make-porsche"
         ),
-        card_selectors=(".car-item", "div[class*='car-item']"),
-        title_selectors=(".car-item__title a", "a.car-name", "h3 a"),
-        price_selectors=(".car-item__price", ".price"),
-        mileage_selectors=(".car-item__odo", ".odometer"),
-        location_selectors=(".car-item__location",),
-        title_status_selectors=(".car-item__doc", ".title-doc"),
+        card_selectors=(".car-card",),
+        title_selectors=(".car-card__header-title",),
+        price_selectors=(".car-card__price",),
+        mileage_selectors=(".car-card__details-text",),
+        location_selectors=(".car-card__details-text",),
+        title_status_selectors=(".car-card__details-text",),
+        max_pages=2,
     ),
     "cars4_bid": SiteConfig(
-        # cars4.bid is a thin mirror of abetter.bid — same template.
+        # Verified 2026-05-14: real URL is /cars-for-sale/porsche-manufacturer/.
+        # Lot URLs: /vehicle/{iaai|copart}-{LOT_NUMBER}-{title}-{year}-porsche-{model}
+        # The card structure is bootstrap-ish ms-1 wrappers — title link
+        # is what we anchor on.
         slug="cars4_bid",
         name="Cars4.bid",
         base="https://cars4.bid",
         search_url=(
-            "https://cars4.bid/cars/porsche"
-            "?price_max={price_max}&year_min={year_min}&page={page}"
+            "https://cars4.bid/cars-for-sale/porsche-manufacturer/"
         ),
-        card_selectors=(".car-item", "div[class*='car-item']"),
-        title_selectors=(".car-item__title a", "a.car-name"),
-        price_selectors=(".car-item__price", ".price"),
-        mileage_selectors=(".car-item__odo", ".odometer"),
-        location_selectors=(".car-item__location",),
-        title_status_selectors=(".car-item__doc",),
+        card_selectors=(".ms-1",),
+        title_selectors=("a[href*='/vehicle/']",),
+        price_selectors=(".price",),
+        mileage_selectors=(".odometer",),
+        location_selectors=(".location",),
+        title_status_selectors=(".title-status",),
+        max_pages=2,
     ),
     "auctionexport": SiteConfig(
         slug="auctionexport",
@@ -156,13 +166,25 @@ def _first_node(card, selectors: Iterable[str]):
 
 # Many salvage brokers leak the underlying lot number in the URL —
 # capturing it lets us dedupe across SCA/AutoBidMaster/ABetter.bid when
-# they relist the same Copart car.
-_LOT_NUM_RE = re.compile(r"/(?:lot|cars?|inventory)/[^?#]*?(\d{6,10})", re.IGNORECASE)
+# they relist the same Copart car. Patterns we've seen in the wild
+# (verified 2026-05-14):
+#   abetter.bid:    /en/{LOT}-{year}-porsche-{model}        (10-digit leading)
+#   cars4.bid:      /vehicle/(iaai|copart)-{LOT}-{...}      (8-digit)
+#   autobidmaster:  /en/search/lot/{LOT}/copart-{...}
+#   sca/old style:  /lot/{LOT}/...  /cars/{...}-{LOT}
+_LOT_NUM_PATTERNS = (
+    re.compile(r"/(?:search/lot|lot|cars?|inventory)/[^?#]*?(\d{6,12})", re.IGNORECASE),
+    re.compile(r"/vehicle/(?:iaai|copart)-(\d{6,12})", re.IGNORECASE),
+    re.compile(r"/en/(\d{8,12})-\d{4}-porsche", re.IGNORECASE),
+)
 
 
 def _extract_lot_id(url: str) -> str | None:
-    m = _LOT_NUM_RE.search(url)
-    return m.group(1) if m else None
+    for pat in _LOT_NUM_PATTERNS:
+        m = pat.search(url)
+        if m:
+            return m.group(1)
+    return None
 
 
 def parse_results_html(html: str, config: SiteConfig) -> list[Listing]:
@@ -196,6 +218,7 @@ def parse_results_html(html: str, config: SiteConfig) -> list[Listing]:
             source=config.slug,
             source_url=url,
             listing_id=lot_id,
+            lot_number=lot_id,  # cross-source dedupe — same physical Copart/IAA lot
             title=title,
             year=parse_year(title),
             current_bid_usd=price,
@@ -227,19 +250,42 @@ class SalvageBrokerScraper(BaseScraper):
 
     async def fetch(self) -> list[Listing]:
         out: list[Listing] = []
+        seen_urls: set[str] = set()
         for page in range(1, self.config.max_pages + 1):
             url = self.config.search_url.format(
                 year_min=self.year_min, price_max=self.price_max, page=page
             )
             try:
-                html = await fetch_text_stealth(url, timeout=60)
+                # Salvage-broker sites are all Cloudflare/JS-fronted apps
+                # (verified 2026-05-14: abetter.bid 404s on plain curl,
+                # cars4.bid 403s, autobidmaster returns a 1KB JS shell).
+                # Skip curl-cffi entirely and go straight to a rendered
+                # fetch. Chaining curl_cffi -> Scrapling in the same
+                # process has produced segfaults — render is the only
+                # safe primary path here.
+                html = await fetch_rendered(
+                    url, timeout=90,
+                    wait_for_selector=None,  # let network_idle handle it
+                    scroll_iterations=3,
+                    post_scroll_wait_ms=2500,
+                )
             except Exception as exc:  # noqa: BLE001
                 log.warning("%s page %d failed: %s", self.slug, page, exc)
                 break
             listings = parse_results_html(html, self.config)
-            if not listings:
+            # When the search URL doesn't actually paginate (e.g. abetter.bid's
+            # /en/car-finder/... ignores ?page=N), the same lots come back
+            # every iteration — dedupe by source_url across pages so we
+            # don't return 3× copies.
+            new_count = 0
+            for li in listings:
+                if li.source_url in seen_urls:
+                    continue
+                seen_urls.add(li.source_url)
+                out.append(li)
+                new_count += 1
+            if new_count == 0:
                 break
-            out.extend(listings)
         return out
 
 

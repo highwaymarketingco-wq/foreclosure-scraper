@@ -121,6 +121,7 @@ def parse_listing_page(html: str) -> list[Listing]:
             source="iaai",
             source_url=url,
             listing_id=stock,
+            lot_number=stock,  # IAA stock # is the upstream lot — mirrors expose the same #
             vin=m.group("vin") if "*" not in m.group("vin") else None,
             title=title,
             year=year,

@@ -59,7 +59,11 @@ NON_DRIVABLE_KEYWORDS = (
 )
 
 
-_YEAR_RE = re.compile(r"\b(19|20)\d{2}\b")
+# Year regex: must be a real 4-digit year not embedded in a longer
+# digit run, but can be glued straight to a letter (e.g. "2017Porsche"
+# from cars4.bid where the title rendering omits the space). Uses
+# digit-boundary look-arounds instead of \b which fails on "2017P".
+_YEAR_RE = re.compile(r"(?<!\d)(?:19|20)\d{2}(?!\d)")
 # Order matters: "k-mile" / "k-Mile" must match before bare "mile".
 _MILES_RE = re.compile(
     r"([\d][\d,]*)\s*-?\s*(k-mile|k-miles|k\s*mi|k\s*miles|mi\b|miles?\b|mile\b)",
@@ -187,6 +191,11 @@ class Listing(BaseModel):
 
     photo_url: str | None = None
     vin: str | None = None
+    # Upstream Copart / IAA lot number. Multiple broker sites
+    # (autobidmaster, abetter.bid, cars4.bid, sca.auction, etc.)
+    # all mirror the same Copart/IAA lots; capturing the source-stable
+    # lot number lets dedupe collapse 6 mirrors into one row.
+    lot_number: str | None = None
 
     first_seen: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     raw: dict[str, Any] = Field(default_factory=dict)
@@ -234,10 +243,21 @@ class Listing(BaseModel):
     def dedupe_key(self) -> str:
         """Stable hash across sources for dedupe.
 
-        Prefer VIN if present (only used cars publish them on most sites).
-        Fall back to (source, listing_id) and finally a hash of the URL.
+        Preference order:
+          1. lot_number — upstream Copart/IAA lot. Same physical car
+             shown on copart.com, autobidmaster, abetter.bid, etc. all
+             carry the same lot number, so this is the strongest
+             cross-source dedupe signal.
+          2. VIN — works on clean-title used cars but most salvage
+             listings mask the VIN (WP1AE2A21CL******) precisely to
+             stop cross-referencing.
+          3. (source, listing_id) — source-stable id but does NOT
+             collapse across mirror sites.
+          4. URL hash — last resort.
         """
-        if self.vin:
+        if self.lot_number:
+            return f"lot:{self.lot_number}"
+        if self.vin and "*" not in self.vin:
             return f"vin:{self.vin.upper()}"
         if self.listing_id:
             return f"{self.source}:{self.listing_id}"
