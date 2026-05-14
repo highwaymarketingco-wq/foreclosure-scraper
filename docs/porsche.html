@@ -66,7 +66,17 @@
   .thumb .sale { position: absolute; bottom: 8px; right: 8px;
                  background: rgba(220, 38, 38, 0.92); color: #fff;
                  padding: 3px 8px; font-size: 11px; font-weight: 700;
-                 border-radius: 4px; letter-spacing: 0.02em; }
+                 border-radius: 4px; letter-spacing: 0.02em;
+                 font-variant-numeric: tabular-nums; }
+  /* Urgent: < 1h remaining. Pulses to draw attention. */
+  .thumb .sale.urgent { background: rgba(220, 38, 38, 1);
+                        box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7);
+                        animation: pulse-urgent 1.4s ease-out infinite; }
+  @keyframes pulse-urgent {
+    0%   { box-shadow: 0 0 0 0   rgba(220, 38, 38, 0.7); }
+    70%  { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0);   }
+    100% { box-shadow: 0 0 0 0   rgba(220, 38, 38, 0);   }
+  }
   .body { padding: 14px 16px 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
   .price { font-size: 22px; font-weight: 800; color: var(--accent); }
   .price .label { font-size: 11px; color: var(--muted); font-weight: 500;
@@ -201,6 +211,20 @@
   function fmtMileage(v) {
     return v == null ? '? mi' : v.toLocaleString() + ' mi';
   }
+  // Live countdown helper used by saleBadge + tickCountdowns.
+  // Shows seconds when < 1 hour remains so the timer feels live.
+  function fmtRemaining(t) {
+    const ms = t - Date.now();
+    if (ms < 0) return 'sold ' + new Date(t).toLocaleDateString();
+    const d = Math.floor(ms / 86400000);
+    const h = Math.floor((ms % 86400000) / 3600000);
+    const m = Math.floor((ms % 3600000) / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+    if (d > 0) return `ends in ${d}d ${h}h`;
+    if (h > 0) return `ends in ${h}h ${m}m`;
+    if (m > 0) return `ends in ${m}m ${String(s).padStart(2,'0')}s`;
+    return `ends in ${s}s`;
+  }
 
   const TIER_ORDER = { salvage: 0, rebuilt: 1, damaged: 2, clean: 3 };
 
@@ -270,26 +294,17 @@
     const tier = l.project_tier || 'clean';
     const ep = effPrice(l);
     const isBid = l.price_usd == null && l.current_bid_usd != null;
-    // Sale-end date: render as relative ("3d 4h"/"2h 18m") if in the
-    // future, else as the absolute date. Listings without sale_date
-    // (most non-auction sources) just hide the badge.
+    // Sale-end date: render as live countdown ("3d 4h"/"2h 18m 04s") if
+    // in the future, else as the absolute date. Listings without
+    // sale_date (most non-auction sources) just hide the badge.
+    // The data-end attribute lets tickCountdowns() re-render every
+    // second without rebuilding the card.
     const saleBadge = (() => {
       if (!l.sale_date) return '';
       const t = new Date(l.sale_date).getTime();
       if (isNaN(t)) return '';
-      const ms = t - Date.now();
-      let label;
-      if (ms < 0) {
-        label = 'sold ' + new Date(t).toLocaleDateString();
-      } else {
-        const d = Math.floor(ms / 86400000);
-        const h = Math.floor((ms % 86400000) / 3600000);
-        const m = Math.floor((ms % 3600000) / 60000);
-        if (d > 0) label = `ends in ${d}d ${h}h`;
-        else if (h > 0) label = `ends in ${h}h ${m}m`;
-        else label = `ends in ${m}m`;
-      }
-      return `<span class="sale" title="${new Date(t).toLocaleString()}">${label}</span>`;
+      const urgent = t - Date.now() < 3600000 && t > Date.now();
+      return `<span class="sale${urgent ? ' urgent' : ''}" data-end="${t}" title="${new Date(t).toLocaleString()}">${fmtRemaining(t)}</span>`;
     })();
     div.innerHTML = `
       <div class="thumb" style="background-image:url('${l.photo_url || ''}')">
@@ -314,6 +329,21 @@
 
   for (const el of [qEl, tierEl, sourceEl, statusEl, listingTypeEl, sortEl]) el.addEventListener('input', render);
   render();
+
+  // Live countdown ticker — updates every .sale badge in place without
+  // rebuilding cards. Toggles .urgent class as the < 1h threshold is
+  // crossed. Runs every second so the trailing seconds digit ticks.
+  function tickCountdowns() {
+    const now = Date.now();
+    document.querySelectorAll('.sale[data-end]').forEach(el => {
+      const t = parseInt(el.dataset.end, 10);
+      if (isNaN(t)) return;
+      el.textContent = fmtRemaining(t);
+      const isUrgent = t > now && (t - now) < 3600000;
+      el.classList.toggle('urgent', isUrgent);
+    });
+  }
+  setInterval(tickCountdowns, 1000);
 })();
 </script>
 </body>
