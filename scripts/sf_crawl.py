@@ -153,10 +153,19 @@ PRESETS: dict[str, SitePreset] = {
     "copart": SitePreset(
         slug="copart",
         name="Copart",
+        # Copart publishes its sitemap on a separate host. If this URL
+        # 404s in your browser, check the robots.txt at copart.com/robots.txt
+        # for the current sitemap-index location.
         seed="https://www.copart-sitemaps.com/sitemap-index.xml",
         crawl_mode="sitemap",
-        include_regex=r"copart\.com/lot/\d+/.*porsche-(?:911|cayman|boxster|718)",
-        max_urls=3000,
+        # Loose match: any /lot/<digits>/...porsche... — Copart slugs vary
+        # ("porsche-911-carrera", "2018-porsche-cayman-s-lot-12345",
+        # "porsche-coupe-no-model-in-slug"), and the previous narrow
+        # pattern `porsche-(?:911|cayman|boxster|718)` was dropping most
+        # of them. Cayenne / Panamera / Macan exclusion happens later in
+        # the importer via the EXCLUDED_MODELS check.
+        include_regex=r"copart\.com/lot/\d+/.*porsche",
+        max_urls=15000,
     ),
     "iaai": SitePreset(
         slug="iaai",
@@ -282,6 +291,10 @@ def _extract_urls_from_sf_csv(path: Path, preset: "SitePreset | None" = None) ->
 
     SF 23.3 has no `--include` or `--max-urls` CLI flag, so we apply
     both filters here (using the SitePreset that produced this CSV).
+
+    Set SF_DEBUG=1 to print: raw rows in CSV, match/skip counts, and
+    the first few skipped URLs — useful for diagnosing whether a low
+    final count comes from SF's crawl scope or our include_regex.
     """
     import re as _re
 
@@ -291,7 +304,10 @@ def _extract_urls_from_sf_csv(path: Path, preset: "SitePreset | None" = None) ->
         else None
     )
     cap = preset.max_urls if preset else 10_000
+    debug = os.environ.get("SF_DEBUG") == "1"
     urls: list[str] = []
+    raw_count = 0
+    skipped_examples: list[str] = []
     with path.open(newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         if not reader.fieldnames:
@@ -306,11 +322,22 @@ def _extract_urls_from_sf_csv(path: Path, preset: "SitePreset | None" = None) ->
             u = (row.get(addr_col) or "").strip()
             if not u.startswith("http"):
                 continue
+            raw_count += 1
             if include_re and not include_re.search(u):
+                if debug and len(skipped_examples) < 5:
+                    skipped_examples.append(u)
                 continue
             urls.append(u)
             if len(urls) >= cap:
                 break
+    if debug:
+        slug = preset.slug if preset else "?"
+        print(f"  [SF_DEBUG] {slug}: csv={path.name} raw_rows={raw_count} "
+              f"matched={len(urls)} regex={preset.include_regex if preset else ''!r}")
+        if skipped_examples:
+            print(f"  [SF_DEBUG] first 5 skipped URLs:")
+            for u in skipped_examples:
+                print(f"    {u}")
     return urls
 
 
