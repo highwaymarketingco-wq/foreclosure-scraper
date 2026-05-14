@@ -16,8 +16,8 @@ name: Porsche dashboard refresh
 
 on:
   schedule:
-    # Every Tuesday + Friday 09:00 UTC. Edit / add cron lines to taste.
-    - cron: "0 9 * * 2,5"
+    # Daily at 09:00 UTC.
+    - cron: "0 9 * * *"
   workflow_dispatch:
     inputs:
       sites:
