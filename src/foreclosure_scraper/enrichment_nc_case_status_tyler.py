@@ -26,6 +26,14 @@ step died — and the heuristic + ROD path always runs as fallback.
 
 Set NC_ECOURTS_SKIP=1 to skip the entire Tyler attempt without
 disabling the heuristic fallback.
+
+Set TYLER_USE_WAF_SOLVER=1 to pre-warm an aws-waf-token cookie via
+the vendored xKiian/awswaf invisible-challenge solver before the
+browser launches. When the solver succeeds, the browser hits Tyler
+with a valid WAF token on its very first request and skips the
+challenge page entirely — short-circuits the image-grid escalation
+we've been seeing with solve_cloudflare alone. Falls back silently
+to the existing flow if the solver returns None.
 """
 from __future__ import annotations
 
@@ -156,6 +164,26 @@ async def _drive_anonymous_search(
     out or have no results are simply absent from the result.
     """
     out: dict[str, dict] = {}
+
+    # Step 0: pre-warm an aws-waf-token via curl_cffi if the solver flag
+    # is on. Inject it into the browser context so WAF sees a valid token
+    # on the first page.goto and skips the challenge entirely. No-op if
+    # TYLER_USE_WAF_SOLVER is unset or the solver returns None (image
+    # grid served, network blip, etc.) — we fall through to the existing
+    # in-browser WAF flow.
+    from .tyler_waf_token import fetch_waf_token
+    pre_token = await fetch_waf_token(SEARCH_URL, "portal-nc.tylertech.cloud")
+    if pre_token:
+        try:
+            await page.context.add_cookies([{
+                "name": "aws-waf-token",
+                "value": pre_token,
+                "domain": ".tylertech.cloud",
+                "path": "/",
+            }])
+            LAST_RUN_STATUS["waf_pretoken_injected"] = True
+        except Exception as exc:
+            log.warning("nc_ecourts.search.pretoken_inject_fail", error=str(exc)[:200])
 
     # Step 1: Land on Smart Search. May get WAF-challenged.
     LAST_RUN_STATUS["last_step"] = "landing_search_url"
@@ -434,6 +462,22 @@ async def _drive_login_and_search(
     exactly where the flow died (visible in run_health.json next run).
     """
     out: dict[str, dict] = {}
+
+    # Step 0: pre-warm aws-waf-token via curl_cffi (see _drive_anonymous_search
+    # for rationale). No-op when TYLER_USE_WAF_SOLVER is unset.
+    from .tyler_waf_token import fetch_waf_token
+    pre_token = await fetch_waf_token(LOGIN_URL, "portal-nc.tylertech.cloud")
+    if pre_token:
+        try:
+            await page.context.add_cookies([{
+                "name": "aws-waf-token",
+                "value": pre_token,
+                "domain": ".tylertech.cloud",
+                "path": "/",
+            }])
+            LAST_RUN_STATUS["waf_pretoken_injected"] = True
+        except Exception as exc:
+            log.warning("nc_ecourts.auth.pretoken_inject_fail", error=str(exc)[:200])
 
     # Step 1: Land at portal — Tyler's WS-Fed wrapper redirects to IdP login
     LAST_RUN_STATUS["last_step"] = "landing_login_url"
