@@ -17,6 +17,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y15SS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280406Z",
     "raw": {
       "sf_csv": true
@@ -41,6 +43,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1BA2AYXSD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281087Z",
     "raw": {
       "sf_csv": true
@@ -65,6 +69,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1BA2AY1TD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281494Z",
     "raw": {
       "sf_csv": true
@@ -89,6 +95,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY2MD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281030Z",
     "raw": {
       "sf_csv": true
@@ -113,6 +121,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AB2AY7PD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281391Z",
     "raw": {
       "sf_csv": true
@@ -137,6 +147,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CB2A95ES******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.596987Z",
     "raw": {
       "sf_csv": true
@@ -161,6 +173,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "PARTSNLY123******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281330Z",
     "raw": {
       "sf_csv": true
@@ -185,6 +199,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A27JK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281589Z",
     "raw": {
       "sf_csv": true
@@ -209,6 +225,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY1KD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281210Z",
     "raw": {
       "sf_csv": true
@@ -233,6 +251,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1BL2AY5SD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281160Z",
     "raw": {
       "sf_csv": true
@@ -257,6 +277,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AE2A27HL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281364Z",
     "raw": {
       "sf_csv": true
@@ -279,9 +301,11 @@
     "seller_type": "salvage_auction",
     "title_status": "salvage",
     "drivable": null,
-    "photo_url": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0925/63b9207d85544ca18d44227708bf952e_thb.jpg",
     "vin": "WP1AA2A22HK******",
-    "first_seen": "2026-05-14T03:48:49.281093Z",
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-05-14T05:29:57.074888Z",
     "raw": {
       "sf_csv": true
     },
@@ -305,6 +329,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CB2A87RK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.597437Z",
     "raw": {
       "sf_csv": true
@@ -329,6 +355,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1BB2AYXPD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281218Z",
     "raw": {
       "sf_csv": true
@@ -353,6 +381,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY8RD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281486Z",
     "raw": {
       "sf_csv": true
@@ -377,6 +407,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1BA2AY6RD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281422Z",
     "raw": {
       "sf_csv": true
@@ -401,6 +433,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY1RD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281138Z",
     "raw": {
       "sf_csv": true
@@ -425,6 +459,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AB2A29GL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281518Z",
     "raw": {
       "sf_csv": true
@@ -449,6 +485,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AB2A29EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281005Z",
     "raw": {
       "sf_csv": true
@@ -473,6 +511,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AB2AY7MD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281054Z",
     "raw": {
       "sf_csv": true
@@ -497,6 +537,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY3RD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281462Z",
     "raw": {
       "sf_csv": true
@@ -521,6 +563,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A29EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281022Z",
     "raw": {
       "sf_csv": true
@@ -545,6 +589,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AB2AY6LD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280905Z",
     "raw": {
       "sf_csv": true
@@ -569,6 +615,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AL2AY8SD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280809Z",
     "raw": {
       "sf_csv": true
@@ -593,6 +641,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2A86JK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.597292Z",
     "raw": {
       "sf_csv": true
@@ -617,6 +667,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AC2A27HL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280826Z",
     "raw": {
       "sf_csv": true
@@ -641,6 +693,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY8MD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281557Z",
     "raw": {
       "sf_csv": true
@@ -665,6 +719,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY0ND******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281407Z",
     "raw": {
       "sf_csv": true
@@ -689,6 +745,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1BA2AY5SD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281399Z",
     "raw": {
       "sf_csv": true
@@ -713,6 +771,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2A82JK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.597308Z",
     "raw": {
       "sf_csv": true
@@ -737,6 +797,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AF2A24EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280938Z",
     "raw": {
       "sf_csv": true
@@ -761,6 +823,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1BA2AY1RD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281101Z",
     "raw": {
       "sf_csv": true
@@ -785,6 +849,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A28GL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280843Z",
     "raw": {
       "sf_csv": true
@@ -809,6 +875,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AD2A22HL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281542Z",
     "raw": {
       "sf_csv": true
@@ -833,6 +901,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AC2A27EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281154Z",
     "raw": {
       "sf_csv": true
@@ -857,6 +927,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A24HK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280834Z",
     "raw": {
       "sf_csv": true
@@ -881,6 +953,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A27GL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281267Z",
     "raw": {
       "sf_csv": true
@@ -905,6 +979,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AF2A22EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281233Z",
     "raw": {
       "sf_csv": true
@@ -929,6 +1005,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AE2A25EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280914Z",
     "raw": {
       "sf_csv": true
@@ -953,6 +1031,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AC2Y12LS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280428Z",
     "raw": {
       "sf_csv": true
@@ -977,6 +1057,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AC2A22GL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281202Z",
     "raw": {
       "sf_csv": true
@@ -1001,6 +1083,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2A90HS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.596912Z",
     "raw": {
       "sf_csv": true
@@ -1025,6 +1109,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2Y10LS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280477Z",
     "raw": {
       "sf_csv": true
@@ -1049,6 +1135,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1BB2AY7LD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280971Z",
     "raw": {
       "sf_csv": true
@@ -1073,6 +1161,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y18MS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280454Z",
     "raw": {
       "sf_csv": true
@@ -1097,6 +1187,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AYXKD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281250Z",
     "raw": {
       "sf_csv": true
@@ -1121,6 +1213,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y12PS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280390Z",
     "raw": {
       "sf_csv": true
@@ -1145,6 +1239,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0ZZZ98ZLK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.597315Z",
     "raw": {
       "sf_csv": true
@@ -1169,6 +1265,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y19NS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280759Z",
     "raw": {
       "sf_csv": true
@@ -1193,6 +1291,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y16RS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280382Z",
     "raw": {
       "sf_csv": true
@@ -1217,6 +1317,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A21JK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281258Z",
     "raw": {
       "sf_csv": true
@@ -1241,6 +1343,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1BE2AY8ND******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281372Z",
     "raw": {
       "sf_csv": true
@@ -1265,6 +1369,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY3KD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281241Z",
     "raw": {
       "sf_csv": true
@@ -1289,6 +1395,8 @@
     "drivable": null,
     "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/05/2021_porsche_911-carrera-coupe_img_3174-48832.jpeg?resize=470%2C318",
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:51.401580Z",
     "raw": {},
     "project_tier": "clean"
@@ -1311,6 +1419,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2Y13SS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280398Z",
     "raw": {
       "sf_csv": true
@@ -1335,6 +1445,8 @@
     "drivable": null,
     "photo_url": "https://platform.cstatic-images.com/in/v2/6d32d7b8-e8ab-5d9a-8b5e-86e890b6d934/754e3d3f-3701-41ec-b0cd-53ed6a83d3c3/D-VHzIasMw2AEusBlCygSpmgxyE.jpg",
     "vin": "WP0AA2A8XFK160370",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:49.394295Z",
     "raw": {
       "cars_com": {
@@ -1389,6 +1501,8 @@
     "drivable": null,
     "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/04/2022_porsche_718-spyder_20260422_222941176_ios-95931.jpg?resize=470%2C318",
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:51.397240Z",
     "raw": {},
     "project_tier": "clean"
@@ -1411,6 +1525,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2A81KS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.597274Z",
     "raw": {
       "sf_csv": true
@@ -1435,6 +1551,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CB2A80SK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.597430Z",
     "raw": {
       "sf_csv": true
@@ -1459,6 +1577,8 @@
     "drivable": null,
     "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/04/2014_porsche_cayman-s_img_5977-27147.jpeg?resize=470%2C318",
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:51.399531Z",
     "raw": {},
     "project_tier": "clean"
@@ -1481,6 +1601,8 @@
     "drivable": null,
     "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/04/2016_porsche_911-targa-4-gts_2016_porsche_911-targa-4-gts_ff9412a4-972c-496a-a7b8-372aa0c0c505-wwB6tK-96798-96799-scaled.jpg?resize=470%2C318",
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:51.401226Z",
     "raw": {},
     "project_tier": "clean"
@@ -1503,6 +1625,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AE2Y13SS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280469Z",
     "raw": {
       "sf_csv": true
@@ -1527,6 +1651,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY4PD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280817Z",
     "raw": {
       "sf_csv": true
@@ -1551,6 +1677,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AN2AY8SD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281446Z",
     "raw": {
       "sf_csv": true
@@ -1575,6 +1703,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2A91ES******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.596978Z",
     "raw": {
       "sf_csv": true
@@ -1599,6 +1729,8 @@
     "drivable": null,
     "photo_url": "https://platform.cstatic-images.com/in/v2/9c471491-7905-5228-a4fc-abf4e2a4958e/8cdf76e3-3b36-414a-a59a-6ff6290d2da5/blH-iDCgWs61iDhynwk_RpmlUvY.jpg",
     "vin": "WP0CA2A80GS120583",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:49.394268Z",
     "raw": {
       "cars_com": {
@@ -1653,6 +1785,8 @@
     "drivable": null,
     "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/04/2021_porsche_718-cayman_20260419-rhp_9633-copy-64044.jpg?resize=470%2C318",
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:51.397170Z",
     "raw": {},
     "project_tier": "clean"
@@ -1675,6 +1809,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CB2A91HS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.596923Z",
     "raw": {
       "sf_csv": true
@@ -1699,6 +1835,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY9RD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280930Z",
     "raw": {
       "sf_csv": true
@@ -1723,6 +1861,8 @@
     "drivable": null,
     "photo_url": "https://platform.cstatic-images.com/in/v2/389e5b10-118b-57aa-b0f8-0233a11b9e86/d500a8c6-f118-4a78-8471-4d4f332bdd4a/LGtpa2zpfHH4_SZGIG4gsWnN2_M.jpg",
     "vin": "WP0CA2A87GS120287",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:49.394241Z",
     "raw": {
       "cars_com": {
@@ -1777,6 +1917,8 @@
     "drivable": null,
     "photo_url": "https://photos.classiccars.com/cc-temp/listing/202/6231/56570609-2014-porsche-boxster-std.jpg",
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T15:04:17.717054Z",
     "raw": {},
     "project_tier": "clean"
@@ -1799,6 +1941,8 @@
     "drivable": null,
     "photo_url": "https://platform.cstatic-images.com/in/v2/eb18a1af-d1f7-5e9f-919a-b28476fb03c3/e31d6f13-fc6b-4e86-ab57-8f9dbfb28a5a/QzYt31Y6DZZv2Fj3kQOLgS5Ldjs.jpg",
     "vin": "WP0CA2A88KS210072",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:49.393833Z",
     "raw": {
       "cars_com": {
@@ -1853,6 +1997,8 @@
     "drivable": null,
     "photo_url": "https://platform.cstatic-images.com/in/v2/a84a6aa5-510d-5a7e-a296-342e9aa21d89/918ecf37-d7f3-490b-a148-10bc0c49312a/RK4ktPiS_ayGl66iucfMI0iV2wg.jpg",
     "vin": "WP0CA2A85GS120692",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:49.394065Z",
     "raw": {
       "cars_com": {
@@ -1907,6 +2053,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CB2A95RS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.597020Z",
     "raw": {
       "sf_csv": true
@@ -1931,6 +2079,8 @@
     "drivable": null,
     "photo_url": "https://platform.cstatic-images.com/in/v2/755797b5-18d6-5d96-b5e2-28ee6fa65909/b69a6f4b-fb6d-4d86-ab81-f2981c55fac4/Kt2pn3VmHNOBNmR_t-gtE1YZkIU.jpg",
     "vin": "WP0CA2A81GS120155",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:49.394147Z",
     "raw": {
       "cars_com": {
@@ -1985,6 +2135,8 @@
     "drivable": null,
     "photo_url": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/b091beb0-d196-49c4-b8ae-7b854351bbb4/IY6sET_b2jEZu91uAL70Beljysk.jpg",
     "vin": "WP0AA2A84EK173100",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:49.394401Z",
     "raw": {
       "cars_com": {
@@ -2039,6 +2191,8 @@
     "drivable": null,
     "photo_url": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/036e689b-4752-4e72-8154-981efd4db5ea/7xyiSu7nV3OmWhh-Aw4NA_qCohc.jpg",
     "vin": "WP0AA2A86EK170358",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:49.394427Z",
     "raw": {
       "cars_com": {
@@ -2093,6 +2247,8 @@
     "drivable": null,
     "photo_url": "https://platform.cstatic-images.com/in/v2/3ad59070-01de-5a67-8eaf-f072103a4b59/6b7127a6-472c-4561-a147-5965ee805d2d/CwRGCcPeWYZLP5B8AErLTzcVJFE.jpg",
     "vin": "WP0AA2A80FK160474",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:49.394213Z",
     "raw": {
       "cars_com": {
@@ -2147,6 +2303,8 @@
     "drivable": null,
     "photo_url": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/43127910-c97c-4fff-90e6-f3fdb6130dc9/0H1koswL5eEOrnB3ic8CBU3weV4.jpg",
     "vin": "WP0AA2A8XEK173361",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:49.394111Z",
     "raw": {
       "cars_com": {
@@ -2201,6 +2359,8 @@
     "drivable": null,
     "photo_url": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/88c683b2-f1b5-441e-a075-6b1b00f88b52/7A313BeOws03Rt52EVIJhLI6SSQ.jpg",
     "vin": "WP0AB2A82FK183851",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:49.394322Z",
     "raw": {
       "cars_com": {
@@ -2255,6 +2415,8 @@
     "drivable": null,
     "photo_url": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/5ce37df0-4128-4def-851b-8055a9f84150/M3wTK6yFTC09TfTU_c3uiwd7J98.jpg",
     "vin": "WP0AB2A8XEK193137",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:49.394348Z",
     "raw": {
       "cars_com": {
@@ -2309,6 +2471,8 @@
     "drivable": null,
     "photo_url": "https://platform.cstatic-images.com/in/v2/158cae50-b317-51e4-9c28-65699862cd8a/afd6bc1f-be61-471f-9b06-ed0e95e6f0a0/Bk2G52rgQ4ppG37HUuQR2J377jE.jpg",
     "vin": "WP0CB2A80HS241466",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:49.394181Z",
     "raw": {
       "cars_com": {
@@ -2363,6 +2527,8 @@
     "drivable": null,
     "photo_url": "https://platform.cstatic-images.com/in/v2/3334d918-7d74-555d-9e4f-5f9e6c9f008a/8a1ee75a-0b58-44b6-8086-c16894f9492b/2DZXGelv-3nIcveBQjgJynhz5O4.jpg",
     "vin": "WP0AA2A83KS260823",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-13T14:58:49.394373Z",
     "raw": {
       "cars_com": {
@@ -2417,6 +2583,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2A99LS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.596902Z",
     "raw": {
       "sf_csv": true
@@ -2441,6 +2609,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AC2A81PS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:39:10.280209Z",
     "raw": {
       "sf_csv": true
@@ -2465,6 +2635,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AF2A99KS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.597003Z",
     "raw": {
       "sf_csv": true
@@ -2489,6 +2661,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1BK2AY2RD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281063Z",
     "raw": {
       "sf_csv": true
@@ -2513,6 +2687,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AC2A99NS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.596933Z",
     "raw": {
       "sf_csv": true
@@ -2537,6 +2713,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AF2A90RS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:39:10.279467Z",
     "raw": {
       "sf_csv": true
@@ -2561,6 +2739,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.698631Z",
     "raw": {
       "sf_csv": true
@@ -2585,6 +2765,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.698999Z",
     "raw": {
       "sf_csv": true
@@ -2609,6 +2791,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699014Z",
     "raw": {
       "sf_csv": true
@@ -2633,6 +2817,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699023Z",
     "raw": {
       "sf_csv": true
@@ -2657,6 +2843,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699031Z",
     "raw": {
       "sf_csv": true
@@ -2681,6 +2869,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699040Z",
     "raw": {
       "sf_csv": true
@@ -2705,6 +2895,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699047Z",
     "raw": {
       "sf_csv": true
@@ -2729,6 +2921,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699055Z",
     "raw": {
       "sf_csv": true
@@ -2753,6 +2947,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699064Z",
     "raw": {
       "sf_csv": true
@@ -2777,6 +2973,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699072Z",
     "raw": {
       "sf_csv": true
@@ -2801,6 +2999,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699080Z",
     "raw": {
       "sf_csv": true
@@ -2825,6 +3025,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699087Z",
     "raw": {
       "sf_csv": true
@@ -2849,6 +3051,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699095Z",
     "raw": {
       "sf_csv": true
@@ -2873,6 +3077,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699102Z",
     "raw": {
       "sf_csv": true
@@ -2897,6 +3103,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699109Z",
     "raw": {
       "sf_csv": true
@@ -2921,6 +3129,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699116Z",
     "raw": {
       "sf_csv": true
@@ -2945,6 +3155,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699123Z",
     "raw": {
       "sf_csv": true
@@ -2969,6 +3181,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699131Z",
     "raw": {
       "sf_csv": true
@@ -2993,6 +3207,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699137Z",
     "raw": {
       "sf_csv": true
@@ -3017,6 +3233,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699146Z",
     "raw": {
       "sf_csv": true
@@ -3041,6 +3259,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699153Z",
     "raw": {
       "sf_csv": true
@@ -3065,6 +3285,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699160Z",
     "raw": {
       "sf_csv": true
@@ -3089,6 +3311,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699167Z",
     "raw": {
       "sf_csv": true
@@ -3113,6 +3337,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699174Z",
     "raw": {
       "sf_csv": true
@@ -3137,6 +3363,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": null,
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T02:57:22.699181Z",
     "raw": {
       "sf_csv": true
@@ -3161,6 +3389,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AD2A92FS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.596959Z",
     "raw": {
       "sf_csv": true
@@ -3185,6 +3415,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CA2A93MS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.596995Z",
     "raw": {
       "sf_csv": true
@@ -3209,6 +3441,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2A80KS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.597300Z",
     "raw": {
       "sf_csv": true
@@ -3233,6 +3467,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CA2A80HS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.597445Z",
     "raw": {
       "sf_csv": true
@@ -3257,6 +3493,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CA2A85HS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:32:58.597453Z",
     "raw": {
       "sf_csv": true
@@ -3281,6 +3519,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AD2A98NS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007318Z",
     "raw": {
       "sf_csv": true
@@ -3305,6 +3545,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CA2A94HS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007374Z",
     "raw": {
       "sf_csv": true
@@ -3329,6 +3571,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AD2A95HS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007384Z",
     "raw": {
       "sf_csv": true
@@ -3353,6 +3597,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CB2A99SS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007401Z",
     "raw": {
       "sf_csv": true
@@ -3375,9 +3621,11 @@
     "seller_type": "salvage_auction",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/a9a56f0e8f874e9392cb885ae55e1655_thb.jpg",
     "vin": "WP0AB2A9XLS******",
-    "first_seen": "2026-05-14T03:48:49.280056Z",
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-05-14T05:29:57.073210Z",
     "raw": {
       "sf_csv": true
     },
@@ -3401,6 +3649,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CD2A98PS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007459Z",
     "raw": {
       "sf_csv": true
@@ -3425,6 +3675,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CD2A95MS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007467Z",
     "raw": {
       "sf_csv": true
@@ -3449,6 +3701,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AD2A99KS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007474Z",
     "raw": {
       "sf_csv": true
@@ -3473,6 +3727,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CB2A95NS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007483Z",
     "raw": {
       "sf_csv": true
@@ -3497,6 +3753,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AC2A93FS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007492Z",
     "raw": {
       "sf_csv": true
@@ -3521,6 +3779,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2A90JS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007499Z",
     "raw": {
       "sf_csv": true
@@ -3545,6 +3805,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2A91FS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007507Z",
     "raw": {
       "sf_csv": true
@@ -3569,6 +3831,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2A92RS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007514Z",
     "raw": {
       "sf_csv": true
@@ -3593,6 +3857,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2A99NS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007521Z",
     "raw": {
       "sf_csv": true
@@ -3617,6 +3883,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2A91HS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007529Z",
     "raw": {
       "sf_csv": true
@@ -3641,6 +3909,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2A92KS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007538Z",
     "raw": {
       "sf_csv": true
@@ -3665,6 +3935,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CA2A96RS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007546Z",
     "raw": {
       "sf_csv": true
@@ -3689,6 +3961,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AD2A96ES******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007554Z",
     "raw": {
       "sf_csv": true
@@ -3713,6 +3987,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CB2A90ES******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007562Z",
     "raw": {
       "sf_csv": true
@@ -3737,6 +4013,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0BH2A99TS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007570Z",
     "raw": {
       "sf_csv": true
@@ -3761,6 +4039,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CA2A90HS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007578Z",
     "raw": {
       "sf_csv": true
@@ -3785,6 +4065,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2A97HS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007586Z",
     "raw": {
       "sf_csv": true
@@ -3809,6 +4091,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2A99SS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007602Z",
     "raw": {
       "sf_csv": true
@@ -3833,6 +4117,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AD2A92PS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007609Z",
     "raw": {
       "sf_csv": true
@@ -3857,6 +4143,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2A94LS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007617Z",
     "raw": {
       "sf_csv": true
@@ -3881,6 +4169,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AH2A92SS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007625Z",
     "raw": {
       "sf_csv": true
@@ -3905,6 +4195,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CB2A99JS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007632Z",
     "raw": {
       "sf_csv": true
@@ -3929,6 +4221,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AH2A9XSS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007640Z",
     "raw": {
       "sf_csv": true
@@ -3953,6 +4247,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2A95HS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007648Z",
     "raw": {
       "sf_csv": true
@@ -3977,6 +4273,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2A95SS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007664Z",
     "raw": {
       "sf_csv": true
@@ -4001,6 +4299,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AH2A93TS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007672Z",
     "raw": {
       "sf_csv": true
@@ -4025,6 +4325,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AC2A93JS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007680Z",
     "raw": {
       "sf_csv": true
@@ -4049,6 +4351,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CB2A93NS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007689Z",
     "raw": {
       "sf_csv": true
@@ -4073,6 +4377,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2A82KS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007755Z",
     "raw": {
       "sf_csv": true
@@ -4097,6 +4403,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2A8XJS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007763Z",
     "raw": {
       "sf_csv": true
@@ -4121,6 +4429,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2A80GK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007771Z",
     "raw": {
       "sf_csv": true
@@ -4145,6 +4455,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AC2A80NS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007780Z",
     "raw": {
       "sf_csv": true
@@ -4169,6 +4481,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2A86NS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007788Z",
     "raw": {
       "sf_csv": true
@@ -4193,6 +4507,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2A89MS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007802Z",
     "raw": {
       "sf_csv": true
@@ -4217,6 +4533,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2A84EK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007811Z",
     "raw": {
       "sf_csv": true
@@ -4241,6 +4559,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2A80JK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007820Z",
     "raw": {
       "sf_csv": true
@@ -4265,6 +4585,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2A82JK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007827Z",
     "raw": {
       "sf_csv": true
@@ -4289,6 +4611,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AD2A80SK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007835Z",
     "raw": {
       "sf_csv": true
@@ -4313,6 +4637,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AC2A82GK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007843Z",
     "raw": {
       "sf_csv": true
@@ -4337,6 +4663,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2A85GK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007851Z",
     "raw": {
       "sf_csv": true
@@ -4361,6 +4689,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CA2A87HS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007890Z",
     "raw": {
       "sf_csv": true
@@ -4385,6 +4715,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CA2A88HS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007897Z",
     "raw": {
       "sf_csv": true
@@ -4409,6 +4741,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CB2A82HS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007905Z",
     "raw": {
       "sf_csv": true
@@ -4433,6 +4767,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0CA2A81LS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:43:47.007913Z",
     "raw": {
       "sf_csv": true
@@ -4457,6 +4793,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y11MS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280414Z",
     "raw": {
       "sf_csv": true
@@ -4481,6 +4819,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AD2Y18PS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280422Z",
     "raw": {
       "sf_csv": true
@@ -4505,6 +4845,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2Y14LS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280437Z",
     "raw": {
       "sf_csv": true
@@ -4529,6 +4871,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2Y12MS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280444Z",
     "raw": {
       "sf_csv": true
@@ -4553,6 +4897,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y12MS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280461Z",
     "raw": {
       "sf_csv": true
@@ -4577,6 +4923,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y14NS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280485Z",
     "raw": {
       "sf_csv": true
@@ -4601,6 +4949,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y17MS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280492Z",
     "raw": {
       "sf_csv": true
@@ -4625,6 +4975,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AC2Y12MS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280501Z",
     "raw": {
       "sf_csv": true
@@ -4649,6 +5001,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2Y14PS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280509Z",
     "raw": {
       "sf_csv": true
@@ -4673,6 +5027,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y16NS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280547Z",
     "raw": {
       "sf_csv": true
@@ -4697,6 +5053,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2Y1XMS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280523Z",
     "raw": {
       "sf_csv": true
@@ -4721,6 +5079,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y1XMS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280530Z",
     "raw": {
       "sf_csv": true
@@ -4745,6 +5105,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0BB2Y12PS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280539Z",
     "raw": {
       "sf_csv": true
@@ -4769,6 +5131,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y14RS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280555Z",
     "raw": {
       "sf_csv": true
@@ -4793,6 +5157,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y10RS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280562Z",
     "raw": {
       "sf_csv": true
@@ -4817,6 +5183,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y1XPS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280570Z",
     "raw": {
       "sf_csv": true
@@ -4841,6 +5209,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AC2Y11LS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280578Z",
     "raw": {
       "sf_csv": true
@@ -4865,6 +5235,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2Y11TS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280586Z",
     "raw": {
       "sf_csv": true
@@ -4889,6 +5261,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2Y16NS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280594Z",
     "raw": {
       "sf_csv": true
@@ -4913,6 +5287,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2Y15LS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280602Z",
     "raw": {
       "sf_csv": true
@@ -4937,6 +5313,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y15NS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280667Z",
     "raw": {
       "sf_csv": true
@@ -4961,6 +5339,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y14SS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280675Z",
     "raw": {
       "sf_csv": true
@@ -4985,6 +5365,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2Y19MS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280682Z",
     "raw": {
       "sf_csv": true
@@ -5009,6 +5391,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AC2Y15LS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280690Z",
     "raw": {
       "sf_csv": true
@@ -5033,6 +5417,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2Y11LS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280697Z",
     "raw": {
       "sf_csv": true
@@ -5057,6 +5443,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y17PS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280705Z",
     "raw": {
       "sf_csv": true
@@ -5081,6 +5469,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y19PS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280712Z",
     "raw": {
       "sf_csv": true
@@ -5105,6 +5495,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0BA2Y18NS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280721Z",
     "raw": {
       "sf_csv": true
@@ -5129,6 +5521,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AC2Y13MS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280729Z",
     "raw": {
       "sf_csv": true
@@ -5153,6 +5547,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AA2Y19SS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280743Z",
     "raw": {
       "sf_csv": true
@@ -5177,6 +5573,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0AB2Y10RS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280751Z",
     "raw": {
       "sf_csv": true
@@ -5201,6 +5599,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP0BB2Y1XPS******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280766Z",
     "raw": {
       "sf_csv": true
@@ -5225,6 +5625,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1BA2AY1MD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280995Z",
     "raw": {
       "sf_csv": true
@@ -5249,6 +5651,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AF2A28GL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280792Z",
     "raw": {
       "sf_csv": true
@@ -5273,6 +5677,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A21EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280859Z",
     "raw": {
       "sf_csv": true
@@ -5297,6 +5703,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AE2A24GL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280867Z",
     "raw": {
       "sf_csv": true
@@ -5321,6 +5729,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AB2AY6PD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280874Z",
     "raw": {
       "sf_csv": true
@@ -5343,9 +5753,11 @@
     "seller_type": "salvage_auction",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/5cd3ee04e6e141238a2b7165c3f4da80_thb.jpg",
     "vin": "WP1AB2A24HL******",
-    "first_seen": "2026-05-14T03:48:49.281124Z",
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-05-14T05:29:57.074937Z",
     "raw": {
       "sf_csv": true
     },
@@ -5367,9 +5779,11 @@
     "seller_type": "salvage_auction",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/1125/115cfb7a872248c6b0219ed14a034b0e_thb.jpg",
     "vin": "WP1AA2A28GK******",
-    "first_seen": "2026-05-14T03:48:49.281667Z",
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-05-14T05:29:57.075806Z",
     "raw": {
       "sf_csv": true
     },
@@ -5391,9 +5805,11 @@
     "seller_type": "salvage_auction",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/aab2fa264e494838a9abf98fd75d9c8f_thb.jpg",
     "vin": "WP1AE2A20HL******",
-    "first_seen": "2026-05-14T03:48:49.281013Z",
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-05-14T05:29:57.074758Z",
     "raw": {
       "sf_csv": true
     },
@@ -5415,9 +5831,11 @@
     "seller_type": "salvage_auction",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0226/622457de3cf141fba0be3ff94e410ec0_thb.jpg",
     "vin": "WP1AA2A21HK******",
-    "first_seen": "2026-05-14T03:48:49.281748Z",
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-05-14T05:29:57.075936Z",
     "raw": {
       "sf_csv": true
     },
@@ -5441,6 +5859,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AB2AY8ND******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280954Z",
     "raw": {
       "sf_csv": true
@@ -5465,6 +5885,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AYXND******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280962Z",
     "raw": {
       "sf_csv": true
@@ -5489,6 +5911,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AE2A29HL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.280979Z",
     "raw": {
       "sf_csv": true
@@ -5513,6 +5937,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A27HK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281740Z",
     "raw": {
       "sf_csv": true
@@ -5537,6 +5963,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY9KD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281038Z",
     "raw": {
       "sf_csv": true
@@ -5561,6 +5989,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A23GL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281046Z",
     "raw": {
       "sf_csv": true
@@ -5585,6 +6015,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AF2A24GK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281071Z",
     "raw": {
       "sf_csv": true
@@ -5609,6 +6041,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A21GL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281194Z",
     "raw": {
       "sf_csv": true
@@ -5631,9 +6065,11 @@
     "seller_type": "salvage_auction",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/e543f7e0959840fbb61847445a658615_thb.jpg",
     "vin": "WP1AA2AY4KD******",
-    "first_seen": "2026-05-14T03:48:49.281454Z",
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-05-14T05:29:57.075459Z",
     "raw": {
       "sf_csv": true
     },
@@ -5657,6 +6093,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1BA2AY8RD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281116Z",
     "raw": {
       "sf_csv": true
@@ -5681,6 +6119,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A23EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281130Z",
     "raw": {
       "sf_csv": true
@@ -5705,6 +6145,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AD2A23GL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281146Z",
     "raw": {
       "sf_csv": true
@@ -5729,6 +6171,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY8PD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281168Z",
     "raw": {
       "sf_csv": true
@@ -5753,6 +6197,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A26EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281177Z",
     "raw": {
       "sf_csv": true
@@ -5777,6 +6223,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY7LD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281381Z",
     "raw": {
       "sf_csv": true
@@ -5801,6 +6249,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A23HK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281226Z",
     "raw": {
       "sf_csv": true
@@ -5825,6 +6275,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A20GL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281275Z",
     "raw": {
       "sf_csv": true
@@ -5849,6 +6301,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY6PD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281715Z",
     "raw": {
       "sf_csv": true
@@ -5873,6 +6327,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AE2A23HL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281298Z",
     "raw": {
       "sf_csv": true
@@ -5897,6 +6353,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AB2A28EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281315Z",
     "raw": {
       "sf_csv": true
@@ -5921,6 +6379,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AB2A21FL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281323Z",
     "raw": {
       "sf_csv": true
@@ -5945,6 +6405,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A24EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281338Z",
     "raw": {
       "sf_csv": true
@@ -5969,6 +6431,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AE2A27FL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281355Z",
     "raw": {
       "sf_csv": true
@@ -5993,6 +6457,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY6ND******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281415Z",
     "raw": {
       "sf_csv": true
@@ -6017,6 +6483,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A29JK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281430Z",
     "raw": {
       "sf_csv": true
@@ -6041,6 +6509,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AB2A23GL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281438Z",
     "raw": {
       "sf_csv": true
@@ -6065,6 +6535,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A20EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281470Z",
     "raw": {
       "sf_csv": true
@@ -6089,6 +6561,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AE2A24FL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281478Z",
     "raw": {
       "sf_csv": true
@@ -6113,6 +6587,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY8KD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281503Z",
     "raw": {
       "sf_csv": true
@@ -6137,6 +6613,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AE2A20GL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281510Z",
     "raw": {
       "sf_csv": true
@@ -6161,6 +6639,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AE2A28GL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281526Z",
     "raw": {
       "sf_csv": true
@@ -6185,6 +6665,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY6RD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281534Z",
     "raw": {
       "sf_csv": true
@@ -6209,6 +6691,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY0KD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281549Z",
     "raw": {
       "sf_csv": true
@@ -6233,6 +6717,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AB2A23JL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281573Z",
     "raw": {
       "sf_csv": true
@@ -6257,6 +6743,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY9PD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281580Z",
     "raw": {
       "sf_csv": true
@@ -6281,6 +6769,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AH2AY0PD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281596Z",
     "raw": {
       "sf_csv": true
@@ -6305,6 +6795,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY8LD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281604Z",
     "raw": {
       "sf_csv": true
@@ -6329,6 +6821,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1BA2AY9LD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281611Z",
     "raw": {
       "sf_csv": true
@@ -6353,6 +6847,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WPAB2A2XJX******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281620Z",
     "raw": {
       "sf_csv": true
@@ -6377,6 +6873,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AB2AY8KD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281628Z",
     "raw": {
       "sf_csv": true
@@ -6401,6 +6899,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1BE2AY8MD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281635Z",
     "raw": {
       "sf_csv": true
@@ -6425,6 +6925,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AD2A27EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281652Z",
     "raw": {
       "sf_csv": true
@@ -6449,6 +6951,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AD2A23HL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281658Z",
     "raw": {
       "sf_csv": true
@@ -6473,6 +6977,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY3LD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281674Z",
     "raw": {
       "sf_csv": true
@@ -6497,6 +7003,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AB2A20GL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281682Z",
     "raw": {
       "sf_csv": true
@@ -6521,6 +7029,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AB2A23EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281690Z",
     "raw": {
       "sf_csv": true
@@ -6545,6 +7055,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY9MD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281699Z",
     "raw": {
       "sf_csv": true
@@ -6569,6 +7081,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A22GK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281707Z",
     "raw": {
       "sf_csv": true
@@ -6593,6 +7107,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AH2AYXPD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281731Z",
     "raw": {
       "sf_csv": true
@@ -6617,6 +7133,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AE2A28EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281761Z",
     "raw": {
       "sf_csv": true
@@ -6641,6 +7159,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY5MD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281770Z",
     "raw": {
       "sf_csv": true
@@ -6665,6 +7185,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY5LD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281777Z",
     "raw": {
       "sf_csv": true
@@ -6689,6 +7211,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A22EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281799Z",
     "raw": {
       "sf_csv": true
@@ -6713,6 +7237,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A20GK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281807Z",
     "raw": {
       "sf_csv": true
@@ -6737,6 +7263,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY5RD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281816Z",
     "raw": {
       "sf_csv": true
@@ -6761,6 +7289,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AG2AY7MD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281824Z",
     "raw": {
       "sf_csv": true
@@ -6785,6 +7315,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AL2AY0RD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281831Z",
     "raw": {
       "sf_csv": true
@@ -6809,6 +7341,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1BA2AY6SD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281838Z",
     "raw": {
       "sf_csv": true
@@ -6833,6 +7367,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A29GL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281844Z",
     "raw": {
       "sf_csv": true
@@ -6857,6 +7393,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2AY4LD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281852Z",
     "raw": {
       "sf_csv": true
@@ -6881,6 +7419,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A2XHK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281859Z",
     "raw": {
       "sf_csv": true
@@ -6905,6 +7445,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AA2A29HK******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281867Z",
     "raw": {
       "sf_csv": true
@@ -6929,6 +7471,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1AF2A28EL******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281874Z",
     "raw": {
       "sf_csv": true
@@ -6953,6 +7497,8 @@
     "drivable": null,
     "photo_url": null,
     "vin": "WP1BA2AY3MD******",
+    "lot_number": null,
+    "sale_date": null,
     "first_seen": "2026-05-14T03:48:49.281889Z",
     "raw": {
       "sf_csv": true
