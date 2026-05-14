@@ -1177,6 +1177,30 @@
   },
   {
     "source": "copart",
+    "source_url": "https://www.copart.com/lot/48870486",
+    "listing_id": "WP0AC2A81PS******",
+    "title": "2023 Porsche CAYMAN GT4",
+    "year": 2023,
+    "make": "Porsche",
+    "model": "CAYMAN",
+    "trim": "GT4",
+    "price_usd": null,
+    "current_bid_usd": 57000.0,
+    "mileage": 17384,
+    "location": "TX - HOUSTON",
+    "seller_type": "salvage_auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": null,
+    "vin": "WP0AC2A81PS******",
+    "first_seen": "2026-05-14T03:39:10.280209Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "copart",
     "source_url": "https://www.copart.com/lot/93473775",
     "listing_id": "WP0AF2A99KS******",
     "title": "2019 Porsche 911 GT3 RS",
@@ -1222,6 +1246,30 @@
       "sf_csv": true
     },
     "project_tier": "salvage"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/78883825",
+    "listing_id": "WP0AF2A90RS******",
+    "title": "2024 Porsche 911 GT3 RS",
+    "year": 2024,
+    "make": "Porsche",
+    "model": "911",
+    "trim": "GT3 RS",
+    "price_usd": null,
+    "current_bid_usd": 117000.0,
+    "mileage": 16124,
+    "location": "FL - WEST PALM BEACH",
+    "seller_type": "salvage_auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": null,
+    "vin": "WP0AF2A90RS******",
+    "first_seen": "2026-05-14T03:39:10.279467Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
   },
   {
     "source": "copart",
