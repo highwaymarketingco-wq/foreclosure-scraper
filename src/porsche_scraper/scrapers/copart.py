@@ -202,12 +202,35 @@ class CopartScraper(BaseScraper):
                     if "porsche" not in slug:
                         continue
                     title = slug.replace("-", " ").replace("salvage ", "").title()
+                # Extract model from the slug. Copart slugs look like
+                # "salvage-2015-porsche-911-carrera-ca-stockton" or
+                # "1985-porsche-944-..." — match the most common Porsche
+                # model tokens. Order: longer specific names first so e.g.
+                # "boxster-s" matches "boxster" not "s".
+                model = None
+                slug_tokens = slug.replace("salvage-", "").split("-")
+                for tok in slug_tokens:
+                    upper = tok.lower()
+                    if upper in ("911", "718", "928", "944", "924", "968", "959", "356"):
+                        model = upper
+                        break
+                    if upper in ("cayman", "boxster", "carrera", "taycan"):
+                        model = upper.title()
+                        break
+                # Client-side year filter — Copart's HTML page ignores the
+                # from/to URL params (verified 2026-05-13: requested 2014+,
+                # got 1985 928 / 1985 944 back). Drop pre-year_min here so
+                # downstream dedupe+filter doesn't waste cycles.
+                year = parse_year(title) or parse_year(slug)
+                if year and year < self.year_min:
+                    continue
                 listing = Listing(
                     source="copart",
                     source_url=full,
                     listing_id=href.rstrip("/").rsplit("/")[-2],
                     title=title,
-                    year=parse_year(title) or parse_year(slug),
+                    year=year,
+                    model=model,
                     title_status=(infer_title_status(slug) if "salvage" in slug or "rebuilt" in slug
                                   else TitleStatus.SALVAGE),
                     seller_type="salvage_auction",

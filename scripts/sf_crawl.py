@@ -152,10 +152,15 @@ PRESETS: dict[str, SitePreset] = {
     ),
     "copart": SitePreset(
         slug="copart",
-        name="Copart",
-        seed="https://www.copart-sitemaps.com/sitemap-index.xml",
-        crawl_mode="sitemap",
-        include_regex=r"copart\.com/lot/\d+/.*porsche-(?:911|cayman|boxster|718)",
+        name="Copart (Solr API)",
+        # Copart's public sitemaps return Incapsula "Loading" placeholders
+        # for every endpoint — SF will crawl thousands of them but find zero
+        # real lot URLs. The working approach is the public Solr search API
+        # used by src/porsche_scraper/scrapers/copart.py. This preset routes
+        # there via crawl_mode="api"; the seed is informational only.
+        seed="https://www.copart.com/public/data/lotdetails/solr/lotSearch",
+        crawl_mode="api",
+        include_regex="",
         max_urls=3000,
     ),
     "iaai": SitePreset(
@@ -248,9 +253,59 @@ def _find_csvs(out_dir: Path) -> list[Path]:
     return sorted(out_dir.rglob("*.csv"))
 
 
+async def _run_api_preset(preset: SitePreset) -> list[dict]:
+    """Bypass SF entirely for presets where the source's anti-bot makes SF
+    crawling pointless (e.g. Copart sitemap → Incapsula "Loading" wall).
+    Run the in-tree porsche_scraper for that source instead, return rows
+    in the same shape _enrich_urls produces."""
+    if preset.slug == "copart":
+        from porsche_scraper.scrapers.copart import CopartScraper
+        scraper = CopartScraper()
+    else:
+        raise ValueError(f"no api scraper wired for preset slug {preset.slug!r}")
+    listings = await scraper.fetch()
+    rows = []
+    for li in listings:
+        rows.append({
+            "URL":          li.source_url,
+            "Source":       li.source,
+            "Year":         li.year or "",
+            "Model":        li.model or "",
+            "Trim":         li.trim or "",
+            "Price":        li.price_usd or "",
+            "Bid":          li.current_bid_usd or "",
+            "Mileage":      li.mileage or "",
+            "Location":     li.location or "",
+            "Title Status": li.title_status.value if li.title_status else "",
+            "VIN":          li.vin or "",
+            "Image":        li.photo_url or "",
+            "Title 1":      li.title or "",
+        })
+    return rows
+
+
 def run_site(preset: SitePreset, binary: str, work_root: Path) -> list[Path]:
     out_dir = work_root / preset.slug
     out_dir.mkdir(parents=True, exist_ok=True)
+    # API mode: skip SF entirely, run the in-tree scraper that bypasses
+    # the source's anti-bot. Writes a single CSV in the same shape the
+    # enrichment step produces, so the importer treats it identically.
+    if preset.crawl_mode == "api":
+        print(f"\n┌── API scrape: {preset.name} ──────────────────────")
+        print(f"│  preset: {preset.slug} (skipping SF — anti-bot blocks sitemap)")
+        try:
+            rows = asyncio.run(_run_api_preset(preset))
+        except Exception as exc:
+            print(f"  ✗ API scraper {preset.slug} failed: {exc}")
+            return []
+        if not rows:
+            print(f"  → API scraper {preset.slug} returned 0 listings")
+            return []
+        out_csv = out_dir / "internal_all.csv"
+        _write_enriched_csv(rows, out_csv)
+        print(f"  → API scraper {preset.slug} produced {len(rows)} listings ({out_csv})")
+        return [out_csv]
+
     config = CONFIG_DIR / f"{preset.slug}.seospiderconfig"
     cmd = _build_sf_command(binary, preset, out_dir, config)
     print(f"\n┌── SF crawl: {preset.name} ──────────────────────")
@@ -386,22 +441,35 @@ def run_import(
     import_paths = list(csvs)
 
     if enrich:
+        # Split CSVs: api-mode ones are already fully enriched (Copart's
+        # Solr scraper returns Year/Model/Price/etc. directly), pass them
+        # through unchanged. SF-mode CSVs go through detail-page enrichment.
+        api_csvs = [c for c in csvs
+                    if (p := _preset_for_csv(c)) and p.crawl_mode == "api"]
+        sf_csvs = [c for c in csvs if c not in api_csvs]
+
         urls: set[str] = set()
-        for c in csvs:
+        for c in sf_csvs:
             preset = _preset_for_csv(c)
             urls.update(_extract_urls_from_sf_csv(c, preset))
         urls_l = sorted(urls)
         print(f"\n  enriching {len(urls_l)} URLs via detail-page fetches "
-              f"(concurrency={enrich_concurrency}) …")
-        rows = asyncio.run(_enrich_urls(urls_l, enrich_concurrency))
+              f"(concurrency={enrich_concurrency}); skipping "
+              f"{len(api_csvs)} already-enriched API CSV(s) …")
+        rows = asyncio.run(_enrich_urls(urls_l, enrich_concurrency)) if urls_l else []
         enriched_csv = work_root / "_enriched.csv"
         _write_enriched_csv(rows, enriched_csv)
+        # Importer gets: enriched-from-SF (if any) + api-mode CSVs as-is.
+        import_paths = []
         if rows:
             print(f"  → {len(rows)} listings enriched ({enriched_csv})")
-            # Prefer the enriched data — it has prices.
-            import_paths = [enriched_csv]
-        else:
+            import_paths.append(enriched_csv)
+        elif urls_l:
             print("  → enrichment produced 0 rows; falling back to raw SF CSVs")
+            import_paths.extend(sf_csvs)
+        import_paths.extend(api_csvs)
+        if not import_paths:
+            import_paths = list(csvs)
 
     cmd = ["uv", "run", "python", str(IMPORTER), *map(str, import_paths)]
     if allow_unknown_price:
