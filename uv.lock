@@ -572,6 +572,7 @@ dependencies = [
     { name = "anthropic" },
     { name = "apify-client" },
     { name = "beautifulsoup4" },
+    { name = "cryptography" },
     { name = "curl-cffi" },
     { name = "feedparser" },
     { name = "google-auth" },
@@ -586,6 +587,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydoll-python" },
     { name = "pypdf" },
+    { name = "pyscrypt" },
     { name = "python-dateutil" },
     { name = "rapidfuzz" },
     { name = "rich" },
@@ -612,6 +614,7 @@ requires-dist = [
     { name = "anthropic", specifier = ">=0.97.0" },
     { name = "apify-client", specifier = ">=1.7" },
     { name = "beautifulsoup4", specifier = ">=4.12" },
+    { name = "cryptography", specifier = ">=42" },
     { name = "curl-cffi", specifier = ">=0.15.0" },
     { name = "feedparser", specifier = ">=6.0" },
     { name = "google-auth", specifier = ">=2.30" },
@@ -626,6 +629,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pydoll-python", specifier = ">=2.0" },
     { name = "pypdf", specifier = ">=4.3" },
+    { name = "pyscrypt", specifier = ">=1.6.2" },
     { name = "python-dateutil", specifier = ">=2.9" },
     { name = "rapidfuzz", specifier = ">=3.9" },
     { name = "rich", specifier = ">=13.7" },
@@ -2101,6 +2105,12 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/6f/13/e0dbc9377d976d8b03ed0dd07fe9892e06d09fcf4f6a0e66df49366227d7/pypdfium2-5.7.1-py3-none-win_amd64.whl", hash = "sha256:fdf117af26bd310f4f176b3cf0e2e23f0f800e48dcf2bcf6c2cca0de3326f5cb", size = 3747295, upload-time = "2026-04-20T15:00:59.15Z" },
     { url = "https://files.pythonhosted.org/packages/bc/67/4759522f5bca0ac4cda9f42c7f3f818aa826568793bd8b4532d2d2ffa515/pypdfium2-5.7.1-py3-none-win_arm64.whl", hash = "sha256:622821698fcc30fc560bd4eead6df9e6b846de9876b82861bed0091c09a4c27b", size = 3540903, upload-time = "2026-04-20T15:01:00.994Z" },
 ]
+
+[[package]]
+name = "pyscrypt"
+version = "1.6.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c6/56/51603b5714d221b784e4cbc2790b1215b3fb108e4d308a0bd52e4c3ce532/pyscrypt-1.6.2.tar.gz", hash = "sha256:bafdd195f10f7c7395f0133bad09746a68e0e6b66da202c9bdb6b1eb4abba5e9", size = 36555, upload-time = "2015-02-03T21:44:52.793Z" }
 
 [[package]]
 name = "pytest"

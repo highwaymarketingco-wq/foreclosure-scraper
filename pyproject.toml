@@ -36,6 +36,11 @@ dependencies = [
     "curl-cffi>=0.15.0",
     "anthropic>=0.97.0",
     "google-genai>=1.0.0",
+    # AWS WAF invisible/PoW solver deps for src/.../_vendor/awswaf/.
+    # Lets Tyler get an aws-waf-token cookie without launching a browser,
+    # avoiding the image-grid escalation we hit with Scrapling stealth.
+    "pyscrypt>=1.6.2",
+    "cryptography>=42",
 ]
 
 [project.scripts]
