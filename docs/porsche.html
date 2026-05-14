@@ -116,6 +116,12 @@
     <option value="salvage">salvage</option>
     <option value="unknown">unknown</option>
   </select></label>
+  <label>Listing <select id="filterListingType">
+    <option value="">buy + bid</option>
+    <option value="buy">buy now (fixed price)</option>
+    <option value="bid">bid (auction)</option>
+    <option value="ending_soon">bid — ending in 24h</option>
+  </select></label>
   <label>Sort <select id="sortBy">
     <option value="price_asc">price ↑</option>
     <option value="price_desc">price ↓</option>
@@ -150,6 +156,7 @@
   const tierEl = document.getElementById('filterTier');
   const sourceEl = document.getElementById('filterSource');
   const statusEl = document.getElementById('filterStatus');
+  const listingTypeEl = document.getElementById('filterListingType');
   const sortEl = document.getElementById('sortBy');
 
   let listings = [];
@@ -202,6 +209,7 @@
     const fTier = tierEl.value;
     const fSource = sourceEl.value;
     const fStatus = statusEl.value;
+    const fListingType = listingTypeEl.value;
     const sortBy = sortEl.value;
 
     let out = listings.filter(l => {
@@ -213,6 +221,21 @@
       }
       if (fSource && l.source !== fSource) return false;
       if (fStatus && (l.title_status || 'unknown') !== fStatus) return false;
+      // Listing type: "buy" = fixed price (price_usd set, no bid),
+      // "bid" = auction (current_bid_usd set, no fixed price),
+      // "ending_soon" = bid AND sale_date within next 24h.
+      if (fListingType) {
+        const isBuy = l.price_usd != null;
+        const isBid = !isBuy && l.current_bid_usd != null;
+        if (fListingType === 'buy' && !isBuy) return false;
+        if (fListingType === 'bid' && !isBid) return false;
+        if (fListingType === 'ending_soon') {
+          if (!isBid) return false;
+          if (!l.sale_date) return false;
+          const ms = new Date(l.sale_date).getTime() - Date.now();
+          if (!(ms > 0 && ms < 24 * 3600 * 1000)) return false;
+        }
+      }
       if (q) {
         const hay = (l.title + ' ' + (l.model || '') + ' ' + (l.location || '')).toLowerCase();
         if (!hay.includes(q)) return false;
@@ -289,7 +312,7 @@
     return div;
   }
 
-  for (const el of [qEl, tierEl, sourceEl, statusEl, sortEl]) el.addEventListener('input', render);
+  for (const el of [qEl, tierEl, sourceEl, statusEl, listingTypeEl, sortEl]) el.addEventListener('input', render);
   render();
 })();
 </script>
