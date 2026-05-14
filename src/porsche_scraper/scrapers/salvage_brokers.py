@@ -218,6 +218,44 @@ def _extract_lot_id(url: str) -> str | None:
     return None
 
 
+# Sale-date extraction. Brokers display either an absolute date
+# (5/19/2026) or a relative offset ("5 days", "1 day", "2 hours").
+_DATE_ABS_RE = re.compile(r"\b(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b")
+_DATE_REL_RE = re.compile(r"\b(\d{1,3})\s*(day|hour|hr|hrs|min)s?\b", re.IGNORECASE)
+
+
+def _extract_sale_date(text: str) -> "datetime | None":
+    """Find the next-auction date in the card's full text. Returns
+    None when no date / relative offset is present (e.g. "Future Sale").
+    """
+    if not text:
+        return None
+    from datetime import datetime, timedelta, timezone
+    m = _DATE_ABS_RE.search(text)
+    if m:
+        mo, d, y = m.groups()
+        try:
+            yi = int(y)
+            if yi < 100:
+                yi += 2000
+            return datetime(yi, int(mo), int(d), tzinfo=timezone.utc)
+        except (ValueError, OverflowError):
+            pass
+    m = _DATE_REL_RE.search(text)
+    if m:
+        n, unit = int(m.group(1)), m.group(2).lower()
+        delta = {
+            "day": timedelta(days=n),
+            "hour": timedelta(hours=n),
+            "hr": timedelta(hours=n),
+            "hrs": timedelta(hours=n),
+            "min": timedelta(minutes=n),
+        }.get(unit)
+        if delta:
+            return datetime.now(timezone.utc) + delta
+    return None
+
+
 def parse_results_html(html: str, config: SiteConfig) -> list[Listing]:
     """Parse one search-results page using a per-site SiteConfig."""
     tree = HTMLParser(html)
@@ -245,6 +283,10 @@ def parse_results_html(html: str, config: SiteConfig) -> list[Listing]:
         img = (img_node.attributes.get("src") or img_node.attributes.get("data-src")) if img_node else None
         lot_id = _extract_lot_id(url)
         status = infer_title_status(status_text)
+        # Pull sale_date from the full card text — broker layouts vary
+        # widely so a generic regex on the rendered text is more robust
+        # than per-config selectors that break every redesign.
+        sale_dt = _extract_sale_date(card.text(strip=False))
         listing = Listing(
             source=config.slug,
             source_url=url,
@@ -258,6 +300,7 @@ def parse_results_html(html: str, config: SiteConfig) -> list[Listing]:
             photo_url=img,
             title_status=status,
             seller_type="salvage_auction",
+            sale_date=sale_dt,
         )
         listing.drivable = infer_drivable(title, status)
         if url in seen:

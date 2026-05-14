@@ -23,9 +23,11 @@ CSV_FIELDS = (
     "location",
     "seller_type",
     "vin",
+    "lot_number",
     "listing_id",
     "source_url",
     "photo_url",
+    "sale_date",
     "first_seen",
 )
 

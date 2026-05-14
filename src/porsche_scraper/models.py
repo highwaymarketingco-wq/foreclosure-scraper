@@ -196,6 +196,10 @@ class Listing(BaseModel):
     # all mirror the same Copart/IAA lots; capturing the source-stable
     # lot number lets dedupe collapse 6 mirrors into one row.
     lot_number: str | None = None
+    # When the auction closes / bid ends. Copart returns this as the
+    # `ad` (auction date) ms-epoch field. Other auction sources can
+    # populate from their own date string.
+    sale_date: datetime | None = None
 
     first_seen: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     raw: dict[str, Any] = Field(default_factory=dict)

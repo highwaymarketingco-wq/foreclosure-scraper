@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -65,6 +66,8 @@ COLUMN_ALIASES = {
     "vin":          ("vin", "vehicle identification number"),
     "photo":        ("image", "image src", "photo", "og:image", "primary image 1"),
     "title_text":   ("title 1", "page title", "name"),
+    "sale_date":    ("sale date", "auction date", "ends", "end date", "close date"),
+    "lot_number":   ("lot number", "lot #", "lot", "stock number", "lot id"),
 }
 
 
@@ -147,11 +150,28 @@ def _row_to_listing(row: dict, idx: dict[str, str]) -> Listing | None:
         location=get("location") or None,
         title_status=status,
         photo_url=get("photo") or None,
+        lot_number=get("lot_number") or None,
+        sale_date=_parse_iso_date(get("sale_date")),
         seller_type=_infer_seller(source),
         raw={"sf_csv": True},
     )
     listing.drivable = infer_drivable(listing.title, listing.title_status)
     return listing
+
+
+def _parse_iso_date(raw: str | None) -> "datetime | None":
+    """Best-effort parse of an ISO-8601 sale_date string. Empty / unparseable
+    -> None. Accepts both 'Z' and explicit offsets."""
+    if not raw:
+        return None
+    s = raw.strip()
+    if not s:
+        return None
+    # datetime.fromisoformat in Python 3.11+ handles 'Z' suffix
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
 
 
 def _normalize_status(raw: str) -> TitleStatus | None:
@@ -205,15 +225,48 @@ def load_csv(path: Path) -> Iterable[Listing]:
                 yield listing
 
 
+_EXISTING_LOT_PATTERNS = (
+    re.compile(r"copart\.com/lot/(\d{6,12})", re.IGNORECASE),
+    re.compile(r"iaai\.com/[^?#]*?(\d{6,12})", re.IGNORECASE),
+    re.compile(r"/(?:search/lot|lot|cars?|inventory)/[^?#]*?(\d{6,12})", re.IGNORECASE),
+    re.compile(r"/vehicle/(?:iaai|copart)-(\d{6,12})", re.IGNORECASE),
+    re.compile(r"/en/(\d{8,12})-\d{4}-porsche", re.IGNORECASE),
+    re.compile(r"/cars-for-sale/(\d{6,12})-\d{4}-porsche", re.IGNORECASE),
+)
+
+
+def _backfill_lot_number(li: Listing) -> Listing:
+    """One-time migration: existing dashboard entries written before
+    Listing.lot_number existed end up with lot_number=None and so
+    don't dedupe against fresh entries that DO have it. Backfill
+    from listing_id (copart/iaai store lot in there) or from the URL.
+    """
+    if li.lot_number:
+        return li
+    # Copart and IAAI both stored the upstream lot # in listing_id
+    if li.source in ("copart", "iaai") and li.listing_id and li.listing_id.isdigit():
+        li.lot_number = li.listing_id
+        return li
+    for pat in _EXISTING_LOT_PATTERNS:
+        m = pat.search(li.source_url or "")
+        if m:
+            li.lot_number = m.group(1)
+            return li
+    return li
+
+
 def load_existing(path: Path) -> list[Listing]:
-    """Re-hydrate the current docs/porsche.json so we can merge into it."""
+    """Re-hydrate the current docs/porsche.json so we can merge into it.
+    Also backfills lot_number for entries written before that field
+    existed, so cross-source dedupe works correctly on the merge."""
     if not path.exists():
         return []
     raw = json.loads(path.read_text())
     out: list[Listing] = []
     for d in raw:
         try:
-            out.append(Listing.model_validate(d))
+            li = Listing.model_validate(d)
+            out.append(_backfill_lot_number(li))
         except Exception:  # noqa: BLE001
             continue
     return out
@@ -239,7 +292,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  loaded {n:>5} rows from {path}")
 
     base = [] if args.no_merge else load_existing(args.out)
-    combined = base + fresh
+    # Fresh first so dedupe() keeps the just-fetched entry (with the
+    # newest photo / sale_date / bid). Existing entries fill in for
+    # lots that didn't reappear this run.
+    combined = fresh + base
     deduped = dedupe(combined)
     criteria = FilterCriteria(
         require_known_year=not args.keep_unknown_year,

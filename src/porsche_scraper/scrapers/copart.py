@@ -88,6 +88,22 @@ def _lot_to_listing(d: dict) -> Listing | None:
     price = parse_price(dyn.get("buyItNowPrice") or d.get("buyItNowPrice"))
     bid = parse_price(dyn.get("currentBid") or d.get("currentBid") or d.get("hb"))
     status = _td_to_status(d.get("td") or d.get("ts"))
+    # Auction date: `ad` is ms-since-epoch in Copart's API (verified
+    # 2026-05-14 e.g. 1778767200000 -> 2026-05-14T14:00 UTC). Convert
+    # safely; fall back to lad (last auction date) only if ad missing.
+    from datetime import datetime as _dt, timezone as _tz
+    sale_date = None
+    for key in ("ad", "lad"):
+        ts = d.get(key)
+        if isinstance(ts, (int, float)) and 1_000_000_000_000 < ts < 5_000_000_000_000:
+            try:
+                sale_date = _dt.fromtimestamp(ts / 1000, tz=_tz.utc)
+                break
+            except (ValueError, OSError):
+                continue
+    # Image: `tims` is the thumbnail URL. lurl/lotImageUrl are legacy
+    # field names from the older Solr endpoint.
+    photo = d.get("tims") or d.get("lurl") or d.get("lotImageUrl")
     listing = Listing(
         source="copart",
         source_url=url,
@@ -102,9 +118,10 @@ def _lot_to_listing(d: dict) -> Listing | None:
         current_bid_usd=bid,
         mileage=parse_miles(d.get("orr") or d.get("odometer")),
         location=d.get("yn") or d.get("yardName") or d.get("locState"),
-        photo_url=d.get("lurl") or d.get("lotImageUrl"),
+        photo_url=photo,
         title_status=status,
         seller_type="salvage_auction",
+        sale_date=sale_date,
         raw={"copart": d},
     )
     listing.drivable = _drivable_from_copart(d, status, title)

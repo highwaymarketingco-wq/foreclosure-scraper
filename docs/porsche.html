@@ -62,6 +62,11 @@
   .tier-rebuilt  { background: var(--rebuilt); color: #000; }
   .tier-damaged  { background: #d4a017; color: #000; }
   .tier-clean    { background: rgba(255,255,255,0.12); color: var(--muted); }
+  /* Sale-end badge — bottom-right of thumbnail */
+  .thumb .sale { position: absolute; bottom: 8px; right: 8px;
+                 background: rgba(220, 38, 38, 0.92); color: #fff;
+                 padding: 3px 8px; font-size: 11px; font-weight: 700;
+                 border-radius: 4px; letter-spacing: 0.02em; }
   .body { padding: 14px 16px 16px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
   .price { font-size: 22px; font-weight: 800; color: var(--accent); }
   .price .label { font-size: 11px; color: var(--muted); font-weight: 500;
@@ -242,11 +247,33 @@
     const tier = l.project_tier || 'clean';
     const ep = effPrice(l);
     const isBid = l.price_usd == null && l.current_bid_usd != null;
+    // Sale-end date: render as relative ("3d 4h"/"2h 18m") if in the
+    // future, else as the absolute date. Listings without sale_date
+    // (most non-auction sources) just hide the badge.
+    const saleBadge = (() => {
+      if (!l.sale_date) return '';
+      const t = new Date(l.sale_date).getTime();
+      if (isNaN(t)) return '';
+      const ms = t - Date.now();
+      let label;
+      if (ms < 0) {
+        label = 'sold ' + new Date(t).toLocaleDateString();
+      } else {
+        const d = Math.floor(ms / 86400000);
+        const h = Math.floor((ms % 86400000) / 3600000);
+        const m = Math.floor((ms % 3600000) / 60000);
+        if (d > 0) label = `ends in ${d}d ${h}h`;
+        else if (h > 0) label = `ends in ${h}h ${m}m`;
+        else label = `ends in ${m}m`;
+      }
+      return `<span class="sale" title="${new Date(t).toLocaleString()}">${label}</span>`;
+    })();
     div.innerHTML = `
       <div class="thumb" style="background-image:url('${l.photo_url || ''}')">
         <span class="src">${l.source}</span>
         <span class="status status-${status}">${status}</span>
         <span class="tier tier-${tier}">${tier}</span>
+        ${saleBadge}
       </div>
       <div class="body">
         <div class="price"><span class="label">${ep == null ? 'Price' : (isBid ? 'Bid' : 'Price')}</span>${ep == null ? '<span style="color:var(--muted);font-size:14px;font-weight:500">click to view</span>' : fmtPrice(ep)}</div>

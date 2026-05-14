@@ -279,6 +279,8 @@ async def _run_api_preset(preset: SitePreset) -> list[dict]:
             "Title Status": li.title_status.value if li.title_status else "",
             "VIN":          li.vin or "",
             "Image":        li.photo_url or "",
+            "Sale Date":    li.sale_date.isoformat() if li.sale_date else "",
+            "Lot Number":   li.lot_number or "",
             "Title 1":      li.title or "",
         })
     return rows
