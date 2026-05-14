@@ -14,7 +14,11 @@ from datetime import datetime, timezone
 from .models import EXCLUDED_MODELS, Listing, TitleStatus
 
 MIN_YEAR = 2014
-MAX_PRICE_USD = 45_000.0
+# Raised 2026-05-13 from $45,000 → $200,000 so clean-title late-model
+# 911 / Cayman / Boxster / 718 holds (GT3, Turbo, GT4) make it into
+# the dashboard. Salvage/rebuilt-title cars still bypass the cap
+# entirely via _price_or_title_ok().
+MAX_PRICE_USD = 200_000.0
 
 
 def current_year() -> int:

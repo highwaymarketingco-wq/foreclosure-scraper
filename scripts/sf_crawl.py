@@ -543,9 +543,16 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  ⚠ {slug} failed: {exc}")
             continue
 
+    # Copart's API returns upcoming-auction lots with price=$0 until the
+    # first bid lands — without --allow-unknown-price they all get
+    # filtered out (verified 2026-05-13: 46 imported vs 95 with the flag).
+    # Auto-enable it whenever an api-mode preset (currently just copart)
+    # is in the run. Caller can still pass --allow-unknown-price
+    # explicitly for SF-mode presets if they want it too.
+    auto_allow = any(PRESETS[s].crawl_mode == "api" for s in sites)
     run_import(
         all_csvs,
-        allow_unknown_price=args.allow_unknown_price,
+        allow_unknown_price=args.allow_unknown_price or auto_allow,
         enrich=not args.no_enrich,
         enrich_concurrency=args.enrich_concurrency,
         work_root=work_root,
