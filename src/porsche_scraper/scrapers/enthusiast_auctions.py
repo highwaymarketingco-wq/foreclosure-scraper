@@ -228,6 +228,10 @@ CONFIGS: dict[str, SiteConfig] = {
         location_selectors=(".auction-card__location", ".location"),
         use_render=True,
         render_wait_selector=".auction-card, a[href*='/for-sale/']",
+        # PyDoll attempted but blocked by Cloudflare JS challenge that
+        # neither Turnstile bypass nor stealth tooling can clear from a
+        # datacenter IP. Stay on Patchright; only a residential proxy
+        # (PROXY_URL) will unblock this.
     ),
     "themarket": SiteConfig(
         # themarket.bonhams.com migrated to themarket.co.uk in 2025.
@@ -258,6 +262,7 @@ CONFIGS: dict[str, SiteConfig] = {
         location_selectors=(".listing-card__location",),
         use_render=True,
         render_wait_selector=".listing-card, a[href*='/auction/']",
+        # CF JS challenge — see collecting_cars note above.
     ),
     "broad_arrow": SiteConfig(
         slug="broad_arrow",
@@ -271,6 +276,8 @@ CONFIGS: dict[str, SiteConfig] = {
         price_selectors=(".lot-card__estimate", ".estimate", ".price"),
         use_render=True,
         render_wait_selector=".lot-card, a[href*='/lots/']",
+        # Bot-blocked altogether — datacenter IPs get 117-byte stub
+        # responses. Needs residential IP / proxy.
     ),
     "iconic_auctioneers": SiteConfig(
         # Silverstone Auctions rebranded to Iconic Auctioneers.

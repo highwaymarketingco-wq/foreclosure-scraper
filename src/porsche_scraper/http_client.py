@@ -319,12 +319,18 @@ async def fetch_rendered_pydoll(
     timeout: float = 90.0,
     wait_for_selector: str | None = None,
     wait_extra_seconds: float = 3.0,
+    solve_cloudflare: bool = True,
 ) -> str:
     """JS-rendered fetch via PyDoll (raw CDP, no Playwright).
 
     Use for sites where Patchright is detected and served an empty
     page — PyDoll's CDP-direct approach bypasses fingerprint heuristics
     that look for Playwright's residual automation markers.
+
+    When `solve_cloudflare` is True we register PyDoll's Turnstile-
+    bypass callback before navigation, which clicks the invisible
+    challenge once it lands. Adds ~5–7s wall time on challenged sites
+    and is a no-op when no challenge is served.
     """
     try:
         from pydoll.browser import Chrome
@@ -357,11 +363,17 @@ async def fetch_rendered_pydoll(
     try:
         async with Chrome(options=opts) as browser:
             tab = await browser.start()
+            if solve_cloudflare:
+                # Register the Turnstile auto-solver BEFORE navigation so
+                # the LOAD callback fires on the challenge page itself.
+                try:
+                    await tab.enable_auto_solve_cloudflare_captcha(
+                        time_to_wait_captcha=8,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    log.debug("pydoll CF auto-solve setup failed: %s", exc)
             await tab.go_to(url, timeout=int(timeout))
             if wait_for_selector:
-                # Best-effort wait. PyDoll's `query` returns the element
-                # once available; ignore failures and fall through to
-                # the static sleep below.
                 try:
                     await tab.query(wait_for_selector, timeout=int(min(timeout, 15)))
                 except Exception:  # noqa: BLE001
@@ -369,6 +381,12 @@ async def fetch_rendered_pydoll(
             if wait_extra_seconds:
                 await asyncio.sleep(wait_extra_seconds)
             html = await tab.page_source
+            # If we're still stuck on the Cloudflare interstitial, give
+            # the Turnstile solver another pass and re-read the DOM.
+            if html and "Just a moment..." in html[:2000]:
+                log.info("pydoll: CF challenge still up for %s, waiting for solve", url)
+                await asyncio.sleep(8)
+                html = await tab.page_source
             if html and len(html) > 500:
                 return html
             raise RuntimeError(

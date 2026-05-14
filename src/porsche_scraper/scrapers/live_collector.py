@@ -18,7 +18,7 @@ from urllib.parse import urljoin
 from selectolax.parser import HTMLParser
 
 from ..base import BaseScraper
-from ..http_client import fetch_rendered, fetch_text_stealth
+from ..http_client import fetch_rendered, fetch_rendered_pydoll, fetch_text_stealth
 from ..models import (
     Listing,
     infer_drivable,
@@ -41,11 +41,18 @@ class HouseConfig:
     title_selectors: tuple[str, ...]
     estimate_selectors: tuple[str, ...]
     location_selectors: tuple[str, ...] = ()
+    # Optional: when the link element wraps the whole card (image +
+    # nested title div), point at a separate title-text node. We still
+    # take the href from title_selectors.
+    title_text_selectors: tuple[str, ...] = ()
     max_pages: int = 5
     # Live-auction houses all sit behind DataDome / Imperva / Cloudflare —
     # default to Scrapling rendering. Set False to use plain stealth httpx.
     use_render: bool = True
     render_wait_selector: str | None = None
+    # Some sites (RM Sotheby's, Bonhams) detect Patchright but pass
+    # PyDoll's CDP-direct render. Opt in per-site.
+    use_pydoll: bool = False
 
 
 CONFIGS: dict[str, HouseConfig] = {
@@ -74,10 +81,33 @@ CONFIGS: dict[str, HouseConfig] = {
         name="RM Sotheby's",
         base="https://rmsothebys.com",
         search_url_template="https://rmsothebys.com/search?query=porsche&type=lot&page={page}",
-        card_selectors=(".lot-tile", "article.lot", "[data-testid='lot-card']"),
-        title_selectors=(".lot-title a", "h3 a", "a[href*='/lots/']"),
-        estimate_selectors=(".lot-estimate", ".estimate"),
+        # Live shape: `.search-result` cards (also `.search-result--favorited`,
+        # 40 per page), titles in `.lot-title`, prices in
+        # `.lot-value-status`. Detail URLs are `/ps00/inventory/<slug>`,
+        # NOT `/lots/`. Keep the legacy selectors as fallbacks.
+        card_selectors=(
+            ".search-result",
+            ".lot-tile",
+            "article.lot",
+            "[data-testid='lot-card']",
+        ),
+        title_selectors=(
+            "a[href*='/inventory/']",
+            "a.lot-title",
+            ".lot-title a",
+            "h3 a",
+        ),
+        title_text_selectors=(".lot-title",),
+        estimate_selectors=(
+            ".lot-value-status",
+            ".lot-estimate",
+            ".estimate",
+        ),
         location_selectors=(".lot-location", ".lot-event"),
+        render_wait_selector=".search-result",
+        # Patchright was returning empty pages here; PyDoll gets a full
+        # ~490KB SPA render with the Porsche search results inlined.
+        use_pydoll=True,
     ),
     "gooding": HouseConfig(
         slug="gooding",
@@ -91,14 +121,17 @@ CONFIGS: dict[str, HouseConfig] = {
     "bonhams_cars": HouseConfig(
         slug="bonhams_cars",
         name="Bonhams Cars",
-        base="https://cars.bonhams.com",
+        base="https://carsonline.bonhams.com",
+        # The cars.bonhams.com URL 404'd; carsonline.bonhams.com is the
+        # current public listings host.
         search_url_template=(
-            "https://cars.bonhams.com/auctions/upcoming/?make=Porsche&page={page}"
+            "https://carsonline.bonhams.com/en/search?query=porsche&page={page}"
         ),
         card_selectors=(".lot-summary", "article.lot", ".search-result"),
         title_selectors=(".lot-title a", "h3 a", "a[href*='/lot/']"),
         estimate_selectors=(".lot-estimate-low", ".lot-estimate", ".estimate"),
         location_selectors=(".lot-location", ".lot-event"),
+        use_pydoll=True,
     ),
 }
 
@@ -139,7 +172,10 @@ def parse_results(html: str, config: HouseConfig) -> list[Listing]:
         if url in seen:
             continue
         seen.add(url)
-        title = link.text(strip=True)
+        title = (
+            _first_text(card, config.title_text_selectors)
+            or link.text(strip=True)
+        )
         if "porsche" not in title.lower():
             continue  # No make filter on some endpoints — drop non-Porsches.
         est = _first_text(card, config.estimate_selectors)
@@ -177,7 +213,12 @@ class LiveCollectorScraper(BaseScraper):
         for page in range(1, self.config.max_pages + 1):
             url = self.config.search_url_template.format(page=page)
             try:
-                if self.config.use_render:
+                if self.config.use_render and self.config.use_pydoll:
+                    html = await fetch_rendered_pydoll(
+                        url, timeout=90,
+                        wait_for_selector=self.config.render_wait_selector,
+                    )
+                elif self.config.use_render:
                     html = await fetch_rendered(
                         url, timeout=90,
                         wait_for_selector=self.config.render_wait_selector,
