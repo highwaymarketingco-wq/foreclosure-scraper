@@ -20,7 +20,7 @@ import logging
 from selectolax.parser import HTMLParser
 
 from ..base import BaseScraper
-from ..http_client import fetch_json, fetch_rendered
+from ..http_client import fetch_browser_api, fetch_json, fetch_rendered
 from ..models import (
     Listing,
     TitleStatus,
@@ -68,17 +68,25 @@ def _drivable_from_copart(d: dict, status: TitleStatus, title: str) -> bool | No
 def _lot_to_listing(d: dict) -> Listing | None:
     if not d:
         return None
-    mmd = (d.get("mmd") or "").strip()
-    if mmd.upper() in EXCLUDED_MODELS_UPPER:
+    # Copart's /public/lots/search-results uses short field names:
+    #   lm  = model ("911"), lmg = same, lmtd = "911 CARRERA 2"
+    #   ltd = trim ("CARRERA 2"), lcy = year, mkn = make
+    #   ln/lotNumberStr = lot number, td = title type
+    #   orr = odometer, fv = vin, lurl = image url
+    # Legacy mmd field comes from the older Solr endpoint — keep both
+    # for compatibility.
+    model = (d.get("mmd") or d.get("lm") or d.get("lmg") or "").strip()
+    if model.upper() in EXCLUDED_MODELS_UPPER:
         return None  # Drop excluded models server-side too.
     lot_no = d.get("lotNumberStr") or d.get("ln")
     if not lot_no:
         return None
     url = f"{BASE}/lot/{lot_no}"
-    title = " ".join(filter(None, [str(d.get("lcy") or ""), "Porsche", mmd]))
+    trim = (d.get("ltd") or "").strip() or None
+    title = " ".join(filter(None, [str(d.get("lcy") or ""), "Porsche", model, trim or ""]))
     dyn = d.get("dynamicLotDetails") or {}
     price = parse_price(dyn.get("buyItNowPrice") or d.get("buyItNowPrice"))
-    bid = parse_price(dyn.get("currentBid") or d.get("currentBid"))
+    bid = parse_price(dyn.get("currentBid") or d.get("currentBid") or d.get("hb"))
     status = _td_to_status(d.get("td") or d.get("ts"))
     listing = Listing(
         source="copart",
@@ -87,11 +95,12 @@ def _lot_to_listing(d: dict) -> Listing | None:
         vin=d.get("fv") or d.get("vin"),
         title=title,
         year=int(d["lcy"]) if str(d.get("lcy") or "").isdigit() else None,
-        model=mmd or None,
+        model=model or None,
+        trim=trim,
         price_usd=price,
         current_bid_usd=bid,
         mileage=parse_miles(d.get("orr") or d.get("odometer")),
-        location=d.get("yn") or d.get("yardName"),
+        location=d.get("yn") or d.get("yardName") or d.get("locState"),
         photo_url=d.get("lurl") or d.get("lotImageUrl"),
         title_status=status,
         seller_type="salvage_auction",
@@ -126,13 +135,69 @@ class CopartScraper(BaseScraper):
         self.max_pages = max_pages
 
     async def fetch(self) -> list[Listing]:
-        """Try Solr JSON first; fall back to Scrapling-rendered HTML when
-        the Solr endpoint rejects us (it does as of 2026-05).
+        """Try browser-session API first (yields all 91+ lots per model
+        with full data in one POST). Fall back to Solr direct, then
+        HTML scrape. Verified 2026-05-13: the browser-API path returns
+        100+ listings vs ~20 from the HTML-render path.
         """
+        out = await self._fetch_browser_api()
+        if out:
+            return out
         out = await self._fetch_solr()
         if out:
             return out
         return await self._fetch_html()
+
+    async def _fetch_browser_api(self) -> list[Listing]:
+        """Use a Scrapling-rendered session to POST against the public
+        search-results API. The site gates the API behind session cookies
+        a fresh curl can't set — but page.evaluate() inside the rendered
+        page carries the credentials transparently."""
+        queries = ["porsche 911", "porsche cayman", "porsche boxster", "porsche 718"]
+        out: list[Listing] = []
+        seen: set[str] = set()
+        for q in queries:
+            warmup = (f"{BASE}/lotSearchResults?free=true"
+                      f"&query={q.replace(' ', '%20')}"
+                      f"&from={self.year_min}&to={self.year_max}")
+            body = {
+                "query": [q],
+                "filter": {"LCY": [f"{self.year_min}..{self.year_max}"]},
+                "sort": ["lot_number asc"],
+                "page": 0, "size": 200,
+                "watchListOnly": False, "freeFormSearch": False,
+            }
+            payload = await fetch_browser_api(
+                warmup_url=warmup,
+                api_path="/public/lots/search-results",
+                body=body,
+                timeout=60,
+                wait_for_selector="a[href*='/lot/']",
+            )
+            if not payload:
+                log.info("copart browser-api %s: no payload", q)
+                continue
+            content = (payload.get("data") or {}).get("results", {}).get("content") or []
+            # `returnCode` is an integer that's 0 on success, but some
+            # successful responses return non-zero codes with `Success`
+            # in returnCodeDesc — treat presence of content as the real
+            # success signal.
+            if not content:
+                log.info("copart browser-api %s empty: returnCode=%s desc=%s",
+                         q, payload.get("returnCode"), payload.get("returnCodeDesc"))
+                continue
+            log.info("copart browser-api %s: %d lots", q, len(content))
+            for d in content:
+                listing = _lot_to_listing(d)
+                if listing is None:
+                    continue
+                if listing.year and listing.year < self.year_min:
+                    continue
+                if listing.source_url in seen:
+                    continue
+                seen.add(listing.source_url)
+                out.append(listing)
+        return out
 
     async def _fetch_solr(self) -> list[Listing]:
         out: list[Listing] = []
@@ -167,23 +232,41 @@ class CopartScraper(BaseScraper):
         return out
 
     async def _fetch_html(self) -> list[Listing]:
+        # Query each wanted model separately. A generic `query=porsche`
+        # is dominated by Cayenne/Macan/Panamera (verified 2026-05-13:
+        # 1,000+ "porsche" results, top pages all Cayenne/Macan) — by
+        # the time the 5-page window runs out we've seen ~0 of the
+        # 911/Cayman/Boxster/718 listings the user actually wants.
+        # Per-model queries returned 91 results for "porsche 911" alone
+        # and similar counts for cayman/boxster.
+        queries = ["porsche 911", "porsche cayman", "porsche boxster", "porsche 718"]
         out: list[Listing] = []
         seen: set[str] = set()
-        for page in range(self.max_pages):
-            url = (f"{BASE}/lotSearchResults/?free=true&query=porsche"
-                   f"&from={self.year_min}&to={self.year_max}&page={page}")
+        for q in queries:
+            # Copart's lotSearchResults page renders the entire result set
+            # (e.g. 91 911s) into one DOM, lazily — the `page=N` URL param
+            # is ignored. Verified 2026-05-13: page=0 and page=2 return
+            # identical HTML. One fetch per query with aggressive scrolling
+            # (4 passes × 2.2s wait) gives all lots time to mount before
+            # we read the HTML.
+            url = (f"{BASE}/lotSearchResults/?free=true"
+                   f"&query={q.replace(' ', '%20')}"
+                   f"&from={self.year_min}&to={self.year_max}")
             try:
                 html = await fetch_rendered(
-                    url, timeout=90,
+                    url, timeout=120,
                     wait_for_selector="a[href*='/lot/']",
+                    scroll_iterations=4,
+                    post_scroll_wait_ms=2200,
                 )
             except Exception as exc:  # noqa: BLE001
-                log.warning("copart html page %d: %s", page, exc)
-                break
+                log.warning("copart html %s: %s", q, exc)
+                continue
             tree = HTMLParser(html)
             anchors = tree.css("a[href*='/lot/']")
             if not anchors:
-                break
+                # One bad query shouldn't kill the others — move on.
+                continue
             for a in anchors:
                 href = a.attributes.get("href") or ""
                 if "/lot/" not in href:

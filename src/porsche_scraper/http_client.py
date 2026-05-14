@@ -168,8 +168,15 @@ async def _scrapling_fetch(
     timeout: float,
     wait_for_selector: str | None,
     solve_cloudflare: bool,
+    scroll_iterations: int = 1,
+    post_scroll_wait_ms: int = 1500,
 ) -> str:
-    """Scrapling StealthyFetcher — runs a real Chromium under the hood."""
+    """Scrapling StealthyFetcher — runs a real Chromium under the hood.
+
+    `scroll_iterations` repeats scroll-to-bottom + wait that many times
+    so lazy-loaded result grids (e.g. Copart's virtualized list of 91
+    lots per Porsche-911 search) fully render before we read the HTML.
+    """
     from scrapling.fetchers import StealthyFetcher  # type: ignore
 
     page_action = None
@@ -180,9 +187,9 @@ async def _scrapling_fetch(
             except Exception:
                 pass
             try:
-                # Scroll to trigger any lazy-loaded cards.
-                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                await page.wait_for_timeout(1500)
+                for _ in range(max(1, scroll_iterations)):
+                    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    await page.wait_for_timeout(post_scroll_wait_ms)
             except Exception:
                 pass
 
@@ -201,6 +208,104 @@ async def _scrapling_fetch(
     if isinstance(body, bytes):
         return body.decode("utf-8", errors="replace")
     return str(body or "")
+
+
+async def fetch_browser_api(
+    warmup_url: str,
+    api_path: str,
+    body: dict,
+    *,
+    timeout: float = 60.0,
+    wait_for_selector: str | None = None,
+) -> dict | None:
+    """Make a JSON API POST from inside a Scrapling-rendered page.
+
+    Some sites (Copart, Tyler) gate their JSON APIs behind cookies +
+    headers that only a real browser session has. We load `warmup_url`
+    in Scrapling, then `page.evaluate()` a fetch() against `api_path`
+    using the page's own credentials. The response is parsed as JSON
+    and returned directly — no HTML scraping, no lazy-load races.
+
+    Returns the parsed JSON dict, or None on any failure.
+    """
+    import json as _json
+    from scrapling.fetchers import StealthyFetcher  # type: ignore
+
+    body_json = _json.dumps(body)
+
+    async def page_action(page):
+        try:
+            if wait_for_selector:
+                try:
+                    await page.wait_for_selector(wait_for_selector, timeout=10000)
+                except Exception:
+                    pass
+            # Make the API call inside the page so it carries the
+            # session's cookies + Origin header. Stash the JSON result
+            # in a <pre id="__api__"> element so it survives into the
+            # HTML body that StealthyFetcher returns.
+            await page.evaluate(
+                """async ({path, body}) => {
+                    try {
+                        const r = await fetch(path, {
+                            method: 'POST', credentials: 'same-origin',
+                            headers: {'Content-Type': 'application/json',
+                                      'Accept': 'application/json'},
+                            body: body,
+                        });
+                        const txt = await r.text();
+                        const el = document.createElement('pre');
+                        el.id = '__api__';
+                        el.textContent = txt;
+                        document.body.appendChild(el);
+                    } catch (e) {
+                        const el = document.createElement('pre');
+                        el.id = '__api__';
+                        el.textContent = JSON.stringify({_error: String(e)});
+                        document.body.appendChild(el);
+                    }
+                }""",
+                {"path": api_path, "body": body_json},
+            )
+            # Give the response time to fully serialize into DOM.
+            await page.wait_for_timeout(500)
+        except Exception:
+            pass
+
+    try:
+        result = await StealthyFetcher.async_fetch(
+            warmup_url,
+            headless=True,
+            network_idle=True,
+            timeout=int(timeout * 1000),
+            page_action=page_action,
+            solve_cloudflare=True,
+            google_search=True,
+            wait=2000,
+            retries=1,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("fetch_browser_api failed for %s: %s", warmup_url, exc)
+        return None
+    raw = getattr(result, "body", b"") if result else b""
+    if isinstance(raw, bytes):
+        html = raw.decode("utf-8", errors="replace")
+    else:
+        html = str(raw or "")
+    # Extract the <pre id="__api__"> contents.
+    import re as _re
+    m = _re.search(r'<pre[^>]*id="__api__"[^>]*>(.*?)</pre>', html, _re.DOTALL)
+    if not m:
+        log.info("fetch_browser_api: no __api__ element in returned HTML (len=%d)", len(html))
+        return None
+    txt = m.group(1)
+    # Unescape any HTML entities the renderer inserted.
+    txt = txt.replace("&quot;", '"').replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    try:
+        return _json.loads(txt)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("fetch_browser_api: JSON parse failed: %s; head=%s", exc, txt[:200])
+        return None
 
 
 async def fetch_text_stealth(
@@ -254,6 +359,8 @@ async def fetch_rendered(
     timeout: float = 90.0,
     wait_for_selector: str | None = None,
     solve_cloudflare: bool = True,
+    scroll_iterations: int = 1,
+    post_scroll_wait_ms: int = 1500,
 ) -> str:
     """Force a JS-rendered fetch via Scrapling StealthyFetcher.
 
@@ -268,6 +375,8 @@ async def fetch_rendered(
             timeout=timeout,
             wait_for_selector=wait_for_selector,
             solve_cloudflare=solve_cloudflare,
+            scroll_iterations=scroll_iterations,
+            post_scroll_wait_ms=post_scroll_wait_ms,
         )
         if html and len(html) > 500:
             return html
