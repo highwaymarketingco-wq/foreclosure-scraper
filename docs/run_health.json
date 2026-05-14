@@ -2493,7 +2493,7 @@
     },
     {
       "kind": "rerun_scrapers",
-      "applied_at": "2026-05-14T00:05:52.452498+00:00",
+      "applied_at": "2026-05-14T00:28:24.726778+00:00",
       "scraper_slugs": [
         "counties_nc.brunswick_tax",
         "counties_nc.buncombe_tax",
@@ -2521,7 +2521,7 @@
         "public_notices.ncnotices"
       ],
       "raw_per_slug": {
-        "public_notices.ncnotices": 46,
+        "public_notices.ncnotices": 45,
         "law_firms.aldridge_pite": 0,
         "law_firms.bell_carrington": 61,
         "law_firms.brock_scott": 348,
@@ -2540,18 +2540,18 @@
         "counties_nc.buncombe_tax": 2,
         "counties_nc.cleveland_tax": 3,
         "counties_nc.henderson_tax": 15,
-        "counties_nc.nc_ecourts_lis_pendens": 327,
+        "counties_nc.nc_ecourts_lis_pendens": 321,
         "counties_nc.nc_rod_substitute_trustee": 0,
         "counties_nc.new_hanover_tax": 4,
         "counties_nc.polk_tax": 2,
         "counties_nc.rutherford_tax": 11
       },
-      "active_kept": 727,
+      "active_kept": 721,
       "sold_pool_kept": 40,
       "promoted_to_sold_via_case_status": 0,
-      "active_added_new": 11,
-      "active_merged_into_existing": 716,
-      "active_final": 1425,
+      "active_added_new": 9,
+      "active_merged_into_existing": 712,
+      "active_final": 1423,
       "sold_pool_final": 46,
       "valuation_failures": 0,
       "enrichment_stats": {
@@ -2576,26 +2576,26 @@
           "fiduciary_skipped": 1
         },
         "parcel_reverse_geo": {
-          "queried": 46,
-          "annotated": 46,
+          "queried": 47,
+          "annotated": 47,
           "no_match": 0
         },
         "address_synth": "ok",
         "county_pin": {
-          "scanned": 727,
-          "case_pinned": 574,
-          "already_correct": 574,
+          "scanned": 721,
+          "case_pinned": 568,
+          "already_correct": 568,
           "retagged_county": 0,
           "address_nulled": 0,
           "no_case_decode": 153
         },
         "property_kind": "ok",
         "judgment_amount": {
-          "scanned": 727,
+          "scanned": 721,
           "matched": 0,
           "already_set": 0,
           "no_text": 9,
-          "text_no_match": 718,
+          "text_no_match": 712,
           "by_source_matched": {}
         },
         "judgment_amount_detail": {
@@ -2623,18 +2623,18 @@
           "validation_exceptions": 0
         },
         "data_quality": {
-          "synthetic_address": 386,
-          "approximate_address": 46,
+          "synthetic_address": 382,
+          "approximate_address": 47,
           "low_arv_confidence": 0,
-          "no_sqft": 586,
+          "no_sqft": 580,
           "no_address": 0,
           "exceptions": 0
         },
         "upset_bid": {
-          "scanned": 727,
+          "scanned": 721,
           "tagged_in_window": 0,
           "tag_cleared_outside_window": 0,
-          "no_sale_date": 328,
+          "no_sale_date": 322,
           "non_nc": 299
         }
       },
@@ -2645,12 +2645,12 @@
           "reason": "no_cases_returned_from_tyler",
           "tagged": 0,
           "targets": 50,
-          "checked_at": "2026-05-14T00:03:41.867384Z",
+          "checked_at": "2026-05-14T00:26:26.125229Z",
           "last_step": "waf_solve_failed",
           "landed_url": "https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29",
           "step_error": "Browser-driven OSS solve failed; set CAPSOLVER_API_KEY as paid fallback if needed."
         },
-        "heuristic_targets": 1319
+        "heuristic_targets": 1317
       }
     }
   ]
