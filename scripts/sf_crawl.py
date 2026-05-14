@@ -93,26 +93,26 @@ class SitePreset:
 PRESETS: dict[str, SitePreset] = {
     "cars_com": SitePreset(
         slug="cars_com",
-        name="Cars.com",
-        seed=(
-            "https://www.cars.com/shopping/results/?stock_type=used"
-            "&makes[]=porsche"
-            "&models[]=porsche-911&models[]=porsche-718_cayman"
-            "&models[]=porsche-cayman&models[]=porsche-718_boxster"
-            "&models[]=porsche-boxster"
-            "&year_min=2014&list_price_max=45000&page_size=100"
-        ),
-        crawl_mode="spider",
-        include_regex=r"^https://www\.cars\.com/vehicledetail/.+",
+        name="Cars.com (API)",
+        # SF spider-mode against cars.com search pages only crawls the seed
+        # — listing-card links are JS-injected and SF doesn't render. The
+        # in-tree CarsComScraper uses cars.com's JSON search endpoint with
+        # the same query params and produces real listings.
+        seed="https://www.cars.com/shopping/results/",
+        crawl_mode="api",
+        include_regex="",
         max_urls=2000,
     ),
     "bring_a_trailer": SitePreset(
         slug="bring_a_trailer",
-        name="Bring a Trailer",
+        name="Bring a Trailer (API)",
+        # SF spider-mode discovers thousands of BaT pages but rarely exports
+        # them cleanly (CSV write phase aborts on large crawls). The in-tree
+        # BringATrailerScraper hits the curated /porsche/<model>/ indexes
+        # directly and parses listing-cards from server-rendered HTML.
         seed="https://bringatrailer.com/porsche/",
-        crawl_mode="spider",
-        # Vehicle slugs always start with a 4-digit year.
-        include_regex=r"^https://bringatrailer\.com/listing/(?:19|20)\d{2}-porsche-.+",
+        crawl_mode="api",
+        include_regex="",
         max_urls=3000,
     ),
     "classiccars": SitePreset(
@@ -165,26 +165,36 @@ PRESETS: dict[str, SitePreset] = {
     ),
     "iaai": SitePreset(
         slug="iaai",
-        name="IAA",
+        name="IAA (API)",
+        # IAA's public sitemap is 116k URLs and SF can't honour --max-urls
+        # for --crawl-sitemap, so the whole crawl times out. The in-tree
+        # IaaiScraper queries IAA's vehicle-search JSON endpoint directly
+        # for Porsche-only results.
         seed="https://www.iaai.com/Xj9rDOVMEi0hc38S/sitemap_index.xml",
-        crawl_mode="sitemap",
-        include_regex=r"iaai\.com/VehicleDetail/.*porsche",
+        crawl_mode="api",
+        include_regex="",
         max_urls=3000,
     ),
     "autobidmaster": SitePreset(
         slug="autobidmaster",
-        name="AutoBidMaster",
+        name="AutoBidMaster (API)",
+        # AutoBidMaster's sitemaps.autobidmaster.com/en/sitemap_index.xml
+        # responds with HTML, not XML — SF rejects it as "not a sitemap".
+        # The in-tree make_autobidmaster() scraper queries their search API.
         seed="https://sitemaps.autobidmaster.com/en/sitemap_index.xml",
-        crawl_mode="sitemap",
-        include_regex=r"autobidmaster\.com/.*porsche",
+        crawl_mode="api",
+        include_regex="",
         max_urls=3000,
     ),
     "carsandbids": SitePreset(
         slug="cars_and_bids",
-        name="Cars & Bids",
+        name="Cars & Bids (API)",
+        # carsandbids.com/sitemap.xml is HTML, not XML; SF rejects it as
+        # "not a sitemap". CarsAndBidsScraper hits their auction listing
+        # API with a Porsche filter.
         seed="https://carsandbids.com/sitemap.xml",
-        crawl_mode="sitemap",
-        include_regex=r"carsandbids\.com/auctions/.*porsche",
+        crawl_mode="api",
+        include_regex="",
         max_urls=2000,
     ),
 }
@@ -261,6 +271,21 @@ async def _run_api_preset(preset: SitePreset) -> list[dict]:
     if preset.slug == "copart":
         from porsche_scraper.scrapers.copart import CopartScraper
         scraper = CopartScraper()
+    elif preset.slug == "cars_com":
+        from porsche_scraper.scrapers.cars_com import CarsComScraper
+        scraper = CarsComScraper(year_min=2014, price_max=45000)
+    elif preset.slug == "bring_a_trailer":
+        from porsche_scraper.scrapers.bring_a_trailer import BringATrailerScraper
+        scraper = BringATrailerScraper()
+    elif preset.slug == "iaai":
+        from porsche_scraper.scrapers.iaai import IaaiScraper
+        scraper = IaaiScraper(year_min=2014)
+    elif preset.slug == "cars_and_bids":
+        from porsche_scraper.scrapers.cars_and_bids import CarsAndBidsScraper
+        scraper = CarsAndBidsScraper(year_min=2014, max_bid=45000)
+    elif preset.slug == "autobidmaster":
+        from porsche_scraper.scrapers.salvage_brokers import make_autobidmaster
+        scraper = make_autobidmaster(2014, 45000)
     else:
         raise ValueError(f"no api scraper wired for preset slug {preset.slug!r}")
     listings = await scraper.fetch()
