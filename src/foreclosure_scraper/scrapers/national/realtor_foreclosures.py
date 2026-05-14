@@ -21,16 +21,13 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
-# Top metros likely to have foreclosure listings beyond our priority counties
+# Top metros INSIDE our footprint (matched against SCOPE_DENY_COUNTIES
+# downstream — out-of-scope cities like Charlotte/Raleigh/Greenville-SC
+# would just get filtered, so don't bother scraping them at all).
 SEARCH_LOCATIONS = (
-    "Charlotte, NC",
     "Asheville, NC",
     "Hickory, NC",
-    "Greensboro, NC",
-    "Raleigh, NC",
-    "Greenville, SC",
-    "Columbia, SC",
-    "Charleston, SC",
+    "Wilmington, NC",
     "Spartanburg, SC",
 )
 

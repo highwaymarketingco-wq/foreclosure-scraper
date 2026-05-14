@@ -15,12 +15,12 @@ class County:
 
 
 SC_COUNTIES: tuple[County, ...] = (
-    # Upstate SC corridor. 2026-05-07c restored Greenville per user
-    # direction (it was in the 2026-05a "narrow" pruning, but the user
-    # confirmed Greenville is wanted — sc_courtrosters already targets
-    # it, so adding it back unblocks that scraper's listings).
+    # Upstate SC corridor.
+    # Iteration history:
+    #   2026-05-07a — pruned Greenville
+    #   2026-05-07c — re-added Greenville
+    #   2026-05-14  — pruned Greenville again per user direction
     County("Spartanburg", "SC", "45083", "Spartanburg"),
-    County("Greenville",  "SC", "45045", "Greenville"),
     County("Anderson", "SC", "45007", "Anderson"),
     County("Pickens", "SC", "45077", "Pickens"),
     County("Oconee", "SC", "45073", "Walhalla"),
@@ -114,6 +114,10 @@ SCOPE_DENY_COUNTIES: tuple[tuple[str, str], ...] = (
     # SC_COUNTIES but BK / lis pendens leak via the 296 zip prefix.
     ("Newberry", "SC"),
     ("Greenwood", "SC"),
+    # 2026-05-14 — Greenville SC re-pruned per user direction. The 296xx
+    # zip prefix covers Greenville too, so without explicit deny the
+    # zip-fallback would re-let it in.
+    ("Greenville", "SC"),
 )
 # Pre-normalized for fast lookup in in_scope() + main._in_scope.
 SCOPE_DENY_COUNTIES_NORMALIZED: frozenset[tuple[str, str]] = frozenset(

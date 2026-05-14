@@ -23,17 +23,15 @@ from foreclosure_scraper.scrapers._registry import all_scrapers
 # Excludes: CourtListener (needs token), foreclosure.com (needs login),
 # Apify-backed scrapers (needs APIFY_TOKEN), Vision/RentCast.
 FREE_SCRAPERS = {
-    "counties_nc.wake_tax",
-    "counties_nc.forsyth_tax",
-    "counties_nc.guilford_tax",
+    # In-scope NC tax-foreclosure counties (wake/forsyth/guilford/durham/
+    # mecklenburg dropped 2026-05-14 per scope tightening)
     "counties_nc.new_hanover_tax",
-    "counties_nc.durham_tax",
-    "counties_nc.mecklenburg_tax",
     "counties_nc.buncombe_tax",
     "counties_nc.cleveland_tax",
     "counties_nc.henderson_tax",
     "counties_nc.polk_tax",
     "counties_nc.rutherford_tax",
+    "counties_nc.brunswick_tax",
     "counties_nc.nc_rod_substitute_trustee",
     "counties_nc.nc_ecourts_lis_pendens",
     "counties_sc.sc_courtrosters",
@@ -45,7 +43,6 @@ FREE_SCRAPERS = {
     "reo.usda_rd",
     "reo.treasury_seized",
     "reo.vrm_va_reo",
-    "city_websites.charlotte_demolition",
 }
 
 

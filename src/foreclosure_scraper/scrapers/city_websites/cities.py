@@ -90,13 +90,10 @@ CITIES: tuple[tuple[str, str, str, str], ...] = (
     ("SC", "Laurens", "Laurens", "cityoflaurenssc.com"),
     ("SC", "Laurens", "Clinton", "cityofclintonsc.com"),
     # NC
-    ("NC", "Mecklenburg", "Charlotte", "charlottenc.gov"),
-    ("NC", "Mecklenburg", "Davidson", "townofdavidson.org"),
-    ("NC", "Mecklenburg", "Cornelius", "cornelius.org"),
-    ("NC", "Mecklenburg", "Huntersville", "huntersville.org"),
-    ("NC", "Mecklenburg", "Matthews", "matthewsnc.gov"),
-    ("NC", "Mecklenburg", "Mint Hill", "minthill.com"),
-    ("NC", "Mecklenburg", "Pineville", "pinevillenc.gov"),
+    # Mecklenburg cities (Charlotte, Davidson, Cornelius, Huntersville,
+    # Matthews, Mint Hill, Pineville) dropped 2026-05-14 per scope tightening
+    # — Mecklenburg is in SCOPE_DENY_COUNTIES so search hits there would
+    # just get filtered downstream. Skip the scrape entirely.
     ("NC", "Buncombe", "Asheville", "ashevillenc.gov"),
     ("NC", "Buncombe", "Black Mountain", "townofblackmountain.org"),
     ("NC", "Buncombe", "Weaverville", "weavervillenc.org"),

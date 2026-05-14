@@ -120,13 +120,8 @@ FORECLOSURE_SALE_SOURCES = frozenset({
     "counties_sc.pickens_master_in_equity",
     "counties_sc.sc_courtrosters",
     "counties_sc.sc_flc",
-    # County tax-foreclosure (sale at courthouse steps)
-    "counties_nc.wake_tax",
-    "counties_nc.forsyth_tax",
-    "counties_nc.guilford_tax",
-    "counties_nc.durham_tax",
+    # County tax-foreclosure (sale at courthouse steps) — in-scope NC only
     "counties_nc.new_hanover_tax",
-    "counties_nc.mecklenburg_tax",
     "counties_nc.buncombe_tax",
     "counties_nc.cleveland_tax",
     "counties_nc.henderson_tax",

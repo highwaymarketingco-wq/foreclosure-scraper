@@ -546,29 +546,42 @@ async def main() -> int:
         log.error("patch_run.no_listings_file", path=str(listings_path))
         return 1
 
-    # Hydrate existing active listings
+    # Hydrate existing active listings, re-filter through current _in_scope
+    # so any listings that fail today's scope (e.g. counties added to
+    # SCOPE_DENY_COUNTIES after this row was first scraped) get dropped
+    # rather than persisted indefinitely.
     raw_data = json.loads(listings_path.read_text())
     existing: list[Listing] = []
-    skipped = 0
+    skipped = scope_dropped = 0
     for d in raw_data:
         li = _hydrate_listing(d)
         if li is None:
             skipped += 1
             continue
+        if not _in_scope(li):
+            scope_dropped += 1
+            continue
         existing.append(li)
     log.info("patch_run.loaded_existing",
-             live=len(existing), skipped=skipped)
+             live=len(existing), skipped=skipped, scope_dropped=scope_dropped)
 
     # Hydrate existing sold pool (separate file). May not exist yet.
+    # Same scope re-filter as active pool.
     existing_sold: list[Listing] = []
+    sold_scope_dropped = 0
     if sold_pool_path.exists():
         try:
             sold_data = json.loads(sold_pool_path.read_text())
             for d in sold_data:
                 li = _hydrate_listing(d)
-                if li is not None:
-                    existing_sold.append(li)
-            log.info("patch_run.loaded_sold_pool", count=len(existing_sold))
+                if li is None:
+                    continue
+                if not _in_scope(li):
+                    sold_scope_dropped += 1
+                    continue
+                existing_sold.append(li)
+            log.info("patch_run.loaded_sold_pool",
+                     count=len(existing_sold), scope_dropped=sold_scope_dropped)
         except (ValueError, json.JSONDecodeError):
             pass
 
