@@ -32,7 +32,7 @@ log = logging.getLogger(__name__)
 
 BASE = "https://www.iaai.com"
 LISTING_URL = f"{BASE}/Vehiclelisting/Porsche"
-EXCLUDED_MODELS_UPPER = ("PANAMERA", "CAYENNE", "MACAN")
+EXCLUDED_MODELS_UPPER = ("PANAMERA", "MACAN")
 
 
 def _title_status(raw: str | None) -> TitleStatus:

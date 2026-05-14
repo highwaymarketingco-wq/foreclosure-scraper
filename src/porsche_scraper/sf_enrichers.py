@@ -193,7 +193,7 @@ async def _enrich_copart(url: str) -> Listing | None:
     title = ym_node.text(strip=True) if ym_node else ""
     if "porsche" not in title.lower():
         return None
-    if any(em in title.upper() for em in ("CAYENNE", "MACAN", "PANAMERA")):
+    if any(em in title.upper() for em in ("MACAN", "PANAMERA")):
         return None
     bid_node = tree.css_first("[class*='current-bid']") or tree.css_first("[id*='currentBid']")
     odo_node = tree.css_first("[class*='odometer']")
@@ -231,7 +231,7 @@ async def _enrich_elferspot(url: str) -> Listing | None:
     if not slug_m:
         return None
     model_slug, year_s = slug_m.group(1), slug_m.group(2)
-    if any(t in model_slug.lower() for t in ("cayenne", "macan", "panamera")):
+    if any(t in model_slug.lower() for t in ("macan", "panamera")):
         return None
     title = _meta(html, "og:title") or f"Porsche {model_slug.replace('-', ' ').title()} {year_s}"
     title = title.replace("For sale: ", "").rsplit(" - ", 1)[0]

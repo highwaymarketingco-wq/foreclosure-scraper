@@ -34,7 +34,7 @@ _SLUG_RE = re.compile(
     re.IGNORECASE,
 )
 _SLUG_PARSER = SlugParser(_SLUG_RE, model_aliases={})
-EXCLUDED_SLUG_TOKENS = ("cayenne", "macan", "panamera")
+EXCLUDED_SLUG_TOKENS = ("macan", "panamera")
 
 
 def _model_from_slug(raw: str) -> str:

@@ -22,8 +22,10 @@ class TitleStatus(str, Enum):
 
 # Models we explicitly DO NOT want. Lower-cased substring match against
 # title + model fields. "718" Cayman/Boxster and "911" are wanted; only
-# the SUV / sedan lines are filtered out.
-EXCLUDED_MODELS = ("panamera", "cayenne", "macan")
+# the SUV / sedan lines are filtered out. Cayenne was un-excluded
+# 2026-05-13 at user request — they're fine seeing those alongside the
+# sports cars. Macan + Panamera stay out.
+EXCLUDED_MODELS = ("panamera", "macan")
 
 
 # Words in the title that suggest the car is not drivable as-is.

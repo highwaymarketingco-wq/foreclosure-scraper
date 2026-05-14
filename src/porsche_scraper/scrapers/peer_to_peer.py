@@ -149,7 +149,7 @@ def parse_fb_html(html: str) -> Iterable[Listing]:
         title = _fb_unescape(title_m.group(1) if title_m else "")
         if "porsche" not in title.lower():
             continue
-        if any(em in title.lower() for em in ("panamera", "cayenne", "macan")):
+        if any(em in title.lower() for em in ("panamera", "macan")):
             continue
 
         year_val = int(year_m.group(1)) if year_m else parse_year(title)

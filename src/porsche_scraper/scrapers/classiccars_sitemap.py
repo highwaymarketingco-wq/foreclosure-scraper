@@ -28,7 +28,7 @@ _SLUG_RE = re.compile(
     r"/listings/view/(?P<id>\d+)/(?P<year>(?:19|20)\d{2})-porsche-(?P<model>[a-z0-9-]+?)-for-sale",
     re.IGNORECASE,
 )
-EXCLUDED_SLUG_TOKENS = ("cayenne", "macan", "panamera")
+EXCLUDED_SLUG_TOKENS = ("macan", "panamera")
 
 # ClassicCars embeds price in a JSON-LD Vehicle blob.
 _JSONLD_PRICE_RE = re.compile(r'"price"\s*:\s*"?(\d[\d.,]*)"?')

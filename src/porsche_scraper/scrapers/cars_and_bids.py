@@ -37,7 +37,7 @@ log = logging.getLogger(__name__)
 
 BASE = "https://carsandbids.com"
 SEARCH_URL = f"{BASE}/search/porsche"
-EXCLUDED_MODELS_LOWER = ("panamera", "cayenne", "macan")
+EXCLUDED_MODELS_LOWER = ("panamera", "macan")
 
 
 def parse_search_html(html: str) -> list[Listing]:

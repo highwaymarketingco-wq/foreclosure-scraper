@@ -41,7 +41,7 @@ SEARCH_PATHS = (
     "/auctions?search=porsche&status=ended",
     "/marketplace?search=porsche",
 )
-EXCLUDED_MODELS_LOWER = ("panamera", "cayenne", "macan")
+EXCLUDED_MODELS_LOWER = ("panamera", "macan")
 
 # Title/status/price are jammed into a single anchor text. The em-dash
 # `—` (or hyphen "-" fallback) separates the title from the status +

@@ -193,7 +193,7 @@ def parse_results(html: str, config: AggregatorConfig) -> list[Listing]:
         if "porsche" not in title.lower():
             continue
         # Excluded models — drop server-side before producing a listing.
-        if any(em in title.lower() for em in ("panamera", "cayenne", "macan")):
+        if any(em in title.lower() for em in ("panamera", "macan")):
             continue
         img_node = card.css_first("img")
         img = (img_node.attributes.get("src") or img_node.attributes.get("data-src")) if img_node else None

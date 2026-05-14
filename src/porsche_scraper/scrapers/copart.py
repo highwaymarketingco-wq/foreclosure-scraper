@@ -35,7 +35,7 @@ log = logging.getLogger(__name__)
 
 BASE = "https://www.copart.com"
 SEARCH_URL = f"{BASE}/public/data/lotdetails/solr/lotSearch"
-EXCLUDED_MODELS_UPPER = ("PANAMERA", "CAYENNE", "MACAN")
+EXCLUDED_MODELS_UPPER = ("PANAMERA", "MACAN")
 
 
 def _td_to_status(td: str | None) -> TitleStatus:
@@ -153,7 +153,16 @@ class CopartScraper(BaseScraper):
         search-results API. The site gates the API behind session cookies
         a fresh curl can't set — but page.evaluate() inside the rendered
         page carries the credentials transparently."""
-        queries = ["porsche 911", "porsche cayman", "porsche boxster", "porsche 718"]
+        # Per-model queries. Generic "porsche" returns 1000+ hits dominated
+        # by Panamera/Macan, so the 5-page window never reaches the sports
+        # cars. Each specific query returns its full match set (911=91,
+        # cayman=28, boxster=59, 718=1, taycan=~40, cayenne=~150).
+        # 911-variants (GT3, Turbo, Carrera, etc.) all show as model=911
+        # in the API so a single query covers them. Same for Cayman/GT4.
+        queries = [
+            "porsche 911", "porsche cayman", "porsche boxster",
+            "porsche 718", "porsche taycan", "porsche cayenne",
+        ]
         out: list[Listing] = []
         seen: set[str] = set()
         for q in queries:
@@ -239,7 +248,10 @@ class CopartScraper(BaseScraper):
         # 911/Cayman/Boxster/718 listings the user actually wants.
         # Per-model queries returned 91 results for "porsche 911" alone
         # and similar counts for cayman/boxster.
-        queries = ["porsche 911", "porsche cayman", "porsche boxster", "porsche 718"]
+        queries = [
+            "porsche 911", "porsche cayman", "porsche boxster",
+            "porsche 718", "porsche taycan", "porsche cayenne",
+        ]
         out: list[Listing] = []
         seen: set[str] = set()
         for q in queries:
@@ -277,7 +289,7 @@ class CopartScraper(BaseScraper):
                 seen.add(full)
                 # The slug carries year+model: /lot/12345678/salvage-2015-porsche-911-...
                 slug = href.rstrip("/").rsplit("/", 1)[-1].lower()
-                if any(em in slug for em in ("panamera", "cayenne", "macan")):
+                if any(em in slug for em in ("panamera", "macan")):
                     continue
                 title = a.text(strip=True)
                 if not title or "porsche" not in title.lower():
@@ -297,7 +309,7 @@ class CopartScraper(BaseScraper):
                     if upper in ("911", "718", "928", "944", "924", "968", "959", "356"):
                         model = upper
                         break
-                    if upper in ("cayman", "boxster", "carrera", "taycan"):
+                    if upper in ("cayman", "boxster", "carrera", "taycan", "cayenne"):
                         model = upper.title()
                         break
                 # Client-side year filter — Copart's HTML page ignores the
