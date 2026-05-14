@@ -103,16 +103,22 @@ def _listing_from_card(card, config: SiteConfig) -> Listing | None:
     if not href:
         return None
     url = urljoin(config.base, href)
+    img = card.css_first("img")
     title = (
         _first_text(card, config.title_text_selectors)
-        or link.text(strip=True)
+        or (img.attributes.get("alt") if img else None)
         or link.attributes.get("title")
+        or link.text(strip=True)
         or ""
     )
+    # Most enthusiast sites list all makes — drop non-Porsche cards
+    # here so the dashboard doesn't have to. (live_collector does the
+    # same in its own parser.)
+    if "porsche" not in title.lower():
+        return None
     price = parse_price(_first_text(card, config.price_selectors))
     miles = parse_miles(_first_text(card, config.mileage_selectors))
     loc = _first_text(card, config.location_selectors)
-    img = card.css_first("img")
     listing = Listing(
         source=config.slug,
         source_url=url,
@@ -218,20 +224,33 @@ CONFIGS: dict[str, SiteConfig] = {
         slug="collecting_cars",
         name="Collecting Cars",
         base="https://collectingcars.com",
-        search_url_template=(
-            "https://collectingcars.com/for-sale/porsche?page={page}&currency=USD"
+        # The previous `/for-sale/porsche?currency=USD` path 404s now;
+        # the canonical inventory grid is `/for-sale` (no make filter)
+        # and we filter to Porsche client-side via the slug + title.
+        search_url_template="https://collectingcars.com/for-sale?page={page}",
+        # CSS-modules class names contain build-time hashes (e.g.
+        # `listing-tile-module-scss-module__kVq3na__listing`), so we
+        # anchor on the auction id attribute and the href pattern
+        # instead. Listing wraps in `<div id="auction-<n>">`.
+        card_selectors=(
+            "div[id^='auction-']",
+            ".auction-card",
+            "[data-testid='auction-card']",
+            "article.lot",
         ),
-        card_selectors=(".auction-card", "[data-testid='auction-card']", "article.lot"),
-        title_selectors=("a.auction-card__title", "a[href*='/for-sale/']", "h3 a"),
+        title_selectors=(
+            "a[href*='/for-sale/']",
+            "a.auction-card__title",
+            "h3 a",
+        ),
         price_selectors=(".auction-card__bid", ".current-bid", ".price"),
         mileage_selectors=(".auction-card__mileage", ".mileage"),
         location_selectors=(".auction-card__location", ".location"),
         use_render=True,
-        render_wait_selector=".auction-card, a[href*='/for-sale/']",
-        # PyDoll attempted but blocked by Cloudflare JS challenge that
-        # neither Turnstile bypass nor stealth tooling can clear from a
-        # datacenter IP. Stay on Patchright; only a residential proxy
-        # (PROXY_URL) will unblock this.
+        render_wait_selector="div[id^='auction-'], a[href*='/for-sale/']",
+        # Patchright + solve_cloudflare=True clears CC's Turnstile
+        # challenge in ~12s and renders the listings grid. PyDoll's CF
+        # auto-solver can't beat the same wall from datacenter IPs.
     ),
     "themarket": SiteConfig(
         # themarket.bonhams.com migrated to themarket.co.uk in 2025.
@@ -251,33 +270,33 @@ CONFIGS: dict[str, SiteConfig] = {
         slug="autohunter",
         name="AutoHunter",
         base="https://www.autohunter.com",
-        search_url_template=(
-            "https://www.autohunter.com/vehicle-listings/"
-            "?make=Porsche&status=live&year_min={year_min}&price_max={price_max}&page={page}"
-        ),
-        card_selectors=(".listing-card", ".auction-card", "article.lot"),
-        title_selectors=(".listing-card__title a", "h3 a", "a[href*='/auction/']"),
+        # `/vehicle-listings/` 307-redirected to a 404. `/auctions/` is
+        # the live URL. AutoHunter often has zero Porsches active at
+        # any given moment — the scraper will return [] cleanly when
+        # that's true and grab any active 911/Cayman/Boxster as they
+        # show up.
+        search_url_template="https://www.autohunter.com/auctions/?page={page}",
+        card_selectors=(".vehicle-card", ".listing-card", ".auction-card"),
+        title_selectors=("a[href*='/auction/']", ".listing-card__title a", "h3 a"),
         price_selectors=(".listing-card__price", ".current-bid", ".price"),
         mileage_selectors=(".listing-card__mileage",),
         location_selectors=(".listing-card__location",),
         use_render=True,
-        render_wait_selector=".listing-card, a[href*='/auction/']",
-        # CF JS challenge — see collecting_cars note above.
+        render_wait_selector="a[href*='/auction/'], .vehicle-card",
     ),
     "broad_arrow": SiteConfig(
         slug="broad_arrow",
         name="Broad Arrow",
         base="https://broadarrowauctions.com",
-        # No site-wide make filter — we crawl the listings index and filter
-        # client-side via the title.
-        search_url_template="https://broadarrowauctions.com/auctions?page={page}",
-        card_selectors=(".lot-card", ".auction-lot", "article.lot"),
-        title_selectors=(".lot-card__title a", "h3 a", "a[href*='/lots/']"),
-        price_selectors=(".lot-card__estimate", ".estimate", ".price"),
+        # Old `/auctions` path 404s. The canonical vehicles grid is
+        # `/vehicles`; URLs are `/vehicles/<auction-id_lot>/<year>-<make>-<slug>`.
+        # No site-wide make filter — client-side filter on the title.
+        search_url_template="https://broadarrowauctions.com/vehicles?page={page}",
+        card_selectors=(".vehicle-card", ".lot-card", ".auction-lot", "article.lot"),
+        title_selectors=("a[href*='/vehicles/']", ".lot-card__title a", "h3 a"),
+        price_selectors=(".vehicle-card__estimate", ".lot-card__estimate", ".estimate"),
         use_render=True,
-        render_wait_selector=".lot-card, a[href*='/lots/']",
-        # Bot-blocked altogether — datacenter IPs get 117-byte stub
-        # responses. Needs residential IP / proxy.
+        render_wait_selector="a[href*='/vehicles/']",
     ),
     "iconic_auctioneers": SiteConfig(
         # Silverstone Auctions rebranded to Iconic Auctioneers.
