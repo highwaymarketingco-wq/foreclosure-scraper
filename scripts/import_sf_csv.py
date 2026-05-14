@@ -281,6 +281,12 @@ def main(argv: list[str] | None = None) -> int:
                    help="Don't merge with the existing porsche.json — start fresh")
     p.add_argument("--keep-unknown-year", action="store_true")
     p.add_argument("--allow-unknown-price", action="store_true")
+    p.add_argument("--no-refilter-existing", action="store_true",
+                   help="Only filter the freshly-loaded CSV rows. Pre-existing "
+                        "listings in porsche.json keep their last-known state "
+                        "(they were already filtered when they got in). Use "
+                        "this on partial-refresh runs so unrefreshed sources "
+                        "don't shrink when their entries naturally age out.")
     args = p.parse_args(argv)
 
     fresh: list[Listing] = []
@@ -292,16 +298,23 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  loaded {n:>5} rows from {path}")
 
     base = [] if args.no_merge else load_existing(args.out)
-    # Fresh first so dedupe() keeps the just-fetched entry (with the
-    # newest photo / sale_date / bid). Existing entries fill in for
-    # lots that didn't reappear this run.
-    combined = fresh + base
-    deduped = dedupe(combined)
     criteria = FilterCriteria(
         require_known_year=not args.keep_unknown_year,
         allow_unknown_price=args.allow_unknown_price,
     )
-    filtered = filter_listings(deduped, criteria)
+    if args.no_refilter_existing:
+        # Filter only the fresh batch; pre-existing entries are assumed
+        # already-vetted from their original import. Fresh first so dedupe
+        # picks the newer copy when URLs collide.
+        fresh_filtered = filter_listings(fresh, criteria)
+        deduped = dedupe(fresh_filtered + base)
+        filtered = deduped
+    else:
+        # Re-filter everything — appropriate when running a full refresh,
+        # where filter criteria may have changed since last write.
+        combined = fresh + base
+        deduped = dedupe(combined)
+        filtered = filter_listings(deduped, criteria)
     filtered.sort(key=lambda l: (l.effective_price is None, l.effective_price or 9e9))
 
     from porsche_scraper.output import write_json, write_csv

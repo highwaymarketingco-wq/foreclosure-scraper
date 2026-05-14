@@ -460,6 +460,7 @@ def run_import(
     enrich: bool,
     enrich_concurrency: int,
     work_root: Path,
+    refilter_existing: bool = True,
 ) -> None:
     if not csvs:
         print("  nothing to import")
@@ -501,6 +502,8 @@ def run_import(
     cmd = ["uv", "run", "python", str(IMPORTER), *map(str, import_paths)]
     if allow_unknown_price:
         cmd.append("--allow-unknown-price")
+    if not refilter_existing:
+        cmd.append("--no-refilter-existing")
     print(f"\n  importing {len(import_paths)} CSV(s) into docs/porsche.json …")
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)
 
@@ -577,12 +580,21 @@ def main(argv: list[str] | None = None) -> int:
     # is in the run. Caller can still pass --allow-unknown-price
     # explicitly for SF-mode presets if they want it too.
     auto_allow = any(PRESETS[s].crawl_mode == "api" for s in sites)
+    # Partial-refresh guard: on subset runs (not --all), tell the importer to
+    # keep pre-existing listings from un-touched sources as-is. Otherwise the
+    # filter pass naturally ages out auctions whose sale_date has passed and
+    # the dashboard shrinks for sources that weren't even re-scraped.
+    full_refresh = args.all or set(sites) == set(PRESETS)
+    if not full_refresh:
+        print(f"\n  ⓘ partial refresh ({len(sites)} of {len(PRESETS)} sources): "
+              f"preserving pre-existing entries from un-touched sources")
     run_import(
         all_csvs,
         allow_unknown_price=args.allow_unknown_price or auto_allow,
         enrich=not args.no_enrich,
         enrich_concurrency=args.enrich_concurrency,
         work_root=work_root,
+        refilter_existing=full_refresh,
     )
     if args.push:
         maybe_push()
