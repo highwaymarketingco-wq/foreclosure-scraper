@@ -58,34 +58,63 @@ class SiteConfig:
 
 CONFIGS: dict[str, SiteConfig] = {
     "sca_auction": SiteConfig(
+        # Verified 2026-05-14: en.sca.auction is dead (NXDOMAIN). Real
+        # site is now sca.auction/en/...; URL format is the same as
+        # abetter.bid: /en/{LOT}-{year}-porsche-{model} (10-digit lot
+        # leading). Title link class .result-lots__link-title, card
+        # wrapper .result-lots__item.
         slug="sca_auction",
         name="SCA Auction",
-        base="https://en.sca.auction",
+        base="https://sca.auction",
         search_url=(
-            "https://en.sca.auction/cars?make=Porsche"
-            "&yearFrom={year_min}&priceTo={price_max}&page={page}"
+            "https://sca.auction/en/search/type-cars/make-porsche"
         ),
-        card_selectors=(".lot-card", "div[class*='lot-card']"),
-        title_selectors=(".lot-card__title a", ".lot-title a", "h3 a"),
-        price_selectors=(".lot-card__price", ".price-value", ".price"),
-        mileage_selectors=(".lot-card__odometer", ".odo-value", ".odometer"),
-        location_selectors=(".lot-card__location", ".location-value"),
-        title_status_selectors=(".lot-card__damage", ".lot-card__title-doc", ".title-doc"),
+        card_selectors=(".result-lots__item", ".result-lots__head"),
+        title_selectors=(".result-lots__link-title",),
+        price_selectors=(".result-lots__price", ".price"),
+        mileage_selectors=(".result-lots__odometer",),
+        location_selectors=(".result-lots__location",),
+        title_status_selectors=(".result-lots__title-doc", ".result-lots__damage"),
+        max_pages=2,
     ),
     "autobidmaster": SiteConfig(
+        # Verified 2026-05-14: real URL is /en/search/salvage-cars/porsche/
+        # — 24 Porsche listings vs 0 from the old carfinder URL. Card
+        # CSS classes are hashed (lotCard-bp2dr, _Ay3P-title) so use
+        # attribute-based selectors that survive bundle rebuilds. Lot #
+        # in URL: /en/search/lot/{LOT}/copart-{year}-{make}-...
         slug="autobidmaster",
         name="AutoBidMaster",
         base="https://www.autobidmaster.com",
         search_url=(
-            "https://www.autobidmaster.com/en/carfinder-online-auto-auctions/Porsche/"
-            "?price_to={price_max}&year_from={year_min}&page={page}"
+            "https://www.autobidmaster.com/en/search/salvage-cars/porsche/"
         ),
-        card_selectors=(".lot-list-item", ".car-item-block", "div[class*='lot-item']"),
-        title_selectors=(".car-name a", ".lot-title a", "a[href*='/lot/']"),
-        price_selectors=(".car-price .price-value", ".price-value", ".lot-price"),
-        mileage_selectors=(".lot-info-odometer", ".odometer-value"),
-        location_selectors=(".lot-info-location", ".location"),
-        title_status_selectors=(".lot-info-title-doc", ".title-doc"),
+        card_selectors=("[class*='lotCard']", "[class*='lot-card']", "[class*='Card']"),
+        title_selectors=("a[href*='/search/lot/']",),
+        price_selectors=("[class*='price']", "[class*='Price']", "[class*='bid']"),
+        mileage_selectors=("[class*='odo']", "[class*='Odo']"),
+        location_selectors=("[class*='location']", "[class*='Location']"),
+        title_status_selectors=("[class*='title-doc']", "[class*='Damage']", "[class*='damage']"),
+        max_pages=2,
+    ),
+    "salvagereseller": SiteConfig(
+        # Verified 2026-05-14. Also covers usa-auto-online.com which
+        # 301-redirects to salvagereseller (same network, IAA mirror).
+        # URL: /cars-for-sale/make/porsche, card .vehicle-model, lot #
+        # leading in detail URL: /cars-for-sale/{LOT}-{year}-porsche-...
+        slug="salvagereseller",
+        name="Salvage Reseller",
+        base="https://www.salvagereseller.com",
+        search_url=(
+            "https://www.salvagereseller.com/cars-for-sale/make/porsche"
+        ),
+        card_selectors=(".vehicle-card", ".vehicle-model"),
+        title_selectors=("a.vehicle-model", "a[href*='/cars-for-sale/'][href*='-porsche-']"),
+        price_selectors=(".vehicle-price", ".price"),
+        mileage_selectors=(".vehicle-odometer", ".odometer"),
+        location_selectors=(".vehicle-location", ".location"),
+        title_status_selectors=(".vehicle-title-doc", ".title-doc"),
+        max_pages=2,
     ),
     "abetter_bid": SiteConfig(
         # Verified 2026-05-14: real URL is /en/car-finder/type-automobiles/
@@ -176,6 +205,8 @@ _LOT_NUM_PATTERNS = (
     re.compile(r"/(?:search/lot|lot|cars?|inventory)/[^?#]*?(\d{6,12})", re.IGNORECASE),
     re.compile(r"/vehicle/(?:iaai|copart)-(\d{6,12})", re.IGNORECASE),
     re.compile(r"/en/(\d{8,12})-\d{4}-porsche", re.IGNORECASE),
+    # salvagereseller: /cars-for-sale/{LOT}-{year}-porsche-...
+    re.compile(r"/cars-for-sale/(\d{6,12})-\d{4}-porsche", re.IGNORECASE),
 )
 
 
@@ -299,6 +330,10 @@ def make_autobidmaster(year_min=2014, price_max=45000):
 
 def make_abetter_bid(year_min=2014, price_max=45000):
     return SalvageBrokerScraper(CONFIGS["abetter_bid"], year_min=year_min, price_max=price_max)
+
+
+def make_salvagereseller(year_min=2014, price_max=45000):
+    return SalvageBrokerScraper(CONFIGS["salvagereseller"], year_min=year_min, price_max=price_max)
 
 
 def make_cars4_bid(year_min=2014, price_max=45000):

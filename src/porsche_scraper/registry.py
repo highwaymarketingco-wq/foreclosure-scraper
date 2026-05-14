@@ -30,6 +30,7 @@ from .scrapers.salvage_brokers import (
     make_auctionexport,
     make_autobidmaster,
     make_cars4_bid,
+    make_salvagereseller,
     make_sca_auction,
 )
 
@@ -117,6 +118,7 @@ ALL_SCRAPERS: list[tuple[str, Callable[[int, int | None], BaseScraper]]] = [
     ("abetter_bid", lambda y, p: make_abetter_bid(y, p or 45000)),
     ("cars4_bid", lambda y, p: make_cars4_bid(y, p or 45000)),
     ("auctionexport", lambda y, p: make_auctionexport(y, p or 45000)),
+    ("salvagereseller", lambda y, p: make_salvagereseller(y, p or 45000)),
     # Porsche-specific
     ("pcarmarket", lambda y, p: PCarMarketScraper()),
     ("rennlist", lambda y, p: RennlistScraper()),
