@@ -30,14 +30,15 @@ SC_COUNTIES: tuple[County, ...] = (
 )
 
 NC_COUNTIES: tuple[County, ...] = (
-    # WNC mountains + foothills + Charlotte-metro footprint. Scope is
-    # the upstate-SC / WNC corridor where the user actually invests.
+    # WNC mountains + foothills only. Scope is strictly upstate-SC / WNC
+    # corridor west of Charlotte.
     # Iteration history:
     #   2026-05-07a — pruned 11 eastern-NC counties (Wake/Forsyth/
     #     Guilford/Durham/Cumberland/Alamance/Iredell/Cabarrus/Union/
     #     Pitt/Johnston). Too far east of WNC.
     #   2026-05-07b — pruned 3 more (Mecklenburg, Madison, Yancey).
-    #     Mecklenburg = Charlotte, dropped per user direction.
+    #   2026-05-15  — pruned New Hanover / Brunswick / Onslow per user
+    #     direction "anything east of Charlotte should be removed".
     County("Rutherford", "NC", "37161", "Rutherfordton"),
     County("Cleveland", "NC", "37045", "Shelby"),
     County("Henderson", "NC", "37089", "Hendersonville"),
@@ -49,10 +50,6 @@ NC_COUNTIES: tuple[County, ...] = (
     County("Lincoln", "NC", "37109", "Lincolnton"),
     County("Mitchell", "NC", "37121", "Bakersville"),
     County("Burke", "NC", "37023", "Morganton"),
-    # User-key coastal NC counties (Wilmington area + Onslow).
-    County("New Hanover", "NC", "37129", "Wilmington"),
-    County("Brunswick", "NC", "37019", "Bolivia"),
-    County("Onslow", "NC", "37133", "Jacksonville"),
 )
 
 ALL_COUNTIES: tuple[County, ...] = SC_COUNTIES + NC_COUNTIES
@@ -118,6 +115,16 @@ SCOPE_DENY_COUNTIES: tuple[tuple[str, str], ...] = (
     # zip prefix covers Greenville too, so without explicit deny the
     # zip-fallback would re-let it in.
     ("Greenville", "SC"),
+    # 2026-05-15 — coastal NC pruned per user direction ("anything east
+    # of Charlotte should be removed"). New Hanover / Brunswick / Onslow
+    # were previously in NC_COUNTIES; explicit deny ensures the 284 zip
+    # prefix can't sneak them back in via the zip fallback.
+    ("New Hanover", "NC"),
+    ("Brunswick", "NC"),
+    ("Onslow", "NC"),
+    # Other coastal/eastern NC counties the 284 prefix might catch.
+    ("Pender", "NC"),
+    ("Sampson", "NC"),
 )
 # Pre-normalized for fast lookup in in_scope() + main._in_scope.
 SCOPE_DENY_COUNTIES_NORMALIZED: frozenset[tuple[str, str]] = frozenset(
@@ -136,10 +143,8 @@ SCOPE_ZIP_PREFIXES: tuple[str, ...] = (
     # NC western piedmont + WNC mountains: Asheville/Hendersonville/Charlotte
     # corridor + Gaston/Cleveland/Rutherford/Polk
     "280", "281", "282", "287", "288",
-    # NC coastal — user-key Brunswick/New Hanover/Onslow. Without 284,
-    # HomeHarvest distressed listings tagged only by zip (no county
-    # field) failed _in_scope. 284 = Wilmington/Brunswick/Pender/Sampson.
-    "284",
+    # 2026-05-15: 284 (Wilmington/Brunswick/Pender/Sampson) removed per
+    # user direction — anything east of Charlotte is out of scope.
 )
 
 

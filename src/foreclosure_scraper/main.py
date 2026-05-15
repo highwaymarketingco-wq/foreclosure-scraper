@@ -122,7 +122,6 @@ DATELESS_OK_SOURCES = {
     # entries, _active_only would drop their listings whenever sale_date
     # is missing (which is most of the time for monthly/annual cadence).
     "counties_sc.sc_courtrosters",                # SC MIE rosters (monthly)
-    "counties_nc.new_hanover_tax",                # annual tax-foreclosure auctions
     "counties_nc.nc_rod_substitute_trustee",      # ROD substitute-trustee deed filings
     "reo.usda_rd",                                # USDA Rural Development resale REO
     "reo.treasury_seized",                        # Treasury seized real property

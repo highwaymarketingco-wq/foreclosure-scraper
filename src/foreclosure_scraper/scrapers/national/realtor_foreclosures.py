@@ -27,7 +27,6 @@ log = structlog.get_logger()
 SEARCH_LOCATIONS = (
     "Asheville, NC",
     "Hickory, NC",
-    "Wilmington, NC",
     "Spartanburg, SC",
 )
 

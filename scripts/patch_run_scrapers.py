@@ -104,13 +104,11 @@ KNOWN_FIXED = (
     # the 2026-05-07 eastern-NC scope rollback are listed here — Wake /
     # Forsyth / Guilford / Durham tax pages are scraped pointlessly if
     # their listings will fail _in_scope.
-    "counties_nc.new_hanover_tax",          # 3ee745c
     "counties_nc.buncombe_tax",             # 3ee745c
     "counties_nc.cleveland_tax",            # 3ee745c
     "counties_nc.henderson_tax",            # 3ee745c
     "counties_nc.polk_tax",                 # 3ee745c
     "counties_nc.rutherford_tax",           # 3ee745c
-    "counties_nc.brunswick_tax",            # 11e00d4: Brunswick scraper added
     # Sold-comp sources — added 2026-05-07
     "counties_sc.spartanburg_master_in_equity",  # 92752da: sold-price extraction
     "counties_sc.anderson_master_in_equity",     # 92752da

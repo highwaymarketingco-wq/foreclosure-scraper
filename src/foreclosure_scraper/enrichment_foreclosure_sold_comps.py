@@ -121,13 +121,11 @@ FORECLOSURE_SALE_SOURCES = frozenset({
     "counties_sc.sc_courtrosters",
     "counties_sc.sc_flc",
     # County tax-foreclosure (sale at courthouse steps) — in-scope NC only
-    "counties_nc.new_hanover_tax",
     "counties_nc.buncombe_tax",
     "counties_nc.cleveland_tax",
     "counties_nc.henderson_tax",
     "counties_nc.polk_tax",
     "counties_nc.rutherford_tax",
-    "counties_nc.brunswick_tax",
     "counties_nc.nc_rod_substitute_trustee",  # Trustee's-Deed-Upon-Sale = post-sale recordings
     "counties_sc.sc_tax_delinquent",
     # National auction sites — these ARE foreclosure auctions, sold prices

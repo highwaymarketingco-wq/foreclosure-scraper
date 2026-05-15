@@ -71,6 +71,14 @@ def _to_listing(h: dict, slug: str) -> Listing | None:
         price = float(re.match(r"^\d+(\.\d+)?", price_str).group(0)) if price_str else None
     except Exception:
         price = None
+    # Photo: media.heroImage.url.medium (or small fallback)
+    photos: list[str] = []
+    media = h.get("media") or {}
+    hero = (media.get("heroImage") or {}) if isinstance(media, dict) else {}
+    url_obj = hero.get("url") or {}
+    img_url = url_obj.get("medium") or url_obj.get("small") if isinstance(url_obj, dict) else None
+    if isinstance(img_url, str) and img_url.startswith("http"):
+        photos.append(img_url)
     return Listing(
         source=slug,
         source_url=f"https://www.trulia.com{href}" if href.startswith("/") else (href or URL),
@@ -93,6 +101,7 @@ def _to_listing(h: dict, slug: str) -> Listing | None:
             "trulia_id": home_id,
             "is_foreclosure": True,
             "is_recently_sold": status.get("isRecentlySold"),
+            "images": {"real": photos} if photos else {},
         },
     )
 

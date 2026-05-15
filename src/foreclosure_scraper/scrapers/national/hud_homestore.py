@@ -104,6 +104,24 @@ def _to_listing(p: dict, state: str) -> Listing | None:
     lat = _safe_float(p.get("latitude"))
     lng = _safe_float(p.get("longitude"))
 
+    # HUD encodes images two ways:
+    #   propertyThumb = single Cloudinary CDN URL
+    #   galleryImages = quoted-comma-joined filenames; not full URLs but the
+    #                   propertyThumb URL prefix is consistent and can be
+    #                   reused to build the full URLs.
+    photos: list[str] = []
+    thumb = p.get("propertyThumb")
+    if isinstance(thumb, str) and thumb.startswith("http"):
+        photos.append(thumb)
+    gallery = p.get("galleryImages") or ""
+    if isinstance(gallery, str) and gallery and thumb and "/hhs/" in thumb:
+        prefix = thumb.rsplit("/", 1)[0] + "/"
+        for fn in re.findall(r'"([^"]+\.(?:jpg|jpeg|png))"', gallery):
+            full = prefix + fn
+            if full not in photos:
+                photos.append(full)
+        photos = photos[:6]
+
     return Listing(
         source="national.hud_homestore",
         source_url=(
@@ -140,6 +158,7 @@ def _to_listing(p: dict, state: str) -> Listing | None:
             "bathrooms": _safe_float(p.get("bathrooms")),
             "sqft": _safe_int(p.get("squareFootage")),
             "year_built": _safe_int(p.get("yearBuilt")),
+            "images": {"real": photos} if photos else {},
         },
     )
 

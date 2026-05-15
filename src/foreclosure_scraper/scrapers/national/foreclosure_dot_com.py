@@ -56,6 +56,10 @@ def _node_to_listing(node: dict, state: str, slug: str) -> Listing | None:
     url = item.get("url") or ""
     lid_match = LID_RE.search(url)
     listing_id = lid_match.group(1) if lid_match else None
+    img = item.get("image") or ""
+    if isinstance(img, str) and img.startswith("//"):
+        img = "https:" + img
+    photos = [img] if isinstance(img, str) and img.startswith("http") else []
     offered = (item.get("offers") or {}).get("itemOffered") or {}
     addr = offered.get("address") or {}
     region = (addr.get("addressRegion") or "").strip().upper()
@@ -101,6 +105,7 @@ def _node_to_listing(node: dict, state: str, slug: str) -> Listing | None:
             "baths": baths,
             "sqft": sqft,
             "anonymized_address": True,  # street number masked by paywall
+            "images": {"real": photos} if photos else {},
         },
     )
 

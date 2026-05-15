@@ -82,6 +82,8 @@ def _to_listing(item: dict, state: str, slug: str) -> Listing | None:
     lat_lng = item.get("latLong") or {}
     price = item.get("unformattedPrice")
     home_info = (item.get("hdpData") or {}).get("homeInfo") or {}
+    img = item.get("imgSrc") or ""
+    photos = [img] if isinstance(img, str) and img.startswith("http") else []
     return Listing(
         source=slug,
         source_url=item.get("detailUrl") or f"https://www.zillow.com/{state.lower()}/foreclosures/",
@@ -110,6 +112,7 @@ def _to_listing(item: dict, state: str, slug: str) -> Listing | None:
             "beds": item.get("beds"),
             "baths": item.get("baths"),
             "area": item.get("area"),
+            "images": {"real": photos} if photos else {},
         },
     )
 

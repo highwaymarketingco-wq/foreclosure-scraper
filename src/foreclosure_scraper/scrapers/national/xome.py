@@ -96,6 +96,14 @@ def _parse_card(card, slug: str) -> Listing | None:
             except ValueError:
                 price = None
 
+    # Photo: <img class="lazyload" data-src="...">
+    photos: list[str] = []
+    img_node = card.css_first("img.lazyload, img[data-src]")
+    if img_node is not None:
+        src = (img_node.attributes.get("data-src") or img_node.attributes.get("src") or "").strip()
+        if src.startswith("http"):
+            photos.append(src)
+
     # Listing type from bank-type / auction-type chips
     type_chip_text = ""
     for sel in (".bank-type", ".auction-type", ".property-auction-type"):
@@ -125,7 +133,10 @@ def _parse_card(card, slug: str) -> Listing | None:
         description=(type_chip_text or "Xome auction").strip(),
         first_seen=datetime.utcnow(),
         last_seen=datetime.utcnow(),
-        raw={"xome_listing_id": listing_id},
+        raw={
+            "xome_listing_id": listing_id,
+            "images": {"real": photos} if photos else {},
+        },
     )
 
 

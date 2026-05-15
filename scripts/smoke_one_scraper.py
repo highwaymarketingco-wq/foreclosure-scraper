@@ -24,14 +24,13 @@ from foreclosure_scraper.scrapers._registry import all_scrapers
 # Apify-backed scrapers (needs APIFY_TOKEN), Vision/RentCast.
 FREE_SCRAPERS = {
     # In-scope NC tax-foreclosure counties (wake/forsyth/guilford/durham/
-    # mecklenburg dropped 2026-05-14 per scope tightening)
-    "counties_nc.new_hanover_tax",
+    # mecklenburg dropped 2026-05-14; new_hanover dropped 2026-05-15 per
+    # "anything east of Charlotte" scope cut)
     "counties_nc.buncombe_tax",
     "counties_nc.cleveland_tax",
     "counties_nc.henderson_tax",
     "counties_nc.polk_tax",
     "counties_nc.rutherford_tax",
-    "counties_nc.brunswick_tax",
     "counties_nc.nc_rod_substitute_trustee",
     "counties_nc.nc_ecourts_lis_pendens",
     "counties_sc.sc_courtrosters",

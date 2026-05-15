@@ -58,6 +58,15 @@ def _parse_card(card, state: str, slug: str) -> Listing | None:
         return None
     listing_id = m.group(1)
 
+    # Photo: <img class="img-fit" src="...">
+    photos: list[str] = []
+    img_node = card.css_first("img.img-fit, .img-ratio img")
+    if img_node is not None:
+        src = (img_node.attributes.get("src") or "").strip()
+        # VRM uses a placeholder on error — drop that
+        if src.startswith("http") and "featured-listing-house" not in src:
+            photos.append(src)
+
     body = card.css_first(".card-body")
     if body is None:
         body = card
@@ -128,6 +137,7 @@ def _parse_card(card, state: str, slug: str) -> Listing | None:
             "baths": baths,
             "sqft": sqft,
             "list_price": price,
+            "images": {"real": photos} if photos else {},
         },
     )
 

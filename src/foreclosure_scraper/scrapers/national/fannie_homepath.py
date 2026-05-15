@@ -68,6 +68,8 @@ def _to_listing(p: dict, slug: str) -> Listing | None:
         return None
     uuid = p.get("propertyUuid") or p.get("reoId") or p.get("mlsId")
     geo = p.get("geoPoint") or {}
+    img_url = p.get("primHiResImageUrl") or p.get("primaryImageUrl")
+    photos = [img_url] if img_url and isinstance(img_url, str) and img_url.startswith("http") else []
     listing_ms = p.get("listingStartDate")
     first_seen = datetime.utcnow()
     if isinstance(listing_ms, (int, float)) and listing_ms > 0:
@@ -108,6 +110,7 @@ def _to_listing(p: dict, slug: str) -> Listing | None:
             "retail_status": p.get("retailStatus"),
             "online_offer_only": p.get("onlineOfferOnly"),
             "first_look": bool(p.get("firstLookProgramIndicator")),
+            "images": {"real": photos} if photos else {},
         },
     )
 
