@@ -25,9 +25,32 @@ log = structlog.get_logger()
 # downstream — out-of-scope cities like Charlotte/Raleigh/Greenville-SC
 # would just get filtered, so don't bother scraping them at all).
 SEARCH_LOCATIONS = (
+    # In-scope WNC + upstate-SC anchors
     "Asheville, NC",
     "Hickory, NC",
     "Spartanburg, SC",
+    # Coastal cities — only oceanfront-passing listings will survive
+    # _in_scope (OCEANFRONT_COASTAL_COUNTIES override). HomeHarvest's
+    # MLS descriptions usually contain "oceanfront" / "beachfront" terms
+    # when the property qualifies, giving the keyword signal the second
+    # hit it needs alongside geofence.
+    "Wilmington, NC",
+    "Wrightsville Beach, NC",
+    "Carolina Beach, NC",
+    "Oak Island, NC",
+    "Holden Beach, NC",
+    "Topsail Beach, NC",
+    "Atlantic Beach, NC",
+    "Emerald Isle, NC",
+    "Nags Head, NC",
+    "Myrtle Beach, SC",
+    "North Myrtle Beach, SC",
+    "Pawleys Island, SC",
+    "Folly Beach, SC",
+    "Isle of Palms, SC",
+    "Charleston, SC",
+    "Edisto Beach, SC",
+    "Hilton Head Island, SC",
 )
 
 

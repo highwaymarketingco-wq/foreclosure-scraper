@@ -66,12 +66,22 @@ def _to_listing(item: dict, state: str, slug: str) -> Listing | None:
     home_info = (item.get("hdpData") or {}).get("homeInfo") or {}
     img = item.get("imgSrc") or ""
     photos = [img] if isinstance(img, str) and img.startswith("http") else []
+    county = (home_info.get("county") or "").strip() or None
+    if county and county.lower().endswith(" county"):
+        county = county[:-7].strip()
+    if not county:
+        from ..._coastal_city_to_county import coastal_county_for
+        county = coastal_county_for(
+            (item.get("addressCity") or "").strip(),
+            region,
+        )
     return Listing(
         source=slug,
         source_url=item.get("detailUrl") or f"https://www.zillow.com/{state.lower()}/sold/foreclosures/",
         listing_type=ListingType.REO,  # sold comp
         property_kind=_kind(home_info.get("homeType")),
         state=region,
+        county=county,
         city=(item.get("addressCity") or "").strip() or None,
         zip_code=(item.get("addressZipcode") or "").strip() or None,
         street_address=addr_street,

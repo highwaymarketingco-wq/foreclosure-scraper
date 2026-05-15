@@ -3236,6 +3236,298 @@
         },
         "heuristic_targets": 1987
       }
+    },
+    {
+      "kind": "rerun_scrapers",
+      "applied_at": "2026-05-15T18:14:33.832876+00:00",
+      "scraper_slugs": [
+        "city_websites.search",
+        "counties.nod_discovery",
+        "counties_nc.nc_ecourts_lis_pendens",
+        "counties_sc.sc_tax_delinquent",
+        "law_firms.aldridge_pite",
+        "law_firms.korn",
+        "law_firms.mcmichael_taylor_gray",
+        "national.fannie_homepath",
+        "national.foreclosure_dot_com",
+        "national.freddie_homesteps",
+        "national.hubzu",
+        "national.hud_homestore",
+        "national.probate_foreclosure_leads",
+        "national.propwire",
+        "national.realtor_foreclosures",
+        "national.trulia",
+        "national.xome",
+        "national.zillow_bulk",
+        "national.zillow_foreclosures",
+        "reo.vrm_va_reo"
+      ],
+      "raw_per_slug": {
+        "national.fannie_homepath": 666,
+        "national.foreclosure_dot_com": 600,
+        "national.freddie_homesteps": 0,
+        "national.hubzu": 0,
+        "national.hud_homestore": 27,
+        "national.probate_foreclosure_leads": 0,
+        "national.propwire": 0,
+        "national.realtor_foreclosures": 3,
+        "national.trulia": 17,
+        "national.xome": 4,
+        "national.zillow_bulk": 82,
+        "national.zillow_foreclosures": 337,
+        "law_firms.aldridge_pite": 0,
+        "law_firms.korn": 0,
+        "law_firms.mcmichael_taylor_gray": 95,
+        "counties_sc.sc_tax_delinquent": 0,
+        "counties_nc.nc_ecourts_lis_pendens": 322,
+        "counties.nod_discovery": 0,
+        "reo.vrm_va_reo": 148,
+        "city_websites.search": 138
+      },
+      "active_kept": 676,
+      "sold_pool_kept": 0,
+      "promoted_to_sold_via_case_status": 0,
+      "active_added_new": 145,
+      "active_merged_into_existing": 531,
+      "active_final": 2176,
+      "sold_pool_final": 27,
+      "valuation_failures": 0,
+      "enrichment_stats": {
+        "enrich_gis": "ok",
+        "enrich_courts": "ok",
+        "compute_flags": "ok",
+        "geocode": "ok",
+        "location": "ok",
+        "rod": "ok",
+        "address_backfill": "ok",
+        "bk_property": "ok",
+        "parcel_lookup": "ok",
+        "aggressive_address": "ok",
+        "lis_pendens_resolver": {
+          "queried": 0,
+          "address_filled": 0,
+          "ambiguous": 0,
+          "no_match": 0,
+          "retagged_county": 0,
+          "parcel_only": 0
+        },
+        "parcel_reverse_geo": {
+          "queried": 34,
+          "annotated": 34,
+          "no_match": 0
+        },
+        "address_synth": "ok",
+        "county_pin": {
+          "scanned": 676,
+          "case_pinned": 170,
+          "already_correct": 152,
+          "retagged_county": 18,
+          "address_nulled": 6,
+          "no_case_decode": 506
+        },
+        "property_kind": "ok",
+        "judgment_amount": {
+          "scanned": 676,
+          "matched": 0,
+          "already_set": 0,
+          "no_text": 0,
+          "text_no_match": 676,
+          "by_source_matched": {}
+        },
+        "judgment_amount_detail": {
+          "candidates": 0,
+          "fetched": 0,
+          "matched": 0,
+          "skipped_capped": 0,
+          "matched_by_source": {}
+        },
+        "validation": {
+          "county_normalized": 1,
+          "county_nulled_cross_state": 4,
+          "parcel_nulled_too_short": 10,
+          "parcel_nulled_bad_pattern": 0,
+          "opening_bid_zeroed": 0,
+          "opening_bid_too_large": 0,
+          "tax_value_too_low": 0,
+          "tax_value_too_large": 0,
+          "sqft_out_of_range": 0,
+          "year_built_out_of_range": 0,
+          "bedrooms_out_of_range": 0,
+          "bathrooms_out_of_range": 0,
+          "comps_dropped_price": 0,
+          "comps_dropped_kind_mismatch": 0,
+          "validation_exceptions": 0
+        },
+        "data_quality": {
+          "synthetic_address": 138,
+          "approximate_address": 34,
+          "low_arv_confidence": 0,
+          "no_sqft": 611,
+          "no_address": 6,
+          "exceptions": 0
+        },
+        "upset_bid": {
+          "scanned": 676,
+          "tagged_in_window": 0,
+          "tag_cleared_outside_window": 0,
+          "no_sale_date": 410,
+          "non_nc": 259
+        }
+      },
+      "nc_case_status": {
+        "tyler_tagged": 0,
+        "tyler_status": {
+          "outcome": "not_attempted",
+          "reason": "creds_missing"
+        },
+        "heuristic_targets": 2101
+      }
+    },
+    {
+      "kind": "rerun_scrapers",
+      "applied_at": "2026-05-15T18:35:18.815979+00:00",
+      "scraper_slugs": [
+        "city_websites.search",
+        "counties.nod_discovery",
+        "counties_nc.nc_ecourts_lis_pendens",
+        "counties_sc.sc_tax_delinquent",
+        "law_firms.aldridge_pite",
+        "law_firms.korn",
+        "law_firms.mcmichael_taylor_gray",
+        "national.fannie_homepath",
+        "national.foreclosure_dot_com",
+        "national.freddie_homesteps",
+        "national.hubzu",
+        "national.hud_homestore",
+        "national.probate_foreclosure_leads",
+        "national.propwire",
+        "national.realtor_foreclosures",
+        "national.trulia",
+        "national.xome",
+        "national.zillow_bulk",
+        "national.zillow_foreclosures",
+        "reo.vrm_va_reo"
+      ],
+      "raw_per_slug": {
+        "national.fannie_homepath": 690,
+        "national.foreclosure_dot_com": 600,
+        "national.freddie_homesteps": 0,
+        "national.hubzu": 0,
+        "national.hud_homestore": 27,
+        "national.probate_foreclosure_leads": 0,
+        "national.propwire": 0,
+        "national.realtor_foreclosures": 16,
+        "national.trulia": 17,
+        "national.xome": 2,
+        "national.zillow_bulk": 83,
+        "national.zillow_foreclosures": 337,
+        "law_firms.aldridge_pite": 0,
+        "law_firms.korn": 0,
+        "law_firms.mcmichael_taylor_gray": 95,
+        "counties_sc.sc_tax_delinquent": 0,
+        "counties_nc.nc_ecourts_lis_pendens": 323,
+        "counties.nod_discovery": 0,
+        "reo.vrm_va_reo": 148,
+        "city_websites.search": 138
+      },
+      "active_kept": 665,
+      "sold_pool_kept": 0,
+      "promoted_to_sold_via_case_status": 0,
+      "active_added_new": 121,
+      "active_merged_into_existing": 544,
+      "active_final": 2267,
+      "sold_pool_final": 27,
+      "valuation_failures": 0,
+      "enrichment_stats": {
+        "enrich_gis": "ok",
+        "enrich_courts": "ok",
+        "compute_flags": "ok",
+        "geocode": "ok",
+        "location": "ok",
+        "rod": "ok",
+        "address_backfill": "ok",
+        "bk_property": "ok",
+        "parcel_lookup": "ok",
+        "aggressive_address": "ok",
+        "lis_pendens_resolver": {
+          "queried": 0,
+          "address_filled": 0,
+          "ambiguous": 0,
+          "no_match": 0,
+          "retagged_county": 0,
+          "parcel_only": 0
+        },
+        "parcel_reverse_geo": {
+          "queried": 34,
+          "annotated": 34,
+          "no_match": 0
+        },
+        "address_synth": "ok",
+        "county_pin": {
+          "scanned": 665,
+          "case_pinned": 171,
+          "already_correct": 153,
+          "retagged_county": 18,
+          "address_nulled": 6,
+          "no_case_decode": 494
+        },
+        "property_kind": "ok",
+        "judgment_amount": {
+          "scanned": 665,
+          "matched": 0,
+          "already_set": 0,
+          "no_text": 0,
+          "text_no_match": 665,
+          "by_source_matched": {}
+        },
+        "judgment_amount_detail": {
+          "candidates": 0,
+          "fetched": 0,
+          "matched": 0,
+          "skipped_capped": 0,
+          "matched_by_source": {}
+        },
+        "validation": {
+          "county_normalized": 0,
+          "county_nulled_cross_state": 5,
+          "parcel_nulled_too_short": 18,
+          "parcel_nulled_bad_pattern": 0,
+          "opening_bid_zeroed": 0,
+          "opening_bid_too_large": 0,
+          "tax_value_too_low": 1,
+          "tax_value_too_large": 0,
+          "sqft_out_of_range": 0,
+          "year_built_out_of_range": 0,
+          "bedrooms_out_of_range": 0,
+          "bathrooms_out_of_range": 0,
+          "comps_dropped_price": 0,
+          "comps_dropped_kind_mismatch": 0,
+          "validation_exceptions": 0
+        },
+        "data_quality": {
+          "synthetic_address": 140,
+          "approximate_address": 34,
+          "low_arv_confidence": 0,
+          "no_sqft": 601,
+          "no_address": 6,
+          "exceptions": 0
+        },
+        "upset_bid": {
+          "scanned": 665,
+          "tagged_in_window": 0,
+          "tag_cleared_outside_window": 0,
+          "no_sale_date": 402,
+          "non_nc": 256
+        }
+      },
+      "nc_case_status": {
+        "tyler_tagged": 0,
+        "tyler_status": {
+          "outcome": "not_attempted",
+          "reason": "creds_missing"
+        },
+        "heuristic_targets": 2192
+      }
     }
   ]
 }

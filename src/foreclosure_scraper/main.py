@@ -17,6 +17,7 @@ from .config import (
     SCOPE_ZIP_PREFIXES,
     in_scope,
 )
+from .oceanfront import is_oceanfront
 from .dedupe import dedupe
 from .email_sender import send_digest
 from .enrichment import enrich
@@ -55,7 +56,47 @@ def _setup_logging() -> None:
 log = structlog.get_logger()
 
 
+# NC + SC ocean-facing counties. Listings in these counties are denied by
+# default (they're east of Charlotte / outside the upstate footprint), but
+# get re-admitted through the OCEANFRONT_OVERRIDE in _in_scope when the
+# listing's data passes the 2-of-3 oceanfront signal check.
+OCEANFRONT_COASTAL_COUNTIES: frozenset[tuple[str, str]] = frozenset({
+    ("Currituck", "NC"), ("Dare", "NC"), ("Hyde", "NC"), ("Carteret", "NC"),
+    ("Onslow", "NC"), ("Pender", "NC"), ("New Hanover", "NC"), ("Brunswick", "NC"),
+    ("Horry", "SC"), ("Georgetown", "SC"), ("Charleston", "SC"),
+    ("Beaufort", "SC"), ("Colleton", "SC"),
+})
+
+
+def _check_oceanfront(li: Listing) -> bool:
+    """Run is_oceanfront against the listing's data and, on a pass, tag
+    raw.oceanfront=True with the contributing signals for transparency."""
+    ok, signals = is_oceanfront(
+        description=li.description,
+        street_address=li.street_address,
+        city=li.city,
+        latitude=li.latitude,
+        longitude=li.longitude,
+    )
+    if ok:
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["oceanfront"] = True
+        li.raw["oceanfront_signals"] = signals
+    return ok
+
+
 def _in_scope(li: Listing) -> bool:
+    # Oceanfront override — runs BEFORE the deny check so the otherwise-
+    # denied coastal counties (New Hanover/Brunswick/Onslow + the SC
+    # coast) can re-enter when a listing passes the strict 2-of-3
+    # oceanfront filter. Listings keep tag raw.oceanfront=True so the
+    # dashboard can sort/filter them.
+    if li.county and li.state:
+        cs = (li.county.replace(" County", "").strip().title(),
+              li.state.upper())
+        if cs in OCEANFRONT_COASTAL_COUNTIES and _check_oceanfront(li):
+            return True
     # Deny set takes precedence over EVERY other scope path. Without this,
     # a listing tagged with a denied county still gets through via the zip-
     # prefix fallback (288/287/296 cover Haywood NC, Mecklenburg NC,
