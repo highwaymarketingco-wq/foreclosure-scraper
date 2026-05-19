@@ -342,11 +342,24 @@ def run_site(preset: SitePreset, binary: str, work_root: Path) -> list[Path]:
     print(f"│  config:  {'(none)' if not config.exists() else config}")
     print(f"│  out:     {out_dir}")
     print(f"└── running: {' '.join(cmd)}")
+    # Per-site timeout. Some sitemaps (classiccars, carsforsale) have
+    # hundreds of sub-sitemaps and SF doesn't honor --max-urls on
+    # --crawl-sitemap, so a single bad site can hang the whole crawl
+    # for hours. 10 minutes is generous for any reasonable source —
+    # api-mode presets short-circuit before this code path anyway.
+    SF_TIMEOUT_S = 600
     try:
-        result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+        result = subprocess.run(
+            cmd, check=False, capture_output=True, text=True,
+            timeout=SF_TIMEOUT_S,
+        )
     except FileNotFoundError as exc:
         print(f"  ✗ SF binary not executable: {exc}")
         return []
+    except subprocess.TimeoutExpired:
+        print(f"  ⚠ SF crawl for {preset.slug} exceeded {SF_TIMEOUT_S}s — killed.")
+        print(f"  → skipping {preset.slug}; continuing with remaining sources.")
+        return _find_csvs(out_dir)
     # Always echo SF's output so the CI log shows what it actually did.
     if result.stdout:
         print(result.stdout)
