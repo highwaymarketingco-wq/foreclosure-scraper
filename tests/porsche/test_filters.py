@@ -59,7 +59,11 @@ def test_keeps_below_price_cap():
 
 
 def test_drops_over_price_cap_with_clean_title():
-    assert not matches(_l(price_usd=46_000, title_status=TitleStatus.CLEAN))
+    # Cap raised 2026-05-13 to $200k; a clean-title car must exceed THAT
+    # to be dropped. $46k clean is now kept (it was dropped under the old
+    # $45k cap).
+    assert matches(_l(price_usd=46_000, title_status=TitleStatus.CLEAN))
+    assert not matches(_l(price_usd=210_000, title_status=TitleStatus.CLEAN))
 
 
 def test_keeps_over_price_cap_when_salvage():
@@ -88,8 +92,10 @@ def test_drops_panamera_by_title():
     assert not matches(_l(title="2018 Porsche Panamera 4S", model="Panamera"))
 
 
-def test_drops_cayenne_by_model():
-    assert not matches(_l(model="Cayenne", title="2017 Porsche SUV"))
+def test_keeps_cayenne_now_included():
+    # Cayenne exclusion was dropped 2026-05-13 (commit 1e9e158) — Cayenne +
+    # Taycan are now in scope. Only Panamera + Macan remain excluded.
+    assert matches(_l(model="Cayenne", title="2017 Porsche Cayenne"))
 
 
 def test_drops_macan():

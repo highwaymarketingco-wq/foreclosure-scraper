@@ -164,20 +164,47 @@ def test_parse_case_detail_returns_none_for_no_status():
 # ---- dispatch behavior ----
 
 @pytest.mark.asyncio
-async def test_dispatch_no_creds_returns_zero(monkeypatch):
-    """When NC_ECOURTS_USERNAME/PASSWORD are missing, function should
-    log + return 0 without attempting browser launch."""
+async def test_dispatch_empty_list_returns_no_targets(monkeypatch):
+    """Empty input → return 0, outcome 'no_targets' (nothing to enrich)."""
     monkeypatch.delenv("NC_ECOURTS_SKIP", raising=False)
-    monkeypatch.delenv("NC_ECOURTS_USERNAME", raising=False)
-    monkeypatch.delenv("NC_ECOURTS_PASSWORD", raising=False)
     from foreclosure_scraper.enrichment_nc_case_status_tyler import (
         get_last_run_status,
     )
     out = await enrich_with_nc_case_status_authenticated([])
     assert out == 0
-    status = get_last_run_status()
-    assert status["outcome"] == "skipped"
-    assert "no_credentials_in_env" in (status["reason"] or "")
+    assert get_last_run_status()["outcome"] == "no_targets"
+
+
+@pytest.mark.asyncio
+async def test_dispatch_no_creds_when_anonymous_disabled(monkeypatch):
+    """With anonymous search disabled AND no credentials, a real NC target
+    must skip cleanly (return 0, outcome 'skipped') rather than attempt a
+    browser launch it can't authenticate. (Default mode is anonymous, which
+    needs no creds — this exercises the explicit credentialed path.)"""
+    monkeypatch.delenv("NC_ECOURTS_SKIP", raising=False)
+    monkeypatch.delenv("NC_ECOURTS_USERNAME", raising=False)
+    monkeypatch.delenv("NC_ECOURTS_PASSWORD", raising=False)
+    monkeypatch.setenv("NC_ECOURTS_USE_ANONYMOUS", "0")
+    from datetime import datetime
+    from foreclosure_scraper.enrichment_nc_case_status_tyler import (
+        get_last_run_status,
+    )
+    from foreclosure_scraper.models import Listing, ListingType, PropertyKind
+
+    target = Listing(
+        source="counties_nc.nc_ecourts_lis_pendens",
+        source_url="https://example.com/x",
+        listing_type=ListingType.LIS_PENDENS,
+        property_kind=PropertyKind.UNKNOWN,
+        state="NC",
+        county="Buncombe",
+        case_number="26CV000123-110",
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+    )
+    out = await enrich_with_nc_case_status_authenticated([target])
+    assert out == 0
+    assert get_last_run_status()["outcome"] == "skipped"
 
 
 @pytest.mark.asyncio

@@ -59,14 +59,14 @@ APP_BASE = "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/"
 #   2026-05-07a — pruned 11 eastern-NC counties (Wake/Forsyth/etc).
 #   2026-05-07b — pruned 3 more (Mecklenburg/Madison/Yancey) per user
 #     scope rollback. Mecklenburg = Charlotte; user out of that market.
-TARGET_COUNTIES = [
-    # WNC mountains + foothills
-    "Rutherford", "Cleveland", "Henderson", "Polk", "Gaston",
-    "Buncombe", "Transylvania", "McDowell", "Lincoln",
-    "Mitchell", "Burke",
-    # User-key coastal NC counties
-    "New Hanover", "Brunswick", "Onslow",
-]
+# Derived from config.NC_COUNTIES so it can never silently drift out of
+# scope: querying a county that isn't in scope just wastes Tyler requests +
+# case-detail enrichment on listings that _in_scope drops. (New Hanover /
+# Brunswick / Onslow were pruned 2026-05-15 — they fall out automatically
+# now that this list is config-driven.)
+from ...config import NC_COUNTIES as _NC_COUNTIES
+
+TARGET_COUNTIES = [c.name for c in _NC_COUNTIES]
 
 
 # NC Upset Bid window: NCGS §45-21.27 gives 10 days from filing of the
