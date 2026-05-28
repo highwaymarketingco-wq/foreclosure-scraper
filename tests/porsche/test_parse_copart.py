@@ -11,11 +11,12 @@ from porsche_scraper.scrapers.copart import parse_solr_response
 FIXTURE = Path(__file__).parent / "fixtures" / "copart.json"
 
 
-def test_excludes_cayenne_at_parse_time():
+def test_includes_cayenne_at_parse_time():
+    # Cayenne exclusion was dropped 2026-05-13 (commit 1e9e158). The parser
+    # no longer filters it out — Cayenne is a valid in-scope model now.
     listings = parse_solr_response(json.loads(FIXTURE.read_text()))
     models = {l.model for l in listings}
-    assert "CAYENNE" not in models
-    # Other excluded models we left out of the fixture but verifying defense-in-depth.
+    assert "CAYENNE" in models
 
 
 def test_parses_run_and_drive_flag():

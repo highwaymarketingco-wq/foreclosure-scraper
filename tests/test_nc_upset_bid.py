@@ -47,20 +47,22 @@ def test_upset_bid_window_constant():
 
 
 def test_target_counties_match_user_territory():
-    """2026-05-07 scope: WNC mountains/foothills + the user's coastal-NC
-    keys (New Hanover, Brunswick, Onslow). Eastern-NC expansion AND
-    Charlotte (Mecklenburg) + Madison + Yancey were pruned because the
-    user doesn't invest there."""
+    """Current scope: WNC mountains/foothills only. Eastern-NC + Charlotte
+    (Mecklenburg) + Madison/Yancey were pruned 2026-05-07, and the coastal
+    trio (New Hanover/Brunswick/Onslow) was pruned 2026-05-15 ("anything
+    east of Charlotte"). TARGET_COUNTIES is now derived from
+    config.NC_COUNTIES so it tracks scope automatically."""
     # User-key NC counties in scope:
     for c in ("Buncombe", "Henderson", "Gaston", "Cleveland",
-              "Rutherford", "Polk", "Transylvania",
-              "New Hanover", "Brunswick", "Onslow"):
+              "Rutherford", "Polk", "Transylvania", "McDowell",
+              "Lincoln", "Mitchell", "Burke"):
         assert c in TARGET_COUNTIES, f"{c} missing from TARGET_COUNTIES"
     # Counties dropped from scope:
     for c in ("Wake", "Forsyth", "Guilford", "Durham", "Cumberland",
-              "Mecklenburg", "Madison", "Yancey"):
+              "Mecklenburg", "Madison", "Yancey",
+              "New Hanover", "Brunswick", "Onslow"):
         assert c not in TARGET_COUNTIES, (
-            f"{c} should have been removed from TARGET_COUNTIES on 2026-05-07"
+            f"{c} should have been removed from TARGET_COUNTIES"
         )
 
 

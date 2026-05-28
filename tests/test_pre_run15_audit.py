@@ -17,20 +17,17 @@ from foreclosure_scraper.scrapers.counties_nc.nc_ecourts_lis_pendens import (
 )
 
 
-# Sources added in the May 2026 expansion. All emit listings that
-# typically lack sale_date — must be in DATELESS_OK_SOURCES.
+# Sources added in the May 2026 expansion that are STILL in scope. All emit
+# listings that typically lack sale_date — must be in DATELESS_OK_SOURCES.
+# (Out-of-scope county tax scrapers — Wake/Forsyth/Guilford/Durham/New
+# Hanover — and city_websites.charlotte_demolition were deleted when their
+# counties left scope, so they're no longer asserted here.)
 NEW_SOURCES_2026_05 = {
     "counties_sc.sc_courtrosters",
-    "counties_nc.wake_tax",
-    "counties_nc.forsyth_tax",
-    "counties_nc.guilford_tax",
-    "counties_nc.new_hanover_tax",
-    "counties_nc.durham_tax",
     "counties_nc.nc_rod_substitute_trustee",
     "reo.usda_rd",
     "reo.treasury_seized",
     "reo.vrm_va_reo",
-    "city_websites.charlotte_demolition",
     "national.courtlistener_civil",
     "national.courtlistener_adversary",
 }
@@ -58,11 +55,12 @@ def test_nc_ecourts_targets_all_in_scope():
 
 def test_in_scope_works_for_kept_counties():
     """Spot-check the NC counties currently in the user's target territory.
-    The 2026-05-07 scope rollbacks (a + b) removed eastern NC + Charlotte
-    + Madison/Yancey. WNC core + coastal NC keys remain."""
+    Scope rollbacks removed eastern NC + Charlotte + Madison/Yancey
+    (2026-05-07) and the coastal trio New Hanover/Brunswick/Onslow
+    (2026-05-15, "anything east of Charlotte"). WNC core remains."""
     for county in ("Henderson", "Buncombe", "Gaston", "Cleveland", "Rutherford",
                    "Polk", "Transylvania", "Burke", "McDowell", "Lincoln",
-                   "New Hanover", "Brunswick", "Onslow"):
+                   "Mitchell"):
         assert in_scope(county, "NC"), f"NC county {county} should be in scope"
 
 
@@ -79,6 +77,12 @@ def test_dropped_counties_no_longer_in_scope():
         )
     # 2026-05-07b — Charlotte + adjacent WNC pruning
     for county in ("Mecklenburg", "Madison", "Yancey", "Haywood"):
+        assert not in_scope(county, "NC"), (
+            f"NC county {county} was dropped from scope but in_scope still "
+            f"returns True"
+        )
+    # 2026-05-15 — coastal trio pruned ("anything east of Charlotte")
+    for county in ("New Hanover", "Brunswick", "Onslow"):
         assert not in_scope(county, "NC"), (
             f"NC county {county} was dropped from scope but in_scope still "
             f"returns True"

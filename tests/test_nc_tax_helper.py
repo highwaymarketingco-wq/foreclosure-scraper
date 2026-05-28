@@ -1,8 +1,10 @@
 """Tests for the shared NC tax-foreclosure helper.
 
-Each per-county scraper (Wake/Forsyth/Guilford/New Hanover/Durham) is
-a thin wrapper around fetch_county_tax_listings. These tests pin the
-parser logic against fixture HTML.
+The per-county tax scrapers that used to wrap fetch_county_tax_listings
+(Wake/Forsyth/Guilford/New Hanover/Durham) were removed when their
+counties fell out of scope. The helper itself is retained (it's the
+generic NC county tax parser, also covered by test_nc_tax_parser_fallback)
+so these tests pin the standalone parsing functions against fixture HTML.
 """
 from __future__ import annotations
 
@@ -14,11 +16,6 @@ from foreclosure_scraper.scrapers.counties_nc._nc_tax_helper import (
     _parse_sale_date,
     fetch_county_tax_listings,
 )
-from foreclosure_scraper.scrapers.counties_nc.wake_tax import WakeTaxForeclosure
-from foreclosure_scraper.scrapers.counties_nc.forsyth_tax import ForsythTaxForeclosure
-from foreclosure_scraper.scrapers.counties_nc.guilford_tax import GuilfordTaxForeclosure
-from foreclosure_scraper.scrapers.counties_nc.new_hanover_tax import NewHanoverTaxForeclosure
-from foreclosure_scraper.scrapers.counties_nc.durham_tax import DurhamTaxForeclosure
 
 
 # ---- _parse_money -----------------------------------------------------------
@@ -138,20 +135,3 @@ def test_returns_empty_on_short_html():
             slug="x", county="x", url="http://example.com",
         ))
     assert listings == []
-
-
-# ---- per-county scraper class metadata --------------------------------------
-
-def test_each_county_scraper_has_correct_county_and_slug():
-    cases = [
-        (WakeTaxForeclosure, "counties_nc.wake_tax", "Wake"),
-        (ForsythTaxForeclosure, "counties_nc.forsyth_tax", "Forsyth"),
-        (GuilfordTaxForeclosure, "counties_nc.guilford_tax", "Guilford"),
-        (NewHanoverTaxForeclosure, "counties_nc.new_hanover_tax", "New Hanover"),
-        (DurhamTaxForeclosure, "counties_nc.durham_tax", "Durham"),
-    ]
-    for cls, expected_slug, expected_county in cases:
-        s = cls()
-        assert s.slug == expected_slug, f"{cls.__name__} slug wrong"
-        assert expected_county.lower() in s.name.lower()
-        assert s.expected_min_count == 0  # Annual cadence; many runs see 0

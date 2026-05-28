@@ -14,14 +14,15 @@ from porsche_scraper.scrapers.cars_and_bids import parse_search_html
 FIXTURE = Path(__file__).parent / "fixtures" / "cars_and_bids.html"
 
 
-def test_parses_two_kept_auction_cards():
-    """Cayenne is dropped at parse-time by the excluded-model guard."""
+def test_parses_all_three_auction_cards():
+    """All three cards parse. Cayenne is no longer dropped at parse time
+    (model exclusion lifted 2026-05-13, commit 1e9e158)."""
     listings = parse_search_html(FIXTURE.read_text())
-    assert len(listings) == 2
+    assert len(listings) == 3
     slugs = {l.source_url for l in listings}
     assert any("2014-porsche-boxster-base" in s for s in slugs)
     assert any("2018-porsche-911-rebuilt" in s for s in slugs)
-    assert not any("cayenne" in s.lower() for s in slugs)
+    assert any("cayenne" in s.lower() for s in slugs)
 
 
 def test_title_status_inference():
@@ -47,10 +48,10 @@ def test_extracts_bid_and_mileage():
     assert boxster.mileage == 58000
 
 
-def test_filter_drops_cayenne_keeps_rebuilt_911_at_high_price():
+def test_filter_keeps_cayenne_and_rebuilt_911_at_high_price():
     crit = FilterCriteria(min_year=2014, max_year=2026, max_price_usd=45_000)
     kept = filter_listings(parse_search_html(FIXTURE.read_text()), crit)
     kept_titles = {l.title for l in kept}
-    assert not any("Cayenne" in t for t in kept_titles)
-    assert any("Boxster" in t for t in kept_titles)  # Under price cap.
-    assert any("911" in t for t in kept_titles)  # Above cap but rebuilt-title exception.
+    assert any("Boxster" in t for t in kept_titles)   # $22.5k clean — under cap.
+    assert any("Cayenne" in t for t in kept_titles)   # $25k clean — under cap, now in-scope.
+    assert any("911" in t for t in kept_titles)       # $55k but rebuilt-title exception.
