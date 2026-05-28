@@ -1,0 +1,39 @@
+name: Tests
+
+# Runs the pytest suite on every PR and on pushes to main. This gate exists
+# because a broken/red suite previously went unnoticed for weeks (no workflow
+# ran the tests), which let real regressions and stale tests pile up. Keep it
+# green.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Pin Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen || uv sync
+
+      - name: Run test suite
+        # Pure unit/parser tests — no network, no secrets. The scrapers
+        # themselves are exercised by the weekly/patch workflows, not here.
+        run: uv run pytest -q --no-header
