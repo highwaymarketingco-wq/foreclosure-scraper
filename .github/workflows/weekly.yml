@@ -20,11 +20,11 @@ permissions:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    # 90-min timeout was hitting the wall at 1h 30m — the May 2026 expansion
-    # (27 NC counties, 13 new scrapers, RECAP fetches, full Vision pool)
-    # pushed the run past the prior ~60-min baseline. 240 min gives plenty
-    # of headroom and matches GitHub-hosted-runner free-tier limits.
-    timeout-minutes: 240
+    # No job-level timeout — let it run as long as it needs. GitHub-hosted
+    # runners cap at 6h for public repos (free tier) which is the only hard
+    # ceiling. Prior 240-min cap was cancelling otherwise-healthy runs as
+    # the scraper set grew (2026-05-19 hit it at 4h on the tier2 additions).
+    timeout-minutes: 360
     env:
       SHEET_ID: ${{ secrets.SHEET_ID }}
       GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
