@@ -199,7 +199,14 @@ jobs:
             --base main \
             --head "${{ steps.open_pr.outputs.branch }}" \
             --title "porsche: refresh dashboard from SF crawl" \
-            --body "Automated refresh from .github/workflows/porsche-refresh.yml. Merge to publish the updated dashboard at https://highwaymarketingco-wq.github.io/foreclosure-scraper/porsche.html"
+            --body "Automated refresh from .github/workflows/porsche-refresh.yml. Auto-merges once checks pass. Dashboard publishes at https://highwaymarketingco-wq.github.io/foreclosure-scraper/porsche.html"
+          # Auto-merge so the daily refresh doesn't pile up open PRs
+          # nobody clicks. If branch protection rejects the merge, the
+          # PR stays open and a human can review — failure here doesn't
+          # break the cron run.
+          gh pr merge "${{ steps.open_pr.outputs.branch }}" \
+            --auto --squash --delete-branch || \
+            echo "::warning::auto-merge enable failed; PR left open for manual review"
 
       - name: Upload SF logs (debug)
         if: always()

@@ -47,7 +47,7 @@ from porsche_scraper.models import (
     parse_price,
     parse_year,
 )
-from porsche_scraper.pipeline import dedupe
+from porsche_scraper.pipeline import dedupe, purge_stale
 
 
 # Column aliases — left side is what we want, right side is anything SF
@@ -287,12 +287,19 @@ def main(argv: list[str] | None = None) -> int:
                         "(they were already filtered when they got in). Use "
                         "this on partial-refresh runs so unrefreshed sources "
                         "don't shrink when their entries naturally age out.")
+    p.add_argument("--stale-after-days", type=int, default=10,
+                   help="Drop rows whose last_seen is older than this many "
+                        "days (default 10). Set to 0 to disable the purge.")
     args = p.parse_args(argv)
 
+    now = datetime.now(timezone.utc)
     fresh: list[Listing] = []
     for path in args.csv:
         n = 0
         for listing in load_csv(path):
+            # Mark every fresh observation. Dedupe will carry the
+            # newer last_seen forward when merging with the base list.
+            listing.last_seen = now
             fresh.append(listing)
             n += 1
         print(f"  loaded {n:>5} rows from {path}")
@@ -315,6 +322,12 @@ def main(argv: list[str] | None = None) -> int:
         combined = fresh + base
         deduped = dedupe(combined)
         filtered = filter_listings(deduped, criteria)
+
+    pre_purge = len(filtered)
+    if args.stale_after_days > 0:
+        filtered = purge_stale(
+            filtered, max_age_days=args.stale_after_days, now=now
+        )
     filtered.sort(key=lambda l: (l.effective_price is None, l.effective_price or 9e9))
 
     from porsche_scraper.output import write_json, write_csv
@@ -325,7 +338,12 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  fresh from SF:    {len(fresh)}")
     print(f"  pre-existing:     {len(base)}")
     print(f"  after dedupe:     {len(deduped)}")
-    print(f"  after filter:     {len(filtered)}")
+    if args.stale_after_days > 0:
+        print(f"  after filter:     {pre_purge}")
+        print(f"  after staleness:  {len(filtered)}  "
+              f"(dropped {pre_purge - len(filtered)} > {args.stale_after_days}d)")
+    else:
+        print(f"  after filter:     {len(filtered)}")
     print(f"  wrote:            {args.out} + {args.csv_out}")
 
     by_source: dict[str, int] = {}
