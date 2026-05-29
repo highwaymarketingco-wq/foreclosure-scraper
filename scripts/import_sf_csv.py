@@ -353,6 +353,29 @@ def main(argv: list[str] | None = None) -> int:
     print("  by source:")
     for s, c in sorted(by_source.items(), key=lambda kv: -kv[1]):
         print(f"    {s:30s} {c}")
+
+    # Per-source freshness: how many rows did each source produce on
+    # THIS run? If a source's fresh-count is 0 for several consecutive
+    # runs while its dashboard count stays put, it's silently dead
+    # (returning nothing but inflating the dashboard with old rows
+    # carried forward by the merge). This printed under STALENESS so
+    # cron logs surface regressions without manual diagnosis.
+    fresh_by_source: dict[str, int] = {}
+    for l in fresh:
+        fresh_by_source[l.source] = fresh_by_source.get(l.source, 0) + 1
+    print()
+    print("  STALENESS WATCH — fresh rows from this run, by source:")
+    # Always print the section, even when fresh_by_source is empty —
+    # an all-zero run is the loudest possible signal of a regression
+    # (whole pipeline produced nothing) and must not be silenced.
+    all_sources = sorted(set(by_source) | set(fresh_by_source))
+    if not all_sources:
+        print("    (no sources in dashboard; nothing to compare against)")
+    for s in all_sources:
+        fresh_n = fresh_by_source.get(s, 0)
+        total_n = by_source.get(s, 0)
+        marker = " ⚠ NONE" if fresh_n == 0 else ""
+        print(f"    {s:30s} fresh={fresh_n:4d}  total={total_n:4d}{marker}")
     return 0
 
 

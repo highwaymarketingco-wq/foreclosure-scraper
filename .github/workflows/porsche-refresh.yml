@@ -168,7 +168,28 @@ jobs:
           fi
           # SF needs a display server even in headless mode for some
           # rendering plugins; Xvfb provides a virtual one for free.
-          xvfb-run -a -- uv run python scripts/sf_crawl.py "${ARGS[@]}"
+          # Tee to a file so the freshness watch can be surfaced as
+          # the GH Actions step summary (top of the run page).
+          xvfb-run -a -- uv run python scripts/sf_crawl.py "${ARGS[@]}" \
+            2>&1 | tee /tmp/sf_crawl_output.log
+
+      - name: Surface staleness watch to step summary
+        if: always()
+        run: |
+          # Pull the importer's STALENESS WATCH section and put it at
+          # the top of the run page so silent source-regressions are
+          # impossible to miss when scanning the cron history.
+          {
+            echo "## Porsche refresh — staleness watch"
+            echo ""
+            echo '```'
+            awk '/STALENESS WATCH/,/^$/' /tmp/sf_crawl_output.log || true
+            echo '```'
+            echo ""
+            echo "Any source marked \`⚠ NONE\` returned zero fresh rows on this run."
+            echo "If the same source shows ⚠ NONE for 3+ consecutive runs, the"
+            echo "scraper is silently broken (its dashboard rows are stale carry-over)."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Open a PR with the refreshed dashboard
         id: open_pr
