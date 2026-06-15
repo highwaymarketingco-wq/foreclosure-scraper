@@ -46,25 +46,38 @@ SC_LAYER: dict[str, int] = {
 # ---- NC: direct ArcGIS REST per county ------------------------------------------
 
 NC_GIS: dict[str, dict[str, Any]] = {
+    # Audited 2026-06-15 against live FeatureServer schemas. Each addr_field
+    # was verified against a real parcel from docs/listings.json. Tests in
+    # tests/test_nc_gis_addr_fields.py guard against future drift.
+    #
+    # When a county's FeatureServer exposes only parcel geometry with no
+    # situs/property-address field, set addr_field=None — the resolver
+    # skips writing a street address (parcel_id + centroid still useful).
     "Mecklenburg": {
         "url": "https://meckgis.mecklenburgcountync.gov/server/rest/services/TaxParcel_Camaownershipvalues/FeatureServer/0/query",
-        "addr_field": "txt_propaddr",
+        "addr_field": "situsaddress1",
     },
     "Buncombe": {
         "url": "https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query",
-        "addr_field": "streetname",
+        "addr_field": "Address",
     },
     "Henderson": {
         "url": "https://gisweb.hendersoncountync.gov/arcgis/rest/services/Parcels/FeatureServer/0/query",
-        "addr_field": "PHYADDR",
+        "addr_field": "LOCATION_ADDR",
     },
     "Rutherford": {
+        # MapServer/6 exposes only parcel geometry + MBL/PIN/REID, no address.
+        # Real situs lives at the tax-assessor (a separate, JS-rendered site).
+        # TODO: find a Rutherford FeatureServer that exposes situs, or pair
+        # with countywide centerline geocode by MBL.
         "url": "https://gis.rutherfordcountync.gov/server/rest/services/MapMetricsServiceRutherford/MapServer/6/query",
-        "addr_field": "MBL",
+        "addr_field": None,
     },
     "Cleveland": {
+        # GIS_PID/GIS_PIN only; no address field on this layer.
+        # TODO: locate a Cleveland County situs feature service.
         "url": "https://gis.clevelandcounty.com/arcgis/rest/services/Tax/Tax/MapServer/1/query",
-        "addr_field": "PIN",
+        "addr_field": None,
     },
     "Polk": {
         "url": "https://services1.arcgis.com/23uf7jKvz6SRPFWJ/arcgis/rest/services/TaxParcels/FeatureServer/0/query",
@@ -72,11 +85,12 @@ NC_GIS: dict[str, dict[str, Any]] = {
     },
     "Gaston": {
         "url": "https://cogserver.gastonianc.gov/serverweb/rest/services/Parcels/GastonCountyParcels/MapServer/0/query",
-        "addr_field": "PROPADDR",
+        "addr_field": "PHYSSTRADD",
     },
     "Transylvania": {
+        # ADDRESS_1 stores the owner's name, ADDRESS_3 stores the situs.
         "url": "https://gis.transylvaniacounty.org/server/rest/services/Parcels/MapServer/2/query",
-        "addr_field": "ADDRESS_1",
+        "addr_field": "ADDRESS_3",
     },
     "McDowell": {
         "url": "https://services9.arcgis.com/ETP7IuCigkUz7iI9/arcgis/rest/services/McDowell_Parcels/FeatureServer/0/query",
@@ -84,13 +98,18 @@ NC_GIS: dict[str, dict[str, Any]] = {
     },
     "Lincoln": {
         "url": "https://arcgisserver.lincolncountync.gov/arcgis/rest/services/Server_TaxParcelViewerSP/MapServer/0/query",
-        "addr_field": "PROPADDR",
+        "addr_field": "PHYSICALADDR",
     },
     "Madison": {
         "url": "https://services1.arcgis.com/SIYkiqjmENweC50g/arcgis/rest/services/Parcels_NC/FeatureServer/0/query",
         "addr_field": "ADDR",
     },
     "Mitchell": {
+        # LocAddr returns street name only (no house #). MailAddr is owner
+        # mailing, often the situs for owner-occupied but not always. The
+        # resolver should prefer LocAddr + house-number from any neighbor
+        # field if present; leaving LocAddr here so behaviour is unchanged
+        # for now and the resolver can keep enriching from there.
         "url": "https://mapping.mitchellcountync.gov/arcgis/rest/services/WebMapNew/MapServer/12/query",
         "addr_field": "LocAddr",
     },
@@ -98,6 +117,9 @@ NC_GIS: dict[str, dict[str, Any]] = {
         "url": "https://services3.arcgis.com/axQ4OCSpcxALIQsV/arcgis/rest/services/Tax_Parcels/FeatureServer/0/query",
         "addr_field": "LOCATION_ADDR",
     },
+    # Yancey: no public FeatureServer with parcel layer found as of 2026-06-15.
+    # Yancey GIS is hosted at gis.yanceycountync.gov but exposes only static
+    # map tiles. Skip until a queryable endpoint becomes available.
 }
 
 
