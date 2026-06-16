@@ -30,15 +30,15 @@ from selectolax.parser import HTMLParser
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
 
-# county-url-slug -> display name
+# county-url-slug -> display name.
+# Only in-scope upstate counties. Greenwood/Abbeville/Newberry are in the
+# SCOPE_DENY_COUNTIES list (pruned per owner direction), so they're omitted
+# here — no point spinning a stealth browser for data that gets filtered out.
 COUNTIES: dict[str, str] = {
     "oconee": "Oconee",
     "cherokee": "Cherokee",
     "laurens": "Laurens",
     "union": "Union",
-    "greenwood": "Greenwood",
-    "abbeville": "Abbeville",
-    "newberry": "Newberry",
 }
 
 HOST = "https://publicindex.sccourts.org"

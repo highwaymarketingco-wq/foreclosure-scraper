@@ -70,11 +70,10 @@ def test_scraper_registered():
     assert "counties_sc.sc_county_rosters" in slugs
 
 
-def test_covers_seven_missing_upstate_counties():
-    assert set(COUNTIES.values()) == {
-        "Oconee", "Cherokee", "Laurens", "Union",
-        "Greenwood", "Abbeville", "Newberry",
-    }
+def test_covers_in_scope_upstate_counties_only():
+    # Greenwood/Abbeville/Newberry are in SCOPE_DENY_COUNTIES, so this
+    # scraper only covers the in-scope upstate counties.
+    assert set(COUNTIES.values()) == {"Oconee", "Cherokee", "Laurens", "Union"}
 
 
 @pytest.mark.skipif(

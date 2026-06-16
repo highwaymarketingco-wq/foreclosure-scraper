@@ -27,9 +27,11 @@ from ...models import Listing, ListingType, PropertyKind
 URL = "https://www.theinglefirm.com/Sales.aspx"
 
 # In-scope NC counties (county cell looks like "Rutherford, NC").
+# Mecklenburg/Madison/Yancey are in SCOPE_DENY_COUNTIES (pruned per owner
+# direction), so they're excluded here to avoid emitting filtered rows.
 IN_SCOPE = {
-    "rutherford", "cleveland", "henderson", "polk", "gaston", "mecklenburg",
-    "buncombe", "transylvania", "mcdowell", "lincoln", "madison", "yancey",
+    "rutherford", "cleveland", "henderson", "polk", "gaston",
+    "buncombe", "transylvania", "mcdowell", "lincoln",
     "mitchell", "burke",
 }
 

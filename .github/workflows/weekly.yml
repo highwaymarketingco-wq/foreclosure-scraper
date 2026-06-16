@@ -5,6 +5,10 @@ on:
   # before the investor workday. (Comment said "Monday" historically;
   # the cron is and always has been Tuesday — comment now matches.)
   schedule:
+<<<<<<< Updated upstream
+=======
+    # Every Tuesday at 09:00 UTC = 04:00/05:00 ET, before the workday
+>>>>>>> Stashed changes
     - cron: "0 9 * * 2"
   workflow_dispatch: {}  # allow manual triggering from the Actions tab
 
@@ -13,24 +17,34 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
+<<<<<<< Updated upstream
   # Required so the workflow can commit docs/listings.json back to the repo
   # (GitHub Pages serves that file as the live dashboard data feed).
   contents: write
+=======
+  contents: write  # needed to push docs/listings.json back
+>>>>>>> Stashed changes
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
+<<<<<<< Updated upstream
     # No job-level timeout — let it run as long as it needs. GitHub-hosted
     # runners cap at 6h for public repos (free tier) which is the only hard
     # ceiling. Prior 240-min cap was cancelling otherwise-healthy runs as
     # the scraper set grew (2026-05-19 hit it at 4h on the tier2 additions).
     timeout-minutes: 360
+=======
+    timeout-minutes: 240  # ~4h: scrape + vision + scrapling + bk_property + case_detail
+>>>>>>> Stashed changes
     env:
+      # Sheets / email delivery
       SHEET_ID: ${{ secrets.SHEET_ID }}
       GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
       GMAIL_SENDER: ${{ secrets.GMAIL_SENDER }}
       GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
       EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
+<<<<<<< Updated upstream
       # Vision provider switch — see patch-run-scrapers.yml for details.
       VISION_PROVIDER: ${{ vars.VISION_PROVIDER || 'anthropic' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -61,6 +75,21 @@ jobs:
       RENTCAST_API_KEY: ${{ secrets.RENTCAST_API_KEY }}
       FORECLOSURE_DOT_COM_USER: ${{ secrets.FORECLOSURE_DOT_COM_USER }}
       FORECLOSURE_DOT_COM_PASS: ${{ secrets.FORECLOSURE_DOT_COM_PASS }}
+=======
+
+      # Vision (Claude Sonnet 4.5 photo condition assessment)
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      VISION_CONCURRENCY: "2"
+      VISION_INTER_CALL_DELAY: "2"
+
+      # CourtListener (NC/SC bankruptcy filings + xref enrichment)
+      COURTLISTENER_TOKEN: ${{ secrets.COURTLISTENER_TOKEN }}
+
+      # Apify is OPTIONAL — every scraper has a Scrapling/HTTP fallback
+      APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+      APIFY_FREE_TIER_ONLY: "1"
+
+>>>>>>> Stashed changes
       LOG_LEVEL: INFO
       PYTHONUNBUFFERED: "1"
 
@@ -83,6 +112,7 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen || uv sync
 
+<<<<<<< Updated upstream
       - name: Install Playwright browsers (for Scrapling stealth fetchers)
         run: |
           uv run python -m playwright install chromium --with-deps || true
@@ -95,6 +125,14 @@ jobs:
 
       - name: Run scraper
         id: run
+=======
+      - name: Install Playwright / Camoufox for Scrapling stealth
+        run: |
+          uv run python -m playwright install chromium --with-deps || true
+          uv run python -c "from scrapling.fetchers import StealthyFetcher; print('Scrapling OK')" || true
+
+      - name: Run full scraper pipeline
+>>>>>>> Stashed changes
         run: uv run python -m foreclosure_scraper
         # Don't fail the publish step just because one scraper threw.
         continue-on-error: true
@@ -176,6 +214,20 @@ jobs:
           done
           echo "::error::Failed to publish dashboard data after 5 attempts; artifact still downloadable from run page (listings-${{ github.run_id }})"
           exit 1
+
+      - name: Commit + push updated dashboard data
+        if: success() || failure()
+        run: |
+          git config --global user.name  "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/listings.json docs/run_meta.json docs/multifamily.json 2>/dev/null || true
+          if git diff --staged --quiet; then
+            echo "No data changes to commit"
+          else
+            COUNT=$(uv run python -c "import json; d=json.load(open('docs/listings.json')); print(len(d))" 2>/dev/null || echo "?")
+            git commit -m "weekly: $(date -u +'%Y-%m-%d') — ${COUNT} listings"
+            git push
+          fi
 
       - name: Upload run log
         if: always()

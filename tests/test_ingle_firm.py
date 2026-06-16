@@ -21,9 +21,12 @@ def test_money_parses_bid():
     assert _money("$0.00") is None
 
 
-def test_in_scope_has_14_nc_counties():
-    assert len(IN_SCOPE) == 14
-    assert "rutherford" in IN_SCOPE and "mecklenburg" in IN_SCOPE
+def test_in_scope_excludes_denied_counties():
+    # 11 in-scope NC counties; Mecklenburg/Madison/Yancey are denied.
+    assert len(IN_SCOPE) == 11
+    assert "rutherford" in IN_SCOPE and "buncombe" in IN_SCOPE
+    assert "mecklenburg" not in IN_SCOPE  # denied (Charlotte)
+    assert "madison" not in IN_SCOPE and "yancey" not in IN_SCOPE
     # Ashe / Cabarrus appear in the table but are out of scope.
     assert "ashe" not in IN_SCOPE and "cabarrus" not in IN_SCOPE
 
