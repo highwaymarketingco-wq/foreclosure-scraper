@@ -72,6 +72,21 @@ END=$(date +%s)
 
 echo "==> exit=$RC  elapsed=$(( (END-START)/60 ))m  $(date)" | tee -a "$LOG"
 
+# Surface the fail-loud signals from the run so they're visible at the
+# tail of the log (and to anything tailing it / parsing exit status).
+if grep -q "count_drop_alert" "$LOG"; then
+  echo "==> ⚠️  COUNT-DROP ALERT fired this run — a source may be broken. See log above." | tee -a "$LOG"
+  RC=2
+fi
+TOTAL=$(grep -oE '"total": [0-9]+' "$LOG" | tail -1 | grep -oE '[0-9]+' || echo "")
+if [ -n "$TOTAL" ]; then
+  echo "==> total listings this run: $TOTAL" | tee -a "$LOG"
+  if [ "$TOTAL" -lt 200 ]; then
+    echo "==> ⚠️  LOW TOTAL ($TOTAL < 200) — likely a broad failure. Investigate." | tee -a "$LOG"
+    RC=2
+  fi
+fi
+
 # Keep the 12 most recent run logs; prune older.
 ls -1t "$ROOT"/logs/local-run-*.log 2>/dev/null | tail -n +13 | xargs rm -f 2>/dev/null || true
 

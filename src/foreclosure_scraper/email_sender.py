@@ -39,10 +39,25 @@ def _summary_html(sheet_url: str, run_summary: dict) -> str:
     )
 
     sheet_link = f'<a href="{sheet_url}" style="color:#1a4d2e;text-decoration:none">Open in Google Sheet →</a>' if sheet_url else ""
+
+    # Loud banner when this run shipped far fewer listings than the last —
+    # the silent-drop failure mode is now impossible to miss in the email.
+    alert = run_summary.get("count_drop_alert")
+    alert_banner = ""
+    if alert:
+        alert_banner = (
+            f'<div style="background:#fdecea;border:1px solid #f5c6cb;color:#a12;'
+            f'padding:14px 18px;border-radius:6px;margin:0 0 18px 0;font-weight:600">'
+            f'⚠️ Listing count dropped {alert.get("drop_pct")}% '
+            f'({alert.get("prev_total")} → {alert.get("curr_total")}) vs the last run. '
+            f'A source may be broken — check the run log before trusting this data.'
+            f'</div>'
+        )
     return f"""
 <html>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; color:#222; max-width:680px;margin:0 auto;padding:20px;">
 <h2 style="color:#1a4d2e">Foreclosure Listings — {datetime.utcnow().strftime('%B %Y')}</h2>
+{alert_banner}
 <p>Run completed {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}.</p>
 <p style="font-size:18px"><strong>{total}</strong> active listings across upstate SC + western NC.</p>
 <p>

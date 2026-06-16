@@ -1052,6 +1052,34 @@ async def run() -> int:
         "notes": f"horizon={cfg.sale_horizon_days}d, scrapers={len(scrapers)}, regressions={len(regressions)}",
     }
 
+    # ---- Fail-loud guard: catastrophic week-over-week count drop ----------
+    # A silent drop in total listings is the failure mode that hid for a
+    # month (the pipeline reported "success" while shipping far less data).
+    # Compare against the prior committed listings.json BEFORE we overwrite
+    # it; surface a sharp drop as a regression in the health report + log so
+    # it can never pass unnoticed again. We do NOT abort — a genuinely quiet
+    # week should still publish — but the drop is made impossible to miss.
+    try:
+        import json as _json
+        from pathlib import Path as _P
+        prev_path = _P(__file__).resolve().parent.parent.parent / "docs" / "listings.json"
+        if prev_path.exists():
+            prev = _json.loads(prev_path.read_text())
+            prev_total = len(prev) if isinstance(prev, list) else 0
+            curr_total = len(enriched)
+            if prev_total >= 100 and curr_total < prev_total * 0.75:
+                pct = round(100 * (1 - curr_total / prev_total))
+                msg = (f"COUNT DROP {pct}%: {prev_total} -> {curr_total} "
+                       f"listings vs last run — investigate before trusting this run")
+                summary.setdefault("regressions", []).append(msg)
+                summary["count_drop_alert"] = {
+                    "prev_total": prev_total, "curr_total": curr_total, "drop_pct": pct,
+                }
+                log.error("orchestrator.count_drop_alert",
+                          prev=prev_total, curr=curr_total, drop_pct=pct)
+    except Exception:
+        log.error("count_drop_guard.failed", traceback=traceback.format_exc())
+
     # Web artifact — always write, even when Sheets/Email secrets are missing.
     # GitHub Actions then commits docs/ back to the repo, GitHub Pages serves it.
     try:
