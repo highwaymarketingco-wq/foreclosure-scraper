@@ -16,7 +16,7 @@ from typing import Iterable
 
 import structlog
 
-from .apify_helper import fetch_rendered
+from .render import fetch_rendered
 from .config import ALL_COUNTIES
 from .models import Listing, ListingType, PropertyKind
 
@@ -84,10 +84,8 @@ def _apply_court_text(li: Listing, text: str) -> int:
 
 async def enrich_with_court_records(listings: list[Listing]) -> list[Listing]:
     """For every listing that has a case_number, look it up in the right e-court system."""
-    token = os.environ.get("APIFY_TOKEN", "")
-    if not token:
-        log.info("courts.skip", reason="no_apify_token")
-        return listings
+    # Rendering is free (local stealth browser); no token gate.
+    token = None
 
     sem = asyncio.Semaphore(4)
     counts = {"queried": 0, "matched": 0, "fields_filled": 0}
@@ -128,9 +126,8 @@ async def discover_lis_pendens() -> list[Listing]:
     search-results page exposes (case number, county, listing_type=LIS_PENDENS,
     plus any plaintiff/defendant text we can scrape).
     """
-    token = os.environ.get("APIFY_TOKEN", "")
-    if not token:
-        return []
+    # Rendering is free (local stealth browser); no token gate.
+    token = None
 
     sem = asyncio.Semaphore(3)
     out: list[Listing] = []

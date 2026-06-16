@@ -4,7 +4,7 @@ Greenville + Greenwood dropped per scope narrowing 2026-05.
 
 Web app with bot-protected backend. Free read but blocks raw curl. We hit the
 internal API endpoint with a real-browser-style request; if blocked, the
-caller can fall back to Apify rag-web-browser (requires APIFY_TOKEN).
+caller falls back to the free stealth-browser renderer (render.fetch_rendered).
 """
 from __future__ import annotations
 
@@ -95,15 +95,11 @@ async def search_by_name(state: str, county: str, name: str, max_docs: int = 50)
             if r.status_code == 200 and r.headers.get("content-type", "").startswith("application/json"):
                 data = r.json()
             else:
-                # Bot-blocked. Fall back to Apify rag-web-browser if token available.
-                token = os.environ.get("APIFY_TOKEN")
-                if not token:
-                    return []
-                from ..apify_helper import fetch_rendered
+                # Bot-blocked. Fall back to the free stealth-browser renderer.
+                from ..render import fetch_rendered
 
                 rendered = await fetch_rendered(
                     f"https://{host}/?searchType=name&searchValue={name.replace(' ', '+')}",
-                    token=token,
                 )
                 if not rendered:
                     return []

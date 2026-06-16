@@ -1015,10 +1015,9 @@ async def run() -> int:
     by_state = Counter(li.state for li in enriched if li.state)
     by_county = Counter(f"{li.county}, {li.state}" for li in enriched if li.county and li.state)
     # Build per-source status: working / empty (verified) / regressed /
-    # apify-blocked / paywall-blocked / render-required. The blocked /
-    # render-required statuses are acknowledged failure modes (no alert)
-    # versus REGRESSED (alert).
-    apify_required = {s.slug for s in scrapers if getattr(s, "requires_apify", False)}
+    # paywall-blocked / render-required. The blocked / render-required
+    # statuses are acknowledged failure modes (no alert) versus
+    # REGRESSED (alert).
     paywall_required = {s.slug for s in scrapers if getattr(s, "requires_paywall", False)}
     render_required = {s.slug for s in scrapers if getattr(s, "requires_render", False)}
     source_status = {}
@@ -1035,9 +1034,7 @@ async def run() -> int:
         elif slug in paywall_required:
             source_status[slug] = "PAYWALL-BLOCKED"
         elif slug in render_required:
-            source_status[slug] = "RENDER-REQUIRED (Scrapling stealth not wired)"
-        elif slug in apify_required:
-            source_status[slug] = "APIFY-BLOCKED"
+            source_status[slug] = "RENDER-REQUIRED (stealth fetch returned nothing)"
         elif expected[slug] == 0:
             source_status[slug] = "EMPTY (verified)"
         else:

@@ -1,11 +1,11 @@
-"""SC Judicial Public Index — per-county case search via Apify rag-web-browser."""
+"""SC Judicial Public Index — per-county case search via the free stealth renderer."""
 from __future__ import annotations
 
 import re
 from datetime import datetime
 from typing import Iterable
 
-from ...apify_helper import fetch_rendered
+from ...render import fetch_rendered
 from ...base_scraper import BaseScraper
 from ...config import SC_COUNTIES
 from ...models import Listing, ListingType, PropertyKind
@@ -22,7 +22,7 @@ class SCPublicIndex(BaseScraper):
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         # Per-county Public Index pages — these are the live case search portals
-        for c in SC_COUNTIES[:5]:  # cap to 5 highest-pop counties to keep Apify cost bounded
+        for c in SC_COUNTIES[:5]:  # cap to 5 highest-pop counties to bound render time
             url = f"https://publicindex.sccourts.org/{c.name}/PublicIndex/"
             content = await fetch_rendered(url)
             if not content:

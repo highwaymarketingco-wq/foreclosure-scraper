@@ -13,20 +13,14 @@ not one call per listing — this is critical for cost.
 """
 from __future__ import annotations
 
-import asyncio
-import os
 import re
 from typing import Any
 
 import structlog
 
-from .apify_helper import run_actor_sync
-from .budget import cap
 from .models import Listing, PropertyKind
 
 log = structlog.get_logger()
-
-ZILLOW_ACTOR = "realsimpli/zillow-property-details-scraper"
 
 
 # ----- Inference helpers (run before/after Apify) ---------------------------------
@@ -172,43 +166,23 @@ def _apply_zillow_payload(li: Listing, payload: dict[str, Any]) -> None:
                 li.raw["flags"].append(f)
 
 
-async def _zillow_batch(addresses: list[str], token: str) -> dict[str, dict]:
-    """Look up many addresses in one Apify run. Returns {addr_lower: payload}."""
-    if not addresses or not token:
-        return {}
-    items = await run_actor_sync(
-        ZILLOW_ACTOR,
-        {"address": addresses},
-        token=token,
-        timeout_s=420,
-    )
-    out: dict[str, dict] = {}
-    for it in items:
-        # Each result has a queriedAddress / address / fullAddress field
-        addr = (
-            it.get("queriedAddress")
-            or it.get("address")
-            or it.get("fullAddress")
-            or ""
-        )
-        if isinstance(addr, dict):
-            parts = [addr.get("streetAddress", ""), addr.get("city", ""), addr.get("state", ""), addr.get("zipcode", "")]
-            addr = ", ".join(p for p in parts if p)
-        if addr:
-            out[addr.strip().lower()] = it
-    log.info("zillow.batch.complete", asked=len(addresses), got=len(out))
-    return out
-
-
 # ----- Public API -----------------------------------------------------------------
 
 
 async def enrich(listings: list[Listing]) -> list[Listing]:
-    """Enrich every listing in place, batching Apify calls."""
-    token = os.environ.get("APIFY_TOKEN", "")
-    budget = cap("zillow_enrichment_per_run", default=400)
+    """Free, in-place enrichment: property-kind / acreage inference + flag
+    extraction from text we already have.
 
-    # 1. Cheap inference first
+    Property details (beds / baths / sqft / year / value) are backfilled
+    downstream for free by enrichment_comps (HomeHarvest → Realtor.com) and
+    enrichment_arcgis (county GIS). The old paid Apify Zillow-details batch
+    was removed 2026-06-16 when the project went free-only.
+
+    TODO(free-zillow): if property-detail coverage proves thin, add a
+    stealth-browser Zillow-details enrichment (StealthyFetcher already
+    bypasses Zillow's PerimeterX locally — see render.py). Kept out for now
+    to avoid per-address browser launches on every run.
+    """
     for li in listings:
         if li.property_kind == PropertyKind.UNKNOWN:
             li.property_kind = _infer_property_kind(li)
@@ -217,66 +191,5 @@ async def enrich(listings: list[Listing]) -> list[Listing]:
         flags = _flags_from_text(" ".join(filter(None, (li.description, li.legal_description))))
         if flags:
             li.raw["flags"] = flags
-
-    # 2. Build address list, prioritizing listings with the most opening_bid signal
-    candidates = [
-        li for li in listings
-        if li.street_address
-        and li.zip_code or (li.city and li.state)
-        and li.property_kind not in (PropertyKind.LAND,)  # land has no Zillow detail anyway
-    ]
-    # Sort: highest bid first, then soonest sale date. Use datetime.min for missing
-    # dates so the sort is stable across date/None mix.
-    from datetime import datetime as _dt
-    candidates.sort(key=lambda li: (-(li.opening_bid or 0), li.sale_date or _dt.max))
-    candidates = candidates[:budget]
-
-    if not candidates or not token:
-        log.info("enrichment.skip", reason="no_candidates_or_token", count=len(candidates), token=bool(token))
-        return listings
-
-    # Build clean address strings
-    addr_to_listing: dict[str, Listing] = {}
-    addresses: list[str] = []
-    for li in candidates:
-        bits = [
-            li.street_address,
-            li.city or "",
-            f"{li.state or ''} {li.zip_code or ''}".strip(),
-        ]
-        addr = ", ".join(b for b in bits if b)
-        if not addr or len(addr) < 8:
-            continue
-        addr_to_listing[addr.lower()] = li
-        addresses.append(addr)
-
-    log.info("enrichment.zillow.batch", addresses=len(addresses))
-
-    # 3. One batched Apify call. Fail-soft so a bad batch doesn't kill the run.
-    try:
-        results = await asyncio.wait_for(
-            _zillow_batch(addresses, token),
-            timeout=540,
-        )
-    except (asyncio.TimeoutError, Exception) as exc:  # noqa: BLE001
-        log.warning("enrichment.zillow.failed", error=str(exc))
-        results = {}
-
-    # 4. Apply payloads
-    matched = 0
-    for addr_lower, payload in results.items():
-        li = addr_to_listing.get(addr_lower)
-        if not li:
-            # Try fuzzy match on street portion
-            street = addr_lower.split(",")[0].strip()
-            for k, candidate in addr_to_listing.items():
-                if k.split(",")[0].strip() == street:
-                    li = candidate
-                    break
-        if not li:
-            continue
-        _apply_zillow_payload(li, payload)
-        matched += 1
-    log.info("enrichment.zillow.applied", matched=matched, total=len(addresses))
 
     return listings

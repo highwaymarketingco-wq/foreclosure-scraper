@@ -23,7 +23,7 @@ from typing import Iterable
 import structlog
 from selectolax.parser import HTMLParser
 
-from ...apify_helper import fetch_rendered
+from ...render import fetch_rendered
 from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
@@ -58,14 +58,12 @@ async def _fetch_plain(url: str) -> str:
 
 async def _fetch_city_page(url: str) -> str:
     """Fetch a city-site page. Tries plain HTTP first (fast, free); falls
-    back to Apify rag-web-browser only when plain HTTP returns nothing
-    AND APIFY_TOKEN is set."""
+    back to the free stealth-browser renderer when plain HTTP returns
+    nothing (JS-rendered city CMS sites)."""
     text = await _fetch_plain(url)
     if text:
         return text
-    if os.environ.get("APIFY_TOKEN"):
-        return await fetch_rendered(url)
-    return ""
+    return await fetch_rendered(url)
 
 
 # (state, county, city, domain) — covers every city seat plus major suburbs

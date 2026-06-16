@@ -155,7 +155,6 @@ class RuntimeConfig:
     gmail_sender: str
     gmail_app_password: str
     email_recipients: tuple[str, ...]
-    apify_token: str
     user_agent: str = (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) "
         "AppleWebKit/605.1.15 (KHTML, like Gecko) "
@@ -183,5 +182,4 @@ class RuntimeConfig:
             gmail_sender=os.environ.get("GMAIL_SENDER", "greghhigh@gmail.com"),
             gmail_app_password=os.environ.get("GMAIL_APP_PASSWORD", ""),
             email_recipients=recipients,
-            apify_token=os.environ.get("APIFY_TOKEN", ""),
         )

@@ -116,10 +116,12 @@ def test_workflow_passes_required_secrets_as_env():
     required = {
         "ANTHROPIC_API_KEY", "COURTLISTENER_TOKEN", "RENTCAST_API_KEY",
         "FORECLOSURE_DOT_COM_USER", "FORECLOSURE_DOT_COM_PASS",
-        "APIFY_TOKEN", "GOOGLE_SERVICE_ACCOUNT_JSON",
+        "GOOGLE_SERVICE_ACCOUNT_JSON",
     }
     missing = required - set(env.keys())
     assert not missing, f"workflow missing env vars: {missing}"
+    # Project is free-only: APIFY_TOKEN must NOT be wired into the workflow.
+    assert "APIFY_TOKEN" not in env, "APIFY_TOKEN should be removed (free-only)"
 
 
 def test_workflow_installs_playwright():
