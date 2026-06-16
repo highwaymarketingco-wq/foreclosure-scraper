@@ -79,33 +79,46 @@ SC_LAYER = {
 
 # Per-county SCDOT field schemas (vary widely across counties).
 COUNTY_SCHEMA: dict[str, dict[str, Any]] = {
+    # Audited 2026-06-15 against live SCDOT MapServer schemas. Previous
+    # config had schemas for only 6 of 11 user counties (missing Greenville,
+    # Spartanburg, Abbeville, Greenwood, Newberry) AND several drift bugs:
+    # Anderson was missing PHYS_ADDR in situs, Pickens had LOCADD (field
+    # doesn't exist), Oconee had FullAdd (also gone). With those bugs the
+    # resolver filled 0 of 277 SC LP addresses on the 2026-06-09 run.
     "Anderson": {
-        "owner": ("OWNER",), "situs": (), "situs_parts": (),
+        "owner": ("OWNER",), "situs": ("PHYS_ADDR",), "situs_parts": (),
         "mailing": ("OWNER_ADDR",), "city": ("CITY",), "zip": ("ZIPCODE",),
         "parcel": ("TMS",), "owner_occ": (),
     },
     "Cherokee": {
-        "owner": ("SHEET1__Na",), "situs": (), "situs_parts": (),
-        "mailing": ("SHEET1___1",), "city": ("SHEET1___2",),
-        "zip": ("SHEET1__Zi", "ZipCode"), "parcel": ("ParcelPoly",), "owner_occ": (),
+        # Layer 11 exposes ParcelPo_* (sheet sub-fields) + ZipCode only.
+        # No owner/address fields available; owner-name lookup will not
+        # match anything meaningful here — the resolver will accept the
+        # `no_match` outcome rather than fabricate an address.
+        "owner": (), "situs": (), "situs_parts": (),
+        "mailing": (), "city": (), "zip": ("ZipCode",),
+        "parcel": ("ParcelPoly",), "owner_occ": (),
     },
     "Oconee": {
-        "owner": ("OWNERNAME", "Owner"), "situs": ("FullAdd",),
-        "situs_parts": ("HOUSE_NO", "STREET_NAM", "TYPE"),
+        "owner": ("OWNERNAME", "Owner"), "situs": (),
+        "situs_parts": ("HOUSE_NO", "STREET_NAM"),
         "mailing": ("ADDRESS2",), "city": ("CITY",), "zip": ("ZIP",),
         "parcel": ("TMS_NUMBER", "PARCEL_NO"), "owner_occ": (),
     },
     "Pickens": {
-        "owner": ("NAME1", "OwnerAll"), "situs": ("LOCADD",), "situs_parts": (),
-        "mailing": ("ADD1",), "city": ("LOCCITY", "CITY"),
+        # Layer 39 schema: PIN, NAME1, NAME2, CITY, ZIP, LOCCITY, LOCZIP,
+        # OwnerAll. No street-address field. Resolver can confirm owner
+        # match + parcel + city/zip but won't write street_address.
+        "owner": ("NAME1", "OwnerAll"), "situs": (), "situs_parts": (),
+        "mailing": (), "city": ("LOCCITY", "CITY"),
         "zip": ("LOCZIP", "ZIP"), "parcel": ("PIN",), "owner_occ": (),
     },
     "Laurens": {
-        "owner": ("Name1", "Owner", "OwneAll"), "situs": ("Property_A",),
+        "owner": ("Name1", "Owner", "OwneAll"), "situs": (),
         "situs_parts": ("Street_Num", "Street_Nam"),
-        "mailing": ("Address1",), "city": ("Mailing_Ci", "Address2"),
+        "mailing": ("Address1",), "city": ("Address2",),
         "zip": ("ZIP_Code",), "parcel": ("TMS", "TaxPIN", "Map_Number"),
-        "owner_occ": ("Owner_Occu", "Residentia"),
+        "owner_occ": ("Owner_Occu",),
     },
     "Union": {
         "owner": ("NAME_1", "Name", "OwnerAll"), "situs": (),
@@ -113,6 +126,45 @@ COUNTY_SCHEMA: dict[str, dict[str, Any]] = {
         "mailing": ("Address_2", "ADDRESS_12"),
         "city": ("Address_3", "ADDRESS_23"), "zip": ("ZIP_CODE",),
         "parcel": ("ParcelID", "Map_Number"), "owner_occ": (),
+    },
+    "Greenville": {
+        # Layer 23 schema: PIN, OWNAM1/2, NAMECO, STREET, CITY, ZIP5/4, LOCATE.
+        # STREET holds the situs.
+        "owner": ("OWNAM1", "OWNAM2", "NAMECO", "OwnerAll"),
+        "situs": ("STREET",), "situs_parts": (),
+        "mailing": (), "city": ("CITY",), "zip": ("ZIP5",),
+        "parcel": ("PIN",), "owner_occ": (),
+    },
+    "Spartanburg": {
+        # Layer 42 schema: TAXPIN, PARCELNUMBER, OwnerName, StreetAddress,
+        # PropertyLocation, City, Zip, plus parts (StreetNumber+StreetName).
+        "owner": ("OwnerName", "TaxpayerName"),
+        "situs": ("StreetAddress", "PropertyLocation"),
+        "situs_parts": ("StreetNumber", "StreetName"),
+        "mailing": (), "city": ("City",), "zip": ("Zip", "StreetZip"),
+        "parcel": ("TAXPIN", "PARCELNUMBER", "MAPNUMBER"), "owner_occ": (),
+    },
+    "Abbeville": {
+        # Layer 1 schema is minimal: ParcelNum + OwnerName only. Resolver
+        # can match owner + return parcel_id but can't write address.
+        "owner": ("OwnerName",), "situs": (), "situs_parts": (),
+        "mailing": (), "city": (), "zip": (),
+        "parcel": ("ParcelNum",), "owner_occ": (),
+    },
+    "Greenwood": {
+        # Layer 24 schema: PIN, Owner, MailAddres, MailCitySt, SiteAddres.
+        "owner": ("Owner",), "situs": ("SiteAddres",), "situs_parts": (),
+        "mailing": ("MailAddres",), "city": ("MailCitySt",), "zip": (),
+        "parcel": ("PIN", "SHORTPIN", "OLDPIN"), "owner_occ": (),
+    },
+    "Newberry": {
+        # Layer 36 schema: PIN/ParcelID, Name/CurrentOwner1, StreetNumber+
+        # StreetName (parts), BillingAddress (mailing), CuOCity (mailing
+        # city), OwnOcc.
+        "owner": ("Name", "CurrentOwner1", "OwnerAll"),
+        "situs": (), "situs_parts": ("StreetNumber", "StreetName"),
+        "mailing": ("BillingAddress",), "city": ("CuOCity",), "zip": (),
+        "parcel": ("PIN", "ParcelID"), "owner_occ": ("OwnOcc",),
     },
 }
 
