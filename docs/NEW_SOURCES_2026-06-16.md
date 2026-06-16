@@ -98,3 +98,19 @@ Spartanburg/Anderson/Pickens/Oconee/Cherokee tax PDFs + portals.
 - ⏳ scpublicnotices.com — VIABLE via stealth (search "foreclosure"/"tax sale" returns results; 100 pages). Mechanics: fill input[type=text], press Enter, results in GridView #ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1; per-row view button onclick=location.href='Details.aspx?SID=<session>&ID=<id>'. Row cells (title/publication/date) need nested-table parse; detail pages are session-bound. Needs focused iteration — NOT yet shipped.
 - ⏳ GovDeals county auctions — reachable via stealth (200, not blocked), BUT it's a React SPA: lot titles render into card components not tied to the asset anchor (/en/asset/<cat>/<id>). Correct approach = hit GovDeals' JSON search API (XHR the SPA calls), filter category=Real Estate, per county seller (Burke 29265 / Rutherford agency 554 / Buncombe buncombecountync / Cherokee). Storefronts are episodic — currently ~0 real estate listed, so live verification needs a cycle with RE present. NOT shipped (don't ship an unverifiable DOM parser).
 - ⏳ Terry Howe (SC FLC), Transylvania Times, Tryon AdHunter, Gannett iPublish (Henderson), Mitchell News, Column.us (McDowell/Burke), Gaffney Ledger, SC county tax portals (Pickens/Oconee/Cherokee/Spartanburg/Anderson) — DISCOVERED + URL-verified, NOT yet built. Each is an individual fiddly live-site build.
+
+## NATIONAL / FEDERAL / BANK SOURCES (verified 2026-06-16)
+
+### Worth building (net-new, public, scrapeable, NC/SC inventory)
+- **CWS Marketing Group** `cwsmarketing.com/auctions/real-estate/north-carolina-real-estate-auctions/` — US Treasury/IRS/US-Marshals SEIZED real estate. Public (browse free), clean static HTML state pages, confirmed NC inventory. Dedupe vs existing treasury_seized (same program; CWS is the working front-end). TOP federal find.
+- **RealtyBid.com** `realtybid.com/auction/NorthCarolina.cfm` + `/auction/southcarolina/` — independent REO/foreclosure auctions, live NC+SC inventory, public, clean ColdFusion pages w/ `?page=N` pagination. TOP national-auction find.
+- **Bank of America foreclosures** `foreclosures.bankofamerica.com/search` — public JSON API (session + __RequestVerificationToken POST), state filter, SC inventory now. ONLY viable bank-direct REO (all other banks agent-gated/dead). Low volume but clean.
+- **Williams & Williams** `williamsauction.com/real-estate-auction/south-carolina` (backend `bid.auctionnetwork.com`) — auctions, SC residential + NC/SC land, public.
+- **RealtyTrac** `realtytrac.com/sc/...` `/nc/...` — high-volume pre-foreclosure/auction/REO, public (not paywalled for listings). Overlaps court/MLS data — dedupe.
+- **FDIC** `fdicrealestatelistings.com` — public + scrapeable but ZERO inventory now; build as a dormant monitor (only matters on bank failures).
+
+### Dead ends (do NOT build)
+- Bank REO agent-gated/dead: Wells Fargo PAS (offline), Truist/PNC/Citi (res.net login), Chase/US Bank/PennyMac/First Citizens/United Community (no public inventory → MLS/agents). Mr. Cooper = Xome (covered).
+- USMS = Bid4Assets (covered). SBA = no portal (GovDeals/Bid4Assets). GSA = surplus not distressed, sparse. IRS irsauctions.gov = timeout-prone + tiny volume + overlaps CWS.
+- **Tax platforms have NO NC/SC footprint** (important): RealAuction/GovEase/Zeus serve other states. NC = courthouse-step sales via county law firms (Kania/ZLS); SC = in-house county treasurers. That inventory is county-level, not a national platform.
+- ForeclosureListings.com / TaxSaleResources = paywalled re-aggregators.
