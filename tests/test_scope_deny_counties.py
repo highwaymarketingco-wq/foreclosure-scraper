@@ -104,19 +104,19 @@ def test_kept_county_still_passes():
     assert _in_scope(li) is True
 
 
-def test_greenville_sc_back_in_scope():
-    """2026-05-07c restored Greenville per user direction."""
+def test_greenville_sc_denied():
+    """Greenville SC was re-pruned 2026-05-14 and the owner re-confirmed it
+    stays denied 2026-06-16. Its listings must be filtered out of scope."""
     li = _li(county="Greenville", state="SC", zip_code="29601")
-    assert _in_scope(li) is True
+    assert _in_scope(li) is False
 
 
-def test_brunswick_zip_prefix_now_passes():
-    """Brunswick NC (Wilmington area) — coastal user-key. Without 284
-    in SCOPE_ZIP_PREFIXES, HomeHarvest distressed listings tagged only
-    by zip would have failed scope. 2026-05-07c added 284."""
-    # zip-only path: county not set, but 284xx zip
-    li = _li(county=None, state="NC", zip_code="28461")
-    assert _in_scope(li) is True
+def test_brunswick_nc_denied():
+    """Brunswick NC (coastal, Wilmington area) was pruned 2026-05-15 in the
+    'anything east of Charlotte' cleanup. Explicit deny beats the 284 zip
+    prefix, so a 284xx Brunswick listing must fail scope."""
+    li = _li(county="Brunswick", state="NC", zip_code="28461")
+    assert _in_scope(li) is False
 
 
 def test_unattributed_bk_listing_tagged_state_only():
