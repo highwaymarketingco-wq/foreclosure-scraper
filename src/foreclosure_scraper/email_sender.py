@@ -15,6 +15,28 @@ log = structlog.get_logger()
 DASHBOARD_URL = "https://highwaymarketingco-wq.github.io/foreclosure-scraper/"
 
 
+def _new_banner(run_summary: dict) -> str:
+    """Early-access highlight: how many NEW distressed properties appeared
+    since the last run, and how many are fresh pre-foreclosures (lis
+    pendens — the earliest signal, before they hit the general listings)."""
+    new = run_summary.get("new_this_week", 0)
+    if not new:
+        return ""
+    new_lp = run_summary.get("new_lis_pendens", 0)
+    lp_line = (
+        f' — including <strong>{new_lp}</strong> brand-new pre-foreclosure'
+        f' filing{"s" if new_lp != 1 else ""} (earliest signal)'
+        if new_lp else ""
+    )
+    return (
+        f'<div style="background:#eaf5ec;border:1px solid #b9dcc0;color:#1a4d2e;'
+        f'padding:14px 18px;border-radius:6px;margin:0 0 18px 0;font-weight:600">'
+        f'🆕 <strong>{new}</strong> new distressed propert'
+        f'{"ies" if new != 1 else "y"} in your area this run{lp_line}.'
+        f'</div>'
+    )
+
+
 def _summary_html(sheet_url: str, run_summary: dict) -> str:
     by_source = run_summary.get("by_source", {})
     by_state = run_summary.get("by_state", {})
@@ -58,6 +80,7 @@ def _summary_html(sheet_url: str, run_summary: dict) -> str:
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; color:#222; max-width:680px;margin:0 auto;padding:20px;">
 <h2 style="color:#1a4d2e">Foreclosure Listings — {datetime.utcnow().strftime('%B %Y')}</h2>
 {alert_banner}
+{_new_banner(run_summary)}
 <p>Run completed {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}.</p>
 <p style="font-size:18px"><strong>{total}</strong> active listings across upstate SC + western NC.</p>
 <p>

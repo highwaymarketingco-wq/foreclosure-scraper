@@ -28,6 +28,8 @@ RAW_KEEP = {
     "calc": "*",      # ARV / rehab / max_bid / ROI / cash-on-cash
     "amount_owed": "*",  # cross-sourced debt figure {value, source, label, confidence, is_actual_debt}
     "skip_trace": "*",   # owner name / mailing address / phone for outreach (free)
+    "is_new": "*",       # new-this-run flag (early-access highlight)
+    "first_seen_run": "*",
     "grade": "*",     # A-F per-dimension + overall
     "location": ("median_household_income", "median_home_value",
                  "owner_occupied_pct", "unemployment_pct"),

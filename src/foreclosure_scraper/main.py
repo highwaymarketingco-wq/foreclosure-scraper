@@ -1051,9 +1051,19 @@ async def run() -> int:
         else:
             source_status[slug] = f"REGRESSED (expected ≥ {expected[slug]})"
 
+    # New-this-run detection (early-access / geo-alert capability). Must run
+    # BEFORE web_artifact overwrites the prior listings.json. Tags raw.is_new.
+    new_stats = {"new": 0}
+    try:
+        from .new_listings import mark_new_listings
+        new_stats = mark_new_listings(enriched)
+    except Exception:
+        log.error("new_listings.failed", traceback=traceback.format_exc())
+
     summary = {
         "total": len(enriched),
-        "new_this_week": len(enriched),  # placeholder until we wire historical compare
+        "new_this_week": new_stats.get("new", 0),
+        "new_lis_pendens": new_stats.get("new_lis_pendens", 0),
         "by_state": dict(by_state),
         "by_county_top": by_county.most_common(15),
         "by_source": dict(by_source),
