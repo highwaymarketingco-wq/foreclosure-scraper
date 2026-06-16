@@ -95,8 +95,13 @@ QUERIES: tuple[tuple[str, str], ...] = (
 )
 
 ADDR_RE = re.compile(
-    r"(\d+\s+[A-Z][\w .'\-]+(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
-    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\.?)",
+    # \b word-boundaries on the street-type token prevent matching "St"
+    # inside "Estate", "Way" inside "always", etc. Without them, probate
+    # notices like "qualified on the 27 day of May, 2026 as Limited
+    # Personal Representative of the Estate of …" parsed as the fake
+    # address "2026 as Limited Personal Representative of the Est".
+    r"(\d+\s+[A-Z][\w .'\-]+\b(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
+    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\b\.?)",
     re.I,
 )
 COUNTY_RE = re.compile(

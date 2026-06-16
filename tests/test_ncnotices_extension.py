@@ -259,6 +259,41 @@ def test_h4_real_href_preserved():
     assert out[0].source_url == "https://www.ncnotices.com/notices/123"
 
 
+def test_addr_re_skips_probate_estate_false_positives():
+    """ADDR_RE must not match 'St' inside 'Estate'. Forensics 2026-06-15:
+    ~11 probate notices landed with street_address like
+    '2026 as Limited Personal Representative of the Est' because the
+    street-type alternation lacked \\b word boundaries."""
+    from foreclosure_scraper.scrapers.public_notices.ncpublicnotices import ADDR_RE
+    probate_texts = [
+        "Having qualified on the 27 day of May, 2026 as Limited Personal "
+        "Representative of the Estate of Jerry Basel Wilson",
+        "Notice qualified 19 May, 2026 as Executor of the Estate",
+        "qualified on the 26 day of May, 2026 as Administrator of the Estate "
+        "of Jeffrey Brent Saunders",
+    ]
+    for text in probate_texts:
+        m = ADDR_RE.search(text)
+        assert m is None, (
+            f"ADDR_RE incorrectly matched {m.group(1)!r} in probate text {text!r}"
+        )
+
+
+def test_addr_re_still_matches_real_addresses():
+    """Word-boundary tightening must not break true-positive captures."""
+    from foreclosure_scraper.scrapers.public_notices.ncpublicnotices import ADDR_RE
+    cases = [
+        ("Property located at 1014 Sunset Drive, Asheville NC", "1014 Sunset Drive"),
+        ("Sale at 712 Hanover Drive Shelby NC 28150",            "712 Hanover Drive"),
+        ("Inspect 4567 Westview Way for showing",                "4567 Westview Way"),
+        ("foreclosure on 89 N Main St, Hendersonville",          "89 N Main St"),
+    ]
+    for text, expected in cases:
+        m = ADDR_RE.search(text)
+        assert m, f"ADDR_RE failed on {text!r}"
+        assert m.group(1) == expected, f"got {m.group(1)!r} expected {expected!r}"
+
+
 def test_parse_dedupes_by_named_party():
     """Two probate cards for the same estate (same name + county)
     should emit one listing."""
