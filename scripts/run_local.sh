@@ -52,6 +52,14 @@ export PYTHONUNBUFFERED=1
 export SKIP_TRACE_PROVIDER="${SKIP_TRACE_PROVIDER:-free}"
 export FREE_SKIPTRACE_PHONE_MAX="${FREE_SKIPTRACE_PHONE_MAX:-40}"
 
+# Enrichment budget — keep the run finishing in a sane window. The cloud
+# run died at 4h partly on a Gemini-quota Vision spiral; locally we use
+# Anthropic (set above) and cap Vision so the run completes. Raise
+# VISION_MAX_LISTINGS later for deeper condition coverage. ROD deed
+# enrichment stays OFF (broken vendor portals = 27 min for 0 matches).
+export VISION_MAX_LISTINGS="${VISION_MAX_LISTINGS:-250}"
+# ROD_ENRICH_ON unset = skipped (default).
+
 # If no NC eCourts creds are present, fall back to anonymous access.
 if [[ -z "${NC_ECOURTS_USERNAME:-}" ]]; then
   export NC_ECOURTS_USE_ANONYMOUS=1

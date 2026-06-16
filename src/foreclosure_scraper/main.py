@@ -476,11 +476,19 @@ async def run() -> int:
     # Per-county Register of Deeds enrichment — recorded mortgage history,
     # lis pendens, satisfactions, lien-position computation. Free, pure-HTTP
     # for the 4 vendors I've adapted (CCHS / Aumentum / Cott / Kofile).
-    try:
-        from .rod import enrich as rod_enrich
-        await rod_enrich.enrich_all(enriched)
-    except Exception:
-        log.error("rod.failed", traceback=traceback.format_exc())
+    # ROD deed enrichment: the CCHS/Aumentum/Cott/Kofile vendor portals
+    # migrated to iframe apps and currently match 0 (verified: 27 min for
+    # 0 hits on the 2026-06-16 run). Gated off by default so it doesn't
+    # burn wall-clock; set ROD_ENRICH_ON=1 to re-enable after adapters are
+    # rebuilt.
+    if os.environ.get("ROD_ENRICH_ON") == "1":
+        try:
+            from .rod import enrich as rod_enrich
+            await rod_enrich.enrich_all(enriched)
+        except Exception:
+            log.error("rod.failed", traceback=traceback.format_exc())
+    else:
+        log.info("rod.skipped", reason="adapters_broken_set_ROD_ENRICH_ON=1")
 
     # Address backfill — for listings that have defendant + county but no
     # street_address (SC Public Index lis pendens, NC eCourts, courthouse
