@@ -92,3 +92,9 @@ Buncombe to new domain.
 Tier 3 (newspaper portals): Transylvania Times, Tryon AdHunter, Gannett iPublish
 (Henderson), Mitchell News, Column.us (McDowell/Burke), Gaffney Ledger,
 Spartanburg/Anderson/Pickens/Oconee/Cherokee tax PDFs + portals.
+
+## BUILD STATUS (updated during build)
+- ✅ NC county tax-foreclosure (Gaston/McDowell/Rutherford) — BUILT + tested (nc_county_tax_foreclosure.py), 9 live listings.
+- ⏳ scpublicnotices.com — VIABLE via stealth (search "foreclosure"/"tax sale" returns results; 100 pages). Mechanics: fill input[type=text], press Enter, results in GridView #ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1; per-row view button onclick=location.href='Details.aspx?SID=<session>&ID=<id>'. Row cells (title/publication/date) need nested-table parse; detail pages are session-bound. Needs focused iteration — NOT yet shipped.
+- ⏳ GovDeals county auctions — reachable via stealth (200, not blocked), BUT it's a React SPA: lot titles render into card components not tied to the asset anchor (/en/asset/<cat>/<id>). Correct approach = hit GovDeals' JSON search API (XHR the SPA calls), filter category=Real Estate, per county seller (Burke 29265 / Rutherford agency 554 / Buncombe buncombecountync / Cherokee). Storefronts are episodic — currently ~0 real estate listed, so live verification needs a cycle with RE present. NOT shipped (don't ship an unverifiable DOM parser).
+- ⏳ Terry Howe (SC FLC), Transylvania Times, Tryon AdHunter, Gannett iPublish (Henderson), Mitchell News, Column.us (McDowell/Burke), Gaffney Ledger, SC county tax portals (Pickens/Oconee/Cherokee/Spartanburg/Anderson) — DISCOVERED + URL-verified, NOT yet built. Each is an individual fiddly live-site build.
