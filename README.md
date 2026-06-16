@@ -1,142 +1,132 @@
 # Foreclosure Scraper
 
-Comprehensive weekly aggregator of foreclosure, tax sale, tax lien, and REO listings across upstate SC + nearby NC.
+Comprehensive weekly aggregator of foreclosure, lis-pendens (pre-foreclosure),
+tax sale, tax lien, probate, and REO listings across upstate SC + western NC.
 
-**Output:** Google Sheet, auto-emailed every Monday morning to greghhigh@gmail.com and cashrandolphhigh@gmail.com.
+**Output:** Google Sheet + a live web dashboard, auto-emailed every Tuesday
+morning to greghhigh@gmail.com and cashrandolphhigh@gmail.com.
 
-**Runs:** GitHub Actions cron, no laptop required.
+**Runs:** Locally on the Mac via a `launchd` schedule (see below). **100% free
+— no Apify, no paid proxies, no paid data.**
+
+> **Why local, not GitHub Actions?** The anti-bot sources (Zillow, Tyler
+> courts, law-firm trustee sites, etc.) require a real stealth browser
+> (Scrapling/camoufox). That works on a real Mac but gets fingerprinted and
+> blocked on GitHub's headless cloud runners — and the full pipeline exceeds
+> GitHub's 4-hour job cap. The GitHub Actions workflow is therefore retired
+> (disabled); `scripts/run_local.sh` is the canonical runner.
 
 ---
 
 ## What it covers
 
-**Counties (25 total)**
-- SC (11): Greenville, Spartanburg, Anderson, Pickens, Oconee, Cherokee, Union, Laurens, Abbeville, Greenwood, Newberry
-- NC (14): Rutherford, Cleveland, Henderson, Polk, Gaston, Mecklenburg, Buncombe, Transylvania, McDowell, Lincoln, Madison, Yancey, Mitchell, Burke
+**Scope: 18 counties** (this README used to say 25; the deny-list in
+`config.py` is authoritative).
 
-**Sources** (~30 active scrapers)
+- **SC (7):** Spartanburg, Anderson, Pickens, Oconee, Cherokee, Union, Laurens
+- **NC (11):** Rutherford, Cleveland, Henderson, Polk, Gaston, Buncombe,
+  Transylvania, McDowell, Lincoln, Mitchell, Burke
+
+> Denied per owner direction: SC Greenville/Greenwood/Abbeville/Newberry;
+> NC Mecklenburg/Madison/Yancey + all eastern/coastal NC. Anything in those
+> counties is filtered out by `_in_scope` even if a scraper returns it.
+
+**~59 source scrapers**, auto-discovered. Highlights:
 
 | Category | Sources |
 |---|---|
-| **National auction / aggregator** | Auction.com, Foreclosure.com, Hubzu, Xome, Bid4Assets, Zillow Foreclosures |
-| **Federal REO** | HUD HomeStore, Fannie Mae HomePath, Freddie Mac HomeSteps |
-| **Public notices** | publicnoticesc.com (SCPA), ncpublicnotices.com (NCPA) |
-| **Substitute trustee law firms** | Brock & Scott, Hutchens, Shapiro & Ingle (logs.com), Aldridge Pite, Rogers Townsend, Finkel, Riley Pope & Laney, Korn, Padgett, McMichael Taylor Gray, Bell Carrington |
-| **SC court / tax** | SC Judicial Public Index (all 11 counties), SC Forfeited Land Commission (all 11 county tax collectors), Greenville / Spartanburg / Anderson / Pickens Master in Equity |
-| **NC court / tax** | NC Clerk of Court foreclosure postings (all 14 counties), Mecklenburg Tax Foreclosure (Kania Law), Buncombe Tax, Zacchaeus Legal Group statewide |
-| **Open-data leads** | jungle_synthesizer probate/foreclosure/sheriff/tax-sale national feed |
+| **Pre-foreclosure (lis pendens)** | NC eCourts (Tyler), SC Public Index, CourtListener bankruptcy/civil |
+| **Foreclosure sales** | County Master-in-Equity rosters (Spartanburg, Anderson, + Oconee/Cherokee/Laurens/Union via publicindex.sccourts.org), substitute-trustee law firms (Hutchens, Brock & Scott, Bell Carrington, Finkel, McMichael, Kania, The Ingle Firm) |
+| **National auction / aggregator** | Auction.com, Bid4Assets, Hubzu, Xome, Zillow, Trulia, Realtor, Propwire |
+| **Federal REO** | HUD HomeStore, Fannie HomePath, Freddie HomeSteps, VA (VRM) |
+| **Public notices / newspapers** | ncnotices.com, local legal-notice papers |
+| **SC tax** | Forfeited Land Commission, tax-delinquent |
 
-**Listing types tracked**
-Foreclosure sale, sheriff sale, tax sale, tax lien, lis pendens, HOA sale, REO/bank-owned, auction.
+**Listing types:** foreclosure sale, sheriff sale, tax sale, tax lien, lis
+pendens, REO/bank-owned, auction, probate notice.
 
-**Property kinds tracked**
-Single family, condo, townhouse, multi-family, mobile/manufactured, commercial, raw land, mixed.
-
-**Per-listing fields**
-Address, county, state, ZIP, parcel ID, sale date, sale time, sale location, opening bid, judgment amount, plaintiff, defendant, trustee, case number, beds, baths, living sqft, year built, acreage, zoning, tax/market value, **condition score**, **estimated rehab cost**, **estimated ARV**, **suggested max bid (70% rule)**, **flags** (fire damage, vacant, foundation, etc.), source, source URL, first seen, last seen.
-
----
-
-## Setup (one-time, ~15 minutes)
-
-You do these three things on your phone or laptop. After that the weekly run is fully automated.
-
-### 1. Create a Google service account + share the Sheet
-
-1. Go to https://console.cloud.google.com/iam-admin/serviceaccounts
-2. Create a new project called `foreclosure-scraper` if you don't have one.
-3. Click **Create Service Account** → name it `foreclosure-scraper` → **Done**.
-4. Click the new service account → **Keys** tab → **Add Key** → **JSON** → download the file.
-5. Open the downloaded JSON in a text editor and copy the **entire contents** (it's a one-line JSON blob).
-6. Enable the **Google Sheets API** and **Google Drive API** in the project: https://console.cloud.google.com/apis/library
-7. Run the bootstrap script locally to create the destination Sheet and share it with both recipients:
-
-   ```bash
-   uv sync
-   GOOGLE_SERVICE_ACCOUNT_JSON='<paste the full JSON here>' uv run python scripts/bootstrap_sheet.py
-   ```
-
-   It prints a `SHEET_ID = <long string>` — copy that.
-
-### 2. Get a Gmail app password
-
-1. Go to https://myaccount.google.com/apppasswords (signed in as **greghhigh@gmail.com**).
-2. Type `Foreclosure Scraper` as the app name → **Create**.
-3. Copy the 16-character password (no spaces).
-
-### 3. Get the Apify API token
-
-1. Go to https://console.apify.com/account/integrations.
-2. Copy the **Personal API token**.
+**Per-listing fields:** address, county, state, ZIP, parcel/TMS, sale date/
+time/location, opening bid, **amount owed** (cross-sourced + labeled), plaintiff,
+defendant, trustee, case number, beds/baths/sqft/year/acreage, tax/market value,
+**condition tier**, **est. rehab**, **est. ARV**, **suggested max bid (70%
+rule)**, **deal verdict**, **owner name + mailing address (free skip trace)**,
+**absentee-owner flag**, flags (fire/vacant/foundation), **NEW-this-run flag**,
+source, source URL, first seen, last seen.
 
 ---
 
-## Add the 6 secrets to GitHub Actions
+## Running it
 
-Go to https://github.com/highwaymarketingco-wq/foreclosure-scraper/settings/secrets/actions and add:
+### Secrets (local)
+Stored as files in `.secrets/` (gitignored), loaded by `scripts/run_local.sh`:
 
-| Secret name | Value |
+| File | Purpose |
 |---|---|
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | The full one-line JSON blob from step 1.5 |
-| `SHEET_ID` | The Sheet ID from `bootstrap_sheet.py` output |
-| `GMAIL_SENDER` | `greghhigh@gmail.com` |
-| `GMAIL_APP_PASSWORD` | The 16-character password from step 2 |
-| `EMAIL_RECIPIENTS` | `greghhigh@gmail.com,cashrandolphhigh@gmail.com` |
-| `APIFY_TOKEN` | Token from step 3 |
+| `service_account.json` | Google service account (Sheets + Drive) |
+| `sheet_id.txt` | Destination Google Sheet ID |
+| `gmail_app_password.txt` | Gmail SMTP app password (greghhigh@gmail.com) |
+| `anthropic_api_key.txt` | Claude Vision (condition analysis) |
+| `courtlistener_token.txt` | CourtListener bankruptcy/civil |
+| `nc_ecourts_username.txt` / `nc_ecourts_password.txt` | *(optional)* NC eCourts auth; falls back to anonymous |
 
-That's it. The workflow at `.github/workflows/weekly.yml` runs every Monday at 9 AM UTC. To test sooner, go to **Actions → Weekly Foreclosure Scrape → Run workflow**.
-
----
-
-## Apify cost on the free tier
-
-Apify free plan = $5 in platform credits per month. Per-run targets:
-
-| Source | Cost model | Cap | Cost / run |
-|---|---|---|---|
-| Auction.com (`memo23/auction-com-scraper`) | $0.009 + $0.001/result | 400 | ~$0.41 |
-| Probate / foreclosure leads (`jungle_synthesizer/...`) | $0.10 + $0.001/result | 250 | ~$0.35 |
-| Zillow enrichment (`maxcopell/zillow-detail-scraper`) | $0.0036/result | 60 | ~$0.22 |
-| HUD (`martc03/hud-foreclosures`) | $0.00005 + $0.00001/result | 5,000 | ~$0.05 |
-| Hubzu / Xome / Foreclosure.com | rag-web-browser (free) | n/a | $0.00 |
-| **Total per weekly run** | | | **~$1.05** |
-| **Monthly (4 runs)** | | | **~$4.20** |
-
-That fits inside the $5/month free tier. Caps live in `src/foreclosure_scraper/budget.py`. Override individual caps with env vars like `CAP_AUCTION_DOT_COM=600` if you upgrade Apify and want more.
-
----
-
-## Running locally (optional)
-
+### One-time: install the weekly schedule
 ```bash
-cp .env.example .env
-# Fill in .env with the same values as your GitHub secrets
-uv sync
-uv run python -m foreclosure_scraper
+bash scripts/install_local_schedule.sh        # launchd, Tuesdays 9am local
+launchctl list | grep foreclosure             # verify
 ```
+
+### Run manually any time
+```bash
+bash scripts/run_local.sh                      # full pipeline → Sheet + email
+tail -f logs/local-run-*.log                   # watch it
+```
+
+`run_local.sh` exits non-zero and prints a loud line if listings drop sharply
+or the total is suspiciously low (fail-loud guard). The weekly email shows a
+red banner on a count drop and a 🆕 banner with the count of new properties
+(and fresh pre-foreclosures) since the last run.
+
+---
+
+## Enrichment knobs (env, optional)
+
+| Env | Default | Effect |
+|---|---|---|
+| `VISION_PROVIDER` | `anthropic` | Condition analysis provider (avoid `gemini` — quota walls) |
+| `VISION_MAX_LISTINGS` | `250` (local) | Cap on Vision API calls per run |
+| `SKIP_TRACE_PROVIDER` | `free` | `free` = tax-records owner/mailing + best-effort people-search phone |
+| `ROD_ENRICH_ON` | unset (off) | ROD deed enrichment — off because the vendor portals migrated and match 0 |
 
 ---
 
 ## Property assessment
 
-Each listing gets four estimated values based on heuristics + the data we can pull:
+Each listing gets heuristic + data-driven estimates:
 
-- **Condition Score (0-100)** — keyword scan of description for "fire damage / vacant / renovated / move-in ready" plus age penalty
-- **Est. Rehab** — per-square-foot tier based on the score: $10/sqft cosmetic up to $160/sqft gut rehab
-- **Est. ARV** — Zillow zestimate when we got it, else tax value × 1.25, else opening bid × 2.4
-- **Suggested Max Bid (70% rule)** — `0.70 × ARV - rehab - 5% fees`
+- **Condition tier** — Claude Vision on photos/aerials, else keyword scan + age
+- **Est. Rehab** — per-sqft tier from the condition tier
+- **Est. ARV** — geographically-filtered HomeHarvest comps (within 10 mi of the
+  subject; county-wide "kind-only" comps are flagged low-confidence and excluded
+  from ARV so far-away sales never inflate it)
+- **Suggested Max Bid** — `0.70 × ARV − rehab − fees`
+- **Amount owed** — cross-sourced waterfall: explicit judgment → opening bid
+  (≈ debt, labeled) → assessed value (labeled "not debt"); never misrepresented
 
-These are rough. Treat them as a first-pass screen, not a substitute for an inspection / BPO.
+These are a first-pass screen, not a substitute for an inspection / BPO.
 
 ---
 
-## Adding a new source
+## Adding a source
 
 1. Drop a file in `src/foreclosure_scraper/scrapers/<category>/<name>.py`.
-2. Subclass `BaseScraper`. Set `slug`, `name`, `category`. Implement `async def fetch()` returning `Listing` objects.
-3. The registry auto-discovers it on next run.
+2. Subclass `BaseScraper`; set `slug`/`name`/`category`; implement
+   `async def fetch()` returning `Listing` objects.
+3. Check the county is in scope (`config.in_scope`) — denied-county data is
+   filtered out downstream, so don't scrape what gets dropped.
+4. The registry auto-discovers it on next run.
 
-See `src/foreclosure_scraper/scrapers/law_firms/brock_scott.py` for a minimal example.
+For JS-rendered / anti-bot sites, use `from ..render import fetch_rendered`
+(free local stealth browser) — see `scrapers/law_firms/aldridge_pite.py`.
 
 ---
 
@@ -144,24 +134,19 @@ See `src/foreclosure_scraper/scrapers/law_firms/brock_scott.py` for a minimal ex
 
 ```
 src/foreclosure_scraper/
-├── main.py              # orchestrator
-├── models.py            # Listing schema
-├── base_scraper.py      # BaseScraper interface
-├── config.py            # county lists, scope filters
-├── budget.py            # Apify free-tier cost governor
-├── http_client.py       # shared httpx client
-├── apify_helper.py      # Apify SDK wrapper
-├── enrichment.py        # Zillow detail + heuristic fills
-├── assessment.py        # condition / ARV / rehab / max bid
-├── dedupe.py            # cross-source dedupe (parcel + fuzzy address)
-├── link_validator.py    # drops 404 / dead listings every run
-├── sheets.py            # Google Sheets writer
-├── email_sender.py      # Gmail SMTP digest
-└── scrapers/            # all source modules, auto-discovered
-    ├── national/        # 10 nationwide aggregators
-    ├── public_notices/  # SCPA + NCPA legal notice search
-    ├── law_firms/       # 11 substitute trustee firms
-    ├── counties_sc/     # SC court + tax
-    ├── counties_nc/     # NC court + tax
-    └── newspapers/      # newspaper legal-notice direct (mostly covered by public_notices)
+├── main.py                  # orchestrator (scrape → dedupe → scope → enrich → value → write)
+├── models.py                # Listing schema + dedupe_key
+├── base_scraper.py          # BaseScraper interface
+├── config.py                # county lists + SCOPE_DENY_COUNTIES (authoritative scope)
+├── render.py                # FREE stealth-browser fetcher (replaces old Apify path)
+├── http_client.py           # shared httpx client
+├── enrichment*.py           # GIS, comps, vision, amount_owed, skip_trace, judgment, …
+├── new_listings.py          # new-this-run / early-access detection
+├── valuation/               # ARV / rehab / max-bid / deal verdict
+├── dedupe.py · carryover.py · validation.py · link_validator.py
+├── sheets.py · email_sender.py · web_artifact.py
+└── scrapers/                # all source modules, auto-discovered
+scripts/
+├── run_local.sh             # canonical local runner (loads .secrets/, runs pipeline)
+└── install_local_schedule.sh# launchd weekly schedule installer
 ```
