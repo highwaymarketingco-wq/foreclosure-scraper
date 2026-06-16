@@ -17,31 +17,30 @@ from foreclosure_scraper.scrapers.counties_nc.nc_ecourts_lis_pendens import (
 )
 
 
-# Sources added in the May 2026 expansion. All emit listings that
-# typically lack sale_date — must be in DATELESS_OK_SOURCES.
-NEW_SOURCES_2026_05 = {
+# Sources that emit listings which typically lack sale_date — these must
+# be in DATELESS_OK_SOURCES or _active_only would drop them. Filtered to
+# currently-registered scrapers at test time so deleted scrapers (wake_tax,
+# durham_tax, charlotte_demolition, etc., pruned in later scope cuts) don't
+# break the audit.
+DATELESS_EMITTING_SOURCES = {
     "counties_sc.sc_courtrosters",
-    "counties_nc.wake_tax",
-    "counties_nc.forsyth_tax",
-    "counties_nc.guilford_tax",
-    "counties_nc.new_hanover_tax",
-    "counties_nc.durham_tax",
     "counties_nc.nc_rod_substitute_trustee",
     "reo.usda_rd",
     "reo.treasury_seized",
     "reo.vrm_va_reo",
-    "city_websites.charlotte_demolition",
     "national.courtlistener_civil",
     "national.courtlistener_adversary",
 }
 
 
 def test_all_new_sources_in_dateless_ok():
-    """Without these entries, _active_only would drop any listing from
-    these sources that has sale_date=None. Most do — they list inventory
-    that's not yet on a specific auction date."""
-    missing = NEW_SOURCES_2026_05 - DATELESS_OK_SOURCES
-    assert not missing, f"new sources missing from DATELESS_OK_SOURCES: {missing}"
+    """Every still-registered dateless-emitting source must be in
+    DATELESS_OK_SOURCES, else _active_only drops its sale_date=None rows."""
+    from foreclosure_scraper.scrapers._registry import all_scrapers
+    registered = {s.slug for s in all_scrapers()}
+    expected = DATELESS_EMITTING_SOURCES & registered
+    missing = expected - DATELESS_OK_SOURCES
+    assert not missing, f"dateless sources missing from DATELESS_OK_SOURCES: {missing}"
 
 
 def test_nc_ecourts_targets_all_in_scope():
@@ -57,12 +56,11 @@ def test_nc_ecourts_targets_all_in_scope():
 
 
 def test_in_scope_works_for_kept_counties():
-    """Spot-check the NC counties currently in the user's target territory.
-    The 2026-05-07 scope rollbacks (a + b) removed eastern NC + Charlotte
-    + Madison/Yancey. WNC core + coastal NC keys remain."""
+    """Spot-check the 11 in-scope NC counties. Eastern NC + Charlotte +
+    Madison/Yancey were pruned in the 2026-05-07 rollbacks; coastal NC
+    (New Hanover/Brunswick/Onslow) was pruned 2026-05-15."""
     for county in ("Henderson", "Buncombe", "Gaston", "Cleveland", "Rutherford",
-                   "Polk", "Transylvania", "Burke", "McDowell", "Lincoln",
-                   "New Hanover", "Brunswick", "Onslow"):
+                   "Polk", "Transylvania", "Burke", "McDowell", "Lincoln", "Mitchell"):
         assert in_scope(county, "NC"), f"NC county {county} should be in scope"
 
 

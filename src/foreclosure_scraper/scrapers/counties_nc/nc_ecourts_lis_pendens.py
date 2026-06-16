@@ -53,19 +53,22 @@ log = structlog.get_logger()
 SERVICE_URL = "https://portal-nc.tylertech.cloud/app/NCJudgmentSearchService/search"
 APP_BASE = "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/"
 
-# Target counties for the eCourts judgment search. Must mirror
-# config.NC_COUNTIES — Tyler indexes them as "<County> District Court" /
-# "<County> Superior Court". Iteration history:
+# Target counties for the eCourts judgment search. Must mirror the
+# in-scope NC counties (config.NC_COUNTIES minus SCOPE_DENY_COUNTIES) —
+# Tyler indexes them as "<County> District Court" / "<County> Superior
+# Court". Iteration history:
 #   2026-05-07a — pruned 11 eastern-NC counties (Wake/Forsyth/etc).
 #   2026-05-07b — pruned 3 more (Mecklenburg/Madison/Yancey) per user
 #     scope rollback. Mecklenburg = Charlotte; user out of that market.
+#   2026-06-16 — dropped New Hanover/Brunswick/Onslow: they were pruned
+#     2026-05-15 ("anything east of Charlotte") and are in
+#     SCOPE_DENY_COUNTIES, so querying them just scraped rows that the
+#     scope filter then discarded.
 TARGET_COUNTIES = [
-    # WNC mountains + foothills
+    # WNC mountains + foothills — the 11 in-scope NC counties
     "Rutherford", "Cleveland", "Henderson", "Polk", "Gaston",
     "Buncombe", "Transylvania", "McDowell", "Lincoln",
     "Mitchell", "Burke",
-    # User-key coastal NC counties
-    "New Hanover", "Brunswick", "Onslow",
 ]
 
 
