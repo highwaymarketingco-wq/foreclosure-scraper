@@ -167,12 +167,29 @@ SQFT_BAND_PCT = 0.20    # ±20% of subject sqft
 YEAR_BAND = 15          # ±15 years
 BED_BAND_EXACT = True   # bedrooms must match exactly
 LAND_LOT_BAND_PCT = 0.50  # for land, ±50% acreage tolerance
+# Geographic accuracy: when the subject has coordinates, comps must be
+# within this radius. Prevents a rural subject from being valued against
+# county-seat sales 20+ miles away (the "inaccurate comps" complaint).
+COMP_RADIUS_MILES = 10.0
 
 
 def _within_band(value: float, target: float, pct: float) -> bool:
     if not value or not target:
         return False
     return target * (1 - pct) <= value <= target * (1 + pct)
+
+
+def _haversine_miles(lat1, lon1, lat2, lon2) -> float | None:
+    """Great-circle distance in miles, or None if any coord is missing."""
+    try:
+        from math import asin, cos, radians, sin, sqrt
+        lat1, lon1, lat2, lon2 = float(lat1), float(lon1), float(lat2), float(lon2)
+    except (TypeError, ValueError):
+        return None
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    return 3958.8 * 2 * asin(min(1.0, sqrt(a)))
 
 
 def _filter_by_kind(pool: list[dict], target_kind: str) -> list[dict]:
@@ -212,18 +229,35 @@ def _pick_3_comps(target: Listing, sold_pool: list[dict]) -> list[dict]:
         return []
     match_quality = "kind"
 
+    # Stage 1.5: geographic gate. If the subject has coordinates, attach a
+    # distance to every comp that has coordinates and keep only those within
+    # COMP_RADIUS_MILES. This is the most accurate anchor — it stops a rural
+    # subject from being compared against county-seat sales 20+ miles away.
+    has_geo = target.latitude is not None and target.longitude is not None
+    if has_geo:
+        near = []
+        for s in kind_pool:
+            d = _haversine_miles(target.latitude, target.longitude,
+                                 s.get("latitude"), s.get("longitude"))
+            if d is not None and d <= COMP_RADIUS_MILES:
+                s = {**s, "_distance_mi": round(d, 1)}
+                near.append(s)
+        if near:
+            kind_pool = near
+            match_quality = "kind+geo"
+
     # Stage 2: zip-match within same kind
     zip_pool = [s for s in kind_pool if str(s.get("zip_code") or "").strip() == target_zip] if target_zip else []
     pool = zip_pool if zip_pool else kind_pool
     if zip_pool:
-        match_quality = "zip+kind"
+        match_quality = "zip+kind" + ("+geo" if has_geo else "")
     elif target_city:
         city_pool = [s for s in kind_pool
                      if str(s.get("city") or "").strip().lower() == target_city
                      and str(s.get("state") or "").strip().upper() == target_state]
         if city_pool:
             pool = city_pool
-            match_quality = "city+kind"
+            match_quality = "city+kind" + ("+geo" if has_geo else "")
 
     # Stage 3 (LAND ONLY): match by lot acreage band — sqft is meaningless for raw land
     if target_kind == "land" and target_lot:
@@ -257,11 +291,20 @@ def _pick_3_comps(target: Listing, sold_pool: list[dict]) -> list[dict]:
             pool = yr_filt
             match_quality += "+era"
 
-    # Sort by recency
+    # Sort: closest-first when we have distances, else most-recent-first.
     try:
-        pool.sort(key=lambda s: str(s.get("last_sold_date") or "0000"), reverse=True)
+        if has_geo and any(s.get("_distance_mi") is not None for s in pool):
+            pool.sort(key=lambda s: (s.get("_distance_mi") if s.get("_distance_mi") is not None else 9e9))
+        else:
+            pool.sort(key=lambda s: str(s.get("last_sold_date") or "0000"), reverse=True)
     except Exception:
         pass
+
+    # Honesty flag: when the only anchor was "kind" — no zip, no city, and no
+    # geographic coordinates — the comps are county-wide, NOT local. Mark them
+    # so ARV downstream treats them as low-confidence instead of presenting
+    # far-away sales as comparable.
+    geographically_anchored = ("geo" in match_quality) or ("zip" in match_quality) or ("city" in match_quality)
 
     out: list[dict] = []
     for s in pool[:3]:
@@ -279,6 +322,8 @@ def _pick_3_comps(target: Listing, sold_pool: list[dict]) -> list[dict]:
             "baths": _num(s.get("full_baths")),
             "year_built": int(s["year_built"]) if s.get("year_built") and str(s["year_built"]).replace(".0", "").isdigit() else None,
             "kind": _classify_kind(s),
+            "distance_mi": s.get("_distance_mi"),
+            "geo_anchored": geographically_anchored,
             "price_per_sqft": round(sold_price / sqft, 2) if sold_price and sqft else None,
             "url": s.get("property_url"),
             "match_quality": match_quality,
@@ -479,8 +524,19 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
             comps = _pick_3_comps(li, sold_pool)
             if comps:
                 li.raw["comps"] = comps
+                # Honesty gate: only derive ARV $/sqft from comps that are
+                # geographically anchored (same zip / city / within radius).
+                # County-wide "kind only" comps are kept in raw for
+                # transparency but must NOT drive ARV — that was the
+                # "inaccurate comps" failure mode.
+                anchored = bool(comps and comps[0].get("geo_anchored"))
+                if not anchored:
+                    li.raw["comps_geo_warning"] = (
+                        "comps are county-wide (no same-zip/city/nearby match) — "
+                        "ARV from these is low confidence"
+                    )
                 ppsf = [c["price_per_sqft"] for c in comps if c.get("price_per_sqft")]
-                if ppsf:
+                if ppsf and anchored:
                     ppsf.sort()
                     # Tear-down filter: drop bottom-quintile $/sqft comps when
                     # we have 4+ data points. Comps that sold for outlier-low
