@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Local weekly run — the free, stealth-browser pipeline on this Mac.
+#
+# Loads secrets from .secrets/, runs the full foreclosure pipeline (which
+# writes the Google Sheet + emails Greg & Cash), and logs to logs/.
+#
+# Run manually:           bash scripts/run_local.sh
+# Run via launchd:        installed by scripts/install_local_schedule.sh
+#
+# 100% free: no Apify, no proxies. Anti-bot sites (Zillow/Tyler/law firms)
+# are handled by the local Scrapling stealth browser — which is exactly why
+# this runs on your Mac and not on headless CI.
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+SECRETS="$ROOT/.secrets"
+mkdir -p "$ROOT/logs"
+STAMP="$(date +%Y%m%dT%H%M%S)"
+LOG="$ROOT/logs/local-run-$STAMP.log"
+
+# ---- load secrets from .secrets/ -------------------------------------------
+load() {  # load <ENV_NAME> <file> [required]
+  local name="$1" file="$2" required="${3:-}"
+  if [[ -f "$file" ]]; then
+    export "$name"="$(cat "$file")"
+  elif [[ "$required" == "required" ]]; then
+    echo "FATAL: required secret $name missing ($file)" | tee -a "$LOG"
+    exit 1
+  fi
+}
+
+load GOOGLE_SERVICE_ACCOUNT_JSON "$SECRETS/service_account.json" required
+load SHEET_ID                    "$SECRETS/sheet_id.txt"         required
+load GMAIL_APP_PASSWORD          "$SECRETS/gmail_app_password.txt" required
+load ANTHROPIC_API_KEY           "$SECRETS/anthropic_api_key.txt"
+load COURTLISTENER_TOKEN         "$SECRETS/courtlistener_token.txt"
+load GEMINI_API_KEY              "$SECRETS/gemini_api_key.txt"
+load NC_ECOURTS_USERNAME         "$SECRETS/nc_ecourts_username.txt"
+load NC_ECOURTS_PASSWORD         "$SECRETS/nc_ecourts_password.txt"
+
+# ---- defaults (config.py also defaults these, set here for clarity) --------
+export GMAIL_SENDER="${GMAIL_SENDER:-greghhigh@gmail.com}"
+export EMAIL_RECIPIENTS="${EMAIL_RECIPIENTS:-greghhigh@gmail.com,cashrandolphhigh@gmail.com}"
+export VISION_PROVIDER="${VISION_PROVIDER:-anthropic}"
+export LOG_LEVEL="${LOG_LEVEL:-INFO}"
+export PYTHONUNBUFFERED=1
+
+# If no NC eCourts creds are present, fall back to anonymous access.
+if [[ -z "${NC_ECOURTS_USERNAME:-}" ]]; then
+  export NC_ECOURTS_USE_ANONYMOUS=1
+fi
+
+# Stealth-browser tuning (real browsers are heavy; keep concurrency modest).
+export RENDER_HEADLESS="${RENDER_HEADLESS:-1}"
+export RENDER_CONCURRENCY="${RENDER_CONCURRENCY:-2}"
+
+echo "==> foreclosure-scraper local run $STAMP" | tee -a "$LOG"
+echo "==> sheet=${SHEET_ID:0:8}…  vision=$VISION_PROVIDER  log=$LOG" | tee -a "$LOG"
+
+# Ensure deps + the stealth browser are present (idempotent, fast if cached).
+uv sync --frozen >>"$LOG" 2>&1 || uv sync >>"$LOG" 2>&1
+uv run python -m playwright install chromium >>"$LOG" 2>&1 || true
+uv run scrapling install >>"$LOG" 2>&1 || true
+
+# ---- run the pipeline ------------------------------------------------------
+START=$(date +%s)
+uv run python -m foreclosure_scraper >>"$LOG" 2>&1
+RC=$?
+END=$(date +%s)
+
+echo "==> exit=$RC  elapsed=$(( (END-START)/60 ))m  $(date)" | tee -a "$LOG"
+
+# Keep the 12 most recent run logs; prune older.
+ls -1t "$ROOT"/logs/local-run-*.log 2>/dev/null | tail -n +13 | xargs rm -f 2>/dev/null || true
+
+exit $RC
