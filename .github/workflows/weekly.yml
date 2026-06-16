@@ -20,17 +20,19 @@ permissions:
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    # No job-level timeout — let it run as long as it needs. GitHub-hosted
-    # runners cap at 6h for public repos (free tier) which is the only hard
-    # ceiling. Prior 240-min cap was cancelling otherwise-healthy runs as
-    # the scraper set grew (2026-05-19 hit it at 4h on the tier2 additions).
-    timeout-minutes: 360
+    # 90-min timeout was hitting the wall at 1h 30m — the May 2026 expansion
+    # (27 NC counties, 13 new scrapers, RECAP fetches, full Vision pool)
+    # pushed the run past the prior ~60-min baseline. 240 min gives plenty
+    # of headroom and matches GitHub-hosted-runner free-tier limits.
+    timeout-minutes: 240
     env:
       SHEET_ID: ${{ secrets.SHEET_ID }}
       GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
       GMAIL_SENDER: ${{ secrets.GMAIL_SENDER }}
       GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
       EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
+      APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+      APIFY_FREE_TIER_ONLY: "1"
       # Vision provider switch — see patch-run-scrapers.yml for details.
       VISION_PROVIDER: ${{ vars.VISION_PROVIDER || 'anthropic' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
