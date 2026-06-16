@@ -47,6 +47,11 @@ export VISION_PROVIDER="${VISION_PROVIDER:-anthropic}"
 export LOG_LEVEL="${LOG_LEVEL:-INFO}"
 export PYTHONUNBUFFERED=1
 
+# Free skip tracing: reliable tax-records owner + mailing address, plus
+# best-effort people-search phone for the most imminent sales. Zero cost.
+export SKIP_TRACE_PROVIDER="${SKIP_TRACE_PROVIDER:-free}"
+export FREE_SKIPTRACE_PHONE_MAX="${FREE_SKIPTRACE_PHONE_MAX:-40}"
+
 # If no NC eCourts creds are present, fall back to anonymous access.
 if [[ -z "${NC_ECOURTS_USERNAME:-}" ]]; then
   export NC_ECOURTS_USE_ANONYMOUS=1

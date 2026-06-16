@@ -38,6 +38,7 @@ Cost & rate-limit control:
 from __future__ import annotations
 
 import os
+import re
 from datetime import datetime
 from typing import Optional, Protocol
 
@@ -86,28 +87,128 @@ class TaxRecordsOnlyProvider:
     async def lookup(self, li: Listing) -> Optional[dict]:
         raw = li.raw if isinstance(li.raw, dict) else {}
         gis = raw.get("gis") or {}
+        # County GIS enrichment stores these as gis["mailing"] / gis["owner"]
+        # (see enrichment_arcgis). Older aliases kept for safety.
         mailing = (
-            gis.get("owner_mailing_address")
+            gis.get("mailing")
+            or gis.get("owner_mailing_address")
             or gis.get("mailing_address")
             or gis.get("Owner_Mailing_Address")
         )
-        if not mailing:
+        owner = gis.get("owner") or gis.get("Owner") or li.defendant
+        if not mailing and not owner:
             return None
 
         prop_addr = (li.street_address or "").lower().strip()
-        mailing_clean = str(mailing).lower().strip()
-        diff = bool(prop_addr) and prop_addr not in mailing_clean and mailing_clean not in prop_addr
+        mailing_clean = str(mailing or "").lower().strip()
+        diff = bool(prop_addr) and bool(mailing_clean) and \
+            prop_addr not in mailing_clean and mailing_clean not in prop_addr
 
         return {
             "provider": self.name,
-            "owner_mailing_address": str(mailing),
+            "owner_name": str(owner) if owner else None,
+            "owner_mailing_address": str(mailing) if mailing else None,
             "owner_mailing_diff_from_property": diff,
+            "absentee_owner": diff,
             "phone_numbers": [],
             "email_addresses": [],
             "additional_owners": [],
             "skip_trace_at": datetime.utcnow().isoformat() + "Z",
             "confidence": "medium" if diff else "low",
         }
+
+
+class FreePeopleSearchProvider:
+    """Best-effort FREE phone lookup via a public people-search site,
+    driven by the local stealth browser (these sites are bot-protected).
+
+    Keyed on owner/defendant name + property city/state. Accuracy is
+    lower than paid credit-header data (~50-70%), and results are clearly
+    marked low/medium confidence. Bounded + slow (real browser per lookup),
+    so it's only used for the highest-priority listings.
+
+    Set FREE_SKIPTRACE_SITE to override the base query URL if a site
+    changes. Returns {} (not None) so the combined provider can still
+    attach the reliable tax-records data.
+    """
+    name = "free_people_search"
+    # FastPeopleSearch: name + city/state query, phones rendered in the card.
+    BASE = os.environ.get(
+        "FREE_SKIPTRACE_SITE",
+        "https://www.fastpeoplesearch.com/name/{name}_{city}-{state}",
+    )
+
+    _PHONE_RE = re.compile(r"\(?\b\d{3}\)?[-.\s]\d{3}[-.\s]\d{4}\b")
+
+    async def lookup(self, li: Listing) -> Optional[dict]:
+        name = (li.defendant or "").strip()
+        if not name or not li.city or not li.state:
+            return None
+        # Normalize "LAST FIRST" / "First Last" → "first-last" slug.
+        parts = re.sub(r"[^A-Za-z\s]", " ", name).split()
+        if len(parts) < 2:
+            return None
+        slug = "-".join(p.lower() for p in parts[:3])
+        city_slug = re.sub(r"\s+", "-", li.city.strip().lower())
+        url = self.BASE.format(name=slug, city=city_slug, state=li.state.lower())
+
+        try:
+            from .render import fetch_rendered
+            text = await fetch_rendered(url)
+        except Exception as exc:
+            log.debug("skip_trace.people_search.error", error=str(exc)[:120])
+            return None
+        if not text:
+            return None
+
+        phones = []
+        for m in self._PHONE_RE.finditer(text):
+            p = re.sub(r"[^\d]", "", m.group(0))
+            if len(p) == 10 and p not in phones:
+                phones.append(p)
+            if len(phones) >= 4:
+                break
+        if not phones:
+            return None
+        return {
+            "provider": self.name,
+            "phone_numbers": phones,
+            "phone_confidence": "low",   # free-site match, unverified
+            "phone_source_url": url,
+            "skip_trace_at": datetime.utcnow().isoformat() + "Z",
+        }
+
+
+class FreeProvider:
+    """Combined FREE skip trace: reliable tax-records owner + mailing
+    address, PLUS best-effort people-search phone for the most
+    time-sensitive listings. Zero cost. This is the default 'free' mode."""
+    name = "free"
+
+    def __init__(self):
+        self.tax = TaxRecordsOnlyProvider()
+        self.people = FreePeopleSearchProvider()
+        # People-search is slow (real browser); only attempt it for the
+        # top N closest-to-sale listings to keep run time sane.
+        self.phone_budget = int(os.environ.get("FREE_SKIPTRACE_PHONE_MAX", "40"))
+        self._phone_used = 0
+
+    async def lookup(self, li: Listing) -> Optional[dict]:
+        result = await self.tax.lookup(li)  # reliable, free, no network
+        # Try a phone only for imminent sales, within budget.
+        want_phone = (
+            self._phone_used < self.phone_budget
+            and li.defendant and li.city and li.state
+        )
+        if want_phone:
+            self._phone_used += 1
+            phone_res = await self.people.lookup(li)
+            if phone_res:
+                result = result or {"provider": "free"}
+                result["phone_numbers"] = phone_res["phone_numbers"]
+                result["phone_confidence"] = phone_res.get("phone_confidence", "low")
+                result["phone_source_url"] = phone_res.get("phone_source_url")
+        return result
 
 
 class BatchSkipTracingProvider:
@@ -187,6 +288,8 @@ class BatchSkipTracingProvider:
 def _resolve_provider() -> SkipTraceProvider:
     """Pick the provider from env. Defaults to noop (free, no-op)."""
     name = (os.environ.get("SKIP_TRACE_PROVIDER") or "none").strip().lower()
+    if name == "free":
+        return FreeProvider()
     if name == "tax_records_only":
         return TaxRecordsOnlyProvider()
     if name == "batchskiptracing":
