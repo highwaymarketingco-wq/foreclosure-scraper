@@ -945,6 +945,17 @@ async def run() -> int:
     except Exception:
         log.error("judgment_detail.failed", traceback=traceback.format_exc())
 
+    # Cross-source "amount owed" waterfall — fills a single, honestly-labeled
+    # debt figure (judgment → opening-bid proxy → assessed value) so the
+    # dashboard always shows something with clear provenance. Runs AFTER
+    # judgment enrichment so explicit judgments win.
+    try:
+        from .enrichment_amount_owed import enrich_amount_owed
+        s = enrich_amount_owed(enriched)
+        if s: enrichment_stats["amount_owed"] = s
+    except Exception:
+        log.error("amount_owed.failed", traceback=traceback.format_exc())
+
     # Pre-write data validation gate — runs BEFORE valuation so the
     # calculator sees validated inputs. Catches recurring data-quality
     # bugs at a single chokepoint: state/county mismatch, casing fixes

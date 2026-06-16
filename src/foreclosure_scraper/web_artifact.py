@@ -26,6 +26,7 @@ RAW_KEEP = {
     "flags": "*",
     "assessment": "*",
     "calc": "*",      # ARV / rehab / max_bid / ROI / cash-on-cash
+    "amount_owed": "*",  # cross-sourced debt figure {value, source, label, confidence, is_actual_debt}
     "grade": "*",     # A-F per-dimension + overall
     "location": ("median_household_income", "median_home_value",
                  "owner_occupied_pct", "unemployment_pct"),
