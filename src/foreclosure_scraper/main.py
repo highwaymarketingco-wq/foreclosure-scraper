@@ -714,10 +714,23 @@ async def run() -> int:
     # Default 600 ≈ $12-18 max per run (Sonnet 4.5 pricing). Without this
     # cap, an unexpected listing-count spike could blow past the Anthropic
     # spend budget for the week before anyone notices.
+    # HARD wall-clock cap: a rate-limited (429) API key can otherwise stall
+    # Vision for hours and hang the whole run before it ever writes the Sheet
+    # (observed 2026-06-17: 47/250 scored in 18h on a throttled key). Vision
+    # is best-effort condition scoring — listings it doesn't reach fall back
+    # to the regex/age condition tier. So we time-box it and ALWAYS proceed.
     try:
         from .enrichment_vision import enrich_with_vision
         vision_cap = int(os.environ.get("VISION_MAX_LISTINGS", "600"))
-        await enrich_with_vision(enriched, max_listings=vision_cap)
+        vision_budget_s = float(os.environ.get("VISION_MAX_SECONDS", "900"))  # 15 min
+        try:
+            await asyncio.wait_for(
+                enrich_with_vision(enriched, max_listings=vision_cap),
+                timeout=vision_budget_s,
+            )
+        except asyncio.TimeoutError:
+            log.warning("vision.time_capped", budget_s=vision_budget_s,
+                        note="proceeding; unscored listings use regex/age condition")
     except Exception:
         log.error("vision.failed", traceback=traceback.format_exc())
 

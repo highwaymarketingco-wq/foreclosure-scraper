@@ -57,7 +57,11 @@ export FREE_SKIPTRACE_PHONE_MAX="${FREE_SKIPTRACE_PHONE_MAX:-40}"
 # Anthropic (set above) and cap Vision so the run completes. Raise
 # VISION_MAX_LISTINGS later for deeper condition coverage. ROD deed
 # enrichment stays OFF (broken vendor portals = 27 min for 0 matches).
-export VISION_MAX_LISTINGS="${VISION_MAX_LISTINGS:-250}"
+export VISION_MAX_LISTINGS="${VISION_MAX_LISTINGS:-150}"
+# Hard wall-clock cap on the Vision step (a rate-limited key stalled a run
+# for 18h once). After this, the pipeline proceeds; unscored listings fall
+# back to the regex/age condition tier.
+export VISION_MAX_SECONDS="${VISION_MAX_SECONDS:-600}"
 # ROD_ENRICH_ON unset = skipped (default).
 
 # If no NC eCourts creds are present, fall back to anonymous access.
