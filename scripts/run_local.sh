@@ -119,6 +119,36 @@ if [ -n "$TOTAL" ]; then
   fi
 fi
 
+# ---- publish dashboard data to GitHub Pages --------------------------------
+# The pipeline wrote docs/listings.json (with images, Vision condition,
+# A-F grade, ARV/max-bid, comps, amount_owed) + run_health.json locally.
+# The retired cloud workflow used to push these so GitHub Pages served the
+# live dashboard; now the local run must do it. Only publish on a healthy
+# run so we never overwrite a good dashboard with a broken/empty one.
+if [[ "$RC" -eq 0 && -f "$ROOT/docs/listings.json" ]]; then
+  PUB_FILES=(docs/listings.json docs/run_meta.json docs/run_health.json
+             docs/foreclosure_sold_pool.json docs/multifamily.json)
+  if command -v git >/dev/null 2>&1; then
+    cd "$ROOT"
+    git add "${PUB_FILES[@]}" 2>/dev/null || true
+    if ! git diff --staged --quiet 2>/dev/null; then
+      git commit -q -m "local run: refresh dashboard data ($(date +%Y-%m-%d))" 2>>"$LOG" || true
+      # Rebase over any remote changes, then push (docs/ doesn't touch
+      # .github/workflows, so the normal token can push it).
+      git pull --rebase --autostash origin main >>"$LOG" 2>&1 || true
+      if git push origin main >>"$LOG" 2>&1; then
+        echo "==> ✓ dashboard published to GitHub (Pages will update in ~1 min)" | tee -a "$LOG"
+      else
+        echo "==> ⚠️  dashboard commit made locally but push failed — see log" | tee -a "$LOG"
+      fi
+    else
+      echo "==> dashboard data unchanged — nothing to publish" | tee -a "$LOG"
+    fi
+  fi
+else
+  echo "==> skipping dashboard publish (run unhealthy: RC=$RC)" | tee -a "$LOG"
+fi
+
 # Keep the 12 most recent run logs; prune older.
 ls -1t "$ROOT"/logs/local-run-*.log 2>/dev/null | tail -n +13 | xargs rm -f 2>/dev/null || true
 
