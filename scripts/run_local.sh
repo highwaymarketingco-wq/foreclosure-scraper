@@ -36,14 +36,29 @@ load SHEET_ID                    "$SECRETS/sheet_id.txt"         required
 load GMAIL_APP_PASSWORD          "$SECRETS/gmail_app_password.txt" required
 load ANTHROPIC_API_KEY           "$SECRETS/anthropic_api_key.txt"
 load COURTLISTENER_TOKEN         "$SECRETS/courtlistener_token.txt"
-load GEMINI_API_KEY              "$SECRETS/gemini_api_key.txt"
 load NC_ECOURTS_USERNAME         "$SECRETS/nc_ecourts_username.txt"
 load NC_ECOURTS_PASSWORD         "$SECRETS/nc_ecourts_password.txt"
+
+# Gemini Vision keys — one per Google account (free tier 1500 req/day each).
+# The vision code auto-rotates to the next key when one hits its daily limit,
+# so 4 keys = ~6000 free calls/day. Drop each account's key in its own file:
+#   .secrets/gemini_api_key_1.txt  (account 1)  ... gemini_api_key_4.txt
+load GEMINI_API_KEY              "$SECRETS/gemini_api_key.txt"
+load GEMINI_API_KEY_1            "$SECRETS/gemini_api_key_1.txt"
+load GEMINI_API_KEY_2            "$SECRETS/gemini_api_key_2.txt"
+load GEMINI_API_KEY_3            "$SECRETS/gemini_api_key_3.txt"
+load GEMINI_API_KEY_4            "$SECRETS/gemini_api_key_4.txt"
 
 # ---- defaults (config.py also defaults these, set here for clarity) --------
 export GMAIL_SENDER="${GMAIL_SENDER:-greghhigh@gmail.com}"
 export EMAIL_RECIPIENTS="${EMAIL_RECIPIENTS:-greghhigh@gmail.com,cashrandolphhigh@gmail.com}"
-export VISION_PROVIDER="${VISION_PROVIDER:-anthropic}"
+# Vision provider: prefer FREE Gemini when any Gemini key is present
+# (4 accounts auto-rotate); fall back to Anthropic only if no Gemini key.
+if [[ -n "${GEMINI_API_KEY:-}${GEMINI_API_KEY_1:-}${GEMINI_API_KEY_2:-}" ]]; then
+  export VISION_PROVIDER="${VISION_PROVIDER:-gemini}"
+else
+  export VISION_PROVIDER="${VISION_PROVIDER:-anthropic}"
+fi
 export LOG_LEVEL="${LOG_LEVEL:-INFO}"
 export PYTHONUNBUFFERED=1
 
