@@ -114,3 +114,19 @@ Spartanburg/Anderson/Pickens/Oconee/Cherokee tax PDFs + portals.
 - USMS = Bid4Assets (covered). SBA = no portal (GovDeals/Bid4Assets). GSA = surplus not distressed, sparse. IRS irsauctions.gov = timeout-prone + tiny volume + overlaps CWS.
 - **Tax platforms have NO NC/SC footprint** (important): RealAuction/GovEase/Zeus serve other states. NC = courthouse-step sales via county law firms (Kania/ZLS); SC = in-house county treasurers. That inventory is county-level, not a national platform.
 - ForeclosureListings.com / TaxSaleResources = paywalled re-aggregators.
+
+## REGIONAL BANK / CREDIT UNION REO (verified 2026-06-16 — owner lead)
+Big nationals are gated, but regional Carolina institutions post REO publicly:
+- ✅ **First Citizens Bank** `firstcitizens.com/real-estate` — BUILT (first_citizens_reo.py). Clean HTML table (Location=<th>), stealth-fetched, NC/SC filtered. Live: 4 NC/SC. 61 scrapers.
+- ⏳ **First Bank** `localfirstbank.com/about-us/bank-owned-properties/` — JS-rendered table + map + ZIP-radius search, NC inventory. Needs stealth + structure parse. QUEUED.
+- ⏳ **Founders FCU** (upstate SC) `foundersfcu.com/foreclosures` — JS carousel (~9 props, live NC), needs slide-iteration. QUEUED.
+- 🔁 **United Community Bank** (Greenville SC) `ucbi.com/properties-for-sale` — Angular list, infra live but EMPTY now; dormant monitor.
+- 🔁 **Sharonview FCU** — REO page retired (was live); re-check.
+- 🔴 No public REO: SECU (rentals only), SC Federal CU (404), Truliant, Coastal, Self-Help, Allegacy, Greenville FCU, Pinnacle, FNB, Bank OZK.
+
+## CLOUD FEASIBILITY (honest, 2026-06-16)
+The local-only constraint = datacenter-IP + headless fingerprint getting blocked on hard anti-bot sites (NOT "cloud can't"). Options:
+- Free + full coverage → must run local (Mac residential IP). [current]
+- Cloud + full coverage → needs PAID residential proxy (~$50-500/mo) or paid scraping API. Against free rule.
+- FREE middle ground: self-hosted GitHub Actions runner ON the Mac — GitHub schedules it, executes on Mac's IP, no 4h cap. Best automation+IP combo; consider later.
+- The 4h GitHub cap alone is solvable (split sub-4h jobs / self-hosted runner); the IP is the real constraint.
