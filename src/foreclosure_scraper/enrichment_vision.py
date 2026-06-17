@@ -544,6 +544,18 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
         return
 
     targets = [li for li in listings if _select_image_urls(li)]
+    # Prioritize the most actionable listings for the (free-quota-bounded)
+    # Vision budget: soonest sale date first, then listings with an opening
+    # bid (real auctions), so the cap covers the best leads — not whatever
+    # happened to be first.
+    def _vpri(li: Listing):
+        from datetime import datetime as _dt
+        sd = li.sale_date
+        if sd is not None and hasattr(sd, "tzinfo") and sd.tzinfo is not None:
+            sd = sd.replace(tzinfo=None)
+        has_date = 0 if sd else 1
+        return (has_date, sd or _dt.max, 0 if li.opening_bid else 1)
+    targets.sort(key=_vpri)
     if max_listings:
         targets = targets[:max_listings]
     if not targets:
@@ -557,38 +569,65 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
         of_total=len(listings),
     )
 
-    sem = asyncio.Semaphore(CONCURRENCY)
     overrides = 0
     total_in = total_out = 0
 
+    def _apply(li: Listing, result: Optional[dict]) -> None:
+        nonlocal overrides, total_in, total_out
+        if not result:
+            return
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["vision"] = result
+        usage = result.pop("_usage", None) or {}
+        total_in += usage.get("input_tokens", 0) or 0
+        total_out += usage.get("output_tokens", 0) or 0
+        ct = result.get("condition_tier")
+        conf = (result.get("confidence") or "").upper()
+        if ct in ("move_in_ready", "cosmetic", "major", "gut") and conf in ("HIGH", "MEDIUM"):
+            old = li.raw.get("condition_tier")
+            li.raw["condition_tier"] = ct
+            li.raw["condition_source"] = f"vision-{conf}"
+            if old != ct:
+                overrides += 1
+
     async with httpx.AsyncClient(timeout=httpx.Timeout(20.0)) as http:
+        # FREE Gemini: run one serial stream PER KEY in parallel. Each key
+        # handles its own slice within its rate limit (no single-key 429
+        # storm), giving ~Nx throughput across N accounts. Falls through to
+        # the single-client + semaphore path for Anthropic / single-key.
+        gem_keys = _parse_gemini_keys() if VISION_PROVIDER == "gemini" else []
+        if VISION_PROVIDER == "gemini" and len(gem_keys) > 1:
+            from google import genai
+            clients = [genai.Client(api_key=k) for k in gem_keys]
+            buckets: list[list[Listing]] = [[] for _ in clients]
+            for i, li in enumerate(targets):
+                buckets[i % len(clients)].append(li)
 
-        async def one(li: Listing) -> None:
-            nonlocal overrides, total_in, total_out
-            async with sem:
-                result = await assess_fn(client, li, http)
-                if INTER_CALL_DELAY > 0:
-                    await asyncio.sleep(INTER_CALL_DELAY)
-            if not result:
-                return
-            if not isinstance(li.raw, dict):
-                li.raw = {}
-            li.raw["vision"] = result
-            usage = result.pop("_usage", None) or {}
-            total_in += usage.get("input_tokens", 0) or 0
-            total_out += usage.get("output_tokens", 0) or 0
+            async def stream(cl, bucket: list[Listing]) -> None:
+                for li in bucket:
+                    try:
+                        res = await _assess_one_gemini(cl, li, http)
+                    except Exception:
+                        res = None
+                    _apply(li, res)
+                    if INTER_CALL_DELAY > 0:
+                        await asyncio.sleep(INTER_CALL_DELAY)
 
-            # Override condition_tier when Vision confidence is HIGH or MEDIUM
-            ct = result.get("condition_tier")
-            conf = (result.get("confidence") or "").upper()
-            if ct in ("move_in_ready", "cosmetic", "major", "gut") and conf in ("HIGH", "MEDIUM"):
-                old = li.raw.get("condition_tier")
-                li.raw["condition_tier"] = ct
-                li.raw["condition_source"] = f"vision-{conf}"
-                if old != ct:
-                    overrides += 1
+            log.info("vision.parallel_streams", keys=len(clients),
+                     per_stream=len(buckets[0]) if buckets else 0)
+            await asyncio.gather(*(stream(cl, b) for cl, b in zip(clients, buckets)))
+        else:
+            sem = asyncio.Semaphore(CONCURRENCY)
 
-        await asyncio.gather(*(one(li) for li in targets))
+            async def one(li: Listing) -> None:
+                async with sem:
+                    result = await assess_fn(client, li, http)
+                    if INTER_CALL_DELAY > 0:
+                        await asyncio.sleep(INTER_CALL_DELAY)
+                _apply(li, result)
+
+            await asyncio.gather(*(one(li) for li in targets))
 
     pricing = _PROVIDER_PRICING.get(VISION_PROVIDER, _PROVIDER_PRICING["anthropic"])
     cost = (total_in / 1_000_000 * pricing["in_per_mtok"]) + (
