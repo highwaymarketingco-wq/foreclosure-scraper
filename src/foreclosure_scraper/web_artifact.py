@@ -30,6 +30,8 @@ RAW_KEEP = {
     "skip_trace": "*",   # owner name / mailing address / phone for outreach (free)
     "is_new": "*",       # new-this-run flag (early-access highlight)
     "first_seen_run": "*",
+    "outreach": "*",     # owner contact + letter/email/sms drafts + channels
+    "crm": "*",          # lead status + notes (persisted across runs)
     "grade": "*",     # A-F per-dimension + overall
     "location": ("median_household_income", "median_home_value",
                  "owner_occupied_pct", "unemployment_pct"),

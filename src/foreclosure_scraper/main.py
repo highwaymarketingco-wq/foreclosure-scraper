@@ -1068,10 +1068,21 @@ async def run() -> int:
     except Exception:
         log.error("new_listings.failed", traceback=traceback.format_exc())
 
+    # Outreach stack — owner contact actions (letter/email/SMS), a postcard
+    # mail-merge CSV, and persistent CRM status. Runs after skip-trace +
+    # valuation so it has owner contact + deal numbers to work with.
+    outreach_stats = {}
+    try:
+        from .outreach import generate_outreach
+        outreach_stats = generate_outreach(enriched)
+    except Exception:
+        log.error("outreach.failed", traceback=traceback.format_exc())
+
     summary = {
         "total": len(enriched),
         "new_this_week": new_stats.get("new", 0),
         "new_lis_pendens": new_stats.get("new_lis_pendens", 0),
+        "outreach": outreach_stats,
         "by_state": dict(by_state),
         "by_county_top": by_county.most_common(15),
         "by_source": dict(by_source),
