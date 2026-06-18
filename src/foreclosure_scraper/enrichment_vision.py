@@ -538,9 +538,10 @@ OLLAMA_MODEL = os.environ.get("OLLAMA_VISION_MODEL", "qwen2.5vl:3b")
 # OpenRouter — free tier routes to ~30 models incl. free vision ones, one key.
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL = os.environ.get("OPENROUTER_VISION_MODEL", "meta-llama/llama-3.2-11b-vision-instruct:free")
-# Mistral — free "Experiment" tier: Pixtral, ~1B tokens/month, no card (2 RPM).
+# Mistral — free "Experiment" tier: ~1B tokens/month, no card (2 RPM). Pixtral
+# is deprecated; the current maintained vision model is mistral-small-latest.
 MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
-MISTRAL_MODEL = os.environ.get("MISTRAL_VISION_MODEL", "pixtral-12b-2409")
+MISTRAL_MODEL = os.environ.get("MISTRAL_VISION_MODEL", "mistral-small-latest")
 # Cloudflare Workers AI — 10k neurons/day free; needs account id + token.
 CLOUDFLARE_MODEL = os.environ.get("CLOUDFLARE_VISION_MODEL", "@cf/meta/llama-3.2-11b-vision-instruct")
 
