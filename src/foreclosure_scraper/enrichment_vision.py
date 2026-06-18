@@ -1014,10 +1014,37 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
                     res = None
                 _apply2(li, res)
 
-        workers = []
-        for b in backends:
-            workers.append(floor_worker(b) if getattr(b, "is_floor", False) else api_worker(b))
-        await asyncio.gather(*workers)
+        worker_tasks = [
+            asyncio.create_task(
+                floor_worker(b) if getattr(b, "is_floor", False) else api_worker(b))
+            for b in backends
+        ]
+
+        # Heartbeat + no-progress watchdog. Even a single wedged worker (sync
+        # block / pool-wait that freezes the loop between item-timeouts) used to
+        # stall the whole run silently. This logs progress every 60s and, if
+        # `scored` hasn't advanced for VISION_STALL_SECONDS, cancels the workers
+        # so the run finishes and publishes whatever it has.
+        stall_limit = float(os.environ.get("VISION_STALL_SECONDS", "360"))
+
+        async def watchdog() -> None:
+            last_scored, last_progress = -1, _time.monotonic()
+            while any(not t.done() for t in worker_tasks):
+                await asyncio.sleep(60)
+                log.info("vision.heartbeat", scored=scored, queue=queue.qsize(),
+                         live_workers=sum(1 for t in worker_tasks if not t.done()))
+                if scored > last_scored:
+                    last_scored, last_progress = scored, _time.monotonic()
+                elif _time.monotonic() - last_progress > stall_limit:
+                    log.warning("vision.stall_abort", scored=scored, queue=queue.qsize(),
+                                idle_s=int(_time.monotonic() - last_progress))
+                    for t in worker_tasks:
+                        t.cancel()
+                    return
+
+        wd = asyncio.create_task(watchdog())
+        await asyncio.gather(*worker_tasks, return_exceptions=True)
+        wd.cancel()
         leftover = queue.qsize()
 
     # Mixed-provider cost estimate (free pools = $0).
