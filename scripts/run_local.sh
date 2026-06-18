@@ -51,6 +51,8 @@ load GITHUB_MODELS_TOKEN         "$SECRETS/github_models_token.txt"
 [[ -z "${GITHUB_MODELS_TOKEN:-}" ]] && export GITHUB_MODELS_TOKEN="$(gh auth token 2>/dev/null || true)"
 # Groq (free, separate pool) — optional.
 load GROQ_API_KEY                "$SECRETS/groq_api_key.txt"
+# Local Ollama removed (redundant vs cloud pools; slow/weak on 8GB).
+export VISION_USE_OLLAMA=0
 # More free API pools — each activates only if its key file exists.
 load OPENROUTER_API_KEY          "$SECRETS/openrouter_api_key.txt"
 load MISTRAL_API_KEY             "$SECRETS/mistral_api_key.txt"

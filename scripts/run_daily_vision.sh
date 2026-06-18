@@ -23,14 +23,9 @@ fi
 echo $$ > "$LOCK"
 trap 'rm -f "$LOCK"' EXIT
 
-# Ensure local Ollama is up if it's installed (the unlimited free floor).
-if [[ -x "$HOME/Applications/Ollama.app/Contents/Resources/ollama" ]]; then
-  if ! curl -s -o /dev/null --max-time 2 http://localhost:11434/api/tags; then
-    ("$HOME/Applications/Ollama.app/Contents/Resources/ollama" serve \
-        > "$ROOT/logs/ollama-serve.log" 2>&1 &)
-    sleep 4
-  fi
-fi
+# Local Ollama removed (redundant vs the 4 cloud pools; too slow/weak on 8GB).
+# Re-enable by installing Ollama + `ollama pull qwen2.5vl:3b` and unsetting this.
+export VISION_USE_OLLAMA=0
 
 # Load every free vision credential present. The vision pool uses ALL of them
 # (each Gemini key = one project's free quota; GitHub Models + Groq + local
