@@ -626,6 +626,15 @@ async def run() -> int:
         except Exception:
             log.error("owner_mailing.failed", traceback=traceback.format_exc())
 
+    # Incarceration distress (NC DAC name-match against owners from #0). Low-
+    # confidence name-only stack signal; runs after owner_mailing fills names.
+    if not os.environ.get("INCARCERATION_OFF"):
+        try:
+            from .enrichment_incarceration import enrich_incarceration
+            enrichment_stats["incarceration"] = await enrich_incarceration(enriched)
+        except Exception:
+            log.error("incarceration.failed", traceback=traceback.format_exc())
+
     # NC case-status: two-stage dispatch.
     #   Stage 1 (when NC_ECOURTS_USERNAME/PASSWORD set): authenticated
     #     Tyler portal scrape via WS-Fed login. Up to NC_ECOURTS_AUTH_CAP
