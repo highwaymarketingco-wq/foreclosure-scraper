@@ -22,6 +22,7 @@ from .dedupe import dedupe
 from .email_sender import send_digest
 from .enrichment import enrich
 from .enrichment_arcgis import enrich as enrich_gis
+from .enrichment_owner_mailing import enrich_owner_mailing
 from .enrichment_courts import discover_lis_pendens, enrich_with_court_records
 from .enrichment_geocode import enrich as enrich_geocode
 from .flags import compute_flags
@@ -614,6 +615,16 @@ async def run() -> int:
         after=len(enriched),
         collapsed=pre_dedupe2_count - len(enriched),
     )
+
+    # #0 contactability spine: owner name + MAILING address + absentee/
+    # out-of-state flags from county GIS (free ArcGIS REST). Runs on every
+    # crawl so contactability is automatic — no manual backfill needed.
+    if not os.environ.get("OWNER_MAILING_OFF"):
+        try:
+            om = await enrich_owner_mailing(enriched)
+            enrichment_stats["owner_mailing"] = om
+        except Exception:
+            log.error("owner_mailing.failed", traceback=traceback.format_exc())
 
     # NC case-status: two-stage dispatch.
     #   Stage 1 (when NC_ECOURTS_USERNAME/PASSWORD set): authenticated

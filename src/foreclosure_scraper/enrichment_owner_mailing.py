@@ -40,6 +40,7 @@ COUNTY_GIS: dict[str, dict] = {
         "owner": ["owner"], "care_of": "CareOf",
         "mail": ["Address", "CityName", "State", "Zipcode"], "mail_state": "State",
         "situs": ["HouseNumber", "NumberSuffix", "direction", "streetname", "StreetType", "PostDirection"],
+        "situs_match": "streetname",  # split situs → LIKE the street-name field, not house#
         "parcel": "pin"},
     "NC:Henderson": {"url": "https://gisweb.hendersoncountync.gov/arcgis/rest/services/Parcels/FeatureServer/0",
         "owner": ["PROPERTY_OWNER"],
@@ -106,10 +107,11 @@ def _join(attrs: dict, fields: list[str]) -> str:
     return " ".join(p for p in parts if p and p.lower() != "none").strip()
 
 
-async def _query(http: httpx.AsyncClient, base: str, where: str, out_fields: str = "*") -> list[dict]:
+async def _query(http: httpx.AsyncClient, base: str, where: str, out_fields: str = "*",
+                 count: int = 25) -> list[dict]:
     url = base.rstrip("/") + "/query"
     params = {"where": where, "outFields": out_fields, "returnGeometry": "false",
-              "resultRecordCount": "5", "f": "json"}
+              "resultRecordCount": str(count), "f": "json"}
     try:
         r = await http.get(url, params=params, timeout=20.0)
         if r.status_code != 200:
@@ -130,22 +132,33 @@ async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
         if pid:
             rows = await _query(http, spec["url"], f"{spec['parcel']} LIKE '%{pid}%'")
             attrs = rows[0] if rows else None
-    # 2) else match on situs street address (house number + street)
+    # 2) else match on situs street address. Query the street-NAME field broadly
+    #    (the longest, most distinctive street word) so format differences don't
+    #    block the hit, then verify house-number + street client-side. Works for
+    #    both combined-situs and component-situs (e.g. Buncombe) counties.
     if attrs is None and spec.get("situs") and li.street_address:
         m = _NUM_STREET.match(li.street_address)
         if m:
-            num, street = m.group(1), _norm(m.group(2)).split()[0:2]
-            field = spec["situs"][0]  # primary combined situs field
-            like = f"%{num}%{(' '.join(street))}%".upper().replace("'", "")
-            rows = await _query(http, spec["url"], f"UPPER({field}) LIKE '{like}'")
-            # pick the row whose situs best matches the listing
-            want = _norm(li.street_address)
-            for row in rows:
-                if _norm(_join(row, spec["situs"])).startswith(want[:10]):
-                    attrs = row
-                    break
-            if attrs is None and rows:
-                attrs = rows[0]
+            num = m.group(1)
+            words = [w for w in _norm(m.group(2)).split()
+                     if w not in ("rd", "dr", "st", "ln", "ave", "ct", "way", "cir",
+                                  "blvd", "pl", "trl", "hwy", "pkwy", "n", "s", "e", "w")]
+            if words:
+                mfield = spec.get("situs_match", spec["situs"][0])
+                key = max(words, key=len)  # most distinctive street word
+                rows = await _query(http, spec["url"],
+                                    f"UPPER({mfield}) LIKE '%{key.upper()}%'")
+                for row in rows:
+                    rs = _norm(_join(row, spec["situs"]))
+                    if num in rs and all(w in rs for w in words):
+                        attrs = row
+                        break
+                if attrs is None:  # looser: number + the key word
+                    for row in rows:
+                        rs = _norm(_join(row, spec["situs"]))
+                        if num in rs and key in rs:
+                            attrs = row
+                            break
     if not attrs:
         return None
 
