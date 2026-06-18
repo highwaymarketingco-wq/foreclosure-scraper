@@ -25,14 +25,28 @@ import re
 from typing import Optional
 
 # Sale-document types we care about, most-advanced (latest in the lifecycle)
-# first — the first one present determines sale_status.
+# first — the first one present determines sale_status. Covers BOTH NC eCourts
+# (Tyler) and SC Public Index (Master-in-Equity) foreclosure vocabularies.
 _DOC_TYPES = [
+    # confirmed / title transferred (sale is final)
     "Order of Confirmation of Sale",
+    "Order Confirming Sale",
     "Order of Confirmation",
+    "Master in Equity Deed",
+    "Master's Deed",
+    "Title to Real Estate",
+    # sold, pending confirmation
+    "Master's Report of Sale",
     "Report of Sale",
+    # sale scheduled / noticed
+    "Notice of Foreclosure Sale",
     "Notice Of Sale/Resale",
     "Notice of Sale/Resale",
     "Notice of Sale",
+    # judgment entered (pre-sale)
+    "Judgment of Foreclosure",
+    "Order of Foreclosure and Sale",
+    "Decree of Foreclosure",
     "Writ of Execution",
     "Judgment for Taxes",
     "Case Filed",
@@ -41,8 +55,14 @@ _DOC_TYPES = [
 # Which sale_status a given (most-advanced) document implies.
 _STATUS_BY_DOC = {
     "Order of Confirmation of Sale": "confirmed",
+    "Order Confirming Sale": "confirmed",
     "Order of Confirmation": "confirmed",
+    "Master in Equity Deed": "confirmed",
+    "Master's Deed": "confirmed",
+    "Title to Real Estate": "confirmed",
+    "Master's Report of Sale": "sold_unconfirmed",
     "Report of Sale": "sold_unconfirmed",
+    "Notice of Foreclosure Sale": "sale_noticed",
     "Notice Of Sale/Resale": "sale_noticed",
     "Notice of Sale/Resale": "sale_noticed",
     "Notice of Sale": "sale_noticed",

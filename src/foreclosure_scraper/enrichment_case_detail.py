@@ -127,26 +127,72 @@ def _extract_address(html: str) -> Optional[str]:
     return None
 
 
+def _apply_court_detail(li: Listing, html: str) -> bool:
+    """Parse SC case-detail HTML for court detail (judgment, sale documents,
+    sale_status) and store onto the listing — same raw fields as the NC Tyler
+    path so the dashboard treats both uniformly. Returns True if anything found."""
+    from .court_detail_parser import parse_register_of_actions
+    roa = parse_register_of_actions(html)
+    if not roa:
+        return False
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    if roa.get("judgment_amount") and not li.judgment_amount:
+        li.judgment_amount = roa["judgment_amount"]
+    if roa.get("balance_due"):
+        li.raw["court_balance_due"] = roa["balance_due"]
+        li.raw["court_balance_due_as_of"] = roa.get("balance_due_as_of")
+    if roa.get("documents"):
+        li.raw["court_documents"] = roa["documents"]
+    ss = roa.get("sale_status")
+    if ss:
+        li.raw["court_sale_status"] = ss
+        if ss == "confirmed":
+            li.raw["sold_confirmed"] = True
+    return True
+
+
 async def enrich_case_detail_addresses(listings: list[Listing]) -> None:
-    """For listings whose street_address is a synthesized "Lis Pendens" placeholder,
-    render the case detail page and extract the real property address.
+    """Render SC case-detail pages to (a) resolve placeholder "Lis Pendens"
+    addresses and (b) capture court detail (judgment / sale documents /
+    sale_status — incl. the confirmed-sold flag that filters sold properties).
+
+    Default targets: placeholder-address SC lis pendens (address resolution).
+    With SC_COURT_INCREMENTAL=1: also sweep ALL SC cases with a case# that
+    aren't court-enriched yet (capped by SC_COURT_CAP, default 60), so court
+    coverage builds across runs like the NC pass.
     """
-    targets = [
-        li for li in listings
-        if li.case_number
-        and li.street_address
-        and li.street_address.startswith("Lis Pendens ")
-        and li.state == "SC"
-        and "lis_pendens" in (li.source or "").lower()
-    ]
+    import os
+    incremental = os.environ.get("SC_COURT_INCREMENTAL") == "1"
+    cap = int(os.environ.get("SC_COURT_CAP", "60"))
+
+    def _placeholder(li: Listing) -> bool:
+        return bool(li.street_address and li.street_address.startswith("Lis Pendens ")
+                    and "lis_pendens" in (li.source or "").lower())
+
+    def _needs_court(li: Listing) -> bool:
+        r = li.raw if isinstance(li.raw, dict) else {}
+        return not r.get("court_sale_status")
+
+    seen: set[int] = set()
+    targets: list[Listing] = []
+    for li in listings:
+        if li.state != "SC" or not li.case_number:
+            continue
+        if _placeholder(li) or (incremental and _needs_court(li)):
+            if id(li) not in seen:
+                seen.add(id(li))
+                targets.append(li)
+    if incremental:
+        targets = targets[:cap]
     if not targets:
         log.info("case_detail.no_targets")
         return
 
-    log.info("case_detail.start", target_count=len(targets))
+    log.info("case_detail.start", target_count=len(targets), incremental=incremental)
 
     sem = asyncio.Semaphore(2)
-    counts = {"queried": 0, "resolved": 0, "no_match": 0}
+    counts = {"queried": 0, "resolved": 0, "no_match": 0, "court_tagged": 0}
 
     async def one(li: Listing) -> None:
         urls = _sc_case_urls(li.case_number)
@@ -157,11 +203,17 @@ async def enrich_case_detail_addresses(listings: list[Listing]) -> None:
             for url in urls:
                 html = await _fetch_case_detail_html(url)
                 if html and len(html) > 2000:
-                    addr = _extract_address(html)
-                    if addr:
-                        li.street_address = addr.strip()
-                        counts["resolved"] += 1
-                        return
+                    if _apply_court_detail(li, html):
+                        counts["court_tagged"] += 1
+                        if not isinstance(li.raw, dict):
+                            li.raw = {}
+                        li.raw["court_record_url"] = url
+                    if li.street_address and li.street_address.startswith("Lis Pendens "):
+                        addr = _extract_address(html)
+                        if addr:
+                            li.street_address = addr.strip()
+                            counts["resolved"] += 1
+                    return
             counts["no_match"] += 1
 
     await asyncio.gather(*(one(li) for li in targets))

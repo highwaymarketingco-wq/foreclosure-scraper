@@ -1010,12 +1010,23 @@ async def enrich_with_nc_case_status_authenticated(
         })
         return 0
 
+    # Daily-incremental: when NC_ECOURTS_INCREMENTAL=1, skip cases we've
+    # already pulled court detail for (raw has nc_case_status / court_sale_status),
+    # so each run advances to the NEXT batch of un-enriched cases and coverage
+    # builds across the whole ~3,900 over successive runs (like the vision pass).
+    incremental = os.environ.get("NC_ECOURTS_INCREMENTAL") == "1"
+
+    def _already_enriched(li: Listing) -> bool:
+        r = li.raw if isinstance(li.raw, dict) else {}
+        return bool(r.get("nc_case_status") or r.get("court_sale_status"))
+
     targets = [
         li
         for li in listings
         if li.state == "NC"
         and li.case_number
         and li.source not in ("national.courtlistener_bankruptcy",)
+        and not (incremental and _already_enriched(li))
     ]
 
     # Prioritize: recent past sales (upset-bid window) first, then
