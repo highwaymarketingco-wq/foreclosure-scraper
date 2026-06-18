@@ -444,6 +444,8 @@ async def _query_one_case_anonymous(page, case_number: str, debug_dump: bool = F
     parsed = _parse_case_detail_html(html)
     if parsed is None:
         log.info("nc_ecourts.case.parse_fail", case=case_number, html_length=len(html))
+    elif detail_url:
+        parsed["detail_url"] = detail_url
     return parsed
 
 
@@ -894,7 +896,12 @@ async def _query_one_case(page, case_number: str, debug_dump: bool = False) -> O
 
 
 def _parse_case_detail_html(html: str) -> Optional[dict]:
-    """Extract status + last event + sold_price from a Tyler case-detail page."""
+    """Extract status + last event + sold_price from a Tyler case-detail page,
+    PLUS the rich detail (judgment amount, balance due, sale documents,
+    sale_status) via court_detail_parser."""
+    from .court_detail_parser import parse_register_of_actions
+    roa = parse_register_of_actions(html)
+
     events = re.findall(
         r"(\d{1,2}/\d{1,2}/\d{2,4})\s*[\-:]?\s*([A-Z][\w \-,/.()&'\"]{8,200})",
         html,
@@ -902,7 +909,12 @@ def _parse_case_detail_html(html: str) -> Optional[dict]:
     last_event = events[0] if events else None
 
     status = _normalize_status(html)
-    if not status:
+    # If the coarse keyword scan found nothing, fall back to the sale_status the
+    # rich parser derived from the sale documents (more reliable).
+    if not status and roa.get("sale_status"):
+        status = {"confirmed": "confirmed", "sold_unconfirmed": "sold",
+                  "sale_noticed": "scheduled"}.get(roa["sale_status"])
+    if not status and not roa:
         return None
 
     info: dict = {
@@ -910,6 +922,8 @@ def _parse_case_detail_html(html: str) -> Optional[dict]:
         "method": "tyler_authenticated",
         "checked_at": datetime.utcnow().isoformat() + "Z",
     }
+    if roa:
+        info["detail"] = roa
     if last_event:
         info["last_event_date"] = last_event[0]
         info["last_event_text"] = last_event[1].strip()[:200]
@@ -1085,6 +1099,26 @@ async def enrich_with_nc_case_status_authenticated(
             li.raw = {}
         li.raw["nc_case_status"] = info
         tagged += 1
+
+        # Promote the rich court detail onto the listing: real debt figures,
+        # the sale paper trail, and a sold/confirmed flag for filtering.
+        det = info.get("detail") or {}
+        if det.get("judgment_amount") and not li.judgment_amount:
+            li.judgment_amount = det["judgment_amount"]  # feeds amount_owed waterfall
+        if det.get("balance_due"):
+            li.raw["court_balance_due"] = det["balance_due"]
+            li.raw["court_balance_due_as_of"] = det.get("balance_due_as_of")
+        if det.get("documents"):
+            li.raw["court_documents"] = det["documents"]
+        if det.get("court_record_url") or info.get("detail_url"):
+            li.raw["court_record_url"] = det.get("court_record_url") or info.get("detail_url")
+        ss = det.get("sale_status")
+        if ss:
+            li.raw["court_sale_status"] = ss
+            # "confirmed" = sold at auction AND confirmed by the court → it is
+            # no longer an available opportunity. Flag for downstream filtering.
+            if ss == "confirmed":
+                li.raw["sold_confirmed"] = True
         # Hammer-price promotion: tag actual_sold_price so the
         # promote-to-sold-pool pass routes this listing into
         # foreclosure_sold_comps. Mirrors the legacy Tyler scraper's
