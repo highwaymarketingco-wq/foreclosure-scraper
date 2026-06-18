@@ -221,6 +221,8 @@ function applyFilters() {
   const wmax = win ? now + win * 86400000 : 0;
 
   filtered = LISTINGS.filter((l) => {
+    // Court-confirmed sales already sold at auction — not opportunities. Hide.
+    if (l.raw && l.raw.sold_confirmed) return false;
     if (st && l.state !== st) return false;
     if (co && `${l.county || ""}, ${l.state || "?"}` !== co) return false;
     if (ty && l.listing_type !== ty) return false;
@@ -688,15 +690,33 @@ function openDetail(l) {
   }
 
   // Court
+  const raw = l.raw || {};
+  const fmtUsd = (n) => "$" + Math.round(n).toLocaleString();
   const court = [
     ["Case Number", l.case_number],
     ["Plaintiff", l.plaintiff],
     ["Defendant", l.defendant],
     ["Trustee", l.trustee],
+    ["Judgment", l.judgment_amount ? fmtUsd(l.judgment_amount) : null],
+    ["Balance due", raw.court_balance_due
+      ? `${fmtUsd(raw.court_balance_due)}${raw.court_balance_due_as_of ? " (as of " + raw.court_balance_due_as_of + ")" : ""}`
+      : null],
+    ["Sale status", raw.court_sale_status
+      ? raw.court_sale_status.replace(/_/g, " ") + (raw.sold_confirmed ? " — SOLD" : "")
+      : null],
   ].filter(([_, v]) => v);
-  if (court.length) {
+  const docs = raw.court_documents || [];
+  if (court.length || docs.length) {
     $("d-court-section").style.display = "block";
-    $("d-court").innerHTML = court.map(([k, v]) => `<div><strong>${k}:</strong> ${v}</div>`).join("");
+    let html = court.map(([k, v]) => `<div><strong>${k}:</strong> ${v}</div>`).join("");
+    if (docs.length) {
+      html += `<div style="margin-top:8px"><strong>Court documents:</strong><ul style="margin:4px 0 0;padding-left:18px">` +
+        docs.map((d) => `<li>${d.type}${d.date ? " — " + d.date : ""}</li>`).join("") + `</ul></div>`;
+    }
+    if (raw.court_record_url) {
+      html += `<div style="margin-top:6px"><a href="${raw.court_record_url}" target="_blank" rel="noopener">Open court record →</a></div>`;
+    }
+    $("d-court").innerHTML = html;
   } else {
     $("d-court-section").style.display = "none";
   }

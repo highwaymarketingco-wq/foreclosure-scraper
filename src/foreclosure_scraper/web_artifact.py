@@ -73,6 +73,12 @@ RAW_KEEP = {
     "nc_ecourts": "*",                # NC Tyler Odyssey judgment-search row
     "upset_bid": "*",                 # NCGS §45-21.27 10-day upset-bid window
     "nc_case_status": "*",            # NC eCourts case status (pending/sold/upset)
+    "court_documents": "*",           # Tyler RegisterOfActions sale paper trail [{type,date,available}]
+    "court_balance_due": "*",         # live court-derived debt (judgment + accrued interest)
+    "court_balance_due_as_of": "*",
+    "court_record_url": "*",          # deep link to the Tyler case page
+    "court_sale_status": "*",         # confirmed / sold_unconfirmed / sale_noticed / judgment
+    "sold_confirmed": "*",            # court-confirmed sale → already sold, filter off active board
     "carryover": "*",                 # Last-known-good replay marker
     "filed_date": "*",                # Generic file-date for lis pendens / liens
     "county_pin": "*",                # Case#-encoded venue county correction

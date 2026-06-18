@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "dashboard",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "docs"],
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /Users/cashhigh/foreclosure-scraper/docs && exec python3 -m http.server 8765"],
       "port": 8765
     }
   ]
