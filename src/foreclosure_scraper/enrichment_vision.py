@@ -652,16 +652,42 @@ class _OpenAICompatBackend:
 
 class _OllamaBackend:
     """Local Ollama vision model — unlimited, free, never quota-exhausts."""
-    def __init__(self, host: str, model: str, http: httpx.AsyncClient, cap: int = 2):
+    def __init__(self, host: str, model: str, http: httpx.AsyncClient, cap: int = 1):
         self.name = "ollama"
         self.host = host
         self.model = model
         self.http = http
         self.cap = cap
         self.delay = 0.0
+        self.is_floor = True   # low-quality local fallback: run last, only on leftovers
+
+    @staticmethod
+    def _to_clean_jpeg_b64(data: bytes) -> Optional[str]:
+        """Normalize any image to a plain RGB JPEG — moondream's loader rejects
+        webp/odd formats with 'failed to load image'. Returns base64 or None."""
+        try:
+            import io
+            from PIL import Image
+            im = Image.open(io.BytesIO(data))
+            im.load()
+            if im.mode not in ("RGB", "L"):
+                im = im.convert("RGB")
+            # Downscale big photos — moondream is small; 768px is plenty.
+            im.thumbnail((768, 768))
+            buf = io.BytesIO()
+            im.save(buf, format="JPEG", quality=85)
+            return base64.b64encode(buf.getvalue()).decode("ascii")
+        except Exception:
+            return None
 
     async def assess(self, li: Listing, payloads, urls) -> Optional[dict]:
-        imgs = [base64.b64encode(d).decode("ascii") for d, _ in payloads[:self.cap]]
+        imgs = []
+        for d, _ in payloads[:self.cap]:
+            j = self._to_clean_jpeg_b64(d)
+            if j:
+                imgs.append(j)
+        if not imgs:
+            return None
         body = {"model": self.model, "stream": False, "format": "json",
                 "prompt": f"{SYSTEM_PROMPT}\n\n{_user_prompt(li)}",
                 "images": imgs, "options": {"num_predict": MAX_TOKENS}}
@@ -864,8 +890,78 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
         for li in targets:
             queue.put_nowait(li)
 
-        async def worker(backend) -> None:
+        # Cooldown/strikes: a 429 is often a PER-MINUTE limit (Groq, GitHub),
+        # not a daily cap. So on 429 we re-queue the listing, sleep a cooldown,
+        # and let the SAME backend rejoin — only retiring it after STRIKES
+        # consecutive 429s with no success in between. A success resets strikes,
+        # so a per-minute-limited backend keeps contributing all run; a truly
+        # daily-exhausted one (e.g. a spent Gemini key) retires after STRIKES.
+        cooldown = float(os.environ.get("VISION_BACKEND_COOLDOWN", "60"))
+        max_strikes = int(os.environ.get("VISION_BACKEND_STRIKES", "2"))
+
+        # Optional wall-clock cap so a long run (esp. the slow local floor)
+        # can't overrun into the next scheduled pass. 0 = unlimited.
+        import time as _time
+        _budget = float(os.environ.get("VISION_MAX_SECONDS", "0") or 0)
+        _deadline = (_time.monotonic() + _budget) if _budget > 0 else None
+
+        def _past_deadline() -> bool:
+            return _deadline is not None and _time.monotonic() > _deadline
+
+        # Floor backends (Ollama) are low-quality local fallbacks. They must
+        # only score what the API pools COULDN'T this run — otherwise they'd
+        # race ahead (no cooldown) and poison listings with weak scores that
+        # block a good provider from scoring them on a future day. So a floor
+        # worker waits until every API backend has retired, then drains the rest.
+        api_active = {"n": sum(1 for b in backends if not getattr(b, "is_floor", False))}
+
+        async def api_worker(backend) -> None:
+            strikes = 0
+            try:
+                while True:
+                    if _past_deadline():
+                        return
+                    try:
+                        li = queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        return
+                    payloads, urls = await _fetch_image_blocks(li, http)
+                    if not payloads:
+                        continue
+                    try:
+                        res = await backend.assess(li, payloads, urls)
+                    except QuotaExhausted:
+                        strikes += 1
+                        queue.put_nowait(li)
+                        if strikes >= max_strikes:
+                            log.info("vision.backend_retired", backend=backend.name,
+                                     strikes=strikes, remaining=queue.qsize())
+                            return
+                        log.info("vision.backend_cooldown", backend=backend.name,
+                                 strikes=strikes, cooldown_s=cooldown, remaining=queue.qsize())
+                        await asyncio.sleep(cooldown)
+                        continue
+                    except Exception as exc:
+                        log.warning("vision.worker_error", backend=backend.name, error=str(exc)[:140])
+                        res = None
+                    else:
+                        strikes = 0
+                    _apply2(li, res)
+                    if getattr(backend, "delay", 0):
+                        await asyncio.sleep(backend.delay)
+            finally:
+                api_active["n"] -= 1
+
+        async def floor_worker(backend) -> None:
+            # Wait for the API pools to finish; bail early if they drain it all.
+            while api_active["n"] > 0:
+                if queue.empty():
+                    return
+                await asyncio.sleep(3)
+            log.info("vision.floor_active", backend=backend.name, remaining=queue.qsize())
             while True:
+                if _past_deadline():
+                    return
                 try:
                     li = queue.get_nowait()
                 except asyncio.QueueEmpty:
@@ -875,19 +971,15 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
                     continue
                 try:
                     res = await backend.assess(li, payloads, urls)
-                except QuotaExhausted:
-                    queue.put_nowait(li)  # let another backend take it
-                    log.info("vision.backend_exhausted", backend=backend.name,
-                             remaining=queue.qsize())
-                    return
                 except Exception as exc:
                     log.warning("vision.worker_error", backend=backend.name, error=str(exc)[:140])
                     res = None
                 _apply2(li, res)
-                if getattr(backend, "delay", 0):
-                    await asyncio.sleep(backend.delay)
 
-        await asyncio.gather(*(worker(b) for b in backends))
+        workers = []
+        for b in backends:
+            workers.append(floor_worker(b) if getattr(b, "is_floor", False) else api_worker(b))
+        await asyncio.gather(*workers)
         leftover = queue.qsize()
 
     # Mixed-provider cost estimate (free pools = $0).

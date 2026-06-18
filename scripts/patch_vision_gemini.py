@@ -61,9 +61,16 @@ async def main() -> int:
             by_id[id(li)] = d  # map back to the source dict to update in place
 
     cap = int(os.environ.get("VISION_MAX_LISTINGS", "800"))
-    # Daily-incremental: only score listings that DON'T already have vision,
-    # so each run advances coverage over the week as free quota resets.
-    unscored = [li for li in listings if not (li.raw or {}).get("vision")]
+    # Daily-incremental: score listings that DON'T already have vision — PLUS
+    # ones only scored by the local Ollama floor (low quality), so a real
+    # provider upgrades them once fresh API quota is available. Each run thus
+    # advances coverage AND quality over the week as free quotas reset.
+    def _needs_vision(li) -> bool:
+        vis = (li.raw or {}).get("vision")
+        if not vis:
+            return True
+        return vis.get("_provider") == "ollama"
+    unscored = [li for li in listings if _needs_vision(li)]
     already = len(listings) - len(unscored)
     print(f"[{time.strftime('%H:%M:%S')}] {already} already vision-scored; "
           f"{len(unscored)} un-scored. Running {os.environ.get('VISION_PROVIDER','?')} "
