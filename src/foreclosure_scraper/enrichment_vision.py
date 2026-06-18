@@ -543,7 +543,9 @@ OPENROUTER_MODEL = os.environ.get("OPENROUTER_VISION_MODEL", "meta-llama/llama-3
 MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
 MISTRAL_MODEL = os.environ.get("MISTRAL_VISION_MODEL", "mistral-small-latest")
 # Cloudflare Workers AI — 10k neurons/day free; needs account id + token.
-CLOUDFLARE_MODEL = os.environ.get("CLOUDFLARE_VISION_MODEL", "@cf/meta/llama-3.2-11b-vision-instruct")
+# mistral-small-3.1-24b has strong vision and (unlike Llama-3.2-vision) needs
+# NO one-time license-agreement click, so it works on a fresh token immediately.
+CLOUDFLARE_MODEL = os.environ.get("CLOUDFLARE_VISION_MODEL", "@cf/mistralai/mistral-small-3.1-24b-instruct")
 
 
 class QuotaExhausted(Exception):
