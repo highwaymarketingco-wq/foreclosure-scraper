@@ -24,12 +24,30 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
-# county -> tax-foreclosure sale page URL
-COUNTY_PAGES: dict[str, str] = {
-    "Gaston": "https://www.gastongov.com/669/Tax-Foreclosure-Sales",
-    "McDowell": "https://mcdowellnc.gov/departments/tax-collections/tax-foreclosures/upcoming-tax-foreclosure-sales",
-    "Rutherford": "https://www.rutherfordcountync.gov/departments/revenue_department_tax_administrator/foreclosure_sale_dates.php",
+# county -> list of tax-foreclosure pages. Gaston's /669 "active" page usually
+# has ~1 property; the /671 "Previous Sales" page carries the volume (~70) with
+# current bid + upset-bid deadline + sale status. Verified static HTML 2026-06-18.
+COUNTY_PAGES: dict[str, list[str]] = {
+    "Gaston": [
+        "https://www.gastongov.com/669/Tax-Foreclosure-Sales",
+        "https://www.gastongov.com/671/Previous-Tax-Foreclosure-Sales",
+    ],
+    "McDowell": ["https://mcdowellnc.gov/departments/tax-collections/tax-foreclosures/upcoming-tax-foreclosure-sales"],
+    "Rutherford": ["https://www.rutherfordcountync.gov/departments/revenue_department_tax_administrator/foreclosure_sale_dates.php"],
 }
+
+# Sale-status phrases (priority order). "sold"/"redeemed" = the sale is over →
+# not an active opportunity (flag sold_confirmed so the dashboard hides it);
+# "upset_bid" = still biddable.
+_STATUS_PATTERNS = [
+    (r"property\s+sold|sale\s+closed", "sold"),
+    (r"redeem", "redeemed"),
+    (r"surplus", "surplus"),
+    (r"upset\s+bid", "upset_bid"),
+]
+_UPSET_DEADLINE_RE = re.compile(
+    r"last day to upset[^.\n]*?((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}"
+    r"|\d{1,2}/\d{1,2}/\d{2,4})", re.I)
 
 # NC tax-foreclosure court file numbers: "25 M 388", "26-CVD-178", "24 CVD 67"
 _FILE_RE = re.compile(r"\b(\d{2}\s?[- ]?(?:M|CV[D]?)\s?[- ]?\d{2,5})\b", re.I)
@@ -80,6 +98,28 @@ def parse_text(text: str, county: str, url: str) -> list[Listing]:
             except (ValueError, TypeError, OverflowError):
                 pass
 
+        # Sale status + upset-bid deadline (esp. the /671 "Previous Sales" page).
+        low = block.lower()
+        status = next((s for pat, s in _STATUS_PATTERNS if re.search(pat, low)), None)
+        upset_deadline = None
+        um = _UPSET_DEADLINE_RE.search(block)
+        if um:
+            try:
+                from dateutil import parser as dp
+                upset_deadline = dp.parse(um.group(1)).date().isoformat()
+            except (ValueError, TypeError, OverflowError):
+                pass
+
+        raw: dict = {"nc_county_tax_foreclosure": {"county": county}}
+        if status:
+            raw["tax_sale_status"] = status
+            # A completed/redeemed sale is no longer an opportunity — hide it
+            # from the active board (same flag the court sold-filter uses).
+            if status in ("sold", "redeemed"):
+                raw["sold_confirmed"] = True
+        if upset_deadline:
+            raw["upset_bid_deadline"] = upset_deadline
+
         out.append(
             Listing(
                 source="counties_nc.nc_county_tax_foreclosure",
@@ -96,7 +136,7 @@ def parse_text(text: str, county: str, url: str) -> list[Listing]:
                 description=re.sub(r"\s+", " ", block)[:400],
                 first_seen=datetime.utcnow(),
                 last_seen=datetime.utcnow(),
-                raw={"nc_county_tax_foreclosure": {"county": county}},
+                raw=raw,
             )
         )
     return out
@@ -110,6 +150,23 @@ async def _render(url: str) -> str:
         return ""
 
 
+async def _fetch_page(url: str) -> str:
+    """Static HTTP first (fast + reliable for CivicPlus pages like Gaston),
+    falling back to the stealth browser only if the static fetch yields no
+    parseable content (no court file number found)."""
+    from ...http_client import get_text
+    try:
+        html = await get_text(url, headers={"User-Agent": "Mozilla/5.0"})
+        text = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", html)
+        text = re.sub(r"(?s)<[^>]+>", " ", text)
+        text = re.sub(r"&nbsp;", " ", text)
+        if _FILE_RE.search(text):
+            return text
+    except Exception:
+        pass
+    return await _render(url)
+
+
 class NCCountyTaxForeclosure(BaseScraper):
     slug = "counties_nc.nc_county_tax_foreclosure"
     name = "NC County Tax Foreclosure Sales"
@@ -121,14 +178,15 @@ class NCCountyTaxForeclosure(BaseScraper):
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         seen: set[tuple] = set()
-        for county, url in COUNTY_PAGES.items():
-            text = await _render(url)
-            if not text:
-                continue
-            for li in parse_text(text, county, url):
-                key = (li.county, li.case_number)
-                if li.case_number and key in seen:
+        for county, urls in COUNTY_PAGES.items():
+            for url in urls:
+                text = await _fetch_page(url)
+                if not text:
                     continue
-                seen.add(key)
-                out.append(li)
+                for li in parse_text(text, county, url):
+                    key = (li.county, li.case_number)
+                    if li.case_number and key in seen:
+                        continue
+                    seen.add(key)
+                    out.append(li)
         return out
