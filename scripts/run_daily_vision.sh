@@ -44,6 +44,11 @@ load GITHUB_MODELS_TOKEN "$SECRETS/github_models_token.txt"
 [[ -z "${GITHUB_MODELS_TOKEN:-}" ]] && export GITHUB_MODELS_TOKEN="$(gh auth token 2>/dev/null || true)"
 # Groq (free) — optional, only if a key is dropped in.
 load GROQ_API_KEY "$SECRETS/groq_api_key.txt"
+# More free API pools — each activates only if its key file exists.
+load OPENROUTER_API_KEY    "$SECRETS/openrouter_api_key.txt"
+load MISTRAL_API_KEY       "$SECRETS/mistral_api_key.txt"
+load CLOUDFLARE_API_TOKEN  "$SECRETS/cloudflare_api_token.txt"
+load CLOUDFLARE_ACCOUNT_ID "$SECRETS/cloudflare_account_id.txt"
 
 export VISION_PROVIDER=gemini
 export VISION_MAX_LISTINGS="${VISION_MAX_LISTINGS:-1500}"   # let daily quota be the limiter

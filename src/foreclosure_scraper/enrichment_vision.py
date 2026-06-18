@@ -532,9 +532,17 @@ GITHUB_MODELS_MODEL = os.environ.get("GITHUB_MODELS_MODEL", "openai/gpt-4o-mini"
 # Groq — free tier, very fast. Vision model names change; override via env.
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = os.environ.get("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
-# Ollama — local, unlimited, free. moondream is tiny enough for 8GB RAM.
+# Ollama — local, unlimited, free. qwen2.5vl:3b > moondream and still fits 8GB.
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
-OLLAMA_MODEL = os.environ.get("OLLAMA_VISION_MODEL", "moondream")
+OLLAMA_MODEL = os.environ.get("OLLAMA_VISION_MODEL", "qwen2.5vl:3b")
+# OpenRouter — free tier routes to ~30 models incl. free vision ones, one key.
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODEL = os.environ.get("OPENROUTER_VISION_MODEL", "meta-llama/llama-3.2-11b-vision-instruct:free")
+# Mistral — free "Experiment" tier: Pixtral, ~1B tokens/month, no card (2 RPM).
+MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
+MISTRAL_MODEL = os.environ.get("MISTRAL_VISION_MODEL", "pixtral-12b-2409")
+# Cloudflare Workers AI — 10k neurons/day free; needs account id + token.
+CLOUDFLARE_MODEL = os.environ.get("CLOUDFLARE_VISION_MODEL", "@cf/meta/llama-3.2-11b-vision-instruct")
 
 
 class QuotaExhausted(Exception):
@@ -767,6 +775,27 @@ async def _build_backends(http: httpx.AsyncClient) -> list:
     if gq:
         backends.append(_OpenAICompatBackend("groq", GROQ_URL, gq, GROQ_MODEL,
                                              http, cap=4, delay=2.0))
+
+    # OpenRouter — free tier, one key reaches many free vision models.
+    ork = os.environ.get("OPENROUTER_API_KEY")
+    if ork:
+        backends.append(_OpenAICompatBackend("openrouter", OPENROUTER_URL, ork,
+                                             OPENROUTER_MODEL, http, cap=4, delay=3.0))
+
+    # Mistral — free Experiment tier (Pixtral, ~1B tok/mo) but only 2 RPM,
+    # so pace it ~30s/call; the cooldown handles any 429 spillover.
+    mk = os.environ.get("MISTRAL_API_KEY")
+    if mk:
+        backends.append(_OpenAICompatBackend("mistral", MISTRAL_URL, mk,
+                                             MISTRAL_MODEL, http, cap=4, delay=30.0))
+
+    # Cloudflare Workers AI — 10k neurons/day free. Needs account id + token.
+    cf_tok = os.environ.get("CLOUDFLARE_API_TOKEN")
+    cf_acct = os.environ.get("CLOUDFLARE_ACCOUNT_ID")
+    if cf_tok and cf_acct:
+        cf_url = f"https://api.cloudflare.com/client/v4/accounts/{cf_acct}/ai/v1/chat/completions"
+        backends.append(_OpenAICompatBackend("cloudflare", cf_url, cf_tok,
+                                             CLOUDFLARE_MODEL, http, cap=2, delay=1.0))
 
     # Ollama — local, unlimited. Only if the daemon is reachable + model present.
     if os.environ.get("VISION_USE_OLLAMA", "1") != "0":
