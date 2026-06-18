@@ -61,11 +61,16 @@ async def main() -> int:
             by_id[id(li)] = d  # map back to the source dict to update in place
 
     cap = int(os.environ.get("VISION_MAX_LISTINGS", "800"))
-    print(f"[{time.strftime('%H:%M:%S')}] running {os.environ.get('VISION_PROVIDER','?')} "
-          f"vision (cap {cap}) across {len(listings)} hydrated listings…", flush=True)
+    # Daily-incremental: only score listings that DON'T already have vision,
+    # so each run advances coverage over the week as free quota resets.
+    unscored = [li for li in listings if not (li.raw or {}).get("vision")]
+    already = len(listings) - len(unscored)
+    print(f"[{time.strftime('%H:%M:%S')}] {already} already vision-scored; "
+          f"{len(unscored)} un-scored. Running {os.environ.get('VISION_PROVIDER','?')} "
+          f"vision (cap {cap}) on the un-scored, prioritized…", flush=True)
     t0 = time.time()
-    await enrich_with_vision(listings, max_listings=cap)
-    print(f"[{time.strftime('%H:%M:%S')}] vision done in {int(time.time()-t0)}s", flush=True)
+    await enrich_with_vision(unscored, max_listings=cap)
+    print(f"[{time.strftime('%H:%M:%S')}] vision pass done in {int(time.time()-t0)}s", flush=True)
 
     # Recompute calc + grade (condition_tier may have changed) and write the
     # updated vision/condition/calc/grade back onto the source dicts.
@@ -88,7 +93,27 @@ async def main() -> int:
             scored += 1
 
     path.write_text(json.dumps(data, ensure_ascii=False, default=str), encoding="utf-8")
-    print(f"[{time.strftime('%H:%M:%S')}] wrote {path} — {scored} now have Gemini vision", flush=True)
+    print(f"[{time.strftime('%H:%M:%S')}] wrote {path} — {scored} total now have vision", flush=True)
+
+    # Publish to the GitHub Pages dashboard (docs/ doesn't touch workflows,
+    # so the normal token can push it).
+    if os.environ.get("PATCH_PUBLISH", "1") == "1":
+        import subprocess
+        root = str(Path(__file__).parent.parent)
+        try:
+            subprocess.run(["git", "add", "docs/listings.json"], cwd=root, check=False)
+            r = subprocess.run(["git", "diff", "--staged", "--quiet"], cwd=root)
+            if r.returncode != 0:  # there are changes
+                subprocess.run(["git", "commit", "-q", "-m",
+                                f"daily vision: {scored} listings scored ({time.strftime('%Y-%m-%d')})"],
+                               cwd=root, check=False)
+                subprocess.run(["git", "pull", "--rebase", "--autostash", "origin", "main"],
+                               cwd=root, check=False)
+                p = subprocess.run(["git", "push", "origin", "main"], cwd=root)
+                print(f"[{time.strftime('%H:%M:%S')}] "
+                      + ("dashboard published ✓" if p.returncode == 0 else "push failed ⚠"), flush=True)
+        except Exception as exc:
+            print(f"publish error: {exc}", flush=True)
     return 0
 
 
