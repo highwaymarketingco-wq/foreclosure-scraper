@@ -13,10 +13,18 @@ SECRETS="$ROOT/.secrets"
 mkdir -p "$ROOT/logs"
 LOG="$ROOT/logs/daily-vision-$(date +%Y%m%dT%H%M%S).log"
 
-# Load every Gemini key present (one per Google account → more daily quota).
+# Load every free vision credential present. The vision pool uses ALL of them
+# (each Gemini key = one project's free quota; GitHub Models + Groq + local
+# Ollama are separate free pools) and rotates across them.
 load() { [[ -f "$2" ]] && export "$1"="$(cat "$2")"; }
 load GEMINI_API_KEY   "$SECRETS/gemini_api_key.txt"
-for i in $(seq 1 10); do load "GEMINI_API_KEY_$i" "$SECRETS/gemini_api_key_$i.txt"; done
+for i in $(seq 1 60); do load "GEMINI_API_KEY_$i" "$SECRETS/gemini_api_key_$i.txt"; done
+
+# GitHub Models (free) — prefer a saved token, else fall back to the gh CLI.
+load GITHUB_MODELS_TOKEN "$SECRETS/github_models_token.txt"
+[[ -z "${GITHUB_MODELS_TOKEN:-}" ]] && export GITHUB_MODELS_TOKEN="$(gh auth token 2>/dev/null || true)"
+# Groq (free) — optional, only if a key is dropped in.
+load GROQ_API_KEY "$SECRETS/groq_api_key.txt"
 
 export VISION_PROVIDER=gemini
 export VISION_MAX_LISTINGS="${VISION_MAX_LISTINGS:-1500}"   # let daily quota be the limiter

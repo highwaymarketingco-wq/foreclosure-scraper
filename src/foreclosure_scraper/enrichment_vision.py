@@ -376,7 +376,7 @@ def _parse_gemini_keys() -> list[str]:
         k = part.strip()
         if k:
             keys.append(k)
-    for i in range(1, 11):
+    for i in range(1, 61):
         v = (os.environ.get(f"GEMINI_API_KEY_{i}") or "").strip()
         if v and v not in keys:
             keys.append(v)
@@ -516,13 +516,267 @@ def _build_gemini_client():
     return client, _assess_one_gemini
 
 
+# ---------------------------------------------------------------------------
+# Multi-provider backend pool
+# ---------------------------------------------------------------------------
+# Each FREE source (one per Gemini *project*, GitHub Models, Groq, local
+# Ollama) is a "backend". enrich_with_vision pools them: all backends pull
+# from ONE shared work queue, so a backend that hits its daily quota (429)
+# just drops out and the others keep draining the remaining listings — no
+# key's share is wasted. Ollama (local, unlimited) never drops out, so it's
+# the floor that finishes whatever the API pools couldn't.
+
+# GitHub Models — free tier, uses the existing `gh` token (or GITHUB_MODELS_TOKEN).
+GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions"
+GITHUB_MODELS_MODEL = os.environ.get("GITHUB_MODELS_MODEL", "openai/gpt-4o-mini")
+# Groq — free tier, very fast. Vision model names change; override via env.
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_MODEL = os.environ.get("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
+# Ollama — local, unlimited, free. moondream is tiny enough for 8GB RAM.
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+OLLAMA_MODEL = os.environ.get("OLLAMA_VISION_MODEL", "moondream")
+
+
+class QuotaExhausted(Exception):
+    """Raised by a backend when it hits its daily/rate quota (HTTP 429 /
+    RESOURCE_EXHAUSTED). The pool catches this, retires that backend for the
+    rest of the run, and re-queues the listing for another backend."""
+
+
+def _is_quota_msg(msg: str) -> bool:
+    msg = msg.lower()
+    return ("429" in msg or "resource_exhausted" in msg or "quota" in msg
+            or "exceeded" in msg or "rate limit" in msg)
+
+
+def _finalize(parsed: Optional[dict], provider: str, model: str, n: int,
+              urls: list[str], usage: Optional[dict] = None) -> Optional[dict]:
+    if not parsed:
+        return None
+    if usage:
+        parsed["_usage"] = usage
+    parsed["_provider"] = provider
+    parsed["_model"] = model
+    parsed["_n_photos"] = n
+    parsed["_image_urls"] = urls
+    return parsed
+
+
+class _GeminiBackend:
+    """One Gemini API key = one backend (one project's free quota)."""
+    def __init__(self, key: str, idx: int):
+        from google import genai
+        self.client = genai.Client(api_key=key)
+        self.name = f"gemini#{idx}"
+        self.model = GEMINI_VISION_MODEL
+        self.delay = INTER_CALL_DELAY
+        self.cap = MAX_PHOTOS_PER_LISTING
+
+    async def assess(self, li: Listing, payloads, urls) -> Optional[dict]:
+        from google.genai import types as t
+        parts = [t.Part.from_bytes(data=d, mime_type=m) for d, m in payloads[:self.cap]]
+        prompt = f"{SYSTEM_PROMPT}\n\n{_user_prompt(li)}"
+        try:
+            resp = await self.client.aio.models.generate_content(
+                model=self.model, contents=parts + [prompt],
+                config=t.GenerateContentConfig(
+                    max_output_tokens=MAX_TOKENS,
+                    response_mime_type="application/json"),
+            )
+        except Exception as exc:
+            if _is_quota_msg(str(exc)):
+                raise QuotaExhausted(self.name)
+            log.warning("vision.api_error", backend=self.name, source_url=li.source_url, error=str(exc)[:160])
+            return None
+        text = ""
+        try:
+            text = (resp.text or "").strip()
+        except Exception:
+            for cand in getattr(resp, "candidates", []) or []:
+                for p in getattr(getattr(cand, "content", None), "parts", []) or []:
+                    text += getattr(p, "text", "") or ""
+        usage = None
+        u = getattr(resp, "usage_metadata", None)
+        if u:
+            usage = {"input_tokens": getattr(u, "prompt_token_count", None),
+                     "output_tokens": getattr(u, "candidates_token_count", None)}
+        return _finalize(_parse_json_response(text), "gemini", self.model,
+                         len(parts), urls, usage)
+
+
+class _OpenAICompatBackend:
+    """GitHub Models or Groq — both speak the OpenAI chat/completions API
+    with base64 data-URL images."""
+    def __init__(self, name: str, url: str, key: str, model: str,
+                 http: httpx.AsyncClient, cap: int = 4, delay: float = 1.0):
+        self.name = name
+        self.url = url
+        self.key = key
+        self.model = model
+        self.http = http
+        self.cap = cap
+        self.delay = delay
+
+    async def assess(self, li: Listing, payloads, urls) -> Optional[dict]:
+        content = [{"type": "text", "text": f"{SYSTEM_PROMPT}\n\n{_user_prompt(li)}"}]
+        for d, m in payloads[:self.cap]:
+            b64 = base64.b64encode(d).decode("ascii")
+            content.append({"type": "image_url", "image_url": {"url": f"data:{m};base64,{b64}"}})
+        body = {"model": self.model, "max_tokens": MAX_TOKENS, "temperature": 0.2,
+                "messages": [{"role": "user", "content": content}]}
+        try:
+            r = await self.http.post(self.url, json=body, timeout=90.0,
+                                     headers={"Authorization": f"Bearer {self.key}",
+                                              "Content-Type": "application/json"})
+        except Exception as exc:
+            log.warning("vision.api_error", backend=self.name, source_url=li.source_url, error=str(exc)[:160])
+            return None
+        if r.status_code == 429:
+            raise QuotaExhausted(self.name)
+        if r.status_code >= 400:
+            log.warning("vision.api_error", backend=self.name, status=r.status_code, error=r.text[:160])
+            return None
+        try:
+            data = r.json()
+            text = data["choices"][0]["message"]["content"]
+        except Exception:
+            return None
+        usage = None
+        u = data.get("usage") or {}
+        if u:
+            usage = {"input_tokens": u.get("prompt_tokens"),
+                     "output_tokens": u.get("completion_tokens")}
+        return _finalize(_parse_json_response(text), self.name, self.model,
+                         min(len(payloads), self.cap), urls, usage)
+
+
+class _OllamaBackend:
+    """Local Ollama vision model — unlimited, free, never quota-exhausts."""
+    def __init__(self, host: str, model: str, http: httpx.AsyncClient, cap: int = 2):
+        self.name = "ollama"
+        self.host = host
+        self.model = model
+        self.http = http
+        self.cap = cap
+        self.delay = 0.0
+
+    async def assess(self, li: Listing, payloads, urls) -> Optional[dict]:
+        imgs = [base64.b64encode(d).decode("ascii") for d, _ in payloads[:self.cap]]
+        body = {"model": self.model, "stream": False, "format": "json",
+                "prompt": f"{SYSTEM_PROMPT}\n\n{_user_prompt(li)}",
+                "images": imgs, "options": {"num_predict": MAX_TOKENS}}
+        try:
+            r = await self.http.post(f"{self.host}/api/generate", json=body, timeout=240.0)
+        except Exception as exc:
+            log.warning("vision.api_error", backend=self.name, source_url=li.source_url, error=str(exc)[:160])
+            return None
+        if r.status_code >= 400:
+            log.warning("vision.api_error", backend=self.name, status=r.status_code, error=r.text[:160])
+            return None
+        try:
+            text = r.json().get("response", "")
+        except Exception:
+            return None
+        return _finalize(_parse_json_response(text), "ollama", self.model, len(imgs), urls)
+
+
+class _AnthropicBackend:
+    """Legacy paid fallback — only used when no free backend is configured."""
+    def __init__(self, client):
+        self.client = client
+        self.name = "anthropic"
+        self.model = ANTHROPIC_VISION_MODEL
+        self.delay = INTER_CALL_DELAY
+        self.cap = MAX_PHOTOS_PER_LISTING
+
+    async def assess(self, li: Listing, payloads, urls) -> Optional[dict]:
+        blocks = [{"type": "image", "source": {"type": "base64", "media_type": m,
+                   "data": base64.b64encode(d).decode("ascii")}}
+                  for d, m in payloads[:self.cap]]
+        try:
+            resp = await self.client.messages.create(
+                model=self.model, max_tokens=MAX_TOKENS, system=SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": blocks + [{"type": "text", "text": _user_prompt(li)}]}])
+        except Exception as exc:
+            if _is_quota_msg(str(exc)):
+                raise QuotaExhausted(self.name)
+            log.warning("vision.api_error", backend=self.name, source_url=li.source_url, error=str(exc)[:160])
+            return None
+        text = "\n".join(b.text for b in resp.content if hasattr(b, "text")).strip()
+        usage = None
+        u = getattr(resp, "usage", None)
+        if u:
+            usage = {"input_tokens": getattr(u, "input_tokens", None),
+                     "output_tokens": getattr(u, "output_tokens", None)}
+        return _finalize(_parse_json_response(text), "anthropic", self.model,
+                         len(blocks), urls, usage)
+
+
+async def _build_backends(http: httpx.AsyncClient) -> list:
+    """Assemble every available FREE vision backend (plus paid Anthropic only
+    as a last resort). Order doesn't matter — all pull from one shared queue."""
+    backends: list = []
+
+    # Gemini — one backend per key (each key = one project's free quota).
+    keys = _parse_gemini_keys()
+    if keys:
+        try:
+            from google import genai  # noqa: F401
+            for i, k in enumerate(keys, 1):
+                try:
+                    backends.append(_GeminiBackend(k, i))
+                except Exception as exc:
+                    log.warning("vision.backend_init_fail", backend=f"gemini#{i}", error=str(exc)[:120])
+        except ImportError:
+            log.warning("vision.sdk_missing", provider="gemini", hint="pip install google-genai")
+
+    # GitHub Models — free, uses the gh token if GITHUB_MODELS_TOKEN/GITHUB_TOKEN set.
+    gh = os.environ.get("GITHUB_MODELS_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    if gh:
+        backends.append(_OpenAICompatBackend("github", GITHUB_MODELS_URL, gh,
+                                             GITHUB_MODELS_MODEL, http, cap=4, delay=1.0))
+
+    # Groq — free, fast. Only if a key is present.
+    gq = os.environ.get("GROQ_API_KEY")
+    if gq:
+        backends.append(_OpenAICompatBackend("groq", GROQ_URL, gq, GROQ_MODEL,
+                                             http, cap=4, delay=2.0))
+
+    # Ollama — local, unlimited. Only if the daemon is reachable + model present.
+    if os.environ.get("VISION_USE_OLLAMA", "1") != "0":
+        try:
+            tr = await http.get(f"{OLLAMA_HOST}/api/tags", timeout=2.5)
+            if tr.status_code == 200:
+                names = [m.get("name", "") for m in (tr.json().get("models") or [])]
+                if any(OLLAMA_MODEL in n for n in names):
+                    backends.append(_OllamaBackend(OLLAMA_HOST, OLLAMA_MODEL, http))
+                else:
+                    log.info("vision.ollama_model_absent", host=OLLAMA_HOST, want=OLLAMA_MODEL, have=names[:5])
+        except Exception:
+            pass  # ollama not running — fine, it's optional
+
+    # Anthropic — paid; only as a fallback when nothing free is configured.
+    if not backends and os.environ.get("ANTHROPIC_API_KEY"):
+        try:
+            from anthropic import AsyncAnthropic
+            backends.append(_AnthropicBackend(AsyncAnthropic(
+                api_key=os.environ["ANTHROPIC_API_KEY"], max_retries=4, timeout=90.0)))
+        except ImportError:
+            log.warning("vision.sdk_missing", provider="anthropic", hint="pip install anthropic")
+
+    return backends
+
+
 # Pricing per 1M tokens for cost estimate logging. Anthropic: Sonnet 4.5
-# $3 in / $15 out. Gemini-2.0-flash: $0.075 in / $0.30 out (paid tier).
-# gemini-2.0-flash-exp is currently free; the math still produces a non-zero
-# "what it would have cost" estimate which is useful for capacity planning.
+# $3 in / $15 out. Gemini-2.5-flash: $0.075 in / $0.30 out (paid tier).
+# Free pools (gemini free project, github models, groq, ollama) cost $0; the
+# math still yields a "what it would have cost" figure for capacity planning.
 _PROVIDER_PRICING = {
     "anthropic": {"in_per_mtok": 3.0, "out_per_mtok": 15.0},
     "gemini": {"in_per_mtok": 0.075, "out_per_mtok": 0.30},
+    "github": {"in_per_mtok": 0.15, "out_per_mtok": 0.60},
+    "groq": {"in_per_mtok": 0.0, "out_per_mtok": 0.0},
+    "ollama": {"in_per_mtok": 0.0, "out_per_mtok": 0.0},
 }
 
 
@@ -536,13 +790,6 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
       - "gemini": Gemini 2.0 Flash, FREE on -exp model up to 1500 req/day
     Caller controls budget by max_listings.
     """
-    if VISION_PROVIDER == "gemini":
-        client, assess_fn = _build_gemini_client()
-    else:
-        client, assess_fn = _build_anthropic_client()
-    if client is None or assess_fn is None:
-        return
-
     targets = [li for li in listings if _select_image_urls(li)]
     # Prioritize the most actionable listings for the (free-quota-bounded)
     # Vision budget: soonest sale date first, then listings with an opening
@@ -591,52 +838,69 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
             if old != ct:
                 overrides += 1
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(20.0)) as http:
-        # FREE Gemini: run one serial stream PER KEY in parallel. Each key
-        # handles its own slice within its rate limit (no single-key 429
-        # storm), giving ~Nx throughput across N accounts. Falls through to
-        # the single-client + semaphore path for Anthropic / single-key.
-        gem_keys = _parse_gemini_keys() if VISION_PROVIDER == "gemini" else []
-        if VISION_PROVIDER == "gemini" and len(gem_keys) > 1:
-            from google import genai
-            clients = [genai.Client(api_key=k) for k in gem_keys]
-            buckets: list[list[Listing]] = [[] for _ in clients]
-            for i, li in enumerate(targets):
-                buckets[i % len(clients)].append(li)
+    scored = 0
+    by_backend: dict[str, int] = {}
 
-            async def stream(cl, bucket: list[Listing]) -> None:
-                for li in bucket:
-                    try:
-                        res = await _assess_one_gemini(cl, li, http)
-                    except Exception:
-                        res = None
-                    _apply(li, res)
-                    if INTER_CALL_DELAY > 0:
-                        await asyncio.sleep(INTER_CALL_DELAY)
+    def _apply2(li: Listing, result: Optional[dict]) -> None:
+        nonlocal scored
+        _apply(li, result)
+        if result:
+            scored += 1
+            prov = result.get("_provider", "?")
+            by_backend[prov] = by_backend.get(prov, 0) + 1
 
-            log.info("vision.parallel_streams", keys=len(clients),
-                     per_stream=len(buckets[0]) if buckets else 0)
-            await asyncio.gather(*(stream(cl, b) for cl, b in zip(clients, buckets)))
-        else:
-            sem = asyncio.Semaphore(CONCURRENCY)
+    async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as http:
+        backends = await _build_backends(http)
+        if not backends:
+            log.warning("vision.no_backends",
+                        hint="set GEMINI_API_KEY_n / GITHUB_MODELS_TOKEN / GROQ_API_KEY, or run Ollama")
+            return
+        log.info("vision.pool_built", backends=[b.name for b in backends], count=len(backends))
 
-            async def one(li: Listing) -> None:
-                async with sem:
-                    result = await assess_fn(client, li, http)
-                    if INTER_CALL_DELAY > 0:
-                        await asyncio.sleep(INTER_CALL_DELAY)
-                _apply(li, result)
+        # One SHARED queue; one worker per backend. When a backend hits its
+        # quota it retires and re-queues its in-flight listing, so the other
+        # backends pick up the slack — no quota share is wasted.
+        queue: asyncio.Queue = asyncio.Queue()
+        for li in targets:
+            queue.put_nowait(li)
 
-            await asyncio.gather(*(one(li) for li in targets))
+        async def worker(backend) -> None:
+            while True:
+                try:
+                    li = queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    return
+                payloads, urls = await _fetch_image_blocks(li, http)
+                if not payloads:
+                    continue
+                try:
+                    res = await backend.assess(li, payloads, urls)
+                except QuotaExhausted:
+                    queue.put_nowait(li)  # let another backend take it
+                    log.info("vision.backend_exhausted", backend=backend.name,
+                             remaining=queue.qsize())
+                    return
+                except Exception as exc:
+                    log.warning("vision.worker_error", backend=backend.name, error=str(exc)[:140])
+                    res = None
+                _apply2(li, res)
+                if getattr(backend, "delay", 0):
+                    await asyncio.sleep(backend.delay)
 
-    pricing = _PROVIDER_PRICING.get(VISION_PROVIDER, _PROVIDER_PRICING["anthropic"])
-    cost = (total_in / 1_000_000 * pricing["in_per_mtok"]) + (
-        total_out / 1_000_000 * pricing["out_per_mtok"]
-    )
+        await asyncio.gather(*(worker(b) for b in backends))
+        leftover = queue.qsize()
+
+    # Mixed-provider cost estimate (free pools = $0).
+    cost = 0.0
+    pr = _PROVIDER_PRICING
+    cost += (total_in / 1_000_000) * pr.get("gemini", {}).get("in_per_mtok", 0)
+    cost += (total_out / 1_000_000) * pr.get("gemini", {}).get("out_per_mtok", 0)
     log.info(
         "vision.done",
-        provider=VISION_PROVIDER,
         targets=len(targets),
+        scored=scored,
+        by_backend=by_backend,
+        unscored_remaining=leftover,
         overrides=overrides,
         input_tokens=total_in,
         output_tokens=total_out,

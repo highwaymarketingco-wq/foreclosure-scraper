@@ -44,8 +44,13 @@ load NC_ECOURTS_PASSWORD         "$SECRETS/nc_ecourts_password.txt"
 # so 4 keys = ~6000 free calls/day. Drop each account's key in its own file:
 #   .secrets/gemini_api_key_1.txt  (account 1)  ... gemini_api_key_4.txt
 load GEMINI_API_KEY              "$SECRETS/gemini_api_key.txt"
-# One free key per Google account; auto-load every gemini_api_key_N.txt (1..10).
-for i in $(seq 1 10); do load "GEMINI_API_KEY_$i" "$SECRETS/gemini_api_key_$i.txt"; done
+# One free key per Gemini project; auto-load every gemini_api_key_N.txt.
+for i in $(seq 1 60); do load "GEMINI_API_KEY_$i" "$SECRETS/gemini_api_key_$i.txt"; done
+# GitHub Models (free, separate pool) — saved token or gh CLI fallback.
+load GITHUB_MODELS_TOKEN         "$SECRETS/github_models_token.txt"
+[[ -z "${GITHUB_MODELS_TOKEN:-}" ]] && export GITHUB_MODELS_TOKEN="$(gh auth token 2>/dev/null || true)"
+# Groq (free, separate pool) — optional.
+load GROQ_API_KEY                "$SECRETS/groq_api_key.txt"
 
 # ---- defaults (config.py also defaults these, set here for clarity) --------
 export GMAIL_SENDER="${GMAIL_SENDER:-greghhigh@gmail.com}"
