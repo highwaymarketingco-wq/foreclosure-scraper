@@ -928,6 +928,11 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
         # daily-exhausted one (e.g. a spent Gemini key) retires after STRIKES.
         cooldown = float(os.environ.get("VISION_BACKEND_COOLDOWN", "60"))
         max_strikes = int(os.environ.get("VISION_BACKEND_STRIKES", "2"))
+        # Per-listing hard timeout — a single stuck network await (hung image
+        # fetch or provider call whose own timeout doesn't fire) must never
+        # freeze a worker. On timeout we drop that listing (re-scored next run)
+        # and move on. Covers fetch(≤15s) + provider POST(≤90s) with margin.
+        item_timeout = float(os.environ.get("VISION_ITEM_TIMEOUT", "150"))
 
         # Optional wall-clock cap so a long run (esp. the slow local floor)
         # can't overrun into the next scheduled pass. 0 = unlimited.
@@ -955,11 +960,15 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
                         li = queue.get_nowait()
                     except asyncio.QueueEmpty:
                         return
-                    payloads, urls = await _fetch_image_blocks(li, http)
-                    if not payloads:
-                        continue
+                    res = None
                     try:
-                        res = await backend.assess(li, payloads, urls)
+                        payloads, urls = await asyncio.wait_for(
+                            _fetch_image_blocks(li, http), timeout=item_timeout)
+                        if not payloads:
+                            continue
+                        res = await asyncio.wait_for(
+                            backend.assess(li, payloads, urls), timeout=item_timeout)
+                        strikes = 0
                     except QuotaExhausted:
                         strikes += 1
                         queue.put_nowait(li)
@@ -971,11 +980,10 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
                                  strikes=strikes, cooldown_s=cooldown, remaining=queue.qsize())
                         await asyncio.sleep(cooldown)
                         continue
+                    except asyncio.TimeoutError:
+                        log.warning("vision.item_timeout", backend=backend.name, remaining=queue.qsize())
                     except Exception as exc:
                         log.warning("vision.worker_error", backend=backend.name, error=str(exc)[:140])
-                        res = None
-                    else:
-                        strikes = 0
                     _apply2(li, res)
                     if getattr(backend, "delay", 0):
                         await asyncio.sleep(backend.delay)

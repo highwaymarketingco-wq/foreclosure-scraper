@@ -76,7 +76,18 @@ async def main() -> int:
           f"{len(unscored)} un-scored. Running {os.environ.get('VISION_PROVIDER','?')} "
           f"vision (cap {cap}) on the un-scored, prioritized…", flush=True)
     t0 = time.time()
-    await enrich_with_vision(unscored, max_listings=cap)
+    # Hard wall-clock cap: a single hung worker (stuck network await) must NOT
+    # stall the whole run forever. enrich_with_vision applies results to each
+    # listing in place as it goes, so on timeout we still keep partial progress
+    # and proceed to write/publish what was scored. Default 4h; +120s grace so
+    # the pool's own internal VISION_MAX_SECONDS deadline fires first when set.
+    hard_cap = float(os.environ.get("VISION_MAX_SECONDS", "14400")) + 120
+    try:
+        await asyncio.wait_for(
+            enrich_with_vision(unscored, max_listings=cap), timeout=hard_cap)
+    except asyncio.TimeoutError:
+        print(f"[{time.strftime('%H:%M:%S')}] vision pass hit hard cap ({hard_cap:.0f}s) "
+              f"— writing partial progress", flush=True)
     print(f"[{time.strftime('%H:%M:%S')}] vision pass done in {int(time.time()-t0)}s", flush=True)
 
     # Recompute calc + grade (condition_tier may have changed) and write the
