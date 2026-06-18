@@ -1052,6 +1052,55 @@ footer strong { color: var(--text-2); font-weight: 600; }
   #cards-grid { grid-template-columns: 1fr; gap: 14px; }
 }
 
+/* === Distress (HOT/WARM operator board) === */
+.distress-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .03em;
+  color: #fff;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.distress-badge.hot  { background: linear-gradient(135deg, #d92d20, #f97316); }
+.distress-badge.warm { background: linear-gradient(135deg, #b8860b, #e0a106); }
+.card-distress-corner {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,.25));
+}
+.distress-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+.distress-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--surface-2);
+  color: var(--text-2, #475467);
+  border: 1px solid var(--border, rgba(0,0,0,.08));
+}
+.distress-chip.absentee { background: #fde68a; color: #7c5e10; border-color: #f5cf6a; }
+.tier-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.tier-dot.hot  { background: #d92d20; box-shadow: 0 0 0 2px rgba(217,45,32,.18); }
+.tier-dot.warm { background: #e0a106; box-shadow: 0 0 0 2px rgba(224,161,6,.18); }
+
 .hidden { display: none; }
 
 /* Scrollbar polish (webkit) */

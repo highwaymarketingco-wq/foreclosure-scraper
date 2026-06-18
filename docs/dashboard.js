@@ -163,7 +163,7 @@ function initFilters() {
       sel.appendChild(opt);
     });
 
-  ["search", "filter-state", "filter-county", "filter-type", "filter-grade", "filter-window", "filter-roi"].forEach((id) =>
+  ["search", "filter-state", "filter-county", "filter-type", "filter-distress", "filter-grade", "filter-window", "filter-roi"].forEach((id) =>
     $(id).addEventListener("input", applyFilters),
   );
 
@@ -205,6 +205,7 @@ function getSortValue(l, k) {
   if (k === "_rehab") return (getCalc(l) || {}).rehab_expected || 0;
   if (k === "_max_bid") return (getCalc(l) || {}).max_bid_70 || 0;
   if (k === "_roi") return (getCalc(l) || {}).roi_pct;
+  if (k === "_distress") return (getDistress(l) || {}).score || 0;
   return l[k];
 }
 
@@ -213,6 +214,7 @@ function applyFilters() {
   const st = $("filter-state").value;
   const co = $("filter-county").value;
   const ty = $("filter-type").value;
+  const distress = $("filter-distress").value;
   const minGrade = $("filter-grade").value;
   const minGradeRank = minGrade ? gradeOrder[minGrade] : 0;
   const win = parseInt($("filter-window").value);
@@ -226,6 +228,13 @@ function applyFilters() {
     if (st && l.state !== st) return false;
     if (co && `${l.county || ""}, ${l.state || "?"}` !== co) return false;
     if (ty && l.listing_type !== ty) return false;
+    if (distress) {
+      const ds = getDistress(l);
+      if (!ds) return false;
+      if (distress === "HOT" && ds.tier !== "HOT") return false;
+      if (distress === "HOTWARM" && ds.tier === "COLD") return false;
+      if (distress === "STACK2" && !(ds.stack >= 2)) return false;
+    }
     if (win && l.sale_date) {
       const d = Date.parse(l.sale_date);
       if (isNaN(d) || d < now || d > wmax) return false;
@@ -251,21 +260,32 @@ function applyFilters() {
     return true;
   });
 
+  // When the operator is filtering by distress, surface hottest-first
+  // regardless of the table-header sort (the board reads like a lead queue).
+  const effKey = distress ? "_distress" : sortKey;
+  const effDir = distress ? "desc" : sortDir;
   filtered.sort((a, b) => {
-    let av = getSortValue(a, sortKey);
-    let bv = getSortValue(b, sortKey);
-    if (av == null) av = sortDir === "asc" ? Infinity : -Infinity;
-    if (bv == null) bv = sortDir === "asc" ? Infinity : -Infinity;
+    let av = getSortValue(a, effKey);
+    let bv = getSortValue(b, effKey);
+    if (av == null) av = effDir === "asc" ? Infinity : -Infinity;
+    if (bv == null) bv = effDir === "asc" ? Infinity : -Infinity;
     if (typeof av === "string") av = av.toLowerCase();
     if (typeof bv === "string") bv = bv.toLowerCase();
-    if (av < bv) return sortDir === "asc" ? -1 : 1;
-    if (av > bv) return sortDir === "asc" ? 1 : -1;
+    if (av < bv) return effDir === "asc" ? -1 : 1;
+    if (av > bv) return effDir === "asc" ? 1 : -1;
     return 0;
   });
 
   renderTable();
   renderCards();
-  $("result-count").textContent = `${filtered.length} of ${LISTINGS.length} listings`;
+  // Tier tally over the current filtered set (the operator-board headline).
+  let hot = 0, warm = 0;
+  filtered.forEach((l) => {
+    const t = (getDistress(l) || {}).tier;
+    if (t === "HOT") hot++; else if (t === "WARM") warm++;
+  });
+  const tally = hot || warm ? `  ·  🔥 ${hot} HOT · ${warm} WARM` : "";
+  $("result-count").textContent = `${filtered.length} of ${LISTINGS.length} listings${tally}`;
 }
 
 // ------------- Format helpers ------------------------------------------------
@@ -285,6 +305,31 @@ function fmtType(t) {
 function gradeBadge(g) {
   if (!g || !g.overall) return `<span class="grade-badge F" style="opacity:0.4">—</span>`;
   return `<span class="grade-badge ${g.overall}">${g.overall}</span>`;
+}
+// ------------- Distress (HOT/WARM operator board) ---------------------------
+function getDistress(l) { return (l.raw && l.raw.distress_stack) || null; }
+const distressLabel = {
+  HOT:  { emoji: "🔥", cls: "hot",  txt: "HOT" },
+  WARM: { emoji: "🌡", cls: "warm", txt: "WARM" },
+};
+const catLabel = {
+  FINANCIAL: "💰 financial", SALES: "🏷 sale", LEGAL: "⚖ legal",
+  LIFE_EVENT: "👤 life-event", PROPERTY: "🏚 property",
+};
+function distressBadge(ds) {
+  if (!ds || !distressLabel[ds.tier]) return "";
+  const d = distressLabel[ds.tier];
+  const stk = ds.stack >= 2 ? ` ·${ds.stack}×` : "";
+  const tip = `${(ds.signals || []).join(", ") || "single signal"} — score ${ds.score}`;
+  return `<span class="distress-badge ${d.cls}" title="${tip}">${d.emoji} ${d.txt}${stk}</span>`;
+}
+function distressChips(ds) {
+  if (!ds || !ds.categories || !ds.categories.length || ds.tier === "COLD") return "";
+  const chips = ds.categories.map((c) => `<span class="distress-chip">${catLabel[c] || c.toLowerCase()}</span>`).join("");
+  const tags = [];
+  if (ds.absentee) tags.push(`<span class="distress-chip absentee">absentee</span>`);
+  if (ds.out_of_state) tags.push(`<span class="distress-chip absentee">out-of-state</span>`);
+  return `<div class="distress-chips">${chips}${tags.join("")}</div>`;
 }
 function roiCell(roi) {
   if (roi == null) return "";
@@ -312,7 +357,7 @@ function renderTable() {
       const dateCell = isBkSource && cl && cl.date_filed ? cl.date_filed : fmtDate(l.sale_date);
       return `
     <tr class="${rowClass}" data-id="${i}">
-      <td>${gradeBadge(g)}</td>
+      <td>${(() => { const ds = getDistress(l); return ds && distressLabel[ds.tier] ? `<span class="tier-dot ${distressLabel[ds.tier].cls}" title="${ds.tier} · ${(ds.signals || []).join(', ')}"></span>` : ""; })()}${gradeBadge(g)}</td>
       <td>${dateCell}</td>
       <td>${l.state || ""}</td>
       <td>${l.county || ""}</td>
@@ -376,13 +421,16 @@ function renderCards() {
       const cardLoc = isBkSource
         ? `${cl && cl.court ? cl.court.toUpperCase() : ""} · ${l.state || ""} · Filed ${cl && cl.date_filed || "?"}`
         : `${l.city || ""}${l.city ? ", " : ""}${l.county || "?"} County, ${l.state || ""}`;
+      const ds = getDistress(l);
       return `
       <div class="card" data-id="${i}">
         ${g ? `<div class="card-grade-corner">${gradeBadge(g)}</div>` : ""}
+        ${ds && distressLabel[ds.tier] ? `<div class="card-distress-corner">${distressBadge(ds)}</div>` : ""}
         ${photo}
         <div class="card-body">
           <div class="card-addr">${cardAddr}</div>
           <div class="card-loc">${cardLoc}</div>
+          ${distressChips(ds)}
           <div class="card-meta">
             ${fmtType(l.listing_type)}
             ${l.opening_bid ? `<span>Bid ${fmtMoney(l.opening_bid)}</span>` : ""}
