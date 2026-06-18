@@ -44,10 +44,8 @@ load NC_ECOURTS_PASSWORD         "$SECRETS/nc_ecourts_password.txt"
 # so 4 keys = ~6000 free calls/day. Drop each account's key in its own file:
 #   .secrets/gemini_api_key_1.txt  (account 1)  ... gemini_api_key_4.txt
 load GEMINI_API_KEY              "$SECRETS/gemini_api_key.txt"
-load GEMINI_API_KEY_1            "$SECRETS/gemini_api_key_1.txt"
-load GEMINI_API_KEY_2            "$SECRETS/gemini_api_key_2.txt"
-load GEMINI_API_KEY_3            "$SECRETS/gemini_api_key_3.txt"
-load GEMINI_API_KEY_4            "$SECRETS/gemini_api_key_4.txt"
+# One free key per Google account; auto-load every gemini_api_key_N.txt (1..10).
+for i in $(seq 1 10); do load "GEMINI_API_KEY_$i" "$SECRETS/gemini_api_key_$i.txt"; done
 
 # ---- defaults (config.py also defaults these, set here for clarity) --------
 export GMAIL_SENDER="${GMAIL_SENDER:-greghhigh@gmail.com}"
