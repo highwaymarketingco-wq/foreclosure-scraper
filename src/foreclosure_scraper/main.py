@@ -1049,6 +1049,15 @@ async def run() -> int:
             log.warning("valuation.failed", source_url=li.source_url)
     log.info("orchestrator.graded", count=len(enriched))
 
+    # Stacked-distress score (HOT/WARM/COLD operator board) — runs last so it
+    # can stack every signal + equity + contactability gathered above.
+    try:
+        from .distress_score import score_board
+        enrichment_stats["distress_stack"] = score_board(enriched)
+        log.info("orchestrator.distress_scored", tiers=enrichment_stats["distress_stack"])
+    except Exception:
+        log.error("distress_score.failed", traceback=traceback.format_exc())
+
     # RentCast AVM cross-check on top-N listings (authoritative AVM + comparables).
     # Only fires when RENTCAST_API_KEY is set.
     # Free tier (50 calls/mo) → 25 listings × 2 calls each.

@@ -81,6 +81,7 @@ RAW_KEEP = {
     "sold_confirmed": "*",            # court-confirmed sale → already sold, filter off active board
     "owner_mailing": "*",             # #0 contactability: owner name + mailing addr + absentee/out-of-state flags
     "incarceration": "*",             # owner matched a state corrections roster (NC DAC) — low-conf stack signal
+    "distress_stack": "*",            # HOT/WARM/COLD tier + stacked distress categories + score (operator board)
     "refresh_misses": "*",            # daily-refresh consecutive-absence counter (drop after N)
     "last_refresh_seen": "*",         # date a refreshed source last confirmed this listing in inventory
     "carryover": "*",                 # Last-known-good replay marker
