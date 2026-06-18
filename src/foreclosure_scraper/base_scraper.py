@@ -40,6 +40,21 @@ class BaseScraper(ABC):
     #: Used for skip-when-budget-exhausted and run-report categorization.
     requires_apify: bool = False
 
+    #: Months (1-12) this source is active; None = always. Sources whose data is
+    #: published only seasonally (e.g. SC annual delinquent-tax lists post ~Nov)
+    #: set this so off-season runs skip cleanly and auto-resume in-window — no
+    #: wasted fetches against absent data. Override the "current month" for
+    #: testing with env SEASONAL_MONTH_OVERRIDE.
+    active_months: tuple[int, ...] | None = None
+
+    def _in_season(self) -> bool:
+        if self.active_months is None:
+            return True
+        import datetime as _dt
+        import os as _os
+        mo = int(_os.environ.get("SEASONAL_MONTH_OVERRIDE", "0")) or _dt.datetime.utcnow().month
+        return mo in self.active_months
+
     @abstractmethod
     async def fetch(self) -> Iterable[Listing]:
         """Yield Listing objects. Implementations may be async generators or return lists."""
@@ -47,6 +62,9 @@ class BaseScraper(ABC):
     async def safe_run(self) -> list[Listing]:
         """Run with timeout + error handling; never raise to the orchestrator."""
         bound = log.bind(scraper=self.slug)
+        if not self._in_season():
+            bound.info("scraper.dormant_off_season", active_months=self.active_months)
+            return []
         try:
             bound.info("scraper.start")
             results = await asyncio.wait_for(self._collect(), timeout=self.timeout_s)
