@@ -252,7 +252,7 @@ class CourtListenerBankruptcy(BaseScraper):
                         Listing(
                             source=self.slug,
                             source_url=("https://www.courtlistener.com" + d["absolute_url"]) if d.get("absolute_url") else "",
-                            listing_type=ListingType.LIS_PENDENS,  # bankruptcy = pre-sale signal
+                            listing_type=ListingType.BANKRUPTCY,  # 2026-06-19: was mislabeled LIS_PENDENS
                             property_kind=PropertyKind.UNKNOWN,
                             state=state,
                             county=county,

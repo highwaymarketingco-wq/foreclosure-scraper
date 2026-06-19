@@ -122,6 +122,7 @@ class ListingType(str, Enum):
     TAX_SALE = "tax_sale"
     TAX_LIEN = "tax_lien"
     LIS_PENDENS = "lis_pendens"
+    BANKRUPTCY = "bankruptcy"   # federal BK filing — a debtor-name distress signal, NOT a property listing
     REO = "reo"
     AUCTION = "auction"
     SHERIFF_SALE = "sheriff_sale"

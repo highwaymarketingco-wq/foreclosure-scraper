@@ -163,8 +163,8 @@
     "city_websites.search": "OK (144)"
   },
   "regressions": [
-    "counties_sc.anderson_master_in_equity: got 3, expected ≥ 5",
-    "counties_nc.cleveland_tax: got 2, expected ≥ 3"
+    "counties_sc.anderson_master_in_equity: got 3, expected \u2265 5",
+    "counties_nc.cleveland_tax: got 2, expected \u2265 3"
   ],
   "errors": [
     "national.courtlistener_adversary",

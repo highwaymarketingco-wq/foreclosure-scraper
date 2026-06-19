@@ -38,6 +38,13 @@ def _synth_for_listing(li: Listing) -> str | None:
     case = li.case_number or ""
     defendant = (li.defendant or "").strip()
 
+    # 2026-06-19: bankruptcy filings have NO property address. Never synthesize
+    # one from the debtor name — doing so faked "Name — case#" into street_address
+    # for 1,548 listings (misrepresentation). The debtor name lives in
+    # li.defendant; the dashboard renders BK by name. Leave street_address empty.
+    if "courtlistener_bankruptcy" in src:
+        return None
+
     # Try to find an actual address pattern in the description first
     if desc:
         m = ADDR_RE.search(desc)

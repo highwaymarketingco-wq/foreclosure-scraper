@@ -223,6 +223,22 @@ def grade(li: Listing, c: _calc.Calc | None = None) -> Grade:
 
     # Weighted overall: financial 40 / property 25 / location 20 / risk 15
     overall = round(fs * 0.40 + ps * 0.25 + ls * 0.20 + rs * 0.15)
+    # 2026-06-19: WITHHOLD the overall letter when there's no real financial
+    # basis. A data-less listing got financial=50 ("neutral" C) and the
+    # property/location baselines floated the overall to a confident C/D — a
+    # misleading grade on a row we know nothing about. Rate it only when we have
+    # an opening bid OR a non-proxy (HIGH/MEDIUM-confidence) ARV.
+    arv_conf = getattr(c, "arv_confidence", None)
+    assessable = bool(li.opening_bid) or bool(c.arv_expected and arv_conf in ("HIGH", "MEDIUM"))
+    if not assessable:
+        return Grade(
+            overall=None, overall_score=0,
+            financial=_letter(fs), financial_score=fs,
+            property=_letter(ps), property_score=ps,
+            location=_letter(ls), location_score=ls,
+            risk=_letter(rs), risk_score=rs,
+            rationale=["Unrated — insufficient valuation data (no bid / only proxy ARV)", pn, ln, rn],
+        )
     return Grade(
         overall=_letter(overall),
         overall_score=overall,
