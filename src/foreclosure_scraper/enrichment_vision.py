@@ -555,13 +555,17 @@ CLOUDFLARE_MODEL = os.environ.get("CLOUDFLARE_VISION_MODEL", "@cf/mistralai/mist
 NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 NVIDIA_VISION_MODELS = [m.strip() for m in os.environ.get("NVIDIA_VISION_MODELS", ",".join([
     "mistralai/mistral-small-4-119b-2603",
+    "mistralai/mistral-medium-3.5-128b",
     "meta/llama-4-maverick-17b-128e-instruct",
     "minimaxai/minimax-m3",
     "meta/llama-3.2-11b-vision-instruct",
     "nvidia/nemotron-nano-12b-v2-vl",
     "qwen/qwen3.5-397b-a17b",
     "mistralai/mistral-large-3-675b-instruct-2512",
+    "mistralai/ministral-14b-instruct-2512",
     "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+    "google/gemma-3n-e4b-it",
+    "google/gemma-3n-e2b-it",
     "meta/llama-3.2-90b-vision-instruct",
 ])).split(",") if m.strip()]
 
