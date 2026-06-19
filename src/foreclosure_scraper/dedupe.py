@@ -1,9 +1,32 @@
 """Listing deduplication. Same property from multiple sources merges into one row."""
 from __future__ import annotations
 
+import re
+
 from rapidfuzz import fuzz
 
 from .models import Listing
+
+
+def _strong_sigs(li: Listing) -> set:
+    """Strong same-property signatures for union-merge. Excludes placeholder /
+    bankruptcy 'addresses' so name-only rows never collapse together."""
+    out: set = set()
+    st = (li.state or "")
+    z = (li.zip_code or "").strip()
+    a = _norm_addr(li.street_address)
+    lt = li.listing_type.value if hasattr(li.listing_type, "value") else str(li.listing_type or "")
+    if a.startswith(("lis pendens", "property in", "vacant")) or lt == "bankruptcy":
+        a = ""
+    pn = re.sub(r"[^a-z0-9]", "", (li.parcel_id or "").lower())
+    if pn and len(pn) >= 4 and st:          # guard: whitespace/degenerate parcel -> no sig
+        out.add(("p", pn, st))
+    cn = (li.case_number or "").strip()
+    if cn and a:                            # require a real case# AND a real address
+        out.add(("c", cn, (li.county or ""), a))
+    if a and z:
+        out.add(("a", a, z))
+    return out
 
 
 def _norm_addr(s: str | None) -> str:
@@ -54,4 +77,30 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
                 consumed.add(j)
         final.append(a)
 
-    return final
+    # Pass 3 (2026-06-19): signature union-merge. dedupe_key is parcel>addr>case>
+    # url, so the SAME property with a parcel_id on one copy and only a case# on
+    # another splits into two keys and never merges (verified leak: ~19 rows).
+    # Union any rows sharing a strong signature, then merge each group.
+    parent = list(range(len(final)))
+    def _find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+    sigmap: dict = {}
+    for i, li in enumerate(final):
+        for s in _strong_sigs(li):
+            if s in sigmap:
+                parent[_find(sigmap[s])] = _find(i)
+            else:
+                sigmap[s] = i
+    groups: dict = {}
+    for i in range(len(final)):
+        groups.setdefault(_find(i), []).append(i)
+    out: list[Listing] = []
+    for idxs in groups.values():
+        m = final[idxs[0]]
+        for j in idxs[1:]:
+            m = m.merge(final[j])
+        out.append(m)
+    return out
