@@ -137,6 +137,21 @@ async def _fetch_image_bytes(c: httpx.AsyncClient, url: str) -> Optional[tuple[b
             media_type = "image/jpeg"
         # Cap at ~3 MB (Anthropic limit)
         data = r.content[:3 * 1024 * 1024]
+        # Normalize WebP/other formats to JPEG. Some backends (e.g. NVIDIA
+        # nemotron-nano-vl-8b) 500 with "cannot identify image file" on WebP,
+        # and rdcpix/Realtor + Zillow serve WebP heavily. PIL reads WebP fine;
+        # re-encoding to JPEG makes every backend able to decode it. JPEG/PNG
+        # pass through untouched.
+        if media_type not in ("image/jpeg", "image/png"):
+            try:
+                import io as _io
+                from PIL import Image as _Image
+                im = _Image.open(_io.BytesIO(data)).convert("RGB")
+                out = _io.BytesIO()
+                im.save(out, "JPEG", quality=85)
+                data, media_type = out.getvalue(), "image/jpeg"
+            except Exception:
+                pass  # unreadable here — leave as-is; a backend that can read it still will
         return data, media_type
     except Exception:
         return None
