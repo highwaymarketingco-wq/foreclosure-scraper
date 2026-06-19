@@ -179,7 +179,7 @@ class RuntimeConfig:
         return cls(
             sheet_id=os.environ.get("SHEET_ID", ""),
             google_service_account_json=os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON", ""),
-            gmail_sender=os.environ.get("GMAIL_SENDER", "greghhigh@gmail.com"),
+            gmail_sender=os.environ.get("GMAIL_SENDER", "highwaymarketingco@gmail.com"),
             gmail_app_password=os.environ.get("GMAIL_APP_PASSWORD", ""),
             email_recipients=recipients,
         )

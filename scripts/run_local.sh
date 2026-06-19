@@ -60,7 +60,7 @@ load CLOUDFLARE_API_TOKEN        "$SECRETS/cloudflare_api_token.txt"
 load CLOUDFLARE_ACCOUNT_ID       "$SECRETS/cloudflare_account_id.txt"
 
 # ---- defaults (config.py also defaults these, set here for clarity) --------
-export GMAIL_SENDER="${GMAIL_SENDER:-greghhigh@gmail.com}"
+export GMAIL_SENDER="${GMAIL_SENDER:-highwaymarketingco@gmail.com}"
 export EMAIL_RECIPIENTS="${EMAIL_RECIPIENTS:-greghhigh@gmail.com,cashrandolphhigh@gmail.com}"
 # Vision provider: prefer FREE Gemini when any Gemini key is present
 # (4 accounts auto-rotate); fall back to Anthropic only if no Gemini key.
