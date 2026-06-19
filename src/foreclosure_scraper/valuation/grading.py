@@ -239,6 +239,26 @@ def grade(li: Listing, c: _calc.Calc | None = None) -> Grade:
             risk=_letter(rs), risk_score=rs,
             rationale=["Unrated — insufficient valuation data (no bid / only proxy ARV)", pn, ln, rn],
         )
+    # 2026-06-19: also WITHHOLD when the deal-math is anomalous (garbage-in). A
+    # tiny placeholder opening bid (<5% of ARV — an upset/opening figure, not the
+    # real acquisition cost) or an implausible ARV (>$2M in these rural counties =
+    # a comp error) produces an absurd ROI (e.g. 1300%). Presenting that as a
+    # confident 'B' misrepresents it — rate it 'unrated' instead.
+    roi = getattr(c, "roi_pct", None)
+    anomalous = (
+        (roi is not None and roi > 400)
+        or (c.arv_expected and c.arv_expected > 2_000_000)
+        or (li.opening_bid and c.arv_expected and li.opening_bid < 0.05 * c.arv_expected)
+    )
+    if anomalous:
+        return Grade(
+            overall=None, overall_score=0,
+            financial=_letter(fs), financial_score=fs,
+            property=_letter(ps), property_score=ps,
+            location=_letter(ls), location_score=ls,
+            risk=_letter(rs), risk_score=rs,
+            rationale=["Unrated — anomalous valuation (placeholder bid or implausible ARV)", pn, ln, rn],
+        )
     return Grade(
         overall=_letter(overall),
         overall_score=overall,
