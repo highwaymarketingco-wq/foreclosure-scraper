@@ -1,13 +1,19 @@
 {
-  "generated_at": "2026-06-17T17:00:41.341929+00:00",
+  "generated_at": "2026-06-19T01:55:54.057792+00:00",
   "totals": {
-    "total_listings": 4816,
+    "total_listings": 5073,
     "by_state": {
-      "NC": 2551,
-      "SC": 2265
+      "NC": 2706,
+      "SC": 2367
     }
   },
   "sources": [
+    {
+      "source": "counties_nc.nc_ecourts_lis_pendens",
+      "count": 480,
+      "status": "CARRYOVER (480 stale from prior run)",
+      "severity": 2
+    },
     {
       "source": "law_firms.aldridge_pite",
       "count": 0,
@@ -39,9 +45,21 @@
       "severity": 2
     },
     {
+      "source": "national.trulia",
+      "count": 0,
+      "status": "RENDER-REQUIRED (stealth fetch returned nothing)",
+      "severity": 2
+    },
+    {
+      "source": "national.foreclosure_dot_com",
+      "count": 0,
+      "status": "PAYWALL-BLOCKED",
+      "severity": 1
+    },
+    {
       "source": "city_websites.search",
-      "count": 117,
-      "status": "OK (117)",
+      "count": 144,
+      "status": "OK (144)",
       "severity": 0
     },
     {
@@ -63,6 +81,12 @@
       "severity": 0
     },
     {
+      "source": "counties_nc.buncombe_tax_foreclosure",
+      "count": 1,
+      "status": "OK (1)",
+      "severity": 0
+    },
+    {
       "source": "counties_nc.cleveland_tax",
       "count": 2,
       "status": "OK (2)",
@@ -75,9 +99,9 @@
       "severity": 0
     },
     {
-      "source": "counties_nc.nc_ecourts_lis_pendens",
-      "count": 285,
-      "status": "OK (285)",
+      "source": "counties_nc.nc_county_tax_foreclosure",
+      "count": 88,
+      "status": "OK (88)",
       "severity": 0
     },
     {
@@ -112,12 +136,18 @@
     },
     {
       "source": "counties_sc.sc_county_rosters",
-      "count": 6,
-      "status": "OK (6)",
+      "count": 7,
+      "status": "OK (7)",
       "severity": 0
     },
     {
       "source": "counties_sc.sc_courtrosters",
+      "count": 0,
+      "status": "EMPTY (verified)",
+      "severity": 0
+    },
+    {
+      "source": "counties_sc.sc_delinquent_tax_list",
       "count": 0,
       "status": "EMPTY (verified)",
       "severity": 0
@@ -136,8 +166,8 @@
     },
     {
       "source": "counties_sc.sc_public_index_lis_pendens",
-      "count": 221,
-      "status": "OK (221)",
+      "count": 211,
+      "status": "OK (211)",
       "severity": 0
     },
     {
@@ -160,14 +190,14 @@
     },
     {
       "source": "law_firms.bell_carrington",
-      "count": 70,
-      "status": "OK (70)",
+      "count": 75,
+      "status": "OK (75)",
       "severity": 0
     },
     {
       "source": "law_firms.brock_scott",
-      "count": 324,
-      "status": "OK (324)",
+      "count": 319,
+      "status": "OK (319)",
       "severity": 0
     },
     {
@@ -178,8 +208,8 @@
     },
     {
       "source": "law_firms.hutchens",
-      "count": 389,
-      "status": "OK (389)",
+      "count": 383,
+      "status": "OK (383)",
       "severity": 0
     },
     {
@@ -196,8 +226,8 @@
     },
     {
       "source": "law_firms.mcmichael_taylor_gray",
-      "count": 90,
-      "status": "OK (90)",
+      "count": 88,
+      "status": "OK (88)",
       "severity": 0
     },
     {
@@ -238,20 +268,20 @@
     },
     {
       "source": "national.distressed",
-      "count": 299,
-      "status": "OK (299)",
+      "count": 309,
+      "status": "OK (309)",
       "severity": 0
     },
     {
       "source": "national.fannie_homepath",
-      "count": 690,
-      "status": "OK (690)",
+      "count": 691,
+      "status": "OK (691)",
       "severity": 0
     },
     {
-      "source": "national.foreclosure_dot_com",
-      "count": 370,
-      "status": "OK (370)",
+      "source": "national.first_citizens_reo",
+      "count": 4,
+      "status": "OK (4)",
       "severity": 0
     },
     {
@@ -262,14 +292,14 @@
     },
     {
       "source": "national.homeharvest",
-      "count": 11,
-      "status": "OK (11)",
+      "count": 10,
+      "status": "OK (10)",
       "severity": 0
     },
     {
       "source": "national.hud_homestore",
-      "count": 30,
-      "status": "OK (30)",
+      "count": 27,
+      "status": "OK (27)",
       "severity": 0
     },
     {
@@ -286,44 +316,38 @@
     },
     {
       "source": "national.realtor_foreclosures",
-      "count": 15,
-      "status": "OK (15)",
-      "severity": 0
-    },
-    {
-      "source": "national.trulia",
-      "count": 22,
-      "status": "OK (22)",
+      "count": 14,
+      "status": "OK (14)",
       "severity": 0
     },
     {
       "source": "national.xome",
-      "count": 2,
-      "status": "OK (2)",
+      "count": 1,
+      "status": "OK (1)",
       "severity": 0
     },
     {
       "source": "national.zillow_bulk",
-      "count": 82,
-      "status": "OK (82)",
+      "count": 41,
+      "status": "OK (41)",
       "severity": 0
     },
     {
       "source": "national.zillow_foreclosures",
-      "count": 358,
-      "status": "OK (358)",
+      "count": 369,
+      "status": "OK (369)",
       "severity": 0
     },
     {
       "source": "newspapers.daily_courier",
-      "count": 3,
-      "status": "OK (3)",
+      "count": 1,
+      "status": "OK (1)",
       "severity": 0
     },
     {
       "source": "newspapers.hendersonville_lightning",
-      "count": 5,
-      "status": "OK (5)",
+      "count": 6,
+      "status": "OK (6)",
       "severity": 0
     },
     {
@@ -340,8 +364,8 @@
     },
     {
       "source": "public_notices.ncnotices",
-      "count": 34,
-      "status": "OK (34)",
+      "count": 33,
+      "status": "OK (33)",
       "severity": 0
     },
     {
@@ -364,8 +388,8 @@
     },
     {
       "source": "reo.vrm_va_reo",
-      "count": 156,
-      "status": "OK (156)",
+      "count": 155,
+      "status": "OK (155)",
       "severity": 0
     }
   ],
@@ -376,10 +400,12 @@
   "errors": [
     "national.courtlistener_adversary",
     "national.courtlistener_civil",
+    "national.foreclosure_dot_com",
     "national.freddie_homesteps",
     "national.hubzu",
     "national.probate_foreclosure_leads",
     "national.propwire",
+    "national.trulia",
     "public_notices.publicnoticesc",
     "law_firms.aldridge_pite",
     "law_firms.aldridge_pite_pydoll",
@@ -387,8 +413,10 @@
     "law_firms.korn_pydoll",
     "counties_sc.pickens_master_in_equity",
     "counties_sc.sc_courtrosters",
+    "counties_sc.sc_delinquent_tax_list",
     "counties_sc.sc_public_index",
     "counties_sc.sc_tax_delinquent",
+    "counties_nc.nc_ecourts_lis_pendens",
     "counties_nc.nc_rod_substitute_trustee",
     "counties.nod_discovery",
     "newspapers.shelby_star",
@@ -398,92 +426,108 @@
   ],
   "enrichments": {
     "lis_pendens_resolver": {
-      "queried": 335,
-      "address_filled": 89,
-      "parcel_only": 20,
+      "queried": 265,
+      "address_filled": 10,
+      "parcel_only": 17,
       "ambiguous": 20,
-      "no_match": 206,
+      "no_match": 218,
       "retagged_county": 0,
       "no_layer": 0,
-      "fiduciary_skipped": 2
+      "fiduciary_skipped": 1
     },
     "parcel_reverse_geo": {
-      "queried": 143,
-      "annotated": 143,
+      "queried": 116,
+      "annotated": 116,
       "no_match": 0
     },
     "county_pin": {
-      "scanned": 5341,
-      "case_pinned": 1275,
-      "already_correct": 1275,
+      "scanned": 5746,
+      "case_pinned": 1188,
+      "already_correct": 1188,
       "retagged_county": 0,
       "address_nulled": 0,
-      "no_case_decode": 4066
+      "no_case_decode": 4558
+    },
+    "owner_mailing": {
+      "queried": 1414,
+      "resolved": 137,
+      "absentee": 74,
+      "out_of_state": 10
+    },
+    "incarceration": {
+      "queried": 150,
+      "matched": 18,
+      "sc_skipped": 1324
     },
     "foreclosure_sold_comps": {
-      "active": 4816,
+      "active": 5073,
       "pool": 47,
-      "matched": 1166,
-      "no_county_match": 899,
-      "no_kind_match": 500,
-      "no_match_at_all": 228
+      "matched": 1384,
+      "no_county_match": 968,
+      "no_kind_match": 288,
+      "no_match_at_all": 284
     },
     "recap_documents": {
       "queried": 0,
       "annotated": 0
     },
     "judgment_amount": {
-      "scanned": 4816,
+      "scanned": 5073,
       "matched": 0,
       "already_set": 0,
       "no_text": 0,
-      "text_no_match": 4816,
+      "text_no_match": 5073,
       "by_source_matched": {}
     },
     "judgment_amount_detail": {
-      "candidates": 78,
-      "fetched": 78,
+      "candidates": 79,
+      "fetched": 79,
       "matched": 0,
       "skipped_capped": 0,
       "matched_by_source": {}
     },
     "amount_owed": {
       "judgment": 0,
-      "opening_bid": 109,
-      "assessed_value": 705,
-      "none": 4002
+      "opening_bid": 114,
+      "assessed_value": 737,
+      "none": 4222
     },
     "validation": {
       "county_normalized": 2,
-      "county_nulled_cross_state": 5,
-      "parcel_nulled_too_short": 155,
+      "county_nulled_cross_state": 3,
+      "parcel_nulled_too_short": 181,
       "parcel_nulled_bad_pattern": 0,
-      "opening_bid_zeroed": 43,
+      "opening_bid_zeroed": 44,
       "opening_bid_too_large": 0,
-      "tax_value_too_low": 14,
+      "tax_value_too_low": 12,
       "tax_value_too_large": 0,
       "sqft_out_of_range": 0,
       "year_built_out_of_range": 0,
       "bedrooms_out_of_range": 0,
       "bathrooms_out_of_range": 0,
       "comps_dropped_price": 1,
-      "comps_dropped_kind_mismatch": 130,
+      "comps_dropped_kind_mismatch": 137,
       "validation_exceptions": 0
     },
     "data_quality": {
-      "synthetic_address": 657,
-      "approximate_address": 83,
-      "low_arv_confidence": 903,
-      "no_sqft": 2919,
+      "synthetic_address": 666,
+      "approximate_address": 88,
+      "low_arv_confidence": 979,
+      "no_sqft": 3084,
       "no_address": 0,
       "exceptions": 0
     },
     "upset_bid": {
-      "scanned": 4816,
-      "tagged_in_window": 23,
-      "tag_cleared_outside_window": 22,
-      "no_sale_date": 2429,
-      "non_nc": 2265
+      "scanned": 5073,
+      "tagged_in_window": 22,
+      "tag_cleared_outside_window": 1,
+      "no_sale_date": 2567,
+      "non_nc": 2367
+    },
+    "distress_stack": {
+      "HOT": 21,
+      "WARM": 786,
+      "COLD": 4264
     }
   }
 }
