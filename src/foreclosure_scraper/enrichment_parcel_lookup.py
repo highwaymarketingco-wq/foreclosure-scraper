@@ -141,9 +141,19 @@ def _synthesize_address_from_description(
         road = m.group(1).strip().title()
         return f"Vacant lot — {road}"
 
-    # Last resort: use whatever name is in the description as identifier
+    # Last resort: use whatever name is in the description as identifier.
+    # 2026-06-19: but REJECT court/docket vocabulary — descriptions like
+    # "Motion Enlarge Time", "Cv Federal Tax Lien Judgment...", "Order Dismiss"
+    # are docket entries, NOT places, and were being turned into fake
+    # "Vacant parcel — Motion Enlarge Time" addresses. Return None so the
+    # address stays explicitly unresolved instead of fabricated.
     cleaned = re.sub(r"[^A-Za-z0-9 ]", " ", desc).strip()
     cleaned = re.sub(r"\s+", " ", cleaned)
+    _DOCKET = re.compile(r"\b(motion|dismiss|enlarge|order|notice|hearing|judgment|"
+                         r"summons|lien|affidavit|service|complaint|petition|appeal|"
+                         r"continuance|subpoena|writ|garnish|federal|district court)\b", re.I)
+    if _DOCKET.search(cleaned):
+        return None
     if 3 <= len(cleaned) <= 80:
         return f"Vacant parcel — {cleaned.title()}"
     return None

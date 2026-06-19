@@ -94,7 +94,11 @@ async def _dac_match(http: httpx.AsyncClient, last: str, first: str) -> Optional
     # Only flag a NEAR-UNIQUE name. A name returning many offenders (e.g. 24
     # "Robert Morgan"s) is noise; 1-2 exact matches is a usable lead. Even then
     # it's name-only (no DOB) → low confidence, stack-signal only.
-    max_results = int(os.environ.get("INCARCERATION_MAX_RESULTS", "2"))
+    # 2026-06-19: require EXACTLY ONE result. With 2+ result rows, has_last and
+    # has_first can match DIFFERENT offenders (cross-row), producing hard name
+    # mismatches (e.g. last from row A + first from row B). A single result row
+    # makes cross-row contamination impossible, so the name match is reliable.
+    max_results = int(os.environ.get("INCARCERATION_MAX_RESULTS", "1"))
     if has_last and has_first and 1 <= n_results <= max_results:
         return {"state": "NC", "source": "NC DAC offender search",
                 "matched_name": f"{first} {last}", "results": n_results,

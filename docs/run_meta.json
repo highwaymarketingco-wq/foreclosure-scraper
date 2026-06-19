@@ -1,75 +1,39 @@
 {
   "run_time": "2026-06-19T01:55:54.048620Z",
-  "total": 5073,
+  "total": 4627,
   "by_source": {
-    "national.auction_dot_com": 28,
-    "national.bid4assets": 4,
-    "national.courtlistener_adversary": 0,
-    "national.courtlistener_bankruptcy": 600,
-    "national.courtlistener_civil": 0,
-    "national.fannie_homepath": 691,
-    "national.first_citizens_reo": 4,
-    "national.foreclosure_dot_com": 0,
-    "national.freddie_homesteps": 0,
-    "national.homeharvest": 10,
-    "national.distressed": 309,
-    "national.hubzu": 0,
-    "national.hud_homestore": 27,
-    "national.probate_foreclosure_leads": 0,
-    "national.propwire": 0,
-    "national.realtor_foreclosures": 14,
-    "national.trulia": 0,
-    "national.xome": 1,
-    "national.zillow_bulk": 41,
-    "national.zillow_foreclosures": 369,
-    "public_notices.ncnotices": 33,
-    "public_notices.publicnoticesc": 0,
-    "law_firms.aldridge_pite": 0,
-    "law_firms.aldridge_pite_pydoll": 0,
-    "law_firms.bell_carrington": 75,
-    "law_firms.brock_scott": 319,
-    "law_firms.finkel": 8,
-    "law_firms.hutchens": 383,
-    "law_firms.ingle_firm": 1,
-    "law_firms.kania": 6,
-    "law_firms.korn": 0,
-    "law_firms.korn_pydoll": 0,
-    "law_firms.mcmichael_taylor_gray": 88,
-    "law_firms.rogers_townsend": 19,
-    "counties_sc.anderson_master_in_equity": 3,
-    "counties_sc.pickens_master_in_equity": 0,
+    "national.auction_dot_com": 16,
+    "national.courtlistener_bankruptcy": 1754,
+    "national.fannie_homepath": 855,
+    "national.homeharvest": 13,
+    "national.distressed": 348,
+    "national.hud_homestore": 5,
+    "national.realtor_foreclosures": 2,
+    "national.zillow_bulk": 118,
+    "national.zillow_foreclosures": 83,
+    "public_notices.ncnotices": 11,
+    "law_firms.bell_carrington": 13,
+    "law_firms.brock_scott": 102,
+    "law_firms.hutchens": 75,
+    "law_firms.mcmichael_taylor_gray": 16,
+    "law_firms.rogers_townsend": 4,
     "counties_sc.sc_county_rosters": 7,
-    "counties_sc.sc_courtrosters": 0,
-    "counties_sc.sc_delinquent_tax_list": 0,
-    "counties_sc.sc_flc": 18,
-    "counties_sc.sc_public_index": 0,
-    "counties_sc.sc_public_index_lis_pendens": 211,
-    "counties_sc.sc_tax_delinquent": 0,
-    "counties_sc.spartanburg_master_in_equity": 15,
-    "counties_nc.buncombe_tax": 1,
-    "counties_nc.buncombe_tax_foreclosure": 1,
-    "counties_nc.cleveland_tax": 2,
-    "counties_nc.henderson_tax": 15,
-    "counties_nc.nc_county_tax_foreclosure": 88,
+    "counties_sc.sc_public_index_lis_pendens": 483,
+    "counties_nc.nc_county_tax_foreclosure": 1,
+    "newspapers.hendersonville_lightning": 1,
+    "reo.vrm_va_reo": 10,
     "counties_nc.nc_ecourts_lis_pendens": 480,
-    "counties_nc.nc_rod_substitute_trustee": 0,
-    "counties_nc.polk_tax": 2,
-    "counties_nc.rutherford_tax": 11,
-    "counties.nod_discovery": 0,
-    "counties.sitemap_walker": 31,
-    "newspapers.daily_courier": 1,
-    "newspapers.hendersonville_lightning": 6,
-    "newspapers.shelby_star": 0,
-    "newspapers.tryon_bulletin": 0,
-    "reo.treasury_seized": 0,
-    "reo.usda_rd": 0,
-    "reo.vrm_va_reo": 155,
-    "city_websites.search": 144,
-    "courts.lis_pendens_discovery": 0
+    "national.foreclosure_dot_com": 197,
+    "national.trulia": 10,
+    "national.xome": 3,
+    "newspapers.daily_courier": 2,
+    "national.courtlistener_civil": 1,
+    "counties_nc.henderson_tax": 15,
+    "derived.probate_deed": 2
   },
   "by_state": {
-    "NC": 2706,
-    "SC": 2367
+    "NC": 2262,
+    "SC": 2365
   },
   "by_county_top": [
     [
@@ -101,10 +65,6 @@
       147
     ],
     [
-      "Macon, NC",
-      128
-    ],
-    [
       "Cleveland, NC",
       108
     ],
@@ -121,7 +81,7 @@
       69
     ],
     [
-      "McDowell, NC",
+      "Mcdowell, NC",
       66
     ],
     [
@@ -131,6 +91,10 @@
     [
       "Union, SC",
       61
+    ],
+    [
+      "Polk, NC",
+      45
     ]
   ],
   "source_status": {
@@ -229,5 +193,5 @@
     "reo.treasury_seized",
     "reo.usda_rd"
   ],
-  "notes": "horizon=120d, scrapers=63, regressions=2"
+  "notes": "horizon=120d, scrapers=63, regressions=2 | 2026-06-19 QA: scope-cleaned + data-quality backfill"
 }

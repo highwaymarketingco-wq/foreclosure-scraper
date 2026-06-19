@@ -107,6 +107,17 @@ SCOPE_DENY_COUNTIES: tuple[tuple[str, str], ...] = (
     ("Johnston", "NC"),
     ("Rowan", "NC"),
     ("Swain", "NC"),
+    # 2026-06-19 QA audit — far-western NC (287xx/288xx) + piedmont (280/281)
+    # counties leaking in via the zip-prefix fallback. Fannie HomePath alone
+    # shipped ~200 rows in Macon/Jackson/Graham. None are in the 18-county scope.
+    ("Macon", "NC"),
+    ("Jackson", "NC"),
+    ("Graham", "NC"),
+    ("Clay", "NC"),
+    ("Cherokee", "NC"),   # NC Cherokee — distinct from in-scope Cherokee, SC
+    ("Stanly", "NC"),
+    ("Davidson", "NC"),
+    ("Anson", "NC"),
     # SC counties south of Newberry / around Augusta — never were in
     # SC_COUNTIES but BK / lis pendens leak via the 296 zip prefix.
     ("Newberry", "SC"),
@@ -142,7 +153,9 @@ SCOPE_ZIP_PREFIXES: tuple[str, ...] = (
     "296",  # Greenville+Spartanburg+Anderson+Pickens+Oconee+Laurens+Union
     # NC western piedmont + WNC mountains: Asheville/Hendersonville/Charlotte
     # corridor + Gaston/Cleveland/Rutherford/Polk
-    "280", "281", "282", "287", "288",
+    # 2026-06-19: "282" removed — it is pure Charlotte/Mecklenburg (a DENIED
+    # county); it was admitting ~99 empty-county Charlotte rows via the fallback.
+    "280", "281", "287", "288",
     # 2026-05-15: 284 (Wilmington/Brunswick/Pender/Sampson) removed per
     # user direction — anything east of Charlotte is out of scope.
 )

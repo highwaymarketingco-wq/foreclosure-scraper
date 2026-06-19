@@ -175,7 +175,10 @@ def _land_arv(li: Listing) -> tuple[float | None, float | None, float | None, st
                 f"ARV from {len(ppa_list)} land comps × {subj_ac:.2f} ac "
                 f"(${mid:,.0f}/ac median; range ${low_ppa:,.0f}-${high_ppa:,.0f}/ac)"
             )
-            return expected, low, high, "HIGH", notes
+            # 2026-06-19: a >=3x low/high spread means the comps disagree wildly
+            # ($/acre varies hugely by location) — don't present that as HIGH.
+            conf = "LOW" if (low and high and low > 0 and high / low >= 3) else "HIGH"
+            return expected, low, high, conf, notes
 
     # Tier 2: tax-assessed × 1.10 (land is assessed closer to market than improved)
     if li.tax_value and li.tax_value > 0:
@@ -202,7 +205,12 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
 
     Range = expected ± 15%. Land takes a separate $/acre path (_land_arv).
     """
-    if li.property_kind == PropertyKind.LAND:
+    # 2026-06-19: a listing with living_sqft is an IMPROVED property even if
+    # mis-classified as LAND — never value a house off $/acre land comps (that
+    # produced nonsense like a 1,808-sqft house at $12,500). Route it to the
+    # sqft-comp path below; if no sqft comps exist it returns ARV-unavailable
+    # (honest) rather than a fabricated land value.
+    if li.property_kind == PropertyKind.LAND and not (li.living_sqft and li.living_sqft > 0):
         return _land_arv(li)
 
     notes: list[str] = []

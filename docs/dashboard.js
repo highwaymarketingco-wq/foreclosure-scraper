@@ -841,9 +841,21 @@ function openDetail(l) {
     badges.push(`<span class="qbadge ${c.cls}">${c.label}</span>`);
   }
 
+  // 2026-06-19 HONESTY: surface data-quality caveats the pipeline computes but
+  // the UI used to hide — so a placeholder address / proxy ARV never looks like
+  // a verified value. Driven by raw.data_quality.flags.
+  const dq = (l.raw && l.raw.data_quality) || {};
+  const dqf = Array.isArray(dq.flags) ? dq.flags : [];
+  if (dqf.includes("synthetic_address")) {
+    badges.push(`<span class="qbadge neg" title="${dq.summary || 'Placeholder address (case #/parcel ID), not a verified situs'}">⚠ placeholder address</span>`);
+  } else if (dqf.includes("approximate_address")) {
+    badges.push(`<span class="qbadge warn" title="${dq.summary || 'Approximate address'}">📍 approx address</span>`);
+  }
+
   // ARV / max bid / ROI summary chips
   if (calc.arv_expected) {
-    badges.push(`<span class="qbadge info">ARV ~$${Number(calc.arv_expected).toLocaleString()}</span>`);
+    const lowArv = calc.arv_confidence === "LOW" || dqf.includes("low_arv_confidence") || dqf.includes("no_sqft");
+    badges.push(`<span class="qbadge info" title="${(calc.notes && calc.notes[0]) || ''}">ARV ~$${Number(calc.arv_expected).toLocaleString()}${lowArv ? " (proxy)" : ""}</span>`);
   }
   if (calc.max_bid_70) {
     badges.push(`<span class="qbadge info">Max bid (70%) $${Number(calc.max_bid_70).toLocaleString()}</span>`);
@@ -927,16 +939,25 @@ function exportCsv() {
     "opening_bid", "arv_expected", "rehab_expected", "max_bid_70", "roi_pct", "cash_on_cash_pct",
     "bedrooms", "bathrooms", "living_sqft", "year_built", "acreage", "zoning",
     "case_number", "plaintiff", "defendant", "trustee", "source", "source_url",
+    // 2026-06-19: data-quality caveats so the export never presents a placeholder
+    // address or proxy ARV as a verified value (the "nothing made up" rule).
+    "address_quality", "arv_confidence", "data_quality_note",
   ];
   const rows = [cols.join(",")];
   filtered.forEach((l) => {
     const g = getGrade(l) || {};
     const c = getCalc(l) || {};
+    const dq = (l.raw && l.raw.data_quality) || {};
+    const dqf = Array.isArray(dq.flags) ? dq.flags : [];
     const row = {
       grade_overall: g.overall, grade_financial: g.financial, grade_property: g.property,
       grade_location: g.location, grade_risk: g.risk,
       arv_expected: c.arv_expected, rehab_expected: c.rehab_expected,
       max_bid_70: c.max_bid_70, roi_pct: c.roi_pct, cash_on_cash_pct: c.cash_on_cash_pct,
+      address_quality: dqf.includes("synthetic_address") ? "placeholder"
+                       : dqf.includes("approximate_address") ? "approximate" : "verified",
+      arv_confidence: c.arv_confidence || "",
+      data_quality_note: dq.summary || "",
       ...l,
     };
     rows.push(cols.map((k) => {

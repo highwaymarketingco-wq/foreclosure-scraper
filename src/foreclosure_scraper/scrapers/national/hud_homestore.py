@@ -124,10 +124,10 @@ def _to_listing(p: dict, state: str) -> Listing | None:
 
     return Listing(
         source="national.hud_homestore",
-        source_url=(
-            f"{BASE}/Listing/PropertyDetails?caseNumber={case}"
-            if case else f"{BASE}/searchresult?stateCode={state}"
-        ),
+        # 2026-06-19: /Listing/PropertyDetails 404s (HUD has no stable public
+        # deep-link). Point at the working state search page so the link always
+        # resolves; the case number is carried in raw for lookup.
+        source_url=f"{BASE}/searchresult?stateCode={state}",
         listing_type=ListingType.REO,
         property_kind=_kind(p.get("propertyType")),
         state=(p.get("propertyState") or state).strip().upper(),

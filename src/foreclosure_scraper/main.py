@@ -117,7 +117,12 @@ def _in_scope(li: Listing) -> bool:
         return True
     if in_scope(li.county, li.state):
         return True
-    if li.zip_code and any(li.zip_code.startswith(p) for p in SCOPE_ZIP_PREFIXES):
+    # ZIP-prefix fallback is a LAST resort for listings with NO county only.
+    # 2026-06-19: previously this rescued rows that already carried an
+    # out-of-scope county (e.g. Fannie in Macon/Jackson/Graham, 287xx) that
+    # in_scope() had just rejected. Guarding on empty-county stops that.
+    if (not (li.county and li.county.strip())) and li.zip_code \
+            and any(li.zip_code.startswith(p) for p in SCOPE_ZIP_PREFIXES):
         return True
     return False
 
@@ -615,6 +620,22 @@ async def run() -> int:
         after=len(enriched),
         collapsed=pre_dedupe2_count - len(enriched),
     )
+
+    # 2026-06-19 QA fix — POST-ENRICHMENT SCOPE RE-PASS. _in_scope() runs once
+    # at ingest, BEFORE the enrichment chain fills county on 'state-only'
+    # bankruptcy rows (and others). A row admitted with an empty county can be
+    # enriched to a DENIED county (e.g. Mecklenburg) and then ship, because the
+    # deny-check never re-runs. Re-apply the deny-list on the now-final county so
+    # denied counties can never appear regardless of how they were admitted.
+    def _denied_now(li: Listing) -> bool:
+        if li.county and li.state:
+            key = (li.county.replace(" County", "").strip().title(), li.state.upper())
+            return key in SCOPE_DENY_COUNTIES_NORMALIZED
+        return False
+    _pre_scope = len(enriched)
+    enriched = [li for li in enriched if not _denied_now(li)]
+    if _pre_scope != len(enriched):
+        log.info("orchestrator.scope_repass", dropped=_pre_scope - len(enriched))
 
     # #0 contactability spine: owner name + MAILING address + absentee/
     # out-of-state flags from county GIS (free ArcGIS REST). Runs on every
