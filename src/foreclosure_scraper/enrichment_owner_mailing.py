@@ -121,6 +121,39 @@ async def _query(http: httpx.AsyncClient, base: str, where: str, out_fields: str
         return []
 
 
+# 2026-06-19: generic building-spec extractor. County CAMA/parcel layers that
+# expose building attributes (e.g. Spartanburg: LivingArea/YearBuilt/BedRooms/
+# FullBaths) can backfill beds/baths/sqft/year — the root unblocker for ARV. We
+# match by field-NAME pattern (not per-county hardcoding) so it works on any
+# layer that has them, and sanity-check values so junk fields don't leak in.
+_SPEC_PATTERNS = {
+    "living_sqft": re.compile(r"^(living_?area|heated_?(sq_?ft|area)|tot(al)?_?liv(ing)?(_?area)?|finish(ed)?_?(sq_?ft|area)|gross_?(sq_?ft|living)|bldg_?sq_?ft|heatedsqft|sqft_?heated|heated_?sf)$", re.I),
+    "year_built": re.compile(r"^(year_?built|yr_?built|act(ual)?_?year_?bl?t|yearbuilt|eff(ective)?_?year_?built)$", re.I),
+    "bedrooms":   re.compile(r"^(bed_?rooms?|beds|no_?(of_?)?bed(room)?s?|num_?bed(room)?s?)$", re.I),
+    "bathrooms":  re.compile(r"^(full_?baths?|bath_?rooms?|baths|no_?(of_?)?baths?|num_?baths?)$", re.I),
+}
+def _extract_specs(attrs: dict) -> dict:
+    out: dict = {}
+    half = None
+    for k, v in (attrs or {}).items():
+        if (k or "").lower() in ("halfbaths", "half_baths") and v not in (None, "", 0, "0"):
+            try: half = float(str(v).replace(",", ""))
+            except (ValueError, TypeError): pass
+    for field, pat in _SPEC_PATTERNS.items():
+        for k, v in (attrs or {}).items():
+            if pat.match(k or "") and v not in (None, "", 0, "0"):
+                try: fv = float(str(v).replace(",", ""))
+                except (ValueError, TypeError): continue
+                if field == "living_sqft" and not (200 <= fv <= 30000): continue
+                if field == "year_built" and not (1800 <= fv <= 2030): continue
+                if field in ("bedrooms", "bathrooms") and not (0 < fv <= 25): continue
+                if field == "bathrooms" and half and 0 < half <= 10:
+                    fv += 0.5 * half   # combine full + half baths
+                out[field] = fv
+                break
+    return out
+
+
 async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
     spec = COUNTY_GIS.get(f"{li.state}:{(li.county or '').strip().title()}")
     if not spec:
@@ -178,7 +211,8 @@ async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
     out_of_state = bool(mail_state and li.state and mail_state != li.state)
     return {"owner": owner or None, "mailing": mailing or None, "situs": situs,
             "parcel_id": parcel, "mail_state": mail_state or None,
-            "absentee": absentee, "out_of_state": out_of_state, "source": "county_gis"}
+            "absentee": absentee, "out_of_state": out_of_state, "source": "county_gis",
+            "_specs": _extract_specs(attrs)}
 
 
 async def enrich_owner_mailing(listings: list[Listing], max_concurrency: int = 4) -> dict:
@@ -200,6 +234,17 @@ async def enrich_owner_mailing(listings: list[Listing], max_concurrency: int = 4
             if res:
                 if not isinstance(li.raw, dict):
                     li.raw = {}
+                # Backfill building specs from the GIS record (where the layer
+                # exposes them) — beds/baths/sqft/year, only when missing.
+                specs = res.pop("_specs", None) or {}
+                if specs.get("living_sqft") and not li.living_sqft:
+                    li.living_sqft = specs["living_sqft"]; counts["specs_sqft"] = counts.get("specs_sqft", 0) + 1
+                if specs.get("year_built") and not li.year_built:
+                    li.year_built = int(specs["year_built"])
+                if specs.get("bedrooms") and not li.bedrooms:
+                    li.bedrooms = specs["bedrooms"]
+                if specs.get("bathrooms") and not li.bathrooms:
+                    li.bathrooms = specs["bathrooms"]
                 li.raw["owner_mailing"] = res
                 if res.get("parcel_id") and not li.parcel_id:
                     li.parcel_id = res["parcel_id"]
