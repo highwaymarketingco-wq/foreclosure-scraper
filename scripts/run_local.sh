@@ -125,7 +125,13 @@ if grep -q "count_drop_alert" "$LOG"; then
   echo "==> ⚠️  COUNT-DROP ALERT fired this run — a source may be broken. See log above." | tee -a "$LOG"
   RC=2
 fi
-TOTAL=$(grep -oE '"total": [0-9]+' "$LOG" | tail -1 | grep -oE '[0-9]+' || echo "")
+# Read the REAL listing count from the artifact-write event (not a stray
+# "total": from some sub-summary — that false-positived a 47 once and blocked
+# a healthy 5073-listing publish). Fall back to run_meta.json if absent.
+TOTAL=$(grep '"event": "web_artifact.written"' "$LOG" | grep -oE '"listings": [0-9]+' | tail -1 | grep -oE '[0-9]+' || echo "")
+if [ -z "$TOTAL" ] && [ -f "$ROOT/docs/run_meta.json" ]; then
+  TOTAL=$(grep -oE '"total": [0-9]+' "$ROOT/docs/run_meta.json" | head -1 | grep -oE '[0-9]+' || echo "")
+fi
 if [ -n "$TOTAL" ]; then
   echo "==> total listings this run: $TOTAL" | tee -a "$LOG"
   if [ "$TOTAL" -lt 200 ]; then
