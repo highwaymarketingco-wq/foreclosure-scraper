@@ -58,6 +58,8 @@ load OPENROUTER_API_KEY          "$SECRETS/openrouter_api_key.txt"
 load MISTRAL_API_KEY             "$SECRETS/mistral_api_key.txt"
 load CLOUDFLARE_API_TOKEN        "$SECRETS/cloudflare_api_token.txt"
 load CLOUDFLARE_ACCOUNT_ID       "$SECRETS/cloudflare_account_id.txt"
+# NVIDIA NIM (free) — one key, many vision models (each its own ~40 RPM lane).
+load NVIDIA_API_KEY             "$SECRETS/nvidia_api_key.txt"
 
 # ---- defaults (config.py also defaults these, set here for clarity) --------
 export GMAIL_SENDER="${GMAIL_SENDER:-highwaymarketingco@gmail.com}"

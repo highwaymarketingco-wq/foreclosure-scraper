@@ -547,6 +547,24 @@ MISTRAL_MODEL = os.environ.get("MISTRAL_VISION_MODEL", "mistral-small-latest")
 # NO one-time license-agreement click, so it works on a fresh token immediately.
 CLOUDFLARE_MODEL = os.environ.get("CLOUDFLARE_VISION_MODEL", "@cf/mistralai/mistral-small-3.1-24b-instruct")
 
+# NVIDIA NIM — OpenAI-compatible. ONE free key reaches MANY hosted vision models,
+# and NIM rate-limits PER MODEL (~40 RPM each), so registering N vision models =
+# N parallel free lanes in the pool. List = the models verified working for
+# property-photo description on 2026-06-19 (dropped kimi-k2.6/phi-4-mm/step-3.7/
+# qwen3.5-122b which errored or returned garbage). Override via NVIDIA_VISION_MODELS.
+NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
+NVIDIA_VISION_MODELS = [m.strip() for m in os.environ.get("NVIDIA_VISION_MODELS", ",".join([
+    "mistralai/mistral-small-4-119b-2603",
+    "meta/llama-4-maverick-17b-128e-instruct",
+    "minimaxai/minimax-m3",
+    "meta/llama-3.2-11b-vision-instruct",
+    "nvidia/nemotron-nano-12b-v2-vl",
+    "qwen/qwen3.5-397b-a17b",
+    "mistralai/mistral-large-3-675b-instruct-2512",
+    "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+    "meta/llama-3.2-90b-vision-instruct",
+])).split(",") if m.strip()]
+
 
 class QuotaExhausted(Exception):
     """Raised by a backend when it hits its daily/rate quota (HTTP 429 /
@@ -799,6 +817,17 @@ async def _build_backends(http: httpx.AsyncClient) -> list:
         cf_url = f"https://api.cloudflare.com/client/v4/accounts/{cf_acct}/ai/v1/chat/completions"
         backends.append(_OpenAICompatBackend("cloudflare", cf_url, cf_tok,
                                              CLOUDFLARE_MODEL, http, cap=2, delay=1.0))
+
+    # NVIDIA NIM — ONE free key, MANY vision models, each its own ~40 RPM lane.
+    # Verified live: 13 models hit back-to-back on one key with zero 429s, so the
+    # per-model limits stack into many parallel free lanes — typically the single
+    # biggest contributor in the pool.
+    nv = os.environ.get("NVIDIA_API_KEY")
+    if nv:
+        for m in NVIDIA_VISION_MODELS:
+            short = m.split("/")[-1][:22]
+            backends.append(_OpenAICompatBackend(f"nvidia:{short}", NVIDIA_URL, nv, m,
+                                                 http, cap=2, delay=2.0))
 
     # Ollama — local, unlimited. Only if the daemon is reachable + model present.
     if os.environ.get("VISION_USE_OLLAMA", "1") != "0":
