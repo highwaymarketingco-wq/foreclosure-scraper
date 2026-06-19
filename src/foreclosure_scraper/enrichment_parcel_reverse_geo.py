@@ -126,6 +126,15 @@ async def enrich_parcel_reverse_geo(listings: list[Listing]) -> dict:
                 "Approximate: nearest-road snap from parcel centroid. "
                 "Verify before relying on this address."
             )
+            # 2026-06-19: PROMOTE the resolved county to li.county when missing.
+            # Reverse-geo already had it but only stashed it in components, so 600+
+            # listings sat county-less. Normalize "Buncombe County" -> "Buncombe".
+            # The post-enrichment scope re-pass (main.py) then drops any that
+            # resolve to a denied county.
+            rg_county = (addr.get("county") or "").replace(" County", "").strip()
+            if rg_county and not (li.county or "").strip():
+                li.county = rg_county
+                stats["county_filled"] = stats.get("county_filled", 0) + 1
             stats["annotated"] += 1
 
     log.info("parcel_reverse_geo.done", **stats)
