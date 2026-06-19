@@ -92,6 +92,11 @@ export VISION_MAX_LISTINGS="${VISION_MAX_LISTINGS:-800}"
 export VISION_INTER_CALL_DELAY="${VISION_INTER_CALL_DELAY:-4}"
 # Generous wall-clock cap so it can finish the 800 but can never hang.
 export VISION_MAX_SECONDS="${VISION_MAX_SECONDS:-1800}"
+# Keep rate-limited vision backends alive (cooldown+retry) instead of retiring
+# them after 2 strikes — a too-low threshold killed the whole Gemini fleet in
+# ~2 min. See run_daily_vision.sh for the rationale.
+export VISION_BACKEND_STRIKES="${VISION_BACKEND_STRIKES:-10}"
+export VISION_BACKEND_COOLDOWN="${VISION_BACKEND_COOLDOWN:-70}"
 # ROD_ENRICH_ON unset = skipped (default).
 
 # If no NC eCourts creds are present, fall back to anonymous access.

@@ -48,6 +48,13 @@ load CLOUDFLARE_ACCOUNT_ID "$SECRETS/cloudflare_account_id.txt"
 export VISION_PROVIDER=gemini
 export VISION_MAX_LISTINGS="${VISION_MAX_LISTINGS:-1500}"   # let daily quota be the limiter
 export VISION_INTER_CALL_DELAY="${VISION_INTER_CALL_DELAY:-4}"
+# Free-tier 429s are usually PER-MINUTE rate limits, not daily exhaustion. Keep a
+# rate-limited backend cooling-down-and-retrying instead of retiring it after 2
+# strikes (which used to kill the whole 9-key Gemini fleet in ~2 min). High strike
+# tolerance + a cooldown that outlasts the 1-min window keeps the pool alive so it
+# scores steadily whenever quota frees up.
+export VISION_BACKEND_STRIKES="${VISION_BACKEND_STRIKES:-10}"
+export VISION_BACKEND_COOLDOWN="${VISION_BACKEND_COOLDOWN:-70}"
 # Wall-clock cap so a slow local-Ollama floor pass can't run into the next
 # scheduled job (which the lock above would otherwise make skip). 4h.
 export VISION_MAX_SECONDS="${VISION_MAX_SECONDS:-14400}"
