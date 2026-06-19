@@ -200,7 +200,7 @@ class CourtListenerAdversary(BaseScraper):
 
                     out.append(Listing(
                         source=self.slug,
-                        source_url=docket.get("absolute_url") or "",
+                        source_url=("https://www.courtlistener.com" + docket["absolute_url"]) if docket.get("absolute_url") else "",
                         listing_type=ListingType.LIS_PENDENS,
                         property_kind=PropertyKind.UNKNOWN,
                         state=state_match or state_default,

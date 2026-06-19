@@ -172,7 +172,7 @@ class CourtListenerCivil(BaseScraper):
 
                     out.append(Listing(
                         source=self.slug,
-                        source_url=d.get("absolute_url") or "",
+                        source_url=("https://www.courtlistener.com" + d["absolute_url"]) if d.get("absolute_url") else "",
                         listing_type=ListingType.LIS_PENDENS,
                         property_kind=PropertyKind.UNKNOWN,
                         state=state,
