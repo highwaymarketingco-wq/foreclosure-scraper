@@ -106,10 +106,11 @@ COUNTY_SCHEMA: dict[str, dict[str, Any]] = {
         "parcel": ("TMS_NUMBER", "PARCEL_NO"), "owner_occ": (),
     },
     "Pickens": {
-        # Layer 39 schema: PIN, NAME1, NAME2, CITY, ZIP, LOCCITY, LOCZIP,
-        # OwnerAll. No street-address field. Resolver can confirm owner
-        # match + parcel + city/zip but won't write street_address.
-        "owner": ("NAME1", "OwnerAll"), "situs": (), "situs_parts": (),
+        # 2026-06-19: layer 39 DOES expose LOCADD (verified live: fields incl
+        # LOCADD/LOCCITY/LOCZIP). The old config set situs=() with a comment
+        # claiming "no street-address field" — wrong, so Pickens lis-pendens
+        # got parcel-only and never a real address. Read LOCADD as the situs.
+        "owner": ("NAME1", "OwnerAll"), "situs": ("LOCADD",), "situs_parts": (),
         "mailing": (), "city": ("LOCCITY", "CITY"),
         "zip": ("LOCZIP", "ZIP"), "parcel": ("PIN",), "owner_occ": (),
     },

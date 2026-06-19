@@ -14,11 +14,9 @@ from foreclosure_scraper.scrapers.counties_nc._nc_tax_helper import (
     _parse_sale_date,
     fetch_county_tax_listings,
 )
-from foreclosure_scraper.scrapers.counties_nc.wake_tax import WakeTaxForeclosure
-from foreclosure_scraper.scrapers.counties_nc.forsyth_tax import ForsythTaxForeclosure
-from foreclosure_scraper.scrapers.counties_nc.guilford_tax import GuilfordTaxForeclosure
-from foreclosure_scraper.scrapers.counties_nc.new_hanover_tax import NewHanoverTaxForeclosure
-from foreclosure_scraper.scrapers.counties_nc.durham_tax import DurhamTaxForeclosure
+# 2026-06-19: removed imports of wake/forsyth/guilford/new_hanover/durham tax
+# scrapers — those are denied (out-of-scope) counties whose modules were deleted,
+# so the imports errored on collection. The shared-helper tests below are valid.
 
 
 # ---- _parse_money -----------------------------------------------------------
@@ -140,18 +138,5 @@ def test_returns_empty_on_short_html():
     assert listings == []
 
 
-# ---- per-county scraper class metadata --------------------------------------
-
-def test_each_county_scraper_has_correct_county_and_slug():
-    cases = [
-        (WakeTaxForeclosure, "counties_nc.wake_tax", "Wake"),
-        (ForsythTaxForeclosure, "counties_nc.forsyth_tax", "Forsyth"),
-        (GuilfordTaxForeclosure, "counties_nc.guilford_tax", "Guilford"),
-        (NewHanoverTaxForeclosure, "counties_nc.new_hanover_tax", "New Hanover"),
-        (DurhamTaxForeclosure, "counties_nc.durham_tax", "Durham"),
-    ]
-    for cls, expected_slug, expected_county in cases:
-        s = cls()
-        assert s.slug == expected_slug, f"{cls.__name__} slug wrong"
-        assert expected_county.lower() in s.name.lower()
-        assert s.expected_min_count == 0  # Annual cadence; many runs see 0
+# (per-county scraper-metadata test removed 2026-06-19 — it only covered the
+# deleted denied-county tax scrapers; the in-scope ones are exercised elsewhere.)

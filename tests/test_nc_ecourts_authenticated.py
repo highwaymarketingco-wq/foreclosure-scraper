@@ -175,9 +175,12 @@ async def test_dispatch_no_creds_returns_zero(monkeypatch):
     )
     out = await enrich_with_nc_case_status_authenticated([])
     assert out == 0
+    # 2026-06-19: credentials are no longer required (anonymous Smart Search has
+    # worked since 2026-05-13). With an empty listing set the dispatch returns 0
+    # without launching a browser; the outcome is 'no_targets' (or 'skipped' if
+    # scrapling is unavailable) — either way it did NOT attempt a browser run.
     status = get_last_run_status()
-    assert status["outcome"] == "skipped"
-    assert "no_credentials_in_env" in (status["reason"] or "")
+    assert status["outcome"] in ("no_targets", "skipped")
 
 
 @pytest.mark.asyncio
