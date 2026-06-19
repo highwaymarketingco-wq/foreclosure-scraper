@@ -830,8 +830,12 @@ async def _build_backends(http: httpx.AsyncClient) -> list:
     if nv:
         for m in NVIDIA_VISION_MODELS:
             short = m.split("/")[-1][:22]
+            # cap=1 (single image): several NIM models (llama-3.2-90b, the mistral
+            # family) reject >1 image ("at most 1 image"); sending just the primary
+            # photo makes ALL 13 lanes usable for multi-photo listings + kills the
+            # ~500 wasted "at most 1 image" calls seen in the backlog-clear run.
             backends.append(_OpenAICompatBackend(f"nvidia:{short}", NVIDIA_URL, nv, m,
-                                                 http, cap=2, delay=2.0))
+                                                 http, cap=1, delay=2.0))
 
     # Ollama — local, unlimited. Only if the daemon is reachable + model present.
     if os.environ.get("VISION_USE_OLLAMA", "1") != "0":
