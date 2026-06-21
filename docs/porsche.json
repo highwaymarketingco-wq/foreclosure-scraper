@@ -113,7 +113,7 @@
     "model": "911",
     "trim": null,
     "price_usd": null,
-    "current_bid_usd": 30.0,
+    "current_bid_usd": 35.0,
     "mileage": 17807,
     "location": "PA - PHILADELPHIA EAST-SUBLOT",
     "seller_type": "salvage_auction",
@@ -123,7 +123,7 @@
     "vin": "WP0CB2A93NS******",
     "lot_number": "41875906",
     "sale_date": "2026-06-24T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981749Z",
+    "first_seen": "2026-06-21T13:12:08.751750Z",
     "raw": {
       "sf_csv": true
     },
@@ -149,7 +149,7 @@
     "vin": "WP1AB2AY7ND******",
     "lot_number": "54296316",
     "sale_date": "2026-06-24T19:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983869Z",
+    "first_seen": "2026-06-21T13:12:08.753773Z",
     "raw": {
       "sf_csv": true
     },
@@ -183,32 +183,6 @@
   },
   {
     "source": "copart",
-    "source_url": "https://www.copart.com/lot/56488306",
-    "listing_id": "WP0AB2A9XLS******",
-    "title": "2020 Porsche 911 CARRERA S",
-    "year": 2020,
-    "make": "Porsche",
-    "model": "911",
-    "trim": "CARRERA S",
-    "price_usd": null,
-    "current_bid_usd": 100.0,
-    "mileage": null,
-    "location": "NY - LONG ISLAND",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0626/025283b520c5430f8dd1fb1fdf9fc48f_thb.jpg",
-    "vin": "WP0AB2A9XLS******",
-    "lot_number": "56488306",
-    "sale_date": "2026-06-22T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981667Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
     "source_url": "https://www.copart.com/lot/57013716",
     "listing_id": "WP1AE2A25EL******",
     "title": "2014 Porsche CAYENNE S HYBRID",
@@ -227,7 +201,7 @@
     "vin": "WP1AE2A25EL******",
     "lot_number": "57013716",
     "sale_date": "2026-06-25T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983931Z",
+    "first_seen": "2026-06-21T13:12:08.753832Z",
     "raw": {
       "sf_csv": true
     },
@@ -305,7 +279,7 @@
     "vin": "WP1AA2A21GL******",
     "lot_number": "77515555",
     "sale_date": "2026-06-23T19:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983639Z",
+    "first_seen": "2026-06-21T13:12:08.753550Z",
     "raw": {
       "sf_csv": true
     },
@@ -383,37 +357,11 @@
     "vin": "WP0AA2A80JK******",
     "lot_number": "49645216",
     "sale_date": "2026-07-21T18:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982256Z",
+    "first_seen": "2026-06-21T13:12:08.752228Z",
     "raw": {
       "sf_csv": true
     },
     "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/54545816",
-    "listing_id": "WP1BA2AYXRD******",
-    "title": "2024 Porsche CAYENNE COUPE",
-    "year": 2024,
-    "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": "COUPE",
-    "price_usd": null,
-    "current_bid_usd": 150.0,
-    "mileage": null,
-    "location": "CA - SAN BERNARDINO",
-    "seller_type": "salvage_auction",
-    "title_status": "clean",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/8959fad084f049878171737eee4e5052_thb.jpg",
-    "vin": "WP1BA2AYXRD******",
-    "lot_number": "54545816",
-    "sale_date": "2026-06-22T19:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983311Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
   },
   {
     "source": "copart",
@@ -461,7 +409,7 @@
     "vin": "WP1AA2AY9MD******",
     "lot_number": "54552306",
     "sale_date": "2026-06-23T19:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983647Z",
+    "first_seen": "2026-06-21T13:12:08.753558Z",
     "raw": {
       "sf_csv": true
     },
@@ -539,7 +487,7 @@
     "vin": "WP1AB2A24GL******",
     "lot_number": "51956966",
     "sale_date": "2026-06-24T19:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983878Z",
+    "first_seen": "2026-06-21T13:12:08.753780Z",
     "raw": {
       "sf_csv": true
     },
@@ -591,7 +539,7 @@
     "vin": "WP1AA2A21HK******",
     "lot_number": "78712625",
     "sale_date": "2026-07-14T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984017Z",
+    "first_seen": "2026-06-21T13:12:08.753904Z",
     "raw": {
       "sf_csv": true
     },
@@ -807,32 +755,6 @@
   },
   {
     "source": "copart",
-    "source_url": "https://www.copart.com/lot/55183286",
-    "listing_id": "WP1AA2AY2LD******",
-    "title": "2020 Porsche CAYENNE",
-    "year": 2020,
-    "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 200.0,
-    "mileage": 60893,
-    "location": "TX - HOUSTON",
-    "seller_type": "salvage_auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0626/c555703b56ec4fd383d7221acb3a07e8_thb.jpg",
-    "vin": "WP1AA2AY2LD******",
-    "lot_number": "55183286",
-    "sale_date": "2026-06-23T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983591Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "copart",
     "source_url": "https://www.copart.com/lot/85322295",
     "listing_id": "WP1AE2A27HL******",
     "title": "2017 Porsche CAYENNE SE HYBRID PLATINUM",
@@ -877,7 +799,7 @@
     "vin": "WP1BB2AY6PD******",
     "lot_number": "50603696",
     "sale_date": "2026-06-25T13:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983896Z",
+    "first_seen": "2026-06-21T13:12:08.753797Z",
     "raw": {
       "sf_csv": true
     },
@@ -903,7 +825,7 @@
     "vin": "WP1AB2AY1PD******",
     "lot_number": "55349976",
     "sale_date": "2026-06-29T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983980Z",
+    "first_seen": "2026-06-21T13:12:08.753868Z",
     "raw": {
       "sf_csv": true
     },
@@ -1059,7 +981,33 @@
     "vin": "WP1AA2A24HK******",
     "lot_number": "56650256",
     "sale_date": "2026-06-22T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983194Z",
+    "first_seen": "2026-06-21T13:12:08.753123Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "salvage"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/49534476",
+    "listing_id": "WP1AA2A21HK******",
+    "title": "2017 Porsche CAYENNE",
+    "year": 2017,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 225.0,
+    "mileage": 153652,
+    "location": "MN - MINNEAPOLIS",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/6f3b3bd819fd49a292f7b5f51471c04a_thb.jpg",
+    "vin": "WP1AA2A21HK******",
+    "lot_number": "49534476",
+    "sale_date": "2026-06-23T17:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753541Z",
     "raw": {
       "sf_csv": true
     },
@@ -1093,25 +1041,25 @@
   },
   {
     "source": "copart",
-    "source_url": "https://www.copart.com/lot/53064176",
-    "listing_id": "WP0AA2Y14RS******",
-    "title": "2024 Porsche TAYCAN",
-    "year": 2024,
+    "source_url": "https://www.copart.com/lot/53427066",
+    "listing_id": "WP1AA2A27HK******",
+    "title": "2017 Porsche CAYENNE",
+    "year": 2017,
     "make": "Porsche",
-    "model": "TAYCAN",
+    "model": "CAYENNE",
     "trim": null,
     "price_usd": null,
     "current_bid_usd": 250.0,
-    "mileage": 22881,
-    "location": "CA - SUN VALLEY",
+    "mileage": 76988,
+    "location": "NY - SYRACUSE",
     "seller_type": "salvage_auction",
     "title_status": "salvage",
     "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/892a423d4ea745f1aa19717f89dfd8b0_thb.jpg",
-    "vin": "WP0AA2Y14RS******",
-    "lot_number": "53064176",
-    "sale_date": "2026-06-22T19:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982805Z",
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/f3c276854bf64e8798b9ebdd8fca588d_thb.jpg",
+    "vin": "WP1AA2A27HK******",
+    "lot_number": "53427066",
+    "sale_date": "2026-06-22T14:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753161Z",
     "raw": {
       "sf_csv": true
     },
@@ -1137,7 +1085,7 @@
     "vin": "WP1AA2AYXND******",
     "lot_number": "52905416",
     "sale_date": "2026-06-22T19:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983320Z",
+    "first_seen": "2026-06-21T13:12:08.753240Z",
     "raw": {
       "sf_csv": true
     },
@@ -1189,7 +1137,7 @@
     "vin": "WP1AA2A20GK******",
     "lot_number": "48745446",
     "sale_date": "2026-06-24T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983822Z",
+    "first_seen": "2026-06-21T13:12:08.753727Z",
     "raw": {
       "sf_csv": true
     },
@@ -1345,59 +1293,7 @@
     "vin": "WP0AA2A85JK******",
     "lot_number": "56959546",
     "sale_date": "2026-07-20T18:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982247Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/57734996",
-    "listing_id": "WP0CA2A80RK******",
-    "title": "2024 Porsche BOXSTER BASE",
-    "year": 2024,
-    "make": "Porsche",
-    "model": "BOXSTER",
-    "trim": "BASE",
-    "price_usd": null,
-    "current_bid_usd": 275.0,
-    "mileage": 3735,
-    "location": "AZ - PHOENIX NORTH",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0626/1a926cec05814dd48e68cbabb144751b_thb.jpg",
-    "vin": "WP0CA2A80RK******",
-    "lot_number": "57734996",
-    "sale_date": "2026-06-23T19:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982617Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/54097886",
-    "listing_id": "WP1AD2A27JL******",
-    "title": "2018 Porsche CAYENNE GTS",
-    "year": 2018,
-    "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": "GTS",
-    "price_usd": null,
-    "current_bid_usd": 275.0,
-    "mileage": 63918,
-    "location": "NY - ALBANY",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/576c40899da649788f779c6364ba5ce6_thb.jpg",
-    "vin": "WP1AD2A27JL******",
-    "lot_number": "54097886",
-    "sale_date": "2026-06-22T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983214Z",
+    "first_seen": "2026-06-21T13:12:08.752215Z",
     "raw": {
       "sf_csv": true
     },
@@ -1423,7 +1319,7 @@
     "vin": "WP1AB2A26HL******",
     "lot_number": "55178436",
     "sale_date": "2026-07-13T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984007Z",
+    "first_seen": "2026-06-21T13:12:08.753895Z",
     "raw": {
       "sf_csv": true
     },
@@ -1509,51 +1405,25 @@
   },
   {
     "source": "copart",
-    "source_url": "https://www.copart.com/lot/55273426",
-    "listing_id": "WP1AA2A29HK******",
-    "title": "2017 Porsche CAYENNE",
-    "year": 2017,
+    "source_url": "https://www.copart.com/lot/56488306",
+    "listing_id": "WP0AB2A9XLS******",
+    "title": "2020 Porsche 911 CARRERA S",
+    "year": 2020,
     "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": null,
+    "model": "911",
+    "trim": "CARRERA S",
     "price_usd": null,
     "current_bid_usd": 300.0,
-    "mileage": 165757,
-    "location": "ON - TORONTO",
-    "seller_type": "salvage_auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0626/2748f81e2b3540d7a3d0183d7523d4a1_thb.jpg",
-    "vin": "WP1AA2A29HK******",
-    "lot_number": "55273426",
-    "sale_date": "2026-06-23T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983496Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/53987406",
-    "listing_id": "WP1AB2A27FL******",
-    "title": "2015 Porsche CAYENNE S",
-    "year": 2015,
-    "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": "S",
-    "price_usd": null,
-    "current_bid_usd": 300.0,
-    "mileage": 103136,
-    "location": "OH - COLUMBUS",
+    "mileage": null,
+    "location": "NY - LONG ISLAND",
     "seller_type": "salvage_auction",
     "title_status": "salvage",
     "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/58dcb8e1d2024a1199a83fd3bddd2762_thb.jpg",
-    "vin": "WP1AB2A27FL******",
-    "lot_number": "53987406",
-    "sale_date": "2026-06-23T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983535Z",
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0626/025283b520c5430f8dd1fb1fdf9fc48f_thb.jpg",
+    "vin": "WP0AB2A9XLS******",
+    "lot_number": "56488306",
+    "sale_date": "2026-06-22T14:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.751671Z",
     "raw": {
       "sf_csv": true
     },
@@ -1561,55 +1431,29 @@
   },
   {
     "source": "copart",
-    "source_url": "https://www.copart.com/lot/49534476",
-    "listing_id": "WP1AA2A21HK******",
-    "title": "2017 Porsche CAYENNE",
-    "year": 2017,
+    "source_url": "https://www.copart.com/lot/53064176",
+    "listing_id": "WP0AA2Y14RS******",
+    "title": "2024 Porsche TAYCAN",
+    "year": 2024,
     "make": "Porsche",
-    "model": "CAYENNE",
+    "model": "TAYCAN",
     "trim": null,
     "price_usd": null,
     "current_bid_usd": 300.0,
-    "mileage": 153652,
-    "location": "MN - MINNEAPOLIS",
+    "mileage": 22881,
+    "location": "CA - SUN VALLEY",
     "seller_type": "salvage_auction",
     "title_status": "salvage",
     "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/6f3b3bd819fd49a292f7b5f51471c04a_thb.jpg",
-    "vin": "WP1AA2A21HK******",
-    "lot_number": "49534476",
-    "sale_date": "2026-06-30T17:00:00Z",
-    "first_seen": "2026-06-18T13:12:13.529613Z",
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/892a423d4ea745f1aa19717f89dfd8b0_thb.jpg",
+    "vin": "WP0AA2Y14RS******",
+    "lot_number": "53064176",
+    "sale_date": "2026-06-22T19:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.752748Z",
     "raw": {
       "sf_csv": true
     },
     "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/52490166",
-    "listing_id": "WP1BG2AY4PD******",
-    "title": "2023 Porsche CAYENNE GTS COUPE",
-    "year": 2023,
-    "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": "GTS COUPE",
-    "price_usd": null,
-    "current_bid_usd": 300.0,
-    "mileage": 46398,
-    "location": "TX - FT. WORTH",
-    "seller_type": "salvage_auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/55129e81b39d4e35b096b9951c823712_thb.jpg",
-    "vin": "WP1BG2AY4PD******",
-    "lot_number": "52490166",
-    "sale_date": "2026-07-17T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984114Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
   },
   {
     "source": "copart",
@@ -1691,6 +1535,58 @@
   },
   {
     "source": "copart",
+    "source_url": "https://www.copart.com/lot/57734996",
+    "listing_id": "WP0CA2A80RK******",
+    "title": "2024 Porsche BOXSTER BASE",
+    "year": 2024,
+    "make": "Porsche",
+    "model": "BOXSTER",
+    "trim": "BASE",
+    "price_usd": null,
+    "current_bid_usd": 350.0,
+    "mileage": 3735,
+    "location": "AZ - PHOENIX NORTH",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0626/1a926cec05814dd48e68cbabb144751b_thb.jpg",
+    "vin": "WP0CA2A80RK******",
+    "lot_number": "57734996",
+    "sale_date": "2026-06-23T19:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.752568Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "salvage"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/51594006",
+    "listing_id": "WP1AA2AY6KD******",
+    "title": "2019 Porsche CAYENNE",
+    "year": 2019,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 350.0,
+    "mileage": 101032,
+    "location": "MI - DETROIT",
+    "seller_type": "salvage_auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/94a3a35d0fd543bdba01a586b4e91da9_thb.jpg",
+    "vin": "WP1AA2AY6KD******",
+    "lot_number": "51594006",
+    "sale_date": "2026-06-23T14:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753471Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "copart",
     "source_url": "https://www.copart.com/lot/53253916",
     "listing_id": "WP1AE2AY0KD******",
     "title": "2019 Porsche CAYENNE SE HYBRID",
@@ -1769,32 +1665,6 @@
   },
   {
     "source": "copart",
-    "source_url": "https://www.copart.com/lot/73425155",
-    "listing_id": "WP0AB2A87FK******",
-    "title": "2015 Porsche CAYMAN S",
-    "year": 2015,
-    "make": "Porsche",
-    "model": "CAYMAN",
-    "trim": "S",
-    "price_usd": null,
-    "current_bid_usd": 400.0,
-    "mileage": 31789,
-    "location": "PA - CHAMBERSBURG",
-    "seller_type": "salvage_auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0225/fed0891cffff46d88bdff8f440ef7398_thb.jpg",
-    "vin": "WP0AB2A87FK******",
-    "lot_number": "73425155",
-    "sale_date": "2026-06-26T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982226Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "copart",
     "source_url": "https://www.copart.com/lot/53545506",
     "listing_id": "WP0AB2Y11LS******",
     "title": "2020 Porsche TAYCAN 4S",
@@ -1839,7 +1709,7 @@
     "vin": "WP1BA2AY7RD******",
     "lot_number": "49947396",
     "sale_date": "2026-06-22T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983263Z",
+    "first_seen": "2026-06-21T13:12:08.753187Z",
     "raw": {
       "sf_csv": true
     },
@@ -1865,7 +1735,7 @@
     "vin": "WP1BL2AY9SD******",
     "lot_number": "47942556",
     "sale_date": "2026-07-09T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983989Z",
+    "first_seen": "2026-06-21T13:12:08.753876Z",
     "raw": {
       "sf_csv": true
     },
@@ -2047,7 +1917,7 @@
     "vin": "WP1AA2A29JK******",
     "lot_number": "52412776",
     "sale_date": "2026-07-20T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984162Z",
+    "first_seen": "2026-06-21T13:12:08.754041Z",
     "raw": {
       "sf_csv": true
     },
@@ -2099,7 +1969,33 @@
     "vin": "WP0AB2A94MS******",
     "lot_number": "54559266",
     "sale_date": "2026-07-17T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981808Z",
+    "first_seen": "2026-06-21T13:12:08.751806Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "salvage"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/55528996",
+    "listing_id": "WP0CA2A86HS******",
+    "title": "2017 Porsche BOXSTER",
+    "year": 2017,
+    "make": "Porsche",
+    "model": "BOXSTER",
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 525.0,
+    "mileage": 53506,
+    "location": "CT - HARTFORD",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0626/2f00201c52ca4eaf850a86a56fabc0e4_thb.jpg",
+    "vin": "WP0CA2A86HS******",
+    "lot_number": "55528996",
+    "sale_date": "2026-06-23T14:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.752549Z",
     "raw": {
       "sf_csv": true
     },
@@ -2133,25 +2029,25 @@
   },
   {
     "source": "copart",
-    "source_url": "https://www.copart.com/lot/53069576",
-    "listing_id": "WP1AE2A27GL******",
-    "title": "2016 Porsche CAYENNE SE HYBRID",
-    "year": 2016,
+    "source_url": "https://www.copart.com/lot/55273426",
+    "listing_id": "WP1AA2A29HK******",
+    "title": "2017 Porsche CAYENNE",
+    "year": 2017,
     "make": "Porsche",
     "model": "CAYENNE",
-    "trim": "SE HYBRID",
+    "trim": null,
     "price_usd": null,
     "current_bid_usd": 525.0,
-    "mileage": 202124,
+    "mileage": 165757,
     "location": "ON - TORONTO",
     "seller_type": "salvage_auction",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/6640d405a4c640c1bc1fdacdada4b46e_thb.jpg",
-    "vin": "WP1AE2A27GL******",
-    "lot_number": "53069576",
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0626/2748f81e2b3540d7a3d0183d7523d4a1_thb.jpg",
+    "vin": "WP1AA2A29HK******",
+    "lot_number": "55273426",
     "sale_date": "2026-06-23T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983545Z",
+    "first_seen": "2026-06-21T13:12:08.753406Z",
     "raw": {
       "sf_csv": true
     },
@@ -2185,29 +2081,29 @@
   },
   {
     "source": "copart",
-    "source_url": "https://www.copart.com/lot/52472786",
-    "listing_id": "WP1AA2AY9KD******",
-    "title": "2019 Porsche CAYENNE",
-    "year": 2019,
+    "source_url": "https://www.copart.com/lot/73425155",
+    "listing_id": "WP0AB2A87FK******",
+    "title": "2015 Porsche CAYMAN S",
+    "year": 2015,
     "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": null,
+    "model": "CAYMAN",
+    "trim": "S",
     "price_usd": null,
     "current_bid_usd": 550.0,
-    "mileage": 57824,
-    "location": "MD - BALTIMORE",
+    "mileage": 31789,
+    "location": "PA - CHAMBERSBURG",
     "seller_type": "salvage_auction",
-    "title_status": "salvage",
+    "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/274c05ed8f924289af19868db6b45984_thb.jpg",
-    "vin": "WP1AA2AY9KD******",
-    "lot_number": "52472786",
-    "sale_date": "2026-06-22T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983255Z",
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0225/fed0891cffff46d88bdff8f440ef7398_thb.jpg",
+    "vin": "WP0AB2A87FK******",
+    "lot_number": "73425155",
+    "sale_date": "2026-06-26T14:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.752197Z",
     "raw": {
       "sf_csv": true
     },
-    "project_tier": "salvage"
+    "project_tier": "clean"
   },
   {
     "source": "copart",
@@ -2237,58 +2133,6 @@
   },
   {
     "source": "copart",
-    "source_url": "https://www.copart.com/lot/45800476",
-    "listing_id": "WP0AD2A94MS******",
-    "title": "2021 Porsche 911 TURBO",
-    "year": 2021,
-    "make": "Porsche",
-    "model": "911",
-    "trim": "TURBO",
-    "price_usd": null,
-    "current_bid_usd": 600.0,
-    "mileage": 7179,
-    "location": "NY - NEWBURGH",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0326/5b8c045d6288483f90070f7a82a36e13_thb.jpg",
-    "vin": "WP0AD2A94MS******",
-    "lot_number": "45800476",
-    "sale_date": "2026-06-25T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981776Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/79938585",
-    "listing_id": "WP1AA2A22GK******",
-    "title": "2016 Porsche CAYENNE",
-    "year": 2016,
-    "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 625.0,
-    "mileage": 112210,
-    "location": "PA - PHILADELPHIA",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0326/324076564ed345e08060d98d25374222_thb.jpg",
-    "vin": "WP1AA2A22GK******",
-    "lot_number": "79938585",
-    "sale_date": "2026-06-23T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983468Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
     "source_url": "https://www.copart.com/lot/51515786",
     "listing_id": "WP1AB2A24GL******",
     "title": "2016 Porsche CAYENNE S",
@@ -2307,7 +2151,7 @@
     "vin": "WP1AB2A24GL******",
     "lot_number": "51515786",
     "sale_date": "2026-06-24T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983814Z",
+    "first_seen": "2026-06-21T13:12:08.753719Z",
     "raw": {
       "sf_csv": true
     },
@@ -2333,11 +2177,37 @@
     "vin": "WP1BA2AY9ND******",
     "lot_number": "53947636",
     "sale_date": "2026-06-24T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983859Z",
+    "first_seen": "2026-06-21T13:12:08.753764Z",
     "raw": {
       "sf_csv": true
     },
     "project_tier": "salvage"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/53069576",
+    "listing_id": "WP1AE2A27GL******",
+    "title": "2016 Porsche CAYENNE SE HYBRID",
+    "year": 2016,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": "SE HYBRID",
+    "price_usd": null,
+    "current_bid_usd": 700.0,
+    "mileage": 202124,
+    "location": "ON - TORONTO",
+    "seller_type": "salvage_auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/6640d405a4c640c1bc1fdacdada4b46e_thb.jpg",
+    "vin": "WP1AE2A27GL******",
+    "lot_number": "53069576",
+    "sale_date": "2026-06-23T14:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753453Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
   },
   {
     "source": "copart",
@@ -2390,6 +2260,32 @@
       "sf_csv": true
     },
     "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/45800476",
+    "listing_id": "WP0AD2A94MS******",
+    "title": "2021 Porsche 911 TURBO",
+    "year": 2021,
+    "make": "Porsche",
+    "model": "911",
+    "trim": "TURBO",
+    "price_usd": null,
+    "current_bid_usd": 925.0,
+    "mileage": 7179,
+    "location": "NY - NEWBURGH",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0326/5b8c045d6288483f90070f7a82a36e13_thb.jpg",
+    "vin": "WP0AD2A94MS******",
+    "lot_number": "45800476",
+    "sale_date": "2026-06-25T17:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.751776Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "salvage"
   },
   {
     "source": "copart",
@@ -2497,6 +2393,32 @@
   },
   {
     "source": "copart",
+    "source_url": "https://www.copart.com/lot/52472786",
+    "listing_id": "WP1AA2AY9KD******",
+    "title": "2019 Porsche CAYENNE",
+    "year": 2019,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 1050.0,
+    "mileage": 57824,
+    "location": "MD - BALTIMORE",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/274c05ed8f924289af19868db6b45984_thb.jpg",
+    "vin": "WP1AA2AY9KD******",
+    "lot_number": "52472786",
+    "sale_date": "2026-06-22T14:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753179Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "salvage"
+  },
+  {
+    "source": "copart",
     "source_url": "https://www.copart.com/lot/76630424",
     "listing_id": "WP1AA2A29EL******",
     "title": "2014 Porsche CAYENNE",
@@ -2515,7 +2437,7 @@
     "vin": "WP1AA2A29EL******",
     "lot_number": "76630424",
     "sale_date": "2024-10-15T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984323Z",
+    "first_seen": "2026-06-21T13:12:08.754224Z",
     "raw": {
       "sf_csv": true
     },
@@ -2653,6 +2575,32 @@
   },
   {
     "source": "copart",
+    "source_url": "https://www.copart.com/lot/79938585",
+    "listing_id": "WP1AA2A22GK******",
+    "title": "2016 Porsche CAYENNE",
+    "year": 2016,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 1300.0,
+    "mileage": 112210,
+    "location": "PA - PHILADELPHIA",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0326/324076564ed345e08060d98d25374222_thb.jpg",
+    "vin": "WP1AA2A22GK******",
+    "lot_number": "79938585",
+    "sale_date": "2026-06-23T14:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753379Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "salvage"
+  },
+  {
+    "source": "copart",
     "source_url": "https://www.copart.com/lot/52951656",
     "listing_id": "WP1AA2A20GL******",
     "title": "2016 Porsche CAYENNE",
@@ -2750,6 +2698,58 @@
     "lot_number": "41469483",
     "sale_date": "2026-06-17T19:00:00Z",
     "first_seen": "2026-06-17T13:12:25.985535Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "salvage"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/54545816",
+    "listing_id": "WP1BA2AYXRD******",
+    "title": "2024 Porsche CAYENNE COUPE",
+    "year": 2024,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": "COUPE",
+    "price_usd": null,
+    "current_bid_usd": 1700.0,
+    "mileage": null,
+    "location": "CA - SAN BERNARDINO",
+    "seller_type": "salvage_auction",
+    "title_status": "clean",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/8959fad084f049878171737eee4e5052_thb.jpg",
+    "vin": "WP1BA2AYXRD******",
+    "lot_number": "54545816",
+    "sale_date": "2026-06-22T19:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753231Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/53987406",
+    "listing_id": "WP1AB2A27FL******",
+    "title": "2015 Porsche CAYENNE S",
+    "year": 2015,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": "S",
+    "price_usd": null,
+    "current_bid_usd": 1700.0,
+    "mileage": 103136,
+    "location": "OH - COLUMBUS",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/58dcb8e1d2024a1199a83fd3bddd2762_thb.jpg",
+    "vin": "WP1AB2A27FL******",
+    "lot_number": "53987406",
+    "sale_date": "2026-06-23T14:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753441Z",
     "raw": {
       "sf_csv": true
     },
@@ -3043,6 +3043,32 @@
   },
   {
     "source": "copart",
+    "source_url": "https://www.copart.com/lot/46943776",
+    "listing_id": "WP1AA2AY4KD******",
+    "title": "2019 Porsche CAYENNE",
+    "year": 2019,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 2350.0,
+    "mileage": 95225,
+    "location": "CA - RANCHO CUCAMONGA",
+    "seller_type": "salvage_auction",
+    "title_status": "clean",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0326/18c9e9d11bc848c397c78a01c0f2749f_thb.jpg",
+    "vin": "WP1AA2AY4KD******",
+    "lot_number": "46943776",
+    "sale_date": "2026-06-23T19:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753595Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "copart",
     "source_url": "https://www.copart.com/lot/47067076",
     "listing_id": "WP0CB2A80SK******",
     "title": "2025 Porsche BOXSTER S",
@@ -3147,32 +3173,6 @@
   },
   {
     "source": "copart",
-    "source_url": "https://www.copart.com/lot/49454246",
-    "listing_id": "WP0CB2A82HS******",
-    "title": "2017 Porsche BOXSTER S",
-    "year": 2017,
-    "make": "Porsche",
-    "model": "BOXSTER",
-    "trim": "S",
-    "price_usd": null,
-    "current_bid_usd": 2600.0,
-    "mileage": 19265,
-    "location": "FL - PUNTA GORDA",
-    "seller_type": "salvage_auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/6983dad4289e4f34ad619078be8de9fc_thb.jpg",
-    "vin": "WP0CB2A82HS******",
-    "lot_number": "49454246",
-    "sale_date": "2026-06-23T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982608Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "copart",
     "source_url": "https://www.copart.com/lot/55784476",
     "listing_id": "WP1AA2A26HK******",
     "title": "2017 Porsche CAYENNE",
@@ -3191,7 +3191,7 @@
     "vin": "WP1AA2A26HK******",
     "lot_number": "55784476",
     "sale_date": "2026-06-23T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983391Z",
+    "first_seen": "2026-06-21T13:12:08.753308Z",
     "raw": {
       "sf_csv": true
     },
@@ -3555,7 +3555,7 @@
     "vin": "WP1AE2A25EL******",
     "lot_number": "46138876",
     "sale_date": "2026-06-23T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983458Z",
+    "first_seen": "2026-06-21T13:12:08.753369Z",
     "raw": {
       "sf_csv": true
     },
@@ -3634,32 +3634,6 @@
     "lot_number": "78719645",
     "sale_date": "2026-05-26T17:00:00Z",
     "first_seen": "2026-05-25T20:11:15.321948Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/52201596",
-    "listing_id": "WP1AE2AY0PD******",
-    "title": "2023 Porsche CAYENNE E-HYBRID",
-    "year": 2023,
-    "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": "E-HYBRID",
-    "price_usd": null,
-    "current_bid_usd": 4050.0,
-    "mileage": 28286,
-    "location": "ON - TORONTO",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/501adc1319764aabbad6b1f8a4389da0_thb.jpg",
-    "vin": "WP1AE2AY0PD******",
-    "lot_number": "52201596",
-    "sale_date": "2026-06-23T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983554Z",
     "raw": {
       "sf_csv": true
     },
@@ -3779,7 +3753,7 @@
     "model": "CAYENNE",
     "trim": null,
     "price_usd": null,
-    "current_bid_usd": 4250.0,
+    "current_bid_usd": 4300.0,
     "mileage": 107059,
     "location": "MA - SOUTH BOSTON",
     "seller_type": "salvage_auction",
@@ -3789,7 +3763,7 @@
     "vin": "WP1AF2A28GL******",
     "lot_number": "79979335",
     "sale_date": "2026-06-23T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983341Z",
+    "first_seen": "2026-06-21T13:12:08.753258Z",
     "raw": {
       "sf_csv": true
     },
@@ -3815,7 +3789,7 @@
     "vin": "WP1AA2A29EL******",
     "lot_number": "55377576",
     "sale_date": "2026-06-22T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983205Z",
+    "first_seen": "2026-06-21T13:12:08.753133Z",
     "raw": {
       "sf_csv": true
     },
@@ -3901,32 +3875,6 @@
   },
   {
     "source": "copart",
-    "source_url": "https://www.copart.com/lot/79793145",
-    "listing_id": "WP1AA2AY4KD******",
-    "title": "2019 Porsche CAYENNE",
-    "year": 2019,
-    "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 5000.0,
-    "mileage": 17775,
-    "location": "FL - MIAMI NORTH",
-    "seller_type": "salvage_auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0326/4acf29d8c8b94154b8be67fd83768f03_thb.jpg",
-    "vin": "WP1AA2AY4KD******",
-    "lot_number": "79793145",
-    "sale_date": "2026-06-19T14:00:00Z",
-    "first_seen": "2026-06-18T13:12:13.529027Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "copart",
     "source_url": "https://www.copart.com/lot/55159076",
     "listing_id": "WP1AA2A28EL******",
     "title": "2014 Porsche CAYENNE",
@@ -3945,11 +3893,37 @@
     "vin": "WP1AA2A28EL******",
     "lot_number": "55159076",
     "sale_date": "2026-06-23T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983410Z",
+    "first_seen": "2026-06-21T13:12:08.753327Z",
     "raw": {
       "sf_csv": true
     },
     "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/53569846",
+    "listing_id": "WP1AA2AY1LD******",
+    "title": "2020 Porsche CAYENNE",
+    "year": 2020,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 5100.0,
+    "mileage": 64027,
+    "location": "VA - RICHMOND",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/e7ab5be9123e4895975936012e64df7a_thb.jpg",
+    "vin": "WP1AA2AY1LD******",
+    "lot_number": "53569846",
+    "sale_date": "2026-06-26T14:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753860Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "salvage"
   },
   {
     "source": "bring_a_trailer",
@@ -4005,32 +3979,6 @@
   },
   {
     "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2015-porsche-cayenne-s-17/",
-    "listing_id": "2015-porsche-cayenne-s-17",
-    "title": "2015 Porsche Cayenne S",
-    "year": 2015,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 5500.0,
-    "mileage": null,
-    "location": null,
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/252822529-copy-2026-06-16-3q8-15465-scaled.jpg?resize=470%2C318",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.980412Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "bring_a_trailer",
     "source_url": "https://bringatrailer.com/listing/2014-porsche-cayenne-diesel-156/",
     "listing_id": "2014-porsche-cayenne-diesel-156",
     "title": "2014 Porsche Cayenne Diesel Platinum Edition",
@@ -4075,7 +4023,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985895Z",
+    "first_seen": "2026-06-21T13:12:08.755607Z",
     "raw": {
       "sf_csv": true
     },
@@ -4128,6 +4076,84 @@
     "lot_number": "53064366",
     "sale_date": "2026-05-22T19:00:00Z",
     "first_seen": "2026-05-22T17:27:32.197747Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/55183286",
+    "listing_id": "WP1AA2AY2LD******",
+    "title": "2020 Porsche CAYENNE",
+    "year": 2020,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 6100.0,
+    "mileage": 60893,
+    "location": "TX - HOUSTON",
+    "seller_type": "salvage_auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0626/c555703b56ec4fd383d7221acb3a07e8_thb.jpg",
+    "vin": "WP1AA2AY2LD******",
+    "lot_number": "55183286",
+    "sale_date": "2026-06-23T17:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753504Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/52490166",
+    "listing_id": "WP1BG2AY4PD******",
+    "title": "2023 Porsche CAYENNE GTS COUPE",
+    "year": 2023,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": "GTS COUPE",
+    "price_usd": null,
+    "current_bid_usd": 6200.0,
+    "mileage": 46398,
+    "location": "TX - FT. WORTH",
+    "seller_type": "salvage_auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/55129e81b39d4e35b096b9951c823712_thb.jpg",
+    "vin": "WP1BG2AY4PD******",
+    "lot_number": "52490166",
+    "sale_date": "2026-07-17T17:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753996Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2015-porsche-cayenne-s-17/",
+    "listing_id": "2015-porsche-cayenne-s-17",
+    "title": "2015 Porsche Cayenne S",
+    "year": 2015,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 6250.0,
+    "mileage": null,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/252822529-copy-2026-06-16-3q8-15465-scaled.jpg?resize=470%2C318",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.750485Z",
     "raw": {
       "sf_csv": true
     },
@@ -4205,7 +4231,7 @@
     "vin": "WP1AA2AY7LD******",
     "lot_number": "51842776",
     "sale_date": "2026-06-22T19:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983330Z",
+    "first_seen": "2026-06-21T13:12:08.753249Z",
     "raw": {
       "sf_csv": true
     },
@@ -4309,7 +4335,7 @@
     "vin": "WP1AA2A24GL******",
     "lot_number": "55167216",
     "sale_date": "2026-06-23T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983400Z",
+    "first_seen": "2026-06-21T13:12:08.753318Z",
     "raw": {
       "sf_csv": true
     },
@@ -4317,25 +4343,25 @@
   },
   {
     "source": "copart",
-    "source_url": "https://www.copart.com/lot/48864856",
-    "listing_id": "WP0AA2A81KS******",
-    "title": "2019 Porsche CAYMAN BASE",
+    "source_url": "https://www.copart.com/lot/79793145",
+    "listing_id": "WP1AA2AY4KD******",
+    "title": "2019 Porsche CAYENNE",
     "year": 2019,
     "make": "Porsche",
-    "model": "CAYMAN",
-    "trim": "BASE",
+    "model": "CAYENNE",
+    "trim": null,
     "price_usd": null,
     "current_bid_usd": 7000.0,
-    "mileage": 103041,
-    "location": "KS - KANSAS CITY",
+    "mileage": 17775,
+    "location": "FL - MIAMI NORTH",
     "seller_type": "salvage_auction",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/669aee5cb23d4db4911f69b1d167692f_thb.jpg",
-    "vin": "WP0AA2A81KS******",
-    "lot_number": "48864856",
-    "sale_date": "2026-06-23T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982217Z",
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0326/4acf29d8c8b94154b8be67fd83768f03_thb.jpg",
+    "vin": "WP1AA2AY4KD******",
+    "lot_number": "79793145",
+    "sale_date": "2026-06-23T14:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753388Z",
     "raw": {
       "sf_csv": true
     },
@@ -4387,7 +4413,7 @@
     "vin": "WP1BA2AY1RD******",
     "lot_number": "53440046",
     "sale_date": "2026-06-22T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983223Z",
+    "first_seen": "2026-06-21T13:12:08.753152Z",
     "raw": {
       "sf_csv": true
     },
@@ -4465,7 +4491,33 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.981332Z",
+    "first_seen": "2026-06-21T13:12:08.751322Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/48864856",
+    "listing_id": "WP0AA2A81KS******",
+    "title": "2019 Porsche CAYMAN BASE",
+    "year": 2019,
+    "make": "Porsche",
+    "model": "CAYMAN",
+    "trim": "BASE",
+    "price_usd": null,
+    "current_bid_usd": 7300.0,
+    "mileage": 103041,
+    "location": "KS - KANSAS CITY",
+    "seller_type": "salvage_auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/669aee5cb23d4db4911f69b1d167692f_thb.jpg",
+    "vin": "WP0AA2A81KS******",
+    "lot_number": "48864856",
+    "sale_date": "2026-06-23T17:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.752187Z",
     "raw": {
       "sf_csv": true
     },
@@ -4517,7 +4569,7 @@
     "vin": "WP1BE2AY8MD******",
     "lot_number": "96994425",
     "sale_date": "2026-07-15T19:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984050Z",
+    "first_seen": "2026-06-21T13:12:08.753935Z",
     "raw": {
       "sf_csv": true
     },
@@ -4758,32 +4810,6 @@
     "project_tier": "salvage"
   },
   {
-    "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2015-porsche-cayenne-diesel-179/",
-    "listing_id": "2015-porsche-cayenne-diesel-179",
-    "title": "2015 Porsche Cayenne Diesel",
-    "year": 2015,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 8850.0,
-    "mileage": null,
-    "location": null,
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/IMG_7775-55395-scaled-1-copy-2026-06-10-c19-26763-scaled.jpeg?resize=470%2C318",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.980116Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
     "source": "copart",
     "source_url": "https://www.copart.com/lot/55988126",
     "listing_id": "WP1AA2A21JK******",
@@ -4803,11 +4829,63 @@
     "vin": "WP1AA2A21JK******",
     "lot_number": "55988126",
     "sale_date": "2026-06-23T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983380Z",
+    "first_seen": "2026-06-21T13:12:08.753298Z",
     "raw": {
       "sf_csv": true
     },
     "project_tier": "clean"
+  },
+  {
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2015-porsche-cayenne-diesel-179/",
+    "listing_id": "2015-porsche-cayenne-diesel-179",
+    "title": "2015 Porsche Cayenne Diesel",
+    "year": 2015,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 8950.0,
+    "mileage": null,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/IMG_7775-55395-scaled-1-copy-2026-06-10-c19-26763-scaled.jpeg?resize=470%2C318",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.750225Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/54097886",
+    "listing_id": "WP1AD2A27JL******",
+    "title": "2018 Porsche CAYENNE GTS",
+    "year": 2018,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": "GTS",
+    "price_usd": null,
+    "current_bid_usd": 9100.0,
+    "mileage": 63918,
+    "location": "NY - ALBANY",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/576c40899da649788f779c6364ba5ce6_thb.jpg",
+    "vin": "WP1AD2A27JL******",
+    "lot_number": "54097886",
+    "sale_date": "2026-06-22T14:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753143Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "salvage"
   },
   {
     "source": "copart",
@@ -4907,7 +4985,7 @@
     "vin": "WP0CA2A87RK******",
     "lot_number": "54510646",
     "sale_date": "2026-07-08T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982639Z",
+    "first_seen": "2026-06-21T13:12:08.752586Z",
     "raw": {
       "sf_csv": true
     },
@@ -4959,7 +5037,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985845Z",
+    "first_seen": "2026-06-21T13:12:08.755559Z",
     "raw": {
       "sf_csv": true
     },
@@ -5037,11 +5115,37 @@
     "vin": "WP1AB2A22FL******",
     "lot_number": "58078006",
     "sale_date": "2026-06-24T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983717Z",
+    "first_seen": "2026-06-21T13:12:08.753635Z",
     "raw": {
       "sf_csv": true
     },
     "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/52201596",
+    "listing_id": "WP1AE2AY0PD******",
+    "title": "2023 Porsche CAYENNE E-HYBRID",
+    "year": 2023,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": "E-HYBRID",
+    "price_usd": null,
+    "current_bid_usd": 9800.0,
+    "mileage": 28286,
+    "location": "ON - TORONTO",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/501adc1319764aabbad6b1f8a4389da0_thb.jpg",
+    "vin": "WP1AE2AY0PD******",
+    "lot_number": "52201596",
+    "sale_date": "2026-06-23T14:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753462Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "salvage"
   },
   {
     "source": "copart",
@@ -5219,7 +5323,59 @@
     "vin": "WP0ZZZ98ZLK******",
     "lot_number": "65111355",
     "sale_date": "2025-07-15T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982264Z",
+    "first_seen": "2026-06-21T13:12:08.752421Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "salvage"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/49454246",
+    "listing_id": "WP0CB2A82HS******",
+    "title": "2017 Porsche BOXSTER S",
+    "year": 2017,
+    "make": "Porsche",
+    "model": "BOXSTER",
+    "trim": "S",
+    "price_usd": null,
+    "current_bid_usd": 10200.0,
+    "mileage": 19265,
+    "location": "FL - PUNTA GORDA",
+    "seller_type": "salvage_auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/6983dad4289e4f34ad619078be8de9fc_thb.jpg",
+    "vin": "WP0CB2A82HS******",
+    "lot_number": "49454246",
+    "sale_date": "2026-06-23T14:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.752559Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/50180226",
+    "listing_id": "WP1AB2AY9KD******",
+    "title": "2019 Porsche CAYENNE S",
+    "year": 2019,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": "S",
+    "price_usd": null,
+    "current_bid_usd": 10200.0,
+    "mileage": 57539,
+    "location": "IL - CHICAGO NORTH",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/980801d437464d17b27db73b9d7c41b2_thb.jpg",
+    "vin": "WP1AB2AY9KD******",
+    "lot_number": "50180226",
+    "sale_date": "2026-07-21T17:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.754059Z",
     "raw": {
       "sf_csv": true
     },
@@ -5271,7 +5427,7 @@
     "vin": "WP0CA2A81RK******",
     "lot_number": "55398256",
     "sale_date": "2026-07-15T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982648Z",
+    "first_seen": "2026-06-21T13:12:08.752595Z",
     "raw": {
       "sf_csv": true
     },
@@ -5328,32 +5484,6 @@
       "sf_csv": true
     },
     "project_tier": "clean"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/74553605",
-    "listing_id": "WP1AG2AY7MD******",
-    "title": "2021 Porsche CAYENNE GTS",
-    "year": 2021,
-    "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": "GTS",
-    "price_usd": null,
-    "current_bid_usd": 11300.0,
-    "mileage": 27797,
-    "location": "IL - CHICAGO NORTH",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0126/9d97b780e44448e8a72e23606e684f4e_thb.jpg",
-    "vin": "WP1AG2AY7MD******",
-    "lot_number": "74553605",
-    "sale_date": "2026-06-23T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983582Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "salvage"
   },
   {
     "source": "copart",
@@ -5557,7 +5687,7 @@
     "vin": "WP1BF2AY8LD******",
     "lot_number": "56712326",
     "sale_date": "2026-07-20T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984143Z",
+    "first_seen": "2026-06-21T13:12:08.754022Z",
     "raw": {
       "sf_csv": true
     },
@@ -5661,7 +5791,7 @@
     "vin": "WP1AA2A22JK******",
     "lot_number": "52655876",
     "sale_date": "2026-06-23T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983448Z",
+    "first_seen": "2026-06-21T13:12:08.753359Z",
     "raw": {
       "sf_csv": true
     },
@@ -5851,6 +5981,32 @@
   },
   {
     "source": "copart",
+    "source_url": "https://www.copart.com/lot/74553605",
+    "listing_id": "WP1AG2AY7MD******",
+    "title": "2021 Porsche CAYENNE GTS",
+    "year": 2021,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": "GTS",
+    "price_usd": null,
+    "current_bid_usd": 13700.0,
+    "mileage": 27797,
+    "location": "IL - CHICAGO NORTH",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0126/9d97b780e44448e8a72e23606e684f4e_thb.jpg",
+    "vin": "WP1AG2AY7MD******",
+    "lot_number": "74553605",
+    "sale_date": "2026-06-23T17:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753495Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "salvage"
+  },
+  {
+    "source": "copart",
     "source_url": "https://www.copart.com/lot/54127196",
     "listing_id": "WP1AA2AYXPD******",
     "title": "2023 Porsche CAYENNE BASE",
@@ -5859,7 +6015,7 @@
     "model": "CAYENNE",
     "trim": "BASE",
     "price_usd": null,
-    "current_bid_usd": 13700.0,
+    "current_bid_usd": 13900.0,
     "mileage": 32554,
     "location": "MI - DETROIT",
     "seller_type": "salvage_auction",
@@ -5869,7 +6025,7 @@
     "vin": "WP1AA2AYXPD******",
     "lot_number": "54127196",
     "sale_date": "2026-06-23T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983524Z",
+    "first_seen": "2026-06-21T13:12:08.753432Z",
     "raw": {
       "sf_csv": true
     },
@@ -5895,11 +6051,37 @@
     "vin": "WP1BA2AY1MD******",
     "lot_number": "80855025",
     "sale_date": "2026-06-24T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983695Z",
+    "first_seen": "2026-06-21T13:12:08.753604Z",
     "raw": {
       "sf_csv": true
     },
     "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/54252276",
+    "listing_id": "WP1AB2AY7KD******",
+    "title": "2019 Porsche CAYENNE S",
+    "year": 2019,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": "S",
+    "price_usd": null,
+    "current_bid_usd": 14200.0,
+    "mileage": 41399,
+    "location": "CA - NAPA",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/2d52d405619b42bb84a7e141cbe17ea4_thb.jpg",
+    "vin": "WP1AB2AY7KD******",
+    "lot_number": "54252276",
+    "sale_date": "2026-06-25T07:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753789Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "salvage"
   },
   {
     "source": "bring_a_trailer",
@@ -5980,26 +6162,26 @@
     "project_tier": "clean"
   },
   {
-    "source": "cars_and_bids",
-    "source_url": "https://carsandbids.com/auctions/rkQ151D4/2020-porsche-cayenne-coupe",
-    "listing_id": "2020-porsche-cayenne-coupe",
-    "title": "2020 Porsche Cayenne Coupe",
-    "year": 2020,
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/78970455",
+    "listing_id": "WP0AB2Y16MS******",
+    "title": "2021 Porsche TAYCAN 4S",
+    "year": 2021,
     "make": "Porsche",
-    "model": null,
-    "trim": null,
+    "model": "TAYCAN",
+    "trim": "4S",
     "price_usd": null,
     "current_bid_usd": 15000.0,
-    "mileage": null,
-    "location": "Jersey City, NJ 07310",
-    "seller_type": "auction",
+    "mileage": 48889,
+    "location": "FL - JACKSONVILLE NORTH",
+    "seller_type": "salvage_auction",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/c51905b0000b639a185eeb080dd879bf007f5604/photos/exterior/KYYE2MGx-cH0ZZa4/edit/xH4NL.jpg?t=177995330283",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985836Z",
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0226/41ac0f141ace47c5b3a67995235bee8f_thb.jpg",
+    "vin": "WP0AB2Y16MS******",
+    "lot_number": "78970455",
+    "sale_date": "2026-06-24T14:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.752766Z",
     "raw": {
       "sf_csv": true
     },
@@ -6077,7 +6259,7 @@
     "vin": "WP0CA2A96RS******",
     "lot_number": "52366746",
     "sale_date": "2026-06-25T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981758Z",
+    "first_seen": "2026-06-21T13:12:08.751759Z",
     "raw": {
       "sf_csv": true
     },
@@ -6108,32 +6290,6 @@
       "sf_csv": true
     },
     "project_tier": "salvage"
-  },
-  {
-    "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2019-porsche-cayenne-s-20/",
-    "listing_id": "2019-porsche-cayenne-s-20",
-    "title": "2019 Porsche Cayenne S",
-    "year": 2019,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 15252.0,
-    "mileage": null,
-    "location": null,
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/05/IMG_7977-copy-2026-06-05-oab-85516-scaled.jpeg?resize=470%2C318",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.980831Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
   },
   {
     "source": "copart",
@@ -6181,7 +6337,7 @@
     "vin": "WP1BE2AY8ND******",
     "lot_number": "78750825",
     "sale_date": "2026-06-24T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983785Z",
+    "first_seen": "2026-06-21T13:12:08.753692Z",
     "raw": {
       "sf_csv": true
     },
@@ -6207,7 +6363,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985912Z",
+    "first_seen": "2026-06-21T13:12:08.755623Z",
     "raw": {
       "sf_csv": true
     },
@@ -6311,7 +6467,7 @@
     "vin": "WP1AA2AY3KD******",
     "lot_number": "56300446",
     "sale_date": "2026-06-24T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983745Z",
+    "first_seen": "2026-06-21T13:12:08.753653Z",
     "raw": {
       "sf_csv": true
     },
@@ -6467,7 +6623,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.980972Z",
+    "first_seen": "2026-06-21T13:12:08.751004Z",
     "raw": {
       "sf_csv": true
     },
@@ -6519,33 +6675,7 @@
     "vin": "WP1AA2AY6KD******",
     "lot_number": "75927185",
     "sale_date": "2026-06-23T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983351Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/46943776",
-    "listing_id": "WP1AA2AY4KD******",
-    "title": "2019 Porsche CAYENNE",
-    "year": 2019,
-    "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 18700.0,
-    "mileage": 95225,
-    "location": "CA - RANCHO CUCAMONGA",
-    "seller_type": "salvage_auction",
-    "title_status": "clean",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0326/18c9e9d11bc848c397c78a01c0f2749f_thb.jpg",
-    "vin": "WP1AA2AY4KD******",
-    "lot_number": "46943776",
-    "sale_date": "2026-06-19T01:00:00Z",
-    "first_seen": "2026-06-18T13:12:13.529018Z",
+    "first_seen": "2026-06-21T13:12:08.753267Z",
     "raw": {
       "sf_csv": true
     },
@@ -6597,7 +6727,7 @@
     "vin": "WP1AA2AY2KD******",
     "lot_number": "54662536",
     "sale_date": "2026-06-24T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983765Z",
+    "first_seen": "2026-06-21T13:12:08.753671Z",
     "raw": {
       "sf_csv": true
     },
@@ -6623,7 +6753,7 @@
     "vin": "WP1AE2AY4KD******",
     "lot_number": "54117146",
     "sale_date": "2026-06-23T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983439Z",
+    "first_seen": "2026-06-21T13:12:08.753351Z",
     "raw": {
       "sf_csv": true
     },
@@ -6680,6 +6810,32 @@
     "project_tier": "clean"
   },
   {
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2019-porsche-cayenne-s-20/",
+    "listing_id": "2019-porsche-cayenne-s-20",
+    "title": "2019 Porsche Cayenne S",
+    "year": 2019,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 20052.0,
+    "mileage": null,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/05/IMG_7977-copy-2026-06-05-oab-85516-scaled.jpeg?resize=470%2C318",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.750616Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
     "source": "copart",
     "source_url": "https://www.copart.com/lot/53332116",
     "listing_id": "WP0AA2A80RK******",
@@ -6704,32 +6860,6 @@
       "sf_csv": true
     },
     "project_tier": "clean"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/47730856",
-    "listing_id": "WP1AA2AY4RD******",
-    "title": "2024 Porsche CAYENNE",
-    "year": 2024,
-    "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 20200.0,
-    "mileage": 27534,
-    "location": "TN - NASHVILLE",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0326/4aece7906ce64cde8254fa4a3e4564a2_thb.jpg",
-    "vin": "WP1AA2AY4RD******",
-    "lot_number": "47730856",
-    "sale_date": "2026-06-22T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983292Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "salvage"
   },
   {
     "source": "copart",
@@ -6778,6 +6908,32 @@
     "lot_number": null,
     "sale_date": null,
     "first_seen": "2026-05-20T04:20:49.887328Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "cars_and_bids",
+    "source_url": "https://carsandbids.com/auctions/rkQ151D4/2020-porsche-cayenne-coupe",
+    "listing_id": "2020-porsche-cayenne-coupe",
+    "title": "2020 Porsche Cayenne Coupe",
+    "year": 2020,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 21000.0,
+    "mileage": null,
+    "location": "Jersey City, NJ 07310",
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/c51905b0000b639a185eeb080dd879bf007f5604/photos/exterior/KYYE2MGx-cH0ZZa4/edit/xH4NL.jpg?t=177995330283",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.755551Z",
     "raw": {
       "sf_csv": true
     },
@@ -6888,6 +7044,32 @@
     "project_tier": "clean"
   },
   {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/47730856",
+    "listing_id": "WP1AA2AY4RD******",
+    "title": "2024 Porsche CAYENNE",
+    "year": 2024,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 23200.0,
+    "mileage": 27534,
+    "location": "TN - NASHVILLE",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0326/4aece7906ce64cde8254fa4a3e4564a2_thb.jpg",
+    "vin": "WP1AA2AY4RD******",
+    "lot_number": "47730856",
+    "sale_date": "2026-06-22T17:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.753215Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "salvage"
+  },
+  {
     "source": "bring_a_trailer",
     "source_url": "https://bringatrailer.com/listing/2014-porsche-cayenne-diesel-153/",
     "listing_id": "2014-porsche-cayenne-diesel-153",
@@ -6959,7 +7141,7 @@
     "vin": "WP1BG2AY1ND******",
     "lot_number": "54986166",
     "sale_date": "2026-06-23T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983514Z",
+    "first_seen": "2026-06-21T13:12:08.753423Z",
     "raw": {
       "sf_csv": true
     },
@@ -7011,7 +7193,7 @@
     "vin": "WP0BA2Y13NS******",
     "lot_number": "53038196",
     "sale_date": "2026-06-22T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982784Z",
+    "first_seen": "2026-06-21T13:12:08.752729Z",
     "raw": {
       "sf_csv": true
     },
@@ -7090,32 +7272,6 @@
     "lot_number": "51923416",
     "sale_date": "2026-06-23T01:00:00Z",
     "first_seen": "2026-06-18T13:12:13.529383Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/53426766",
-    "listing_id": "WP0AD2A83MS******",
-    "title": "2021 Porsche CAYMAN GTS",
-    "year": 2021,
-    "make": "Porsche",
-    "model": "CAYMAN",
-    "trim": "GTS",
-    "price_usd": null,
-    "current_bid_usd": 26000.0,
-    "mileage": 25584,
-    "location": "FL - WEST PALM BEACH",
-    "seller_type": "salvage_auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/e9b94bebef444c9b8dd43cf2af4672bb_thb.jpg",
-    "vin": "WP0AD2A83MS******",
-    "lot_number": "53426766",
-    "sale_date": "2026-06-23T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982207Z",
     "raw": {
       "sf_csv": true
     },
@@ -7276,32 +7432,6 @@
     "project_tier": "clean"
   },
   {
-    "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2020-porsche-cayenne-turbo-15/",
-    "listing_id": "2020-porsche-cayenne-turbo-15",
-    "title": "2020 Porsche Cayenne Turbo",
-    "year": 2020,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 27000.0,
-    "mileage": 40000,
-    "location": null,
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/DSC_2662-copy-2026-06-04-qtj-03316-scaled.jpg?resize=470%2C318",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.981294Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
     "source": "copart",
     "source_url": "https://www.copart.com/lot/53161356",
     "listing_id": "WP0AB2A80GK******",
@@ -7321,11 +7451,63 @@
     "vin": "WP0AB2A80GK******",
     "lot_number": "53161356",
     "sale_date": "2026-06-23T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982197Z",
+    "first_seen": "2026-06-21T13:12:08.752168Z",
     "raw": {
       "sf_csv": true
     },
     "project_tier": "salvage"
+  },
+  {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/26b5b78c-81de-4f9e-bee6-66d86d15d126/",
+    "listing_id": "WP0CA2A82ES120937",
+    "title": "2014 Porsche Boxster PDK Convenience PKG $64K MSRP",
+    "year": 2014,
+    "make": "Porsche",
+    "model": "Boxster",
+    "trim": "PDK Convenience PKG $64K MSRP",
+    "price_usd": 28995.0,
+    "current_bid_usd": null,
+    "mileage": 84562,
+    "location": "28269",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/cd4d95ac-94fb-5394-925c-91453e4aae92/f1a7d4ee-5424-4ce4-9caf-42e4b318c9f4/brcAUPzJDqStVCvsW8872dUHJKk.jpg",
+    "vin": "WP0CA2A82ES120937",
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.749382Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/53426766",
+    "listing_id": "WP0AD2A83MS******",
+    "title": "2021 Porsche CAYMAN GTS",
+    "year": 2021,
+    "make": "Porsche",
+    "model": "CAYMAN",
+    "trim": "GTS",
+    "price_usd": null,
+    "current_bid_usd": 29000.0,
+    "mileage": 25584,
+    "location": "FL - WEST PALM BEACH",
+    "seller_type": "salvage_auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/e9b94bebef444c9b8dd43cf2af4672bb_thb.jpg",
+    "vin": "WP0AD2A83MS******",
+    "lot_number": "53426766",
+    "sale_date": "2026-06-23T14:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.752178Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
   },
   {
     "source": "copart",
@@ -7525,7 +7707,7 @@
     "vin": "WP0BA2Y18NS******",
     "lot_number": "48619616",
     "sale_date": "2026-06-22T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982794Z",
+    "first_seen": "2026-06-21T13:12:08.752739Z",
     "raw": {
       "sf_csv": true
     },
@@ -7603,7 +7785,7 @@
     "vin": "WP1BA2AY2LD******",
     "lot_number": "56825746",
     "sale_date": "2026-06-24T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983726Z",
+    "first_seen": "2026-06-21T13:12:08.753644Z",
     "raw": {
       "sf_csv": true
     },
@@ -7630,32 +7812,6 @@
     "lot_number": null,
     "sale_date": null,
     "first_seen": "2026-05-20T04:20:49.887299Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "cars_and_bids",
-    "source_url": "https://carsandbids.com/auctions/92oBg74b/2014-porsche-911-carrera-coupe",
-    "listing_id": "2014-porsche-911-carrera-coupe",
-    "title": "2014 Porsche 911 Carrera Coupe",
-    "year": 2014,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 31000.0,
-    "mileage": null,
-    "location": "Encinitas, CA 92024",
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/a5cc277df6ef4101510a8b02c47d55db6d9cbb50/photos/Porsche911CarreraCoupe2014002.jpg?t=178032688742",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985826Z",
     "raw": {
       "sf_csv": true
     },
@@ -7766,6 +7922,32 @@
     "project_tier": "clean"
   },
   {
+    "source": "cars_and_bids",
+    "source_url": "https://carsandbids.com/auctions/92oBg74b/2014-porsche-911-carrera-coupe",
+    "listing_id": "2014-porsche-911-carrera-coupe",
+    "title": "2014 Porsche 911 Carrera Coupe",
+    "year": 2014,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 31500.0,
+    "mileage": null,
+    "location": "Encinitas, CA 92024",
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/a5cc277df6ef4101510a8b02c47d55db6d9cbb50/photos/Porsche911CarreraCoupe2014002.jpg?t=178032688742",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.755542Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
     "source": "cars_com",
     "source_url": "https://www.cars.com/vehicledetail/6cf203ec-fe27-4d7e-b8f8-8de565216c40/",
     "listing_id": "WP0CA2A82EK120212",
@@ -7837,7 +8019,7 @@
     "vin": "WP0CA2A85JS210156",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.979119Z",
+    "first_seen": "2026-06-21T13:12:08.749394Z",
     "raw": {
       "sf_csv": true
     },
@@ -7915,7 +8097,7 @@
     "vin": "WP1BE2AY8ND******",
     "lot_number": "56307576",
     "sale_date": "2026-06-23T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983370Z",
+    "first_seen": "2026-06-21T13:12:08.753288Z",
     "raw": {
       "sf_csv": true
     },
@@ -7967,7 +8149,7 @@
     "vin": "WP1BA2AY2MD******",
     "lot_number": "58120416",
     "sale_date": "2026-06-24T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983705Z",
+    "first_seen": "2026-06-21T13:12:08.753615Z",
     "raw": {
       "sf_csv": true
     },
@@ -7993,7 +8175,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985876Z",
+    "first_seen": "2026-06-21T13:12:08.755590Z",
     "raw": {
       "sf_csv": true
     },
@@ -8045,7 +8227,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.980332Z",
+    "first_seen": "2026-06-21T13:12:08.750405Z",
     "raw": {
       "sf_csv": true
     },
@@ -8097,7 +8279,7 @@
     "vin": "WP0AA2A86GK171528",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.979095Z",
+    "first_seen": "2026-06-21T13:12:08.749368Z",
     "raw": {
       "sf_csv": true
     },
@@ -8282,32 +8464,6 @@
     "lot_number": null,
     "sale_date": null,
     "first_seen": "2026-05-19T12:01:21.110649Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "cars_and_bids",
-    "source_url": "https://carsandbids.com/auctions/9aQ4gRvP/2024-porsche-718-boxster-style-edition",
-    "listing_id": "2024-porsche-718-boxster-style-edition",
-    "title": "2024 Porsche 718 Boxster Style Edition",
-    "year": 2024,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 37786.0,
-    "mileage": null,
-    "location": "Cocoa Beach, FL 32931",
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/f51186f3a37942b3ae54fab02eb9bca29ea74102/photos/porscheboxster2024002.jpg?t=177990046287",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985867Z",
     "raw": {
       "sf_csv": true
     },
@@ -8643,7 +8799,7 @@
     "vin": "WP0CA2A93MS******",
     "lot_number": "51148266",
     "sale_date": "2026-06-22T19:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981699Z",
+    "first_seen": "2026-06-21T13:12:08.751701Z",
     "raw": {
       "sf_csv": true
     },
@@ -8728,6 +8884,32 @@
     "project_tier": "clean"
   },
   {
+    "source": "cars_and_bids",
+    "source_url": "https://carsandbids.com/auctions/9aQ4gRvP/2024-porsche-718-boxster-style-edition",
+    "listing_id": "2024-porsche-718-boxster-style-edition",
+    "title": "2024 Porsche 718 Boxster Style Edition",
+    "year": 2024,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 40000.0,
+    "mileage": null,
+    "location": "Cocoa Beach, FL 32931",
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/f51186f3a37942b3ae54fab02eb9bca29ea74102/photos/porscheboxster2024002.jpg?t=177990046287",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.755579Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
     "source": "bring_a_trailer",
     "source_url": "https://bringatrailer.com/listing/2017-porsche-718-cayman-s-9/",
     "listing_id": "2017-porsche-718-cayman-s-9",
@@ -8799,7 +8981,7 @@
     "vin": "WP0CA2A82EK120209",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.979006Z",
+    "first_seen": "2026-06-21T13:12:08.749346Z",
     "raw": {
       "sf_csv": true
     },
@@ -9509,7 +9691,7 @@
     "vin": "WP1BA2AY6PD******",
     "lot_number": "55097076",
     "sale_date": "2026-06-24T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983756Z",
+    "first_seen": "2026-06-21T13:12:08.753662Z",
     "raw": {
       "sf_csv": true
     },
@@ -9531,11 +9713,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://platform.cstatic-images.com/in/v2/8025e65d-c07b-590c-8758-52ae7969e01a/DGNg5SI0i45WViSY3OqcBW/6WP-hlKYJOufjoQJIowNcg_wHu4.jpg",
+    "photo_url": "https://platform.cstatic-images.com/in/v2/8025e65d-c07b-590c-8758-52ae7969e01a/5f17010d-03f7-481d-b81f-80cdb6d607b1/6WP-hlKYJOufjoQJIowNcg_wHu4.jpg",
     "vin": "WP0CB2A86ES140587",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.978548Z",
+    "first_seen": "2026-06-21T13:12:08.749151Z",
     "raw": {
       "sf_csv": true
     },
@@ -9776,6 +9958,32 @@
     "project_tier": "clean"
   },
   {
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2020-porsche-cayenne-turbo-15/",
+    "listing_id": "2020-porsche-cayenne-turbo-15",
+    "title": "2020 Porsche Cayenne Turbo",
+    "year": 2020,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 50000.0,
+    "mileage": 40000,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/DSC_2662-copy-2026-06-04-qtj-03316-scaled.jpg?resize=470%2C318",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.751286Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
     "source": "cars_com",
     "source_url": "https://www.cars.com/vehicledetail/e6878a83-9cd5-4ca5-a7ad-3db89bbddcf8/",
     "listing_id": "WP0AA2A87EK170448",
@@ -9899,7 +10107,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.981132Z",
+    "first_seen": "2026-06-21T13:12:08.751133Z",
     "raw": {
       "sf_csv": true
     },
@@ -10062,32 +10270,6 @@
     "project_tier": "clean"
   },
   {
-    "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2019-porsche-911-carrera-t-26/",
-    "listing_id": "2019-porsche-911-carrera-t-26",
-    "title": "13k-Mile 2019 Porsche 911 Carrera T 7-Speed",
-    "year": 2019,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 55000.0,
-    "mileage": null,
-    "location": null,
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/05/2019_porsche_911-carrera-t_2019_porsche_911-carrera-t_2097568a-23e6-48ef-80be-76dff66c845d-ImWQgg-19531-19532-scaled.jpg?resize=470%2C318",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.981323Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
     "source": "cars_and_bids",
     "source_url": "https://carsandbids.com/auctions/3O7wmym6/2015-porsche-911-carrera-4s-cabriolet",
     "listing_id": "2015-porsche-911-carrera-4s-cabriolet",
@@ -10140,30 +10322,56 @@
     "project_tier": "clean"
   },
   {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/50114366",
-    "listing_id": "WP0AB2A99SS******",
-    "title": "2025 Porsche 911 CARRERA GTS",
-    "year": 2025,
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/7ebdc97d-9bf1-43c4-b627-b6e873ee4c3c/",
+    "listing_id": "WP0AA2A8XMS260160",
+    "title": "2021 Porsche 718 Cayman",
+    "year": 2021,
     "make": "Porsche",
-    "model": "911",
-    "trim": "CARRERA GTS",
-    "price_usd": null,
-    "current_bid_usd": 55500.0,
-    "mileage": 3736,
-    "location": "OR - PORTLAND SOUTH",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
+    "model": "718 Cayman",
+    "trim": null,
+    "price_usd": 55998.0,
+    "current_bid_usd": null,
+    "mileage": 38676,
+    "location": "28227",
+    "seller_type": "dealer",
+    "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/7776b4dc2575441f857eb748525dfa67_thb.jpg",
-    "vin": "WP0AB2A99SS******",
-    "lot_number": "50114366",
-    "sale_date": "2026-07-23T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981817Z",
+    "photo_url": "https://platform.cstatic-images.com/in/v2/28ef1488-e2f6-5542-a542-bb76e0ee5195/a9bca778-d12c-4fc2-b813-80c306a0ff81/UQ3OwOsywHDcZM19mxp1ruAt2No.jpg",
+    "vin": "WP0AA2A8XMS260160",
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.749661Z",
     "raw": {
       "sf_csv": true
     },
-    "project_tier": "salvage"
+    "project_tier": "clean"
+  },
+  {
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2019-porsche-911-carrera-t-26/",
+    "listing_id": "2019-porsche-911-carrera-t-26",
+    "title": "13k-Mile 2019 Porsche 911 Carrera T 7-Speed",
+    "year": 2019,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 56000.0,
+    "mileage": null,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/05/2019_porsche_911-carrera-t_2019_porsche_911-carrera-t_2097568a-23e6-48ef-80be-76dff66c845d-ImWQgg-19531-19532-scaled.jpg?resize=470%2C318",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.751314Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
   },
   {
     "source": "cars_and_bids",
@@ -10400,6 +10608,32 @@
     "project_tier": "clean"
   },
   {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/fbfca5b7-8701-47ee-b958-e52e2b3a7630/",
+    "listing_id": "WP0AA2A87KS260078",
+    "title": "2019 Porsche 718 Cayman Coupe",
+    "year": 2019,
+    "make": "Porsche",
+    "model": "718 Cayman",
+    "trim": "Coupe",
+    "price_usd": 60179.0,
+    "current_bid_usd": null,
+    "mileage": 16573,
+    "location": "30305",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/449c10ed-5ec4-4a40-954c-876ec8a2efe1/f2458100-4627-419f-b002-7930154031c2/p0qFb2_Mm0kePD89fuHVVrQLgbE.jpg",
+    "vin": "WP0AA2A87KS260078",
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.749583Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
     "source": "copart",
     "source_url": "https://www.copart.com/lot/46928596",
     "listing_id": "WP0AC2A91ES******",
@@ -10528,6 +10762,32 @@
       "sf_csv": true
     },
     "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/50114366",
+    "listing_id": "WP0AB2A99SS******",
+    "title": "2025 Porsche 911 CARRERA GTS",
+    "year": 2025,
+    "make": "Porsche",
+    "model": "911",
+    "trim": "CARRERA GTS",
+    "price_usd": null,
+    "current_bid_usd": 61000.0,
+    "mileage": 3736,
+    "location": "OR - PORTLAND SOUTH",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/7776b4dc2575441f857eb748525dfa67_thb.jpg",
+    "vin": "WP0AB2A99SS******",
+    "lot_number": "50114366",
+    "sale_date": "2026-07-23T17:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.751814Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "salvage"
   },
   {
     "source": "cars_com",
@@ -10972,32 +11232,6 @@
     "project_tier": "clean"
   },
   {
-    "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2018-porsche-911-carrera-s-coupe-9/",
-    "listing_id": "2018-porsche-911-carrera-s-coupe-9",
-    "title": "13k-Mile 2018 Porsche 911 Carrera S Coupe",
-    "year": 2018,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 72000.0,
-    "mileage": 13000,
-    "location": null,
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/03/2018_porsche_911-carrera-s-coupe_2018_porsche_911-carrera-s-coupe_bd8215b9-1173-4693-ade6-87da68cb725d-rKcVdJ-43108-43109-scaled.jpg?resize=470%2C318",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.980963Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
     "source": "cars_com",
     "source_url": "https://www.cars.com/vehicledetail/683e37b7-b24a-4471-849a-f7c75c618740/",
     "listing_id": "WP0CB2A86JS228887",
@@ -11017,7 +11251,33 @@
     "vin": "WP0CB2A86JS228887",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.979142Z",
+    "first_seen": "2026-06-21T13:12:08.749427Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2018-porsche-911-carrera-s-coupe-9/",
+    "listing_id": "2018-porsche-911-carrera-s-coupe-9",
+    "title": "13k-Mile 2018 Porsche 911 Carrera S Coupe",
+    "year": 2018,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 72500.0,
+    "mileage": 13000,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/03/2018_porsche_911-carrera-s-coupe_2018_porsche_911-carrera-s-coupe_bd8215b9-1173-4693-ade6-87da68cb725d-rKcVdJ-43108-43109-scaled.jpg?resize=470%2C318",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.750996Z",
     "raw": {
       "sf_csv": true
     },
@@ -11173,7 +11433,7 @@
     "vin": "WP0AF2A99KS******",
     "lot_number": "93473775",
     "sale_date": "2025-11-17T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981828Z",
+    "first_seen": "2026-06-21T13:12:08.751823Z",
     "raw": {
       "sf_csv": true
     },
@@ -11199,33 +11459,7 @@
     "vin": "WP0CA2A95GS141356",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.979513Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "cars_and_bids",
-    "source_url": "https://carsandbids.com/auctions/3gG0JgLo/2022-porsche-911-carrera-cabriolet",
-    "listing_id": "2022-porsche-911-carrera-cabriolet",
-    "title": "2022 Porsche 911 Carrera Cabriolet",
-    "year": 2022,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 78500.0,
-    "mileage": null,
-    "location": "Los Altos, CA 94024",
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/1477bbe21e8d6b5e719c7c3ccab577fd47dd8cc3/photos/Porsche911Type9922022002/edit/YE0AH.jpg?t=178150705655",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985887Z",
+    "first_seen": "2026-06-21T13:12:08.749692Z",
     "raw": {
       "sf_csv": true
     },
@@ -11311,32 +11545,6 @@
   },
   {
     "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2014-porsche-911-gt3-48/",
-    "listing_id": "2014-porsche-911-gt3-48",
-    "title": "3k-Mile 2014 Porsche 911 GT3",
-    "year": 2014,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 80000.0,
-    "mileage": 3000,
-    "location": null,
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/IV5A3016-14808-scaled.jpg?resize=470%2C318",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.981191Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "bring_a_trailer",
     "source_url": "https://bringatrailer.com/listing/2014-porsche-911-carrera-4-coupe-2/",
     "listing_id": "2014-porsche-911-carrera-4-coupe-2",
     "title": "One-Owner 2014 Porsche 911 Carrera 4 Coupe 7-Speed",
@@ -11408,6 +11616,32 @@
     "lot_number": null,
     "sale_date": null,
     "first_seen": "2026-05-15T11:19:04.209581Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2014-porsche-911-gt3-48/",
+    "listing_id": "2014-porsche-911-gt3-48",
+    "title": "3k-Mile 2014 Porsche 911 GT3",
+    "year": 2014,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 80500.0,
+    "mileage": 3000,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/IV5A3016-14808-scaled.jpg?resize=470%2C318",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.751191Z",
     "raw": {
       "sf_csv": true
     },
@@ -11492,56 +11726,30 @@
     "project_tier": "clean"
   },
   {
-    "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2020-porsche-911-carrera-s-coupe-47/",
-    "listing_id": "2020-porsche-911-carrera-s-coupe-47",
-    "title": "2020 Porsche 911 Carrera S Coupe",
-    "year": 2020,
+    "source": "cars_and_bids",
+    "source_url": "https://carsandbids.com/auctions/3gG0JgLo/2022-porsche-911-carrera-cabriolet",
+    "listing_id": "2022-porsche-911-carrera-cabriolet",
+    "title": "2022 Porsche 911 Carrera Cabriolet",
+    "year": 2022,
     "make": "Porsche",
     "model": null,
     "trim": null,
     "price_usd": null,
-    "current_bid_usd": 82992.0,
+    "current_bid_usd": 85000.0,
     "mileage": null,
-    "location": null,
+    "location": "Los Altos, CA 94024",
     "seller_type": "auction",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/05/2020_porsche_911-carrera-s-coupe_2020_porsche_911-carrera-s-coupe_2c638802-788e-4339-a0b9-acac5c04982f-Nw6B6Y-58650-58651-scaled-1-copy-2026-06-11-q5h-81734-scaled.jpg?resize=470%2C318",
+    "photo_url": "https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/1477bbe21e8d6b5e719c7c3ccab577fd47dd8cc3/photos/Porsche911Type9922022002/edit/YE0AH.jpg?t=178150705655",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.980146Z",
+    "first_seen": "2026-06-21T13:12:08.755598Z",
     "raw": {
       "sf_csv": true
     },
     "project_tier": "clean"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/51893216",
-    "listing_id": "WP0BH2A99TS******",
-    "title": "2026 Porsche 911 TARGA 4S",
-    "year": 2026,
-    "make": "Porsche",
-    "model": "911",
-    "trim": "TARGA 4S",
-    "price_usd": null,
-    "current_bid_usd": 85500.0,
-    "mileage": 1,
-    "location": "CA - LONG BEACH",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/e4b19c989f974f4284250d23749fb9a4_thb.jpg",
-    "vin": "WP0BH2A99TS******",
-    "lot_number": "51893216",
-    "sale_date": "2026-06-25T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981767Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "salvage"
   },
   {
     "source": "bring_a_trailer",
@@ -11570,6 +11778,58 @@
     "project_tier": "clean"
   },
   {
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2020-porsche-911-carrera-s-coupe-47/",
+    "listing_id": "2020-porsche-911-carrera-s-coupe-47",
+    "title": "2020 Porsche 911 Carrera S Coupe",
+    "year": 2020,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 85991.0,
+    "mileage": null,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/05/2020_porsche_911-carrera-s-coupe_2020_porsche_911-carrera-s-coupe_2c638802-788e-4339-a0b9-acac5c04982f-Nw6B6Y-58650-58651-scaled-1-copy-2026-06-11-q5h-81734-scaled.jpg?resize=470%2C318",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.750253Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/51893216",
+    "listing_id": "WP0BH2A99TS******",
+    "title": "2026 Porsche 911 TARGA 4S",
+    "year": 2026,
+    "make": "Porsche",
+    "model": "911",
+    "trim": "TARGA 4S",
+    "price_usd": null,
+    "current_bid_usd": 86000.0,
+    "mileage": 1,
+    "location": "CA - LONG BEACH",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/e4b19c989f974f4284250d23749fb9a4_thb.jpg",
+    "vin": "WP0BH2A99TS******",
+    "lot_number": "51893216",
+    "sale_date": "2026-06-25T17:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.751767Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "salvage"
+  },
+  {
     "source": "cars_and_bids",
     "source_url": "https://carsandbids.com/auctions/rMLxv2YL/2018-porsche-911-carrera-s-coupe",
     "listing_id": "2018-porsche-911-carrera-s-coupe",
@@ -11589,7 +11849,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985856Z",
+    "first_seen": "2026-06-21T13:12:08.755570Z",
     "raw": {
       "sf_csv": true
     },
@@ -11719,7 +11979,7 @@
     "vin": "WP0CA2A98HS141319",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.979489Z",
+    "first_seen": "2026-06-21T13:12:08.749682Z",
     "raw": {
       "sf_csv": true
     },
@@ -11745,7 +12005,7 @@
     "vin": "WP0AD2A91JS******",
     "lot_number": "53832186",
     "sale_date": "2026-06-24T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981740Z",
+    "first_seen": "2026-06-21T13:12:08.751741Z",
     "raw": {
       "sf_csv": true
     },
@@ -11760,7 +12020,7 @@
     "make": "Porsche",
     "model": "911",
     "trim": "Carrera",
-    "price_usd": 97444.0,
+    "price_usd": 96777.0,
     "current_bid_usd": null,
     "mileage": 31454,
     "location": "28078",
@@ -11771,7 +12031,7 @@
     "vin": "WP0AA2A95JS105200",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.979558Z",
+    "first_seen": "2026-06-21T13:12:08.749720Z",
     "raw": {
       "sf_csv": true
     },
@@ -11953,7 +12213,7 @@
     "vin": "WP0CD2A95RS******",
     "lot_number": "55202316",
     "sale_date": "2026-06-22T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981680Z",
+    "first_seen": "2026-06-21T13:12:08.751683Z",
     "raw": {
       "sf_csv": true
     },
@@ -12083,7 +12343,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.980361Z",
+    "first_seen": "2026-06-21T13:12:08.750441Z",
     "raw": {
       "sf_csv": true
     },
@@ -12195,32 +12455,6 @@
   },
   {
     "source": "cars_and_bids",
-    "source_url": "https://carsandbids.com/auctions/3ojlO54w/2015-porsche-911-gt3",
-    "listing_id": "2015-porsche-911-gt3",
-    "title": "2015 Porsche 911 GT3",
-    "year": 2015,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 107500.0,
-    "mileage": 24000,
-    "location": "McKinney, TX 75072",
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/b0c6c1410477e2fd1777909047289247f8fdc5d6/photos/Porsche911GT32015008.jpg?t=178102193447",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985813Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "cars_and_bids",
     "source_url": "https://carsandbids.com/auctions/98dyXOwd/2023-porsche-911-carrera-s-coupe",
     "listing_id": "2023-porsche-911-carrera-s-coupe",
     "title": "2023 Porsche 911 Carrera S Coupe",
@@ -12239,7 +12473,33 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985929Z",
+    "first_seen": "2026-06-21T13:12:08.755640Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/7db0223f-10ed-44c2-9d27-91ec262f2dc8/",
+    "listing_id": "WP0CB2A81SK226448",
+    "title": "2025 Porsche 718 Boxster S",
+    "year": 2025,
+    "make": "Porsche",
+    "model": "718 Boxster",
+    "trim": "S",
+    "price_usd": 109671.0,
+    "current_bid_usd": null,
+    "mileage": 1899,
+    "location": "29607",
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/f553cd2b-ce78-4cf9-9a8e-8ba9896f9ac7/b822ebc5-7ce8-4aa0-bd72-afc3aa0b15c9/QucxIr-PYPdRsLjWJez-x2_KbTA.jpg",
+    "vin": "WP0CB2A81SK226448",
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.749437Z",
     "raw": {
       "sf_csv": true
     },
@@ -12376,32 +12636,6 @@
     "project_tier": "clean"
   },
   {
-    "source": "cars_com",
-    "source_url": "https://www.cars.com/vehicledetail/7db0223f-10ed-44c2-9d27-91ec262f2dc8/",
-    "listing_id": "WP0CB2A81SK226448",
-    "title": "2025 Porsche 718 Boxster S",
-    "year": 2025,
-    "make": "Porsche",
-    "model": "718 Boxster",
-    "trim": "S",
-    "price_usd": 110498.0,
-    "current_bid_usd": null,
-    "mileage": 1899,
-    "location": "29607",
-    "seller_type": "dealer",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://platform.cstatic-images.com/in/v2/f553cd2b-ce78-4cf9-9a8e-8ba9896f9ac7/b822ebc5-7ce8-4aa0-bd72-afc3aa0b15c9/QucxIr-PYPdRsLjWJez-x2_KbTA.jpg",
-    "vin": "WP0CB2A81SK226448",
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.979153Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
     "source": "bring_a_trailer",
     "source_url": "https://bringatrailer.com/listing/2023-porsche-911-carrera-t-coupe-20/",
     "listing_id": "2023-porsche-911-carrera-t-coupe-20",
@@ -12421,33 +12655,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.980421Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2019-porsche-911-turbo-s-coupe-36/",
-    "listing_id": "2019-porsche-911-turbo-s-coupe-36",
-    "title": "4,400-Mile 2019 Porsche 911 Turbo S Coupe",
-    "year": 2019,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 111000.0,
-    "mileage": null,
-    "location": null,
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/2019_porsche_911-turbo-s-coupe_IMG_1937-97612-scaled-1-copy-2026-06-15-3gp-57343-scaled.jpeg?resize=470%2C318",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.980929Z",
+    "first_seen": "2026-06-21T13:12:08.750494Z",
     "raw": {
       "sf_csv": true
     },
@@ -12473,7 +12681,7 @@
     "vin": "WP0CD2A85PS216507",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.979308Z",
+    "first_seen": "2026-06-21T13:12:08.749573Z",
     "raw": {
       "sf_csv": true
     },
@@ -12525,7 +12733,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.980861Z",
+    "first_seen": "2026-06-21T13:12:08.750646Z",
     "raw": {
       "sf_csv": true
     },
@@ -12636,26 +12844,26 @@
     "project_tier": "clean"
   },
   {
-    "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2021-porsche-911-targa-4s-48/",
-    "listing_id": "2021-porsche-911-targa-4s-48",
-    "title": "Nato Olive 2021 Porsche 911 Targa 4S Heritage Design Edition",
-    "year": 2021,
+    "source": "cars_and_bids",
+    "source_url": "https://carsandbids.com/auctions/3ojlO54w/2015-porsche-911-gt3",
+    "listing_id": "2015-porsche-911-gt3",
+    "title": "2015 Porsche 911 GT3",
+    "year": 2015,
     "make": "Porsche",
     "model": null,
     "trim": null,
     "price_usd": null,
-    "current_bid_usd": 121500.0,
-    "mileage": null,
-    "location": null,
+    "current_bid_usd": 122000.0,
+    "mileage": 24000,
+    "location": "McKinney, TX 75072",
     "seller_type": "auction",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/IMG-3260-87604-scaled.jpg?resize=470%2C318",
+    "photo_url": "https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/b0c6c1410477e2fd1777909047289247f8fdc5d6/photos/Porsche911GT32015008.jpg?t=178102193447",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.980384Z",
+    "first_seen": "2026-06-21T13:12:08.755532Z",
     "raw": {
       "sf_csv": true
     },
@@ -12734,6 +12942,32 @@
     "lot_number": null,
     "sale_date": null,
     "first_seen": "2026-05-15T11:19:04.201482Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2019-porsche-911-turbo-s-coupe-36/",
+    "listing_id": "2019-porsche-911-turbo-s-coupe-36",
+    "title": "4,400-Mile 2019 Porsche 911 Turbo S Coupe",
+    "year": 2019,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 125000.0,
+    "mileage": null,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/2019_porsche_911-turbo-s-coupe_IMG_1937-97612-scaled-1-copy-2026-06-15-3gp-57343-scaled.jpeg?resize=470%2C318",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.750965Z",
     "raw": {
       "sf_csv": true
     },
@@ -12844,6 +13078,32 @@
     "project_tier": "clean"
   },
   {
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2021-porsche-911-targa-4s-48/",
+    "listing_id": "2021-porsche-911-targa-4s-48",
+    "title": "Nato Olive 2021 Porsche 911 Targa 4S Heritage Design Edition",
+    "year": 2021,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 130000.0,
+    "mileage": null,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/IMG-3260-87604-scaled.jpg?resize=470%2C318",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-06-21T13:12:08.750458Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
     "source": "cars_and_bids",
     "source_url": "https://carsandbids.com/auctions/KVWXAQZQ/2020-porsche-911-carrera-s-coupe",
     "listing_id": "2020-porsche-911-carrera-s-coupe",
@@ -12922,26 +13182,26 @@
     "project_tier": "clean"
   },
   {
-    "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2016-porsche-911-gt3-rs-112/",
-    "listing_id": "2016-porsche-911-gt3-rs-112",
-    "title": "Oryx White Metallic 5k-Mile 2016 Porsche 911 GT3 RS",
-    "year": 2016,
+    "source": "cars_com",
+    "source_url": "https://www.cars.com/vehicledetail/77243463-49c4-40f5-904b-091c3242a3ff/",
+    "listing_id": "WP0AD2A97ES167145",
+    "title": "2014 Porsche 911 Turbo S",
+    "year": 2014,
     "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 135000.0,
-    "mileage": null,
-    "location": null,
-    "seller_type": "auction",
+    "model": "911",
+    "trim": "Turbo S",
+    "price_usd": 135700.0,
+    "current_bid_usd": null,
+    "mileage": 80501,
+    "location": "29730",
+    "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/IMG_0012-copy-2026-06-11-7hr-41655-scaled.jpeg?resize=470%2C318",
-    "vin": null,
+    "photo_url": "https://platform.cstatic-images.com/in/v2/1f644210-1d14-4673-994e-c45198430b8c/c379d479-b77b-4bce-99f6-4944ab8ba5d1/UTYoPfgqShVm6YM0647-VQpwxFo.jpg",
+    "vin": "WP0AD2A97ES167145",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.980820Z",
+    "first_seen": "2026-06-21T13:12:08.749623Z",
     "raw": {
       "sf_csv": true
     },
@@ -13071,7 +13331,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.980160Z",
+    "first_seen": "2026-06-21T13:12:08.750262Z",
     "raw": {
       "sf_csv": true
     },
@@ -13175,7 +13435,7 @@
     "vin": "WP0AB2A90LS229164",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.979263Z",
+    "first_seen": "2026-06-21T13:12:08.749531Z",
     "raw": {
       "sf_csv": true
     },
@@ -13201,7 +13461,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.980341Z",
+    "first_seen": "2026-06-21T13:12:08.750422Z",
     "raw": {
       "sf_csv": true
     },
@@ -13253,7 +13513,7 @@
     "vin": "WP0AA2A91RS209100",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.979195Z",
+    "first_seen": "2026-06-21T13:12:08.749467Z",
     "raw": {
       "sf_csv": true
     },
@@ -13514,32 +13774,6 @@
     "lot_number": "78883825",
     "sale_date": "2026-05-14T17:00:00Z",
     "first_seen": "2026-05-14T18:45:10.925911Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2018-porsche-911-turbo-s-coupe-exclusive-series-14/",
-    "listing_id": "2018-porsche-911-turbo-s-coupe-exclusive-series-14",
-    "title": "1,400-Mile 2018 Porsche 911 Turbo S Coupe Exclusive Series",
-    "year": 2018,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 152000.0,
-    "mileage": 1400,
-    "location": null,
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/IV5A2647-76473-scaled.jpg?resize=470%2C318",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.981266Z",
     "raw": {
       "sf_csv": true
     },
@@ -13929,7 +14163,7 @@
     "vin": "WP0CB2A95RS246463",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.979273Z",
+    "first_seen": "2026-06-21T13:12:08.749549Z",
     "raw": {
       "sf_csv": true
     },
@@ -13955,7 +14189,7 @@
     "vin": "WP0BB2A92NS231179",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.979186Z",
+    "first_seen": "2026-06-21T13:12:08.749458Z",
     "raw": {
       "sf_csv": true
     },
@@ -14267,7 +14501,7 @@
     "vin": "WP0CA2A9XSS235810",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.979223Z",
+    "first_seen": "2026-06-21T13:12:08.749493Z",
     "raw": {
       "sf_csv": true
     },
@@ -14527,7 +14761,7 @@
     "vin": "WP0BB2A96RS234012",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.979463Z",
+    "first_seen": "2026-06-21T13:12:08.749651Z",
     "raw": {
       "sf_csv": true
     },
@@ -14631,7 +14865,7 @@
     "vin": "WP0AD2A98NS******",
     "lot_number": "78606545",
     "sale_date": "2026-06-22T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981689Z",
+    "first_seen": "2026-06-21T13:12:08.751692Z",
     "raw": {
       "sf_csv": true
     },
@@ -14657,7 +14891,7 @@
     "vin": "WP0CA2A94HS******",
     "lot_number": "49285266",
     "sale_date": "2026-06-23T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981709Z",
+    "first_seen": "2026-06-21T13:12:08.751711Z",
     "raw": {
       "sf_csv": true
     },
@@ -14683,7 +14917,7 @@
     "vin": "WP0AD2A92FS******",
     "lot_number": "74494825",
     "sale_date": "2026-06-23T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981720Z",
+    "first_seen": "2026-06-21T13:12:08.751721Z",
     "raw": {
       "sf_csv": true
     },
@@ -14709,7 +14943,7 @@
     "vin": "WP0AA2A97ES******",
     "lot_number": "58413336",
     "sale_date": "2026-06-23T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981731Z",
+    "first_seen": "2026-06-21T13:12:08.751732Z",
     "raw": {
       "sf_csv": true
     },
@@ -14735,7 +14969,7 @@
     "vin": "WP0CB2A9XLS******",
     "lot_number": "57359036",
     "sale_date": "2026-07-02T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981788Z",
+    "first_seen": "2026-06-21T13:12:08.751787Z",
     "raw": {
       "sf_csv": true
     },
@@ -14761,7 +14995,7 @@
     "vin": "WP0AB2A9XLS******",
     "lot_number": "50550656",
     "sale_date": "2026-07-15T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981797Z",
+    "first_seen": "2026-06-21T13:12:08.751797Z",
     "raw": {
       "sf_csv": true
     },
@@ -14787,7 +15021,7 @@
     "vin": "WP0CD2A95MS******",
     "lot_number": "78532565",
     "sale_date": "2026-02-19T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981839Z",
+    "first_seen": "2026-06-21T13:12:08.751833Z",
     "raw": {
       "sf_csv": true
     },
@@ -14813,7 +15047,7 @@
     "vin": "WP0AD2A99KS******",
     "lot_number": "78531825",
     "sale_date": "2026-02-19T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981848Z",
+    "first_seen": "2026-06-21T13:12:08.751841Z",
     "raw": {
       "sf_csv": true
     },
@@ -14839,7 +15073,7 @@
     "vin": "WP0CB2A95NS******",
     "lot_number": "78486915",
     "sale_date": "2026-02-19T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981857Z",
+    "first_seen": "2026-06-21T13:12:08.751850Z",
     "raw": {
       "sf_csv": true
     },
@@ -14865,7 +15099,7 @@
     "vin": "WP0AA2A90JS******",
     "lot_number": "72165475",
     "sale_date": "2026-01-06T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981865Z",
+    "first_seen": "2026-06-21T13:12:08.751857Z",
     "raw": {
       "sf_csv": true
     },
@@ -14891,7 +15125,7 @@
     "vin": "WP0AA2A91FS******",
     "lot_number": "58589703",
     "sale_date": "2023-06-30T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981875Z",
+    "first_seen": "2026-06-21T13:12:08.751868Z",
     "raw": {
       "sf_csv": true
     },
@@ -14917,7 +15151,7 @@
     "vin": "WP0AC2A93NS******",
     "lot_number": "58242566",
     "sale_date": "2026-06-18T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981885Z",
+    "first_seen": "2026-06-21T13:12:08.751878Z",
     "raw": {
       "sf_csv": true
     },
@@ -14943,7 +15177,7 @@
     "vin": "WP0AC2A94NS******",
     "lot_number": "57901506",
     "sale_date": "2026-06-16T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981894Z",
+    "first_seen": "2026-06-21T13:12:08.751887Z",
     "raw": {
       "sf_csv": true
     },
@@ -14969,7 +15203,7 @@
     "vin": "WP0AB2A91LS******",
     "lot_number": "57673186",
     "sale_date": "2026-06-15T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981904Z",
+    "first_seen": "2026-06-21T13:12:08.751896Z",
     "raw": {
       "sf_csv": true
     },
@@ -14995,7 +15229,7 @@
     "vin": "WP0CB2A9XJS******",
     "lot_number": "57655096",
     "sale_date": "2026-06-15T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981913Z",
+    "first_seen": "2026-06-21T13:12:08.751904Z",
     "raw": {
       "sf_csv": true
     },
@@ -15021,7 +15255,7 @@
     "vin": "WP0AB2A91RS******",
     "lot_number": "57533996",
     "sale_date": "2026-06-12T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981921Z",
+    "first_seen": "2026-06-21T13:12:08.751912Z",
     "raw": {
       "sf_csv": true
     },
@@ -15047,7 +15281,7 @@
     "vin": "WP0AD2A99HS******",
     "lot_number": "57018836",
     "sale_date": "2026-06-09T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981930Z",
+    "first_seen": "2026-06-21T13:12:08.751921Z",
     "raw": {
       "sf_csv": true
     },
@@ -15073,7 +15307,7 @@
     "vin": "WP0BB2A91FS******",
     "lot_number": "56461836",
     "sale_date": "2026-06-04T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981939Z",
+    "first_seen": "2026-06-21T13:12:08.751929Z",
     "raw": {
       "sf_csv": true
     },
@@ -15099,7 +15333,7 @@
     "vin": "WP0AA2A94MS******",
     "lot_number": "56407766",
     "sale_date": "2026-06-04T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981948Z",
+    "first_seen": "2026-06-21T13:12:08.751939Z",
     "raw": {
       "sf_csv": true
     },
@@ -15125,7 +15359,7 @@
     "vin": "WP0AD2A92TS******",
     "lot_number": "56353716",
     "sale_date": "2026-06-03T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981967Z",
+    "first_seen": "2026-06-21T13:12:08.751956Z",
     "raw": {
       "sf_csv": true
     },
@@ -15151,7 +15385,7 @@
     "vin": "WP0CA2A98NS******",
     "lot_number": "56286586",
     "sale_date": "2026-06-03T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981976Z",
+    "first_seen": "2026-06-21T13:12:08.751966Z",
     "raw": {
       "sf_csv": true
     },
@@ -15177,7 +15411,7 @@
     "vin": "WP0AD2A99MS******",
     "lot_number": "56257326",
     "sale_date": "2026-06-03T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981987Z",
+    "first_seen": "2026-06-21T13:12:08.751974Z",
     "raw": {
       "sf_csv": true
     },
@@ -15203,7 +15437,7 @@
     "vin": "WP0AH2A95SS******",
     "lot_number": "56101996",
     "sale_date": "2026-06-02T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.981997Z",
+    "first_seen": "2026-06-21T13:12:08.751983Z",
     "raw": {
       "sf_csv": true
     },
@@ -15229,7 +15463,7 @@
     "vin": "WP0AA2A96KS******",
     "lot_number": "56036816",
     "sale_date": "2026-06-02T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982007Z",
+    "first_seen": "2026-06-21T13:12:08.751991Z",
     "raw": {
       "sf_csv": true
     },
@@ -15255,7 +15489,7 @@
     "vin": "WP0AB2A9XTS******",
     "lot_number": "55746966",
     "sale_date": "2026-05-29T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982015Z",
+    "first_seen": "2026-06-21T13:12:08.751999Z",
     "raw": {
       "sf_csv": true
     },
@@ -15281,7 +15515,7 @@
     "vin": "WP0AC2A92SS******",
     "lot_number": "55642606",
     "sale_date": "2026-05-28T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982028Z",
+    "first_seen": "2026-06-21T13:12:08.752007Z",
     "raw": {
       "sf_csv": true
     },
@@ -15307,7 +15541,7 @@
     "vin": "WP0AB2A9XKS******",
     "lot_number": "55552486",
     "sale_date": "2026-05-28T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982039Z",
+    "first_seen": "2026-06-21T13:12:08.752017Z",
     "raw": {
       "sf_csv": true
     },
@@ -15333,7 +15567,7 @@
     "vin": "WP0AA2A91HS******",
     "lot_number": "55138086",
     "sale_date": "2026-05-26T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982051Z",
+    "first_seen": "2026-06-21T13:12:08.752026Z",
     "raw": {
       "sf_csv": true
     },
@@ -15359,7 +15593,33 @@
     "vin": "WP0AA2A91ES******",
     "lot_number": "54815256",
     "sale_date": "2026-05-21T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982061Z",
+    "first_seen": "2026-06-21T13:12:08.752036Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/54718296",
+    "listing_id": "WP0AB2A99TS******",
+    "title": "2026 Porsche 911",
+    "year": 2026,
+    "make": "Porsche",
+    "model": "911",
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": null,
+    "mileage": null,
+    "location": "CA - SAN DIEGO",
+    "seller_type": "salvage_auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/567980cac6f74159977ced0a71c10501_thb.jpg",
+    "vin": "WP0AB2A99TS******",
+    "lot_number": "54718296",
+    "sale_date": "2026-05-20T07:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.752044Z",
     "raw": {
       "sf_csv": true
     },
@@ -15385,7 +15645,7 @@
     "vin": "WP0AB2A94NS******",
     "lot_number": "54455496",
     "sale_date": "2026-05-19T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982071Z",
+    "first_seen": "2026-06-21T13:12:08.752052Z",
     "raw": {
       "sf_csv": true
     },
@@ -15411,7 +15671,7 @@
     "vin": "WP0AA2A91HS******",
     "lot_number": "53140046",
     "sale_date": "2026-05-11T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982082Z",
+    "first_seen": "2026-06-21T13:12:08.752061Z",
     "raw": {
       "sf_csv": true
     },
@@ -15437,7 +15697,7 @@
     "vin": "WP0CB2A91LS******",
     "lot_number": "52895476",
     "sale_date": "2026-05-06T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982091Z",
+    "first_seen": "2026-06-21T13:12:08.752070Z",
     "raw": {
       "sf_csv": true
     },
@@ -15463,7 +15723,7 @@
     "vin": "WP0AD2A96ES******",
     "lot_number": "52337276",
     "sale_date": "2026-05-01T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982101Z",
+    "first_seen": "2026-06-21T13:12:08.752079Z",
     "raw": {
       "sf_csv": true
     },
@@ -15489,7 +15749,7 @@
     "vin": "WP0CA2A90HS******",
     "lot_number": "51824886",
     "sale_date": "2026-04-28T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982110Z",
+    "first_seen": "2026-06-21T13:12:08.752089Z",
     "raw": {
       "sf_csv": true
     },
@@ -15515,7 +15775,7 @@
     "vin": "WP0AB2A97HS******",
     "lot_number": "51715562",
     "sale_date": "2022-07-06T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982121Z",
+    "first_seen": "2026-06-21T13:12:08.752097Z",
     "raw": {
       "sf_csv": true
     },
@@ -15541,7 +15801,7 @@
     "vin": "WP0AD2A92PS******",
     "lot_number": "49948296",
     "sale_date": "2026-04-13T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982129Z",
+    "first_seen": "2026-06-21T13:12:08.752106Z",
     "raw": {
       "sf_csv": true
     },
@@ -15567,7 +15827,7 @@
     "vin": "WP0AH2A92SS******",
     "lot_number": "48666576",
     "sale_date": "2026-04-01T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982138Z",
+    "first_seen": "2026-06-21T13:12:08.752114Z",
     "raw": {
       "sf_csv": true
     },
@@ -15593,7 +15853,7 @@
     "vin": "WP0AH2A9XSS******",
     "lot_number": "47946096",
     "sale_date": "2026-03-26T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982149Z",
+    "first_seen": "2026-06-21T13:12:08.752122Z",
     "raw": {
       "sf_csv": true
     },
@@ -15619,7 +15879,7 @@
     "vin": "WP0CA2A90HS******",
     "lot_number": "46372396",
     "sale_date": "2026-03-13T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982158Z",
+    "first_seen": "2026-06-21T13:12:08.752131Z",
     "raw": {
       "sf_csv": true
     },
@@ -15645,7 +15905,7 @@
     "vin": "WP0AH2A93TS******",
     "lot_number": "46194766",
     "sale_date": "2026-03-12T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982168Z",
+    "first_seen": "2026-06-21T13:12:08.752139Z",
     "raw": {
       "sf_csv": true
     },
@@ -15671,7 +15931,7 @@
     "vin": "WP0AC2A93JS******",
     "lot_number": "41955756",
     "sale_date": "2026-03-05T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982177Z",
+    "first_seen": "2026-06-21T13:12:08.752151Z",
     "raw": {
       "sf_csv": true
     },
@@ -15697,7 +15957,7 @@
     "vin": "WP0CA2A96RS******",
     "lot_number": "79409325",
     "sale_date": "2026-02-26T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982186Z",
+    "first_seen": "2026-06-21T13:12:08.752159Z",
     "raw": {
       "sf_csv": true
     },
@@ -15723,7 +15983,7 @@
     "vin": "WP0AA2A87JS******",
     "lot_number": "55221786",
     "sale_date": "2026-06-30T13:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982238Z",
+    "first_seen": "2026-06-21T13:12:08.752206Z",
     "raw": {
       "sf_csv": true
     },
@@ -15749,7 +16009,7 @@
     "vin": "WP0AD2A81SK******",
     "lot_number": "58125496",
     "sale_date": "2026-06-17T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982474Z",
+    "first_seen": "2026-06-21T13:12:08.752432Z",
     "raw": {
       "sf_csv": true
     },
@@ -15775,7 +16035,7 @@
     "vin": "WP0AA2A84RK******",
     "lot_number": "57877536",
     "sale_date": "2026-06-16T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982485Z",
+    "first_seen": "2026-06-21T13:12:08.752441Z",
     "raw": {
       "sf_csv": true
     },
@@ -15801,7 +16061,7 @@
     "vin": "WP0AA2A85JK******",
     "lot_number": "57442366",
     "sale_date": "2026-06-15T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982495Z",
+    "first_seen": "2026-06-21T13:12:08.752450Z",
     "raw": {
       "sf_csv": true
     },
@@ -15827,7 +16087,7 @@
     "vin": "WP0AA2A80RK******",
     "lot_number": "57382046",
     "sale_date": "2026-06-11T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982506Z",
+    "first_seen": "2026-06-21T13:12:08.752459Z",
     "raw": {
       "sf_csv": true
     },
@@ -15853,7 +16113,7 @@
     "vin": "WP0AA2A88FK******",
     "lot_number": "56594446",
     "sale_date": "2026-06-05T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982515Z",
+    "first_seen": "2026-06-21T13:12:08.752467Z",
     "raw": {
       "sf_csv": true
     },
@@ -15879,7 +16139,7 @@
     "vin": "WP0AC2A82GK******",
     "lot_number": "56549196",
     "sale_date": "2026-06-08T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982524Z",
+    "first_seen": "2026-06-21T13:12:08.752476Z",
     "raw": {
       "sf_csv": true
     },
@@ -15905,7 +16165,7 @@
     "vin": "WP0AB2A83RK******",
     "lot_number": "55176386",
     "sale_date": "2026-05-26T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982534Z",
+    "first_seen": "2026-06-21T13:12:08.752486Z",
     "raw": {
       "sf_csv": true
     },
@@ -15931,7 +16191,7 @@
     "vin": "WP0AA2A89EK******",
     "lot_number": "55113066",
     "sale_date": "2026-05-25T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982543Z",
+    "first_seen": "2026-06-21T13:12:08.752495Z",
     "raw": {
       "sf_csv": true
     },
@@ -15957,7 +16217,7 @@
     "vin": "WP0AA2A85GK******",
     "lot_number": "54754626",
     "sale_date": "2026-05-21T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982554Z",
+    "first_seen": "2026-06-21T13:12:08.752504Z",
     "raw": {
       "sf_csv": true
     },
@@ -15983,7 +16243,7 @@
     "vin": "WP0AB2A82KS******",
     "lot_number": "53372515",
     "sale_date": "2025-04-14T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982563Z",
+    "first_seen": "2026-06-21T13:12:08.752514Z",
     "raw": {
       "sf_csv": true
     },
@@ -16009,7 +16269,7 @@
     "vin": "WP0AB2A8XJS******",
     "lot_number": "53308686",
     "sale_date": "2026-05-09T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982572Z",
+    "first_seen": "2026-06-21T13:12:08.752523Z",
     "raw": {
       "sf_csv": true
     },
@@ -16035,7 +16295,7 @@
     "vin": "WP0AC2A80NS******",
     "lot_number": "51987996",
     "sale_date": "2026-04-29T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982581Z",
+    "first_seen": "2026-06-21T13:12:08.752531Z",
     "raw": {
       "sf_csv": true
     },
@@ -16061,37 +16321,11 @@
     "vin": "WP0AB2A86NS******",
     "lot_number": "51776836",
     "sale_date": "2026-04-28T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982590Z",
+    "first_seen": "2026-06-21T13:12:08.752540Z",
     "raw": {
       "sf_csv": true
     },
     "project_tier": "clean"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/55528996",
-    "listing_id": "WP0CA2A86HS******",
-    "title": "2017 Porsche BOXSTER",
-    "year": 2017,
-    "make": "Porsche",
-    "model": "BOXSTER",
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": null,
-    "mileage": 53506,
-    "location": "CT - HARTFORD",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0626/2f00201c52ca4eaf850a86a56fabc0e4_thb.jpg",
-    "vin": "WP0CA2A86HS******",
-    "lot_number": "55528996",
-    "sale_date": "2026-06-23T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982599Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "salvage"
   },
   {
     "source": "copart",
@@ -16113,7 +16347,7 @@
     "vin": "WP0CA2A88LS******",
     "lot_number": "53647256",
     "sale_date": "2026-06-24T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982629Z",
+    "first_seen": "2026-06-21T13:12:08.752577Z",
     "raw": {
       "sf_csv": true
     },
@@ -16139,7 +16373,7 @@
     "vin": "WP0CB2A83GS******",
     "lot_number": "57831386",
     "sale_date": "2026-06-16T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982659Z",
+    "first_seen": "2026-06-21T13:12:08.752604Z",
     "raw": {
       "sf_csv": true
     },
@@ -16165,7 +16399,7 @@
     "vin": "WP0CA2A85RK******",
     "lot_number": "57633396",
     "sale_date": "2026-06-15T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982667Z",
+    "first_seen": "2026-06-21T13:12:08.752612Z",
     "raw": {
       "sf_csv": true
     },
@@ -16191,7 +16425,7 @@
     "vin": "WP0CB2A87HS******",
     "lot_number": "57396476",
     "sale_date": "2026-06-11T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982677Z",
+    "first_seen": "2026-06-21T13:12:08.752621Z",
     "raw": {
       "sf_csv": true
     },
@@ -16217,7 +16451,7 @@
     "vin": "WP0CB2A84MS******",
     "lot_number": "57376986",
     "sale_date": "2026-06-11T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982686Z",
+    "first_seen": "2026-06-21T13:12:08.752631Z",
     "raw": {
       "sf_csv": true
     },
@@ -16243,7 +16477,7 @@
     "vin": "WP0CA2A81FK******",
     "lot_number": "56691756",
     "sale_date": "2026-06-05T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982695Z",
+    "first_seen": "2026-06-21T13:12:08.752640Z",
     "raw": {
       "sf_csv": true
     },
@@ -16269,7 +16503,7 @@
     "vin": "WP0CA2A87RK******",
     "lot_number": "56349826",
     "sale_date": "2026-06-03T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982704Z",
+    "first_seen": "2026-06-21T13:12:08.752649Z",
     "raw": {
       "sf_csv": true
     },
@@ -16295,7 +16529,7 @@
     "vin": "WP0CD2A86SK******",
     "lot_number": "55790816",
     "sale_date": "2026-05-29T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982714Z",
+    "first_seen": "2026-06-21T13:12:08.752659Z",
     "raw": {
       "sf_csv": true
     },
@@ -16321,7 +16555,7 @@
     "vin": "WP0CB2A82ES******",
     "lot_number": "55150636",
     "sale_date": "2026-05-26T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982723Z",
+    "first_seen": "2026-06-21T13:12:08.752668Z",
     "raw": {
       "sf_csv": true
     },
@@ -16347,7 +16581,7 @@
     "vin": "WP0CB2A81MS******",
     "lot_number": "54370426",
     "sale_date": "2026-05-18T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982732Z",
+    "first_seen": "2026-06-21T13:12:08.752677Z",
     "raw": {
       "sf_csv": true
     },
@@ -16373,7 +16607,7 @@
     "vin": "WP0CA2A83KS******",
     "lot_number": "54010296",
     "sale_date": "2026-05-14T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982742Z",
+    "first_seen": "2026-06-21T13:12:08.752685Z",
     "raw": {
       "sf_csv": true
     },
@@ -16399,7 +16633,7 @@
     "vin": "WP0CA2A88PS******",
     "lot_number": "53951286",
     "sale_date": "2026-04-02T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982752Z",
+    "first_seen": "2026-06-21T13:12:08.752694Z",
     "raw": {
       "sf_csv": true
     },
@@ -16425,33 +16659,7 @@
     "vin": "WP0CA2A88HS******",
     "lot_number": "51662796",
     "sale_date": "2026-04-27T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982762Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/78970455",
-    "listing_id": "WP0AB2Y16MS******",
-    "title": "2021 Porsche TAYCAN 4S",
-    "year": 2021,
-    "make": "Porsche",
-    "model": "TAYCAN",
-    "trim": "4S",
-    "price_usd": null,
-    "current_bid_usd": null,
-    "mileage": 48889,
-    "location": "FL - JACKSONVILLE NORTH",
-    "seller_type": "salvage_auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0226/41ac0f141ace47c5b3a67995235bee8f_thb.jpg",
-    "vin": "WP0AB2Y16MS******",
-    "lot_number": "78970455",
-    "sale_date": "2026-06-24T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982823Z",
+    "first_seen": "2026-06-21T13:12:08.752718Z",
     "raw": {
       "sf_csv": true
     },
@@ -16477,7 +16685,7 @@
     "vin": "WP0AB2Y16LS******",
     "lot_number": "53785896",
     "sale_date": "2026-07-16T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982832Z",
+    "first_seen": "2026-06-21T13:12:08.752775Z",
     "raw": {
       "sf_csv": true
     },
@@ -16503,7 +16711,7 @@
     "vin": "WP0AC2Y12MS******",
     "lot_number": "94217265",
     "sale_date": "2025-11-21T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982841Z",
+    "first_seen": "2026-06-21T13:12:08.752784Z",
     "raw": {
       "sf_csv": true
     },
@@ -16529,7 +16737,7 @@
     "vin": "WP0AB2Y14PS******",
     "lot_number": "93020965",
     "sale_date": "2025-11-13T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982850Z",
+    "first_seen": "2026-06-21T13:12:08.752793Z",
     "raw": {
       "sf_csv": true
     },
@@ -16555,7 +16763,7 @@
     "vin": "WP0AB2Y1XMS******",
     "lot_number": "86818785",
     "sale_date": "2025-10-14T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982859Z",
+    "first_seen": "2026-06-21T13:12:08.752803Z",
     "raw": {
       "sf_csv": true
     },
@@ -16581,7 +16789,7 @@
     "vin": "WP0BB2Y12PS******",
     "lot_number": "79246565",
     "sale_date": "2026-02-25T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982869Z",
+    "first_seen": "2026-06-21T13:12:08.752812Z",
     "raw": {
       "sf_csv": true
     },
@@ -16607,7 +16815,7 @@
     "vin": "WP0AA2Y16NS******",
     "lot_number": "72114575",
     "sale_date": "2026-01-06T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982880Z",
+    "first_seen": "2026-06-21T13:12:08.752821Z",
     "raw": {
       "sf_csv": true
     },
@@ -16633,7 +16841,7 @@
     "vin": "WP0AA2Y13PS******",
     "lot_number": "57749956",
     "sale_date": "2026-06-15T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982889Z",
+    "first_seen": "2026-06-21T13:12:08.752830Z",
     "raw": {
       "sf_csv": true
     },
@@ -16659,7 +16867,7 @@
     "vin": "WP0AB2Y1XRS******",
     "lot_number": "56799176",
     "sale_date": "2026-06-08T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982900Z",
+    "first_seen": "2026-06-21T13:12:08.752839Z",
     "raw": {
       "sf_csv": true
     },
@@ -16685,7 +16893,7 @@
     "vin": "WP0AC2Y17MS******",
     "lot_number": "55891906",
     "sale_date": "2026-06-01T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982909Z",
+    "first_seen": "2026-06-21T13:12:08.752847Z",
     "raw": {
       "sf_csv": true
     },
@@ -16711,7 +16919,7 @@
     "vin": "WP0AA2Y17NS******",
     "lot_number": "55744366",
     "sale_date": "2026-05-29T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982918Z",
+    "first_seen": "2026-06-21T13:12:08.752858Z",
     "raw": {
       "sf_csv": true
     },
@@ -16737,7 +16945,7 @@
     "vin": "WP0AB2Y16MS******",
     "lot_number": "55722486",
     "sale_date": "2026-05-29T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982927Z",
+    "first_seen": "2026-06-21T13:12:08.752866Z",
     "raw": {
       "sf_csv": true
     },
@@ -16763,7 +16971,7 @@
     "vin": "WP0AA2Y12NS******",
     "lot_number": "55714986",
     "sale_date": "2026-05-29T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982937Z",
+    "first_seen": "2026-06-21T13:12:08.752877Z",
     "raw": {
       "sf_csv": true
     },
@@ -16789,7 +16997,7 @@
     "vin": "WP0AA2Y12MS******",
     "lot_number": "55464996",
     "sale_date": "2026-06-01T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982947Z",
+    "first_seen": "2026-06-21T13:12:08.752886Z",
     "raw": {
       "sf_csv": true
     },
@@ -16815,7 +17023,7 @@
     "vin": "WP0AA2Y19PS******",
     "lot_number": "55308346",
     "sale_date": "2026-05-27T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982958Z",
+    "first_seen": "2026-06-21T13:12:08.752897Z",
     "raw": {
       "sf_csv": true
     },
@@ -16841,7 +17049,7 @@
     "vin": "WP0BB2Y19SS******",
     "lot_number": "55263286",
     "sale_date": "2026-05-26T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982967Z",
+    "first_seen": "2026-06-21T13:12:08.752905Z",
     "raw": {
       "sf_csv": true
     },
@@ -16867,7 +17075,7 @@
     "vin": "WP0AA2Y16NS******",
     "lot_number": "55163136",
     "sale_date": "2026-05-26T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.982975Z",
+    "first_seen": "2026-06-21T13:12:08.752913Z",
     "raw": {
       "sf_csv": true
     },
@@ -16893,7 +17101,7 @@
     "vin": "WP0AD2Y19RS******",
     "lot_number": "55035316",
     "sale_date": "2026-05-22T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983032Z",
+    "first_seen": "2026-06-21T13:12:08.752922Z",
     "raw": {
       "sf_csv": true
     },
@@ -16919,7 +17127,7 @@
     "vin": "WP0AB2Y19MS******",
     "lot_number": "54974266",
     "sale_date": "2026-05-22T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983042Z",
+    "first_seen": "2026-06-21T13:12:08.752931Z",
     "raw": {
       "sf_csv": true
     },
@@ -16945,7 +17153,7 @@
     "vin": "WP0AB2Y19MS******",
     "lot_number": "54909416",
     "sale_date": "2026-05-22T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983049Z",
+    "first_seen": "2026-06-21T13:12:08.752938Z",
     "raw": {
       "sf_csv": true
     },
@@ -16971,7 +17179,7 @@
     "vin": "WP0AA2Y19NS******",
     "lot_number": "54800696",
     "sale_date": "2026-05-21T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983058Z",
+    "first_seen": "2026-06-21T13:12:08.752951Z",
     "raw": {
       "sf_csv": true
     },
@@ -16997,7 +17205,7 @@
     "vin": "WP0AA2Y10PS******",
     "lot_number": "54352866",
     "sale_date": "2026-05-17T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983067Z",
+    "first_seen": "2026-06-21T13:12:08.752960Z",
     "raw": {
       "sf_csv": true
     },
@@ -17023,7 +17231,7 @@
     "vin": "WP0AB2Y19LS******",
     "lot_number": "53996386",
     "sale_date": "2026-05-14T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983077Z",
+    "first_seen": "2026-06-21T13:12:08.752968Z",
     "raw": {
       "sf_csv": true
     },
@@ -17049,7 +17257,7 @@
     "vin": "WP0BB2Y19SS******",
     "lot_number": "53349776",
     "sale_date": "2026-05-11T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983086Z",
+    "first_seen": "2026-06-21T13:12:08.753022Z",
     "raw": {
       "sf_csv": true
     },
@@ -17075,7 +17283,7 @@
     "vin": "WP0AA2Y10RS******",
     "lot_number": "52932496",
     "sale_date": "2026-05-06T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983096Z",
+    "first_seen": "2026-06-21T13:12:08.753031Z",
     "raw": {
       "sf_csv": true
     },
@@ -17101,7 +17309,7 @@
     "vin": "WP0AA2Y1XPS******",
     "lot_number": "52745246",
     "sale_date": "2026-05-05T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983103Z",
+    "first_seen": "2026-06-21T13:12:08.753039Z",
     "raw": {
       "sf_csv": true
     },
@@ -17127,7 +17335,7 @@
     "vin": "WP0AC2Y11LS******",
     "lot_number": "52695156",
     "sale_date": "2026-05-05T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983113Z",
+    "first_seen": "2026-06-21T13:12:08.753054Z",
     "raw": {
       "sf_csv": true
     },
@@ -17153,7 +17361,7 @@
     "vin": "WP0AB2Y15LS******",
     "lot_number": "52099386",
     "sale_date": "2026-05-05T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983130Z",
+    "first_seen": "2026-06-21T13:12:08.753063Z",
     "raw": {
       "sf_csv": true
     },
@@ -17179,7 +17387,7 @@
     "vin": "WP0AB2Y19MS******",
     "lot_number": "49972666",
     "sale_date": "2026-04-13T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983138Z",
+    "first_seen": "2026-06-21T13:12:08.753072Z",
     "raw": {
       "sf_csv": true
     },
@@ -17205,7 +17413,7 @@
     "vin": "WP0AC2Y15LS******",
     "lot_number": "49933676",
     "sale_date": "2026-04-13T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983149Z",
+    "first_seen": "2026-06-21T13:12:08.753080Z",
     "raw": {
       "sf_csv": true
     },
@@ -17231,7 +17439,7 @@
     "vin": "WP0AA2Y14RS******",
     "lot_number": "47994316",
     "sale_date": "2026-03-26T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983158Z",
+    "first_seen": "2026-06-21T13:12:08.753088Z",
     "raw": {
       "sf_csv": true
     },
@@ -17257,7 +17465,7 @@
     "vin": "WP0AB2Y10RS******",
     "lot_number": "47358376",
     "sale_date": "2026-03-23T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983167Z",
+    "first_seen": "2026-06-21T13:12:08.753096Z",
     "raw": {
       "sf_csv": true
     },
@@ -17283,7 +17491,7 @@
     "vin": "WP0BB2Y1XPS******",
     "lot_number": "46489066",
     "sale_date": "2026-03-16T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983176Z",
+    "first_seen": "2026-06-21T13:12:08.753106Z",
     "raw": {
       "sf_csv": true
     },
@@ -17309,37 +17517,11 @@
     "vin": "WP0AB2Y19MS******",
     "lot_number": "45992606",
     "sale_date": "2026-03-11T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983185Z",
+    "first_seen": "2026-06-21T13:12:08.753114Z",
     "raw": {
       "sf_csv": true
     },
     "project_tier": "clean"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/53427066",
-    "listing_id": "WP1AA2A27HK******",
-    "title": "2017 Porsche CAYENNE",
-    "year": 2017,
-    "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": null,
-    "mileage": 76988,
-    "location": "NY - SYRACUSE",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/f3c276854bf64e8798b9ebdd8fca588d_thb.jpg",
-    "vin": "WP1AA2A27HK******",
-    "lot_number": "53427066",
-    "sale_date": "2026-06-22T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983234Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "salvage"
   },
   {
     "source": "copart",
@@ -17361,7 +17543,7 @@
     "vin": "WP1AB2AY6PD******",
     "lot_number": "85879095",
     "sale_date": "2026-06-22T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983283Z",
+    "first_seen": "2026-06-21T13:12:08.753205Z",
     "raw": {
       "sf_csv": true
     },
@@ -17387,7 +17569,7 @@
     "vin": "WP1AA2AY8PD******",
     "lot_number": "99370865",
     "sale_date": "2026-06-22T19:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983301Z",
+    "first_seen": "2026-06-21T13:12:08.753223Z",
     "raw": {
       "sf_csv": true
     },
@@ -17413,7 +17595,7 @@
     "vin": "WP1AB2A25HL******",
     "lot_number": "56992136",
     "sale_date": "2026-06-23T01:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983361Z",
+    "first_seen": "2026-06-21T13:12:08.753276Z",
     "raw": {
       "sf_csv": true
     },
@@ -17439,7 +17621,7 @@
     "vin": "WP1AB2AY7ND******",
     "lot_number": "55174046",
     "sale_date": "2026-06-23T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983505Z",
+    "first_seen": "2026-06-21T13:12:08.753414Z",
     "raw": {
       "sf_csv": true
     },
@@ -17465,7 +17647,7 @@
     "vin": "WP1AB2AY6MD******",
     "lot_number": "54450906",
     "sale_date": "2026-06-23T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983609Z",
+    "first_seen": "2026-06-21T13:12:08.753523Z",
     "raw": {
       "sf_csv": true
     },
@@ -17491,7 +17673,7 @@
     "vin": "WP1AA2A26GK******",
     "lot_number": "52612896",
     "sale_date": "2026-06-23T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983618Z",
+    "first_seen": "2026-06-21T13:12:08.753532Z",
     "raw": {
       "sf_csv": true
     },
@@ -17517,7 +17699,7 @@
     "vin": "WP1AA2AY7LD******",
     "lot_number": "53657536",
     "sale_date": "2026-06-23T19:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983657Z",
+    "first_seen": "2026-06-21T13:12:08.753567Z",
     "raw": {
       "sf_csv": true
     },
@@ -17543,7 +17725,7 @@
     "vin": "WP1AE2A23GL******",
     "lot_number": "52066336",
     "sale_date": "2026-06-23T19:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983667Z",
+    "first_seen": "2026-06-21T13:12:08.753576Z",
     "raw": {
       "sf_csv": true
     },
@@ -17569,7 +17751,7 @@
     "vin": "WP1AB2A22FL******",
     "lot_number": "52066316",
     "sale_date": "2026-06-23T19:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983676Z",
+    "first_seen": "2026-06-21T13:12:08.753585Z",
     "raw": {
       "sf_csv": true
     },
@@ -17595,7 +17777,7 @@
     "vin": "WP1AB2A22GL******",
     "lot_number": "55778916",
     "sale_date": "2026-06-24T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983805Z",
+    "first_seen": "2026-06-21T13:12:08.753711Z",
     "raw": {
       "sf_csv": true
     },
@@ -17621,7 +17803,7 @@
     "vin": "WP1AA2AY5LD******",
     "lot_number": "77419185",
     "sale_date": "2026-06-24T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983831Z",
+    "first_seen": "2026-06-21T13:12:08.753737Z",
     "raw": {
       "sf_csv": true
     },
@@ -17647,7 +17829,7 @@
     "vin": "WP1AA2AY9RD******",
     "lot_number": "55883746",
     "sale_date": "2026-06-24T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983840Z",
+    "first_seen": "2026-06-21T13:12:08.753746Z",
     "raw": {
       "sf_csv": true
     },
@@ -17673,33 +17855,7 @@
     "vin": "WP1AB2A25EL******",
     "lot_number": "54510066",
     "sale_date": "2026-06-24T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983850Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/54252276",
-    "listing_id": "WP1AB2AY7KD******",
-    "title": "2019 Porsche CAYENNE S",
-    "year": 2019,
-    "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": "S",
-    "price_usd": null,
-    "current_bid_usd": null,
-    "mileage": 41399,
-    "location": "CA - NAPA",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/2d52d405619b42bb84a7e141cbe17ea4_thb.jpg",
-    "vin": "WP1AB2AY7KD******",
-    "lot_number": "54252276",
-    "sale_date": "2026-06-25T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983887Z",
+    "first_seen": "2026-06-21T13:12:08.753755Z",
     "raw": {
       "sf_csv": true
     },
@@ -17725,7 +17881,7 @@
     "vin": "WP1AA2A21GL******",
     "lot_number": "50171956",
     "sale_date": "2026-06-25T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983914Z",
+    "first_seen": "2026-06-21T13:12:08.753814Z",
     "raw": {
       "sf_csv": true
     },
@@ -17751,37 +17907,11 @@
     "vin": "WP1AA2A22HK******",
     "lot_number": "47397296",
     "sale_date": "2026-06-25T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983923Z",
+    "first_seen": "2026-06-21T13:12:08.753824Z",
     "raw": {
       "sf_csv": true
     },
     "project_tier": "clean"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/53569846",
-    "listing_id": "WP1AA2AY1LD******",
-    "title": "2020 Porsche CAYENNE",
-    "year": 2020,
-    "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": null,
-    "mileage": 64027,
-    "location": "VA - RICHMOND",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/e7ab5be9123e4895975936012e64df7a_thb.jpg",
-    "vin": "WP1AA2AY1LD******",
-    "lot_number": "53569846",
-    "sale_date": "2026-06-26T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983962Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "salvage"
   },
   {
     "source": "copart",
@@ -17803,7 +17933,7 @@
     "vin": "WP1AA2A25GL******",
     "lot_number": "55711926",
     "sale_date": "2026-07-10T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.983998Z",
+    "first_seen": "2026-06-21T13:12:08.753885Z",
     "raw": {
       "sf_csv": true
     },
@@ -17829,7 +17959,7 @@
     "vin": "WP1AA2AY6KD******",
     "lot_number": "56672316",
     "sale_date": "2026-07-14T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984027Z",
+    "first_seen": "2026-06-21T13:12:08.753918Z",
     "raw": {
       "sf_csv": true
     },
@@ -17855,7 +17985,7 @@
     "vin": "WP1AA2A27JK******",
     "lot_number": "56520506",
     "sale_date": "2026-07-15T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984042Z",
+    "first_seen": "2026-06-21T13:12:08.753927Z",
     "raw": {
       "sf_csv": true
     },
@@ -17881,7 +18011,7 @@
     "vin": "WP1AA2AY2PD******",
     "lot_number": "52545486",
     "sale_date": "2026-07-16T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984058Z",
+    "first_seen": "2026-06-21T13:12:08.753942Z",
     "raw": {
       "sf_csv": true
     },
@@ -17907,7 +18037,7 @@
     "vin": "WP1BA2AYXRD******",
     "lot_number": "50638036",
     "sale_date": "2026-07-16T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984067Z",
+    "first_seen": "2026-06-21T13:12:08.753951Z",
     "raw": {
       "sf_csv": true
     },
@@ -17933,7 +18063,7 @@
     "vin": "WP1AF2A29EL******",
     "lot_number": "56801316",
     "sale_date": "2026-07-16T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984076Z",
+    "first_seen": "2026-06-21T13:12:08.753960Z",
     "raw": {
       "sf_csv": true
     },
@@ -17959,7 +18089,7 @@
     "vin": "WP1AA2A27HK******",
     "lot_number": "57390286",
     "sale_date": "2026-07-17T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984085Z",
+    "first_seen": "2026-06-21T13:12:08.753970Z",
     "raw": {
       "sf_csv": true
     },
@@ -17985,7 +18115,7 @@
     "vin": "WP1AL2AY8RD******",
     "lot_number": "57306576",
     "sale_date": "2026-07-17T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984094Z",
+    "first_seen": "2026-06-21T13:12:08.753978Z",
     "raw": {
       "sf_csv": true
     },
@@ -18011,7 +18141,7 @@
     "vin": "WP1AA2A2XGK******",
     "lot_number": "52313236",
     "sale_date": "2026-07-17T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984105Z",
+    "first_seen": "2026-06-21T13:12:08.753987Z",
     "raw": {
       "sf_csv": true
     },
@@ -18037,7 +18167,7 @@
     "vin": "WP1BA2AY7LD******",
     "lot_number": "47201746",
     "sale_date": "2026-07-17T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984124Z",
+    "first_seen": "2026-06-21T13:12:08.754005Z",
     "raw": {
       "sf_csv": true
     },
@@ -18063,7 +18193,7 @@
     "vin": "WP1AH2AYXPD******",
     "lot_number": "79672725",
     "sale_date": "2026-07-20T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984134Z",
+    "first_seen": "2026-06-21T13:12:08.754013Z",
     "raw": {
       "sf_csv": true
     },
@@ -18089,7 +18219,7 @@
     "vin": "WP1AA2A27GL******",
     "lot_number": "53967486",
     "sale_date": "2026-07-20T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984153Z",
+    "first_seen": "2026-06-21T13:12:08.754031Z",
     "raw": {
       "sf_csv": true
     },
@@ -18115,33 +18245,7 @@
     "vin": "WP1AD2A27EL******",
     "lot_number": "56888586",
     "sale_date": "2026-07-21T14:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984171Z",
-    "raw": {
-      "sf_csv": true
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/50180226",
-    "listing_id": "WP1AB2AY9KD******",
-    "title": "2019 Porsche CAYENNE S",
-    "year": 2019,
-    "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": "S",
-    "price_usd": null,
-    "current_bid_usd": null,
-    "mileage": 57539,
-    "location": "IL - CHICAGO NORTH",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/980801d437464d17b27db73b9d7c41b2_thb.jpg",
-    "vin": "WP1AB2AY9KD******",
-    "lot_number": "50180226",
-    "sale_date": "2026-07-21T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984191Z",
+    "first_seen": "2026-06-21T13:12:08.754049Z",
     "raw": {
       "sf_csv": true
     },
@@ -18167,7 +18271,7 @@
     "vin": "WP1AA2A28GL******",
     "lot_number": "56087936",
     "sale_date": "2026-07-22T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984200Z",
+    "first_seen": "2026-06-21T13:12:08.754067Z",
     "raw": {
       "sf_csv": true
     },
@@ -18193,7 +18297,7 @@
     "vin": "WP1AA2A20JK******",
     "lot_number": "55585436",
     "sale_date": "2026-07-22T17:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984209Z",
+    "first_seen": "2026-06-21T13:12:08.754076Z",
     "raw": {
       "sf_csv": true
     },
@@ -18219,7 +18323,7 @@
     "vin": "WP1AA2AY8LD******",
     "lot_number": "98859845",
     "sale_date": "2025-12-29T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984219Z",
+    "first_seen": "2026-06-21T13:12:08.754084Z",
     "raw": {
       "sf_csv": true
     },
@@ -18245,7 +18349,7 @@
     "vin": "WP1BA2AY9LD******",
     "lot_number": "98609335",
     "sale_date": "2025-12-23T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984228Z",
+    "first_seen": "2026-06-21T13:12:08.754092Z",
     "raw": {
       "sf_csv": true
     },
@@ -18271,7 +18375,7 @@
     "vin": "WP1AB2A2XJL******",
     "lot_number": "97816925",
     "sale_date": "2025-12-17T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984237Z",
+    "first_seen": "2026-06-21T13:12:08.754101Z",
     "raw": {
       "sf_csv": true
     },
@@ -18297,7 +18401,7 @@
     "vin": "WP1AD2A27EL******",
     "lot_number": "94499535",
     "sale_date": "2025-11-24T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984247Z",
+    "first_seen": "2026-06-21T13:12:08.754111Z",
     "raw": {
       "sf_csv": true
     },
@@ -18323,7 +18427,7 @@
     "vin": "WP1AD2A23HL******",
     "lot_number": "94309295",
     "sale_date": "2025-11-21T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984257Z",
+    "first_seen": "2026-06-21T13:12:08.754119Z",
     "raw": {
       "sf_csv": true
     },
@@ -18349,7 +18453,7 @@
     "vin": "WP1AA2A28GK******",
     "lot_number": "93348545",
     "sale_date": "2025-11-17T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984268Z",
+    "first_seen": "2026-06-21T13:12:08.754163Z",
     "raw": {
       "sf_csv": true
     },
@@ -18375,7 +18479,7 @@
     "vin": "WP1AB2A20GL******",
     "lot_number": "90051985",
     "sale_date": "2025-10-23T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984277Z",
+    "first_seen": "2026-06-21T13:12:08.754172Z",
     "raw": {
       "sf_csv": true
     },
@@ -18401,7 +18505,7 @@
     "vin": "WP1AB2A23EL******",
     "lot_number": "82563775",
     "sale_date": "2025-10-15T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984287Z",
+    "first_seen": "2026-06-21T13:12:08.754182Z",
     "raw": {
       "sf_csv": true
     },
@@ -18427,7 +18531,7 @@
     "vin": "WP1AA2AY9MD******",
     "lot_number": "80371005",
     "sale_date": "2025-09-09T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984296Z",
+    "first_seen": "2026-06-21T13:12:08.754191Z",
     "raw": {
       "sf_csv": true
     },
@@ -18453,7 +18557,7 @@
     "vin": "WP1AA2AY6PD******",
     "lot_number": "79931615",
     "sale_date": "2026-03-03T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984305Z",
+    "first_seen": "2026-06-21T13:12:08.754199Z",
     "raw": {
       "sf_csv": true
     },
@@ -18479,7 +18583,7 @@
     "vin": "WP1AE2A28EL******",
     "lot_number": "77939175",
     "sale_date": "2026-02-16T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984315Z",
+    "first_seen": "2026-06-21T13:12:08.754209Z",
     "raw": {
       "sf_csv": true
     },
@@ -18505,7 +18609,7 @@
     "vin": "WP1AA2A22EL******",
     "lot_number": "76482105",
     "sale_date": "2026-02-09T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984339Z",
+    "first_seen": "2026-06-21T13:12:08.754233Z",
     "raw": {
       "sf_csv": true
     },
@@ -18531,7 +18635,7 @@
     "vin": "WP1AA2A23EL******",
     "lot_number": "73851485",
     "sale_date": "2026-01-16T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984349Z",
+    "first_seen": "2026-06-21T13:12:08.754242Z",
     "raw": {
       "sf_csv": true
     },
@@ -18557,7 +18661,7 @@
     "vin": "WP1AL2AY0RD******",
     "lot_number": "73306355",
     "sale_date": "2026-01-13T08:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984358Z",
+    "first_seen": "2026-06-21T13:12:08.754251Z",
     "raw": {
       "sf_csv": true
     },
@@ -18583,7 +18687,7 @@
     "vin": "WP1AA2AY4LD******",
     "lot_number": "67571185",
     "sale_date": "2025-08-01T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984369Z",
+    "first_seen": "2026-06-21T13:12:08.754259Z",
     "raw": {
       "sf_csv": true
     },
@@ -18609,7 +18713,7 @@
     "vin": "WP1AA2A2XHK******",
     "lot_number": "66344973",
     "sale_date": "2023-08-29T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984377Z",
+    "first_seen": "2026-06-21T13:12:08.754267Z",
     "raw": {
       "sf_csv": true
     },
@@ -18635,7 +18739,7 @@
     "vin": "WP1AA2A29HK******",
     "lot_number": "64607695",
     "sale_date": "2025-07-10T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984386Z",
+    "first_seen": "2026-06-21T13:12:08.754275Z",
     "raw": {
       "sf_csv": true
     },
@@ -18661,7 +18765,7 @@
     "vin": "WP1AF2A28EL******",
     "lot_number": "63538534",
     "sale_date": "2024-07-15T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984394Z",
+    "first_seen": "2026-06-21T13:12:08.754282Z",
     "raw": {
       "sf_csv": true
     },
@@ -18687,7 +18791,7 @@
     "vin": "WP1AA2A21EL******",
     "lot_number": "58272776",
     "sale_date": "2026-04-24T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984404Z",
+    "first_seen": "2026-06-21T13:12:08.754293Z",
     "raw": {
       "sf_csv": true
     },
@@ -18713,7 +18817,7 @@
     "vin": "WP1AA2A21GK******",
     "lot_number": "58116446",
     "sale_date": "2026-06-17T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984413Z",
+    "first_seen": "2026-06-21T13:12:08.754301Z",
     "raw": {
       "sf_csv": true
     },
@@ -18739,7 +18843,7 @@
     "vin": "WP1BG2AY7TD******",
     "lot_number": "58078316",
     "sale_date": "2026-06-17T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984424Z",
+    "first_seen": "2026-06-21T13:12:08.754311Z",
     "raw": {
       "sf_csv": true
     },
@@ -18765,7 +18869,7 @@
     "vin": "WP1AE2A23JL******",
     "lot_number": "57964186",
     "sale_date": "2026-06-16T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984433Z",
+    "first_seen": "2026-06-21T13:12:08.754320Z",
     "raw": {
       "sf_csv": true
     },
@@ -18791,7 +18895,33 @@
     "vin": "WP1AB2A28FL******",
     "lot_number": "57955076",
     "sale_date": "2026-06-16T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984443Z",
+    "first_seen": "2026-06-21T13:12:08.754330Z",
+    "raw": {
+      "sf_csv": true
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/57935036",
+    "listing_id": "WP1AE2A21GL******",
+    "title": "2016 Porsche CAYENNE SE HYBRID",
+    "year": 2016,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": "SE HYBRID",
+    "price_usd": null,
+    "current_bid_usd": null,
+    "mileage": 76811,
+    "location": "TX - HOUSTON",
+    "seller_type": "salvage_auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0626/80a9b51f6b2d4e049c82919d8c57277e_thb.jpg",
+    "vin": "WP1AE2A21GL******",
+    "lot_number": "57935036",
+    "sale_date": "2026-06-16T07:00:00Z",
+    "first_seen": "2026-06-21T13:12:08.754339Z",
     "raw": {
       "sf_csv": true
     },
@@ -18817,7 +18947,7 @@
     "vin": "WP1AA2AY5LD******",
     "lot_number": "57931326",
     "sale_date": "2026-06-16T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984452Z",
+    "first_seen": "2026-06-21T13:12:08.754349Z",
     "raw": {
       "sf_csv": true
     },
@@ -18843,7 +18973,7 @@
     "vin": "WP1AA2AY1KD******",
     "lot_number": "57930366",
     "sale_date": "2026-06-16T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984462Z",
+    "first_seen": "2026-06-21T13:12:08.754358Z",
     "raw": {
       "sf_csv": true
     },
@@ -18869,7 +18999,7 @@
     "vin": "WP1AB2A22EL******",
     "lot_number": "57914256",
     "sale_date": "2026-06-16T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984471Z",
+    "first_seen": "2026-06-21T13:12:08.754368Z",
     "raw": {
       "sf_csv": true
     },
@@ -18895,7 +19025,7 @@
     "vin": "WP1AA2A22GL******",
     "lot_number": "57865716",
     "sale_date": "2026-06-16T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984481Z",
+    "first_seen": "2026-06-21T13:12:08.754377Z",
     "raw": {
       "sf_csv": true
     },
@@ -18921,7 +19051,7 @@
     "vin": "WP1BA2AY8RD******",
     "lot_number": "57823496",
     "sale_date": "2026-06-16T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984489Z",
+    "first_seen": "2026-06-21T13:12:08.754385Z",
     "raw": {
       "sf_csv": true
     },
@@ -18947,7 +19077,7 @@
     "vin": "WP1AA2AY3LD******",
     "lot_number": "57822446",
     "sale_date": "2026-06-16T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984499Z",
+    "first_seen": "2026-06-21T13:12:08.754394Z",
     "raw": {
       "sf_csv": true
     },
@@ -18973,7 +19103,7 @@
     "vin": "WP1AA2A23GL******",
     "lot_number": "57752366",
     "sale_date": "2026-06-15T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984509Z",
+    "first_seen": "2026-06-21T13:12:08.754403Z",
     "raw": {
       "sf_csv": true
     },
@@ -18999,7 +19129,7 @@
     "vin": "WP1AE2A27HL******",
     "lot_number": "57719976",
     "sale_date": "2026-06-15T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984519Z",
+    "first_seen": "2026-06-21T13:12:08.754412Z",
     "raw": {
       "sf_csv": true
     },
@@ -19025,7 +19155,7 @@
     "vin": "WP1AG2AY7PD******",
     "lot_number": "57717016",
     "sale_date": "2026-06-15T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984529Z",
+    "first_seen": "2026-06-21T13:12:08.754421Z",
     "raw": {
       "sf_csv": true
     },
@@ -19051,7 +19181,7 @@
     "vin": "WP1AA2A21HK******",
     "lot_number": "57697916",
     "sale_date": "2026-06-15T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984540Z",
+    "first_seen": "2026-06-21T13:12:08.754430Z",
     "raw": {
       "sf_csv": true
     },
@@ -19077,7 +19207,7 @@
     "vin": "WP1AB2A21EL******",
     "lot_number": "57672816",
     "sale_date": "2026-06-15T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984549Z",
+    "first_seen": "2026-06-21T13:12:08.754440Z",
     "raw": {
       "sf_csv": true
     },
@@ -19103,7 +19233,7 @@
     "vin": "WP1AA2A24HK******",
     "lot_number": "57597526",
     "sale_date": "2026-06-12T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984558Z",
+    "first_seen": "2026-06-21T13:12:08.754449Z",
     "raw": {
       "sf_csv": true
     },
@@ -19155,7 +19285,7 @@
     "vin": "WP1AA2AY9KD******",
     "lot_number": "57560346",
     "sale_date": "2026-06-12T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984576Z",
+    "first_seen": "2026-06-21T13:12:08.754466Z",
     "raw": {
       "sf_csv": true
     },
@@ -19181,7 +19311,7 @@
     "vin": "WP1AE2A22JL******",
     "lot_number": "57550026",
     "sale_date": "2026-06-12T07:00:00Z",
-    "first_seen": "2026-06-20T13:12:10.984585Z",
+    "first_seen": "2026-06-21T13:12:08.754475Z",
     "raw": {
       "sf_csv": true
     },
@@ -19207,7 +19337,7 @@
     "vin": null,
     "lot_number": "45784365",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.984829Z",
+    "first_seen": "2026-06-21T13:12:08.754700Z",
     "raw": {
       "sf_csv": true
     },
@@ -19233,7 +19363,7 @@
     "vin": null,
     "lot_number": "45668772",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.984838Z",
+    "first_seen": "2026-06-21T13:12:08.754709Z",
     "raw": {
       "sf_csv": true
     },
@@ -19259,7 +19389,7 @@
     "vin": null,
     "lot_number": "45481261",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.984846Z",
+    "first_seen": "2026-06-21T13:12:08.754718Z",
     "raw": {
       "sf_csv": true
     },
@@ -19285,7 +19415,7 @@
     "vin": null,
     "lot_number": "45116142",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.984854Z",
+    "first_seen": "2026-06-21T13:12:08.754726Z",
     "raw": {
       "sf_csv": true
     },
@@ -19311,7 +19441,7 @@
     "vin": null,
     "lot_number": "44839781",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.984861Z",
+    "first_seen": "2026-06-21T13:12:08.754733Z",
     "raw": {
       "sf_csv": true
     },
@@ -19337,7 +19467,7 @@
     "vin": null,
     "lot_number": "45738266",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.984868Z",
+    "first_seen": "2026-06-21T13:12:08.754740Z",
     "raw": {
       "sf_csv": true
     },
@@ -19363,7 +19493,7 @@
     "vin": null,
     "lot_number": "45436119",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.984878Z",
+    "first_seen": "2026-06-21T13:12:08.754747Z",
     "raw": {
       "sf_csv": true
     },
@@ -19389,7 +19519,7 @@
     "vin": null,
     "lot_number": "45749327",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.984886Z",
+    "first_seen": "2026-06-21T13:12:08.754754Z",
     "raw": {
       "sf_csv": true
     },
@@ -19415,7 +19545,7 @@
     "vin": null,
     "lot_number": "45705698",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.984893Z",
+    "first_seen": "2026-06-21T13:12:08.754761Z",
     "raw": {
       "sf_csv": true
     },
@@ -19441,7 +19571,7 @@
     "vin": null,
     "lot_number": "45627610",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.984901Z",
+    "first_seen": "2026-06-21T13:12:08.754767Z",
     "raw": {
       "sf_csv": true
     },
@@ -19467,7 +19597,7 @@
     "vin": null,
     "lot_number": "45602149",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.984908Z",
+    "first_seen": "2026-06-21T13:12:08.754774Z",
     "raw": {
       "sf_csv": true
     },
@@ -19493,7 +19623,7 @@
     "vin": null,
     "lot_number": "45598201",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.984915Z",
+    "first_seen": "2026-06-21T13:12:08.754783Z",
     "raw": {
       "sf_csv": true
     },
@@ -19519,7 +19649,7 @@
     "vin": null,
     "lot_number": "45525636",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.984922Z",
+    "first_seen": "2026-06-21T13:12:08.754790Z",
     "raw": {
       "sf_csv": true
     },
@@ -19545,7 +19675,7 @@
     "vin": null,
     "lot_number": "45493803",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.984930Z",
+    "first_seen": "2026-06-21T13:12:08.754797Z",
     "raw": {
       "sf_csv": true
     },
@@ -19571,7 +19701,7 @@
     "vin": null,
     "lot_number": "45437843",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.984938Z",
+    "first_seen": "2026-06-21T13:12:08.754803Z",
     "raw": {
       "sf_csv": true
     },
@@ -19597,7 +19727,7 @@
     "vin": null,
     "lot_number": "45411779",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.984995Z",
+    "first_seen": "2026-06-21T13:12:08.754811Z",
     "raw": {
       "sf_csv": true
     },
@@ -19623,7 +19753,7 @@
     "vin": null,
     "lot_number": "45392595",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985003Z",
+    "first_seen": "2026-06-21T13:12:08.754818Z",
     "raw": {
       "sf_csv": true
     },
@@ -19649,7 +19779,7 @@
     "vin": null,
     "lot_number": "45312026",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985010Z",
+    "first_seen": "2026-06-21T13:12:08.754824Z",
     "raw": {
       "sf_csv": true
     },
@@ -19675,7 +19805,7 @@
     "vin": null,
     "lot_number": "45208704",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985017Z",
+    "first_seen": "2026-06-21T13:12:08.754831Z",
     "raw": {
       "sf_csv": true
     },
@@ -19701,7 +19831,7 @@
     "vin": null,
     "lot_number": "45026061",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985024Z",
+    "first_seen": "2026-06-21T13:12:08.754839Z",
     "raw": {
       "sf_csv": true
     },
@@ -19727,7 +19857,7 @@
     "vin": null,
     "lot_number": "44816823",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985032Z",
+    "first_seen": "2026-06-21T13:12:08.754891Z",
     "raw": {
       "sf_csv": true
     },
@@ -19753,7 +19883,7 @@
     "vin": null,
     "lot_number": "44725925",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985041Z",
+    "first_seen": "2026-06-21T13:12:08.754898Z",
     "raw": {
       "sf_csv": true
     },
@@ -19779,7 +19909,7 @@
     "vin": null,
     "lot_number": "43817092",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985050Z",
+    "first_seen": "2026-06-21T13:12:08.754905Z",
     "raw": {
       "sf_csv": true
     },
@@ -19805,7 +19935,7 @@
     "vin": null,
     "lot_number": "45831975",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985058Z",
+    "first_seen": "2026-06-21T13:12:08.754913Z",
     "raw": {
       "sf_csv": true
     },
@@ -19831,7 +19961,7 @@
     "vin": null,
     "lot_number": "45793056",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985065Z",
+    "first_seen": "2026-06-21T13:12:08.754920Z",
     "raw": {
       "sf_csv": true
     },
@@ -19857,7 +19987,7 @@
     "vin": null,
     "lot_number": "45759261",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985072Z",
+    "first_seen": "2026-06-21T13:12:08.754927Z",
     "raw": {
       "sf_csv": true
     },
@@ -19883,7 +20013,7 @@
     "vin": null,
     "lot_number": "45747015",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985079Z",
+    "first_seen": "2026-06-21T13:12:08.754934Z",
     "raw": {
       "sf_csv": true
     },
@@ -19909,7 +20039,7 @@
     "vin": null,
     "lot_number": "45645171",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985086Z",
+    "first_seen": "2026-06-21T13:12:08.754942Z",
     "raw": {
       "sf_csv": true
     },
@@ -19935,7 +20065,7 @@
     "vin": null,
     "lot_number": "45531672",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985093Z",
+    "first_seen": "2026-06-21T13:12:08.754948Z",
     "raw": {
       "sf_csv": true
     },
@@ -19961,7 +20091,7 @@
     "vin": null,
     "lot_number": "45301426",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985101Z",
+    "first_seen": "2026-06-21T13:12:08.754955Z",
     "raw": {
       "sf_csv": true
     },
@@ -19987,7 +20117,7 @@
     "vin": null,
     "lot_number": "43535600",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985112Z",
+    "first_seen": "2026-06-21T13:12:08.754962Z",
     "raw": {
       "sf_csv": true
     },
@@ -20013,7 +20143,7 @@
     "vin": null,
     "lot_number": "45870911",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985120Z",
+    "first_seen": "2026-06-21T13:12:08.754968Z",
     "raw": {
       "sf_csv": true
     },
@@ -20039,7 +20169,7 @@
     "vin": null,
     "lot_number": "45711910",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985129Z",
+    "first_seen": "2026-06-21T13:12:08.754975Z",
     "raw": {
       "sf_csv": true
     },
@@ -20065,7 +20195,7 @@
     "vin": null,
     "lot_number": "45558409",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985138Z",
+    "first_seen": "2026-06-21T13:12:08.754982Z",
     "raw": {
       "sf_csv": true
     },
@@ -20091,7 +20221,7 @@
     "vin": null,
     "lot_number": "45417309",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985146Z",
+    "first_seen": "2026-06-21T13:12:08.754990Z",
     "raw": {
       "sf_csv": true
     },
@@ -20117,7 +20247,7 @@
     "vin": null,
     "lot_number": "44310239",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985153Z",
+    "first_seen": "2026-06-21T13:12:08.754998Z",
     "raw": {
       "sf_csv": true
     },
@@ -20143,7 +20273,7 @@
     "vin": null,
     "lot_number": "45827681",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985160Z",
+    "first_seen": "2026-06-21T13:12:08.755005Z",
     "raw": {
       "sf_csv": true
     },
@@ -20169,7 +20299,7 @@
     "vin": null,
     "lot_number": "45826205",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985167Z",
+    "first_seen": "2026-06-21T13:12:08.755012Z",
     "raw": {
       "sf_csv": true
     },
@@ -20195,7 +20325,7 @@
     "vin": null,
     "lot_number": "45786588",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985176Z",
+    "first_seen": "2026-06-21T13:12:08.755019Z",
     "raw": {
       "sf_csv": true
     },
@@ -20221,7 +20351,7 @@
     "vin": null,
     "lot_number": "45540994",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985183Z",
+    "first_seen": "2026-06-21T13:12:08.755026Z",
     "raw": {
       "sf_csv": true
     },
@@ -20247,7 +20377,7 @@
     "vin": null,
     "lot_number": "45272493",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985192Z",
+    "first_seen": "2026-06-21T13:12:08.755034Z",
     "raw": {
       "sf_csv": true
     },
@@ -20273,7 +20403,7 @@
     "vin": null,
     "lot_number": "45388251",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985200Z",
+    "first_seen": "2026-06-21T13:12:08.755040Z",
     "raw": {
       "sf_csv": true
     },
@@ -20299,7 +20429,7 @@
     "vin": null,
     "lot_number": "45801927",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985207Z",
+    "first_seen": "2026-06-21T13:12:08.755047Z",
     "raw": {
       "sf_csv": true
     },
@@ -20325,7 +20455,7 @@
     "vin": null,
     "lot_number": "45745631",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985215Z",
+    "first_seen": "2026-06-21T13:12:08.755055Z",
     "raw": {
       "sf_csv": true
     },
@@ -20351,7 +20481,7 @@
     "vin": null,
     "lot_number": "45649581",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985222Z",
+    "first_seen": "2026-06-21T13:12:08.755062Z",
     "raw": {
       "sf_csv": true
     },
@@ -20377,7 +20507,7 @@
     "vin": null,
     "lot_number": "45569407",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985229Z",
+    "first_seen": "2026-06-21T13:12:08.755068Z",
     "raw": {
       "sf_csv": true
     },
@@ -20403,7 +20533,7 @@
     "vin": null,
     "lot_number": "45537520",
     "sale_date": null,
-    "first_seen": "2026-06-20T13:12:10.985238Z",
+    "first_seen": "2026-06-21T13:12:08.755075Z",
     "raw": {
       "sf_csv": true
     },
