@@ -76,6 +76,7 @@ class Calc:
     # county tax/appraised value, LOW = opening-bid guess. grading.py reads this
     # to decide whether a listing is assessable enough to rate.
     arv_confidence: str | None = None
+    arv_vs_assessed: float | None = None   # comp-ARV / county appraised value (accuracy anchor)
     notes: list[str] | None = None
     # Flip framing — what's the deal status at the listed/asking price?
     deal_status: str | None = None         # GREAT / OK / NEGOTIATE / PASS
@@ -350,6 +351,25 @@ def compute(li: Listing) -> Calc:
                 f"Listing price (${li.opening_bid:,.0f}) is {1/ratio*100:.0f}% of "
                 f"comp-grounded ARV (${out.arv_expected:,.0f}) — high-discount "
                 f"signal; preserved for investor review."
+            )
+
+    # ---- Assessed-value anchor (comp accuracy cross-check) --------------
+    # A comp-grounded ARV should exceed a distressed property's county
+    # appraisal (after-repair > as-is), but a comp ARV that's WILDLY off the
+    # assessor (>2.5x or <0.6x) almost always means bad comps (wrong submarket
+    # or property type — the zip-match failure). We don't rewrite the ARV
+    # (the assessor isn't ARV), but we flag it and lower confidence so a
+    # bad-comp number can't masquerade as HIGH. Only meaningful when ARV is
+    # comp-grounded (HIGH) — the tax-value fallback would be circular.
+    assessed = li.market_value or li.assessed_value or li.tax_value
+    if out.arv_expected and assessed and float(assessed) > 0:
+        out.arv_vs_assessed = round(out.arv_expected / float(assessed), 2)
+        if arv_conf == "HIGH" and (out.arv_vs_assessed > 2.5 or out.arv_vs_assessed < 0.6):
+            arv_conf = "MEDIUM"
+            out.notes.append(
+                f"Comp ARV (${out.arv_expected:,.0f}) is {out.arv_vs_assessed:.1f}× the "
+                f"county appraisal (${float(assessed):,.0f}) — comps may be off-market; "
+                f"confidence lowered to MEDIUM, verify before bidding."
             )
 
     # ---- Rehab range ----------------------------------------------------
