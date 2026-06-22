@@ -1157,11 +1157,27 @@ async def run() -> int:
     # REGRESSED (alert).
     paywall_required = {s.slug for s in scrapers if getattr(s, "requires_paywall", False)}
     render_required = {s.slug for s in scrapers if getattr(s, "requires_render", False)}
+
+    # Per-source SILENT-FAILURE alarm: rolling baselines + consecutive-zero +
+    # sustained-bleed across runs. Catches a source that breaks and STAYS
+    # broken, or quietly bleeds (was ~50/run, now 5/run) — failure modes the
+    # single-run REGRESSED check below cannot see. Surfaced loudly in the email.
+    docs_dir = Path(__file__).resolve().parent.parent.parent / "docs"
+    source_alarms: dict = {}
+    try:
+        from .source_health_tracker import update_source_health
+        source_alarms = update_source_health(by_source, expected, docs_dir)
+    except Exception:
+        log.error("source_health.call_failed", traceback=traceback.format_exc())
+
     source_status = {}
     for slug in expected:
         n = by_source.get(slug, 0)
         carried_n = (carry_stats or {}).get(slug, 0)
-        if carried_n > 0 and n == carried_n:
+        if slug in source_alarms:
+            # Alarm supersedes the normal status so it can't be missed.
+            source_status[slug] = f"🔴 ALARM — {source_alarms[slug]['reason']}"
+        elif carried_n > 0 and n == carried_n:
             # All "listings" for this slug came from the prior run — fresh
             # scrape returned zero. Surface it visibly so on-call knows the
             # data is stale, not real-world dry.
@@ -1207,6 +1223,7 @@ async def run() -> int:
         "errors": errors,
         "regressions": regressions,
         "source_status": source_status,
+        "source_alarms": source_alarms,
         "notes": f"horizon={cfg.sale_horizon_days}d, scrapers={len(scrapers)}, regressions={len(regressions)}",
     }
 

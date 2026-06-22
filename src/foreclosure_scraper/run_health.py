@@ -38,6 +38,7 @@ def write_health_artifact(
             "by_state": summary.get("by_state", {}),
         },
         "sources": _per_source_section(summary),
+        "source_alarms": summary.get("source_alarms") or {},
         "regressions": summary.get("regressions") or [],
         "errors": summary.get("errors") or [],
         "enrichments": enrichment_stats or {},
@@ -69,6 +70,7 @@ def _per_source_section(summary: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _severity(status: str) -> int:
     """Higher = more attention needed.
+       4 = SILENT-FAILURE ALARM (broken/bleeding across runs) — top priority
        3 = REGRESSED (alert)
        2 = render-required / no creds (action item)
        2 = CARRYOVER (stale prior-run data — needs investigation)
@@ -78,6 +80,8 @@ def _severity(status: str) -> int:
     if not status:
         return 0
     s = status.upper()
+    if "ALARM" in s:
+        return 4
     if s.startswith("REGRESSED"):
         return 3
     if s.startswith("CARRYOVER"):

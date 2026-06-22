@@ -37,6 +37,29 @@ def _new_banner(run_summary: dict) -> str:
     )
 
 
+def _source_alarm_banner(run_summary: dict) -> str:
+    """Loud, top-of-email banner listing any source in SILENT-FAILURE alarm
+    (broken or bleeding across runs) so a dead scraper is impossible to miss."""
+    alarms = run_summary.get("source_alarms") or {}
+    if not alarms:
+        return ""
+    items = "".join(
+        f'<li style="margin:4px 0"><strong>{slug}</strong>: {a.get("reason", "alarm")}</li>'
+        for slug, a in sorted(alarms.items())
+    )
+    return (
+        f'<div style="background:#fde8e8;border:2px solid #e53935;color:#8a1414;'
+        f'padding:16px 18px;border-radius:6px;margin:0 0 18px 0;">'
+        f'<div style="font-weight:700;font-size:15px;margin-bottom:6px">'
+        f'🔴 SOURCE HEALTH — {len(alarms)} source(s) need attention</div>'
+        f'<ul style="margin:6px 0 0 18px;padding:0;font-weight:600">{items}</ul>'
+        f'<div style="font-weight:400;font-size:12px;margin-top:8px">'
+        f'These scrapers broke or are bleeding vs their normal output. Fix before '
+        f'trusting this run for those areas.</div>'
+        f'</div>'
+    )
+
+
 def _summary_html(sheet_url: str, run_summary: dict) -> str:
     by_source = run_summary.get("by_source", {})
     by_state = run_summary.get("by_state", {})
@@ -79,6 +102,7 @@ def _summary_html(sheet_url: str, run_summary: dict) -> str:
 <html>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; color:#222; max-width:680px;margin:0 auto;padding:20px;">
 <h2 style="color:#1a4d2e">Foreclosure Listings — {datetime.utcnow().strftime('%B %Y')}</h2>
+{_source_alarm_banner(run_summary)}
 {alert_banner}
 {_new_banner(run_summary)}
 <p>Run completed {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}.</p>
@@ -125,8 +149,10 @@ def send_digest(
     msg = MIMEMultipart("alternative")
     msg["From"] = sender
     msg["To"] = ", ".join(recipients)
+    n_alarms = len(run_summary.get("source_alarms") or {})
+    alarm_prefix = f"🔴 {n_alarms} SOURCE ALARM{'S' if n_alarms != 1 else ''} — " if n_alarms else ""
     msg["Subject"] = (
-        f"Foreclosure Listings — {datetime.utcnow().strftime('%b %d, %Y')} "
+        f"{alarm_prefix}Foreclosure Listings — {datetime.utcnow().strftime('%b %d, %Y')} "
         f"({run_summary.get('total', 0)} active)"
     )
     msg.attach(MIMEText(_summary_html(sheet_url, run_summary), "html"))
