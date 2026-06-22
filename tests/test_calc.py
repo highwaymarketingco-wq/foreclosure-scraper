@@ -284,3 +284,43 @@ def test_seventy_pct_rule_max_bid_with_vision_rehab():
     assert c.max_bid_70 is not None and c.max_bid_70 > 0
     # Bid 70k > max 28k → deal_status = NEGOTIATE or PASS
     assert c.deal_status in ("NEGOTIATE", "PASS", "OK", "GREAT")
+
+
+# ---- ARV-method confidence (2026-06-21) ----
+# arv_conf was computed in compute() but never stored on the Calc object, so
+# grading.py's getattr(c, "arv_confidence") was always None and the
+# grade-withhold logic silently degraded to "has opening_bid" only. These pin
+# the fix + the tax/appraised-value -> MEDIUM upgrade that makes GIS-backfilled
+# listings gradeable.
+
+def test_arv_confidence_is_persisted_on_calc():
+    c = vcalc.compute(_li(tax_value=150_000))
+    assert c.arv_confidence in ("HIGH", "MEDIUM", "LOW")
+
+
+def test_tax_value_arv_is_medium_confidence():
+    c = vcalc.compute(_li(tax_value=200_000))
+    assert c.arv_expected and c.arv_expected > 0
+    assert c.arv_confidence == "MEDIUM"
+
+
+def test_opening_bid_only_arv_is_low_confidence():
+    c = vcalc.compute(_li(opening_bid=50_000))
+    assert c.arv_confidence == "LOW"
+
+
+def test_tax_value_listing_is_gradeable():
+    from foreclosure_scraper.valuation import grading as vgrade
+    li = _li(tax_value=180_000, county="Henderson", state="NC",
+             living_sqft=1500, year_built=1995)
+    c = vcalc.compute(li)
+    g = vgrade.grade(li, c)
+    assert g.overall is not None  # MEDIUM ARV -> assessable -> actually rated
+
+
+def test_dataless_listing_grade_still_withheld():
+    from foreclosure_scraper.valuation import grading as vgrade
+    li = _li(county="Henderson", state="NC")  # no bid, no value, no comps
+    c = vcalc.compute(li)
+    g = vgrade.grade(li, c)
+    assert g.overall is None  # nothing to assess -> withheld (honest)

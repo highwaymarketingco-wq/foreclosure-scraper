@@ -71,6 +71,11 @@ class Calc:
     cash_on_cash_pct: float | None = None
     bid_to_arv_pct: float | None = None
     confidence: str = "LOW"
+    # ARV-METHOD confidence (distinct from `confidence`, which scores overall
+    # data completeness): HIGH = sold-comp grounded, MEDIUM = zestimate or
+    # county tax/appraised value, LOW = opening-bid guess. grading.py reads this
+    # to decide whether a listing is assessable enough to rate.
+    arv_confidence: str | None = None
     notes: list[str] | None = None
     # Flip framing — what's the deal status at the listed/asking price?
     deal_status: str | None = None         # GREAT / OK / NEGOTIATE / PASS
@@ -247,7 +252,12 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
     elif li.tax_value and li.tax_value > 0:
         expected = float(li.tax_value) * 1.25
         notes.append(f"ARV from tax-assessed × 1.25 ({li.tax_value:,.0f} × 1.25)")
-        confidence = "LOW"
+        # 2026-06-21: MEDIUM, not LOW. A county tax-assessed / appraised value
+        # is an official, authoritative valuation (just conservative/stale),
+        # not a guess like opening_bid × 2.4. Treating it as MEDIUM lets the
+        # grade engine actually rate the listing instead of withholding; the
+        # anomaly guard in grading.py still backstops implausible ARVs.
+        confidence = "MEDIUM"
     elif li.opening_bid and li.opening_bid > 0:
         expected = float(li.opening_bid) * 2.4
         notes.append(f"ARV proxy from opening bid × 2.4 ({li.opening_bid:,.0f} × 2.4) — rough")
@@ -442,6 +452,11 @@ def compute(li: Listing) -> Calc:
     if li.tax_value:
         score += 1
     out.confidence = "HIGH" if score >= 5 else "MEDIUM" if score >= 3 else "LOW"
+    # Persist the ARV-method confidence so grading.py can read it (it was
+    # computed locally but never stored — grade-withhold silently degraded to
+    # bid-only). arv_conf is final by here (set in _arv_signals + any MEDIUM
+    # upgrade above).
+    out.arv_confidence = arv_conf
 
     # ---- Deal status: investor's actionable verdict ----------------------
     # Frames the listing in terms a flipper actually decides on:
