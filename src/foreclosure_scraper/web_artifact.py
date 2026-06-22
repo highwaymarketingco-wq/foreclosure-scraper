@@ -39,6 +39,8 @@ RAW_KEEP = {
     "rent_comps": "*",                # 3 rent comps per listing (HomeHarvest)
     "comps_note": "*",                # explanation when no like-for-like found
     "comp_median_ppsf": "*",
+    "recorded_comps": "*",            # county-GIS recorded arms-length sales (median $/sqft, Tier-0 ARV)
+    "comp_median_ppsf_recorded": "*",
     "condition_tier": "*",            # move_in_ready / cosmetic / major / gut
     "condition_source": "*",          # "vision-HIGH" / "vision-MEDIUM" / regex/age default
     "vision": "*",                    # full Claude Vision condition report

@@ -224,6 +224,22 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
     comps = raw.get("comps") or []
     comp_ppsf = raw.get("comp_median_ppsf")
 
+    # Tier 0: RECORDED arms-length sales comps (county GIS, distance-matched).
+    # Real recorded transactions beat scraped listings — no list-vs-sold gap,
+    # tighter geography. This is the comp-accuracy fix (enrichment_recorded_comps).
+    rec = raw.get("recorded_comps") or {}
+    rec_ppsf = raw.get("comp_median_ppsf_recorded")
+    if rec_ppsf and li.living_sqft:
+        expected = float(rec_ppsf) * float(li.living_sqft)
+        notes.append(
+            f"ARV from {rec.get('count', '?')} RECORDED arms-length sales within "
+            f"{rec.get('radius_mi', '?')}mi (${rec_ppsf:,.0f}/sqft × {li.living_sqft:,.0f} sqft)"
+        )
+        low = round((rec.get("p25_ppsf") or rec_ppsf * 0.9) * li.living_sqft, -2)
+        high = round((rec.get("p75_ppsf") or rec_ppsf * 1.1) * li.living_sqft, -2)
+        conf = "HIGH" if rec.get("confidence") == "HIGH" else "MEDIUM"
+        return round(expected, -2), low, high, conf, notes
+
     # Tier 1: comp-based ARV (HIGHEST confidence)
     if comps and comp_ppsf and li.living_sqft:
         expected = float(comp_ppsf) * float(li.living_sqft)

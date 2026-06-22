@@ -768,6 +768,18 @@ async def run() -> int:
     except Exception:
         log.error("skip_trace.failed", traceback=traceback.format_exc())
 
+    # RECORDED-SALES comps (Tier 0) — query each county GIS for REAL nearby
+    # arms-length recorded sales (distance-matched to the subject's coordinates)
+    # and attach a median $/sqft. This is the comp-accuracy fix: real recorded
+    # transactions outrank scraped listings in valuation/calc.py. Free, polite
+    # (shared rate-limited client). Runs before the listing-comp fallback so the
+    # valuation tier order is recorded > scraped > zestimate > tax.
+    try:
+        from .enrichment_recorded_comps import enrich as enrich_recorded_comps
+        await enrich_recorded_comps(enriched)
+    except Exception:
+        log.error("recorded_comps.failed", traceback=traceback.format_exc())
+
     # Comp finder + property-spec backfill — pulls 180-day sold pool per county
     # from HomeHarvest (free), backfills missing sqft/beds/baths/year, attaches
     # 3 comparable sales per listing matched by zip + sqft + beds.
