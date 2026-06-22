@@ -1,8 +1,16 @@
-"""Shared async HTTP client with sane retries."""
+"""Shared async HTTP client: sane retries + PER-HOST rate limiting + UA rotation.
+
+Politeness is enforced at the TRANSPORT layer, so every request that goes through
+`client()` (scrapers, enrichments, get_text/get_bytes) is automatically spaced
+per hostname — different hosts stay parallel, same-host bursts get throttled.
+This is the structural fix for IP-ban risk: nothing hammers a single host.
+"""
 from __future__ import annotations
 
 import asyncio
 import os
+import random
+import time
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
@@ -17,12 +25,24 @@ from tenacity import (
 
 log = structlog.get_logger()
 
+# A small pool of REAL current desktop browser UAs. One is chosen per process
+# (so a run looks like a single consistent browser) and varies run-to-run, so a
+# fingerprinting service can't pin one static UA to our IP over time.
+_UA_POOL = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 "
+    "(KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
+)
+_SESSION_UA = random.choice(_UA_POOL)
+
 DEFAULT_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) "
-        "AppleWebKit/605.1.15 (KHTML, like Gecko) "
-        "Version/17.5 Safari/605.1.15"
-    ),
+    "User-Agent": _SESSION_UA,
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
     # Drop brotli — httpx doesn't decode it without the brotli package, and many
@@ -31,6 +51,50 @@ DEFAULT_HEADERS = {
     "Cache-Control": "no-cache",
     "Connection": "keep-alive",
 }
+
+# --- per-host rate limiter --------------------------------------------------
+# Minimum spacing between request STARTS to the same host, plus random jitter so
+# the cadence isn't a tell-tale fixed interval. Tunable via env for a slow,
+# extra-polite run.
+_MIN_INTERVAL_S = float(os.environ.get("HTTP_MIN_INTERVAL_S", "0.8"))
+_JITTER_S = float(os.environ.get("HTTP_JITTER_S", "0.7"))
+_host_last: dict[str, float] = {}
+_host_locks: dict[tuple[int, str], asyncio.Lock] = {}
+
+
+def _host_lock(host: str) -> asyncio.Lock:
+    # Key by running loop so a lock is never reused across event loops (tests).
+    key = (id(asyncio.get_running_loop()), host)
+    lk = _host_locks.get(key)
+    if lk is None:
+        lk = _host_locks[key] = asyncio.Lock()
+    return lk
+
+
+async def _throttle(host: str | None) -> None:
+    if not host:
+        return
+    async with _host_lock(host):
+        wait = (_MIN_INTERVAL_S + random.uniform(0, _JITTER_S)) - (
+            time.monotonic() - _host_last.get(host, 0.0)
+        )
+        if wait > 0:
+            await asyncio.sleep(wait)
+        _host_last[host] = time.monotonic()
+
+
+class _ThrottledTransport(httpx.AsyncBaseTransport):
+    """Wraps the real transport and spaces requests per hostname."""
+
+    def __init__(self, inner: httpx.AsyncBaseTransport):
+        self._inner = inner
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        await _throttle(request.url.host)
+        return await self._inner.handle_async_request(request)
+
+    async def aclose(self) -> None:
+        await self._inner.aclose()
 
 
 @asynccontextmanager
@@ -45,7 +109,7 @@ async def client(
     if headers:
         h.update(headers)
     proxy = os.environ.get("PROXY_URL") or None
-    transport = httpx.AsyncHTTPTransport(retries=2)
+    transport = _ThrottledTransport(httpx.AsyncHTTPTransport(retries=2))
     async with httpx.AsyncClient(
         timeout=timeout,
         follow_redirects=follow_redirects,
@@ -89,10 +153,25 @@ async def get_text(
 
 
 async def get_bytes(url: str, *, timeout: float = 60.0) -> bytes:
-    async with client(timeout=timeout) as c:
-        r = await c.get(url)
-        r.raise_for_status()
-        return r.content
+    """GET raw bytes (images/PDFs), with the same transient-error retry as text."""
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=10),
+        retry=retry_if_exception_type(
+            (httpx.TransportError, httpx.HTTPStatusError, httpx.TimeoutException)
+        ),
+        reraise=True,
+    ):
+        with attempt:
+            async with client(timeout=timeout) as c:
+                r = await c.get(url)
+                if r.status_code in (429, 500, 502, 503, 504):
+                    raise httpx.HTTPStatusError(
+                        f"transient {r.status_code}", request=r.request, response=r
+                    )
+                r.raise_for_status()
+                return r.content
+    raise RuntimeError("unreachable")
 
 
 async def gather_with_concurrency(n: int, *aws):

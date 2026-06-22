@@ -17,12 +17,14 @@ satisfactions are resolutions, not distress, and are excluded.
 """
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import datetime, timedelta
 
 import httpx
 import structlog
 
+from ..http_client import client
 from .models import RodDoc
 
 log = structlog.get_logger()
@@ -31,8 +33,6 @@ ACCLAIM_COUNTIES: dict[tuple[str, str], str] = {
     ("SC", "Pickens"): "https://www.pickensscrod.us/AcclaimWeb",
 }
 
-_UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-       "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"}
 _DATE_RE = re.compile(r"/Date\((\d+)")
 
 # Distress doc-type tokens; resolutions (release/satisfaction/etc.) excluded.
@@ -114,10 +114,15 @@ async def discover_recent_nods(state: str, county: str, days_back: int = 45,
     seen: set[str] = set()
     scanned = 0
     try:
-        async with httpx.AsyncClient(timeout=45.0, follow_redirects=True, headers=_UA) as c:
+        # Shared client => per-host throttle + retry/backoff + rotating UA.
+        async with client(timeout=45.0) as c:
             await c.get(f"{base}/search/SearchTypeDocType")  # session cookie
             cur = today
+            first = True
             while cur > earliest and len(out) < max_docs:
+                if not first:
+                    await asyncio.sleep(1.0)  # extra spacing between date windows
+                first = False
                 chunk_from = max(earliest, cur - timedelta(days=_CHUNK_DAYS))
                 rows = await _search_chunk(c, base, chunk_from, cur)
                 scanned += len(rows)
