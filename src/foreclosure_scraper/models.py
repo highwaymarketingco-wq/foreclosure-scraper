@@ -188,6 +188,8 @@ class Listing(BaseModel):
     judgment_amount: float | None = None
     upset_bid_deadline: datetime | None = None
     auction_status: str | None = None  # active, postponed, withdrawn, cancelled
+    redemption_deadline: datetime | None = None  # SC tax sale: sale_date + ~12mo (SC Code 12-51-90)
+    foreclosure_process: str | None = None  # power_of_sale (NC) | judicial (SC) | tax
 
     # Parties
     plaintiff: str | None = None

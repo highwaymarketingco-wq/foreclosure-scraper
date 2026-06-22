@@ -1128,6 +1128,17 @@ async def run() -> int:
     except Exception:
         log.error("upset_bid.failed", traceback=traceback.format_exc())
 
+    # Foreclosure-process + redemption-clock labels (NC power-of-sale vs SC
+    # judicial vs tax; SC tax = ~12-mo redemption). Pure-Python; runs before
+    # calc/grade so the risk model can read the process timing.
+    try:
+        from .enrichment_process_timing import enrich_process_timing
+        s = enrich_process_timing(enriched)
+        if s:
+            enrichment_stats["process_timing"] = s
+    except Exception:
+        log.error("process_timing.failed", traceback=traceback.format_exc())
+
     # Investor calculator + A-F grades per listing.
     for li in enriched:
         try:

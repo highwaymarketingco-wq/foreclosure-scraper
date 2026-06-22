@@ -200,6 +200,20 @@ def _risk_score(li: Listing, c: "_calc.Calc | None" = None) -> tuple[int, str]:
         score += 8
         notes.append("REO — clean title typical")
 
+    # Foreclosure process: NC power-of-sale is fast + clean; SC judicial is a
+    # slow lawsuit (Master-in-Equity, court confirmation) = more timing risk;
+    # SC tax sale carries a ~12-mo redemption window before title is takeable.
+    proc = getattr(li, "foreclosure_process", None)
+    if proc == "judicial":
+        score -= 5
+        notes.append("SC judicial foreclosure — slower (court confirmation), higher timing risk")
+    elif proc == "power_of_sale":
+        score += 3
+        notes.append("NC power-of-sale — fast, clean title (10-day upset-bid window)")
+    if getattr(li, "redemption_deadline", None):
+        score -= 6
+        notes.append("SC tax sale — ~12-mo owner redemption period before title is takeable")
+
     # Equity flag from county GIS or zillow
     flag_set = set(flags)
     if "high_equity" in flag_set:
