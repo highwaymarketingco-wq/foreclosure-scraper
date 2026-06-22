@@ -510,10 +510,13 @@ def compute(li: Listing) -> Calc:
                 out.wholesale_spread = round(out.max_bid_70 - float(li.opening_bid), -2)
 
     # ---- Total investment if bidding at opening bid ---------------------
+    # Holding period scales with local market velocity (months-of-inventory from
+    # enrichment_comps): fast market -> shorter carry, slow market -> longer.
+    holding_months = (raw.get("market_velocity") or {}).get("holding_months_est") or HOLDING_MONTHS
     bid = li.opening_bid
     if bid and out.arv_expected:
         closing = bid * CLOSING_PCT
-        holding = bid * HOLDING_RATE_MONTH * HOLDING_MONTHS
+        holding = bid * HOLDING_RATE_MONTH * holding_months
         selling = out.arv_expected * SELLING_PCT
         # senior_cost (junior-position + super-priority liens) computed above;
         # rehab_buy includes the contingency buffer (same number used for max bid).

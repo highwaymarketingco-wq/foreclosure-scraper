@@ -84,6 +84,44 @@ def _rent_pool_for_seat(seat: str, state: str) -> list[dict]:
         return []
 
 
+# --- Market velocity: months-of-inventory -> per-listing holding period -----
+SOLD_WINDOW_MONTHS = 6.0   # the sold pool's past_days=180 == 6 months
+
+
+def _active_count_for_seat(seat: str, state: str) -> int:
+    """Count current for-sale listings (the numerator of months-of-inventory)."""
+    try:
+        from homeharvest import scrape_property
+    except ImportError:
+        return 0
+    try:
+        df = scrape_property(location=f"{seat}, {state}", listing_type="for_sale")
+        return 0 if df is None else int(len(df))
+    except Exception as exc:
+        log.debug("comps.active_pool.error", seat=seat, state=state, error=str(exc)[:100])
+        return 0
+
+
+def _months_of_inventory(active: int, sold: int) -> float | None:
+    """MOI = active listings / monthly sold rate. None if no sold signal."""
+    monthly_sold = sold / SOLD_WINDOW_MONTHS
+    if monthly_sold <= 0:
+        return None
+    return round(active / monthly_sold, 1)
+
+
+def _holding_months_from_moi(moi: float | None) -> int:
+    """Map absorption to an exit-time estimate (carrying cost driver).
+    <2mo seller's market -> fast flip; 2-6 balanced; >6 buyer's market -> slow."""
+    if moi is None:
+        return 6
+    if moi < 2:
+        return 4
+    if moi <= 6:
+        return 6
+    return 9
+
+
 def _num(v):
     try:
         if v is None or (isinstance(v, float) and (v != v)):
@@ -569,18 +607,27 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
     with ThreadPoolExecutor(max_workers=6) as pool:
         sold_futs = [loop.run_in_executor(pool, _sold_pool_for_seat, c.seat, c.state) for c in ALL_COUNTIES]
         rent_futs = [loop.run_in_executor(pool, _rent_pool_for_seat, c.seat, c.state) for c in ALL_COUNTIES]
-        sold_results, rent_results = await asyncio.gather(
+        active_futs = [loop.run_in_executor(pool, _active_count_for_seat, c.seat, c.state) for c in ALL_COUNTIES]
+        sold_results, rent_results, active_results = await asyncio.gather(
             asyncio.gather(*sold_futs, return_exceptions=True),
             asyncio.gather(*rent_futs, return_exceptions=True),
+            asyncio.gather(*active_futs, return_exceptions=True),
         )
 
     sold_pools: dict[tuple[str, str], list[dict]] = {}
     rent_pools: dict[tuple[str, str], list[dict]] = {}
-    for c, sr, rr in zip(ALL_COUNTIES, sold_results, rent_results):
+    velocity: dict[tuple[str, str], dict] = {}
+    for c, sr, rr, ar in zip(ALL_COUNTIES, sold_results, rent_results, active_results):
         if isinstance(sr, list):
             sold_pools[(c.state, c.name)] = sr
         if isinstance(rr, list):
             rent_pools[(c.state, c.name)] = rr
+        active = ar if isinstance(ar, int) else 0
+        moi = _months_of_inventory(active, len(sr) if isinstance(sr, list) else 0)
+        velocity[(c.state, c.name)] = {
+            "moi": moi, "holding_months_est": _holding_months_from_moi(moi),
+            "active": active, "sold_180d": len(sr) if isinstance(sr, list) else 0,
+        }
     total_sold = sum(len(p) for p in sold_pools.values())
     total_rent = sum(len(p) for p in rent_pools.values())
     log.info("comps.pools_built", counties=len(sold_pools),
@@ -604,6 +651,11 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
         # Condition tier
         if not isinstance(li.raw, dict):
             li.raw = {}
+
+        # Market velocity -> per-listing holding-period estimate (calc reads it).
+        vel = velocity.get((li.state, li.county)) if (li.county and li.state) else None
+        if vel:
+            li.raw["market_velocity"] = vel
         tier = _condition_tier(li)
         li.raw["condition_tier"] = tier
         cond_counts[tier] = cond_counts.get(tier, 0) + 1
