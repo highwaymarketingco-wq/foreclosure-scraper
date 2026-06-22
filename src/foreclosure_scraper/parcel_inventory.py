@@ -85,9 +85,9 @@ def _connect() -> sqlite3.Connection:
     return con
 
 
-async def _pull_page(http, base: str, offset: int) -> tuple[list[dict], bool]:
+async def _pull_page(http, base: str, offset: int, where: str = "1=1") -> tuple[list[dict], bool]:
     url = base.rstrip("/") + "/query"
-    params = {"where": "1=1", "outFields": "*", "returnGeometry": "false",
+    params = {"where": where, "outFields": "*", "returnGeometry": "false",
               "resultOffset": str(offset), "resultRecordCount": str(_PAGE), "f": "json"}
     r = await http.get(url, params=params, timeout=60.0)
     if r.status_code != 200:
@@ -104,12 +104,18 @@ async def pull_county(state: str, county: str, spec: dict, *,
     ts = _now_iso()
     total = 0
     seen_parcels: set[str] = set()
+    # Statewide/shared layers (e.g. Cleveland via NC OneMap) MUST be county-
+    # filtered or they pull the whole state mislabeled as this county. Layers
+    # that are already per-county (SCDOT per-id, county-specific hosts) have no
+    # county_field and use 1=1.
+    cf = spec.get("county_field")
+    where = f"UPPER({cf})='{county.upper()}'" if cf else "1=1"
     try:
         async with client(timeout=60.0) as http:
             offset, page = 0, 0
             while page < max_pages:
                 try:
-                    feats, more = await _pull_page(http, spec["url"], offset)
+                    feats, more = await _pull_page(http, spec["url"], offset, where)
                 except Exception:
                     log.warning("parcel_inv.page_failed", county=county, offset=offset)
                     break
