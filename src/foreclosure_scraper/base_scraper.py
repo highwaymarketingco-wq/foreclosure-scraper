@@ -5,11 +5,21 @@ import asyncio
 from abc import ABC, abstractmethod
 from typing import Iterable
 
+import httpx
 import structlog
 
 from .models import Listing
 
 log = structlog.get_logger()
+
+# Per-run outcome classes so the orchestrator can tell the owner EXACTLY why a
+# source produced nothing — a code bug, a block, a timeout, or a legit empty.
+OUTCOME_OK = "OK"
+OUTCOME_ZERO = "ZERO_RESULT"      # ran clean, genuinely 0 rows
+OUTCOME_TIMEOUT = "TIMEOUT"       # exceeded the soft timeout / network timeout
+OUTCOME_BLOCKED = "BLOCKED"       # 401/403/406/429 or WAF/connection refused
+OUTCOME_ERROR = "ERROR"           # code/parse exception (a real bug)
+OUTCOME_DORMANT = "DORMANT"       # intentionally skipped (off-season)
 
 
 class BaseScraper(ABC):
@@ -59,21 +69,68 @@ class BaseScraper(ABC):
     async def fetch(self) -> Iterable[Listing]:
         """Yield Listing objects. Implementations may be async generators or return lists."""
 
+    #: Set by every safe_run() so the orchestrator/report can explain a 0-count.
+    last_outcome: str = OUTCOME_OK
+    last_reason: str = ""
+
     async def safe_run(self) -> list[Listing]:
-        """Run with timeout + error handling; never raise to the orchestrator."""
+        """Run with timeout + error handling; never raise to the orchestrator.
+
+        Records self.last_outcome / self.last_reason so a 0-count is never
+        ambiguous — the owner sees code-error vs blocked vs timeout vs legit-empty.
+        """
         bound = log.bind(scraper=self.slug)
+        self.last_outcome, self.last_reason = OUTCOME_OK, ""
         if not self._in_season():
+            self.last_outcome = OUTCOME_DORMANT
+            self.last_reason = f"off-season (active months {self.active_months})"
             bound.info("scraper.dormant_off_season", active_months=self.active_months)
             return []
         try:
             bound.info("scraper.start")
             results = await asyncio.wait_for(self._collect(), timeout=self.timeout_s)
-            bound.info("scraper.ok", count=len(results))
+            if not results:
+                self.last_outcome = OUTCOME_ZERO
+                self.last_reason = "ran clean but returned 0 rows"
+            bound.info("scraper.ok", count=len(results), outcome=self.last_outcome)
             return results
         except asyncio.TimeoutError:
+            self.last_outcome = OUTCOME_TIMEOUT
+            self.last_reason = f"exceeded soft timeout {self.timeout_s:.0f}s"
             bound.warning("scraper.timeout")
             return []
+        except httpx.TimeoutException as exc:
+            self.last_outcome = OUTCOME_TIMEOUT
+            self.last_reason = f"network timeout ({type(exc).__name__})"
+            bound.warning("scraper.net_timeout", exc_type=type(exc).__name__)
+            if not self.optional:
+                raise
+            return []
+        except httpx.HTTPStatusError as exc:
+            code = exc.response.status_code if exc.response is not None else None
+            if code in (401, 403, 406, 429):
+                self.last_outcome = OUTCOME_BLOCKED
+                self.last_reason = f"HTTP {code} ({'rate-limited' if code == 429 else 'blocked/forbidden'})"
+            elif code and 500 <= code < 600:
+                self.last_outcome = OUTCOME_BLOCKED
+                self.last_reason = f"HTTP {code} (server error / possible WAF)"
+            else:
+                self.last_outcome = OUTCOME_ERROR
+                self.last_reason = f"HTTP {code}"
+            bound.warning("scraper.http_error", code=code, outcome=self.last_outcome)
+            if not self.optional:
+                raise
+            return []
+        except (httpx.ConnectError, httpx.RemoteProtocolError, httpx.ProxyError) as exc:
+            self.last_outcome = OUTCOME_BLOCKED
+            self.last_reason = f"connection refused/dropped ({type(exc).__name__})"
+            bound.warning("scraper.conn_error", exc_type=type(exc).__name__)
+            if not self.optional:
+                raise
+            return []
         except Exception as exc:  # noqa: BLE001
+            self.last_outcome = OUTCOME_ERROR
+            self.last_reason = f"{type(exc).__name__}: {str(exc)[:160]}"
             bound.warning("scraper.error", error=str(exc), exc_type=type(exc).__name__)
             if not self.optional:
                 raise

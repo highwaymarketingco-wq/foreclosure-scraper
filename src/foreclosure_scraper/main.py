@@ -355,6 +355,10 @@ async def run() -> int:
     errors: list[str] = []
     regressions: list[str] = []
     expected = {s.slug: s.expected_min_count for s in scrapers}
+    # Per-run outcome+reason from base_scraper.safe_run — so a 0-count source is
+    # never ambiguous (code error vs blocked vs timeout vs legit empty).
+    source_outcomes = {s.slug: (getattr(s, "last_outcome", "OK"),
+                                getattr(s, "last_reason", "")) for s in scrapers}
     for slug, listings in results:
         n = len(listings)
         by_source[slug] = n
@@ -1193,10 +1197,20 @@ async def run() -> int:
     except Exception:
         log.error("source_health.call_failed", traceback=traceback.format_exc())
 
+    # A hard per-run failure (0 rows WITH a real cause: blocked / errored /
+    # timed out) is an alarm on the FIRST occurrence — the owner wants immediate
+    # notice + the exact reason, not a 2-run-consecutive DEAD detection delay.
+    for slug, (outcome, reason) in source_outcomes.items():
+        if (by_source.get(slug, 0) == 0
+                and outcome in ("BLOCKED", "ERROR", "TIMEOUT")
+                and slug not in source_alarms):
+            source_alarms[slug] = {"reason": f"{outcome}: {reason}", "severity": outcome}
+
     source_status = {}
     for slug in expected:
         n = by_source.get(slug, 0)
         carried_n = (carry_stats or {}).get(slug, 0)
+        outcome, reason = source_outcomes.get(slug, ("OK", ""))
         if slug in source_alarms:
             # Alarm supersedes the normal status so it can't be missed.
             source_status[slug] = f"🔴 ALARM — {source_alarms[slug]['reason']}"
@@ -1207,6 +1221,15 @@ async def run() -> int:
             source_status[slug] = f"CARRYOVER ({carried_n} stale from prior run)"
         elif n > 0:
             source_status[slug] = f"OK ({n})"
+        # n == 0 below — say EXACTLY what happened this run, not a static guess.
+        elif outcome == "BLOCKED":
+            source_status[slug] = f"🔴 BLOCKED — {reason}"
+        elif outcome == "TIMEOUT":
+            source_status[slug] = f"🔴 TIMEOUT — {reason}"
+        elif outcome == "ERROR":
+            source_status[slug] = f"🔴 ERROR — {reason}"
+        elif outcome == "DORMANT":
+            source_status[slug] = f"DORMANT — {reason}"
         elif slug in paywall_required:
             source_status[slug] = "PAYWALL-BLOCKED"
         elif slug in render_required:
@@ -1337,7 +1360,12 @@ async def run() -> int:
     else:
         log.warning("sheets.skipped_no_secret")
 
-    if cfg.gmail_app_password and cfg.gmail_sender and sheet_url:
+    # Send the digest whenever Gmail creds exist — do NOT gate on sheet_url.
+    # Gating on the sheet meant a missing/failed Sheets export silently
+    # suppressed the ENTIRE email, including the source-alarm/failure banner the
+    # owner relies on to learn a source broke. The template already guards the
+    # sheet link with `if sheet_url`, so an empty sheet_url is fine.
+    if cfg.gmail_app_password and cfg.gmail_sender:
         try:
             send_digest(
                 sender=cfg.gmail_sender,
@@ -1348,6 +1376,9 @@ async def run() -> int:
             )
         except Exception:
             log.error("email.failed", traceback=traceback.format_exc())
+    elif summary.get("source_alarms"):
+        # No Gmail creds but sources failed — make sure it can't pass silently.
+        log.error("email.skipped_but_alarms_present", alarms=list(summary["source_alarms"]))
     else:
         log.warning("email.skipped_no_secret")
 
