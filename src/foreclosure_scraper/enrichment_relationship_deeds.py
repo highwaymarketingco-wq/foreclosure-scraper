@@ -13,9 +13,13 @@ foreclosure sweep. This module re-scans the same data with different
 pattern detectors and tags listings with raw["relationship_signal"].
 
 Signal types:
-  - "probate"  — executor's deed, administrator's deed, devise, will
-  - "divorce"  — quitclaim deed with $0 consideration AND grantor pattern
-                 indicating couple-to-single transfer
+  - "probate"   — executor/administrator/PR deed, deed of distribution (SC),
+                  devise, estate-of, will
+  - "divorce"   — deed/memorandum of separation, OR quitclaim with $0
+                  consideration AND a couple-to-single grantor pattern
+  - "partition" — Commissioner's Deed (court-ordered partition / judicial
+                  sale, often heirs' property). Tagged for distress context
+                  only; not promoted to a new lead (sale already complete).
 """
 from __future__ import annotations
 
@@ -38,6 +42,7 @@ PROBATE_KEYWORDS = (
     "EXECUTOR",
     "ADMINISTRATOR",
     "PERSONAL REPRESENTATIVE",
+    "DEED OF DISTRIBUTION",  # SC statutory PR instrument (SC Code §62-3-907/908)
     "DEVISE",
     "AFFIDAVIT OF HEIRS",
     "ESTATE OF",
@@ -45,6 +50,18 @@ PROBATE_KEYWORDS = (
     "TESTAMENTARY",
     "LAST WILL",         # 'LAST WILL [AND TESTAMENT]' is unambiguous
     "WILL AND TESTAMENT",
+)
+
+# Partition / forced-sale instruments. A Commissioner's Deed conveys property
+# sold under a court-ordered partition or judicial sale (often heirs' property
+# being force-split) — a genuine distress marker. Require the full phrase: bare
+# 'COMMISSIONER' is too broad (County Commissioner, commission language).
+# NOTE: a commissioner's deed is the deed TO the purchaser, so the sale is
+# usually already complete at recording — treated as a distress context/comp
+# signal, not promoted to a new lead.
+PARTITION_KEYWORDS = (
+    "COMMISSIONER'S DEED",
+    "COMMISSIONERS DEED",
 )
 
 # Quitclaim doc-type keywords — divorce candidates record one of these
@@ -55,6 +72,14 @@ QUITCLAIM_KEYWORDS = (
     "DIVORCE DECREE",
     "DECREE OF DIVORCE",
     "EQUITABLE DISTRIBUTION",
+)
+
+# Marital-separation instruments that ARE recorded at the ROD (NC G.S. §39-13.4).
+# Direct, marital-specific matches — they bypass the consideration/grantor gate
+# in _looks_divorce because the instrument itself is inherently a divorce signal.
+SEPARATION_KEYWORDS = (
+    "DEED OF SEPARATION",
+    "MEMORANDUM OF SEPARATION",
 )
 
 # Grantor-grantee couple-to-single divorce pattern.
@@ -102,6 +127,11 @@ def _looks_divorce(li: Listing) -> Optional[str]:
         if x
     ).upper()
 
+    # Direct marital-instrument match — a deed/memorandum of separation IS the
+    # divorce signal on its own; no $0-consideration / couple-name gate needed.
+    if any(kw in doc_type_blob for kw in SEPARATION_KEYWORDS):
+        return "deed_of_separation"
+
     if not any(kw in doc_type_blob for kw in QUITCLAIM_KEYWORDS):
         return None
 
@@ -134,6 +164,23 @@ def _looks_divorce(li: Listing) -> Optional[str]:
     return None
 
 
+def _looks_partition(li: Listing) -> Optional[str]:
+    """Return the matched keyword if the doc-type looks like a court-ordered
+    partition / judicial sale (Commissioner's Deed)."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    rod_section = raw.get("rod") if isinstance(raw.get("rod"), dict) else {}
+    blob = " ".join(
+        str(x) for x in (
+            raw.get("doc_type", ""), raw.get("notes", ""),
+            rod_section.get("doc_type", ""), li.description or "",
+        ) if x
+    ).upper()
+    for kw in PARTITION_KEYWORDS:
+        if kw in blob:
+            return kw.strip()
+    return None
+
+
 def enrich_with_relationship_deeds(
     listings: list[Listing],
     sold_pool: Optional[list[Listing]] = None,
@@ -161,6 +208,7 @@ def enrich_with_relationship_deeds(
         "scanned": 0,
         "probate_tagged": 0,
         "divorce_tagged": 0,
+        "partition_tagged": 0,
         "probate_emitted": 0,
         "divorce_emitted": 0,
         "emit_skipped_already_in_active": 0,
@@ -172,7 +220,8 @@ def enrich_with_relationship_deeds(
 
         probate_kw = _looks_probate(li)
         divorce_kw = _looks_divorce(li)
-        if not (probate_kw or divorce_kw):
+        partition_kw = None if (probate_kw or divorce_kw) else _looks_partition(li)
+        if not (probate_kw or divorce_kw or partition_kw):
             continue
 
         if not isinstance(li.raw, dict):
@@ -193,6 +242,17 @@ def enrich_with_relationship_deeds(
                 "tagged_at": datetime.utcnow().isoformat() + "Z",
             }
             counts["divorce_tagged"] += 1
+        elif partition_kw:
+            li.raw["relationship_signal"] = {
+                "kind": "partition",
+                "keyword": partition_kw,
+                "tagged_at": datetime.utcnow().isoformat() + "Z",
+            }
+            counts["partition_tagged"] += 1
+            # Partition (Commissioner's Deed) is the deed TO the purchaser —
+            # the sale already happened, so tag the context but never promote
+            # it to a new lead.
+            continue
 
         # H5: when the source is ALREADY in the active pool, the in-place
         # tag (above) is sufficient — the dashboard reads

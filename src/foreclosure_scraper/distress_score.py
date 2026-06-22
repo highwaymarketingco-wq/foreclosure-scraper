@@ -62,6 +62,22 @@ def _signals_for(li: Listing) -> list[tuple[str, str, int]]:
     # life event
     if r.get("probate") or r.get("estate"):
         sig.append(("probate", "LIFE_EVENT", 20))
+    # relationship-deed signals (probate / divorce / partition) tagged by
+    # enrichment_relationship_deeds. Without this, in-place-tagged active
+    # listings and ALL divorce signals never reached the score.
+    rs = r.get("relationship_signal")
+    if isinstance(rs, dict):
+        kind = rs.get("kind")
+        if kind == "probate":
+            sig.append(("probate_deed", "LIFE_EVENT", 20))
+        elif kind == "divorce":
+            # zero-consideration quitclaim could be a gift, not a split — weaker
+            kw = rs.get("keyword")
+            w = 8 if kw == "zero_consideration_quitclaim" else 15
+            sig.append(("divorce", "LIFE_EVENT", w))
+        elif kind == "partition":
+            # forced/judicial sale (usually already sold) — modest SALES signal
+            sig.append(("partition", "SALES", 12))
     # property
     if r.get("code_enforcement") or r.get("condemned"):
         sig.append(("code_enforcement", "PROPERTY", 14))

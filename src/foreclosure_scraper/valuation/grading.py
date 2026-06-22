@@ -171,7 +171,7 @@ def _location_score(li: Listing) -> tuple[int, str]:
     return max(0, min(100, s)), why
 
 
-def _risk_score(li: Listing) -> tuple[int, str]:
+def _risk_score(li: Listing, c: "_calc.Calc | None" = None) -> tuple[int, str]:
     """Risk grade from auction status + flag count + listing type."""
     score = 75
     notes = []
@@ -209,6 +209,27 @@ def _risk_score(li: Listing) -> tuple[int, str]:
         score -= 12
         notes.append("negative equity (short-sale territory)")
 
+    # Underwater on the foreclosing lien: court-tested judgment debt >= ARV.
+    # Mortgage/sheriff foreclosures ONLY — a tax sale's opening figure is taxes
+    # owed, not debt, and the ARV must be real (HIGH/MEDIUM), never a bid proxy.
+    # Soft downgrade, never a hard veto: lien position is unverified, so a
+    # senior-lien foreclosure that wipes junior liens can still be a real deal.
+    # Don't double-count with the negative_equity flag — cap this concern at -15.
+    if c is not None:
+        lt_uw = (li.listing_type.value if hasattr(li.listing_type, "value")
+                 else str(li.listing_type)).lower()
+        jud = li.judgment_amount or 0
+        arv = getattr(c, "arv_expected", None)
+        conf = (getattr(c, "arv_confidence", "") or "").upper()
+        if (("foreclosure_sale" in lt_uw or "sheriff_sale" in lt_uw)
+                and jud > 0 and arv and conf in ("HIGH", "MEDIUM")
+                and jud >= arv):
+            # negative_equity flag (if set) already took -12; top up to -15 total
+            score -= 3 if "negative_equity" in flag_set else 15
+            notes.append(
+                f"judgment (${jud:,.0f}) >= ARV (${arv:,.0f}) — likely underwater "
+                "on foreclosing lien (lien position unverified)")
+
     return max(0, min(100, score)), "; ".join(notes) or "no major flags"
 
 
@@ -219,7 +240,7 @@ def grade(li: Listing, c: _calc.Calc | None = None) -> Grade:
     fs, fn = _financial_score(li, c)
     ps, pn = _property_score(li)
     ls, ln = _location_score(li)
-    rs, rn = _risk_score(li)
+    rs, rn = _risk_score(li, c)
 
     # Weighted overall: financial 40 / property 25 / location 20 / risk 15
     overall = round(fs * 0.40 + ps * 0.25 + ls * 0.20 + rs * 0.15)
