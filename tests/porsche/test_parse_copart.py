@@ -11,11 +11,12 @@ from porsche_scraper.scrapers.copart import parse_solr_response
 FIXTURE = Path(__file__).parent / "fixtures" / "copart.json"
 
 
-def test_excludes_cayenne_at_parse_time():
+def test_includes_cayenne_at_parse_time():
     listings = parse_solr_response(json.loads(FIXTURE.read_text()))
     models = {l.model for l in listings}
-    assert "CAYENNE" not in models
-    # Other excluded models we left out of the fixture but verifying defense-in-depth.
+    assert "CAYENNE" in models  # Cayenne intentionally included (feat 1e9e158)
+    # Panamera + Macan remain excluded (defense-in-depth; not in fixture).
+    assert "PANAMERA" not in models and "MACAN" not in models
 
 
 def test_parses_run_and_drive_flag():

@@ -59,7 +59,9 @@ def test_keeps_below_price_cap():
 
 
 def test_drops_over_price_cap_with_clean_title():
-    assert not matches(_l(price_usd=46_000, title_status=TitleStatus.CLEAN))
+    # Default cap is $200k (raised from $45k in 3f96d90 to capture clean-title
+    # GT3/Turbo/GT4 holds); a clean-title car above it is still dropped.
+    assert not matches(_l(price_usd=210_000, title_status=TitleStatus.CLEAN))
 
 
 def test_keeps_over_price_cap_when_salvage():
@@ -88,8 +90,11 @@ def test_drops_panamera_by_title():
     assert not matches(_l(title="2018 Porsche Panamera 4S", model="Panamera"))
 
 
-def test_drops_cayenne_by_model():
-    assert not matches(_l(model="Cayenne", title="2017 Porsche SUV"))
+def test_keeps_cayenne_now_included():
+    # Cayenne (+ Taycan) are intentionally INCLUDED (feat 1e9e158, "include
+    # Taycan + Cayenne ... drop cayenne exclusion"). Only Panamera + Macan
+    # remain excluded.
+    assert matches(_l(model="Cayenne", title="2017 Porsche Cayenne"))
 
 
 def test_drops_macan():
