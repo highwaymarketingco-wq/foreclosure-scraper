@@ -12,6 +12,7 @@ import os
 import random
 import time
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from typing import AsyncIterator
 
 import httpx
@@ -83,6 +84,23 @@ async def _throttle(host: str | None) -> None:
         _host_last[host] = time.monotonic()
 
 
+# Per-task record of the last block-status HTTP response, so a scraper that
+# SWALLOWS its own httpx error (returns [] / "") can still be classified as
+# BLOCKED by base_scraper.safe_run instead of looking like a legit empty result.
+# contextvars are copied per asyncio task (each safe_run runs as its own gather
+# task), so concurrent scrapers don't clobber each other's signal.
+_last_block: "ContextVar[tuple[int, str] | None]" = ContextVar("_last_block", default=None)
+_BLOCK_CODES = {401, 403, 406, 409, 429}
+
+
+def reset_block_signal() -> None:
+    _last_block.set(None)
+
+
+def take_block_signal() -> "tuple[int, str] | None":
+    return _last_block.get()
+
+
 class _ThrottledTransport(httpx.AsyncBaseTransport):
     """Wraps the real transport and spaces requests per hostname."""
 
@@ -91,7 +109,14 @@ class _ThrottledTransport(httpx.AsyncBaseTransport):
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         await _throttle(request.url.host)
-        return await self._inner.handle_async_request(request)
+        resp = await self._inner.handle_async_request(request)
+        code = resp.status_code
+        if code in _BLOCK_CODES or 500 <= code < 600:
+            reason = ("rate-limited" if code == 429
+                      else "blocked/forbidden" if code in (401, 403, 406, 409)
+                      else "server error / possible WAF")
+            _last_block.set((code, f"HTTP {code} ({reason}) from {request.url.host}"))
+        return resp
 
     async def aclose(self) -> None:
         await self._inner.aclose()

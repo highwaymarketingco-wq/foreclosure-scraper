@@ -79,8 +79,10 @@ class BaseScraper(ABC):
         Records self.last_outcome / self.last_reason so a 0-count is never
         ambiguous — the owner sees code-error vs blocked vs timeout vs legit-empty.
         """
+        from .http_client import reset_block_signal, take_block_signal
         bound = log.bind(scraper=self.slug)
         self.last_outcome, self.last_reason = OUTCOME_OK, ""
+        reset_block_signal()
         if not self._in_season():
             self.last_outcome = OUTCOME_DORMANT
             self.last_reason = f"off-season (active months {self.active_months})"
@@ -90,8 +92,16 @@ class BaseScraper(ABC):
             bound.info("scraper.start")
             results = await asyncio.wait_for(self._collect(), timeout=self.timeout_s)
             if not results:
-                self.last_outcome = OUTCOME_ZERO
-                self.last_reason = "ran clean but returned 0 rows"
+                # The scraper returned empty WITHOUT raising — but if the shared
+                # client saw a block status this run, the scraper swallowed it.
+                # Promote ZERO -> BLOCKED so a silent block is still surfaced.
+                blk = take_block_signal()
+                if blk:
+                    self.last_outcome = OUTCOME_BLOCKED
+                    self.last_reason = f"{blk[1]} (scraper swallowed the error)"
+                else:
+                    self.last_outcome = OUTCOME_ZERO
+                    self.last_reason = "ran clean but returned 0 rows"
             bound.info("scraper.ok", count=len(results), outcome=self.last_outcome)
             return results
         except asyncio.TimeoutError:

@@ -214,14 +214,26 @@ def _risk_score(li: Listing, c: "_calc.Calc | None" = None) -> tuple[int, str]:
         score -= 6
         notes.append("SC tax sale — ~12-mo owner redemption period before title is takeable")
 
-    # Equity flag from county GIS or zillow
+    # Equity: PREFER the real equity engine (ARV − payoff − liens) over the
+    # legacy purchase-price-vs-zestimate flags, which can contradict it. Fall
+    # back to the flags only when the engine produced nothing (Pass-2 reconcile).
     flag_set = set(flags)
-    if "high_equity" in flag_set:
-        score += 6
-        notes.append("high equity (likely 1st-mortgage foreclosure)")
-    if "negative_equity" in flag_set:
-        score -= 12
-        notes.append("negative equity (short-sale territory)")
+    eq = (li.raw or {}).get("equity") if isinstance(li.raw, dict) else None
+    eq_pct = (eq or {}).get("pct")
+    if eq_pct is not None:
+        if eq.get("is_underwater"):
+            score -= 12
+            notes.append(f"underwater — real equity {eq_pct * 100:.0f}% (after payoff + liens)")
+        elif eq_pct >= 0.40:
+            score += 6
+            notes.append(f"high real equity ({eq_pct * 100:.0f}%)")
+    else:
+        if "high_equity" in flag_set:
+            score += 6
+            notes.append("high equity (likely 1st-mortgage foreclosure)")
+        if "negative_equity" in flag_set:
+            score -= 12
+            notes.append("negative equity (short-sale territory)")
 
     # Underwater on the foreclosing lien: court-tested judgment debt >= ARV.
     # Mortgage/sheriff foreclosures ONLY — a tax sale's opening figure is taxes

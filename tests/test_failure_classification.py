@@ -87,6 +87,28 @@ def test_timeout():
     assert s.last_outcome == "TIMEOUT"
 
 
+def test_swallowed_block_promoted_to_blocked():
+    # A scraper that catches its own HTTP error and returns [] is still flagged
+    # BLOCKED because the shared transport recorded the block signal this run.
+    from foreclosure_scraper.http_client import _last_block
+
+    async def f():
+        _last_block.set((403, "HTTP 403 (blocked/forbidden) from courts.example"))
+        return []   # swallowed the error
+    s = _mk(f)
+    _run(s)
+    assert s.last_outcome == "BLOCKED"
+    assert "403" in s.last_reason and "swallowed" in s.last_reason
+
+
+def test_clean_zero_not_promoted_without_block():
+    async def f():
+        return []
+    s = _mk(f)
+    _run(s)
+    assert s.last_outcome == "ZERO_RESULT"   # no block signal -> stays ZERO
+
+
 def test_500_is_blocked_possible_waf():
     async def f():
         req = httpx.Request("GET", "https://x.example")
