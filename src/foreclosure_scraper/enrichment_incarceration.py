@@ -31,6 +31,10 @@ from .models import Listing
 log = structlog.get_logger()
 
 DAC_URL = "https://webapps.doc.state.nc.us/opi/offendersearch.do"
+# SC Dept of Corrections public inmate search. The React SPA calls this with
+# the query params in the URL (NOT the POST body) + method=POST; it returns a
+# JSON array of inmate records. Verified live 2026-06-21.
+SCDC_URL = "https://public.doc.state.sc.us/scdc-public/inmateSearch.do"
 
 # Owner strings that aren't a person → no one to incarcerate, skip.
 _ENTITY = re.compile(r"\b(LLC|L\.L\.C|INC|CORP|COMPANY|CO\b|TRUST|ESTATE|HEIRS|BANK|"
@@ -106,38 +110,72 @@ async def _dac_match(http: httpx.AsyncClient, last: str, first: str) -> Optional
     return None
 
 
+async def _scdc_match(http: httpx.AsyncClient, last: str, first: str) -> Optional[dict]:
+    """Search SC DOC by name; return match info when a single offender with the
+    exact last+first is found, else None. Same single-result gate as NC so
+    common names don't produce false positives (name-only, no DOB → low conf)."""
+    params = {"lastName": last, "firstName": first, "scdcId": "", "sid": "",
+              "phoneticMatch": ""}
+    try:
+        # SCDC wants the params in the QUERY STRING with method=POST (mirrors
+        # the SPA's own fetch); a body POST returns an empty 200.
+        r = await http.post(SCDC_URL, params=params, timeout=25.0,
+                            headers={"User-Agent": "Mozilla/5.0",
+                                     "Accept": "application/json, text/plain, */*"})
+        if r.status_code != 200:
+            return None
+        recs = r.json()
+    except Exception:
+        return None
+    if not isinstance(recs, list) or not recs:
+        return None
+    # Exact last+first (fields are space-padded in the feed). Require EXACTLY one
+    # so a common name returning several offenders is treated as noise, not a hit.
+    exact = [x for x in recs
+             if str(x.get("lname") or "").strip().upper() == last
+             and str(x.get("fname") or "").strip().upper() == first]
+    max_results = int(os.environ.get("INCARCERATION_MAX_RESULTS", "1"))
+    if 1 <= len(exact) <= max_results:
+        rec = exact[0]
+        return {"state": "SC", "source": "SC DOC inmate search",
+                "matched_name": f"{first} {last}", "results": len(exact),
+                "scdc_id": str(rec.get("scdcId") or "").strip() or None,
+                "confidence": "name_only_low"}
+    return None
+
+
 def _owner_of(li: Listing) -> Optional[str]:
     om = (li.raw or {}).get("owner_mailing") or {}
     return om.get("owner") or li.defendant or None
 
 
 async def enrich_incarceration(listings: list[Listing], max_queries: int = 150) -> dict:
-    """Flag listings whose owner matches a state corrections roster (NC now)."""
+    """Flag listings whose owner matches a state corrections roster (NC + SC)."""
     targets = []
     for li in listings:
-        if li.state != "NC":
+        if li.state not in ("NC", "SC"):
             continue
         if (li.raw or {}).get("incarceration"):
             continue
         owner = _owner_of(li)
         if owner and _name_parts(owner):
             targets.append(li)
-    sc_skipped = sum(1 for li in listings if li.state == "SC" and _owner_of(li) and _name_parts(_owner_of(li)))
     targets = targets[:max_queries]
     if not targets:
-        log.info("incarceration.no_targets", sc_skipped=sc_skipped)
-        return {"queried": 0, "matched": 0, "sc_skipped": sc_skipped}
+        log.info("incarceration.no_targets")
+        return {"queried": 0, "matched": 0}
 
     sem = asyncio.Semaphore(int(os.environ.get("INCARCERATION_CONCURRENCY", "2")))
     delay = float(os.environ.get("INCARCERATION_DELAY", "0.5"))
-    counts = {"queried": 0, "matched": 0, "sc_skipped": sc_skipped}
+    counts = {"queried": 0, "matched": 0, "matched_nc": 0, "matched_sc": 0}
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(30.0), follow_redirects=True) as http:
         async def one(li: Listing):
             last, first = _name_parts(_owner_of(li))
             async with sem:
                 counts["queried"] += 1
-                res = await _dac_match(http, last, first)
+                # Route to the right state's corrections roster.
+                res = await (_scdc_match if li.state == "SC" else _dac_match)(http, last, first)
                 if delay:
                     await asyncio.sleep(delay)
             if res:
@@ -145,6 +183,7 @@ async def enrich_incarceration(listings: list[Listing], max_queries: int = 150) 
                     li.raw = {}
                 li.raw["incarceration"] = res
                 counts["matched"] += 1
+                counts["matched_sc" if li.state == "SC" else "matched_nc"] += 1
         await asyncio.gather(*(one(li) for li in targets))
     log.info("incarceration.done", **counts)
     return counts
