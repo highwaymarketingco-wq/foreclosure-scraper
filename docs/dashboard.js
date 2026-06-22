@@ -928,6 +928,68 @@ function openDetail(l) {
     $("d-flags-section").style.display = "none";
   }
 
+  // -------- Extended sections: surface collected-but-previously-hidden data --
+  const E = (s) => String(s == null ? "" : s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+  const kv = (rows) => rows.filter((r) => r[1] != null && r[1] !== "" && r[1] !== false)
+    .map(([k, v]) => `<div class="lbl">${E(k)}</div><div class="val">${E(v === true ? "Yes" : v)}</div>`).join("");
+  const setSec = (sec, id, rows) => {
+    const html = kv(rows);
+    if (html) { $(id).innerHTML = `<div class="detail-grid">${html}</div>`; $(sec).style.display = "block"; }
+    else { $(sec).style.display = "none"; }
+  };
+  const flat = (o) => Object.entries(o || {})
+    .filter(([k, v]) => v != null && v !== "" && typeof v !== "object")
+    .map(([k, v]) => [k.replace(/_/g, " "), v === true ? "Yes" : v]);
+
+  // Owner & Contact (mailing addr + absentee + any free/paid skip-trace)
+  const _om = (l.raw && l.raw.owner_mailing) || {};
+  const _st = (l.raw && l.raw.skip_trace) || {};
+  setSec("d-contact-section", "d-contact", [
+    ["Owner", _om.owner], ["Mailing address", _om.mailing],
+    ["Absentee owner", _om.absentee], ["Out of state", _om.out_of_state],
+    ["Phone", _st.phone], ["Email", _st.email],
+  ]);
+
+  // Distress Stack — full breakdown (only the tier badge was shown before)
+  const _ds = getDistress(l);
+  if (_ds && (_ds.score != null || (_ds.signals || []).length)) {
+    const sigs = (_ds.signals || []).map((s) => Array.isArray(s)
+      ? `<span class="qbadge warn-light">${E(String(s[0]).replace(/_/g, " "))} +${E(s[2])}</span>` : "").join(" ");
+    $("d-distress").innerHTML =
+      `<div class="detail-grid">${kv([["Tier", _ds.tier], ["Score", _ds.score], ["Categories stacked", _ds.stack], ["Equity band", _ds.equity_band], ["Absentee", _ds.absentee]])}</div>` +
+      (sigs ? `<div style="margin-top:8px">${sigs}</div>` : "");
+    $("d-distress-section").style.display = "block";
+  } else { $("d-distress-section").style.display = "none"; }
+
+  // Risk & Environment (flood / FEMA repetitive loss / EPA / crime / code enf)
+  let _risk = [];
+  const _fl = (l.raw && l.raw.flood) || {};
+  if (_fl.zone) _risk.push(["Flood zone", _fl.zone + (_fl.in_sfha ? " (in SFHA)" : "")]);
+  if (l.raw && l.raw.fema_repetitive_loss) _risk = _risk.concat(flat(l.raw.fema_repetitive_loss));
+  if (l.raw && l.raw.epa) _risk = _risk.concat(flat(l.raw.epa));
+  if (l.raw && l.raw.crime) _risk = _risk.concat(flat(l.raw.crime));
+  if (l.raw && l.raw.code_enforcement) _risk = _risk.concat(flat(l.raw.code_enforcement));
+  setSec("d-risk-section", "d-risk", _risk);
+
+  // Deeds, Liens & Life Events (relationship deed / CAMA / liens / permits / …)
+  let _deeds = [];
+  const _rs = (l.raw && l.raw.relationship_signal) || null;
+  if (_rs) _deeds.push([(_rs.kind || "life event") + " signal", _rs.keyword || "Yes"]);
+  if (l.raw && l.raw.cama) _deeds = _deeds.concat(flat(l.raw.cama));
+  const _up = (l.raw && l.raw.upset_bid) || null;
+  if (_up) _deeds.push(["Upset-bid window", (_up.in_window ? "OPEN" : "closed") + (_up.days_remaining != null ? ` (${_up.days_remaining}d left)` : "")]);
+  if (l.raw && l.raw.sc_tax_delinquent) _deeds.push(["SC tax delinquent", "Yes"]);
+  if (l.raw && l.raw.incarceration) _deeds.push(["Owner incarcerated (name match)", "Yes"]);
+  if (l.raw && l.raw.sos_status) _deeds = _deeds.concat(flat(l.raw.sos_status));
+  const _liens = (l.raw && l.raw.lien_priority);
+  if (Array.isArray(_liens) && _liens.length) _deeds.push(["Liens on record", _liens.length]);
+  const _rod = (l.raw && l.raw.rod_docs);
+  if (Array.isArray(_rod) && _rod.length) _deeds.push(["ROD documents", _rod.length]);
+  const _perm = (l.raw && l.raw.building_permits);
+  if (Array.isArray(_perm) && _perm.length) _deeds.push(["Building permits", _perm.length]);
+  else if (_perm && typeof _perm === "object") _deeds = _deeds.concat(flat(_perm));
+  setSec("d-deeds-section", "d-deeds", _deeds);
+
   $("detail-panel").classList.remove("hidden");
 }
 
