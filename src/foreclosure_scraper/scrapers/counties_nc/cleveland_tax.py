@@ -11,6 +11,7 @@ Cleveland's mod_security blocks plain "Mozilla/5.0" UA; need full Chrome UA + Ac
 """
 from __future__ import annotations
 
+import html as _html
 import re
 from datetime import datetime
 from typing import Iterable
@@ -32,19 +33,21 @@ HEADERS = {
 
 _TAG = re.compile(r"<[^>]+>")
 _WS = re.compile(r"\s+")
-# Each entry: <day>, <Month> <day>, <year> at <time> Parcel <id> / File # <case#> / <address>, <city>, NC <zip>
+# Tolerant entry pattern. The page lists every property (whether a scheduled
+# upset-bid sale or a pending foreclosure) as:
+#   "Parcel[:] <id> / File # <case#> / [Address:] <address> / Map ..."
+# "Parcel" may carry an optional colon and the "/" separators may be padded
+# with &nbsp; (decoded before matching). The address runs up to the next "/".
 ENTRY_RE = re.compile(
-    r"(?P<day>\w+),?\s+(?P<month>January|February|March|April|May|June|July|August|"
-    r"September|October|November|December)\s+(?P<dayno>\d{1,2}),?\s+(?P<year>\d{4})"
-    r"(?:\s+at\s+(?P<time>\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)))?\s*\.?\s*"
-    r"Parcel\s+(?P<parcel>\d+)\s*/\s*File\s*#\s*(?P<file>[\dA-Z\-]+)\s*/\s*"
-    r"(?P<addr>[^,/]+,\s*[\w ]+,?\s*NC\s*\d{5})?",
+    r"Parcel:?\s*(?P<parcel>\d+)\s*/\s*File\s*#\s*(?P<file>[\dA-Za-z\-]+)\s*/\s*"
+    r"(?:Address:\s*)?(?P<addr>[^/]+)",
     re.I,
 )
-# In-foreclosure bullets (no sale date yet)
-PENDING_RE = re.compile(
-    r"Parcel\s+(?P<parcel>\d+)\s*/\s*File\s*#\s*(?P<file>[\dA-Z\-]+)\s*/\s*"
-    r"(?:Address:\s*)?(?P<addr>[^/]+(?:NC\s*\d{5})?)",
+# Sale date, when present in a section header preceding a scheduled listing.
+DATE_RE = re.compile(
+    r"(?:January|February|March|April|May|June|July|August|September|October|"
+    r"November|December)\s+\d{1,2},?\s+\d{4}"
+    r"(?:\s+at\s+\d{1,2}(?::\d{2})?\s*[ap]\.?m\.?)?",
     re.I,
 )
 
@@ -63,11 +66,18 @@ class ClevelandTaxForeclosure(BaseScraper):
                 return []
             html = r.text
 
-        flat = _WS.sub(" ", _TAG.sub(" ", html))
+        # Decode HTML entities BEFORE flattening whitespace: the page pads its
+        # "/" separators with literal &nbsp; entities (e.g. "Parcel 57139 /&nbsp;
+        # File #"). Without unescape these survive as literal text and break the
+        # "/ File" boundary, silently dropping the scheduled/upset-bid listings.
+        flat = _WS.sub(" ", _html.unescape(_TAG.sub(" ", html)))
         out: list[Listing] = []
         seen: set[str] = set()
 
-        # Pattern 1: scheduled sales (have date+time)
+        # Properties after the "CURRENTLY IN FORECLOSURE" marker are pending
+        # (no sale yet); those before it are scheduled / in the upset-bid window.
+        marker = flat.upper().find("CURRENTLY IN FORECLOSURE")
+
         for m in ENTRY_RE.finditer(flat):
             parcel = m.group("parcel")
             file_no = m.group("file")
@@ -75,20 +85,24 @@ class ClevelandTaxForeclosure(BaseScraper):
             if key in seen:
                 continue
             seen.add(key)
-            sale_date = None
-            try:
-                sale_date = dateparser.parse(
-                    f"{m.group('month')} {m.group('dayno')} {m.group('year')} "
-                    f"{m.group('time') or ''}".strip()
-                )
-            except (ValueError, TypeError):
-                pass
             addr = (m.group("addr") or "").strip().rstrip("/").strip()
+            pending = marker > 0 and m.start() > marker
+
+            sale_date = None
+            if not pending:
+                # Look back a short window for a section/header sale date.
+                dm = DATE_RE.search(flat[max(0, m.start() - 180):m.start()])
+                if dm:
+                    try:
+                        sale_date = dateparser.parse(dm.group(0))
+                    except (ValueError, TypeError):
+                        pass
+
             out.append(
                 Listing(
                     source=self.slug,
                     source_url=URL,
-                    listing_type=ListingType.TAX_SALE,
+                    listing_type=ListingType.LIS_PENDENS if pending else ListingType.TAX_SALE,
                     property_kind=PropertyKind.UNKNOWN,
                     state="NC",
                     county="Cleveland",
@@ -97,41 +111,11 @@ class ClevelandTaxForeclosure(BaseScraper):
                     sale_date=sale_date,
                     case_number=file_no,
                     description=m.group(0)[:500],
+                    auction_status="pending" if pending else None,
                     first_seen=datetime.utcnow(),
                     last_seen=datetime.utcnow(),
-                    raw={"cleveland_tax": {"entry": m.group(0)[:500]}},
+                    raw={"cleveland_tax": {"entry": m.group(0)[:500],
+                                          "stage": "pending" if pending else "scheduled"}},
                 )
             )
-
-        # Pattern 2: properties IN foreclosure (no sale date yet)
-        # Limit search to text after "CURRENTLY IN FORECLOSURE" marker
-        in_marker = flat.upper().find("CURRENTLY IN FORECLOSURE")
-        if in_marker > 0:
-            tail = flat[in_marker:in_marker + 8000]
-            for m in PENDING_RE.finditer(tail):
-                parcel = m.group("parcel")
-                file_no = m.group("file")
-                key = (parcel, file_no)
-                if key in seen:
-                    continue
-                seen.add(key)
-                addr = (m.group("addr") or "").strip().rstrip("/").strip()
-                out.append(
-                    Listing(
-                        source=self.slug,
-                        source_url=URL,
-                        listing_type=ListingType.LIS_PENDENS,
-                        property_kind=PropertyKind.UNKNOWN,
-                        state="NC",
-                        county="Cleveland",
-                        parcel_id=parcel,
-                        street_address=addr or None,
-                        case_number=file_no,
-                        description=m.group(0)[:500],
-                        auction_status="pending",
-                        first_seen=datetime.utcnow(),
-                        last_seen=datetime.utcnow(),
-                        raw={"cleveland_tax": {"entry": m.group(0)[:500], "stage": "pending"}},
-                    )
-                )
         return out

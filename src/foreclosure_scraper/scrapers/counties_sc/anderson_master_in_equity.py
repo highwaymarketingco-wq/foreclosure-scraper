@@ -16,7 +16,7 @@ from ...models import Listing, ListingType, PropertyKind
 PAGE_URL = "https://www.andersoncountysc.org/departments-a-z/master-in-equity/"
 
 PDF_HREF_RE = re.compile(
-    r"/wp-content/uploads/(\d{4})/(\d{2})/([A-Za-z]+)-(\d+)-(\d{4})-Sale-List\.pdf",
+    r"/wp-content/uploads/(\d{4})/(\d{2})/([A-Za-z]+)-(\d+)-(\d{4})-Sale-List(?:-\d+)?\.pdf",
     re.I,
 )
 # Anderson also publishes Sale-Results and Deficiency-Sale-Results PDFs
