@@ -31,8 +31,6 @@ jobs:
       GMAIL_SENDER: ${{ secrets.GMAIL_SENDER }}
       GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
       EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
-      APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
-      APIFY_FREE_TIER_ONLY: "1"
       # Vision provider switch — see patch-run-scrapers.yml for details.
       VISION_PROVIDER: ${{ vars.VISION_PROVIDER || 'anthropic' }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
