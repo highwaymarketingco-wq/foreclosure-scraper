@@ -208,6 +208,67 @@ def _extract_value(attrs: dict) -> Optional[float]:
     if land or improv:
         s = (land or 0) + (improv or 0)
         return s if s >= 1000 else None
+
+
+# 2026-06-22: county CAMA distress signals (the "D" ask — ROD-adjacent data via a
+# clean ArcGIS layer instead of the broken Spartanburg deeds portal). Pattern-
+# matched so any CAMA layer carrying these fields benefits (Spartanburg's
+# Parcel_and_CAMA layer has them all). Conservative: only KNOWN poor-condition
+# codes flag distress, and owner-occupancy is only asserted on an explicit
+# homestead marker (blank is the majority, so blank != absentee).
+_HOMESTEAD_PAT = re.compile(r"^(homestead.*|hmstd.*|owner_?occ.*|oo_?flag)$", re.I)
+_CONDITION_PAT = re.compile(r"^(condition.*|cond_?cd|cond_?code|bldg_?cond.*|cdu)$", re.I)
+_SALEDATE_PAT = re.compile(r"^(sale_?date|saledate|last_?sale_?date|deed_?date|transfer_?date)$", re.I)
+_SALEAMT_PAT = re.compile(r"^(sale_?amt|sale_?amount|saleamount|sale_?price|saleprice|last_?sale_?(amount|price))$", re.I)
+_DEEDBOOK_PAT = re.compile(r"^(deed_?book|deedbook)$", re.I)
+_DEEDPAGE_PAT = re.compile(r"^(deed_?page|deedpage)$", re.I)
+_PREVOWNER_PAT = re.compile(r"^(previous_?ow.*|prev_?ow.*|prior_?ow.*|former_?ow.*)$", re.I)
+
+_POOR_CONDITION = {"PR", "VP", "DL", "UN", "POOR", "VERY POOR", "DILAPIDATED",
+                   "UNSOUND", "UNSAFE", "BAD"}
+_OWNER_OCC_VALUES = {"H", "Y", "YES", "1", "HS", "HX", "TRUE", "OO"}
+
+
+def _first_match(attrs: dict, pat) -> Optional[str]:
+    for k, v in (attrs or {}).items():
+        if pat.match(k or "") and v not in (None, "", " "):
+            return str(v).strip()
+    return None
+
+
+def _extract_distress(attrs: dict) -> dict:
+    """ROD-adjacent distress signals from a CAMA parcel record (or {})."""
+    if not attrs:
+        return {}
+    out: dict = {}
+    hs = _first_match(attrs, _HOMESTEAD_PAT)
+    if hs is not None and hs.upper() in _OWNER_OCC_VALUES:
+        out["owner_occupied"] = True   # authoritative: suppress false absentee
+    cond = _first_match(attrs, _CONDITION_PAT)
+    if cond:
+        out["condition_code"] = cond
+        if cond.upper() in _POOR_CONDITION:
+            out["condition_distressed"] = True
+    sd = _first_match(attrs, _SALEDATE_PAT)
+    if sd:
+        out["last_sale_date"] = sd
+    sa = _first_match(attrs, _SALEAMT_PAT)
+    if sa:
+        try:
+            amt = float(str(sa).replace(",", "").replace("$", ""))
+            if amt > 0:
+                out["last_sale_amount"] = amt
+                if amt < 1000:   # nominal/quitclaim consideration (informational)
+                    out["nominal_transfer"] = True
+        except (ValueError, TypeError):
+            pass
+    book, page = _first_match(attrs, _DEEDBOOK_PAT), _first_match(attrs, _DEEDPAGE_PAT)
+    if book and page:
+        out["deed_ref"] = f"{book}/{page}"
+    prev = _first_match(attrs, _PREVOWNER_PAT)
+    if prev:
+        out["previous_owner"] = prev
+    return out
     return None
 
 
@@ -290,7 +351,8 @@ def _build_result(li: Listing, spec: dict, attrs: dict) -> Optional[dict]:
             "absentee": _is_absentee(prop_addr, mailing),
             "out_of_state": bool(mail_state and li.state and mail_state != li.state),
             "source": spec.get("source_label", "county_gis"),
-            "_specs": _extract_specs(attrs), "_value": _extract_value(attrs)}
+            "_specs": _extract_specs(attrs), "_value": _extract_value(attrs),
+            "_distress": _extract_distress(attrs)}
 
 
 async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
@@ -363,6 +425,19 @@ async def enrich_owner_mailing(listings: list[Listing], max_concurrency: int = 4
                         li.market_value = val
                     if not li.assessed_value:
                         li.assessed_value = val
+                # CAMA distress signals (the "D" ask via clean ArcGIS): record
+                # them for the operator and feed scoring. Owner-occupancy is
+                # authoritative, so it SUPPRESSES a false-positive absentee flag;
+                # known poor condition raises the PROPERTY distress signal.
+                dist = res.pop("_distress", None) or {}
+                if dist:
+                    li.raw["cama"] = dist
+                    if dist.get("owner_occupied") and res.get("absentee"):
+                        res["absentee"] = False
+                        counts["owner_occ_suppressed"] = counts.get("owner_occ_suppressed", 0) + 1
+                    if dist.get("condition_distressed"):
+                        li.raw["distressed"] = True
+                        counts["condition_distress"] = counts.get("condition_distress", 0) + 1
                 li.raw["owner_mailing"] = res
                 if res.get("parcel_id") and not li.parcel_id:
                     li.parcel_id = res["parcel_id"]
