@@ -44,6 +44,8 @@ HOLDING_RATE_MONTH = 0.005  # ~6% APR / 12 mo of bid value
 HOLDING_MONTHS = 6
 DOWN_PCT = 0.25           # cash down for cash-on-cash
 LOAN_RATE_MONTH = 0.008   # 9.5% APR (hard money) / 12
+REHAB_CONTINGENCY_PCT = 0.125  # every pro pads the repair estimate 10-15% for surprises
+ASSIGNMENT_FEE = 10000    # typical residential wholesale assignment fee
 
 # Sources where opening_bid is a retail asking price (and therefore a useful
 # ARV sanity-check). For everything else (auctions, lis pendens, REO floors,
@@ -64,7 +66,10 @@ class Calc:
     rehab_expected: float | None = None
     rehab_high: float | None = None
     rehab_tier: str | None = None
+    rehab_with_contingency: float | None = None   # rehab_expected + 12.5% surprise buffer
     max_bid_70: float | None = None
+    wholesale_mao: float | None = None            # max_bid − assignment fee (wholesale lens)
+    wholesale_spread: float | None = None         # max_bid − opening_bid (assignable margin)
     total_investment: float | None = None
     estimated_profit: float | None = None
     roi_pct: float | None = None
@@ -257,7 +262,20 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
         else:
             low = round(expected * 0.90, -2)
             high = round(expected * 1.10, -2)
-        return round(expected, -2), low, high, "HIGH", notes
+        # Comp-QUALITY gate: scraped comps are only HIGH-confidence when there
+        # are enough of them, they're geographically anchored (not county-wide),
+        # and they actually agree. A single far/stale comp is not bankable.
+        conf = "HIGH"
+        reasons = []
+        if len(ppsfs) < 3:
+            conf, reasons = "MEDIUM", reasons + [f"only {len(ppsfs)} comp(s)"]
+        if comps and not comps[0].get("geo_anchored", True):
+            conf, reasons = "MEDIUM", reasons + ["county-wide comps (no local anchor)"]
+        if len(ppsfs) >= 2 and ppsfs[0] > 0 and ppsfs[-1] / ppsfs[0] >= 1.6:
+            conf, reasons = "MEDIUM", reasons + ["comps disagree (wide $/sqft spread)"]
+        if reasons:
+            notes.append("ARV confidence lowered to MEDIUM: " + "; ".join(reasons))
+        return round(expected, -2), low, high, conf, notes
 
     # Tier 2: Zillow zestimate
     z = raw.get("zillow", {}) if isinstance(raw, dict) else {}
@@ -460,12 +478,19 @@ def compute(li: Listing) -> Calc:
     senior_cost = round(junior_senior + superpri, 2)
     senior_applies = senior_cost > 0
 
+    # Pad the repair estimate with a contingency buffer for the buy math — every
+    # seasoned flipper bids on rehab + 10-15% for hidden conditions, never the
+    # optimistic mid. (The headline rehab_expected stays un-padded for display.)
+    rehab_buy = round((out.rehab_expected or 0) * (1 + REHAB_CONTINGENCY_PCT), -2)
+    if out.rehab_expected:
+        out.rehab_with_contingency = rehab_buy
+
     # ---- Max bid (70% rule, expected case) ------------------------------
     if out.arv_expected:
         fees = out.arv_expected * SELLING_PCT
         out.max_bid_70 = max(
             0.0,
-            round(0.70 * out.arv_expected - (out.rehab_expected or 0) - fees, -2),
+            round(0.70 * out.arv_expected - rehab_buy - fees, -2),
         )
         if senior_applies and out.max_bid_70 is not None:
             out.max_bid_70 = max(0.0, round(out.max_bid_70 - senior_cost, -2))
@@ -478,6 +503,11 @@ def compute(li: Listing) -> Calc:
                 "Subtracted " + " + ".join(bits) + " from max bid (buyer takes "
                 "title subject to this debt)."
             )
+        # Wholesale lens: what an end-investor MAO leaves for an assignment fee.
+        if out.max_bid_70 is not None:
+            out.wholesale_mao = max(0.0, round(out.max_bid_70 - ASSIGNMENT_FEE, -2))
+            if li.opening_bid:
+                out.wholesale_spread = round(out.max_bid_70 - float(li.opening_bid), -2)
 
     # ---- Total investment if bidding at opening bid ---------------------
     bid = li.opening_bid
@@ -485,8 +515,9 @@ def compute(li: Listing) -> Calc:
         closing = bid * CLOSING_PCT
         holding = bid * HOLDING_RATE_MONTH * HOLDING_MONTHS
         selling = out.arv_expected * SELLING_PCT
-        # senior_cost (junior-position + super-priority liens) computed above.
-        total = bid + senior_cost + (out.rehab_expected or 0) + closing + holding + selling
+        # senior_cost (junior-position + super-priority liens) computed above;
+        # rehab_buy includes the contingency buffer (same number used for max bid).
+        total = bid + senior_cost + rehab_buy + closing + holding + selling
         out.total_investment = round(total, -2)
         out.estimated_profit = round(out.arv_expected - total, -2)
         if total > 0:
