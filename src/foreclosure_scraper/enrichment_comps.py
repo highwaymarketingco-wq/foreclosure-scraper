@@ -47,7 +47,19 @@ def _sold_pool_for_seat(seat: str, state: str) -> list[dict]:
         )
         if df is None or len(df) == 0:
             return []
-        return df.to_dict("records")
+        records = df.to_dict("records")
+        # Dedupe — HomeHarvest can return the same sale twice (re-list, MLS dupes);
+        # an un-deduped pool double-counts a sale in the median.
+        seen: set = set()
+        deduped = []
+        for r in records:
+            key = r.get("property_url") or (
+                str(r.get("street") or ""), r.get("sold_price"), str(r.get("last_sold_date") or ""))
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(r)
+        return deduped
     except Exception as exc:
         log.debug("comps.sold_pool.error", seat=seat, state=state, error=str(exc)[:100])
         return []
@@ -291,6 +303,16 @@ def _pick_3_comps(target: Listing, sold_pool: list[dict]) -> list[dict]:
             pool = yr_filt
             match_quality += "+era"
 
+    # Condition parity: a gut/major-condition sale closed BELOW renovated retail,
+    # so it understates ARV for a fixed-up subject. Drop those when 3+ retail-
+    # grade comps remain. Non-land only.
+    if target_kind != "land":
+        retail = [s for s in pool
+                  if _comp_condition_tier(str(s.get("text") or s.get("description") or "")) not in ("gut", "major")]
+        if len(retail) >= 3:
+            pool = retail
+            match_quality += "+cond"
+
     # Sort: closest-first when we have distances, else most-recent-first.
     try:
         if has_geo and any(s.get("_distance_mi") is not None for s in pool):
@@ -328,6 +350,19 @@ def _pick_3_comps(target: Listing, sold_pool: list[dict]) -> list[dict]:
             "url": s.get("property_url"),
             "match_quality": match_quality,
         })
+
+    # Line-item adjustment grid (improved property only): adjust each comp toward
+    # the subject and re-express on the SUBJECT's sqft. ARV uses the median
+    # ADJUSTED $/sqft (see enrich loop) instead of raw $/sqft.
+    if target_kind != "land" and target.living_sqft:
+        raw_ppsfs = sorted(c["price_per_sqft"] for c in out if c.get("price_per_sqft"))
+        base_ppsf = raw_ppsfs[len(raw_ppsfs) // 2] if raw_ppsfs else None
+        if base_ppsf:
+            for c, s in zip(out, pool[:3]):
+                eff, adj = _adjust_comp(target, s, base_ppsf)
+                if eff:
+                    c["adjusted_ppsf"] = eff
+                    c["adjustments"] = adj
     return out
 
 
@@ -405,6 +440,60 @@ CONDITION_PATTERNS = {
         r"shell\s+only|down\s+to\s+studs|fire[\s\-]?damaged|"
         r"condemned|uninhabitable)\b", re.I),
 }
+
+# --- Appraisal-style line-item adjustment grid (free, pure-Python) ---------
+# A raw $/sqft median treats a 1,000-sqft and a 2,500-sqft comp as identical
+# value-per-foot; a pro adjusts each comp toward the subject. GLA is adjusted at
+# a MARGINAL rate (a bigger house isn't worth proportionally more per foot), the
+# rest at conventional paired-sale dollar amounts. Gross adjustment is capped at
+# 25% of the comp price — beyond that the comp is too dissimilar to trust.
+MARGINAL_GLA_FRAC = 0.40   # marginal $/sqft = 40% of the local whole-value ppsf
+BATH_ADJ = 5000.0          # per full-bath difference
+LOT_ADJ_PER_SQFT = 1.0     # per sqft of lot delta (conservative)
+LOT_ADJ_CAP_FRAC = 0.10    # lot adjustment capped at 10% of comp price
+YEAR_ADJ = 400.0           # per year of effective-age difference (newer worth more)
+MAX_GROSS_ADJ_FRAC = 0.25  # appraisal rule: total adjustment <= 25% of comp price
+
+
+def _comp_condition_tier(text: str) -> str | None:
+    """Worst condition tier signalled by a comp's listing text (or None)."""
+    if not text:
+        return None
+    for tier in ("gut", "major", "cosmetic", "move_in_ready"):
+        if CONDITION_PATTERNS[tier].search(text):
+            return tier
+    return None
+
+
+def _adjust_comp(target: Listing, s: dict, base_ppsf: float) -> tuple[float | None, dict | None]:
+    """Adjust a comp's sold price toward the subject; return (effective $/sqft
+    expressed on the SUBJECT's sqft, adjustments breakdown). None if unusable."""
+    price = _num(s.get("sold_price")) or _num(s.get("list_price"))
+    comp_sqft = _num(s.get("sqft"))
+    tgt_sqft = target.living_sqft
+    if not price or not comp_sqft or not tgt_sqft or comp_sqft <= 0 or tgt_sqft <= 0:
+        return None, None
+    adj: dict = {}
+    if base_ppsf:
+        adj["gla"] = round((tgt_sqft - comp_sqft) * (MARGINAL_GLA_FRAC * base_ppsf), -2)
+    cb, tb = _num(s.get("full_baths")), target.bathrooms
+    if cb is not None and tb is not None:
+        adj["baths"] = round((tb - cb) * BATH_ADJ, -2)
+    cl, tl = _num(s.get("lot_sqft")), target.lot_size_sqft
+    if cl and tl:
+        lot_cap = LOT_ADJ_CAP_FRAC * price
+        adj["lot"] = round(max(-lot_cap, min(lot_cap, (tl - cl) * LOT_ADJ_PER_SQFT)), -2)
+    cy, ty = _num(s.get("year_built")), target.year_built
+    if cy and ty:
+        adj["age"] = round((ty - cy) * YEAR_ADJ, -2)
+    net = sum(adj.values())
+    cap = MAX_GROSS_ADJ_FRAC * price
+    capped_net = max(-cap, min(cap, net))
+    adj["net"] = round(capped_net, -2)
+    adj["capped"] = abs(capped_net - net) > 1
+    effective_ppsf = round((price + capped_net) / tgt_sqft, 2)
+    return effective_ppsf, adj
+
 
 # Default condition by year-built bucket when no description signals
 DEFAULT_CONDITION_BY_AGE = {
@@ -535,17 +624,20 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
                         "comps are county-wide (no same-zip/city/nearby match) — "
                         "ARV from these is low confidence"
                     )
-                ppsf = [c["price_per_sqft"] for c in comps if c.get("price_per_sqft")]
+                # Prefer the line-item ADJUSTED $/sqft (comp adjusted toward the
+                # subject); fall back to raw $/sqft where no grid was computed.
+                ppsf = [(c.get("adjusted_ppsf") or c.get("price_per_sqft"))
+                        for c in comps
+                        if (c.get("adjusted_ppsf") or c.get("price_per_sqft"))]
                 if ppsf and anchored:
                     ppsf.sort()
-                    # Tear-down filter: drop bottom-quintile $/sqft comps when
-                    # we have 4+ data points. Comps that sold for outlier-low
-                    # $/sqft are typically as-is/distressed sales, not retail
-                    # comps — they understate ARV for a renovated subject.
-                    if len(ppsf) >= 4:
+                    # Arms-length / distressed filter: drop comps whose $/sqft is
+                    # far below the median — typically as-is/distressed sales that
+                    # understate ARV for a renovated subject. Tightened to 0.70x
+                    # and fires at 3+ comps (was 0.50x / 4+).
+                    if len(ppsf) >= 3:
                         median = ppsf[len(ppsf) // 2]
-                        # Drop anything <50% of median (clearly distressed sale)
-                        clean_ppsf = [p for p in ppsf if p >= median * 0.50]
+                        clean_ppsf = [p for p in ppsf if p >= median * 0.70]
                         if len(clean_ppsf) >= 3:
                             ppsf = clean_ppsf
                     li.raw["comp_median_ppsf"] = ppsf[len(ppsf) // 2]
