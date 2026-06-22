@@ -16,6 +16,27 @@ Codes are county-specific. Counties whose pick-list loads (Transylvania,
 McDowell, Mitchell) share the standard Logan distress codes below. Spartanburg's
 loader is broken AND its codes differ (DEED returns 0), so it needs its own code
 set sourced separately — not wired here yet.
+
+SC ROD landscape (verified 2026-06-22, both httpx + real browser):
+  * SPARTANBURG — newer Logan; the name-less instrument-type date sweep mechanics
+    are fully reverse-engineered, BUT the deployment is in a QC/empty-index state
+    returning ZERO rows for EVERY search type. No live data => its codes cannot be
+    derived empirically. Mechanics are ready; activates when the county restores
+    the index. (County-side outage, not a request bug.)
+  * LAURENS — older Logan (NameSearch.php/NamePick.php). search_type=Standard ONLY
+    => NAME-REQUIRED; there is NO name-less instrument-type date sweep. Distress
+    labels use FULL TEXT (instType[FORECLOSURE DEED]=...), not short codes:
+    FORECLOSURE DEED, DEED OF DISTRIBUTION (probate), TAX DEED, HOMEOWNERS
+    ASSOCIATION LIEN, ORDER BY JUDGE. Cannot be swept; only name-searched.
+  * Architecturally, SC foreclosure is JUDICIAL — the lis pendens + judgment are
+    Common Pleas (Clerk of Court / Public Index) records, NOT the ROD. So SC ROD
+    holds only POST-sale foreclosure deeds, probate, and tax deeds. SC pre-
+    foreclosure leads come from the court Public Index + tax-delinquent lists
+    (already covered), NOT from a ROD sweep.
+  * The name-search that DOES work on every Logan deployment is the path to the
+    MORTGAGE-BALANCE / EQUITY gap: name (we have owner names) -> Deed of Trust
+    recording -> original loan amount + date -> amortized payoff estimate ->
+    equity = ARV - payoff - junior liens. Built per-listing in Pass 2.
 """
 from __future__ import annotations
 
