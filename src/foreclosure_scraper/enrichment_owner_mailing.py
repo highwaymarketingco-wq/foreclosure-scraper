@@ -173,7 +173,7 @@ def _extract_specs(attrs: dict) -> dict:
 _VALUE_PRIORITY = [
     re.compile(r"^(total_?market_?value|market_?value)$", re.I),                       # Buncombe TotalMarketValue
     re.compile(r"^(appraised_?value|apprval|appr_?val)$", re.I),                       # Buncombe AppraisedValue
-    re.compile(r"^(total_?tax_?value|cost_?total_?value|total_?value|totval|totalvalue)$", re.I),  # Polk/Henderson/Lincoln/Gaston
+    re.compile(r"^(total_?tax_?value|cost_?total_?value|total_?value|totval|totalvalue|parval|present_?val|presentval)$", re.I),  # Polk/Henderson/Lincoln/Gaston + NC OneMap parval/presentval
     re.compile(r"^(assessed_?value|assessed_?v|taxvalue|tax_?value)$", re.I),          # Transylvania ASSESSED_V, Buncombe TaxValue
 ]
 _LAND_PAT = re.compile(r"^(land_?value|landval)$", re.I)
@@ -211,47 +211,66 @@ def _extract_value(attrs: dict) -> Optional[float]:
     return None
 
 
-async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
-    spec = COUNTY_GIS.get(f"{li.state}:{(li.county or '').strip().title()}")
-    if not spec:
-        return None
-    attrs = None
+# NC OneMap statewide parcel FeatureService — one consistent owner+mailing+value
+# (parval) schema across ALL 100 NC counties. Used as a per-county FALLBACK for
+# NC listings the county-specific layer didn't resolve, and for counties whose
+# own layer has no value field (e.g. Mitchell). MUST be county-filtered (it's
+# statewide, so a street-name match would otherwise hit another county's parcel).
+NC_ONEMAP = {
+    "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
+    "owner": ["ownname", "ownname2"],
+    "mail": ["mailadd", "munit", "mcity", "mstate", "mzip"], "mail_state": "mstate",
+    "situs": ["siteadd"], "parcel": "parno", "county_field": "cntyname",
+    "source_label": "nc_onemap",
+}
+
+_STREET_STOPWORDS = ("rd", "dr", "st", "ln", "ave", "ct", "way", "cir",
+                     "blvd", "pl", "trl", "hwy", "pkwy", "n", "s", "e", "w")
+
+
+def _county_clause(spec: dict, li: Listing) -> str:
+    """Extra WHERE clause pinning a statewide layer to the listing's county."""
+    cf = spec.get("county_field")
+    cty = (li.county or "").strip()
+    return f" AND UPPER({cf})='{cty.upper()}'" if cf and cty else ""
+
+
+async def _match_attrs(http: httpx.AsyncClient, li: Listing, spec: dict) -> Optional[dict]:
+    """Find the parcel record for a listing in one GIS layer (parcel match,
+    then situs street-name match), county-filtered when the layer is statewide."""
+    cc = _county_clause(spec, li)
     # 1) exact parcel match if we already have a parcel id
     if li.parcel_id:
         pid = re.sub(r"[^A-Za-z0-9]", "", li.parcel_id)
         if pid:
-            rows = await _query(http, spec["url"], f"{spec['parcel']} LIKE '%{pid}%'")
-            attrs = rows[0] if rows else None
+            rows = await _query(http, spec["url"], f"{spec['parcel']} LIKE '%{pid}%'{cc}")
+            if rows:
+                return rows[0]
     # 2) else match on situs street address. Query the street-NAME field broadly
     #    (the longest, most distinctive street word) so format differences don't
-    #    block the hit, then verify house-number + street client-side. Works for
-    #    both combined-situs and component-situs (e.g. Buncombe) counties.
-    if attrs is None and spec.get("situs") and li.street_address:
+    #    block the hit, then verify house-number + street client-side.
+    if spec.get("situs") and li.street_address:
         m = _NUM_STREET.match(li.street_address)
         if m:
             num = m.group(1)
-            words = [w for w in _norm(m.group(2)).split()
-                     if w not in ("rd", "dr", "st", "ln", "ave", "ct", "way", "cir",
-                                  "blvd", "pl", "trl", "hwy", "pkwy", "n", "s", "e", "w")]
+            words = [w for w in _norm(m.group(2)).split() if w not in _STREET_STOPWORDS]
             if words:
                 mfield = spec.get("situs_match", spec["situs"][0])
                 key = max(words, key=len)  # most distinctive street word
                 rows = await _query(http, spec["url"],
-                                    f"UPPER({mfield}) LIKE '%{key.upper()}%'")
+                                    f"UPPER({mfield}) LIKE '%{key.upper()}%'{cc}")
                 for row in rows:
                     rs = _norm(_join(row, spec["situs"]))
                     if num in rs and all(w in rs for w in words):
-                        attrs = row
-                        break
-                if attrs is None:  # looser: number + the key word
-                    for row in rows:
-                        rs = _norm(_join(row, spec["situs"]))
-                        if num in rs and key in rs:
-                            attrs = row
-                            break
-    if not attrs:
-        return None
+                        return row
+                for row in rows:  # looser: number + the key word
+                    rs = _norm(_join(row, spec["situs"]))
+                    if num in rs and key in rs:
+                        return row
+    return None
 
+
+def _build_result(li: Listing, spec: dict, attrs: dict) -> Optional[dict]:
     owner = _join(attrs, spec["owner"])
     if spec.get("care_of") and attrs.get(spec["care_of"]):
         mailing = f"C/O {attrs[spec['care_of']]}, " + _join(attrs, spec["mail"])
@@ -260,21 +279,45 @@ async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
     situs = _join(attrs, spec["situs"]) if spec.get("situs") else None
     parcel = str(attrs.get(spec["parcel"]) or "").strip() or None
     mail_state = (attrs.get(spec.get("mail_state", "")) or "").strip().upper() if spec.get("mail_state") else None
-
     if not owner and not mailing:
         return None
     # absentee = owner mails from somewhere other than the property; out_of_state
-    # = mails from a different state. For the property address, prefer the GIS
-    # situs field, but fall back to the LISTING's own street address so counties
-    # whose parcel layer has no situs field (Oconee, Union — parcel-match-only)
-    # can still flag absentee owners.
+    # = mails from a different state. Prefer the GIS situs; fall back to the
+    # listing's own street address (no-situs counties).
     prop_addr = situs or (li.street_address or None)
-    absentee = _is_absentee(prop_addr, mailing)
-    out_of_state = bool(mail_state and li.state and mail_state != li.state)
     return {"owner": owner or None, "mailing": mailing or None, "situs": situs,
             "parcel_id": parcel, "mail_state": mail_state or None,
-            "absentee": absentee, "out_of_state": out_of_state, "source": "county_gis",
+            "absentee": _is_absentee(prop_addr, mailing),
+            "out_of_state": bool(mail_state and li.state and mail_state != li.state),
+            "source": spec.get("source_label", "county_gis"),
             "_specs": _extract_specs(attrs), "_value": _extract_value(attrs)}
+
+
+async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
+    # 1) county-specific layer (richer — has building specs/CAMA where available)
+    res = None
+    spec = COUNTY_GIS.get(f"{li.state}:{(li.county or '').strip().title()}")
+    if spec:
+        attrs = await _match_attrs(http, li, spec)
+        if attrs:
+            res = _build_result(li, spec, attrs)
+
+    if li.state == "NC" and li.county:
+        if res is None:
+            # 2a) full NC OneMap fallback — county layer didn't resolve at all.
+            attrs = await _match_attrs(http, li, NC_ONEMAP)
+            if attrs:
+                res = _build_result(li, NC_ONEMAP, attrs)
+        elif not res.get("_value"):
+            # 2b) county layer resolved owner but has NO value field (e.g.
+            #     Mitchell) — supplement the value (parval) from NC OneMap.
+            attrs = await _match_attrs(http, li, NC_ONEMAP)
+            if attrs:
+                v = _extract_value(attrs)
+                if v:
+                    res["_value"] = v
+                    res["value_source"] = "nc_onemap"
+    return res
 
 
 async def enrich_owner_mailing(listings: list[Listing], max_concurrency: int = 4) -> dict:

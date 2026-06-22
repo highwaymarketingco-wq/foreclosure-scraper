@@ -58,3 +58,36 @@ def test_empty_attrs():
 def test_land_only_below_floor_rejected():
     # A lone tiny land value under the $1k floor is not a usable property value.
     assert _extract_value({"landval": 500}) is None
+
+
+# ---- NC OneMap fallback (2026-06-22) ----
+from foreclosure_scraper.enrichment_owner_mailing import (  # noqa: E402
+    NC_ONEMAP, _county_clause,
+)
+from foreclosure_scraper.models import Listing, ListingType  # noqa: E402
+
+
+def test_extract_value_handles_onemap_parval():
+    assert _extract_value({"parval": 492600.0, "landval": 50000, "improvval": 442600}) == 492600.0
+
+
+def test_onemap_parval_zero_falls_back_to_components():
+    assert _extract_value({"parval": 0.0, "landval": 50000, "improvval": 30000}) == 80000.0
+
+
+def test_county_clause_pins_statewide_layer_to_county():
+    li = Listing(source="t", source_url="http://x",
+                 listing_type=ListingType.FORECLOSURE_SALE, state="NC", county="Mitchell")
+    assert _county_clause(NC_ONEMAP, li) == " AND UPPER(cntyname)='MITCHELL'"
+
+
+def test_county_clause_empty_when_no_county_field():
+    li = Listing(source="t", source_url="http://x",
+                 listing_type=ListingType.FORECLOSURE_SALE, state="NC", county="Mitchell")
+    assert _county_clause({"url": "x"}, li) == ""  # county-specific layer needs no filter
+
+
+def test_onemap_spec_shape():
+    assert NC_ONEMAP["county_field"] == "cntyname"
+    assert "ownname" in NC_ONEMAP["owner"]
+    assert NC_ONEMAP["source_label"] == "nc_onemap"
