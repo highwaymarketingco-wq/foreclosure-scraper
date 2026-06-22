@@ -81,7 +81,7 @@ Rehab tiers (Carolina market, 2026 dollars):
 - major: $35-80/sqft. Significant interior rehab + some systems work (HVAC, roof patching, plumbing fixtures). Cosmetic done top-to-bottom.
 - gut: $110-220/sqft. Down to studs, full systems replacement, foundation/roof/structural work, possible additions. Property is uninhabitable as-is.
 
-When the only photo is a basemap or generic Realtor placeholder (no actual property visible), return condition_tier=null and confidence=LOW.
+When the only photo is a basemap or generic Realtor placeholder (no actual property visible), set the JSON value of condition_tier to null (the literal null, not the text) and confidence to "LOW".
 
 Output ONLY valid JSON, no markdown fences, no preamble."""
 
@@ -935,6 +935,17 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
             return
         if not isinstance(li.raw, dict):
             li.raw = {}
+        # Normalize condition_tier: weaker models sometimes echo the prompt's
+        # literal "condition_tier=null" instruction, or return the string
+        # "null"/"none"/"n/a" instead of a real JSON null. Coerce any value
+        # that isn't one of the four canonical tiers to None.
+        ct_raw = result.get("condition_tier")
+        if isinstance(ct_raw, str):
+            s = ct_raw.strip().lower()
+            if "=" in s:                       # "condition_tier=null" -> "null"
+                s = s.split("=", 1)[1].strip()
+            result["condition_tier"] = s if s in (
+                "move_in_ready", "cosmetic", "major", "gut") else None
         li.raw["vision"] = result
         usage = result.pop("_usage", None) or {}
         total_in += usage.get("input_tokens", 0) or 0

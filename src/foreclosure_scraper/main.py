@@ -604,6 +604,22 @@ async def run() -> int:
     except Exception:
         log.error("county_pin.failed", traceback=traceback.format_exc())
 
+    # Final county normalization: late enrichments (reverse-geo, parcel-pin,
+    # aggressive-address) assign li.county AFTER validate() ran, and some use
+    # str.title() which mangles 'MCDOWELL' -> 'Mcdowell'. Canonicalize here so
+    # the board doesn't split one county across casings and dedupe sees a
+    # consistent county in its signatures.
+    from .validation import normalize_county as _norm_county
+    _county_fixed = 0
+    for _li in enriched:
+        if _li.county:
+            _canon = _norm_county(_li.county)
+            if _canon != _li.county:
+                _li.county = _canon
+                _county_fixed += 1
+    if _county_fixed:
+        log.info("orchestrator.county_normalized", fixed=_county_fixed)
+
     # H1 FIX (post-enrich dedupe): the initial dedupe() at line 369 ran
     # before parcel_id / zip_code / street_address / county were filled
     # by the enrichment chain above. Cross-source duplicates (same

@@ -86,6 +86,14 @@ def _normalize_county(raw: str) -> str:
     return fixes.get(titled, titled)
 
 
+# Public alias — the orchestrator runs a final county-normalization pass with
+# this right before the post-enrichment dedupe, so late enrichments that assign
+# li.county (reverse-geo, parcel-pin, aggressive-address) can't reintroduce the
+# 'Mcdowell' vs 'McDowell' split that validate() fixed earlier in the pipeline.
+def normalize_county(raw: str) -> str:
+    return _normalize_county(raw)
+
+
 def _validate_state_county(li: Listing, stats: dict) -> None:
     if not li.state or not li.county:
         return
