@@ -21,13 +21,13 @@ def _subject(owner, county="Gaston", lt=ListingType.FORECLOSURE_SALE):
 
 
 def test_name_tokens_order_insensitive_and_suffix_stripped():
-    assert _name_tokens("SMITH, JOHN A JR") == _name_tokens("JOHN A SMITH")
+    assert _name_tokens("SMITH, JOHN A JR") == _name_tokens("JOHN A SMITH")  # initials kept, suffix dropped
     assert _name_tokens("John Smith") == frozenset({"JOHN", "SMITH"})
 
 
 def test_exact_name_match_attaches_lien():
-    lien = _lien_row("SMITH, JOHN", amt=30000)
-    subj = _subject("JOHN SMITH")
+    lien = _lien_row("SMITH, JOHN ADAM", amt=30000)
+    subj = _subject("JOHN ADAM SMITH")
     enrich_lien_stack([lien, subj])
     liens = subj.raw["liens"]
     assert len(liens) == 1
@@ -35,15 +35,15 @@ def test_exact_name_match_attaches_lien():
 
 
 def test_no_match_different_county():
-    lien = _lien_row("JOHN SMITH", county="Gaston")
-    subj = _subject("JOHN SMITH", county="Pickens")
+    lien = _lien_row("JOHN ADAM SMITH", county="Gaston")
+    subj = _subject("JOHN ADAM SMITH", county="Pickens")
     enrich_lien_stack([lien, subj])
     assert "liens" not in subj.raw
 
 
 def test_no_match_partial_name():
-    lien = _lien_row("JOHN SMITH")
-    subj = _subject("JOHN SMITHSON")
+    lien = _lien_row("JOHN ADAM SMITH")
+    subj = _subject("JOHN ADAM SMITHSON")
     enrich_lien_stack([lien, subj])
     assert "liens" not in subj.raw
 
@@ -56,9 +56,9 @@ def test_business_names_skipped():
 
 
 def test_lien_flows_into_equity_and_maxbid():
-    lien = _lien_row("JOHN SMITH", amt=40000)
+    lien = _lien_row("JOHN ADAM SMITH", amt=40000)
     subj = Listing(source="x", source_url="u", listing_type=ListingType.FORECLOSURE_SALE,
-                   state="SC", county="Gaston", defendant="JOHN SMITH", living_sqft=1500,
+                   state="SC", county="Gaston", defendant="JOHN ADAM SMITH", living_sqft=1500,
                    opening_bid=50000,
                    raw={"comp_median_ppsf_recorded": 200.0,
                         "recorded_comps": {"median_ppsf": 200.0, "count": 10, "p25_ppsf": 180,

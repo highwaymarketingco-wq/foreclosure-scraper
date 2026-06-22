@@ -252,8 +252,11 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
             f"ARV from {len(comps)} zip-matched sold comps × subject sqft "
             f"(${comp_ppsf:,.0f}/sqft × {li.living_sqft:,.0f} sqft)"
         )
-        # Range: low = 25th percentile $/sqft, high = 75th percentile
-        ppsfs = sorted(c["price_per_sqft"] for c in comps if c.get("price_per_sqft"))
+        # Range from the SAME (adjusted) $/sqft series as `expected` — comp_ppsf
+        # is the adjusted-median, so low/high must use adjusted_ppsf too, else the
+        # headline ARV could fall outside its own range (Pass-2 fix).
+        ppsfs = sorted((c.get("adjusted_ppsf") or c["price_per_sqft"])
+                       for c in comps if (c.get("adjusted_ppsf") or c.get("price_per_sqft")))
         if len(ppsfs) >= 3:
             low_ppsf = ppsfs[0]
             high_ppsf = ppsfs[-1]
@@ -525,12 +528,14 @@ def compute(li: Listing) -> Calc:
         out.estimated_profit = round(out.arv_expected - total, -2)
         if total > 0:
             out.roi_pct = round((out.estimated_profit / total) * 100, 1)
-        # Cash on cash: 25% down + 75% loan
-        cash_down = bid * DOWN_PCT + (out.rehab_expected or 0)  # rehab usually cash
+        # Cash on cash: 25% down + 75% loan. Use rehab_buy (contingency-padded)
+        # and the market-velocity holding_months EVERYWHERE so the cash math is
+        # the same deal as the flip math (Pass-2 fix: was using un-padded rehab
+        # + the fixed 6-month constant, making CoC optimistic vs ROI).
+        cash_down = bid * DOWN_PCT + rehab_buy  # rehab usually cash
         loan_amt = bid * (1 - DOWN_PCT)
-        loan_interest = loan_amt * LOAN_RATE_MONTH * HOLDING_MONTHS
-        cash_total = cash_down + loan_interest + closing + holding + selling
-        cash_profit = out.arv_expected - bid - senior_cost - (out.rehab_expected or 0) - closing - holding - selling - loan_interest
+        loan_interest = loan_amt * LOAN_RATE_MONTH * holding_months
+        cash_profit = out.arv_expected - bid - senior_cost - rehab_buy - closing - holding - selling - loan_interest
         if cash_down > 0:
             out.cash_on_cash_pct = round((cash_profit / cash_down) * 100, 1)
         out.bid_to_arv_pct = round((bid / out.arv_expected) * 100, 1)

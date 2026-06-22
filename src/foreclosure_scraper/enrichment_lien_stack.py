@@ -29,9 +29,11 @@ _BIZ = {"LLC", "INC", "CORP", "TRUST", "TR", "LP", "LLP", "COMPANY", "CO", "BANK
 
 
 def _name_tokens(name: str | None) -> frozenset[str]:
+    # Keep single-letter initials — a middle initial adds real discrimination
+    # ("JOHN A SMITH" != "JOHN B SMITH") and lets the 3-token join gate work.
     if not name:
         return frozenset()
-    toks = [t for t in re.split(r"[^A-Za-z]+", name.upper()) if len(t) > 1]
+    toks = [t for t in re.split(r"[^A-Za-z]+", name.upper()) if t]
     toks = [t for t in toks if t not in _SUFFIXES]
     return frozenset(toks)
 
@@ -60,10 +62,13 @@ def enrich_lien_stack(listings: list[Listing]) -> dict:
         if not stl:
             continue
         toks = _name_tokens(stl.get("owner") or li.defendant)
-        if len(toks) < 2 or _is_business(toks):   # need a real personal full name
+        # Require 3+ name tokens (first + middle/initial + last) so a bare
+        # two-token common name ("JOHN SMITH") can't false-match the wrong owner
+        # and wrongly tank a real deal's equity. Businesses skipped.
+        if len(toks) < 3 or _is_business(toks):
             continue
-        amt = stl.get("balance") or li.judgment_amount
-        if not amt:
+        amt = stl.get("balance")   # authoritative SCDOR balance only — never fall
+        if not amt:                # back to the lien row's judgment_amount
             continue
         key = ((li.county or "").upper(), toks)
         lien_index[key] = max(lien_index.get(key, 0.0), float(amt))
@@ -78,7 +83,7 @@ def enrich_lien_stack(listings: list[Listing]) -> dict:
         if raw.get("sc_state_tax_lien") or li.listing_type is ListingType.TAX_LIEN:
             continue
         toks = _owner_tokens(li)
-        if len(toks) < 2:
+        if len(toks) < 3:   # mirror the index's 3-token minimum
             continue
         amt = lien_index.get(((li.county or "").upper(), toks))
         if not amt:

@@ -22,8 +22,10 @@ from typing import Optional
 
 import structlog
 
+from datetime import date
+
 from .models import Listing
-from .valuation.amortize import amortized_balance
+from .valuation.amortize import _as_date, amortized_balance
 
 log = structlog.get_logger()
 
@@ -44,29 +46,39 @@ def _arv(li: Listing) -> Optional[float]:
 
 
 def _recorded_dt(raw: dict) -> tuple[Optional[float], object]:
-    """Best recorded Deed-of-Trust (mortgage) original amount + date, if captured."""
+    """Best (most-recent) recorded Deed-of-Trust original amount + date."""
     docs = raw.get("rod_docs") or []
-    best_amt, best_date = None, None
+    best_amt, best_date, best_key = None, None, None
     for d in docs if isinstance(docs, list) else []:
         dt = (d.get("doc_type") or "").upper()
         if "DEED OF TRUST" in dt or dt in ("DT", "MTG", "MORTGAGE"):
             amt = d.get("amount")
-            if amt and (best_amt is None or (d.get("recorded_date") or "") > (best_date or "")):
-                best_amt, best_date = float(amt), d.get("recorded_date")
+            if not amt:
+                continue
+            # Compare PARSED dates, not raw strings — ROD feeds mix ISO and
+            # US formats, so a string compare picks the wrong (older) note.
+            key = _as_date(d.get("recorded_date")) or date.min
+            if best_key is None or key > best_key:
+                best_amt, best_date, best_key = float(amt), d.get("recorded_date"), key
     return best_amt, best_date
 
 
 def _senior_liens(raw: dict) -> float:
+    """Senior debt the buyer takes subject to — MIRRORS calc.py exactly so the
+    two never disagree: junior-position senior total (gated on fpos>1) PLUS any
+    super-priority liens from raw['liens'] (state tax liens survive any sale)."""
     lp = raw.get("lien_priority") or {}
-    total = lp.get("total_senior_amount")
-    if total:
-        return float(total)
-    liens = raw.get("liens") or []
-    return float(sum((x.get("amount") or 0) for x in liens if isinstance(x, dict)))
+    total = float(lp.get("total_senior_amount") or 0)
+    fpos = lp.get("foreclosure_position")
+    junior = total if (total > 0 and (fpos is None or fpos > 1)) else 0.0
+    superpri = sum(float(x.get("amount") or 0) for x in (raw.get("liens") or [])
+                   if isinstance(x, dict) and x.get("super_priority"))
+    return junior + superpri
 
 
-def _payoff(li: Listing) -> tuple[Optional[float], str, str]:
-    """(estimated_payoff, source, confidence)."""
+def _payoff(li: Listing, arv: float) -> tuple[Optional[float], str, str]:
+    """(estimated_payoff, source, confidence). arv is the value reference used to
+    arms-length-gate the last-sale proxy."""
     raw = li.raw if isinstance(li.raw, dict) else {}
     # 1) recorded Deed of Trust -> amortized current balance
     amt, dt = _recorded_dt(raw)
@@ -78,15 +90,20 @@ def _payoff(li: Listing) -> tuple[Optional[float], str, str]:
     ao = raw.get("amount_owed") or {}
     if ao.get("is_actual_debt") and ao.get("value"):
         return float(ao["value"]), f"amount_owed:{ao.get('source', '?')}", ao.get("confidence", "medium")
-    # 3) last arms-length sale -> assume ~90% financed, amortize from sale date
+    # 3) last sale -> ~90% financed, amortized. ARMS-LENGTH GATE: a $1/$10
+    #    intra-family quitclaim or estate deed amortizes to ~0 and fakes ~100%
+    #    equity (the exact failure mode this whole engine prevents). Require the
+    #    sale price to clear a real-transaction floor before trusting it.
     gis = raw.get("gis") or {}
     ls = gis.get("last_sale") or {}
     sale_amt = ls.get("amount") or gis.get("last_sale_amount")
     sale_date = ls.get("date") or gis.get("last_sale_date")
     if sale_amt and sale_date:
-        bal = amortized_balance(float(sale_amt) * _LTV_PROXY, sale_date)
-        if bal is not None:
-            return bal, "last_sale_amortized", "low"
+        floor = max(10000.0, 0.30 * arv)
+        if float(sale_amt) >= floor:
+            bal = amortized_balance(float(sale_amt) * _LTV_PROXY, sale_date)
+            if bal is not None:
+                return bal, "last_sale_amortized", "low"
     return None, "unknown", "none"
 
 
@@ -97,7 +114,7 @@ def enrich_equity(listings: list[Listing]) -> dict:
         arv = _arv(li)
         if not arv or arv <= 0:
             continue
-        payoff, src, conf = _payoff(li)
+        payoff, src, conf = _payoff(li, arv)
         if payoff is None:
             continue
         seniors = _senior_liens(li.raw if isinstance(li.raw, dict) else {})

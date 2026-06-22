@@ -27,11 +27,22 @@ from .models import Listing
 log = structlog.get_logger()
 
 ECHO_FACILITIES = "https://echodata.epa.gov/echo/echo_rest_services.get_facilities"
+ECHO_FACILITY_INFO = "https://echodata.epa.gov/echo/echo_rest_services.get_facility_info"
 FBI_CRIME = "https://api.usa.gov/crime/fbi/cde/summarized"
 
 
 async def _epa_nearby(c: httpx.AsyncClient, lat: float, lon: float, radius_mi: float = 1.0) -> Optional[dict]:
-    """Count regulated facilities within `radius_mi` miles of (lat, lon)."""
+    """Count regulated facilities within `radius_mi` miles of (lat, lon).
+
+    ECHO's ``get_facilities`` does NOT return the facility array inline — it
+    returns a query *summary* whose total count lives at
+    ``Results.QueryRows`` (a string). The prior code read a non-existent
+    ``Results.Results`` list and therefore always reported ``nearby_count: 0``.
+
+    We read ``QueryRows`` for the nearby count, then fetch the inline facility
+    records via ``get_facility_info`` (which DOES nest them under
+    ``Results.Facilities``) to break out hazardous/air violators.
+    """
     try:
         r = await c.get(
             ECHO_FACILITIES,
@@ -47,18 +58,41 @@ async def _epa_nearby(c: httpx.AsyncClient, lat: float, lon: float, radius_mi: f
         )
         if r.status_code != 200:
             return None
-        data = r.json()
-        results = (data.get("Results") or {}).get("Results") or []
-        if not isinstance(results, list):
+        res = (r.json().get("Results") or {})
+        if res.get("Error"):
+            return None
+        try:
+            nearby = int(str(res.get("QueryRows") or "0").replace(",", ""))
+        except (ValueError, TypeError):
+            nearby = 0
+        if nearby <= 0:
             return {"nearby_count": 0, "hazardous_count": 0}
-        nearby = len(results)
-        # Count those with hazardous-waste or air-quality violations
-        haz = sum(
-            1
-            for f in results
-            if (f.get("Hazardous_Waste") or "").upper() == "Y"
-            or (f.get("AIR_FLAG") or "").upper() == "Y"
-        )
+
+        # Pull the inline facility records to count hazardous/air violators.
+        haz = 0
+        try:
+            ri = await c.get(
+                ECHO_FACILITY_INFO,
+                params={
+                    "output": "JSON",
+                    "p_lat": lat,
+                    "p_long": lon,
+                    "p_r": radius_mi,
+                    "p_act": "Y",
+                },
+                timeout=12.0,
+            )
+            if ri.status_code == 200:
+                facs = ((ri.json().get("Results") or {}).get("Facilities")) or []
+                if isinstance(facs, list):
+                    haz = sum(
+                        1
+                        for f in facs
+                        if str(f.get("FacHasInspections") or f.get("Hazardous_Waste") or "").upper() in ("Y", "TRUE")
+                        or str(f.get("AIRFlag") or f.get("AIR_FLAG") or "").upper() in ("Y", "TRUE")
+                    )
+        except (httpx.HTTPError, ValueError):
+            pass
         return {"nearby_count": nearby, "hazardous_count": haz}
     except Exception:
         return None

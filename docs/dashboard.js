@@ -542,6 +542,9 @@ function openDetail(l) {
     if (c.max_bid_70 != null) {
       rows.push(`<div class="calc-row"><div class="lbl">Max Bid (70% rule)</div><div class="val big">${fmtMoney(c.max_bid_70)}</div></div>`);
     }
+    if (c.wholesale_mao != null) {
+      rows.push(`<div class="calc-row"><div class="lbl">Wholesale MAO</div><div class="val">${fmtMoney(c.wholesale_mao)}${c.wholesale_spread != null ? ` <span class="muted">(spread ${fmtMoney(c.wholesale_spread)})</span>` : ""}</div></div>`);
+    }
     if (c.bid_to_arv_pct != null) {
       rows.push(`<div class="calc-row"><div class="lbl">Bid / ARV</div><div class="val">${c.bid_to_arv_pct.toFixed(1)}%</div></div>`);
     }
@@ -559,6 +562,17 @@ function openDetail(l) {
     if (c.cash_on_cash_pct != null) {
       const cls = c.cash_on_cash_pct > 0 ? "pos" : "neg";
       rows.push(`<div class="calc-row"><div class="lbl">Cash-on-Cash</div><div class="val ${cls}">${c.cash_on_cash_pct.toFixed(1)}%</div></div>`);
+    }
+    const _eq = (l.raw && l.raw.equity) || null;
+    if (_eq && _eq.value != null) {
+      const ec = _eq.is_underwater ? "neg" : ((_eq.pct || 0) >= 0.4 ? "pos" : "");
+      rows.push(`<div class="calc-row"><div class="lbl">Owner Equity</div><div class="val big ${ec}">${fmtMoney(_eq.value)} <span class="muted">(${Math.round((_eq.pct || 0) * 100)}%)</span></div></div>`);
+      rows.push(`<div class="calc-row"><div class="lbl">Est. Payoff</div><div class="val">${fmtMoney(_eq.payoff_estimate)} <span class="muted">${String(_eq.payoff_source || "").replace(/_/g, " ")} · ${_eq.confidence || ""}</span></div></div>`);
+      if (_eq.senior_liens) rows.push(`<div class="calc-row"><div class="lbl">Senior Liens</div><div class="val neg">${fmtMoney(_eq.senior_liens)}</div></div>`);
+    }
+    const _mv = (l.raw && l.raw.market_velocity) || null;
+    if (_mv && _mv.moi != null) {
+      rows.push(`<div class="calc-row"><div class="lbl">Market (months of inventory)</div><div class="val">${_mv.moi} mo → ${_mv.holding_months_est}-mo hold</div></div>`);
     }
     rows.push(`<div class="calc-row"><div class="lbl">Confidence</div><div class="val"><span class="confidence-pill confidence-${c.confidence || "LOW"}">${c.confidence || "LOW"}</span></div></div>`);
     if (c.notes && c.notes.length) {
@@ -981,6 +995,17 @@ function openDetail(l) {
   if (l.raw && l.raw.sc_tax_delinquent) _deeds.push(["SC tax delinquent", "Yes"]);
   if (l.raw && l.raw.incarceration) _deeds.push(["Owner incarcerated (name match)", "Yes"]);
   if (l.raw && l.raw.sos_status) _deeds = _deeds.concat(flat(l.raw.sos_status));
+  if (l.foreclosure_process) _deeds.push(["Foreclosure process", String(l.foreclosure_process).replace(/_/g, " ")]);
+  if (l.redemption_deadline) _deeds.push(["SC redemption deadline", fmtDate(l.redemption_deadline)]);
+  // Joined lien stack (state tax liens etc.) — raw['liens'], distinct from the
+  // ROD lien_priority engine below.
+  const _liensStack = (l.raw && l.raw.liens);
+  if (Array.isArray(_liensStack) && _liensStack.length) {
+    _liensStack.forEach((x) => _deeds.push([
+      (x.type ? String(x.type).replace(/_/g, " ") : "lien") + (x.super_priority ? " (super-priority)" : ""),
+      fmtMoney(x.amount),
+    ]));
+  }
   const _liens = (l.raw && l.raw.lien_priority);
   if (Array.isArray(_liens) && _liens.length) _deeds.push(["Liens on record", _liens.length]);
   const _rod = (l.raw && l.raw.rod_docs);

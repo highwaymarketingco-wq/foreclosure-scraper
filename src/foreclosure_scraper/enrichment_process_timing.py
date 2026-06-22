@@ -51,8 +51,10 @@ def enrich_process_timing(listings: list[Listing]) -> dict:
         if proc:
             li.foreclosure_process = proc
             labeled += 1
-        # SC tax sale -> 12-month redemption clock from the sale date.
-        if (li.state == "SC" and li.listing_type in _TAX_TYPES and li.sale_date
+        # SC tax SALE -> 12-month redemption clock from the sale date. Only the
+        # conveying TAX_SALE event starts the clock; a TAX_LIEN/certificate row
+        # is pre-sale and its sale_date semantics differ, so it's excluded.
+        if (li.state == "SC" and li.listing_type is ListingType.TAX_SALE and li.sale_date
                 and li.redemption_deadline is None):
             li.redemption_deadline = li.sale_date + timedelta(days=_SC_REDEMPTION_DAYS)
             redemptions += 1

@@ -88,22 +88,27 @@ def _rent_pool_for_seat(seat: str, state: str) -> list[dict]:
 SOLD_WINDOW_MONTHS = 6.0   # the sold pool's past_days=180 == 6 months
 
 
-def _active_count_for_seat(seat: str, state: str) -> int:
-    """Count current for-sale listings (the numerator of months-of-inventory)."""
+def _active_count_for_seat(seat: str, state: str) -> Optional[int]:
+    """Count current for-sale listings. Returns None on FETCH FAILURE (distinct
+    from a genuine 0) so a failed pull can't masquerade as a red-hot market."""
     try:
         from homeharvest import scrape_property
     except ImportError:
-        return 0
+        return None
     try:
         df = scrape_property(location=f"{seat}, {state}", listing_type="for_sale")
         return 0 if df is None else int(len(df))
     except Exception as exc:
         log.debug("comps.active_pool.error", seat=seat, state=state, error=str(exc)[:100])
-        return 0
+        return None
 
 
-def _months_of_inventory(active: int, sold: int) -> float | None:
-    """MOI = active listings / monthly sold rate. None if no sold signal."""
+def _months_of_inventory(active: Optional[int], sold: int) -> float | None:
+    """MOI = active listings / monthly sold rate. None when either signal is
+    missing (active None=fetch failed, or active 0 ~ almost always a failed pull
+    for a county seat) so the holding period falls back to the neutral default."""
+    if not active or sold <= 0:
+        return None
     monthly_sold = sold / SOLD_WINDOW_MONTHS
     if monthly_sold <= 0:
         return None
@@ -525,10 +530,14 @@ def _adjust_comp(target: Listing, s: dict, base_ppsf: float) -> tuple[float | No
     if cy and ty:
         adj["age"] = round((ty - cy) * YEAR_ADJ, -2)
     net = sum(adj.values())
+    gross = sum(abs(v) for v in adj.values())   # appraisal rule is on GROSS
     cap = MAX_GROSS_ADJ_FRAC * price
     capped_net = max(-cap, min(cap, net))
     adj["net"] = round(capped_net, -2)
-    adj["capped"] = abs(capped_net - net) > 1
+    adj["gross"] = round(gross, -2)
+    # Flag when GROSS adjustment exceeds the limit — the comp is too dissimilar
+    # to fully trust (per the 25% appraisal guideline), even if NET is small.
+    adj["capped"] = gross > cap
     effective_ppsf = round((price + capped_net) / tgt_sqft, 2)
     return effective_ppsf, adj
 
@@ -622,7 +631,7 @@ async def enrich_with_comps(listings: list[Listing]) -> None:
             sold_pools[(c.state, c.name)] = sr
         if isinstance(rr, list):
             rent_pools[(c.state, c.name)] = rr
-        active = ar if isinstance(ar, int) else 0
+        active = ar if isinstance(ar, int) else None   # None = fetch failed
         moi = _months_of_inventory(active, len(sr) if isinstance(sr, list) else 0)
         velocity[(c.state, c.name)] = {
             "moi": moi, "holding_months_est": _holding_months_from_moi(moi),
