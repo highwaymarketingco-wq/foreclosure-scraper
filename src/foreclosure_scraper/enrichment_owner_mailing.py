@@ -154,6 +154,53 @@ def _extract_specs(attrs: dict) -> dict:
     return out
 
 
+# 2026-06-21: county appraised/market value extractor. Most county CAMA layers
+# expose the total property valuation (the root unblocker for the proxy-ARV in
+# valuation/calc.py, which reads tax_value × 1.25). Field names vary wildly, so
+# we try priority-ordered patterns for a single TOTAL value, then fall back to
+# summing land + improvement. Land-only fields and SC's "Assessment" class
+# string ("4% OO RES IM") are deliberately NOT used as the value.
+_VALUE_PRIORITY = [
+    re.compile(r"^(total_?market_?value|market_?value)$", re.I),                       # Buncombe TotalMarketValue
+    re.compile(r"^(appraised_?value|apprval|appr_?val)$", re.I),                       # Buncombe AppraisedValue
+    re.compile(r"^(total_?tax_?value|cost_?total_?value|total_?value|totval|totalvalue)$", re.I),  # Polk/Henderson/Lincoln/Gaston
+    re.compile(r"^(assessed_?value|assessed_?v|taxvalue|tax_?value)$", re.I),          # Transylvania ASSESSED_V, Buncombe TaxValue
+]
+_LAND_PAT = re.compile(r"^(land_?value|landval)$", re.I)
+_IMPROV_PAT = re.compile(r"^(improvement_?value|improv_?value|improvval|bldg_?value|building_?value|building_?v)$", re.I)
+
+
+def _num_value(v) -> Optional[float]:
+    try:
+        f = float(str(v).replace(",", "").replace("$", "").strip())
+    except (ValueError, TypeError):
+        return None
+    return f if 1000 <= f <= 50_000_000 else None  # reject 0/exempt + absurd
+
+
+def _extract_value(attrs: dict) -> Optional[float]:
+    """Total appraised/market property value, or None."""
+    if not attrs:
+        return None
+    for pat in _VALUE_PRIORITY:
+        for k, v in attrs.items():
+            if pat.match(k or ""):
+                n = _num_value(v)
+                if n:
+                    return n
+    # Last resort: land + improvement components summed (e.g. McDowell).
+    land = improv = None
+    for k, v in attrs.items():
+        if _LAND_PAT.match(k or ""):
+            land = _num_value(v) or land
+        if _IMPROV_PAT.match(k or ""):
+            improv = _num_value(v) or improv
+    if land or improv:
+        s = (land or 0) + (improv or 0)
+        return s if s >= 1000 else None
+    return None
+
+
 async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
     spec = COUNTY_GIS.get(f"{li.state}:{(li.county or '').strip().title()}")
     if not spec:
@@ -212,7 +259,7 @@ async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
     return {"owner": owner or None, "mailing": mailing or None, "situs": situs,
             "parcel_id": parcel, "mail_state": mail_state or None,
             "absentee": absentee, "out_of_state": out_of_state, "source": "county_gis",
-            "_specs": _extract_specs(attrs)}
+            "_specs": _extract_specs(attrs), "_value": _extract_value(attrs)}
 
 
 async def enrich_owner_mailing(listings: list[Listing], max_concurrency: int = 4) -> dict:
@@ -245,6 +292,19 @@ async def enrich_owner_mailing(listings: list[Listing], max_concurrency: int = 4
                     li.bedrooms = specs["bedrooms"]
                 if specs.get("bathrooms") and not li.bathrooms:
                     li.bathrooms = specs["bathrooms"]
+                # County total appraised/market value — feeds the proxy-ARV in
+                # valuation/calc.py (tax_value × 1.25) and closes the
+                # assessed_value gap. Fill all three value fields when missing
+                # (for these county appraisal records they are the same total).
+                val = res.pop("_value", None)
+                if val:
+                    if not li.tax_value:
+                        li.tax_value = val
+                        counts["value_filled"] = counts.get("value_filled", 0) + 1
+                    if not li.market_value:
+                        li.market_value = val
+                    if not li.assessed_value:
+                        li.assessed_value = val
                 li.raw["owner_mailing"] = res
                 if res.get("parcel_id") and not li.parcel_id:
                     li.parcel_id = res["parcel_id"]
