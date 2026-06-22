@@ -102,6 +102,16 @@ def _norm(s: str) -> str:
     return re.sub(r"[^a-z0-9 ]", "", (s or "").lower()).strip()
 
 
+def _is_absentee(prop_addr: Optional[str], mailing: Optional[str]) -> bool:
+    """True when the owner mails from somewhere other than the property.
+
+    prop_addr is the GIS situs when available, else the listing's own street
+    address (so counties whose parcel layer has no situs field still resolve an
+    absentee flag). Substring test tolerates the mailing carrying extra
+    city/state/zip the situs string doesn't."""
+    return bool(prop_addr and mailing and _norm(prop_addr) not in _norm(mailing))
+
+
 def _join(attrs: dict, fields: list[str]) -> str:
     parts = [str(attrs.get(f)).strip() for f in fields if attrs.get(f) not in (None, "", " ")]
     return " ".join(p for p in parts if p and p.lower() != "none").strip()
@@ -253,8 +263,13 @@ async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
 
     if not owner and not mailing:
         return None
-    # absentee = mailing differs from situs; out_of_state = mails from another state
-    absentee = bool(situs and mailing and _norm(situs) not in _norm(mailing))
+    # absentee = owner mails from somewhere other than the property; out_of_state
+    # = mails from a different state. For the property address, prefer the GIS
+    # situs field, but fall back to the LISTING's own street address so counties
+    # whose parcel layer has no situs field (Oconee, Union — parcel-match-only)
+    # can still flag absentee owners.
+    prop_addr = situs or (li.street_address or None)
+    absentee = _is_absentee(prop_addr, mailing)
     out_of_state = bool(mail_state and li.state and mail_state != li.state)
     return {"owner": owner or None, "mailing": mailing or None, "situs": situs,
             "parcel_id": parcel, "mail_state": mail_state or None,
