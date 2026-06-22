@@ -33,10 +33,13 @@ import math
 import re
 from typing import Iterable
 
+from .coastal_geofilter import distance_to_ocean_m as _precise_ocean_dist
 
-# Distance threshold for the geofence signal (meters). 150m fits a
-# typical oceanfront lot's front-to-back depth plus geocoding drift.
-OCEANFRONT_DISTANCE_M = 150.0
+
+# Distance threshold for the geofence signal (meters). 250m ≈ "on the beach or
+# within 2-3 blocks" (owner direction 2026-06-22), superseding the old 150m
+# "immediate oceanfront" bar. Measured against the real OSM ocean shoreline.
+OCEANFRONT_DISTANCE_M = 250.0
 
 
 # Keywords in description / source text that mean "true oceanfront" in
@@ -295,17 +298,37 @@ def is_oceanfront(*, description: str | None = None,
     st = _street_hit(street_address, city)
     geo = False
     geo_dist = None
+    geo_precise = False
     if latitude is not None and longitude is not None:
         try:
-            geo_dist = distance_to_shoreline_m(float(latitude), float(longitude))
-            geo = geo_dist <= distance_threshold_m
+            lat_f, lon_f = float(latitude), float(longitude)
+            # Prefer the precise OSM-coastline geofilter (real Atlantic shoreline,
+            # excludes ICW/sounds); fall back to the curated reference points only
+            # if the bundled coastline asset is unavailable.
+            geo_dist = _precise_ocean_dist(lat_f, lon_f)
+            if geo_dist is not None:
+                geo_precise = True
+            else:
+                geo_dist = distance_to_shoreline_m(lat_f, lon_f)
+            geo = geo_dist is not None and geo_dist <= distance_threshold_m
         except (TypeError, ValueError):
             geo_dist = None
     hits = sum((kw, st, geo))
-    return hits >= 2, {
+    # When we have PRECISE coordinates, distance is AUTHORITATIVE — the owner's
+    # rule is "on the beach or within 2-3 blocks, hard pass on anything outside,"
+    # which is purely a distance test. So a listing with real coords passes iff
+    # it's within the threshold of the true ocean shoreline, regardless of
+    # keyword/street (a 'beachfront!' listing a mile inland must still fail).
+    # Without coords we fall back to the 2-of-3 keyword/street heuristic.
+    if geo_precise:
+        ok = geo
+    else:
+        ok = hits >= 2
+    return ok, {
         "keyword": kw,
         "street": st,
         "geofence": geo,
-        "geo_distance_m": geo_dist,
+        "geo_distance_m": round(geo_dist, 1) if geo_dist is not None else None,
+        "geo_precise": geo_precise,
         "hits": hits,
     }
