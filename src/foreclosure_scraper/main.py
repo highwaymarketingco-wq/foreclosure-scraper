@@ -68,6 +68,40 @@ OCEANFRONT_COASTAL_COUNTIES: frozenset[tuple[str, str]] = frozenset({
     ("Beaufort", "SC"), ("Colleton", "SC"),
 })
 
+# TRUE downtown Charleston peninsula (owner direction 2026-06-22 — keep these
+# even though they're harbor-side, not oceanfront; rare but valuable). The
+# historic peninsula south of the Crosstown/Hampton Park, between the Ashley
+# (W) and Cooper (E) rivers. This bbox EXCLUDES North Charleston (lat >32.81),
+# Summerville (~33.0/-80.18), West Ashley (lon <-79.975) and James Island
+# (lat <32.76) — exactly the "not Summerville, not North Charleston" ask.
+DOWNTOWN_CHARLESTON_BBOX = (32.760, 32.808, -79.975, -79.915)  # lat_min,lat_max,lon_min,lon_max
+_DOWNTOWN_CHS_DENY_CITY = {"north charleston", "summerville", "hanahan",
+                           "goose creek", "west ashley", "james island", "ladson"}
+
+
+def _is_downtown_charleston(li: Listing) -> bool:
+    """True for a Charleston-peninsula (true downtown) listing — admitted
+    alongside the oceanfront path, but never North Charleston / Summerville."""
+    if (li.state or "").upper() != "SC":
+        return False
+    if li.county and li.county.replace(" County", "").strip().title() != "Charleston":
+        return False
+    if (li.city or "").strip().lower() in _DOWNTOWN_CHS_DENY_CITY:
+        return False
+    if li.latitude is None or li.longitude is None:
+        return False
+    try:
+        lat, lon = float(li.latitude), float(li.longitude)
+    except (TypeError, ValueError):
+        return False
+    a0, a1, o0, o1 = DOWNTOWN_CHARLESTON_BBOX
+    if a0 <= lat <= a1 and o0 <= lon <= o1:
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["downtown_charleston"] = True
+        return True
+    return False
+
 
 def _check_oceanfront(li: Listing) -> bool:
     """Run is_oceanfront against the listing's data and, on a pass, tag
@@ -98,6 +132,11 @@ def _in_scope(li: Listing) -> bool:
               li.state.upper())
         if cs in OCEANFRONT_COASTAL_COUNTIES and _check_oceanfront(li):
             return True
+    # True downtown Charleston peninsula — harbor-side, so it won't pass the
+    # oceanfront distance gate, but the owner wants it kept (not N. Charleston /
+    # Summerville). Also runs before the deny check.
+    if _is_downtown_charleston(li):
+        return True
     # Deny set takes precedence over EVERY other scope path. Without this,
     # a listing tagged with a denied county still gets through via the zip-
     # prefix fallback (288/287/296 cover Haywood NC, Mecklenburg NC,
