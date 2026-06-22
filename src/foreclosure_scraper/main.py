@@ -8,6 +8,7 @@ import sys
 import traceback
 from collections import Counter
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import structlog
 
@@ -1151,6 +1152,7 @@ async def run() -> int:
         log.error("lien_stack.failed", traceback=traceback.format_exc())
 
     # Investor calculator + A-F grades per listing.
+    valuation_failures = 0
     for li in enriched:
         try:
             c = valuation_calc.compute(li)
@@ -1160,8 +1162,14 @@ async def run() -> int:
             li.raw["calc"] = valuation_calc.to_dict(c)
             li.raw["grade"] = valuation_grading.to_dict(g)
         except Exception:
-            log.warning("valuation.failed", source_url=li.source_url)
-    log.info("orchestrator.graded", count=len(enriched))
+            valuation_failures += 1
+            log.warning("valuation.failed", source_url=li.source_url,
+                        traceback=traceback.format_exc())
+    log.info("orchestrator.graded", count=len(enriched), failures=valuation_failures)
+    # A blanket calc/grade break (refactor that throws on every listing) would
+    # otherwise pass as a green run with empty calc/grade — surface it as an alarm.
+    if enriched and valuation_failures >= max(5, len(enriched) // 4):
+        enrichment_stats["valuation_failures"] = valuation_failures
 
     # Owner-equity engine — ARV − mortgage payoff − junior liens. Runs after
     # calc (needs arv_expected) + amount_owed, before distress scoring (which
@@ -1304,8 +1312,7 @@ async def run() -> int:
     # week should still publish — but the drop is made impossible to miss.
     try:
         import json as _json
-        from pathlib import Path as _P
-        prev_path = _P(__file__).resolve().parent.parent.parent / "docs" / "listings.json"
+        prev_path = Path(__file__).resolve().parent.parent.parent / "docs" / "listings.json"
         if prev_path.exists():
             prev = _json.loads(prev_path.read_text())
             prev_total = len(prev) if isinstance(prev, list) else 0
@@ -1336,9 +1343,8 @@ async def run() -> int:
     # This separate file is for power-users / future analytics.
     try:
         import json as _json
-        from pathlib import Path as _Path
         from .web_artifact import _to_dict as _slim
-        sold_path = _Path(__file__).resolve().parent.parent.parent / \
+        sold_path = Path(__file__).resolve().parent.parent.parent / \
             "docs" / "foreclosure_sold_pool.json"
         sold_payload = [_slim(li) for li in sold_pool]
         sold_path.write_text(
@@ -1355,7 +1361,6 @@ async def run() -> int:
     # so an investor (or alerting hook) can see at a glance which sources
     # are OK, which are blocked, and which actually regressed.
     try:
-        from pathlib import Path
         from .run_health import write_health_artifact
         health_path = Path(__file__).resolve().parent.parent.parent / "docs" / "run_health.json"
         write_health_artifact(

@@ -84,21 +84,29 @@ async def _throttle(host: str | None) -> None:
         _host_last[host] = time.monotonic()
 
 
-# Per-task record of the last block-status HTTP response, so a scraper that
-# SWALLOWS its own httpx error (returns [] / "") can still be classified as
-# BLOCKED by base_scraper.safe_run instead of looking like a legit empty result.
-# contextvars are copied per asyncio task (each safe_run runs as its own gather
-# task), so concurrent scrapers don't clobber each other's signal.
-_last_block: "ContextVar[tuple[int, str] | None]" = ContextVar("_last_block", default=None)
+# Per-run record of block-status HTTP responses, so a scraper that SWALLOWS its
+# own httpx error (returns [] / "") is still classified as BLOCKED by
+# base_scraper.safe_run instead of looking like a legit empty result.
+#
+# The holder is a MUTABLE LIST stored in a ContextVar. safe_run sets a fresh list
+# per run; the transport APPENDS to it (never .set()). This is deliberate: a
+# child asyncio task (asyncio.gather/create_task — how many scrapers fetch)
+# inherits the SAME list object by reference when its context is copied, so an
+# append inside the child is visible to safe_run in the parent. A plain
+# ContextVar.set() inside a child would NOT propagate back — that was the bug.
+# Concurrent scrapers each get their own list (set per safe_run task), so they
+# don't clobber each other.
+_block_holder: "ContextVar[list | None]" = ContextVar("_block_holder", default=None)
 _BLOCK_CODES = {401, 403, 406, 409, 429}
 
 
 def reset_block_signal() -> None:
-    _last_block.set(None)
+    _block_holder.set([])
 
 
 def take_block_signal() -> "tuple[int, str] | None":
-    return _last_block.get()
+    h = _block_holder.get()
+    return h[0] if h else None   # first block recorded this run
 
 
 class _ThrottledTransport(httpx.AsyncBaseTransport):
@@ -112,10 +120,12 @@ class _ThrottledTransport(httpx.AsyncBaseTransport):
         resp = await self._inner.handle_async_request(request)
         code = resp.status_code
         if code in _BLOCK_CODES or 500 <= code < 600:
-            reason = ("rate-limited" if code == 429
-                      else "blocked/forbidden" if code in (401, 403, 406, 409)
-                      else "server error / possible WAF")
-            _last_block.set((code, f"HTTP {code} ({reason}) from {request.url.host}"))
+            holder = _block_holder.get()
+            if holder is not None:   # mutate the shared list (survives child tasks)
+                reason = ("rate-limited" if code == 429
+                          else "blocked/forbidden" if code in (401, 403, 406, 409)
+                          else "server error / possible WAF")
+                holder.append((code, f"HTTP {code} ({reason}) from {request.url.host}"))
         return resp
 
     async def aclose(self) -> None:

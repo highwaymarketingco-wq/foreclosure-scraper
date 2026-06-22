@@ -89,16 +89,36 @@ def test_timeout():
 
 def test_swallowed_block_promoted_to_blocked():
     # A scraper that catches its own HTTP error and returns [] is still flagged
-    # BLOCKED because the shared transport recorded the block signal this run.
-    from foreclosure_scraper.http_client import _last_block
+    # BLOCKED because the shared transport recorded the block in the run's holder.
+    from foreclosure_scraper.http_client import _block_holder
 
     async def f():
-        _last_block.set((403, "HTTP 403 (blocked/forbidden) from courts.example"))
+        h = _block_holder.get()        # safe_run set a fresh list before fetch
+        if h is not None:
+            h.append((403, "HTTP 403 (blocked/forbidden) from courts.example"))
         return []   # swallowed the error
     s = _mk(f)
     _run(s)
     assert s.last_outcome == "BLOCKED"
     assert "403" in s.last_reason and "swallowed" in s.last_reason
+
+
+def test_swallowed_block_survives_child_task():
+    # The Pass-3 bug: the block append happens in a CHILD task (asyncio.gather);
+    # the shared-list holder must still surface it to safe_run in the parent.
+    from foreclosure_scraper.http_client import _block_holder
+
+    async def f():
+        async def child():
+            h = _block_holder.get()
+            if h is not None:
+                h.append((429, "HTTP 429 (rate-limited) from gis.example"))
+            return []
+        await asyncio.gather(child())   # fetch inside a child task
+        return []
+    s = _mk(f)
+    _run(s)
+    assert s.last_outcome == "BLOCKED" and "429" in s.last_reason
 
 
 def test_clean_zero_not_promoted_without_block():
