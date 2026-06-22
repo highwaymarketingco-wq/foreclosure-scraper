@@ -170,16 +170,11 @@ async def enrich_judgment_amount_via_detail_pages(
 
     sem = asyncio.Semaphore(CONCURRENCY)
 
-    async with httpx.AsyncClient(
-        timeout=FETCH_TIMEOUT_S,
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
-        },
-    ) as client:
+    # Route through the shared rate-limited client: these fetch li.source_url —
+    # the SAME law-firm/court hosts the scrapers already hit — so they need the
+    # per-host throttle + UA rotation to avoid bursting (and banning) a host.
+    from .http_client import client as _shared_client
+    async with _shared_client(timeout=FETCH_TIMEOUT_S) as client:
 
         async def one(li: Listing) -> None:
             async with sem:
