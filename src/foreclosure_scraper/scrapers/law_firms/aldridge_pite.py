@@ -1,18 +1,19 @@
 """Aldridge Pite — NC foreclosure trustee.
 
-Disclaimer-gated: aldridgepite.com requires clicking "I Agree" on the
-NC disclaimer page before the listings table renders. Uses Scrapling
-stealth and drives the disclaimer modal click.
+Compliant plain fetch (no bot-detection bypass). aldridgepite.com 301s the
+listings page to its NC disclaimer page UNLESS the request carries a Referer
+of that disclaimer page; with that header it returns HTTP 200 with the
+listings table rendered server-side (WordPress Posts Table Pro, serverSide
+:false — the rows are in the static HTML, no admin-ajax round-trip). So a
+normal GET + Referer is all that's needed — no stealth browser, no
+solve_cloudflare, no challenge handling.
 
 Sites:
   NC: /sale-day-listings-selection/foreclosure-listings-north-carolina/
-Disclaimer page: /disclaimer-north-carolina/ — clicking I-Agree sets
-a session cookie that unlocks the listings page.
+Referer used: /disclaimer-north-carolina/
 
-SC support removed 2026-05-13: every variant of the SC URL
-(/sale-day-listings-selection/foreclosure-listings-south-carolina/,
-/disclaimer-south-carolina/, /disclaimer-sc/, etc.) now 404s.
-Aldridge appears to have exited the SC market.
+SC support removed 2026-05-13: every variant of the SC URL now 404s
+(Aldridge appears to have exited the SC market).
 """
 from __future__ import annotations
 
@@ -23,74 +24,35 @@ from typing import Iterable
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
+from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
 URLS = (
     ("https://aldridgepite.com/sale-day-listings-selection/foreclosure-listings-north-carolina/", "NC"),
 )
 
+# Sending the disclaimer page as Referer is what unlocks the listings page
+# (otherwise it 301s back to the disclaimer). This is a normal HTTP header,
+# not a bot-detection bypass.
+_REFERER = "https://aldridgepite.com/disclaimer-north-carolina/"
+_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Referer": _REFERER,
+}
+
 
 async def _fetch_state(url: str) -> str:
-    """Drive the disclaimer-modal accept flow via Scrapling stealth.
-    Returns the listings HTML (table content) or empty string on failure."""
+    """Plain GET with a disclaimer Referer. Returns the listings HTML (table
+    content) or empty string on failure. No bot-detection bypass."""
     try:
-        from scrapling.fetchers import StealthyFetcher
-    except ImportError:
-        return ""
-
-    async def page_action(page):
-        # If we landed on the disclaimer page, click the agree button.
-        # Aldridge Pite uses different button shapes across templates;
-        # try several.
-        for sel in (
-            'a:has-text("I AGREE")',
-            'a:has-text("I Agree")',
-            'button:has-text("I AGREE")',
-            'button:has-text("Accept")',
-            'a:has-text("Accept")',
-            'a.disclaimer-accept',
-            'input[type="submit"][value*="Agree" i]',
-        ):
-            try:
-                await page.click(sel, timeout=4000)
-                await page.wait_for_load_state("networkidle", timeout=15000)
-                break
-            except Exception:
-                continue
-        # The listings come from a WP Posts-Table-Pro plugin (DataTables,
-        # serverSide:false) that POSTs to /wp-admin/admin-ajax.php on load
-        # and inserts rows client-side. The empty placeholder row
-        # ("No data available in table.") renders immediately, so we
-        # can't just wait for `tbody tr` — that matches the placeholder
-        # and returns before the data lands. Wait for a row with >=4
-        # cells (the real layout has 8: title/addr/city/state/zip/county/
-        # date/bid). If admin-ajax 500s, this times out and we fall back
-        # to whatever rendered (typically 0).
-        try:
-            await page.wait_for_function(
-                """() => {
-                    const t = document.querySelector('table.posts-data-table tbody');
-                    if (!t) return false;
-                    return Array.from(t.querySelectorAll('tr'))
-                        .some(r => r.querySelectorAll('td').length >= 4);
-                }""",
-                timeout=20000,
-            )
-        except Exception:
-            pass
-        try:
-            await page.wait_for_load_state("networkidle", timeout=15000)
-        except Exception:
-            pass
-
-    try:
-        result = await StealthyFetcher.async_fetch(
-            url, headless=True, network_idle=True,
-            timeout=180000, page_action=page_action,
-            solve_cloudflare=True,
-        )
-        body = getattr(result, "body", b"")
-        return body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
+        async with client(timeout=30.0) as c:
+            r = await c.get(url, headers=_HEADERS)
+            if r.status_code != 200:
+                return ""
+            return r.text
     except Exception:
         return ""
 
@@ -151,12 +113,12 @@ def _parse_listings(html: str, url: str, state: str, slug: str) -> list[Listing]
 
 class AldridgePite(BaseScraper):
     slug = "law_firms.aldridge_pite"
-    name = "Aldridge Pite (disclaimer-gated, stealth)"
+    name = "Aldridge Pite (NC, plain fetch + disclaimer Referer)"
     category = "law_firm"
     requires_apify = False
-    requires_render = True
-    expected_min_count = 0
-    timeout_s = 240.0  # NC only (~180s + slack) since SC URL is dead
+    requires_render = False
+    expected_min_count = 0  # NC table is often empty between sale cycles
+    timeout_s = 60.0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []

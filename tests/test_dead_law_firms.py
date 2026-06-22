@@ -1,16 +1,17 @@
 """Regression tests for the previously-silent-broken law-firm scrapers.
 
 After investigation:
-  * korn — JS-rendered SPA (gets only "Click here to enter")
+  * korn — parked/dead domain (FingerprintJS redirect shim, no firm content)
   * mcmichael_taylor_gray — AJAX-loaded ("Loading..." in body)
-  * aldridge_pite — disclaimer page now requires session cookie
+  * aldridge_pite — FIXED via compliant plain fetch (GET + disclaimer Referer
+    returns the table server-side; no bot-detection bypass). NC table is
+    often empty between sale cycles.
   * finkel — actually works (8 listings/run); most fall outside in-scope
     counties (Lexington, Richland) so post-filter yield is 0
 
-Three of the four are now classified requires_render=True so the
-weekly run summary shows "RENDER-REQUIRED" instead of REGRESSED.
-This stops the silent-fail noise without claiming we've fixed them
-(future fix: wire Scrapling stealth login flow per scraper).
+korn + mcmichael remain requires_render=True so the weekly run summary
+shows "RENDER-REQUIRED" instead of REGRESSED (stops silent-fail noise
+without claiming a fix).
 """
 from __future__ import annotations
 
@@ -33,9 +34,13 @@ def test_mtg_classified_render_required():
     assert s.expected_min_count == 0
 
 
-def test_aldridge_classified_render_required():
+def test_aldridge_now_plain_fetch():
+    # aldridge_pite was reclassified from RENDER-REQUIRED to a plain, compliant
+    # fetch: a normal GET with a disclaimer-page Referer returns the listings
+    # table server-side (no stealth browser, no bot-detection bypass). The NC
+    # table is often empty between sale cycles, hence expected_min_count == 0.
     s = AldridgePite()
-    assert getattr(s, "requires_render", False) is True
+    assert getattr(s, "requires_render", False) is False
     assert s.expected_min_count == 0
 
 
