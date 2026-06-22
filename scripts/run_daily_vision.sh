@@ -62,6 +62,15 @@ export VISION_BACKEND_COOLDOWN="${VISION_BACKEND_COOLDOWN:-70}"
 export VISION_MAX_SECONDS="${VISION_MAX_SECONDS:-14400}"
 export PYTHONUNBUFFERED=1
 
+# Daily API refresh FIRST: re-pull the browserless JSON sources (Fannie REO,
+# HUD, VA, foreclosure.com, CourtListener…) and merge, so day-old REO that has
+# sold drops out and its deep-link stops 404'ing, and fresh inventory appears.
+# Runs before vision so vision scores the now-current set. Non-fatal: if it
+# fails we still run vision on yesterday's data.
+echo "==> daily api refresh (fresh Fannie/REO links, kills 404s) $(date)" | tee -a "$LOG"
+uv run python scripts/daily_api_refresh.py >>"$LOG" 2>&1 \
+  || echo "==> api refresh failed (continuing to vision on existing data)" | tee -a "$LOG"
+
 echo "==> daily vision $(date)" | tee -a "$LOG"
 uv run python scripts/patch_vision_gemini.py >>"$LOG" 2>&1
 RC=$?

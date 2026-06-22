@@ -16,6 +16,9 @@ alarm always means "go look."
 from __future__ import annotations
 
 import json
+import os
+import traceback
+import urllib.request
 from pathlib import Path
 from typing import Any, Optional
 
@@ -93,6 +96,28 @@ def _load(path: Path) -> dict[str, Any]:
         return {}
 
 
+def _send_ntfy(alarms: dict[str, dict]) -> None:
+    """Free phone push when a source alarm fires. OFF unless NTFY_TOPIC is set
+    (ntfy.sh — no account, no cost). Never raises."""
+    topic = os.environ.get("NTFY_TOPIC", "").strip()
+    if not topic or not alarms:
+        return
+    server = os.environ.get("NTFY_SERVER", "https://ntfy.sh").rstrip("/")
+    body = "\n".join(f"{slug}: {a.get('reason', 'alarm')}"
+                     for slug, a in sorted(alarms.items()))[:3500]
+    try:
+        req = urllib.request.Request(
+            f"{server}/{topic}", data=body.encode("utf-8"), method="POST",
+            headers={
+                "Title": f"{len(alarms)} foreclosure source alarm(s)",
+                "Priority": "high", "Tags": "rotating_light",
+            })
+        urllib.request.urlopen(req, timeout=10)
+        log.info("source_health.ntfy_sent", count=len(alarms))
+    except Exception:
+        log.error("source_health.ntfy_failed", traceback=traceback.format_exc())
+
+
 def update_source_health(by_source: dict[str, int], expected: dict[str, int],
                          docs_dir: Path | str) -> dict[str, dict]:
     """Append this run's counts to the rolling history, evaluate each source,
@@ -122,7 +147,7 @@ def update_source_health(by_source: dict[str, int], expected: dict[str, int],
         if alarms:
             log.warning("source_health.alarms", count=len(alarms),
                         slugs=sorted(alarms))
+            _send_ntfy(alarms)
     except Exception:
-        import traceback
         log.error("source_health.failed", traceback=traceback.format_exc())
     return alarms
