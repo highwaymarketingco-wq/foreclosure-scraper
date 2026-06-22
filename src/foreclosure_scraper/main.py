@@ -1151,6 +1151,17 @@ async def run() -> int:
     except Exception:
         log.error("lien_stack.failed", traceback=traceback.format_exc())
 
+    # SC CAMA backfill — clean appraised value + specs + condition from the county
+    # Assessor CSV (Spartanburg's live SCDOT value is corrupt). Runs before calc so
+    # the value/specs feed ARV + grade. Fills only missing fields.
+    try:
+        from .enrichment_sc_cama import enrich_sc_cama
+        s = enrich_sc_cama(enriched)
+        if s:
+            enrichment_stats["sc_cama"] = s
+    except Exception:
+        log.error("sc_cama.failed", traceback=traceback.format_exc())
+
     # Investor calculator + A-F grades per listing.
     valuation_failures = 0
     for li in enriched:
