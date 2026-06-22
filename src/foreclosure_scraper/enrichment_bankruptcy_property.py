@@ -66,6 +66,33 @@ COURT_FOOTPRINT_COUNTIES: dict[str, list[tuple[str, str]]] = {
 }
 
 
+# NC OneMap statewide parcel service — one query covers all 100 NC counties
+# with a CONSISTENT value field (parval) that many per-county layers lack. We
+# search it by owner name for NC bankruptcy debtors, filtered to our footprint,
+# so a debtor's NC property + its assessed value get recovered even when the
+# per-county layer has no value field. (SC has no statewide equivalent.)
+NC_ONEMAP_QUERY = (
+    "https://services.nconemap.gov/secure/rest/services/"
+    "NC1Map_Parcels/FeatureServer/1/query"
+)
+# Filter OneMap matches to the canonical IN-SCOPE NC counties (the 11), NOT
+# NC_GIS.keys() — that set also carries denied Mecklenburg/Madison (used for
+# other cross-refs), which the scope re-pass would just drop anyway.
+from .config import NC_COUNTIES as _NC_COUNTIES  # noqa: E402
+_ALLOWED_NC_UPPER = {c.name.upper() for c in _NC_COUNTIES}
+_NAME_STOP = {
+    "llc", "inc", "corp", "corporation", "company", "co", "ltd", "lp",
+    "llp", "trust", "trustee", "estate", "of", "the", "and",
+}
+
+
+def _distinctive_tokens(name: str) -> set[str]:
+    return {
+        t for t in re.split(r"\W+", (name or "").lower())
+        if len(t) >= 3 and t not in _NAME_STOP
+    }
+
+
 def _gis_base(state: str, county: str) -> str | None:
     """Return the ArcGIS query base URL for a (state, county) pair, or None."""
     if state == "NC":
@@ -173,6 +200,51 @@ async def _try_county(
     return None
 
 
+async def _try_nc_onemap(
+    c: httpx.AsyncClient, defendant: str
+) -> dict[str, Any] | None:
+    """Search NC OneMap statewide by owner name, keep only matches inside our
+    NC footprint, and return a single confident match (with parval value)."""
+    results = await _query_by_owner(c, NC_ONEMAP_QUERY, "ownname", defendant)
+    if not results:
+        return None
+    in_fp = [
+        r for r in results
+        if str(r.get("cntyname") or "").strip().upper() in _ALLOWED_NC_UPPER
+    ]
+    if not in_fp:
+        return None
+    if len(in_fp) == 1:
+        return in_fp[0]
+    # Multiple — require the owner to contain ALL distinctive debtor tokens
+    d_tokens = _distinctive_tokens(defendant)
+    best, best_score = None, 0
+    for r in in_fp:
+        owner = (str(r.get("ownname") or "") + " " + str(r.get("ownname2") or "")).lower()
+        score = sum(1 for t in d_tokens if t in owner)
+        if score > best_score:
+            best_score, best = score, r
+    if best and best_score == len(d_tokens) and len(d_tokens) >= 2:
+        return best
+    return None
+
+
+def _apply_match(li: Listing, attrs: dict[str, Any], county_name: str | None,
+                 counts: dict[str, int]) -> None:
+    """Populate a bankruptcy listing from a confident GIS/OneMap match."""
+    filled = _populate_from_attrs(li, attrs)
+    attrs["_match_confident"] = True  # already confidence-gated by the caller
+    filled += _apply_attrs(li, attrs)
+    if county_name and not li.county:
+        li.county = county_name.title() if county_name.isupper() else county_name
+    kind = _infer_property_kind(attrs)
+    if kind and (not li.property_kind or li.property_kind == PropertyKind.UNKNOWN):
+        li.property_kind = kind
+        counts["kind_inferred"] += 1
+    counts["matched"] += 1
+    counts["fields_filled"] += filled
+
+
 async def enrich_bankruptcy_property(
     listings: list[Listing], concurrency: int = 8
 ) -> None:
@@ -210,28 +282,21 @@ async def enrich_bankruptcy_property(
             return
         async with sem:
             counts["queried"] += 1
+            # NC: one statewide OneMap query (covers all 11 footprint counties
+            # AND carries parval value) before the per-county layers. This
+            # recovers value the per-county NC layers often lack.
+            if court == "ncwb":
+                om = await _try_nc_onemap(c, li.defendant)
+                if om is not None:
+                    _apply_match(li, om, str(om.get("cntyname") or "") or None, counts)
+                    counts["matched_onemap"] = counts.get("matched_onemap", 0) + 1
+                    return
             for state, county in counties:
                 hit = await _try_county(c, state, county, li.defendant, owner_field_cache)
                 if not hit:
                     continue
-                attrs, n_results = hit
-                # Populate basic address/coords/owner
-                filled = _populate_from_attrs(li, attrs)
-                # Also populate property specs (sqft/beds/baths/year/parcel/tax_value)
-                # via the standard apply-attrs from enrichment_arcgis
-                attrs["_match_confident"] = True  # we already filtered for confidence
-                filled += _apply_attrs(li, attrs)
-                # Set county since we discovered it
-                if not li.county:
-                    li.county = county
-                # Infer property kind
-                kind = _infer_property_kind(attrs)
-                if kind and (not li.property_kind or li.property_kind == PropertyKind.UNKNOWN):
-                    li.property_kind = kind
-                    counts["kind_inferred"] += 1
-                counts["matched"] += 1
-                counts["fields_filled"] += filled
-                # Stop on first successful county
+                attrs, _n = hit
+                _apply_match(li, attrs, county, counts)
                 return
             counts["no_match"] += 1
 
