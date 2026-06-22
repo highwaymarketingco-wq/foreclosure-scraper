@@ -1139,6 +1139,17 @@ async def run() -> int:
     except Exception:
         log.error("process_timing.failed", traceback=traceback.format_exc())
 
+    # Lien-stack join — attach an owner's OTHER recorded debts (SC state tax
+    # liens = super-priority) to the subject so calc + equity subtract them.
+    # MUST run before the calc loop so max_bid reflects the senior debt.
+    try:
+        from .enrichment_lien_stack import enrich_lien_stack
+        s = enrich_lien_stack(enriched)
+        if s:
+            enrichment_stats["lien_stack"] = s
+    except Exception:
+        log.error("lien_stack.failed", traceback=traceback.format_exc())
+
     # Investor calculator + A-F grades per listing.
     for li in enriched:
         try:

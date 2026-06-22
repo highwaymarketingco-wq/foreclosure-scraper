@@ -444,14 +444,21 @@ def compute(li: Listing) -> Calc:
                 f"= ${lo_psf}-${hi_psf}/sqft"
             )
 
-    # Senior liens: at a JUNIOR-position foreclosure the winning bidder takes
-    # title SUBJECT TO senior debt, so it must come out of both the max bid and
-    # the total investment — otherwise a junior foreclosure looks falsely cheap.
-    # (total_senior_amount comes from rod/priority.py, free.)
+    # Senior liens reduce what a buyer can pay:
+    #  (a) at a JUNIOR-position foreclosure the winner takes title SUBJECT TO all
+    #      senior debt (rod/priority.py total_senior_amount), and
+    #  (b) SUPER-PRIORITY liens (state tax liens) survive ANY foreclosure, so
+    #      they always come off the bid (enrichment_lien_stack -> raw['liens']).
+    # Either way the cost must come out of both max bid and total investment,
+    # else the deal looks falsely cheap.
     lp = raw.get("lien_priority") or {}
     senior = float(lp.get("total_senior_amount") or 0)
     fpos = lp.get("foreclosure_position")
-    senior_applies = senior > 0 and (fpos is None or fpos > 1)
+    junior_senior = senior if (senior > 0 and (fpos is None or fpos > 1)) else 0.0
+    superpri = sum(float(x.get("amount") or 0) for x in (raw.get("liens") or [])
+                   if isinstance(x, dict) and x.get("super_priority"))
+    senior_cost = round(junior_senior + superpri, 2)
+    senior_applies = senior_cost > 0
 
     # ---- Max bid (70% rule, expected case) ------------------------------
     if out.arv_expected:
@@ -461,10 +468,15 @@ def compute(li: Listing) -> Calc:
             round(0.70 * out.arv_expected - (out.rehab_expected or 0) - fees, -2),
         )
         if senior_applies and out.max_bid_70 is not None:
-            out.max_bid_70 = max(0.0, round(out.max_bid_70 - senior, -2))
+            out.max_bid_70 = max(0.0, round(out.max_bid_70 - senior_cost, -2))
+            bits = []
+            if junior_senior:
+                bits.append(f"${junior_senior:,.0f} junior-position senior lien(s)")
+            if superpri:
+                bits.append(f"${superpri:,.0f} super-priority lien(s) (e.g. tax)")
             out.notes.append(
-                f"Junior-position foreclosure: subtracted ${senior:,.0f} senior "
-                f"lien(s) from max bid (buyer takes title subject to senior debt)."
+                "Subtracted " + " + ".join(bits) + " from max bid (buyer takes "
+                "title subject to this debt)."
             )
 
     # ---- Total investment if bidding at opening bid ---------------------
@@ -473,7 +485,7 @@ def compute(li: Listing) -> Calc:
         closing = bid * CLOSING_PCT
         holding = bid * HOLDING_RATE_MONTH * HOLDING_MONTHS
         selling = out.arv_expected * SELLING_PCT
-        senior_cost = senior if senior_applies else 0.0
+        # senior_cost (junior-position + super-priority liens) computed above.
         total = bid + senior_cost + (out.rehab_expected or 0) + closing + holding + selling
         out.total_investment = round(total, -2)
         out.estimated_profit = round(out.arv_expected - total, -2)
