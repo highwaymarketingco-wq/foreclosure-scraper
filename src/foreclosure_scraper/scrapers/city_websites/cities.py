@@ -1,16 +1,17 @@
 """Generic city-website foreclosure / tax sale / code enforcement scraper.
 
-Cities in our 25-county footprint don't all have dedicated foreclosure pages,
+Cities across our 18-county footprint don't all have dedicated foreclosure pages,
 but most publish:
   * Tax sale notices (delinquent property auctions) on the finance / treasurer page
   * Code enforcement / nuisance abatement / demolition lists
   * Public notice / legal advertising sections
   * Surplus property auctions
 
-Rather than maintain 50+ custom city parsers, we use Apify rag-web-browser to
-search each city's domain for foreclosure-related keywords and harvest links +
+Rather than maintain 50+ custom city parsers, we run the city site's own search
+(/?s=<keyword>) over plain HTTP — falling back to the free stealth-browser
+renderer for JS-rendered CMS sites — and harvest the foreclosure-related links +
 text. Each hit becomes a lightweight Listing pointing at the city URL — these
-get enriched downstream by GIS + court records.
+get enriched downstream by GIS + court records. (No Apify / paid services.)
 """
 from __future__ import annotations
 
@@ -73,12 +74,16 @@ CITIES: tuple[tuple[str, str, str, str], ...] = (
     ("SC", "Spartanburg", "Spartanburg", "cityofspartanburg.org"),
     ("SC", "Spartanburg", "Boiling Springs", "boilingspringssc.org"),
     ("SC", "Spartanburg", "Inman", "cityofinmansc.org"),
+    ("SC", "Spartanburg", "Woodruff", "cityofwoodruff.com"),
+    ("SC", "Spartanburg", "Landrum", "cityoflandrumsc.com"),
+    ("SC", "Spartanburg", "Duncan", "duncansc.gov"),
     ("SC", "Anderson", "Anderson", "cityofandersonsc.com"),
     ("SC", "Anderson", "Belton", "cityofbeltonsc.com"),
     ("SC", "Anderson", "Williamston", "williamstonsc.us"),
     ("SC", "Pickens", "Easley", "cityofeasley.com"),
     ("SC", "Pickens", "Pickens", "cityofpickens.com"),
     ("SC", "Pickens", "Liberty", "cityoflibertysc.com"),
+    ("SC", "Pickens", "Clemson", "cityofclemson.org"),
     ("SC", "Oconee", "Walhalla", "cityofwalhalla.com"),
     ("SC", "Oconee", "Seneca", "seneca.sc.us"),
     ("SC", "Oconee", "Westminster", "cityofwestminstersc.com"),
@@ -95,11 +100,15 @@ CITIES: tuple[tuple[str, str, str, str], ...] = (
     ("NC", "Buncombe", "Asheville", "ashevillenc.gov"),
     ("NC", "Buncombe", "Black Mountain", "townofblackmountain.org"),
     ("NC", "Buncombe", "Weaverville", "weavervillenc.org"),
+    ("NC", "Buncombe", "Woodfin", "woodfin-nc.gov"),
     ("NC", "Henderson", "Hendersonville", "hendersonvillenc.gov"),
     ("NC", "Henderson", "Flat Rock", "villageofflatrock.org"),
+    ("NC", "Henderson", "Fletcher", "fletchernc.org"),
+    ("NC", "Henderson", "Mills River", "millsriver.org"),
     ("NC", "Rutherford", "Rutherfordton", "rutherfordton.net"),
     ("NC", "Rutherford", "Forest City", "townoffc.org"),
     ("NC", "Rutherford", "Spindale", "townofspindale.com"),
+    ("NC", "Rutherford", "Lake Lure", "townoflakelure.com"),
     ("NC", "Cleveland", "Shelby", "cityofshelby.com"),
     ("NC", "Cleveland", "Kings Mountain", "cityofkm.com"),
     ("NC", "Cleveland", "Boiling Springs", "boilingspringsnc.com"),
@@ -110,13 +119,14 @@ CITIES: tuple[tuple[str, str, str, str], ...] = (
     ("NC", "Gaston", "Belmont", "cityofbelmont.org"),
     ("NC", "Gaston", "Bessemer City", "bessemercity.com"),
     ("NC", "Gaston", "Cherryville", "cityofcherryville.com"),
+    ("NC", "Gaston", "Stanley", "townofstanley.org"),
+    ("NC", "Gaston", "Cramerton", "cramerton.org"),
+    ("NC", "Gaston", "Lowell", "lowellnc.com"),
+    ("NC", "Gaston", "Dallas", "dallasnc.net"),
     ("NC", "Transylvania", "Brevard", "cityofbrevard.com"),
     ("NC", "McDowell", "Marion", "marionnc.org"),
     ("NC", "McDowell", "Old Fort", "oldfortnc.gov"),
     ("NC", "Lincoln", "Lincolnton", "lincolntonnc.org"),
-    ("NC", "Madison", "Marshall", "townofmarshall.org"),
-    ("NC", "Madison", "Mars Hill", "townofmarshillnc.com"),
-    ("NC", "Yancey", "Burnsville", "townofburnsville.org"),
     ("NC", "Mitchell", "Bakersville", "townofbakersville.com"),
     ("NC", "Mitchell", "Spruce Pine", "townofsprucepine.org"),
     ("NC", "Burke", "Morganton", "morgantonnc.gov"),
