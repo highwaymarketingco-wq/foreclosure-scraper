@@ -27,6 +27,7 @@ RAW_KEEP = {
     "assessment": "*",
     "calc": "*",      # ARV / rehab / max_bid / ROI / cash-on-cash
     "amount_owed": "*",  # cross-sourced debt figure {value, source, label, confidence, is_actual_debt}
+    "equity": "*",       # owner equity = ARV − payoff − senior liens {value, pct, payoff_source, ...}
     "skip_trace": "*",   # owner name / mailing address / phone for outreach (free)
     "is_new": "*",       # new-this-run flag (early-access highlight)
     "first_seen_run": "*",

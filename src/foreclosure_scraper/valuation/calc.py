@@ -444,6 +444,15 @@ def compute(li: Listing) -> Calc:
                 f"= ${lo_psf}-${hi_psf}/sqft"
             )
 
+    # Senior liens: at a JUNIOR-position foreclosure the winning bidder takes
+    # title SUBJECT TO senior debt, so it must come out of both the max bid and
+    # the total investment — otherwise a junior foreclosure looks falsely cheap.
+    # (total_senior_amount comes from rod/priority.py, free.)
+    lp = raw.get("lien_priority") or {}
+    senior = float(lp.get("total_senior_amount") or 0)
+    fpos = lp.get("foreclosure_position")
+    senior_applies = senior > 0 and (fpos is None or fpos > 1)
+
     # ---- Max bid (70% rule, expected case) ------------------------------
     if out.arv_expected:
         fees = out.arv_expected * SELLING_PCT
@@ -451,6 +460,12 @@ def compute(li: Listing) -> Calc:
             0.0,
             round(0.70 * out.arv_expected - (out.rehab_expected or 0) - fees, -2),
         )
+        if senior_applies and out.max_bid_70 is not None:
+            out.max_bid_70 = max(0.0, round(out.max_bid_70 - senior, -2))
+            out.notes.append(
+                f"Junior-position foreclosure: subtracted ${senior:,.0f} senior "
+                f"lien(s) from max bid (buyer takes title subject to senior debt)."
+            )
 
     # ---- Total investment if bidding at opening bid ---------------------
     bid = li.opening_bid
@@ -458,7 +473,8 @@ def compute(li: Listing) -> Calc:
         closing = bid * CLOSING_PCT
         holding = bid * HOLDING_RATE_MONTH * HOLDING_MONTHS
         selling = out.arv_expected * SELLING_PCT
-        total = bid + (out.rehab_expected or 0) + closing + holding + selling
+        senior_cost = senior if senior_applies else 0.0
+        total = bid + senior_cost + (out.rehab_expected or 0) + closing + holding + selling
         out.total_investment = round(total, -2)
         out.estimated_profit = round(out.arv_expected - total, -2)
         if total > 0:
@@ -468,14 +484,16 @@ def compute(li: Listing) -> Calc:
         loan_amt = bid * (1 - DOWN_PCT)
         loan_interest = loan_amt * LOAN_RATE_MONTH * HOLDING_MONTHS
         cash_total = cash_down + loan_interest + closing + holding + selling
-        cash_profit = out.arv_expected - bid - (out.rehab_expected or 0) - closing - holding - selling - loan_interest
+        cash_profit = out.arv_expected - bid - senior_cost - (out.rehab_expected or 0) - closing - holding - selling - loan_interest
         if cash_down > 0:
             out.cash_on_cash_pct = round((cash_profit / cash_down) * 100, 1)
         out.bid_to_arv_pct = round((bid / out.arv_expected) * 100, 1)
 
     # ---- Confidence -----------------------------------------------------
     score = 0
-    if arv_conf == "MEDIUM":
+    if arv_conf == "HIGH":
+        score += 3      # comp-grounded ARV — was previously unscored (bug)
+    elif arv_conf == "MEDIUM":
         score += 2
     elif arv_conf == "LOW":
         score += 0

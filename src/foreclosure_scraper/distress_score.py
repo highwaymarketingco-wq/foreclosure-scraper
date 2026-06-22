@@ -87,8 +87,17 @@ def _signals_for(li: Listing) -> list[tuple[str, str, int]]:
 
 
 def _equity_band(li: Listing) -> Optional[str]:
-    calc = (li.raw or {}).get("calc") or {}
-    roi = calc.get("roi_pct")
+    """Seller's REAL equity (ARV − payoff − liens), from enrichment_equity.
+    Falls back to flip-ROI only when equity could not be computed."""
+    raw = li.raw or {}
+    pct = (raw.get("equity") or {}).get("pct")
+    if pct is not None:
+        if pct >= 0.40:
+            return "high"
+        if pct >= 0.15:
+            return "med"
+        return "low"   # includes underwater (negative pct)
+    roi = (raw.get("calc") or {}).get("roi_pct")
     if roi is None:
         return None
     if roi >= 50:

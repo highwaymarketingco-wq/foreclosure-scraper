@@ -1,0 +1,108 @@
+"""Owner-equity engine + amortization + senior-lien-aware max bid."""
+from __future__ import annotations
+
+from datetime import date
+
+from foreclosure_scraper.enrichment_equity import enrich_equity
+from foreclosure_scraper.valuation import amortize, calc
+from foreclosure_scraper.models import Listing, ListingType
+from foreclosure_scraper.distress_score import _equity_band
+
+
+# ---- amortization -------------------------------------------------------
+def test_amortized_balance_pays_down_over_time():
+    # 200k @ ~4% (2018) 30yr, 6 years in -> below original, above zero
+    bal = amortize.amortized_balance(200000, date(2018, 1, 1), as_of=date(2024, 1, 1))
+    assert bal is not None and 150000 < bal < 185000
+
+
+def test_amortized_fresh_loan_full_balance():
+    assert amortize.amortized_balance(200000, date(2024, 1, 1), as_of=date(2024, 1, 1)) == 200000.0
+
+
+def test_amortized_matured_loan_zero():
+    assert amortize.amortized_balance(200000, date(1985, 1, 1), as_of=date(2024, 1, 1)) == 0.0
+
+
+def test_amortized_bad_inputs_none():
+    assert amortize.amortized_balance(0, date(2020, 1, 1)) is None
+    assert amortize.amortized_balance(200000, None) is None
+
+
+def test_amortize_parses_string_dates():
+    assert amortize._as_date("2018-01-01") == date(2018, 1, 1)
+    assert amortize._as_date("01/15/2019") == date(2019, 1, 15)
+    assert amortize._as_date("20200601") == date(2020, 6, 1)
+
+
+# ---- equity engine ------------------------------------------------------
+def test_equity_from_actual_debt():
+    li = Listing(source="x", source_url="u", listing_type=ListingType.FORECLOSURE_SALE,
+                 state="NC", county="Gaston",
+                 raw={"calc": {"arv_expected": 300000},
+                      "amount_owed": {"value": 120000, "source": "judgment",
+                                      "is_actual_debt": True, "confidence": "high"}})
+    enrich_equity([li])
+    eq = li.raw["equity"]
+    assert eq["value"] == 180000 and eq["pct"] == 0.6
+    assert eq["payoff_source"].startswith("amount_owed") and eq["confidence"] == "high"
+    assert eq["is_underwater"] is False
+
+
+def test_equity_underwater_with_senior_liens():
+    li = Listing(source="x", source_url="u", listing_type=ListingType.FORECLOSURE_SALE,
+                 state="NC", county="Gaston",
+                 raw={"calc": {"arv_expected": 200000},
+                      "amount_owed": {"value": 190000, "is_actual_debt": True},
+                      "lien_priority": {"total_senior_amount": 40000}})
+    enrich_equity([li])
+    eq = li.raw["equity"]
+    assert eq["value"] == -30000 and eq["is_underwater"] is True
+    assert eq["senior_liens"] == 40000
+
+
+def test_equity_from_last_sale_amortized():
+    li = Listing(source="x", source_url="u", listing_type=ListingType.REO,
+                 state="NC", county="Gaston", market_value=250000,
+                 raw={"gis": {"last_sale": {"amount": 150000, "date": "2015-06-01"}}})
+    enrich_equity([li])
+    eq = li.raw["equity"]
+    assert eq["payoff_source"] == "last_sale_amortized" and eq["confidence"] == "low"
+    assert eq["value"] > 0   # paid-down loan on a 250k-value home -> positive equity
+
+
+def test_equity_band_uses_real_equity_not_roi():
+    li = Listing(source="x", source_url="u", listing_type=ListingType.REO, state="NC",
+                 county="Gaston",
+                 raw={"equity": {"pct": 0.55}, "calc": {"roi_pct": 5}})
+    assert _equity_band(li) == "high"      # 55% equity -> high, despite low ROI
+    li.raw["equity"]["pct"] = -0.1
+    assert _equity_band(li) == "low"       # underwater -> low
+
+
+# ---- senior-lien-aware max bid + HIGH confidence ------------------------
+def test_senior_liens_cut_max_bid_on_junior_foreclosure():
+    base = Listing(source="x", source_url="u", listing_type=ListingType.FORECLOSURE_SALE,
+                   state="NC", county="Gaston", living_sqft=1500, opening_bid=50000,
+                   raw={"comp_median_ppsf_recorded": 200.0,
+                        "recorded_comps": {"median_ppsf": 200.0, "count": 10,
+                                           "p25_ppsf": 180, "p75_ppsf": 220,
+                                           "radius_mi": 1, "confidence": "HIGH"}})
+    clean = calc.compute(base)
+    junior = Listing(**{**base.__dict__})
+    junior.raw = dict(base.raw)
+    junior.raw["lien_priority"] = {"total_senior_amount": 80000, "foreclosure_position": 2}
+    jr = calc.compute(junior)
+    assert jr.max_bid_70 == clean.max_bid_70 - 80000
+    assert any("senior lien" in n.lower() for n in jr.notes)
+
+
+def test_high_arv_confidence_now_scores():
+    li = Listing(source="x", source_url="u", listing_type=ListingType.REO, state="NC",
+                 county="Gaston", living_sqft=1500, year_built=1990,
+                 raw={"comp_median_ppsf_recorded": 200.0,
+                      "recorded_comps": {"median_ppsf": 200.0, "count": 10, "p25_ppsf": 180,
+                                         "p75_ppsf": 220, "radius_mi": 1, "confidence": "HIGH"}})
+    c = calc.compute(li)
+    assert c.arv_confidence == "HIGH"
+    assert c.confidence == "HIGH"   # HIGH arv (+3) + sqft (+1) + year (+1) = 5

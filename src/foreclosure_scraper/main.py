@@ -1137,6 +1137,17 @@ async def run() -> int:
             log.warning("valuation.failed", source_url=li.source_url)
     log.info("orchestrator.graded", count=len(enriched))
 
+    # Owner-equity engine — ARV − mortgage payoff − junior liens. Runs after
+    # calc (needs arv_expected) + amount_owed, before distress scoring (which
+    # now gates HOT on real equity, not flip ROI). Pure-Python, free.
+    try:
+        from .enrichment_equity import enrich_equity
+        s = enrich_equity(enriched)
+        if s:
+            enrichment_stats["equity"] = s
+    except Exception:
+        log.error("equity.failed", traceback=traceback.format_exc())
+
     # Stacked-distress score (HOT/WARM/COLD operator board) — runs last so it
     # can stack every signal + equity + contactability gathered above.
     try:
