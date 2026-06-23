@@ -1,103 +1,11 @@
 {
-  "run_time": "2026-06-23T02:35:15.933296Z",
-  "total": 2963,
-  "by_source": {
-    "national.auction_dot_com": 13,
-    "national.courtlistener_bankruptcy": 414,
-    "national.fannie_homepath": 679,
-    "national.homeharvest": 13,
-    "national.distressed": 348,
-    "national.hud_homestore": 5,
-    "national.realtor_foreclosures": 2,
-    "national.zillow_bulk": 74,
-    "national.zillow_foreclosures": 64,
-    "public_notices.ncnotices": 11,
-    "law_firms.bell_carrington": 13,
-    "law_firms.brock_scott": 83,
-    "law_firms.hutchens": 75,
-    "law_firms.mcmichael_taylor_gray": 16,
-    "law_firms.rogers_townsend": 4,
-    "counties_sc.sc_county_rosters": 7,
-    "counties_sc.sc_public_index_lis_pendens": 483,
-    "counties_nc.nc_county_tax_foreclosure": 1,
-    "newspapers.hendersonville_lightning": 1,
-    "reo.vrm_va_reo": 7,
-    "counties_nc.nc_ecourts_lis_pendens": 480,
-    "national.foreclosure_dot_com": 138,
-    "national.trulia": 10,
-    "national.xome": 3,
-    "newspapers.daily_courier": 2,
-    "counties_nc.henderson_tax": 15,
-    "derived.probate_deed": 2
-  },
-  "by_state": {
-    "NC": 1175,
-    "SC": 1788
-  },
-  "by_county_top": [
-    [
-      "SC/Spartanburg",
-      681
-    ],
-    [
-      "SC/Anderson",
-      464
-    ],
-    [
-      "NC/Gaston",
-      314
-    ],
-    [
-      "SC/Pickens",
-      206
-    ],
-    [
-      "SC/Laurens",
-      202
-    ],
-    [
-      "NC/Buncombe",
-      190
-    ],
-    [
-      "NC/Henderson",
-      167
-    ],
-    [
-      "NC/Cleveland",
-      127
-    ],
-    [
-      "SC/Oconee",
-      95
-    ],
-    [
-      "NC/Lincoln",
-      90
-    ],
-    [
-      "SC/Cherokee",
-      77
-    ],
-    [
-      "NC/McDowell",
-      66
-    ],
-    [
-      "NC/Burke",
-      62
-    ],
-    [
-      "SC/Union",
-      61
-    ],
-    [
-      "NC/Polk",
-      48
-    ]
-  ],
+  "run_time": "2026-06-23T12:41:07.782680Z",
+  "total": 3740,
+  "by_source": {},
+  "by_state": {},
+  "by_county_top": [],
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "regenerated in-place from persisted dataset (no re-scrape)"
+  "notes": ""
 }
