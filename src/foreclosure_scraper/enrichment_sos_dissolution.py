@@ -17,7 +17,9 @@ Free, no auth, Scrapling stealth.
 from __future__ import annotations
 
 import asyncio
+import os
 import re
+import time
 from datetime import datetime
 from typing import Optional
 
@@ -26,6 +28,15 @@ import structlog
 from .models import Listing
 
 log = structlog.get_logger()
+
+# Reliability guards — sosnc.gov sits behind Cloudflare and will challenge every
+# request when it decides to; without these the run hung 4.5h grinding retries.
+# Hard per-call timeout (kills a render even if the fetcher's own timeout hangs),
+# an overall wall-clock budget, and a consecutive-failure breaker that bails the
+# whole step the moment SOS starts blocking. All env-tunable; 0 disables a guard.
+_SOS_CALL_TIMEOUT_S = float(os.environ.get("SOS_CALL_TIMEOUT_S", "75"))
+_SOS_MAX_SECONDS = float(os.environ.get("SOS_MAX_SECONDS", "240"))
+_SOS_BREAKER_FAILS = int(os.environ.get("SOS_BREAKER_FAILS", "5"))
 
 
 _BUSINESS_MARKERS = (
@@ -87,11 +98,15 @@ async def _lookup_nc_sos(name: str, cache: dict) -> Optional[dict]:
             pass
 
     try:
-        result = await StealthyFetcher.async_fetch(
+        # Hard outer timeout: Cloudflare interstitials can hang a stealth render
+        # past its own `timeout`, so asyncio.wait_for is the real kill-switch.
+        coro = StealthyFetcher.async_fetch(
             search_url, headless=True, network_idle=True, timeout=60000,
             page_action=page_action,
         )
-    except Exception:
+        result = (await asyncio.wait_for(coro, timeout=_SOS_CALL_TIMEOUT_S)
+                  if _SOS_CALL_TIMEOUT_S > 0 else await coro)
+    except (Exception, asyncio.TimeoutError):
         cache[name] = None
         return None
 
@@ -149,13 +164,26 @@ async def enrich_with_sos_dissolution(listings: list[Listing], max_check: int = 
     sem = asyncio.Semaphore(2)
     cache: dict = {}
     counts = {"checked": 0, "dissolved": 0, "active": 0, "unknown": 0}
+    # Circuit-breaker state: bail the whole step once SOS starts blocking, so a
+    # Cloudflare wall can't turn a 50-name check into a multi-hour hang.
+    state = {"consec_fail": 0, "tripped": False, "deadline": time.monotonic() + _SOS_MAX_SECONDS}
 
     async def one(li: Listing) -> None:
+        if state["tripped"] or time.monotonic() > state["deadline"]:
+            return
         async with sem:
+            if state["tripped"] or time.monotonic() > state["deadline"]:
+                return
             info = await _lookup_nc_sos(li.defendant, cache)
             counts["checked"] += 1
             if not info:
+                state["consec_fail"] += 1
+                if _SOS_BREAKER_FAILS and state["consec_fail"] >= _SOS_BREAKER_FAILS:
+                    state["tripped"] = True
+                    log.warning("sos_dissolution.circuit_open",
+                                consec_fail=state["consec_fail"], checked=counts["checked"])
                 return
+            state["consec_fail"] = 0
             status = info.get("status")
             counts[status if status in counts else "unknown"] = (
                 counts.get(status if status in counts else "unknown", 0) + 1
@@ -165,5 +193,11 @@ async def enrich_with_sos_dissolution(listings: list[Listing], max_check: int = 
                     li.raw = {}
                 li.raw["sos_status"] = info
 
-    await asyncio.gather(*(one(li) for li in targets))
-    log.info("sos_dissolution.done", **counts)
+    try:
+        # Hard overall backstop in case the per-call timeout + breaker still leave
+        # work outstanding (e.g. many slow-but-not-failing renders).
+        await asyncio.wait_for(asyncio.gather(*(one(li) for li in targets)),
+                               timeout=_SOS_MAX_SECONDS + _SOS_CALL_TIMEOUT_S)
+    except asyncio.TimeoutError:
+        log.warning("sos_dissolution.overall_timeout", **counts)
+    log.info("sos_dissolution.done", tripped=state["tripped"], **counts)
