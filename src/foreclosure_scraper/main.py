@@ -740,17 +740,11 @@ async def run() -> int:
             from .enrichment_nc_case_status import (
                 enrich_with_nc_case_status_dispatched,
             )
-            # Wall-clock budget: the anonymous Tyler portal path has no internal
-            # cap and stalled a full run for hours when the headless browser
-            # degraded (see logs 2026-06-23). Bound the whole step so it enriches
-            # as many cases as it can, then the pipeline moves on to the write.
-            _ncs_budget = float(os.environ.get("NC_CASE_STATUS_MAX_SECONDS", "2700"))
-            await asyncio.wait_for(
-                enrich_with_nc_case_status_dispatched(enriched, sold_pool=sold_pool),
-                timeout=_ncs_budget,
-            )
-        except asyncio.TimeoutError:
-            log.warning("nc_case_status.budget_exceeded", budget_s=_ncs_budget)
+            # No time limit: the authenticated Tyler path is already count-capped
+            # (NC_ECOURTS_AUTH_CAP) and the no-creds path is pure compute. The
+            # per-case court lookups that actually stalled live in
+            # enrichment_courts, which now has its own stall-breaker (no timer).
+            await enrich_with_nc_case_status_dispatched(enriched, sold_pool=sold_pool)
         except Exception:
             log.error("nc_case_status.failed", traceback=traceback.format_exc())
 

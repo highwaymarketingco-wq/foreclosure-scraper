@@ -82,15 +82,28 @@ def _apply_court_text(li: Listing, text: str) -> int:
 
 # ---------- Enrich existing listings ------------------------------------------------
 
+# Stall-breaker config — NOT a time limit. The per-case court lookups hit the
+# e-court portals via the stealth browser; when the headless browser degrades
+# (e.g. after a laptop sleep), renders hang and the step ground a whole run for
+# hours. These let it process EVERY case while healthy, and bail only if the
+# renderer fails/hangs N times in a row. A no-match (empty content) is NOT a
+# failure — only timeouts/exceptions count, so legit misses never trip it.
+_COURT_CALL_TIMEOUT_S = float(os.environ.get("COURT_CALL_TIMEOUT_S", "90"))
+_COURT_BREAKER_FAILS = int(os.environ.get("COURT_BREAKER_FAILS", "12"))
+
+
 async def enrich_with_court_records(listings: list[Listing]) -> list[Listing]:
     """For every listing that has a case_number, look it up in the right e-court system."""
     # Rendering is free (local stealth browser); no token gate.
     token = None
 
     sem = asyncio.Semaphore(4)
-    counts = {"queried": 0, "matched": 0, "fields_filled": 0}
+    counts = {"queried": 0, "matched": 0, "fields_filled": 0, "failed": 0}
+    state = {"consec_fail": 0, "tripped": False}
 
     async def lookup(li: Listing) -> None:
+        if state["tripped"]:
+            return
         if not (li.case_number and li.county and li.state):
             return
         county_clean = li.county.replace(" County", "").strip().split(",")[0].strip()
@@ -105,15 +118,30 @@ async def enrich_with_court_records(listings: list[Listing]) -> list[Listing]:
         else:
             return
         async with sem:
+            if state["tripped"]:
+                return
             counts["queried"] += 1
-            content = await fetch_rendered(url, token=token)
+            try:
+                content = (await asyncio.wait_for(fetch_rendered(url, token=token),
+                                                  timeout=_COURT_CALL_TIMEOUT_S)
+                           if _COURT_CALL_TIMEOUT_S > 0 else await fetch_rendered(url, token=token))
+            except (Exception, asyncio.TimeoutError):
+                # Renderer hung/failed — count toward the stall-breaker.
+                counts["failed"] += 1
+                state["consec_fail"] += 1
+                if _COURT_BREAKER_FAILS and state["consec_fail"] >= _COURT_BREAKER_FAILS:
+                    state["tripped"] = True
+                    log.warning("courts.enrich.circuit_open",
+                                consec_fail=state["consec_fail"], queried=counts["queried"])
+                return
+            state["consec_fail"] = 0  # a returned render (even empty) = browser healthy
             if not content:
                 return
             counts["matched"] += 1
             counts["fields_filled"] += _apply_court_text(li, content)
 
     await asyncio.gather(*(lookup(li) for li in listings))
-    log.info("courts.enrich.done", **counts)
+    log.info("courts.enrich.done", tripped=state["tripped"], **counts)
     return listings
 
 
