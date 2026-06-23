@@ -208,6 +208,16 @@ async def main() -> int:
     merged = dedupe(out)
     print(f"[{time.strftime('%H:%M:%S')}] merged+deduped → {len(merged)}", flush=True)
 
+    # Drop national records that never resolved to an in-scope county (nationwide
+    # Fannie/HUD/etc. REO + bankruptcy that can't be routed to the 18 counties).
+    # Mirrors the full pipeline's filter so the daily path doesn't reintroduce
+    # county-less noise the main run strips.
+    _pre = len(merged)
+    merged = [li for li in merged
+              if not ((li.source or "").startswith("national.") and not (li.county or "").strip())]
+    if _pre != len(merged):
+        print(f"[{time.strftime('%H:%M:%S')}] dropped {_pre - len(merged)} county-less national", flush=True)
+
     # Safety: never publish a gutted dataset. If the merge lost >35% vs prior,
     # something broke broadly — abort without writing so the good board stands.
     if prior and len(merged) < 0.65 * len(prior):
