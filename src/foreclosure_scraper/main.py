@@ -1162,6 +1162,17 @@ async def run() -> int:
     except Exception:
         log.error("sc_cama.failed", traceback=traceback.format_exc())
 
+    # Footprint-based sqft ESTIMATE for SC leads with no true sqft (Spartanburg
+    # assessor blanks LivingArea). Needs sc_cama's story_height; runs before calc
+    # so the $/sqft ARV path can fire (capped to MEDIUM, flagged estimated).
+    try:
+        from .enrichment_footprint_sqft import enrich_footprint_sqft
+        s = enrich_footprint_sqft(enriched)
+        if s:
+            enrichment_stats["footprint_sqft"] = s
+    except Exception:
+        log.error("footprint_sqft.failed", traceback=traceback.format_exc())
+
     # Investor calculator + A-F grades per listing.
     valuation_failures = 0
     for li in enriched:

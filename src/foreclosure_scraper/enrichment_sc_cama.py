@@ -45,6 +45,7 @@ def enrich_sc_cama(listings: list[Listing]) -> dict:
             "condition_code": rec.get("condition_code"),
             "condition_distressed": bool(rec.get("condition_distressed")),
             "grade": rec.get("grade"), "building_type": rec.get("building_type"),
+            "story_height": rec.get("story_height"),
             "last_sale_date": rec.get("sale_date"), "source": "sc_assessor_csv",
         })
         raw["cama"] = cama_blk

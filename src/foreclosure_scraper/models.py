@@ -202,6 +202,7 @@ class Listing(BaseModel):
     acreage: float | None = None
     lot_size_sqft: float | None = None
     living_sqft: float | None = None
+    living_sqft_estimated: bool = False  # True when living_sqft is a footprint×stories ESTIMATE
     bedrooms: float | None = None
     bathrooms: float | None = None
     year_built: int | None = None

@@ -42,7 +42,7 @@ SC_CAMA: dict[tuple[str, str], dict] = {
         "land_val_col": "CurrentAppraisedLandValue", "bldg_val_col": "CurrentAppraisedBuildingValue",
         "year_col": "YearBuilt", "beds_col": "BedRooms", "fullbath_col": "FullBaths",
         "halfbath_col": "HalfBaths", "cond_col": "ConditionFactor", "grade_col": "BuildingGrade",
-        "btype_col": "BuildingType", "saledate_col": "SaleDate",
+        "btype_col": "BuildingType", "saledate_col": "SaleDate", "story_col": "StoryHeight",
     },
 }
 
@@ -74,7 +74,7 @@ def _connect() -> sqlite3.Connection:
         state TEXT, county TEXT, tms TEXT, map_digits TEXT, address_norm TEXT,
         market_value REAL, year_built INTEGER, beds REAL, baths REAL,
         condition_code TEXT, condition_distressed INTEGER, grade TEXT,
-        building_type TEXT, sale_date TEXT, street_address TEXT, updated_at TEXT,
+        building_type TEXT, sale_date TEXT, street_address TEXT, story_height REAL, updated_at TEXT,
         PRIMARY KEY (state, county, tms))""")
     con.execute("CREATE INDEX IF NOT EXISTS idx_cama_map ON sc_cama(state, county, map_digits)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_cama_addr ON sc_cama(state, county, address_norm)")
@@ -118,6 +118,7 @@ def build_cama_table(state: str, county: str, *, max_rows: int | None = None) ->
             "grade": (row.get(spec["grade_col"]) or "").strip() or None,
             "building_type": (row.get(spec["btype_col"]) or "").strip() or None,
             "sale_date": (row.get(spec["saledate_col"]) or "").strip()[:10] or None,
+            "story_height": _num(row.get(spec["story_col"])),
         }
         # Keep the card with the highest building value per parcel (main structure).
         prev = best.get(tms)
@@ -129,11 +130,11 @@ def build_cama_table(state: str, county: str, *, max_rows: int | None = None) ->
     try:
         con.execute("DELETE FROM sc_cama WHERE state=? AND county=?", (state, county))
         con.executemany(
-            "INSERT OR REPLACE INTO sc_cama VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT OR REPLACE INTO sc_cama VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             [(state, county, r["tms"], r["map_digits"], r["address_norm"], r["market_value"],
               r["year_built"], r["beds"], r["baths"], r["condition_code"],
               r["condition_distressed"], r["grade"], r["building_type"], r["sale_date"],
-              r["street_address"], ts) for r in best.values()])
+              r["street_address"], r["story_height"], ts) for r in best.values()])
         con.commit()
     finally:
         con.close()
@@ -142,7 +143,8 @@ def build_cama_table(state: str, county: str, *, max_rows: int | None = None) ->
 
 
 _FIELDS = ("market_value", "year_built", "beds", "baths", "condition_code",
-           "condition_distressed", "grade", "building_type", "sale_date", "street_address")
+           "condition_distressed", "grade", "building_type", "sale_date", "street_address",
+           "story_height")
 
 
 def has_data(state: str, county: str) -> bool:

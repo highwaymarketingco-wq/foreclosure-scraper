@@ -17,13 +17,13 @@ def test_norm_helpers():
 def _seed(db, rows):
     cama.DB_PATH = db
     con = cama._connect()
-    con.executemany("INSERT OR REPLACE INTO sc_cama VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+    con.executemany("INSERT OR REPLACE INTO sc_cama VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
     con.commit(); con.close()
 
 
-def _row(tms, mapnum, addr, val, yr, beds, baths, cond, distressed):
+def _row(tms, mapnum, addr, val, yr, beds, baths, cond, distressed, story=1.0):
     return ("SC", "Spartanburg", tms, cama._norm_tms(mapnum), cama.norm_addr(addr), val, yr, beds, baths,
-            cond, distressed, "B", "SINGLE FAM", "2016-11-08", addr, datetime.utcnow().isoformat())
+            cond, distressed, "B", "SINGLE FAM", "2016-11-08", addr, story, datetime.utcnow().isoformat())
 
 
 def test_lookup_by_tms_map_and_address(tmp_path, monkeypatch):

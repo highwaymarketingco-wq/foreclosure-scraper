@@ -232,17 +232,26 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
     # Tier 0: RECORDED arms-length sales comps (county GIS, distance-matched).
     # Real recorded transactions beat scraped listings — no list-vs-sold gap,
     # tighter geography. This is the comp-accuracy fix (enrichment_recorded_comps).
+    # An ESTIMATED sqft (footprint × stories) is not bankable as TRUE GLA, so any
+    # ARV built on it is capped to MEDIUM and labelled, never HIGH (Pass: footprint
+    # sqft proxy). enrichment_footprint_sqft sets this flag.
+    sqft_est = bool(getattr(li, "living_sqft_estimated", False))
+    sqft_lbl = f"{li.living_sqft:,.0f} sqft{' (ESTIMATED: footprint×stories ~2019)' if sqft_est else ''}" if li.living_sqft else ""
+
     rec = raw.get("recorded_comps") or {}
     rec_ppsf = raw.get("comp_median_ppsf_recorded")
     if rec_ppsf and li.living_sqft:
         expected = float(rec_ppsf) * float(li.living_sqft)
         notes.append(
             f"ARV from {rec.get('count', '?')} RECORDED arms-length sales within "
-            f"{rec.get('radius_mi', '?')}mi (${rec_ppsf:,.0f}/sqft × {li.living_sqft:,.0f} sqft)"
+            f"{rec.get('radius_mi', '?')}mi (${rec_ppsf:,.0f}/sqft × {sqft_lbl})"
         )
         low = round((rec.get("p25_ppsf") or rec_ppsf * 0.9) * li.living_sqft, -2)
         high = round((rec.get("p75_ppsf") or rec_ppsf * 1.1) * li.living_sqft, -2)
         conf = "HIGH" if rec.get("confidence") == "HIGH" else "MEDIUM"
+        if sqft_est:
+            conf = "MEDIUM"
+            notes.append("ARV confidence capped at MEDIUM: living sqft is a footprint-based ESTIMATE")
         return round(expected, -2), low, high, conf, notes
 
     # Tier 1: comp-based ARV (HIGHEST confidence)
@@ -250,7 +259,7 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
         expected = float(comp_ppsf) * float(li.living_sqft)
         notes.append(
             f"ARV from {len(comps)} zip-matched sold comps × subject sqft "
-            f"(${comp_ppsf:,.0f}/sqft × {li.living_sqft:,.0f} sqft)"
+            f"(${comp_ppsf:,.0f}/sqft × {sqft_lbl})"
         )
         # Range from the SAME (adjusted) $/sqft series as `expected` — comp_ppsf
         # is the adjusted-median, so low/high must use adjusted_ppsf too, else the
@@ -270,6 +279,8 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
         # and they actually agree. A single far/stale comp is not bankable.
         conf = "HIGH"
         reasons = []
+        if sqft_est:
+            conf, reasons = "MEDIUM", reasons + ["living sqft is a footprint-based ESTIMATE"]
         if len(ppsfs) < 3:
             conf, reasons = "MEDIUM", reasons + [f"only {len(ppsfs)} comp(s)"]
         if comps and not comps[0].get("geo_anchored", True):
