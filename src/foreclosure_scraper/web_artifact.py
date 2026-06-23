@@ -88,6 +88,7 @@ RAW_KEEP = {
     "incarceration": "*",             # owner matched a state corrections roster (NC DAC) — low-conf stack signal
     "distress_stack": "*",            # HOT/WARM/COLD tier + stacked distress categories + score (operator board)
     "cama": "*",                      # county CAMA distress (condition/last-sale/deed-ref/owner-occupancy)
+    "footprint": "*",                 # footprint-derived sqft ESTIMATE (area/stories/match) — transparency for estimated living_sqft
     "relationship_signal": "*",       # probate / divorce / partition deed signal
     "refresh_misses": "*",            # daily-refresh consecutive-absence counter (drop after N)
     "last_refresh_seen": "*",         # date a refreshed source last confirmed this listing in inventory

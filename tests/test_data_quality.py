@@ -107,6 +107,44 @@ def test_enrich_flags_low_arv_when_tax_proxy():
     assert "low_arv_confidence" in li.raw["data_quality"]["flags"]
 
 
+def test_arv_confidence_prefers_persisted_field_over_notes():
+    # calc.arv_confidence is authoritative; the comp note would say HIGH but the
+    # engine capped it to MEDIUM (e.g. estimated sqft) — the field must win.
+    li = _li(raw={"calc": {"arv_confidence": "MEDIUM",
+                           "notes": ["ARV from 3 zip-matched sold comps × subject sqft"]}})
+    assert _arv_confidence(li) == "MEDIUM"
+
+
+def test_flags_sqft_estimated_from_footprint():
+    li = _li(street_address="123 Real St", living_sqft=1800.0,
+             property_kind=PropertyKind.SINGLE_FAMILY,
+             raw={"calc": {"arv_confidence": "MEDIUM", "notes": ["ARV from comps × subject sqft"]},
+                  "footprint": {"estimated": True, "est_living_sqft": 1800}})
+    enrich_data_quality([li])
+    dq = li.raw["data_quality"]
+    assert "sqft_estimated" in dq["flags"]
+    assert "ESTIMATE" in dq["summary"]
+
+
+def test_flags_arv_outlier_on_high_proxy_no_comps():
+    li = _li(street_address="123 Real St", living_sqft=None,
+             property_kind=PropertyKind.SINGLE_FAMILY,
+             raw={"calc": {"arv_confidence": "MEDIUM", "arv_expected": 9_000_000,
+                           "notes": ["ARV from tax-assessed × 1.25"]}})
+    enrich_data_quality([li])
+    assert "arv_outlier" in li.raw["data_quality"]["flags"]
+    assert "outlier" in li.raw["data_quality"]["summary"].lower()
+
+
+def test_no_arv_outlier_when_comp_grounded():
+    li = _li(street_address="123 Real St", living_sqft=2000.0,
+             raw={"calc": {"arv_confidence": "HIGH", "arv_expected": 9_000_000,
+                           "notes": ["ARV from comps × subject sqft"]},
+                  "comp_median_ppsf": 200})
+    enrich_data_quality([li])
+    assert "arv_outlier" not in li.raw["data_quality"]["flags"]
+
+
 def test_clean_listing_has_empty_flags():
     li = _li(
         street_address="123 Real St", living_sqft=1500.0,

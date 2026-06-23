@@ -697,6 +697,17 @@ async def run() -> int:
     if _pre_scope != len(enriched):
         log.info("orchestrator.scope_repass", dropped=_pre_scope - len(enriched))
 
+    # Drop national court records (bankruptcy/civil) that never resolved to an
+    # in-scope county — without a county they can't be routed or actioned for the
+    # 18-county focus, so they're noise in the export. County-resolved national
+    # records (e.g. bankruptcy debtors geocoded via OneMap) are kept.
+    def _countyless_national(li) -> bool:
+        return (li.source or "").startswith("national.") and not (li.county or "").strip()
+    _pre_natl = len(enriched)
+    enriched = [li for li in enriched if not _countyless_national(li)]
+    if _pre_natl != len(enriched):
+        log.info("orchestrator.drop_countyless_national", dropped=_pre_natl - len(enriched))
+
     # #0 contactability spine: owner name + MAILING address + absentee/
     # out-of-state flags from county GIS (free ArcGIS REST). Runs on every
     # crawl so contactability is automatic — no manual backfill needed.

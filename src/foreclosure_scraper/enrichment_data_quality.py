@@ -61,6 +61,11 @@ def _arv_confidence(li: Listing) -> str | None:
     """Pull out the calc's ARV confidence ('HIGH'/'MEDIUM'/'LOW') if present."""
     raw = li.raw if isinstance(li.raw, dict) else {}
     calc = raw.get("calc") or {}
+    # Authoritative: the confidence the valuation engine actually assigned.
+    conf = calc.get("arv_confidence")
+    if conf:
+        return str(conf).upper()
+    # Fallback heuristic for legacy records that predate persisted confidence.
     notes = calc.get("notes") or []
     # Look at the first note — that's where the ARV-source line goes.
     first = notes[0] if notes else ""
@@ -83,12 +88,15 @@ def enrich_data_quality(listings: list[Listing]) -> dict:
         "approximate_address": 0,
         "low_arv_confidence": 0,
         "no_sqft": 0,
+        "sqft_estimated": 0,
+        "arv_outlier": 0,
         "no_address": 0,
         "exceptions": 0,
     }
     for li in listings:
         try:
             flags: list[str] = []
+            raw = li.raw if isinstance(li.raw, dict) else {}
 
             if _is_synthetic_address(li):
                 flags.append("synthetic_address")
@@ -109,6 +117,23 @@ def enrich_data_quality(listings: list[Listing]) -> dict:
             if arv_conf == "LOW":
                 flags.append("low_arv_confidence")
                 stats["low_arv_confidence"] += 1
+
+            # Footprint-derived sqft is an ESTIMATE — surface it so the comp-based
+            # ARV is never mistaken for one built on true GLA.
+            fp = raw.get("footprint")
+            if isinstance(fp, dict) and fp.get("estimated"):
+                flags.append("sqft_estimated")
+                stats["sqft_estimated"] += 1
+
+            # Outlier guard: a proxy ARV (no comps) that is implausibly large or
+            # tiny is not bankable — flag it for manual verification.
+            calc = raw.get("calc") or {}
+            arv = calc.get("arv_expected")
+            has_comps = bool(raw.get("comp_median_ppsf") or raw.get("comp_median_ppsf_recorded"))
+            if arv and not has_comps and arv_conf in ("LOW", "MEDIUM"):
+                if arv > 1_500_000 or (arv < 15_000 and li.living_sqft):
+                    flags.append("arv_outlier")
+                    stats["arv_outlier"] += 1
 
             # Always write — even an empty list signals "no caveats".
             if not isinstance(li.raw, dict):
@@ -145,4 +170,8 @@ def _summary_text(flags: list[str]) -> str:
         msgs.append("⚠️ rehab/ARV unreliable — sqft missing")
     if "low_arv_confidence" in flags:
         msgs.append("📊 ARV is a proxy (tax × 1.25 or bid × 2.4), not comp-grounded")
+    if "sqft_estimated" in flags:
+        msgs.append("📐 living sqft is an ESTIMATE (building footprint × stories, ~2019)")
+    if "arv_outlier" in flags:
+        msgs.append("⚠️ ARV outlier — proxy value with no comps; verify before bidding")
     return " · ".join(msgs)

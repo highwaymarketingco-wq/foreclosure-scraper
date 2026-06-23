@@ -1,19 +1,19 @@
 {
-  "run_time": "2026-06-19T01:55:54.048620Z",
-  "total": 4627,
+  "run_time": "2026-06-23T02:35:15.933296Z",
+  "total": 2963,
   "by_source": {
-    "national.auction_dot_com": 16,
-    "national.courtlistener_bankruptcy": 1754,
-    "national.fannie_homepath": 855,
+    "national.auction_dot_com": 13,
+    "national.courtlistener_bankruptcy": 414,
+    "national.fannie_homepath": 679,
     "national.homeharvest": 13,
     "national.distressed": 348,
     "national.hud_homestore": 5,
     "national.realtor_foreclosures": 2,
-    "national.zillow_bulk": 118,
-    "national.zillow_foreclosures": 83,
+    "national.zillow_bulk": 74,
+    "national.zillow_foreclosures": 64,
     "public_notices.ncnotices": 11,
     "law_firms.bell_carrington": 13,
-    "law_firms.brock_scott": 102,
+    "law_firms.brock_scott": 83,
     "law_firms.hutchens": 75,
     "law_firms.mcmichael_taylor_gray": 16,
     "law_firms.rogers_townsend": 4,
@@ -21,177 +21,83 @@
     "counties_sc.sc_public_index_lis_pendens": 483,
     "counties_nc.nc_county_tax_foreclosure": 1,
     "newspapers.hendersonville_lightning": 1,
-    "reo.vrm_va_reo": 10,
+    "reo.vrm_va_reo": 7,
     "counties_nc.nc_ecourts_lis_pendens": 480,
-    "national.foreclosure_dot_com": 197,
+    "national.foreclosure_dot_com": 138,
     "national.trulia": 10,
     "national.xome": 3,
     "newspapers.daily_courier": 2,
-    "national.courtlistener_civil": 1,
     "counties_nc.henderson_tax": 15,
     "derived.probate_deed": 2
   },
   "by_state": {
-    "NC": 2262,
-    "SC": 2365
+    "NC": 1175,
+    "SC": 1788
   },
   "by_county_top": [
     [
-      "Spartanburg, SC",
-      590
+      "SC/Spartanburg",
+      681
     ],
     [
-      "Anderson, SC",
-      436
+      "SC/Anderson",
+      464
     ],
     [
-      "Gaston, NC",
-      273
+      "NC/Gaston",
+      314
     ],
     [
-      "Pickens, SC",
-      193
+      "SC/Pickens",
+      206
     ],
     [
-      "Laurens, SC",
-      192
+      "SC/Laurens",
+      202
     ],
     [
-      "Henderson, NC",
-      162
+      "NC/Buncombe",
+      190
     ],
     [
-      "Buncombe, NC",
-      147
+      "NC/Henderson",
+      167
     ],
     [
-      "Cleveland, NC",
-      108
+      "NC/Cleveland",
+      127
     ],
     [
-      "Oconee, SC",
-      87
+      "SC/Oconee",
+      95
     ],
     [
-      "Lincoln, NC",
-      73
+      "NC/Lincoln",
+      90
     ],
     [
-      "Cherokee, SC",
-      69
+      "SC/Cherokee",
+      77
     ],
     [
-      "Mcdowell, NC",
+      "NC/McDowell",
       66
     ],
     [
-      "Burke, NC",
-      64
+      "NC/Burke",
+      62
     ],
     [
-      "Union, SC",
+      "SC/Union",
       61
     ],
     [
-      "Polk, NC",
-      45
+      "NC/Polk",
+      48
     ]
   ],
-  "source_status": {
-    "national.auction_dot_com": "OK (28)",
-    "national.bid4assets": "OK (4)",
-    "national.courtlistener_adversary": "EMPTY (verified)",
-    "national.courtlistener_bankruptcy": "OK (600)",
-    "national.courtlistener_civil": "EMPTY (verified)",
-    "national.fannie_homepath": "OK (691)",
-    "national.first_citizens_reo": "OK (4)",
-    "national.foreclosure_dot_com": "PAYWALL-BLOCKED",
-    "national.freddie_homesteps": "EMPTY (verified)",
-    "national.homeharvest": "OK (10)",
-    "national.distressed": "OK (309)",
-    "national.hubzu": "RENDER-REQUIRED (stealth fetch returned nothing)",
-    "national.hud_homestore": "OK (27)",
-    "national.probate_foreclosure_leads": "EMPTY (verified)",
-    "national.propwire": "EMPTY (verified)",
-    "national.realtor_foreclosures": "OK (14)",
-    "national.trulia": "RENDER-REQUIRED (stealth fetch returned nothing)",
-    "national.xome": "OK (1)",
-    "national.zillow_bulk": "OK (41)",
-    "national.zillow_foreclosures": "OK (369)",
-    "public_notices.ncnotices": "OK (33)",
-    "public_notices.publicnoticesc": "EMPTY (verified)",
-    "law_firms.aldridge_pite": "RENDER-REQUIRED (stealth fetch returned nothing)",
-    "law_firms.aldridge_pite_pydoll": "RENDER-REQUIRED (stealth fetch returned nothing)",
-    "law_firms.bell_carrington": "OK (75)",
-    "law_firms.brock_scott": "OK (319)",
-    "law_firms.finkel": "OK (8)",
-    "law_firms.hutchens": "OK (383)",
-    "law_firms.ingle_firm": "OK (1)",
-    "law_firms.kania": "OK (6)",
-    "law_firms.korn": "RENDER-REQUIRED (stealth fetch returned nothing)",
-    "law_firms.korn_pydoll": "RENDER-REQUIRED (stealth fetch returned nothing)",
-    "law_firms.mcmichael_taylor_gray": "OK (88)",
-    "law_firms.rogers_townsend": "OK (19)",
-    "counties_sc.anderson_master_in_equity": "OK (3)",
-    "counties_sc.pickens_master_in_equity": "EMPTY (verified)",
-    "counties_sc.sc_county_rosters": "OK (7)",
-    "counties_sc.sc_courtrosters": "EMPTY (verified)",
-    "counties_sc.sc_delinquent_tax_list": "EMPTY (verified)",
-    "counties_sc.sc_flc": "OK (18)",
-    "counties_sc.sc_public_index": "EMPTY (verified)",
-    "counties_sc.sc_public_index_lis_pendens": "OK (211)",
-    "counties_sc.sc_tax_delinquent": "EMPTY (verified)",
-    "counties_sc.spartanburg_master_in_equity": "OK (15)",
-    "counties_nc.buncombe_tax": "OK (1)",
-    "counties_nc.buncombe_tax_foreclosure": "OK (1)",
-    "counties_nc.cleveland_tax": "OK (2)",
-    "counties_nc.henderson_tax": "OK (15)",
-    "counties_nc.nc_county_tax_foreclosure": "OK (88)",
-    "counties_nc.nc_ecourts_lis_pendens": "CARRYOVER (480 stale from prior run)",
-    "counties_nc.nc_rod_substitute_trustee": "EMPTY (verified)",
-    "counties_nc.polk_tax": "OK (2)",
-    "counties_nc.rutherford_tax": "OK (11)",
-    "counties.nod_discovery": "EMPTY (verified)",
-    "counties.sitemap_walker": "OK (31)",
-    "newspapers.daily_courier": "OK (1)",
-    "newspapers.hendersonville_lightning": "OK (6)",
-    "newspapers.shelby_star": "EMPTY (verified)",
-    "newspapers.tryon_bulletin": "EMPTY (verified)",
-    "reo.treasury_seized": "EMPTY (verified)",
-    "reo.usda_rd": "EMPTY (verified)",
-    "reo.vrm_va_reo": "OK (155)",
-    "city_websites.search": "OK (144)"
-  },
-  "regressions": [
-    "counties_sc.anderson_master_in_equity: got 3, expected \u2265 5",
-    "counties_nc.cleveland_tax: got 2, expected \u2265 3"
-  ],
-  "errors": [
-    "national.courtlistener_adversary",
-    "national.courtlistener_civil",
-    "national.foreclosure_dot_com",
-    "national.freddie_homesteps",
-    "national.hubzu",
-    "national.probate_foreclosure_leads",
-    "national.propwire",
-    "national.trulia",
-    "public_notices.publicnoticesc",
-    "law_firms.aldridge_pite",
-    "law_firms.aldridge_pite_pydoll",
-    "law_firms.korn",
-    "law_firms.korn_pydoll",
-    "counties_sc.pickens_master_in_equity",
-    "counties_sc.sc_courtrosters",
-    "counties_sc.sc_delinquent_tax_list",
-    "counties_sc.sc_public_index",
-    "counties_sc.sc_tax_delinquent",
-    "counties_nc.nc_ecourts_lis_pendens",
-    "counties_nc.nc_rod_substitute_trustee",
-    "counties.nod_discovery",
-    "newspapers.shelby_star",
-    "newspapers.tryon_bulletin",
-    "reo.treasury_seized",
-    "reo.usda_rd"
-  ],
-  "notes": "horizon=120d, scrapers=63, regressions=2 | 2026-06-19 QA: scope-cleaned + data-quality backfill"
+  "source_status": {},
+  "regressions": [],
+  "errors": [],
+  "notes": "regenerated in-place from persisted dataset (no re-scrape)"
 }
