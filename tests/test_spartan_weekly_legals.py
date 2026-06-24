@@ -50,3 +50,25 @@ def test_saledate_plain_no_weekday():
 def test_saledate_ignores_unrelated_dates():
     # A published-on date elsewhere in the body must not be mistaken for the sale date.
     assert sw._SALEDATE_RE.search("Published June 18, 2026. The property is located at 12 Main St.") is None
+
+
+# ---- probate notice -> decedent (owner) + PR (contact) ----
+
+_PROBATE_BODY = (
+    "Probate Court Notice to Creditors of Estates Case Number: 2026ES4200344 All persons "
+    "having claims against the following estates MUST file ... Estate: Gloria J. Dowell "
+    "Date of Death: January 31, 2026 Case Number: 2026ES4200344 Personal Representative: "
+    "Sherrie D. Tanner 126 Cheshire Road Lexington, SC 29072 6-18, 25, 7-2 June 18, 2026"
+)
+
+
+def test_probate_extracts_decedent_pr_and_case():
+    # decedent (the property OWNER -> feeds owner-name address backfill)
+    assert sw._PROBATE_ESTATE.search(_PROBATE_BODY).group(1).strip() == "Gloria J. Dowell"
+    # personal representative + mailing address (the heir/seller contact)
+    pr = sw._PROBATE_PR.search(_PROBATE_BODY)
+    assert pr.group(1).strip() == "Sherrie D. Tanner"
+    assert "126 Cheshire Road" in pr.group(2)
+    # estate case number (ES, not the CP foreclosure pattern)
+    assert sw._ES_CASE_RE.search(_PROBATE_BODY).group(1) == "2026ES4200344"
+    assert sw._PROBATE_DOD.search(_PROBATE_BODY).group(1) == "January 31, 2026"

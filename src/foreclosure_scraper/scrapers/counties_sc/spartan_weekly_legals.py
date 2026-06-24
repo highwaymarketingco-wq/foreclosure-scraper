@@ -78,6 +78,15 @@ _SALEDATE_RE = re.compile(
     r"will\s+sell\b.{0,40}?\b((?:January|February|March|April|May|June|July|August|"
     r"September|October|November|December)\s+\d{1,2},?\s+\d{4})", re.I)
 _AMOUNT_RE = re.compile(r"\$[\d,]{4,}(?:\.\d{2})?")
+# Probate "Notice to Creditors" fields: "Estate: <DECEDENT> Date of Death: <DATE>
+# Case Number: <ES#> Personal Representative: <PR NAME> <PR ADDRESS>".
+_PROBATE_ESTATE = re.compile(
+    r"\bEstate:\s*([A-Z][A-Za-z .,'\-]{3,60}?)\s+(?:Date of Death|Case Number|a/?k/?a|aka)\b", re.I)
+_PROBATE_DOD = re.compile(r"Date of Death:\s*([A-Z][a-z]+\s+\d{1,2},?\s+\d{4})", re.I)
+_PROBATE_PR = re.compile(
+    r"Personal Representative:\s*([A-Z][A-Za-z .,'\-]{3,60}?)\s+"
+    r"(\d{1,5}\s+[A-Za-z0-9 .,'\-]+?\b(?:SC|NC|GA|N\.C\.|S\.C\.)\s*\d{5})", re.I)
+_ES_CASE_RE = re.compile(r"\b(20\d{2}ES\d{6,9})\b")
 
 
 def _clean(s: str) -> str:
@@ -150,6 +159,8 @@ class SpartanWeeklyLegals(BaseScraper):
         source_url = _HOST + row["href"]
 
         body, defendant, sale_date, amount = "", None, None, None
+        probate = None
+        es_case = None
         if enrich:
             try:
                 d = await c.get(source_url)
@@ -162,6 +173,28 @@ class SpartanWeeklyLegals(BaseScraper):
                         sale_date = sm.group(1) if sm else None
                         am = _AMOUNT_RE.search(body)
                         amount = am.group(0) if am else None
+                    if kind == "probate":
+                        em = _PROBATE_ESTATE.search(body)
+                        decedent = _clean(em.group(1)) if em else defendant
+                        if decedent:
+                            # The DECEDENT is the property owner — putting them in
+                            # `defendant` lets enrichment_address_backfill resolve the
+                            # property by owner-name (the notice has no address).
+                            defendant = decedent
+                        prm = _PROBATE_PR.search(body)
+                        dod = _PROBATE_DOD.search(body)
+                        esm = _ES_CASE_RE.search(body)
+                        es_case = esm.group(1) if esm else None
+                        probate = {
+                            "decedent": decedent or None,
+                            "date_of_death": (dod.group(1) if dod else None),
+                            "personal_representative": (_clean(prm.group(1)) if prm else None),
+                            "pr_address": (_clean(prm.group(2)) if prm else None),
+                            "es_case_number": es_case,
+                        }
+                        # No property address in a probate notice — clear the notice
+                        # title so the owner-name backfill fires on the decedent.
+                        address = None
             except Exception:
                 log.debug("spartan_weekly.detail_failed", url=source_url[:120])
 
@@ -177,6 +210,8 @@ class SpartanWeeklyLegals(BaseScraper):
         if kind == "probate":
             raw["relationship_signal"] = {"kind": "probate", "keyword": "public_notice",
                                           "tagged_at": datetime.utcnow().isoformat() + "Z"}
+            if probate:
+                raw["probate"] = probate
 
         return Listing(
             source=self.slug, source_url=source_url,
@@ -184,8 +219,9 @@ class SpartanWeeklyLegals(BaseScraper):
             state="SC", county="Spartanburg",
             defendant=defendant,
             street_address=address or None,
-            case_number=(case_m.group(1) if case_m else None),
-            description=(f"{row['type'].strip()} — {address}"
+            case_number=(es_case or (case_m.group(1) if case_m else None)),
+            description=(f"{row['type'].strip()}"
+                         + (f" — {address}" if address else "")
                          + (f" — {defendant}" if defendant else "")),
             first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
             raw=raw,
