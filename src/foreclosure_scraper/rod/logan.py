@@ -73,6 +73,24 @@ def _clean(s: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", s or "").replace("&nbsp;", " ")).strip()
 
 
+def _split_book_page(book_info: str) -> tuple[str | None, str | None]:
+    r"""Split a Logan 'Book Info' cell into (book, page).
+
+    Spartanburg-era Logan books can carry an ALPHA SUFFIX — e.g. "149D", which the
+    county searches as "149-D" (per the ROD office). The old digits-only parse
+    (re.findall r"\d+") silently dropped the letter (book "149-D" -> "149").
+    Preserve the suffix, normalize to the dashed searchable form, then take the
+    next number as the page.
+    """
+    s = book_info or ""
+    bm = re.search(r"\d+(?:\s*-\s*[A-Za-z]\b|[A-Za-z]\b)?", s)
+    if not bm:
+        return None, None
+    book = re.sub(r"^(\d+)\s*-?\s*([A-Za-z])$", r"\1-\2", re.sub(r"\s+", "", bm.group(0)))
+    pm = re.search(r"\d+", s[bm.end():])
+    return (book or None), (pm.group(0) if pm else None)
+
+
 def _parse_records(html: str, state: str, county: str) -> list[RodDoc]:
     links = dict(_LINK_RE.findall(html))
     cells: dict[str, list[str]] = defaultdict(list)
@@ -88,9 +106,7 @@ def _parse_records(html: str, state: str, county: str) -> list[RodDoc]:
             grantor, grantee = reverse, searched
         else:
             grantor, grantee = searched, reverse
-        bm = re.findall(r"\d+", book_info or "")
-        book = bm[0] if bm else None
-        page = bm[1] if len(bm) > 1 else None
+        book, page = _split_book_page(book_info)
         try:
             rec = datetime.strptime(date, "%m/%d/%Y")
         except ValueError:

@@ -68,3 +68,16 @@ def test_to_listing_skips_non_distress():
 
 def test_logan_counties_are_the_three_working_nc():
     assert set(logan.LOGAN_COUNTIES) == {("NC", "Transylvania"), ("NC", "McDowell"), ("NC", "Mitchell")}
+
+
+def test_split_book_page_preserves_alpha_suffix():
+    # Spartanburg books carry a letter suffix searched as "149-D" — must NOT drop the D.
+    assert logan._split_book_page("149-D 567") == ("149-D", "567")
+    assert logan._split_book_page("149D 567") == ("149-D", "567")  # normalized to dashed form
+    assert logan._split_book_page("Book 149-D Pg 567") == ("149-D", "567")
+
+
+def test_split_book_page_plain_numeric():
+    assert logan._split_book_page("4821 1203") == ("4821", "1203")
+    assert logan._split_book_page("") == (None, None)
+    assert logan._split_book_page("no digits here") == (None, None)
