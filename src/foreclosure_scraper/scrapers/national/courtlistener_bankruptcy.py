@@ -185,7 +185,10 @@ class CourtListenerBankruptcy(BaseScraper):
     category = "national_aggregator"
     expected_min_count = 0  # graceful when no token
     requires_apify = False
-    timeout_s = 480.0
+    # The per-docket chapter lookups (one extra API call each) are the cost; at
+    # 480s the run timed out mid-pass and got flagged BLOCKED. Give it real
+    # headroom — scrapers run concurrently so a long one doesn't block others.
+    timeout_s = 900.0
 
     async def fetch(self) -> Iterable[Listing]:
         token = _load_token()
@@ -195,9 +198,12 @@ class CourtListenerBankruptcy(BaseScraper):
 
         out: list[Listing] = []
         chapter_lookups = 0
-        # CourtListener free tier = 5000 reqs/hr. We're well under that even
-        # with chapter lookup on every docket. Cap mostly to bound runtime.
-        MAX_CHAPTER_LOOKUPS = 2000
+        # CourtListener free tier = 5000 reqs/hr. The per-docket chapter lookup
+        # is sequential and is the runtime bottleneck, so bound it: debtor NAMES
+        # (the foreclosure-defendant join key) are captured for ALL dockets
+        # regardless; only the precise chapter is skipped past this cap (those
+        # fall back to the text-mined chapter / "?"). Keeps the run inside budget.
+        MAX_CHAPTER_LOOKUPS = int(os.environ.get("BANKRUPTCY_CHAPTER_LOOKUPS", "700"))
 
         # Dedup tracker — CourtListener pagination occasionally returns the
         # same docket twice (cursor-based with overlap on edits, plus we

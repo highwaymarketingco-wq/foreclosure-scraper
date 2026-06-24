@@ -486,13 +486,21 @@ async def run() -> int:
     enriched = await enrich_gis(valid)
     log.info("orchestrator.gis_enriched", count=len(enriched))
 
-    # Court records enrichment (NC eCourts + SC Public Index) — fills plaintiff,
-    # defendant, trustee, sale location for any listing that has a case number.
-    try:
-        await enrich_with_court_records(enriched)
-        log.info("orchestrator.courts_enriched", count=len(enriched))
-    except Exception as exc:  # noqa: BLE001
-        log.warning("orchestrator.courts_failed", error=str(exc))
+    # Court-records enrichment — RETIRED by default (2026-06-24). Verified dead-end:
+    #  • NC: Tyler's NCJudgmentSearchService is search-only (per-case query returns
+    #    0 hits) and the WorkspaceMode page is 202-async/unparseable. Tested live.
+    #    NC court data already comes from the nc_ecourts scraper + nc_case_status.
+    #  • SC: it scraped publicindex.sccourts.org — the SC Public Index, which our
+    #    compliance policy PROHIBITS (admin order + ACLU suit). SC court coverage
+    #    comes compliantly from MIE rosters + scpublicnotices.
+    # It produced 0 fields while costing ~4h + 17k failed renders. Off by default;
+    # set COURT_RECORDS_ENRICH=1 to force-run (not recommended — broken + SC non-compliant).
+    if os.environ.get("COURT_RECORDS_ENRICH") == "1":
+        try:
+            await enrich_with_court_records(enriched)
+            log.info("orchestrator.courts_enriched", count=len(enriched))
+        except Exception as exc:  # noqa: BLE001
+            log.warning("orchestrator.courts_failed", error=str(exc))
 
     # Zillow per-address detail enrichment (Apify) — fills photos, zestimate,
     # description, plus anything county GIS missed.
