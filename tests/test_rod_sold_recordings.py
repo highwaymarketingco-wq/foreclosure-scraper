@@ -26,10 +26,10 @@ from foreclosure_scraper.rod.aumentum import (
     _parse_grid,
 )
 from foreclosure_scraper.rod.cchs import (
-    POST_SALE_DOC_TYPE_CODES,
+    POST_SALE_KEYWORDS,
 )
 from foreclosure_scraper.rod.cchs import _is_post_sale as cchs_is_post_sale
-from foreclosure_scraper.rod.cchs import _parse_results as cchs_parse_results
+from foreclosure_scraper.rod.cchs import _parse_rows as cchs_parse_rows
 from foreclosure_scraper.rod.deed_stamp import sold_price_from_stamp
 
 
@@ -173,28 +173,24 @@ def test_cchs_recognizes_trustee_deed_variants():
     assert not cchs_is_post_sale("Mortgage")
 
 
-def test_cchs_post_sale_codes_include_common():
-    must_have = {"TD", "STD", "FD", "ALL"}
-    assert must_have <= set(POST_SALE_DOC_TYPE_CODES)
+def test_cchs_post_sale_keywords_include_common():
+    assert {"TRUSTEE", "COMMISSIONER"} <= set(POST_SALE_KEYWORDS)
 
 
-def test_cchs_parses_consideration_from_dollar_cell():
-    """CCHS shows consideration as a $-prefixed cell anywhere in the row."""
-    html = """
-    <table>
-      <tr>
-        <td>05/02/2026</td>
-        <td>TRUSTEES DEED UPON SALE</td>
-        <td>BK1234/PG56</td>
-        <td>SMITH JOHN ET AL</td>
-        <td>ACME LLC</td>
-        <td>$48,500.00</td>
-      </tr>
-    </table>
-    """
-    docs = cchs_parse_results(html, "Cleveland", "NC")
+def test_cchs_parses_consideration_from_excise_stamp():
+    """CCHS getall XML: <mo> is the NC excise stamp; consideration = stamp * 500."""
+    xml = (
+        "<SearchResponse><recordcount>1</recordcount>"
+        "<r><da>05/02/2026</da><ki>COM/D</ki><bk>1234</bk><pg>56</pg>"
+        "<dn>2026004567</dn><or>SMITH</or><or1>JOHN</or1>"
+        "<ee>ACME</ee><ee1>LLC</ee1><mo>$97.00</mo><pk>1-99</pk></r>"
+        "</SearchResponse>"
+    )
+    docs = cchs_parse_rows(xml, "NC", "Cleveland", sold=True)
     assert len(docs) == 1
-    assert docs[0].consideration_amount == 48500.0
+    assert docs[0].excise_tax_stamp == 97.0
+    assert docs[0].consideration_amount == 48500.0  # 97 * 500
+    assert docs[0].grantor == "SMITH JOHN"
 
 
 # ---- deed_stamp helper still works ----

@@ -68,8 +68,9 @@ SOURCES: list[tuple[str, object, str]] = [
     ("Polk",       cott,   "cott"),
     ("Rutherford", cott,   "cott"),
     ("Burke",     cchs,    "cchs"),
-    ("Lincoln",   cchs,    "cchs"),
     ("Cleveland", cchs,    "cchs"),
+    # Lincoln uses a different ASP.NET-MVC CCHS install (us4/LincolnNC2) — its
+    # flow isn't wired yet, so it's omitted here rather than silently returning 0.
 ]
 
 LOOKBACK_DAYS = 60                    # PRE-sale (NOD/NOS) sweep window
@@ -87,9 +88,9 @@ def _vendor_search_url(vendor_label: str, county: str) -> str:
         if host:
             return host.rstrip("/") + "/SrchName.aspx"
     elif vendor_label == "cchs":
-        slug = cchs.CCHS_COUNTIES.get(("NC", county))
-        if slug:
-            return f"https://us5.courthousecomputersystems.com/{slug}/searchonline.asp"
+        u = cchs.search_url("NC", county)
+        if u:
+            return u
     return "https://www.nccourts.gov/"
 
 
