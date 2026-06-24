@@ -30,14 +30,27 @@ GRADE_GATE = {"A", "B"}
 
 
 def _adapters() -> dict:
-    """(state, county) -> async adapter. Imported lazily + defensively so one bad
-    adapter never breaks the pipeline."""
+    """(state, county) -> async fetch. Auto-discovered: any module in
+    assessor_cards/ that exposes COUNTY=(state, county) + an async fetch(li) is
+    registered. Each module is imported defensively so one broken adapter never
+    breaks the pipeline (it's just skipped)."""
+    import importlib
+    import pkgutil
+
+    from . import assessor_cards as pkg
+
     table: dict = {}
-    try:
-        from .assessor_cards import anderson_sc
-        table[("SC", "Anderson")] = anderson_sc.fetch
-    except Exception:  # noqa: BLE001
-        log.warning("assessor_card.adapter_import_failed", adapter="anderson_sc")
+    for m in pkgutil.iter_modules(pkg.__path__):
+        if m.name in ("base", "__init__"):
+            continue
+        try:
+            mod = importlib.import_module(f".assessor_cards.{m.name}", __package__)
+            county = getattr(mod, "COUNTY", None)
+            fetch = getattr(mod, "fetch", None)
+            if county and callable(fetch):
+                table[tuple(county)] = fetch
+        except Exception:  # noqa: BLE001
+            log.warning("assessor_card.adapter_import_failed", adapter=m.name)
     return table
 
 

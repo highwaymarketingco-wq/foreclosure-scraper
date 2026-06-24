@@ -20,6 +20,8 @@ _SALES = "https://propertyviewer.andersoncountysc.org/arcgis/rest/services/Parce
 SOURCE_URL = "https://acpass.andersoncountysc.org/"
 _UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/126"}
 
+COUNTY = ("SC", "Anderson")   # auto-discovery key (see enrichment_assessor_card._adapters)
+
 
 def _tms(li) -> str | None:
     digits = re.sub(r"\D", "", li.parcel_id or "")
