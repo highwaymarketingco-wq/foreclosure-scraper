@@ -28,6 +28,11 @@ log = structlog.get_logger()
 
 GRADE_GATE = {"A", "B"}
 
+# Render-class counties (Cloudflare-solving browser per parcel, ~30s-3min each).
+# ASSESSOR_CARD_SKIP_RENDER=1 skips them for a fast JSON/HTML-only pass.
+_RENDER_COUNTIES = {("SC", "Spartanburg"), ("SC", "Oconee"), ("SC", "Pickens"),
+                    ("SC", "Union"), ("NC", "Buncombe")}
+
 
 def _adapters() -> dict:
     """(state, county) -> async fetch. Auto-discovered: any module in
@@ -41,14 +46,17 @@ def _adapters() -> dict:
 
     table: dict = {}
     for m in pkgutil.iter_modules(pkg.__path__):
-        if m.name in ("base", "__init__"):
+        if m.name == "base" or m.name.startswith("_"):
             continue
         try:
             mod = importlib.import_module(f".assessor_cards.{m.name}", __package__)
-            county = getattr(mod, "COUNTY", None)
             fetch = getattr(mod, "fetch", None)
-            if county and callable(fetch):
-                table[tuple(county)] = fetch
+            if not callable(fetch):
+                continue
+            # a module registers one COUNTY=(state,county) or many COUNTIES=[...]
+            keys = getattr(mod, "COUNTIES", None) or ([getattr(mod, "COUNTY")] if getattr(mod, "COUNTY", None) else [])
+            for k in keys:
+                table[tuple(k)] = fetch
         except Exception:  # noqa: BLE001
             log.warning("assessor_card.adapter_import_failed", adapter=m.name)
     return table
@@ -89,8 +97,10 @@ async def _aenrich(listings: list[Listing]) -> dict:
     if not adapters:
         return {}
     cap = int(os.environ.get("ASSESSOR_CARD_MAX", "150"))
+    skip_render = os.environ.get("ASSESSOR_CARD_SKIP_RENDER", "").lower() in ("1", "true", "yes")
     targets = [li for li in listings
-               if _is_bplus(li) and (li.state, li.county) in adapters][:cap]
+               if _is_bplus(li) and (li.state, li.county) in adapters
+               and not (skip_render and (li.state, li.county) in _RENDER_COUNTIES)][:cap]
     stats = {"targets": len(targets), "matched": 0, "filled_sqft": 0, "filled_price": 0}
     for li in targets:
         try:

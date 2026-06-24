@@ -21,6 +21,7 @@ from foreclosure_scraper.valuation import calc as vcalc, grading as vgrade  # no
 from foreclosure_scraper.enrichment_sc_cama import enrich_sc_cama  # noqa: E402
 from foreclosure_scraper.enrichment_footprint_sqft import enrich_footprint_sqft  # noqa: E402
 from foreclosure_scraper.enrichment_data_quality import enrich_data_quality  # noqa: E402
+from foreclosure_scraper.enrichment_assessor_card import enrich_assessor_card  # noqa: E402
 from foreclosure_scraper.web_artifact import write_artifact  # noqa: E402
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
@@ -64,6 +65,23 @@ def main() -> int:
         except Exception:  # noqa: BLE001
             vfail += 1
     print(f"recomputed calc+grade ({vfail} failures)")
+
+    # On-demand per-parcel assessor card (grade-gated B+) — fills real sqft + sale
+    # price the bulk feed omits; re-grade touched leads so a real card sqft flips
+    # ARV MEDIUM->HIGH. No-op unless ASSESSOR_CARD_ON=1 (mirrors main.py).
+    s = enrich_assessor_card(listings)
+    print("enrich_assessor_card:", s)
+    if s:
+        touched = [li for li in listings if isinstance(li.raw, dict) and "assessor_card" in li.raw]
+        for li in touched:
+            try:
+                c = vcalc.compute(li)
+                g = vgrade.grade(li, c)
+                li.raw["calc"] = vcalc.to_dict(c)
+                li.raw["grade"] = vgrade.to_dict(g)
+            except Exception:  # noqa: BLE001
+                pass
+        print(f"re-graded {len(touched)} card-enriched leads")
 
     print("enrich_data_quality:", enrich_data_quality(listings))
 
