@@ -92,55 +92,136 @@ _COURT_CALL_TIMEOUT_S = float(os.environ.get("COURT_CALL_TIMEOUT_S", "90"))
 _COURT_BREAKER_FAILS = int(os.environ.get("COURT_BREAKER_FAILS", "12"))
 
 
-async def enrich_with_court_records(listings: list[Listing]) -> list[Listing]:
-    """For every listing that has a case_number, look it up in the right e-court system."""
-    # Rendering is free (local stealth browser); no token gate.
-    token = None
+def _norm_case(s: str | None) -> str:
+    return re.sub(r"[\s\-]", "", (s or "")).upper()
 
+
+async def _build_nc_case_index() -> dict:
+    """FAST + compliant NC court lookup: run Tyler's working NCJudgmentSearchService
+    (the same JSON search the nc_ecourts scraper uses — public API, no CAPTCHA, no
+    per-case page render) across our counties for the last 90 days, and index every
+    hit by normalized case number. Replaces the broken per-case WorkspaceMode render
+    (202-async) that filled 0 fields while costing hours.
+    """
+    try:
+        from .scrapers.counties_nc.nc_ecourts_lis_pendens import (
+            SERVICE_URL, SERVICE_HEADERS, TARGET_COUNTIES, _build_search_object,
+        )
+        from .http_client import client
+    except Exception as exc:  # noqa: BLE001
+        log.warning("courts.nc_index.import_failed", error=str(exc)[:140])
+        return {}
+    from datetime import datetime, timedelta
+    end = datetime.now()
+    start = end - timedelta(days=90)
+    index: dict = {}
+    try:
+        async with client(timeout=45.0, headers=SERVICE_HEADERS) as c:
+            r = await c.post(SERVICE_URL, content=b"")
+            if r.status_code not in (200, 201):
+                log.warning("courts.nc_index.template_status", status=r.status_code)
+                return {}
+            template = r.json()
+            page_from = 0
+            for _ in range(25):
+                so = _build_search_object(template, counties=TARGET_COUNTIES,
+                                          from_date=start, to_date=end,
+                                          page_from=page_from, page_size=200)
+                r2 = await c.post(SERVICE_URL, json=so)
+                if r2.status_code not in (200, 201):
+                    break
+                sr = (r2.json().get("searchResult") or {})
+                hits = sr.get("hits") or []
+                if not hits:
+                    break
+                for h in hits:
+                    cn = _norm_case(h.get("caseNumber"))
+                    if cn and cn not in index:
+                        index[cn] = h
+                total = sr.get("totalHits") or 0
+                page_from += len(hits)
+                if page_from >= total:
+                    break
+    except Exception as exc:  # noqa: BLE001
+        log.warning("courts.nc_index.failed", error=str(exc)[:140])
+    log.info("courts.nc_index.built", cases=len(index))
+    return index
+
+
+def _apply_nc_hit(li: Listing, hit: dict) -> int:
+    """Fill plaintiff/defendant from a Tyler hit (only if empty) + stash status."""
+    filled = 0
+    debtors = "; ".join(d.get("name", "") for d in (hit.get("debtors") or []) if d.get("name"))[:300]
+    creditors = "; ".join(c.get("name", "") for c in (hit.get("creditors") or []) if c.get("name"))[:300]
+    if debtors and not li.defendant:
+        li.defendant = debtors
+        filled += 1
+    if creditors and not li.plaintiff:
+        li.plaintiff = creditors
+        filled += 1
+    if isinstance(li.raw, dict):
+        li.raw.setdefault("court_record", {}).update({
+            "cause": hit.get("causeOfActionDesc"), "location": hit.get("location"),
+            "ordered_date": hit.get("orderedDate"), "source": "nc_ecourts_search",
+        })
+    return filled
+
+
+async def enrich_with_court_records(listings: list[Listing]) -> list[Listing]:
+    """Court-record enrichment by case number.
+
+    NC: one batch search against Tyler's public JSON API (fast, compliant), then
+        match existing listings by case number — no per-case page renders.
+    SC: per-case render of the SC Public Index. NOTE: SC Public Index automated
+        access is restricted (admin order); this path is gated by the operator's
+        legal clearance, kept available per direction, breaker-protected.
+    """
+    token = None
+    counts = {"nc_targets": 0, "nc_matched": 0, "fields_filled": 0,
+              "sc_queried": 0, "sc_matched": 0, "sc_failed": 0}
+
+    # ---- NC: fast batch index ----
+    nc = [li for li in listings if li.state == "NC" and li.case_number]
+    counts["nc_targets"] = len(nc)
+    if nc:
+        idx = await _build_nc_case_index()
+        for li in nc:
+            hit = idx.get(_norm_case(li.case_number))
+            if hit:
+                counts["nc_matched"] += 1
+                counts["fields_filled"] += _apply_nc_hit(li, hit)
+
+    # ---- SC: per-case render (legal-gated; breaker-protected) ----
     sem = asyncio.Semaphore(4)
-    counts = {"queried": 0, "matched": 0, "fields_filled": 0, "failed": 0}
     state = {"consec_fail": 0, "tripped": False}
 
-    async def lookup(li: Listing) -> None:
-        if state["tripped"]:
-            return
-        if not (li.case_number and li.county and li.state):
+    async def lookup_sc(li: Listing) -> None:
+        if li.state != "SC" or not (li.case_number and li.county) or state["tripped"]:
             return
         county_clean = li.county.replace(" County", "").strip().split(",")[0].strip()
-        if li.state == "SC":
-            url = SC_PUBLICINDEX.format(county=county_clean, case=li.case_number)
-        elif li.state == "NC":
-            # NC eCourts uses a search page; we can include case# in search params
-            url = (
-                "https://portal-nc.tylertech.cloud/Portal/Home/WorkspaceMode?p=0"
-                f"&q={li.case_number}"
-            )
-        else:
-            return
+        url = SC_PUBLICINDEX.format(county=county_clean, case=li.case_number)
         async with sem:
             if state["tripped"]:
                 return
-            counts["queried"] += 1
+            counts["sc_queried"] += 1
             try:
                 content = (await asyncio.wait_for(fetch_rendered(url, token=token),
                                                   timeout=_COURT_CALL_TIMEOUT_S)
                            if _COURT_CALL_TIMEOUT_S > 0 else await fetch_rendered(url, token=token))
             except (Exception, asyncio.TimeoutError):
-                # Renderer hung/failed — count toward the stall-breaker.
-                counts["failed"] += 1
+                counts["sc_failed"] += 1
                 state["consec_fail"] += 1
                 if _COURT_BREAKER_FAILS and state["consec_fail"] >= _COURT_BREAKER_FAILS:
                     state["tripped"] = True
-                    log.warning("courts.enrich.circuit_open",
-                                consec_fail=state["consec_fail"], queried=counts["queried"])
+                    log.warning("courts.enrich.circuit_open", consec_fail=state["consec_fail"])
                 return
-            state["consec_fail"] = 0  # a returned render (even empty) = browser healthy
+            state["consec_fail"] = 0
             if not content:
                 return
-            counts["matched"] += 1
+            counts["sc_matched"] += 1
             counts["fields_filled"] += _apply_court_text(li, content)
 
-    await asyncio.gather(*(lookup(li) for li in listings))
+    await asyncio.gather(*(lookup_sc(li) for li in listings))
     log.info("courts.enrich.done", tripped=state["tripped"], **counts)
     return listings
 

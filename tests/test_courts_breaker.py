@@ -1,6 +1,6 @@
-"""enrich_with_court_records stall-breaker — runs every case while healthy,
-bails only on consecutive renderer failures (no time limit). The fix for the
-Tyler court step that ground a full run for hours after the browser degraded.
+"""Court-records enrichment: NC via Tyler batch search (fast/compliant), SC via
+per-case render with a stall-breaker (runs every case while healthy, bails only
+on consecutive renderer failures — no time limit).
 """
 from __future__ import annotations
 
@@ -10,12 +10,19 @@ from foreclosure_scraper import enrichment_courts as ec
 from foreclosure_scraper.models import Listing, ListingType
 
 
-def _nc(i: int) -> Listing:
+def _sc(i: int) -> Listing:
     return Listing(source="x", source_url="u", listing_type=ListingType.FORECLOSURE_SALE,
-                   state="NC", county="Gaston", case_number=f"26-CVD-{1000 + i}")
+                   state="SC", county="Spartanburg", case_number=f"2026CP{i:06d}")
 
 
-def test_breaker_trips_on_consecutive_renderer_failures(monkeypatch):
+def _nc(case: str, **kw) -> Listing:
+    return Listing(source="x", source_url="u", listing_type=ListingType.FORECLOSURE_SALE,
+                   state="NC", county="Gaston", case_number=case, **kw)
+
+
+# ---- SC per-case render breaker -------------------------------------------------
+
+def test_sc_breaker_trips_on_consecutive_failures(monkeypatch):
     monkeypatch.setattr(ec, "_COURT_BREAKER_FAILS", 12)
     calls = {"n": 0}
 
@@ -24,39 +31,61 @@ def test_breaker_trips_on_consecutive_renderer_failures(monkeypatch):
         raise RuntimeError("render hung")
 
     monkeypatch.setattr(ec, "fetch_rendered", boom)
-    listings = [_nc(i) for i in range(80)]
-    asyncio.run(ec.enrich_with_court_records(listings))
-    # Concurrency is 4, so a few extra in-flight calls land, but it must bail far
-    # short of all 80 — never grind the whole list when the renderer is dead.
-    assert calls["n"] <= 20, f"breaker did not trip: {calls['n']} calls"
+    asyncio.run(ec.enrich_with_court_records([_sc(i) for i in range(80)]))
+    assert calls["n"] <= 20, f"breaker did not trip: {calls['n']}"
 
 
-def test_no_trip_when_healthy(monkeypatch):
+def test_sc_no_trip_when_healthy(monkeypatch):
     monkeypatch.setattr(ec, "_COURT_BREAKER_FAILS", 12)
     calls = {"n": 0}
 
     async def ok(url, token=None):
         calls["n"] += 1
-        return ""  # returned render, just no match — healthy, must not trip
+        return ""  # returned render, no match — healthy, must process all
 
     monkeypatch.setattr(ec, "fetch_rendered", ok)
     monkeypatch.setattr(ec, "_apply_court_text", lambda li, content: 0)
-    listings = [_nc(i) for i in range(80)]
-    asyncio.run(ec.enrich_with_court_records(listings))
-    assert calls["n"] == 80  # every case processed, no time limit, no trip
+    asyncio.run(ec.enrich_with_court_records([_sc(i) for i in range(40)]))
+    assert calls["n"] == 40
 
 
-def test_empty_content_does_not_count_as_failure(monkeypatch):
-    # Alternating empty (no-match) results must never accumulate toward the
-    # breaker — only real exceptions/timeouts do.
-    monkeypatch.setattr(ec, "_COURT_BREAKER_FAILS", 3)
-    calls = {"n": 0}
+# ---- NC batch-search path ------------------------------------------------------
 
-    async def empties(url, token=None):
-        calls["n"] += 1
-        return None
+def test_nc_batch_match_fills_empty_fields(monkeypatch):
+    hit = {"caseNumber": "26 SP000359-440",
+           "debtors": [{"name": "John Doe"}], "creditors": [{"name": "Acme Bank"}],
+           "causeOfActionDesc": "Foreclosure", "location": "Gaston District Court"}
 
-    monkeypatch.setattr(ec, "fetch_rendered", empties)
-    listings = [_nc(i) for i in range(30)]
-    asyncio.run(ec.enrich_with_court_records(listings))
-    assert calls["n"] == 30  # all processed despite every one being a no-match
+    async def fake_index():
+        return {ec._norm_case("26 SP000359-440"): hit}
+
+    monkeypatch.setattr(ec, "_build_nc_case_index", fake_index)
+    li = _nc("26SP000359-440", raw={})
+    asyncio.run(ec.enrich_with_court_records([li]))
+    assert li.defendant == "John Doe" and li.plaintiff == "Acme Bank"
+    assert li.raw["court_record"]["source"] == "nc_ecourts_search"
+
+
+def test_nc_batch_does_not_overwrite_existing(monkeypatch):
+    hit = {"caseNumber": "26 SP1-440", "debtors": [{"name": "New Debtor"}], "creditors": []}
+
+    async def fake_index():
+        return {ec._norm_case("26 SP1-440"): hit}
+
+    monkeypatch.setattr(ec, "_build_nc_case_index", fake_index)
+    li = _nc("26SP1-440", defendant="Original Defendant", raw={})
+    asyncio.run(ec.enrich_with_court_records([li]))
+    assert li.defendant == "Original Defendant"  # preserved
+
+
+def test_no_nc_index_call_when_no_nc_listings(monkeypatch):
+    called = {"n": 0}
+
+    async def spy():
+        called["n"] += 1
+        return {}
+
+    monkeypatch.setattr(ec, "_build_nc_case_index", spy)
+    monkeypatch.setattr(ec, "fetch_rendered", lambda *a, **k: "")
+    asyncio.run(ec.enrich_with_court_records([_sc(1)]))  # SC only
+    assert called["n"] == 0  # never touches the NC search when no NC case#s

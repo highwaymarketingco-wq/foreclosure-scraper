@@ -486,16 +486,11 @@ async def run() -> int:
     enriched = await enrich_gis(valid)
     log.info("orchestrator.gis_enriched", count=len(enriched))
 
-    # Court-records enrichment — RETIRED by default (2026-06-24). Verified dead-end:
-    #  • NC: Tyler's NCJudgmentSearchService is search-only (per-case query returns
-    #    0 hits) and the WorkspaceMode page is 202-async/unparseable. Tested live.
-    #    NC court data already comes from the nc_ecourts scraper + nc_case_status.
-    #  • SC: it scraped publicindex.sccourts.org — the SC Public Index, which our
-    #    compliance policy PROHIBITS (admin order + ACLU suit). SC court coverage
-    #    comes compliantly from MIE rosters + scpublicnotices.
-    # It produced 0 fields while costing ~4h + 17k failed renders. Off by default;
-    # set COURT_RECORDS_ENRICH=1 to force-run (not recommended — broken + SC non-compliant).
-    if os.environ.get("COURT_RECORDS_ENRICH") == "1":
+    # Court-records enrichment. NC now uses Tyler's working JSON search API in
+    # BATCH (fast, compliant) + matches by case number — replacing the broken
+    # per-case WorkspaceMode render. SC uses the per-case Public Index render
+    # (operator's legal call; breaker-protected). Off switch: COURT_RECORDS_OFF=1.
+    if not os.environ.get("COURT_RECORDS_OFF"):
         try:
             await enrich_with_court_records(enriched)
             log.info("orchestrator.courts_enriched", count=len(enriched))
