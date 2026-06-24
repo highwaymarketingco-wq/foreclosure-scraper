@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-06-24T18:51:48.737926Z",
-  "total": 3976,
+  "run_time": "2026-06-24T19:19:12.244925Z",
+  "total": 4059,
   "by_source": {
     "national.auction_dot_com": 10,
     "national.fannie_homepath": 1445,
@@ -29,76 +29,17 @@
     "national.xome": 3,
     "newspapers.daily_courier": 2,
     "counties_nc.henderson_tax": 15,
-    "derived.probate_deed": 2
+    "derived.probate_deed": 2,
+    "national.hubzu": 4,
+    "counties_sc.spartan_weekly_legals": 25,
+    "counties_sc.terry_howe_flc": 20,
+    "counties_nc.nc_rod_logan": 21,
+    "counties_nc.nc_rod_substitute_trustee": 13
   },
-  "by_state": {
-    "NC": 1585,
-    "SC": 2391
-  },
-  "by_county_top": [
-    [
-      "SC/Spartanburg",
-      732
-    ],
-    [
-      "SC/Anderson",
-      509
-    ],
-    [
-      "NC/Gaston",
-      324
-    ],
-    [
-      "SC/Pickens",
-      226
-    ],
-    [
-      "SC/Laurens",
-      216
-    ],
-    [
-      "NC/Buncombe",
-      205
-    ],
-    [
-      "NC/Henderson",
-      172
-    ],
-    [
-      "SC/Beaufort",
-      149
-    ],
-    [
-      "NC/Cleveland",
-      132
-    ],
-    [
-      "SC/Greenville",
-      124
-    ],
-    [
-      "SC/Oconee",
-      100
-    ],
-    [
-      "NC/Lincoln",
-      95
-    ],
-    [
-      "SC/Cherokee",
-      83
-    ],
-    [
-      "NC/McDowell",
-      76
-    ],
-    [
-      "SC/Union",
-      66
-    ]
-  ],
+  "by_state": {},
+  "by_county_top": [],
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "regenerated in-place from persisted dataset (no re-scrape)"
+  "notes": "merged today's new-source leads into persisted dataset (no full re-scrape)"
 }

@@ -210,6 +210,9 @@ DATELESS_OK_SOURCES = {
     # is missing (which is most of the time for monthly/annual cadence).
     "counties_sc.sc_courtrosters",                # SC MIE rosters (monthly)
     "counties_nc.nc_rod_substitute_trustee",      # ROD substitute-trustee deed filings
+    "counties_sc.terry_howe_flc",                 # current FLC auction catalog (no sale dates)
+    "counties_sc.spartan_weekly_legals",          # current Spartanburg legal notices (sale_date best-effort)
+    "counties_nc.nc_rod_logan",                   # recent NOD recordings (date-range limited, current)
     "reo.usda_rd",                                # USDA Rural Development resale REO
     "reo.treasury_seized",                        # Treasury seized real property
     "reo.vrm_va_reo",                             # VRM Properties (VA REO)
