@@ -150,15 +150,18 @@ async def _scrape_pdf(c, url: str, county: str) -> list[Listing]:
                 for tbl in page.extract_tables() or []:
                     if not tbl or len(tbl) < 2:
                         continue
-                    # Heuristic: header row contains "owner" or "parcel" or "address"
+                    # Heuristic header match. SC §12-51-40 lists use SC-specific
+                    # names: "Defaulting Taxpayer" (not Owner), "Map Number"/"PIN"/
+                    # "TMS" (not Parcel), "Description" (the property) — accept all.
                     header = [str(c or "").lower() for c in tbl[0]]
-                    if not any("addr" in h or "owner" in h or "parcel" in h
-                               or "tms" in h for h in header):
+                    if not any("addr" in h or "owner" in h or "parcel" in h or "tms" in h
+                               or "taxpayer" in h or "map" in h or "descript" in h
+                               or "pin" in h for h in header):
                         continue
                     # Find columns
-                    addr_col = next((i for i, h in enumerate(header) if "addr" in h), None)
-                    owner_col = next((i for i, h in enumerate(header) if "owner" in h or "name" in h), None)
-                    parcel_col = next((i for i, h in enumerate(header) if "parcel" in h or "tms" in h), None)
+                    addr_col = next((i for i, h in enumerate(header) if "addr" in h or "descript" in h), None)
+                    owner_col = next((i for i, h in enumerate(header) if "owner" in h or "name" in h or "taxpayer" in h), None)
+                    parcel_col = next((i for i, h in enumerate(header) if "parcel" in h or "tms" in h or "map" in h or "pin" in h), None)
                     amt_col = next((i for i, h in enumerate(header) if "amount" in h or "tax" in h or "due" in h), None)
 
                     for row in tbl[1:]:
@@ -234,12 +237,15 @@ async def _scrape_html(c, url: str, county: str) -> list[Listing]:
         if len(rows) < 2:
             continue
         headers = [c.text(strip=True).lower() for c in rows[0].css("th, td")]
-        if not any("addr" in h or "owner" in h or "parcel" in h
-                   or "tms" in h or "delinquent" in h for h in headers):
+        # SC §12-51-40 column names (Defaulting Taxpayer / Map Number / PIN / TMS /
+        # Description) accepted alongside the generic owner/parcel/address terms.
+        if not any("addr" in h or "owner" in h or "parcel" in h or "tms" in h
+                   or "delinquent" in h or "taxpayer" in h or "map" in h
+                   or "descript" in h or "pin" in h for h in headers):
             continue
-        addr_col = next((i for i, h in enumerate(headers) if "addr" in h), None)
-        owner_col = next((i for i, h in enumerate(headers) if "owner" in h or "name" in h), None)
-        parcel_col = next((i for i, h in enumerate(headers) if "parcel" in h or "tms" in h), None)
+        addr_col = next((i for i, h in enumerate(headers) if "addr" in h or "descript" in h), None)
+        owner_col = next((i for i, h in enumerate(headers) if "owner" in h or "name" in h or "taxpayer" in h), None)
+        parcel_col = next((i for i, h in enumerate(headers) if "parcel" in h or "tms" in h or "map" in h or "pin" in h), None)
         amt_col = next((i for i, h in enumerate(headers) if "amount" in h or "tax" in h or "due" in h), None)
         for row in rows[1:]:
             cells = [c.text(strip=True) for c in row.css("td")]
