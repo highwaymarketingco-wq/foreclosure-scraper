@@ -70,10 +70,15 @@ _SETTLE_MS = 2500
 
 # Building-fact label -> attribute. Matched case-insensitively as a substring of
 # the row's <th> text. Order matters only for sqft (most specific first).
-_SQFT_LABELS_HEATED = ("heated square feet", "finished square feet",
+# Heated/finished labels (the true conditioned living area) — checked FIRST so a
+# card that lists both "Gross Sq Ft" and "Finished Sq Ft" (Spartanburg) yields the
+# finished value, not gross. Covers both spelled-out and abbreviated ("sq ft") forms.
+_SQFT_LABELS_HEATED = ("heated square feet", "heated sq ft", "heated sq",
+                       "finished square feet", "finished sq ft", "finished sq",
                        "total heated", "heated/finished")
-_SQFT_LABELS_PLAIN = ("living area", "square feet", "total living area",
-                      "gross living area", "sq ft", "sqft")
+# Plain fallback (used only when no heated/finished label exists). Gross-area rows
+# are filtered out at the call site, so this never returns a garage-inclusive figure.
+_SQFT_LABELS_PLAIN = ("living area", "total living area", "square feet", "sq ft", "sqft")
 
 
 # --------------------------------------------------------------------------- #
@@ -472,7 +477,9 @@ def _parse_card(html: str, county: str) -> CardResult | None:
     facts = _two_column_facts(soup)
     sqft_h = _float(_pick(facts, _SQFT_LABELS_HEATED))
     sqft_is_heated = sqft_h is not None
-    sqft = sqft_h if sqft_h is not None else _float(_pick(facts, _SQFT_LABELS_PLAIN))
+    # Plain fallback only when no heated/finished label exists; never use a gross row.
+    non_gross = {k: v for k, v in facts.items() if "gross" not in k}
+    sqft = sqft_h if sqft_h is not None else _float(_pick(non_gross, _SQFT_LABELS_PLAIN))
     # Union exposes "Living Area" (incl. basement); treat as living area, not
     # strictly heated -> living_sqft_is_heated stays False for that label.
 
