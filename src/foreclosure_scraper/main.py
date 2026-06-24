@@ -1211,6 +1211,29 @@ async def run() -> int:
     if enriched and valuation_failures >= max(5, len(enriched) // 4):
         enrichment_stats["valuation_failures"] = valuation_failures
 
+    # ON-DEMAND per-parcel assessor card — graded-B+ leads only (~dozens/run). Fills
+    # the SC bulk gap (heated sqft + recorded sale price) the CAMA/GIS feed omits, at
+    # per-subject volume that sidesteps the bulk/WAF walls. OFF unless ASSESSOR_CARD_ON.
+    # Real card sqft clears the footprint-ESTIMATE cap, so re-calc/re-grade the touched.
+    try:
+        from .enrichment_assessor_card import enrich_assessor_card
+        s = enrich_assessor_card(enriched)
+        if s:
+            enrichment_stats["assessor_card"] = s
+            touched = [li for li in enriched
+                       if isinstance(li.raw, dict) and "assessor_card" in li.raw]
+            for li in touched:
+                try:
+                    c = valuation_calc.compute(li)
+                    g = valuation_grading.grade(li, c)
+                    li.raw["calc"] = valuation_calc.to_dict(c)
+                    li.raw["grade"] = valuation_grading.to_dict(g)
+                except Exception:
+                    pass
+            log.info("orchestrator.assessor_card", regraded=len(touched), stats=s)
+    except Exception:
+        log.error("assessor_card.failed", traceback=traceback.format_exc())
+
     # Owner-equity engine — ARV − mortgage payoff − junior liens. Runs after
     # calc (needs arv_expected) + amount_owed, before distress scoring (which
     # now gates HOT on real equity, not flip ROI). Pure-Python, free.
