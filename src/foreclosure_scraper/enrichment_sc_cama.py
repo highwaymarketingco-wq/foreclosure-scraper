@@ -38,6 +38,11 @@ def enrich_sc_cama(listings: list[Listing]) -> dict:
             li.bedrooms = rec["beds"]
         if li.bathrooms is None and rec.get("baths"):
             li.bathrooms = rec["baths"]
+        # Backfill parcel_id from the assessor MAP number when the lead has none,
+        # so the on-demand qPublic card enricher (keyed on parcel_id) can resolve
+        # address-only Spartanburg leads. map_digits is the dashed-map source.
+        if not li.parcel_id and (rec.get("map_digits") or rec.get("tms")):
+            li.parcel_id = rec.get("map_digits") or rec.get("tms")
         raw = li.raw if isinstance(li.raw, dict) else {}
         cama_blk = dict(raw.get("cama") or {})
         cama_blk.update({
