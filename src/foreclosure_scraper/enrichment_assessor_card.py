@@ -101,8 +101,20 @@ async def _aenrich(listings: list[Listing]) -> dict:
     targets = [li for li in listings
                if _is_bplus(li) and (li.state, li.county) in adapters
                and not (skip_render and (li.state, li.county) in _RENDER_COUNTIES)][:cap]
-    stats = {"targets": len(targets), "matched": 0, "filled_sqft": 0, "filled_price": 0}
+    stats = {"targets": len(targets), "key_resolved": 0, "matched": 0,
+             "filled_sqft": 0, "filled_price": 0}
     for li in targets:
+        # Most B+ leads lack parcel_id but have lat/lng — resolve the county key
+        # via point-in-polygon against SCDOT so the adapter has something to fetch.
+        if not li.parcel_id and li.state == "SC":
+            try:
+                from .parcel_resolver import resolve_sc_parcel_key
+                key = await resolve_sc_parcel_key(li)
+            except Exception:  # noqa: BLE001
+                key = None
+            if key:
+                li.parcel_id = key
+                stats["key_resolved"] += 1
         try:
             res = await adapters[(li.state, li.county)](li)
         except Exception:  # noqa: BLE001
