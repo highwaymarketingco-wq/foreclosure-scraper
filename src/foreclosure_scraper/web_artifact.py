@@ -102,6 +102,7 @@ RAW_KEEP = {
     "pickens_mie": "*",               # Pickens MIE results PDF parse provenance
     "anderson_mie_results": "*",      # Anderson MIE Sale-Results parse provenance
     "spartanburg_pdf": "*",           # Spartanburg MIE PDF parse provenance (now includes is_results_pdf)
+    "assessor_card": "*",             # on-demand per-parcel card: recorded sale price + history + sqft source
 }
 
 
