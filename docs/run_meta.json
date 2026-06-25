@@ -1,13 +1,13 @@
 {
-  "run_time": "2026-06-25T01:51:55.863216Z",
-  "total": 5486,
+  "run_time": "2026-06-25T03:16:56.964668Z",
+  "total": 4686,
   "by_source": {
     "national.auction_dot_com": 10,
-    "national.fannie_homepath": 1444,
+    "national.fannie_homepath": 818,
     "national.homeharvest": 15,
     "national.distressed": 375,
-    "national.hud_homestore": 35,
-    "national.realtor_foreclosures": 12,
+    "national.hud_homestore": 5,
+    "national.realtor_foreclosures": 2,
     "national.trulia": 6,
     "national.zillow_foreclosures": 44,
     "law_firms.bell_carrington": 14,
@@ -20,8 +20,8 @@
     "counties_sc.sc_public_index_lis_pendens": 506,
     "counties_nc.nc_ecourts_lis_pendens": 514,
     "newspapers.hendersonville_lightning": 1,
-    "reo.vrm_va_reo": 151,
-    "national.courtlistener_bankruptcy": 413,
+    "reo.vrm_va_reo": 24,
+    "national.courtlistener_bankruptcy": 410,
     "national.zillow_bulk": 74,
     "public_notices.ncnotices": 11,
     "counties_nc.nc_county_tax_foreclosure": 1,
@@ -33,15 +33,79 @@
     "national.hubzu": 4,
     "counties_sc.spartan_weekly_legals": 136,
     "counties_sc.terry_howe_flc": 20,
-    "counties_nc.nc_rod_logan": 21,
-    "counties_nc.nc_rod_substitute_trustee": 13,
+    "counties_nc.nc_rod_logan": 18,
+    "counties_nc.nc_rod_substitute_trustee": 12,
     "counties_sc.pickens_master_in_equity": 4,
     "counties_sc.sc_tax_delinquent": 1311
   },
-  "by_state": {},
-  "by_county_top": [],
+  "by_state": {
+    "NC": 1259,
+    "SC": 3427
+  },
+  "by_county_top": [
+    [
+      "SC/Pickens",
+      1542
+    ],
+    [
+      "SC/Spartanburg",
+      875
+    ],
+    [
+      "SC/Anderson",
+      509
+    ],
+    [
+      "NC/Gaston",
+      324
+    ],
+    [
+      "SC/Laurens",
+      232
+    ],
+    [
+      "NC/Buncombe",
+      209
+    ],
+    [
+      "NC/Henderson",
+      173
+    ],
+    [
+      "NC/Cleveland",
+      134
+    ],
+    [
+      "SC/Oconee",
+      100
+    ],
+    [
+      "NC/Lincoln",
+      96
+    ],
+    [
+      "NC/McDowell",
+      89
+    ],
+    [
+      "SC/Cherokee",
+      83
+    ],
+    [
+      "NC/Burke",
+      69
+    ],
+    [
+      "SC/Union",
+      66
+    ],
+    [
+      "NC/Polk",
+      48
+    ]
+  ],
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "partial merge: today's new/fixed sources + full enrichment (no full re-scrape)"
+  "notes": "regenerated in-place from persisted dataset (no re-scrape)"
 }

@@ -154,7 +154,10 @@ def _in_scope(li: Listing) -> bool:
             if not isinstance(li.raw, dict):
                 li.raw = {}
             li.raw["geo_attribution"] = "state-only"
-        return True
+            return True
+        # Has a county — keep ONLY if it's actually in-footprint. A bankruptcy
+        # filing in an out-of-footprint county must NOT leak onto the board.
+        return in_scope(li.county, li.state)
     if in_scope(li.county, li.state):
         return True
     # ZIP-prefix fallback is a LAST resort for listings with NO county only.

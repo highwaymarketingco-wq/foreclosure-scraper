@@ -49,6 +49,13 @@ def main() -> int:
     listings = [li for li in listings if not _countyless_national(li)]
     print(f"dropped county-less national: {before - len(listings)} -> {len(listings)} kept")
 
+    # Re-apply scope to EVERY lead (carryover from older runs predates scope
+    # tightening, so stale out-of-footprint counties + countyless noise persist).
+    from foreclosure_scraper.main import _in_scope  # noqa: E402
+    before = len(listings)
+    listings = [li for li in listings if _in_scope(li)]
+    print(f"scope re-filter: dropped {before - len(listings)} out-of-footprint -> {len(listings)} kept")
+
     print("enrich_sc_cama:", enrich_sc_cama(listings))
     print("enrich_footprint_sqft:", enrich_footprint_sqft(listings))
 
