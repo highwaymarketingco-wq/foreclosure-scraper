@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-06-24T19:19:12.244925Z",
+  "run_time": "2026-06-25T00:21:39.922603Z",
   "total": 4059,
   "by_source": {
     "national.auction_dot_com": 10,
@@ -36,10 +36,74 @@
     "counties_nc.nc_rod_logan": 21,
     "counties_nc.nc_rod_substitute_trustee": 13
   },
-  "by_state": {},
-  "by_county_top": [],
+  "by_state": {
+    "NC": 1620,
+    "SC": 2439
+  },
+  "by_county_top": [
+    [
+      "SC/Spartanburg",
+      764
+    ],
+    [
+      "SC/Anderson",
+      509
+    ],
+    [
+      "NC/Gaston",
+      324
+    ],
+    [
+      "SC/Laurens",
+      231
+    ],
+    [
+      "SC/Pickens",
+      227
+    ],
+    [
+      "NC/Buncombe",
+      206
+    ],
+    [
+      "NC/Henderson",
+      172
+    ],
+    [
+      "SC/Beaufort",
+      149
+    ],
+    [
+      "NC/Cleveland",
+      137
+    ],
+    [
+      "SC/Greenville",
+      124
+    ],
+    [
+      "SC/Oconee",
+      100
+    ],
+    [
+      "NC/Lincoln",
+      95
+    ],
+    [
+      "NC/McDowell",
+      89
+    ],
+    [
+      "SC/Cherokee",
+      83
+    ],
+    [
+      "NC/Burke",
+      72
+    ]
+  ],
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "merged today's new-source leads into persisted dataset (no full re-scrape)"
+  "notes": "regenerated in-place from persisted dataset (no re-scrape)"
 }
