@@ -258,11 +258,15 @@ function applyFilters() {
     if (ty && l.listing_type !== ty) return false;
     if (src && l.source !== src) return false;
     if (land) {
+      // property_kind is unreliable (some houses are mislabeled "land"), so a real
+      // structure signal (sqft/year/beds/baths or a known dwelling kind) ALWAYS
+      // wins: "Land only" = labeled land AND no structure; "Land + structures" =
+      // anything with a structure.
       const pk = (l.property_kind || "").toLowerCase();
-      const isLand = pk === "land" || pk === "lot" || pk === "vacant";
       const hasStructure =
         ["single_family", "condo", "mobile", "multi_family", "townhouse", "duplex"].includes(pk) ||
-        l.living_sqft > 0 || !!l.year_built;
+        l.living_sqft > 0 || !!l.year_built || l.bedrooms > 0 || l.bathrooms > 0;
+      const isLand = (pk === "land" || pk === "lot" || pk === "vacant") && !hasStructure;
       if (land === "land" && !isLand) return false;
       if (land === "improved" && !hasStructure) return false;
     }
