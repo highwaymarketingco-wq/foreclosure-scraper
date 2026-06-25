@@ -47,6 +47,13 @@ DEBUG_DUMP_DIR = pathlib.Path(
 )
 DEBUG_DUMP_ENABLED = os.environ.get("NCNOTICES_DEBUG_DUMP", "1") == "1"
 
+# Probate detail-body enrichment is bounded so a big run never blows the
+# scraper's timeout_s walking hundreds of detail pages. Only probate rows
+# (which carry the PR / Date-of-Death we want) are followed, newest-first.
+# Set NCNOTICES_DETAIL_FETCH=0 to disable entirely.
+DETAIL_FETCH_ENABLED = os.environ.get("NCNOTICES_DETAIL_FETCH", "1") == "1"
+MAX_DETAIL_FETCH = int(os.environ.get("NCNOTICES_MAX_DETAIL_FETCH", "40"))
+
 
 def _dump_html_for_debug(html: str, query: str, category: str, url: str) -> None:
     """Save the raw HTML response to debug/ when the parser returns 0
@@ -118,6 +125,16 @@ NAMED_PARTY_RE = re.compile(
     re.I,
 )
 
+# Probate detail-body fields — ported from spartan_weekly_legals.py. The
+# list body is server-truncated so the Personal Representative + Date of
+# Death sit past the cutoff; we fetch the Details.aspx body and pull them.
+_PROBATE_DOD = re.compile(
+    r"Date of Death:\s*([A-Z][a-z]+\s+\d{1,2},?\s+\d{4})", re.I)
+_PROBATE_PR = re.compile(
+    r"(?:Personal Representative|Executor|Executrix|Administrator|Administratrix)"
+    r"[:\s]*([A-Z][A-Za-z .,'\-]{3,60}?)\s+"
+    r"(\d{1,5}\s+[A-Za-z0-9 .,'\-]+?\b(?:SC|NC|GA|N\.C\.|S\.C\.)\s*\d{5})", re.I)
+
 
 # Classifier categories → ListingType + foreclosure-relevance keywords.
 # Probate + divorce categories use looser keyword sets since their
@@ -170,6 +187,106 @@ def _matches_category(text: str, category: str) -> bool:
     keywords = rules.get("keywords", ())
     lower = text.lower()
     return any(k in lower for k in keywords)
+
+
+_DETAIL_ID_RE = re.compile(r"[?&]ID=(\d+)", re.I)
+# The detail page hides the notice body behind an "I Agree, View Notice"
+# terms-of-use button + a reCAPTCHA. When that gate is up we DON'T solve it
+# (the site's Terms of Use prohibit automated collection of the notice body,
+# and the reCAPTCHA is the enforcement) — we detect the gate and skip. PR /
+# Date-of-Death are only extracted when the body renders ungated.
+_DETAIL_GATE_TOKENS = (
+    "complete the captcha",
+    "complete the recaptcha",
+    "must complete the",
+    "i agree, view notice",
+)
+
+
+async def _fetch_probate_detail(fetcher, detail_url: str) -> dict | None:
+    """Best-effort, NON-FATAL fetch of a probate notice's detail body to
+    pull Personal Representative + Date of Death (ported from
+    spartan_weekly_legals.py). Returns a dict of the captured fields, or
+    None when the body is captcha/terms-gated (production default) or the
+    fetch fails. Never raises and never solves the captcha."""
+    try:
+        async def reveal(page):
+            try:
+                await page.wait_for_load_state("networkidle", timeout=15000)
+            except Exception:
+                pass
+            # Click "I Agree, View Notice" if present — only reveals the body
+            # on notices that AREN'T captcha-gated; gated notices stay hidden.
+            for sel in (
+                "#ctl00_ContentPlaceHolder1_PublicNoticeDetailsBody1_btnViewNotice",
+                "input[id$='btnViewNotice']",
+            ):
+                try:
+                    await page.click(sel, timeout=5000)
+                    break
+                except Exception:
+                    continue
+            try:
+                await page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception:
+                pass
+
+        result = await fetcher.async_fetch(
+            detail_url, headless=True, network_idle=True, timeout=60000,
+            page_action=reveal,
+        )
+        body = getattr(result, "body", b"")
+        html = (body.decode("utf-8", errors="replace")
+                if isinstance(body, bytes) else str(body or ""))
+        if not html:
+            return None
+        text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html)).strip()
+        low = text.lower()
+        # Gate detection — if the captcha/terms wall is up, the body never
+        # rendered. Bail cleanly (compliant: we do not bypass the captcha).
+        if any(tok in low for tok in _DETAIL_GATE_TOKENS):
+            return None
+        pr = _PROBATE_PR.search(text)
+        dod = _PROBATE_DOD.search(text)
+        if not (pr or dod):
+            return None
+        return {
+            "personal_representative": pr.group(1).strip() if pr else None,
+            "pr_address": pr.group(2).strip() if pr else None,
+            "date_of_death": dod.group(1).strip() if dod else None,
+        }
+    except Exception as exc:
+        log.debug("ncnotices.detail_fetch_fail", url=detail_url[:120], error=str(exc)[:160])
+        return None
+
+
+async def _enrich_probate_details(fetcher, listings: list[Listing]) -> None:
+    """Walk probate listings that carry a real Details.aspx?ID= URL and merge
+    the detail-page PR / Date-of-Death into raw['probate']. Bounded by
+    MAX_DETAIL_FETCH; all per-row failures are swallowed so enrichment never
+    breaks the scrape. Mutates listings in place."""
+    fetched = 0
+    for li in listings:
+        if fetched >= MAX_DETAIL_FETCH:
+            break
+        url = li.source_url or ""
+        m = _DETAIL_ID_RE.search(url)
+        if not m or "Details.aspx" not in url:
+            continue
+        fetched += 1
+        info = await _fetch_probate_detail(fetcher, url)
+        if not info:
+            continue
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        probate = dict(raw.get("probate") or {})
+        for k, v in info.items():
+            if v and not probate.get(k):
+                probate[k] = v
+        if probate:
+            raw["probate"] = probate
+            li.raw = raw
+    if fetched:
+        log.info("ncnotices.probate_detail_done", attempted=fetched)
 
 
 async def _search_one(query: str, category: str) -> list[Listing]:
@@ -279,6 +396,135 @@ async def _search_one(query: str, category: str) -> list[Listing]:
         except Exception:
             pass
 
+        # ---- Pagination ---------------------------------------------------
+        # The WSExtendedGrid is a classic ASP.NET GridView doing FULL-PAGE
+        # postbacks (no UpdatePanel/AJAX — verified 2026-06-24: window.Sys and
+        # __doPostBack are both undefined in the rendered page), default 10
+        # rows/page across ~100 pages. Page 1 alone is the under-capture.
+        # Strategy: bump ddlPerPage to its MAX option (50) to cut the page
+        # count, then walk btnNext via a native element .click() (verified to
+        # advance lblCurrentPage where page.click()+networkidle did not),
+        # waiting on lblCurrentPage actually changing after each postback, and
+        # accumulate each page's grid HTML into the updateWSGrid panel — the
+        # post-postback DOM holds only the current page. Stop when the label
+        # stops advancing (last page) or a safety cap fires. Every step is
+        # non-fatal: a paging break just returns the rows gathered so far.
+        GRID_PANEL = "ctl00_ContentPlaceHolder1_WSExtendedGridNP1_updateWSGrid"
+        GRID = "ctl00_ContentPlaceHolder1_WSExtendedGridNP1_GridView1"
+        PER_PAGE_ID = f"{GRID}_ctl01_ddlPerPage"
+        NEXT_ID = f"{GRID}_ctl01_btnNext"
+        CUR_PAGE_ID = f"{GRID}_ctl01_lblCurrentPage"
+
+        async def _grid_html() -> str:
+            try:
+                return await page.evaluate(
+                    f"() => {{ const g = document.getElementById({GRID!r});"
+                    f" return g ? g.outerHTML : ''; }}"
+                )
+            except Exception:
+                return ""
+
+        async def _current_page() -> str:
+            try:
+                return await page.evaluate(
+                    f"() => {{ const s = document.getElementById({CUR_PAGE_ID!r});"
+                    f" return s ? (s.textContent || '').trim() : ''; }}"
+                )
+            except Exception:
+                return ""
+
+        async def _wait_page_changed(prev: str) -> bool:
+            """Wait for a full-page postback to swap in a new pager label."""
+            try:
+                await page.wait_for_function(
+                    f"""() => {{
+                        const s = document.getElementById({CUR_PAGE_ID!r});
+                        return s && (s.textContent || '').trim()
+                               && (s.textContent || '').trim() !== {prev!r};
+                    }}""",
+                    timeout=20000,
+                )
+                return True
+            except Exception:
+                return False
+
+        # Bump page size to the max (50). This is a full-page postback driven
+        # by the <select>'s onchange; set value + dispatch change natively,
+        # then wait for the grid to settle. The current-page label stays "1"
+        # across a per-page change, so we wait on the rendered ddlPerPage
+        # value reflecting 50 instead of on a label change. Best-effort —
+        # paging still works at 10/page if this doesn't take.
+        try:
+            await page.eval_on_selector(
+                f"#{PER_PAGE_ID}",
+                "el => { el.value = '50';"
+                " el.dispatchEvent(new Event('change', {bubbles:true})); }",
+            )
+            try:
+                await page.wait_for_function(
+                    f"""() => {{
+                        const d = document.getElementById({PER_PAGE_ID!r});
+                        return d && d.value === '50';
+                    }}""",
+                    timeout=15000,
+                )
+            except Exception:
+                pass
+            try:
+                await page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+        accumulated: list[str] = []
+        first = await _grid_html()
+        if first:
+            accumulated.append(first)
+
+        seen_pages: set[str] = set()
+        cur = await _current_page()
+        if cur:
+            seen_pages.add(cur)
+        for _ in range(200):  # safety cap — ~100 pages at 10/page worst case
+            # Native element click — page.click()+networkidle was observed
+            # NOT to advance the pager, but el.click() reliably fires the
+            # GridView's postback. Footer pager (ctl14) is the fallback.
+            clicked = False
+            for ctl_id in (NEXT_ID, f"{GRID}_ctl14_btnNext"):
+                try:
+                    await page.eval_on_selector(f"#{ctl_id}", "el => el.click()")
+                    clicked = True
+                    break
+                except Exception:
+                    continue
+            if not clicked:
+                break
+            if not await _wait_page_changed(cur):
+                break  # label didn't advance -> last page reached
+            nxt = await _current_page()
+            if not nxt or nxt == cur or nxt in seen_pages:
+                break
+            seen_pages.add(nxt)
+            cur = nxt
+            html = await _grid_html()
+            if html:
+                accumulated.append(html)
+
+        # Stash the accumulated multi-page grid HTML back into the panel so
+        # result.body (final DOM) carries every page's rows for the parser.
+        if len(accumulated) > 1:
+            try:
+                joined = "".join(accumulated)
+                await page.evaluate(
+                    f"(h) => {{ const p = document.getElementById({GRID_PANEL!r});"
+                    f" if (p) p.innerHTML = h; }}",
+                    joined,
+                )
+            except Exception:
+                pass
+        # -------------------------------------------------------------------
+
     # Try multiple landing URL shapes — different ncnotices.com
     # deployments respond to different param names + paths.
     candidate_urls = [
@@ -309,6 +555,11 @@ async def _search_one(query: str, category: str) -> list[Listing]:
         )
         # Short-circuit on success
         if listings:
+            # Probate enrichment: follow each notice's Details.aspx?ID= link
+            # for the PR + Date of Death (the list body is server-truncated).
+            # Best-effort + bounded + non-fatal; gated notices are skipped.
+            if category == "probate" and DETAIL_FETCH_ENABLED:
+                await _enrich_probate_details(StealthyFetcher, listings)
             return listings
         # Short-circuit on substantial HTML — means the URL loaded a real
         # page, just no results for this query. Trying alternate URLs won't
@@ -443,15 +694,28 @@ def _parse_results_html(html: str, query: str, category: str) -> list[Listing]:
         if named_party:
             raw_blob["ncnotices"]["named_party"] = named_party
 
+        # For probate/divorce the named party (decedent / divorce defendant)
+        # is the property owner. Pass it as `defendant` so the owner-name
+        # address backfill can resolve the property, and leave street_address
+        # None (even if ADDR_RE matched a PR's mailing address in the body)
+        # so the backfill gate `not li.street_address` fires.
+        if require_address:
+            street_address = addr_m.group(1) if addr_m else None
+            defendant = None
+        else:
+            street_address = None
+            defendant = named_party
+
         out.append(
             Listing(
                 source="public_notices.ncnotices",
                 source_url=href,
                 listing_type=_classify(text, category),
                 property_kind=PropertyKind.UNKNOWN,
-                street_address=addr_m.group(1) if addr_m else None,
+                street_address=street_address,
                 state="NC",
                 county=county,
+                defendant=defendant,
                 description=text[:500],
                 first_seen=datetime.utcnow(),
                 last_seen=datetime.utcnow(),

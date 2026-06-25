@@ -38,8 +38,23 @@ def _as_date(d) -> date | None:
         return d.date()
     if isinstance(d, date):
         return d
+    # ArcGIS frequently returns dates as epoch-milliseconds (int, float, or a
+    # numeric string after str()). A bare 13-digit value never matched any
+    # strptime format below, so it silently fell through to None and killed
+    # the last-sale equity path. Parse it explicitly.
+    if isinstance(d, (int, float)) and not isinstance(d, bool):
+        try:
+            return datetime.fromtimestamp(float(d) / 1000.0).date()
+        except (ValueError, OverflowError, OSError):
+            return None
     if isinstance(d, str) and d.strip():
         s = d.strip()
+        digits = s[1:] if s.startswith("-") else s
+        if digits.isdigit() and len(digits) >= 12:  # epoch-ms (~2001+)
+            try:
+                return datetime.fromtimestamp(float(s) / 1000.0).date()
+            except (ValueError, OverflowError, OSError):
+                return None
         for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%Y%m%d", "%Y%m", "%Y"):
             try:
                 return datetime.strptime(s, fmt).date()

@@ -31,6 +31,22 @@ log = structlog.get_logger()
 
 _LTV_PROXY = 0.90   # if we only know the sale price, assume ~90% was financed
 
+# NC counties whose parcel layer publishes a sale AMOUNT but no sale DATE.
+# For these we attach a conservative assumed note date so the last-sale path
+# can still produce a (low-confidence) payoff instead of yielding 0 equity.
+_NC_AMOUNT_ONLY = {"Buncombe", "Lincoln", "Transylvania"}
+_ASSUMED_NOTE_AGE_YEARS = 3   # recent -> conservative (high payoff, low equity)
+
+
+def _assumed_note_date() -> date:
+    """A deliberately recent assumed origination date for amount-only counties.
+    Recent = less paydown = higher estimated balance = we never overstate equity."""
+    today = date.today()
+    try:
+        return today.replace(year=today.year - _ASSUMED_NOTE_AGE_YEARS)
+    except ValueError:  # Feb 29 on a non-leap target year
+        return today.replace(year=today.year - _ASSUMED_NOTE_AGE_YEARS, day=28)
+
 
 def _arv(li: Listing) -> Optional[float]:
     raw = li.raw if isinstance(li.raw, dict) else {}
@@ -86,10 +102,19 @@ def _payoff(li: Listing, arv: float) -> tuple[Optional[float], str, str]:
         bal = amortized_balance(amt, dt)
         if bal is not None:
             return bal, "recorded_deed_of_trust", "high"
-    # 2) amount_owed when it's an actual debt (judgment / indebtedness)
+    # 2) amount_owed when it's an actual debt (judgment / indebtedness).
+    #    A foreclosure judgment OR the auction opening bid both represent the
+    #    debt being foreclosed (the lender opens at ~the payoff), so treat them
+    #    as actual debt here even when amount_owed flagged the bid a proxy —
+    #    otherwise NC leads (which carry an opening_bid, not a parsed judgment)
+    #    never reach a payoff and the engine yields 0 equity for the whole state.
     ao = raw.get("amount_owed") or {}
-    if ao.get("is_actual_debt") and ao.get("value"):
-        return float(ao["value"]), f"amount_owed:{ao.get('source', '?')}", ao.get("confidence", "medium")
+    _FORECLOSURE_DEBT_SRC = {"judgment", "opening_bid"}
+    if ao.get("value") and (ao.get("is_actual_debt") or ao.get("source") in _FORECLOSURE_DEBT_SRC):
+        try:
+            return float(ao["value"]), f"amount_owed:{ao.get('source', '?')}", ao.get("confidence", "medium")
+        except (ValueError, TypeError):
+            pass
     # 3) last sale -> ~90% financed, amortized. ARMS-LENGTH GATE: a $1/$10
     #    intra-family quitclaim or estate deed amortizes to ~0 and fakes ~100%
     #    equity (the exact failure mode this whole engine prevents). Require the
@@ -98,12 +123,24 @@ def _payoff(li: Listing, arv: float) -> tuple[Optional[float], str, str]:
     ls = gis.get("last_sale") or {}
     sale_amt = ls.get("amount") or gis.get("last_sale_amount")
     sale_date = ls.get("date") or gis.get("last_sale_date")
+    # Some NC counties (Buncombe/Lincoln/Transylvania) expose a sale AMOUNT but
+    # no sale DATE on their parcel layer, so path 3 never fired and these leads
+    # produced 0 equity. When the amount clears the arms-length floor, attach a
+    # conservative ASSUMED note date so amortization can run. "Conservative"
+    # means recent: a fresher note amortizes less -> higher payoff -> we never
+    # overstate equity. Never fabricate when the amount itself is missing.
+    src, conf = "last_sale_amortized", "low"
+    if sale_amt and not sale_date:
+        county = (li.county or "").strip().title()
+        if (li.state or "").strip().upper() == "NC" and county in _NC_AMOUNT_ONLY:
+            sale_date = _assumed_note_date()
+            src, conf = "last_sale_amortized:assumed_date", "low"
     if sale_amt and sale_date:
         floor = max(10000.0, 0.30 * arv)
         if float(sale_amt) >= floor:
             bal = amortized_balance(float(sale_amt) * _LTV_PROXY, sale_date)
             if bal is not None:
-                return bal, "last_sale_amortized", "low"
+                return bal, src, conf
     return None, "unknown", "none"
 
 

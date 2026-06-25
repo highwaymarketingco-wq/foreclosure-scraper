@@ -205,9 +205,15 @@ async def enrich_with_court_records(listings: list[Listing]) -> list[Listing]:
                 return
             counts["sc_queried"] += 1
             try:
-                content = (await asyncio.wait_for(fetch_rendered(url, token=token),
-                                                  timeout=_COURT_CALL_TIMEOUT_S)
-                           if _COURT_CALL_TIMEOUT_S > 0 else await fetch_rendered(url, token=token))
+                # raise_on_http_failure=True so an HTTP-level render failure
+                # (bad status / ERR_HTTP_RESPONSE_CODE_FAILURE) raises instead of
+                # returning "" — otherwise it would look like a benign empty miss
+                # and never count toward the breaker, so the breaker never trips.
+                content = (await asyncio.wait_for(
+                                fetch_rendered(url, token=token, raise_on_http_failure=True),
+                                timeout=_COURT_CALL_TIMEOUT_S)
+                           if _COURT_CALL_TIMEOUT_S > 0
+                           else await fetch_rendered(url, token=token, raise_on_http_failure=True))
             except (Exception, asyncio.TimeoutError):
                 counts["sc_failed"] += 1
                 state["consec_fail"] += 1

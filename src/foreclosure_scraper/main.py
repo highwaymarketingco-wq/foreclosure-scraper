@@ -205,10 +205,13 @@ DATELESS_OK_SOURCES = {
     "counties.nod_discovery",                   # ROD-discovered NOD recordings
     "national.courtlistener_bankruptcy",        # Ch 7/11/13 federal bankruptcy filings
     "counties_sc.sc_tax_delinquent",            # delinquent property tax / pre-tax-sale
+    "counties_sc.sc_flc",                        # SC Forfeited Land Commission inventory (no sale date)
+    "national.first_citizens_reo",               # First Citizens bank-owned REO listings
+    "counties_sc.sc_rod_acclaim",                # SC ROD (Acclaim vendor) recorded NOD/deed filings
+    "counties_sc.sc_rod_cott",                   # SC ROD (Cott vendor) recorded NOD/deed filings
     # 2026-05 expansion — new sources added in this PR. Without these
     # entries, _active_only would drop their listings whenever sale_date
     # is missing (which is most of the time for monthly/annual cadence).
-    "counties_sc.sc_courtrosters",                # SC MIE rosters (monthly)
     "counties_nc.nc_rod_substitute_trustee",      # ROD substitute-trustee deed filings
     "counties_sc.terry_howe_flc",                 # current FLC auction catalog (no sale dates)
     "counties_sc.spartan_weekly_legals",          # current Spartanburg legal notices (sale_date best-effort)
@@ -437,8 +440,7 @@ async def run() -> int:
     # focused on actionable inventory.
     from .enrichment_foreclosure_sold_comps import is_sold_pool_candidate
     sold_pool_raw = [li for li in raw if is_sold_pool_candidate(li)]
-    active_raw = [li for li in raw if li not in set(id(x) for x in sold_pool_raw)
-                  ] if False else [li for li in raw if not is_sold_pool_candidate(li)]
+    active_raw = [li for li in raw if not is_sold_pool_candidate(li)]
     log.info("orchestrator.partitioned",
              active=len(active_raw), sold_pool=len(sold_pool_raw))
 
@@ -460,6 +462,18 @@ async def run() -> int:
     log.info("orchestrator.flip_filtered", count=len(flip_able),
              pruned=len(active) - len(flip_able))
     active = flip_able
+
+    # Silent-drop warning: a source that scraped rows OK (N>0) but where 0
+    # survive the scope/active/flip filters never reaches the dashboard, yet
+    # source_status would still read "OK (N)". Surface it so a misrouted source
+    # (e.g. a DATELESS_OK_SOURCES omission dropping every dateless row) is
+    # caught instead of looking healthy. Compares raw scrape count to survivors.
+    survived_by_source: Counter = Counter(li.source for li in active if li.source)
+    for slug, scraped_n in by_source.items():
+        if scraped_n > 0 and survived_by_source.get(slug, 0) == 0:
+            log.warning("orchestrator.source_all_filtered",
+                        source=slug, scraped=scraped_n,
+                        note="OK with rows but 0 reached the dashboard post-filter")
 
     # Dedupe across sources
     deduped = dedupe(active)
@@ -494,9 +508,21 @@ async def run() -> int:
     # per-case WorkspaceMode render. SC uses the per-case Public Index render
     # (operator's legal call; breaker-protected). Off switch: COURT_RECORDS_OFF=1.
     if not os.environ.get("COURT_RECORDS_OFF"):
+        # HARD wall-clock cap (like the Vision guard): a stuck court phase —
+        # hung stealth renders / a degraded headless browser — must not discard
+        # the late-stage tail (grade/equity/lien_stack/sc_cama/footprint/
+        # assessor/distress + the artifact write). Time-box it and ALWAYS proceed;
+        # listings it doesn't reach just keep whatever fields they had.
+        court_phase_budget_s = float(os.environ.get("COURT_PHASE_MAX_SECONDS", "1800"))
         try:
-            await enrich_with_court_records(enriched)
+            await asyncio.wait_for(
+                enrich_with_court_records(enriched),
+                timeout=court_phase_budget_s,
+            )
             log.info("orchestrator.courts_enriched", count=len(enriched))
+        except asyncio.TimeoutError:
+            log.warning("orchestrator.courts_time_capped", budget_s=court_phase_budget_s,
+                        note="proceeding; unenriched listings keep prior fields")
         except Exception as exc:  # noqa: BLE001
             log.warning("orchestrator.courts_failed", error=str(exc))
 
@@ -510,10 +536,10 @@ async def run() -> int:
     except Exception:
         log.error("zillow_enrich.failed", traceback=traceback.format_exc())
 
-    # Computed flags from enriched data: absentee_owner, high_equity, vacant,
-    # negative_equity, plus keyword flags from descriptions
-    compute_flags(enriched)
-    log.info("orchestrator.flagged", count=len(enriched))
+    # NOTE: compute_flags() was moved DOWN to after owner_mailing + lien_stack +
+    # equity enrichment so the absentee/equity flags compute on enriched data
+    # (mailing address for absentee, ARV−payoff−liens for equity) instead of the
+    # empty fields present here. See the compute_flags call after the equity engine.
 
     # Geocoding fallback — fills lat/lng for any listing the county GIS didn't
     # return geometry for. Rate-limited per Nominatim's policy.
@@ -622,9 +648,18 @@ async def run() -> int:
     # page on the public court portal and extract the real property address.
     # Scrapling stealth, ~20-40s per case. Disable via CASE_DETAIL_OFF=1.
     if not os.environ.get("CASE_DETAIL_OFF"):
+        # Same wall-clock cap as the court-records phase: per-case Scrapling
+        # renders can hang and strand the late-stage tail. Time-box + proceed.
+        case_detail_budget_s = float(os.environ.get("COURT_PHASE_MAX_SECONDS", "1800"))
         try:
             from .enrichment_case_detail import enrich_case_detail_addresses
-            await enrich_case_detail_addresses(enriched)
+            await asyncio.wait_for(
+                enrich_case_detail_addresses(enriched),
+                timeout=case_detail_budget_s,
+            )
+        except asyncio.TimeoutError:
+            log.warning("case_detail.time_capped", budget_s=case_detail_budget_s,
+                        note="proceeding; unenriched listings keep prior fields")
         except Exception:
             log.error("case_detail.failed", traceback=traceback.format_exc())
 
@@ -742,15 +777,23 @@ async def run() -> int:
     #     cross-ref. Fills any listings Tyler didn't tag. Pure compute.
     # Disable both with NC_CASE_STATUS_OFF=1.
     if not os.environ.get("NC_CASE_STATUS_OFF"):
+        # The authenticated Tyler path is count-capped (NC_ECOURTS_AUTH_CAP) and
+        # the no-creds path is pure compute, but the authenticated WS-Fed login +
+        # portal scrape can still hang on a degraded session — so it gets the same
+        # COURT_PHASE_MAX_SECONDS wall-clock cap as the other court phases to
+        # protect the late-stage tail. Time-box + proceed.
+        nc_status_budget_s = float(os.environ.get("COURT_PHASE_MAX_SECONDS", "1800"))
         try:
             from .enrichment_nc_case_status import (
                 enrich_with_nc_case_status_dispatched,
             )
-            # No time limit: the authenticated Tyler path is already count-capped
-            # (NC_ECOURTS_AUTH_CAP) and the no-creds path is pure compute. The
-            # per-case court lookups that actually stalled live in
-            # enrichment_courts, which now has its own stall-breaker (no timer).
-            await enrich_with_nc_case_status_dispatched(enriched, sold_pool=sold_pool)
+            await asyncio.wait_for(
+                enrich_with_nc_case_status_dispatched(enriched, sold_pool=sold_pool),
+                timeout=nc_status_budget_s,
+            )
+        except asyncio.TimeoutError:
+            log.warning("nc_case_status.time_capped", budget_s=nc_status_budget_s,
+                        note="proceeding; unenriched listings keep prior fields")
         except Exception:
             log.error("nc_case_status.failed", traceback=traceback.format_exc())
 
@@ -1247,6 +1290,17 @@ async def run() -> int:
             enrichment_stats["equity"] = s
     except Exception:
         log.error("equity.failed", traceback=traceback.format_exc())
+
+    # Computed flags from enriched data: absentee_owner, high_equity, vacant,
+    # negative_equity, plus keyword flags from descriptions. MOVED here from
+    # the early pipeline so absentee uses the owner_mailing address and the
+    # equity flags use the equity engine's ARV−payoff−liens result — both of
+    # which were empty when this used to run right after court enrichment.
+    try:
+        compute_flags(enriched)
+        log.info("orchestrator.flagged", count=len(enriched))
+    except Exception:
+        log.error("flags.failed", traceback=traceback.format_exc())
 
     # Stacked-distress score (HOT/WARM/COLD operator board) — runs last so it
     # can stack every signal + equity + contactability gathered above.

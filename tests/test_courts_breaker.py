@@ -26,7 +26,7 @@ def test_sc_breaker_trips_on_consecutive_failures(monkeypatch):
     monkeypatch.setattr(ec, "_COURT_BREAKER_FAILS", 12)
     calls = {"n": 0}
 
-    async def boom(url, token=None):
+    async def boom(url, token=None, raise_on_http_failure=False):
         calls["n"] += 1
         raise RuntimeError("render hung")
 
@@ -39,7 +39,7 @@ def test_sc_no_trip_when_healthy(monkeypatch):
     monkeypatch.setattr(ec, "_COURT_BREAKER_FAILS", 12)
     calls = {"n": 0}
 
-    async def ok(url, token=None):
+    async def ok(url, token=None, raise_on_http_failure=False):
         calls["n"] += 1
         return ""  # returned render, no match — healthy, must process all
 

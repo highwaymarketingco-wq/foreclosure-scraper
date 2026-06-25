@@ -22,12 +22,33 @@ import structlog
 from .models import Listing
 from . import sc_building_footprints as fp
 from .enrichment_arcgis import SCDOT_BASE, SC_LAYER
+from .enrichment_geocode import COUNTY_SEAT_CENTROIDS
 
 log = structlog.get_logger()
 
 _CTX = ssl._create_unverified_context()
 _UNHEATED_HAIRCUT = 0.10   # garage/porch share of the ground-floor footprint
 _BANDS = ((1200, "<1200"), (1800, "1200-1799"), (2500, "1800-2499"))
+_MAX_HEATED = 8000         # implausibly large for a single dwelling -> bad footprint
+_CENTROID_TOL = 0.001      # deg (~110m): lat/lng this close to a county seat is a
+                           # Tier-4 geocode placeholder, not a real situs
+
+
+def _is_county_centroid(li: Listing) -> bool:
+    """True when the lead's lat/lng is (essentially) a county-seat centroid, i.e.
+    a Tier-4 geocode fallback rather than a real situs. Point-based footprint
+    attribution on such a coord grabs whatever building sits near the county seat
+    and poisons living_sqft, so we skip footprint lookup for these."""
+    if li.latitude is None or li.longitude is None:
+        return False
+    seat = COUNTY_SEAT_CENTROIDS.get((li.state, li.county))
+    if not seat:
+        return False
+    try:
+        return (abs(float(li.latitude) - seat[0]) <= _CENTROID_TOL
+                and abs(float(li.longitude) - seat[1]) <= _CENTROID_TOL)
+    except (TypeError, ValueError):
+        return False
 
 
 def _band(sqft: float) -> str:
@@ -67,6 +88,11 @@ def enrich_footprint_sqft(listings: list[Listing]) -> dict:
             continue
         if li.living_sqft and li.living_sqft > 0:
             continue  # already have a real (or prior) sqft
+        if _is_county_centroid(li):
+            # lat/lng is a county-seat placeholder, not a real situs — attributing
+            # a footprint here grabs an unrelated building and poisons living_sqft.
+            no_fp += 1
+            continue
         raw = li.raw if isinstance(li.raw, dict) else {}
         story = (raw.get("cama") or {}).get("story_height") or 1.0
         try:
@@ -98,7 +124,7 @@ def enrich_footprint_sqft(listings: list[Listing]) -> dict:
             continue
         area, match = hit
         heated = round(area * story - area * _UNHEATED_HAIRCUT, -1)
-        if heated < 320:  # implausibly small for a dwelling
+        if heated < 320 or heated > _MAX_HEATED:  # implausibly small/large for a dwelling
             no_fp += 1
             continue
         li.living_sqft = heated

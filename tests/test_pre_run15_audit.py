@@ -23,7 +23,6 @@ from foreclosure_scraper.scrapers.counties_nc.nc_ecourts_lis_pendens import (
 # durham_tax, charlotte_demolition, etc., pruned in later scope cuts) don't
 # break the audit.
 DATELESS_EMITTING_SOURCES = {
-    "counties_sc.sc_courtrosters",
     "counties_nc.nc_rod_substitute_trustee",
     "reo.usda_rd",
     "reo.treasury_seized",

@@ -47,6 +47,46 @@ LOAN_RATE_MONTH = 0.008   # 9.5% APR (hard money) / 12
 REHAB_CONTINGENCY_PCT = 0.125  # every pro pads the repair estimate 10-15% for surprises
 ASSIGNMENT_FEE = 10000    # typical residential wholesale assignment fee
 
+# Living-sqft plausibility band for $/sqft ARV. A handful of real records
+# legitimately sit in [8000,10000) (large estates), so only HARD-reject clearly
+# bad values: below this floor is a data-entry/parse error (sqft-as-acres, a lot
+# dimension, a zero), above the ceiling is almost always garbage. Outside the
+# band, living_sqft is treated as missing FOR ARV PURPOSES (the $/sqft tiers are
+# skipped) rather than producing a nonsense headline ARV.
+LIVING_SQFT_MIN = 300
+LIVING_SQFT_MAX = 10000
+
+# Rural land sanity ceiling: a land-comp $/acre median above this is almost
+# always a parse error (a per-sqft figure leaking through, or a 0.01-ac lot
+# dividing a full sale price) and would emit a multi-million phantom land ARV.
+MAX_LAND_PPA = 2_000_000  # $/acre
+
+# Proxy-ARV ceiling. The bid×2.4 / bid×1.5 / tax×1.25 fallbacks fire on rows
+# with no comps, and on those rows opening_bid is often a money-JUDGMENT or
+# total-debt figure (not a property bid), which multiplied out emits a multi-
+# million phantom ARV. Above this ceiling the proxy is not trustworthy, so we
+# return ARV-unavailable (honest) instead of a fabricated number.
+MAX_PROXY_ARV = 2_000_000
+
+
+def _plausible_living_sqft(li: Listing) -> float | None:
+    """Subject living_sqft usable for a $/sqft ARV, or None if implausible.
+
+    Defensive: anything outside [LIVING_SQFT_MIN, LIVING_SQFT_MAX] is treated as
+    missing so a bad parse can't fabricate an ARV. Non-positive / non-numeric
+    values also return None.
+    """
+    sqft = li.living_sqft
+    try:
+        sqft = float(sqft) if sqft is not None else None
+    except (TypeError, ValueError):
+        return None
+    if not sqft or sqft <= 0:
+        return None
+    if sqft < LIVING_SQFT_MIN or sqft > LIVING_SQFT_MAX:
+        return None
+    return sqft
+
 # Sources where opening_bid is a retail asking price (and therefore a useful
 # ARV sanity-check). For everything else (auctions, lis pendens, REO floors,
 # law-firm foreclosure sales) the bid is a discount-to-ARV floor — clamping
@@ -173,6 +213,11 @@ def _land_arv(li: Listing) -> tuple[float | None, float | None, float | None, st
             lot = c.get("lot_sqft")
             if sp and lot and lot > 0:
                 ppa = float(sp) / (float(lot) / 43560.0)
+                # Reject above the rural ceiling — a $/acre this high is almost
+                # always a parse error (per-sqft figure or a near-zero lot) and
+                # would emit a multi-million phantom land ARV. Skip the bad comp.
+                if ppa > MAX_LAND_PPA:
+                    continue
                 ppa_list.append(ppa)
         ppa_list.sort()
         if len(ppa_list) >= 2:
@@ -194,14 +239,18 @@ def _land_arv(li: Listing) -> tuple[float | None, float | None, float | None, st
     # Tier 2: tax-assessed × 1.10 (land is assessed closer to market than improved)
     if li.tax_value and li.tax_value > 0:
         expected = round(float(li.tax_value) * 1.10, -2)
-        notes.append(f"Land ARV from tax-assessed × 1.10 ({li.tax_value:,.0f})")
-        return expected, round(expected * 0.85, -2), round(expected * 1.15, -2), "LOW", notes
+        if expected <= MAX_PROXY_ARV:
+            notes.append(f"Land ARV from tax-assessed × 1.10 ({li.tax_value:,.0f})")
+            return expected, round(expected * 0.85, -2), round(expected * 1.15, -2), "LOW", notes
 
     # Tier 3: bid × 1.5 (land foreclosures discount less than improved)
     if li.opening_bid and li.opening_bid > 0:
         expected = round(float(li.opening_bid) * 1.5, -2)
-        notes.append(f"Land ARV proxy from bid × 1.5 ({li.opening_bid:,.0f})")
-        return expected, round(expected * 0.7, -2), round(expected * 1.3, -2), "LOW", notes
+        # Reject runaway proxies: opening_bid on a comps-empty land row may be a
+        # judgment/debt figure, not a property bid — don't emit a phantom ARV.
+        if expected <= MAX_PROXY_ARV:
+            notes.append(f"Land ARV proxy from bid × 1.5 ({li.opening_bid:,.0f})")
+            return expected, round(expected * 0.7, -2), round(expected * 1.3, -2), "LOW", notes
 
     return None, None, None, "LOW", ["Insufficient land data for ARV"]
 
@@ -238,16 +287,22 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
     sqft_est = bool(getattr(li, "living_sqft_estimated", False))
     sqft_lbl = f"{li.living_sqft:,.0f} sqft{' (ESTIMATED: footprint×stories ~2019)' if sqft_est else ''}" if li.living_sqft else ""
 
+    # Plausibility guard: an implausible living_sqft (parse error, lot dimension,
+    # zero) is treated as missing FOR ARV — skip the $/sqft paths rather than emit
+    # a nonsense headline ARV. A footprint-estimated sqft is allowed but grades
+    # down (LOW for scraped comps, capped MEDIUM for recorded comps).
+    arv_sqft = _plausible_living_sqft(li)
+
     rec = raw.get("recorded_comps") or {}
     rec_ppsf = raw.get("comp_median_ppsf_recorded")
-    if rec_ppsf and li.living_sqft:
-        expected = float(rec_ppsf) * float(li.living_sqft)
+    if rec_ppsf and arv_sqft:
+        expected = float(rec_ppsf) * arv_sqft
         notes.append(
             f"ARV from {rec.get('count', '?')} RECORDED arms-length sales within "
             f"{rec.get('radius_mi', '?')}mi (${rec_ppsf:,.0f}/sqft × {sqft_lbl})"
         )
-        low = round((rec.get("p25_ppsf") or rec_ppsf * 0.9) * li.living_sqft, -2)
-        high = round((rec.get("p75_ppsf") or rec_ppsf * 1.1) * li.living_sqft, -2)
+        low = round((rec.get("p25_ppsf") or rec_ppsf * 0.9) * arv_sqft, -2)
+        high = round((rec.get("p75_ppsf") or rec_ppsf * 1.1) * arv_sqft, -2)
         conf = "HIGH" if rec.get("confidence") == "HIGH" else "MEDIUM"
         if sqft_est:
             conf = "MEDIUM"
@@ -255,40 +310,50 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
         return round(expected, -2), low, high, conf, notes
 
     # Tier 1: comp-based ARV (HIGHEST confidence)
-    if comps and comp_ppsf and li.living_sqft:
-        expected = float(comp_ppsf) * float(li.living_sqft)
-        notes.append(
-            f"ARV from {len(comps)} zip-matched sold comps × subject sqft "
-            f"(${comp_ppsf:,.0f}/sqft × {sqft_lbl})"
-        )
-        # Range from the SAME (adjusted) $/sqft series as `expected` — comp_ppsf
-        # is the adjusted-median, so low/high must use adjusted_ppsf too, else the
-        # headline ARV could fall outside its own range (Pass-2 fix).
+    if comps and comp_ppsf and arv_sqft:
+        # Build the adjusted $/sqft series ONCE and derive both `expected` (median)
+        # and low/high (min/max) from it, so the headline ARV can never fall
+        # outside its own band (Pass-2 fix: expected used the comp_median_ppsf
+        # scalar while the band used this adjusted series — a different base).
         ppsfs = sorted((c.get("adjusted_ppsf") or c["price_per_sqft"])
                        for c in comps if (c.get("adjusted_ppsf") or c.get("price_per_sqft")))
+        if ppsfs:
+            median_ppsf = ppsfs[len(ppsfs) // 2]
+        else:
+            # No usable per-comp $/sqft — fall back to the supplied median scalar.
+            median_ppsf = float(comp_ppsf)
+        expected = median_ppsf * arv_sqft
+        notes.append(
+            f"ARV from {len(comps)} zip-matched sold comps × subject sqft "
+            f"(${median_ppsf:,.0f}/sqft × {sqft_lbl})"
+        )
         if len(ppsfs) >= 3:
-            low_ppsf = ppsfs[0]
-            high_ppsf = ppsfs[-1]
-            low = round(low_ppsf * li.living_sqft, -2)
-            high = round(high_ppsf * li.living_sqft, -2)
+            low = round(ppsfs[0] * arv_sqft, -2)
+            high = round(ppsfs[-1] * arv_sqft, -2)
         else:
             low = round(expected * 0.90, -2)
             high = round(expected * 1.10, -2)
+        # Clamp the rounded headline into [low,high] so it always sits inside its
+        # own band even if rounding or a fallback base nudges it out.
+        expected = min(max(round(expected, -2), low), high)
         # Comp-QUALITY gate: scraped comps are only HIGH-confidence when there
         # are enough of them, they're geographically anchored (not county-wide),
         # and they actually agree. A single far/stale comp is not bankable.
         conf = "HIGH"
         reasons = []
+        # A footprint-estimated sqft CAPS ARV at MEDIUM (never HIGH) — a bounded
+        # estimate, not bankable GLA. The >8000 footprint reject + plausibility
+        # band already drop garbage, so MEDIUM (not LOW) is the right confidence.
         if sqft_est:
             conf, reasons = "MEDIUM", reasons + ["living sqft is a footprint-based ESTIMATE"]
         if len(ppsfs) < 3:
-            conf, reasons = "MEDIUM", reasons + [f"only {len(ppsfs)} comp(s)"]
+            conf, reasons = ("LOW" if conf == "LOW" else "MEDIUM"), reasons + [f"only {len(ppsfs)} comp(s)"]
         if comps and not comps[0].get("geo_anchored", True):
-            conf, reasons = "MEDIUM", reasons + ["county-wide comps (no local anchor)"]
+            conf, reasons = ("LOW" if conf == "LOW" else "MEDIUM"), reasons + ["county-wide comps (no local anchor)"]
         if len(ppsfs) >= 2 and ppsfs[0] > 0 and ppsfs[-1] / ppsfs[0] >= 1.6:
-            conf, reasons = "MEDIUM", reasons + ["comps disagree (wide $/sqft spread)"]
+            conf, reasons = ("LOW" if conf == "LOW" else "MEDIUM"), reasons + ["comps disagree (wide $/sqft spread)"]
         if reasons:
-            notes.append("ARV confidence lowered to MEDIUM: " + "; ".join(reasons))
+            notes.append(f"ARV confidence lowered to {conf}: " + "; ".join(reasons))
         return round(expected, -2), low, high, conf, notes
 
     # Tier 2: Zillow zestimate
@@ -309,10 +374,27 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
         confidence = "MEDIUM"
     elif li.opening_bid and li.opening_bid > 0:
         expected = float(li.opening_bid) * 2.4
+        # Reject runaway proxies: on a comps-empty row opening_bid is often a
+        # money judgment / total debt, not a property bid. Above the ceiling
+        # the ×2.4 proxy emits a phantom multi-million ARV — return unavailable.
+        if expected > MAX_PROXY_ARV:
+            return None, None, None, "LOW", [
+                f"Opening bid (${li.opening_bid:,.0f}) too large for a ×2.4 ARV proxy "
+                f"(>${MAX_PROXY_ARV:,.0f}) — likely a judgment/debt figure, not a "
+                f"property bid; ARV withheld."
+            ]
         notes.append(f"ARV proxy from opening bid × 2.4 ({li.opening_bid:,.0f} × 2.4) — rough")
         confidence = "LOW"
     else:
         return None, None, None, "LOW", ["Insufficient data for ARV"]
+
+    # Final backstop: the tax×1.25 path can also overshoot on a stale/wrong
+    # assessment. Any proxy ARV above the ceiling is not trustworthy.
+    if expected > MAX_PROXY_ARV:
+        return None, None, None, "LOW", [
+            f"Proxy ARV (${expected:,.0f}) exceeds the ${MAX_PROXY_ARV:,.0f} "
+            f"plausibility ceiling — input likely a judgment/debt figure; ARV withheld."
+        ]
 
     low = round(expected * 0.85, -2)
     high = round(expected * 1.15, -2)

@@ -201,7 +201,21 @@ function getSortValue(l, k) {
     const g = getGrade(l);
     return g ? g.overall_score || gradeOrder[g.overall] || 0 : -1;
   }
-  if (k === "_arv") return (getCalc(l) || {}).arv_expected || 0;
+  if (k === "_arv") {
+    const c = getCalc(l) || {};
+    const arv = c.arv_expected || 0;
+    // Fabricated/unrated ARVs (proxy values >$2M, LOW confidence, or an
+    // ungraded listing) shouldn't float to the top of the ARV sort —
+    // they're not real comps. Sink them with a sentinel so genuine,
+    // graded ARVs rank above them on the default descending sort.
+    const g = getGrade(l);
+    const dqf = (l.raw && l.raw.data_quality && Array.isArray(l.raw.data_quality.flags))
+      ? l.raw.data_quality.flags : [];
+    const unrated = !arv || arv > 2000000 || c.arv_confidence === "LOW"
+      || dqf.includes("low_arv_confidence") || dqf.includes("no_sqft")
+      || !(g && g.overall);
+    return unrated ? -1 : arv;
+  }
   if (k === "_rehab") return (getCalc(l) || {}).rehab_expected || 0;
   if (k === "_max_bid") return (getCalc(l) || {}).max_bid_70 || 0;
   if (k === "_roi") return (getCalc(l) || {}).roi_pct;

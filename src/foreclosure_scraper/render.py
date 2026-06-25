@@ -27,6 +27,20 @@ import structlog
 log = structlog.get_logger()
 
 
+class RenderHTTPFailure(Exception):
+    """Raised by fetch_rendered ONLY when raise_on_http_failure=True and the
+    render failed with an HTTP-level error (bad status >=400, or the camoufox
+    ERR_HTTP_RESPONSE_CODE_FAILURE). Lets a breaker-protected caller (the SC
+    court lookup) distinguish a real HTTP failure from a legit empty-page miss,
+    which it counts toward its consecutive-failure circuit breaker. Off by
+    default so every other caller keeps the old ""-on-failure contract."""
+
+
+# Marker strings camoufox/playwright emit in the exception text when the
+# server returns a non-2xx the browser refuses to render.
+_HTTP_FAILURE_MARKERS = ("ERR_HTTP_RESPONSE_CODE_FAILURE", "ERR_ABORTED")
+
+
 # Tunables (env-overridable so a slow run can be adjusted without code change).
 RENDER_TIMEOUT_MS = int(os.environ.get("RENDER_TIMEOUT_MS", "45000"))
 RENDER_HEADLESS = os.environ.get("RENDER_HEADLESS", "1") != "0"
@@ -43,8 +57,14 @@ def _semaphore() -> asyncio.Semaphore:
     return _sem
 
 
-def _render_sync(url: str, *, timeout_ms: int, headless: bool) -> str:
-    """Blocking render in a worker thread. Returns visible text or ""."""
+def _render_sync(url: str, *, timeout_ms: int, headless: bool,
+                 raise_on_http_failure: bool = False) -> str:
+    """Blocking render in a worker thread. Returns visible text or "".
+
+    When raise_on_http_failure is set, an HTTP-level failure (bad status >=400
+    or a camoufox ERR_HTTP_RESPONSE_CODE_FAILURE) raises RenderHTTPFailure
+    instead of silently returning "" — so a breaker-protected caller can count
+    it as a failure rather than a benign empty miss."""
     try:
         from scrapling.fetchers import StealthyFetcher
     except ImportError:
@@ -54,10 +74,14 @@ def _render_sync(url: str, *, timeout_ms: int, headless: bool) -> str:
         page = StealthyFetcher.fetch(url, headless=headless, timeout=timeout_ms)
     except Exception as exc:  # network, browser launch, timeout, etc.
         log.debug("render.fetch_error", url=url[:120], error=str(exc)[:150])
+        if raise_on_http_failure and any(m in str(exc) for m in _HTTP_FAILURE_MARKERS):
+            raise RenderHTTPFailure(str(exc)[:150]) from exc
         return ""
     status = getattr(page, "status", None)
     if status and status >= 400:
         log.debug("render.bad_status", url=url[:120], status=status)
+        if raise_on_http_failure:
+            raise RenderHTTPFailure(f"status={status}")
         return ""
     # Prefer visible text; fall back to raw HTML if text extraction is empty.
     try:
@@ -69,15 +93,21 @@ def _render_sync(url: str, *, timeout_ms: int, headless: bool) -> str:
     return text
 
 
-async def fetch_rendered(url: str, *, token: str | None = None) -> str:
+async def fetch_rendered(url: str, *, token: str | None = None,
+                         raise_on_http_failure: bool = False) -> str:
     """Render a JS page with a real stealth browser. Returns text, or "".
 
     `token` is accepted and ignored for drop-in compatibility with the old
     Apify-based signature.
+
+    `raise_on_http_failure` (opt-in, default off) makes an HTTP-level failure
+    raise RenderHTTPFailure instead of returning "". Only the breaker-protected
+    SC court lookup sets it; every other caller keeps the ""-on-failure contract.
     """
     async with _semaphore():
         return await asyncio.to_thread(
-            _render_sync, url, timeout_ms=RENDER_TIMEOUT_MS, headless=RENDER_HEADLESS
+            _render_sync, url, timeout_ms=RENDER_TIMEOUT_MS,
+            headless=RENDER_HEADLESS, raise_on_http_failure=raise_on_http_failure,
         )
 
 

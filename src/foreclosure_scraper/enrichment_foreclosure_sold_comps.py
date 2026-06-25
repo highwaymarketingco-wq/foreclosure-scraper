@@ -118,7 +118,6 @@ FORECLOSURE_SALE_SOURCES = frozenset({
     "counties_sc.spartanburg_master_in_equity",
     "counties_sc.anderson_master_in_equity",
     "counties_sc.pickens_master_in_equity",
-    "counties_sc.sc_courtrosters",
     "counties_sc.sc_flc",
     # County tax-foreclosure (sale at courthouse steps) — in-scope NC only
     "counties_nc.buncombe_tax",

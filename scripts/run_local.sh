@@ -79,6 +79,11 @@ export PYTHONUNBUFFERED=1
 export SKIP_TRACE_PROVIDER="${SKIP_TRACE_PROVIDER:-free}"
 export FREE_SKIPTRACE_PHONE_MAX="${FREE_SKIPTRACE_PHONE_MAX:-40}"
 
+# Assessor property-card enricher — ON for the weekly run. The default cap
+# (150) is below the ~280 live targets, so raise it to 400 to cover them all.
+export ASSESSOR_CARD_ON="${ASSESSOR_CARD_ON:-1}"
+export ASSESSOR_CARD_MAX="${ASSESSOR_CARD_MAX:-400}"
+
 # Enrichment budget — keep the run finishing in a sane window. The cloud
 # run died at 4h partly on a Gemini-quota Vision spiral; locally we use
 # Anthropic (set above) and cap Vision so the run completes. Raise

@@ -58,6 +58,14 @@ MASTERS_SALE_DATE_RE = re.compile(
 )
 BID_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
 CANCEL_RE = re.compile(r"(√|✓|cancelled|withdrawn|WD\b)", re.I)
+# Deficiency-Sale roster header line, e.g.
+#   "2. SouthState Bank v. Christopher Riddle 25-5700"
+# Plaintiff/Defendant straddle a " v. " separator; the case# closes the line.
+DEF_ENTRY_RE = re.compile(
+    r"^\s*\d+\.\s+(?P<plaintiff>.+?)\s+v\.?\s+(?P<defendant>.+?)\s+"
+    r"(?P<case>\d{2,4}-\d{3,5})\s*$",
+    re.I | re.M,
+)
 
 
 def _is_results_pdf(url: str) -> bool:
@@ -66,6 +74,80 @@ def _is_results_pdf(url: str) -> bool:
     are upcoming."""
     return ("sale-results" in url.lower() or
             "deficiency-sale" in url.lower())
+
+
+def _extract_from_text(
+    full_text: str, source_url: str, is_results: bool, doc_sale_date
+) -> list[Listing]:
+    """Fallback when extract_tables() yields no >=7-col rows (the
+    Deficiency-Sale roster collapses to single-cell rows). Mirror
+    sc_tax_delinquent._extract_from_text: regex the raw page text for each
+    "N. Plaintiff v. Defendant CASE#" entry, then pull the nearby address +
+    bid. One case# can legitimately appear twice (different properties), so
+    we dedupe by ADDRESS, not case#."""
+    out: list[Listing] = []
+    seen_addr: set[str] = set()
+    matches = list(DEF_ENTRY_RE.finditer(full_text))
+    for i, m in enumerate(matches):
+        # Block = text between this header and the next entry header.
+        block_start = m.end()
+        block_end = matches[i + 1].start() if i + 1 < len(matches) else len(full_text)
+        block = full_text[block_start:block_end]
+
+        case_clean = m.group("case")
+        plaintiff = (m.group("plaintiff") or "").strip()
+        defendant = (m.group("defendant") or "").strip()
+
+        addr_m = ADDR_RE.search(block)
+        address = addr_m.group(1).strip() if addr_m else None
+        # Dedupe by address (case# may repeat across distinct properties).
+        addr_key = (address or "").lower()
+        if addr_key and addr_key in seen_addr:
+            continue
+        if addr_key:
+            seen_addr.add(addr_key)
+
+        bid = None
+        bm = BID_RE.search(block)
+        if bm:
+            try:
+                bid = float(bm.group(1).replace(",", ""))
+            except ValueError:
+                pass
+
+        raw_payload = {"spartanburg_pdf": {
+            "status": "deficiency",
+            "attorney": None,
+            "bid_by": None,
+            "doc_sale_date": doc_sale_date.isoformat() if doc_sale_date else None,
+            "is_results_pdf": is_results,
+            "extraction": "text_fallback",
+        }}
+        if is_results and bid is not None:
+            raw_payload["actual_sold_price"] = bid
+
+        out.append(
+            Listing(
+                source="counties_sc.spartanburg_master_in_equity",
+                source_url=source_url,
+                listing_type=ListingType.FORECLOSURE_SALE,
+                property_kind=PropertyKind.UNKNOWN,
+                street_address=address,
+                state="SC",
+                county="Spartanburg",
+                case_number=case_clean,
+                plaintiff=plaintiff or None,
+                defendant=defendant or None,
+                sale_date=doc_sale_date,
+                opening_bid=bid,
+                description=block.strip()[:500] or None,
+                auction_status="deficiency",
+                first_seen=datetime.utcnow(),
+                last_seen=datetime.utcnow(),
+                raw=raw_payload,
+            )
+        )
+    return out
 
 
 def _parse_pdf_tables(data: bytes, source_url: str) -> list[Listing]:
@@ -117,11 +199,13 @@ def _parse_pdf_tables(data: bytes, source_url: str) -> list[Listing]:
                 return []
 
             seen: set[str] = set()
+            saw_wide_row = False
             for page in pdf.pages:
                 for table in page.extract_tables() or []:
                     for row in table:
                         if not row or len(row) < 7:
                             continue
+                        saw_wide_row = True
                         # Skip header row
                         joined = " ".join(c or "" for c in row).lower()
                         if "case #" in joined or "attorney" in joined and "plaintiff" in joined:
@@ -200,6 +284,15 @@ def _parse_pdf_tables(data: bytes, source_url: str) -> list[Listing]:
                                 raw=raw_payload,
                             )
                         )
+
+            # TEXT fallback: the Deficiency-Sale roster yields single-cell
+            # rows, so extract_tables() never produces a >=7-col row and we
+            # drop 100% of it. When no wide row was seen, regex the raw page
+            # text for case# + defendant + address + bid instead.
+            if not saw_wide_row:
+                out.extend(
+                    _extract_from_text(full_text, source_url, is_results, doc_sale_date)
+                )
     except Exception:
         pass
     return out

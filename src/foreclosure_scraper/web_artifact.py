@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -103,7 +104,60 @@ RAW_KEEP = {
     "anderson_mie_results": "*",      # Anderson MIE Sale-Results parse provenance
     "spartanburg_pdf": "*",           # Spartanburg MIE PDF parse provenance (now includes is_results_pdf)
     "assessor_card": "*",             # on-demand per-parcel card: recorded sale price + history + sqft source
+    "pulled_sale": "*",               # cross-run withdrawn/pulled-sale aging counter
+    "comps_geo_warning": "*",         # low-confidence ARV note (comps out of geo radius)
 }
+
+
+# Court-doc / lien / placeholder markers that scrapers sometimes drop into
+# street_address when no real parcel address was resolved. These are NOT
+# properties and must not render on the dashboard/map as one.
+_INVALID_ADDR_MARKERS = (
+    "lis pendens",
+    "claim of lien",
+    "notice to",
+    "tract",
+    "property in",
+)
+
+# A real street address starts with a house number ("123 Main St") or is a
+# recognized rural form: a state/secondary road designator (SR 1135, US 221 N,
+# NC 12, Hwy 9), a "Lot N" form, or a named road with a street-type suffix
+# (e.g. "Riverfork Road", "Antreville Highway"). Anything else that matches an
+# invalid marker (or is empty) is treated as junk.
+_HOUSE_NUM_RE = re.compile(r"^\d+\s+\S")
+_RURAL_DESIGNATOR_RE = re.compile(
+    r"^(?:sr|us|nc|sc|hwy|highway|county\s+road|cr|state\s+road|lot)\b",
+    re.IGNORECASE,
+)
+_ROAD_SUFFIX_RE = re.compile(
+    r"\b(?:road|rd|street|st|drive|dr|highway|hwy|lane|ln|court|ct|avenue|ave|"
+    r"boulevard|blvd|circle|cir|way|place|pl|trail|trl|pike|loop|run|path|"
+    r"terrace|ter|parkway|pkwy|cove|point|pointe|ridge|creek|branch|crossing|"
+    r"bend|pass|row|alley)\b",
+    re.IGNORECASE,
+)
+
+
+def _is_valid_street_address(addr: str | None) -> bool:
+    """True if `addr` looks like a real street address (house number or a
+    recognized rural road form), False for court-doc/lien placeholders and
+    empties. Defensive: bad input -> False, never raises."""
+    if not isinstance(addr, str):
+        return False
+    s = addr.strip()
+    if not s:
+        return False
+    low = s.lower()
+    if any(m in low for m in _INVALID_ADDR_MARKERS):
+        return False
+    if _HOUSE_NUM_RE.match(s):
+        return True
+    if _RURAL_DESIGNATOR_RE.match(s):
+        return True
+    if _ROAD_SUFFIX_RE.search(s):
+        return True
+    return False
 
 
 def _slim_raw(raw: dict | None) -> dict:
@@ -125,6 +179,11 @@ def _to_dict(li: Listing) -> dict:
     d = li.model_dump(mode="json", exclude_none=False)
     # Trim raw payload
     d["raw"] = _slim_raw(li.raw)
+    # Null junk addresses in the PUBLISHED record so the dashboard/map don't
+    # render a court-doc/lien placeholder ("Lis Pendens …", "Tract …", etc.)
+    # as if it were a property. The listing is kept; raw is untouched.
+    if not _is_valid_street_address(d.get("street_address")):
+        d["street_address"] = None
     # Drop legal_description from public view (often huge)
     if "legal_description" in d and d["legal_description"]:
         d["legal_description"] = d["legal_description"][:200]
