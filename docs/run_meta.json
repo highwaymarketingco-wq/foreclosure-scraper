@@ -1,9 +1,9 @@
 {
-  "run_time": "2026-06-25T00:21:39.922603Z",
-  "total": 4059,
+  "run_time": "2026-06-25T01:51:55.863216Z",
+  "total": 5486,
   "by_source": {
     "national.auction_dot_com": 10,
-    "national.fannie_homepath": 1445,
+    "national.fannie_homepath": 1444,
     "national.homeharvest": 15,
     "national.distressed": 375,
     "national.hud_homestore": 35,
@@ -16,7 +16,7 @@
     "law_firms.mcmichael_taylor_gray": 16,
     "law_firms.rogers_townsend": 4,
     "counties_sc.anderson_master_in_equity": 5,
-    "counties_sc.sc_county_rosters": 7,
+    "counties_sc.sc_county_rosters": 9,
     "counties_sc.sc_public_index_lis_pendens": 506,
     "counties_nc.nc_ecourts_lis_pendens": 514,
     "newspapers.hendersonville_lightning": 1,
@@ -31,79 +31,17 @@
     "counties_nc.henderson_tax": 15,
     "derived.probate_deed": 2,
     "national.hubzu": 4,
-    "counties_sc.spartan_weekly_legals": 25,
+    "counties_sc.spartan_weekly_legals": 136,
     "counties_sc.terry_howe_flc": 20,
     "counties_nc.nc_rod_logan": 21,
-    "counties_nc.nc_rod_substitute_trustee": 13
+    "counties_nc.nc_rod_substitute_trustee": 13,
+    "counties_sc.pickens_master_in_equity": 4,
+    "counties_sc.sc_tax_delinquent": 1311
   },
-  "by_state": {
-    "NC": 1620,
-    "SC": 2439
-  },
-  "by_county_top": [
-    [
-      "SC/Spartanburg",
-      764
-    ],
-    [
-      "SC/Anderson",
-      509
-    ],
-    [
-      "NC/Gaston",
-      324
-    ],
-    [
-      "SC/Laurens",
-      231
-    ],
-    [
-      "SC/Pickens",
-      227
-    ],
-    [
-      "NC/Buncombe",
-      206
-    ],
-    [
-      "NC/Henderson",
-      172
-    ],
-    [
-      "SC/Beaufort",
-      149
-    ],
-    [
-      "NC/Cleveland",
-      137
-    ],
-    [
-      "SC/Greenville",
-      124
-    ],
-    [
-      "SC/Oconee",
-      100
-    ],
-    [
-      "NC/Lincoln",
-      95
-    ],
-    [
-      "NC/McDowell",
-      89
-    ],
-    [
-      "SC/Cherokee",
-      83
-    ],
-    [
-      "NC/Burke",
-      72
-    ]
-  ],
+  "by_state": {},
+  "by_county_top": [],
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "regenerated in-place from persisted dataset (no re-scrape)"
+  "notes": "partial merge: today's new/fixed sources + full enrichment (no full re-scrape)"
 }
