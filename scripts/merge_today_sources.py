@@ -27,6 +27,7 @@ from foreclosure_scraper.main import _in_scope, _active_only  # noqa: E402
 from foreclosure_scraper.valuation import calc as vcalc, grading as vgrade  # noqa: E402
 from foreclosure_scraper.enrichment_geocode import enrich as enrich_geocode  # noqa: E402
 from foreclosure_scraper.enrichment_address_backfill import enrich_addresses_from_owner  # noqa: E402
+from foreclosure_scraper.enrichment_parcel_lookup import enrich_with_parcel_lookup  # noqa: E402
 from foreclosure_scraper.enrichment_aggressive_address import enrich_with_aggressive_address  # noqa: E402
 from foreclosure_scraper.enrichment_parcel_reverse_geo import enrich_parcel_reverse_geo  # noqa: E402
 from foreclosure_scraper.enrichment_owner_mailing import enrich_owner_mailing  # noqa: E402
@@ -100,6 +101,7 @@ async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
         except Exception as e:  # noqa: BLE001
             print(f"  {name}: ERROR {str(e)[:80]}")
     await _step("geocode#1", enrich_geocode(merged))
+    await _step("parcel_lookup", enrich_with_parcel_lookup(merged))  # parcel# -> addr/sqft/acreage/owner
     await _step("address_backfill", enrich_addresses_from_owner(merged))
     await _step("aggressive_address", enrich_with_aggressive_address(merged))
     await _step("parcel_reverse_geo", enrich_parcel_reverse_geo(merged))

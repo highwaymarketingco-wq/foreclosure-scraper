@@ -56,6 +56,25 @@ def main() -> int:
     listings = [li for li in listings if _in_scope(li)]
     print(f"scope re-filter: dropped {before - len(listings)} out-of-footprint -> {len(listings)} kept")
 
+    # Drop dead court records — a Canceled/Satisfied/Dismissed/Vacated lien or
+    # judgment is no longer an actionable lead (NC eCourts civilJudgmentStatus).
+    def _terminal_court(li: Listing) -> bool:
+        st = (((li.raw or {}).get("nc_ecourts") or {}).get("civilJudgmentStatus") or "").lower()
+        return any(t in st for t in ("cancel", "satisf", "dismiss", "vacat", "withdraw", "expired", "released"))
+    before = len(listings)
+    listings = [li for li in listings if not _terminal_court(li)]
+    print(f"dropped terminal-status court records: {before - len(listings)} -> {len(listings)} kept")
+
+    # Parcel# -> address/sqft/acreage/owner via county GIS (parcel-bearing leads
+    # that lack a street address / specs). Async, so run it in its own loop.
+    import asyncio
+    from foreclosure_scraper.enrichment_parcel_lookup import enrich_with_parcel_lookup
+    try:
+        asyncio.run(enrich_with_parcel_lookup(listings))
+        print("parcel_lookup: done")
+    except Exception as e:  # noqa: BLE001
+        print("parcel_lookup: ERROR", str(e)[:80])
+
     print("enrich_sc_cama:", enrich_sc_cama(listings))
     print("enrich_footprint_sqft:", enrich_footprint_sqft(listings))
 

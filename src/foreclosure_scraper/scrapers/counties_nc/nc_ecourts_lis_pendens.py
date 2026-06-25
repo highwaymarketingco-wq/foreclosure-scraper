@@ -172,6 +172,15 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
     if cause not in FORECLOSURE_CAUSES:
         return None
 
+    # Skip terminal/dead dispositions — a Canceled/Satisfied/Dismissed/Vacated lien
+    # or judgment is no longer an actionable lead (e.g. an HOA Claim of Lien marked
+    # 'Canceled' once paid). civilJudgmentStatus carries the disposition; without
+    # this we pull dead liens (e.g. 24M001384-100 Avery Park v. Perone, Canceled).
+    status = (hit.get("civilJudgmentStatus") or "").strip().lower()
+    if any(t in status for t in ("cancel", "satisf", "dismiss", "vacat",
+                                 "withdraw", "expired", "released")):
+        return None
+
     case_number = (hit.get("caseNumber") or "").strip()
     location = hit.get("location") or ""
     county = _strip_court_suffix(location)
