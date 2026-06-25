@@ -66,7 +66,10 @@ def _countyless_national(li: Listing) -> bool:
 
 
 async def _scrape_new() -> list[Listing]:
-    scrapers = [s for s in all_scrapers() if s.slug in NEW_SOURCES]
+    import os
+    only = os.environ.get("MERGE_ONLY_SOURCES")
+    active = set(only.split(",")) if only else NEW_SOURCES
+    scrapers = [s for s in all_scrapers() if s.slug in active]
     print("running new/fixed scrapers:", sorted(s.slug for s in scrapers))
     out: list[Listing] = []
     for s in scrapers:
@@ -85,6 +88,10 @@ async def _scrape_new() -> list[Listing]:
 
 async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
     new = await _scrape_new()
+    n_scope = sum(1 for li in new if _in_scope(li))
+    n_active = sum(1 for li in new if _active_only(li, cfg.sale_horizon_days))
+    n_cl = sum(1 for li in new if _countyless_national(li))
+    print(f"new-lead filter breakdown: in_scope={n_scope}/{len(new)} active={n_active}/{len(new)} countyless={n_cl}")
     keep = [li for li in new
             if _in_scope(li) and not _countyless_national(li)
             and _active_only(li, cfg.sale_horizon_days)]
@@ -111,7 +118,7 @@ async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
         except Exception as e:  # noqa: BLE001
             print(f"  {name}: ERROR {str(e)[:80]}")
     await _step("geocode#1", enrich_geocode(merged))
-    await _step("parcel_lookup", enrich_with_parcel_lookup(merged))  # parcel# -> addr/sqft/acreage/owner
+    await _step("parcel_lookup", asyncio.wait_for(enrich_with_parcel_lookup(merged), timeout=600))  # parcel# -> addr/sqft/acreage/owner (bounded)
     await _step("address_backfill", enrich_addresses_from_owner(merged))
     await _step("aggressive_address", enrich_with_aggressive_address(merged))
     await _step("parcel_reverse_geo", enrich_parcel_reverse_geo(merged))

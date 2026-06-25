@@ -294,6 +294,8 @@ DATELESS_OK_SOURCES = {
     # divorce transfers). These are leads, not auctions — no sale_date.
     "derived.probate_deed",
     "derived.divorce_deed",
+    "national.crexi_multifamily",                 # Crexi MF/apartment for-sale listings (no sale date)
+    "counties_sc.sc_coastal_rosters",             # coastal foreclosure rosters (sale_date best-effort)
 }
 
 
