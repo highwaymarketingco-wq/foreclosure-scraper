@@ -1,11 +1,12 @@
 """Freddie Mac HomeSteps REO inventory.
 
-The /listing/search page is a Drupal-rendered page — no JS required for
-the results list. Listings appear inline as `.views-row` blocks. As of
-2026-05-14 the nationwide inventory is empty ("No results found" on the
-unfiltered all-states search). When inventory comes back this scraper
-will pick it up; until then it cleanly returns 0 in under a second per
-state.
+The /listing/search page is server-rendered — no JS required for the
+results list. The real filter is the free-text `?search=` param (the old
+`?state=` param is ignored and returns the full nationwide list), so we
+query `?search=NC` and `?search=SC`. Each result is a `div.property-teaser`
+card wrapped in an `a[href^="/listingdetails/"]` anchor, with address,
+price and beds/baths/sqft in `.property-address`, `.property-price` and
+`.property-details`.
 """
 from __future__ import annotations
 
@@ -23,8 +24,8 @@ from ...models import Listing, ListingType, PropertyKind
 log = structlog.get_logger()
 
 URLS = (
-    ("NC", "https://www.homesteps.com/listing/search?state=NC"),
-    ("SC", "https://www.homesteps.com/listing/search?state=SC"),
+    ("NC", "https://www.homesteps.com/listing/search?search=NC"),
+    ("SC", "https://www.homesteps.com/listing/search?search=SC"),
 )
 HEADERS = {
     "User-Agent": (
@@ -57,27 +58,47 @@ def _kind(label: str | None) -> PropertyKind:
     return PropertyKind.UNKNOWN
 
 
+def _wrapping_href(row) -> str | None:
+    """Find the /listingdetails/ href for a card — either on the wrapping
+    anchor (the card is nested inside <a>) or on an anchor inside the card."""
+    inner = row.css_first("a.no-decoration[href^='/listingdetails/']") or row.css_first(
+        "a[href^='/listingdetails/']"
+    )
+    if inner is not None:
+        return inner.attributes.get("href")
+    node = row.parent
+    depth = 0
+    while node is not None and depth < 5:
+        if node.tag == "a":
+            href = node.attributes.get("href")
+            if href and "/listingdetails/" in href:
+                return href
+        node = node.parent
+        depth += 1
+    return None
+
+
 def _parse_row(row, state: str) -> Listing | None:
-    """Parse a single .views-row card. Returns None for any unparseable row
-    (no address)."""
-    addr_node = row.css_first("[class*='address'], .field--name-field-address")
+    """Parse a single property-teaser card. Returns None for any unparseable
+    row (no address)."""
+    addr_node = row.css_first(
+        "div.property-address, [class*='address'], .field--name-field-address"
+    )
     if addr_node is None:
-        text = row.text(separator=" ", strip=True)
-        # try inline regex on the whole card text
-        m = _ADDR_RE.search(text)
-        if not m:
-            return None
-        street, city, st, z = m.group(1).strip(), m.group(2).strip(), m.group(3), m.group(4)
+        addr = row.text(separator=" ", strip=True)
     else:
-        addr = addr_node.text(strip=True)
-        m = _ADDR_RE.match(addr)
-        if not m:
-            return None
-        street, city, st, z = m.group(1).strip(), m.group(2).strip(), m.group(3), m.group(4)
+        addr = addr_node.text(separator=" ", strip=True)
+    # The markup puts street/city/state/zip on separate lines, so collapse all
+    # whitespace (incl. newlines) to single spaces BEFORE the address regex.
+    addr = re.sub(r"\s+", " ", addr or "").strip()
+    m = _ADDR_RE.search(addr)
+    if not m:
+        return None
+    street, city, st, z = m.group(1).strip(), m.group(2).strip(), m.group(3), m.group(4)
     if st != state:
         return None
 
-    price_node = row.css_first("[class*='price']")
+    price_node = row.css_first("div.property-price, [class*='price']")
     price = None
     if price_node is not None:
         pm = _PRICE_RE.search(price_node.text(strip=True))
@@ -87,11 +108,17 @@ def _parse_row(row, state: str) -> Listing | None:
             except ValueError:
                 price = None
 
+    details_node = row.css_first("div.property-details")
+    details_text = (
+        re.sub(r"\s+", " ", details_node.text()).strip()
+        if details_node is not None
+        else None
+    )
+
     kind_node = row.css_first("[class*='type'], [class*='property-type']")
     kind_text = kind_node.text(strip=True) if kind_node is not None else None
 
-    link_node = row.css_first("a[href*='/listing/']") or row.css_first("a[href]")
-    link = (link_node.attributes.get("href", "") if link_node else "") or "https://www.homesteps.com/"
+    link = _wrapping_href(row) or "https://www.homesteps.com/"
     if link and not link.startswith("http"):
         link = f"https://www.homesteps.com{link}"
 
@@ -105,10 +132,12 @@ def _parse_row(row, state: str) -> Listing | None:
         zip_code=z,
         street_address=street,
         opening_bid=price,
-        description=f"Freddie Mac HomeSteps REO. {kind_text or ''}".strip(),
+        description=" ".join(
+            p for p in ("Freddie Mac HomeSteps REO.", kind_text, details_text) if p
+        ).strip(),
         first_seen=datetime.utcnow(),
         last_seen=datetime.utcnow(),
-        raw={"homesteps_kind": kind_text},
+        raw={"homesteps_kind": kind_text, "homesteps_details": details_text},
     )
 
 
@@ -121,11 +150,16 @@ async def _fetch_state(state: str, url: str) -> list[Listing]:
             return []
     if r.status_code != 200 or len(r.text) < 5000:
         return []
-    if "no-results" in r.text or "No results found" in r.text:
-        return []
     tree = HTMLParser(r.text)
     out: list[Listing] = []
-    for row in tree.css(".views-row, [class*='property-listing'] article, [class*='listing-tile']"):
+    cards = tree.css("div.property-teaser") or tree.css(
+        ".views-row, [class*='property-listing'] article, [class*='listing-tile']"
+    )
+    # Only honor a "no results" short-circuit when there are genuinely no cards
+    # — the phrase can appear in inert page chrome even when results exist.
+    if not cards and ("No results found" in r.text or "no-results" in r.text):
+        return []
+    for row in cards:
         try:
             li = _parse_row(row, state)
         except Exception:

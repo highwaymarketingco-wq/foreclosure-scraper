@@ -25,6 +25,7 @@ publicly-mirrored PACER, no per-page billing).
 from __future__ import annotations
 
 import re
+import time
 from datetime import datetime, timedelta
 from typing import Iterable
 
@@ -75,18 +76,75 @@ def _classify_entry(description: str) -> str | None:
     return None
 
 
-async def _scan_recent_dockets(c, token: str, court: str) -> list[dict]:
+def _entry_blob(entry: dict) -> str:
+    """Combine the entry description with each recap_documents description.
+
+    v4 dockets no longer surface the long-form motion text on the entry
+    itself; the descriptive text lives on the nested recap_documents. Build
+    one blob so the classifier sees the full filing text.
+    """
+    parts = [entry.get("description") or ""]
+    for rd in entry.get("recap_documents") or []:
+        if isinstance(rd, dict):
+            parts.append(rd.get("description") or "")
+    return " ".join(p for p in parts if p)
+
+
+async def _fetch_docket_entries(c, token: str, docket_id) -> list[dict]:
+    """Pull all docket entries for one docket via the v4 docket-entries
+    endpoint, paginating on 'next'. Best-effort, never raises."""
+    if not docket_id:
+        return []
+    entries: list[dict] = []
+    next_url: str | None = (
+        f"{API_BASE}/docket-entries/?docket={docket_id}&page_size={PAGE_SIZE}"
+    )
+    pages = 0
+    while next_url and pages < 20:
+        try:
+            er = await c.get(
+                next_url,
+                headers={
+                    "Authorization": f"Token {token}",
+                    "Accept": "application/json",
+                },
+            )
+            if er.status_code != 200:
+                break
+            edata = er.json()
+        except Exception:
+            break
+        entries.extend(edata.get("results") or [])
+        next_url = edata.get("next")
+        pages += 1
+    return entries
+
+
+async def _scan_recent_dockets(
+    c, token: str, court: str, deadline: float | None = None
+) -> list[dict]:
     """Pull dockets from the last N days from one bankruptcy court, then
     for each docket fetch its entries and look for our motion patterns.
 
     Returns a list of (docket, entry, classification) tuples shaped as
     dicts so the scraper can build Listings.
+
+    Each docket opens a sub-fetch for its entries (v4 docket-entries
+    endpoint), so this is request-heavy. ``deadline`` is a monotonic
+    wall-clock budget: when reached we stop and return what we have so
+    far rather than letting safe_run() hard-timeout the whole run to 0.
     """
     cutoff = (datetime.utcnow() - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%d")
     hits: list[dict] = []
+    # Order by -date_modified, not default -date_filed: lift-stay / §363
+    # motions land WEEKS after a case opens, so the dockets carrying them
+    # are the recently-TOUCHED ones, not the newest-filed. Newest-filed
+    # dockets are mostly skeletal (no RECAP entries mirrored yet) and just
+    # burn the entries-fetch budget. This ordering puts entry-bearing
+    # dockets first so the budget reaches actual motions.
     next_url: str | None = (
         f"{API_BASE}/dockets/?court={court}&date_filed__gte={cutoff}"
-        f"&page_size={PAGE_SIZE}"
+        f"&order_by=-date_modified&page_size={PAGE_SIZE}"
     )
     pages = 0
     # Cap docket-detail traversal harder than pagination (each docket
@@ -95,6 +153,8 @@ async def _scan_recent_dockets(c, token: str, court: str) -> list[dict]:
     seen_dockets = 0
 
     while next_url and pages < 20:
+        if deadline is not None and time.monotonic() >= deadline:
+            break
         try:
             r = await c.get(
                 next_url,
@@ -111,28 +171,14 @@ async def _scan_recent_dockets(c, token: str, court: str) -> list[dict]:
         for docket in data.get("results", []):
             if seen_dockets >= docket_cap:
                 break
+            if deadline is not None and time.monotonic() >= deadline:
+                next_url = None
+                break
             seen_dockets += 1
             docket_id = docket.get("id")
-            entries_url = docket.get("docket_entries")
-            if not entries_url:
-                continue
-            try:
-                er = await c.get(
-                    entries_url,
-                    headers={
-                        "Authorization": f"Token {token}",
-                        "Accept": "application/json",
-                    },
-                )
-                if er.status_code != 200:
-                    continue
-                entries_data = er.json()
-            except Exception:
-                continue
-
-            for entry in entries_data.get("results", []):
-                desc = entry.get("description") or ""
-                cls = _classify_entry(desc)
+            entries = await _fetch_docket_entries(c, token, docket_id)
+            for entry in entries:
+                cls = _classify_entry(_entry_blob(entry))
                 if cls:
                     hits.append({
                         "docket": docket,
@@ -166,9 +212,21 @@ class CourtListenerAdversary(BaseScraper):
         out: list[Listing] = []
         seen: set[tuple[str, int, str]] = set()
 
+        # Stay inside safe_run()'s soft timeout: the per-docket entries
+        # fetch is request-heavy, so budget a wall-clock deadline ~30s
+        # under timeout_s and return partial hits rather than getting
+        # hard-killed to 0. Split the remaining budget across courts so
+        # one slow court can't starve the others.
+        deadline = time.monotonic() + max(self.timeout_s - 30.0, 30.0)
+
         async with client(timeout=30.0) as c:
-            for court in COURTS:
-                hits = await _scan_recent_dockets(c, token, court)
+            for i, court in enumerate(COURTS):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                courts_left = len(COURTS) - i
+                court_deadline = time.monotonic() + remaining / courts_left
+                hits = await _scan_recent_dockets(c, token, court, court_deadline)
                 for h in hits:
                     docket = h["docket"]
                     entry = h["entry"]

@@ -35,11 +35,48 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml",
 }
 
-# Address with state suffix — Treasury format is consistent: city, state zip
+# Full state name -> 2-letter code. Treasury spells states out in full
+# ("Merry Hill, North Carolina 27957"), so we normalize before the
+# NC/SC footprint check. Only the states we might encounter need entries;
+# anything unmapped falls through and is skipped by the footprint filter.
+STATE_NAME_TO_CODE = {
+    "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
+    "california": "CA", "colorado": "CO", "connecticut": "CT",
+    "delaware": "DE", "florida": "FL", "georgia": "GA", "hawaii": "HI",
+    "idaho": "ID", "illinois": "IL", "indiana": "IN", "iowa": "IA",
+    "kansas": "KS", "kentucky": "KY", "louisiana": "LA", "maine": "ME",
+    "maryland": "MD", "massachusetts": "MA", "michigan": "MI",
+    "minnesota": "MN", "mississippi": "MS", "missouri": "MO",
+    "montana": "MT", "nebraska": "NE", "nevada": "NV",
+    "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM",
+    "new york": "NY", "north carolina": "NC", "north dakota": "ND",
+    "ohio": "OH", "oklahoma": "OK", "oregon": "OR", "pennsylvania": "PA",
+    "puerto rico": "PR", "rhode island": "RI", "south carolina": "SC",
+    "south dakota": "SD", "tennessee": "TN", "texas": "TX", "utah": "UT",
+    "vermont": "VT", "virginia": "VA", "washington": "WA",
+    "west virginia": "WV", "wisconsin": "WI", "wyoming": "WY",
+    "district of columbia": "DC",
+}
+
+# Address with state suffix — Treasury format is "City, State ZIP" where
+# State is either a 2-letter code OR a full spelled-out name. The state
+# group matches a full name (greedy multi-word) or a bare 2-letter code;
+# _normalize_state() collapses it to a code before the footprint check.
 ADDR_RE = re.compile(
     r"\b(\d{1,5}\s+[A-Z][\w .'\-]+?)\s*,?\s*"
-    r"([A-Z][\w .'\-]+?),\s*([A-Z]{2})\s*(\d{5})\b",
+    r"([A-Z][\w .'\-]+?),\s*"
+    r"([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*|[A-Z]{2}),?\s*(\d{5})\b",
 )
+
+
+def _normalize_state(raw: str) -> str | None:
+    """Return a 2-letter state code for ``raw`` (code or full name), else None."""
+    if not raw:
+        return None
+    s = raw.strip()
+    if len(s) == 2 and s.isalpha():
+        return s.upper()
+    return STATE_NAME_TO_CODE.get(s.lower())
 DATE_RE = re.compile(
     r"\b(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b"
 )
@@ -76,7 +113,9 @@ class TreasurySeizedRealProperty(BaseScraper):
         seen: set[str] = set()
 
         for m in ADDR_RE.finditer(body):
-            street, city, state, zip_code = m.groups()
+            street, city, state_raw, zip_code = m.groups()
+            # Normalize "North Carolina"/"SC"/etc. to a 2-letter code.
+            state = _normalize_state(state_raw)
             # Only NC + SC for our footprint; Treasury data is national.
             if state not in ("NC", "SC"):
                 continue

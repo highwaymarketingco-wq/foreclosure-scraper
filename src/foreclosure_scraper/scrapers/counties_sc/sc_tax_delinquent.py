@@ -34,6 +34,7 @@ import io
 import re
 from datetime import datetime
 from typing import Iterable
+from urllib.parse import urljoin
 
 import structlog
 from selectolax.parser import HTMLParser
@@ -82,7 +83,7 @@ ADDR_RE = re.compile(
     r"Trail|Trl|Parkway|Pkwy)\.?)(?=[\s,.\n]|$)",
     re.I,
 )
-PARCEL_SC_RE = re.compile(r"\b\d{3}-\d{2}-\d{2}-\d{3,4}\b")  # SC TMS pattern
+PARCEL_SC_RE = re.compile(r"\b\d{3,4}-\d{2}-\d{2}-\d{3,4}\b")  # SC TMS pattern (3/4-2-2-3/4)
 
 
 def _extract_from_text(text: str, county: str, source_url: str) -> list["Listing"]:
@@ -231,6 +232,20 @@ async def _scrape_html(c, url: str, county: str) -> list[Listing]:
     out: list[Listing] = []
     tree = HTMLParser(r.text)
 
+    # Resolve relative links against the page URL, honoring any <base href>
+    # in the document (Revize/CMS pages set one; the manual rsplit approach
+    # 404s on Pickens). urljoin handles "/abs", "rel", "../up" and absolute
+    # hrefs correctly.
+    join_base = str(r.url) if getattr(r, "url", None) else url
+    try:
+        base_nodes = tree.css("base")
+        if base_nodes:
+            base_href = (base_nodes[0].attributes.get("href") or "").strip()
+            if base_href:
+                join_base = urljoin(join_base, base_href)
+    except Exception:
+        pass
+
     # 1. Direct HTML tables
     for tbl in tree.css("table"):
         rows = tbl.css("tr")
@@ -294,11 +309,7 @@ async def _scrape_html(c, url: str, county: str) -> list[Listing]:
         if not any(k in (href.lower() + text) for k in
                    ("delinquent", "tax-sale", "tax sale", "tax-foreclosure", "forfeit")):
             continue
-        if href.startswith("/"):
-            href = f"{url.rstrip('/').split('/', 3)[0]}//{url.split('/')[2]}{href}"
-        elif not href.startswith("http"):
-            base = url.rsplit("/", 1)[0]
-            href = f"{base}/{href}"
+        href = urljoin(join_base, href)
         pdf_listings = await _scrape_pdf(c, href, county)
         out.extend(pdf_listings)
 

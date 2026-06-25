@@ -11,6 +11,7 @@ import io
 import re
 from datetime import datetime, timedelta
 from typing import Iterable
+from urllib.parse import urljoin
 
 from dateutil import parser as dateparser
 from selectolax.parser import HTMLParser
@@ -174,6 +175,16 @@ class PickensMasterInEquity(BaseScraper):
                 return out
 
             tree = HTMLParser(html)
+            # The page declares <base href="https://www.co.pickens.sc.us/">, so
+            # bare relative PDF hrefs resolve against the DOMAIN ROOT, not the
+            # /departments/master_in_equity/ path. Honor the declared <base> if
+            # present; otherwise default to the domain root.
+            base_href = "https://www.co.pickens.sc.us/"
+            base_el = tree.css_first("base[href]")
+            if base_el:
+                bh = (base_el.attributes.get("href") or "").strip()
+                if bh:
+                    base_href = bh
             pdf_links: list[tuple[str, datetime | None]] = []
             for a in tree.css("a[href$='.pdf'], a[href*='.pdf?']"):
                 href = a.attributes.get("href", "")
@@ -186,13 +197,13 @@ class PickensMasterInEquity(BaseScraper):
                         sale_d = dateparser.parse(f"{mh.group(1)} 1, {mh.group(2)}")
                     except (ValueError, TypeError):
                         pass
-                # Normalize URL
+                # Normalize URL. Bare relative hrefs (e.g. "JULY 2026 6.2.26.pdf")
+                # must resolve against the declared <base href> (domain root),
+                # NOT the page path — resolving against the path 404s.
                 if href.startswith("http"):
                     full = href
-                elif href.startswith("/"):
-                    full = "https://www.co.pickens.sc.us" + href
                 else:
-                    full = "https://www.co.pickens.sc.us/departments/master_in_equity/" + href
+                    full = urljoin(base_href, href)
                 pdf_links.append((full, sale_d))
 
             # Pick the latest PDF — Pickens posts past sale results too,
