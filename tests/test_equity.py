@@ -71,6 +71,33 @@ def test_equity_from_last_sale_amortized():
     assert eq["value"] > 0   # paid-down loan on a 250k-value home -> positive equity
 
 
+def test_last_sale_rejects_corrupt_billion_dollar_amount():
+    """Regression: a corrupt GIS last-sale amount (concatenated book+page / cents /
+    parcel id leak) must NOT amortize to a billion-dollar payoff. The path-3 upper
+    bound rejects sale_amt > 3x ARV and any resulting payoff > 2x ARV."""
+    li = Listing(source="x", source_url="u", listing_type=ListingType.REO,
+                 state="SC", county="Spartanburg", market_value=234900,
+                 raw={"calc": {"arv_expected": 234900},
+                      "gis": {"last_sale": {"amount": 1038143000, "date": "2015-06-01"}}})
+    enrich_equity([li])
+    eq = li.raw.get("equity") or {}
+    # corrupt amount rejected -> path 3 yields no payoff -> no equity row (not a
+    # $934M payoff). A legit sale on the same home still works (other test).
+    assert not eq, f"corrupt billion-dollar last-sale should be rejected, got {eq}"
+
+
+def test_last_sale_legit_amount_still_works():
+    """The upper-bound gate must not reject a normal in-band sale."""
+    li = Listing(source="x", source_url="u", listing_type=ListingType.REO,
+                 state="SC", county="Spartanburg", market_value=234900,
+                 raw={"calc": {"arv_expected": 234900},
+                      "gis": {"last_sale": {"amount": 180000, "date": "2015-06-01"}}})
+    enrich_equity([li])
+    eq = li.raw.get("equity") or {}
+    assert eq.get("payoff_source") == "last_sale_amortized"
+    assert eq["payoff_estimate"] <= 2 * eq["arv_used"]
+
+
 def test_equity_band_uses_real_equity_not_roi():
     li = Listing(source="x", source_url="u", listing_type=ListingType.REO, state="NC",
                  county="Gaston",

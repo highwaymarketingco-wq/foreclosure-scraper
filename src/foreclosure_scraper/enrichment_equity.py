@@ -136,11 +136,26 @@ def _payoff(li: Listing, arv: float) -> tuple[Optional[float], str, str]:
             sale_date = _assumed_note_date()
             src, conf = "last_sale_amortized:assumed_date", "low"
     if sale_amt and sale_date:
-        floor = max(10000.0, 0.30 * arv)
-        if float(sale_amt) >= floor:
-            bal = amortized_balance(float(sale_amt) * _LTV_PROXY, sale_date)
-            if bal is not None:
-                return bal, src, conf
+        try:
+            sale_amt = float(sale_amt)
+        except (ValueError, TypeError):
+            sale_amt = None
+        if sale_amt:
+            floor = max(10000.0, 0.30 * arv)
+            # UPPER-BOUND sanity gate. Some county GIS layers leak a concatenated
+            # book+page, a cents-denominated amount, or a parcel id into the
+            # sale-amount field — yielding billion-dollar "sales" that amortize to
+            # billion-dollar payoffs (was 228/544 equity rows, e.g. a $234,900-ARV
+            # house with a $934M payoff; 194 were >100x ARV). The 0.30*arv floor
+            # only screened the LOW end. A real arms-length sale is within a few x
+            # ARV, and because this last-sale proxy is LOW confidence we also
+            # discard any result that still implies an absurd >2x-ARV payoff
+            # rather than trust it. (arv is always > 0 here — _payoff's callers gate
+            # on it — so a pure ARV-relative ceiling is safe, no absolute floor.)
+            if floor <= sale_amt <= 3.0 * arv:
+                bal = amortized_balance(sale_amt * _LTV_PROXY, sale_date)
+                if bal is not None and bal <= 2.0 * arv:
+                    return bal, src, conf
     return None, "unknown", "none"
 
 
