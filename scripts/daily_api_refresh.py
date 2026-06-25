@@ -218,6 +218,35 @@ async def main() -> int:
     if _pre != len(merged):
         print(f"[{time.strftime('%H:%M:%S')}] dropped {_pre - len(merged)} county-less national", flush=True)
 
+    # Full footprint re-scope (not just county-less national) — carryover from
+    # older runs predates scope tightening, so out-of-footprint counties leak
+    # otherwise (this path reintroduced 684 on 2026-06-25). Mirrors merge/regen.
+    from foreclosure_scraper.main import _in_scope
+    _pre = len(merged)
+    merged = [li for li in merged if _in_scope(li)]
+    if _pre != len(merged):
+        print(f"[{time.strftime('%H:%M:%S')}] scope re-filter dropped {_pre - len(merged)} out-of-footprint", flush=True)
+
+    # Drop dead court records (Canceled/Satisfied/Dismissed NC eCourts liens).
+    def _terminal_court(li):
+        st = (((li.raw or {}).get("nc_ecourts") or {}).get("civilJudgmentStatus") or "").lower()
+        return any(t in st for t in ("cancel", "satisf", "dismiss", "vacat", "withdraw", "expired", "released"))
+    _pre = len(merged)
+    merged = [li for li in merged if not _terminal_court(li)]
+    if _pre != len(merged):
+        print(f"[{time.strftime('%H:%M:%S')}] dropped {_pre - len(merged)} terminal-status court records", flush=True)
+
+    # Prune sold/removed Fannie REO (per-property SPA URL 404s once the uuid leaves
+    # inventory). The daily refresh already re-scrapes Fannie, so this is cheap.
+    try:
+        import asyncio
+        from foreclosure_scraper.enrichment_reo_freshness import prune_stale_reo
+        merged, _pstats = asyncio.run(prune_stale_reo(merged))
+        if _pstats.get("pruned"):
+            print(f"[{time.strftime('%H:%M:%S')}] prune_stale_reo: {_pstats}", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"[{time.strftime('%H:%M:%S')}] prune_stale_reo skipped: {str(e)[:80]}", flush=True)
+
     # Safety: never publish a gutted dataset. If the merge lost >35% vs prior,
     # something broke broadly — abort without writing so the good board stands.
     if prior and len(merged) < 0.65 * len(prior):
@@ -229,6 +258,19 @@ async def main() -> int:
     for li in merged:
         if not (li.raw or {}).get("grade"):
             _regrade(li)
+
+    # Recompute equity (self-cleaning — clears stale billion-dollar payoffs the
+    # upper-bound gate now rejects), derived signals (LTV etc.), and data-quality.
+    # All in-memory/cheap; keeps the daily board correct without the slow GIS pass.
+    try:
+        from foreclosure_scraper.enrichment_equity import enrich_equity
+        from foreclosure_scraper.enrichment_derived_signals import enrich_derived_signals
+        from foreclosure_scraper.enrichment_data_quality import enrich_data_quality
+        enrich_equity(merged)
+        enrich_derived_signals(merged)
+        enrich_data_quality(merged)
+    except Exception as e:  # noqa: BLE001
+        print(f"[{time.strftime('%H:%M:%S')}] equity/derived/dq skipped: {str(e)[:80]}", flush=True)
 
     if mark_new_listings:
         try:
