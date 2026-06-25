@@ -163,11 +163,16 @@ def enrich_equity(listings: list[Listing]) -> dict:
     """Attach raw['equity'] = {value, pct, arv_used, payoff, payoff_source, ...}."""
     n = 0
     for li in listings:
+        raw0 = li.raw if isinstance(li.raw, dict) else {}
         arv = _arv(li)
         if not arv or arv <= 0:
+            raw0.pop("equity", None)  # never leave a stale equity we can't recompute
             continue
         payoff, src, conf = _payoff(li, arv)
         if payoff is None:
+            # e.g. a corrupt last-sale amount the upper-bound gate now rejects —
+            # clear any prior (possibly billion-dollar) value rather than keep it.
+            raw0.pop("equity", None)
             continue
         seniors = _senior_liens(li.raw if isinstance(li.raw, dict) else {})
         equity = round(arv - payoff - seniors, -2)
