@@ -243,15 +243,42 @@ async def _resolve_tms(c: httpx.AsyncClient, layer: int, tms: str) -> Optional[d
     return None
 
 
-async def _fetch_county(county_slug: str, codes: tuple[str, ...]) -> list[str]:
+def _select_sale_rosters(selection_html: str, codes: tuple[str, ...]) -> list[tuple[str, Optional[datetime]]]:
+    """From a RosterSelection page, return the foreclosure-SALE roster links
+    (href, sale_date) for the requested RosterCodes, newest sale date first,
+    capped at MAX_ROSTERS_PER_COUNTY. Hearing/motion dockets and non-sale
+    rosters are excluded; selection is by parsed DATE, never URL string order."""
+    tree = HTMLParser(selection_html)
+    cand: list[tuple[str, Optional[datetime]]] = []
+    seen: set[str] = set()
+    for a in tree.css("a"):
+        href = (a.attributes.get("href") or "").replace("&amp;", "&").strip()
+        if "RosterDetails.aspx" not in href:
+            continue
+        m = re.search(r"RosterCode=([A-Za-z]+)", href)
+        if not m or m.group(1) not in codes:
+            continue
+        text = a.text() or ""
+        if not _is_sale_roster(text):
+            continue
+        if href in seen:
+            continue
+        seen.add(href)
+        cand.append((href, _roster_date(text)))
+    # Newest sale date first; rosters with no parseable date sort last.
+    cand.sort(key=lambda x: (x[1] is not None, x[1] or datetime.min), reverse=True)
+    return cand[:MAX_ROSTERS_PER_COUNTY]
+
+
+async def _fetch_county(county_slug: str, codes: tuple[str, ...]) -> list[tuple[str, Optional[datetime]]]:
     """Drive Disclaimer -> RosterSelection -> RosterDetails for one coastal
-    county in a single stealth-browser session. Pulls the most-recent sale
-    rosters for each candidate RosterCode (the sale code differs per county —
-    see COUNTY_SALE_CODES). Returns each roster page's HTML."""
+    county in a single stealth-browser session. Selects the foreclosure-SALE
+    rosters with the newest sale dates (see _select_sale_rosters). Returns
+    (roster_html, sale_date_hint) per roster page."""
     from scrapling.fetchers import StealthyFetcher
 
     base = f"{HOST}/{county_slug}/courtrosters"
-    roster_html: list[str] = []
+    roster_pages: list[tuple[str, Optional[datetime]]] = []
 
     async def action(page):
         await page.goto(f"{base}/Disclaimer.aspx", wait_until="domcontentloaded")
@@ -263,20 +290,10 @@ async def _fetch_county(county_slug: str, codes: tuple[str, ...]) -> list[str]:
         await page.goto(f"{base}/RosterSelection.aspx", wait_until="domcontentloaded")
         await page.wait_for_load_state("networkidle", timeout=12000)
         selection = await page.content()
-        paths: list[str] = []
-        for code in codes:
-            links = sorted(set(re.findall(
-                rf"RosterDetails\.aspx\?[^\"']+RosterCode={code}(?![A-Z])[^\"']*",
-                selection)))
-            links = [m.replace("&amp;", "&").strip() for m in links]
-            paths.extend(links[-MAX_ROSTERS_PER_COUNTY:])
-        # De-dupe preserving order.
-        seen: set[str] = set()
-        paths = [p for p in paths if not (p in seen or seen.add(p))]
-        for path in paths:
+        for path, rdate in _select_sale_rosters(selection, codes):
             await page.goto(f"{base}/{path}", wait_until="domcontentloaded")
             await page.wait_for_load_state("networkidle", timeout=12000)
-            roster_html.append(await page.content())
+            roster_pages.append((await page.content(), rdate))
         return page
 
     try:
@@ -285,7 +302,7 @@ async def _fetch_county(county_slug: str, codes: tuple[str, ...]) -> list[str]:
         )
     except Exception:
         return []
-    return roster_html
+    return roster_pages
 
 
 # Parcel/TMS identifiers as they appear in roster cells: a numeric TMS (10-13
@@ -296,6 +313,41 @@ _PARCEL_CELL_RE = re.compile(
 _CASE_RE = re.compile(r"\b(\d{4}CP\d{4,8})\b")
 _AMT_RE = re.compile(r"\$([\d,]+\.\d{2})")
 
+# Roster-link triage. The MO/SALE RosterCode mixes actual foreclosure-SALE
+# rosters ("Foreclosure Sale - June 1, 2026") with motion/hearing dockets
+# ("CPNJ Motions", "Settlement Hearings") under the SAME code. We must keep only
+# the sale rosters, and select them by the SALE DATE in the link text — NOT by a
+# lexicographic URL sort, which silently grabbed stale past rosters (the original
+# bug: every emitted lead was a sale that had already happened).
+_HEARING_WORDS = (
+    "motion", "hearing", "settlement", "trial", "transfer", "removal",
+    "docket", "cpnj", "status conf", "roster call", "non-jury", "non jury",
+    "jury", "calendar call", "pre-trial", "pretrial",
+)
+_ROSTER_DATE_RE = re.compile(
+    r"([A-Z][a-z]+\.?\s+\d{1,2},?\s+\d{4}|\d{1,2}/\d{1,2}/\d{4})"
+)
+
+
+def _is_sale_roster(text: str) -> bool:
+    """True only for a foreclosure SALE roster (not a hearing/motion docket)."""
+    t = (text or "").lower()
+    if any(w in t for w in _HEARING_WORDS):
+        return False
+    return "sale" in t  # "Foreclosure Sale", "Master's Sales", "Upset Bid Sale"
+
+
+def _roster_date(text: str) -> Optional[datetime]:
+    """Parse the sale date out of a roster link's label, e.g.
+    'Foreclosure Sale - June 1, 2026' or 'Master's Sale 7/6/2026'."""
+    m = _ROSTER_DATE_RE.search(text or "")
+    if not m:
+        return None
+    try:
+        return dateparser.parse(m.group(1))
+    except (ValueError, TypeError, OverflowError):
+        return None
+
 
 def _clean_cell(s: str) -> str:
     s = re.sub(r"<[^>]+>", " ", s or "")
@@ -303,7 +355,8 @@ def _clean_cell(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
-def parse_sale_roster(html: str, roster_url: str, county: str) -> list[Listing]:
+def parse_sale_roster(html: str, roster_url: str, county: str,
+                      roster_date: Optional[datetime] = None) -> list[Listing]:
     """Layout-tolerant parser for a publicindex RosterDetails sale page.
 
     The coastal counties use DIFFERENT column layouts (Horry MO = 13 cols with
@@ -344,6 +397,11 @@ def parse_sale_roster(html: str, roster_url: str, county: str) -> list[Listing]:
                     break
                 except (ValueError, TypeError):
                     pass
+        # Fall back to the roster's own sale date (from the RosterSelection link
+        # label, e.g. "Foreclosure Sale - July 6, 2026") when no per-row cell
+        # date is present — so the active-window filter has a real date to judge.
+        if sale_date is None:
+            sale_date = roster_date
 
         sale_time = None
         for cell in cells:
@@ -454,9 +512,9 @@ class SCCoastalRosters(BaseScraper):
                 pages = await _fetch_county(slug, codes)
             except Exception:
                 continue
-            for html in pages:
+            for html, rdate in pages:
                 for li in parse_sale_roster(
-                    html, f"{base}/RosterSelection.aspx", county
+                    html, f"{base}/RosterSelection.aspx", county, rdate
                 ):
                     # parcel + case dedupe (the same case can repeat across the
                     # MO hearing docket and the SALE roster of a county).

@@ -138,3 +138,32 @@ def test_live_yields_geocoded_coastal_rows():
     for li in out:
         assert li.state == "SC"
         assert li.county in COASTAL_COUNTIES.values()
+
+
+def test_select_sale_rosters_excludes_hearings_picks_newest():
+    """Roster selection must keep only foreclosure-SALE rosters and order by
+    sale DATE (newest first), not lexicographic URL — the original stale-roster
+    bug. Mirrors the real Horry MO page (sales + CPNJ/settlement hearings)."""
+    from foreclosure_scraper.scrapers.counties_sc.sc_coastal_rosters import (
+        _select_sale_rosters, _is_sale_roster, _roster_date,
+    )
+    html = (
+        '<a href="RosterDetails.aspx?CourtAgency=26003&RosterID=419&RosterCode=MO">'
+        'Foreclosure Sale - February 2, 2026 - 11:00 am</a>'
+        '<a href="RosterDetails.aspx?CourtAgency=26003&RosterID=422&RosterCode=MO">'
+        'Foreclosure Sale - May 4, 2026 - 11:00am</a>'
+        '<a href="RosterDetails.aspx?CourtAgency=26003&RosterID=430&RosterCode=MO">'
+        'Foreclosure Sale - July 6, 2026</a>'
+        '<a href="RosterDetails.aspx?CourtAgency=26002&RosterID=519&RosterCode=MO">'
+        'CPNJ Motions ( 7/6/2026 - 7/8/2026) Honorable Will Wheeler 3D</a>'
+        '<a href="RosterDetails.aspx?CourtAgency=26002&RosterID=514&RosterCode=MO">'
+        'SETTLEMENT HEARINGS - Honorable G. D. Morgan</a>'
+    )
+    sel = _select_sale_rosters(html, ("MO",))
+    ids = [h.split("RosterID=")[1].split("&")[0] for h, _ in sel]
+    assert "519" not in ids and "514" not in ids   # hearing dockets excluded
+    assert ids[0] == "430"                          # newest sale (July 6) first
+    assert _is_sale_roster("Foreclosure Sale - July 6, 2026")
+    assert not _is_sale_roster("CPNJ Motions")
+    assert not _is_sale_roster("SETTLEMENT HEARINGS")
+    assert _roster_date("Foreclosure Sale - July 6, 2026").date().isoformat() == "2026-07-06"
