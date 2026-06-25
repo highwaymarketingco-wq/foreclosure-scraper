@@ -151,9 +151,17 @@ function fillStats() {
 
 // ------------- Filter init ---------------------------------------------------
 function initFilters() {
+  // Idempotent: loadDataset() calls this on every (re)load + dataset switch, so
+  // strip any previously-appended options (keep the first "All …" default)
+  // before repopulating — otherwise counties/sources duplicate on each call.
+  const resetSelect = (el) => {
+    while (el.options.length > 1) el.remove(1);
+  };
+
   const counties = new Set();
   LISTINGS.forEach((l) => l.county && counties.add(`${l.county}, ${l.state || "?"}`));
   const sel = $("filter-county");
+  resetSelect(sel);
   Array.from(counties)
     .sort()
     .forEach((c) => {
@@ -166,6 +174,7 @@ function initFilters() {
   const sources = new Set();
   LISTINGS.forEach((l) => l.source && sources.add(l.source));
   const ssel = $("filter-source");
+  resetSelect(ssel);
   Array.from(sources)
     .sort()
     .forEach((s) => {
