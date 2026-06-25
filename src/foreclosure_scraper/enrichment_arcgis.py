@@ -197,16 +197,28 @@ def _street_keywords(street: str) -> str:
 
 _FIELD_CACHE: dict[str, list[str]] = {}
 
-# Address-like field name candidates (in priority order)
+# Address-like field name candidates (in priority order). PHYSICAL/SITUS fields
+# come FIRST so a layer that also exposes an owner-mailing field (e.g. Gaston's
+# CURR_ADDR1 = out-of-state owner mailing) never wins the situs slot — we want
+# the property's physical address, not where the (often absentee) owner gets mail.
 _ADDR_FIELD_CANDIDATES = (
-    "situsaddress1", "PROPADDR", "PROPERTY_ADDRESS", "PropertyLocation",
-    "Property_Address", "PHYSICAL_STREET_ADDRESS", "LOCATION_ADDR",
-    "PHYS_ADDR", "PHYADDR", "siteadd", "SITUS_ADDR", "ADDRESS_1",
-    "Site_Address", "PROP_LOC", "ADDRESS", "ADDR", "LocAddr",
-    "STREET_ADDR", "STREET", "StreetAddress", "FULLADDR",
-    "PrimarySitusAddress", "SitusAddress", "PROP_ADDR", "MailAddr",
-    "txt_propaddr",
+    # explicit physical-situs fields, highest priority
+    "PHYSSTRADD", "PHYSADDR", "PHYS_ADDR", "PHYADDR", "PHYSICAL_STREET_ADDRESS",
+    "SITE_ADDR", "SITE_ADDRESS", "Site_Address", "siteadd", "SITUS", "SITUS_ADDR",
+    "situsaddress1", "PrimarySitusAddress", "SitusAddress", "LOCADD", "LOCADDR",
+    "LOCATION_ADDR", "LocAddr",
+    # generic property-address fields
+    "PROPADDR", "PROPERTY_ADDRESS", "PropertyLocation", "Property_Address",
+    "PROP_LOC", "PROP_ADDR", "txt_propaddr", "FULLADDR",
+    # last-resort generic street fields (a mailing field could share these, so
+    # they rank below every situs field above)
+    "ADDRESS_1", "ADDRESS", "ADDR", "STREET_ADDR", "STREET", "StreetAddress",
+    "MailAddr",
 )
+
+# Substrings that mark a field as an OWNER-MAILING address (never a situs).
+_MAILING_FIELD_MARKERS = ("mail", "owner", "curr_addr", "curraddr", "jan1",
+                          "ownaddr", "own_addr", "taxaddr", "tax_addr")
 
 
 async def _detect_addr_field(c: httpx.AsyncClient, base_url: str) -> str | None:
@@ -224,15 +236,18 @@ async def _detect_addr_field(c: httpx.AsyncClient, base_url: str) -> str | None:
             _FIELD_CACHE[base_url] = fields
         except (httpx.HTTPError, ValueError):
             return None
-    # Match against known candidates (case-insensitive)
+    # Match against known candidates (case-insensitive). A candidate that is an
+    # owner-mailing field on THIS layer is skipped so situs always wins.
     field_lower = {f.lower(): f for f in fields}
     for cand in _ADDR_FIELD_CANDIDATES:
-        if cand.lower() in field_lower:
-            return field_lower[cand.lower()]
-    # Fallback: any field with "addr" or "street" in the name (excluding mail)
+        cl = cand.lower()
+        if cl in field_lower and not any(m in cl for m in _MAILING_FIELD_MARKERS):
+            return field_lower[cl]
+    # Fallback: any addr/street/situs field that is NOT an owner-mailing field.
     for f in fields:
         flow = f.lower()
-        if ("addr" in flow or "street" in flow or "situs" in flow) and "mail" not in flow and "owner" not in flow:
+        if ("addr" in flow or "street" in flow or "situs" in flow) and \
+                not any(m in flow for m in _MAILING_FIELD_MARKERS):
             return f
     return None
 

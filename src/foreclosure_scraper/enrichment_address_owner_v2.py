@@ -371,6 +371,19 @@ def _best_unique(
 # Address write with detected-field fallback
 # ---------------------------------------------------------------------------
 
+def _looks_like_mailing(s: Optional[str]) -> bool:
+    """True for values that are an owner-MAILING artifact, never a property situs:
+    a care-of line, an attention line, or a PO box. Belt-and-suspenders behind the
+    situs-field preference in _detect_addr_field so an absentee owner's out-of-state
+    mailing address can never land in street_address."""
+    t = (s or "").strip().upper()
+    if not t:
+        return False
+    return (t.startswith("C/O") or t.startswith("C O ") or t.startswith("ATTN")
+            or t.startswith("POBOX") or "P O BOX" in t or "PO BOX" in t
+            or " C/O " in t)
+
+
 def _inject_site_alias(attrs: dict[str, Any], site_field: Optional[str]) -> None:
     """If the detected situs field isn't one _populate_from_attrs knows, copy
     its value into a recognized alias key so the standard writer picks it up."""
@@ -489,6 +502,11 @@ async def enrich_addresses_from_owner_v2(
             _inject_site_alias(best, site_field)
             had_addr = bool((li.street_address or "").strip())
             filled = _populate_from_attrs(li, best)
+            # Hard guard: if we just wrote a care-of / PO-box / mailing artifact as
+            # the situs (e.g. an absentee owner's out-of-state line slipped through),
+            # reject it rather than mislabel an out-of-state address as the property.
+            if not had_addr and _looks_like_mailing(li.street_address):
+                li.street_address = None
             now_addr = bool((li.street_address or "").strip())
             if now_addr and not had_addr:
                 stats["address_filled"] += 1
