@@ -1,9 +1,9 @@
 {
-  "run_time": "2026-06-25T04:04:33.058262Z",
-  "total": 3857,
+  "run_time": "2026-06-25T06:26:00.696247Z",
+  "total": 3812,
   "by_source": {
     "national.auction_dot_com": 10,
-    "national.fannie_homepath": 57,
+    "national.fannie_homepath": 12,
     "national.homeharvest": 15,
     "national.distressed": 375,
     "national.hud_homestore": 5,
@@ -39,21 +39,21 @@
     "counties_sc.sc_tax_delinquent": 1311
   },
   "by_state": {
-    "NC": 1176,
-    "SC": 2681
+    "NC": 1175,
+    "SC": 2637
   },
   "by_county_top": [
     [
       "SC/Pickens",
-      1423
+      1413
     ],
     [
       "SC/Spartanburg",
-      596
+      574
     ],
     [
       "SC/Anderson",
-      352
+      347
     ],
     [
       "NC/Gaston",
@@ -73,7 +73,7 @@
     ],
     [
       "SC/Laurens",
-      130
+      127
     ],
     [
       "NC/Lincoln",
@@ -85,7 +85,7 @@
     ],
     [
       "SC/Cherokee",
-      66
+      65
     ],
     [
       "NC/Burke",
@@ -93,15 +93,15 @@
     ],
     [
       "SC/Union",
-      52
+      50
     ],
     [
       "SC/Oconee",
-      46
+      45
     ],
     [
-      "NC/Polk",
-      44
+      "NC/Rutherford",
+      43
     ]
   ],
   "source_status": {},
