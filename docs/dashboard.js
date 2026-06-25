@@ -163,7 +163,19 @@ function initFilters() {
       sel.appendChild(opt);
     });
 
-  ["search", "filter-state", "filter-county", "filter-type", "filter-distress", "filter-grade", "filter-window", "filter-roi"].forEach((id) =>
+  const sources = new Set();
+  LISTINGS.forEach((l) => l.source && sources.add(l.source));
+  const ssel = $("filter-source");
+  Array.from(sources)
+    .sort()
+    .forEach((s) => {
+      const opt = document.createElement("option");
+      opt.value = s;
+      opt.textContent = s;
+      ssel.appendChild(opt);
+    });
+
+  ["search", "filter-state", "filter-county", "filter-type", "filter-land", "filter-source", "filter-distress", "filter-grade", "filter-window", "filter-roi"].forEach((id) =>
     $(id).addEventListener("input", applyFilters),
   );
 
@@ -228,6 +240,8 @@ function applyFilters() {
   const st = $("filter-state").value;
   const co = $("filter-county").value;
   const ty = $("filter-type").value;
+  const land = $("filter-land").value;
+  const src = $("filter-source").value;
   const distress = $("filter-distress").value;
   const minGrade = $("filter-grade").value;
   const minGradeRank = minGrade ? gradeOrder[minGrade] : 0;
@@ -242,6 +256,16 @@ function applyFilters() {
     if (st && l.state !== st) return false;
     if (co && `${l.county || ""}, ${l.state || "?"}` !== co) return false;
     if (ty && l.listing_type !== ty) return false;
+    if (src && l.source !== src) return false;
+    if (land) {
+      const pk = (l.property_kind || "").toLowerCase();
+      const isLand = pk === "land" || pk === "lot" || pk === "vacant";
+      const hasStructure =
+        ["single_family", "condo", "mobile", "multi_family", "townhouse", "duplex"].includes(pk) ||
+        l.living_sqft > 0 || !!l.year_built;
+      if (land === "land" && !isLand) return false;
+      if (land === "improved" && !hasStructure) return false;
+    }
     if (distress) {
       const ds = getDistress(l);
       if (!ds) return false;
