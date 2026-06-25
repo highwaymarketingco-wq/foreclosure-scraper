@@ -22,6 +22,8 @@ from foreclosure_scraper.enrichment_sc_cama import enrich_sc_cama  # noqa: E402
 from foreclosure_scraper.enrichment_footprint_sqft import enrich_footprint_sqft  # noqa: E402
 from foreclosure_scraper.enrichment_data_quality import enrich_data_quality  # noqa: E402
 from foreclosure_scraper.enrichment_assessor_card import enrich_assessor_card  # noqa: E402
+from foreclosure_scraper.enrichment_multifamily_class import enrich_multifamily_class  # noqa: E402
+from foreclosure_scraper.enrichment_property_kind import enrich_property_kind  # noqa: E402
 from foreclosure_scraper.web_artifact import write_artifact  # noqa: E402
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
@@ -70,8 +72,10 @@ def main() -> int:
     import asyncio
     from foreclosure_scraper.enrichment_parcel_lookup import enrich_with_parcel_lookup
     try:
-        asyncio.run(enrich_with_parcel_lookup(listings))
+        asyncio.run(asyncio.wait_for(enrich_with_parcel_lookup(listings), timeout=300))
         print("parcel_lookup: done")
+    except (asyncio.TimeoutError, TimeoutError):
+        print("parcel_lookup: time-capped at 300s (partial — rest left un-enriched)")
     except Exception as e:  # noqa: BLE001
         print("parcel_lookup: ERROR", str(e)[:80])
 
@@ -108,6 +112,13 @@ def main() -> int:
             except Exception:  # noqa: BLE001
                 pass
         print(f"re-graded {len(touched)} card-enriched leads")
+
+    # Multifamily classifier BEFORE property_kind backfill (mirrors main.py):
+    # promote apartment/multi-unit distress, then guarantee non-UNKNOWN coverage.
+    mfs = enrich_multifamily_class(listings)
+    print("enrich_multifamily_class:", {k: v for k, v in mfs.items()
+                                        if k not in ("examples", "skipped_examples")})
+    enrich_property_kind(listings)
 
     print("enrich_data_quality:", enrich_data_quality(listings))
 

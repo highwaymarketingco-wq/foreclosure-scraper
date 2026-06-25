@@ -7,7 +7,6 @@ Writes:
 from __future__ import annotations
 
 import json
-import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +14,7 @@ from pathlib import Path
 import structlog
 
 from .models import Listing
+from .stale_link_fallback import annotate_stale_links
 
 log = structlog.get_logger()
 
@@ -106,6 +106,9 @@ RAW_KEEP = {
     "assessor_card": "*",             # on-demand per-parcel card: recorded sale price + history + sqft source
     "pulled_sale": "*",               # cross-run withdrawn/pulled-sale aging counter
     "comps_geo_warning": "*",         # low-confidence ARV note (comps out of geo radius)
+    "link_check": "*",                # link-validator reachability tag {status, http}
+    "fallback_links": "*",            # reliable backups for stale aggregator links {google, maps, parcel_gis}
+    "link_may_be_stale": "*",         # True for old/carryover aggregator leads (operator "verify link" hint)
 }
 
 
@@ -187,6 +190,11 @@ def _to_dict(li: Listing) -> dict:
     # Drop legal_description from public view (often huge)
     if "legal_description" in d and d["legal_description"]:
         d["legal_description"] = d["legal_description"][:200]
+    # Stale-link safety net: for per-property aggregator leads (realtor/
+    # zillow/trulia/homes.com/foreclosure.com) add reliable fallback links
+    # (county GIS + Google + Maps) into raw and flag old carryover leads as
+    # link_may_be_stale. NEVER touches source_url; never drops the lead.
+    annotate_stale_links(d)
     return d
 
 

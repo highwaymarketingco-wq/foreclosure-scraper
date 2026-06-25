@@ -38,6 +38,8 @@ from foreclosure_scraper.enrichment_assessor_card import enrich_assessor_card  #
 from foreclosure_scraper.enrichment_equity import enrich_equity  # noqa: E402
 from foreclosure_scraper.distress_score import score_board  # noqa: E402
 from foreclosure_scraper.enrichment_data_quality import enrich_data_quality  # noqa: E402
+from foreclosure_scraper.enrichment_multifamily_class import enrich_multifamily_class  # noqa: E402
+from foreclosure_scraper.enrichment_property_kind import enrich_property_kind  # noqa: E402
 from foreclosure_scraper.web_artifact import write_artifact  # noqa: E402
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
@@ -54,6 +56,8 @@ NEW_SOURCES = {
     "counties_sc.sc_county_rosters",
     "counties_nc.nc_rod_substitute_trustee", "counties_nc.nc_rod_logan",
     "public_notices.ncpublicnotices",
+    # net-new multifamily + coastal sources (2026-06-25)
+    "national.crexi_multifamily", "counties_sc.sc_coastal_rosters",
 }
 
 
@@ -158,6 +162,12 @@ def main() -> int:
 
     print("enrich_equity:", enrich_equity(merged))
     print("distress score_board:", score_board(merged))
+    # Multifamily classifier BEFORE property_kind backfill (mirrors main.py):
+    # promote apartment/multi-unit distress, then guarantee non-UNKNOWN coverage.
+    mfs = enrich_multifamily_class(merged)
+    print("enrich_multifamily_class:", {k: v for k, v in mfs.items()
+                                        if k not in ("examples", "skipped_examples")})
+    enrich_property_kind(merged)
     print("enrich_data_quality:", enrich_data_quality(merged))
 
     summary = {

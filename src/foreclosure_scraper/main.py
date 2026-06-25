@@ -122,6 +122,48 @@ def _check_oceanfront(li: Listing) -> bool:
     return ok
 
 
+def _in_oceanfront_county(li: Listing) -> bool:
+    if not (li.county and li.state):
+        return False
+    cs = (li.county.replace(" County", "").strip().title(), li.state.upper())
+    return cs in OCEANFRONT_COASTAL_COUNTIES
+
+
+def _oceanfront_pending(li: Listing) -> bool:
+    """Provisional admission for an oceanfront-county listing that has an
+    ADDRESS but no coordinates yet.
+
+    The near-beach test (``is_oceanfront``) is authoritative on precise lat/lng,
+    but most coastal sources (NC law firms, eCourts, SC court rosters with only
+    a parcel#) emit address/parcel rows with NO coordinates — and the scope gate
+    runs at INGEST, BEFORE the geocode + parcel-lookup enrichers fill lat/lng.
+    Without a carve-out those rows are denied (out-of-footprint county + no
+    coords -> oceanfront 2-of-3 fallback fails) and never reach geocoding.
+
+    So we admit them PROVISIONALLY, tagged ``raw.oceanfront_pending``, and the
+    post-geocode re-pass re-applies the strict near-beach test once coordinates
+    exist — dropping the ones that turn out inland.
+
+    Requires a STREET ADDRESS or PARCEL id — something that geocodes to a real
+    point. A bare city/zip is deliberately NOT enough: it only yields a coarse
+    centroid that would unreliably pass/fail the 250 m gate, and it would punch
+    a hole in the deny-list (a 28461 Brunswick zip-only row must still be denied,
+    not provisionally admitted on a town centroid).
+    """
+    if not _in_oceanfront_county(li):
+        return False
+    if li.latitude is not None and li.longitude is not None:
+        return False  # has coords -> the strict test already decided
+    has_locator = bool((li.street_address or "").strip()
+                       or (li.parcel_id or "").strip())
+    if not has_locator:
+        return False
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    li.raw["oceanfront_pending"] = True
+    return True
+
+
 def _in_scope(li: Listing) -> bool:
     # Oceanfront override — runs BEFORE the deny check so the otherwise-
     # denied coastal counties (New Hanover/Brunswick/Onslow + the SC
@@ -133,10 +175,29 @@ def _in_scope(li: Listing) -> bool:
               li.state.upper())
         if cs in OCEANFRONT_COASTAL_COUNTIES and _check_oceanfront(li):
             return True
+    # Provisional oceanfront admission — keep coastal-county rows that have an
+    # address/parcel but no coordinates yet, so the geocode + parcel-lookup
+    # enrichers can fill lat/lng. The post-geocode re-pass re-tests them and
+    # drops the inland ones. (Without this, address-only coastal rows from the
+    # NC law firms / eCourts / SC rosters die before they can be geocoded.)
+    if _oceanfront_pending(li):
+        return True
     # True downtown Charleston peninsula — harbor-side, so it won't pass the
     # oceanfront distance gate, but the owner wants it kept (not N. Charleston /
     # Summerville). Also runs before the deny check.
     if _is_downtown_charleston(li):
+        return True
+    # Downtown-Charleston provisional: a Charleston-county row with an address
+    # but no coords yet — keep it so geocode can place it on the peninsula
+    # bbox; the re-pass drops it if it lands off-peninsula.
+    if (li.state or "").upper() == "SC" and li.county \
+            and li.county.replace(" County", "").strip().title() == "Charleston" \
+            and (li.latitude is None or li.longitude is None) \
+            and (li.city or "").strip().lower() not in _DOWNTOWN_CHS_DENY_CITY \
+            and ((li.street_address or "").strip() or (li.parcel_id or "").strip()):
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["downtown_charleston_pending"] = True
         return True
     # Deny set takes precedence over EVERY other scope path. Without this,
     # a listing tagged with a denied county still gets through via the zip-
@@ -725,13 +786,51 @@ async def run() -> int:
         collapsed=pre_dedupe2_count - len(enriched),
     )
 
+    # 2026-06-24 COASTAL fix — re-test PROVISIONAL oceanfront / downtown rows
+    # now that geocode + parcel-lookup have filled lat/lng. At ingest these were
+    # admitted address-only (raw.oceanfront_pending / downtown_charleston_pending)
+    # because the scope gate runs before geocoding. Apply the strict near-beach /
+    # peninsula test on the now-final coordinates and DROP the ones that resolved
+    # inland. Survivors get the confirmed tag so the deny re-pass below spares
+    # them (New Hanover/Brunswick are in SCOPE_DENY but their oceanfront rows are
+    # the whole point of the coastal track).
+    def _resolve_pending(li: Listing) -> bool:
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        pend_of = raw.pop("oceanfront_pending", None)
+        pend_dt = raw.pop("downtown_charleston_pending", None)
+        if not (pend_of or pend_dt):
+            return None  # not a pending row — leave to the other passes
+        if pend_of and _in_oceanfront_county(li) and _check_oceanfront(li):
+            return True  # confirmed near-beach -> tagged raw.oceanfront
+        # Charleston is in OCEANFRONT_COASTAL_COUNTIES, so a peninsula (harbor-
+        # side) row gets oceanfront_pending but will FAIL the ocean-distance
+        # test; fall through to the downtown peninsula test before dropping it.
+        if _is_downtown_charleston(li):
+            return True  # tagged raw.downtown_charleston
+        return False
+    _pre_pending = len(enriched)
+    _kept = []
+    for li in enriched:
+        verdict = _resolve_pending(li)
+        if verdict is None or verdict:
+            _kept.append(li)
+    enriched = _kept
+    if _pre_pending != len(enriched):
+        log.info("orchestrator.oceanfront_repass",
+                 dropped=_pre_pending - len(enriched))
+
     # 2026-06-19 QA fix — POST-ENRICHMENT SCOPE RE-PASS. _in_scope() runs once
     # at ingest, BEFORE the enrichment chain fills county on 'state-only'
     # bankruptcy rows (and others). A row admitted with an empty county can be
     # enriched to a DENIED county (e.g. Mecklenburg) and then ship, because the
     # deny-check never re-runs. Re-apply the deny-list on the now-final county so
     # denied counties can never appear regardless of how they were admitted.
+    # EXCEPTION: confirmed oceanfront / downtown-Charleston rows are intentional
+    # re-admissions of otherwise-denied coastal counties — never drop those.
     def _denied_now(li: Listing) -> bool:
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        if raw.get("oceanfront") or raw.get("downtown_charleston"):
+            return False
         if li.county and li.state:
             key = (li.county.replace(" County", "").strip().title(), li.state.upper())
             return key in SCOPE_DENY_COUNTIES_NORMALIZED
@@ -1098,6 +1197,23 @@ async def run() -> int:
         await enrich_with_extra_rent_comps(enriched)
     except Exception:
         log.error("rent_comps_extra.failed", traceback=traceback.format_exc())
+
+    # Multifamily classifier — promote mislabeled apartment / multi-unit
+    # distressed properties to MULTI_FAMILY using precise party/owner/title +
+    # description + structure signals. MUST run BEFORE enrich_property_kind:
+    # property_kind runs last and force-defaults UNKNOWN->SINGLE_FAMILY, which
+    # would otherwise mask these. Running first means property_kind sees the MF
+    # tag as already-classified and leaves it intact.
+    try:
+        from .enrichment_multifamily_class import enrich_multifamily_class
+        s = enrich_multifamily_class(enriched)
+        if s:
+            enrichment_stats["multifamily_class"] = {
+                k: v for k, v in s.items()
+                if k not in ("examples", "skipped_examples")
+            }
+    except Exception:
+        log.error("multifamily_class.failed", traceback=traceback.format_exc())
 
     # Property kind backfill — guarantee 100% non-UNKNOWN coverage. Runs
     # LAST so it can use every other signal (description, structure data,
