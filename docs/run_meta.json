@@ -1,9 +1,9 @@
 {
-  "run_time": "2026-06-25T03:16:56.964668Z",
-  "total": 4686,
+  "run_time": "2026-06-25T04:04:33.058262Z",
+  "total": 3857,
   "by_source": {
     "national.auction_dot_com": 10,
-    "national.fannie_homepath": 818,
+    "national.fannie_homepath": 57,
     "national.homeharvest": 15,
     "national.distressed": 375,
     "national.hud_homestore": 5,
@@ -18,7 +18,7 @@
     "counties_sc.anderson_master_in_equity": 5,
     "counties_sc.sc_county_rosters": 9,
     "counties_sc.sc_public_index_lis_pendens": 506,
-    "counties_nc.nc_ecourts_lis_pendens": 514,
+    "counties_nc.nc_ecourts_lis_pendens": 446,
     "newspapers.hendersonville_lightning": 1,
     "reo.vrm_va_reo": 24,
     "national.courtlistener_bankruptcy": 410,
@@ -39,69 +39,69 @@
     "counties_sc.sc_tax_delinquent": 1311
   },
   "by_state": {
-    "NC": 1259,
-    "SC": 3427
+    "NC": 1176,
+    "SC": 2681
   },
   "by_county_top": [
     [
       "SC/Pickens",
-      1542
+      1423
     ],
     [
       "SC/Spartanburg",
-      875
+      596
     ],
     [
       "SC/Anderson",
-      509
+      352
     ],
     [
       "NC/Gaston",
-      324
-    ],
-    [
-      "SC/Laurens",
-      232
+      301
     ],
     [
       "NC/Buncombe",
-      209
+      190
     ],
     [
       "NC/Henderson",
-      173
+      159
     ],
     [
       "NC/Cleveland",
-      134
+      133
     ],
     [
-      "SC/Oconee",
-      100
+      "SC/Laurens",
+      130
     ],
     [
       "NC/Lincoln",
-      96
-    ],
-    [
-      "NC/McDowell",
       89
     ],
     [
+      "NC/McDowell",
+      86
+    ],
+    [
       "SC/Cherokee",
-      83
-    ],
-    [
-      "NC/Burke",
-      69
-    ],
-    [
-      "SC/Union",
       66
     ],
     [
+      "NC/Burke",
+      60
+    ],
+    [
+      "SC/Union",
+      52
+    ],
+    [
+      "SC/Oconee",
+      46
+    ],
+    [
       "NC/Polk",
-      48
+      44
     ]
   ],
   "source_status": {},
