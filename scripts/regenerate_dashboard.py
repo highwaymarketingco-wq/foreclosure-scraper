@@ -11,6 +11,7 @@ Usage: python scripts/regenerate_dashboard.py
 """
 import collections
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -87,9 +88,13 @@ def main() -> int:
         except Exception as e:  # noqa: BLE001
             print(f"{name}: ERROR", str(e)[:80])
 
-    _run_bounded("parcel_from_geo", enrich_parcel_from_geo(listings), 480)
-    _run_bounded("parcel_lookup", enrich_with_parcel_lookup(listings), 300)
-    _run_bounded("gis_attrs", enrich_gis_attrs(listings), 600)
+    # regenerate is the manual THOROUGH re-enrich path, so caps are generous +
+    # concurrency raised to let the GIS backfill complete (value/owner/sqft full
+    # lift) rather than time-cap partway. Env-overridable for a quick pass.
+    _t = lambda k, d: int(os.environ.get(k, d))
+    _run_bounded("parcel_from_geo", enrich_parcel_from_geo(listings, concurrency=16), _t("REGEN_PFG_TIMEOUT", 1200))
+    _run_bounded("parcel_lookup", enrich_with_parcel_lookup(listings), _t("REGEN_PL_TIMEOUT", 600))
+    _run_bounded("gis_attrs", enrich_gis_attrs(listings, concurrency=16), _t("REGEN_GIS_TIMEOUT", 3000))
 
     print("enrich_sc_cama:", enrich_sc_cama(listings))
     print("enrich_footprint_sqft:", enrich_footprint_sqft(listings))

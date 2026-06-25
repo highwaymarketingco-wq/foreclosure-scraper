@@ -1,9 +1,9 @@
 {
-  "run_time": "2026-06-25T14:42:00.203516Z",
-  "total": 3794,
+  "run_time": "2026-06-25T21:07:08.972720Z",
+  "total": 3787,
   "by_source": {
     "national.auction_dot_com": 10,
-    "national.fannie_homepath": 15,
+    "national.fannie_homepath": 8,
     "national.homeharvest": 15,
     "national.distressed": 375,
     "national.hud_homestore": 5,
@@ -39,10 +39,74 @@
     "counties_sc.sc_tax_delinquent": 1299,
     "national.crexi_multifamily": 12
   },
-  "by_state": {},
-  "by_county_top": [],
+  "by_state": {
+    "NC": 1173,
+    "SC": 2614
+  },
+  "by_county_top": [
+    [
+      "SC/Pickens",
+      1400
+    ],
+    [
+      "SC/Spartanburg",
+      564
+    ],
+    [
+      "SC/Anderson",
+      344
+    ],
+    [
+      "NC/Gaston",
+      301
+    ],
+    [
+      "NC/Buncombe",
+      187
+    ],
+    [
+      "NC/Henderson",
+      160
+    ],
+    [
+      "NC/Cleveland",
+      133
+    ],
+    [
+      "SC/Laurens",
+      126
+    ],
+    [
+      "NC/McDowell",
+      86
+    ],
+    [
+      "NC/Lincoln",
+      84
+    ],
+    [
+      "SC/Cherokee",
+      65
+    ],
+    [
+      "NC/Burke",
+      61
+    ],
+    [
+      "SC/Union",
+      51
+    ],
+    [
+      "SC/Oconee",
+      46
+    ],
+    [
+      "NC/Rutherford",
+      44
+    ]
+  ],
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "re-applied self-cleaning equity + derived signals"
+  "notes": "regenerated in-place from persisted dataset (no re-scrape)"
 }
