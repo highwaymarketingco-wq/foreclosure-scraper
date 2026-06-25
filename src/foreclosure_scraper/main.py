@@ -296,6 +296,11 @@ DATELESS_OK_SOURCES = {
     "derived.divorce_deed",
     "national.crexi_multifamily",                 # Crexi MF/apartment for-sale listings (no sale date)
     "counties_sc.sc_coastal_rosters",             # coastal foreclosure rosters (sale_date best-effort)
+    "counties_nc.cleveland_tax",                  # Cleveland NC tax/lis-pendens rows (dateless) — leak fix
+    "counties_sc.sc_state_tax_lien",              # SC DOR state tax-lien registry (dateless) — leak fix
+    "counties_sc.charleston_mie",                 # Charleston MIE roster rows (case#-only, dateless)
+    "national.hud_reac_inspection",               # HUD REAC failing-inspection multifamily (no sale date)
+    "national.hud_section8_contracts",            # HUD Section-8 contract-expiry multifamily (no sale date)
 }
 
 

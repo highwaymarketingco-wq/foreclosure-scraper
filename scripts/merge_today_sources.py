@@ -30,6 +30,7 @@ from foreclosure_scraper.enrichment_address_backfill import enrich_addresses_fro
 from foreclosure_scraper.enrichment_parcel_lookup import enrich_with_parcel_lookup  # noqa: E402
 from foreclosure_scraper.enrichment_parcel_from_geo import enrich_parcel_from_geo  # noqa: E402
 from foreclosure_scraper.enrichment_gis_attrs import enrich_gis_attrs  # noqa: E402
+from foreclosure_scraper.enrichment_gis_derived import enrich_gis_derived  # noqa: E402
 from foreclosure_scraper.enrichment_derived_signals import enrich_derived_signals  # noqa: E402
 from foreclosure_scraper.enrichment_reo_freshness import prune_stale_reo  # noqa: E402
 from foreclosure_scraper.enrichment_aggressive_address import enrich_with_aggressive_address  # noqa: E402
@@ -61,6 +62,13 @@ NEW_SOURCES = {
     "public_notices.ncpublicnotices",
     # net-new multifamily + coastal sources (2026-06-25)
     "national.crexi_multifamily", "counties_sc.sc_coastal_rosters",
+    # net-new + recovered sources (2026-06-25 pm): fixed CourtListener lift-stay,
+    # HUD multifamily (REAC + Section8), Charleston MIE, + dormant-but-healthy
+    # county sources that scrape fine but were never surfaced + DATELESS leak fixes.
+    "national.courtlistener_adversary", "national.hud_reac_inspection",
+    "national.hud_section8_contracts", "counties_sc.charleston_mie",
+    "counties_sc.sc_rod_acclaim", "counties_nc.cleveland_tax",
+    "counties_sc.sc_state_tax_lien",
 }
 
 
@@ -121,9 +129,9 @@ async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
         except Exception as e:  # noqa: BLE001
             print(f"  {name}: ERROR {str(e)[:80]}")
     await _step("geocode#1", enrich_geocode(merged))
-    await _step("parcel_from_geo", asyncio.wait_for(enrich_parcel_from_geo(merged), timeout=480))  # lat/lng -> parcel_id
+    await _step("parcel_from_geo", asyncio.wait_for(enrich_parcel_from_geo(merged, concurrency=16), timeout=1200))  # lat/lng -> parcel_id
     await _step("parcel_lookup", asyncio.wait_for(enrich_with_parcel_lookup(merged), timeout=600))  # parcel# -> addr/sqft/acreage/owner (bounded)
-    await _step("gis_attrs", asyncio.wait_for(enrich_gis_attrs(merged), timeout=600))  # parcel/point -> value/owner/sqft/year/acreage
+    await _step("gis_attrs", asyncio.wait_for(enrich_gis_attrs(merged, concurrency=16), timeout=2400))  # parcel/point -> value/owner/sqft/year/acreage (missing-only, so mostly new leads)
     await _step("address_backfill", enrich_addresses_from_owner(merged))
     await _step("aggressive_address", enrich_with_aggressive_address(merged))
     await _step("parcel_reverse_geo", enrich_parcel_reverse_geo(merged))
@@ -172,6 +180,9 @@ def main() -> int:
         _regrade(touched)
         print(f"re-graded {len(touched)} card-enriched leads")
 
+    # GIS-derived last-sale/deed-age + tax-runway from the full attr bag, BEFORE
+    # equity so _payoff can use the recovered sale data on no-card SC counties.
+    print("enrich_gis_derived:", enrich_gis_derived(merged))
     print("enrich_equity:", enrich_equity(merged))
     print("distress score_board:", score_board(merged))
     # Multifamily classifier BEFORE property_kind backfill (mirrors main.py):

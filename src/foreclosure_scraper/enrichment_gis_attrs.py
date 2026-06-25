@@ -305,6 +305,11 @@ def apply_gis_attrs(li: Listing, attrs: dict[str, Any]) -> dict[str, int]:
             "acreage": li.acreage,
             "land_use": li.land_use,
         }
+        # Stash the WHOLE matched attribute bag (outFields=* already fetched, zero
+        # new HTTP) so downstream enrichers — e.g. enrichment_gis_derived — can mine
+        # per-county fields (last sale price/date, deed book/page, tax-paid date)
+        # that this generic mapper doesn't promote to first-class Listing fields.
+        li.raw["gis_attrs_full"] = attrs
     return flags
 
 

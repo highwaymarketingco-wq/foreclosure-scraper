@@ -143,6 +143,8 @@ def main() -> int:
     from foreclosure_scraper.enrichment_equity import enrich_equity
     from foreclosure_scraper.distress_score import score_board
     from foreclosure_scraper.enrichment_derived_signals import enrich_derived_signals
+    from foreclosure_scraper.enrichment_gis_derived import enrich_gis_derived
+    print("enrich_gis_derived:", enrich_gis_derived(listings))  # last-sale/deed-age/tax-runway before equity
     print("enrich_equity:", enrich_equity(listings))
     print("distress score_board:", score_board(listings))
     print("enrich_derived_signals:", enrich_derived_signals(listings))

@@ -57,6 +57,7 @@ RAW_KEEP = {
     "lien_priority": "*",             # senior/junior liens + super-priority warnings
     "propwire": "*",                  # equity, owner, last sale (when present)
     "loopnet": "*",                   # multifamily-specific cap rate, units, etc.
+    "reac": "*",                      # HUD REAC inspection scores {latest_score, scores[], distressed}
     "images": "*",                    # {primary, map, street} fallback image map
     "flood": "*",                     # FEMA flood-zone tag {zone, in_sfha, ...}
     "nod": "*",                       # ROD-discovered Notice of Default
