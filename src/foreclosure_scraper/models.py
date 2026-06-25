@@ -209,6 +209,8 @@ class Listing(BaseModel):
     assessed_value: float | None = None
     market_value: float | None = None
     tax_value: float | None = None
+    owner_name: str | None = None  # GIS-backfilled record owner (enrichment_gis_attrs)
+    land_use: str | None = None    # GIS land-use / property-class string
     description: str | None = None
 
     # Provenance

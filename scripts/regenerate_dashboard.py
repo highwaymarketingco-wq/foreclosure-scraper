@@ -67,17 +67,29 @@ def main() -> int:
     listings = [li for li in listings if not _terminal_court(li)]
     print(f"dropped terminal-status court records: {before - len(listings)} -> {len(listings)} kept")
 
-    # Parcel# -> address/sqft/acreage/owner via county GIS (parcel-bearing leads
-    # that lack a street address / specs). Async, so run it in its own loop.
+    # GIS chain (async; each bounded so a slow endpoint can't hang the run):
+    #   parcel_from_geo : lat/lng -> parcel_id (point-in-polygon) for geo-bearing
+    #                     parcel-less leads, so the rest can resolve attrs.
+    #   parcel_lookup   : parcel# -> address/sqft/acreage for address-less leads.
+    #   gis_attrs       : parcel/point -> assessed+market value, owner_name, sqft,
+    #                     year_built, acreage, land_use (value 6%->~30%, owner 0%->~80%).
     import asyncio
+    from foreclosure_scraper.enrichment_parcel_from_geo import enrich_parcel_from_geo
     from foreclosure_scraper.enrichment_parcel_lookup import enrich_with_parcel_lookup
-    try:
-        asyncio.run(asyncio.wait_for(enrich_with_parcel_lookup(listings), timeout=300))
-        print("parcel_lookup: done")
-    except (asyncio.TimeoutError, TimeoutError):
-        print("parcel_lookup: time-capped at 300s (partial — rest left un-enriched)")
-    except Exception as e:  # noqa: BLE001
-        print("parcel_lookup: ERROR", str(e)[:80])
+    from foreclosure_scraper.enrichment_gis_attrs import enrich_gis_attrs
+
+    def _run_bounded(name, coro, timeout):
+        try:
+            asyncio.run(asyncio.wait_for(coro, timeout=timeout))
+            print(f"{name}: done")
+        except (asyncio.TimeoutError, TimeoutError):
+            print(f"{name}: time-capped at {timeout}s (partial)")
+        except Exception as e:  # noqa: BLE001
+            print(f"{name}: ERROR", str(e)[:80])
+
+    _run_bounded("parcel_from_geo", enrich_parcel_from_geo(listings), 480)
+    _run_bounded("parcel_lookup", enrich_with_parcel_lookup(listings), 300)
+    _run_bounded("gis_attrs", enrich_gis_attrs(listings), 600)
 
     print("enrich_sc_cama:", enrich_sc_cama(listings))
     print("enrich_footprint_sqft:", enrich_footprint_sqft(listings))
@@ -119,6 +131,16 @@ def main() -> int:
     print("enrich_multifamily_class:", {k: v for k, v in mfs.items()
                                         if k not in ("examples", "skipped_examples")})
     enrich_property_kind(listings)
+
+    # Equity (ARV − payoff − senior liens) + distress score + derived signals.
+    # Run after calc/grade so ARV is set; derived_signals (LTV, ppsf vs comp, etc.)
+    # consume equity + the fresh GIS value, so they run last.
+    from foreclosure_scraper.enrichment_equity import enrich_equity
+    from foreclosure_scraper.distress_score import score_board
+    from foreclosure_scraper.enrichment_derived_signals import enrich_derived_signals
+    print("enrich_equity:", enrich_equity(listings))
+    print("distress score_board:", score_board(listings))
+    print("enrich_derived_signals:", enrich_derived_signals(listings))
 
     print("enrich_data_quality:", enrich_data_quality(listings))
 

@@ -86,23 +86,40 @@ class TaxRecordsOnlyProvider:
 
     async def lookup(self, li: Listing) -> Optional[dict]:
         raw = li.raw if isinstance(li.raw, dict) else {}
+        # PRIMARY source: enrichment_owner_mailing writes the county-GIS owner +
+        # MAILING address (and an authoritative absentee flag) to
+        # raw["owner_mailing"]. The skip-trace step used to read raw["gis"],
+        # which the contactability spine never populates with mailing — that
+        # storage-key mismatch is why this free path produced almost nothing.
+        # We now read owner_mailing first and fall back to the older gis shape.
+        om = raw.get("owner_mailing") or {}
         gis = raw.get("gis") or {}
-        # County GIS enrichment stores these as gis["mailing"] / gis["owner"]
-        # (see enrichment_arcgis). Older aliases kept for safety.
         mailing = (
-            gis.get("mailing")
+            om.get("mailing")
+            or gis.get("mailing")
             or gis.get("owner_mailing_address")
             or gis.get("mailing_address")
             or gis.get("Owner_Mailing_Address")
         )
-        owner = gis.get("owner") or gis.get("Owner") or li.defendant
+        owner = (
+            om.get("owner")
+            or gis.get("owner")
+            or gis.get("Owner")
+            or li.defendant
+        )
         if not mailing and not owner:
             return None
 
-        prop_addr = (li.street_address or "").lower().strip()
-        mailing_clean = str(mailing or "").lower().strip()
-        diff = bool(prop_addr) and bool(mailing_clean) and \
-            prop_addr not in mailing_clean and mailing_clean not in prop_addr
+        # Prefer the spine's already-computed absentee/out-of-state flags (they
+        # compare against the GIS situs and are owner-occupancy-suppressed);
+        # fall back to a substring compare against the listing's own address.
+        if "absentee" in om:
+            diff = bool(om.get("absentee"))
+        else:
+            prop_addr = (li.street_address or "").lower().strip()
+            mailing_clean = str(mailing or "").lower().strip()
+            diff = bool(prop_addr) and bool(mailing_clean) and \
+                prop_addr not in mailing_clean and mailing_clean not in prop_addr
 
         return {
             "provider": self.name,
@@ -110,6 +127,9 @@ class TaxRecordsOnlyProvider:
             "owner_mailing_address": str(mailing) if mailing else None,
             "owner_mailing_diff_from_property": diff,
             "absentee_owner": diff,
+            "out_of_state_owner": bool(om.get("out_of_state")),
+            "parcel_id": om.get("parcel_id"),
+            "mail_state": om.get("mail_state"),
             "phone_numbers": [],
             "email_addresses": [],
             "additional_owners": [],

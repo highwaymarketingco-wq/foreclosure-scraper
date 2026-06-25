@@ -614,6 +614,20 @@ async def run() -> int:
     except Exception:
         log.error("geocode.failed", traceback=traceback.format_exc())
 
+    # Parcel-from-geo — point-in-polygon resolve a parcel_id for every
+    # geo-bearing lead that still has none. SC -> SCDOT SC_Parcels point query;
+    # NC -> NC OneMap NC1Map_Parcels point query. ~52% of leads carry a parcel;
+    # ~2050 of the rest have lat/lng but no parcel, and a parcel unlocks the
+    # value/owner/sqft GIS-attrs track. Runs AFTER the geocode fallback (so
+    # lat/lng is maximally populated) and BEFORE parcel_lookup / owner_mailing /
+    # assessor_card (which all consume parcel_id). Writes only li.parcel_id +
+    # raw.parcel_from_geo provenance; free, pure-HTTP, idempotent.
+    try:
+        from .enrichment_parcel_from_geo import enrich_parcel_from_geo
+        await enrich_parcel_from_geo(enriched)
+    except Exception:
+        log.error("parcel_from_geo.failed", traceback=traceback.format_exc())
+
     # Census ACS location enrichment (free, dedup'd by ZIP) — fills neighborhood
     # signals for the location grade (median HH income, home value, owner pct).
     try:
@@ -670,6 +684,19 @@ async def run() -> int:
         await enrich_with_parcel_lookup(enriched)
     except Exception:
         log.error("parcel_lookup.failed", traceback=traceback.format_exc())
+
+    # GIS attribute backfill — one point-in-polygon (or parcel) query per lead
+    # backfills assessed_value + market_value + owner_name + living_sqft +
+    # year_built + acreage + land_use from the county GIS feature. Runs after
+    # parcel_from_geo + parcel_lookup (so parcel_id/lat-lng are maximally
+    # populated) and BEFORE sc_cama/calc/grade so fresh value+sqft feed ARV +
+    # grading + equity. Missing-only; rejects denormalized-float/out-of-range
+    # junk. Lifts value ~6%->~30% and owner_name 0%->~80%.
+    try:
+        from .enrichment_gis_attrs import enrich_gis_attrs
+        await enrich_gis_attrs(enriched)
+    except Exception:
+        log.error("gis_attrs.failed", traceback=traceback.format_exc())
 
     # Aggressive cross-county owner-name search — last resort for listings
     # still without an address. Tries every county GIS in the state + a

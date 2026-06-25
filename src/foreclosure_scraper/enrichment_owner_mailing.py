@@ -102,6 +102,35 @@ def _norm(s: str) -> str:
     return re.sub(r"[^a-z0-9 ]", "", (s or "").lower()).strip()
 
 
+def _pid_variants(parcel_id: str) -> list[str]:
+    """Ordered, de-duped LIKE candidates for a parcel id.
+
+    ROOT CAUSE (2026-06-25): the old code only tried the *stripped* form
+    (re.sub('[^A-Za-z0-9]','',pid)). But several SC/NC parcel layers store the
+    TMS/PIN WITH dashes (Pickens '5038-08-97-3519', Oconee '120-01-01-028',
+    Transylvania '9506-68-2123-000'), so `PIN LIKE '%503808973519%'` returned
+    zero rows even though the dashed form matches exactly. Pickens alone is
+    1358 leads with a parcel_id and ~2% resolved because of this. We now try,
+    in order: the raw id, the id minus any trailing ' 000'/'-000' card suffix
+    (Union '104-00-00-015 000' → '104-00-00-015'), and the fully-stripped id.
+    """
+    raw = (parcel_id or "").strip()
+    out: list[str] = []
+
+    def _add(v: str) -> None:
+        v = (v or "").strip()
+        # ArcGIS LIKE: escape single quotes; bail on anything that would make
+        # a useless/over-broad wildcard.
+        if v and len(v) >= 4 and v not in out:
+            out.append(v)
+
+    _add(raw)
+    # trailing card/sub-parcel suffix some exports append (' 000', '-000', '.000')
+    _add(re.sub(r"[\s.\-]0{3}$", "", raw))
+    _add(re.sub(r"[^A-Za-z0-9]", "", raw))
+    return out
+
+
 def _is_absentee(prop_addr: Optional[str], mailing: Optional[str]) -> bool:
     """True when the owner mails from somewhere other than the property.
 
@@ -285,6 +314,42 @@ NC_ONEMAP = {
     "source_label": "nc_onemap",
 }
 
+# SCDOT statewide SC_Parcels MapServer — one owner+mailing+value schema for ALL
+# 46 SC counties, on a per-county layer index. Verified live 2026-06-25: every
+# layer exposes OWNER / OWNER_ADDR / CITY / ZIPCODE / PHYS_ADDR (situs) /
+# MRKT_VALUE, keyed on a digits-only TMS. Used as the SC analogue of NC OneMap:
+# the contactability path for SC counties with NO dedicated COUNTY_GIS layer
+# (Anderson, Greenville, Beaufort, Cherokee, York, Lexington, Richland, …) and a
+# value/owner fallback for covered SC counties that didn't resolve. CITY here is
+# "CITY  STATE" (e.g. "ANDERSON  SC") so we derive mail_state from its suffix.
+SCDOT_SC_BASE = "https://smpesri.scdot.org/arcgis/rest/services/GISMapping/SC_Parcels/MapServer"
+SCDOT_SC_LAYER: dict[str, int] = {
+    "Abbeville": 1, "Aiken": 2, "Allendale": 3, "Anderson": 4, "Bamberg": 5,
+    "Barnwell": 6, "Beaufort": 7, "Berkeley": 8, "Calhoun": 9, "Charleston": 10,
+    "Cherokee": 11, "Chester": 12, "Chesterfield": 13, "Clarendon": 14, "Colleton": 15,
+    "Darlington": 16, "Dillon": 17, "Dorchester": 18, "Edgefield": 19, "Fairfield": 20,
+    "Florence": 21, "Georgetown": 22, "Greenville": 23, "Greenwood": 24, "Hampton": 25,
+    "Horry": 26, "Jasper": 27, "Kershaw": 28, "Lancaster": 29, "Laurens": 30,
+    "Lee": 31, "Lexington": 32, "Marion": 33, "Marlboro": 34, "McCormick": 35,
+    "Newberry": 36, "Oconee": 37, "Orangeburg": 38, "Pickens": 39, "Richland": 40,
+    "Saluda": 41, "Spartanburg": 42, "Sumter": 43, "Union": 44, "Williamsburg": 45,
+    "York": 46,
+}
+
+
+def _scdot_spec(county: str) -> Optional[dict]:
+    """Build an owner_mailing spec for the SCDOT statewide layer of `county`."""
+    layer = SCDOT_SC_LAYER.get((county or "").strip().title())
+    if layer is None:
+        return None
+    return {
+        "url": f"{SCDOT_SC_BASE}/{layer}",
+        "owner": ["OWNER"],
+        "mail": ["OWNER_ADDR", "CITY", "ZIPCODE"],  # CITY already carries "  SC"
+        "situs": ["PHYS_ADDR"], "parcel": "TMS",
+        "source_label": "scdot_sc",
+    }
+
 _STREET_STOPWORDS = ("rd", "dr", "st", "ln", "ave", "ct", "way", "cir",
                      "blvd", "pl", "trl", "hwy", "pkwy", "n", "s", "e", "w")
 
@@ -300,11 +365,13 @@ async def _match_attrs(http: httpx.AsyncClient, li: Listing, spec: dict) -> Opti
     """Find the parcel record for a listing in one GIS layer (parcel match,
     then situs street-name match), county-filtered when the layer is statewide."""
     cc = _county_clause(spec, li)
-    # 1) exact parcel match if we already have a parcel id
+    # 1) exact parcel match if we already have a parcel id. Try each candidate
+    #    format (raw dashed → suffix-trimmed → stripped) because parcel layers
+    #    differ on whether they store the TMS/PIN with or without separators.
     if li.parcel_id:
-        pid = re.sub(r"[^A-Za-z0-9]", "", li.parcel_id)
-        if pid:
-            rows = await _query(http, spec["url"], f"{spec['parcel']} LIKE '%{pid}%'{cc}")
+        for cand in _pid_variants(li.parcel_id):
+            safe = cand.replace("'", "''")
+            rows = await _query(http, spec["url"], f"{spec['parcel']} LIKE '%{safe}%'{cc}")
             if rows:
                 return rows[0]
     # 2) else match on situs street address. Query the street-NAME field broadly
@@ -340,6 +407,12 @@ def _build_result(li: Listing, spec: dict, attrs: dict) -> Optional[dict]:
     situs = _join(attrs, spec["situs"]) if spec.get("situs") else None
     parcel = str(attrs.get(spec["parcel"]) or "").strip() or None
     mail_state = (attrs.get(spec.get("mail_state", "")) or "").strip().upper() if spec.get("mail_state") else None
+    # Layers without a discrete state field (e.g. SCDOT, where CITY is
+    # "ANDERSON  SC") — recover the 2-letter state from the mailing tail.
+    if not mail_state and mailing:
+        m = re.search(r"\b([A-Z]{2})\b(?:\s+\d{5}(?:-\d{4})?)?\s*$", mailing.upper())
+        if m:
+            mail_state = m.group(1)
     if not owner and not mailing:
         return None
     # absentee = owner mails from somewhere other than the property; out_of_state
@@ -355,10 +428,20 @@ def _build_result(li: Listing, spec: dict, attrs: dict) -> Optional[dict]:
             "_distress": _extract_distress(attrs)}
 
 
+def _county_key(li: Listing) -> str:
+    """COUNTY_GIS lookup key. `.title()` mangles intercaps ('mcdowell' →
+    'Mcdowell' ≠ 'McDowell'), so normalize a small set of known intercap
+    county names before keying."""
+    cty = (li.county or "").strip().title()
+    cty = {"Mcdowell": "McDowell", "Mccormick": "McCormick",
+           "Mcduffie": "McDuffie", "Mcdowel": "McDowell"}.get(cty, cty)
+    return f"{li.state}:{cty}"
+
+
 async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
     # 1) county-specific layer (richer — has building specs/CAMA where available)
     res = None
-    spec = COUNTY_GIS.get(f"{li.state}:{(li.county or '').strip().title()}")
+    spec = COUNTY_GIS.get(_county_key(li))
     if spec:
         attrs = await _match_attrs(http, li, spec)
         if attrs:
@@ -379,13 +462,34 @@ async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
                 if v:
                     res["_value"] = v
                     res["value_source"] = "nc_onemap"
+
+    if li.state == "SC" and li.county and res is None:
+        # 3) SCDOT statewide SC fallback — the contactability path for SC
+        #    counties with no dedicated COUNTY_GIS layer (Anderson, Greenville,
+        #    Beaufort, Cherokee, …) and for covered SC counties the dedicated
+        #    layer didn't resolve. Same owner+mailing+value shape, keyed on TMS.
+        sspec = _scdot_spec(li.county)
+        if sspec:
+            attrs = await _match_attrs(http, li, sspec)
+            if attrs:
+                res = _build_result(li, sspec, attrs)
     return res
 
 
 async def enrich_owner_mailing(listings: list[Listing], max_concurrency: int = 4) -> dict:
     """Fill owner + mailing + absentee/out-of-state + parcel_id from county GIS."""
+    def _reachable(li: Listing) -> bool:
+        # Dedicated county layer, OR an NC OneMap / SCDOT statewide fallback.
+        if _county_key(li) in COUNTY_GIS:
+            return True
+        if li.state == "NC" and li.county:
+            return True  # NC OneMap covers all 100 NC counties
+        if li.state == "SC" and _scdot_spec(li.county or "") is not None:
+            return True  # SCDOT covers all 46 SC counties
+        return False
+
     targets = [li for li in listings
-               if f"{li.state}:{(li.county or '').strip().title()}" in COUNTY_GIS
+               if _reachable(li)
                and (li.street_address or li.parcel_id)
                and not ((li.raw or {}).get("owner_mailing") or {}).get("mailing")]
     if not targets:

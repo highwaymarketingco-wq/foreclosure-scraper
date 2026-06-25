@@ -28,6 +28,9 @@ from foreclosure_scraper.valuation import calc as vcalc, grading as vgrade  # no
 from foreclosure_scraper.enrichment_geocode import enrich as enrich_geocode  # noqa: E402
 from foreclosure_scraper.enrichment_address_backfill import enrich_addresses_from_owner  # noqa: E402
 from foreclosure_scraper.enrichment_parcel_lookup import enrich_with_parcel_lookup  # noqa: E402
+from foreclosure_scraper.enrichment_parcel_from_geo import enrich_parcel_from_geo  # noqa: E402
+from foreclosure_scraper.enrichment_gis_attrs import enrich_gis_attrs  # noqa: E402
+from foreclosure_scraper.enrichment_derived_signals import enrich_derived_signals  # noqa: E402
 from foreclosure_scraper.enrichment_reo_freshness import prune_stale_reo  # noqa: E402
 from foreclosure_scraper.enrichment_aggressive_address import enrich_with_aggressive_address  # noqa: E402
 from foreclosure_scraper.enrichment_parcel_reverse_geo import enrich_parcel_reverse_geo  # noqa: E402
@@ -118,7 +121,9 @@ async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
         except Exception as e:  # noqa: BLE001
             print(f"  {name}: ERROR {str(e)[:80]}")
     await _step("geocode#1", enrich_geocode(merged))
+    await _step("parcel_from_geo", asyncio.wait_for(enrich_parcel_from_geo(merged), timeout=480))  # lat/lng -> parcel_id
     await _step("parcel_lookup", asyncio.wait_for(enrich_with_parcel_lookup(merged), timeout=600))  # parcel# -> addr/sqft/acreage/owner (bounded)
+    await _step("gis_attrs", asyncio.wait_for(enrich_gis_attrs(merged), timeout=600))  # parcel/point -> value/owner/sqft/year/acreage
     await _step("address_backfill", enrich_addresses_from_owner(merged))
     await _step("aggressive_address", enrich_with_aggressive_address(merged))
     await _step("parcel_reverse_geo", enrich_parcel_reverse_geo(merged))
@@ -175,6 +180,7 @@ def main() -> int:
     print("enrich_multifamily_class:", {k: v for k, v in mfs.items()
                                         if k not in ("examples", "skipped_examples")})
     enrich_property_kind(merged)
+    print("enrich_derived_signals:", enrich_derived_signals(merged))
     print("enrich_data_quality:", enrich_data_quality(merged))
 
     summary = {
