@@ -28,6 +28,7 @@ from foreclosure_scraper.valuation import calc as vcalc, grading as vgrade  # no
 from foreclosure_scraper.enrichment_geocode import enrich as enrich_geocode  # noqa: E402
 from foreclosure_scraper.enrichment_address_backfill import enrich_addresses_from_owner  # noqa: E402
 from foreclosure_scraper.enrichment_parcel_lookup import enrich_with_parcel_lookup  # noqa: E402
+from foreclosure_scraper.enrichment_reo_freshness import prune_stale_reo  # noqa: E402
 from foreclosure_scraper.enrichment_aggressive_address import enrich_with_aggressive_address  # noqa: E402
 from foreclosure_scraper.enrichment_parcel_reverse_geo import enrich_parcel_reverse_geo  # noqa: E402
 from foreclosure_scraper.enrichment_owner_mailing import enrich_owner_mailing  # noqa: E402
@@ -91,6 +92,11 @@ async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
     before_scope = len(merged)
     merged = [li for li in merged if _in_scope(li)]
     print(f"merged+deduped -> {before_scope} | scope re-filter dropped {before_scope - len(merged)} -> {len(merged)}")
+
+    # Drop sold/removed snapshot-REO (Fannie) carryover whose per-property URL
+    # 404s in-browser once the uuid leaves inventory. Fail-safe (empty pull = skip).
+    merged, _pstats = await prune_stale_reo(merged)
+    print(f"  prune_stale_reo: {_pstats}")
 
     # Address-resolution chain (async) — mirrors main.py: name->property for probate/
     # defendant leads, parcel reverse-geo for stranded ones, geocode + owner contact.

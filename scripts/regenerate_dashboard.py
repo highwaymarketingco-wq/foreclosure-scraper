@@ -111,6 +111,15 @@ def main() -> int:
 
     print("enrich_data_quality:", enrich_data_quality(listings))
 
+    # Drop sold/removed snapshot-REO (Fannie) — stale carryover whose per-property
+    # SPA URL renders a browser 404 once the uuid leaves inventory. Fail-safe.
+    from foreclosure_scraper.enrichment_reo_freshness import prune_stale_reo
+    try:
+        listings, _pstats = asyncio.run(prune_stale_reo(listings))
+        print("prune_stale_reo:", _pstats)
+    except Exception as e:  # noqa: BLE001
+        print("prune_stale_reo: ERROR", str(e)[:80])
+
     by_state = collections.Counter(li.state for li in listings if li.state)
     by_county = collections.Counter(f"{li.state}/{li.county}" for li in listings if li.county)
     by_source = collections.Counter(li.source for li in listings if li.source)
