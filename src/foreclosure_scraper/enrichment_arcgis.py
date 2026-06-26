@@ -331,14 +331,28 @@ def _apply_attrs(li: Listing, attrs: dict[str, Any]) -> int:
             setattr(li, field, val)
             filled += 1
 
-    # Coordinates (centroid of parcel polygon if we got geometry)
+    # Coordinates (centroid of parcel polygon if we got geometry). Write the
+    # precise parcel centroid when lat/lng is empty OR when the current point is a
+    # COARSE county-seat centroid stamped by enrichment_geocode's Tier-4 fallback
+    # (one courthouse coord shared by hundreds of leads). Without this override,
+    # ~1079 parcel-bearing leads (sc_tax_delinquent / sc_rod_acclaim) keep the
+    # shared seat coordinate, and enrichment_images refuses to attach an aerial on
+    # a shared centroid — capping photo coverage. Never overwrite a precise point.
     centroid = attrs.get("_centroid")
-    if centroid and not li.latitude and not li.longitude:
+    if centroid:
         try:
-            li.latitude, li.longitude = float(centroid[0]), float(centroid[1])
-            filled += 2
+            new_lat, new_lng = float(centroid[0]), float(centroid[1])
         except (ValueError, TypeError):
-            pass
+            new_lat = None
+        if new_lat is not None:
+            from .enrichment_geocode import COUNTY_SEAT_CENTROIDS
+            _seats = {(round(a, 3), round(b, 3)) for a, b in COUNTY_SEAT_CENTROIDS.values()}
+            is_empty = not li.latitude and not li.longitude
+            is_coarse_seat = bool(li.latitude and li.longitude) and \
+                (round(li.latitude, 3), round(li.longitude, 3)) in _seats
+            if is_empty or is_coarse_seat:
+                li.latitude, li.longitude = new_lat, new_lng
+                filled += 2
 
     # Only write parcel_id when we're confident in the address match. A wrong
     # parcel_id silently corrupts the dedupe key (which prefers parcel over
