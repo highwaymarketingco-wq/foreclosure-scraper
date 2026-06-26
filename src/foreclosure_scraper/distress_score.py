@@ -309,9 +309,18 @@ def score_board(listings: list[Listing], previous_path: Optional[Path] = None) -
             score += 8
         if oos:
             score += 4
+        # Title-wipeout trap: a junior-lien / HOA / credit-union / individual
+        # foreclosure where a senior bank mortgage likely SURVIVES the sale is a
+        # bidding trap, not a clean acquisition — penalize it and keep it out of HOT.
+        senior_survives = any(
+            (li.raw or {}).get("title_risk", {}).get("surviving_senior_debt_risk")
+            for li in active
+        )
+        if senior_survives:
+            score -= 20
 
         eq_ok = eq in ("high", "med")
-        if stack >= 2 and eq_ok and mailable:
+        if stack >= 2 and eq_ok and mailable and not senior_survives:
             tier = "HOT"
         elif stack >= 2 or (score >= 28 and eq_ok) or (absentee and stack >= 1 and score >= 20):
             tier = "WARM"
@@ -321,7 +330,7 @@ def score_board(listings: list[Listing], previous_path: Optional[Path] = None) -
         ds = {"tier": tier, "stack": stack, "categories": categories,
               "signals": signals, "score": round(score),
               "equity_band": eq, "absentee": absentee, "out_of_state": oos,
-              "contactable": mailable}
+              "contactable": mailable, "surviving_senior_debt_risk": senior_survives}
         for li in active:
             if not isinstance(li.raw, dict):
                 li.raw = {}

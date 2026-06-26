@@ -1,15 +1,18 @@
-"""NC GovDeals county real-property auctions (multiple county sellers, one file).
+"""NC + SC GovDeals government real-property auctions (master feed, one file).
 
-Built 2026-06-26 for the NC GOVDEALS REAL-PROPERTY track. NC counties (and a
-handful of municipalities and the occasional in-footprint SC seller) liquidate
-surplus and tax-foreclosed real property through GovDeals. The user named three
-target NC sellers up front — Pender (legacy agency 22325), Burke (legacy seller
-29265), Transylvania (storefront "tcncre") — and the parser keeps EVERY
-in-footprint real-property lot GovDeals surfaces, so those three counties are
-captured the moment they post.
+Built 2026-06-26 for the GOVDEALS REAL-PROPERTY track. NC and SC governments —
+counties, cities/towns, school systems — liquidate surplus and tax-foreclosed
+real property through GovDeals. The user originally named three target NC
+sellers — Pender (legacy agency 22325), Burke (legacy seller 29265),
+Transylvania (storefront "tcncre") — but the scope is now the GovDeals MASTER
+real-estate feed for ALL NC + SC government sellers (e.g. City of Asheville,
+Gaston County, Mount Airy, Yadkin County), so municipal/county surplus +
+tax-foreclosed real property from any NC/SC seller is ingested. The parser keeps
+EVERY real-property lot GovDeals surfaces and records county/state per row;
+in-footprint scoping is applied downstream by the orchestrator.
 
-WHY a category pull rather than a per-seller call
--------------------------------------------------
+WHY the master STATE feed rather than per-seller calls
+------------------------------------------------------
 GovDeals migrated off the old ColdFusion ``index.cfm`` storefront onto a
 Liquidity Services Angular SPA backed by a JSON search service
 (``maestro.lqdt1.com/search/list``). In that migration the legacy seller /
@@ -17,12 +20,26 @@ agency numbers (22325, 29265, the "tcncre" storefront slug) were re-namespaced:
 they no longer resolve as the ``accountId`` the new search service filters on
 (verified live 2026-06-26 — ``accountIds:[22325]`` and ``[29265]`` both return
 0, while a current seller's real ``accountId`` filters correctly). Rather than
-hard-code three brittle, already-stale numeric ids, this scraper pulls the whole
-Real Estate category (external id ``t11``) nationwide and keeps only the
-in-footprint rows. That naturally includes Pender / Burke / Transylvania when
-they have active lots, plus any other footprint county that lists real property
-— a strict superset of the three named sellers, and it survives the next id
-re-shuffle. The named legacy ids are recorded below for provenance.
+hard-code three brittle, already-stale numeric ids, this scraper queries the
+Real Estate category (external id ``t11``) constrained to the ``state`` facet
+for NC and SC — the SPA's own filters, the same ones the public site exposes.
+That captures the WHOLE NC/SC government real-estate inventory (Pender / Burke /
+Transylvania when active, plus City of Asheville, Gaston County, Mount Airy,
+Yadkin County, the SC sellers, etc.) — a strict superset of the three named
+sellers — without depending on those lots bubbling into the nationwide top
+pages, and it survives the next id re-shuffle. The named legacy ids are recorded
+below for provenance, and a per-seller ``accountIds`` pull is preserved as a
+fallback (see ``_seller_account_body`` / ``fetch``) for any future seller whose
+real accountId becomes known.
+
+STATE FACET (verified live 2026-06-26)
+--------------------------------------
+The search response's ``assetSearchFacets`` exposes a ``state`` facet whose
+filter token is ``{!tag=state}state:"NC"`` (resp. ``"SC"``). Passing that
+alongside the category token constrains results server-side to one state. The
+service does NOT honour a combined ``state:("NC" OR "SC")`` token (returns 0),
+so we query each state separately and merge — two small paged pulls instead of
+one ~900-row nationwide sweep.
 
 ENDPOINT (free + compliant — the same SPA JSON the public site uses)
 --------------------------------------------------------------------
@@ -81,7 +98,6 @@ from selectolax.parser import HTMLParser
 from ..._coastal_city_to_county import coastal_county_for
 from ..._upstate_city_to_county import upstate_county_for
 from ...base_scraper import BaseScraper
-from ...config import in_scope
 from ...http_client import client, get_text
 from ...models import Listing, ListingType, PropertyKind
 
@@ -97,23 +113,32 @@ GOVDEALS_API_KEY = "af93060f-337e-428c-87b8-c74b5837d6cd"
 GOVDEALS_ASSET_URL = "https://www.govdeals.com/asset/{asset_id}/{account_id}"
 # Real Estate category external id (t11) — the SPA's own category filter token.
 REAL_ESTATE_FACET = '{!tag=product_category_external_id}product_category_external_id:"t11"'
+# Per-state filter token from the response's ``state`` facet. {st} = NC | SC.
+STATE_FACET = '{{!tag=state}}state:"{st}"'
+# States we pull the master real-estate feed for. The service won't OR them in a
+# single token, so we query each separately and merge.
+FEED_STATES = ("NC", "SC")
 
 # Named target sellers from the task. These are LEGACY GovDeals ids that no
 # longer resolve as the post-migration accountId (see module docstring); kept
-# for provenance and so a future per-seller filter can map them once the new
-# accountId is known. Coverage is by footprint county, which is a superset.
-TARGET_SELLERS = {
-    "Pender": "agency 22325",
-    "Burke": "seller 29265",
-    "Transylvania": "storefront tcncre",
+# for provenance and so the per-seller fallback can map them once a real
+# accountId is known. Coverage is by the NC/SC master feed, which is a superset.
+# Map name -> real numeric accountId (int) to activate the fallback for a seller;
+# the legacy ids below are NON-resolving and stay None until a real id is found.
+TARGET_SELLERS: dict[str, int | None] = {
+    "Pender": None,         # legacy agency 22325 — non-resolving post-migration
+    "Burke": None,          # legacy seller 29265 — non-resolving post-migration
+    "Transylvania": None,   # legacy storefront "tcncre" — non-resolving
 }
 
 TRANSYLVANIA_NEWS = "https://www.transylvaniacounty.org/news"
 
-# Pull cap — the whole Real Estate category is ~600-750 lots nationwide; 100/page
-# x 10 pages covers it with headroom. The footprint filter trims it to a handful.
+# Pull cap. Each NC/SC state slice is small (verified live 2026-06-26: 9 NC + 1
+# SC real-estate lots), but cap generously so a busier cycle (City of Asheville /
+# Gaston County batch surplus sales) is captured in full. 100/page x 5 pages =
+# 500 per state ceiling; pulls stop early when a short page is returned.
 _PAGE_SIZE = 100
-_MAX_PAGES = 10
+_MAX_PAGES = 5
 
 # Street-suffix alternation reused by both address shapes below.
 _SUFFIX = (
@@ -212,8 +237,8 @@ def _search_headers() -> dict[str, str]:
     }
 
 
-def _search_body(page: int) -> dict[str, Any]:
-    """Replicates the SPA's /search/list payload for the Real Estate category."""
+def _base_body(page: int) -> dict[str, Any]:
+    """Common /search/list payload skeleton for the Real Estate category."""
     return {
         "categoryIds": "",
         "businessId": "GD",
@@ -230,7 +255,7 @@ def _search_body(page: int) -> dict[str, Any]:
         "sessionId": str(uuid.uuid4()),
         "requestType": "search",
         "responseStyle": "fullResponse",
-        "facets": ["sellerDisplayName", "region"],
+        "facets": ["sellerDisplayName", "state"],
         "facetsFilter": [REAL_ESTATE_FACET],
         "timeType": "",
         "sellerTypeId": None,
@@ -238,32 +263,58 @@ def _search_body(page: int) -> dict[str, Any]:
     }
 
 
+def _state_body(page: int, state: str) -> dict[str, Any]:
+    """Master real-estate feed constrained to one state (NC | SC) server-side."""
+    body = _base_body(page)
+    body["facetsFilter"] = [REAL_ESTATE_FACET, STATE_FACET.format(st=state)]
+    return body
+
+
+def _seller_account_body(page: int, account_id: int) -> dict[str, Any]:
+    """Per-seller fallback: the SPA's accountIds filter for one known seller.
+
+    Preserves the original per-seller behavior for any seller whose real
+    post-migration accountId becomes known (the legacy ids in TARGET_SELLERS are
+    non-resolving — see module docstring). Unused while every TARGET_SELLERS id
+    is None; kept so coverage degrades gracefully to a direct seller pull.
+    """
+    body = _base_body(page)
+    body["facetsFilter"] = [REAL_ESTATE_FACET]
+    body["accountIds"] = [account_id]
+    return body
+
+
 def parse_asset(d: dict[str, Any]) -> Optional[Listing]:
-    """Turn one GovDeals search-result asset into a footprint Listing, or None
-    when it can't be attributed to an in-scope county (the common case — most of
-    the ~700 nationwide real-estate lots are out of footprint)."""
+    """Turn one GovDeals search-result asset into a Listing carrying county/state,
+    or None when it isn't NC/SC real property we can attribute to a county.
+
+    This is the MASTER NC/SC feed: we keep EVERY attributable NC/SC government
+    real-property lot and record county/state on the row. In-footprint scoping is
+    applied DOWNSTREAM by the orchestrator (main._in_scope + the coastal bypass),
+    not here — so a Mount Airy / Yadkin / City-of-Asheville lot is emitted with
+    its real county and the orchestrator decides whether it makes the board."""
     state = (d.get("locationState") or "").strip().upper() or None
     city = (d.get("locationCity") or "").strip() or None
     short_desc = (d.get("assetShortDescription") or "").strip() or None
     long_desc = (d.get("assetLongDescription") or "").strip() or None
     company = (d.get("companyName") or "").strip() or None
 
-    # County attribution: city gazetteer first, then the seller name.
-    county = _county_for(city, state) or _county_from_company(company, state)
-    if not county or not state:
+    # Master feed is NC/SC only. The state slice already constrains this, but the
+    # per-seller fallback / any stray cross-listing could carry another state —
+    # never emit non-NC/SC rows from this source.
+    if state not in ("NC", "SC"):
+        return None
+    # County attribution: city gazetteer first, then the seller name. A row we
+    # can't pin to a county is useless downstream, so drop it.
+    county = _county_from_company(company, state) or _county_for(city, state)
+    if not county:
         return None
     # Drop personal property mis-filed under the Real Estate category.
     if not _is_real_property(d.get("categoryDescription"), short_desc or long_desc):
         return None
-    # Footprint gate. We DON'T early-drop denied coastal counties (Pender) — the
-    # orchestrator's coastal bypass / oceanfront gate handles those; we only drop
-    # rows that are clearly out of every footprint county.
-    coastal = bool(coastal_county_for(city, state)) or county in {
-        "Pender", "Brunswick", "Onslow", "Carteret", "New Hanover", "Dare",
-        "Horry", "Georgetown", "Charleston", "Beaufort", "Colleton",
-    }
-    if not coastal and not in_scope(county, state):
-        return None
+    # NO in-footprint gate here — see the docstring. The orchestrator applies
+    # footprint scope (and the coastal-county bypass) downstream; we keep every
+    # attributable NC/SC government real-property lot with its county/state.
 
     asset_id = d.get("assetId")
     account_id = d.get("accountId")
@@ -422,38 +473,78 @@ class NCGovDealsRealProperty(BaseScraper):
     expected_min_count = 0
     timeout_s = 240.0
 
+    async def _pull(
+        self,
+        c: Any,
+        label: str,
+        body_for_page,
+        seen_keys: set[tuple[Any, Any]],
+        out: list[Listing],
+    ) -> int:
+        """Page one /search/list slice (a state feed or a seller pull), dedup on
+        (accountId, assetId), parse footprint rows into ``out``. Returns the
+        number of NEW raw rows seen across all pages of this slice."""
+        new_total = 0
+        for page in range(1, _MAX_PAGES + 1):
+            resp = await c.post(
+                GOVDEALS_SEARCH_API,
+                json=body_for_page(page),
+                headers=_search_headers(),
+            )
+            resp.raise_for_status()
+            rows = resp.json().get("assetSearchResults") or []
+            if not rows:
+                break
+            new_on_page = 0
+            for d in rows:
+                key = (d.get("accountId"), d.get("assetId"))
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                new_on_page += 1
+                new_total += 1
+                li = parse_asset(d)
+                if li:
+                    out.append(li)
+            log.info("nc_govdeals.page", slice=label, page=page, rows=len(rows),
+                     new=new_on_page, kept=len(out))
+            if len(rows) < _PAGE_SIZE:
+                break
+        return new_total
+
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         seen_keys: set[tuple[Any, Any]] = set()
 
-        # GovDeals Real Estate category — paged JSON.
+        # GovDeals Real Estate MASTER feed, sliced per state (NC, SC) so the
+        # whole NC/SC government inventory is captured regardless of nationwide
+        # ranking. County/state is kept per row; footprint scoping is downstream.
         try:
             async with client(timeout=40.0) as c:
-                for page in range(1, _MAX_PAGES + 1):
-                    resp = await c.post(
-                        GOVDEALS_SEARCH_API,
-                        json=_search_body(page),
-                        headers=_search_headers(),
+                for state in FEED_STATES:
+                    await self._pull(
+                        c, state,
+                        lambda page, st=state: _state_body(page, st),
+                        seen_keys, out,
                     )
-                    resp.raise_for_status()
-                    data = resp.json()
-                    rows = data.get("assetSearchResults") or []
-                    if not rows:
-                        break
-                    new_on_page = 0
-                    for d in rows:
-                        key = (d.get("accountId"), d.get("assetId"))
-                        if key in seen_keys:
-                            continue
-                        seen_keys.add(key)
-                        new_on_page += 1
-                        li = parse_asset(d)
-                        if li:
-                            out.append(li)
-                    log.info("nc_govdeals.page", page=page, rows=len(rows),
-                             new=new_on_page, kept=len(out))
-                    if len(rows) < _PAGE_SIZE:
-                        break
+                counties_seen = {f"{li.county},{li.state}" for li in out}
+
+                # Per-seller FALLBACK — preserved original behavior. Only fires
+                # for a named seller with a known real accountId whose county the
+                # state feed did NOT already surface (graceful degradation if a
+                # state slice ever 0s out while a seller pull still resolves).
+                for name, account_id in TARGET_SELLERS.items():
+                    if account_id is None:
+                        continue
+                    if any(name in cs for cs in counties_seen):
+                        continue
+                    n = await self._pull(
+                        c, f"seller:{name}",
+                        lambda page, aid=account_id: _seller_account_body(page, aid),
+                        seen_keys, out,
+                    )
+                    log.info("nc_govdeals.seller_fallback", seller=name,
+                             account_id=account_id, new=n)
             log.info("nc_govdeals.govdeals_done", footprint=len(out))
         except Exception as exc:  # noqa: BLE001
             log.warning("nc_govdeals.govdeals_failed", error=str(exc)[:200])

@@ -1,4 +1,4 @@
-"""Column unified legal-notice API — NC foreclosure sales + SC estate/probate.
+"""Column unified legal-notice API — NC foreclosure + NC/SC estate/probate.
 
 Column (column.us / enotice-production) runs the legal-notice publishing
 back-end for hundreds of newspapers, including the NC + SC papers of record
@@ -7,7 +7,7 @@ the FULL OCR'd notice body, county, state, notice type, paper name, and a
 direct PDF link — no auth, no key, no token (a bare JSON POST works).
 
 This is the highest-value single source we have: instead of crawling each
-paper's site individually, one endpoint covers every county. We pull two
+paper's site individually, one endpoint covers every county. We pull three
 notice classes:
 
   (1) NC "Foreclosure Sale" notices — the pre-auction power-of-sale signal.
@@ -16,7 +16,19 @@ notice classes:
       "Deed of Trust Book/Page", "PIN"), so we parse a real Listing with
       address + owner + sale_date + trustee + case_number + parcel.
 
-  (2) SC "Estate (Probate) Filings" notices — SC has NO foreclosure notice
+  (2) NC estate/decedent notices — the NC mortality lane. Column files NC
+      estate notices under TWO noticetype strings (verified live 2026-06-26
+      across the NC footprint, free/no-auth): "Estate (Probate) Filings" AND
+      "Notice to Creditors" (~280 rows in the last 120 days; McDowell, Burke,
+      Gaston, Buncombe, Onslow lead). Both bodies are the same NC-statutory
+      creditor notice ("Having qualified as Executor/Administrator of the
+      Estate of <decedent>, deceased ... File No: <NC estate file#> ... <PR>,
+      Executor"), so one parser handles both. Emitted as PROBATE_NOTICE leads:
+      owner_name = decedent, executor/PR + NC estate file# in raw["probate"],
+      address-less OK (the owner-to-GIS enricher backfills the property address
+      downstream from the decedent name).
+
+  (3) SC "Estate (Probate) Filings" notices — SC has NO foreclosure notice
       type on Column (verified live 2026-06-26: the only SC notice types in
       footprint are '', 'Notice of Application', 'Summons', 'Notice of Sale',
       'Estate (Probate) Filings', 'Parental Action', etc.). Probate "Notice to
@@ -85,6 +97,18 @@ NC_FORECLOSURE_TYPE = "Foreclosure Sale"
 # SC has no foreclosure type; probate is the actionable lead class. Verified
 # live as the exact string Column uses.
 SC_PROBATE_TYPE = "Estate (Probate) Filings"
+
+# NC mortality lane — decedent/estate notices. Column files NC estate notices
+# under TWO distinct noticetype strings (verified live 2026-06-26 across the NC
+# footprint, free/no-auth): "Estate (Probate) Filings" AND "Notice to
+# Creditors". Both bodies are the same NC-statutory creditor notice ("Having
+# qualified as Executor/Administrator of the Estate of <decedent>, deceased ...
+# File No: <NC estate file#> ... <PR name>, Executor"), so one parser handles
+# both. ~280 rows in the last 120 days across the footprint (McDowell, Burke,
+# Gaston, Buncombe, Onslow lead). Emitted as PROBATE_NOTICE leads:
+# owner_name = decedent, address-less OK (owner-to-GIS enricher backfills the
+# property from the decedent name downstream).
+NC_ESTATE_TYPES = ("Estate (Probate) Filings", "Notice to Creditors")
 
 # Recent window — about the last 120 days.
 WINDOW_DAYS = 120
@@ -393,6 +417,114 @@ def _parse_sc_probate(text: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# NC estate / decedent-notice text parsing  (NC mortality lane)
+# --------------------------------------------------------------------------- #
+# The NC creditor notice is highly templated (verified live 2026-06-26):
+#   "[NOTICE TO CREDITORS] NORTH CAROLINA, <COUNTY> COUNTY  File No: <file#>
+#    Having qualified as Executor/Administrator/Executrix of the Estate of
+#    <DECEDENT>, deceased, this is to notify all persons ... This the <date>.
+#    <PR NAME>, Executor  <pr address>  Publication Dates: ..."
+# Two decedent phrasings appear: "Estate of <name>, deceased" and the Gaston
+# variant "estate of <name>, deceased, late of <County> County". The PR
+# (executor/administrator/executrix) shows up TWICE — a top header line
+# "<PR> - Executor" and a signature line "<PR>, Executor" — we read either.
+#
+# Decedent: case-SENSITIVE proper-name capture. The label ("Estate of" /
+# "estate of" / "ESTATE OF") is matched case-insensitively via an inline
+# (?i:...) group, but the captured name is NOT (no global re.I) — a global
+# re.I makes _DECEDENT_TOK's leading [A-Z] match lowercase, which over-captures
+# trailing prose like "PADGETT deceased" when no comma stops it. Two decedent
+# token shapes coexist in one body: Title-case ("Robert Ellis Harwood Sr") and
+# ALL-CAPS ("JANICE REBECCA PARKER PADGETT"). _DECEDENT_TOK already allows both
+# (a leading capital + any mix of letters), so a single case-sensitive pattern
+# covers them. Stop the name at a comma / ; / "deceased"|"DECEASED" / "A/K/A"
+# alias / "late of" clause so we don't swallow the rest of the sentence.
+_NC_ESTATE = re.compile(
+    r"(?i:Estate\s+of\s+)"
+    rf"((?:{_DECEDENT_TOK})(?:\s+(?:{_DECEDENT_TOK})){{0,5}}?)"
+    r"(?=\s*(?:,|;|[Dd]eceased\b|DECEASED\b|\bA\s*/\s*K\s*/\s*A\b|"
+    r"\bAKA\b|\blate of\b)|$)"
+)
+
+# NC estate file number. Forms seen live:
+#   labelled: "File No: 24E477", "File No: 26 E 210", "File No: 26E000231-580",
+#             "File No: 26E00349-110", "Case Number: 26E000307- 350".
+#   bare (Buncombe template): "NORTH CAROLINA BUNCOMBE COUNTY 25E001625-100".
+# OCR inserts spaces around the 'E' and the trailing dash, so tolerate them.
+# A bare file# must carry a dash-suffixed county code ("-100") so we don't grab
+# random "<2 digits>E<digits>" tokens out of body prose; the labelled form is
+# tried first and is the more permissive of the two.
+_NC_FILE_NO = re.compile(
+    r"(?:File\s*No\.?|Case\s*Number)[:\s]*"
+    r"(\d{2}\s*E\s*[0-9][0-9\s\-]*\d)",
+    re.I,
+)
+_NC_FILE_NO_BARE = re.compile(
+    r"\bCOUNTY\b[\s:]*?(\d{2}\s*E\s*\d{3,7}\s*-\s*\d{2,4})\b",
+    re.I,
+)
+
+# Personal representative + role. The role word (Executor/Executrix/
+# Administrator/Administratrix/Co-Executor/Collector) anchors a real name that
+# sits immediately before it on the header line ("Betina Renee Harwood -
+# Executor") or after the closing date on the signature line ("... 2026.
+# Carl Eric Resh, Executor"). We prefer the signature form (name then role).
+_PR_ROLE = r"(?:Co-?\s*)?(?:Executor|Executrix|Administrator|Administratrix|Administrator\s+CTA|Collector)"
+# Signature form: "<Name>, Executor" / "<Name> , Executrix"
+_NC_PR_SIG = re.compile(
+    rf"((?:{_DECEDENT_TOK})(?:\s+(?:{_DECEDENT_TOK})){{1,4}})\s*[,\-]\s*({_PR_ROLE})\b"
+)
+# Header form: "<Name> - Executor"
+_NC_PR_HDR = re.compile(
+    rf"((?:{_DECEDENT_TOK})(?:\s+(?:{_DECEDENT_TOK})){{1,4}})\s+[\-–]\s+({_PR_ROLE})\b"
+)
+# Reject captures that are really the boilerplate run-in ("Estate of X,
+# deceased ... Having qualified as Executor") rather than a person name.
+_PR_REJECT = re.compile(
+    r"\b(Estate|Notice|Creditors|County|Carolina|Qualified|Having|Deceased|"
+    r"Decedent|Said|This|Date|File|Court|Clerk|The|Of|As)\b", re.I
+)
+
+
+def _parse_nc_estate(text: str) -> dict:
+    """Extract decedent + NC file# + executor/PR from an NC creditor notice.
+
+    Address-less by design — owner_name = decedent drives the owner-to-GIS
+    backfill downstream. Any address in the body is the PR's mailing address,
+    NOT the decedent's property, so we deliberately do NOT parse it.
+    """
+    t = _norm(text)
+    out: dict = {}
+
+    m = _NC_ESTATE.search(t)
+    if m:
+        out["owner_name"] = _clean_name(m.group(1))
+
+    m = _NC_FILE_NO.search(t) or _NC_FILE_NO_BARE.search(t)
+    if m:
+        # Collapse OCR whitespace; keep the dash structure ("26E000231-580").
+        out["file_number"] = re.sub(r"\s+", "", m.group(1)).upper()
+
+    # PR — signature form first (name precedes role), then header form. Reject
+    # boilerplate fragments.
+    for pat in (_NC_PR_SIG, _NC_PR_HDR):
+        for m in pat.finditer(t):
+            name = _clean_name(m.group(1))
+            role = m.group(2).strip()
+            if not name or " " not in name:
+                continue
+            if _PR_REJECT.search(name):
+                continue
+            out["personal_representative"] = name
+            out["pr_role"] = role
+            break
+        if out.get("personal_representative"):
+            break
+
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # API call
 # --------------------------------------------------------------------------- #
 async def _query(
@@ -464,7 +596,20 @@ class ColumnLegalNotices(BaseScraper):
                         out.append(li)
                         # dedup tracked inside _nc_listing via seen_ids closure
                 # NOTE: dedup handled below in a single pass to keep id set unified
-            # (2) SC estate/probate filings across the SC footprint.
+            # (2) NC estate/decedent notices across the NC footprint — the NC
+            # mortality lane. Column files these under TWO noticetype strings
+            # ("Estate (Probate) Filings" + "Notice to Creditors"), so loop both
+            # per county. Emitted as PROBATE_NOTICE leads (decedent = owner_name,
+            # address-less OK). Base-id dedup below collapses any overlap between
+            # the two noticetypes / publication runs.
+            for county in NC_FOOTPRINT:
+                for ntype in NC_ESTATE_TYPES:
+                    items = await _query(c, _NC, county, ntype, from_ms, now_ms)
+                    for it in items:
+                        li = self._nc_estate_listing(it, county)
+                        if li is not None:
+                            out.append(li)
+            # (3) SC estate/probate filings across the SC footprint.
             for county in SC_FOOTPRINT:
                 items = await _query(
                     c, _SC, county, SC_PROBATE_TYPE, from_ms, now_ms
@@ -584,6 +729,51 @@ class ColumnLegalNotices(BaseScraper):
             owner_name=parsed.get("owner_name"),
             defendant=parsed.get("owner_name"),  # decedent — drives name backfill
             case_number=parsed.get("case_number"),
+            description=_norm(text)[:500],
+            first_seen=published,
+            last_seen=datetime.utcnow(),
+            raw=raw,
+        )
+
+    def _nc_estate_listing(self, it: dict, county: str) -> Listing | None:
+        """NC decedent/estate notice -> PROBATE_NOTICE lead (NC mortality lane).
+
+        Same emit shape as the SC probate lead: owner_name = decedent (drives
+        the owner-to-GIS address backfill), address-less by design. Executor/PR
+        + NC estate file number land in raw["probate"]. The NC estate file# is
+        NOT a foreclosure SP case number, so it goes in raw, not case_number,
+        to avoid polluting cross-source case-number dedup.
+        """
+        text = it.get("text") or ""
+        if not text.strip():
+            return None
+        parsed = _parse_nc_estate(text)
+        # A real lead needs at least a decedent name; skip un-parseable bodies
+        # (the snippet still records the raw notice for audit).
+        if not parsed.get("owner_name"):
+            return None
+        raw = self._common_raw(it)
+        raw["column"]["snippet"] = _norm(text)[:800]
+        probate: dict = {}
+        if parsed.get("file_number"):
+            probate["nc_estate_file_no"] = parsed["file_number"]
+        if parsed.get("personal_representative"):
+            probate["personal_representative"] = parsed["personal_representative"]
+        if parsed.get("pr_role"):
+            probate["pr_role"] = parsed["pr_role"]
+        if probate:
+            raw["probate"] = probate
+        src_url = it.get("pdfurl") or f"{API_URL}#{it.get('id') or ''}"
+        published = self._published_dt(it)
+        return Listing(
+            source=self.slug,
+            source_url=src_url,
+            listing_type=ListingType.PROBATE_NOTICE,
+            property_kind=PropertyKind.UNKNOWN,
+            state="NC",
+            county=county,
+            owner_name=parsed.get("owner_name"),
+            defendant=parsed.get("owner_name"),  # decedent — drives name backfill
             description=_norm(text)[:500],
             first_seen=published,
             last_seen=datetime.utcnow(),

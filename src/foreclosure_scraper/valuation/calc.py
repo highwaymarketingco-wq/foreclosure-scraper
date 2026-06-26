@@ -359,10 +359,20 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
     # Tier 2: Zillow zestimate
     z = raw.get("zillow", {}) if isinstance(raw, dict) else {}
     zest = z.get("zestimate") or li.market_value
+    _fh = (raw.get("fhfa_value") or {}) if isinstance(raw, dict) else {}
     if zest and zest > 0:
         expected = float(zest)
         notes.append(f"ARV from Zillow Zestimate ({zest:,.0f})")
         confidence = "MEDIUM"
+    elif _fh.get("est_value") and float(_fh["est_value"]) > 0:
+        # Free FHFA-HPI rescale of the property's last recorded sale to today's
+        # market (MSA, else statewide). Coarse trend estimate (not comp-grounded)
+        # so it ranks below zestimate/tax and is LOW confidence — but it gives the
+        # equity engine an ARV basis for comp-thin rural/SC leads that had none.
+        expected = float(_fh["est_value"])
+        notes.append(f"ARV from FHFA-HPI rescale of last recorded sale "
+                     f"({_fh.get('msa_or_state', 'MSA/state')}) — coarse fallback")
+        confidence = "LOW"
     elif li.tax_value and li.tax_value > 0:
         expected = float(li.tax_value) * 1.25
         notes.append(f"ARV from tax-assessed × 1.25 ({li.tax_value:,.0f} × 1.25)")

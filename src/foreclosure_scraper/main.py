@@ -1482,6 +1482,18 @@ async def run() -> int:
     except Exception:
         log.error("court_bid.failed", traceback=traceback.format_exc())
 
+    # FHFA-HPI fallback value — coarse trend-rescale of a known last_sale_price to
+    # today's market for the property's MSA (or state). Free cached CSVs. Runs after
+    # the comp/sale-price enrichers and BEFORE calc so it can serve as a last-resort
+    # ARV input when every real comp tier is empty.
+    try:
+        from .enrichment_fhfa_value import enrich_fhfa_value
+        s = await enrich_fhfa_value(enriched)
+        if s:
+            enrichment_stats["fhfa_value"] = s
+    except Exception:
+        log.error("fhfa_value.failed", traceback=traceback.format_exc())
+
     # Investor calculator + A-F grades per listing.
     valuation_failures = 0
     for li in enriched:
@@ -1535,6 +1547,18 @@ async def run() -> int:
             enrichment_stats["equity"] = s
     except Exception:
         log.error("equity.failed", traceback=traceback.format_exc())
+
+    # Title-risk classifier — flag the foreclosing party as senior-lien (sale
+    # clears junior liens) vs junior-lien/HOA/credit-union/individual (a senior
+    # bank mortgage likely SURVIVES the sale = bidding trap). Pure-compute over
+    # party text; runs before distress scoring so HOT can exclude the traps.
+    try:
+        from .enrichment_title_risk import enrich_title_risk
+        s = enrich_title_risk(enriched)
+        if s:
+            enrichment_stats["title_risk"] = s
+    except Exception:
+        log.error("title_risk.failed", traceback=traceback.format_exc())
 
     # Computed flags from enriched data: absentee_owner, high_equity, vacant,
     # negative_equity, plus keyword flags from descriptions. MOVED here from

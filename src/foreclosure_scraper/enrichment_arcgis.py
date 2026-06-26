@@ -29,6 +29,21 @@ log = structlog.get_logger()
 # ---- SC: single SCDOT base URL with per-county layer ID ---------------------------
 
 SCDOT_BASE = "https://smpesri.scdot.org/arcgis/rest/services/GISMapping/SC_Parcels/MapServer"
+
+# Per-county situs-field overrides for SC SCDOT layers whose address column
+# can't be auto-detected by _detect_addr_field (verified live 2026-06-26).
+# The auto-detector looks for ADDR/STREET/SITUS-style names; these layers either
+# split situs across number+name columns (no single match) or only expose an
+# owner-mailing field that the detector would otherwise pick. We pin the field
+# the LIKE should match against so the SALEP/SALEDT/value aliases can actually
+# fire. Counties whose situs auto-detects cleanly (Pickens=LOCADD,
+# Anderson=PHYS_ADDR, Beaufort=SitusAddre) are intentionally absent.
+SC_SITUS: dict[str, str] = {
+    "Charleston": "PROP_ST_NA",   # split: PROP_ST_NO + PROP_ST_NA; match the name
+    "Georgetown": "StreetName",   # split: StreetNumber + StreetName; match the name
+    "Laurens": "Property_A",      # full situs; auto-detect wrongly picks owner-mail Address1
+}
+
 SC_LAYER: dict[str, int] = {
     "Abbeville": 1, "Aiken": 2, "Allendale": 3, "Anderson": 4, "Bamberg": 5,
     "Barnwell": 6, "Beaufort": 7, "Berkeley": 8, "Calhoun": 9, "Charleston": 10,
@@ -233,11 +248,30 @@ FIELD_ALIASES = {
                   "presentval", "TotalVal", "TotalValue", "Tot_Val", "AppraisalValue",
                   "TOTAL_VAL",
                   # coastal NC: Onslow=TAXMARKETVALUE, Dare(WFS)=aprtot
-                  "TAXMARKETVALUE", "aprtot"),
-    "deed_book": ("DEEDBK", "Deed_Book", "DEED_BK", "DeedBook", "DB"),
-    "deed_page": ("DEEDPG", "Deed_Page", "PAGE", "DeedPage", "DP"),
-    "sale_date": ("SaleDate", "SALEDATE", "DEED_YEAR", "SaleYear", "Sale_Year"),
-    "sale_amount": ("SaleAmount", "SALEAMT", "SalePrice", "Sale_Price"),
+                  "TAXMARKETVALUE", "aprtot",
+                  # SC SCDOT: Pickens=ACTUALVAL, Charleston=APPRAISAL,
+                  # Beaufort=Appraised, Laurens=Tota_Mark/Total_Val. (Anderson's
+                  # MRKT_VALUE + Georgetown's Land/Imp sum are already covered.)
+                  "ACTUALVAL", "APPRAISAL", "Appraised", "Tota_Mark", "Total_Val"),
+    "deed_book": ("DEEDBK", "Deed_Book", "DEED_BK", "DeedBook", "DB",
+                  # SC SCDOT: Charleston=DEED_BOOK_, Anderson=DBOOK,
+                  # Beaufort=Book, Laurens=DEEDBOOK
+                  "DEED_BOOK_", "DBOOK", "Book", "DEEDBOOK"),
+    "deed_page": ("DEEDPG", "Deed_Page", "PAGE", "DeedPage", "DP",
+                  # SC SCDOT: Anderson=DPAGE, Beaufort=Page, Laurens=DEEDPAGE
+                  "DPAGE", "Page", "DEEDPAGE"),
+    "sale_date": ("SaleDate", "SALEDATE", "DEED_YEAR", "SaleYear", "Sale_Year",
+                  # SC SCDOT: Pickens=SALEDT (epoch ms), Charleston=RECORDED_D
+                  # (epoch ms; DOC_DATE is the instrument date), Anderson=SALE_YEAR,
+                  # Laurens=TransferDa. (Beaufort/Georgetown SaleDate already above.)
+                  # Epoch-ms values stringify to a 13-digit value that
+                  # valuation.amortize._as_date already parses.
+                  "SALEDT", "RECORDED_D", "SALE_YEAR", "TransferDa"),
+    "sale_amount": ("SaleAmount", "SALEAMT", "SalePrice", "Sale_Price",
+                    # SC SCDOT: Pickens=SALEP, Charleston/Anderson=SALE_PRICE,
+                    # Laurens=Considerat (True_Sale is a Y/N flag, not an amount).
+                    # (Beaufort/Georgetown SalePrice already above.)
+                    "SALEP", "SALE_PRICE", "Considerat"),
     "zoning": ("Zoning", "ZONING", "ZONE", "ZoneCode", "zone_code", "PRIM_ZONE"),
     "land_value": ("landval", "Land", "LANDVAL", "LandValue", "Land_Val"),
     "improvement_value": ("improvval", "Dwelling", "BLDG_VAL", "ImpValue",
@@ -664,7 +698,13 @@ def _apply_attrs(li: Listing, attrs: dict[str, Any]) -> int:
             gis["last_sale"]["date"] = str(sale_d)
         if sale_a:
             try:
-                gis["last_sale"]["amount"] = float(sale_a)
+                # Some SC layers store the amount as a formatted string with
+                # thousands separators / a currency symbol (e.g. Laurens
+                # Considerat = '80,000'); strip those before float().
+                if isinstance(sale_a, str):
+                    sale_a = re.sub(r"[^\d.\-]", "", sale_a)
+                if sale_a not in ("", "-", "."):
+                    gis["last_sale"]["amount"] = float(sale_a)
             except (ValueError, TypeError):
                 pass
 
@@ -721,7 +761,11 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
             if not layer:
                 return
             base = f"{SCDOT_BASE}/{layer}/query"
-            addr_field = None  # auto-detect; SC layers use STREET, PHYS_ADDR, or PropertyLocation
+            # Most SC layers auto-detect cleanly (LOCADD/PHYS_ADDR/SitusAddre).
+            # A few split situs across number+name columns or only expose an
+            # owner-mailing field; pin those via SC_SITUS so the LIKE matches the
+            # property's street and the SALEP/SALEDT/value aliases can fire.
+            addr_field = SC_SITUS.get(county_clean)  # None -> auto-detect
         elif li.state == "NC":
             cfg = NC_GIS.get(county_clean)
             if not cfg:
