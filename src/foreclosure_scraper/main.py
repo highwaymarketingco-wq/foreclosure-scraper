@@ -182,6 +182,12 @@ def _in_scope(li: Listing) -> bool:
     # NC law firms / eCourts / SC rosters die before they can be geocoded.)
     if _oceanfront_pending(li):
         return True
+    # Source-scoped coastal-county admission — coastal foreclosure sources whose
+    # lead value IS the coastal county, even without near-beach coords. Runs before
+    # the deny check so deny-listed coastal counties (Brunswick/Onslow/Pender/New
+    # Hanover) can re-enter for these sources only.
+    if _coastal_county_source(li):
+        return True
     # True downtown Charleston peninsula — harbor-side, so it won't pass the
     # oceanfront distance gate, but the owner wants it kept (not N. Charleston /
     # Summerville). Also runs before the deny check.
@@ -242,6 +248,35 @@ SCOPE_BYPASS_SOURCES = {
     "national.courtlistener_civil",
     "national.courtlistener_adversary",
 }
+
+#: Coastal foreclosure sources whose COUNTY is the whole point of the lead. They
+#: scrape real Brunswick/Pender/Onslow/Carteret/Dare + SC-coastal rows that have
+#: no near-beach coords yet (roster/lien rows are case#- or parcel-only), so they
+#: fail the _check_oceanfront 2-of-3 gate AND _oceanfront_pending (which needs an
+#: address/parcel). The user wants these COASTAL-COUNTY foreclosures surfaced, not
+#: only literal beachfront. A lead is admitted ONLY when BOTH its source is one of
+#: these AND its county is in OCEANFRONT_COASTAL_COUNTIES — a source-scoped coastal
+#: bypass; it does NOT broaden to any other out-of-footprint county.
+COASTAL_COUNTY_BYPASS_SOURCES = {
+    "counties_nc.nc_coastal_tax_foreclosure",
+    "counties_nc.nc_ecourts_lis_pendens",
+    "counties_sc.charleston_mie",
+    "counties_sc.sc_coastal_rosters",
+}
+
+
+def _coastal_county_source(li: Listing) -> bool:
+    if li.source not in COASTAL_COUNTY_BYPASS_SOURCES:
+        return False
+    if not (li.county and li.state):
+        return False
+    cs = (li.county.replace(" County", "").strip().title(), li.state.upper())
+    if cs in OCEANFRONT_COASTAL_COUNTIES:
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["coastal_county"] = True   # spares it in the deny re-pass
+        return True
+    return False
 
 
 #: Sources where blank sale_date is acceptable — these list ACTIVELY-FOR-SALE
@@ -879,7 +914,7 @@ async def run() -> int:
     # re-admissions of otherwise-denied coastal counties — never drop those.
     def _denied_now(li: Listing) -> bool:
         raw = li.raw if isinstance(li.raw, dict) else {}
-        if raw.get("oceanfront") or raw.get("downtown_charleston"):
+        if raw.get("oceanfront") or raw.get("downtown_charleston") or raw.get("coastal_county"):
             return False
         if li.county and li.state:
             key = (li.county.replace(" County", "").strip().title(), li.state.upper())
@@ -1405,6 +1440,18 @@ async def run() -> int:
             enrichment_stats["footprint_sqft"] = s
     except Exception:
         log.error("footprint_sqft.failed", traceback=traceback.format_exc())
+
+    # Case# -> court record bid/upset-status. For foreclosure leads with a case
+    # number but no posted bid, a PER-CASE public lookup (Rule-610-safe) fills the
+    # recorded sale/upset STATUS (SC Public Index publishes status, not the bid $;
+    # NC SP is gated, skipped). Runs before calc/grade so any filled bid feeds ARV.
+    try:
+        from .enrichment_court_bid import enrich_court_bid
+        s = await enrich_court_bid(enriched)
+        if s:
+            enrichment_stats["court_bid"] = s
+    except Exception:
+        log.error("court_bid.failed", traceback=traceback.format_exc())
 
     # Investor calculator + A-F grades per listing.
     valuation_failures = 0
