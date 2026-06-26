@@ -45,6 +45,8 @@ from foreclosure_scraper.distress_score import score_board  # noqa: E402
 from foreclosure_scraper.enrichment_data_quality import enrich_data_quality  # noqa: E402
 from foreclosure_scraper.enrichment_multifamily_class import enrich_multifamily_class  # noqa: E402
 from foreclosure_scraper.enrichment_property_kind import enrich_property_kind  # noqa: E402
+from foreclosure_scraper.enrichment_fhfa_value import enrich_fhfa_value  # noqa: E402
+from foreclosure_scraper.enrichment_title_risk import enrich_title_risk  # noqa: E402
 from foreclosure_scraper.web_artifact import write_artifact  # noqa: E402
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
@@ -176,6 +178,9 @@ async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
     # off here (per-point street-view is slow; aerial+map+real give the coverage).
     from foreclosure_scraper.enrichment_images import enrich_with_images
     await _step("images", asyncio.wait_for(enrich_with_images(merged, use_mapillary=False), timeout=_cap("MERGE_IMAGES_TIMEOUT", 7200)))
+    # FHFA-HPI fallback value (free CSV AVM) — runs after gis_attrs/sale-price so it
+    # can rescale a known last sale to today's market; feeds the calc ARV ladder below.
+    await _step("fhfa_value", enrich_fhfa_value(merged))
     return merged
 
 
@@ -223,6 +228,7 @@ def main() -> int:
     # equity so _payoff can use the recovered sale data on no-card SC counties.
     print("enrich_gis_derived:", enrich_gis_derived(merged))
     print("enrich_equity:", enrich_equity(merged))
+    print("enrich_title_risk:", enrich_title_risk(merged))
     print("distress score_board:", score_board(merged))
     # Multifamily classifier BEFORE property_kind backfill (mirrors main.py):
     # promote apartment/multi-unit distress, then guarantee non-UNKNOWN coverage.
