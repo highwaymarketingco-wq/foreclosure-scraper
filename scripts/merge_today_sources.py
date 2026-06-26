@@ -84,6 +84,7 @@ NEW_SOURCES = {
     "counties_nc.new_hanover_foreclosures", "newspapers.coastland_times",
     "counties_nc.brunswick_legal_notices",
     "counties.column_legal_notices", "law_firms.mewborn_deselms",
+    "law_firms.zacchaeus",
 }
 
 

@@ -277,6 +277,7 @@ COASTAL_COUNTY_BYPASS_SOURCES = {
     "counties_nc.brunswick_legal_notices",     # Brunswick county legal-notice foreclosure/tax PDFs
     "counties.column_legal_notices",           # Column legal-notice API — coastal NC foreclosure notices
     "law_firms.mewborn_deselms",               # Mewborn & DeSelms — Onslow tax foreclosures
+    "law_firms.zacchaeus",                     # ZLS (zls-nc.com) — Onslow/Dare tax foreclosures + upset/redeemed status
 }
 
 
@@ -333,6 +334,7 @@ DATELESS_OK_SOURCES = {
     "counties_nc.nc_ecourts_estates",            # NC eCourts estate filings (no sale date)
     "counties_nc.nc_ecourts_divorce",            # NC eCourts divorce filings (no sale date)
     "counties.column_legal_notices",             # Column API SC estate/probate notices (no sale date)
+    "law_firms.zacchaeus",                       # ZLS tax foreclosures (status-driven; upset/pending leads outlive sale date)
     "national.first_citizens_reo",               # First Citizens bank-owned REO listings
     "counties_sc.sc_rod_acclaim",                # SC ROD (Acclaim vendor) recorded NOD/deed filings
     "counties_sc.sc_rod_cott",                   # SC ROD (Cott vendor) recorded NOD/deed filings
