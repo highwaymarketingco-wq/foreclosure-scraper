@@ -101,7 +101,18 @@ async def _scrape_new() -> list[Listing]:
     return out
 
 
+# Sources whose scraper was just fixed to PURGE junk (post-sale RESULT PDFs /
+# nav-chrome) — their existing carryover rows are the old junk, so drop them and
+# let the fresh (purged) scrape fully replace them. Otherwise dedupe keeps the
+# stale junk (the ~1216 Pickens post-sale sc_tax_delinquent rows + 18 sc_flc).
+REPLACE_SOURCES = {"counties_sc.sc_tax_delinquent", "counties_sc.sc_flc"}
+
+
 async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
+    _pre = len(existing)
+    existing = [li for li in existing if li.source not in REPLACE_SOURCES]
+    if _pre != len(existing):
+        print(f"replace-drop: removed {_pre - len(existing)} carryover rows from purged sources (sc_tax_delinquent/sc_flc)")
     new = await _scrape_new()
     n_scope = sum(1 for li in new if _in_scope(li))
     n_active = sum(1 for li in new if _active_only(li, cfg.sale_horizon_days))
@@ -148,6 +159,11 @@ async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
     await _step("parcel_reverse_geo", enrich_parcel_reverse_geo(merged))
     await _step("geocode#2", enrich_geocode(merged))
     await _step("owner_mailing", enrich_owner_mailing(merged))
+    # Images LAST — after every address/situs/geocode step, so the freshly-written
+    # addresses get an aerial. Goal: an image for every addressed lead. Mapillary
+    # off here (per-point street-view is slow; aerial+map+real give the coverage).
+    from foreclosure_scraper.enrichment_images import enrich_with_images
+    await _step("images", asyncio.wait_for(enrich_with_images(merged, use_mapillary=False), timeout=_cap("MERGE_IMAGES_TIMEOUT", 7200)))
     return merged
 
 

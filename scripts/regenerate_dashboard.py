@@ -100,6 +100,9 @@ def main() -> int:
     _run_bounded("gis_attrs", enrich_gis_attrs(listings, concurrency=16), _t("REGEN_GIS_TIMEOUT", 14400))
     from foreclosure_scraper.enrichment_situs_address import enrich_situs_address
     _run_bounded("situs_address", enrich_situs_address(listings, concurrency=16), _t("REGEN_SITUS_TIMEOUT", 7200))
+    # Images after situs/geocode so freshly-addressed leads get an aerial.
+    from foreclosure_scraper.enrichment_images import enrich_with_images
+    _run_bounded("images", enrich_with_images(listings, use_mapillary=False), _t("REGEN_IMAGES_TIMEOUT", 7200))
 
     print("enrich_sc_cama:", enrich_sc_cama(listings))
     print("enrich_footprint_sqft:", enrich_footprint_sqft(listings))
