@@ -129,9 +129,15 @@ async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
         except Exception as e:  # noqa: BLE001
             print(f"  {name}: ERROR {str(e)[:80]}")
     await _step("geocode#1", enrich_geocode(merged))
-    await _step("parcel_from_geo", asyncio.wait_for(enrich_parcel_from_geo(merged, concurrency=16), timeout=1200))  # lat/lng -> parcel_id
-    await _step("parcel_lookup", asyncio.wait_for(enrich_with_parcel_lookup(merged), timeout=600))  # parcel# -> addr/sqft/acreage/owner (bounded)
-    await _step("gis_attrs", asyncio.wait_for(enrich_gis_attrs(merged, concurrency=16), timeout=2400))  # parcel/point -> value/owner/sqft/year/acreage (missing-only, so mostly new leads)
+    # GIS steps: each individual query is already bounded (15-25s per-request
+    # timeout + concurrency), so a hung county endpoint skips ONE lead, not the
+    # batch. The wait_for here is only a GENEROUS pathological-hang backstop — NOT
+    # a work budget — so big batches enrich to completion. Env-overridable.
+    import os as _os
+    _cap = lambda k, d: int(_os.environ.get(k, d))
+    await _step("parcel_from_geo", asyncio.wait_for(enrich_parcel_from_geo(merged, concurrency=16), timeout=_cap("MERGE_PFG_TIMEOUT", 10800)))
+    await _step("parcel_lookup", asyncio.wait_for(enrich_with_parcel_lookup(merged), timeout=_cap("MERGE_PL_TIMEOUT", 7200)))
+    await _step("gis_attrs", asyncio.wait_for(enrich_gis_attrs(merged, concurrency=16), timeout=_cap("MERGE_GIS_TIMEOUT", 14400)))
     await _step("address_backfill", enrich_addresses_from_owner(merged))
     await _step("aggressive_address", enrich_with_aggressive_address(merged))
     await _step("parcel_reverse_geo", enrich_parcel_reverse_geo(merged))
