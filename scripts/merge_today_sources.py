@@ -82,6 +82,8 @@ NEW_SOURCES = {
     "counties_nc.nc_govdeals_real_property", "counties_nc.gaston_surplus_properties",
     "counties_nc.nc_ecourts_estates", "counties_nc.nc_ecourts_divorce",
     "counties_nc.new_hanover_foreclosures", "newspapers.coastland_times",
+    "counties_nc.brunswick_legal_notices",
+    "counties.column_legal_notices", "law_firms.mewborn_deselms",
 }
 
 

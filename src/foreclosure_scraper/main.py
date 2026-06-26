@@ -274,6 +274,9 @@ COASTAL_COUNTY_BYPASS_SOURCES = {
     "counties_nc.nc_ecourts_estates",          # NC eCourts estates (coastal counties)
     "counties_nc.nc_ecourts_divorce",          # NC eCourts divorce (coastal counties)
     "newspapers.coastland_times",              # Dare substitute-trustee sale notices
+    "counties_nc.brunswick_legal_notices",     # Brunswick county legal-notice foreclosure/tax PDFs
+    "counties.column_legal_notices",           # Column legal-notice API — coastal NC foreclosure notices
+    "law_firms.mewborn_deselms",               # Mewborn & DeSelms — Onslow tax foreclosures
 }
 
 
@@ -329,6 +332,7 @@ DATELESS_OK_SOURCES = {
     "counties_nc.gaston_surplus_properties",     # Gaston county-owned surplus (accepting offers)
     "counties_nc.nc_ecourts_estates",            # NC eCourts estate filings (no sale date)
     "counties_nc.nc_ecourts_divorce",            # NC eCourts divorce filings (no sale date)
+    "counties.column_legal_notices",             # Column API SC estate/probate notices (no sale date)
     "national.first_citizens_reo",               # First Citizens bank-owned REO listings
     "counties_sc.sc_rod_acclaim",                # SC ROD (Acclaim vendor) recorded NOD/deed filings
     "counties_sc.sc_rod_cott",                   # SC ROD (Cott vendor) recorded NOD/deed filings
@@ -365,6 +369,7 @@ DATELESS_OK_SOURCES = {
     "counties_nc.nc_coastal_tax_foreclosure",     # NEW coastal NC (Brunswick/Onslow/Carteret) tax-foreclosure
     "newspapers.post_and_courier",                # Charleston legal notices (pre-auction, no sale date)
     "newspapers.carolina_coast",                  # coastal NC/SC legal notices (pre-auction)
+    "counties_nc.brunswick_legal_notices",        # Brunswick legal-notice PDFs (sale_date best-effort, often None)
 }
 
 
@@ -1546,7 +1551,13 @@ async def run() -> int:
     # can stack every signal + equity + contactability gathered above.
     try:
         from .distress_score import score_board
-        enrichment_stats["distress_stack"] = score_board(enriched)
+        # Explicit absolute path to the PRIOR run's listings.json snapshot. At
+        # this point web_artifact (line ~1698) has not yet overwritten it, so it
+        # still holds the previous run — correct for the price_cut cross-run diff.
+        # Passing the absolute repo path (instead of distress_score's CWD-relative
+        # default) keeps the comparison working regardless of invocation CWD.
+        _prev_listings = Path(__file__).resolve().parent.parent.parent / "docs" / "listings.json"
+        enrichment_stats["distress_stack"] = score_board(enriched, previous_path=_prev_listings)
         log.info("orchestrator.distress_scored", tiers=enrichment_stats["distress_stack"])
     except Exception:
         log.error("distress_score.failed", traceback=traceback.format_exc())

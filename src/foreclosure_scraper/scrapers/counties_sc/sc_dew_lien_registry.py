@@ -120,7 +120,12 @@ _FETCH_JS = """async (payload) => {
     }
 }""" % (json.dumps(SVC_URL), json.dumps(SECURITY_KEY), _MAX_BYTES)
 
-_SC_CITYZIP = re.compile(r",?\s*([A-Za-z .'-]+?)\s*,?\s*SC\s*(\d{5})?\s*$")
+# Trailing 'CITY, ST[ ]ZIP' — the export format is "STREET, CITY, SC29036" /
+# "..., North Myrtle Beach, SC29582-1234" (no space before the zip). State and
+# zip optional-spaced; state captured so out-of-SC debtors keep their real state.
+_CITY_STATE_ZIP = re.compile(
+    r",\s*([A-Za-z .'-]+?)\s*,?\s*([A-Z]{2})\s*(\d{5}(?:-\d{4})?)?\s*$"
+)
 _COUNTY_RE = re.compile(r"\b([A-Za-z]+)\s+COUNTY\b", re.I)
 
 
@@ -144,43 +149,63 @@ def _parse_date(v) -> datetime | None:
     if not v or not isinstance(v, str):
         return None
     s = v.strip()
-    # WCF often serializes /Date(ms)/ or ISO; handle both + m/d/Y.
+    # WCF serializes /Date(ms)/, ISO, or "M/D/YYYY h:mm:ss AM". Handle all.
     m = re.search(r"/Date\((\d+)", s)
     if m:
         try:
             return datetime.utcfromtimestamp(int(m.group(1)) / 1000.0)
         except (ValueError, OverflowError):
             return None
-    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%m/%d/%Y"):
+    head = s.split()[0]  # date token before any time component
+    for fmt in ("%m/%d/%Y", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S"):
         try:
-            return datetime.strptime(s[:len(fmt) + 2].rstrip("Z"), fmt)
+            return datetime.strptime(head if "T" not in fmt else s.rstrip("Z"), fmt)
         except ValueError:
             continue
     return None
 
 
-def _split_address(addr: str | None) -> tuple[str | None, str | None, str | None, str | None]:
-    """Best-effort split of EmployerAddress -> (street, city, zip, county).
+def _county_for_city(city: str | None, state: str | None) -> str | None:
+    """Resolve a city to its county via the shared SC city->county maps
+    (upstate map is statewide-SC; coastal map adds beach towns)."""
+    if not city:
+        return None
+    try:
+        from ..._upstate_city_to_county import upstate_county_for
+        from ..._coastal_city_to_county import coastal_county_for
+    except ImportError:
+        return None
+    return upstate_county_for(city, state) or coastal_county_for(city, state)
 
-    Most rows have no address; when present it's a free-form mailing string.
-    We extract a trailing 'City, SC ZIP' and an explicit 'X COUNTY' token if
-    either is there — purely to enable footprint scoping; never fabricated."""
+
+def _split_address(
+    addr: str | None,
+) -> tuple[str | None, str | None, str | None, str | None, str | None]:
+    """Best-effort split of EmployerAddress -> (street, city, state, zip, county).
+
+    Export rows are mailing strings like "103 BEAUFORT ST, CHAPIN, SC29036".
+    We pull the trailing 'CITY, ST ZIP', keep the real state (so out-of-SC
+    debtors aren't mislabeled SC), and resolve county from an explicit
+    'X COUNTY' token or, failing that, the city via the shared maps. Purely to
+    enable footprint scoping; nothing fabricated."""
     if not addr or not isinstance(addr, str):
-        return None, None, None, None
+        return None, None, None, None, None
     s = " ".join(addr.split())
     county = None
     mc = _COUNTY_RE.search(s)
     if mc:
         county = mc.group(1).title()
-    city = zipc = None
-    mz = _SC_CITYZIP.search(s)
+    city = state = zipc = None
+    street = s
+    mz = _CITY_STATE_ZIP.search(s)
     if mz:
         city = (mz.group(1) or "").strip().title() or None
-        zipc = (mz.group(2) or "").strip() or None
-    street = s
-    if mz:
+        state = (mz.group(2) or "").strip().upper() or None
+        zipc = (mz.group(3) or "").strip()[:5] or None
         street = s[: mz.start()].rstrip(" ,") or None
-    return street, city, zipc, county
+    if not county:
+        county = _county_for_city(city, state)
+    return street, city, state, zipc, county
 
 
 def _to_listing(row: dict, slug: str) -> Listing | None:
@@ -192,17 +217,23 @@ def _to_listing(row: dict, slug: str) -> Listing | None:
     name = (row.get("TaxpayerName") or row.get("DBAName") or "").strip()
     if not name:
         return None
-    lien_id = row.get("LienID")
+    lien_id = row.get("LienID") or None
     lien_type = row.get("LienType")
     status = row.get("LienStatus") or row.get("StatusDescription")
     balance = _money(row.get("BalanceAmount"))
     lien_amt = _money(row.get("LeinAmount"))  # NB: backend misspells "Lein"
-    filed = _parse_date(row.get("LienDateFiled") or row.get("LienIssued"))
+    filed = _parse_date(row.get("LienDateFiled"))
 
-    street, city, zipc, county = _split_address(row.get("EmployerAddress"))
-    # If a county/city resolved AND it's out of footprint, we STILL keep the
-    # row (statewide name cross-ref is the point) but flag scope in raw.
-    in_footprint = in_scope(county, "SC") if county else None
+    street, city, addr_state, zipc, county = _split_address(row.get("EmployerAddress"))
+    state = (addr_state or "SC").upper()
+    # LienIssued is the filing COUNTY (e.g. "Greenville"), not a date — use it as
+    # a county fallback only for SC debtors when the mailing address lacked one.
+    issued = (row.get("LienIssued") or "").strip()
+    if not county and issued and state == "SC" and not any(ch.isdigit() for ch in issued):
+        county = issued.title()
+    # We KEEP every row statewide (name cross-ref is the point); footprint is just
+    # a flag. Only meaningful for SC; out-of-state debtors are not in footprint.
+    in_footprint = in_scope(county, state) if (county and state == "SC") else False
 
     is_benefit = _benefit_lien(lien_type, status)
     kind_label = "benefit-overpayment" if is_benefit else "UI-tax"
@@ -219,7 +250,7 @@ def _to_listing(row: dict, slug: str) -> Listing | None:
         source_url=SOURCE_URL,
         listing_type=ListingType.TAX_LIEN,
         property_kind=PropertyKind.UNKNOWN,
-        state="SC",
+        state=state,
         county=county,
         city=city,
         zip_code=zipc,
