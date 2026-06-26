@@ -47,14 +47,15 @@ COUNTY_TAX_URLS: dict[str, tuple[str, ...]] = {
     "Pickens": (
         "https://www.pickenscountysc.gov/treasurer/tax-sale",
     ),
-    "Oconee": (
-        "https://oconeesc.com/Departments/A-E/Delinquent-Tax-Collector",  # currently 500; retained for retry
-    ),
+    # Oconee removed 2026-06-26: old URL 500s, and Oconee FLC is now fully
+    # covered by the dedicated counties_sc.oconee_forfeited_land scraper.
     "Cherokee": (
-        "https://cherokeecountysc.gov/delinquent-tax/",
+        "https://cherokeecountysc.gov/delinquent-tax/",  # 403 to plain GET; get_text auto-escalates to curl_cffi impersonate (200)
     ),
-    "Union": ("https://www.countyofunion.com/treasurer/tax-sale",),
-    "Laurens": ("https://www.co.laurens.sc.us/treasurer/tax-sale",),
+    # 2026-06-26: countyofunion.com is SSL-dead and co.laurens.sc.us no longer
+    # resolves (DNS). Repointed to the live tax-collector domains.
+    "Union": ("https://www.unioncountytc.com/",),
+    "Laurens": ("https://www.laurenscountysc.gov/departments/treasurer/",),
 }
 
 PARCEL_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}-\d{3}\.\d{3}\b|\b[A-Z0-9]{3,5}-\d{2}-\d{2,4}-\d{3,4}\b")

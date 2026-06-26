@@ -169,6 +169,14 @@ class ForeclosureDotCom(BaseScraper):
     requires_apify = False
     requires_paywall = True  # full address still gated; flag for surfacing
     timeout_s = 240.0
+    # Disabled 2026-06-26: foreclosure.com edge-WAF returns 403 to a plain GET,
+    # to curl_cffi browser-impersonation, AND to a real stealth browser (all
+    # verified live) — it's a paid-preview site with no free access by any
+    # compliant means, and it's redundant with our other national aggregators
+    # (zillow / realtor / trulia / auction.com / hubzu / xome / bid4assets).
+    # Kept in place per code-retention policy; re-enable if access ever changes.
+    disabled = True
+    disabled_reason = "edge-WAF 403 to GET/impersonate/stealth-browser; paid-preview, no free access; redundant"
 
     async def fetch(self) -> Iterable[Listing]:
         pages_cap = int(os.environ.get("FORECLOSURE_DOT_COM_PAGES", "30"))

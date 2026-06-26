@@ -40,6 +40,13 @@ class BaseScraper(ABC):
     #: If True, scraper is skipped automatically on errors instead of failing the run.
     optional: bool = True
 
+    #: If True, the scraper is intentionally turned OFF — safe_run skips it and
+    #: reports DORMANT (not BLOCKED/ERROR), so a permanently-unreachable-but-kept
+    #: source (e.g. a hard edge-WAF wall with no free access) stops showing up as a
+    #: run failure while its code stays in place per policy. Set disabled_reason.
+    disabled: bool = False
+    disabled_reason: str = ""
+
     #: Minimum expected listings per run. If a run returns fewer than this AND
     #: a previous run returned more, treat as a regression (flag in run report).
     #: Set to 0 for sources that legitimately return 0 sometimes (e.g. annual
@@ -83,6 +90,11 @@ class BaseScraper(ABC):
         bound = log.bind(scraper=self.slug)
         self.last_outcome, self.last_reason = OUTCOME_OK, ""
         reset_block_signal()
+        if self.disabled:
+            self.last_outcome = OUTCOME_DORMANT
+            self.last_reason = f"disabled: {self.disabled_reason}" if self.disabled_reason else "disabled"
+            bound.info("scraper.disabled", reason=self.disabled_reason)
+            return []
         if not self._in_season():
             self.last_outcome = OUTCOME_DORMANT
             self.last_reason = f"off-season (active months {self.active_months})"
