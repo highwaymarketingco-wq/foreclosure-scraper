@@ -16,7 +16,7 @@ LOG="$ROOT/logs/daily-vision-$(date +%Y%m%dT%H%M%S).log"
 # Skip on full-run days — run_local.sh (the full weekly pipeline) fires at 9:30 on
 # these weekdays and is a SUPERSET of this daily refresh, so running both would
 # race on docs/listings.json + the git push. date +%u: 1=Mon..7=Sun. 2=Tuesday.
-FULL_RUN_DAYS="${FULL_RUN_DAYS:-2}"   # space/comma-free list of weekday numbers
+FULL_RUN_DAYS="${FULL_RUN_DAYS:-2 5}"   # space/comma-free list of weekday numbers
 if [[ " ${FULL_RUN_DAYS//,/ } " == *" $(date +%u) "* ]]; then
   echo "==> $(date '+%a') is a full-run day; the weekly run_local.sh handles today — skipping daily." | tee -a "$LOG"
   exit 0
