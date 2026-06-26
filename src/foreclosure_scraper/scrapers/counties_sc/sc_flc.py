@@ -3,6 +3,21 @@
 The SC FLC publishes a county-by-county tax sale calendar plus the list of
 forfeited parcels available for over-the-counter purchase. We scrape the FLC
 landing page on each upstate county tax collector's site.
+
+JUNK FILTER (2026-06-25):
+  The old inline body-text harvest scanned EVERY line of the page body and
+  emitted a Listing whenever ADDR_RE matched a street suffix. On real CMS
+  pages that matched county-office addresses ("110 Railroad Ave", "222
+  McDaniel Avenue"), nav / GIS-menu items ("E-911 Addressing"), copyright
+  footers ("© 2021 Pickens County"), and even JS snippets — producing 18
+  address-less nav-chrome rows with no real parcel. Fix:
+    * inline rows now REQUIRE a real SC TMS (PARCEL_RE) — addr-only lines
+      are no longer harvested at all, and
+    * any line that overlaps the page's own contact / nav / footer block
+      (county office address, phone, hours, copyright, menu labels) is
+      dropped even if it somehow carried a TMS.
+  Net: nav-chrome yields 0 rows; only genuine forfeited-land/tax-sale PDFs
+  and real TMS-tagged inline rows survive.
 """
 from __future__ import annotations
 
@@ -49,6 +64,26 @@ ADDR_RE = re.compile(
     re.I,
 )
 
+# Substrings that mark a line as page chrome (county-office contact block,
+# nav / GIS menu items, footer, JS) rather than a forfeited-land parcel row.
+# Lines containing any of these are dropped even if they happen to carry a TMS.
+_NAV_CONTACT_MARKERS = (
+    "e-911", "e911", "911 address", "addressing",
+    "copyright", "©", "all rights reserved",
+    "contact", "phone", "fax", "email", "hours", "monday", "friday",
+    "planning", "subdividing", "combining",
+    "linklevel", "linksection", "pagelinkfilter", "rz.",  # JS chrome
+    "privacy", "sitemap", "site map", "accessibility", "disclaimer",
+    "department", "treasurer's office", "tax collector's office",
+)
+
+
+def _is_nav_or_contact(line: str) -> bool:
+    """True if a body line is page chrome (office address/phone, nav, footer,
+    JS) and must not be emitted as a forfeited-land parcel row."""
+    low = (line or "").lower()
+    return any(m in low for m in _NAV_CONTACT_MARKERS)
+
 
 class SCForfeitedLand(BaseScraper):
     slug = "counties_sc.sc_flc"
@@ -76,6 +111,12 @@ class SCForfeitedLand(BaseScraper):
                         for k in ("forfeit", "tax sale", "delinquent", "fla", "flc", "forfeited land")
                     ):
                         continue
+                    # Skip post-sale / bidder-info sheets (e.g. "Tax Sale
+                    # Bidders", "...RESULTS...") — those are not the list of
+                    # forfeited / available parcels.
+                    if any(k in (label + " " + href.lower())
+                           for k in ("bidder", "result", "sold", "winning")):
+                        continue
                     out.append(
                         Listing(
                             source=self.slug,
@@ -90,16 +131,22 @@ class SCForfeitedLand(BaseScraper):
                             raw={"page_url": url},
                         )
                     )
-                # Also scan inline tables for parcel rows
+                # Also scan inline tables for parcel rows. Require a REAL SC TMS
+                # (PARCEL_RE) — addr-only lines are page chrome (county-office
+                # address, nav, footer), never a forfeited-land row. Also drop
+                # any line that is nav / contact / footer / JS even if it
+                # somehow carried a TMS-looking token.
                 body_text = tree.body.text(separator="\n") if tree.body else ""
                 for line in body_text.splitlines():
                     line = line.strip()
                     if len(line) < 15:
                         continue
-                    parcel = PARCEL_RE.search(line)
-                    addr = ADDR_RE.search(line)
-                    if not (parcel or addr):
+                    if _is_nav_or_contact(line):
                         continue
+                    parcel = PARCEL_RE.search(line)
+                    if not parcel:
+                        continue
+                    addr = ADDR_RE.search(line)
                     out.append(
                         Listing(
                             source=self.slug,

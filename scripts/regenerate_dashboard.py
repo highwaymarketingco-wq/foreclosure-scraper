@@ -98,6 +98,8 @@ def main() -> int:
     _run_bounded("parcel_from_geo", enrich_parcel_from_geo(listings, concurrency=16), _t("REGEN_PFG_TIMEOUT", 10800))
     _run_bounded("parcel_lookup", enrich_with_parcel_lookup(listings), _t("REGEN_PL_TIMEOUT", 7200))
     _run_bounded("gis_attrs", enrich_gis_attrs(listings, concurrency=16), _t("REGEN_GIS_TIMEOUT", 14400))
+    from foreclosure_scraper.enrichment_situs_address import enrich_situs_address
+    _run_bounded("situs_address", enrich_situs_address(listings, concurrency=16), _t("REGEN_SITUS_TIMEOUT", 7200))
 
     print("enrich_sc_cama:", enrich_sc_cama(listings))
     print("enrich_footprint_sqft:", enrich_footprint_sqft(listings))

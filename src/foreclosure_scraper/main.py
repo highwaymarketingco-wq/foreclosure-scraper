@@ -301,6 +301,11 @@ DATELESS_OK_SOURCES = {
     "counties_sc.charleston_mie",                 # Charleston MIE roster rows (case#-only, dateless)
     "national.hud_reac_inspection",               # HUD REAC failing-inspection multifamily (no sale date)
     "national.hud_section8_contracts",            # HUD Section-8 contract-expiry multifamily (no sale date)
+    "counties_nc.rutherford_tax",                 # NC tax-foreclosure (dateless in-rem/upset rows) — leak fix
+    "counties_nc.nc_county_tax_foreclosure",      # NC Gaston/McDowell/Rutherford tax-foreclosure + upset-bid
+    "counties_nc.nc_coastal_tax_foreclosure",     # NEW coastal NC (Brunswick/Onslow/Carteret) tax-foreclosure
+    "newspapers.post_and_courier",                # Charleston legal notices (pre-auction, no sale date)
+    "newspapers.carolina_coast",                  # coastal NC/SC legal notices (pre-auction)
 }
 
 
@@ -702,6 +707,17 @@ async def run() -> int:
         await enrich_gis_attrs(enriched)
     except Exception:
         log.error("gis_attrs.failed", traceback=traceback.format_exc())
+
+    # Situs-address writer — for leads still missing a street_address but holding a
+    # parcel_id/lat-lng, write the property situs (PHYSSTRADD/SITE_ADDR/...) from the
+    # GIS feature (reuses raw['gis_attrs_full'] where present). Runs AFTER gis_attrs
+    # so the bag exists, and BEFORE geocode/images so the new address feeds map
+    # markers + photo lookup. The address->photo unlock.
+    try:
+        from .enrichment_situs_address import enrich_situs_address
+        await enrich_situs_address(enriched)
+    except Exception:
+        log.error("situs_address.failed", traceback=traceback.format_exc())
 
     # Aggressive cross-county owner-name search — last resort for listings
     # still without an address. Tries every county GIS in the state + a

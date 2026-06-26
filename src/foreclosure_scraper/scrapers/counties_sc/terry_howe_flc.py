@@ -51,13 +51,23 @@ def _county_of(title: str) -> str | None:
 def _clean_addresses(body: str) -> list[str]:
     """Pull clean street addresses out of an FLC auction body.
 
-    The list prefixes a 1-2 digit item number ("00 817 Saxon Ave"); strip it when
-    a real house number follows, and drop vague "Off X" locators (no house #).
+    The list prefixes an FLC item number before the real address. Most counties
+    use a 1-2 digit item# ("00 817 Saxon Ave"); Laurens runs to 3 digits
+    ("031 505 N Broad St"). Strip the item# only when a SECOND, separate run of
+    digits (the real house number) immediately follows — two leading numeric
+    tokens = item# + house#. A lone leading numeric token is a legit house number
+    and must be kept (Spartanburg "817 Saxon Ave" stays intact). Also strip a
+    1-2 digit item# that prefixes an "Off X" locator, then drop the locator.
     """
     addrs: list[str] = []
     for m in _ADDR.finditer(body or ""):
         ad = re.sub(r"\s+", " ", m.group(1)).strip().rstrip(".")
-        ad = re.sub(r"(?i)^\d{1,2}\s+(?=\d|off\b)", "", ad)
+        # Two leading numeric tokens => first is the item# (1-3 digits), strip it
+        # and keep the trailing house-number address. Single house number stays.
+        ad = re.sub(r"^\d{1,3}\s+(?=\d)", "", ad)
+        # 1-2 digit item# prefixing an "Off X" locator (no house #) — strip it
+        # so the locator drops out below.
+        ad = re.sub(r"(?i)^\d{1,2}\s+(?=off\b)", "", ad)
         if re.match(r"(?i)off\b", ad) or not re.match(r"\d", ad):
             continue
         if ad not in addrs:

@@ -69,6 +69,17 @@ TARGET_COUNTIES = [
     "Rutherford", "Cleveland", "Henderson", "Polk", "Gaston",
     "Buncombe", "Transylvania", "McDowell", "Lincoln",
     "Mitchell", "Burke",
+    # 2026-06-25 — COASTAL NC track. The user explicitly wants Brunswick,
+    # Pender, Onslow, Carteret, and Dare coastal foreclosure coverage. These
+    # five are in SCOPE_DENY (east of Charlotte) but are re-admitted via the
+    # oceanfront gate in main._in_scope (OCEANFRONT_COASTAL_COUNTIES) once a
+    # row carries an address/parcel and geocodes near the beach. NC mortgage
+    # (deed-of-trust) foreclosures resolve through the Clerk of Superior Court
+    # as SP cases; Tyler indexes their lis-pendens / lien judgments here, so
+    # querying these county facets surfaces the coastal foreclosure-precursor
+    # signals. Inland coastal-county rows are dropped by the post-geocode
+    # oceanfront re-pass — exactly the "on the beach / within 2-3 blocks" rule.
+    "Brunswick", "Pender", "Onslow", "Carteret", "Dare",
 ]
 
 
@@ -231,7 +242,6 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
     # is a best-effort breadcrumb.
     source_url = f"{APP_BASE}#/search?caseNumber={case_number}"
 
-    raw_blob: dict = {}
     if in_upset_bid_window:
         # Compute deadline (orderedDate + 10 days). Floor to day for clarity.
         deadline = od_naive + timedelta(days=UPSET_BID_WINDOW_DAYS)

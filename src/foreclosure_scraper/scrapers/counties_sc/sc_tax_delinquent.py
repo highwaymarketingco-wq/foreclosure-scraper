@@ -14,11 +14,24 @@ Coverage:
 Why this matters: properties on the delinquent-tax list become next year's
 tax sale candidates. 6-12 months of lead time vs scraping the auction roster.
 
+POST-SALE FILTER (2026-06-25):
+  Pickens links a deep archive of *past* tax sales. Some of those PDFs are
+  POST-SALE RESULTS (header: "BIDDER #" / "SALE/BID PRICE", or the file is
+  named "...RESULTS...") and some are historical pre-sale listings headed
+  "<date> TAX SALE / OWNER (NOW OR FORMERLY)". Either way they are already
+  auctioned and are NOT fresh pre-sale leads — harvesting them produced
+  ~1216 address-less, parcel-only fake leads (1334 rows total, all Pickens).
+  `_is_post_sale_pdf()` now detects these by filename and PDF text markers
+  and EXCLUDES them (they are logged + skipped, never emitted as leads).
+  A genuinely current/pre-sale delinquent PDF (no results/bidder markers,
+  no "now or formerly") still flows through normally.
+
 KNOWN ISSUES (2026-05-14):
   - Spartanburg, Laurens URLs return 404 (CivicEngage CMS migration)
   - Cherokee returns 403 (Cloudflare)
   - Union DNS-fails
-  - Pickens only links to post-sale RESULT PDFs (not pre-sale delinquent)
+  - Pickens currently links only post-sale / historical RESULT PDFs, which
+    are now filtered out (see POST-SALE FILTER above)
   - Anderson / Oconee return HTML but no current delinquent-tax tables
 Net effect: this scraper currently returns 0 between sale cycles. URLs
 should be re-probed each July/August when counties publish that year's
@@ -85,6 +98,39 @@ ADDR_RE = re.compile(
 )
 PARCEL_SC_RE = re.compile(r"\b\d{3,4}-\d{2}-\d{2}-\d{3,4}\b")  # SC TMS pattern (3/4-2-2-3/4)
 
+# Markers that a PDF is a POST-SALE result (already auctioned) and therefore
+# NOT a fresh pre-sale lead. Two distinct Pickens layouts are covered:
+#   1. modern "TAX SALE RESULTS" sheets — header has BIDDER #, SALE/BID PRICE
+#   2. historical pre-sale listings ("<date> TAX SALE / OWNER (NOW OR FORMERLY)")
+#      — these are also for a past sale; "NOW OR FORMERLY" flags that ownership
+#      already changed hands at the auction.
+# Filename markers are checked separately (PDF link/href) so we can skip the
+# fetch entirely; text markers catch result PDFs whose filename looks innocuous.
+_POST_SALE_FILENAME_RE = re.compile(r"result", re.I)
+_POST_SALE_TEXT_MARKERS = (
+    "bidder #",
+    "bidder#",
+    "bidder number",
+    "sale/bid price",
+    "sale-bid price",
+    "sale bid price",
+    "bid price",
+    "tax sale results",
+    "now or formerly",
+)
+
+
+def _is_post_sale_filename(url_or_label: str) -> bool:
+    """True if a PDF link's href/label marks it as a post-sale RESULTS sheet."""
+    return bool(_POST_SALE_FILENAME_RE.search(url_or_label or ""))
+
+
+def _is_post_sale_text(text: str) -> bool:
+    """True if the PDF body shows post-sale RESULT / already-auctioned markers
+    (BIDDER #, SALE/BID PRICE, 'NOW OR FORMERLY', etc.)."""
+    t = (text or "").lower()
+    return any(m in t for m in _POST_SALE_TEXT_MARKERS)
+
 
 def _extract_from_text(text: str, county: str, source_url: str) -> list["Listing"]:
     """Fallback when table-based PDF extraction fails: scan the raw page text
@@ -141,6 +187,18 @@ async def _scrape_pdf(c, url: str, county: str) -> list[Listing]:
         out: list[Listing] = []
         text_pages: list[str] = []
         with pdfplumber.open(io.BytesIO(r.content)) as pdf:
+            # Pre-read the first page's text to gate post-sale RESULT PDFs
+            # before doing any row extraction. These are already-auctioned
+            # sheets (BIDDER # / SALE/BID PRICE / "NOW OR FORMERLY") and must
+            # NOT be emitted as fresh pre-sale leads.
+            try:
+                first_text = pdf.pages[0].extract_text() if pdf.pages else ""
+            except Exception:
+                first_text = ""
+            if _is_post_sale_text(first_text or ""):
+                log.info("sc_tax_delinquent.skip_post_sale_pdf",
+                         county=county, url=url, reason="post-sale RESULT markers in PDF text")
+                return []
             for page in pdf.pages:
                 # Collect text for fallback extraction
                 try:
@@ -308,6 +366,13 @@ async def _scrape_html(c, url: str, county: str) -> list[Listing]:
             continue
         if not any(k in (href.lower() + text) for k in
                    ("delinquent", "tax-sale", "tax sale", "tax-foreclosure", "forfeit")):
+            continue
+        # Skip post-sale RESULT PDFs by filename/label before fetching — these
+        # are already-auctioned sheets, not fresh pre-sale leads. (e.g. Pickens
+        # "...TAX SALE RESULTS FOR WEBSITE.pdf" / "2025 Delinquent Tax Sale Results")
+        if _is_post_sale_filename(href) or _is_post_sale_filename(text):
+            log.info("sc_tax_delinquent.skip_post_sale_link",
+                     county=county, href=href[:160], label=text[:80])
             continue
         href = urljoin(join_base, href)
         pdf_listings = await _scrape_pdf(c, href, county)

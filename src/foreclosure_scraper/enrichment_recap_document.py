@@ -10,13 +10,24 @@ the body text typically includes:
   * Lien priority / title chain references
 
 This enrichment runs ONLY on listings sourced by the
-courtlistener_adversary scraper. For each, it looks up the
-document's plain_text via the RECAP API and writes:
+courtlistener_adversary scraper. The rewritten adversary scraper
+(2026-06-25) stores, per docket, raw["courtlistener_adversary"] =
+{... "docket_id": int, "recap_documents": [{"document_number": int,
+"absolute_url": str, "short_description": str, ...}], ...} but does
+NOT carry an entry_id. So we resolve the document body from
+docket_id + each ref's document_number via the RECAP filter endpoint:
+
+    GET /recap-documents/?docket_entry__docket=<docket_id>
+                          &document_number=<document_number>
+
+and write the first one that has plain_text:
 
     raw["recap"] = {
         "plain_text": "...",        # capped to 50KB to bound size
         "page_count": int,
-        "document_url": "..."
+        "document_url": "...",
+        "document_number": int,
+        "doc_id": int,
     }
 
 The judgment_amount enrichment (already in the pipeline) then text-
@@ -45,19 +56,44 @@ log = structlog.get_logger()
 _MAX_BODY_CHARS = 50_000
 
 
-async def _fetch_recap_doc_for_entry(
+def _doc_payload(doc: dict) -> Optional[dict]:
+    """Build the raw['recap'] payload from a RECAP document record, or None
+    if it has no usable plain_text."""
+    plain = (doc.get("plain_text") or "")[:_MAX_BODY_CHARS]
+    if not plain:
+        return None
+    return {
+        "plain_text": plain,
+        "page_count": doc.get("page_count"),
+        "document_url": doc.get("filepath_local") or doc.get("absolute_url"),
+        "document_number": doc.get("document_number"),
+        "doc_id": doc.get("id"),
+    }
+
+
+async def _fetch_recap_doc(
     c: httpx.AsyncClient,
     token: str,
     docket_id: int,
-    entry_id: int,
+    document_number,
 ) -> Optional[dict]:
-    """For a docket-entry, find its associated RECAP document and pull
-    the plain_text. RECAP nests documents under the entry's
-    docket_entries/<id>/recap_documents/ endpoint.
+    """Resolve one RECAP document's plain_text from (docket_id, document_number).
+
+    The adversary scraper stores recap_documents[] refs with a document_number
+    but no recap-document id, so we query the filter endpoint scoped to the
+    docket. RECAP exposes documents at:
+        /recap-documents/?docket_entry__docket=<docket_id>
+                         &document_number=<document_number>
+    Returns the first result carrying plain_text, else None. Best-effort,
+    never raises.
     """
     try:
         r = await c.get(
-            f"{API_BASE}/recap-documents/?docket_entry={entry_id}",
+            f"{API_BASE}/recap-documents/",
+            params={
+                "docket_entry__docket": docket_id,
+                "document_number": document_number,
+            },
             headers={"Authorization": f"Token {token}", "Accept": "application/json"},
             timeout=20.0,
         )
@@ -67,20 +103,45 @@ async def _fetch_recap_doc_for_entry(
     except Exception:
         return None
 
-    results = data.get("results") or []
-    if not results:
-        return None
-    # Take the first available document; usually one entry has one doc.
-    doc = results[0]
-    plain = (doc.get("plain_text") or "")[:_MAX_BODY_CHARS]
-    if not plain:
-        return None
-    return {
-        "plain_text": plain,
-        "page_count": doc.get("page_count"),
-        "document_url": doc.get("filepath_local") or doc.get("absolute_url"),
-        "doc_id": doc.get("id"),
-    }
+    for doc in (data.get("results") or []):
+        if not isinstance(doc, dict):
+            continue
+        payload = _doc_payload(doc)
+        if payload:
+            return payload
+    return None
+
+
+async def _fetch_recap_doc_for_listing(
+    c: httpx.AsyncClient,
+    token: str,
+    docket_id: int,
+    recap_documents: list,
+) -> Optional[dict]:
+    """Walk a docket's stored recap_documents[] refs (highest document_number
+    first — the latest filing on the docket) and return the first one whose
+    body is available as plain_text on RECAP."""
+    # Sort refs by document_number desc so the most recent motion wins; refs
+    # without a numeric document_number sort last.
+    def _num(rd):
+        try:
+            return int(rd.get("document_number"))
+        except (TypeError, ValueError):
+            return -1
+
+    refs = sorted(
+        (rd for rd in (recap_documents or []) if isinstance(rd, dict)),
+        key=_num,
+        reverse=True,
+    )
+    for rd in refs:
+        dn = rd.get("document_number")
+        if dn in (None, ""):
+            continue
+        payload = await _fetch_recap_doc(c, token, docket_id, dn)
+        if payload:
+            return payload
+    return None
 
 
 async def enrich_recap_documents(listings: list[Listing]) -> dict:
@@ -90,8 +151,8 @@ async def enrich_recap_documents(listings: list[Listing]) -> dict:
         if li.source == "national.courtlistener_adversary"
         and isinstance(li.raw, dict)
         and isinstance(li.raw.get("courtlistener_adversary"), dict)
-        and li.raw["courtlistener_adversary"].get("entry_id")
         and li.raw["courtlistener_adversary"].get("docket_id")
+        and li.raw["courtlistener_adversary"].get("recap_documents")
     ]
     if not targets:
         return {"queried": 0, "annotated": 0}
@@ -109,10 +170,10 @@ async def enrich_recap_documents(listings: list[Listing]) -> dict:
     async def one(c: httpx.AsyncClient, li: Listing) -> None:
         async with sem:
             adv = li.raw.get("courtlistener_adversary") or {}
-            doc = await _fetch_recap_doc_for_entry(
+            doc = await _fetch_recap_doc_for_listing(
                 c, token,
                 docket_id=adv["docket_id"],
-                entry_id=adv["entry_id"],
+                recap_documents=adv.get("recap_documents") or [],
             )
             stats["queried"] += 1
             if not doc:

@@ -31,6 +31,7 @@ from foreclosure_scraper.enrichment_parcel_lookup import enrich_with_parcel_look
 from foreclosure_scraper.enrichment_parcel_from_geo import enrich_parcel_from_geo  # noqa: E402
 from foreclosure_scraper.enrichment_gis_attrs import enrich_gis_attrs  # noqa: E402
 from foreclosure_scraper.enrichment_gis_derived import enrich_gis_derived  # noqa: E402
+from foreclosure_scraper.enrichment_situs_address import enrich_situs_address  # noqa: E402
 from foreclosure_scraper.enrichment_derived_signals import enrich_derived_signals  # noqa: E402
 from foreclosure_scraper.enrichment_reo_freshness import prune_stale_reo  # noqa: E402
 from foreclosure_scraper.enrichment_aggressive_address import enrich_with_aggressive_address  # noqa: E402
@@ -69,6 +70,9 @@ NEW_SOURCES = {
     "national.hud_section8_contracts", "counties_sc.charleston_mie",
     "counties_sc.sc_rod_acclaim", "counties_nc.cleveland_tax",
     "counties_sc.sc_state_tax_lien",
+    # net-new coastal NC + newspapers (2026-06-25 eve)
+    "counties_nc.nc_coastal_tax_foreclosure", "counties_nc.nc_county_tax_foreclosure",
+    "counties_nc.rutherford_tax", "newspapers.post_and_courier", "newspapers.carolina_coast",
 }
 
 
@@ -138,6 +142,7 @@ async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
     await _step("parcel_from_geo", asyncio.wait_for(enrich_parcel_from_geo(merged, concurrency=16), timeout=_cap("MERGE_PFG_TIMEOUT", 10800)))
     await _step("parcel_lookup", asyncio.wait_for(enrich_with_parcel_lookup(merged), timeout=_cap("MERGE_PL_TIMEOUT", 7200)))
     await _step("gis_attrs", asyncio.wait_for(enrich_gis_attrs(merged, concurrency=16), timeout=_cap("MERGE_GIS_TIMEOUT", 14400)))
+    await _step("situs_address", asyncio.wait_for(enrich_situs_address(merged, concurrency=16), timeout=_cap("MERGE_SITUS_TIMEOUT", 7200)))  # parcel/GIS situs -> street_address
     await _step("address_backfill", enrich_addresses_from_owner(merged))
     await _step("aggressive_address", enrich_with_aggressive_address(merged))
     await _step("parcel_reverse_geo", enrich_parcel_reverse_geo(merged))

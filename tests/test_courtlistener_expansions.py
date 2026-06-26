@@ -141,10 +141,17 @@ def _adv_li(**kw) -> Listing:
         source="national.courtlistener_adversary", source_url="http://x",
         listing_type=ListingType.LIS_PENDENS, property_kind=PropertyKind.UNKNOWN,
         first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
+        # The rewritten adversary scraper stores docket_id + recap_documents[]
+        # refs (with document_number) but NO entry_id; the enricher resolves
+        # the body from docket_id + document_number.
         raw={"courtlistener_adversary": {
             "court": "ncwb", "classification": "lift_stay",
-            "docket_id": 12345, "entry_id": 99999,
+            "docket_id": 12345,
             "case_name": "Test Debtor",
+            "recap_documents": [
+                {"document_number": 10, "absolute_url": "/docket/12345/10/x/",
+                 "short_description": "Relief from Stay"},
+            ],
         }},
     )
     base.update(kw)
@@ -198,7 +205,7 @@ def test_recap_enrichment_annotates_adversary_listing():
         "foreclosure_scraper.enrichment_recap_document._load_token",
         return_value="fake-token",
     ), patch(
-        "foreclosure_scraper.enrichment_recap_document._fetch_recap_doc_for_entry",
+        "foreclosure_scraper.enrichment_recap_document._fetch_recap_doc_for_listing",
         new=AsyncMock(return_value=fake_doc),
     ), patch("asyncio.sleep", new=AsyncMock()):
         stats = asyncio.run(enrich_recap_documents([li]))
@@ -220,13 +227,65 @@ def test_recap_enrichment_caps_body_size():
         "foreclosure_scraper.enrichment_recap_document._load_token",
         return_value="fake-token",
     ), patch(
-        "foreclosure_scraper.enrichment_recap_document._fetch_recap_doc_for_entry",
+        "foreclosure_scraper.enrichment_recap_document._fetch_recap_doc_for_listing",
         new=AsyncMock(return_value={
             "plain_text": huge_text[:50_000],   # _fetch already caps
             "page_count": 99,
             "document_url": "x",
+            "document_number": 10,
             "doc_id": 1,
         }),
     ), patch("asyncio.sleep", new=AsyncMock()):
         asyncio.run(enrich_recap_documents([li]))
     assert len(li.raw["recap"]["plain_text"]) == 50_000
+
+
+def test_recap_fetch_resolves_from_docket_and_document_number():
+    """The fetch helper resolves the body from (docket_id, document_number)
+    with NO entry_id — the field the rewritten adversary scraper no longer
+    sets. Mocks only the HTTP layer so the real resolution logic is exercised.
+    """
+    from foreclosure_scraper.enrichment_recap_document import (
+        _fetch_recap_doc_for_listing,
+    )
+
+    class _FakeResp:
+        status_code = 200
+
+        def json(self):
+            return {"results": [{
+                "id": 999,
+                "document_number": 10,
+                "page_count": 12,
+                "plain_text": "Motion for Relief from Automatic Stay ...",
+                "absolute_url": "/docket/12345/10/x/",
+                "filepath_local": None,
+                "is_available": True,
+            }]}
+
+    captured = {}
+
+    class _FakeClient:
+        async def get(self, url, params=None, headers=None, timeout=None):
+            captured["url"] = url
+            captured["params"] = params
+            return _FakeResp()
+
+    recap_documents = [
+        {"document_number": 7, "absolute_url": "/docket/12345/7/x/"},
+        {"document_number": 10, "absolute_url": "/docket/12345/10/x/"},
+    ]
+    payload = asyncio.run(_fetch_recap_doc_for_listing(
+        _FakeClient(), "fake-token",
+        docket_id=12345, recap_documents=recap_documents,
+    ))
+    assert payload is not None
+    assert payload["plain_text"].startswith("Motion for Relief")
+    assert payload["page_count"] == 12
+    assert payload["document_number"] == 10
+    # Highest document_number is tried first (latest filing on the docket).
+    assert captured["params"]["document_number"] == 10
+    assert captured["params"]["docket_entry__docket"] == 12345
+    # entry_id is never used in the query — resolution is docket+doc_number only.
+    assert "docket_entry" not in captured["params"]
+    assert "entry_id" not in captured["params"]

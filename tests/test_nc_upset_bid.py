@@ -16,7 +16,6 @@ day bucket = 0 listings; everything is 31+ days old).
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from unittest.mock import patch
 
 from foreclosure_scraper.scrapers.counties_nc.nc_ecourts_lis_pendens import (
     TARGET_COUNTIES,
@@ -47,20 +46,26 @@ def test_upset_bid_window_constant():
 
 
 def test_target_counties_match_user_territory():
-    """Scope (confirmed 2026-06-16): the 11 in-scope WNC mountains/foothills
-    counties. Eastern NC + Charlotte (Mecklenburg) + Madison/Yancey pruned
-    2026-05-07; coastal NC (New Hanover/Brunswick/Onslow) pruned 2026-05-15."""
-    # In-scope NC counties:
+    """Scope: the 11 in-scope WNC mountains/foothills counties PLUS the five
+    coastal counties added 2026-06-25 (Brunswick/Pender/Onslow/Carteret/Dare)
+    per explicit user direction — those ride the oceanfront gate in
+    main._in_scope rather than the footprint allow-list. Eastern NC + Charlotte
+    (Mecklenburg) + Madison/Yancey remain pruned 2026-05-07."""
+    # In-scope WNC counties:
     for c in ("Buncombe", "Henderson", "Gaston", "Cleveland",
               "Rutherford", "Polk", "Transylvania",
               "McDowell", "Lincoln", "Mitchell", "Burke"):
         assert c in TARGET_COUNTIES, f"{c} missing from TARGET_COUNTIES"
-    # Counties dropped from scope (incl. coastal NC):
+    # Coastal counties — intentionally queried (oceanfront gate re-admits the
+    # near-beach rows):
+    for c in ("Brunswick", "Pender", "Onslow", "Carteret", "Dare"):
+        assert c in TARGET_COUNTIES, f"coastal {c} missing from TARGET_COUNTIES"
+    # Counties still out of scope (eastern NC + Charlotte + New Hanover, which
+    # is NOT in the user's coastal list):
     for c in ("Wake", "Forsyth", "Guilford", "Durham", "Cumberland",
-              "Mecklenburg", "Madison", "Yancey",
-              "New Hanover", "Brunswick", "Onslow"):
+              "Mecklenburg", "Madison", "Yancey", "New Hanover"):
         assert c not in TARGET_COUNTIES, (
-            f"{c} should have been removed from TARGET_COUNTIES on 2026-05-07"
+            f"{c} should NOT be in TARGET_COUNTIES"
         )
 
 
