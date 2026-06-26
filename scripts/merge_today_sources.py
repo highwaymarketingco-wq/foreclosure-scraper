@@ -47,6 +47,7 @@ from foreclosure_scraper.enrichment_multifamily_class import enrich_multifamily_
 from foreclosure_scraper.enrichment_property_kind import enrich_property_kind  # noqa: E402
 from foreclosure_scraper.enrichment_fhfa_value import enrich_fhfa_value  # noqa: E402
 from foreclosure_scraper.enrichment_title_risk import enrich_title_risk  # noqa: E402
+from foreclosure_scraper.enrichment_dew_liens import enrich_dew_liens  # noqa: E402
 from foreclosure_scraper.web_artifact import write_artifact  # noqa: E402
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
@@ -80,7 +81,6 @@ NEW_SOURCES = {
     "counties_sc.charleston_delinquent_tax", "counties_sc.horry_flc",
     "counties_sc.georgetown_civicengage", "counties_sc.colleton_tax_sale",
     "counties_sc.oconee_forfeited_land", "counties_sc.sc_probate_net",
-    "counties_sc.sc_dew_lien_registry",
     "counties_nc.nc_govdeals_real_property", "counties_nc.gaston_surplus_properties",
     "counties_nc.nc_ecourts_estates", "counties_nc.nc_ecourts_divorce",
     "counties_nc.new_hanover_foreclosures", "newspapers.coastland_times",
@@ -181,6 +181,9 @@ async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
     # FHFA-HPI fallback value (free CSV AVM) — runs after gis_attrs/sale-price so it
     # can rescale a known last sale to today's market; feeds the calc ARV ladder below.
     await _step("fhfa_value", enrich_fhfa_value(merged))
+    # SC DEW lien cross-ref — attach UI-tax/benefit liens to matching owners by name
+    # (no standalone board rows; the sc_dew scraper is disabled).
+    await _step("dew_liens", enrich_dew_liens(merged))
     return merged
 
 

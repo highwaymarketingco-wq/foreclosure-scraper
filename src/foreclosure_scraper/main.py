@@ -329,7 +329,6 @@ DATELESS_OK_SOURCES = {
     "counties_sc.charleston_delinquent_tax",     # Charleston FLC sealed-bid + delinquent tax
     "counties_sc.colleton_tax_sale",             # Colleton delinquent-tax list
     "counties_sc.sc_probate_net",                # southcarolinaprobate.net estate/marriage filings
-    "counties_sc.sc_dew_lien_registry",          # SC DEW UI-tax + benefit-overpayment liens
     "counties_nc.gaston_surplus_properties",     # Gaston county-owned surplus (accepting offers)
     "counties_nc.nc_ecourts_estates",            # NC eCourts estate filings (no sale date)
     "counties_nc.nc_ecourts_divorce",            # NC eCourts divorce filings (no sale date)
@@ -1495,6 +1494,17 @@ async def run() -> int:
             enrichment_stats["fhfa_value"] = s
     except Exception:
         log.error("fhfa_value.failed", traceback=traceback.format_exc())
+
+    # SC DEW lien cross-reference — attach UI-tax / benefit-overpayment liens to
+    # matching property owners by name. No standalone board rows (the sc_dew
+    # scraper is disabled); this one-time render fetch is the only DEW touch.
+    try:
+        from .enrichment_dew_liens import enrich_dew_liens
+        s = await enrich_dew_liens(enriched)
+        if s:
+            enrichment_stats["dew_liens"] = s
+    except Exception:
+        log.error("dew_liens.failed", traceback=traceback.format_exc())
 
     # Investor calculator + A-F grades per listing.
     valuation_failures = 0

@@ -208,6 +208,12 @@ def _split_address(
     return street, city, state, zipc, county
 
 
+# SC footprint coastal counties (core counties come from config.in_scope). sc_dew
+# emits a board row ONLY for an in-footprint SC debtor — statewide retention
+# previously spawned ~8k address-less rows that bloated the board.
+_SC_COASTAL = {"Charleston", "Horry", "Beaufort", "Georgetown", "Colleton"}
+
+
 def _to_listing(row: dict, slug: str) -> Listing | None:
     if not isinstance(row, dict):
         return None
@@ -231,9 +237,14 @@ def _to_listing(row: dict, slug: str) -> Listing | None:
     issued = (row.get("LienIssued") or "").strip()
     if not county and issued and state == "SC" and not any(ch.isdigit() for ch in issued):
         county = issued.title()
-    # We KEEP every row statewide (name cross-ref is the point); footprint is just
-    # a flag. Only meaningful for SC; out-of-state debtors are not in footprint.
-    in_footprint = in_scope(county, state) if (county and state == "SC") else False
+    # Footprint-ONLY emission (2026-06-26): keeping every statewide row "for name
+    # cross-ref" spawned ~8k address-less rows that bloated the board and dragged
+    # enrichment. Now emit a board row only for an in-footprint SC debtor (core +
+    # coastal). Out-of-footprint / countyless liens are dropped here.
+    cty = (county or "").replace(" County", "").strip().title()
+    in_footprint = state == "SC" and bool(county) and (in_scope(county, "SC") or cty in _SC_COASTAL)
+    if not in_footprint:
+        return None
 
     is_benefit = _benefit_lien(lien_type, status)
     kind_label = "benefit-overpayment" if is_benefit else "UI-tax"
@@ -444,6 +455,14 @@ class SCDEWLienRegistry(BaseScraper):
     name = "SC DEW Lien Registry (UI tax + benefit liens)"
     category = "state_lien"
     expected_min_count = 0   # backend net.tcp service intermittently times out
+    # 2026-06-26: NOT a board source. These are name+balance lien records keyed to
+    # the debtor's EMPLOYER mailing address, not foreclosure properties — emitting
+    # them spawned ~8k standalone rows that bloated the board and dragged enrichment.
+    # disabled=True keeps it off the board (DORMANT in the scrape loop); the
+    # cross-reference enricher (enrichment_dew_liens) calls .fetch() directly to
+    # attach these liens to MATCHING property leads by owner name.
+    disabled = True
+    disabled_reason = "cross-reference only — used by enrichment_dew_liens, not a board source"
     requires_render = True
     requires_apify = False
     timeout_s = 600.0

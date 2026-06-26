@@ -179,6 +179,16 @@ class ForeclosureDotCom(BaseScraper):
     disabled_reason = "edge-WAF 403 to GET/impersonate/stealth-browser; paid-preview, no free access; redundant"
 
     async def fetch(self) -> Iterable[Listing]:
+        # Paywall/disabled short-circuit (the documented behavior): the site gates
+        # everything behind login and the public preview is edge-WAF blocked, so
+        # without credentials — or while disabled — return [] WITHOUT any HTTP call.
+        # Keeps the source deterministic + classified PAYWALL-BLOCKED, and stops the
+        # short-circuit tests depending on the live site's flaky 403-vs-200.
+        if self.disabled or not (
+            os.environ.get("FORECLOSURE_DOT_COM_USER")
+            and os.environ.get("FORECLOSURE_DOT_COM_PASS")
+        ):
+            return []
         pages_cap = int(os.environ.get("FORECLOSURE_DOT_COM_PAGES", "30"))
         out: list[Listing] = []
         for state, url in URLS:
