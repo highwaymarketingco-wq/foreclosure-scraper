@@ -178,12 +178,11 @@ def _row_to_listing(row: dict) -> Listing | None:
     )
     latest_is_placeholder_zero = latest_score == 0 and prior_real is not None
 
+    # NOTE: do NOT put the inspection release date in sale_date — it is not a
+    # foreclosure sale date, and a (stale) sale_date makes _active_only drop every
+    # row despite DATELESS_OK. These are dateless distress signals; the release
+    # date lives in raw.reac.latest_release_date below.
     sale_date = None
-    if latest_dt:
-        try:
-            sale_date = datetime.fromisoformat(latest_dt)
-        except ValueError:
-            sale_date = None
 
     desc_bits = ["HUD REAC physical-inspection multifamily"]
     if latest_score is not None:

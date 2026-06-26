@@ -1,112 +1,52 @@
 {
-  "run_time": "2026-06-25T21:07:08.972720Z",
-  "total": 3787,
+  "run_time": "2026-06-26T00:42:49.762955Z",
+  "total": 3708,
   "by_source": {
     "national.auction_dot_com": 10,
-    "national.fannie_homepath": 8,
-    "national.homeharvest": 15,
-    "national.distressed": 375,
+    "national.fannie_homepath": 7,
+    "national.homeharvest": 14,
+    "national.distressed": 374,
     "national.hud_homestore": 5,
     "national.realtor_foreclosures": 2,
     "national.trulia": 6,
-    "national.zillow_foreclosures": 44,
+    "national.zillow_foreclosures": 43,
     "law_firms.bell_carrington": 14,
-    "law_firms.brock_scott": 84,
+    "law_firms.brock_scott": 82,
     "law_firms.hutchens": 74,
-    "law_firms.mcmichael_taylor_gray": 16,
+    "law_firms.mcmichael_taylor_gray": 15,
     "law_firms.rogers_townsend": 4,
-    "counties_sc.anderson_master_in_equity": 5,
-    "counties_sc.sc_county_rosters": 7,
-    "counties_sc.sc_public_index_lis_pendens": 502,
-    "counties_nc.nc_ecourts_lis_pendens": 442,
-    "newspapers.hendersonville_lightning": 1,
+    "counties_sc.anderson_master_in_equity": 4,
+    "counties_sc.sc_county_rosters": 6,
+    "counties_sc.sc_public_index_lis_pendens": 241,
+    "counties_nc.nc_ecourts_lis_pendens": 127,
     "reo.vrm_va_reo": 25,
-    "national.courtlistener_bankruptcy": 407,
+    "national.courtlistener_bankruptcy": 397,
     "national.zillow_bulk": 74,
-    "public_notices.ncnotices": 11,
+    "public_notices.ncnotices": 3,
     "counties_nc.nc_county_tax_foreclosure": 1,
-    "national.foreclosure_dot_com": 136,
+    "national.foreclosure_dot_com": 135,
     "national.xome": 3,
-    "newspapers.daily_courier": 2,
-    "counties_nc.henderson_tax": 15,
+    "counties_nc.henderson_tax": 10,
     "derived.probate_deed": 2,
-    "national.hubzu": 3,
-    "counties_sc.spartan_weekly_legals": 132,
-    "counties_sc.terry_howe_flc": 18,
-    "counties_nc.nc_rod_logan": 18,
-    "counties_nc.nc_rod_substitute_trustee": 11,
-    "counties_sc.pickens_master_in_equity": 4,
-    "counties_sc.sc_tax_delinquent": 1299,
-    "national.crexi_multifamily": 12
+    "national.hubzu": 4,
+    "counties_sc.spartan_weekly_legals": 38,
+    "counties_sc.terry_howe_flc": 20,
+    "counties_nc.nc_rod_logan": 12,
+    "counties_nc.nc_rod_substitute_trustee": 7,
+    "counties_sc.pickens_master_in_equity": 3,
+    "counties_sc.sc_tax_delinquent": 1294,
+    "national.crexi_multifamily": 19,
+    "national.hud_section8_contracts": 240,
+    "counties_sc.charleston_mie": 17,
+    "counties_sc.sc_rod_acclaim": 46,
+    "counties_sc.sc_state_tax_lien": 29,
+    "counties_nc.cleveland_tax": 4,
+    "national.hud_reac_inspection": 297
   },
-  "by_state": {
-    "NC": 1173,
-    "SC": 2614
-  },
-  "by_county_top": [
-    [
-      "SC/Pickens",
-      1400
-    ],
-    [
-      "SC/Spartanburg",
-      564
-    ],
-    [
-      "SC/Anderson",
-      344
-    ],
-    [
-      "NC/Gaston",
-      301
-    ],
-    [
-      "NC/Buncombe",
-      187
-    ],
-    [
-      "NC/Henderson",
-      160
-    ],
-    [
-      "NC/Cleveland",
-      133
-    ],
-    [
-      "SC/Laurens",
-      126
-    ],
-    [
-      "NC/McDowell",
-      86
-    ],
-    [
-      "NC/Lincoln",
-      84
-    ],
-    [
-      "SC/Cherokee",
-      65
-    ],
-    [
-      "NC/Burke",
-      61
-    ],
-    [
-      "SC/Union",
-      51
-    ],
-    [
-      "SC/Oconee",
-      46
-    ],
-    [
-      "NC/Rutherford",
-      44
-    ]
-  ],
+  "by_state": {},
+  "by_county_top": [],
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "regenerated in-place from persisted dataset (no re-scrape)"
+  "notes": "add hud_reac multifamily (sale_date fix)"
 }
