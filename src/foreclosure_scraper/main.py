@@ -262,6 +262,18 @@ COASTAL_COUNTY_BYPASS_SOURCES = {
     "counties_nc.nc_ecourts_lis_pendens",
     "counties_sc.charleston_mie",
     "counties_sc.sc_coastal_rosters",
+    # 2026-06 expansion — new coastal sources that must surface FULL coastal-county
+    # inventory (not only literal beachfront), same rationale as above.
+    "counties_nc.nc_govdeals_real_property",   # Pender county-owned real property
+    "counties_nc.new_hanover_foreclosures",    # New Hanover tax-foreclosures (Kania-administered)
+    "counties_sc.charleston_delinquent_tax",   # Charleston FLC sealed-bid + delinquent tax
+    "counties_sc.horry_flc",                   # Horry Forfeited Land Commission
+    "counties_sc.georgetown_civicengage",      # Georgetown FLC + tax-sale + MIE
+    "counties_sc.colleton_tax_sale",           # Colleton delinquent-tax / tax-sale
+    "counties_sc.sc_probate_net",              # SC probate (coastal counties via this gate)
+    "counties_nc.nc_ecourts_estates",          # NC eCourts estates (coastal counties)
+    "counties_nc.nc_ecourts_divorce",          # NC eCourts divorce (coastal counties)
+    "newspapers.coastland_times",              # Dare substitute-trustee sale notices
 }
 
 
@@ -305,6 +317,18 @@ DATELESS_OK_SOURCES = {
     "national.courtlistener_bankruptcy",        # Ch 7/11/13 federal bankruptcy filings
     "counties_sc.sc_tax_delinquent",            # delinquent property tax / pre-tax-sale
     "counties_sc.sc_flc",                        # SC Forfeited Land Commission inventory (no sale date)
+    # 2026-06 expansion — new FLC/tax/probate/estate/lien/surplus sources whose
+    # rows are long-runway (pre-sale) and routinely carry no sale_date.
+    "counties_sc.oconee_forfeited_land",         # Oconee FLC available + assignment lists
+    "counties_sc.horry_flc",                     # Horry FLC year-round inventory
+    "counties_sc.georgetown_civicengage",        # Georgetown FLC (dateless) + tax + MIE
+    "counties_sc.charleston_delinquent_tax",     # Charleston FLC sealed-bid + delinquent tax
+    "counties_sc.colleton_tax_sale",             # Colleton delinquent-tax list
+    "counties_sc.sc_probate_net",                # southcarolinaprobate.net estate/marriage filings
+    "counties_sc.sc_dew_lien_registry",          # SC DEW UI-tax + benefit-overpayment liens
+    "counties_nc.gaston_surplus_properties",     # Gaston county-owned surplus (accepting offers)
+    "counties_nc.nc_ecourts_estates",            # NC eCourts estate filings (no sale date)
+    "counties_nc.nc_ecourts_divorce",            # NC eCourts divorce filings (no sale date)
     "national.first_citizens_reo",               # First Citizens bank-owned REO listings
     "counties_sc.sc_rod_acclaim",                # SC ROD (Acclaim vendor) recorded NOD/deed filings
     "counties_sc.sc_rod_cott",                   # SC ROD (Cott vendor) recorded NOD/deed filings

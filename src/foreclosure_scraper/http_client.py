@@ -4,6 +4,21 @@ Politeness is enforced at the TRANSPORT layer, so every request that goes throug
 `client()` (scrapers, enrichments, get_text/get_bytes) is automatically spaced
 per hostname — different hosts stay parallel, same-host bursts get throttled.
 This is the structural fix for IP-ban risk: nothing hammers a single host.
+
+Fetch tiers, cheapest first — `get_text(impersonate=True)` (or
+`get_text_impersonate`) walks them automatically:
+
+1. plain httpx (HTTP/2, gzip) + rotated real-browser UA — for friendly hosts.
+2. curl-cffi `AsyncSession(impersonate="chrome")` — a real Chrome JA3/TLS +
+   HTTP/2 fingerprint with NO browser process. Many Cloudflare/F5-fronted
+   gov + court hosts (e.g. publicindex.sccourts.org) 403/406 plain httpx purely
+   on the TLS handshake and return 200 to a matching fingerprint. This is a
+   fast (~1s) static-content tier that sits BELOW the StealthyFetcher render
+   path: we only escalate to a headless browser when impersonation also fails.
+
+Presenting a real-browser fingerprint is NOT a CAPTCHA/WAF defeat — no solver,
+no login, no token forgery. Hosts that still block (e.g. portal-nc.tylertech,
+403 on both tiers) need the dedicated WAF-token / render path elsewhere.
 """
 from __future__ import annotations
 
@@ -109,6 +124,27 @@ def take_block_signal() -> "tuple[int, str] | None":
     return h[0] if h else None   # first block recorded this run
 
 
+# Process-wide memory of hosts that returned a _BLOCK_CODES status to PLAIN httpx
+# at least once. Once a host is known to fingerprint-block, get_text(impersonate=
+# True) skips the doomed plain attempt and goes straight to the curl-cffi tier —
+# saving a guaranteed-failing round-trip on every later fetch of that host.
+_impersonate_hosts: set[str] = set()
+
+
+def _host_of(url: str) -> str | None:
+    try:
+        return httpx.URL(url).host
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def mark_host_blocked(url: str) -> None:
+    """Record that `url`'s host blocked plain httpx (so future fetches impersonate first)."""
+    host = _host_of(url)
+    if host:
+        _impersonate_hosts.add(host)
+
+
 class _ThrottledTransport(httpx.AsyncBaseTransport):
     """Wraps the real transport and spaces requests per hostname."""
 
@@ -156,35 +192,143 @@ async def client(
         yield cli
 
 
+async def _impersonate_fetch(
+    url: str,
+    *,
+    timeout: float,
+    headers: dict | None,
+    referer: str | None,
+    impersonate: str,
+) -> str:
+    """Fetch via curl-cffi with a real Chrome JA3/TLS + HTTP/2 fingerprint.
+
+    No browser process — this is a fast static-content tier for hosts that
+    fingerprint-block plain httpx at the TLS handshake (403/406) but answer a
+    matching Chrome fingerprint. curl-cffi is sync per-request under the hood but
+    its AsyncSession runs on an internal curl multi loop, so it stays async.
+
+    Honours the same per-host throttle and per-run block signal as the httpx
+    transport, so politeness + BLOCKED classification are unchanged. Raises on
+    block/transient codes so the retry/escalation logic above can react.
+    """
+    from curl_cffi.requests import AsyncSession  # local import: keep dep optional
+
+    h = dict(DEFAULT_HEADERS)
+    if headers:
+        h.update(headers)
+    if referer:
+        h["Referer"] = referer
+    proxy = os.environ.get("PROXY_URL") or None
+    proxies = {"http": proxy, "https": proxy} if proxy else None
+
+    await _throttle(_host_of(url))
+    async with AsyncSession() as s:
+        r = await s.get(
+            url,
+            headers=h,
+            impersonate=impersonate,
+            timeout=timeout,
+            proxies=proxies,
+            allow_redirects=True,
+        )
+    code = r.status_code
+    if code in _BLOCK_CODES or 500 <= code < 600:
+        holder = _block_holder.get()
+        if holder is not None:
+            reason = ("rate-limited" if code == 429
+                      else "blocked/forbidden" if code in (401, 403, 406, 409)
+                      else "server error / possible WAF")
+            holder.append((code, f"HTTP {code} ({reason}) from {_host_of(url)} [impersonate]"))
+        raise RuntimeError(f"impersonate got {code} for {url}")
+    if code >= 400:
+        raise RuntimeError(f"impersonate got {code} for {url}")
+    return r.text
+
+
+async def get_text_impersonate(
+    url: str,
+    *,
+    timeout: float = 30.0,
+    headers: dict | None = None,
+    referer: str | None = None,
+    impersonate: str = "chrome",
+) -> str:
+    """GET via the curl-cffi browser-impersonation tier only, with retry.
+
+    Use directly when a host is known to need a real TLS fingerprint. For the
+    automatic plain->impersonate escalation, prefer `get_text(..., impersonate=True)`.
+    """
+    async for attempt in AsyncRetrying(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(initial=1, max=10),
+        reraise=True,
+    ):
+        with attempt:
+            return await _impersonate_fetch(
+                url, timeout=timeout, headers=headers,
+                referer=referer, impersonate=impersonate,
+            )
+    raise RuntimeError("unreachable")
+
+
 async def get_text(
     url: str,
     *,
     timeout: float = 30.0,
     headers: dict | None = None,
     referer: str | None = None,
+    impersonate: bool = False,
 ) -> str:
-    """GET a URL and return text, with retry on transient errors."""
+    """GET a URL and return text, with retry on transient errors.
+
+    With `impersonate=True`, plain httpx is tried first; if the host returns a
+    block status (401/403/406/409/429) or any HTTPStatusError, we transparently
+    escalate to the curl-cffi Chrome-fingerprint tier (a fast static fallback
+    BEFORE any browser render). Hosts seen blocking plain httpx are remembered
+    process-wide so later fetches impersonate first and skip the doomed attempt.
+    """
     h = dict(headers or {})
     if referer:
         h["Referer"] = referer
-    async for attempt in AsyncRetrying(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential_jitter(initial=1, max=10),
-        retry=retry_if_exception_type(
-            (httpx.TransportError, httpx.HTTPStatusError, httpx.TimeoutException)
-        ),
-        reraise=True,
-    ):
-        with attempt:
-            async with client(timeout=timeout) as c:
-                r = await c.get(url, headers=h)
-                if r.status_code in (429, 500, 502, 503, 504):
-                    raise httpx.HTTPStatusError(
-                        f"transient {r.status_code}", request=r.request, response=r
-                    )
-                r.raise_for_status()
-                return r.text
-    raise RuntimeError("unreachable")
+
+    host = _host_of(url)
+    impersonate_first = impersonate and host is not None and host in _impersonate_hosts
+    if impersonate_first:
+        return await get_text_impersonate(
+            url, timeout=timeout, headers=headers, referer=referer
+        )
+
+    try:
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=10),
+            retry=retry_if_exception_type(
+                (httpx.TransportError, httpx.HTTPStatusError, httpx.TimeoutException)
+            ),
+            reraise=True,
+        ):
+            with attempt:
+                async with client(timeout=timeout) as c:
+                    r = await c.get(url, headers=h)
+                    if r.status_code in (429, 500, 502, 503, 504):
+                        raise httpx.HTTPStatusError(
+                            f"transient {r.status_code}", request=r.request, response=r
+                        )
+                    r.raise_for_status()
+                    return r.text
+        raise RuntimeError("unreachable")
+    except httpx.HTTPStatusError as exc:
+        code = exc.response.status_code if exc.response is not None else None
+        # Only the impersonation tier can plausibly fix a fingerprint block; a
+        # generic 404/410 won't change, so don't waste a fetch on those.
+        if not (impersonate and (code in _BLOCK_CODES)):
+            raise
+        log.info("get_text.escalate_impersonate", host=host, code=code)
+        if host:
+            _impersonate_hosts.add(host)
+        return await get_text_impersonate(
+            url, timeout=timeout, headers=headers, referer=referer
+        )
 
 
 async def get_bytes(url: str, *, timeout: float = 60.0) -> bytes:

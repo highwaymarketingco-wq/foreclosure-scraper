@@ -73,6 +73,15 @@ NEW_SOURCES = {
     # net-new coastal NC + newspapers (2026-06-25 eve)
     "counties_nc.nc_coastal_tax_foreclosure", "counties_nc.nc_county_tax_foreclosure",
     "counties_nc.rutherford_tax", "newspapers.post_and_courier", "newspapers.carolina_coast",
+    # net-new sources (2026-06-26): SC FLC/tax + probate + DEW liens, NC GovDeals +
+    # surplus + eCourts estates/divorce, New Hanover (Kania mirror), Coastland Times.
+    "counties_sc.charleston_delinquent_tax", "counties_sc.horry_flc",
+    "counties_sc.georgetown_civicengage", "counties_sc.colleton_tax_sale",
+    "counties_sc.oconee_forfeited_land", "counties_sc.sc_probate_net",
+    "counties_sc.sc_dew_lien_registry",
+    "counties_nc.nc_govdeals_real_property", "counties_nc.gaston_surplus_properties",
+    "counties_nc.nc_ecourts_estates", "counties_nc.nc_ecourts_divorce",
+    "counties_nc.new_hanover_foreclosures", "newspapers.coastland_times",
 }
 
 

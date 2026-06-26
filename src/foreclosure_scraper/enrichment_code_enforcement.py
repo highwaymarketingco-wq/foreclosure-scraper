@@ -5,10 +5,15 @@ vehicles, overgrowth, missing permits) via their open-data portals. Direct
 distress signal — properties with active violations are 60-70% likely to
 hit foreclosure or tax sale within 18 months.
 
-Coverage:
-  - Charlotte 311 (Code Enforcement Cases) — Mecklenburg County
-  - Asheville code enforcement (when accessible)
-  - Spartanburg + Greenville SC (when accessible)
+Coverage: NONE currently active. The previously-wired "Charlotte" ArcGIS
+endpoint (services5.arcgis.com/86gdKBxZf7GIt2Or/.../Code_Enforcement_Cases)
+was wrong — it actually serves City of Yucaipa, CA code-enforcement cases,
+which are 2,000+ miles out of footprint. It has been removed rather than
+substituted: no free, public code-enforcement feed for an in-footprint NC/SC
+city has been confirmed yet. The query/match/scoring machinery below stays
+intact so a verified in-footprint endpoint can be slotted into
+``CITY_ENDPOINTS`` later. With the dict empty, ``enrich_with_code_enforcement``
+is a graceful no-op.
 
 Free, ArcGIS REST endpoints, no auth.
 """
@@ -17,7 +22,6 @@ from __future__ import annotations
 import asyncio
 import math
 import re
-from datetime import datetime
 from typing import Optional
 
 import structlog
@@ -30,17 +34,22 @@ log = structlog.get_logger()
 
 # City open-data endpoints — public ArcGIS FeatureServer queries.
 # Discovered via each city's open-data portal (data.<city>.gov / ArcGIS Hub).
-CITY_ENDPOINTS = {
-    "Charlotte": {
-        "url": "https://services5.arcgis.com/86gdKBxZf7GIt2Or/arcgis/rest/services/Code_Enforcement_Cases/FeatureServer/0/query",
-        "addr_fields": ("Address", "Property_Address", "ADDRESS"),
-        "violation_fields": ("Violation", "ViolationDescription", "CASE_TYPE", "Description"),
-        "status_fields": ("Status", "CaseStatus", "STATUS"),
-        "date_fields": ("OpenDate", "CASE_DATE", "DateOpened"),
-    },
-    # Add more as their endpoints are confirmed; many city-of-* portals
-    # change FeatureServer URLs annually so this is best-effort.
-}
+#
+# DISABLED: the former "Charlotte" entry pointed at
+#   services5.arcgis.com/86gdKBxZf7GIt2Or/.../Code_Enforcement_Cases
+# which is actually the City of Yucaipa, CA FeatureServer (out of footprint by
+# ~2,000 miles). It has been removed; no in-footprint NC/SC city code-
+# enforcement feed has been verified yet, and we do NOT substitute a fake one.
+#
+# To re-enable: add a confirmed in-footprint city with the same shape, e.g.
+#   "Asheville": {
+#       "url": "<verified FeatureServer .../query URL>",
+#       "addr_fields": (...), "violation_fields": (...),
+#       "status_fields": (...), "date_fields": (...),
+#   }
+# Many city-of-* portals rotate FeatureServer URLs annually, so confirm the
+# host/owner-org actually serves the intended city before wiring it in.
+CITY_ENDPOINTS: dict[str, dict] = {}
 
 
 def _haversine_miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

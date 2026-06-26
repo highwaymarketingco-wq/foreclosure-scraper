@@ -20,9 +20,45 @@ Pure computation over the board; no scraping.
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Optional
 
 from .models import Listing
+
+# MLS lifecycle statuses that signal a seller who couldn't (or stopped trying
+# to) move the property on the open market — a strong, fresh motivated-seller
+# tell that often precedes a price drop or a quiet pre-foreclosure sale.
+_DEAD_MLS_STATUSES = {"expired", "withdrawn", "cancelled", "canceled"}
+
+# A listing sitting on-market past ~2x the local market-velocity months-of-
+# inventory (MOI) is genuinely stale — buyers have passed on it at the current
+# price for twice as long as the typical sell-through. We read MOI from the
+# per-listing market_velocity block (enrichment_comps); fall back to a sane
+# default when velocity could not be computed for the parcel's market.
+_STALE_MOI_FALLBACK_MONTHS = 6.0
+_STALE_MOI_MULTIPLIER = 2.0
+# A price cut is only meaningful past noise (rounding, list re-keys). Require a
+# real markdown vs the prior snapshot before it counts as a distress signal.
+_PRICE_CUT_MIN_PCT = 0.04   # >=4% off the prior list price
+_PRICE_CUT_MIN_ABS = 2500.0  # and at least $2.5k absolute
+
+
+def _mls_fields(li: Listing) -> dict:
+    """Pull the raw MLS lifecycle fields HomeHarvest persists, regardless of
+    which scraper wrote them. homeharvest.py writes raw['homeharvest'];
+    homeharvest_distressed.py writes raw['distressed']. Both carry the same
+    mls_status / list_date / days_on_mls trio."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    for sub in ("homeharvest", "distressed"):
+        block = raw.get(sub)
+        if isinstance(block, dict) and (
+            block.get("mls_status") is not None
+            or block.get("days_on_mls") is not None
+        ):
+            return block
+    return {}
+
 
 # signal -> (category, weight). Categories: FINANCIAL / SALES / LEGAL /
 # LIFE_EVENT / PROPERTY. Weight ~ motivation strength.
@@ -39,14 +75,68 @@ _LISTING_TYPE_SIGNAL = {
 }
 
 
-def _signals_for(li: Listing) -> list[tuple[str, str, int]]:
-    """Return (signal_name, category, weight) for one listing's distress signals."""
+def _mls_signals(li: Listing, prior_price: Optional[float] = None) -> list[tuple[str, str, int]]:
+    """SALES-category signals derived from the MLS lifecycle fields HomeHarvest
+    persists (mls_status / days_on_mls / list_price). These turn the raw realtor
+    feed — which we previously only used for routing — into real distress tells:
+
+      - stale_on_market: days_on_mls past ~2x local months-of-inventory. The
+        market has passed on it at this price for twice the typical sell-through.
+      - price_cut: current list price meaningfully below the prior snapshot's
+        list price (seller capitulating). prior_price comes from score_board's
+        cross-run index built off docs/listings.json.
+      - withdrawn/expired: mls_status in expired/withdrawn/cancelled — couldn't
+        sell on the open market, a classic pre-foreclosure / pre-pocket-sale tell.
+    """
+    sig: list[tuple[str, str, int]] = []
+    mls = _mls_fields(li)
+
+    status = str(mls.get("mls_status") or "").strip().lower()
+    if status in _DEAD_MLS_STATUSES:
+        sig.append(("mls_withdrawn_expired", "SALES", 18))
+
+    dom = mls.get("days_on_mls")
+    try:
+        dom = float(dom) if dom is not None else None
+    except (TypeError, ValueError):
+        dom = None
+    if dom is not None:
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        moi = (raw.get("market_velocity") or {}).get("moi")
+        try:
+            moi = float(moi) if moi is not None else _STALE_MOI_FALLBACK_MONTHS
+        except (TypeError, ValueError):
+            moi = _STALE_MOI_FALLBACK_MONTHS
+        # moi is months-of-inventory; days threshold = 2x MOI expressed in days.
+        stale_days = moi * 30.0 * _STALE_MOI_MULTIPLIER
+        if dom >= stale_days:
+            sig.append(("stale_on_market", "SALES", 14))
+
+    # price_cut — current list price (opening_bid carries list_price for the
+    # realtor feeds) below the prior run's list price by a real margin.
+    cur = li.opening_bid
+    if prior_price and cur and cur > 0 and prior_price > 0 and cur < prior_price:
+        drop = prior_price - cur
+        if drop >= _PRICE_CUT_MIN_ABS and (drop / prior_price) >= _PRICE_CUT_MIN_PCT:
+            sig.append(("price_cut", "SALES", 16))
+
+    return sig
+
+
+def _signals_for(li: Listing, prior_price: Optional[float] = None) -> list[tuple[str, str, int]]:
+    """Return (signal_name, category, weight) for one listing's distress signals.
+
+    prior_price (optional) is the same listing's list price from the previous
+    run's snapshot, used only for the price_cut MLS signal. Defaults to None so
+    single-listing callers (and tests) keep working unchanged."""
     r = li.raw if isinstance(li.raw, dict) else {}
     sig: list[tuple[str, str, int]] = []
     lt = (li.listing_type.value if li.listing_type else "") if hasattr(li.listing_type, "value") else str(li.listing_type or "")
     if lt in _LISTING_TYPE_SIGNAL:
         cat, w = _LISTING_TYPE_SIGNAL[lt]
         sig.append((lt, cat, w))
+    # MLS-distress (stale_on_market / price_cut / withdrawn-expired)
+    sig.extend(_mls_signals(li, prior_price=prior_price))
     # court / sale status
     if r.get("court_sale_status") in ("sale_noticed", "sold_unconfirmed"):
         sig.append(("court_sale", "FINANCIAL", 25))
@@ -114,13 +204,79 @@ def _parcel_key(li: Listing) -> str:
     return f"id:{id(li)}"  # ungrouped
 
 
-def score_board(listings: list[Listing]) -> dict:
+def _prior_price_index(previous_path: Optional[Path]) -> dict[str, float]:
+    """Build {dedupe_key: prior list_price} from the previous run's snapshot.
+
+    Reuses the same docs/listings.json snapshot enrichment_pulled_sales.py reads
+    (the cross-run diff). We only need each prior listing's identity + list
+    price, so this is a lightweight read — no full Listing hydration. Keyed by
+    Listing.dedupe_key() so it matches the current run's listings exactly.
+    """
+    if previous_path is None:
+        previous_path = Path("docs/listings.json")
+    if not previous_path.exists():
+        return {}
+    try:
+        data = json.loads(previous_path.read_text())
+    except (ValueError, OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(data, list):
+        return {}
+
+    from .models import ListingType, PropertyKind
+    lt_map = {lt.value: lt for lt in ListingType}
+    pk_map = {pk.value: pk for pk in PropertyKind}
+
+    idx: dict[str, float] = {}
+    for d in data:
+        if not isinstance(d, dict):
+            continue
+        price = d.get("opening_bid")
+        try:
+            price = float(price) if price is not None else None
+        except (TypeError, ValueError):
+            price = None
+        if not price or price <= 0:
+            continue
+        # Minimal Listing for a stable dedupe_key (same fields the key uses).
+        try:
+            li = Listing(
+                source=d.get("source") or "prior",
+                source_url=d.get("source_url") or "prior",
+                listing_type=lt_map.get(d.get("listing_type") or "unknown", ListingType.UNKNOWN),
+                property_kind=pk_map.get(d.get("property_kind") or "unknown", PropertyKind.UNKNOWN),
+                street_address=d.get("street_address"),
+                city=d.get("city"),
+                state=d.get("state"),
+                zip_code=d.get("zip_code"),
+                county=d.get("county"),
+                parcel_id=d.get("parcel_id"),
+                case_number=d.get("case_number"),
+            )
+        except Exception:
+            continue
+        key = li.dedupe_key()
+        # Keep the highest prior price on key collision — a real markdown should
+        # measure against the listing's earlier (higher) ask, not a stale low.
+        if key not in idx or price > idx[key]:
+            idx[key] = price
+    return idx
+
+
+def score_board(listings: list[Listing], previous_path: Optional[Path] = None) -> dict:
     """Compute and attach raw['distress_stack'] to each listing. Returns a
-    tier histogram."""
+    tier histogram.
+
+    previous_path points at the prior run's docs/listings.json snapshot (same
+    file enrichment_pulled_sales.py diffs). It powers the price_cut MLS signal
+    by comparing each listing's list price against its prior-run ask. Defaults
+    to docs/listings.json; pass a path (or a non-existent one) to control it."""
     # group by parcel
     groups: dict[str, list[Listing]] = {}
     for li in listings:
         groups.setdefault(_parcel_key(li), []).append(li)
+
+    prior_prices = _prior_price_index(previous_path)
 
     hist = {"HOT": 0, "WARM": 0, "COLD": 0}
     for key, group in groups.items():
@@ -134,7 +290,8 @@ def score_board(listings: list[Listing]) -> dict:
         # union signals across the parcel group
         by_cat: dict[str, list[tuple[str, int]]] = {}
         for li in active:
-            for name, cat, w in _signals_for(li):
+            prior_price = prior_prices.get(li.dedupe_key()) if prior_prices else None
+            for name, cat, w in _signals_for(li, prior_price=prior_price):
                 by_cat.setdefault(cat, []).append((name, w))
         categories = sorted(by_cat)
         stack = len(categories)  # distinct categories = the STACKED-N number

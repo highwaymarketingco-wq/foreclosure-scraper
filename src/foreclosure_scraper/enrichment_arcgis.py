@@ -45,6 +45,12 @@ SC_LAYER: dict[str, int] = {
 
 # ---- NC: direct ArcGIS REST per county ------------------------------------------
 
+# Sentinel addr_field for layers that have NO single situs column and instead
+# store the address across several fields (house #, street name, street type).
+# When a county's addr_field is this object, _arcgis_query builds a multi-field
+# LIKE on the street name and _stitch_situs() rebuilds the full situs on read.
+_BRUNSWICK_CONCAT = "__concat:HouseNumber+StreetDirection+StreetName+StreetType__"
+
 NC_GIS: dict[str, dict[str, Any]] = {
     # Audited 2026-06-15 against live FeatureServer schemas. Each addr_field
     # was verified against a real parcel from docs/listings.json. Tests in
@@ -117,9 +123,72 @@ NC_GIS: dict[str, dict[str, Any]] = {
         "url": "https://services3.arcgis.com/axQ4OCSpcxALIQsV/arcgis/rest/services/Tax_Parcels/FeatureServer/0/query",
         "addr_field": "LOCATION_ADDR",
     },
+    # ---- Coastal NC (added 2026-06-26, all live-verified against the layer's
+    #      DescribeFeatureType + a real residential address-LIKE query) -------
+    "Carteret": {
+        # owner=OWNER, situs=PropertyAddress (full "208 LIVE OAK DR ..."),
+        # sqft=HtdSqFt, value via _pick (TaxValue family). Polygon geometry.
+        "url": "https://arcgisweb.carteretcountync.gov/arcgis/rest/services/Layers/Parceldata/MapServer/0/query",
+        "addr_field": "PropertyAddress",
+    },
+    "Onslow": {
+        # owner=OWNER1, situs=PHYSICALADDRESS, value=TAXMARKETVALUE,
+        # sqft=HEATEDSQUAREFEET. Polygon geometry.
+        "url": "https://maps.onslowcountync.gov/arcgis/rest/services/GISWebsite/GISWebsiteLayers/MapServer/7/query",
+        "addr_field": "PHYSICALADDRESS",
+    },
+    "Brunswick": {
+        # owner=Name1. NO single situs field — situs must be built by
+        # concatenating HouseNumber + StreetDirection + StreetName + StreetType.
+        # addr_field is left as the synthetic sentinel so _arcgis_query knows to
+        # build a multi-field LIKE and stitch the situs on read.
+        "url": "https://bcgis.brunswickcountync.gov/arcgis/rest/services/Layers/TaxParcels/MapServer/0/query",
+        "addr_field": _BRUNSWICK_CONCAT,
+    },
+    "Pender": {
+        # owner=NAME, situs=PROPERTY_ADDRESS, sqft=HEAT_SQ_FT. Polygon geometry.
+        # Slow TLS handshake — needs a longer timeout than the default.
+        "url": "https://gis.pendercountync.gov/arcgis/rest/services/Layers/MapServer/4/query",
+        "addr_field": "PROPERTY_ADDRESS",
+    },
+    "New Hanover": {
+        # Geometry + PID/PIN only on this layer (no owner/value/situs). Use it
+        # for parcel-id + centroid; owner/value continue to resolve via the
+        # county OneMap fallback elsewhere in the pipeline.
+        "url": "https://gis.nhcgov.com/server/rest/services/Layers/IASTAX/MapServer/0/query",
+        "addr_field": None,
+    },
+    # Dare is NOT ArcGIS — it's a GeoServer WFS. Handled by the WFS branch in
+    # one() via NC_WFS below, not through this ArcGIS registry.
+    #
     # Yancey: no public FeatureServer with parcel layer found as of 2026-06-15.
     # Yancey GIS is hosted at gis.yanceycountync.gov but exposes only static
     # map tiles. Skip until a queryable endpoint becomes available.
+}
+
+
+# ---- NC: GeoServer WFS counties (NOT ArcGIS REST) -------------------------------
+#
+# A handful of NC coastal counties publish parcels through an OGC WFS endpoint
+# (GeoServer) rather than an ArcGIS FeatureServer. The query syntax differs:
+# GetFeature + CQL_FILTER instead of ?where=. We model them separately and route
+# to _wfs_query() in the resolver.
+#
+# Dare verified 2026-06-26: geometry field is "geom", native SRS EPSG:3857.
+# Address-LIKE via CQL works and srsName=EPSG:4326 returns a WGS84 centroid for
+# map markers. Point-intersect via INTERSECTS(geom, POINT(x y)) in 3857 also
+# works (used for reverse-geocode when only lat/lng is known).
+
+NC_WFS: dict[str, dict[str, Any]] = {
+    "Dare": {
+        "url": "https://gs.darecountync.gov/geoserver/Production/wfs",
+        "type_names": "Production:tax_polygons24",
+        "geom_field": "geom",
+        "native_srid": 3857,
+        "addr_field": "propertyaddress",
+        # field map → Listing-facing concept; consumed by _apply_attrs via the
+        # shared FIELD_ALIASES (own1/aprtot/sfla/yrblt/saleprice all added there).
+    },
 }
 
 
@@ -133,24 +202,38 @@ FIELD_ALIASES = {
                   "MAPNUMBER", "pid", "PARID", "pid_long", "PARNO"),
     "owner_name": ("OwnerName", "OWNAM1", "Owner1", "PROPERTY_OWNER",
                    "full_owner_name", "owner", "ownname", "NAME1", "OWNER_NAME",
-                   "Name1", "Name", "OWNER", "NAMECO"),
+                   "Name1", "Name", "OWNER", "NAMECO",
+                   # coastal NC: Onslow=OWNER1, Pender=NAME, Dare(WFS)=own1
+                   "OWNER1", "NAME", "own1"),
     "mailing_addr": ("txt_mailaddr1", "MailAddr", "OWNER_MAIL_1", "mailadd",
                      "Mailing_Address", "OwnerMailingAddress"),
     "site_address": ("PropertyLocation", "siteadd", "Property_Address", "LocAddr",
                      "LOCATION_ADDR", "PHYS_ADDR", "PHYADDR",
                      "PHYSICAL_STREET_ADDRESS", "SITUS_ADDR", "ADDRESS_1",
-                     "SitusAddre", "SitusAddress", "Situs_Addr", "SITUSADDR"),
+                     "SitusAddre", "SitusAddress", "Situs_Addr", "SITUSADDR",
+                     # coastal NC: Carteret=PropertyAddress, Onslow=PHYSICALADDRESS,
+                     # Pender=PROPERTY_ADDRESS, Dare(WFS)=propertyaddress
+                     "PropertyAddress", "PHYSICALADDRESS", "PROPERTY_ADDRESS",
+                     "propertyaddress"),
     "acreage": ("Acreage", "ACRES", "gisacres", "ACREAGE", "LegalAc",
                 "DEEDED_ACRES", "Acres", "ACRE", "Acres_Calc"),
     "year_built": ("taxYearBui", "AYB", "YearID", "structyear", "YEARBLT",
-                   "YEAR_BUILT", "YearBuilt", "year_built", "EFFYR"),
+                   "YEAR_BUILT", "YearBuilt", "year_built", "EFFYR",
+                   # coastal NC: Carteret=Y_BLT_HOUSE, Brunswick=ActualYearBuilt,
+                   # Dare(WFS)=yrblt
+                   "Y_BLT_HOUSE", "ActualYearBuilt", "yrblt"),
     "bedrooms": ("BEDROOMS", "BedRooms", "Bedrooms", "BEDS"),
     "bathrooms": ("BATHRMS", "BATHS", "Bathrooms", "FullBaths", "BathRoom"),
     "living_sqft": ("HEATED_SQ_", "SQFEET", "TotLiving", "TotalLiving", "BLDGSQFT",
-                    "BUILDING_S", "HeatedSqFt", "BLDGSF"),
+                    "BUILDING_S", "HeatedSqFt", "BLDGSF",
+                    # coastal NC: Carteret=HtdSqFt, Onslow=HEATEDSQUAREFEET,
+                    # Pender=HEAT_SQ_FT, Dare(WFS)=sfla
+                    "HtdSqFt", "HEATEDSQUAREFEET", "HEAT_SQ_FT", "sfla"),
     "tax_value": ("TAXMKTVAL", "FAIRMKTVAL", "MRKT_VALUE", "Total", "parval",
                   "presentval", "TotalVal", "TotalValue", "Tot_Val", "AppraisalValue",
-                  "TOTAL_VAL"),
+                  "TOTAL_VAL",
+                  # coastal NC: Onslow=TAXMARKETVALUE, Dare(WFS)=aprtot
+                  "TAXMARKETVALUE", "aprtot"),
     "deed_book": ("DEEDBK", "Deed_Book", "DEED_BK", "DeedBook", "DB"),
     "deed_page": ("DEEDPG", "Deed_Page", "PAGE", "DeedPage", "DP"),
     "sale_date": ("SaleDate", "SALEDATE", "DEED_YEAR", "SaleYear", "Sale_Year"),
@@ -174,6 +257,23 @@ def _pick(attrs: dict[str, Any], candidates: tuple[str, ...]) -> Any:
         if v not in (None, "", 0, "0", "<Null>"):
             return v
     return None
+
+
+def _stitch_situs(attrs: dict[str, Any]) -> str | None:
+    """Rebuild a full situs from Brunswick-style component fields.
+
+    Brunswick stores no single situs column; the address is spread across
+    HouseNumber (zero-padded, e.g. '000552'), StreetDirection, StreetName, and
+    StreetType. Join the non-empty parts, stripping leading zeros off the house #.
+    """
+    house = str(attrs.get("HouseNumber") or "").strip().lstrip("0")
+    direction = str(attrs.get("StreetDirection") or "").strip()
+    name = str(attrs.get("StreetName") or "").strip()
+    sttype = str(attrs.get("StreetType") or "").strip()
+    parts = [p for p in (house, direction, name, sttype) if p and p != "<Null>"]
+    if not name:
+        return None
+    return " ".join(parts)
 
 
 def _street_keywords(street: str) -> str:
@@ -264,6 +364,12 @@ async def _arcgis_query(
     Returns list of dicts with both 'attributes' and a derived '_centroid' (lat,lng)
     when geometry is available.
     """
+    # Brunswick has no single situs column. Match on StreetName only and rebuild
+    # the full situs from HouseNumber/StreetDirection/StreetName/StreetType on read.
+    concat_situs = addr_field == _BRUNSWICK_CONCAT
+    if concat_situs:
+        addr_field = "StreetName"
+
     if not addr_field:
         addr_field = await _detect_addr_field(c, base_url)
     if not addr_field:
@@ -273,7 +379,7 @@ async def _arcgis_query(
     if not keyword:
         return []
     patterns = []
-    if house_no:
+    if house_no and not concat_situs:
         patterns.append(f"%{house_no}%{keyword}%")
     patterns.append(f"%{keyword}%")
 
@@ -297,6 +403,12 @@ async def _arcgis_query(
             out: list[dict[str, Any]] = []
             for f in data.get("features", []):
                 attrs = dict(f.get("attributes", {}) or {})
+                # Rebuild Brunswick's situs from its component fields and stash it
+                # under a real situs key so _pick(site_address) resolves it.
+                if concat_situs:
+                    situs = _stitch_situs(attrs)
+                    if situs:
+                        attrs["SITUS_ADDR"] = situs
                 # Centroid from polygon rings or point geometry
                 geom = f.get("geometry") or {}
                 cx = cy = None
@@ -315,6 +427,101 @@ async def _arcgis_query(
         except (httpx.HTTPError, ValueError):
             continue
     return []
+
+
+def _cql_escape(s: str) -> str:
+    """Escape a literal for an OGC CQL string (single-quote doubling)."""
+    return s.replace("'", "''")
+
+
+async def _wfs_query(
+    c: httpx.AsyncClient,
+    cfg: dict[str, Any],
+    street: str,
+    house_no: str | None = None,
+) -> list[dict[str, Any]]:
+    """Query a GeoServer WFS county (e.g. Dare) by address.
+
+    Uses GetFeature + CQL_FILTER LIKE on the configured addr_field and requests
+    srsName=EPSG:4326 so geometry comes back as WGS84 we can centroid for markers.
+    Returns the same attrs+_centroid dict shape as _arcgis_query so _apply_attrs
+    works unchanged.
+    """
+    addr_field = cfg["addr_field"]
+    keyword = _street_keywords(street)
+    if not keyword:
+        return []
+
+    patterns = []
+    if house_no:
+        patterns.append(f"%{house_no}%{keyword}%")
+    patterns.append(f"%{keyword}%")
+
+    for pat in patterns:
+        cql = f"{addr_field} LIKE '{_cql_escape(pat)}'"
+        params = {
+            "service": "WFS",
+            "version": "2.0.0",
+            "request": "GetFeature",
+            "typeNames": cfg["type_names"],
+            "outputFormat": "application/json",
+            "srsName": "EPSG:4326",     # WGS84 lat/lng for map markers
+            "CQL_FILTER": cql,
+            "count": "8",
+        }
+        try:
+            r = await c.get(cfg["url"], params=params, timeout=30.0)
+            if r.status_code != 200:
+                continue
+            data = r.json()
+            out: list[dict[str, Any]] = []
+            for f in data.get("features", []):
+                attrs = dict(f.get("properties", {}) or {})
+                geom = f.get("geometry") or {}
+                centroid = _geojson_centroid(geom)
+                if centroid:
+                    attrs["_centroid"] = centroid  # (lat, lng)
+                out.append(attrs)
+            if out:
+                return out
+        except (httpx.HTTPError, ValueError):
+            continue
+    return []
+
+
+def _geojson_centroid(geom: dict[str, Any]) -> tuple[float, float] | None:
+    """Average all vertices of a GeoJSON geometry → (lat, lng) in WGS84.
+
+    GeoJSON coordinate order is [lng, lat]; we return (lat, lng) to match the
+    convention enrichment_geocode / _apply_attrs expect.
+    """
+    if not geom:
+        return None
+    coords = geom.get("coordinates")
+    if coords is None:
+        if "x" in geom and "y" in geom:
+            return (geom["y"], geom["x"])
+        return None
+    xs: list[float] = []
+    ys: list[float] = []
+
+    def walk(node: Any) -> None:
+        if (
+            isinstance(node, (list, tuple))
+            and len(node) >= 2
+            and isinstance(node[0], (int, float))
+            and isinstance(node[1], (int, float))
+        ):
+            xs.append(float(node[0]))
+            ys.append(float(node[1]))
+        elif isinstance(node, (list, tuple)):
+            for sub in node:
+                walk(sub)
+
+    walk(coords)
+    if not xs:
+        return None
+    return (sum(ys) / len(ys), sum(xs) / len(xs))
 
 
 def _apply_attrs(li: Listing, attrs: dict[str, Any]) -> int:
@@ -484,6 +691,31 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
                 county_clean = county_clean[: -len(suffix)].strip()
         county_clean = county_clean.split(",")[0].strip()
 
+        # Extract house number for tighter match
+        m = re.match(r"^\s*(\d+)", li.street_address)
+        house_no = m.group(1) if m else None
+
+        # GeoServer WFS counties (Dare) use a different query path entirely.
+        wfs_cfg = NC_WFS.get(county_clean) if li.state == "NC" else None
+        if wfs_cfg:
+            async with sem:
+                counts["queried"] += 1
+                results = await _wfs_query(c, wfs_cfg, li.street_address, house_no)
+                if not results:
+                    return
+                counts["matched"] += 1
+                best = results[0]
+                confident = len(results) == 1
+                if house_no:
+                    for r in results:
+                        if str(_pick(r, ("adrno", "ADRNO", "HouseNumber"))).strip().lstrip("0") == house_no:
+                            best = r
+                            confident = True
+                            break
+                best["_match_confident"] = confident
+                counts["fields_filled"] += _apply_attrs(li, best)
+            return
+
         if li.state == "SC":
             layer = SC_LAYER.get(county_clean)
             if not layer:
@@ -495,13 +727,11 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
             if not cfg:
                 return
             base = cfg["url"]
-            addr_field = None  # auto-detect; let the layer schema tell us
+            # Auto-detect by default (robust against schema drift). But honor the
+            # Brunswick concat sentinel, which auto-detect can't reconstruct.
+            addr_field = cfg["addr_field"] if cfg.get("addr_field") == _BRUNSWICK_CONCAT else None
         else:
             return
-
-        # Extract house number for tighter match
-        m = re.match(r"^\s*(\d+)", li.street_address)
-        house_no = m.group(1) if m else None
 
         async with sem:
             counts["queried"] += 1
