@@ -206,6 +206,14 @@ def enrich_gis_derived(listings: list[Listing]) -> dict:
     stats = {"scanned": 0, "last_sale": 0, "deed_age": 0, "tax_status": 0}
     for li in listings:
         raw = li.raw if isinstance(li.raw, dict) else {}
+        # Scrub any carried-over implausible last_sale.amount (e.g. Spartanburg GIS
+        # returns an uninitialized-double ~$1.2B in its sale field) regardless of which
+        # run/source wrote it, BEFORE the attrs gate — the "missing-only, never clobber"
+        # logic below would otherwise preserve a pre-cap corrupt value forever, and the
+        # address-less carryover rows have no gis_attrs_full so they'd skip the gate.
+        _ls = (raw.get("gis") or {}).get("last_sale")
+        if isinstance(_ls, dict) and _ls.get("amount") and _ls["amount"] > 50_000_000:
+            _ls.pop("amount", None)
         attrs = raw.get("gis_attrs_full")
         if not isinstance(attrs, dict) or not attrs:
             continue
