@@ -1,19 +1,19 @@
 {
-  "run_time": "2026-06-27T14:03:52.975785Z",
-  "total": 3728,
+  "run_time": "2026-06-27T15:40:47.393049Z",
+  "total": 3632,
   "by_source": {
     "national.auction_dot_com": 11,
     "national.courtlistener_adversary": 11,
     "national.courtlistener_bankruptcy": 489,
-    "national.crexi_multifamily": 27,
+    "national.crexi_multifamily": 25,
     "national.fannie_homepath": 7,
     "national.freddie_homesteps": 1,
     "national.homeharvest": 15,
     "national.distressed": 377,
     "national.hubzu": 9,
     "national.hud_homestore": 6,
-    "national.hud_reac_inspection": 279,
-    "national.hud_section8_contracts": 170,
+    "national.hud_reac_inspection": 196,
+    "national.hud_section8_contracts": 169,
     "national.realtor_foreclosures": 2,
     "national.trulia": 6,
     "national.xome": 8,
@@ -26,12 +26,12 @@
     "law_firms.mcmichael_taylor_gray": 14,
     "law_firms.rogers_townsend": 4,
     "counties_sc.anderson_master_in_equity": 4,
-    "counties_sc.charleston_mie": 43,
+    "counties_sc.charleston_mie": 34,
     "counties_sc.pickens_master_in_equity": 4,
     "counties_sc.sc_county_rosters": 7,
     "counties_sc.sc_public_index_lis_pendens": 236,
     "counties_sc.sc_rod_acclaim": 83,
-    "counties_sc.sc_state_tax_lien": 8,
+    "counties_sc.sc_state_tax_lien": 7,
     "counties_sc.spartan_weekly_legals": 37,
     "counties_sc.terry_howe_flc": 39,
     "counties_nc.cleveland_tax": 4,
@@ -54,73 +54,12 @@
     "counties.column_legal_notices": 24
   },
   "by_state": {
-    "NC": 1304,
-    "SC": 2424
+    "NC": 1254,
+    "SC": 2378
   },
-  "by_county_top": [
-    [
-      "SC/Oconee",
-      576
-    ],
-    [
-      "SC/Spartanburg",
-      410
-    ],
-    [
-      "SC/Anderson",
-      338
-    ],
-    [
-      "SC/Georgetown",
-      337
-    ],
-    [
-      "NC/Buncombe",
-      280
-    ],
-    [
-      "SC/Charleston",
-      240
-    ],
-    [
-      "NC/Gaston",
-      205
-    ],
-    [
-      "SC/Pickens",
-      182
-    ],
-    [
-      "SC/Laurens",
-      167
-    ],
-    [
-      "NC/Henderson",
-      133
-    ],
-    [
-      "NC/Cleveland",
-      112
-    ],
-    [
-      "NC/McDowell",
-      80
-    ],
-    [
-      "SC/Cherokee",
-      78
-    ],
-    [
-      "NC/Lincoln",
-      78
-    ],
-    [
-      "NC/Burke",
-      74
-    ]
-  ],
+  "by_county_top": [],
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "regenerated in-place from persisted dataset (no re-scrape)"
+  "notes": "surgical post-enrich dedupe (iter3 fix; no re-scrape)"
 }

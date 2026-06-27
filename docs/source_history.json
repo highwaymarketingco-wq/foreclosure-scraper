@@ -1,352 +1,472 @@
 {
   "city_websites.search": {
     "counts": [
+      144,
       144
     ]
   },
   "counties.nod_discovery": {
     "counts": [
-      0
+      0,
+      13
     ]
   },
   "counties.sitemap_walker": {
     "counts": [
+      30,
       30
     ]
   },
   "counties_nc.buncombe_tax": {
     "counts": [
+      1,
       1
     ]
   },
   "counties_nc.buncombe_tax_foreclosure": {
     "counts": [
+      1,
       1
     ]
   },
   "counties_nc.cleveland_tax": {
     "counts": [
+      4,
       4
     ]
   },
   "counties_nc.henderson_tax": {
     "counts": [
+      15,
       15
+    ]
+  },
+  "counties_nc.nc_coastal_tax_foreclosure": {
+    "counts": [
+      6
     ]
   },
   "counties_nc.nc_county_tax_foreclosure": {
     "counts": [
+      87,
       87
     ]
   },
   "counties_nc.nc_ecourts_lis_pendens": {
     "counts": [
-      263
+      263,
+      321
     ]
   },
   "counties_nc.nc_rod_logan": {
     "counts": [
+      23,
       23
     ]
   },
   "counties_nc.nc_rod_substitute_trustee": {
     "counts": [
-      0
+      0,
+      16
     ]
   },
   "counties_nc.polk_tax": {
     "counts": [
+      2,
       2
     ]
   },
   "counties_nc.rutherford_tax": {
     "counts": [
+      11,
       11
     ]
   },
   "counties_sc.anderson_master_in_equity": {
     "counts": [
-      12
+      12,
+      16
+    ]
+  },
+  "counties_sc.charleston_mie": {
+    "counts": [
+      34
     ]
   },
   "counties_sc.oconee_tax_sale": {
     "counts": [
+      0,
       0
     ]
   },
   "counties_sc.pickens_master_in_equity": {
     "counts": [
-      0
+      0,
+      30
+    ]
+  },
+  "counties_sc.sc_coastal_rosters": {
+    "counts": [
+      55
     ]
   },
   "counties_sc.sc_county_rosters": {
     "counts": [
+      7,
       7
     ]
   },
   "counties_sc.sc_courtrosters": {
     "counts": [
+      0,
       0
     ]
   },
   "counties_sc.sc_delinquent_tax_list": {
     "counts": [
+      0,
       0
     ]
   },
   "counties_sc.sc_flc": {
     "counts": [
-      18
+      18,
+      0
     ]
   },
   "counties_sc.sc_public_index": {
     "counts": [
+      0,
       0
     ]
   },
   "counties_sc.sc_public_index_lis_pendens": {
     "counts": [
-      220
+      220,
+      224
     ]
   },
   "counties_sc.sc_public_notices": {
     "counts": [
-      0
+      0,
+      29
     ]
   },
   "counties_sc.sc_rod_acclaim": {
     "counts": [
-      114
+      114,
+      112
     ]
   },
   "counties_sc.sc_rod_cott": {
     "counts": [
+      35,
       35
     ]
   },
   "counties_sc.sc_state_tax_lien": {
     "counts": [
+      80,
       80
     ]
   },
   "counties_sc.sc_tax_delinquent": {
     "counts": [
+      0,
       0
+    ]
+  },
+  "counties_sc.spartan_weekly_legals": {
+    "counts": [
+      138
     ]
   },
   "counties_sc.spartanburg_master_in_equity": {
     "counts": [
-      15
+      15,
+      19
+    ]
+  },
+  "counties_sc.terry_howe_flc": {
+    "counts": [
+      20
     ]
   },
   "courts.lis_pendens_discovery": {
     "counts": [
+      0,
       0
     ]
   },
   "law_firms.aldridge_pite": {
     "counts": [
+      0,
       0
     ]
   },
   "law_firms.aldridge_pite_pydoll": {
     "counts": [
+      0,
       0
     ]
   },
   "law_firms.bell_carrington": {
     "counts": [
-      72
+      72,
+      75
     ]
   },
   "law_firms.brock_scott": {
     "counts": [
-      325
+      325,
+      311
     ]
   },
   "law_firms.finkel": {
     "counts": [
+      8,
       8
     ]
   },
   "law_firms.hutchens": {
     "counts": [
-      393
+      393,
+      395
     ]
   },
   "law_firms.ingle_firm": {
     "counts": [
+      1,
       1
     ]
   },
   "law_firms.kania": {
     "counts": [
+      6,
       6
     ]
   },
   "law_firms.korn": {
     "counts": [
+      0,
       0
     ]
   },
   "law_firms.korn_pydoll": {
     "counts": [
+      0,
       0
     ]
   },
   "law_firms.mcmichael_taylor_gray": {
     "counts": [
-      93
+      93,
+      72
     ]
   },
   "law_firms.rogers_townsend": {
     "counts": [
-      19
+      19,
+      18
     ]
   },
   "national.auction_dot_com": {
     "counts": [
-      28
+      28,
+      514
     ]
   },
   "national.bid4assets": {
     "counts": [
+      4,
       4
     ]
   },
   "national.courtlistener_adversary": {
     "counts": [
-      0
+      0,
+      165
     ]
   },
   "national.courtlistener_bankruptcy": {
     "counts": [
-      0
+      0,
+      600
     ]
   },
   "national.courtlistener_civil": {
     "counts": [
-      1
+      1,
+      2
+    ]
+  },
+  "national.crexi_multifamily": {
+    "counts": [
+      226
     ]
   },
   "national.distressed": {
     "counts": [
-      304
+      304,
+      296
     ]
   },
   "national.fannie_homepath": {
     "counts": [
-      656
+      656,
+      696
     ]
   },
   "national.first_citizens_reo": {
     "counts": [
+      4,
       4
     ]
   },
   "national.foreclosure_dot_com": {
     "counts": [
+      0,
       0
     ]
   },
   "national.freddie_homesteps": {
     "counts": [
-      0
+      0,
+      26
     ]
   },
   "national.homeharvest": {
     "counts": [
-      10
+      10,
+      11
     ]
   },
   "national.hubzu": {
     "counts": [
-      0
+      0,
+      127
     ]
   },
   "national.hud_homestore": {
     "counts": [
-      25
+      25,
+      38
+    ]
+  },
+  "national.hud_reac_inspection": {
+    "counts": [
+      826
+    ]
+  },
+  "national.hud_section8_contracts": {
+    "counts": [
+      250
     ]
   },
   "national.probate_foreclosure_leads": {
     "counts": [
+      0,
       0
     ]
   },
   "national.propwire": {
     "counts": [
+      0,
       0
     ]
   },
   "national.realtor_foreclosures": {
     "counts": [
+      14,
       14
     ]
   },
   "national.trulia": {
     "counts": [
-      23
+      23,
+      25
     ]
   },
   "national.xome": {
     "counts": [
-      4
+      4,
+      56
     ]
   },
   "national.zillow_bulk": {
     "counts": [
-      41
+      41,
+      82
     ]
   },
   "national.zillow_foreclosures": {
     "counts": [
-      123
+      123,
+      373
     ]
   },
-  "newspapers.daily_courier": {
+  "newspapers.carolina_coast": {
     "counts": [
       1
     ]
   },
+  "newspapers.daily_courier": {
+    "counts": [
+      1,
+      4
+    ]
+  },
   "newspapers.hendersonville_lightning": {
+    "counts": [
+      6,
+      6
+    ]
+  },
+  "newspapers.post_and_courier": {
     "counts": [
       6
     ]
   },
   "newspapers.shelby_star": {
     "counts": [
+      0,
       0
     ]
   },
   "newspapers.tryon_bulletin": {
     "counts": [
+      0,
       0
     ]
   },
   "public_notices.ncnotices": {
     "counts": [
-      32
+      32,
+      121
     ]
   },
   "public_notices.publicnoticesc": {
     "counts": [
+      0,
       0
     ]
   },
   "reo.treasury_seized": {
     "counts": [
-      0
+      0,
+      1
     ]
   },
   "reo.usda_rd": {
     "counts": [
-      0
+      0,
+      1
     ]
   },
   "reo.vrm_va_reo": {
     "counts": [
-      154
+      154,
+      155
     ]
   }
 }

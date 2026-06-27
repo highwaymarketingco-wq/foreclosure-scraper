@@ -169,6 +169,15 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         print("prune_stale_reo: ERROR", str(e)[:80])
 
+    # Post-enrich dedupe — mirrors merge_today_sources + main.py's H1 fix. GIS/parcel
+    # backfill fills parcel_id AFTER the original scrape-time dedupe, so same-property
+    # twins (a reverse-geo-resolved row + its synthetic-address sibling) only become
+    # identical-key now; collapse them so duplicates never ship from a regenerate.
+    from foreclosure_scraper.dedupe import dedupe  # noqa: E402
+    _pre = len(listings)
+    listings = dedupe(listings)
+    print(f"post-enrich dedupe: {_pre} -> {len(listings)} (collapsed {_pre - len(listings)})")
+
     by_state = collections.Counter(li.state for li in listings if li.state)
     by_county = collections.Counter(f"{li.state}/{li.county}" for li in listings if li.county)
     by_source = collections.Counter(li.source for li in listings if li.source)
