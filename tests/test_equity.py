@@ -98,6 +98,38 @@ def test_last_sale_legit_amount_still_works():
     assert eq["payoff_estimate"] <= 2 * eq["arv_used"]
 
 
+def test_recorded_dot_is_top_payoff_tier_high_confidence():
+    """A populated raw['rod_docs'] Deed-of-Trust (original principal + recorded
+    date) must be consumed as the #1 HIGH-confidence payoff source, ahead of any
+    judgment/opening-bid/last-sale fallback. Locks the equity reader contract so
+    the ROD enrichment unlock pays off the moment a vendor exposes the amount."""
+    li = Listing(source="x", source_url="u", listing_type=ListingType.LIS_PENDENS,
+                 state="SC", county="Pickens",
+                 raw={"calc": {"arv_expected": 300000},
+                      # also carries a (weaker) judgment that MUST be overridden
+                      "amount_owed": {"value": 250000, "source": "judgment",
+                                      "is_actual_debt": True, "confidence": "high"},
+                      "rod_docs": [{"doc_type": "deed_of_trust", "amount": 200000,
+                                    "recorded_date": "2021-06-01"}]})
+    enrich_equity([li])
+    eq = li.raw["equity"]
+    assert eq["payoff_source"] == "recorded_deed_of_trust" and eq["confidence"] == "high"
+    # 200k note recorded 2021 has paid down -> payoff < 200k -> equity > 100k
+    assert eq["payoff_estimate"] < 200000 and eq["value"] > 100000
+
+
+def test_recorded_dot_label_variants_all_match():
+    """The DoT matcher must accept every label form feeds/contracts emit —
+    underscore ('deed_of_trust'), spaced ('DEED OF TRUST'), short codes (DT/MTG/
+    MORTGAGE). Regression: the underscore form used to fall through to 0 equity."""
+    from foreclosure_scraper.enrichment_equity import _is_deed_of_trust
+    for good in ("deed_of_trust", "DEED OF TRUST", "Deed of Trust", "deed-of-trust",
+                 "DT", "MTG", "MORT", "MORTGAGE"):
+        assert _is_deed_of_trust(good), good
+    for bad in ("DEED", "SATISFACTION", "LIEN", "", None):
+        assert not _is_deed_of_trust(bad), bad
+
+
 def test_equity_band_uses_real_equity_not_roi():
     li = Listing(source="x", source_url="u", listing_type=ListingType.REO, state="NC",
                  county="Gaston",

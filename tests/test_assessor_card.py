@@ -82,3 +82,89 @@ def test_apply_does_not_overwrite_real_sqft():
 def test_enricher_off_by_default():
     os.environ.pop("ASSESSOR_CARD_ON", None)
     assert eac.enrich_assessor_card([_lead("B")]) == {}
+
+
+# ---- UNLOCK 3: widened gate (eligibility / rank / cap) ----
+
+def _qp_lead(grade=None, *, kind="single_family", living_sqft=None,
+             living_sqft_estimated=False, parcel_id="520-29-06-013",
+             latitude=34.7, longitude=-83.0, distress=0, county="Oconee"):
+    from foreclosure_scraper.models import PropertyKind
+    raw = {"grade": {"overall": grade}, "distress_stack": {"score": distress}}
+    return SimpleNamespace(
+        state="SC", county=county, parcel_id=parcel_id, property_kind=PropertyKind(kind),
+        living_sqft=living_sqft, living_sqft_estimated=living_sqft_estimated,
+        latitude=latitude, longitude=longitude, raw=raw)
+
+
+_ADAPTERS = {("SC", "Oconee"): None, ("SC", "Pickens"): None,
+             ("SC", "Spartanburg"): None, ("SC", "Union"): None}
+
+
+def test_eligible_grades_default_admits_unrated():
+    os.environ.pop("ASSESSOR_CARD_GRADES", None)
+    g = eac._eligible_grades()
+    assert {"A", "B", "C", ""} <= g
+    # blank token => None-grade admitted
+    assert eac._grade_ok(_qp_lead(grade=None), g)
+    assert eac._grade_ok(_qp_lead(grade="C"), g)
+
+
+def test_grades_env_restores_strict_ab():
+    os.environ["ASSESSOR_CARD_GRADES"] = "A,B"
+    g = eac._eligible_grades()
+    assert eac._grade_ok(_qp_lead(grade="A"), g)
+    assert not eac._grade_ok(_qp_lead(grade="C"), g)
+    assert not eac._grade_ok(_qp_lead(grade=None), g)
+    os.environ.pop("ASSESSOR_CARD_GRADES", None)
+
+
+def test_card_eligible_includes_c_and_unrated_built():
+    g = eac._eligible_grades()  # default
+    assert eac._is_card_eligible(_qp_lead(grade="C"), g, _ADAPTERS, False)
+    assert eac._is_card_eligible(_qp_lead(grade=None), g, _ADAPTERS, False)
+
+
+def test_card_eligible_excludes_vacant_land_and_filled_sqft():
+    g = eac._eligible_grades()
+    # vacant land -> no heated sqft on a card -> excluded
+    assert not eac._is_card_eligible(_qp_lead(grade=None, kind="land"), g, _ADAPTERS, False)
+    # already has a real (non-estimated) sqft -> nothing to fill
+    assert not eac._is_card_eligible(
+        _qp_lead(grade="C", living_sqft=1800.0, living_sqft_estimated=False),
+        g, _ADAPTERS, False)
+    # estimated sqft still needs a real card sqft -> eligible
+    assert eac._is_card_eligible(
+        _qp_lead(grade="C", living_sqft=1800.0, living_sqft_estimated=True),
+        g, _ADAPTERS, False)
+
+
+def test_card_eligible_requires_key_and_known_county():
+    g = eac._eligible_grades()
+    # no parcel_id and no lat/lng -> no lookup key -> excluded
+    assert not eac._is_card_eligible(
+        _qp_lead(grade="C", parcel_id=None, latitude=None, longitude=None),
+        g, _ADAPTERS, False)
+    # SC lat/lng with no parcel_id is still a key (resolver path)
+    assert eac._is_card_eligible(
+        _qp_lead(grade="C", parcel_id=None), g, _ADAPTERS, False)
+    # county with no adapter in the table -> excluded
+    assert not eac._is_card_eligible(
+        _qp_lead(grade="C", county="Greenville"), g, _ADAPTERS, False)
+
+
+def test_skip_render_excludes_render_counties():
+    g = eac._eligible_grades()
+    li = _qp_lead(grade="C", county="Oconee")  # a render-class county
+    assert eac._is_card_eligible(li, g, _ADAPTERS, False)
+    assert not eac._is_card_eligible(li, g, _ADAPTERS, True)
+
+
+def test_rank_orders_grade_then_distress():
+    a = _qp_lead(grade="A", distress=10)
+    c_hi = _qp_lead(grade="C", distress=90)
+    none_lo = _qp_lead(grade=None, distress=5)
+    ranked = sorted([none_lo, c_hi, a], key=eac._rank_key, reverse=True)
+    assert ranked[0] is a            # grade rank wins first
+    assert ranked[1] is c_hi         # then distress score
+    assert ranked[2] is none_lo

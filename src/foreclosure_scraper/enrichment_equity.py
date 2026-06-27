@@ -20,6 +20,7 @@ Runs AFTER calc (needs arv_expected) and amount_owed, BEFORE distress scoring
 """
 from __future__ import annotations
 
+import re
 from typing import Optional
 
 import structlog
@@ -63,13 +64,27 @@ def _arv(li: Listing) -> Optional[float]:
     return None
 
 
+def _is_deed_of_trust(doc_type: object) -> bool:
+    """True if a rod_doc's doc_type denotes a Deed-of-Trust / mortgage note.
+
+    Normalizes separators so every emitted form matches: feeds (and the
+    ROD enricher contract) variously label these 'deed_of_trust', 'DEED OF
+    TRUST', 'Deed of Trust', 'DT', 'MTG', 'MORTGAGE'. The old check only
+    matched the space-separated phrase or the exact short codes, so the
+    underscore form 'deed_of_trust' (the form the equity engine's own
+    payoff contract emits) silently fell through and produced 0 equity."""
+    s = re.sub(r"[\s_\-/]+", " ", str(doc_type or "").upper()).strip()
+    if "DEED OF TRUST" in s:
+        return True
+    return s in ("DT", "MTG", "MORT", "MORTGAGE")
+
+
 def _recorded_dt(raw: dict) -> tuple[Optional[float], object]:
     """Best (most-recent) recorded Deed-of-Trust original amount + date."""
     docs = raw.get("rod_docs") or []
     best_amt, best_date, best_key = None, None, None
     for d in docs if isinstance(docs, list) else []:
-        dt = (d.get("doc_type") or "").upper()
-        if "DEED OF TRUST" in dt or dt in ("DT", "MTG", "MORTGAGE"):
+        if _is_deed_of_trust(d.get("doc_type")):
             amt = d.get("amount")
             if not amt:
                 continue
