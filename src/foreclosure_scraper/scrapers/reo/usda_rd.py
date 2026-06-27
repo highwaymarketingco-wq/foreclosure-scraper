@@ -286,6 +286,11 @@ class USDARuralDevelopment(BaseScraper):
     category = "federal_reo"
     expected_min_count = 0  # Often 0 in either state
     requires_apify = False
+    disabled = True
+    disabled_reason = ("froze the concurrent run on 2026-06-27 (no completion in 2h47m; "
+                       "an event-loop-blocking call evades safe_run's wait_for, freezing "
+                       "every scraper). National REO, minimal in-footprint value. Re-enable "
+                       "after isolating the blocking call or running it via asyncio.to_thread.")
     timeout_s = 240.0
 
     async def fetch(self) -> Iterable[Listing]:

@@ -187,6 +187,10 @@ class VRMPropertiesVAREO(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     requires_render = False
+    disabled = True
+    disabled_reason = ("froze the concurrent run on 2026-06-27 (in-flight at the 2h47m hang). "
+                       "National VA REO, minimal in-footprint value. Re-enable after isolating "
+                       "the blocking call or running it via asyncio.to_thread.")
     timeout_s = 240.0
 
     async def fetch(self) -> Iterable[Listing]:
