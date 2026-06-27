@@ -26,6 +26,7 @@ from foreclosure_scraper.enrichment_assessor_card import enrich_assessor_card  #
 from foreclosure_scraper.enrichment_multifamily_class import enrich_multifamily_class  # noqa: E402
 from foreclosure_scraper.enrichment_property_kind import enrich_property_kind  # noqa: E402
 from foreclosure_scraper.web_artifact import write_artifact  # noqa: E402
+from foreclosure_scraper.outreach import generate_outreach  # noqa: E402
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
 
@@ -177,6 +178,12 @@ def main() -> int:
         "by_source": dict(by_source),
         "notes": "regenerated in-place from persisted dataset (no re-scrape)",
     }
+    # Refresh the outreach mail-merge list + CRM so the actionable direct-mail
+    # batch stays current on every republish (was only refreshed by the full run).
+    try:
+        print("generate_outreach:", generate_outreach(listings))
+    except Exception as e:  # noqa: BLE001
+        print("generate_outreach: ERROR", str(e)[:80])
     lp, mp = write_artifact(listings, summary, docs_dir=DOCS)
     print(f"wrote {lp} ({lp.stat().st_size:,} bytes) + {mp.name}")
     return 0

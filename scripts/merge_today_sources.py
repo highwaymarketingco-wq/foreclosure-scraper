@@ -49,6 +49,7 @@ from foreclosure_scraper.enrichment_fhfa_value import enrich_fhfa_value  # noqa:
 from foreclosure_scraper.enrichment_title_risk import enrich_title_risk  # noqa: E402
 from foreclosure_scraper.enrichment_dew_liens import enrich_dew_liens  # noqa: E402
 from foreclosure_scraper.web_artifact import write_artifact  # noqa: E402
+from foreclosure_scraper.outreach import generate_outreach  # noqa: E402
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
 
@@ -256,6 +257,11 @@ def main() -> int:
         "by_source": dict(collections.Counter(li.source for li in merged if li.source)),
         "notes": "partial merge: today's new/fixed sources + full enrichment (no full re-scrape)",
     }
+    # Refresh outreach mail-merge list + CRM so the direct-mail batch stays current.
+    try:
+        print("generate_outreach:", generate_outreach(merged))
+    except Exception as e:  # noqa: BLE001
+        print("generate_outreach: ERROR", str(e)[:80])
     lp, mp = write_artifact(merged, summary, docs_dir=DOCS)
     print(f"wrote {lp} ({lp.stat().st_size:,} bytes) + {mp.name}")
     return 0
