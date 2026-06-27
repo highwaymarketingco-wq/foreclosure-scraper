@@ -325,6 +325,7 @@ DATELESS_OK_SOURCES = {
     # 2026-06 expansion — new FLC/tax/probate/estate/lien/surplus sources whose
     # rows are long-runway (pre-sale) and routinely carry no sale_date.
     "counties_sc.oconee_forfeited_land",         # Oconee FLC available + assignment lists
+    "counties_sc.spartanburg_flc",               # Spartanburg FLC assignable-surplus PDF (dateless)
     "counties_sc.horry_flc",                     # Horry FLC year-round inventory
     "counties_sc.georgetown_civicengage",        # Georgetown FLC (dateless) + tax + MIE
     "counties_sc.charleston_delinquent_tax",     # Charleston FLC sealed-bid + delinquent tax
