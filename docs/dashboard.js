@@ -465,6 +465,13 @@ function renderCards() {
       if (l.acreage) meta.push(`${l.acreage} ac`);
       const roi = c.roi_pct;
       const roiCls = roi == null ? "" : roi > 0 ? "roi-pos" : "roi-neg";
+      // ARV proxy caveat: when the ARV is LOW-confidence (no real comps / no sqft)
+      // mirror the detail panel — append " (proxy)" to the ARV chip and dim the ROI
+      // chip so a guessed ARV never reads as a verified value.
+      const dqf = (l.raw && l.raw.data_quality && Array.isArray(l.raw.data_quality.flags))
+        ? l.raw.data_quality.flags : [];
+      const lowArv = c.arv_confidence === "LOW"
+        || dqf.includes("low_arv_confidence") || dqf.includes("no_sqft");
       // Bankruptcy listings: show debtor + chapter as the "address"
       const cardAddr = isBkSource
         ? `🏛 ${cl && cl.chapter && cl.chapter !== "?" ? `Ch.${cl.chapter}` : "Bankruptcy"} · ${(l.defendant || "filing").slice(0, 50)}`
@@ -473,6 +480,33 @@ function renderCards() {
         ? `${cl && cl.court ? cl.court.toUpperCase() : ""} · ${l.state || ""} · Filed ${cl && cl.date_filed || "?"}`
         : `${l.city || ""}${l.city ? ", " : ""}${l.county || "?"} County, ${l.state || ""}`;
       const ds = getDistress(l);
+      // High-value signal chips the cards used to hide. Rendered on EVERY card
+      // (independent of distress tier) so a COLD lead still surfaces equity,
+      // absentee status, and a senior-lien-survives bidding trap.
+      const signalChips = [];
+      // (1) Equity — mirror the detail panel's value/pct + underwater colouring.
+      const eq = (l.raw && l.raw.equity) || null;
+      if (eq && eq.value != null) {
+        const eqColor = eq.is_underwater ? "var(--danger)" : "var(--success)";
+        const eqPct = eq.pct != null ? ` (${Math.round(eq.pct * 100)}%)` : "";
+        const eqLabel = eq.is_underwater
+          ? `Underwater ${fmtMoney(eq.value)}${eqPct}`
+          : `Equity ${fmtMoney(eq.value)}${eqPct}`;
+        signalChips.push(`<span class="distress-chip" style="color:${eqColor};border-color:${eqColor}">${eqLabel}</span>`);
+      }
+      // (2) Absentee / out-of-state — standalone signals, shown on COLD cards too.
+      //     distressChips() suppresses these for COLD tier, so emit from here using
+      //     the owner_mailing flags (the authoritative absentee source).
+      const om = (l.raw && l.raw.owner_mailing) || {};
+      if (om.absentee) signalChips.push(`<span class="distress-chip absentee">absentee</span>`);
+      if (om.out_of_state) signalChips.push(`<span class="distress-chip absentee">out-of-state</span>`);
+      // (4) Title-risk trap — senior lien may survive a junior foreclosure.
+      const tr = (l.raw && l.raw.title_risk) || null;
+      if (tr && tr.surviving_senior_debt_risk === true) {
+        signalChips.push(`<span class="distress-chip" style="color:#fff;background:var(--danger);border-color:var(--danger)" title="Junior-lien foreclosure: a senior lien likely survives the sale. Bidding trap.">⚠ senior lien may survive</span>`);
+      }
+      const signalChipsHtml = signalChips.length
+        ? `<div class="distress-chips">${signalChips.join("")}</div>` : "";
       return `
       <div class="card" data-id="${i}">
         ${g ? `<div class="card-grade-corner">${gradeBadge(g)}</div>` : ""}
@@ -482,14 +516,15 @@ function renderCards() {
           <div class="card-addr">${cardAddr}</div>
           <div class="card-loc">${cardLoc}</div>
           ${distressChips(ds)}
+          ${signalChipsHtml}
           <div class="card-meta">
             ${fmtType(l.listing_type)}
             ${l.opening_bid ? `<span>Bid ${fmtMoney(l.opening_bid)}</span>` : ""}
-            ${c.arv_expected ? `<span>ARV ${fmtMoney(c.arv_expected)}</span>` : ""}
+            ${c.arv_expected ? `<span>ARV ${fmtMoney(c.arv_expected)}${lowArv ? " (proxy)" : ""}</span>` : ""}
             ${l.sale_date ? `<span>${fmtDate(l.sale_date)}</span>` : ""}
             ${meta.length ? `<span>${meta.join(" · ")}</span>` : ""}
           </div>
-          ${roi != null ? `<div class="card-roi ${roiCls}">ROI ${roi.toFixed(1)}%${c.cash_on_cash_pct != null ? ` · CoC ${c.cash_on_cash_pct.toFixed(0)}%` : ""}</div>` : ""}
+          ${roi != null ? `<div class="card-roi ${roiCls}"${lowArv ? ` style="opacity:.45" title="ROI suppressed — derived from a low-confidence (proxy) ARV"` : ""}>ROI ${roi.toFixed(1)}%${c.cash_on_cash_pct != null ? ` · CoC ${c.cash_on_cash_pct.toFixed(0)}%` : ""}</div>` : ""}
         </div>
       </div>`;
     })

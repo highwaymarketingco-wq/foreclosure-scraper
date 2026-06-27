@@ -31,6 +31,8 @@ from foreclosure_scraper.scrapers._registry import all_scrapers
 from foreclosure_scraper.dedupe import dedupe
 from foreclosure_scraper.valuation import calc as vcalc
 from foreclosure_scraper.valuation import grading as vgrade
+from foreclosure_scraper.distress_score import score_board
+from foreclosure_scraper.enrichment_title_risk import enrich_title_risk
 from foreclosure_scraper.web_artifact import write_artifact, _to_dict
 
 try:
@@ -254,10 +256,13 @@ async def main() -> int:
               f"{len(prior)} — refusing to overwrite. Investigate.", flush=True)
         return 2
 
-    # Grade the fresh/unscored ones (kept ones already carry their grade).
+    # Full re-grade of EVERY row, not just the unscored ones. The old "grade
+    # only if missing" left HOT/WARM/COLD + title-trap stale on daily days:
+    # equity/derived signals recompute below for the whole board, so calc/grade
+    # must too — otherwise kept rows keep yesterday's ARV/grade against today's
+    # equity. Cheap (pure compute), so re-grade all.
     for li in merged:
-        if not (li.raw or {}).get("grade"):
-            _regrade(li)
+        _regrade(li)
 
     # Recompute equity (self-cleaning — clears stale billion-dollar payoffs the
     # upper-bound gate now rejects), derived signals (LTV etc.), and data-quality.
@@ -271,6 +276,27 @@ async def main() -> int:
         enrich_data_quality(merged)
     except Exception as e:  # noqa: BLE001
         print(f"[{time.strftime('%H:%M:%S')}] equity/derived/dq skipped: {str(e)[:80]}", flush=True)
+
+    # Full board re-scoring AFTER equity — mirrors main.py's tail. Without this
+    # the daily path leaves HOT/WARM/COLD tiers and the title-trap flag stale on
+    # carried-over rows (score_board/enrich_title_risk only ever ran on the
+    # weekly crawl). title_risk first (HOT gates on it), then score_board.
+    try:
+        enrich_title_risk(merged)
+        _prev = Path(__file__).resolve().parent.parent / "docs" / "listings.json"
+        tiers = score_board(merged, previous_path=_prev)
+        print(f"[{time.strftime('%H:%M:%S')}] re-scored board: {tiers}", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"[{time.strftime('%H:%M:%S')}] title_risk/score_board skipped: {str(e)[:80]}", flush=True)
+
+    # Final post-enrich dedupe — mirrors main.py's H1 FIX (main.py ~896). The
+    # merge dedupe above ran before this re-grade/equity pass; re-running here,
+    # after the whole chain, collapses any same-property twins that survived the
+    # early dedupe so duplicate-property rows don't ship.
+    _pre_dedupe2 = len(merged)
+    merged = dedupe(merged)
+    print(f"[{time.strftime('%H:%M:%S')}] post-enrich dedupe: {_pre_dedupe2} -> {len(merged)} "
+          f"(collapsed {_pre_dedupe2 - len(merged)})", flush=True)
 
     if mark_new_listings:
         try:

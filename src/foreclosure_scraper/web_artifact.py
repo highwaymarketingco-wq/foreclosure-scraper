@@ -110,6 +110,9 @@ RAW_KEEP = {
     "link_check": "*",                # link-validator reachability tag {status, http}
     "fallback_links": "*",            # reliable backups for stale aggregator links {google, maps, parcel_gis}
     "link_may_be_stale": "*",         # True for old/carryover aggregator leads (operator "verify link" hint)
+    "fhfa_value": "*",                # FHFA HPI-adjusted value estimate {value, source, ...}
+    "title_risk": "*",                # title-defect / cloud-on-title risk assessment
+    "zls": "*",                       # ZLS status field
 }
 
 

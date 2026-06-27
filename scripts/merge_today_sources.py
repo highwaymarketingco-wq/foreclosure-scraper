@@ -242,6 +242,16 @@ def main() -> int:
     print("enrich_derived_signals:", enrich_derived_signals(merged))
     print("enrich_data_quality:", enrich_data_quality(merged))
 
+    # Final post-enrich dedupe — mirrors main.py's H1 FIX (main.py ~896). The
+    # dedupe at _resolve() ran BEFORE parcel/GIS backfill filled parcel_id, so
+    # rows for the same property fell through dedupe_key()'s 'url:' branch and
+    # survived. Re-running here, after the whole chain nailed parcel/county,
+    # collapses those late-revealed twins so duplicate-property rows don't ship.
+    _pre_dedupe2 = len(merged)
+    merged = dedupe(merged)
+    print(f"post-enrich dedupe: {_pre_dedupe2} -> {len(merged)} "
+          f"(collapsed {_pre_dedupe2 - len(merged)})")
+
     summary = {
         "by_source": dict(collections.Counter(li.source for li in merged if li.source)),
         "notes": "partial merge: today's new/fixed sources + full enrichment (no full re-scrape)",

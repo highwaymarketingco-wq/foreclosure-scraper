@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import sys
 import traceback
 from collections import Counter
@@ -450,8 +451,75 @@ def _split_embedded_city(listings: list[Listing]) -> None:
     return True
 
 
+# --------------------------------------------------------------------------- #
+# Situs sanity — a street_address must look like a residential SITUS, not a    #
+# business/entity name or a placeholder. Run #20 audit found 157 leaked rows   #
+# whose street_address was a geocoder POI artifact ("Midtown Moter Inn",       #
+# "Haven of Rest Thrift Store", church/thrift/civic-center names) or a         #
+# "Vacant parcel — ..." placeholder. Shipping those as the address misleads    #
+# the investor; we null the address (keeping parcel_id / coords) and flag the  #
+# row data_quality=low instead. Conservative by design: a token-group ending   #
+# in a road suffix is ALWAYS treated as a real street name (so "Glassy         #
+# Mountain Church Road" / "South Academy Street" / "Glenn Church Ln" survive), #
+# and a string that embeds a real "<number> <name> <suffix>" address anywhere  #
+# is left intact (e.g. "STARRWOOD GOLF CO 139 STARRWOOD DR" has a recoverable  #
+# situs).                                                                      #
+_SITUS_VACANT_RE = re.compile(r"^\s*vacant parcel\b", re.I)
+#: A token-group that ENDS in a street/road suffix is a road name, never junk.
+_SITUS_ROAD_SUFFIX_RE = re.compile(
+    r"\b(st|street|rd|road|ave|avenue|dr|drive|ln|lane|blvd|boulevard|ct|court|"
+    r"cir|circle|way|pl|place|pkwy|parkway|hwy|highway|trl|trail|loop|run|path|"
+    r"row|terrace|ter|pike|cove|cv|crossing|xing|bend|ridge|sq|square|alley|aly|"
+    r"walk|connector|extension|ext)\.?$",
+    re.I,
+)
+#: Strong business / institution words — a residential situs never STARTS here.
+_SITUS_ENTITY_RE = re.compile(
+    r"\b(inn|motel|hotel|baptist|methodist|presbyterian|lutheran|episcopal|"
+    r"ministr\w*|temple|tabernacle|chapel|church|synagogue|mosque|llc|l\.l\.c\.?|"
+    r"inc|incorporated|corp|corporation|company|brewing|brewery|winery|distillery|"
+    r"restaurant|cafe|diner|funeral|crematory|club|lodge|academy|university|"
+    r"college|bank|associat\w*|foundation|society|cemetery|photography|holdings|"
+    r"enterprises|outfitters|thrift|store|salon|barber|civic center|senior center|"
+    r"conference center|retreat|golf)\b",
+    re.I,
+)
+#: An embedded "<house#> <words> <road-suffix>" anywhere => a recoverable situs;
+# leave the address alone even if it has a name prefix.
+_SITUS_EMBEDDED_ADDR_RE = re.compile(
+    r"\d+\s+\w[\w .-]*\b(st|street|rd|road|ave|avenue|dr|drive|ln|lane|blvd|ct|"
+    r"court|cir|circle|way|pl|place|hwy|highway|pkwy|trl|trail|loop|run|path|pike)\b",
+    re.I,
+)
+
+
+def _situs_is_junk(address: str | None) -> bool:
+    """True when ``address`` is not a usable residential situs — a 'Vacant
+    parcel' placeholder or a leading business/entity name (geocoder POI
+    artifact). Conservative: real road names and name-prefixed strings that
+    still embed a real street address are NOT flagged."""
+    a = (address or "").strip()
+    if not a:
+        return False
+    if _SITUS_VACANT_RE.match(a):
+        return True
+    first = a.split(",")[0].strip()
+    if not first:
+        return False
+    if first[0].isdigit():
+        return False  # normal house-numbered address
+    if _SITUS_ROAD_SUFFIX_RE.search(first):
+        return False  # a road name (may contain 'church'/'academy' etc.)
+    if _SITUS_EMBEDDED_ADDR_RE.search(a):
+        return False  # name prefix but a real situs is recoverable after it
+    return bool(_SITUS_ENTITY_RE.search(first))
+
+
 def _active_only(li: Listing, horizon_days: int) -> bool:
-    """Drop listings whose sale is too far past or > horizon_days out, and any auction marked withdrawn/cancelled."""
+    """Drop listings whose sale is too far past or > horizon_days out, and any
+    auction marked withdrawn/cancelled or in a TERMINAL court status (redeemed /
+    dismissed / satisfied / disposed — the lien/case is resolved, not a live
+    lead). Run #20 audit: 2 REDEEMED + 24 dismissed court records were shipping."""
     if li.auction_status and li.auction_status.lower() in {
         "withdrawn",
         "cancelled",
@@ -459,6 +527,13 @@ def _active_only(li: Listing, horizon_days: int) -> bool:
         "rescinded",
         "sold",
         "completed",
+        # Terminal court / lien dispositions — the matter is closed, not actionable.
+        "redeemed",
+        "dismissed",
+        "dismissed/settled",
+        "satisfied",
+        "disposed",
+        "closed",
     }:
         return False
     if li.sale_date is None:
@@ -942,29 +1017,69 @@ async def run() -> int:
     # denied counties can never appear regardless of how they were admitted.
     # EXCEPTION: confirmed oceanfront / downtown-Charleston rows are intentional
     # re-admissions of otherwise-denied coastal counties — never drop those.
+    #
+    # 2026-06 (Run #20) — also drop OUT-OF-FOOTPRINT counties that are neither
+    # in the deny set NOR the allow list. A coastal-source row admitted at ingest
+    # with a null/coastal county can be geocoded to a county we simply don't
+    # track (e.g. georgetown_civicengage rows that resolved to AIKEN SC, well
+    # inland of Georgetown). The deny set never listed Aiken, so the old re-pass
+    # let it ship. The OCEANFRONT_COASTAL_COUNTIES carve-out below keeps the
+    # legitimate coastal track (Brunswick / Onslow / Georgetown / Charleston ...)
+    # untouched — only genuinely off-footprint counties are dropped.
     def _denied_now(li: Listing) -> bool:
         raw = li.raw if isinstance(li.raw, dict) else {}
         if raw.get("oceanfront") or raw.get("downtown_charleston") or raw.get("coastal_county"):
             return False
-        if li.county and li.state:
-            key = (li.county.replace(" County", "").strip().title(), li.state.upper())
-            return key in SCOPE_DENY_COUNTIES_NORMALIZED
-        return False
+        if not (li.county and li.state):
+            return False
+        key = (li.county.replace(" County", "").strip().title(), li.state.upper())
+        if key in SCOPE_DENY_COUNTIES_NORMALIZED:
+            return True
+        # Coastal counties are an intentional re-admission track — leave them to
+        # the oceanfront / coastal-source paths, never drop on footprint alone.
+        if key in OCEANFRONT_COASTAL_COUNTIES:
+            return False
+        # County resolved to something we don't track at all -> off-footprint leak.
+        return not in_scope(li.county, li.state)
     _pre_scope = len(enriched)
     enriched = [li for li in enriched if not _denied_now(li)]
     if _pre_scope != len(enriched):
         log.info("orchestrator.scope_repass", dropped=_pre_scope - len(enriched))
 
-    # Drop national court records (bankruptcy/civil) that never resolved to an
-    # in-scope county — without a county they can't be routed or actioned for the
-    # 18-county focus, so they're noise in the export. County-resolved national
-    # records (e.g. bankruptcy debtors geocoded via OneMap) are kept.
+    # Drop national / REO records that never resolved to a county — without one
+    # they can't be routed or actioned for the 18-county focus, so they're noise
+    # in the export. Covers CourtListener bankruptcy/civil (national.*) AND the
+    # federal REO feeds (reo.* — VRM VA-REO, USDA, Treasury) whose city-only rows
+    # (e.g. VRM 'mooresville'/'greenwood' with no county) leaked in Run #20.
+    # County-resolved records (e.g. bankruptcy debtors geocoded via OneMap) keep.
     def _countyless_national(li) -> bool:
-        return (li.source or "").startswith("national.") and not (li.county or "").strip()
+        src = li.source or ""
+        return (src.startswith("national.") or src.startswith("reo.")) \
+            and not (li.county or "").strip()
     _pre_natl = len(enriched)
     enriched = [li for li in enriched if not _countyless_national(li)]
     if _pre_natl != len(enriched):
         log.info("orchestrator.drop_countyless_national", dropped=_pre_natl - len(enriched))
+
+    # SITUS SANITY guard — a street_address that is a business/entity name or a
+    # 'Vacant parcel' placeholder is a geocoder POI artifact, not a real situs.
+    # Null it (the parcel_id / coords / county still locate the property) and tag
+    # the row so the downstream data_quality pass surfaces it as low-confidence
+    # 'no_address' rather than shipping a fake street. Run #20 audit: 157 such
+    # rows ('Midtown Moter Inn', 'Vacant parcel — ...', church / thrift / civic
+    # names). Conservative — real road names + recoverable embedded addresses are
+    # left intact (see _situs_is_junk).
+    _situs_nulled = 0
+    for li in enriched:
+        if _situs_is_junk(li.street_address):
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            li.raw["situs_nulled"] = li.street_address  # keep original for audit
+            li.raw["situs_quality"] = "low"
+            li.street_address = None
+            _situs_nulled += 1
+    if _situs_nulled:
+        log.info("orchestrator.situs_sanity_nulled", count=_situs_nulled)
 
     # #0 contactability spine: owner name + MAILING address + absentee/
     # out-of-state flags from county GIS (free ArcGIS REST). Runs on every

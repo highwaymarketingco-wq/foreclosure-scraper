@@ -147,6 +147,36 @@ _TIME_OF_SALE = re.compile(
     r"Time of Sale[:\s]*([\d: ]+[AaPp]\.?[Mm]\.?)", re.I
 )
 
+# Fallback sale-date pass — only used when the structured "Date of Sale:" label
+# is absent (Hutchens / Green-Law / "Under and by virtue ..." templates bury the
+# auction date in prose). Verified live 2026-06-27 across Burke/Gaston: the
+# misses always phrase the date next to a sale-context cue, e.g.
+#   "the sale will be held on June 23, 2026 at 2:00 p.m."
+#   "...designated for foreclosure sales, at 2:30 PM on June 17, 2026 and will sell"
+#   "...designated for foreclosure sales, on June 3, 2026 at 3:00 PM..."
+#   "...courthouse for conducting the sale on March 11, 2026 at 1:00 PM..."
+#   "...courthouse for conducting the sale, April 28, 2026 at 11:00 AM..."
+# We REQUIRE the cue (and a short same-sentence window via [^.]{0,80}) so we never
+# pick up the Deed-of-Trust "recorded on <date>", a signature "This the <date>",
+# or a summons "no later than <date>" that also live in the body. Both a long
+# "Month D, YYYY" and a numeric "m/d/yyyy" date are accepted.
+_SALE_MONTH = (
+    r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
+    r"Jul(?:y)?|Aug(?:ust)?|Sep(?:t)?(?:ember)?|Oct(?:ober)?|Nov(?:ember)?|"
+    r"Dec(?:ember)?)"
+)
+_SALE_DATE_LONG = rf"{_SALE_MONTH}\.?\s+\d{{1,2}},?\s+\d{{4}}"
+_SALE_DATE_NUM = r"\d{1,2}/\d{1,2}/\d{2,4}"
+_SALE_DATE_ANY = rf"(?:{_SALE_DATE_LONG}|{_SALE_DATE_NUM})"
+_SALE_DATE_FALLBACK = re.compile(
+    r"(?:will be (?:offered for sale|sold|held|exposed)|sale will be held|"
+    r"conducting the sale|designated for foreclosure sales?|"
+    r"will sell(?: to the highest bidder)?|offer (?:the property )?for sale|"
+    r"sell the (?:above|property))"
+    rf"[^.]{{0,80}}?(?:\bon\b|\bat\b|,)?\s*({_SALE_DATE_ANY})",
+    re.I,
+)
+
 # Record owner(s) — stop at the next label or a comma-clause boundary.
 _RECORD_OWNERS = re.compile(
     r"Record Owner(?:\(s\)|s)?[:\s]*"
@@ -302,6 +332,18 @@ def _parse_nc_foreclosure(text: str) -> dict:
     if m:
         out["sale_date_raw"] = m.group(1).strip()
         out["sale_date"] = _parse_dt(m.group(1))
+    else:
+        # No structured "Date of Sale:" label — scan the prose for a sale-context
+        # cue followed by a date (Hutchens / Green-Law / "Under and by virtue"
+        # templates). Cue-gated so a Deed-of-Trust recording date / signature
+        # date / summons deadline in the same body is never mistaken for it.
+        m = _SALE_DATE_FALLBACK.search(t)
+        if m:
+            raw_date = m.group(1).strip()
+            dt = _parse_dt(raw_date)
+            if dt is not None:
+                out["sale_date_raw"] = raw_date
+                out["sale_date"] = dt
     m = _TIME_OF_SALE.search(t)
     if m:
         out["sale_time"] = _norm(m.group(1))

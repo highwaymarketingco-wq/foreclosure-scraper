@@ -9,6 +9,8 @@ estimate the CURRENT payoff:
 
   1. recorded Deed of Trust amount + date  -> amortized current balance  (best)
   2. amount_owed when it's an ACTUAL debt   (foreclosure judgment / indebtedness)
+  2b. raw judgment_amount / opening_bid     -> foreclosure-debt proxy (LOW conf;
+                                               fires when amount_owed is missing)
   3. last arms-length sale price            -> assume ~90% financed, amortized
   4. none                                   -> equity unknown (we say so)
 
@@ -115,6 +117,30 @@ def _payoff(li: Listing, arv: float) -> tuple[Optional[float], str, str]:
             return float(ao["value"]), f"amount_owed:{ao.get('source', '?')}", ao.get("confidence", "medium")
         except (ValueError, TypeError):
             pass
+    # 2b) FALLBACK when amount_owed never populated. The amount_owed waterfall
+    #     only runs for foreclosure/lis-pendens types AND only fires opening_bid
+    #     for foreclosures, so most leads reach here with raw.amount_owed missing
+    #     even though the Listing itself carries a judgment_amount or opening_bid.
+    #     A foreclosure judgment / auction opening bid IS the debt being
+    #     foreclosed (lenders open at ~the payoff), so it's a reasonable payoff
+    #     proxy — taken at LOW confidence since we never amortize or verify it.
+    #     This is what lifts equity coverage from ~500 to ~1k+ leads. We reuse
+    #     the SAME upper-bound sanity as the last-sale path: a concatenated
+    #     book+page or parcel id leaking into the bid field yields a
+    #     billion-dollar "payoff", so reject anything implying >3x ARV (a real
+    #     foreclosure debt is well under ARV — that's the whole point of equity).
+    try:
+        proxy = li.judgment_amount or li.opening_bid
+    except AttributeError:
+        proxy = None
+    if proxy:
+        try:
+            proxy = float(proxy)
+        except (ValueError, TypeError):
+            proxy = None
+        if proxy and 0 < proxy <= 3.0 * arv:
+            psrc = "judgment_amount" if li.judgment_amount else "opening_bid"
+            return proxy, f"foreclosure_proxy:{psrc}", "low"
     # 3) last sale -> ~90% financed, amortized. ARMS-LENGTH GATE: a $1/$10
     #    intra-family quitclaim or estate deed amortizes to ~0 and fakes ~100%
     #    equity (the exact failure mode this whole engine prevents). Require the

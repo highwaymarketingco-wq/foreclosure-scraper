@@ -70,6 +70,47 @@ _ZIP_FIELD_CANDIDATES = (
     "PHYSZIP", "PHYS_ZIP", "SITE_ZIP", "Zip", "ZIP", "ZIPCODE", "ZipCode",
 )
 
+# Some layers (e.g. Georgetown SC) carry NO single combined situs-address field —
+# only a split house-number + street-name pair — so the combined-field detector
+# finds nothing and the lead stays address-less. These let us compose the situs
+# from the split parts. All are situs (non-mailing) field names; the same
+# _MAILING_FIELD_MARKERS guard still applies in _pick_field.
+_STREET_NUM_FIELD_CANDIDATES = (
+    "StreetNumber", "STREETNUMBER", "STREET_NUM", "STREETNUM", "STR_NUM",
+    "HOUSE_NUM", "HOUSENUM", "HOUSE_NO", "HOUSENO", "SITUS_NUM", "ADDR_NUM",
+)
+_STREET_NAME_FIELD_CANDIDATES = (
+    "StreetName", "STREETNAME", "STREET_NAME", "STREETNM", "STR_NAME",
+    "SITUS_STREET", "SITE_STREET", "ROAD_NAME", "RD_NAME",
+)
+
+
+# Trailing sub-parcel / interest suffix some counties append to a base parcel id
+# (e.g. Georgetown SC FLC PINs "01-0442-029-03-00.001") that the county GIS TMS /
+# parcel field does NOT carry — it stores only the base "01-0442-029-03-00".
+_SUBPARCEL_SUFFIX_RE = re.compile(r"\.\d+$")
+
+
+async def _query_parcel_norm(
+    c: httpx.AsyncClient, base: str, parcel: str
+) -> dict[str, Any] | None:
+    """Exact parcel-id match, with a sub-parcel-suffix retry on zero result.
+
+    The county GIS exact match is tried first (unchanged behaviour). Only when it
+    returns NOTHING do we strip a trailing ".NNN" sub-parcel suffix and retry —
+    this is what unlocks Georgetown SC FLC leads whose PIN carries a sub-parcel
+    suffix the SCDOT TMS field lacks. Scoped to the zero-result retry path so it
+    can never mis-resolve a county whose exact id already matched, and it is a
+    no-op for any parcel that has no such suffix.
+    """
+    attrs = await _query_parcel(c, base, parcel)
+    if attrs is not None:
+        return attrs
+    stripped = _SUBPARCEL_SUFFIX_RE.sub("", parcel.strip())
+    if stripped and stripped != parcel.strip():
+        return await _query_parcel(c, base, stripped)
+    return None
+
 
 def _norm_ci(attrs: dict[str, Any]) -> dict[str, Any]:
     """Lowercase-keyed view of the attribute bag (drops _centroid/_match_* meta)."""
@@ -141,6 +182,17 @@ def apply_situs_address(li: Listing, attrs: dict[str, Any], addr_field: str | No
         # from the bag here (situs fields first, mailing fields excluded).
         from .enrichment_arcgis import _ADDR_FIELD_CANDIDATES
         raw_addr = _pick_field(norm, _ADDR_FIELD_CANDIDATES)
+
+    if raw_addr in (None, "", " "):
+        # No combined situs field — compose from split house-number + street-name
+        # (the only situs form some layers, e.g. Georgetown SC, expose). Street
+        # name alone is enough to write; the number is prepended when present.
+        num = _pick_field(norm, _STREET_NUM_FIELD_CANDIDATES)
+        name = _pick_field(norm, _STREET_NAME_FIELD_CANDIDATES)
+        name_s = re.sub(r"\s+", " ", str(name).strip()) if name not in (None, "") else ""
+        if name_s and any(ch.isalpha() for ch in name_s):
+            num_s = re.sub(r"\s+", " ", str(num).strip()) if num not in (None, "") else ""
+            raw_addr = f"{num_s} {name_s}".strip() if num_s else name_s
 
     if raw_addr in (None, "", " "):
         return 0
@@ -267,7 +319,7 @@ async def enrich_situs_address(listings: list[Listing], concurrency: int = 16) -
                 return
             async with sem:
                 if has_parcel:
-                    attrs = await _query_parcel(c, base, li.parcel_id)
+                    attrs = await _query_parcel_norm(c, base, li.parcel_id)
                 if (attrs is None and not placeholder_pt
                         and li.latitude is not None and li.longitude is not None):
                     try:

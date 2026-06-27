@@ -209,6 +209,14 @@ NC_WFS: dict[str, dict[str, Any]] = {
 
 # ---- Field-name normalization ----------------------------------------------------
 
+# Upper-plausibility ceiling for a parsed last-sale amount. Spartanburg's
+# SaleAmount field returns uninitialized doubles (denormalized junk) like
+# 1065353216 / ~1.2e9 for blank cells; without a cap these ship to the
+# dashboard as billion-dollar "sales". No residential/parcel sale is anywhere
+# near $50M here, so anything above the ceiling is garbage and is dropped.
+# (Mirrors enrichment_gis_derived._MAX_SALE and validation.py's $50M guards.)
+_MAX_PLAUSIBLE_SALE = 50_000_000.0
+
 FIELD_ALIASES = {
     # NOTE: DEEDBK was historically in this list but it's the DEED BOOK number,
     # not a parcel identifier. Multiple parcels recorded in the same book all
@@ -704,7 +712,12 @@ def _apply_attrs(li: Listing, attrs: dict[str, Any]) -> int:
                 if isinstance(sale_a, str):
                     sale_a = re.sub(r"[^\d.\-]", "", sale_a)
                 if sale_a not in ("", "-", "."):
-                    gis["last_sale"]["amount"] = float(sale_a)
+                    amt = float(sale_a)
+                    # Reject corrupted GIS values (e.g. Spartanburg's
+                    # uninitialized-double junk in the ~$1.07B-$1.27B band)
+                    # so they never reach the published dashboard.
+                    if 0 < amt <= _MAX_PLAUSIBLE_SALE:
+                        gis["last_sale"]["amount"] = amt
             except (ValueError, TypeError):
                 pass
 
