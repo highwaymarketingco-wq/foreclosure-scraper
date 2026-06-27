@@ -14,6 +14,17 @@ def test_scdot_situs_composes_number_and_name():
     assert pi._scdot_situs({"STREET_NUM": "0", "STREET_NAM": "MAIN ST"}) == "MAIN ST"
 
 
+def test_scdot_situs_charleston_split_fields():
+    # SCDOT Charleston (layer 10): PROP_ST_NO + PROP_ST_NA (live-verified 2026-06-27).
+    assert pi._scdot_situs(
+        {"PROP_ST_NO": "1887", "PROP_ST_NA": "RICHMOND ST"}) == "1887 RICHMOND ST"
+    # vacant parcels carry PROP_ST_NO "0"/"000" -> street name only, no leading zero
+    assert pi._scdot_situs(
+        {"PROP_ST_NO": "0", "PROP_ST_NA": "OYSTER FACTORY"}) == "OYSTER FACTORY"
+    assert pi._scdot_situs(
+        {"PROP_ST_NO": "000", "PROP_ST_NA": "CREEK POINT"}) == "CREEK POINT"
+
+
 def test_scdot_situs_ignores_owner_mailing_block():
     # Union's Address_1 'C/O ...' is owner mailing, not situs -> not returned
     assert pi._scdot_situs({"Address_1": "C/O TRANSPORTATION BANK"}) == ""

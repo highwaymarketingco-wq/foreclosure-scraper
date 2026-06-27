@@ -78,10 +78,12 @@ _ZIP_FIELD_CANDIDATES = (
 _STREET_NUM_FIELD_CANDIDATES = (
     "StreetNumber", "STREETNUMBER", "STREET_NUM", "STREETNUM", "STR_NUM",
     "HOUSE_NUM", "HOUSENUM", "HOUSE_NO", "HOUSENO", "SITUS_NUM", "ADDR_NUM",
+    "PROP_ST_NO",   # SCDOT Charleston (layer 10): split situs = PROP_ST_NO + PROP_ST_NA
 )
 _STREET_NAME_FIELD_CANDIDATES = (
     "StreetName", "STREETNAME", "STREET_NAME", "STREETNM", "STR_NAME",
     "SITUS_STREET", "SITE_STREET", "ROAD_NAME", "RD_NAME",
+    "PROP_ST_NA",   # SCDOT Charleston (layer 10) street-name half
 )
 
 
@@ -192,6 +194,8 @@ def apply_situs_address(li: Listing, attrs: dict[str, Any], addr_field: str | No
         name_s = re.sub(r"\s+", " ", str(name).strip()) if name not in (None, "") else ""
         if name_s and any(ch.isalpha() for ch in name_s):
             num_s = re.sub(r"\s+", " ", str(num).strip()) if num not in (None, "") else ""
+            if num_s and set(num_s) == {"0"}:   # SCDOT vacant parcels carry PROP_ST_NO="0"
+                num_s = ""
             raw_addr = f"{num_s} {name_s}".strip() if num_s else name_s
 
     if raw_addr in (None, "", " "):

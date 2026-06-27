@@ -78,11 +78,12 @@ def _scdot_situs(attrs: dict) -> str:
         if v and str(v).strip():
             return str(v).strip()
     for numf, namf in (("STREET_NUM", "STREET_NAM"), ("StreetNumber", "StreetName"),
-                       ("Street_Num", "Street_Nam"), ("STREET_NUMBER", "STREET_NAME")):
+                       ("Street_Num", "Street_Nam"), ("STREET_NUMBER", "STREET_NAME"),
+                       ("PROP_ST_NO", "PROP_ST_NA")):   # SCDOT Charleston (layer 10) split situs
         nam = attrs.get(namf)
         if nam and str(nam).strip():
             num = str(attrs.get(numf) or "").strip()
-            num = "" if num in ("", "0") else num + " "
+            num = "" if (not num or set(num) == {"0"}) else num + " "  # vacant parcels carry "0"/"000"
             return f"{num}{str(nam).strip()}".strip()
     # ADDRESS1 only if it looks like a street (leading number), not a name / C/O.
     for f in ("ADDRESS1", "Address1", "Address_1"):
