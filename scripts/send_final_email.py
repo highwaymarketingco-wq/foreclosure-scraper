@@ -87,8 +87,23 @@ def _business_stats() -> dict:
             "sde": _money(c.get("sde_used")),
             "value": f"{_money(c.get('fair_value_low'))}-{_money(c.get('fair_value_high'))}",
         })
+    # top-rated blue-collar leads (the GBP roster — contact + rating, the sourcing call-list)
+    rated = sorted(
+        [x for x in d if (x.get("google_rating") or 0) >= 4.5 and x.get("phone")
+         and raw(x).get("industry_bucket") in (SVC | {"personal_services"})],
+        key=lambda y: -(y.get("google_rating") or 0),
+    )[:15]
+    top_rated = [{
+        "name": (x.get("name") or "?")[:36],
+        "where": f"{x.get('city') or ''}, {x.get('state') or ''}".strip(", "),
+        "trade": (x.get("industry") or raw(x).get("industry_bucket", "")),
+        "rating": x.get("google_rating"),
+        "phone": x.get("phone") or "",
+        "dd": (raw(x).get("due_diligence") or {}).get("known"),
+    } for x in rated]
     return {"count": len(d), "warm": tier("WARM"), "service": len(svc),
-            "valued": len(valued), "top": rows}
+            "valued": len(valued), "top": rows, "top_rated": top_rated,
+            "with_phone": sum(1 for x in d if x.get("phone"))}
 
 
 def _html(fc: dict, biz: dict) -> str:
@@ -110,6 +125,20 @@ def _html(fc: dict, biz: dict) -> str:
         f"(employees / SBA-loan size), labeled by confidence, not disclosed figures.</p>"
         if biz else "<p><i>Business dashboard not available.</i></p>"
     )
+    rated_rows = "".join(
+        f"<tr><td>{r['name']}</td><td>{r['where']}</td><td>{r['trade']}</td>"
+        f"<td>{r['rating']}&#9733;</td><td>{r['phone']}</td><td>{r['dd']}/8</td></tr>"
+        for r in (biz.get("top_rated") or [])
+    )
+    if rated_rows:
+        biz_block += (
+            f"<p style='margin-top:14px'><b>Top-rated blue-collar leads</b> "
+            f"({biz.get('with_phone', 0):,} reachable shops across 60 trades — HVAC, plumbing, "
+            f"electrical, roofing, auto, landscaping, restoration, junk/hauling, etc.):</p>"
+            f"<table border=1 cellpadding=5 cellspacing=0 style='border-collapse:collapse;font-size:13px'>"
+            f"<tr style='background:#f0f0f0'><th>Business</th><th>Location</th><th>Trade</th>"
+            f"<th>Rating</th><th>Phone</th><th>Due-dil</th></tr>{rated_rows}</table>"
+        )
     return f"""<html><body style="font-family:Arial,sans-serif;font-size:14px;color:#222">
 <h2>Dashboards complete</h2>
 <p>Both dashboards finished their build. Summary below.</p>
