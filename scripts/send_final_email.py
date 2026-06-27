@@ -30,6 +30,7 @@ SENTINEL = FC_ROOT / "logs" / ".final_email_sent"
 SENDER = "highwaymarketingco@gmail.com"
 RECIPIENTS = ["greghhigh@gmail.com", "cashrandolphhigh@gmail.com"]
 FC_URL = "https://highwaymarketingco-wq.github.io/foreclosure-scraper/"
+BIZ_URL = "https://highwaymarketingco-wq.github.io/business-acquisition-dashboard/"
 
 
 def _load_app_password() -> str | None:
@@ -113,7 +114,7 @@ def _html(fc: dict, biz: dict) -> str:
         for r in biz.get("top", [])
     ) or "<tr><td colspan=6>no valued service-trade targets yet</td></tr>"
     biz_block = (
-        f"<p><b>Business acquisition dashboard</b> (local: <code>~/business-scraper/docs/index.html</code>, attached)</p>"
+        f"<p><b>Business acquisition dashboard</b> &mdash; <a href=\"{BIZ_URL}\">{BIZ_URL}</a> (HTML also attached)</p>"
         f"<ul><li>{biz.get('count', 0):,} businesses tracked, {biz.get('service', 0):,} service-trade "
         f"(HVAC/plumbing/electrical/etc.)</li>"
         f"<li>{biz.get('valued', 0):,} carry estimated financials (revenue to SDE to value band); "
