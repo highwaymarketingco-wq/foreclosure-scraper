@@ -231,6 +231,16 @@ async def _impersonate_fetch(
             proxies=proxies,
             allow_redirects=True,
         )
+        # Some hosts (e.g. overpass-api.de) reject the browser-like Accept header
+        # impersonation sends with a 406, yet answer fine with a permissive Accept.
+        # Retry once with Accept: */* before treating it as a block/escalating.
+        if r.status_code == 406:
+            h2 = dict(h)
+            h2["Accept"] = "*/*"
+            r = await s.get(
+                url, headers=h2, impersonate=impersonate, timeout=timeout,
+                proxies=proxies, allow_redirects=True,
+            )
     code = r.status_code
     if code in _BLOCK_CODES or 500 <= code < 600:
         holder = _block_holder.get()

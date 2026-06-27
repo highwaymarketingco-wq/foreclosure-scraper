@@ -598,6 +598,12 @@ def _dump(label: str, content: str) -> None:
 class NCECourtsEstates(BaseScraper):
     slug = "counties_nc.nc_ecourts_estates"
     name = "NC eCourts Estates (Tyler Odyssey Smart Search)"
+    # 2026-06-27: disabled — NC eCourts Smart Search sits behind an AWS-WAF escalating
+    # image-CAPTCHA that does NOT clear even with the Gemini solver; it burns vision
+    # quota and logs errors for 0 results every run. NC estate/decedent notices are
+    # covered compliantly via counties.column_legal_notices. Re-enable if the WAF drops.
+    disabled = True
+    disabled_reason = "NC eCourts AWS-WAF CAPTCHA unsolvable; NC estate covered via Column"
     category = "county_court"
     # Estate filings are common; but the WAF gate means a run can legitimately
     # come back empty when the image-grid solve fails. Keep min 0 so a blocked

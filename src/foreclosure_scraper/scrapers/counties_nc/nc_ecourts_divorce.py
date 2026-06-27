@@ -504,6 +504,11 @@ def _dump(label: str, content: str) -> None:
 class NCECourtsDivorce(BaseScraper):
     slug = "counties_nc.nc_ecourts_divorce"
     name = "NC eCourts Divorce (Tyler Odyssey Smart Search)"
+    # 2026-06-27: disabled — same AWS-WAF escalating CAPTCHA as estates (0 results,
+    # burns Gemini quota, logs errors every run). Non-sealed divorce isn't compliantly
+    # reachable any other free way; re-enable only if the portal drops the WAF.
+    disabled = True
+    disabled_reason = "NC eCourts AWS-WAF CAPTCHA unsolvable (divorce); no free alternative"
     category = "county_court"
     expected_min_count = 0
     timeout_s = 600.0
