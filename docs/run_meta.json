@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-06-27T15:40:47.393049Z",
+  "run_time": "2026-06-28T23:40:29.705436Z",
   "total": 3632,
   "by_source": {
     "national.auction_dot_com": 11,
@@ -57,9 +57,70 @@
     "NC": 1254,
     "SC": 2378
   },
-  "by_county_top": [],
+  "by_county_top": [
+    [
+      "SC/Oconee",
+      574
+    ],
+    [
+      "SC/Spartanburg",
+      386
+    ],
+    [
+      "SC/Georgetown",
+      337
+    ],
+    [
+      "SC/Anderson",
+      336
+    ],
+    [
+      "NC/Buncombe",
+      265
+    ],
+    [
+      "SC/Charleston",
+      231
+    ],
+    [
+      "NC/Gaston",
+      188
+    ],
+    [
+      "SC/Pickens",
+      181
+    ],
+    [
+      "SC/Laurens",
+      164
+    ],
+    [
+      "NC/Henderson",
+      133
+    ],
+    [
+      "NC/Cleveland",
+      109
+    ],
+    [
+      "NC/McDowell",
+      77
+    ],
+    [
+      "NC/Lincoln",
+      75
+    ],
+    [
+      "SC/Cherokee",
+      74
+    ],
+    [
+      "NC/Burke",
+      73
+    ]
+  ],
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "surgical post-enrich dedupe (iter3 fix; no re-scrape)"
+  "notes": "regenerated in-place from persisted dataset (no re-scrape)"
 }
