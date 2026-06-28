@@ -88,6 +88,8 @@ NEW_SOURCES = {
     "counties_nc.brunswick_legal_notices",
     "counties.column_legal_notices", "law_firms.mewborn_deselms",
     "law_firms.zacchaeus",
+    # net-new (2026-06-27): Greenwood newspaper + Spartanburg FLC tax-sale PDF
+    "newspapers.index_journal", "counties_sc.spartanburg_flc",
 }
 
 
