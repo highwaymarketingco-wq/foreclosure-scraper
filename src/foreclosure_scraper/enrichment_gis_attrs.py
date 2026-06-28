@@ -37,6 +37,7 @@ value/sqft feed grading).
 from __future__ import annotations
 
 import asyncio
+import os
 import json
 import re
 from typing import Any
@@ -318,15 +319,25 @@ def apply_gis_attrs(li: Listing, attrs: dict[str, Any]) -> dict[str, int]:
 async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dict:
     """Backfill GIS attributes for every lead with lat/lng (or parcel_id) in a
     supported SC/NC county. Returns a stats dict for the orchestrator log."""
+    _force = bool(os.environ.get("FORECLOSURE_GIS_FORCE"))
     sem = asyncio.Semaphore(concurrency)
-    stats = {"queried": 0, "matched": 0, "filled_market": 0, "filled_assessed": 0,
+    stats = {"queried": 0, "matched": 0, "skipped_done": 0, "filled_market": 0, "filled_assessed": 0,
              "filled_owner": 0, "filled_sqft": 0, "filled_year": 0,
              "filled_acre": 0, "filled_landuse": 0}
 
     async def one(c: httpx.AsyncClient, li: Listing) -> None:
-        # Only work leads that are still missing at least one target field.
-        if (li.market_value and li.assessed_value and li.owner_name
-                and li.living_sqft and li.year_built and li.acreage and li.land_use):
+        # Idempotent skip — the per-lead county GIS query is the dominant cost of a full
+        # re-enrich (turned an overnight regenerate into a multi-hour slog). Skip when:
+        #   (a) the lead already has the CORE attrs (value + owner + sqft); re-querying
+        #       just to maybe fill minor fields (acreage/land_use/year) isn't worth a call;
+        #   (b) a prior run already ATTEMPTED this lead (same lat/lng -> same GIS result),
+        #       marked raw['gis']['queried']. FORECLOSURE_GIS_FORCE=1 re-attempts all.
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        if (li.assessed_value or li.market_value) and li.owner_name and li.living_sqft:
+            stats["skipped_done"] += 1
+            return
+        if not _force and (raw.get("gis") or {}).get("queried"):
+            stats["skipped_done"] += 1
             return
         base = _resolve_layer(li)
         if not base:
@@ -341,6 +352,10 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
             if attrs is None and li.parcel_id:
                 attrs = await _query_parcel(c, base, li.parcel_id)
             stats["queried"] += 1
+            # Mark attempted so future re-enriches skip this lead (idempotent).
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            li.raw.setdefault("gis", {})["queried"] = True
             if not attrs:
                 return
             stats["matched"] += 1

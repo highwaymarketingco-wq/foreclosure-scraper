@@ -564,6 +564,13 @@ async def run() -> int:
     cfg = RuntimeConfig.from_env()
 
     scrapers = all_scrapers()
+    # FORECLOSURE_ONLY_SOURCES=substr,substr — restrict to matching slugs (for a scoped
+    # timing/subset run). Unset = all sources (normal full run).
+    _only = os.environ.get("FORECLOSURE_ONLY_SOURCES")
+    if _only:
+        _keep = [k.strip() for k in _only.split(",") if k.strip()]
+        scrapers = [s for s in scrapers if any(k in s.slug for k in _keep)]
+        log.info("orchestrator.filtered", only=_keep, kept=len(scrapers))
     log.info("orchestrator.start", scrapers=len(scrapers))
 
     sem = asyncio.Semaphore(cfg.parallel_scrapers)
