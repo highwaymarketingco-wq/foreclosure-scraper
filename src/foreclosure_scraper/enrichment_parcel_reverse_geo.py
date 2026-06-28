@@ -23,6 +23,7 @@ with usable data (parcel_id + lat/lng + missing or placeholder street).
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 from typing import Optional
 
@@ -32,6 +33,19 @@ import structlog
 from .models import Listing
 
 log = structlog.get_logger()
+
+# Nominatim reverse lookups are serial at ~1 req/sec (TOS), so an uncapped board with many
+# NEW address-less leads serializes for a long time (a contributor to the overnight full-run
+# not finishing). Cap the per-run QUERY budget — idempotent promotions of already-annotated
+# leads stay free. Override via env for a supervised daytime run that wants fuller coverage.
+_REVERSE_GEO_MAX = int(os.environ.get("FORECLOSURE_REVERSE_GEO_MAX") or "300")
+
+
+def _rg_priority(li: "Listing") -> int:
+    """Lower = gets the limited query budget first. HOT distress leads before WARM."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    tier = ((raw.get("distress_stack") or {}).get("tier")) or ""
+    return {"HOT": 0, "WARM": 1}.get(tier, 2)
 
 
 # Synthetic-address markers — listings with these as street_address still
@@ -150,9 +164,11 @@ async def enrich_parcel_reverse_geo(listings: list[Listing]) -> dict:
         log.info("parcel_reverse_geo.no_targets")
         return {"queried": 0, "annotated": 0}
 
-    log.info("parcel_reverse_geo.start", target_count=len(targets))
+    # Highest-priority address-less leads get the limited query budget first.
+    targets.sort(key=_rg_priority)
+    log.info("parcel_reverse_geo.start", target_count=len(targets), query_cap=_REVERSE_GEO_MAX)
     stats = {"queried": 0, "annotated": 0, "no_match": 0,
-             "promoted": 0, "promotion_gated": 0}
+             "promoted": 0, "promotion_gated": 0, "skipped_cap": 0}
 
     # Nominatim's TOS: max 1 request/second from a single client. We use a
     # token bucket via asyncio.sleep (no concurrency).
@@ -165,6 +181,12 @@ async def enrich_parcel_reverse_geo(listings: list[Listing]) -> dict:
             already = (li.raw or {}).get("parcel_resolution", {}) if isinstance(li.raw, dict) else {}
             if already.get("reverse_geo_approx"):
                 _promote_approx_address(li, already["reverse_geo_approx"], stats)
+                continue
+
+            # Bound the serial 1/sec phase: once the query budget is spent, stop
+            # querying (remaining leads keep their existing data); never silent.
+            if stats["queried"] >= _REVERSE_GEO_MAX:
+                stats["skipped_cap"] += 1
                 continue
 
             stats["queried"] += 1
