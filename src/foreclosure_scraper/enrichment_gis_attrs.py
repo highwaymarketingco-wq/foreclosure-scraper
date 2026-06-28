@@ -166,7 +166,14 @@ def _resolve_layer(li: Listing) -> str | None:
     return None
 
 
-async def _query_point(c: httpx.AsyncClient, base: str, lat: float, lng: float) -> dict | None:
+class _GISNetworkError(Exception):
+    """Transport/connection error reaching the GIS endpoint (NOT a no-match). Lets the
+    idempotency marker distinguish 'GIS has no data for this lead' from 'the network was
+    down', so a flaky connection never permanently skips a lead on future re-enriches."""
+
+
+async def _query_point(c: httpx.AsyncClient, base: str, lat: float, lng: float,
+                       raise_on_net_error: bool = False) -> dict | None:
     """Point-in-polygon query — the parcel whose boundary contains the lead's coord."""
     geom = json.dumps({"x": lng, "y": lat, "spatialReference": {"wkid": 4326}})
     params = {
@@ -184,7 +191,11 @@ async def _query_point(c: httpx.AsyncClient, base: str, lat: float, lng: float) 
         feats = data.get("features") or []
         if feats and feats[0].get("attributes"):
             return dict(feats[0]["attributes"])
-    except (httpx.HTTPError, ValueError):
+    except httpx.HTTPError as e:
+        if raise_on_net_error:
+            raise _GISNetworkError from e
+        return None
+    except ValueError:
         return None
     return None
 
@@ -194,21 +205,26 @@ _PARCEL_FIELDS = ("PIN", "TMS", "REID", "PARCELNUMBER", "TAXPIN", "PARNO",
 _LAYER_FIELDS_CACHE: dict[str, list[str]] = {}
 
 
-async def _layer_fields(c: httpx.AsyncClient, base: str) -> list[str]:
+async def _layer_fields(c: httpx.AsyncClient, base: str, raise_on_net_error: bool = False) -> list[str]:
     if base in _LAYER_FIELDS_CACHE:
         return _LAYER_FIELDS_CACHE[base]
     try:
         r = await c.get(base.rsplit("/query", 1)[0], params={"f": "json"}, timeout=15.0)
         fields = [f["name"] for f in r.json().get("fields", []) if "name" in f]
-    except (httpx.HTTPError, ValueError):
+    except httpx.HTTPError as e:
+        if raise_on_net_error:
+            raise _GISNetworkError from e
+        fields = []
+    except ValueError:
         fields = []
     _LAYER_FIELDS_CACHE[base] = fields
     return fields
 
 
-async def _query_parcel(c: httpx.AsyncClient, base: str, parcel: str) -> dict | None:
+async def _query_parcel(c: httpx.AsyncClient, base: str, parcel: str,
+                        raise_on_net_error: bool = False) -> dict | None:
     """Fallback when the lead has no lat/lng: match on a parcel-id-style field."""
-    fields = await _layer_fields(c, base)
+    fields = await _layer_fields(c, base, raise_on_net_error=raise_on_net_error)
     flow = {f.lower(): f for f in fields}
     cands = [flow[p.lower()] for p in _PARCEL_FIELDS if p.lower() in flow]
     pv = parcel.strip().replace("'", "''")
@@ -224,7 +240,11 @@ async def _query_parcel(c: httpx.AsyncClient, base: str, parcel: str) -> dict | 
             feats = data.get("features") or []
             if feats and feats[0].get("attributes"):
                 return dict(feats[0]["attributes"])
-        except (httpx.HTTPError, ValueError):
+        except httpx.HTTPError as e:
+            if raise_on_net_error:
+                raise _GISNetworkError from e
+            continue
+        except ValueError:
             continue
     return None
 
@@ -344,18 +364,31 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
             return
         async with sem:
             attrs = None
+            net_ok = True
             if li.latitude and li.longitude:
                 try:
-                    attrs = await _query_point(c, base, float(li.latitude), float(li.longitude))
+                    attrs = await _query_point(c, base, float(li.latitude), float(li.longitude),
+                                               raise_on_net_error=True)
+                except _GISNetworkError:
+                    net_ok = False
                 except (ValueError, TypeError):
                     attrs = None
-            if attrs is None and li.parcel_id:
-                attrs = await _query_parcel(c, base, li.parcel_id)
+            if attrs is None and net_ok and li.parcel_id:
+                try:
+                    attrs = await _query_parcel(c, base, li.parcel_id, raise_on_net_error=True)
+                except _GISNetworkError:
+                    net_ok = False
             stats["queried"] += 1
-            # Mark attempted so future re-enriches skip this lead (idempotent).
-            if not isinstance(li.raw, dict):
-                li.raw = {}
-            li.raw.setdefault("gis", {})["queried"] = True
+            # Mark attempted ONLY when we actually reached the GIS endpoint. A transient
+            # network error leaves net_ok False -> lead stays unmarked -> retried next run
+            # (a flaky wifi drop never permanently skips a lead). A genuine no-match (reached
+            # GIS, no feature) IS marked so we don't re-query it every run forever.
+            if net_ok and (li.latitude or li.parcel_id):
+                if not isinstance(li.raw, dict):
+                    li.raw = {}
+                li.raw.setdefault("gis", {})["queried"] = True
+            elif not net_ok:
+                stats["net_err"] = stats.get("net_err", 0) + 1
             if not attrs:
                 return
             stats["matched"] += 1
