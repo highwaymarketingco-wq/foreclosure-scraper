@@ -14,6 +14,7 @@ Cost: $0. HomeHarvest hits Realtor.com's public API.
 from __future__ import annotations
 
 import asyncio
+import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
@@ -22,6 +23,12 @@ import structlog
 from .models import Listing
 
 log = structlog.get_logger()
+
+# _by_address_lookup does up to 6 slow network+pandas HomeHarvest calls PER lead, so an
+# uncapped board (1000s of leads/comps) makes this phase run for HOURS — the root cause of
+# the overnight full-run not finishing. Cap leads enriched per call (highest distress-tier
+# first); override via env for a supervised daytime run that wants fuller coverage.
+_PHOTO_MAX_TARGETS = int(os.environ.get("FORECLOSURE_PHOTO_MAX_TARGETS") or "500")
 
 
 import re as _re
@@ -150,6 +157,14 @@ def _needs_photos(li: Listing) -> bool:
     return n < 3
 
 
+def _photo_priority(li: Listing) -> int:
+    """Lower = enriched first when targets exceed the cap. HOT distress leads
+    before WARM before everything else (comps/sold-pool rows rank last)."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    tier = ((raw.get("distress_stack") or {}).get("tier")) or ""
+    return {"HOT": 0, "WARM": 1}.get(tier, 2)
+
+
 async def enrich_with_address_photos(listings: list[Listing]) -> None:
     """For listings without rich photo galleries, look up the address on
     HomeHarvest and pull primary + alt photos.
@@ -164,6 +179,15 @@ async def enrich_with_address_photos(listings: list[Listing]) -> None:
     if not targets:
         log.info("photos.no_targets")
         return
+
+    # Bound runtime — HomeHarvest does up to 6 slow calls per lead. Process the
+    # highest-priority leads first and cap; log the skip (never silently drop).
+    all_needing = len(targets)
+    if all_needing > _PHOTO_MAX_TARGETS:
+        targets.sort(key=_photo_priority)
+        targets = targets[:_PHOTO_MAX_TARGETS]
+        log.info("photos.capped", processing=_PHOTO_MAX_TARGETS,
+                 skipped=all_needing - _PHOTO_MAX_TARGETS, total_needing=all_needing)
 
     log.info("photos.start", target_count=len(targets), total=len(listings))
 
