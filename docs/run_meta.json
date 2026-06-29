@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-06-28T23:40:29.705436Z",
+  "run_time": "2026-06-29T18:19:54.477546Z",
   "total": 3632,
   "by_source": {
     "national.auction_dot_com": 11,
@@ -53,74 +53,10 @@
     "newspapers.coastland_times": 1,
     "counties.column_legal_notices": 24
   },
-  "by_state": {
-    "NC": 1254,
-    "SC": 2378
-  },
-  "by_county_top": [
-    [
-      "SC/Oconee",
-      574
-    ],
-    [
-      "SC/Spartanburg",
-      386
-    ],
-    [
-      "SC/Georgetown",
-      337
-    ],
-    [
-      "SC/Anderson",
-      336
-    ],
-    [
-      "NC/Buncombe",
-      265
-    ],
-    [
-      "SC/Charleston",
-      231
-    ],
-    [
-      "NC/Gaston",
-      188
-    ],
-    [
-      "SC/Pickens",
-      181
-    ],
-    [
-      "SC/Laurens",
-      164
-    ],
-    [
-      "NC/Henderson",
-      133
-    ],
-    [
-      "NC/Cleveland",
-      109
-    ],
-    [
-      "NC/McDowell",
-      77
-    ],
-    [
-      "NC/Lincoln",
-      75
-    ],
-    [
-      "SC/Cherokee",
-      74
-    ],
-    [
-      "NC/Burke",
-      73
-    ]
-  ],
+  "by_state": {},
+  "by_county_top": [],
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "regenerated in-place from persisted dataset (no re-scrape)"
+  "notes": "sqft backfill via per-parcel assessor cards (no re-scrape)"
 }
