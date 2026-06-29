@@ -187,11 +187,11 @@ class VRMPropertiesVAREO(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     requires_render = False
-    disabled = True
-    disabled_reason = ("froze the concurrent run on 2026-06-27 (in-flight at the 2h47m hang). "
-                       "National VA REO, minimal in-footprint value. Re-enable after isolating "
-                       "the blocking call or running it via asyncio.to_thread.")
-    timeout_s = 240.0
+    disabled = False  # re-enabled 2026-06-29: isolated re-test returns 161 rows in <100s;
+    # the 2026-06-27 hang was the enrichment phase (since fixed via idempotent gis_attrs +
+    # photo/reverse-geo caps), not this scraper. timeout_s=240 caps it so it can't hang a run.
+    disabled_reason = ("re-enabled 2026-06-29; previously disabled for the 2026-06-27 concurrent hang.")
+    timeout_s = 180.0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
