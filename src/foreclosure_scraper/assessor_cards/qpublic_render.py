@@ -177,18 +177,32 @@ async def _render(url: str, *, on_loaded=None) -> str:
         except Exception:
             holder["html"] = ""
 
-    try:
-        resp = await StealthyFetcher.async_fetch(
-            url, headless=True, network_idle=True, timeout=_TIMEOUT_MS,
-            page_action=page_action, solve_cloudflare=True)
-    except Exception as exc:
-        log.debug("qpublic.render_error", url=url[:120], error=str(exc)[:150])
-        return holder.get("html", "") or ""
-    status = getattr(resp, "status", None)
-    if status and status >= 400 and not holder.get("html"):
-        log.debug("qpublic.bad_status", url=url[:120], status=status)
-        return ""
-    return holder.get("html") or (getattr(resp, "html_content", "") or "")
+    async def _attempt(solve: bool) -> str:
+        holder["html"] = ""
+        try:
+            resp = await StealthyFetcher.async_fetch(
+                url, headless=True, network_idle=True, timeout=_TIMEOUT_MS,
+                page_action=page_action, solve_cloudflare=solve)
+        except Exception as exc:
+            # solve_cloudflare=True raises "No Cloudflare challenge found" on parcels that
+            # load WITHOUT a challenge — that must not fail the parcel. page_action may have
+            # already captured the HTML; otherwise the caller retries with solve=False.
+            log.debug("qpublic.render_error", solve=solve, url=url[:120], error=str(exc)[:150])
+            return holder.get("html", "") or ""
+        status = getattr(resp, "status", None)
+        html = holder.get("html") or (getattr(resp, "html_content", "") or "")
+        if status and status >= 400 and not html:
+            log.debug("qpublic.bad_status", url=url[:120], status=status)
+            return ""
+        return html
+
+    # Solve-if-challenged first; if that yields nothing (no challenge present, so Scrapling
+    # raised, or it came back empty), retry as a plain render — the CAMA/sqft section needs
+    # JS execution either way, but most parcels do NOT present an active Cloudflare challenge.
+    html = await _attempt(True)
+    if not html:
+        html = await _attempt(False)
+    return html
 
 
 async def _resolve_via_search(cfg: dict, query: str) -> str | None:
