@@ -22,6 +22,7 @@ from pathlib import Path
 
 _DATA = Path(__file__).resolve().parent.parent.parent / "data" / "ncvoter"
 _INDEX: dict | None = None
+_NAME_COUNTY: dict | None = None
 _DIRECTIONAL = {"N", "S", "E", "W", "NE", "NW", "SE", "SW", "NORTH", "SOUTH", "EAST", "WEST"}
 
 
@@ -39,8 +40,12 @@ def _street_key(addr: str | None):
     return (m.group(1), toks[0][:6])
 
 
-def _build_index() -> dict:
+def _build_index():
+    """Returns (addr_index, name_county_unique). addr_index keys (last,first,house,street6)->phone.
+    name_county_unique keys (COUNTY,last,first)->phone ONLY when exactly one active voter with
+    that name+county has a phone (unambiguous = safe to assign to an absentee owner)."""
     idx: dict = {}
+    nc_phones: dict = {}   # (county,last,first) -> set(phones)
     for f in sorted(_DATA.glob("ncvoter*.txt")):
         try:
             fh = open(f, encoding="latin-1")
@@ -52,13 +57,18 @@ def _build_index() -> dict:
                 phone = re.sub(r"\D", "", row[23] or "")
                 if len(phone) != 10:
                     continue
+                county = row[1].strip().upper()
                 last, first = row[4].strip().upper(), row[5].strip().upper()
+                if not (last and first):
+                    continue
                 sk = _street_key(row[12])
-                if last and first and sk:
+                if sk:
                     idx.setdefault((last, first, sk[0], sk[1]), phone)
+                nc_phones.setdefault((county, last, first), set()).add(phone)
         except Exception:  # noqa: BLE001
             continue
-    return idx
+    name_county = {k: next(iter(v)) for k, v in nc_phones.items() if len(v) == 1}
+    return idx, name_county
 
 
 def _name_candidates(owner: str):
@@ -80,28 +90,45 @@ def _name_candidates(owner: str):
         yield (toks[-1], toks[0])    # FIRST [MIDDLE] LAST
 
 
+def _set_phone(li, ph, match):
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    li.raw["owner_phone"] = {
+        "phone": f"({ph[0:3]}) {ph[3:6]}-{ph[6:]}",
+        "source": "ncsbe_voter", "line_type": "unknown",
+        "needs_dnc_scrub": True, "match": match,
+    }
+
+
 def enrich_voter_phone(listings) -> dict:
-    global _INDEX
+    global _INDEX, _NAME_COUNTY
     if _INDEX is None:
-        _INDEX = _build_index()
-    stats = {"index_size": len(_INDEX), "nc_targets": 0, "matched": 0}
+        _INDEX, _NAME_COUNTY = _build_index()
+    stats = {"index_size": len(_INDEX), "nc_targets": 0, "matched_addr": 0, "matched_namecty": 0}
     for li in listings:
-        if li.state != "NC" or not li.owner_name or not li.street_address:
-            continue
-        sk = _street_key(li.street_address)
-        if not sk:
+        if li.state != "NC" or not li.owner_name:
             continue
         stats["nc_targets"] += 1
-        for last, first in _name_candidates(li.owner_name):
-            ph = _INDEX.get((last, first, sk[0], sk[1]))
-            if ph:
-                if not isinstance(li.raw, dict):
-                    li.raw = {}
-                li.raw["owner_phone"] = {
-                    "phone": f"({ph[0:3]}) {ph[3:6]}-{ph[6:]}",
-                    "source": "ncsbe_voter", "line_type": "unknown",
-                    "needs_dnc_scrub": True, "match": "name+address",
-                }
-                stats["matched"] += 1
-                break
+        cands = list(_name_candidates(li.owner_name))
+        # 1) high-confidence name + property address (owner-occupants)
+        sk = _street_key(li.street_address) if li.street_address else None
+        hit = False
+        if sk:
+            for last, first in cands:
+                ph = _INDEX.get((last, first, sk[0], sk[1]))
+                if ph:
+                    _set_phone(li, ph, "name+address")
+                    stats["matched_addr"] += 1
+                    hit = True
+                    break
+        # 2) fallback: name unique within the county (catches absentee owners)
+        if not hit and li.county:
+            cty = li.county.upper().replace(" COUNTY", "").strip()
+            for last, first in cands:
+                ph = _NAME_COUNTY.get((cty, last, first))
+                if ph:
+                    _set_phone(li, ph, "name+county-unique")
+                    stats["matched_namecty"] += 1
+                    break
+    stats["matched"] = stats["matched_addr"] + stats["matched_namecty"]
     return stats
