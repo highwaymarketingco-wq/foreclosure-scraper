@@ -61,3 +61,4 @@ logs/
 # Outreach generated state (local operator data)
 docs/crm.json
 docs/outreach_maillist.csv
+data/ncvoter/
