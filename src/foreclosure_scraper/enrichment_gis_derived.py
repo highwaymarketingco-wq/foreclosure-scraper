@@ -80,6 +80,38 @@ _TAX_FIELDS: dict[str, dict[str, str]] = {
 _MAX_SALE = 100_000_000.0
 _MIN_ARMS_LENGTH = 1000.0   # screen $1 / $10 quitclaim & estate deeds
 
+# Generic sale field-name fallback for counties not in _SALE_FIELDS (price tuple, date tuple).
+_GEN_SALE_PRICE = ("SALE_PRICE", "SALEPRICE", "SALE_AMT", "SALEAMT", "SaleAmount", "SALE_AMOUNT",
+                   "TOTSALEPRICE", "PKG_SALE_PRICE", "LASTSALEAMT", "SLPRICE", "SALEP", "PRICE",
+                   "DEED_PRICE", "CONSIDERATION", "SALEPRICE1", "LASTSALE")
+_GEN_SALE_DATE = ("SALE_DATE", "SALEDATE", "SaleDate", "DEED_DATE", "DEEDDATE", "RECORDED_D",
+                  "SALEDT", "TransferDa", "LASTSALEDATE", "DEEDDT", "SALE_DT", "REC_DATE", "DOS")
+# Owner-occupancy: SC assessment ratio (4% = legal residence / owner-occupied; 6% = other) +
+# homestead/legal-residence exemption text (NC + SC).
+_RATIO_FIELDS = ("RATIO", "ASMT_RATIO", "ASSESSMENT_RATIO", "ASSESS_RT", "TAXRATIO", "ASSMT_RAT",
+                 "ASSESSRAT", "RATIO_CD", "RATIOCODE", "ASSESSMENTRATIO", "ASR", "ASMTRATIO")
+_EXEMPT_FIELDS = ("EXEMPTION", "EXEMPT_DESC", "EXEMPTION_DESC", "EXEMPTIONS", "HOMESTEAD",
+                  "LEGAL_RES", "LEGALRES", "RESIDENCE", "EXEMPT_CD", "EXEMPTCODE")
+
+
+def _derive_owner_occupied(attrs: dict) -> Optional[bool]:
+    """SC 4% assessment ratio => owner-occupied legal residence; 6% => not. Plus homestead/
+    legal-residence exemption text. Returns None when no usable signal."""
+    for f in _RATIO_FIELDS:
+        v = _ci_get(attrs, f)
+        if v is None or v == "":
+            continue
+        s = str(v).strip().upper().replace("%", "")
+        if s in ("4", "4.0", "0.04", ".04") or "LEGAL RES" in s or "OWNER OCC" in s or s == "OO":
+            return True
+        if s in ("6", "6.0", "0.06", ".06", "0") or "OTHER" in s or "NON" in s:
+            return False
+    for f in _EXEMPT_FIELDS:
+        v = _ci_get(attrs, f)
+        if v and any(t in str(v).upper() for t in ("HOMESTEAD", "LEGAL RES", "OWNER OCC")):
+            return True
+    return None
+
 
 def _ci_get(attrs: dict[str, Any], key: Optional[str]) -> Any:
     """Case-insensitive attribute lookup (SCDOT field casing is inconsistent)."""
@@ -133,7 +165,28 @@ def _derive_last_sale(county: str, attrs: dict[str, Any]) -> Optional[dict]:
     """
     cfg = _SALE_FIELDS.get(county)
     if not cfg:
-        return None
+        # Generic fallback: try common ArcGIS sale field names so UNLISTED counties
+        # (Oconee, Georgetown, NC) still light up a last_sale + deed-age.
+        g_amt = None
+        for pf in _GEN_SALE_PRICE:
+            v = _num(_ci_get(attrs, pf))
+            if v is not None and _MIN_ARMS_LENGTH <= v <= _MAX_SALE:
+                g_amt = round(v, 2)
+                break
+        g_dt = None
+        for df in _GEN_SALE_DATE:
+            d = _as_date(_ci_get(attrs, df))
+            if isinstance(d, date) and 1900 <= d.year <= date.today().year:
+                g_dt = d
+                break
+        if g_amt is None and g_dt is None:
+            return None
+        out: dict[str, Any] = {"source": "gis_derived:generic"}
+        if g_amt is not None:
+            out["amount"] = g_amt
+        if isinstance(g_dt, date):
+            out["date"] = g_dt.isoformat()
+        return out
 
     # Arms-length gate (Laurens True_Sale = 'N' means NOT a market sale).
     gate = cfg.get("gate")
@@ -238,6 +291,13 @@ def enrich_gis_derived(listings: list[Listing]) -> dict:
                     if 0 <= age <= 200 and "deed_age" not in gis:
                         gis["deed_age"] = {"years": age, "last_transfer": d.isoformat()}
                         stats["deed_age"] += 1
+
+        # --- Owner-occupancy from assessment ratio / homestead exemption (net-new) ---
+        if "owner_occupied" not in gis:
+            oo = _derive_owner_occupied(attrs)
+            if oo is not None:
+                gis["owner_occupied"] = oo
+                stats["owner_occupied"] = stats.get("owner_occupied", 0) + 1
 
         # --- Tax-delinquency runway (Greenville) — missing-only ---
         if not isinstance(raw.get("tax_status"), dict):
