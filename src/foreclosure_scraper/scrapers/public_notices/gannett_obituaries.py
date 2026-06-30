@@ -1,19 +1,22 @@
-"""Upstate-SC obituaries (Gannett papers) — pre-probate heir leads.
+"""Gannett obituaries (W-NC + Upstate-SC) — pre-probate heir leads.
 
 A property owner's DEATH is the earliest motivated-seller signal in the estate
 funnel: it surfaces weeks before a probate creditor-notice publishes, and it also
-catches estates that never formally probate. The Gannett Upstate papers publish
-their daily obituaries as plain server-rendered HTML (the Tukios platform), one
-``/obituaries/<decedent-name-slug>`` link per death — free, no login, no WAF:
+catches estates that never formally probate. The Gannett (USA Today network) local
+papers across the core footprint publish their daily obituaries as plain server-
+rendered HTML (the Tukios platform), one ``/obituaries/<decedent-name-slug>`` link
+per death — free, no login, no WAF:
 
-    goupstate.com         -> Spartanburg County
-    greenvilleonline.com  -> Greenville County
-    independentmail.com   -> Anderson County
+  Western NC : citizen-times.com=Buncombe (Asheville), blueridgenow.com=Henderson,
+               gastongazette.com=Gaston, shelbystar.com=Cleveland,
+               thedigitalcourier.com=Rutherford
+  Upstate SC : goupstate.com=Spartanburg, greenvilleonline.com=Greenville,
+               independentmail.com=Anderson
 
-We emit one name-only lead per decedent (slug -> name). The name->property resolver
-then pins the decedent's parcel via the county GIS owner-name index (exactly like
-the Spartan Weekly probate notices); decedents who owned property in-county become
-real heir/estate leads, the rest stay unresolved name-only and carry no value.
+One name-only lead per decedent (slug -> name). The name->property resolver then
+pins the decedent's parcel via the county GIS owner-name index (same path as the
+Spartan Weekly probate notices); decedents who owned property in-county become real
+heir/estate leads, the rest stay unresolved name-only and carry no value.
 
 Free, public, plain-HTTP. Gate off with FORECLOSURE_OBITUARIES=0.
 """
@@ -32,11 +35,16 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
-# Gannett Upstate-SC papers -> the county each one covers.
+# Gannett local paper host -> (county, state) it covers, across the core footprint.
 PAPERS = {
-    "goupstate.com": "Spartanburg",
-    "greenvilleonline.com": "Greenville",
-    "independentmail.com": "Anderson",
+    "citizen-times.com": ("Buncombe", "NC"),
+    "blueridgenow.com": ("Henderson", "NC"),
+    "gastongazette.com": ("Gaston", "NC"),
+    "shelbystar.com": ("Cleveland", "NC"),
+    "thedigitalcourier.com": ("Rutherford", "NC"),
+    "goupstate.com": ("Spartanburg", "SC"),
+    "greenvilleonline.com": ("Greenville", "SC"),
+    "independentmail.com": ("Anderson", "SC"),
 }
 
 _SLUG_RE = re.compile(r'/obituaries/([a-z][a-z0-9]+-[a-z0-9-]{2,40})(?=["/?])')
@@ -46,8 +54,12 @@ _SUFFIX = {"jr": "Jr.", "sr": "Sr.", "ii": "II", "iii": "III", "iv": "IV"}
 
 
 def _name_from_slug(slug: str) -> str:
+    parts = slug.split("-")
+    # drop trailing numeric disambiguators the platform appends: sara-moore-2026-1
+    while parts and parts[-1].isdigit():
+        parts.pop()
     out = []
-    for p in slug.split("-"):
+    for p in parts:
         if p in _SUFFIX:
             out.append(_SUFFIX[p])
         elif len(p) == 1:
@@ -57,11 +69,11 @@ def _name_from_slug(slug: str) -> str:
     return " ".join(out)
 
 
-class UpstateObituaries(BaseScraper):
-    slug = "counties_sc.upstate_obituaries"
-    name = "Upstate SC Obituaries (Gannett — Spartanburg/Greenville/Anderson)"
+class GannettObituaries(BaseScraper):
+    slug = "public_notices.gannett_obituaries"
+    name = "Gannett Obituaries (W-NC + Upstate-SC — pre-probate heir leads)"
     category = "motivated_seller"
-    timeout_s = 90.0
+    timeout_s = 120.0
     expected_min_count = 0  # captcha/markup drift -> empty, not REGRESSED
 
     async def fetch(self) -> Iterable[Listing]:
@@ -70,7 +82,7 @@ class UpstateObituaries(BaseScraper):
         out: list[Listing] = []
         now = datetime.utcnow()
         async with client(timeout=30.0) as c:
-            for host, county in PAPERS.items():
+            for host, (county, state) in PAPERS.items():
                 try:
                     r = await c.get(f"https://www.{host}/obituaries/")
                     if r.status_code != 200:
@@ -94,14 +106,14 @@ class UpstateObituaries(BaseScraper):
                         source_url=f"https://www.{host}/obituaries/{slug}",
                         listing_type=ListingType.PROBATE_NOTICE,
                         property_kind=PropertyKind.UNKNOWN,
-                        state="SC", county=county,
-                        defendant=name,  # decedent -> resolver pins the parcel by owner-name
-                        description=f"Obituary (death) — {name}, {county} County SC "
+                        state=state, county=county,
+                        defendant=name,  # decedent -> resolver pins parcel by owner-name
+                        description=f"Obituary (death) — {name}, {county} County {state} "
                                     f"— pre-probate heir/estate signal",
                         first_seen=now, last_seen=now,
                         raw={
                             "obituary": {"decedent": name, "slug": slug,
-                                         "paper": host, "county": county},
+                                         "paper": host, "county": county, "state": state},
                             "life_event": "death",
                             "relationship_signal": {"kind": "probate",
                                                     "keyword": "obituary"},
