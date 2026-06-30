@@ -37,6 +37,13 @@
     <button id="ds-foreclosure" class="ds-btn active" data-ds="foreclosure">Foreclosures <span class="ds-count" id="ds-fc-count">—</span></button>
     <button id="ds-multifamily" class="ds-btn" data-ds="multifamily">Multifamily <span class="ds-count" id="ds-mf-count">—</span></button>
   </div>
+  <div class="stage-toggle" id="stage-toggle" title="Work these tracks differently: foreclosure leads are time-sensitive (act before the sale); outbound leads are cold prospects to mail/call.">
+    <button class="ds-btn stage-btn active" data-stage="">All <span class="ds-count stage-count" data-c="">—</span></button>
+    <button class="ds-btn stage-btn" data-stage="foreclosure">🔥 In Foreclosure <span class="ds-count stage-count" data-c="foreclosure">—</span></button>
+    <button class="ds-btn stage-btn" data-stage="prefore">⏳ Pre-Foreclosure <span class="ds-count stage-count" data-c="prefore">—</span></button>
+    <button class="ds-btn stage-btn" data-stage="outbound">📬 Outbound <span class="ds-count stage-count" data-c="outbound">—</span></button>
+    <button class="ds-btn stage-btn" data-stage="reo">🏦 REO/Auction <span class="ds-count stage-count" data-c="reo">—</span></button>
+  </div>
   <div class="brand-meta">
     <span class="badge" id="total-badge">— total</span>
     <span class="badge" id="active-badge">— active</span>

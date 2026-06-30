@@ -212,6 +212,19 @@ function initFilters() {
     }),
   );
 
+  // Stage toggle — split the board into workflow tracks (foreclosure timeline vs
+  // outbound prospecting vs REO). Counts are total-per-stage (independent of the
+  // other filters) so you can see the size of each track at a glance.
+  document.querySelectorAll(".stage-btn").forEach((btn) =>
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".stage-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      STAGE = btn.dataset.stage || "";
+      applyFilters();
+    }),
+  );
+  updateStageCounts();
+
   $("export-csv").addEventListener("click", exportCsv);
   $("close-detail").addEventListener("click", () => $("detail-panel").classList.add("hidden"));
 }
@@ -244,6 +257,37 @@ function getSortValue(l, k) {
   return l[k];
 }
 
+// ---- Stage classification: which workflow track a lead is in --------------
+// You work these lists differently: foreclosure leads are time-sensitive (act
+// before the sale), outbound leads are cold prospects you mail/call. Derived
+// client-side from listing_type + sale_date + source — no board field needed.
+const STAGE_REO = /hud_homestore|fannie|freddie|homepath|homesteps|hubzu|xome|auction_dot_com|bid4assets|servicelink|gsa_real|usda_rd|treasury_seized|vrm_va|first_citizens|reo\.|foreclosure_dot_com/;
+const STAGE_PREFORE = /substitute_trustee|nod_discovery|lis_pendens|rod_acclaim|rod_cott|rod_logan|nc_rod|sc_rod/;
+let STAGE = "";
+
+function stageOf(l) {
+  const t = (l.listing_type || "").toLowerCase();
+  const src = (l.source || "").toLowerCase();
+  if (STAGE_REO.test(src) || t === "reo" || t === "auction") return "reo";
+  const sd = l.sale_date ? Date.parse(l.sale_date) : NaN;
+  const hasSale = !isNaN(sd) && sd >= Date.now() - 14 * 86400000; // sale ~2wk-ago..future
+  if (hasSale || t === "foreclosure_sale" || (l.raw && l.raw.upset_bid)) return "foreclosure";
+  if (t === "lis_pendens" || t === "bankruptcy" || STAGE_PREFORE.test(src)) return "prefore";
+  return "outbound"; // probate/obituary/elderly/divorce/tax-delinquent/vacant/distressed
+}
+
+function updateStageCounts() {
+  const c = { "": 0, foreclosure: 0, prefore: 0, outbound: 0, reo: 0 };
+  LISTINGS.forEach((l) => {
+    if (l.raw && l.raw.sold_confirmed) return;
+    c[""]++;
+    c[stageOf(l)]++;
+  });
+  document.querySelectorAll(".stage-count").forEach((el) => {
+    el.textContent = (c[el.dataset.c] || 0).toLocaleString();
+  });
+}
+
 function applyFilters() {
   const q = $("search").value.toLowerCase();
   const st = $("filter-state").value;
@@ -263,6 +307,7 @@ function applyFilters() {
   filtered = LISTINGS.filter((l) => {
     // Court-confirmed sales already sold at auction — not opportunities. Hide.
     if (l.raw && l.raw.sold_confirmed) return false;
+    if (STAGE && stageOf(l) !== STAGE) return false;
     if (st && l.state !== st) return false;
     if (co && `${l.county || ""}, ${l.state || "?"}` !== co) return false;
     if (ty && l.listing_type !== ty) return false;
