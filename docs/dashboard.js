@@ -1107,26 +1107,53 @@ function openDetail(l) {
 // ------------- CSV export -----------------------------------------------------
 function exportCsv() {
   const cols = [
-    "grade_overall", "grade_financial", "grade_property", "grade_location", "grade_risk",
-    "sale_date", "state", "county", "street_address", "city", "zip_code", "listing_type",
+    // Contact-forward: this export should drive mail-merge + CRM in one shot.
+    "grade_overall", "distress_tier", "distress_score", "contactable",
+    "owner_name", "owner_mailing", "mail_state", "absentee", "out_of_state",
+    "owner_phone", "phone_source", "phone_needs_dnc",
+    "rod_mortgage", "rod_adverse", "equity_band", "senior_debt_risk",
+    "sale_date", "days_to_auction", "stale_case", "geo_quality",
+    "state", "county", "street_address", "city", "zip_code", "listing_type",
     "opening_bid", "arv_expected", "rehab_expected", "max_bid_70", "roi_pct", "cash_on_cash_pct",
     "bedrooms", "bathrooms", "living_sqft", "year_built", "acreage", "zoning",
     "case_number", "plaintiff", "defendant", "trustee", "source", "source_url",
     // 2026-06-19: data-quality caveats so the export never presents a placeholder
     // address or proxy ARV as a verified value (the "nothing made up" rule).
     "address_quality", "arv_confidence", "data_quality_note",
+    "truepeoplesearch_url",
   ];
   const rows = [cols.join(",")];
   filtered.forEach((l) => {
     const g = getGrade(l) || {};
     const c = getCalc(l) || {};
-    const dq = (l.raw && l.raw.data_quality) || {};
+    const r = l.raw || {};
+    const dq = r.data_quality || {};
     const dqf = Array.isArray(dq.flags) ? dq.flags : [];
+    const om = r.owner_mailing || {};
+    const op = r.owner_phone || {};
+    const ds = r.distress_stack || {};
+    const rod = r.rod || {};
+    const dta = l.sale_date ? Math.round((new Date(l.sale_date) - new Date()) / 86400000) : "";
+    const tps = l.owner_name
+      ? `https://www.truepeoplesearch.com/results?name=${encodeURIComponent(l.owner_name)}&citystatezip=${encodeURIComponent(((l.city || "") + " " + (l.state || "")).trim())}`
+      : "";
     const row = {
       grade_overall: g.overall, grade_financial: g.financial, grade_property: g.property,
       grade_location: g.location, grade_risk: g.risk,
       arv_expected: c.arv_expected, rehab_expected: c.rehab_expected,
       max_bid_70: c.max_bid_70, roi_pct: c.roi_pct, cash_on_cash_pct: c.cash_on_cash_pct,
+      // contact + signal block
+      distress_tier: ds.tier || "", distress_score: ds.score != null ? ds.score : "",
+      contactable: ds.contactable ? "yes" : "",
+      owner_name: l.owner_name || "", owner_mailing: om.mailing || "", mail_state: om.mail_state || "",
+      absentee: om.absentee ? "yes" : "", out_of_state: om.out_of_state ? "yes" : "",
+      owner_phone: op.phone || "", phone_source: op.source || "",
+      phone_needs_dnc: op.needs_dnc_scrub ? "yes" : "",
+      rod_mortgage: rod.has_mortgage ? "yes" : "", rod_adverse: rod.has_adverse_lien ? "yes" : "",
+      equity_band: ds.equity_band || "", senior_debt_risk: ds.surviving_senior_debt_risk ? "yes" : "",
+      days_to_auction: dta, stale_case: r.stale_case ? "yes" : "",
+      geo_quality: r.geo_imprecise || "verified",
+      truepeoplesearch_url: tps,
       address_quality: dqf.includes("synthetic_address") ? "placeholder"
                        : dqf.includes("approximate_address") ? "approximate" : "verified",
       arv_confidence: c.arv_confidence || "",
