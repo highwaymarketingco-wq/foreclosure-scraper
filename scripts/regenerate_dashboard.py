@@ -199,6 +199,13 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         print("enrich_aumentum_rod: ERROR", str(e)[:80])
 
+    # Spartanburg SC ROD (render-based, HOT/WARM-first capped) — biggest SC county.
+    try:
+        from foreclosure_scraper.enrichment_spartanburg_rod import enrich_spartanburg_rod
+        print("enrich_spartanburg_rod:", asyncio.run(enrich_spartanburg_rod(listings)))
+    except Exception as e:  # noqa: BLE001
+        print("enrich_spartanburg_rod: ERROR", str(e)[:80])
+
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:
         from foreclosure_scraper.enrichment_life_events import enrich_life_events

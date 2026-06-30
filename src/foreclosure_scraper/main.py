@@ -1589,6 +1589,15 @@ async def run() -> int:
     except Exception:
         log.error("aumentum_rod.failed", traceback=traceback.format_exc())
 
+    # Spartanburg SC ROD lien-existence (render-based Logan/DataTables, HOT/WARM-first capped —
+    # biggest SC county, 0% otherwise; ~25s/owner so bounded per run + idempotent across runs).
+    try:
+        from .enrichment_spartanburg_rod import enrich_spartanburg_rod
+        s = await enrich_spartanburg_rod(enriched)
+        if s and "skipped" not in s: enrichment_stats["spartanburg_rod"] = s
+    except Exception:
+        log.error("spartanburg_rod.failed", traceback=traceback.format_exc())
+
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:
         from .enrichment_life_events import enrich_life_events
