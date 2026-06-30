@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-06-30T15:42:38.055876Z",
+  "run_time": "2026-06-30T15:53:55.207233Z",
   "total": 3583,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "dedupe cleanup + SC divorce"
+  "notes": "ARV floor recompute"
 }
