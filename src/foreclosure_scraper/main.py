@@ -856,6 +856,16 @@ async def run() -> int:
     except Exception:
         log.error("gis_attrs.failed", traceback=traceback.format_exc())
 
+    # Mine raw['gis_attrs_full'] for last-sale (amount/date/book/page) + deed-age +
+    # owner-occupancy. Runs RIGHT AFTER gis_attrs (bag in memory) and BEFORE equity so
+    # the recorded sale price feeds the last-sale-amortized payoff instead of opening-bid.
+    try:
+        from .enrichment_gis_derived import enrich_gis_derived
+        s = enrich_gis_derived(enriched)
+        if s: enrichment_stats["gis_derived"] = s
+    except Exception:
+        log.error("gis_derived.failed", traceback=traceback.format_exc())
+
     # Situs-address writer — for leads still missing a street_address but holding a
     # parcel_id/lat-lng, write the property situs (PHYSSTRADD/SITE_ADDR/...) from the
     # GIS feature (reuses raw['gis_attrs_full'] where present). Runs AFTER gis_attrs
@@ -1756,6 +1766,15 @@ async def run() -> int:
     except Exception:
         log.error("distress_score.failed", traceback=traceback.format_exc())
 
+    # Derived investor signals (LTV, ppsf-vs-comp, equity band, etc.) — consumes equity +
+    # GIS value + distress, so runs LAST among the signal enrichers.
+    try:
+        from .enrichment_derived_signals import enrich_derived_signals
+        s = enrich_derived_signals(enriched)
+        if s: enrichment_stats["derived_signals"] = s
+    except Exception:
+        log.error("derived_signals.failed", traceback=traceback.format_exc())
+
     # RentCast AVM cross-check on top-N listings (authoritative AVM + comparables).
     # Only fires when RENTCAST_API_KEY is set.
     # Free tier (50 calls/mo) → 25 listings × 2 calls each.
@@ -1842,6 +1861,15 @@ async def run() -> int:
         new_stats = mark_new_listings(enriched)
     except Exception:
         log.error("new_listings.failed", traceback=traceback.format_exc())
+
+    # Drop sold/removed snapshot-REO (Fannie) whose per-property SPA URL 404s once it
+    # leaves inventory — stale carryover. Fail-safe (keeps list on error).
+    try:
+        from .enrichment_reo_freshness import prune_stale_reo
+        enriched, _reo_stats = await prune_stale_reo(enriched)
+        if _reo_stats: enrichment_stats["reo_freshness"] = _reo_stats
+    except Exception:
+        log.error("reo_freshness.failed", traceback=traceback.format_exc())
 
     # Data-quality corrections — LAST, after tiers/scoring: bbox/centroid geo guards,
     # auction_status normalization, presumed-withdrawn stale-case flag + HOT down-rank.
