@@ -384,9 +384,40 @@ def _looks_like_mailing(s: Optional[str]) -> bool:
             or " C/O " in t)
 
 
+# Some county GIS layers split the situs into a street-number column and a
+# street-name column instead of one address field (e.g. Charleston SCDOT:
+# PROP_ST_NO + PROP_ST_NA). The single-field detector misses those, so we
+# synthesize the combined situs when BOTH parts are present.
+_SPLIT_SITUS_PAIRS = (
+    ("PROP_ST_NO", "PROP_ST_NA"),
+    ("ST_NO", "ST_NAME"),
+    ("SITUS_NO", "SITUS_STREET"),
+    ("HOUSE_NO", "STREET_NAME"),
+    ("ADDR_NO", "ADDR_ST"),
+)
+
+
+def _synth_split_situs(attrs: dict[str, Any]) -> Optional[str]:
+    lower = {k.lower(): v for k, v in attrs.items()}
+    blank = (None, "", " ", 0, "0", "<Null>")
+    for num_f, name_f in _SPLIT_SITUS_PAIRS:
+        num, nam = lower.get(num_f.lower()), lower.get(name_f.lower())
+        ns = "" if num in blank else str(num).strip()
+        nas = "" if nam in blank else str(nam).strip()
+        if ns and nas:  # need both number and name for a usable full situs
+            return f"{ns} {nas}"
+    return None
+
+
 def _inject_site_alias(attrs: dict[str, Any], site_field: Optional[str]) -> None:
     """If the detected situs field isn't one _populate_from_attrs knows, copy
     its value into a recognized alias key so the standard writer picks it up."""
+    # Prefer a synthesized split-situs (number + name) — strictly better than a
+    # street-name-only single field on layers that split the address.
+    split = _synth_split_situs(attrs)
+    if split:
+        attrs["SITUS_ADDR"] = split
+        return
     if not site_field:
         return
     # Already covered by an alias?

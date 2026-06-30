@@ -765,6 +765,19 @@ async def run() -> int:
     # (mailing address for absentee, ARV−payoff−liens for equity) instead of the
     # empty fields present here. See the compute_flags call after the equity engine.
 
+    # HUD REAC address backfill — the multifamily REAC-inspection leads carry only
+    # a complex NAME + REMS id (no street). Join the REMS id to HUD's public
+    # Multifamily-Assisted layer to fill a real street_address + lat/lng (~82% hit),
+    # which then flows through geocode/parcel_from_geo/GIS/comps like any address.
+    # Runs BEFORE geocode + parcel_from_geo so the filled geo unlocks the GIS chain.
+    try:
+        from .enrichment_hud_reac_address import enrich_hud_reac_address
+        s = await enrich_hud_reac_address(enriched)
+        if s:
+            enrichment_stats["hud_reac_address"] = s
+    except Exception:
+        log.error("hud_reac_address.failed", traceback=traceback.format_exc())
+
     # Geocoding fallback — fills lat/lng for any listing the county GIS didn't
     # return geometry for. Rate-limited per Nominatim's policy.
     try:
@@ -1653,6 +1666,57 @@ async def run() -> int:
         if s: enrichment_stats["name_resolve"] = s
     except Exception:
         log.error("name_resolve.failed", traceback=traceback.format_exc())
+
+    # SAME-RUN catch-up for freshly-resolved leads. The resolver (above) just gave
+    # a name-only court/probate lead its address+parcel — but the address-gated deep
+    # enrichers (recorded comps, assessor comps, HomeHarvest comps, photos, Vision)
+    # all ran hundreds of lines earlier and never saw it. Without this, a just-
+    # resolved lead would wait a full weekly cycle for comps/condition. Re-run those
+    # enrichers on ONLY the newly-resolved subset (small + idempotent) so the
+    # valuation/grade pass below scores them on real comps + photo condition THIS run.
+    # The _resolved_deep_enriched flag (persisted via RAW_KEEP) stops re-sweeping
+    # leads a later full run already covered through the global enricher passes.
+    try:
+        reenrich = [
+            li for li in enriched
+            if isinstance(li.raw, dict)
+            and (li.raw.get("resolved_from_name") or {}).get("confidence") == "unique_match"
+            and (li.street_address or li.parcel_id)
+            and not li.raw.get("_resolved_deep_enriched")
+        ]
+        if reenrich:
+            log.info("resolved_catchup.start", count=len(reenrich))
+            from .enrichment_recorded_comps import enrich as _rc_enrich
+            from .enrichment_assessor_comps import enrich_assessor_comps as _ac_enrich
+            from .enrichment_comps import enrich_with_comps as _hc_enrich
+            from .enrichment_photos import enrich_with_address_photos as _ph_enrich
+            from .enrichment_images import enrich_with_images as _img_enrich
+            from .enrichment_vision import enrich_with_vision as _vis_enrich
+            for _fn, _is_async in ((_rc_enrich, True), (_ac_enrich, False),
+                                   (_hc_enrich, True), (_ph_enrich, True),
+                                   (_img_enrich, True)):
+                try:
+                    _r = _fn(reenrich)
+                    if _is_async:
+                        await _r
+                except Exception:
+                    log.error("resolved_catchup.enricher_failed",
+                              fn=getattr(_fn, "__name__", "?"),
+                              traceback=traceback.format_exc())
+            # Vision is API-metered — cap + time-box exactly like the main pass.
+            try:
+                _vcap = int(os.environ.get("VISION_MAX_LISTINGS", "600"))
+                await asyncio.wait_for(
+                    _vis_enrich(reenrich, max_listings=_vcap), timeout=300.0)
+            except Exception:
+                log.error("resolved_catchup.vision_failed",
+                          traceback=traceback.format_exc())
+            for li in reenrich:
+                li.raw["_resolved_deep_enriched"] = True
+            enrichment_stats["resolved_catchup"] = {"count": len(reenrich)}
+            log.info("resolved_catchup.done", count=len(reenrich))
+    except Exception:
+        log.error("resolved_catchup.failed", traceback=traceback.format_exc())
 
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:

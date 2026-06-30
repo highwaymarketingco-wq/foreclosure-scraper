@@ -115,7 +115,10 @@ def test_source_url_resolves_to_vendor_search_page():
         grantor="Smith",
     )
     li = _doc_to_listing(doc, vendor_label="aumentum")
-    assert "registerofdeeds.buncombecounty.org" in li.source_url
+    # Buncombe's official ROD search portal (current host; the old .org vendor
+    # domain was retired). source_url must land on the searchable record page.
+    assert "registerofdeeds.buncombenc.gov" in li.source_url
+    assert li.source_url.lower().endswith(".aspx")
 
 
 def test_doc_listing_type_is_lis_pendens():

@@ -275,8 +275,25 @@ def _county_clean(li: Listing) -> str:
 
 
 def _in_core(li: Listing) -> bool:
-    cty = _county_clean(li)
-    return (li.state == "NC" and cty in _CORE_NC) or (li.state == "SC" and cty in _CORE_SC)
+    # Resolvable = the county has a wired GIS owner-search endpoint. This now
+    # covers coastal NC/SC (Charleston, Georgetown, Horry, Beaufort, Brunswick,
+    # New Hanover, Pender, Onslow, Carteret, ...) which are real targets, not the
+    # old inland-only _CORE_* sets. Unwired counties fall out via _endpoint_for.
+    return _endpoint_for(li) is not None
+
+
+# Government/agency parties that show up as the plaintiff on tax-foreclosure
+# notices — never a resolvable property owner, so skip them entirely.
+_GOV_PREFIXES = (
+    "COUNTY OF ", "CITY OF ", "TOWN OF ", "STATE OF ", "DEPARTMENT OF ",
+    "DEPT OF ", "US ", "UNITED STATES", "INTERNAL REVENUE", "SC DEPARTMENT",
+    "NC DEPARTMENT",
+)
+
+
+def _is_gov_entity(name: str) -> bool:
+    u = name.upper().strip()
+    return any(u.startswith(p) for p in _GOV_PREFIXES)
 
 
 def _lead_name(li: Listing) -> Optional[str]:
@@ -284,7 +301,7 @@ def _lead_name(li: Listing) -> Optional[str]:
     fall back to defendant (court party)."""
     for cand in (li.owner_name, li.defendant):
         s = (cand or "").strip()
-        if len(s) >= 4 and not s.replace(" ", "").isdigit():
+        if len(s) >= 4 and not s.replace(" ", "").isdigit() and not _is_gov_entity(s):
             return s
     return None
 
@@ -392,6 +409,15 @@ async def enrich_resolve_name_to_property(
             if not patterns:
                 continue
 
+            # Re-check the budget HERE, not just at task entry: gather() dispatches
+            # every target at once, so without this a long queue of coastal leads
+            # serialized behind the shared SCDOT host-throttle would all sail past
+            # the entry check and run for far longer than _BUDGET_S.
+            if time.monotonic() - t0 > _BUDGET_S:
+                stop.set()
+                stats["budget_hit"] = 1
+                return
+
             async with sem:
                 stats["attempted"] += 1
                 rows = await _query_owner(c, base, owner_field, patterns)
@@ -460,7 +486,18 @@ async def enrich_resolve_name_to_property(
                                                  "confidence": "no_match"})
 
     async with client(timeout=25.0) as c:
-        await asyncio.gather(*(one(c, li) for li in targets))
+        # Hard wall-clock backstop around the whole fan-out. The per-call budget
+        # check above stops NEW queries; this guarantees the pass returns even if
+        # in-flight requests stall, so the caller always gets to write the board.
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*(one(c, li) for li in targets)),
+                timeout=_BUDGET_S + 30.0,
+            )
+        except asyncio.TimeoutError:
+            stats["budget_hit"] = 1
+            log.warning("name_resolve.hard_timeout",
+                        elapsed_s=round(time.monotonic() - t0))
 
     log.info("name_resolve.done", **stats)
     return stats

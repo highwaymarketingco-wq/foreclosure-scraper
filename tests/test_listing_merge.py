@@ -127,21 +127,26 @@ def test_merge_records_secondary_source_slug():
             source_url="https://ecourts.nc.gov/2")
     merged = a.merge(b)
     assert merged.source == "law_firms.brock_scott"
+    # also_seen_in keeps BOTH the secondary source slug AND its link (so an
+    # investor can open the other portal too) — list of {source, url} dicts.
     also_seen = merged.raw.get("also_seen_in", [])
-    assert "counties_nc.nc_ecourts_lis_pendens" in also_seen
+    assert any(e["source"] == "counties_nc.nc_ecourts_lis_pendens" for e in also_seen)
+    assert any(e["url"] == "https://ecourts.nc.gov/2" for e in also_seen)
 
 
 def test_merge_preserves_already_seen_in():
     """Three-way merge: A merged with B (a+b), then merged with C
-    should retain attribution for all three sources."""
-    a = _li(source="src.a")
-    b = _li(source="src.b")
-    c = _li(source="src.c")
+    should retain attribution + link for all three sources."""
+    a = _li(source="src.a", source_url="https://a.example/1")
+    b = _li(source="src.b", source_url="https://b.example/2")
+    c = _li(source="src.c", source_url="https://c.example/3")
     ab = a.merge(b)
     abc = ab.merge(c)
     also_seen = abc.raw.get("also_seen_in", [])
-    assert "src.b" in also_seen
-    assert "src.c" in also_seen
+    seen_srcs = {e["source"] for e in also_seen}
+    seen_urls = {e["url"] for e in also_seen}
+    assert "src.b" in seen_srcs and "https://b.example/2" in seen_urls
+    assert "src.c" in seen_srcs and "https://c.example/3" in seen_urls
 
 
 def test_merge_does_not_duplicate_source_in_also_seen():
@@ -151,7 +156,8 @@ def test_merge_does_not_duplicate_source_in_also_seen():
     b = _li(source="src.a")
     merged = a.merge(b)
     also_seen = merged.raw.get("also_seen_in", [])
-    assert also_seen.count("src.a") == 0  # same as primary, not added
+    # same slug as the primary source -> never added to also_seen_in
+    assert sum(1 for e in also_seen if e["source"] == "src.a") == 0
 
 
 # ---- _deep_merge_dict directly ----
