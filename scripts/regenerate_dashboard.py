@@ -269,6 +269,16 @@ def main() -> int:
     listings = dedupe(listings)
     print(f"post-enrich dedupe: {_pre} -> {len(listings)} (collapsed {_pre - len(listings)})")
 
+    # Automated data-quality VERIFICATION (mirrors main.py) — flags dup-address,
+    # ARV-below-as-is, rehab-vs-condition, un-surfaced sale history, missing
+    # sqft/owner into raw['qa_flags']; prints the per-flag counts. Runs after the
+    # final dedupe so dup_address reflects the shipped board.
+    try:
+        from foreclosure_scraper.enrichment_board_qa import enrich_board_qa  # noqa: E402
+        print("enrich_board_qa:", enrich_board_qa(listings))
+    except Exception as e:  # noqa: BLE001
+        print("enrich_board_qa: ERROR", str(e)[:80])
+
     by_state = collections.Counter(li.state for li in listings if li.state)
     by_county = collections.Counter(f"{li.state}/{li.county}" for li in listings if li.county)
     by_source = collections.Counter(li.source for li in listings if li.source)

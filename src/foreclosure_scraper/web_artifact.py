@@ -122,6 +122,7 @@ RAW_KEEP = {
     "fhfa_value": "*",                # FHFA HPI-adjusted value estimate {value, source, ...}
     "title_risk": "*",                # title-defect / cloud-on-title risk assessment
     "zls": "*",                       # ZLS status field
+    "qa_flags": "*",                  # automated data-quality flags (dup_address, arv_below_asis, etc.)
 }
 
 

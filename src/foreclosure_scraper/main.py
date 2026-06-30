@@ -1936,6 +1936,21 @@ async def run() -> int:
     except Exception:
         log.error("board_quality.failed", traceback=traceback.format_exc())
 
+    # Automated data-quality VERIFICATION — flags the bugs the operator keeps
+    # catching by hand (cross-source dup address, ARV below as-is value, rehab
+    # tier vs condition contradiction, un-surfaced assessor sale history, missing
+    # sqft/owner) into raw['qa_flags'] and logs the per-flag counts. Pure-Python,
+    # runs LAST so it sees the fully-enriched/deduped board. These are regression
+    # tripwires: a non-zero arv_below_asis / dup_address means a prior fix broke.
+    try:
+        from .enrichment_board_qa import enrich_board_qa
+        qa = enrich_board_qa(enriched)
+        if qa:
+            enrichment_stats["board_qa"] = qa
+            log.info("orchestrator.board_qa", **qa)
+    except Exception:
+        log.error("board_qa.failed", traceback=traceback.format_exc())
+
     # Outreach stack — owner contact actions (letter/email/SMS), a postcard
     # mail-merge CSV, and persistent CRM status. Runs after skip-trace +
     # valuation so it has owner contact + deal numbers to work with.

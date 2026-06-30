@@ -155,3 +155,131 @@ def test_clean_listing_has_empty_flags():
     dq = li.raw["data_quality"]
     assert dq["flags"] == []
     assert dq["summary"] == "OK — no data-quality caveats."
+
+
+# =============================================================================
+# Regression locks for the bugs the operator kept catching BY HAND.
+# These pin recent fixes (cross-source dup-address collapse, the ARV floor) and
+# the automated board-QA verifier so they can't silently regress.
+# =============================================================================
+
+from foreclosure_scraper.dedupe import dedupe
+from foreclosure_scraper.valuation import calc as valuation_calc
+from foreclosure_scraper.enrichment_board_qa import enrich_board_qa
+
+
+def test_dedupe_collapses_same_address_across_sources():
+    """The '19 Gosnell Ave' cross-source duplicate class: the SAME street address
+    arriving from two sources (one copy jamming the city into the street field, no
+    shared parcel) must collapse to ONE row via the _canon_street signature."""
+    a = _li(
+        source="counties_sc.spartanburg_a", source_url="http://a",
+        listing_type=ListingType.FORECLOSURE_SALE,
+        street_address="19 Gosnell Avenue", county="Spartanburg", state="SC",
+        parcel_id="1-23-45-678.00",
+    )
+    b = _li(
+        source="counties_sc.spartanburg_b", source_url="http://b",
+        listing_type=ListingType.FORECLOSURE_SALE,
+        street_address="19 Gosnell Avenue Inman", county="Spartanburg", state="SC",
+        parcel_id=None,
+    )
+    out = dedupe([a, b])
+    assert len(out) == 1, f"expected 1 merged row, got {len(out)}"
+
+
+def test_arv_floored_at_market_value():
+    """The ARV floor: a comp-grounded ARV that lands BELOW the county market value
+    (after-repair value can't sit under the as-is value) must be raised to the
+    market value. Weak comps (~$60/sqft on a 1,000 sqft house ≈ $60k) against a
+    $315,000 county value -> ARV floored to ~$315k."""
+    li = _li(
+        source="counties_sc.x", source_url="http://x",
+        listing_type=ListingType.FORECLOSURE_SALE,
+        property_kind=PropertyKind.SINGLE_FAMILY,
+        street_address="123 Real St", living_sqft=1000.0, market_value=315000.0,
+        raw={
+            "comp_median_ppsf": 60.0,
+            "comps": [
+                {"price_per_sqft": 58.0, "sold_price": 58000, "geo_anchored": True},
+                {"price_per_sqft": 60.0, "sold_price": 60000, "geo_anchored": True},
+                {"price_per_sqft": 62.0, "sold_price": 62000, "geo_anchored": True},
+            ],
+        },
+    )
+    c = valuation_calc.compute(li)
+    assert c.arv_expected is not None
+    assert c.arv_expected >= 315000 * 0.99, (
+        f"ARV {c.arv_expected} should be floored to >= the $315k as-is value"
+    )
+
+
+def test_board_qa_flags_arv_below_asis():
+    """The board-QA verifier must CATCH an ARV that sits below the as-is value
+    (a regression tripwire for the floor) by writing 'arv_below_asis'."""
+    li = _li(
+        source="counties_sc.x", source_url="http://x",
+        listing_type=ListingType.FORECLOSURE_SALE,
+        street_address="123 Real St", market_value=315000.0,
+        raw={"calc": {"arv_expected": 264500.0}},
+    )
+    summary = enrich_board_qa([li])
+    assert "arv_below_asis" in li.raw["qa_flags"]
+    assert summary.get("arv_below_asis") == 1
+
+
+def test_board_qa_clean_case_no_arv_flag():
+    """A lead whose ARV is at/above the county value must NOT be flagged
+    arv_below_asis (and a fully-populated lead carries no qa_flags at all)."""
+    li = _li(
+        source="counties_sc.x", source_url="http://x",
+        listing_type=ListingType.FORECLOSURE_SALE,
+        street_address="123 Real St", market_value=315000.0,
+        owner_name="JANE DOE", living_sqft=1500.0,
+        raw={"calc": {"arv_expected": 330000.0, "rehab_tier": "light"},
+             "condition_tier": "cosmetic"},
+    )
+    summary = enrich_board_qa([li])
+    assert "arv_below_asis" not in li.raw.get("qa_flags", [])
+    assert summary.get("arv_below_asis", 0) == 0
+    # fully-populated single lead -> no qa_flags key written at all
+    assert "qa_flags" not in li.raw
+
+
+def test_board_qa_flags_rehab_vs_condition():
+    """Good condition (cosmetic) but a heavy rehab tier (gut) is a contradiction."""
+    li = _li(
+        source="counties_sc.x", source_url="http://x",
+        listing_type=ListingType.FORECLOSURE_SALE,
+        street_address="123 Real St", owner_name="JANE DOE", living_sqft=1500.0,
+        raw={"condition_tier": "cosmetic", "calc": {"rehab_tier": "gut"}},
+    )
+    enrich_board_qa([li])
+    assert "rehab_vs_condition" in li.raw["qa_flags"]
+
+
+def test_board_qa_flags_missing_last_sale():
+    """Assessor sale DATE present but the surfaced raw.last_sale empty -> flag it."""
+    li = _li(
+        source="counties_sc.x", source_url="http://x",
+        listing_type=ListingType.FORECLOSURE_SALE,
+        street_address="123 Real St", owner_name="JANE DOE", living_sqft=1500.0,
+        raw={"cama": {"last_sale_date": "20220818"}},
+    )
+    enrich_board_qa([li])
+    assert "missing_last_sale" in li.raw["qa_flags"]
+
+
+def test_board_qa_dup_address_counts_groups():
+    """dup_address is counted by GROUP (clusters), not by row."""
+    common = dict(
+        listing_type=ListingType.FORECLOSURE_SALE,
+        street_address="19 Gosnell Avenue", county="Spartanburg", state="SC",
+        owner_name="JANE DOE", living_sqft=1500.0,
+    )
+    a = _li(source="a", source_url="http://a", **common)
+    b = _li(source="b", source_url="http://b", **common)
+    summary = enrich_board_qa([a, b])
+    assert summary.get("dup_address") == 1
+    assert "dup_address" in a.raw["qa_flags"]
+    assert "dup_address" in b.raw["qa_flags"]
