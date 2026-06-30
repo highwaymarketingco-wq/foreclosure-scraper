@@ -12,11 +12,14 @@ from __future__ import annotations
 
 import os
 import re
+from datetime import datetime, timezone
 
 from .rod.logan_render import search_by_name_render
 
 _MORTGAGE = re.compile(r"DEED OF TRUST|MORTGAGE|\bMTG\b|SECURITY (DEED|AGREEMENT)|\bD\s*/?\s*T\b", re.I)
 _ADVERSE = re.compile(r"JUDG|\bLIEN\b|\bTAX\b|EXECUTION|FORECLOS|LIS PEND|MECHANIC|HOA", re.I)
+# Liens that are NOT real-estate distress (don't flag these as adverse).
+_NOT_REALTY_LIEN = re.compile(r"AIRPLANE|AIRCRAFT|\bUCC\b|VESSEL|\bBOAT\b", re.I)
 _SATISFY = re.compile(r"SATISF|CANCEL|RELEASE|\bSAT\b|\bREL\b", re.I)
 # Keep the title/lien-relevant instruments in full detail; drop pure noise (plats, UCC, charters).
 _KEEP = re.compile(r"MORTGAGE|DEED|TRUST|\bMTG\b|\bD/?T\b|LIEN|JUDG|\bTAX\b|FORECLOS|SATISF|CANCEL|RELEASE|ASSIGN|SECURITY|LIS PEND", re.I)
@@ -54,7 +57,7 @@ def _classify(docs) -> dict:
         if _MORTGAGE.search(k):
             has_m = True
             mtg += 1
-        if _ADVERSE.search(k):
+        if _ADVERSE.search(k) and not _NOT_REALTY_LIEN.search(k):
             has_a = True
             adv.add(k)
         if _SATISFY.search(k):
@@ -77,23 +80,44 @@ def _classify(docs) -> dict:
     }
 
 
-def _tier(li) -> str:
-    return ((li.raw or {}).get("distress_stack") or {}).get("tier") or "COLD"
+def _rod_age_days(li, now: datetime) -> float | None:
+    """Days since this lead's ROD was last fetched (None if never)."""
+    rod = (li.raw or {}).get("rod") if isinstance(li.raw, dict) else None
+    fa = (rod or {}).get("fetched_at")
+    if not fa:
+        return None
+    try:
+        dt = datetime.fromisoformat(fa)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return (now - dt).total_seconds() / 86400.0
+    except Exception:  # noqa: BLE001
+        return None
 
 
 async def enrich_spartanburg_rod(listings, max_lookups: int | None = None) -> dict:
     if os.environ.get("FORECLOSURE_SPARTANBURG_ROD", "1") == "0":
         return {"skipped": "disabled (FORECLOSURE_SPARTANBURG_ROD=0)"}
-    cap = max_lookups if max_lookups is not None else int(os.environ.get("FORECLOSURE_SPARTANBURG_ROD_MAX", "30"))
+    cap = max_lookups if max_lookups is not None else int(os.environ.get("FORECLOSURE_SPARTANBURG_ROD_MAX", "40"))
+    # Revolving window: re-fetch any lead whose ROD is older than this so new liens get caught
+    # as days/weeks pass. Never-fetched leads always qualify.
+    refresh_days = float(os.environ.get("FORECLOSURE_SPARTANBURG_ROD_REFRESH_DAYS", "21"))
+    now = datetime.now(timezone.utc)
+
+    def stale(li) -> bool:
+        age = _rod_age_days(li, now)
+        return age is None or age >= refresh_days
+
+    # ALL Spartanburg leads (not just HOT) — rolling coverage capped per run.
     targets = [li for li in listings
                if li.state == "SC" and (li.county or "").strip() == "Spartanburg"
-               and li.owner_name and not (isinstance(li.raw, dict) and "rod" in li.raw)]
-    # HOT/WARM first (render budget goes to the highest-value leads).
-    order = {"HOT": 0, "WARM": 1, "COLD": 2}
-    targets.sort(key=lambda li: order.get(_tier(li), 3))
+               and li.owner_name and stale(li)]
+    # Order: never-fetched first, then stalest first (oldest fetched_at) -> the window revolves.
+    targets.sort(key=lambda li: (_rod_age_days(li, now) is not None, -(_rod_age_days(li, now) or 1e9)))
+    total_pending = len(targets)
     targets = targets[:cap]
-    stats = {"targets": len(targets), "searched": 0, "with_instruments": 0,
-             "with_mortgage": 0, "with_adverse": 0}
+    stats = {"pending": total_pending, "targets": len(targets), "searched": 0,
+             "with_instruments": 0, "with_mortgage": 0, "with_adverse": 0}
     for li in targets:
         last, first = _name_parts(li.owner_name)
         try:
@@ -101,13 +125,21 @@ async def enrich_spartanburg_rod(listings, max_lookups: int | None = None) -> di
         except Exception:  # noqa: BLE001
             docs = []
         stats["searched"] += 1
+        if not docs:
+            continue  # render failed / no page returned -> leave unstamped so it retries next run
         mine = [d for d in docs if _owner_doc(d, last, first)]
-        if not mine:
-            continue
-        summ = _classify(mine)
+        # Stamp fetched_at even on a clean no-match so the revolving window doesn't re-poll it
+        # until the refresh interval; only genuine render failures (above) retry immediately.
+        summ = _classify(mine) if mine else {
+            "instrument_count": 0, "kinds": {}, "has_mortgage": False, "has_adverse_lien": False,
+            "adverse_types": [], "mortgage_count": 0, "satisfaction_count": 0,
+            "open_mortgages_est": 0, "instruments": [], "source": "spartanburg_rod_render"}
+        summ["fetched_at"] = now.isoformat()
         if not isinstance(li.raw, dict):
             li.raw = {}
         li.raw["rod"] = summ
+        if not mine:
+            continue
         stats["with_instruments"] += 1
         if summ["has_mortgage"]:
             stats["with_mortgage"] += 1
