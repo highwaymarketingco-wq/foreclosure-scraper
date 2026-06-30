@@ -88,6 +88,7 @@ RAW_KEEP = {
     "sold_confirmed": "*",            # court-confirmed sale → already sold, filter off active board
     "owner_mailing": "*",             # #0 contactability: owner name + mailing addr + absentee/out-of-state flags
     "owner_phone": "*",               # NC voter-file phone (name+address match) — DNC-gated, needs_dnc_scrub
+    "rod": "*",                       # Gaston NC ROD lien existence (D/T mortgage + adverse liens) by owner name
     "incarceration": "*",             # owner matched a state corrections roster (NC DAC) — low-conf stack signal
     "distress_stack": "*",            # HOT/WARM/COLD tier + stacked distress categories + score (operator board)
     "cama": "*",                      # county CAMA distress (condition/last-sale/deed-ref/owner-occupancy)

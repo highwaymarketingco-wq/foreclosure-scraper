@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-06-29T18:55:02.350339Z",
+  "run_time": "2026-06-30T02:59:39.013284Z",
   "total": 3632,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "NC voter-file phone enrichment (name+address, DNC-gated)"
+  "notes": "Gaston NC ROD lien-existence by owner name"
 }
