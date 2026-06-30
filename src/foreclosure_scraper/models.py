@@ -143,6 +143,10 @@ class ListingType(str, Enum):
     # name matched against tax-record owner names. Property may not
     # yet be in formal probate but heirs are likely the new owners.
     ESTATE_LEAD = "estate_lead"
+    # ELDERLY_DISABLED = owner carries a statutory age/disability property-tax
+    # exemption (ELD 65+ / DIS totally-disabled / BLD blind / VET disabled-vet).
+    # Property-keyed motivated-seller prospect (downsizing / can't maintain / heirs).
+    ELDERLY_DISABLED = "elderly_disabled"
     UNKNOWN = "unknown"
 
 
