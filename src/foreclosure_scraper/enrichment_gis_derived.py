@@ -88,27 +88,33 @@ _GEN_SALE_DATE = ("SALE_DATE", "SALEDATE", "SaleDate", "DEED_DATE", "DEEDDATE", 
                   "SALEDT", "TransferDa", "LASTSALEDATE", "DEEDDT", "SALE_DT", "REC_DATE", "DOS")
 # Owner-occupancy: SC assessment ratio (4% = legal residence / owner-occupied; 6% = other) +
 # homestead/legal-residence exemption text (NC + SC).
-_RATIO_FIELDS = ("RATIO", "ASMT_RATIO", "ASSESSMENT_RATIO", "ASSESS_RT", "TAXRATIO", "ASSMT_RAT",
-                 "ASSESSRAT", "RATIO_CD", "RATIOCODE", "ASSESSMENTRATIO", "ASR", "ASMTRATIO")
-_EXEMPT_FIELDS = ("EXEMPTION", "EXEMPT_DESC", "EXEMPTION_DESC", "EXEMPTIONS", "HOMESTEAD",
-                  "LEGAL_RES", "LEGALRES", "RESIDENCE", "EXEMPT_CD", "EXEMPTCODE")
+# Real SC field names (live-verified across the SCDOT shared MapServer): Spartanburg AssessmentCode
+# (4%OO / 6%VAC), Anderson RATIO, plus the generic candidates.
+_RATIO_FIELDS = ("RATIO", "AssessmentCode", "ASSESSMENTCODE", "ASSESS_CD", "ASMT_CODE", "USE_CODE",
+                 "ASMT_RATIO", "ASSESSMENT_RATIO", "ASSESS_RT", "TAXRATIO", "ASSMT_RAT", "ASSESSRAT",
+                 "RATIO_CD", "RATIOCODE", "ASSESSMENTRATIO", "ASR", "ASMTRATIO", "RC")
+_EXEMPT_FIELDS = ("EXEMPTSTAT", "TaxExempti", "Exempt_Par", "EXEMPT_PAR", "EXEMPTPAR", "EXEMPTION",
+                  "EXEMPT_DESC", "EXEMPTION_DESC", "EXEMPTIONS", "HOMESTEAD", "LEGAL_RES", "LEGALRES",
+                  "RESIDENCE", "EXEMPT_CD", "EXEMPTCODE", "Exempt")
 
 
 def _derive_owner_occupied(attrs: dict) -> Optional[bool]:
-    """SC 4% assessment ratio => owner-occupied legal residence; 6% => not. Plus homestead/
-    legal-residence exemption text. Returns None when no usable signal."""
+    """SC 4% assessment ratio / AssessmentCode '4%OO' => owner-occupied legal residence; 6%/VAC =>
+    not. Plus homestead/elderly/veteran/legal-residence exemption text. None when no usable signal."""
     for f in _RATIO_FIELDS:
         v = _ci_get(attrs, f)
-        if v is None or v == "":
+        if v in (None, ""):
             continue
-        s = str(v).strip().upper().replace("%", "")
-        if s in ("4", "4.0", "0.04", ".04") or "LEGAL RES" in s or "OWNER OCC" in s or s == "OO":
+        s = str(v).strip().upper()
+        if len(s) > 12:
+            continue  # not a ratio code (probably a value field collision)
+        if "OWNER" in s or "LEGAL RES" in s or "OO" in s or "4%" in s or s in ("4", "4.0", "0.04", ".04", "RC"):
             return True
-        if s in ("6", "6.0", "0.06", ".06", "0") or "OTHER" in s or "NON" in s:
+        if "VAC" in s or "OTHER" in s or "NON" in s or "6%" in s or s in ("6", "6.0", "0.06", ".06"):
             return False
     for f in _EXEMPT_FIELDS:
         v = _ci_get(attrs, f)
-        if v and any(t in str(v).upper() for t in ("HOMESTEAD", "LEGAL RES", "OWNER OCC")):
+        if v and any(t in str(v).upper() for t in ("HOMESTEAD", "LEGAL RES", "OWNER OCC", "ELD", "VET")):
             return True
     return None
 

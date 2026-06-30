@@ -28,6 +28,8 @@ from .models import RodDoc, normalize_doc_type
 CCHS_COUNTIES = {
     ("NC", "Burke"): ("us5", "BurkeNCNW", "burkenc"),
     ("NC", "Cleveland"): ("us5", "ClevelandNCNW", "clevelandnc"),
+    ("NC", "Madison"): ("us4", "MadisonNCNW", "madisonnc"),
+    ("NC", "Henderson"): ("us4", "HendersonNCNW", "hendersonnc"),
 }
 
 _NOD_TYPES = "FCL,LIS/P,FORECLOSURE,LIS PENDEN"

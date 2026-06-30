@@ -18,9 +18,9 @@ import re
 
 from .rod import cchs
 
-_COUNTIES = {"Burke", "Cleveland"}
-# Match on the alpha-only normalized code (D/T -> DT, TAX_LIEN -> TAXLIEN, S/TR -> STR).
-_MORTGAGE_N = {"DT", "DOT", "MORT", "MTG", "MORTGAGE", "DEEDOFTRUST"}
+_COUNTIES = {"Burke", "Cleveland", "Madison", "Henderson"}
+# Match on the alpha-only normalized code (D/T -> DT, D OF TR -> DOFTR, TAX_LIEN -> TAXLIEN).
+_MORTGAGE_N = {"DT", "DOT", "DOFTR", "MORT", "MTG", "MORTGAGE", "DEEDOFTRUST"}
 _ADVERSE_N = {"LIEN", "TAXLIEN", "TAX", "JUDG", "JUDGMENT", "LP", "LISP", "EXECUTION",
               "FCL", "NOS", "CLAIM", "STLIEN", "FEDTAXLIEN"}
 
