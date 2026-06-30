@@ -1536,6 +1536,15 @@ async def run() -> int:
     except Exception:
         log.error("data_quality.failed", traceback=traceback.format_exc())
 
+    # Promote a recoverable tax/GIS owner into any empty owner_name (unblocks mailing/phone/ROD
+    # downstream). Runs BEFORE voter_phone + gaston_rod so they consume the promoted names.
+    try:
+        from .enrichment_promote_owner import enrich_promote_owner
+        s = enrich_promote_owner(enriched)
+        if s: enrichment_stats["promote_owner"] = s
+    except Exception:
+        log.error("promote_owner.failed", traceback=traceback.format_exc())
+
     # Free NC owner-phone from the NCSBE voter file (name+address / name+county-unique);
     # no-op if data/ncvoter/ absent. DNC-gated downstream.
     try:
@@ -1553,6 +1562,14 @@ async def run() -> int:
         if s and "skipped" not in s: enrichment_stats["gaston_rod"] = s
     except Exception:
         log.error("gaston_rod.failed", traceback=traceback.format_exc())
+
+    # Elderly/probate life-event tagging on owner_name (after promotion).
+    try:
+        from .enrichment_life_events import enrich_life_events
+        s = enrich_life_events(enriched)
+        if s: enrichment_stats["life_events"] = s
+    except Exception:
+        log.error("life_events.failed", traceback=traceback.format_exc())
 
     # Upset-bid window tagging (NCGS §45-21.27) — for every NC listing
     # whose sale_date is in the past 0-10 calendar days, attach
@@ -1825,6 +1842,15 @@ async def run() -> int:
         new_stats = mark_new_listings(enriched)
     except Exception:
         log.error("new_listings.failed", traceback=traceback.format_exc())
+
+    # Data-quality corrections — LAST, after tiers/scoring: bbox/centroid geo guards,
+    # auction_status normalization, presumed-withdrawn stale-case flag + HOT down-rank.
+    try:
+        from .enrichment_board_quality import enrich_board_quality
+        s = enrich_board_quality(enriched)
+        if s: enrichment_stats["board_quality"] = s
+    except Exception:
+        log.error("board_quality.failed", traceback=traceback.format_exc())
 
     # Outreach stack — owner contact actions (letter/email/SMS), a postcard
     # mail-merge CSV, and persistent CRM status. Runs after skip-trace +

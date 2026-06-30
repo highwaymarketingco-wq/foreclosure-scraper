@@ -145,8 +145,9 @@ def _name_parts(owner: str):
 async def enrich_gaston_rod(listings, max_lookups: int | None = None) -> dict:
     """For NC/Gaston leads with an owner_name, attach raw['rod'] lien-existence summary.
     Gated by FORECLOSURE_GASTON_ROD=1 (network). One seeded session serves all lookups."""
-    if AsyncSession is None or os.environ.get("FORECLOSURE_GASTON_ROD") != "1":
-        return {"skipped": "gated (set FORECLOSURE_GASTON_ROD=1)"}
+    # Default-ON so every future run captures ROD lien-existence; set FORECLOSURE_GASTON_ROD=0 to skip.
+    if AsyncSession is None or os.environ.get("FORECLOSURE_GASTON_ROD", "1") == "0":
+        return {"skipped": "disabled (FORECLOSURE_GASTON_ROD=0)"}
     targets = [li for li in listings
                if li.state == "NC" and (li.county or "").strip().upper().replace(" COUNTY", "") == "GASTON"
                and li.owner_name and not (isinstance(li.raw, dict) and "rod" in li.raw)]
