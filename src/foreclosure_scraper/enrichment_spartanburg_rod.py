@@ -17,6 +17,9 @@ from .rod.logan_render import search_by_name_render
 
 _MORTGAGE = re.compile(r"DEED OF TRUST|MORTGAGE|\bMTG\b|SECURITY (DEED|AGREEMENT)|\bD\s*/?\s*T\b", re.I)
 _ADVERSE = re.compile(r"JUDG|\bLIEN\b|\bTAX\b|EXECUTION|FORECLOS|LIS PEND|MECHANIC|HOA", re.I)
+_SATISFY = re.compile(r"SATISF|CANCEL|RELEASE|\bSAT\b|\bREL\b", re.I)
+# Keep the title/lien-relevant instruments in full detail; drop pure noise (plats, UCC, charters).
+_KEEP = re.compile(r"MORTGAGE|DEED|TRUST|\bMTG\b|\bD/?T\b|LIEN|JUDG|\bTAX\b|FORECLOS|SATISF|CANCEL|RELEASE|ASSIGN|SECURITY|LIS PEND", re.I)
 
 
 def _name_parts(owner: str):
@@ -40,19 +43,37 @@ def _classify(docs) -> dict:
     kinds: dict[str, int] = {}
     has_m = has_a = False
     adv: set[str] = set()
+    instruments: list[dict] = []
+    mtg = sat = 0
+    # newest first so the kept (capped) detail favors current liens
+    docs = sorted(docs, key=lambda d: (d.recorded_date or __import__("datetime").datetime.min), reverse=True)
     for d in docs:
         k = (d.doc_type or "").upper().strip()
         if k:
             kinds[k] = kinds.get(k, 0) + 1
         if _MORTGAGE.search(k):
             has_m = True
+            mtg += 1
         if _ADVERSE.search(k):
             has_a = True
             adv.add(k)
+        if _SATISFY.search(k):
+            sat += 1
+        if _KEEP.search(k) and len(instruments) < 40:
+            instruments.append({
+                "date": d.recorded_date.date().isoformat() if d.recorded_date else None,
+                "type": d.doc_type, "grantor": d.grantor, "grantee": d.grantee,
+                "book": d.book, "page": d.page,
+            })
     return {
         "instrument_count": len(docs), "kinds": kinds,
-        "has_mortgage": has_m, "has_adverse_lien": has_a,
-        "adverse_types": sorted(adv), "source": "spartanburg_rod_render",
+        "has_mortgage": has_m, "has_adverse_lien": has_a, "adverse_types": sorted(adv),
+        # Full per-instrument lien stack (type/date/parties/book-page). No $ amount — that's on the
+        # paid document image. open_mortgages = mortgages minus satisfactions/cancellations (rough).
+        "mortgage_count": mtg, "satisfaction_count": sat,
+        "open_mortgages_est": max(0, mtg - sat),
+        "instruments": instruments,
+        "source": "spartanburg_rod_render",
     }
 
 
