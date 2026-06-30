@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-06-30T04:54:20.780947Z",
+  "run_time": "2026-06-30T05:51:35.105306Z",
   "total": 3632,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "life-event elderly/probate tags"
+  "notes": "cchs Burke+Cleveland ROD"
 }
