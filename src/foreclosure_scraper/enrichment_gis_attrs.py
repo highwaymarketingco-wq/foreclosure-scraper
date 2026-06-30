@@ -390,7 +390,9 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
         #   (b) a prior run already ATTEMPTED this lead (same lat/lng -> same GIS result),
         #       marked raw['gis']['queried']. FORECLOSURE_GIS_FORCE=1 re-attempts all.
         raw = li.raw if isinstance(li.raw, dict) else {}
-        if (li.assessed_value or li.market_value) and li.owner_name and li.living_sqft:
+        # FORCE re-attempts all (per docstring) — needed so coded fields like the exemption
+        # signal get read even on leads whose core attrs are already complete.
+        if not _force and (li.assessed_value or li.market_value) and li.owner_name and li.living_sqft:
             stats["skipped_done"] += 1
             return
         if not _force and (raw.get("gis") or {}).get("queried"):
