@@ -12,6 +12,8 @@ no-image card.
 from __future__ import annotations
 
 import asyncio
+import os
+import time
 from typing import Optional
 
 import structlog
@@ -98,8 +100,13 @@ async def _nominatim_geocode(c, query: str) -> Optional[tuple[float, float]]:
     return None
 
 
-async def _resolve(c, li: Listing, nominatim_delay: float) -> Optional[tuple[float, float]]:
-    """Cascade: Census -> Nominatim -> city centroid -> county centroid."""
+async def _resolve(c, li: Listing, nominatim_delay: float,
+                   fast_only: bool = False) -> Optional[tuple[float, float]]:
+    """Cascade: Census -> Nominatim -> city centroid -> county centroid.
+
+    fast_only (set once the run's geocode budget is spent): use only cached
+    lookups + the instant county-seat centroid — no new network and no rate-limited
+    Nominatim sleeps — so the loop can never run for hours."""
     # Build candidate address strings from most specific to least
     candidates: list[str] = []
     if li.street_address:
@@ -113,23 +120,26 @@ async def _resolve(c, li: Listing, nominatim_delay: float) -> Optional[tuple[flo
         cache_key = f"census:{q}"
         if cache_key in _CACHE:
             res = _CACHE[cache_key]
+        elif fast_only:
+            continue  # budget spent — no new network; fall through to centroid
         else:
             res = await _census_geocode(c, q)
             _CACHE[cache_key] = res
         if res:
             return res
 
-    # Tier 2: Nominatim (rate-limited)
-    for q in candidates:
-        cache_key = f"nominatim:{q}"
-        if cache_key in _CACHE:
-            res = _CACHE[cache_key]
-        else:
-            res = await _nominatim_geocode(c, q)
-            _CACHE[cache_key] = res
-            await asyncio.sleep(nominatim_delay)
-        if res:
-            return res
+    # Tier 2: Nominatim (rate-limited) — skipped entirely once budget is spent
+    if not fast_only:
+        for q in candidates:
+            cache_key = f"nominatim:{q}"
+            if cache_key in _CACHE:
+                res = _CACHE[cache_key]
+            else:
+                res = await _nominatim_geocode(c, q)
+                _CACHE[cache_key] = res
+                await asyncio.sleep(nominatim_delay)
+            if res:
+                return res
 
     # Tier 3: city centroid via Census (just city + state, no street)
     if li.city and li.state:
@@ -137,6 +147,8 @@ async def _resolve(c, li: Listing, nominatim_delay: float) -> Optional[tuple[flo
         cache_key = f"city:{q}"
         if cache_key in _CACHE:
             res = _CACHE[cache_key]
+        elif fast_only:
+            res = None  # budget spent — skip network, fall through to centroid
         else:
             res = await _census_geocode(c, q) or await _nominatim_geocode(c, q)
             _CACHE[cache_key] = res
@@ -159,20 +171,29 @@ async def enrich(listings: list[Listing], rate_per_sec: float = 1.0) -> list[Lis
     if not targets:
         return listings
 
+    # Hard wall-clock budget on the RATE-LIMITED tiers. Nominatim sleeps 1s/lead,
+    # so thousands of address-less / name-only leads would otherwise stall the run
+    # for hours (observed: 8.5h full-run hang). Once the budget is spent, remaining
+    # leads skip Census/Nominatim network and take the instant county-seat centroid.
+    budget_s = float(os.environ.get("GEOCODE_BUDGET_S", "600"))
+    t0 = time.monotonic()
+    budget_hit = False
+
     async with client(timeout=20.0) as c:
         delay = max(1.0 / rate_per_sec, 1.0)
         matched = 0
-        by_tier = {"census": 0, "nominatim": 0, "city": 0, "county": 0, "missed": 0}
         for li in targets:
-            res = await _resolve(c, li, delay)
+            if not budget_hit and time.monotonic() - t0 > budget_s:
+                budget_hit = True
+                log.warning("geocode.budget_hit", budget_s=budget_s,
+                            elapsed_s=round(time.monotonic() - t0))
+            res = await _resolve(c, li, delay, fast_only=budget_hit)
             if res:
                 li.latitude, li.longitude = res
                 matched += 1
-            else:
-                by_tier["missed"] += 1
 
     final_missing = sum(1 for li in listings if li.latitude is None or li.longitude is None)
     log.info("geocode.done",
-             queried=len(targets), matched=matched,
+             queried=len(targets), matched=matched, budget_hit=budget_hit,
              total=len(listings), still_missing=final_missing)
     return listings

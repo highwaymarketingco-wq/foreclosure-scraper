@@ -48,6 +48,8 @@ Pure-Python, no I/O, idempotent.
 """
 from __future__ import annotations
 
+import os
+import time
 from datetime import datetime, timedelta, timezone
 from statistics import median
 from typing import Optional
@@ -368,7 +370,23 @@ def enrich_foreclosure_sold_comps(
         "no_match_at_all": 0,
     }
 
+    # Wall-clock budget on this O(active x county_pool) synchronous match loop —
+    # _similarity_score (haversine) per pair × millions of pairs on a big county
+    # is pure CPU that blocks the run (the post-comps "CPU-spin" half of the 8.5h
+    # hang). Once spent, remaining leads skip sold-comps (non-fatal — other comp
+    # tiers still feed ARV).
+    budget_s = float(os.environ.get("FORECLOSURE_SOLD_COMPS_BUDGET_S", "120"))
+    t0 = time.monotonic()
+    budget_hit = False
+
     for li in active_listings:
+        if not budget_hit and time.monotonic() - t0 > budget_s:
+            budget_hit = True
+            stats["budget_hit"] = 1
+            log.warning("foreclosure_sold_comps.budget_hit", budget_s=budget_s,
+                        matched=stats["matched"], of=len(active_listings))
+        if budget_hit:
+            break
         ck = _county_key(li)
         if ck is None:
             continue
