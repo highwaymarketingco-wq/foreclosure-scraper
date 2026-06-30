@@ -47,6 +47,12 @@ def _strong_sigs(li: Listing) -> set:
     pn = re.sub(r"[^a-z0-9]", "", (li.parcel_id or "").lower())
     if pn and len(pn) >= 4 and st:          # guard: whitespace/degenerate parcel -> no sig
         out.add(("p", pn, st))
+        # Buncombe (and similar) write the same PIN two ways: a 15-digit zero-padded form
+        # (9678774126 -> 967877412600000) and the bare 10-digit. Emit the 10-digit form too so
+        # the padded + bare copies of one parcel union-merge (they otherwise split, esp. on
+        # bankruptcy rows that have no address signature to fall back on).
+        if len(pn) == 15 and pn.endswith("00000"):
+            out.add(("p", pn[:10], st))
     cn = (li.case_number or "").strip()
     if cn and a:                            # require a real case# AND a real address
         out.add(("c", cn, (li.county or ""), a))
