@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-06-30T18:08:16.737331Z",
+  "run_time": "2026-06-30T18:35:25.593468Z",
   "total": 3576,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "source-link classification"
+  "notes": "name resolver on board"
 }
