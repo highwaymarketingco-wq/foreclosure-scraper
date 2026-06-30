@@ -260,7 +260,10 @@ FIELD_ALIASES = {
                   # SC SCDOT: Pickens=ACTUALVAL, Charleston=APPRAISAL,
                   # Beaufort=Appraised, Laurens=Tota_Mark/Total_Val. (Anderson's
                   # MRKT_VALUE + Georgetown's Land/Imp sum are already covered.)
-                  "ACTUALVAL", "APPRAISAL", "Appraised", "Tota_Mark", "Total_Val"),
+                  "ACTUALVAL", "APPRAISAL", "Appraised", "Tota_Mark", "Total_Val",
+                  # Oconee=CURRENT_VA (total appraised, 560 leads value 3%->99%).
+                  # NOT TOTALASMT — that's the annual assessed/levy figure, would corrupt ARV.
+                  "CURRENT_VA"),
     "deed_book": ("DEEDBK", "Deed_Book", "DEED_BK", "DeedBook", "DB",
                   # SC SCDOT: Charleston=DEED_BOOK_, Anderson=DBOOK,
                   # Beaufort=Book, Laurens=DEEDBOOK
