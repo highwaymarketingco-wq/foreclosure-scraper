@@ -64,6 +64,60 @@ def _classify_from_text(text: str) -> Optional[PropertyKind]:
     return None
 
 
+# CAMA assessor building_type -> PropertyKind. The assessor's classification is
+# authoritative, so this beats the listing-type / source heuristics below (and
+# the blind SFR fallback). Matched on a normalized (upper, alnum-collapsed)
+# building_type token; order is specific-first so 'MOBILE HOME PARK' resolves to
+# MOBILE not via a partial. Live board building_type values seeded this map:
+# SINGLE FAM, TOWNHOUSE, MOBILE HOME, CONDOS, DUPLEX, APTS-MULTI, QUADPLEX,
+# MH PARK, GEN OFFICE, INDUSTRIAL, CONV STORE, BANK, GEN WHSE, RESTWAITSERV...
+_BUILDING_TYPE_KEYWORDS = (
+    ("MOBILE", PropertyKind.MOBILE),
+    ("MANUFACTURED", PropertyKind.MOBILE),
+    ("MH ", PropertyKind.MOBILE),
+    ("TOWNHOUSE", PropertyKind.TOWNHOUSE),
+    ("TOWNHOME", PropertyKind.TOWNHOUSE),
+    ("CONDO", PropertyKind.CONDO),
+    ("DUPLEX", PropertyKind.MULTI_FAMILY),
+    ("TRIPLEX", PropertyKind.MULTI_FAMILY),
+    ("QUADPLEX", PropertyKind.MULTI_FAMILY),
+    ("FOURPLEX", PropertyKind.MULTI_FAMILY),
+    ("APT", PropertyKind.MULTI_FAMILY),
+    ("MULTI", PropertyKind.MULTI_FAMILY),
+    ("OFFICE", PropertyKind.COMMERCIAL),
+    ("RETAIL", PropertyKind.COMMERCIAL),
+    ("INDUSTRIAL", PropertyKind.COMMERCIAL),
+    ("WHSE", PropertyKind.COMMERCIAL),
+    ("WAREHOUSE", PropertyKind.COMMERCIAL),
+    ("STORE", PropertyKind.COMMERCIAL),
+    ("BANK", PropertyKind.COMMERCIAL),
+    ("REST", PropertyKind.COMMERCIAL),     # RESTWAITSERV (restaurant)
+    ("COMMERCIAL", PropertyKind.COMMERCIAL),
+    ("LUBE", PropertyKind.COMMERCIAL),
+    ("GARAGE", PropertyKind.COMMERCIAL),
+    ("SINGLE FAM", PropertyKind.SINGLE_FAMILY),
+    ("SINGLEFAM", PropertyKind.SINGLE_FAMILY),
+    ("SFR", PropertyKind.SINGLE_FAMILY),
+)
+
+
+def _classify_from_cama_building_type(li: Listing) -> Optional[PropertyKind]:
+    """Promote raw['cama']['building_type'] (assessor classification) to a
+    PropertyKind. Authoritative — runs before the heuristic / fallback tiers."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    cama = raw.get("cama")
+    if not isinstance(cama, dict):
+        return None
+    bt = cama.get("building_type")
+    if not bt:
+        return None
+    token = str(bt).strip().upper()
+    for needle, kind in _BUILDING_TYPE_KEYWORDS:
+        if needle in token:
+            return kind
+    return None
+
+
 def _classify_from_structure(li: Listing) -> Optional[PropertyKind]:
     """Use GIS-derived structure data (acreage, sqft, year built)."""
     sqft = li.living_sqft or 0
@@ -120,6 +174,7 @@ def enrich_property_kind(listings: list[Listing]) -> None:
     counts = {
         "already_classified": 0,
         "from_description": 0,
+        "from_cama_building_type": 0,
         "from_structure": 0,
         "from_listing_type": 0,
         "from_source": 0,
@@ -151,6 +206,16 @@ def enrich_property_kind(listings: list[Listing]) -> None:
             if kind:
                 li.property_kind = kind
                 counts["from_description"] += 1
+                continue
+
+            # Tier 1.7: CAMA assessor building_type — authoritative classification.
+            # Runs before structure/listing-type heuristics and the SFR fallback so
+            # the assessor's actual type (TOWNHOUSE/MOBILE/CONDO/DUPLEX/commercial)
+            # wins instead of being coerced to single-family.
+            kind = _classify_from_cama_building_type(li)
+            if kind:
+                li.property_kind = kind
+                counts["from_cama_building_type"] += 1
                 continue
 
             # Tier 2: structure data
