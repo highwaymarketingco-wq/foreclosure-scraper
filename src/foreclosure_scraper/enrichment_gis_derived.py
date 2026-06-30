@@ -238,6 +238,100 @@ def _derive_last_sale(county: str, attrs: dict[str, Any]) -> Optional[dict]:
     return out
 
 
+def _qualified_sale_from_card(card: dict[str, Any]) -> Optional[tuple[float, Optional[str]]]:
+    """Pull a usable (amount, date) from a qPublic-style assessor_card.
+
+    Order: a top-level 'sale_price' first (the card's headline last sale), else
+    the most-recent QUALIFIED arms-length entry in card['sales'][]. An entry is
+    QUALIFIED only when its 'reason' contains 'QUALIF' but NOT 'NOT QUALIF'
+    (the board carries both 'DEED QUALIFIED'/'QUALIFIED SALE' and 'NOT QUALIFIED'
+    — the naive substring check would wrongly accept the latter) AND it carries a
+    real 'price'. $1/$10 non-arms-length transfers are screened by _MIN_ARMS_LENGTH.
+    """
+    if not isinstance(card, dict):
+        return None
+    # Headline sale_price on the card (paired with the most-recent sale's date if any).
+    sp = _num(card.get("sale_price"))
+    if sp is not None and _MIN_ARMS_LENGTH <= sp <= _MAX_SALE:
+        sdate = None
+        sales = card.get("sales")
+        if isinstance(sales, list):
+            for s in sales:
+                if isinstance(s, dict) and _num(s.get("price")) == round(sp, 2):
+                    sdate = _clean_str(s.get("sale_date"))
+                    break
+            if sdate is None and sales and isinstance(sales[0], dict):
+                sdate = _clean_str(sales[0].get("sale_date"))
+        return round(sp, 2), sdate
+
+    # Else: most-recent QUALIFIED arms-length sale with a price.
+    sales = card.get("sales")
+    if not isinstance(sales, list):
+        return None
+    best: Optional[tuple] = None  # (sortkey, amount, date_str)
+    for s in sales:
+        if not isinstance(s, dict):
+            continue
+        reason = (s.get("reason") or "").upper()
+        if "QUALIF" not in reason or "NOT QUALIF" in reason:
+            continue
+        amt = _num(s.get("price"))
+        if amt is None or not (_MIN_ARMS_LENGTH <= amt <= _MAX_SALE):
+            continue
+        ds = _clean_str(s.get("sale_date"))
+        d = _as_date(ds)
+        sortkey = d.isoformat() if isinstance(d, date) else "0000"
+        if best is None or sortkey > best[0]:
+            best = (sortkey, round(amt, 2), ds)
+    if best is not None:
+        return best[1], best[2]
+    return None
+
+
+def _consolidate_sale_amount(li: Listing) -> Optional[dict]:
+    """Recover a recorded sale AMOUNT (+date/source) for the ARV floor when
+    gis.last_sale carries no usable amount.
+
+    The board-wide Gosnell bug: calc.py's ARV floor reads ONLY raw.gis.last_sale
+    .amount, so 84 leads whose recorded sale lives in raw.cama / raw.assessor_card
+    (but not on the GIS parcel layer) get an ARV *below* a known sale. Waterfall:
+      1) raw.cama  : last_sale_amount / last_sale_price (+ last_sale_date)
+      2) raw.assessor_card : sale_price, else most-recent QUALIFIED sales[] entry
+    Returns {amount, date?, source} or None. Amount/date are screened the same way
+    as _derive_last_sale (arms-length floor, plausible date).
+    """
+    raw = li.raw if isinstance(li.raw, dict) else {}
+
+    # 1) CAMA recorded sale.
+    cama = raw.get("cama")
+    if isinstance(cama, dict):
+        amt = None
+        for f in ("last_sale_amount", "last_sale_price"):
+            v = _num(cama.get(f))
+            if v is not None and _MIN_ARMS_LENGTH <= v <= _MAX_SALE:
+                amt = round(v, 2)
+                break
+        if amt is not None:
+            out: dict[str, Any] = {"amount": amt, "source": "cama"}
+            d = _as_date(cama.get("last_sale_date"))
+            if isinstance(d, date) and 1900 <= d.year <= date.today().year:
+                out["date"] = d.isoformat()
+            return out
+
+    # 2) Assessor card (sale_price / qualified sales[]).
+    card = raw.get("assessor_card")
+    qc = _qualified_sale_from_card(card) if isinstance(card, dict) else None
+    if qc is not None:
+        amt, ds = qc
+        out = {"amount": amt, "source": "assessor_card"}
+        d = _as_date(ds)
+        if isinstance(d, date) and 1900 <= d.year <= date.today().year:
+            out["date"] = d.isoformat()
+        return out
+
+    return None
+
+
 def _derive_tax_status(county: str, attrs: dict[str, Any]) -> Optional[dict]:
     """Greenville PAIDDATE (epoch-ms) + TOTTAX -> {paid_through, amount, source}."""
     cfg = _TAX_FIELDS.get(county)
@@ -262,7 +356,8 @@ def enrich_gis_derived(listings: list[Listing]) -> dict:
     Must run AFTER enrich_gis_attrs (populates gis_attrs_full) and BEFORE
     enrich_equity (consumes raw['gis']['last_sale']).
     """
-    stats = {"scanned": 0, "last_sale": 0, "deed_age": 0, "tax_status": 0}
+    stats = {"scanned": 0, "last_sale": 0, "deed_age": 0, "tax_status": 0,
+             "sale_consolidated": 0}
     for li in listings:
         raw = li.raw if isinstance(li.raw, dict) else {}
         # Scrub any carried-over implausible last_sale.amount (e.g. Spartanburg GIS
@@ -273,6 +368,38 @@ def enrich_gis_derived(listings: list[Listing]) -> dict:
         _ls = (raw.get("gis") or {}).get("last_sale")
         if isinstance(_ls, dict) and _ls.get("amount") and _ls["amount"] > 50_000_000:
             _ls.pop("amount", None)
+
+        # --- SALE CONSOLIDATION (runs for EVERY listing, BEFORE the attrs gate) ---
+        # The board-wide Gosnell bug: calc.py's ARV floor reads ONLY
+        # gis.last_sale.amount, so leads whose recorded sale only lives in raw.cama /
+        # raw.assessor_card (many courtlistener/bankruptcy rows have NO gis_attrs_full)
+        # get an ARV below a known sale. When gis.last_sale lacks a usable AMOUNT,
+        # fall back to cama/assessor_card and write amount/date/source into
+        # gis.last_sale so the PRE-valuation ARV floor + equity see it.
+        _gis = raw.get("gis")
+        _cur = _gis.get("last_sale") if isinstance(_gis, dict) else None
+        _has_amount = isinstance(_cur, dict) and _cur.get("amount")
+        if not _has_amount:
+            consol = _consolidate_sale_amount(li)
+            if consol is not None:
+                g = raw.setdefault("gis", {})
+                cur = g.get("last_sale")
+                if isinstance(cur, dict):
+                    # Preserve any existing date/book/page provenance; only fill amount
+                    # (+date when the existing entry has none).
+                    cur["amount"] = consol["amount"]
+                    if "date" in consol and not cur.get("date"):
+                        cur["date"] = consol["date"]
+                    cur["amount_source"] = consol["source"]
+                else:
+                    g["last_sale"] = {
+                        "amount": consol["amount"],
+                        **({"date": consol["date"]} if "date" in consol else {}),
+                        "source": f"gis_derived:consolidated:{consol['source']}",
+                    }
+                stats["sale_consolidated"] += 1
+                li.raw = raw
+
         attrs = raw.get("gis_attrs_full")
         if not isinstance(attrs, dict) or not attrs:
             continue

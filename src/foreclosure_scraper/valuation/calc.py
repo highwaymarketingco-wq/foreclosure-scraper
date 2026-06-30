@@ -663,6 +663,75 @@ def compute(li: Listing) -> Calc:
                 "Subtracted " + " + ".join(bits) + " from max bid (buyer takes "
                 "title subject to this debt)."
             )
+
+        # ---- Actual payoff into max bid -------------------------------------
+        # A buyer who must ASSUME or CLEAR real debt to take clean title can't bid
+        # that money away — surviving debt competes with the bid dollar-for-dollar.
+        # The 70%-rule max bid above only nets out senior liens (debt senior to the
+        # foreclosing lien); it ignores the FORECLOSED debt itself. Subtract a payoff
+        # when we actually know it:
+        #   (a) raw.amount_owed.is_actual_debt — a parsed judgment / indebtedness, or
+        #   (b) raw.equity.payoff_estimate at MEDIUM+ confidence (the equity engine's
+        #       amount_owed-grounded payoff; LOW-confidence opening-bid/last-sale
+        #       proxies are excluded — too noisy to bid against).
+        #
+        # DOUBLE-COUNT GUARD (critical): at a foreclosure auction the *winning bid*
+        # already extinguishes the foreclosed debt up to the bid amount — so when the
+        # lead carries an opening_bid we only subtract the payoff that SURVIVES it,
+        # i.e. max(0, payoff − opening_bid). Subtracting the full payoff on top of an
+        # opening-bid-grounded payoff (the common amount_owed:opening_bid case, where
+        # payoff == opening_bid) would charge the same dollars twice. When there's no
+        # opening_bid (e.g. a bare money judgment), the full payoff competes with the
+        # bid. This is also DISTINCT from senior_cost (liens senior to the
+        # foreclosure, already netted above), so those are never double-counted; and
+        # we never read both an actual-debt value and the equity payoff (prefer the
+        # actual-debt figure once).
+        if out.max_bid_70 is not None and out.max_bid_70 > 0:
+            ao = raw.get("amount_owed") if isinstance(raw, dict) else None
+            eq = raw.get("equity") if isinstance(raw, dict) else None
+            payoff_amt = None
+            payoff_label = None
+            if isinstance(ao, dict) and ao.get("is_actual_debt") and ao.get("value"):
+                try:
+                    v = float(ao["value"])
+                    if v > 0:
+                        payoff_amt = v
+                        payoff_label = f"actual debt ({ao.get('label') or ao.get('source') or 'amount_owed'})"
+                except (TypeError, ValueError):
+                    pass
+            if payoff_amt is None and isinstance(eq, dict) and eq.get("payoff_estimate"):
+                conf = str(eq.get("payoff_confidence") or eq.get("confidence") or "").lower()
+                if conf in ("medium", "high"):
+                    try:
+                        v = float(eq["payoff_estimate"])
+                        if v > 0:
+                            payoff_amt = v
+                            payoff_label = f"estimated payoff ({eq.get('payoff_source') or 'equity'}, {conf} conf)"
+                    except (TypeError, ValueError):
+                        pass
+            if payoff_amt is not None:
+                # Only the debt that survives the winning bid is assumable on top.
+                ob = float(li.opening_bid) if li.opening_bid else 0.0
+                surviving = payoff_amt - ob if ob > 0 else payoff_amt
+                # A surviving payoff that would dwarf the property (a money judgment
+                # leaking in, or a multiple-of-ARV figure) isn't a clean assumable
+                # debt — gate on the 3×ARV sanity ceiling rather than let garbage
+                # flip the bid; max() already floors the result at 0.
+                # Materiality floor: when payoff ≈ opening_bid (the common
+                # amount_owed:opening_bid case) the surviving sliver is just
+                # rounding noise — don't emit a "$2 subtracted" note.
+                if (surviving >= 500 and out.arv_expected
+                        and surviving <= 3.0 * out.arv_expected):
+                    old_bid = out.max_bid_70
+                    out.max_bid_70 = max(0.0, round(out.max_bid_70 - surviving, -2))
+                    src_note = (f" beyond the ${ob:,.0f} opening bid the winning bid clears"
+                                if ob > 0 else "")
+                    out.notes.append(
+                        f"Subtracted ${surviving:,.0f} {payoff_label}{src_note} from "
+                        f"max bid (buyer must clear/assume this surviving debt for "
+                        f"clean title): ${old_bid:,.0f} → ${out.max_bid_70:,.0f}."
+                    )
+
         # Wholesale lens: what an end-investor MAO leaves for an assignment fee.
         if out.max_bid_70 is not None:
             out.wholesale_mao = max(0.0, round(out.max_bid_70 - ASSIGNMENT_FEE, -2))

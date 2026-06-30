@@ -22,8 +22,9 @@ def test_rehab_contingency_applied_to_max_bid():
     assert c.arv_expected == 300000
     assert c.rehab_expected is not None
     assert c.rehab_with_contingency == round(c.rehab_expected * 1.125, -2)
-    fees = 300000 * calc.SELLING_PCT
-    assert c.max_bid_70 == round(0.70 * 300000 - c.rehab_with_contingency - fees, -2)
+    # 70% rule, post-calibration (backtest n=266): the 30% haircut already embeds selling cost,
+    # so max_bid = 0.75*ARV - rehab (no separate fee — the old formula double-charged ~7% of ARV).
+    assert c.max_bid_70 == round(0.75 * 300000 - c.rehab_with_contingency, -2)
 
 
 def test_wholesale_mao_and_spread():
