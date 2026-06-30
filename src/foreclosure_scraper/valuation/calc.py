@@ -512,6 +512,35 @@ def compute(li: Listing) -> Calc:
                 f"confidence lowered to MEDIUM, verify before bidding."
             )
 
+    # ---- ARV FLOOR at county market value / recent recorded sale --------
+    # A comp-grounded ARV BELOW what the county appraises the home at (or below a
+    # recent arms-length sale) is almost always a thin/weak-comp artifact — the
+    # home's own market appraisal and last sale are stronger signals than 3 stray
+    # comps. After-repair value should never sit under the as-is county value.
+    # So when comps are NOT high-confidence, FLOOR (raise) the ARV to it.
+    mv = float(li.market_value) if (li.market_value and float(li.market_value) > 10000) else None
+    sale_amt = None
+    _ls = (raw.get("gis") or {}).get("last_sale") if isinstance(raw, dict) else None
+    if isinstance(_ls, dict) and _ls.get("amount"):
+        try:
+            sale_amt = float(_ls["amount"]) if float(_ls["amount"]) > 10000 else None
+        except (TypeError, ValueError):
+            sale_amt = None
+    floor_val = max([v for v in (mv, sale_amt) if v], default=None)
+    if out.arv_expected and floor_val and out.arv_expected < floor_val:
+        old_arv = out.arv_expected
+        out.arv_expected = round(floor_val, -2)
+        out.arv_low = round(min(out.arv_low or floor_val, floor_val * 0.95), -2)
+        out.arv_high = round(max(out.arv_high or floor_val, floor_val * 1.10), -2)
+        # A comp ARV that disagreed with the county/sale value is, by definition, not a
+        # clean comp read — cap confidence at MEDIUM so a floored number reads as "verify".
+        if arv_conf == "HIGH":
+            arv_conf = "MEDIUM"
+        out.notes.append(
+            f"ARV floored to county market value/recent sale (${floor_val:,.0f}); "
+            f"comp ARV (${old_arv:,.0f}) sat below the as-is value (after-repair can't be lower)."
+        )
+
     # ---- Rehab range ----------------------------------------------------
     if li.property_kind == PropertyKind.LAND:
         out.rehab_tier = "land"
