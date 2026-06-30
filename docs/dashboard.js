@@ -184,7 +184,7 @@ function initFilters() {
       ssel.appendChild(opt);
     });
 
-  ["search", "filter-state", "filter-county", "filter-type", "filter-land", "filter-source", "filter-distress", "filter-grade", "filter-window", "filter-roi"].forEach((id) =>
+  ["search", "filter-state", "filter-county", "filter-type", "filter-contact", "filter-land", "filter-source", "filter-distress", "filter-grade", "filter-window", "filter-roi"].forEach((id) =>
     $(id).addEventListener("input", applyFilters),
   );
 
@@ -251,6 +251,7 @@ function applyFilters() {
   const ty = $("filter-type").value;
   const land = $("filter-land").value;
   const src = $("filter-source").value;
+  const contact = $("filter-contact").value;
   const distress = $("filter-distress").value;
   const minGrade = $("filter-grade").value;
   const minGradeRank = minGrade ? gradeOrder[minGrade] : 0;
@@ -285,6 +286,18 @@ function applyFilters() {
       if (distress === "HOT" && ds.tier !== "HOT") return false;
       if (distress === "HOTWARM" && ds.tier === "COLD") return false;
       if (distress === "STACK2" && !(ds.stack >= 2)) return false;
+    }
+    if (contact) {
+      const r = l.raw || {};
+      const om = r.owner_mailing || {};
+      if (contact === "phone" && !r.owner_phone) return false;
+      if (contact === "mailing" && !om.mailing) return false;
+      if (contact === "contactable" && !(r.owner_phone || om.mailing)) return false;
+      if (contact === "absentee" && !om.absentee) return false;
+      if (contact === "out_of_state" && !om.out_of_state) return false;
+      if (contact === "mortgage" && !(r.rod && r.rod.has_mortgage)) return false;
+      if (contact === "estate_elderly" && !(r.life_events && r.life_events.length)) return false;
+      if (contact === "hide_stale" && r.stale_case) return false;
     }
     if (win && l.sale_date) {
       const d = Date.parse(l.sale_date);
