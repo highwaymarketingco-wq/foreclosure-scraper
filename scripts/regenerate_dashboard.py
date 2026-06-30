@@ -214,6 +214,16 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         print("enrich_spartanburg_rod: ERROR", str(e)[:80])
 
+    # NC absolute-divorce (CVD) distress by owner party-name (render path; 50B DV
+    # excluded). GATED OFF by default (FORECLOSURE_NC_DIVORCE=1) — NC eCourts
+    # Smart Search is AWS-WAF/CAPTCHA-walled to automated renders today.
+    if os.environ.get("FORECLOSURE_NC_DIVORCE") == "1":
+        try:
+            from foreclosure_scraper.enrichment_nc_divorce import enrich_nc_divorce
+            print("enrich_nc_divorce:", asyncio.run(enrich_nc_divorce(listings)))
+        except Exception as e:  # noqa: BLE001
+            print("enrich_nc_divorce: ERROR", str(e)[:80])
+
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:
         from foreclosure_scraper.enrichment_life_events import enrich_life_events

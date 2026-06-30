@@ -1607,6 +1607,17 @@ async def run() -> int:
     except Exception:
         log.error("spartanburg_rod.failed", traceback=traceback.format_exc())
 
+    # NC absolute-divorce (CVD) distress, by owner party-name in the NC eCourts
+    # Tyler portal (render path; 50B DV excluded). GATED OFF by default
+    # (FORECLOSURE_NC_DIVORCE=1) — the portal Smart Search is AWS-WAF/CAPTCHA-
+    # walled to automated renders today, so it makes zero calls until enabled.
+    try:
+        from .enrichment_nc_divorce import enrich_nc_divorce
+        s = await enrich_nc_divorce(enriched)
+        if s and "skipped" not in s: enrichment_stats["nc_divorce"] = s
+    except Exception:
+        log.error("nc_divorce.failed", traceback=traceback.format_exc())
+
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:
         from .enrichment_life_events import enrich_life_events
