@@ -1545,6 +1545,15 @@ async def run() -> int:
     except Exception:
         log.error("voter_phone.failed", traceback=traceback.format_exc())
 
+    # Gaston NC Register of Deeds lien-existence by owner name (gated FORECLOSURE_GASTON_ROD=1).
+    # Free name-index search over the public ROD; attaches raw['rod'] (D/T mortgage + adverse liens).
+    try:
+        from .enrichment_gaston_rod import enrich_gaston_rod
+        s = await enrich_gaston_rod(enriched)
+        if s and "skipped" not in s: enrichment_stats["gaston_rod"] = s
+    except Exception:
+        log.error("gaston_rod.failed", traceback=traceback.format_exc())
+
     # Upset-bid window tagging (NCGS §45-21.27) — for every NC listing
     # whose sale_date is in the past 0-10 calendar days, attach
     # raw.upset_bid + upset_bid_deadline. Pure-Python, idempotent.

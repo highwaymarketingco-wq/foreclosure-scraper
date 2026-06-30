@@ -168,6 +168,15 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         print("enrich_voter_phone: ERROR", str(e)[:80])
 
+    # Gaston NC Register of Deeds lien-existence by owner name (gated FORECLOSURE_GASTON_ROD=1;
+    # free name-index search, 3-step session-seed). Attaches raw['rod'] (D/T mortgage + adverse liens).
+    if os.environ.get("FORECLOSURE_GASTON_ROD") == "1":
+        try:
+            from foreclosure_scraper.enrichment_gaston_rod import enrich_gaston_rod
+            print("enrich_gaston_rod:", asyncio.run(enrich_gaston_rod(listings)))
+        except Exception as e:  # noqa: BLE001
+            print("enrich_gaston_rod: ERROR", str(e)[:80])
+
     # Drop sold/removed snapshot-REO (Fannie) — stale carryover whose per-property
     # SPA URL renders a browser 404 once the uuid leaves inventory. Fail-safe.
     from foreclosure_scraper.enrichment_reo_freshness import prune_stale_reo
