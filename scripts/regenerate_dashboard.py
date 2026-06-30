@@ -160,6 +160,14 @@ def main() -> int:
 
     print("enrich_data_quality:", enrich_data_quality(listings))
 
+    # Free NC owner-phone from the NCSBE voter file (name+address / name+county-unique).
+    # No-op if data/ncvoter/ isn't present (degrades gracefully). DNC-gated downstream.
+    try:
+        from foreclosure_scraper.enrichment_voter_phone import enrich_voter_phone
+        print("enrich_voter_phone:", enrich_voter_phone(listings))
+    except Exception as e:  # noqa: BLE001
+        print("enrich_voter_phone: ERROR", str(e)[:80])
+
     # Drop sold/removed snapshot-REO (Fannie) — stale carryover whose per-property
     # SPA URL renders a browser 404 once the uuid leaves inventory. Fail-safe.
     from foreclosure_scraper.enrichment_reo_freshness import prune_stale_reo

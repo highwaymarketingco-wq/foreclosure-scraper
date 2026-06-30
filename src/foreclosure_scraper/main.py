@@ -1536,6 +1536,15 @@ async def run() -> int:
     except Exception:
         log.error("data_quality.failed", traceback=traceback.format_exc())
 
+    # Free NC owner-phone from the NCSBE voter file (name+address / name+county-unique);
+    # no-op if data/ncvoter/ absent. DNC-gated downstream.
+    try:
+        from .enrichment_voter_phone import enrich_voter_phone
+        s = enrich_voter_phone(enriched)
+        if s: enrichment_stats["voter_phone"] = s
+    except Exception:
+        log.error("voter_phone.failed", traceback=traceback.format_exc())
+
     # Upset-bid window tagging (NCGS §45-21.27) — for every NC listing
     # whose sale_date is in the past 0-10 calendar days, attach
     # raw.upset_bid + upset_bid_deadline. Pure-Python, idempotent.
