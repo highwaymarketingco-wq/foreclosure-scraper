@@ -192,6 +192,13 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         print("enrich_cchs_rod: ERROR", str(e)[:80])
 
+    # Buncombe NC ROD lien-existence (Cott/Aumentum v4) — default-on.
+    try:
+        from foreclosure_scraper.enrichment_aumentum_rod import enrich_aumentum_rod
+        print("enrich_aumentum_rod:", asyncio.run(enrich_aumentum_rod(listings)))
+    except Exception as e:  # noqa: BLE001
+        print("enrich_aumentum_rod: ERROR", str(e)[:80])
+
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:
         from foreclosure_scraper.enrichment_life_events import enrich_life_events

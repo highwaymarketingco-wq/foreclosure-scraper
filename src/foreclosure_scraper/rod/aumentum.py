@@ -182,54 +182,92 @@ def _money(s: str | None) -> float | None:
     return v if 0 < v <= 50_000_000 else None
 
 
-async def search_by_name(state: str, county: str, name: str, max_docs: int = 50) -> list[RodDoc]:
-    """Two-stage ASP.NET fetch: GET the form to get __VIEWSTATE, POST with name."""
+_INSTR_GRID_ROW = re.compile(
+    r"<tr[^>]*>((?:(?!</tr>).)*?\d{2}/\d{2}/\d{4}(?:(?!</tr>).)*?)</tr>", re.S)
+_TD = re.compile(r"<td[^>]*>(.*?)</td>", re.S)
+
+
+def _cell_text(html: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html)).strip()
+
+
+def _parse_instruments_grid(html: str, county: str, state: str) -> list[RodDoc]:
+    """Parse the Cott/Aumentum v4 cpgvInstruments results grid (position-based).
+    Column order verified live (Buncombe/Gaston 2026-06-30):
+    td0=row#, 1=Date Filed, 2=Code, 3=Type, 4=Grantor, 5=Grantee, 6=Description,
+    7=File Number, 8=Book-Page."""
+    out: list[RodDoc] = []
+    for m in _INSTR_GRID_ROW.finditer(html or ""):
+        cells = [_cell_text(c) for c in _TD.findall(m.group(1))]
+        if len(cells) < 5:
+            continue
+        date_s = cells[1]
+        try:
+            recorded = dateparser.parse(date_s)
+        except (ValueError, TypeError, OverflowError):
+            recorded = None
+        dtype = cells[3] if len(cells) > 3 else ""
+        grantor = cells[4] if len(cells) > 4 else ""
+        grantee = cells[5] if len(cells) > 5 else ""
+        bp = cells[8] if len(cells) > 8 else ""
+        book, page = (bp.split("-", 1) + [""])[:2] if "-" in bp else (bp, "")
+        out.append(RodDoc(
+            county=county, state=state, doc_type=normalize_doc_type(dtype),
+            recorded_date=recorded, book=book.strip() or None, page=page.strip() or None,
+            grantor=grantor[:200] or None, grantee=grantee[:200] or None,
+        ))
+    return out
+
+
+async def search_by_name(state: str, county: str, name: str, max_docs: int = 400) -> list[RodDoc]:
+    """Cott/Aumentum v4 name-index search (live-verified 2026-06-30; replaces the old
+    broken field names + the empty-__VIEWSTATE bail). GET SrchName.aspx to seed the
+    session cookies, then POST the ucSrchNames tab with btnInstruments='Search (All
+    Matches)' (server holds search state in the session, __VIEWSTATE is intentionally
+    empty on this Cott v4 form). curl_cffi chrome impersonation + verify=False for the
+    Buncombe SSL chain."""
     if (state, county) not in AUMENTUM_COUNTIES:
         return []
     base = AUMENTUM_COUNTIES[(state, county)]
-    form_url = f"{base}/SrchName.aspx"
-
+    url = f"{base}/SrchName.aspx"
+    last, first = name, ""
+    if "," in name:
+        a, b = name.split(",", 1)
+        last, first = a.strip(), (b.strip().split(" ")[0] if b.strip() else "")
+    elif " " in name:
+        parts = name.split()
+        last, first = parts[0], parts[1]
     try:
-        async with client(timeout=30.0) as c:
-            # Stage 1: get the form (acquire viewstate cookies)
-            r = await c.get(form_url)
-            if r.status_code != 200:
-                return []
-            html = r.text
-            viewstate = _extract_hidden(html, "__VIEWSTATE")
-            generator = _extract_hidden(html, "__VIEWSTATEGENERATOR")
-            event_val = _extract_hidden(html, "__EVENTVALIDATION")
-            if not viewstate:
-                return []
-
-            # Stage 2: POST the form with name fields
-            # Aumentum form uses ctl00$cphMain$txtLastName etc.
-            # Heuristic: split "LAST FIRST" or "LAST, FIRST"
-            last = name
-            first = ""
-            if "," in name:
-                parts = [p.strip() for p in name.split(",", 1)]
-                last, first = parts[0], parts[1] if len(parts) > 1 else ""
-            elif " " in name:
-                parts = name.split()
-                last = parts[0]
-                first = " ".join(parts[1:])
-
+        from curl_cffi.requests import AsyncSession
+    except Exception:  # pragma: no cover
+        return []
+    P = "ctl00$cphMain$tcMain$tpNewSearch$ucSrchNames$"
+    try:
+        async with AsyncSession(verify=False, impersonate="chrome") as s:
+            r = await s.get(url, allow_redirects=True, timeout=30)
+            final = str(r.url)
             data = {
-                "__VIEWSTATE": viewstate,
-                "__VIEWSTATEGENERATOR": generator,
-                "__EVENTVALIDATION": event_val,
-                "ctl00$cphMain$txtLastName": last,
-                "ctl00$cphMain$txtFirstName": first,
-                "ctl00$cphMain$btnSearch": "Search",
+                "ctl00_cphMain_tcMain_ClientState": '{"ActiveTabIndex":0,"TabEnabledState":[true,false,false,false,true],"TabWasLoadedOnceState":[false,false,false,false,false]}',
+                "__EVENTTARGET": "", "__EVENTARGUMENT": "", "__LASTFOCUS": "",
+                "__VIEWSTATE": "", "__SCROLLPOSITIONX": "0", "__SCROLLPOSITIONY": "0",
+                "__VIEWSTATEENCRYPTED": "",
+                P + "weFiledFrom_ClientState": "", P + "weFiledThru_ClientState": "",
+                P + "meeFiledFrom_ClientState": "", P + "meeFiledThru_ClientState": "",
+                P + "txtFirmSurname": last, P + "ddlWildcardLast": "0",
+                P + "txtGivenName": first, P + "ddlWildcardFirst": "0",
+                P + "ddlSide": "-1", P + "ddlType": "-1", P + "ddlIndexType": "",
+                P + "txtFiledFrom": "", P + "txtFiledThru": "",
+                P + "ddlSortDir": "Date Descending",
+                P + "btnInstruments": "Search (All Matches)",
+                "ctl00$txtJobReference": "",
+                "ctl00$ucShoppingCart$meeZipCode_ClientState": "",
+                "ctl00$ucShoppingCart$hfQuantity": "",
             }
-            r2 = await c.post(form_url, data=data, headers={"Referer": form_url})
-            if r2.status_code != 200:
-                return []
+            r2 = await s.post(final, data=data, headers={"Referer": final},
+                              allow_redirects=True, timeout=45)
     except Exception:
         return []
-
-    return _parse_grid(r2.text, county, state)[:max_docs]
+    return _parse_instruments_grid(r2.text, county, state)[:max_docs]
 
 
 async def discover_recent_nods(

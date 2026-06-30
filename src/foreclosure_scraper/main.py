@@ -1581,6 +1581,14 @@ async def run() -> int:
     except Exception:
         log.error("cchs_rod.failed", traceback=traceback.format_exc())
 
+    # Buncombe NC ROD lien-existence (Cott/Aumentum v4 name search — fixed adapter).
+    try:
+        from .enrichment_aumentum_rod import enrich_aumentum_rod
+        s = await enrich_aumentum_rod(enriched)
+        if s and "skipped" not in s: enrichment_stats["aumentum_rod"] = s
+    except Exception:
+        log.error("aumentum_rod.failed", traceback=traceback.format_exc())
+
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:
         from .enrichment_life_events import enrich_life_events
