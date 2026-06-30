@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from datetime import datetime
 from typing import Iterable
 
@@ -43,6 +44,7 @@ _LIST = _HOST + "/legal-notices/?page={page}"
 _MAX_PAGES = 40          # safety cap; loop also stops when a page adds nothing new
 _ENRICH_DETAILS = True   # follow each notice to its detail page for the body text
 _MAX_DETAIL_FETCH = 250  # bound detail fetches so a big run never blows timeout_s
+_DETAIL_BUDGET_S = 150   # hard wall-clock cap on the (throttled) detail-enrich pass
 
 _ARTICLE_RE = re.compile(
     r'<div class="article[^"]*">\s*'
@@ -141,12 +143,37 @@ class SpartanWeeklyLegals(BaseScraper):
                 if not page_rows or fresh == 0:   # clamped/empty -> end of notices
                     break
 
-            listings: list[Listing] = []
-            for i, row in enumerate(rows):
-                enrich = _ENRICH_DETAILS and i < _MAX_DETAIL_FETCH
-                li = await self._row_to_listing(row, c, enrich)
-                if li:
-                    listings.append(li)
+            # 1) Emit a base lead for EVERY notice FIRST (network-free), so all of
+            #    them land even if detail enrichment is slow or cut off. The old
+            #    single loop detail-fetched sequentially under the per-host throttle
+            #    and stalled before reaching the probate notices (which sit later in
+            #    the list) — dropping every Spartanburg probate lead.
+            listings: list[Listing] = [
+                await self._row_to_listing(row, c, enrich=False) for row in rows
+            ]
+
+            # 2) Best-effort, TIME-BOXED detail enrichment — PROBATE FIRST (those need
+            #    the decedent/PR/address from the body; foreclosure rows already carry
+            #    an address from the list row). A slow/failed fetch never drops a lead.
+            if _ENRICH_DETAILS:
+                order = sorted(
+                    range(len(rows)),
+                    key=lambda j: 0 if _classify(rows[j]["type"])[1] == "probate" else 1,
+                )
+                t0 = time.monotonic()
+                enriched_n = 0
+                for j in order[:_MAX_DETAIL_FETCH]:
+                    if time.monotonic() - t0 > _DETAIL_BUDGET_S:
+                        break
+                    try:
+                        full = await self._row_to_listing(rows[j], c, enrich=True)
+                    except Exception:
+                        full = None
+                    if full:
+                        listings[j] = full
+                        enriched_n += 1
+                log.info("spartan_weekly.enriched", enriched=enriched_n, of=len(rows))
+        listings = [li for li in listings if li]
         log.info("spartan_weekly.done", notices=len(rows), leads=len(listings))
         return listings
 
