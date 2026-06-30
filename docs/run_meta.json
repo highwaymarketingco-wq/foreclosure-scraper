@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-06-30T05:51:35.105306Z",
+  "run_time": "2026-06-30T06:15:16.339041Z",
   "total": 3632,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "cchs Burke+Cleveland ROD"
+  "notes": "cchs Madison+Henderson ROD"
 }
