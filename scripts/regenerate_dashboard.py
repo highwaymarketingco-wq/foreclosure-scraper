@@ -160,6 +160,14 @@ def main() -> int:
 
     print("enrich_data_quality:", enrich_data_quality(listings))
 
+    # Promote a recoverable tax/GIS owner into any empty owner_name (unblocks mailing,
+    # voter-phone, ROD name-search downstream). Runs BEFORE voter_phone + gaston_rod.
+    try:
+        from foreclosure_scraper.enrichment_promote_owner import enrich_promote_owner
+        print("enrich_promote_owner:", enrich_promote_owner(listings))
+    except Exception as e:  # noqa: BLE001
+        print("enrich_promote_owner: ERROR", str(e)[:80])
+
     # Free NC owner-phone from the NCSBE voter file (name+address / name+county-unique).
     # No-op if data/ncvoter/ isn't present (degrades gracefully). DNC-gated downstream.
     try:
