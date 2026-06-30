@@ -108,6 +108,19 @@ def main() -> int:
     print("enrich_sc_cama:", enrich_sc_cama(listings))
     print("enrich_footprint_sqft:", enrich_footprint_sqft(listings))
 
+    # Seed Tier-0 recorded-comp signal from the subject parcel's OWN QUALIFIED
+    # assessor-card sale(s) for comp-thin counties (gap-fill: never clobbers a
+    # GIS recorded_comps basket). MUST run before the valuation recompute below
+    # so calc reads raw['comp_median_ppsf_recorded'] (mirrors main.py order).
+    from foreclosure_scraper.enrichment_assessor_comps import enrich_assessor_comps
+    print("enrich_assessor_comps:", enrich_assessor_comps(listings))
+
+    # Court-lead owner verification — strip the wrong property off any courtlistener/lis-pendens
+    # /bankruptcy lead whose geo-snapped owner surname doesn't match the docket defendant (the
+    # neighbor's-parcel bug). MUST run before valuation so stripped leads don't keep a bogus ARV.
+    from foreclosure_scraper.enrichment_court_owner_verify import enrich_court_owner_verify
+    print("enrich_court_owner_verify:", enrich_court_owner_verify(listings))
+
     # Recompute valuation + grade with current logic (mirrors main.py).
     vfail = 0
     for li in listings:
@@ -235,6 +248,19 @@ def main() -> int:
                          _t("REGEN_SC_DIVORCE_TIMEOUT", 14400))
         except Exception as e:  # noqa: BLE001
             print("enrich_sc_divorce: ERROR", str(e)[:80])
+
+    # NAME -> PROPERTY resolver — name-indexed leads (owner_name/defendant, no
+    # address/parcel) -> real parcel via county GIS owner-name index. Runs AFTER
+    # the court/divorce enrichers, BEFORE calc/grade/equity so the resolved
+    # parcel value/sqft feed them. Gated FORECLOSURE_NAME_RESOLVE (default on).
+    try:
+        from foreclosure_scraper.enrichment_resolve_name_to_property import (
+            enrich_resolve_name_to_property,
+        )
+        _run_bounded("name_resolve", enrich_resolve_name_to_property(listings),
+                     _t("REGEN_NAME_RESOLVE_TIMEOUT", 3600))
+    except Exception as e:  # noqa: BLE001
+        print("enrich_resolve_name_to_property: ERROR", str(e)[:80])
 
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:

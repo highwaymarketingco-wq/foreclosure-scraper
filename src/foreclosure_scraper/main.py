@@ -1199,6 +1199,17 @@ async def run() -> int:
     except Exception:
         log.error("recorded_comps.failed", traceback=traceback.format_exc())
 
+    # ASSESSOR-CARD QUALIFIED-sale Tier-0 fallback — for the comp-thin counties
+    # the GIS recorded-comps pass doesn't cover, seed raw['recorded_comps'] from
+    # the subject parcel's OWN QUALIFIED arms-length sale(s) on its assessor card
+    # (price / subject sqft). MEDIUM confidence, never clobbers a real GIS basket.
+    # Runs after the GIS pass (gap-fill only) and before valuation.
+    try:
+        from .enrichment_assessor_comps import enrich_assessor_comps
+        enrich_assessor_comps(enriched)
+    except Exception:
+        log.error("assessor_comps.failed", traceback=traceback.format_exc())
+
     # Comp finder + property-spec backfill — pulls 180-day sold pool per county
     # from HomeHarvest (free), backfills missing sqft/beds/baths/year, attaches
     # 3 comparable sales per listing matched by zip + sqft + beds.
@@ -1629,6 +1640,20 @@ async def run() -> int:
     except Exception:
         log.error("sc_divorce.failed", traceback=traceback.format_exc())
 
+    # NAME -> PROPERTY resolver — the backbone that turns name-indexed leads
+    # (SC Public Index civil/criminal, SC/NC divorce, NC court ingest, probate
+    # notices) with owner_name/defendant but NO address/parcel into real property
+    # leads, via the county GIS owner-name index. Runs AFTER the court/divorce
+    # enrichers (so those name-only leads exist) and BEFORE the calc/grade/equity
+    # pass (so the resolved parcel's value/sqft feed them). Gated
+    # FORECLOSURE_NAME_RESOLVE (default on), per-run cap + budget, core counties.
+    try:
+        from .enrichment_resolve_name_to_property import enrich_resolve_name_to_property
+        s = await enrich_resolve_name_to_property(enriched)
+        if s: enrichment_stats["name_resolve"] = s
+    except Exception:
+        log.error("name_resolve.failed", traceback=traceback.format_exc())
+
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:
         from .enrichment_life_events import enrich_life_events
@@ -1729,6 +1754,17 @@ async def run() -> int:
             enrichment_stats["dew_liens"] = s
     except Exception:
         log.error("dew_liens.failed", traceback=traceback.format_exc())
+
+    # Court-lead owner verification — strip the wrong property off any courtlistener/lis-pendens/
+    # bankruptcy lead whose geo-snapped owner surname doesn't match the docket defendant (the
+    # neighbor's-parcel bug). MUST run before valuation so a stripped lead doesn't keep a bogus ARV.
+    try:
+        from .enrichment_court_owner_verify import enrich_court_owner_verify
+        s = enrich_court_owner_verify(enriched)
+        if s:
+            enrichment_stats["court_owner_verify"] = s
+    except Exception:
+        log.error("court_owner_verify.failed", traceback=traceback.format_exc())
 
     # Investor calculator + A-F grades per listing.
     valuation_failures = 0
