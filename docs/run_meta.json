@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-06-30T08:46:46.742110Z",
+  "run_time": "2026-06-30T08:58:19.559803Z",
   "total": 3632,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "phone line-type classification"
+  "notes": "Buncombe gis_exempt elderly backfill"
 }
