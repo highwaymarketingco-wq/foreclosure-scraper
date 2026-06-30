@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-06-30T07:59:29.122845Z",
+  "run_time": "2026-06-30T08:45:16.909713Z",
   "total": 3632,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "Spartanburg ROD render batch"
+  "notes": "ROD detail propagation"
 }
