@@ -113,10 +113,13 @@ _DIVORCE_CATEGORIES = (
 # Per-run cap + refresh windows. The API is fast (~1 req/category/lead) so the
 # cap is generous; bounded only so a single run can't sweep the whole board in
 # one go if the operator wants to stage it. Idempotent across runs via fetched_at.
-_DEFAULT_CAP = int(os.environ.get("FORECLOSURE_SC_DIVORCE_MAX", "100000"))
+_DEFAULT_CAP = int(os.environ.get("FORECLOSURE_SC_DIVORCE_MAX", "400"))
 _REFRESH_DAYS = float(os.environ.get("FORECLOSURE_SC_DIVORCE_REFRESH_DAYS", "30"))
 _REFRESH_HOT_DAYS = float(os.environ.get("FORECLOSURE_SC_DIVORCE_REFRESH_HOT_DAYS", "7"))
-_CALL_TIMEOUT_S = float(os.environ.get("FORECLOSURE_SC_DIVORCE_CALL_TIMEOUT_S", "45"))
+_CALL_TIMEOUT_S = float(os.environ.get("FORECLOSURE_SC_DIVORCE_CALL_TIMEOUT_S", "20"))
+# Wall-clock cap on the whole run so a throttled/hanging FCCMS can't drag it on for hours
+# (it hung ~6h once on a 1,677-lead bulk pass). Unreached leads retry next run via the refresh window.
+_BUDGET_S = float(os.environ.get("FORECLOSURE_SC_DIVORCE_BUDGET_S", "1800"))
 _PER_QUERY_CAP = 25  # max case rows kept per lead
 
 
@@ -358,10 +361,13 @@ async def enrich_sc_divorce(listings, max_lookups: int | None = None) -> dict:
     targets = targets[:cap]
 
     stats = {"pending": total_pending, "targets": len(targets), "searched": 0,
-             "with_divorce": 0, "cases_found": 0, "errors": 0}
+             "with_divorce": 0, "cases_found": 0, "errors": 0, "budget_exhausted": False}
     if not targets:
         return stats
 
+    import time as _time
+    _t0 = _time.monotonic()
+    consec_err = 0
     async with AsyncSession(verify=False) as s:
         token = await _handshake(s)
         if not token:
@@ -375,14 +381,22 @@ async def enrich_sc_divorce(listings, max_lookups: int | None = None) -> dict:
             "Origin": BASE,
         }
         for li in targets:
+            if _time.monotonic() - _t0 > _BUDGET_S:
+                stats["budget_exhausted"] = True
+                break
+            if consec_err >= 12:
+                stats["aborted_throttled"] = True  # FCCMS is failing every call -> stop, retry later
+                break
             last, first = _name_parts(li.owner_name)
             if not last:
                 continue
             county_code = _COUNTY_CODE[(li.county or "").strip()]
             try:
                 cases = await _search_one(s, headers, last, first, county_code)
+                consec_err = 0
             except Exception:  # noqa: BLE001
                 stats["errors"] += 1
+                consec_err += 1
                 continue  # leave unstamped -> retried next run
             stats["searched"] += 1
             _apply(li, cases, now)
