@@ -186,6 +186,14 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         print("prune_stale_reo: ERROR", str(e)[:80])
 
+    # Data-quality corrections (LAST, after tiers set): bbox/centroid geo guards,
+    # auction_status normalization, presumed-withdrawn stale-case flag + HOT down-rank.
+    try:
+        from foreclosure_scraper.enrichment_board_quality import enrich_board_quality
+        print("enrich_board_quality:", enrich_board_quality(listings))
+    except Exception as e:  # noqa: BLE001
+        print("enrich_board_quality: ERROR", str(e)[:80])
+
     # Post-enrich dedupe — mirrors merge_today_sources + main.py's H1 fix. GIS/parcel
     # backfill fills parcel_id AFTER the original scrape-time dedupe, so same-property
     # twins (a reverse-geo-resolved row + its synthetic-address sibling) only become
