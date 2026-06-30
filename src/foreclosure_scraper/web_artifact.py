@@ -92,6 +92,7 @@ RAW_KEEP = {
     "geo_imprecise": "*",             # out_of_bbox (geo nulled) | centroid_snap (county/town-center fallback)
     "stale_case": "*",                # presumed_withdrawn lis-pendens — likely resolved, down-ranked from HOT
     "life_events": "*",               # elderly/probate signals: life_estate | estate_probate | multiple_heirs | trust
+    "gis_exempt": "*",                # statutory tax-relief exemption (ELD/DIS/BLD/VET) -> hard elderly/disabled signal
     "owner_name_source": "*",         # provenance when owner_name was promoted from tax/GIS
     "notice_contact": "*",            # attributable attorney/trustee email from the legal-notice body
     "incarceration": "*",             # owner matched a state corrections roster (NC DAC) — low-conf stack signal

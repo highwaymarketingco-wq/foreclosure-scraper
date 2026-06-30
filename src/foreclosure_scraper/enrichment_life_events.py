@@ -26,6 +26,12 @@ def enrich_life_events(listings) -> dict:
     for li in listings:
         o = getattr(li, "owner_name", None) or ""
         flags = [k for k, p in _PATTERNS if p.search(o)]
+        # Fold in a statutory tax-relief exemption (elderly/disabled/blind/veteran) surfaced by
+        # enrichment_gis_attrs as raw['gis_exempt'] — a HARD age/disability signal, not just name text.
+        ex = li.raw.get("gis_exempt") if isinstance(li.raw, dict) else None
+        ex_tag = ex.get("tag") if isinstance(ex, dict) else None
+        if ex_tag and ex_tag not in flags:
+            flags.append(ex_tag)
         if not flags:
             continue
         if not isinstance(li.raw, dict):

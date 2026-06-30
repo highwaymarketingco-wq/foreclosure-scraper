@@ -251,6 +251,37 @@ async def _query_parcel(c: httpx.AsyncClient, base: str, parcel: str,
 
 # ---- Apply ---------------------------------------------------------------------
 
+# Statutory tax-relief exemption codes (NC homestead etc.) — a HARD, free age/disability
+# signal that several county GIS layers (e.g. Buncombe) carry in the attribute bag we already
+# fetch. ELD requires owner 65+, DIS = totally & permanently disabled, BLD = blind, by law.
+EXEMPT_FIELDS = ("exempt", "exemptcd", "exempt_cd", "exemptioncode", "exemption",
+                 "exemptdesc", "exempt_desc", "taxrelief", "tax_relief", "exemptstat")
+_EXEMPT_TABLE = {"ELD": "elderly_exemption", "DIS": "disabled_exemption",
+                 "BLD": "blind_exemption", "VET": "disabled_veteran_exemption"}
+
+
+def _exempt_signal(norm: dict) -> tuple[str, str] | None:
+    """Return (code, tag) for a recognized statutory age/disability exemption, else None."""
+    raw = _pick(norm, EXEMPT_FIELDS)
+    if raw is None:
+        return None
+    v = str(raw).strip().upper()
+    if not v or v in ("0", "NONE", "N", "NO", "FALSE", "0.0"):
+        return None
+    code = v[:3]
+    if code in _EXEMPT_TABLE:
+        return code, _EXEMPT_TABLE[code]
+    if "ELDER" in v:
+        return "ELD", "elderly_exemption"
+    if "DISAB" in v:
+        return "DIS", "disabled_exemption"
+    if "BLIND" in v:
+        return "BLD", "blind_exemption"
+    if "VETERAN" in v:
+        return "VET", "disabled_veteran_exemption"
+    return None
+
+
 def apply_gis_attrs(li: Listing, attrs: dict[str, Any]) -> dict[str, int]:
     """Backfill value/owner/specs from a matched GIS feature. Missing-only.
     Returns per-field fill flags (1 = newly populated this call)."""
@@ -331,6 +362,12 @@ def apply_gis_attrs(li: Listing, attrs: dict[str, Any]) -> dict[str, int]:
         # per-county fields (last sale price/date, deed book/page, tax-paid date)
         # that this generic mapper doesn't promote to first-class Listing fields.
         li.raw["gis_attrs_full"] = attrs
+        # Promote a recognized statutory exemption to a durable, whitelisted signal so the
+        # life-events enricher can flag elderly/disabled owners (survives to listings.json,
+        # unlike gis_attrs_full which is stripped at publish).
+        ex = _exempt_signal(norm)
+        if ex:
+            li.raw["gis_exempt"] = {"code": ex[0], "tag": ex[1]}
     return flags
 
 
