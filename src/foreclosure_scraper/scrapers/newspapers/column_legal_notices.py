@@ -309,6 +309,31 @@ def _split_addr(full: str | None) -> tuple[str | None, str | None, str | None]:
     return (street or None), city, zip_code
 
 
+_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+_EMAIL_JUNK = re.compile(r"noreply|no-reply|column\.us|enotice|example\.|wordpress|sentry|\.(png|jpg|gif)", re.I)
+_FIRM_RE = re.compile(
+    r"([A-Z][A-Za-z&,.'\- ]{4,55}(?:PLLC|LLP|LLC|P\.?A\.?|P\.?C\.?|"
+    r"Law(?: Firm| Offices?| Group)?|Attorney|Substitute Trustee|Trustee|& Ingle))")
+
+
+def _notice_email(text: str) -> dict:
+    """The ONE free, attributable email channel — the attorney/trustee/firm email published in
+    the legal-notice body (verified 2026-06-30: jfletcher@fletchertydings.com etc.). ~5% of
+    notices carry one. It's the filer/trustee, not the owner, but a real reachable case contact."""
+    if not text:
+        return {}
+    for m in _EMAIL_RE.finditer(text):
+        e = m.group(0).rstrip(".").lower()
+        if _EMAIL_JUNK.search(e) or len(e) > 60:
+            continue
+        out = {"email": e, "source": "column_notice_body"}
+        fm = _FIRM_RE.findall(text[max(0, m.start() - 180): m.start()])
+        if fm:
+            out["name"] = re.sub(r"\s+", " ", fm[-1]).strip()
+        return out
+    return {}
+
+
 def _parse_nc_foreclosure(text: str) -> dict:
     """Extract structured fields from an NC foreclosure-sale notice body."""
     t = _norm(text)
@@ -685,7 +710,7 @@ class ColumnLegalNotices(BaseScraper):
 
     # ----------------------------------------------------------------- #
     def _common_raw(self, it: dict) -> dict:
-        return {
+        raw = {
             "column": {
                 "id": it.get("id"),
                 "newspapername": it.get("newspapername"),
@@ -695,6 +720,10 @@ class ColumnLegalNotices(BaseScraper):
                 "publishedtimestamp": it.get("publishedtimestamp"),
             }
         }
+        nc = _notice_email(it.get("text") or "")
+        if nc:
+            raw["notice_contact"] = nc   # attributable attorney/trustee email
+        return raw
 
     def _published_dt(self, it: dict) -> datetime:
         ts = it.get("publishedtimestamp")

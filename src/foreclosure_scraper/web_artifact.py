@@ -93,6 +93,7 @@ RAW_KEEP = {
     "stale_case": "*",                # presumed_withdrawn lis-pendens — likely resolved, down-ranked from HOT
     "life_events": "*",               # elderly/probate signals: life_estate | estate_probate | multiple_heirs | trust
     "owner_name_source": "*",         # provenance when owner_name was promoted from tax/GIS
+    "notice_contact": "*",            # attributable attorney/trustee email from the legal-notice body
     "incarceration": "*",             # owner matched a state corrections roster (NC DAC) — low-conf stack signal
     "distress_stack": "*",            # HOT/WARM/COLD tier + stacked distress categories + score (operator board)
     "cama": "*",                      # county CAMA distress (condition/last-sale/deed-ref/owner-occupancy)
