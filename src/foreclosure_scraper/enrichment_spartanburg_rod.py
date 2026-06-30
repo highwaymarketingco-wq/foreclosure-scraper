@@ -98,13 +98,17 @@ def _rod_age_days(li, now: datetime) -> float | None:
 async def enrich_spartanburg_rod(listings, max_lookups: int | None = None) -> dict:
     if os.environ.get("FORECLOSURE_SPARTANBURG_ROD", "1") == "0":
         return {"skipped": "disabled (FORECLOSURE_SPARTANBURG_ROD=0)"}
-    cap = max_lookups if max_lookups is not None else int(os.environ.get("FORECLOSURE_SPARTANBURG_ROD_MAX", "40"))
-    # Deal-aware revolving window: a fresh lien matters MOST on imminent deals, so HOT / near-auction
-    # leads re-check every couple days; everyone else weekly. (Render cost forbids re-checking all 376
-    # every run, so this is the cost/freshness knob — both env-tunable.) Never-fetched always qualifies.
-    base_days = float(os.environ.get("FORECLOSURE_SPARTANBURG_ROD_REFRESH_DAYS", "7"))
-    hot_days = float(os.environ.get("FORECLOSURE_SPARTANBURG_ROD_REFRESH_HOT_DAYS", "2"))
+    # ALL Spartanburg leads, every full scrape — no per-run count cap (set MAX only to bound a quick
+    # test). Refresh defaults to 3 days so a twice-weekly full scrape always re-pulls everyone (no
+    # gaps). Bounded only by a wall-clock BUDGET_S safety so a pathological render can't hang the run;
+    # any leads not reached stay unstamped and get pulled next run.
+    cap = max_lookups if max_lookups is not None else int(os.environ.get("FORECLOSURE_SPARTANBURG_ROD_MAX", "100000"))
+    base_days = float(os.environ.get("FORECLOSURE_SPARTANBURG_ROD_REFRESH_DAYS", "3"))
+    hot_days = float(os.environ.get("FORECLOSURE_SPARTANBURG_ROD_REFRESH_HOT_DAYS", "1"))
+    budget_s = float(os.environ.get("FORECLOSURE_SPARTANBURG_ROD_BUDGET_S", "14400"))  # 4h safety
     now = datetime.now(timezone.utc)
+    import time as _time
+    _t0 = _time.monotonic()
 
     def _imminent(li) -> bool:
         tier = ((li.raw or {}).get("distress_stack") or {}).get("tier")
@@ -123,17 +127,20 @@ async def enrich_spartanburg_rod(listings, max_lookups: int | None = None) -> di
         age = _rod_age_days(li, now)
         return age is None or age >= (hot_days if _imminent(li) else base_days)
 
-    # ALL Spartanburg leads (not just HOT) — rolling coverage capped per run.
+    # EVERY Spartanburg lead that's due a refresh (all of them on a twice-weekly full scrape).
     targets = [li for li in listings
                if li.state == "SC" and (li.county or "").strip() == "Spartanburg"
                and li.owner_name and stale(li)]
-    # Order: never-fetched first, then stalest first (oldest fetched_at) -> the window revolves.
+    # Order: never-fetched first, then stalest first, so a budget-trimmed run still makes progress.
     targets.sort(key=lambda li: (_rod_age_days(li, now) is not None, -(_rod_age_days(li, now) or 1e9)))
     total_pending = len(targets)
     targets = targets[:cap]
     stats = {"pending": total_pending, "targets": len(targets), "searched": 0,
-             "with_instruments": 0, "with_mortgage": 0, "with_adverse": 0}
+             "with_instruments": 0, "with_mortgage": 0, "with_adverse": 0, "budget_exhausted": False}
     for li in targets:
+        if _time.monotonic() - _t0 > budget_s:
+            stats["budget_exhausted"] = True
+            break
         last, first = _name_parts(li.owner_name)
         try:
             docs = await search_by_name_render("SC", "Spartanburg", li.owner_name)
