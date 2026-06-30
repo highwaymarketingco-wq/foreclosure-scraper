@@ -1564,6 +1564,15 @@ async def run() -> int:
     except Exception:
         log.error("voter_phone.failed", traceback=traceback.format_exc())
 
+    # Classify each owner_phone (free LERG lookup) -> line_type + tcpa_class so landlines become a
+    # compliant call lane; runs AFTER voter_phone so it sees the numbers it just set.
+    try:
+        from .enrichment_line_type import enrich_line_type
+        s = await enrich_line_type(enriched)
+        if s: enrichment_stats["line_type"] = s
+    except Exception:
+        log.error("line_type.failed", traceback=traceback.format_exc())
+
     # Gaston NC Register of Deeds lien-existence by owner name (gated FORECLOSURE_GASTON_ROD=1).
     # Free name-index search over the public ROD; attaches raw['rod'] (D/T mortgage + adverse liens).
     try:

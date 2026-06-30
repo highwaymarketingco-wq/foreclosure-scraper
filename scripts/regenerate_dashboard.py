@@ -176,6 +176,14 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         print("enrich_voter_phone: ERROR", str(e)[:80])
 
+    # Classify each owner_phone line-type (free LERG lookup) -> tcpa_class; landlines become the
+    # compliant call lane. Async + bounded; runs after voter_phone so it sees the set numbers.
+    try:
+        from foreclosure_scraper.enrichment_line_type import enrich_line_type
+        print("enrich_line_type:", _run_bounded("line_type", enrich_line_type(listings), _t("REGEN_LINETYPE_TIMEOUT", 600)))
+    except Exception as e:  # noqa: BLE001
+        print("enrich_line_type: ERROR", str(e)[:80])
+
     # Gaston NC Register of Deeds lien-existence by owner name (gated FORECLOSURE_GASTON_ROD=1;
     # free name-index search, 3-step session-seed). Attaches raw['rod'] (D/T mortgage + adverse liens).
     if os.environ.get("FORECLOSURE_GASTON_ROD") == "1":
