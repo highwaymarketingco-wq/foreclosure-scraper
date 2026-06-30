@@ -1718,6 +1718,20 @@ async def run() -> int:
     except Exception:
         log.error("resolved_catchup.failed", traceback=traceback.format_exc())
 
+    # Taxes-OWED normalizer — fold each tax source's own amount key (Buncombe
+    # principal_tax_due, SC state-lien balance, Oconee FLC bid) into one
+    # raw['tax_owed'], then cross-reference it onto any same-parcel lead (a court/
+    # probate lead the resolver just pinned to a tax-delinquent parcel inherits the
+    # balance). Runs AFTER the resolver (so resolved parcels exist) and BEFORE
+    # equity/lien-stack so the owed balance can feed them. Free, pure-Python.
+    try:
+        from .enrichment_tax_owed import enrich_tax_owed
+        s = enrich_tax_owed(enriched)
+        if s:
+            enrichment_stats["tax_owed"] = s
+    except Exception:
+        log.error("tax_owed.failed", traceback=traceback.format_exc())
+
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:
         from .enrichment_life_events import enrich_life_events

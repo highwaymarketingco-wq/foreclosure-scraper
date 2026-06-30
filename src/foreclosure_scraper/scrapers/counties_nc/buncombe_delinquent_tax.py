@@ -124,7 +124,11 @@ def parse_block(block_lines: list[str], url: str) -> Listing | None:
         owner_name=owner,
         defendant=owner,
         parcel_id=pin,
-        tax_value=tax_due,
+        # NOTE: tax_due is the back-tax balance OWED, NOT the assessed/taxable
+        # value — do NOT put it in tax_value (calc.py would read it as the
+        # property value and ARV=tax_value*1.25 would collapse to ~$1k). The
+        # owed amount lives in raw.principal_tax_due and is normalized to
+        # raw['tax_owed'] by enrichment_tax_owed; assessed value comes from GIS.
         foreclosure_process="tax",
         description=_clean(f"{owner or ''} {situs or ''} PIN {pin}")[:300],
         first_seen=datetime.utcnow(),
