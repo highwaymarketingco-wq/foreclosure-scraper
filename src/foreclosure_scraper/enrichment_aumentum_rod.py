@@ -13,8 +13,10 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+from datetime import datetime, timezone
 
 from .rod import aumentum
+from .rod.classify import classify_rod_docs, is_stale, refresh_windows
 
 _COUNTIES = {"Buncombe"}
 _MORTGAGE = re.compile(r"DEED OF TRUST|MORTGAGE|SECURITY (DEED|AGREEMENT)|\bD\s*/?\s*T\b", re.I)
@@ -61,13 +63,18 @@ def _classify(docs) -> dict:
 async def enrich_aumentum_rod(listings, max_lookups: int | None = None) -> dict:
     if os.environ.get("FORECLOSURE_AUMENTUM_ROD", "1") == "0":
         return {"skipped": "disabled (FORECLOSURE_AUMENTUM_ROD=0)"}
+    now = datetime.now(timezone.utc)
+    hot_days, base_days = refresh_windows("FORECLOSURE_AUMENTUM_ROD", 7, 2)
     targets = [li for li in listings
                if li.state == "NC" and (li.county or "").strip() in _COUNTIES
-               and li.owner_name and not (isinstance(li.raw, dict) and "rod" in li.raw)]
+               and li.owner_name and is_stale(li, now, hot_days, base_days)]
     if max_lookups:
         targets = targets[:max_lookups]
     stats = {"targets": len(targets), "searched": 0, "with_instruments": 0,
              "with_mortgage": 0, "with_adverse": 0}
+    empty = {"instrument_count": 0, "kinds": {}, "has_mortgage": False, "has_adverse_lien": False,
+             "adverse_types": [], "mortgage_count": 0, "satisfaction_count": 0,
+             "open_mortgages_est": 0, "instruments": [], "source": "aumentum_rod"}
     for li in targets:
         last, first = _name_parts(li.owner_name)
         try:
@@ -75,17 +82,19 @@ async def enrich_aumentum_rod(listings, max_lookups: int | None = None) -> dict:
         except Exception:  # noqa: BLE001
             docs = []
         stats["searched"] += 1
+        if not docs:
+            continue  # fetch failed -> leave unstamped, retry next run
         mine = [d for d in docs if _owner_doc(d, last, first)]
-        if not mine:
-            continue
-        summ = _classify(mine)
+        summ = classify_rod_docs(mine, "aumentum_rod") if mine else dict(empty)
+        summ["fetched_at"] = now.isoformat()
         if not isinstance(li.raw, dict):
             li.raw = {}
         li.raw["rod"] = summ
-        stats["with_instruments"] += 1
-        if summ["has_mortgage"]:
-            stats["with_mortgage"] += 1
-        if summ["has_adverse_lien"]:
-            stats["with_adverse"] += 1
+        if mine:
+            stats["with_instruments"] += 1
+            if summ["has_mortgage"]:
+                stats["with_mortgage"] += 1
+            if summ["has_adverse_lien"]:
+                stats["with_adverse"] += 1
         await asyncio.sleep(0.3)
     return stats

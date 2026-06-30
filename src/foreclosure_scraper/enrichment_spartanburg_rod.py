@@ -99,14 +99,29 @@ async def enrich_spartanburg_rod(listings, max_lookups: int | None = None) -> di
     if os.environ.get("FORECLOSURE_SPARTANBURG_ROD", "1") == "0":
         return {"skipped": "disabled (FORECLOSURE_SPARTANBURG_ROD=0)"}
     cap = max_lookups if max_lookups is not None else int(os.environ.get("FORECLOSURE_SPARTANBURG_ROD_MAX", "40"))
-    # Revolving window: re-fetch any lead whose ROD is older than this so new liens get caught
-    # as days/weeks pass. Never-fetched leads always qualify.
-    refresh_days = float(os.environ.get("FORECLOSURE_SPARTANBURG_ROD_REFRESH_DAYS", "21"))
+    # Deal-aware revolving window: a fresh lien matters MOST on imminent deals, so HOT / near-auction
+    # leads re-check every couple days; everyone else weekly. (Render cost forbids re-checking all 376
+    # every run, so this is the cost/freshness knob — both env-tunable.) Never-fetched always qualifies.
+    base_days = float(os.environ.get("FORECLOSURE_SPARTANBURG_ROD_REFRESH_DAYS", "7"))
+    hot_days = float(os.environ.get("FORECLOSURE_SPARTANBURG_ROD_REFRESH_HOT_DAYS", "2"))
     now = datetime.now(timezone.utc)
+
+    def _imminent(li) -> bool:
+        tier = ((li.raw or {}).get("distress_stack") or {}).get("tier")
+        if tier == "HOT":
+            return True
+        sd = getattr(li, "sale_date", None)
+        if sd:
+            try:
+                d = datetime.fromisoformat(str(sd)[:10]).replace(tzinfo=timezone.utc)
+                return 0 <= (d - now).days <= 30   # auction within 30 days
+            except Exception:  # noqa: BLE001
+                return False
+        return False
 
     def stale(li) -> bool:
         age = _rod_age_days(li, now)
-        return age is None or age >= refresh_days
+        return age is None or age >= (hot_days if _imminent(li) else base_days)
 
     # ALL Spartanburg leads (not just HOT) — rolling coverage capped per run.
     targets = [li for li in listings
