@@ -274,6 +274,11 @@ def main() -> int:
     # sqft/owner into raw['qa_flags']; prints the per-flag counts. Runs after the
     # final dedupe so dup_address reflects the shipped board.
     try:
+        from foreclosure_scraper.enrichment_last_sale import enrich_last_sale  # noqa: E402
+        print("enrich_last_sale:", enrich_last_sale(listings))
+    except Exception as e:  # noqa: BLE001
+        print("enrich_last_sale: ERROR", str(e)[:80])
+    try:
         from foreclosure_scraper.enrichment_board_qa import enrich_board_qa  # noqa: E402
         print("enrich_board_qa:", enrich_board_qa(listings))
     except Exception as e:  # noqa: BLE001

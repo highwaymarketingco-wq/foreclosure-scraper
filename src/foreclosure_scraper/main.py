@@ -1941,6 +1941,16 @@ async def run() -> int:
     # tier vs condition contradiction, un-surfaced assessor sale history, missing
     # sqft/owner) into raw['qa_flags'] and logs the per-flag counts. Pure-Python,
     # runs LAST so it sees the fully-enriched/deduped board. These are regression
+    # Surface a single display-ready last-sale fact (recorded sale / assessor value) before QA,
+    # so the dashboard shows "when/what it sold" and missing_last_sale reflects it.
+    try:
+        from .enrichment_last_sale import enrich_last_sale
+        s = enrich_last_sale(enriched)
+        if s:
+            enrichment_stats["last_sale"] = s
+    except Exception:
+        log.error("last_sale.failed", traceback=traceback.format_exc())
+
     # tripwires: a non-zero arv_below_asis / dup_address means a prior fix broke.
     try:
         from .enrichment_board_qa import enrich_board_qa

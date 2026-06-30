@@ -123,6 +123,7 @@ RAW_KEEP = {
     "title_risk": "*",                # title-defect / cloud-on-title risk assessment
     "zls": "*",                       # ZLS status field
     "qa_flags": "*",                  # automated data-quality flags (dup_address, arv_below_asis, etc.)
+    "last_sale": "*",                 # display-ready last sale {date, amount, basis, source} for the dashboard
 }
 
 

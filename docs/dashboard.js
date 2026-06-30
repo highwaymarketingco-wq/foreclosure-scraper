@@ -534,6 +534,7 @@ function renderCards() {
             ${fmtType(l.listing_type)}
             ${l.opening_bid ? `<span>Bid ${fmtMoney(l.opening_bid)}</span>` : ""}
             ${c.arv_expected ? `<span>ARV ${fmtMoney(c.arv_expected)}${lowArv ? " (proxy)" : ""}</span>` : ""}
+            ${(l.raw && l.raw.last_sale && l.raw.last_sale.date) ? `<span title="${l.raw.last_sale.basis === "assessor_value" ? "county assessor market value as of the sale date (sale price not published)" : "last recorded sale"}">Sold ${l.raw.last_sale.date.slice(0, 7)}${l.raw.last_sale.amount ? " · " + fmtMoney(l.raw.last_sale.amount) + (l.raw.last_sale.basis === "assessor_value" ? "*" : "") : ""}</span>` : ""}
             ${l.sale_date ? `<span>${fmtDate(l.sale_date)}</span>` : ""}
             ${meta.length ? `<span>${meta.join(" · ")}</span>` : ""}
           </div>
