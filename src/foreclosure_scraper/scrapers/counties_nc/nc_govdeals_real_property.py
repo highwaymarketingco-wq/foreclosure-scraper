@@ -472,6 +472,13 @@ class NCGovDealsRealProperty(BaseScraper):
     # a given run can legitimately surface 0 in-footprint lots.
     expected_min_count = 0
     timeout_s = 240.0
+    # 2026-06-30: GOVDEALS_API_KEY 'af93060f-…' now returns HTTP 400 (current govdeals.com
+    # Angular-bundle UUID keys return 401) → maestro.lqdt1.com silently yields 0 rows. Last good
+    # run was only 9 NC + 1 SC statewide lots (municipal surplus, not distressed comps) = low ROI.
+    # Disabled so it stops counting as a live source. Re-enable: re-discover the current x-api-key +
+    # payload from the live main.<hash>.js bundle, verify a real NC/SC real-estate row, drop these.
+    disabled = True
+    disabled_reason = "dead API key (HTTP 400) since 2026-06-30 + low ROI; re-key from live bundle to re-enable"
 
     async def _pull(
         self,

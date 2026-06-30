@@ -18,7 +18,7 @@ from .models import RodDoc, normalize_doc_type
 
 AUMENTUM_COUNTIES = {
     ("NC", "Mecklenburg"): "https://meckrod.manatron.com/External/LandRecords/protected/v4",
-    ("NC", "Buncombe"): "https://registerofdeeds.buncombecounty.org/External/LandRecords/protected/v4",
+    ("NC", "Buncombe"): "https://registerofdeeds.buncombenc.gov/External/LandRecords/protected/v4",
     ("NC", "Gaston"): "https://deeds.gastongov.com/external/LandRecords/protected/v4",
 }
 
@@ -210,7 +210,12 @@ def _parse_instruments_grid(html: str, county: str, state: str) -> list[RodDoc]:
         grantor = cells[4] if len(cells) > 4 else ""
         grantee = cells[5] if len(cells) > 5 else ""
         bp = cells[8] if len(cells) > 8 else ""
-        book, page = (bp.split("-", 1) + [""])[:2] if "-" in bp else (bp, "")
+        book, page = bp, ""
+        for sep in ("/", "-"):
+            if sep in bp:
+                parts = [p.strip() for p in bp.split(sep, 1)]
+                book, page = parts[0], (parts[1] if len(parts) > 1 else "")
+                break
         out.append(RodDoc(
             county=county, state=state, doc_type=normalize_doc_type(dtype),
             recorded_date=recorded, book=book.strip() or None, page=page.strip() or None,
@@ -242,32 +247,44 @@ async def search_by_name(state: str, county: str, name: str, max_docs: int = 400
     except Exception:  # pragma: no cover
         return []
     P = "ctl00$cphMain$tcMain$tpNewSearch$ucSrchNames$"
+
+    def _body(dfrom: str, dthru: str) -> dict:
+        return {
+            "ctl00_cphMain_tcMain_ClientState": '{"ActiveTabIndex":0,"TabEnabledState":[true,false,false,false,true],"TabWasLoadedOnceState":[false,false,false,false,false]}',
+            "__EVENTTARGET": "", "__EVENTARGUMENT": "", "__LASTFOCUS": "",
+            "__VIEWSTATE": "", "__SCROLLPOSITIONX": "0", "__SCROLLPOSITIONY": "0",
+            "__VIEWSTATEENCRYPTED": "",
+            P + "weFiledFrom_ClientState": "", P + "weFiledThru_ClientState": "",
+            P + "meeFiledFrom_ClientState": "", P + "meeFiledThru_ClientState": "",
+            P + "txtFirmSurname": last, P + "ddlWildcardLast": "0",
+            P + "txtGivenName": first, P + "ddlWildcardFirst": "0",
+            P + "ddlSide": "-1", P + "ddlType": "-1", P + "ddlIndexType": "",
+            P + "txtFiledFrom": dfrom, P + "txtFiledThru": dthru,
+            P + "ddlSortDir": "Date Descending",
+            P + "btnInstruments": "Search (All Matches)",
+            "ctl00$txtJobReference": "",
+            "ctl00$ucShoppingCart$meeZipCode_ClientState": "",
+            "ctl00$ucShoppingCart$hfQuantity": "",
+        }
+
     try:
         async with AsyncSession(verify=False, impersonate="chrome") as s:
             r = await s.get(url, allow_redirects=True, timeout=30)
             final = str(r.url)
-            data = {
-                "ctl00_cphMain_tcMain_ClientState": '{"ActiveTabIndex":0,"TabEnabledState":[true,false,false,false,true],"TabWasLoadedOnceState":[false,false,false,false,false]}',
-                "__EVENTTARGET": "", "__EVENTARGUMENT": "", "__LASTFOCUS": "",
-                "__VIEWSTATE": "", "__SCROLLPOSITIONX": "0", "__SCROLLPOSITIONY": "0",
-                "__VIEWSTATEENCRYPTED": "",
-                P + "weFiledFrom_ClientState": "", P + "weFiledThru_ClientState": "",
-                P + "meeFiledFrom_ClientState": "", P + "meeFiledThru_ClientState": "",
-                P + "txtFirmSurname": last, P + "ddlWildcardLast": "0",
-                P + "txtGivenName": first, P + "ddlWildcardFirst": "0",
-                P + "ddlSide": "-1", P + "ddlType": "-1", P + "ddlIndexType": "",
-                P + "txtFiledFrom": "", P + "txtFiledThru": "",
-                P + "ddlSortDir": "Date Descending",
-                P + "btnInstruments": "Search (All Matches)",
-                "ctl00$txtJobReference": "",
-                "ctl00$ucShoppingCart$meeZipCode_ClientState": "",
-                "ctl00$ucShoppingCart$hfQuantity": "",
-            }
-            r2 = await s.post(final, data=data, headers={"Referer": final},
+            r2 = await s.post(final, data=_body("", ""), headers={"Referer": final},
                               allow_redirects=True, timeout=45)
+            rows = _parse_instruments_grid(r2.text, county, state)
+            # A bare/common surname blows past the server result cap: the grid is empty
+            # and the message panel says "maximum number of allowable results". Narrow by
+            # a wide Filed-date window (captures any still-relevant recent mortgage/lien).
+            if not rows and re.search(r"allowable results", r2.text or "", re.I):
+                today = datetime.now().strftime("%m/%d/%Y")
+                r3 = await s.post(final, data=_body("01/01/2005", today),
+                                  headers={"Referer": final}, allow_redirects=True, timeout=45)
+                rows = _parse_instruments_grid(r3.text, county, state)
     except Exception:
         return []
-    return _parse_instruments_grid(r2.text, county, state)[:max_docs]
+    return rows[:max_docs]
 
 
 async def discover_recent_nods(
