@@ -224,6 +224,18 @@ def main() -> int:
         except Exception as e:  # noqa: BLE001
             print("enrich_nc_divorce: ERROR", str(e)[:80])
 
+    # SC divorce / marital-dissolution distress by owner party-name (SC Family
+    # Court FCCMS PublicAccess portal — free public API). Default-ON in the live
+    # pipeline; here it's gated behind FORECLOSURE_SC_DIVORCE=1 so a manual
+    # regenerate only runs it when explicitly asked, bounded by _run_bounded.
+    if os.environ.get("FORECLOSURE_SC_DIVORCE") == "1":
+        try:
+            from foreclosure_scraper.enrichment_sc_divorce import enrich_sc_divorce
+            _run_bounded("sc_divorce", enrich_sc_divorce(listings),
+                         _t("REGEN_SC_DIVORCE_TIMEOUT", 14400))
+        except Exception as e:  # noqa: BLE001
+            print("enrich_sc_divorce: ERROR", str(e)[:80])
+
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:
         from foreclosure_scraper.enrichment_life_events import enrich_life_events

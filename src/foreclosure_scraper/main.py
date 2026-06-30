@@ -1618,6 +1618,17 @@ async def run() -> int:
     except Exception:
         log.error("nc_divorce.failed", traceback=traceback.format_exc())
 
+    # SC divorce / marital-dissolution distress by owner party-name in the SC
+    # Family Court FCCMS PublicAccess portal (free public API; one CSRF session
+    # reused across leads). Default-ON (FORECLOSURE_SC_DIVORCE=0 to disable);
+    # attaches raw['divorce'] + the 'divorce' distress category on a name match.
+    try:
+        from .enrichment_sc_divorce import enrich_sc_divorce
+        s = await enrich_sc_divorce(enriched)
+        if s and "skipped" not in s: enrichment_stats["sc_divorce"] = s
+    except Exception:
+        log.error("sc_divorce.failed", traceback=traceback.format_exc())
+
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:
         from .enrichment_life_events import enrich_life_events

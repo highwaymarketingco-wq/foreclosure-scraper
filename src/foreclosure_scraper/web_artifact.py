@@ -89,6 +89,7 @@ RAW_KEEP = {
     "owner_mailing": "*",             # #0 contactability: owner name + mailing addr + absentee/out-of-state flags
     "owner_phone": "*",               # NC voter-file phone (name+address match) — DNC-gated, needs_dnc_scrub
     "rod": "*",                       # Gaston NC ROD lien existence (D/T mortgage + adverse liens) by owner name
+    "divorce": "*",                   # SC Family-Court divorce / marital-dissolution match on owner party-name (FCCMS)
     "geo_imprecise": "*",             # out_of_bbox (geo nulled) | centroid_snap (county/town-center fallback)
     "stale_case": "*",                # presumed_withdrawn lis-pendens — likely resolved, down-ranked from HOT
     "life_events": "*",               # elderly/probate signals: life_estate | estate_probate | multiple_heirs | trust
