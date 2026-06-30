@@ -604,7 +604,9 @@ async def _query(
             {"state": state},
             {"county": county},
             {"noticetype": noticetype},
-            {"publishedtimestamp": {"from": from_ms, "to": to_ms}},
+            # NOTE: the server-side publishedtimestamp range filter was DROPPED — Column changed
+            # its format ~2026-06 so the nested {from,to} now silently matches 0 rows even for
+            # in-window notices. We sort newest-first and filter the page client-side below.
         ],
         "noneFilters": [],
         "sort": [{"publishedtimestamp": "desc"}],
@@ -630,7 +632,13 @@ async def _query(
     except Exception:
         return []
     results = data.get("results") if isinstance(data, dict) else data
-    return results if isinstance(results, list) else []
+    if not isinstance(results, list):
+        return []
+    # Client-side window filter (replaces the dropped server-side range filter). Results arrive
+    # newest-first, so the page already favors recent notices; keep only those in [from_ms, to_ms].
+    return [it for it in results
+            if isinstance(it.get("publishedtimestamp"), (int, float))
+            and from_ms <= it["publishedtimestamp"] <= to_ms]
 
 
 class ColumnLegalNotices(BaseScraper):
