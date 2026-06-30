@@ -310,6 +310,10 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         print("enrich_board_qa: ERROR", str(e)[:80])
 
+    # Classify source links (record vs search-only) so the dashboard never shows a dead link.
+    from foreclosure_scraper.enrichment_source_link import enrich_source_link  # noqa: E402
+    print("enrich_source_link:", enrich_source_link(listings))
+
     by_state = collections.Counter(li.state for li in listings if li.state)
     by_county = collections.Counter(f"{li.state}/{li.county}" for li in listings if li.county)
     by_source = collections.Counter(li.source for li in listings if li.source)

@@ -1997,6 +1997,13 @@ async def run() -> int:
     except Exception:
         log.error("board_qa.failed", traceback=traceback.format_exc())
 
+    # Classify source links (record vs search-only) so the dashboard never shows a dead link.
+    try:
+        from .enrichment_source_link import enrich_source_link
+        enrichment_stats["source_link"] = enrich_source_link(enriched)
+    except Exception:
+        log.error("source_link.failed", traceback=traceback.format_exc())
+
     # Outreach stack — owner contact actions (letter/email/SMS), a postcard
     # mail-merge CSV, and persistent CRM status. Runs after skip-trace +
     # valuation so it has owner contact + deal numbers to work with.

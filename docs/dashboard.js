@@ -746,8 +746,27 @@ function openDetail(l) {
     $("d-map").style.display = "none";
   }
 
-  $("d-source-url").href = l.source_url || "#";
-  $("d-source-url").textContent = l.source_url || "(no link)";
+  // Honest source link: a real per-record page is clickable as-is; a search-only portal or a
+  // synthetic placeholder is shown as "Search <portal>" so it never reads as a direct record.
+  const _lk = (l.raw && l.raw.link_kind) || "record";
+  if (_lk === "search") {
+    const _su = (l.raw && l.raw.search_url) || l.source_url || "#";
+    $("d-source-url").href = _su;
+    $("d-source-url").textContent = "🔍 Search " + _su.replace(/^https?:\/\//, "").split("/")[0]
+      + " for this name (no direct record link)";
+  } else {
+    $("d-source-url").href = l.source_url || "#";
+    $("d-source-url").textContent = l.source_url || "(no link)";
+  }
+  // Court geo-snap that was stripped -> mark the property as unverified, not a vetted lead.
+  // Idempotent: renderDetail re-runs on every open, so drop any prior badge first.
+  const _prev = $("d-source-url").nextElementSibling;
+  if (_prev && _prev.classList && _prev.classList.contains("unverified-badge")) _prev.remove();
+  if (l.raw && l.raw.owner_mismatch) {
+    $("d-source-url").insertAdjacentHTML("afterend",
+      '<div class="unverified-badge" style="color:#c0392b;font-size:12px;margin-top:3px">&#9888; '
+      + 'name-only court record &mdash; no verified property (a wrong geo-match was removed)</div>');
+  }
 
   // Sold Comps (HomeHarvest comp finder)
   const comps = (l.raw && l.raw.comps) || [];
