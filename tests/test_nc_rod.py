@@ -144,3 +144,22 @@ def test_scraper_class_metadata():
     assert s.requires_render is False
     # Empty weeks are normal for ROD scraping (small counties)
     assert s.expected_min_count == 0
+
+
+def test_spartan_weekly_pr_regex_handles_out_of_state_and_pobox():
+    """PR mailing-address regex must keep out-of-state executors + PO-Box lines
+    (the absentee-heir cases the old SC|NC|GA-only pattern dropped)."""
+    from foreclosure_scraper.scrapers.counties_sc.spartan_weekly_legals import _PROBATE_PR
+    cases = {
+        "Personal Representative: Michael Davis 10 Pipeline Lane Lyman, SC 29365":
+            ("Michael Davis", "SC"),
+        "Personal Representative: Riedar Mark Oestenstad 3245 260th Avenue Spencer, IA 51301":
+            ("Riedar Mark Oestenstad", "IA"),
+        "Personal Representative: Cathy Phillips Holland Post Office Box 24, Moore, SC 29369":
+            ("Cathy Phillips Holland", "Box"),
+    }
+    for body, (name, addr_marker) in cases.items():
+        m = _PROBATE_PR.search(body)
+        assert m, f"no match: {body}"
+        assert m.group(1).strip() == name
+        assert addr_marker in m.group(2)

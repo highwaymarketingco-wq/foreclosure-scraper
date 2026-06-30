@@ -85,9 +85,14 @@ _AMOUNT_RE = re.compile(r"\$[\d,]{4,}(?:\.\d{2})?")
 _PROBATE_ESTATE = re.compile(
     r"\bEstate:\s*([A-Z][A-Za-z .,'\-]{3,60}?)\s+(?:Date of Death|Case Number|a/?k/?a|aka)\b", re.I)
 _PROBATE_DOD = re.compile(r"Date of Death:\s*([A-Z][a-z]+\s+\d{1,2},?\s+\d{4})", re.I)
+# PR name + mailing address. Accepts ANY US state (executors who inherited often
+# live out of state — an absentee heir is a STRONGER seller, not one to drop) and
+# PO-Box mailing addresses (the old SC|NC|GA + house-number-only pattern dropped
+# ~28% of PRs: out-of-state IA/DC/etc. and "Post Office Box N" lines).
 _PROBATE_PR = re.compile(
-    r"Personal Representative:\s*([A-Z][A-Za-z .,'\-]{3,60}?)\s+"
-    r"(\d{1,5}\s+[A-Za-z0-9 .,'\-]+?\b(?:SC|NC|GA|N\.C\.|S\.C\.)\s*\d{5})", re.I)
+    r"Personal Representative[s]?:?\s*([A-Z][A-Za-z .,'\-]{3,55}?)\s+"
+    r"((?:P\.?\s*O\.?\s*Box|Post\s+Office\s+Box|\d{1,6})"
+    r"[A-Za-z0-9 .,'#\-]*?,?\s*[A-Z]{2}\.?\s*\d{5})", re.I)
 _ES_CASE_RE = re.compile(r"\b(20\d{2}ES\d{6,9})\b")
 
 
