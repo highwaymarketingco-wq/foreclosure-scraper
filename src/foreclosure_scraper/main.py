@@ -1573,6 +1573,14 @@ async def run() -> int:
     except Exception:
         log.error("gaston_rod.failed", traceback=traceback.format_exc())
 
+    # Burke + Cleveland NC ROD lien-existence (CCHS SearchService.asp) — same shape as Gaston.
+    try:
+        from .enrichment_cchs_rod import enrich_cchs_rod
+        s = await enrich_cchs_rod(enriched)
+        if s and "skipped" not in s: enrichment_stats["cchs_rod"] = s
+    except Exception:
+        log.error("cchs_rod.failed", traceback=traceback.format_exc())
+
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:
         from .enrichment_life_events import enrich_life_events

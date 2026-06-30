@@ -185,6 +185,13 @@ def main() -> int:
         except Exception as e:  # noqa: BLE001
             print("enrich_gaston_rod: ERROR", str(e)[:80])
 
+    # Burke + Cleveland NC ROD lien-existence (CCHS) — default-on.
+    try:
+        from foreclosure_scraper.enrichment_cchs_rod import enrich_cchs_rod
+        print("enrich_cchs_rod:", asyncio.run(enrich_cchs_rod(listings)))
+    except Exception as e:  # noqa: BLE001
+        print("enrich_cchs_rod: ERROR", str(e)[:80])
+
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:
         from foreclosure_scraper.enrichment_life_events import enrich_life_events
