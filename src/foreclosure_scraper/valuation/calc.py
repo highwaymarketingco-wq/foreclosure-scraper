@@ -597,6 +597,26 @@ def compute(li: Listing) -> Calc:
                 f"= ${lo_psf}-${hi_psf}/sqft"
             )
 
+        # Sanity cap: a per-sqft rehab on a LARGE but modest-$/sqft home balloons out of
+        # proportion (a cosmetic-condition 2,770 sqft home showed 31% of ARV in repairs).
+        # Cap rehab at a tier-appropriate share of ARV so the per-sqft model can't overstate
+        # the repair on big, modest-value houses. Only ever LOWERS an over-estimate.
+        _cap_pct = {"cosmetic": 0.08, "light": 0.15, "moderate": 0.27,
+                    "heavy": 0.42, "gut": 0.60}.get(tier)
+        if _cap_pct and out.arv_expected and out.rehab_expected:
+            _cap = out.arv_expected * _cap_pct
+            if out.rehab_expected > _cap:
+                _scale = _cap / out.rehab_expected
+                _old_re = out.rehab_expected
+                out.rehab_expected = round(_cap, -2)
+                out.rehab_low = round((out.rehab_low or 0) * _scale, -2)
+                out.rehab_high = round((out.rehab_high or 0) * _scale, -2)
+                out.notes.append(
+                    f"Rehab capped at {_cap_pct * 100:.0f}% of ARV for '{tier}' tier "
+                    f"(${_old_re:,.0f} → ${out.rehab_expected:,.0f}) — per-sqft estimate was "
+                    f"disproportionate to a ${out.arv_expected:,.0f} property."
+                )
+
     # Senior liens reduce what a buyer can pay:
     #  (a) at a JUNIOR-position foreclosure the winner takes title SUBJECT TO all
     #      senior debt (rod/priority.py total_senior_amount), and
