@@ -185,6 +185,13 @@ def main() -> int:
         except Exception as e:  # noqa: BLE001
             print("enrich_gaston_rod: ERROR", str(e)[:80])
 
+    # Elderly/probate life-event tagging on owner_name (after promotion).
+    try:
+        from foreclosure_scraper.enrichment_life_events import enrich_life_events
+        print("enrich_life_events:", enrich_life_events(listings))
+    except Exception as e:  # noqa: BLE001
+        print("enrich_life_events: ERROR", str(e)[:80])
+
     # Drop sold/removed snapshot-REO (Fannie) — stale carryover whose per-property
     # SPA URL renders a browser 404 once the uuid leaves inventory. Fail-safe.
     from foreclosure_scraper.enrichment_reo_freshness import prune_stale_reo

@@ -91,6 +91,8 @@ RAW_KEEP = {
     "rod": "*",                       # Gaston NC ROD lien existence (D/T mortgage + adverse liens) by owner name
     "geo_imprecise": "*",             # out_of_bbox (geo nulled) | centroid_snap (county/town-center fallback)
     "stale_case": "*",                # presumed_withdrawn lis-pendens — likely resolved, down-ranked from HOT
+    "life_events": "*",               # elderly/probate signals: life_estate | estate_probate | multiple_heirs | trust
+    "owner_name_source": "*",         # provenance when owner_name was promoted from tax/GIS
     "incarceration": "*",             # owner matched a state corrections roster (NC DAC) — low-conf stack signal
     "distress_stack": "*",            # HOT/WARM/COLD tier + stacked distress categories + score (operator board)
     "cama": "*",                      # county CAMA distress (condition/last-sale/deed-ref/owner-occupancy)
