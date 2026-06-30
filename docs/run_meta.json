@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-06-30T17:39:40.046939Z",
+  "run_time": "2026-06-30T18:08:16.737331Z",
   "total": 3576,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "court owner-verify"
+  "notes": "source-link classification"
 }
