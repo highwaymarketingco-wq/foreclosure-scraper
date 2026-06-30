@@ -8,6 +8,32 @@ from rapidfuzz import fuzz
 from .models import Listing
 
 
+_SUFFIX = {
+    "avenue": "ave", "ave": "ave", "street": "st", "st": "st", "road": "rd", "rd": "rd",
+    "drive": "dr", "dr": "dr", "lane": "ln", "ln": "ln", "boulevard": "blvd", "blvd": "blvd",
+    "court": "ct", "ct": "ct", "circle": "cir", "cir": "cir", "place": "pl", "pl": "pl",
+    "trail": "trl", "trl": "trl", "way": "way", "parkway": "pkwy", "pkwy": "pkwy",
+    "highway": "hwy", "hwy": "hwy", "terrace": "ter", "ter": "ter", "loop": "loop", "run": "run",
+    "cove": "cv", "cv": "cv", "path": "path", "pike": "pike", "point": "pt", "pt": "pt",
+    "crossing": "xing", "square": "sq", "ridge": "rdg",
+}
+
+
+def _canon_street(a: str) -> str:
+    """House# + street name through the standardized suffix, dropping any trailing city/unit
+    ('19 gosnell avenue inman' -> '19 gosnell ave'). '' if no leading house# or no known suffix."""
+    if not a:
+        return ""
+    toks = a.split()
+    if not toks or not re.match(r"^\d", toks[0]):
+        return ""
+    for i in range(1, len(toks)):
+        base = re.sub(r"[^a-z]", "", toks[i])
+        if base in _SUFFIX:
+            return " ".join(toks[:i] + [_SUFFIX[base]])
+    return ""
+
+
 def _strong_sigs(li: Listing) -> set:
     """Strong same-property signatures for union-merge. Excludes placeholder /
     bankruptcy 'addresses' so name-only rows never collapse together."""
@@ -26,6 +52,12 @@ def _strong_sigs(li: Listing) -> set:
         out.add(("c", cn, (li.county or ""), a))
     if a and z:
         out.add(("a", a, z))
+    # Canonical street + county + state — merges the SAME street address across sources even when
+    # one copy lacks a zip or jams the city into the street field (the '19 Gosnell Ave' dup class).
+    cs = _canon_street(a)
+    cty = re.sub(r"[^a-z0-9]", "", (li.county or "").lower())
+    if cs and cty and st:
+        out.add(("s", cs, cty, st))
     return out
 
 
