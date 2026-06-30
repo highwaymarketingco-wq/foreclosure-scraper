@@ -73,10 +73,13 @@ def _normalize_parcel(parcel: str | None) -> str:
     if not parcel:
         return ""
     s = re.sub(r"[^a-zA-Z0-9]", "", parcel).lower()
-    # Some county GIS exports add a 3-digit '.000' suffix to base parcels;
-    # strip if the result is just trailing zeros (heuristic — never strip
-    # significant digits).
-    if len(s) > 10 and s.endswith("000"):
+    # County GIS exports pad a base 10-digit PIN with trailing zeros out to 12 or 15 digits
+    # (9678774126 -> 967877412600000). When EVERYTHING past the 10th char is zeros, the
+    # 10-digit form is canonical, so the padded + bare copies collapse to one dedupe key.
+    # Conservative: only strips a pure-zero pad, never significant digits.
+    if len(s) > 10 and set(s[10:]) <= {"0"}:
+        s = s[:10]
+    elif len(s) > 10 and s.endswith("000"):   # legacy '.000' suffix on 11-13 digit variants
         s = s[:-3]
     return s
 
@@ -328,14 +331,21 @@ class Listing(BaseModel):
         # Deep-merge raw (preserves nested subkeys instead of clobbering)
         out.raw = _deep_merge_dict(self.raw, other.raw)
 
-        # Multi-source attribution
-        also_seen = list(out.raw.get("also_seen_in") or [])
-        for s in (self.source, other.source):
-            if s and s not in also_seen and s != out.source:
-                also_seen.append(s)
-        for u in (self.source_url, other.source_url):
-            if u and not any(d.get("url") == u for d in also_seen if isinstance(d, dict)):
-                pass  # we record source slugs above; URLs aren't needed in this list
-        if also_seen:
-            out.raw["also_seen_in"] = also_seen
+        # Multi-source attribution — keep EVERY source AND its link so the operator can open each
+        # source for one property (e.g. ROD + assessor + law-firm), instead of hunting them down
+        # by hand. Stored as {source, url} dicts; the primary stays on source/source_url.
+        seen = [d for d in (out.raw.get("also_seen_in") or []) if isinstance(d, dict)]
+
+        def _add(src, url):
+            if not url or url == out.source_url:
+                return  # primary link already lives on source_url
+            if not any(d.get("url") == url for d in seen):
+                seen.append({"source": src, "url": url})
+
+        _add(other.source, other.source_url)
+        for d in (other.raw.get("also_seen_in") or []):
+            if isinstance(d, dict):
+                _add(d.get("source"), d.get("url"))
+        if seen:
+            out.raw["also_seen_in"] = seen
         return out
