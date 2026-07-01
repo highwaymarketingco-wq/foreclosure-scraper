@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-07-01T13:21:52.798088Z",
+  "run_time": "2026-07-01T14:24:30.023474Z",
   "total": 16329,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "bounded owner-mailing enrichment on HOT/WARM no-contact leads"
+  "notes": "qPayBill delinquent-tax balance refresh"
 }

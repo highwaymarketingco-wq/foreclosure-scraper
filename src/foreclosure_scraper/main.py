@@ -1512,6 +1512,18 @@ async def run() -> int:
     except Exception:
         log.error("sos_agent.failed", traceback=traceback.format_exc())
 
+    # qPayBill county tax portal — fills the per-parcel delinquent tax BALANCE the
+    # tax-sale-LIST scrapers can't (SC Spartanburg etc. publish parcel+owner but no
+    # amount). Network-heavy per-surname query, so self-gates on QPAYBILL_TAX=1;
+    # runs in a scheduled/opt-in pass, not the weekly crawl.
+    try:
+        from .enrichment_qpaybill_tax import enrich_qpaybill_tax
+        s = await enrich_qpaybill_tax(enriched)
+        if s:
+            enrichment_stats["qpaybill_tax"] = s
+    except Exception:
+        log.error("qpaybill_tax.failed", traceback=traceback.format_exc())
+
     # Expanded rent comps — for listings without strict like-for-like comps,
     # broaden to zip-level for-rent pool. Free via HomeHarvest.
     try:
