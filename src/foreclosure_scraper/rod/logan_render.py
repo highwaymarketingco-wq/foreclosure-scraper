@@ -63,16 +63,20 @@ async def search_by_name_render(state: str, county: str, name: str,
             el = await pg.query_selector("input[name=Accept]")
             if el:
                 await el.click()
-            await pg.wait_for_timeout(2500)
-            # find the form frame
+            # The search form frame loads via JS AFTER Accept — a single scan often
+            # misses it ("no form frame"). Poll for it (live-verified more reliable).
             tgt = None
-            for fr in pg.frames:
-                try:
-                    if await fr.query_selector("input[name=last_name]"):
-                        tgt = fr
-                        break
-                except Exception:
-                    pass
+            for _ in range(12):
+                await pg.wait_for_timeout(2500)
+                for fr in pg.frames:
+                    try:
+                        if await fr.query_selector("input[name=last_name]"):
+                            tgt = fr
+                            break
+                    except Exception:
+                        pass
+                if tgt:
+                    break
             if tgt is None:
                 await br.close()
                 return []
