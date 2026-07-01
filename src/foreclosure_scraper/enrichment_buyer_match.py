@@ -24,7 +24,7 @@ from typing import Iterable
 
 from .models import Listing
 
-_ENABLED = os.environ.get("BUYER_MATCH") != "0"
+_ENABLED = os.environ.get("BUYER_MATCH") == "1"  # dashboard matches client-side; off by default
 _CAP_PER_TYPE = int(os.environ.get("BUYER_MATCH_CAP", "4"))
 _DATA = Path(__file__).resolve().parent / "data" / "land_buyers.json"
 

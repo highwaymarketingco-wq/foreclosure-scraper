@@ -106,14 +106,27 @@ async function preloadDatasetCounts() {
 }
 
 async function loadData() {
-  await Promise.all([loadDataset("foreclosure"), preloadDatasetCounts()]);
+  await Promise.all([loadDataset("foreclosure"), preloadDatasetCounts(), loadBuyerRegistry()]);
   // Wire toggle buttons
   document.querySelectorAll(".ds-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const target = btn.dataset.ds;
+      document.querySelectorAll(".ds-btn").forEach((b) => b.classList.toggle("active", b === btn));
+      if (target === "_buyers") { enterBuyersMode(); return; }
+      if (BUYERS_MODE) exitBuyersMode();
       if (target && target !== DATASET) loadDataset(target);
     });
   });
+}
+
+async function loadBuyerRegistry() {
+  try {
+    const r = await fetch(`land_buyers.json?t=${Date.now()}`);
+    if (r.ok) { BUYER_REGISTRY = (await r.json()).buyers || []; }
+  } catch (e) { BUYER_REGISTRY = []; }
+  BUYER_REGISTRY = BUYER_REGISTRY.concat(_EXTRA_BUYERS);
+  const c = document.getElementById("ds-buyers-count");
+  if (c) c.textContent = BUYER_REGISTRY.length;
 }
 
 // ------------- Stats ---------------------------------------------------------
@@ -335,8 +348,7 @@ function applyFilters() {
     }
     if (strategy) {
       const sf = (l.raw && l.raw.strategy_fit) || null;
-      const bm = (l.raw && l.raw.buyer_match) || null;
-      if (strategy === "_buyers") { if (!(bm && bm.count)) return false; }
+      if (strategy === "_buyers") { if (!buyerCountForListing(l)) return false; }
       else if (!(sf && sf.tags && sf.tags.includes(strategy))) return false;
     }
     if (contact) {
@@ -516,12 +528,149 @@ function strategyBuyerChips(l) {
       if (m) chips.push(`<span class="strat-chip ${m.cls}" title="${(sf.reasons && sf.reasons[t]) || t}">${m.label}</span>`);
     });
   }
-  const bm = (l.raw && l.raw.buyer_match) || null;
-  if (bm && bm.count) {
-    const types = bm.by_type ? Object.keys(bm.by_type).length : 0;
-    chips.push(`<span class="buyer-chip" title="${bm.count} active buyers across ${types} categories — click for the list">🏢 ${bm.count} buyers want this</span>`);
+  const bt = buyersForListing(l);
+  const bcount = Object.values(bt).reduce((n, a) => n + a.length, 0);
+  if (bcount) {
+    chips.push(`<span class="buyer-chip" title="${bcount} active buyers across ${Object.keys(bt).length} categories — open the Land Buyers tab">🏢 ${bcount} buyers want this</span>`);
   }
   return chips.length ? `<div class="strat-chips">${chips.join("")}</div>` : "";
+}
+
+// ============================================================================
+// LAND BUYERS view — the 188-buyer registry, matched to listings client-side
+// (so the board JSON stays small; buyers are computed on the fly, not stored).
+// ============================================================================
+let BUYER_REGISTRY = [];
+const _WNC = new Set(["Buncombe","Henderson","Rutherford","McDowell","Cleveland","Polk","Gaston","Lincoln","Burke","Transylvania","Mitchell","Madison"]);
+const _UPSTATE = new Set(["Greenville","Spartanburg","Anderson","Pickens","Oconee","Cherokee","Union","Laurens"]);
+const _I85 = new Set(["Spartanburg","Greenville","Cherokee","Anderson","Gaston"]);
+const _LAND_TYPES = new Set(["residential_land_developers","production_homebuilders","regional_local_builders","timber_recreational","solar_utility_land","conservation_trusts","manufactured_housing","econ_dev_municipal"]);
+const _MF_TYPES = new Set(["multifamily_developers"]);
+const _COMM_TYPES = new Set(["commercial_retail_office","industrial_logistics","self_storage"]);
+const BUYER_TYPE_LABEL = {
+  production_homebuilders:"Production builders", regional_local_builders:"Regional builders",
+  residential_land_developers:"Land developers", multifamily_developers:"Multifamily developers",
+  commercial_retail_office:"Commercial developers", industrial_logistics:"Industrial / logistics",
+  self_storage:"Self-storage", solar_utility_land:"Solar / utility-scale",
+  manufactured_housing:"Manufactured housing", timber_recreational:"Timber / recreational",
+  conservation_trusts:"Conservation trusts", econ_dev_municipal:"Economic development",
+  land_flippers:"Cash land buyers", house_buyers:"Cash house buyers",
+};
+// Direct "we buy land / houses" cash outreach lanes (not in the 188 registry; added client-side)
+const _EXTRA_BUYERS = [
+  {name:"Bubba Land Company", type:"land_flippers", contact:"https://bubba-land.com/", buys:"rural acreage 3+ ac, outside city limits", regions:["wnc","upstate_sc"], min_acres:3, geo:"All 19 WNC + Upstate-SC counties"},
+  {name:"Value Land Buyers", type:"land_flippers", contact:"https://www.valuelandbuyers.com/", buys:"raw land + vacant lots, any size", regions:["wnc","upstate_sc"], geo:"All 19 WNC + Upstate-SC counties"},
+  {name:"Selling Land Fast", type:"land_flippers", contact:"https://www.sellinglandfast.com/", buys:"rural acreage, raw land, lots, farms", regions:["wnc","upstate_sc"], geo:"All 19 WNC + Upstate-SC counties"},
+  {name:"HomeVestors / We Buy Ugly Houses", type:"house_buyers", contact:"https://www.webuyuglyhouses.com/", buys:"cash for houses, blanket coverage", regions:["wnc","upstate_sc"], geo:"Footprint-wide"},
+  {name:"Greenville Home Solutions", type:"house_buyers", contact:"https://www.greenvillehomesolutions.com/", buys:"houses + land, Upstate SC", regions:["upstate_sc"], geo:"Greenville/Anderson/Pickens/Oconee/Spartanburg/Laurens"},
+];
+function _acresOf(l) { const r=l.raw||{}; for (const s of [r.lrcpwa, r.gis, r]) { if (s) for (const k of ["acreage","acres","calculatedAcres","deededAcres"]) { const v=parseFloat(s[k]); if (!isNaN(v)) return v; } } return null; }
+function _regionOf(l) { const c = (l.county||"").replace(" County","").trim(); return _WNC.has(c) ? "wnc" : _UPSTATE.has(c) ? "upstate_sc" : null; }
+function _catOf(l) {
+  const pk = (l.property_kind||"").toLowerCase(), d = (l.description||"").toLowerCase();
+  if (["land","lot","vacant","acreage"].some(k=>pk.includes(k)) || d.includes("vacant lot") || d.includes("vacant land") || d.includes("vacant parcel")) return "land";
+  if (pk.includes("multi") || pk.includes("apartment") || (l.raw && l.raw.multifamily_class)) return "multifamily";
+  if (["commercial","retail","office","industrial"].some(k=>pk.includes(k))) return "commercial";
+  return "residential";
+}
+function buyersForListing(l) {
+  const region = _regionOf(l); if (!region) return {};
+  const cat = _catOf(l), county = (l.county||"").replace(" County","").trim(), acres = _acresOf(l);
+  let want;
+  if (cat === "land") { want = new Set([..._LAND_TYPES, "land_flippers"]); if (_I85.has(county)) want.add("industrial_logistics"); }
+  else if (cat === "multifamily") want = _MF_TYPES;
+  else if (cat === "commercial") want = _COMM_TYPES;
+  else if (cat === "residential") { const t = (l.raw && l.raw.distress_stack || {}).tier; want = (t === "HOT" || t === "WARM") ? new Set(["house_buyers"]) : new Set(); }
+  else return {};
+  const byType = {};
+  BUYER_REGISTRY.forEach((b) => {
+    if (!want.has(b.type) || !(b.regions||[]).includes(region)) return;
+    if (b.type === "solar_utility_land" && acres != null && acres < 5) return;      // solar wants real acreage
+    if (b.min_acres && acres != null && acres < b.min_acres) return;                // Bubba 3-acre floor
+    (byType[b.type] = byType[b.type] || []).push(b);
+  });
+  Object.keys(byType).forEach((t) => { byType[t] = byType[t].slice(0, 4); });
+  return byType;
+}
+function buyerCountForListing(l) { return Object.values(buyersForListing(l)).reduce((n,a)=>n+a.length,0); }
+
+// Precomputed buyer(name) -> matching listing indices, built on first entering the view.
+let _BUYER_LISTINGS = null;
+function buildBuyerListingIndex() {
+  _BUYER_LISTINGS = {};
+  LISTINGS.forEach((l, i) => {
+    if (l.raw && l.raw.sold_confirmed) return;
+    const bt = buyersForListing(l);
+    Object.values(bt).flat().forEach((b) => { (_BUYER_LISTINGS[b.name] = _BUYER_LISTINGS[b.name] || []).push(i); });
+  });
+}
+
+let BUYERS_MODE = false;
+function enterBuyersMode() {
+  BUYERS_MODE = true;
+  ["stats", "filters"].forEach((c) => { const el = document.querySelector("." + c); if (el) el.style.display = "none"; });
+  const main = document.querySelector("main"); if (main) main.style.display = "none";
+  let bv = document.getElementById("buyers-view");
+  bv.classList.remove("hidden");
+  if (!_BUYER_LISTINGS) buildBuyerListingIndex();
+  renderBuyersView();
+}
+function exitBuyersMode() {
+  BUYERS_MODE = false;
+  ["stats", "filters"].forEach((c) => { const el = document.querySelector("." + c); if (el) el.style.display = ""; });
+  const main = document.querySelector("main"); if (main) main.style.display = "";
+  const bv = document.getElementById("buyers-view"); if (bv) bv.classList.add("hidden");
+}
+function renderBuyersView(typeFilter) {
+  const bv = document.getElementById("buyers-view");
+  const byType = {};
+  BUYER_REGISTRY.forEach((b) => { (byType[b.type] = byType[b.type] || []).push(b); });
+  const types = Object.keys(byType).sort((a,b)=>byType[b].length-byType[a].length);
+  const pills = `<div class="buyer-type-pills"><span class="btype-pill ${!typeFilter?'active':''}" data-bt="">All types (${BUYER_REGISTRY.length})</span>` +
+    types.map((t)=>`<span class="btype-pill ${typeFilter===t?'active':''}" data-bt="${t}">${BUYER_TYPE_LABEL[t]||t} (${byType[t].length})</span>`).join("") + `</div>`;
+  const shown = typeFilter ? { [typeFilter]: byType[typeFilter] } : byType;
+  let html = `<div class="buyers-head"><h2>🏢 Land Buyers <span class="muted">— ${BUYER_REGISTRY.length} active buyers · click a buyer to see their criteria + matching parcels</span></h2>${pills}</div><div class="buyer-cards">`;
+  Object.keys(shown).forEach((t) => {
+    (shown[t]||[]).forEach((b) => {
+      const n = (_BUYER_LISTINGS[b.name] || []).length;
+      html += `<div class="buyer-card" data-buyer="${encodeURIComponent(b.name)}">
+        <div class="bc-type">${BUYER_TYPE_LABEL[t]||t}</div>
+        <div class="bc-name">${b.name}</div>
+        <div class="bc-geo">${b.geo||""}</div>
+        <div class="bc-match">${n} matching parcel${n===1?"":"s"} →</div>
+      </div>`;
+    });
+  });
+  html += `</div>`;
+  bv.innerHTML = html;
+  bv.querySelectorAll(".btype-pill").forEach((p)=>p.addEventListener("click",()=>renderBuyersView(p.dataset.bt||null)));
+  bv.querySelectorAll(".buyer-card").forEach((c)=>c.addEventListener("click",()=>openBuyer(decodeURIComponent(c.dataset.buyer))));
+}
+function openBuyer(name) {
+  const b = BUYER_REGISTRY.find((x)=>x.name===name); if (!b) return;
+  const idxs = _BUYER_LISTINGS[name] || [];
+  const bv = document.getElementById("buyers-view");
+  let html = `<div class="buyers-head"><button class="buyer-back">← All buyers</button>
+    <h2>${b.name}</h2><div class="bc-type">${BUYER_TYPE_LABEL[b.type]||b.type}</div>
+    <div class="buyer-crit"><div><strong>Wants:</strong> ${b.buys||"—"}</div>
+      <div><strong>Where:</strong> ${b.geo||"—"}</div>
+      <div><strong>Contact:</strong> ${b.contact ? (/^https?:/.test(b.contact) ? `<a href="${b.contact}" target="_blank" rel="noopener">${b.contact} ↗</a>` : b.contact) : "—"}</div></div>
+    <h3 style="margin-top:14px">${idxs.length} matching parcel${idxs.length===1?"":"s"} on the board</h3></div>
+    <div class="buyer-match-grid">`;
+  idxs.slice(0, 300).forEach((i) => {
+    const l = LISTINGS[i];
+    const addr = [l.street_address, l.city].filter(Boolean).join(", ") || `${l.county} County parcel ${l.parcel_id||""}`;
+    const g = getGrade(l);
+    const owed = l.raw && l.raw.tax_owed && l.raw.tax_owed.balance;
+    html += `<div class="bm-card" data-li="${i}">
+      <div class="bm-addr">${addr}</div>
+      <div class="bm-meta">${l.county} ${l.state}${g&&g.overall?` · ${g.overall}`:""}${owed?` · $${Math.round(owed).toLocaleString()} owed`:""}${l.owner_name?` · ${l.owner_name}`:""}</div>
+    </div>`;
+  });
+  html += `</div>`;
+  bv.innerHTML = html;
+  bv.querySelector(".buyer-back").addEventListener("click", ()=>renderBuyersView());
+  bv.querySelectorAll(".bm-card").forEach((c)=>c.addEventListener("click",()=>openDetail(LISTINGS[parseInt(c.dataset.li)])));
 }
 
 function renderCards() {
@@ -791,28 +940,18 @@ function openDetail(l) {
     }).join("");
   } else { $("d-strategy-section").style.display = "none"; }
 
-  // Buyers wanting this — active buyers grouped by type, with contact links
-  const _bm = (l.raw && l.raw.buyer_match) || null;
-  if (_bm && _bm.by_type) {
-    const TYPE_LABEL = {
-      production_homebuilders: "Production builders", regional_local_builders: "Regional builders",
-      residential_land_developers: "Land developers", multifamily_developers: "Multifamily developers",
-      commercial_retail_office: "Commercial developers", industrial_logistics: "Industrial / logistics",
-      self_storage: "Self-storage", solar_utility_land: "Solar / utility-scale",
-      manufactured_housing: "Manufactured housing", timber_recreational: "Timber / recreational",
-      conservation_trusts: "Conservation trusts", econ_dev_municipal: "Economic development",
-      land_flippers: "Cash land buyers", house_buyers: "Cash house buyers",
-    };
+  // Buyers wanting this — computed from the registry (region + property category)
+  const _bt = buyersForListing(l);
+  const _bcount = Object.values(_bt).reduce((n, a) => n + a.length, 0);
+  if (_bcount) {
     $("d-buyers-section").style.display = "block";
-    let bh = `<div class="buyers-note">${_bm.count} active buyers — ${_bm.note || "outreach list"}</div>`;
-    Object.entries(_bm.by_type).forEach(([type, buyers]) => {
-      bh += `<div class="buyer-group"><div class="buyer-group-title">${TYPE_LABEL[type] || type} (${buyers.length})</div>`;
+    let bh = `<div class="buyers-note">${_bcount} active buyers — outreach list (no published buy box). Full list + reverse-match in the <strong>Land Buyers</strong> tab.</div>`;
+    Object.entries(_bt).forEach(([type, buyers]) => {
+      bh += `<div class="buyer-group"><div class="buyer-group-title">${BUYER_TYPE_LABEL[type] || type} (${buyers.length})</div>`;
       bh += buyers.map((b) => {
         const isUrl = b.contact && /^https?:\/\//.test(b.contact);
         const nm = isUrl ? `<a href="${b.contact}" target="_blank" rel="noopener">${b.name} ↗</a>` : `<span class="buyer-name">${b.name}</span>`;
-        const extra = b.buys ? `<span class="buyer-buys">${b.buys}</span>` : "";
-        const ct = (!isUrl && b.contact) ? `<span class="buyer-buys">${b.contact}</span>` : "";
-        return `<div class="buyer-row">${nm}${extra}${ct}</div>`;
+        return `<div class="buyer-row">${nm}${b.buys ? `<span class="buyer-buys">${b.buys}</span>` : ""}</div>`;
       }).join("");
       bh += `</div>`;
     });
