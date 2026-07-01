@@ -200,6 +200,15 @@ def _signals_for(li: Listing, prior_price: Optional[float] = None) -> list[tuple
         # revoked/expired short-term-rental permit = lost rental income, a
         # financial motivation to sell (esp. where whole-house STRs are banned).
         sig.append(("str_permit_lapsed", "FINANCIAL", 12))
+    tr = r.get("tax_relief")
+    if isinstance(tr, dict):
+        if tr.get("kind") in ("elderly", "disabled", "blind"):
+            # senior/disabled owner-occupant: equity-rich, motivated by health/
+            # downsizing/estate transition.
+            sig.append(("senior_exemption", "LIFE_EVENT", 8))
+        elif tr.get("kind") == "use_value_deferral":
+            # present-use deferral = rollback lien due on sale (equity + urgency).
+            sig.append(("deferral_rollback", "FINANCIAL", 6))
     # legal
     if r.get("bankruptcy"):
         sig.append(("bankruptcy", "LEGAL", 18))

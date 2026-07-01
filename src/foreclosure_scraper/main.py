@@ -1813,6 +1813,16 @@ async def run() -> int:
     except Exception:
         log.error("tenure.failed", traceback=traceback.format_exc())
 
+    # Tax relief — senior/disabled homestead exclusion (owner-occupant) + present-
+    # use deferral rollback lien. Parcel-keyed, reads the county exemption layer.
+    try:
+        from .enrichment_tax_relief import enrich_tax_relief
+        s = await enrich_tax_relief(enriched)
+        if s:
+            enrichment_stats["tax_relief"] = s
+    except Exception:
+        log.error("tax_relief.failed", traceback=traceback.format_exc())
+
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:
         from .enrichment_life_events import enrich_life_events
