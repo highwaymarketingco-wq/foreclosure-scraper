@@ -7,8 +7,13 @@ checks them against the state corrections roster, flagging raw['incarceration'].
 
 NC: NC DAC Offender Public Information — queryable by last+first name
 (webapps.doc.state.nc.us/opi/offendersearch.do), parseable HTML results.
-SC: SCDC inmate search is a React SPA (no static form) — TODO once its JSON
-API is identified; SC owners are skipped for now (logged), not silently dropped.
+SC: SCDC inmate search — the React SPA's backing servlet
+(public.doc.state.sc.us/scdc-public/inmateSearch.do, params in the query string,
+method=POST) returns a JSON offender array. Wired via _scdc_match (verified live
+2026-07-01: 250 records for lastName=SMITH). Same single-exact-match noise gate
+as NC. Both are STATE-PRISON rosters; county-jail bookings (pre-trial + local
+holds, several exposing full DOB) are a separate net-new lane — see
+docs/ or project_gap_analysis for the P2C/Zuercher/Southern-Software endpoints.
 
 HONEST CAVEAT: this is a NAME-ONLY match (we have no owner DOB), so common
 names produce false positives. It is therefore emitted as a LOW-confidence
