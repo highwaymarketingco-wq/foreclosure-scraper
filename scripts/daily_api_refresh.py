@@ -33,7 +33,7 @@ from foreclosure_scraper.valuation import calc as vcalc
 from foreclosure_scraper.valuation import grading as vgrade
 from foreclosure_scraper.distress_score import score_board
 from foreclosure_scraper.enrichment_title_risk import enrich_title_risk
-from foreclosure_scraper.web_artifact import write_artifact, _to_dict
+from foreclosure_scraper.web_artifact import write_artifact, _to_dict, load_board
 
 try:
     from foreclosure_scraper.new_listings import mark_new_listings
@@ -70,10 +70,13 @@ def _regrade(li: Listing) -> None:
 
 
 async def main() -> int:
-    path = Path("docs/listings.json")
-    prior_dicts = json.loads(path.read_text()) if path.exists() else []
-    prior = [li for li in (_hydrate(d) for d in prior_dicts) if li]
-    print(f"[{time.strftime('%H:%M:%S')}] loaded {len(prior)} prior listings", flush=True)
+    # load_board() merges the lazy-detail sidecar (listings_detail.json) back into
+    # each listing's raw BEFORE we re-split on write. Without it, write_artifact
+    # re-emits an empty sidecar and wipes vision/comps/cama (the sidecar-wipe
+    # regression fixed elsewhere this session). Mirrors the other refresh scripts.
+    _docs = Path(__file__).resolve().parent.parent / "docs"
+    prior = load_board(_docs)
+    print(f"[{time.strftime('%H:%M:%S')}] loaded {len(prior)} prior listings (sidecar merged)", flush=True)
 
     # Explicit allowlist of confirmed plain-HTTP/JSON sources. The
     # requires_render flag isn't reliably set on every scraper (some browser
@@ -311,7 +314,7 @@ async def main() -> int:
         import subprocess
         root = str(Path(__file__).parent.parent)
         try:
-            subprocess.run(["git", "add", "docs/listings.json", "docs/run_meta.json"], cwd=root, check=False)
+            subprocess.run(["git", "add", "docs/listings.json", "docs/listings_detail.json", "docs/run_meta.json"], cwd=root, check=False)
             if subprocess.run(["git", "diff", "--staged", "--quiet"], cwd=root).returncode != 0:
                 subprocess.run(["git", "commit", "-q", "-m",
                                 f"daily api refresh: {len(merged)} listings ({time.strftime('%Y-%m-%d')})"],
