@@ -1,5 +1,16 @@
+import pytest
+
 from foreclosure_scraper.models import Listing, ListingType, PropertyKind
 from foreclosure_scraper.enrichment_buyer_match import enrich_buyer_match, _load
+import foreclosure_scraper.enrichment_buyer_match as _bm
+
+
+@pytest.fixture(autouse=True)
+def _enable_buyer_match(monkeypatch):
+    # Production gates the server-side tagger OFF (the dashboard matches
+    # client-side); enable it here to exercise the matching logic directly.
+    monkeypatch.setattr(_bm, "_ENABLED", True)
+
 
 def _li(**kw):
     base=dict(source="s",source_url="x",listing_type=ListingType.TAX_LIEN,state="NC",county="Polk")
