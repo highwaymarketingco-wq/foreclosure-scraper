@@ -49,7 +49,18 @@ log = structlog.get_logger()
 #   }
 # Many city-of-* portals rotate FeatureServer URLs annually, so confirm the
 # host/owner-org actually serves the intended city before wiring it in.
-CITY_ENDPOINTS: dict[str, dict] = {}
+CITY_ENDPOINTS: dict[str, dict] = {
+    # City of Asheville self-hosted Accela services view (verified live 2026-07-01,
+    # HTTP 200, real addressed cases). record_type covers Building/Zoning/Stormwater
+    # Enforcement + STR complaints; record_status carries Open / NOV Mailed / Closed.
+    "Asheville": {
+        "url": "https://gis.ashevillenc.gov/server/rest/services/Permits/AccelaServicesView/MapServer/0",
+        "addr_fields": ("address",),
+        "violation_fields": ("record_type", "description"),
+        "status_fields": ("record_status",),
+        "date_fields": ("date_opened",),
+    },
+}
 
 
 def _haversine_miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
