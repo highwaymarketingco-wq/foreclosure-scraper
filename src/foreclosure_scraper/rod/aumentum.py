@@ -14,6 +14,7 @@ from dateutil import parser as dateparser
 from selectolax.parser import HTMLParser
 
 from ..http_client import client
+from . import deed_stamp
 from .models import RodDoc, normalize_doc_type
 
 AUMENTUM_COUNTIES = {
@@ -139,10 +140,10 @@ def _parse_grid(html: str, county: str, state: str) -> list[RodDoc]:
 
         consideration = _money(consideration_str)
         stamp = _money(stamp_str)
-        # Derive consideration from stamp when only the stamp is shown
-        # (NC: $1 stamp per $500 consideration).
-        if consideration is None and stamp is not None:
-            consideration = stamp * 500.0
+        # Canonical guarded conversion: prefer explicit consideration, else
+        # recover from the excise stamp (NC $1/$500). Rejects implausible
+        # parser misfires so garbage prices never reach the sold-comp pool.
+        consideration = deed_stamp.consideration_from_fields(consideration, stamp)
         amt = _money(amount_str)
 
         out.append(

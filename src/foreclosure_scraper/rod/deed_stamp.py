@@ -30,6 +30,47 @@ CONSIDERATION_RE = re.compile(
 )
 
 
+# Plausible consideration band. Reject parser misfires (a "stamp" that is
+# really a zip, doc number, or phone) and nominal related-party transfers
+# ($1 deeds) before they can pollute the sold-comp pool that feeds ARV.
+_MIN_PRICE = 100.0
+_MAX_PRICE = 10_000_000.0
+
+
+def _plausible(v: Optional[float]) -> Optional[float]:
+    if v is None:
+        return None
+    return v if _MIN_PRICE <= v <= _MAX_PRICE else None
+
+
+def consideration_from_fields(
+    consideration: Optional[float], stamp: Optional[float]
+) -> Optional[float]:
+    """Best sold price from a recorded deed's STRUCTURED fields (as already
+    parsed by the ROD vendor adapters). Prefer an explicit consideration;
+    otherwise recover it from the NC excise stamp (stamp × 500). Both pass the
+    plausibility guard, so a misfired stamp or a nominal transfer returns None
+    instead of injecting a garbage sold comp into the ARV pool.
+
+    This is the canonical structured converter the adapters (aumentum, cchs, …)
+    should use instead of an inline, unguarded `stamp * 500`.
+    """
+    try:
+        c = float(consideration) if consideration is not None else None
+    except (TypeError, ValueError):
+        c = None
+    v = _plausible(c)
+    if v is not None:
+        return v
+    try:
+        s = float(stamp) if stamp is not None else None
+    except (TypeError, ValueError):
+        s = None
+    if s is not None:
+        return _plausible(round(s * 500.0, 2))
+    return None
+
+
 def sold_price_from_stamp(text: str) -> Optional[float]:
     """NC deed tax: $1 per $500 of consideration. Stamp_amount × 500 =
     sold price. Prefer explicit CONSIDERATION line if present.
@@ -43,18 +84,15 @@ def sold_price_from_stamp(text: str) -> Optional[float]:
     m = CONSIDERATION_RE.search(text)
     if m:
         try:
-            v = float(m.group(1).replace(",", ""))
-            if 100 <= v <= 10_000_000:
+            v = _plausible(float(m.group(1).replace(",", "")))
+            if v is not None:
                 return v
         except ValueError:
             pass
     m = EXCISE_TAX_RE.search(text)
     if m:
         try:
-            stamp = float(m.group(1).replace(",", ""))
-            v = stamp * 500
-            if 100 <= v <= 10_000_000:
-                return v
+            return _plausible(float(m.group(1).replace(",", "")) * 500)
         except ValueError:
             pass
     return None

@@ -11,7 +11,33 @@ the per-vendor Permitium search-form flow is wired.
 """
 from __future__ import annotations
 
-from foreclosure_scraper.rod.deed_stamp import sold_price_from_stamp as _sold_price_from_stamp
+from foreclosure_scraper.rod.deed_stamp import (
+    sold_price_from_stamp as _sold_price_from_stamp,
+    consideration_from_fields,
+)
+
+
+def test_consideration_from_fields_prefers_explicit():
+    # explicit consideration wins even when a stamp is also present
+    assert consideration_from_fields(48500.0, 97.0) == 48500.0
+
+
+def test_consideration_from_fields_recovers_from_stamp():
+    # no explicit consideration -> stamp x 500
+    assert consideration_from_fields(None, 50.0) == 25000.0
+
+
+def test_consideration_from_fields_guards_misfires():
+    # implausibly small (nominal transfer) and huge (parser misfire) -> None
+    assert consideration_from_fields(None, 0.10) is None      # $50 "sale"
+    assert consideration_from_fields(None, 50000.0) is None   # $25M
+    assert consideration_from_fields(1.0, None) is None       # $1 related-party deed
+    assert consideration_from_fields(None, None) is None
+
+
+def test_consideration_from_fields_implausible_explicit_falls_back_to_stamp():
+    # a $0 explicit consideration with a real stamp -> recover from the stamp
+    assert consideration_from_fields(0.0, 90.0) == 45000.0
 
 
 def test_explicit_consideration_preferred():

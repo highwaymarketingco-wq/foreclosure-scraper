@@ -20,6 +20,7 @@ from urllib.parse import urlencode
 from dateutil import parser as dateparser
 
 from ..http_client import client
+from . import deed_stamp
 from .models import RodDoc, normalize_doc_type
 
 # (state, county) -> (host, app_slug, root_slug). Burke + Cleveland share the
@@ -110,7 +111,9 @@ def _parse_rows(xml: str, state: str, county: str, *, sold: bool) -> list[RodDoc
             stamp = _money(_field(rec, "mo"))
             if stamp:
                 doc.excise_tax_stamp = stamp
-                doc.consideration_amount = round(stamp * 500, 2)
+                # Canonical guarded conversion — a misfired stamp yields None
+                # (no garbage comp) rather than a bogus consideration.
+                doc.consideration_amount = deed_stamp.consideration_from_fields(None, stamp)
         out.append(doc)
     return out
 
