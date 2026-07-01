@@ -1,0 +1,2186 @@
+{
+ "buyers": [
+  {
+   "name": "D.R. Horton (incl. Express Homes / Emerald Homes brands, + acquired SK Builders)",
+   "type": "production_homebuilders",
+   "contact": "Property submittal form: https://www.drhorton.com/contact-us---property-submittals (routes to local land-acq team). Greenville/Upstate SC Division: 100 Verdae Blvd, Greenville, SC 29607, 864-757-9930 (Div. Pres. Jay Henderson). Asheville/WNC served via NC division. Corp land team dir: theorg.com/org/d-r-horton/teams/land-acquisition-and-development",
+   "geo": "BOTH metros. Upstate SC: Greenville, Spartanburg, Anderson, Easley, Pickens, Woodruff, Fountain Inn. WNC: Buncombe/Asheville, Woodfin, Enka-Candler, Arden, Hendersonville (Henderson Co.).",
+   "buys": "Entry-level to move-up SF lots + raw/entitled tracts for full subdivisions (finished lots and optioned takedowns). Deal sizes seen: $0.85M\u2013$4.5M single land buys in Buncombe Co.; homes ~$1,360\u20132,368 sqft. Also does 44-unit townhome tracts (White Oak Townes, Arden). Nation's #1 builder \u2014 largest lot appetite of any buyer here.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Lennar",
+   "type": "production_homebuilders",
+   "contact": "Lennar Greenville: 888-208-4555 (linkedin.com/showcase/lennar-greenville). Corp: 5505 Waterford District Dr, Miami FL 33126, 305-559-4000; land acquisition contacts routed through Charlotte/Greenville division. Corp contact: investors.lennar.com/information-request/contact-us",
+   "geo": "Greenville-Spartanburg-Anderson MSA (26 communities). Cities: Spartanburg, Boiling Springs, Fountain Inn, Taylors, Central. Charlotte division also covers upstate/NC border. Not confirmed in Asheville metro.",
+   "buys": "SF ranch + 2-story, townhomes, and active-adult (55+) masterplans. Buys finished lots and larger masterplan parcels. Communities: Cleveland Meadows (Spartanburg), Riverbend Ranch 55+ (Boiling Springs, 4,000 sqft clubhouse), Stoneledge Cottages (Fountain Inn), Reid Valley Towns (Taylors).",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Meritage Homes (Meritage Homes of the Carolinas, Inc.)",
+   "type": "production_homebuilders",
+   "contact": "833-MTH-6527 (833-684-6527); meritagehomes.com/company/contact. Carolinas land buys brokered via Land Advisors Organization (Charlotte office \u2014 advisor Forde Britt) and MPV Properties. Carolinas HQ: 3300 Paramount Pkwy, Morrisville NC.",
+   "geo": "Greenville-Spartanburg-Anderson MSA (24 area communities: 22-23 in Greenville Co., plus Anderson + Spartanburg). Also Charlotte metro (NC border). Not confirmed Asheville.",
+   "buys": "SF communities; buys sizable acreage tracts for 100-170+ lot subdivisions (e.g., 97 ac / 171 lots China Grove NC; 123 ac NE Charlotte). Price band high $300s-mid $400s. Energy-efficient product focus.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "NVR / Ryan Homes",
+   "type": "production_homebuilders",
+   "contact": "ryanhomes.com/new-homes/communities/south-carolina/greenville. Member of Fountain Inn Chamber (members.fountaininnchamber.org/list/member/ryan-homes-nvr-inc-613). NVR corp land: nvrinc.com. NVR uses lot-option/land-banking model \u2014 submit via local Greenville division sales/land office.",
+   "geo": "Greenville-Spartanburg-Anderson MSA: 32 communities in Greenville, 25 in Greenville Co., plus Spartanburg Co. and Anderson Co. Not present in Asheville metro (per search).",
+   "buys": "Entry-level to move-up SF + townhomes. NVR is land-LIGHT: prefers finished-lot takedowns / lot options from developers rather than raw land \u2014 best fit for sellers/developers who can deliver entitled or finished lots.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "PulteGroup (Pulte Homes / Del Webb / Centex / Century \u2014 note: Pulte brand here)",
+   "type": "production_homebuilders",
+   "contact": "pulte.com/homes/south-carolina/greenville. Entered Greenville 2023; press/land inquiries via newsroom.pultegroup.com and pultegroupinc.com investor-relations. Submit land via Pulte Southeast/Carolinas division land team.",
+   "geo": "Greenville-Spartanburg-Anderson MSA: Greenville city, Easley, Spartanburg. Not confirmed Asheville.",
+   "buys": "SF (62-109 lot enclaves) + townhomes + masterplan participation. Prices from ~$334,990 (Indigo Park). Communities: Indigo Park (Easley, 62 SF), Briarwood Reserve (Spartanburg, 31+ ac / 109 SF w/ pool), Alston Park (Greenville, 88 townhomes, opened Feb 2025), Harrington masterplan.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Toll Brothers",
+   "type": "production_homebuilders",
+   "contact": "tollbrothers.com/luxury-homes/Greenville-SC; corp land acquisition via tollbrothers.com (Investor/Newsroom). Submit luxury/estate land to Toll's Carolinas division.",
+   "geo": "Greenville metro (city + ~10 mi out). Cambric Village at Buena Vista Way & Old Boiling Spring Rd. Hudson Pointe (estate-sized). Luxury tier only; not in rural counties or Asheville.",
+   "buys": "LUXURY SF + townhomes; larger estate homesites and enclaves. Cambric Village enclave homes priced low $800,000s. Buys entitled parcels in premium submarkets near downtown Greenville.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Taylor Morrison",
+   "type": "production_homebuilders",
+   "contact": "taylormorrison.com/nc/charlotte (Charlotte Regional division covers Upstate SC; Regional Pres. Andrew Bodary). Land brokered via Land Advisors Organization Greenville office (advisors Clay Driggers, Whit Cox). Corp: taylormorrison.com.",
+   "geo": "NEW to Upstate SC \u2014 entering via Braxton Ridge, Fountain Inn (Greenville-Spartanburg MSA). Charlotte metro (16 communities) covers NC border. Not Asheville.",
+   "buys": "Move-up/premium SF. First Upstate parcel = ~33 homes (Braxton Ridge) \u2014 begins development immediately on acquisition. Actively seeking additional Upstate parcels as a new-market entrant.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Century Communities (Century Complete brand \u2014 online-only value arm)",
+   "type": "production_homebuilders",
+   "contact": "Upstate SC Sales Studio: 864-509-9195; centurycommunities.com/find-your-new-home/south-carolina/upstate-south-carolina-metro. Interest lists at CenturyCommunities.com. Land submittals via Century Southeast division.",
+   "geo": "Greenville-Spartanburg-Anderson MSA \u2014 heavy in Spartanburg (Frey Creek, Riverdale Hills, Moss Creek). Not confirmed Asheville.",
+   "buys": "Affordable/value SF from mid $200s-$270s + townhomes (coming to Spartanburg). Buys finished lots and smaller tracts in outlying/value submarkets near I-85/I-26. Century Complete targets lower land-basis locations.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "LGI Homes",
+   "type": "production_homebuilders",
+   "contact": "lgihomes.com/south-carolina/greenville-spartanburg; investor.lgihomes.com news releases. LGI land team via corporate; submit land through LGI Greenville-Spartanburg division.",
+   "geo": "Greenville-Spartanburg-Anderson MSA \u2014 Woodruff, Moore (SW of Spartanburg), Boiling Springs, Greenville. Not Asheville.",
+   "buys": "Entry-level SF, 3-4 BR, from $270s. Buys larger single-owner tracts for full self-developed communities (198 homesites at Waters Farm). LGI prefers to control whole neighborhoods = large-acreage raw/entitled land buyer.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Smith Douglas Homes",
+   "type": "production_homebuilders",
+   "contact": "smithdouglas.com/communities/greenville-sc; member Home Builders Assn of Greenville (members.hbaofgreenville.com). Land submittal via Smith Douglas Greenville division.",
+   "geo": "Greenville-Spartanburg-Anderson MSA \u2014 Anderson (Anderson Crossing), Travelers Rest, Simpsonville, Spartanburg area. Not Asheville.",
+   "buys": "Affordable/value SF. Coming-soon tracts: Anderson Crossing, Fox Landing, Terra Trace. Buys entitled lots/tracts in Upstate value submarkets.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Eastwood Homes",
+   "type": "production_homebuilders",
+   "contact": "eastwoodhomes.com/greenville (Greenville Division). Land via Eastwood Greenville division office. PRNewswire expansion release Oct 2025.",
+   "geo": "Greenville-Spartanburg-Anderson MSA \u2014 Anderson, Moore, Woodruff, Spartanburg, Landrum, Fountain Inn, Greer, Inman. Regional (Carolinas) builder, strong Upstate. Not confirmed Asheville.",
+   "buys": "SF + townhomes. Buys tracts for full communities. Pipeline: East Main Townes (Spartanburg, 28 TH), Clairborne (Landrum), + summer 2026: Hinson Farm (Fountain Inn), Irby Glen (Moore), Heritage Landing (Greer), Claybank Farm (Spartanburg).",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Mungo Homes (Berkshire Hathaway / M/I Homes-owned; major SC regional)",
+   "type": "production_homebuilders",
+   "contact": "mungo.com/communities/greenville-spartanburg. Land submittal via Mungo Homes Upstate/Greenville division. SC-based (Columbia HQ).",
+   "geo": "Greenville-Spartanburg-Anderson MSA \u2014 Inman (Lake Emory), plus Greenville/Spartanburg broadly. One of the largest SC-native builders. Not Asheville.",
+   "buys": "SF incl. larger 1/2-acre-lot communities (Burke Estates, 38 homesites) + luxury low-maintenance (Cottages at Lake Emory). Buys tracts across price points.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Adams Homes",
+   "type": "production_homebuilders",
+   "contact": "adamshomes.com/communities/south-carolina/greenville. Member Greenville-Pitt chambers. Land via Adams Homes SC division.",
+   "geo": "Greenville-Spartanburg-Anderson MSA \u2014 11 area communities. Value builder. Not Asheville (separate NC-coastal ops).",
+   "buys": "Affordable SF ('Value, Simplified'). Buys finished lots + tracts in value/outlying Upstate submarkets.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "DRB Homes (D.R. Bramante / part of Brookfield-owned group)",
+   "type": "production_homebuilders",
+   "contact": "drbhomes.com/drbhomes/find-your-home/communities/south-carolina/greenville. Land via DRB Carolinas division.",
+   "geo": "Greenville, SC (Greenville-Spartanburg MSA). Not Asheville.",
+   "buys": "SF + townhomes, entry to move-up. Buys entitled lots/tracts in Greenville submarkets.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Great Southern Homes (United Homes Group, NASDAQ: UHG \u2014 SC-native production builder)",
+   "type": "production_homebuilders",
+   "contact": "Via United Homes Group (unitedhomesgroup.com) / Great Southern Homes Upstate division. Listed on newhomesource/newhomesdirectory for Greenville.",
+   "geo": "Greenville-Spartanburg-Anderson MSA (8+ plans in Greenville). SC-based, heavy Upstate + Midlands. Not Asheville.",
+   "buys": "Affordable/entry SF. Buys finished lots and tracts across Upstate SC; land-light option/takedown model as public UHG.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Windsor Built Homes (Windsor Aughtry Co. \u2014 Greenville-based regional; the key ASHEVILLE-metro production builder)",
+   "type": "production_homebuilders",
+   "contact": "windsorbuilt.com (Hendersonville: windsorbuilt.com/hendersonville-new-homes/). Greenville-based parent Windsor Aughtry. Land via Windsor development office, Greenville SC.",
+   "geo": "SPANS BOTH footprints \u2014 Asheville metro (Asheville, Fletcher, Arden), Hendersonville (Henderson Co.), + Johnson City TN; also Greenville SC roots. Best-positioned regional buyer for WNC mountain land where nationals are thin.",
+   "buys": "SF new-home communities in the mountains/foothills. Buys developable tracts in Buncombe/Henderson terrain. Fills the Asheville-metro gap left by land-light nationals.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Windsor Homes / Windsor Built Homes (now a Stanley Martin company)",
+   "type": "regional_local_builders",
+   "contact": "Land Acquisition form: windsorbuilt.com/land-acquisition/ | Corporate: 40 W Broad St, Suite 500, Greenville SC 29601 | (864) 370-9037. Note: acquired by Stanley Martin (Sept 2025) but Windsor Built brand + WNC land program continue.",
+   "geo": "Western NC (Asheville, Hendersonville) + Eastern TN (Johnson City) + Upstate SC. Core of our footprint.",
+   "buys": "Small, medium AND large tracts for planned communities (they develop/acquire communities, NOT scattered single lots). 4,000+ homes built; controls ~2,100 lots in NC. Entitled/developable acreage preferred.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Stanley Martin Homes (Greenville-Spartanburg division)",
+   "type": "regional_local_builders",
+   "contact": "Sam Tedde, Director of Land Acquisition, Greenville-Spartanburg-Anderson (LinkedIn: sam-tedde). Greenville office: 430 Roper Mountain Rd, Suite F-1, Greenville SC 29615 | (864) 635-2953. Corporate land team: Alex Capps (VP Land Acq), Anthony Rocco (VP Land Acq), Bryan Steffen (Dir Land Acq).",
+   "geo": "Greenville, Greer, Easley, Mauldin, Simpsonville (Upstate SC); expanding across NC via Windsor + United Homes acquisitions.",
+   "buys": "Finished lots + raw/entitled tracts for single-family and townhome communities. 17-person land-acq team. Aggressive M&A ($221M United Homes buy = 1,192 homes/yr across Greenville/Spartanburg/Clemson; Windsor buy for WNC).",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Mungo Homes (Berkshire Hathaway / Clayton company)",
+   "type": "regional_local_builders",
+   "contact": "Land Acquisition: Jason Ewing, Land Acquisition Manager (Apollo/ZoomInfo). Dir. of Land Acquisition line (803) 227-8464; Dir. of Land Development (803) 749-9000. HQ Irmo/Columbia SC. Contact: mungo.com/contact-us | New Home Advisors (803) 832-4933.",
+   "geo": "Greenville/Spartanburg (dedicated communities page), plus Columbia Midlands, Charleston, NC & GA.",
+   "buys": "Raw and finished residential tracts for production single-family communities across price bands; large-volume regional builder with active land-acq + land-development departments.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Great Southern Homes (Dream Finders Homes subsidiary)",
+   "type": "regional_local_builders",
+   "contact": "William Cate, Manager of Land Development (Irmo SC; email pattern ***@greatsouthernhomes.com via ZoomInfo). HQ: 917 Chapin Rd, Chapin SC 29036 | greatsouthernhomes.com/contact-us. Also BIA Central SC (803) 331-8505; HBA of Greenville member.",
+   "geo": "Greenville/Spartanburg + Clemson explicitly, plus Midlands, Charleston, Myrtle Beach, Florence, Sumter, Aiken/Augusta.",
+   "buys": "Residential tracts for affordable/production single-family communities statewide SC; publicly-traded parent (now Dream Finders) with capital to acquire.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Eastwood Homes",
+   "type": "regional_local_builders",
+   "contact": "Mike Kemp, Land Acquisition Manager, mkemp@eastwoodhomes.com. Build-On-Your-Lot / free site evaluation: eastwoodhomes.com/build-on-your-lot | eastwoodhomes.com/contact-us.",
+   "geo": "Greater Greenville SC (plus Charlotte NC/SC, Charleston, Raleigh, Triad). Greenville is the in-footprint market.",
+   "buys": "Both community tracts AND individual build-on-your-lot parcels (offers free site evaluation on owner land). Production single-family builder.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "True Homes",
+   "type": "regional_local_builders",
+   "contact": "Scott Utsey, Market Partner of Land / former Program Manager Land Acquisition & Development (s***@truehomesusa.com, LinkedIn). Sell-Your-Land form: truehomes.com/sell-your-land | Corporate (704) 238-1229 | hello@truehomesusa.com. Based Monroe NC.",
+   "geo": "Carolinas (self-billed 'Carolinas #1 local builder'); strongest in greater Charlotte NC/SC \u2014 edges into our eastern footprint (Cleveland/Gaston/Lincoln NC).",
+   "buys": "Land for semi-custom + on-your-lot single-family production homes; dedicated 'Sell Your Land' intake routed to regional land specialists.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "SK Builders (now a D.R. Horton company)",
+   "type": "regional_local_builders",
+   "contact": "skbuilders.com (redirects to D.R. Horton); HBA of Greenville directory listing (members.hbaofgreenville.com). Family founders Tim & Russell Kalliainen. Land inquiries now flow through D.R. Horton's Greenville land team post-acquisition.",
+   "geo": "Upstate SC core: Taylors, Greer, Lyman, Simpsonville, Easley, Travelers Rest, Anderson (plus Charleston).",
+   "buys": "Self-developed holdings + optioned takedowns (~1,900 lots brought to D.R. Horton). Largest privately-held Greenville builder pre-acquisition; top-5 Greenville / top-10 Spartanburg.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Dan Ryan Builders / DRB Homes (DRB Group)",
+   "type": "regional_local_builders",
+   "contact": "Land inquiries via corporate: 3000 RDU Center Dr, Suite 202, Morrisville NC 27560 | (919) 747-4970. Jay Knight, VP Land Acquisition. danryanbuilders.com. HBA Charleston lists them as Land Developer + Single-Family Volume builder.",
+   "geo": "Carolinas incl. Charlotte NC/SC (via Fielding Homes) \u2014 reaches eastern edge of footprint (Gaston/Cleveland/Lincoln); also Upstate SC production markets.",
+   "buys": "Raw + entitled residential tracts for single-family volume production; active acquirer (Fielding Homes + Knight Homes integrations; 1,700+ SF lots in Charlotte/Raleigh).",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Enchanted Homes / Enchanted Construction LLC",
+   "type": "regional_local_builders",
+   "contact": "Ryan C. Kaiser, Owner. 1479 Mount Lebanon Rd, Campobello SC 29322 | (864) 895-0601 | enchantedhomes.com | @enchantedhomessc. Land/lot inquiries direct to owner.",
+   "geo": "Upstate SC core: Greenville, Spartanburg, Cherokee, Anderson counties \u2014 Campobello, Boiling Springs, Inman, Greer. Squarely in footprint.",
+   "buys": "Lots + small community tracts for affordable production single-family ($176k+ price points, e.g., Pheasant Ridge Anderson). 40+ communities. Local, owner-run \u2014 most approachable for scattered/small tracts.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Dillard-Jones Builders (Luxe Brands Collective)",
+   "type": "regional_local_builders",
+   "contact": "Corporate offices Greenville SC | dillardjones.com (Contact + Where We Build pages). Founded 2003, family-owned. Land/lot inquiries via site; builds on owner land or in listed communities.",
+   "geo": "Greenville & Upstate SC + Asheville NC + Cashiers/Highlands, Lake Keowee (Oconee), Bluffton, Charleston. Hits Greenville, Oconee/Pickens, Asheville, Transylvania/Polk luxury markets.",
+   "buys": "Premium/luxury lots and homesites in high-end/gated communities (Hartness, The Cliffs, Lake Keowee); build-on-your-private-land. High price signal (luxury custom).",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Morgan-Keefe Builders (MKB)",
+   "type": "regional_local_builders",
+   "contact": "morgankeefe.com (About / Where We Build / Contact). Based Arden/Asheville NC. Since 1980. Custom-lot inquiries via site; also listed build-on-your-lot in Arden on NewHomeSource.",
+   "geo": "Western NC + Upstate SC luxury mountain/lake communities: Asheville, Hendersonville, Black Mountain; The Cliffs, Champion Hills, Kenmure, Lake Toxaway, Lake Adger (Polk), Reserve at Lake Keowee (Oconee), Balsam Mountain, Bright's Creek.",
+   "buys": "Premium mountain + lakefront homesites/lots in prestige gated/golf communities; 100+ luxury estates built. Build-on-your-lot custom. High price signal.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "JS Miller Construction Co., Inc.",
+   "type": "regional_local_builders",
+   "contact": "Asheville HBA (Builders Assoc. of the Blue Ridge Mountains) directory listing (members.ashevillehba.com, member 111489). 3-generation GC. Land/community inquiries via HBA listing / company site.",
+   "geo": "Western NC (Asheville area) \u2014 Buncombe/Henderson core.",
+   "buys": "Builds homes AND develops communities in WNC (40+ yrs). Small-to-mid community tracts + custom lots.",
+   "regions": [
+    "wnc"
+   ]
+  },
+  {
+   "name": "Buchanan Construction",
+   "type": "regional_local_builders",
+   "contact": "Asheville NC design-build firm; contact via company site + Asheville HBA directory. Custom/renovation + commercial.",
+   "geo": "Asheville / Buncombe NC (WNC).",
+   "buys": "Infill/custom homesites in Asheville metro for luxury custom residences; smaller-scale, high-end.",
+   "regions": [
+    "wnc"
+   ]
+  },
+  {
+   "name": "Saussy Burbank",
+   "type": "regional_local_builders",
+   "contact": "2550 West Tyvola Rd, Charlotte NC 28217 | (704) 945-1515 | saussyburbank.com. Land inquiries via main line (no dedicated public land page \u2014 call and ask for land/development).",
+   "geo": "Charlotte NC + Fort Mill SC (Charleston, Myrtle Beach too). Reaches eastern-footprint fringe (Gaston/Lincoln NC) via Charlotte metro.",
+   "buys": "Infill + community tracts for single-family and townhomes; established (since 1989) regional builder-developer.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Lifestyle Homes of Distinction",
+   "type": "regional_local_builders",
+   "contact": "WNC-based; contact via company site + Asheville HBA / WNC Parade of Homes. Developer-builder.",
+   "geo": "Western NC (Asheville area) \u2014 Buncombe/Henderson.",
+   "buys": "Community-scale tracts (has developed 12 communities, 1,000+ homes over 29 yrs) \u2014 actively acquires land to develop planned communities.",
+   "regions": [
+    "wnc"
+   ]
+  },
+  {
+   "name": "Deltec Homes",
+   "type": "regional_local_builders",
+   "contact": "Asheville NC (3rd-gen family-owned); deltechomes.com. Round/prefab custom homes. Contact via site.",
+   "geo": "Asheville NC base; builds regionally/nationally on owner lots.",
+   "buys": "Primarily build-on-your-lot (customer-supplied land) rather than tract acquisition \u2014 lower priority as a land BUYER, but relevant referral/partner for lot owners.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Falcon Real Estate Development",
+   "type": "residential_land_developers",
+   "contact": "Shelby Day (Dir. of Operations) 864-907-6504 shelby@falconsouthcarolina.com; Bob Barreto 864-979-4838 bob@falconsouthcarolina.com; https://falconsouthcarolina.com/",
+   "geo": "Upstate SC core: Greenville, Spartanburg, Anderson counties; incl. Greer, Duncan, Lyman, Wellford, Powdersville, Simpsonville",
+   "buys": "Raw land they identify, purchase, entitle and develop into residential lots (single-family + townhome). Project scale 20-285 units; tracts roughly 10-150+ acres. Buy-and-hold entitlement developer, not just a builder.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Landbank Acquisitions (LandBank Companies)",
+   "type": "residential_land_developers",
+   "contact": "Shannon Van Etten, Managing Director; svanetten@landofskyregionalcenter.com; 828-712-1468; https://landbankcompanies.com/",
+   "geo": "Western NC (Buncombe/Asheville, Madison) + broader NC/SC per service-area map",
+   "buys": "Single-family residential development sites / land banking; acquires raw land, entitles into subdivisions, delivers/sells to builders. Example tract 77 acres / 53 lots. Fits mid-to-large raw-land tracts near Asheville.",
+   "regions": [
+    "wnc"
+   ]
+  },
+  {
+   "name": "BRD Land & Investment",
+   "type": "residential_land_developers",
+   "contact": "Contact form via https://www.brdland.com/ (no direct email/phone published on landing page); Charlotte NC based",
+   "geo": "Carolinas \u2014 currently Charlotte/Concord NC and Charleston SC; a regional Carolinas entitlement/land-dev partner (footprint-adjacent, expanding)",
+   "buys": "Identifies, acquires and entitles raw land, delivers turnkey shovel-ready residential communities to national + regional homebuilders. Land-banking / entitlement developer model (founded 2018).",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Windsor Aughtry Company / Windsor Built Homes",
+   "type": "residential_land_developers",
+   "contact": "Greenville SC HQ; https://www.windsoraughtry.com/ (contact/about page); listed in Greenville Chamber directory",
+   "geo": "Greenville SC and Upstate; Southeast",
+   "buys": "Long-standing land-development culture ('find properties in the path of progress'); develops residential neighborhoods (Windsor Built Homes, 2015) plus commercial/hospitality. Acquires and develops land for its own communities.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Dunean Capital Management",
+   "type": "residential_land_developers",
+   "contact": "CEO Gaston Albergotti (7th-gen Anderson native); reachable via Post & Courier coverage / Anderson County; search company site for direct contact",
+   "geo": "Anderson County SC (Anderson Reservoir / Lake Hartwell area)",
+   "buys": "Large-tract raw land for master-planned residential. Acquired \u00b11,200 acres to develop ~1,000 homes / ~900 lots (plus 135 large 1.5-15 acre estate parcels). Buyer of very large farm/estate tracts in-footprint.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Biltmore Farms",
+   "type": "residential_land_developers",
+   "contact": "Asheville NC; https://ramblebiltmoreforest.com/ and biltmorefarms.com (contact page); long-standing WNC developer",
+   "geo": "Buncombe County / Asheville, WNC",
+   "buys": "Master-planned residential community developer; assembles and develops large mountain acreage (The Ramble = \u00b11,000 acres). Buyer/holder of large WNC tracts for entitled homesites.",
+   "regions": [
+    "wnc"
+   ]
+  },
+  {
+   "name": "Envision Development Innovation, LLC (Endevi)",
+   "type": "residential_land_developers",
+   "contact": "Founder Stephen E. Stark; https://endevi.co (contact form); Hendersonville NC",
+   "geo": "Hendersonville & Asheville NC (Henderson, Buncombe)",
+   "buys": "Real-estate development (luxury residential + hospitality verticals); leads land planning and residential development. Smaller/luxury infill and community sites in WNC.",
+   "regions": [
+    "wnc"
+   ]
+  },
+  {
+   "name": "Dynamic Development (Dynamic Builders)",
+   "type": "residential_land_developers",
+   "contact": "https://dynamic-builders.com/services/asheville-real-estate-developer/ (contact form); Asheville NC",
+   "geo": "Asheville / WNC (statewide NC)",
+   "buys": "Land planning, site development and vertical construction for residential + commercial. Assembles acreage and brings subdivisions to market \u2014 will buy/assemble land to develop.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Flow North Developers",
+   "type": "residential_land_developers",
+   "contact": "https://flownorthdev.com (contact form; /what-we-do page); Asheville NC",
+   "geo": "Asheville NC metro and surrounding WNC",
+   "buys": "Buys raw land, then plans and develops it into residential subdivisions (20 yrs land-dev + new-home experience). Classic raw-land-to-lots developer in the exact footprint.",
+   "regions": [
+    "wnc"
+   ]
+  },
+  {
+   "name": "Mungo Homes",
+   "type": "residential_land_developers",
+   "contact": "Land Acquisitions via corporate site https://www.mungo.com; SC-based; Land Acq team (e.g., Bob Pickard, Land Acquisitions Mgr in adjacent division)",
+   "geo": "South Carolina statewide incl. Upstate (Greenville/Spartanburg); NC expansion",
+   "buys": "Large regional homebuilder with dedicated land-acquisition staff that review, appraise and acquire property for new-home development; buys finished lots AND raw/developable tracts (200+ ac deals documented).",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Stanley Martin Homes (incl. Great Southern Homes / former United Homes Group)",
+   "type": "residential_land_developers",
+   "contact": "Upstate office 430 Roper Mountain Rd, Ste F-1, Greenville SC 29615; 864-635-2953; land opportunities via https://www.stanleymartin.com/contact-us",
+   "geo": "Upstate SC (Greenville, Spartanburg, Anderson, Easley, Greer, Mauldin, Simpsonville); Clemson; expanding NC",
+   "buys": "National builder buying developable land + finished lots for single-family and townhome communities across the Upstate. Buys entitled/near-entitled tracts and finished-lot takedowns.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Prime Land Buyers",
+   "type": "residential_land_developers",
+   "contact": "service@primelandbuyers.com; 786-250-1103; sell-my-land form at https://www.primelandbuyers.com/counties/sell-land-greenville-county-south-carolina",
+   "geo": "SC: Greenville (primary), Spartanburg, Anderson, plus Greer/Taylors/Travelers Rest/Simpsonville/Fountain Inn/Powdersville etc.; also NC; 40+ states",
+   "buys": "Cash land buyer / land banker \u2014 vacant land, mountain/rural, back-tax parcels, growth-path land; makes 48-hr cash offers, no acreage floor stated. Quick-close aggregator that resells/holds.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Value Land Buyers",
+   "type": "residential_land_developers",
+   "contact": "Jeremy@valuelandbuyers.com; 843-507-5176; 2305 N Oak St Ste A2, Myrtle Beach SC; form https://www.valuelandbuyers.com/how-to-sell-my-land-fast-for-cash/",
+   "geo": "SC statewide incl. footprint counties Pickens, Oconee, Laurens, Cherokee, Union, Greenwood; also NC/GA/TN/VA",
+   "buys": "Cash land buyer / land banker \u2014 raw land, vacant lots, rural/ag, buildable plots, inherited/out-of-state/tax-burdened land. No stated acreage range; family-owned volume buyer.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Flournoy Development Group",
+   "type": "multifamily_developers",
+   "contact": "HQ 1100 Brookstone Centre Pkwy, Columbus GA 31904; phone 706-324-4000; contact/land-submittal form at flournoycompanies.com/contact-us. Land/acq via general dev contact form.",
+   "geo": "Both hot metros - active in Greenville SC AND Asheville (Buncombe) NC simultaneously; broader Sunbelt/Southeast (NC, SC, GA, TN, VA, FL, etc.)",
+   "buys": "Apartment-zoned + mixed-use land, large sites (~20-42 acres). Class A garden/mid-rise multifamily, BTR townhomes, active-adult. Deal scale 250-460+ units, $70-100M+ project cost.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "SunCap Property Group",
+   "type": "multifamily_developers",
+   "contact": "HQ Charlotte NC; contact page suncappg.com/contact; email pattern FLast@suncappg.com. Key contact: Bill Palmer, Managing Director. Team page suncappg.com/about/our-team.",
+   "geo": "Greenville-Spartanburg (2.1M SF already developed here) + Southeast concentration; Charlotte-based",
+   "buys": "Multifamily, mixed-use, industrial land. Urban/infill mid-rise apartment sites. Markley + Main = 277 units, 6-story, ~$100M. Institutional scale.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Peakline Real Estate Funds (QOZ Fund III)",
+   "type": "multifamily_developers",
+   "contact": "Peakline Real Estate Funds (Chicago investment firm); reachable via SunCap partnership and press contacts; announced via PRNewswire June 2025. Website peakline funds / investor relations.",
+   "geo": "Greenville SC (Opportunity Zone plays) + 15+ US growth markets",
+   "buys": "Equity capital partner for ground-up multifamily; targets Opportunity-Zone apartment land. $1.7B equity across 6 funds, $5B gross value. Backs 250-300 unit urban projects.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Woodfield Development",
+   "type": "multifamily_developers",
+   "contact": "850 Morrison Dr, Suite 700, Charleston SC 29403; leasing@woodfielddevelopment.net; InvestorInfo@WoodfieldDevelopment.net. Land deals via local-partner sourcing.",
+   "geo": "Asheville (River Arts District) + Greenville SC + Charleston/Daniel Island SC; eastern seaboard/Southeast",
+   "buys": "Class A multifamily + mixed-use, urban infill/redevelopment sites. 60+ communities built. The Wyre = 237 units. Custom-designed mid-rise.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Catalyst Capital Partners",
+   "type": "multifamily_developers",
+   "contact": "1600 Camden Rd Ste 200, Charlotte NC 28203; 704-741-4584. Named: A.J. Klenk (Managing Partner) aj@catalystcp.com / 704-231-4882; Ted Hill (CIO) ted@catalystcp.com / 704-449-5886; Brian Ford ford@catalystcp.com.",
+   "geo": "Asheville NC (primary), Charlotte NC, Rock Hill SC; high-growth Southeastern metros in NC/SC",
+   "buys": "Multifamily, build-to-rent, and active-adult (55+) land. Ground-up dev + opportunistic acquisitions. 4,700+ units under mgmt, $483M+ assets.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Southwood Realty Company",
+   "type": "multifamily_developers",
+   "contact": "165 S York St, Gastonia NC 28052 (in-footprint HQ); phone 704-869-6024. CEO Gene Ratchford Jr. Builds + acquires directly.",
+   "geo": "In-footprint HQ (Gaston County). Buys/builds across NC (>50% of portfolio), SC, GA, TN, VA. Active in Arden/Buncombe (Asheville metro).",
+   "buys": "Apartment land for ground-up garden-style complexes + existing-property acquisition. 100+ complexes owned. Recent: 252-unit Arden complex on 24.6 acres (10 buildings); $41M Concord acquisition. Mid-size garden apartments.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "FRP Development Corp.",
+   "type": "multifamily_developers",
+   "contact": "FRP Holdings / FRP Development; reachable via corporate FRP Holdings (Jacksonville FL) investor/dev contacts. Announced Woven via MultifamilyBiz.",
+   "geo": "Greenville SC (Village of West Greenville); Southeast mixed-use infill",
+   "buys": "Mixed-use + multifamily infill land in urban districts; market-rate + workforce. Woven = 214 apartments (1-3BR).",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Homes Urban",
+   "type": "multifamily_developers",
+   "contact": "Offices in Mount Pleasant SC and Greenville SC; homesurban.com (who-we-are page). Boutique developer - direct principal contact via site.",
+   "geo": "Greenville SC office; Southeastern US on prime infill sites",
+   "buys": "Prime infill sites for thoughtfully-designed multifamily rental communities; boutique/mid-size. Developer + investor, formed 2013.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Advenir Oakley Capital",
+   "type": "multifamily_developers",
+   "contact": "Advenir Oakley Capital LLC (MF investment firm); managed by Advenir Azora. Reach via advenirazora / Advenir Oakley corporate. Built with Capstone Building Corp.",
+   "geo": "Greer SC (Greenville-Spartanburg MSA, near BMW / GSP airport); Southeast BTR",
+   "buys": "Build-to-rent cottage/townhome land near job centers. LEO Jamestown = 296 homes on a large tract, $78M. BTR at scale.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Kassinger Development Group",
+   "type": "multifamily_developers",
+   "contact": "Based in Charleston SC AND Asheville NC; kassingerdevelopmentgroup.com (about/contact). Direct developer contact via site.",
+   "geo": "Asheville NC (dual HQ) + Charleston SC",
+   "buys": "Multifamily apartment land; garden/mid-rise communities. Built Retreat at Hunt Hill, Weirbridge Village, Audubon Place in Asheville.",
+   "regions": [
+    "wnc"
+   ]
+  },
+  {
+   "name": "RCG (RCG-Killian) / RCG Asheville",
+   "type": "multifamily_developers",
+   "contact": "rcgasheville.com; rcg-llc.com. Partner David Steinbergh (spoke on 2025 project). Direct developer contact via RCG Asheville site.",
+   "geo": "Asheville NC (local), downtown/urban infill",
+   "buys": "Urban infill multifamily + townhome land in Asheville; smaller-to-mid urban parcels. Owns Treetop Apartments; developing Charlotte St townhomes.",
+   "regions": [
+    "wnc"
+   ]
+  },
+  {
+   "name": "Montgomery Development Group",
+   "type": "multifamily_developers",
+   "contact": "montgomerydevelopmentgroup.com (portfolio/multifamily + news pages). Direct developer contact via site.",
+   "geo": "Spartanburg SC (Northside/Eastside), Upstate",
+   "buys": "Infill land for townhome-style multifamily; workforce + market-rate. Northside/Eastside ~110 townhome units, $22M.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Taft-Gibbs LLC",
+   "type": "multifamily_developers",
+   "contact": "Taft-Gibbs LLC; reachable via City of Spartanburg development-agreement records and project filings. Direct principal via Spartanburg planning contacts.",
+   "geo": "Spartanburg SC (Beaumont Mill / North Pine St)",
+   "buys": "Former mill / redevelopment sites for multifamily. Beaumont Mill = 275 units (247 market + 28 workforce), $70M. Adaptive-reuse + new MF.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "VanRock Holdings",
+   "type": "multifamily_developers",
+   "contact": "VanRock Holdings; reachable via City of Spartanburg development-agreement records (Village Grove project). Direct via Spartanburg planning.",
+   "geo": "Spartanburg SC (1017 Florida Ave)",
+   "buys": "Infill land for townhome/multifamily; ~95 units (Village Grove Townhomes).",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Southwood/Millstone Ventures & Ambach Community (Asheville rezoning applicants)",
+   "type": "multifamily_developers",
+   "contact": "Millstone Ventures LLC (Indianapolis) and Ambach Community LLC (Boca Raton FL) with local Asheville/Weaverville property-owner partners; reach via Buncombe County / Asheville planning rezoning filings (ZPH case records).",
+   "geo": "Asheville / Buncombe County NC (Weaverville, South Asheville)",
+   "buys": "Large multifamily-rezoning tracts: Ambach 497 units on 42.1 acres; Millstone 186 units on 5.36 acres (incl affordable set-aside). Big garden/mid-rise sites.",
+   "regions": [
+    "wnc"
+   ]
+  },
+  {
+   "name": "Terwilliger Pappas",
+   "type": "multifamily_developers",
+   "contact": "terwilligerpappas.com (contact page). Atlanta/Charlotte-based Solis-brand developer; direct dev/acq contact via site.",
+   "geo": "Southeast's growth suburbs incl Carolinas; Charlotte metro confirmed, targets Upstate SC / western NC suburbs",
+   "buys": "Class A Solis-brand suburban multifamily land; ~200-250 unit sites. Solis Birkdale = 210 units.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Crescent Communities",
+   "type": "multifamily_developers",
+   "contact": "crescentcommunities.com/Development (development contact). Charlotte HQ; regional Atlanta office covers Carolinas MF acquisitions.",
+   "geo": "Charlotte HQ; national incl Carolinas; targets high-growth Southeastern metros (Greenville/Asheville in-region)",
+   "buys": "NOVEL-brand Class A multifamily + mixed-use land; institutional 250-350 unit urban/suburban sites. 95+ MF communities since 1963.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "NRP Group",
+   "type": "multifamily_developers",
+   "contact": "nrpgroup.com/communities; corporate acquisitions team. National developer/GC/manager with Carolinas activity.",
+   "geo": "National incl North Carolina; active Carolinas MF pipeline",
+   "buys": "Market-rate + affordable/tax-credit multifamily land; garden + mid-rise, 200-350 units. Top-5 national MF developer.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Greystar",
+   "type": "multifamily_developers",
+   "contact": "greystar.com/business/services/development-and-construction; Charleston SC HQ. Development & land-acq team via business services portal.",
+   "geo": "Global; Charleston SC HQ; active in Asheville NC and Carolinas markets",
+   "buys": "Class A multifamily land at scale, urban + suburban, 200-400+ units. World's largest apartment developer/manager.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Mountain Housing Opportunities (MHO)",
+   "type": "multifamily_developers",
+   "contact": "mtnhousing.org; Asheville NC nonprofit. Contact Allison Rollison (email via site). Direct dev-pipeline contact.",
+   "geo": "Buncombe, Henderson, Madison, Haywood counties NC (Asheville metro / WNC core footprint)",
+   "buys": "Affordable multifamily sites, 1-7 acres, 60-159 units (LIHTC/AMI-restricted). Star Point 60 units/1.3ac, Erwin 159 units, Balsam Edge 84 units.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Windsor Aughtry Company",
+   "type": "commercial_retail_office",
+   "contact": "40 W Broad St, Suite 500, Greenville, SC 29601 | (864) 271-9855 | windsoraughtry.com | Commercial Division Broker-In-Charge: P.C. (Bo) Aughtry, III",
+   "geo": "Greenville-Spartanburg-Anderson MSA (HQ Greenville); Upstate SC core + broader Southeast",
+   "buys": "Commercial development land + pads for retail/mixed-use/hotel; 1,000,000+ sq ft GLA developed; typical brokerage inventory ~$50M market value; suburban commercial parcels",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Collett (Collett & Associates / Collett Capital)",
+   "type": "commercial_retail_office",
+   "contact": "collettre.com/team | Charlotte HQ + Greenville SC + Morganton NC offices. Development Partners: William Anderson 704.206.8298, Wesley Walls 704.206.8338; Morganton: Eric Engstrom 828.604.7034, Frank Mellon 828.430.8674, Robert Collett 828.430.8676; Industrial: Teddy Hull 704.206.8325",
+   "geo": "Carolinas core (NC/SC), incl. Western NC via Morganton (Burke County) office + Greenville SC office; suburban/secondary markets across 10+ states",
+   "buys": "Grocery-anchored + community/neighborhood shopping centers (Food Lion, Publix, etc.); ~45,000 sq ft neighborhood centers up to larger community centers; pads; development land in growing suburban/secondary trade areas",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Halvorsen Holdings",
+   "type": "commercial_retail_office",
+   "contact": "halvorsenholdings.com | LinkedIn: linkedin.com/company/halvorsen-holdings (submit sites via site contact form)",
+   "geo": "Southeast US incl. NC/SC; follows Publix expansion territory (which covers the entire footprint)",
+   "buys": "Publix-anchored shopping centers (developed ~80); grocery-anchored retail pads/outparcels; neighborhood/community center land sized for a grocery anchor + shops",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Crosland Southeast",
+   "type": "commercial_retail_office",
+   "contact": "croslandsoutheast.com | Charlotte NC HQ",
+   "geo": "VA, TN, NC, SC, GA, FL \u2014 directly covers Western NC + Upstate SC",
+   "buys": "Mixed-use + grocery-anchored and power/community retail development land; larger master-planned retail and mixed-use sites",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Faison",
+   "type": "commercial_retail_office",
+   "contact": "faison.com | Charlotte NC HQ",
+   "geo": "Southeast US incl. Carolinas",
+   "buys": "Neighborhood shopping centers, retail, mixed-use, and commercial investment/development land",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Agree Realty Corp (NYSE: ADC)",
+   "type": "commercial_retail_office",
+   "contact": "agreerealty.com/about | Director of Development: Austin Armstrong (originates development + Developer Funding Platform with developer partners)",
+   "geo": "All 50 states incl. NC/SC; footprint metros qualify as strong retail corridors",
+   "buys": "Net-lease single-tenant retail, ground leases, and pads for investment-grade national retailers/QSR; freestanding buildings + multi-tenant centers; ~1 acre pads up to larger centers; buys via development + Developer Funding Platform (funds developer partners' deals)",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Four Corners Property Trust (NYSE: FCPT)",
+   "type": "commercial_retail_office",
+   "contact": "fcpt.com | Mill Valley CA HQ; acquisitions team via investor/acquisitions contact on site",
+   "geo": "Nationwide incl. NC/SC restaurant corridors",
+   "buys": "Net-leased restaurant + retail pads (QSR/casual dining, auto service, veterinary, tire); corporate-operated single-tenant NNN assets; individual pad deals in the low-single-millions (e.g. ~$4.6M/asset)",
+   "regions": [
+    "wnc",
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Net Lease Development Inc.",
+   "type": "commercial_retail_office",
+   "contact": "netleasedevelopment.com (site submittal via contact form)",
+   "geo": "Southeast US incl. Carolinas (national QSR brand partners)",
+   "buys": "QSR/restaurant build-to-suit pads and ground leases; ~0.5-1.5 acre freestanding drive-thru pad sites for national QSR brands",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Publix Super Markets \u2014 Real Estate Dept.",
+   "type": "commercial_retail_office",
+   "contact": "corporate.publix.com/business/realestate | Submit sites to the area Real Estate Manager for the NC/SC region via the Real Estate Questionnaire + Proforma + trade-area map (Lakeland FL HQ; 9 regions)",
+   "geo": "AL, FL, GA, KY, NC, SC, TN, VA \u2014 entire footprint (Asheville + GSA metros + growth suburbs)",
+   "buys": "~10-15 acre grocery-anchor sites at strong intersections/quadrants for new stores; also anchor pads within third-party developments; recently paid $3M+ for a 10-acre store site",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Harris Teeter (Kroger) \u2014 Real Estate",
+   "type": "commercial_retail_office",
+   "contact": "harristeeter.com / Kroger real estate (site submittals via Kroger real estate dept); Matthews NC roots",
+   "geo": "Carolinas incl. SC growth suburbs (Clemson, Lake Wylie, Fort Mill); NC",
+   "buys": "Grocery-anchor sites (~5-12 acres) for new supermarkets in growing suburban trade areas",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Flagship Healthcare Properties",
+   "type": "commercial_retail_office",
+   "contact": "2701 Coltsgate Rd, Suite 300, Charlotte, NC 28211 | flagshiphp.com/contact | flagshiphp.com/development (acquisitions + development teams listed at flagshiphp.com/our-team)",
+   "geo": "Southeast + Southern Mid-Atlantic incl. entire NC/SC footprint (Rock Hill, Chapel Hill acquisitions confirmed)",
+   "buys": "Medical office buildings (MOB), ambulatory surgery centers, outpatient healthcare land + build-to-suit near hospitals/growth suburbs; 6.3M+ sq ft / 304+ properties managed; develops + acquires MOB sites",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Montecito Medical Real Estate",
+   "type": "commercial_retail_office",
+   "contact": "montecitomac.com | montecitomac.com/developers (developer/JV + acquisitions contact); Nashville TN HQ",
+   "geo": "National incl. Upstate SC (Greenville/Clemson) + NC",
+   "buys": "Medical office buildings + healthcare real estate; buys MOB portfolios and single buildings; also partners with developers on new MOB projects; ~88,000 sq ft SC portfolio (Greenville/Clemson) acquired",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Rendina Healthcare Real Estate",
+   "type": "commercial_retail_office",
+   "contact": "rendina.com/what-we-do/healthcare-real-estate-development (development + acquisitions contact via site); Jupiter FL HQ",
+   "geo": "National incl. Southeast/Carolinas (works with health systems)",
+   "buys": "Medical office + outpatient facility development land, on/near hospital campuses and suburban growth nodes; 6.85M+ sq ft developed",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Catalyst Healthcare Real Estate",
+   "type": "commercial_retail_office",
+   "contact": "catalysthre.com (development + acquisitions contact via site)",
+   "geo": "National incl. Southeast; partners with integrated health systems/physician groups",
+   "buys": "Medical office + outpatient/ASC development land and build-to-suit near health systems",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Johnson Development Associates (The Johnson Group)",
+   "type": "commercial_retail_office",
+   "contact": "johnsondevelopment.net | Spartanburg SC HQ; Spartanburg team: johnsondevelopment.net/spartanburg-properties/team",
+   "geo": "National for industrial/multifamily/self-storage; office + retail focused in home market of Spartanburg SC (Upstate core)",
+   "buys": "In Spartanburg: office, retail, and mixed residential land/redevelopment; nationally industrial, multifamily, self-storage sites",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Biltmore Farms (Commercial)",
+   "type": "commercial_retail_office",
+   "contact": "biltmorefarms.com/commercial | Asheville NC (owner/developer of Biltmore Park Town Square)",
+   "geo": "Asheville MSA / Buncombe County + South Asheville-Hendersonville corridor",
+   "buys": "Large mixed-use commercial land (retail, Class A office, residential) \u2014 master-planned; 42-acre Biltmore Park model; retail/office pads within its holdings",
+   "regions": [
+    "wnc"
+   ]
+  },
+  {
+   "name": "Woodfield Development",
+   "type": "commercial_retail_office",
+   "contact": "woodfielddevelopment.com | Charlotte NC HQ (co-developer of Woven, Greenville)",
+   "geo": "Southeast incl. Greenville SC + growth metros",
+   "buys": "Mixed-use land (multifamily + ground-floor commercial/retail); urban infill parcels; assembled 13-parcel sites like Woven (214 units + 13k sf commercial)",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "FRP Development Corp.",
+   "type": "commercial_retail_office",
+   "contact": "frpholdings.com | Jacksonville FL HQ (co-developer of Woven, Greenville)",
+   "geo": "Southeast/Mid-Atlantic incl. Greenville SC",
+   "buys": "Mixed-use + commercial development land in urban growth corridors (JV with local partners)",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Saint Capital LLC (Richard Jackson)",
+   "type": "commercial_retail_office",
+   "contact": "Greenville SC (developer of Mosaic, 605 S. Academy St.); principal Richard Jackson",
+   "geo": "Greenville SC / Upstate core",
+   "buys": "Urban mixed-use land \u2014 five-story mixed-use + residential + ground-floor commercial parcels; downtown/near-downtown Greenville sites",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Reedy River Retail (SVN \u2014 Dustin Tenney)",
+   "type": "commercial_retail_office",
+   "contact": "SVN Greenville | Managing Partner: Dustin Tenney (Backyard at Pelham developer)",
+   "geo": "Greenville SC / Upstate retail corridors",
+   "buys": "Retail + entertainment/dining redevelopment sites and pads (e.g. 30,000 sf Backyard at Pelham); infill retail parcels and outparcels",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "NAI Earle Furman",
+   "type": "commercial_retail_office",
+   "contact": "naiearlefurman.com | Greenville SC HQ (also Spartanburg, Anderson offices); land/retail/office brokerage + development",
+   "geo": "Upstate SC core (Greenville, Spartanburg, Anderson, and surrounding counties)",
+   "buys": "Represents buyers/developers on retail, office, and development land across the Upstate; sources land-acq for commercial clients",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Cardinal Commercial Properties",
+   "type": "commercial_retail_office",
+   "contact": "cardinalcommercialproperties.net | Greenville SC HQ; team + listings at /our-team and /land",
+   "geo": "Upstate SC + Southeast (Greenville, Easley/Pickens, and surrounding)",
+   "buys": "Office, retail, land, multifamily and income-producing commercial real estate; represents buyers on land acquisitions (e.g. 2.75+ acres on Dacusville Hwy, Easley/Pickens Co.)",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Spencer/Hines Commercial (Spencer Commercial)",
+   "type": "commercial_retail_office",
+   "contact": "spencercommercial.net | Spartanburg SC (serves Spartanburg + Greenville + Upstate)",
+   "geo": "Spartanburg County + Upstate SC",
+   "buys": "Retail, office, and commercial land/pads for sale + development throughout Spartanburg/Greenville",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "SunCap Property Group",
+   "type": "industrial_logistics",
+   "contact": "HQ Charlotte NC; https://www.suncappg.com (About/Contact page). Land-acq deals brokered through Colliers Upstate industrial team (Garrett Scott/John Montgomery/Brockton Hall, Spartanburg). Charlotte office ~ (704) 561-5240.",
+   "geo": "Greenville-Spartanburg-Anderson MSA; I-85 corridor (Duncan, Greer, Greenville Enterprise Park); Charlotte metro incl. Gaston/Lincoln reach",
+   "buys": "Class A spec warehouse/distribution + single-tenant build-to-suit. Land tracts ~18-140 acres. Recent: 29.56 ac Spartanburg (Spartan Exchange, 270K SF), 140-ac Greenville Enterprise Park (1M+ SF Enterprise 85). Institutional capital (Goldman Sachs AM partner). Buys utility-served, I-85-adjacent parcels.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Rockefeller Group",
+   "type": "industrial_logistics",
+   "contact": "National; https://www.rockefellergroup.com (Developments/Contact). Southeast/Carolinas development office; leasing via Colliers Upstate. Corporate HQ New York; regional development leads listed on site.",
+   "geo": "Spartanburg County (Hwy 221, I-85 Exit 78), Duncan SC; broader Greenville-Spartanburg",
+   "buys": "Class A big-box distribution centers, 800K-1M+ SF singles. Land 89-100+ acres. Recent: Spartanburg 221 (1.02M SF on 89 ac), Duncan Logistics Center (827K SF on 98 ac), 827K SF GSA park. Targets I-85-interchange-proximate large tracts.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "CRG (Clayco affiliate, 'The Cubes' brand)",
+   "type": "industrial_logistics",
+   "contact": "https://www.realcrg.com (Contact/Latest). Southeast regional team; leasing via Colliers Upstate. Chicago HQ; Carolinas development contact via site.",
+   "geo": "Spartanburg County (Fort Prince, Greer/Inland 85), midway Greenville-Spartanburg",
+   "buys": "Large spec logistics parks under 'The Cubes' brand. Land 186-324 acres. Recent: 186 ac Spartanburg (Cubes at Fort Prince, 2.35M SF), 324-ac Inland 85 Logistics Center, sold Cubes at Inland 85 Bldg C for $119.5M. Multi-building 1M+ SF campuses.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Glenstar Logistics (with Creek Lane Capital)",
+   "type": "industrial_logistics",
+   "contact": "Paula Widholm, pwidholm@glenstar.com, (312) 267-4525; https://glenstar.com. Leasing: Colliers Spartanburg (John Montgomery/Garrett Scott/Brockton Hall/Dillon Swayngim).",
+   "geo": "Cherokee County / Gaffney SC (I-85 & Hwy 105 interchange); Upstate SC I-85 corridor",
+   "buys": "Multi-building spec logistics park (CCC-85, Cherokee Commerce Center 85): 290 acres, 5 buildings up to 3.6M SF, 40' clear. Secured $32.8M-$38.2M construction financing. Targets large I-85-interchange raw tracts.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Panattoni Development Company (with PCCP)",
+   "type": "industrial_logistics",
+   "contact": "https://www.panattoni.com (news/contact); Carolinas/Southeast development office. LinkedIn: Panattoni Development Company. Deals via PCCP JV.",
+   "geo": "Duncan SC, Greer SC; Greenville-Spartanburg metro (I-85)",
+   "buys": "Class A spec parks + shallow-bay. Land ~16.5-136 acres. Recent: Tyger Ridge Logistics Center (1.5M SF / 3 bldgs on 136 ac, Duncan), Abner Creek Logistics Center (182K SF on 16.5 ac, Greer). Rear-load & cross-dock tilt-up.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Johnson Development Associates (JDA)",
+   "type": "industrial_logistics",
+   "contact": "One Morgan Square, 100 Dunbar St, Suite 400, Spartanburg SC 29306; (864) 585-2000. Alex Powell (Commercial RE Mgr), apowell@johnsondevelopment.net; https://www.johnsondevelopment.net/industrial/properties",
+   "geo": "Spartanburg (home base) + national; Upstate SC I-85 corridor",
+   "buys": "National build-to-suit + spec industrial developer/GC/owner (34M+ SF industrial developed). Buys raw land in Spartanburg and develops industrial; also multifamily/self-storage. Local land-assembly capacity.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Scannell Properties",
+   "type": "industrial_logistics",
+   "contact": "https://scannellproperties.com (news/contact); Southeast development team. Indianapolis HQ; leasing via Colliers Upstate.",
+   "geo": "Duncan SC (Hillside Enterprise Park); Greenville-Spartanburg",
+   "buys": "Spec + build-to-suit warehouse. Recent: Hillside Enterprise Park, Duncan \u2014 84-acre development, first 3 buildings 400K+ SF leased/sold, final 408K SF spec under construction. Buys mid-large I-85 tracts.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Red Rock Developments",
+   "type": "industrial_logistics",
+   "contact": "https://www.redrockdevelopments.com (Spartanburg SC Available Land page + Contact). Columbia/Greenville SC-based Southeast developer.",
+   "geo": "Spartanburg SC + Greenville/Spartanburg; also I-26 (Calhoun) \u2014 controls land across Upstate",
+   "buys": "Spec distribution + industrial parks. Recent: Smith Farms Industrial Park (450 ac, 2.5M+ SF GSA), Sandy Run (519K SF cross-dock). Actively markets its own Spartanburg available-land inventory (seeks + assembles tracts).",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "MRP Industrial (Charlotte regional office)",
+   "type": "industrial_logistics",
+   "contact": "Charlotte NC regional office; site-acq leads Ace Richardson & Tim Hudson (SVPs). HQ 509 S. Exeter St, Suite 216, Baltimore MD 21202, (410) 685-0000; https://mrpindustrial.com",
+   "geo": "Carolinas (Charlotte + reaching Gaston/Lincoln/Upstate SC via new Charlotte office)",
+   "buys": "Class A spec industrial developer expanding into Southeast. Actively hunting 'compelling, strategically-located acquisition sites' across the Carolinas. Mid-to-large development parcels.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Redline Property Partners (with Landmark Industrial)",
+   "type": "industrial_logistics",
+   "contact": "Andrew Webb (President/Managing Partner). Charlotte office: 6101 Carnegie Blvd, Suite 455, Charlotte NC 28209, (704) 900-5131; https://redlinepropertypartners.com/contact-us/",
+   "geo": "Charlotte metro incl. Gaston/Lincoln; I-85 corridor (also Salisbury/Rowan)",
+   "buys": "Class A infill + larger industrial. Recent: 13.2-ac E. Charlotte infill (137K SF), 115.6-ac parcel off I-85 in Salisbury. Buys both rare infill tracts and 100+-ac future-industrial land.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "4130 Partners (with Peerless Development)",
+   "type": "industrial_logistics",
+   "contact": "https://www.businesswire.com/... (4130 Partners press) + 4130partners.com; deal brokered in GSA submarket. Peerless Development (Chicago) partner.",
+   "geo": "Williamston SC (Anderson County) / Alliance Industrial Park; Greenville-Spartanburg submarket",
+   "buys": "Shallow-bay industrial. Recent inaugural deal: ~28 acres in Williamston (Alliance Industrial Park) for up to 226K SF / 2 buildings, direct I-85 access. Targets functional shallow-bay land where inventory is scarce.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Appian Investments",
+   "type": "industrial_logistics",
+   "contact": "Greenville SC-based; https://greenvilleeconomicdevelopment.com (Magnolia Grove flyer references) \u2014 search Appian Investments Greenville. Private investment firm, direct principal contact via GADC referrals.",
+   "geo": "Greenville County / Greenville-Spartanburg",
+   "buys": "Ground-up Class A industrial + flex. 5M+ SF track record; Magnolia Grove Flex Park was its 13th ground-up Class A project. Buys Greenville-area development parcels for flex/shallow-bay.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Becknell Industrial",
+   "type": "industrial_logistics",
+   "contact": "https://becknellindustrial.com (Properties/Contact). National build-to-suit developer/owner; Southeast team.",
+   "geo": "Spartanburg County (BMW supplier ecosystem)",
+   "buys": "Build-to-suit + spec industrial. Recent: 349,800 SF expansion to 1.25M SF supporting BMW Plant Spartanburg logistics. Targets land near BMW / automotive supply chain.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Childress Klein",
+   "type": "industrial_logistics",
+   "contact": "https://www.childressklein.com/industrial (Development/Contact). Charlotte + Atlanta offices; Southeast industrial team.",
+   "geo": "Charlotte metro (incl. Gaston/Lincoln) + Southeast; expanding toward Upstate SC",
+   "buys": "24M+ SF industrial developed. Build-to-suit + spec parks across the Southeast; acquires large development tracts. Established Carolinas developer with land-assembly capacity.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Greystar (industrial division) + Frampton Construction",
+   "type": "industrial_logistics",
+   "contact": "Greystar industrial: https://www.greystar.com; Frampton Construction https://www.frampton.construction (Charleston/Southeast). GSA deals via regional teams.",
+   "geo": "Greer/Duncan SC (Mid85, near Inland Port Greer); Greenville-Spartanburg",
+   "buys": "Large spec industrial parks. Recent: Mid85 \u2014 2M SF industrial park off I-85 near Inland Port Greer (Greystar dev, Frampton GC); ~1M SF Greenville spec. Targets I-85 + inland-port-adjacent tracts.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Agracel, Inc.",
+   "type": "industrial_logistics",
+   "contact": "https://agracel.com (Development Solutions/Contact). SIOR corporate member with NAIOP staff; works directly with economic developers on speculative + BTS.",
+   "geo": "Upstate SC + rural/foothills Carolinas (partners with county EDCs)",
+   "buys": "Build-to-suit and spec industrial; frequently develops on certified sites / EDC-controlled land in smaller markets. Good fit for rural mountain/foothills county tracts.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Public Storage (PSA)",
+   "type": "self_storage",
+   "contact": "Real estate site-submission form at publicstorage.com/real-estate/real-estate.html; dev/acq line 385-715-2456. East regional contacts: Matt Toussaint & John Schafer; Central: Daniel Wollent.",
+   "geo": "National, 40 states incl. NC & SC; buys/develops in top MSAs and growing secondary markets \u2014 Asheville and Greenville-Spartanburg-Anderson MSAs both qualify.",
+   "buys": "The only REIT that acquires land AND develops in-house. (1) Development land: entitled or unentitled, min 2+ acres; (2) Conversion space: 40,000-150,000 GSF industrial or big-box retail to convert. Institutional pricing.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Extra Space Storage (EXR)",
+   "type": "self_storage",
+   "contact": "Acquisitions program page extraspace.com/acquisition/ (site returned 403 to bot but is the intake page); HQ Salt Lake City. Team: VP Investments Kely Chipman, Director of Investments Samantha Battis, plus Eastern-US Transactions Officer.",
+   "geo": "National, largest US operator (4,000+ locations) incl. Asheville & Hendersonville NC and Greenville SC; targets high-growth MSAs and secondary markets.",
+   "buys": "Existing facilities (single assets to portfolios), CofO/lease-up deals, plus future development sites (acquired 14 dev sites in the Storage Express deal). $19B in deals over 5 yrs. Also JV, bridge-loan and 3rd-party-mgmt-to-acquisition pipeline.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "CubeSmart (CUBE)",
+   "type": "self_storage",
+   "contact": "investments@cubesmart.com; general 1-877-279-7585; online deal form on cubesmart.com/about-us/acquisitions/. Team: SVP Investments Daniel Ruble (druble@cubesmart.com), Directors Jessie Smith (jsmith@cubesmart.com) & Matt Lawlor (mlawlor@cubesmart.com).",
+   "geo": "National top markets, 'infill or growing markets with favorable demographics' \u2014 Greenville-Spartanburg-Anderson and Asheville MSAs fit their stated criteria.",
+   "buys": "High-quality EXISTING self-storage facilities (does not self-develop, but partners with developers on layout/lease-up). Closes most deals in <60 days. Form asks Property Size (SF) + Asking Price.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "SmartStop Self Storage REIT / Strategic Storage Growth Trust III (SSGT III)",
+   "type": "self_storage",
+   "contact": "IR@smartstop.com (David Corak, SVP Corporate Finance & Strategy). SmartStop corporate, Ladera Ranch CA. Investor/acq inquiries routed via IR.",
+   "geo": "National with a demonstrated Upstate SC appetite \u2014 just bought a 3-property Spartanburg County portfolio (Boiling Springs, Spartanburg, John B. White Sr. Blvd).",
+   "buys": "Modern Class-A existing facilities, climate-controlled, in suburban trade areas with strong income/traffic/population growth. Acquired ~179,900 NRSF / ~1,580 units / ~120 parking spaces in the Dec 2025 Spartanburg deal.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Prime Group Holdings / Prime Storage",
+   "type": "self_storage",
+   "contact": "Deal/sell inquiries via goprimegroup.com/contact/ ; media/IR PrimeGroup@gasthalter.com, (212) 257-4170. HQ Saratoga Springs NY; investment-origination offices Denver CO & Hackensack NJ; regional office Jupiter FL.",
+   "geo": "National, 28 states, 400+ properties; densely populated communities with strong demographics \u2014 active across the Southeast/East Coast.",
+   "buys": "Acquires AND develops high-quality self-storage; heavy off-market focus. Single assets and large portfolios (e.g., 30 properties / 1.725M SF across 10 states in <90 days). Deploys from $2.5B Prime Storage Fund III.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Go Store It Self Storage (Madison Capital Group)",
+   "type": "self_storage",
+   "contact": "Charlotte NC HQ. Madison Capital Group founder/CEO Ryan Hanks 704-998-8646; Go Store It President Matt Lang leads acquisitions & 3PM. Deal intake via madisoncapgroup.com and gostoreit.com.",
+   "geo": "Sun Belt focus, HQ'd in-region (Charlotte); already 5 locations in the Charlotte MSA and active across the Carolinas \u2014 natural fit for Gaston/Lincoln/Cleveland NC and Upstate SC near the Charlotte orbit.",
+   "buys": "Vertically integrated: ground-up DEVELOPMENT (in-house site selection/construction) + value-add acquisitions + 3rd-party mgmt. Targets high-growth, high-barrier secondary markets. Deploys via $250M Go Store It Opportunity Fund.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Storage Units Capital",
+   "type": "self_storage",
+   "contact": "Southeast-focused self-storage investment/management firm; contact via storageunitscapital.com and PR/deal channels (PRNewswire release 302448885). Development & acquisitions team sources sites directly.",
+   "geo": "Southeast US; explicitly targeting 'fast-growing, undersupplied' markets \u2014 opened directly in Greenville SC (757 Mauldin Rd) and now 3 SC facilities.",
+   "buys": "Develops, acquires and manages Class-A purpose-built facilities. Greenville build ~91,000 usable SF / 786 units, 3-story, climate-controlled + drive-up, on signalized I-85-access intersection (their site-selection template). Portfolio 15 properties / ~15,000 units.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Childress Klein / SpaceMax Storage",
+   "type": "self_storage",
+   "contact": "Charlotte NC-based full-service developer (est. 1978); self-storage division SpaceMax. Contact via childressklein.com (self-storage team) and spacemaxstorage.com. Key exec Chris Poholek.",
+   "geo": "Southeast US; operates in Greenville SC and Charlotte NC directly \u2014 regional developer whose footprint overlaps the Upstate SC and Gaston/Lincoln NC target counties.",
+   "buys": "Develops Class-A multi-story climate-controlled facilities (e.g., Greenville 305 McAlister Rd, 74,360 RSF / 702 units). Has JV'd with Life Storage to build and rebrand facilities. Development-led, ~70k-90k SF urban infill sites.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Arcland Property Company",
+   "type": "self_storage",
+   "contact": "Vertically integrated storage developer; contact via arc.land 'Contact Us'. Actively hiring a Land Acquisition Manager for the Mid-Atlantic & SOUTHEAST \u2014 that role is the site-submission target.",
+   "geo": "Mid-Atlantic and Southeastern US, 20+ markets \u2014 expanding into the Southeast where WNC/Upstate SC sit.",
+   "buys": "Ground-up development: sources, negotiates and closes ~12 institutional-quality land sites/year, managing a 20+ site pipeline; aims to add 15-20 facilities annually. Institutional development land, ~4M+ RSF portfolio.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Azalea Partnership / Azalea Management & Leasing (Secured Self Storage)",
+   "type": "self_storage",
+   "contact": "Local Asheville NC operator/developer; Secured Self Storage brand (securedselfstg.com, 411 New Leicester Hwy, Asheville). Reach via the Secured Self Storage / Azalea Management office in Asheville.",
+   "geo": "Asheville / Buncombe County NC and TN \u2014 hyper-local WNC developer, the most footprint-native buyer on this list.",
+   "buys": "Retail-to-storage conversions and ground-up: proposed converting 4.77 acres of Kendale Shopping Center (Industrial Dr, Asheville) into 94,000+ SF of storage. Operates temperature-controlled + outdoor RV/boat/vehicle parking. Smaller in-market deals.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Pine Gate Renewables",
+   "type": "solar_utility_land",
+   "contact": "Landowner page + form: https://pinegaterenewables.com/landowners/ ; general contact https://pinegaterenewables.com/faqs/ ; HQ Asheville, NC (130 Roberts St, Asheville, NC 28801). Utility-scale + storage developer headquartered IN the footprint.",
+   "geo": "National developer HQ'd in Asheville, NC (Buncombe) \u2014 core footprint. Active across NC + SC (Carolinas are their home base). Targets Western NC + broader Southeast.",
+   "buys": "Utility-scale solar + battery storage. Competitive LEASE and PURCHASE rates. Selects on market/electric-transmission/geographic criteria; standard lease 30-40 yrs. Typical utility-scale parcels ~50-500+ ac near transmission/substation. SolarCulture land-stewardship program.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Cypress Creek Renewables",
+   "type": "solar_utility_land",
+   "contact": "Landowner line (800) 385-1802; landowner page + form https://ccrenew.com/landowners/ ; contact https://ccrenew.com/contact/ ; Durham, NC office (plus Chicago, SF, Santa Monica, DC).",
+   "geo": "Very active in Upstate SC (Anderson County) and NC. Operates 27 solar facilities in SC totaling ~520 MW. Durham NC office covers the Carolinas.",
+   "buys": "Utility-scale solar (+ storage). Land criteria: 10-15+ continuous unused acres minimum; typical parcels 20 to 150+ continuous acres; flat, contiguous, near existing substations, no wetlands/endangered species. 40-year lease term. Lease + purchase.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Silicon Ranch Corporation",
+   "type": "solar_utility_land",
+   "contact": "Phone +1 615-577-4786; email info@siliconranch.com; landowner page https://www.siliconranch.com/landowners/ ; contact https://www.siliconranch.com/contact-us/ ; HQ 222 2nd Ave S, Suite 1900, Nashville, TN 37201.",
+   "geo": "Active in the Carolinas (SC + NC). Southeast-focused; owns rather than leases in many deals. Not yet a confirmed Upstate/Western-NC project but actively acquiring across SC/NC.",
+   "buys": "Utility-scale solar (buys land outright and long-term leases). Criteria: contiguous 25 acres to 1,000+ acres, preferably flat and clear, near power lines/substation; considers topography, floodplains, wetlands, local zoning. 40-year project life.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Birdseye Renewable Energy (a Dominion Energy company)",
+   "type": "solar_utility_land",
+   "contact": "1125 E. Morehead Street, Suite 206, Charlotte, NC 28204; https://www.birdseyeenergy.com/ ; contact via site. Founder Brian C. Bednar. Now backed by Dominion Energy.",
+   "geo": "Charlotte, NC-based greenfield developer \u2014 directly adjacent to/inside the Piedmont-foothills footprint (Gaston, Lincoln, Cleveland). Active in NC + SC.",
+   "buys": "Greenfield utility-scale solar + storage. Long-term LEASE and PURCHASE agreements, customized. Identifies optimal sites, analyzes markets. ~1 GW of greenfield projects developed/operating since 2009.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Geenex Solar",
+   "type": "solar_utility_land",
+   "contact": "Phone (980) 237-7926; landowner page https://www.geenexpower.com/landowners/ ; contact https://www.geenexpower.com/contact/ ; HQ 1000 NC Music Factory Blvd, Suite C3, Charlotte, NC 28206 (+ Indianapolis office).",
+   "geo": "Charlotte, NC-based. Focus NC + Mid-Atlantic/PJM. Adjacent to footprint (Gaston/Lincoln/Cleveland corridor).",
+   "buys": "Utility-scale solar, battery storage, advanced nuclear. Landowner criteria: minimum 100 continuous acres, near power lines/substations, primarily free of wetlands/environmental concerns. Lease (part or all of land). Filed 12+ GW in PJM since 2012.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Southern Current (an energyRe company)",
+   "type": "solar_utility_land",
+   "contact": "1519 King St, Charleston, SC 29405; phone (843) 277-2090; https://www.energyre.com/ (parent) / Southern Current brand. Owner Kent Trowbridge.",
+   "geo": "Charleston SC-based, statewide SC developer. Confirmed active in Anderson County (Upstate SC, in footprint).",
+   "buys": "Utility-scale solar + battery storage (EPC + developer). Typical SC utility-scale acreage (100+ ac, near substation). Land lease + development.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Duke Energy (Sell or Lease Land for Solar program)",
+   "type": "solar_utility_land",
+   "contact": "Program page + interest form https://www.duke-energy.com/Our-Company/About-Us/New-Generation/Sell-or-Lease-Land-for-Solar-Energy ; contact https://www.duke-energy.com/our-company/about-us/new-generation/sell-or-lease-land-for-solar-energy/contact-us (10-business-day response).",
+   "geo": "The dominant utility across the ENTIRE footprint (Duke Energy Carolinas / Progress serve nearly all Western NC + Upstate SC counties). Buys/leases land statewide in NC + SC.",
+   "buys": "Utility-scale solar generation land. Both SALE (cost-per-acre estimate; up to 4-yr viability evaluation) and LEASE (fixed annual rate, ~2%/yr escalator, 30-35 yr life). Large acreage able to accommodate generation, near their own transmission.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "SunEnergy1",
+   "type": "solar_utility_land",
+   "contact": "6750 NC Highway 30 E, Bethel, NC 27812; https://www.sunenergy1.com/ ; projects https://www.sunenergy1.com/projects ; contact via site.",
+   "geo": "NC-based (eastern NC HQ) utility-scale developer, active across NC. Statewide land acquisition.",
+   "buys": "Large-scale corporate, institutional, and utility solar. 1,000+ MW installed, 14 GW pipeline. Utility-scale acreage near transmission; lease + development.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "National Grid Renewables",
+   "type": "solar_utility_land",
+   "contact": "Landowner program via https://nationalgridrenewables.com (Land/Landowners section); developer land-lease team. National footprint incl. Southeast.",
+   "geo": "National utility-scale developer active in the Southeast including the Carolinas; targets rural land near transmission.",
+   "buys": "Utility-scale solar + battery storage. Prefers 50-500+ acre contiguous parcels, flat, low tree cover, within 1-2 miles of high-voltage transmission. Long-term lease; landowner retains ownership.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Origis Energy",
+   "type": "solar_utility_land",
+   "contact": "Landowner page + form https://origisenergy.com/landowners/ ; contact via site. National solar + storage IPP/developer.",
+   "geo": "National developer active in the Southeast (heavy in the Carolinas/Southeast). Rural transmission-adjacent land.",
+   "buys": "Utility-scale solar + battery storage. Long-term LEASE (stable passive income for decades) and purchase. Standard utility-scale acreage near interconnection.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "AES (AES Clean Energy)",
+   "type": "solar_utility_land",
+   "contact": "Landowner page + intake https://www.aes.com/sustainability-impact/people-communities/landowners ; national developer/IPP.",
+   "geo": "National developer/IPP acquiring land across the US including the Southeast/Carolinas. Rural land near interconnection.",
+   "buys": "Utility-scale solar + storage. Land LEASE (owner retains ownership for project life). Suitability = acreage, proximity to utility interconnection point, zoning. Typical large utility-scale parcels.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "EnerWealth Solutions",
+   "type": "solar_utility_land",
+   "contact": "https://www.enerwealthsol.com (Solar-Land Leasing / community-scale + /contact). NC-based; partners with Yes Solar Solutions.",
+   "geo": "Specifically targets NORTH and SOUTH CAROLINA \u2014 squarely in footprint. Focus on rural, small-scale, and Black landowners/farmers.",
+   "buys": "Community-scale / distributed solar + storage. Smaller parcels than utility-scale (fits small farms). At least 35-year host term; ~$500-$750 per acre annually. Lease (host) model.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Pivot Energy",
+   "type": "solar_utility_land",
+   "contact": "Landowner page https://www.pivotenergy.net/landowners ; SC-specific https://go.pivotenergy.net/sc-land (local rep intake form).",
+   "geo": "Runs a South Carolina community-solar land program (go.pivotenergy.net/sc-land) \u2014 in footprint for SC counties. Also NC.",
+   "buys": "Community-scale solar (+ dual-use agrivoltaics: honey, cropping, native seeding). 20+ year lease, no upfront cost, owner keeps ownership. Mid-size parcels suited to community solar.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "New Leaf Energy",
+   "type": "solar_utility_land",
+   "contact": "Landowner page + form https://www.newleafenergy.com/landowners ; developer of solar + storage.",
+   "geo": "National/Eastern-US developer soliciting land including the Carolinas. Flexible acreage suits foothills/rural parcels.",
+   "buys": "Solar + energy storage. Wide acreage band: minimum 15 acres up to 100-500+ acres; flat, open, good sun, near utility infrastructure. Annual rent; long-term lease.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Nexamp",
+   "type": "solar_utility_land",
+   "contact": "Host-a-solar-farm page + form https://www.nexamp.com/host-a-solar-farm ; community-solar developer.",
+   "geo": "National community-solar developer acquiring rural land in the Eastern US/Southeast. Suits mid-size parcels.",
+   "buys": "Community solar farms. Larger sites 50+ acres; competitive lease rates; 20-25 year lease term with annual rent. Underutilized acreage near distribution/interconnection.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Manufactured Housing Properties Inc. (MHP / MHPC \u2014 Gvest / Raymond M. Gee)",
+   "type": "manufactured_housing",
+   "contact": "Corporate HQ 136 Main Street, Pineville, NC 28134; (980) 273-1702; site mhproperties.com with a 'Sell Your Park' / investor path at mhproperties.com/investors; CEO Raymond M. Gee (Gvest Real Estate Capital LLC). General inbox via site contact form; investor/acq inquiries routed through Pineville office.",
+   "geo": "Directly in-footprint: Charlotte-Concord-Gastonia metro (incl. Gaston/Lincoln), Asheville metro (owns Maple Hills in Mills River, Henderson County), Spartanburg SC metro; broader NC, SC, GA, TN, TX.",
+   "buys": "Value-add manufactured housing communities in high-growth Southeast markets; historically 50-250 pad parks (acquisitions in the ~70-220 pad range documented). Owns ~58 communities / ~3,150 sites. Buys stabilized and turnaround/value-add; prefers public utilities. Prices per community roughly low single-digit millions (e.g., ~$3-5M range comps).",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "FG Communities, Inc.",
+   "type": "manufactured_housing",
+   "contact": "Based Mooresville, NC. Phone 855-935-7368; info@fgcommunities.com; investor relations ir@fgcommunities.com; dedicated 'Sell Your Property' page at fgcommunities.com.",
+   "geo": "Southeastern US, NC-headquartered (Mooresville is adjacent to Lincoln/Gaston/Iredell) \u2014 core Carolinas buyer for the footprint.",
+   "buys": "Manufactured housing communities / mobile home parks, affordable-housing preservation angle; ~60 properties / ~2,500 sites, i.e. skews toward smaller mom-and-pop parks (roughly 40-50 avg lots) that fit a foothills/rural board. Buys directly from owners.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Affordable Communities Group, LLC (ACG)",
+   "type": "manufactured_housing",
+   "contact": "Based Cary, NC. Website acgmhc.com with a 'Sell Your Community' page (submission funnel); contact via site form (no direct acq email published).",
+   "geo": "Southeast, Mid-Atlantic and Midwest; NC-headquartered \u2014 active in the Carolinas.",
+   "buys": "Underperforming / poorly-managed manufactured housing communities for rehab (replace old homes, repave, add amenities, tighten screening). ~40+ properties / ~6,200 spaces (avg ~150 lots). Value-add / distressed acquisition playbook \u2014 a strong fit for motivated-seller parks.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Riverstone Communities",
+   "type": "manufactured_housing",
+   "contact": "HQ mailing PO Box 36084, Charlotte, NC 28236 (ops office 6400 Telegraph Rd, Bloomfield Hills MI); Chief Acquisitions Officer Jason Tink, (248) 988-8845 x139; acquisition contact via rivstone.com/contact.",
+   "geo": "National, ~70+ communities; Charlotte NC operating base makes the Carolinas a core region.",
+   "buys": "Manufactured housing communities meeting defined investment criteria (buy-and-hold, professional management); ~13,000+ lots across portfolio. Buys stabilized and value-add parks. Note: has drawn NC tenant litigation (rent-to-own), so vet reputationally.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "UMH Properties, Inc. (NYSE: UMH)",
+   "type": "manufactured_housing",
+   "contact": "REIT HQ Freehold, NJ; Juniper Business Plaza, 3499 NW Route 9, Freehold NJ 07728; (732) 577-9997; acquisitions via umh.com / umh.reit investor relations. Public-company acquisitions team.",
+   "geo": "Mid-Atlantic + Southeast expansion, with an established South Carolina presence (Sumter SC acquired 2021; additional SC community 2022). Actively pushing into SC / Carolinas.",
+   "buys": "Land-lease manufactured home communities, both stabilized and turnaround with vacant-lot infill upside; typical acquisitions ~100-150+ developed homesites (e.g., Sumter SC = 142 sites / ~24 acres / ~49% occupied for ~$3.4M). Price signals ~$3-5M+ per community.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Three Pillar Communities, LLC",
+   "type": "manufactured_housing",
+   "contact": "221 Main Street, Suite 2039, Los Altos, CA 94023; (903) 875-0097; info@threepillarcommunities.com; acquisitions funnel + mailing list at threepillarcommunities.com.",
+   "geo": "16+ states nationally; demonstrably active in the Carolinas \u2014 bought a 9-park Carolinas portfolio (incl. West Columbia SC) in 2023.",
+   "buys": "Full risk spectrum: 'heavy-lift' turnarounds AND stabilized core communities. Value-add plays (solar, infrastructure rebuild, vacant-lot infill with new energy-efficient homes). 90+ communities. Portfolio and single-asset buys; the 2023 Carolinas deal was 9 parks / ~$31M (~$3.4M/park).",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Roots Management Group (parent of Treehouse Communities [Blackstone-backed] + Vineyards Management Group)",
+   "type": "manufactured_housing",
+   "contact": "Dallas, TX-based; rootsmg.com with an explicit 'Acquisitions: We're Buying!' page/funnel; contact via site. Top-10 US MHC operator.",
+   "geo": "National; in-footprint & adjacent presence \u2014 Glen at Clover (Clover, SC, York County, adjacent to Gaston/Cleveland/Cherokee) and multiple NC communities (Mebane, Fayetteville).",
+   "buys": "Manufactured housing communities & RV; 'capabilities to consider the acquisition of any available properties nationwide.' Institutional scale, buys stabilized and value-add; larger, well-utilitied parks preferred given size.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Sun Communities, Inc. (NYSE: SUI)",
+   "type": "manufactured_housing",
+   "contact": "REIT HQ 27777 Franklin Rd, Suite 300, Southfield, MI 48034; (248) 208-2500; acquisitions via suncommunities.com investor/acquisitions channel.",
+   "geo": "National MH/RV REIT with dedicated NC (Mountains/Asheville-Hendersonville, Foothills) and SC (Upstate, Aiken, Coastal, Myrtle Beach) region pages \u2014 presence across the footprint's metros.",
+   "buys": "Larger, higher-quality manufactured-home and RV communities (institutional grade, typically 100+ sites, public utilities, strong occupancy). Buys stabilized portfolios and premium single assets; top-of-market pricing. Best fit for larger/cleaner parcels on the board, not deep-distress.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "YES! Communities (Stockbridge Capital)",
+   "type": "manufactured_housing",
+   "contact": "HQ Denver, CO; yescommunities.com (corporate/acquisitions via site). Largest US MHC operator by lots (~265 parks / ~75,000 lots).",
+   "geo": "National with Carolinas footprint \u2014 communities in NC (e.g., Greensboro/Village Park) and SC (e.g., The Gables of Charleston); actively expands in Southeast growth metros incl. Charlotte/Greenville corridor.",
+   "buys": "Stabilized, larger all-age manufactured home communities (institutional scale, 100+ lots, public utilities). Portfolio-scale buyer; premium pricing; not a distress buyer but a strong exit for larger stabilized parks.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Harmony Home Buyers (direct park buyer)",
+   "type": "manufactured_housing",
+   "contact": "Phone 984-229-8073; harmonyhomebuyers.com ('We Buy Mobile Home Parks In North Carolina').",
+   "geo": "North Carolina-focused direct buyer (statewide, incl. footprint counties).",
+   "buys": "Buys mobile home parks directly from owners \u2014 off-market, hassle-free/cash positioning. Fits smaller mom-and-pop foothills/mountain parks; flexible on condition (value-add/distress friendly). Price signals not published (direct-negotiation buyer).",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Sell My Mobile Home Park Cash / Trailer Park Buyers",
+   "type": "manufactured_housing",
+   "contact": "sellmymobilehomeparkcash.com ('We Buy Mobile Home Parks North Carolina'); contact via site form/phone on page.",
+   "geo": "Nationwide direct buyer with a dedicated NC page; buys in the Carolinas.",
+   "buys": "Acquires mobile home parks nationwide directly from owners (cash / solutions-driven). Condition-flexible, works off-market/distress \u2014 good fit for motivated-seller parks on the board. No published pricing (negotiated).",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "National Land Realty - Western NC Office (Fairview) + Greenville SC HQ",
+   "type": "timber_recreational",
+   "contact": "Western NC office: 13 Lynnette Dr, Fairview, NC 28730, 855-384-5263; Managing Broker Pat Snyder (m) 828-761-0841 / (o) 828-618-4448; Land Broker Richard Simpson (m) 828-845-4858. Corporate HQ: 7001 Pelham Rd Ste M, Greenville, SC 29615, 855-384-5263. Site: nationalland.com/land-brokerage/Fairview-NC/western-nc-office and /Greenville-SC",
+   "geo": "Both sides of the footprint. WNC office: Buncombe, Haywood, Henderson, Jackson, Madison, McDowell, Mitchell, Polk, Swain, Rutherford, Transylvania, Yancey (+select Cherokee/Clay/Macon/Graham). Greenville office: Greenville, Anderson, Laurens + Upstate SC.",
+   "buys": "Recreation tracts, timber, agriculture, legacy estates, conservation, homesteads, investment land. Full range of tract sizes; specializes in larger rural acreage. National land brokerage/buyer network \u2014 brings institutional and private land investors to tracts.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Whitetail Properties - Derek Yelton (WNC Land Specialist)",
+   "type": "timber_recreational",
+   "contact": "Derek Yelton, cell 828-429-8231, derek.yelton@whitetailproperties.com; corporate 217-285-9000. Rutherford County based. whitetailproperties.com/agents/derek-yelton-1",
+   "geo": "Rutherford, Cleveland, Polk, McDowell, Burke, Buncombe, Caldwell, Avery, Watauga \u2014 core WNC/foothills. Named focus areas: Tryon Equestrian area, Lake James, South Mountains State Park, Lake Lure, Chimney Rock.",
+   "buys": "Hunting/recreational tracts, timber (offers timber cruising/stand improvement guidance), farm/ag, country homes on acreage, investment/subdivision plays. Buyer network is hunting/recreational-land investors nationwide.",
+   "regions": [
+    "wnc"
+   ]
+  },
+  {
+   "name": "Whitetail Properties - Chip Camp (Broker-in-Charge, Carolinas)",
+   "type": "timber_recreational",
+   "contact": "Via whitetailproperties.com/agents/chip-camp; NC/SC/VA licensed; Broker-in-Charge/Principal Broker over 25+ Whitetail agents in the Carolinas. Corporate 217-285-9000.",
+   "geo": "Carolinas-wide including WNC foothills and Upstate SC; personally a large-acreage owner in Cleveland County, NC (in-footprint).",
+   "buys": "Hunting land, recreational tracts, farms, timber, rural investment acreage. Oversees the Carolinas Whitetail buyer/agent network that sources deer/turkey/timber tracts.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Metcalf Land Company, Inc. (\"The Upstate's Land Broker\")",
+   "type": "timber_recreational",
+   "contact": "1078 Boiling Springs Rd, Spartanburg, SC 29303; 864-585-0444; metcalfland.com. Family-owned since 1971; Accredited Land Consultants on staff; licensed SC + NC.",
+   "geo": "Upstate SC + adjacent WNC: Spartanburg, Laurens, Greenville, Union, Cherokee, Anderson, Pickens, Oconee (SC) and Polk, Henderson, Rutherford, Buncombe (NC) \u2014 plus York/Chester/Chester/Abbeville.",
+   "buys": "Timberland, recreational/hunting land, agricultural/farm land, equestrian, waterfront, homes with acreage, country home sites, development. Works clients from small acreage up to national companies with tens of thousands of acres. Featured tracts ~$175K to $795K+.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "AFM Real Estate / American Forest Management (Charlotte HQ; Troy NC office)",
+   "type": "timber_recreational",
+   "contact": "afmrealestate.com; parent American Forest Management HQ in Charlotte, NC; regional land-sales office in Troy, NC. Full land-management + timber-sales + appraisal + recreational-licensing team behind the brokerage.",
+   "geo": "Carolinas + Southeast. Recent 'Upstate Timberlands' offering covered Cherokee, Union, Laurens, Abbeville (+York/Chester/Fairfield/Newberry/Greenwood/McCormick/Saluda) SC \u2014 all within ~1.5 hrs of Greenville-Spartanburg and Charlotte.",
+   "buys": "Investment-grade timberland and farmland; also conservation, recreation, acreage estates. Transaction sizes 5,000 to 100,000+ acres \u2014 brings institutional/TIMO-scale timber buyers. Also assembles multi-parcel timber offerings.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Mossy Oak Properties - Carolina Timber & Realty (Sylva) + Land and Luxury (SC)",
+   "type": "timber_recreational",
+   "contact": "WNC franchise: Mossy Oak Properties Carolina Timber & Realty, Sylva NC (mopwnc.com), owned/operated by Jeff Norwood (15+ yr rural/timber veteran) and Tom Peacock. SC: Mossy Oak Properties Land and Luxury, landandluxury.com (Rock Hill/Mooresville). Main network: mossyoakproperties.com/find-office/north-carolina.",
+   "geo": "WNC mountain region (Sylva-based, agents cover Marion, Morganton, Rutherfordton and the broader western mountains); SC franchise covers Upstate + Midlands.",
+   "buys": "Large land tracts, timberland, farms, estates, recreational parcels, hunting land, investment properties. Certified Land Specialists; uses UTVs/drones/land-mapping for big-tract showings.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Forest Investment Associates (FIA) - TIMO, Atlanta",
+   "type": "timber_recreational",
+   "contact": "15 Piedmont Center, Suite 1250, Atlanta, GA 30305; forestinvest.com/contact and /acquisitions. Evaluates 100+ opportunities/yr; general acquisitions inquiry via site contact form (no named acq lead published).",
+   "geo": "Southeast US incl. both Carolinas. Current holdings: South Carolina 191,325 ac; North Carolina 34,455 ac (Southern Yellow Pine + Mixed Hardwoods).",
+   "buys": "Institutional timberland for pension/endowment/insurance investors; pine + hardwood. Larger investment-grade tracts (institutional TIMO scale \u2014 typically thousands of acres, though evaluates the majority of institutional properties on market).",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Timberland Investment Resources, LLC (TIR) - TIMO, Charlotte satellite office",
+   "type": "timber_recreational",
+   "contact": "Charlotte satellite office: 14120 Ballantyne Corporate Place, Suite 525, Charlotte, NC 28277; 704-543-5005; tirllc.com/contact-us. HQ Atlanta GA; field offices Chattanooga TN, Mobile AL, Lufkin TX.",
+   "geo": "Southeast US timberland; Charlotte office positions them for the Carolinas/southern-Appalachian region adjacent to the footprint.",
+   "buys": "Direct acquisition/management/sale of timberland for institutional investors; investment-grade timber tracts (TIMO scale, generally large acreage).",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "The Molpus Woodlands Group, LLC - TIMO",
+   "type": "timber_recreational",
+   "contact": "Acquisitions: Ashley Harris, VP Timberland Investments, aharris@molpus.com, 251-580-5690 (sources acquisitions + closings). Client relations: Michael R. Cooper, EVP, mcooper@molpus.com, 601-948-8733. molpus.com.",
+   "geo": "17 US states incl. NC & SC; buys southern pine AND Appalachian/Northern hardwoods \u2014 directly relevant to WNC/Upstate hardwood tracts.",
+   "buys": "Institutional timberland for pension/endowment clients; both pine and Appalachian hardwood stands. TIMO scale (recent buys 26,739 ac across AL/MS/NC/SC; 173,000 ac 2025). Named acquisitions VP with direct email/phone.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Weyerhaeuser Company - Timber REIT (active NC acquirer)",
+   "type": "timber_recreational",
+   "contact": "Timberlands acquisitions via investor.weyerhaeuser.com; corporate land/timberlands division. (Public REIT; route large NC/SC tract offerings through their timberlands acquisition team.)",
+   "geo": "Southeast incl. North Carolina; May 2025 agreement to acquire ~117,000 acres of NC + Virginia timberlands from Roanoke Timberlands LLC.",
+   "buys": "Large-scale industrial timberland (thousands to 100k+ acres); merchantable pine/hardwood tracts. Institutional/REIT buyer for very large assemblages.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Rayonier (now merged with PotlatchDeltic, Feb 2026) - Timber REIT",
+   "type": "timber_recreational",
+   "contact": "Via rayonier.com / PotlatchDeltic land & timberland acquisitions and dispositions team; investor relations for large-tract offerings. Combined entity ~4M+ acres US timberland.",
+   "geo": "Southeast incl. South Carolina (both firms historically overlapped in SC among 5 states). SC industrial timberland.",
+   "buys": "Institutional/REIT-scale timberland; pine plantation and merchantable timber tracts. Very large acreage; also has an active HBU (higher-and-better-use) rural land sales program.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Foothills Conservancy of North Carolina (recreational/forest-tract conservation buyer)",
+   "type": "timber_recreational",
+   "contact": "P.O. Box 3023, Morganton, NC 28680; 828-437-9930; foothillsconservancy.org/conserve-your-land. Land-protection staff: Michael Gaffney, Tom Kenney, Andrew Kota.",
+   "geo": "Eight counties, heavily in-footprint: Burke, McDowell, Rutherford, Cleveland, Lincoln, Caldwell (+Alexander, Catawba).",
+   "buys": "Buys and protects forest, mountain, and farm tracts (fee purchase + conservation easement). Historically bought ~18,000 ac in the South Mountains; 47,000+ ac protected. Pays for high-conservation-value forest/recreational land; also accepts bargain sales and donations.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Conserving Carolina (land trust, WNC/Upstate border)",
+   "type": "timber_recreational",
+   "contact": "828-697-5777; conservingcarolina.org/who-we-are. Land protection team works with landowners on acquisitions/easements.",
+   "geo": "Polk, Henderson, Transylvania + parts of Rutherford NC (and reaches toward Upstate SC border/Hickory Nut Gorge, DuPont, Green River).",
+   "buys": "Fee-simple purchases and conservation easements on forest, farm, river, and recreational land; 51,000+ acres protected. Buys/accepts high-conservation-value mountain and foothills tracts.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Upstate Forever (land trust, Upstate SC)",
+   "type": "timber_recreational",
+   "contact": "landtrust@upstateforever.org; 864-250-0500; upstateforever.org/land-conservation. Greenville-based since 1998.",
+   "geo": "Ten-county Upstate SC service area, nearly all in-footprint: Anderson, Cherokee, Greenville, Laurens, Oconee, Pickens, Spartanburg, Union (+Abbeville, Greenwood).",
+   "buys": "Conservation easements + fee acquisitions on farm, forest, and recreational land; qualifying tracts typically 100+ acres. ~40,000 acres protected; also administers farmland-protection funding. Allows continued farming/hunting/timbering under easements.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Bubba Land Company (cash land buyer)",
+   "type": "timber_recreational",
+   "contact": "bubba-land.com/sell-my-land-north-carolina; direct-to-seller cash offer / 'Net Cash' model (pays 100% of closing costs + transfer taxes).",
+   "geo": "Statewide NC incl. footprint counties: Buncombe, Henderson, McDowell, Rutherford (and rural WNC generally).",
+   "buys": "Rural acreage 3+ acres, timberland, and farmland located outside city limits. Fast all-cash purchases of raw/vacant land; typical distressed/motivated-seller land buyer profile.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Southeast Land Buyers (cash land buyer)",
+   "type": "timber_recreational",
+   "contact": "selandbuyers.com/sell-my-land-north-carolina; direct cash-offer model.",
+   "geo": "NC incl. Buncombe, Henderson, McDowell, Rutherford; buys 'secluded mountain acreage in the west.'",
+   "buys": "All raw/vacant land types incl. secluded WNC mountain acreage and parcels with development potential. Fast cash close.",
+   "regions": [
+    "wnc"
+   ]
+  },
+  {
+   "name": "United Country Real Estate - Timberland/Recreational (NC mountain offices)",
+   "type": "timber_recreational",
+   "contact": "unitedcountry.com/our-offices; timberland-properties.unitedcountry.com; NC mountain sites ncarolina-real-estate.com / forestandlandsales.com. Auction + brokerage network.",
+   "geo": "Rural NC incl. WNC mountains (Waynesville/Asheville region) and rural SC; nationwide opt-in timberland buyer database.",
+   "buys": "Timberland, wooded acreage, hunting land, recreational/mountain property, farms, timber farms. Largest opt-in timberland-buyer database in the country; runs land auctions to source buyers.",
+   "regions": [
+    "wnc"
+   ]
+  },
+  {
+   "name": "Conserving Carolina",
+   "type": "conservation_trusts",
+   "contact": "Tom Fanslow, Land Protection Director \u2014 tom@conservingcarolina.org, (828) 697-5777. Cassidy Wilson, Land Protection Assistant. Landowner page: https://conservingcarolina.org/our-impact/landowners/ . Hendersonville office (main).",
+   "geo": "Core footprint match. Serves Henderson, Polk, Transylvania, and adjacent counties in Western NC PLUS Upstate SC (spun from Carolina Mountain Land Conservancy + Pacolet Area Conservancy merger 2017). Directly covers Hendersonville, Polk County, and reaches into Greenville/Spartanburg SC side.",
+   "buys": "Fee-simple purchase, bargain sale, and donated land + conservation easements. Rural mountain/foothills tracts \u2014 farms, forests, natural areas, gorges, river/creek frontage, greenway/trail corridors. No fixed acreage minimum; takes small strategic tracts up to large assemblages. Funds purchases via NCLWF, ADFP, SC Conservation Bank grants \u2014 pays appraised easement/fee value on grant-funded deals.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Southern Appalachian Highlands Conservancy (SAHC)",
+   "type": "conservation_trusts",
+   "contact": "Kyle Shute, Land Protection Associate \u2014 kyle@appalachian.org. Office: 372 Merrimon Ave, Asheville, NC 28801, (828) 253-0095. Protect-your-land page: https://appalachian.org/protect-2/protect-your-land/",
+   "geo": "Asheville MSA core. Buncombe, Madison, Mitchell, and the Highlands of Roan through to the edge of Great Smoky Mountains NP; NE Tennessee counties. Strong on Mitchell County (in footprint).",
+   "buys": "Conservation easements, fee-simple preserves, donated land + easements; occasionally applies for grants to PAY landowners for qualifying land/easements. Seeks mountain forest, cove, pasture/farmland, creek frontage, high-elevation and AT-viewshed tracts. Tracts from single-digit acres (e.g., 9-ac Stevens Creek) to 400+ ac.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Upstate Forever",
+   "type": "conservation_trusts",
+   "contact": "landtrust@upstateforever.org, (864) 250-0500. Lauren Ulich, Director of Stewardship & Land Management \u2014 lulich@upstateforever.org. Land conservation page: https://www.upstateforever.org/land-conservation . Offices in Greenville and Spartanburg (900 S. Pine St, Ste 1B, Spartanburg 29302).",
+   "geo": "Entire Upstate SC footprint: Greenville, Spartanburg, Anderson, Cherokee, Laurens, Oconee, Pickens, Union \u2014 plus Abbeville & Greenwood. Also protects land on the southern NC side of the state line.",
+   "buys": "Conservation easements (primary), plus partner acquisitions and farmland protection. Farms, forests, mountains, meadows, wetlands, riverbanks. Runs a dedicated farmland-protection funding program. Uses SC Conservation Bank + federal ACEP funds to purchase development rights.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Foothills Conservancy of North Carolina",
+   "type": "conservation_trusts",
+   "contact": "Michael Gaffney, Tom Kenney, Andrew Kota (staff who work directly with landowners) \u2014 (828) 437-9930. Conserve-your-land page: https://www.foothillsconservancy.org/conserve-your-land . Based Morganton, NC.",
+   "geo": "Directly in footprint: Burke, McDowell, Cleveland, Lincoln, Rutherford \u2014 plus Alexander, Caldwell, Catawba. Overlaps foothills counties on our board.",
+   "buys": "Land purchases (outright fee-simple, funded by public+private fundraising and grants), land donations, and conservation easements. Rural foothills/mountain land, water resources, gorges, river frontage, working forest and farm land. Retains landowner rights to limited development/ag/forestry/inheritance under easement.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Naturaland Trust",
+   "type": "conservation_trusts",
+   "contact": "PO Box 728, Greenville, SC 29602, (864) 387-6079. Contact page: http://www.naturalandtrust.org/contact . 'What We Do': http://www.naturalandtrust.org/land-conservation/",
+   "geo": "SC Blue Ridge escarpment + Piedmont \u2014 Greenville County (esp. Cedar Mountain / Greenville Watershed), Pickens, Oconee. Upstate SC mountain footprint.",
+   "buys": "Fee-simple purchase and holding of escarpment/mountain and Piedmont tracts; owns/manages 7,000+ ac and conveys land into public domain (state parks, Mountain Bridge). Seeks high-conservation-value mountain land, watershed buffers, escarpment forest. Takes both small adjacent parcels and large assemblages.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Blue Ridge Conservancy",
+   "type": "conservation_trusts",
+   "contact": "416 Aho Rd, Blowing Rock, NC; Watauga office 971 W. King St, Boone (828-264-3061); Mitchell County office 10 S. Mitchell St, Bakersville 28705; Avery office 146 West B St, Unit 3, Newland. Landowner info: https://blueridgeconservancy.org/landowner-information . Staff: https://blueridgeconservancy.org/brc-staff",
+   "geo": "NW NC High Country. In-footprint county: MITCHELL. Also Alleghany, Ashe, Avery, Watauga, Wilkes, Yancey. (Northern edge of our board via Mitchell.)",
+   "buys": "Two tools: voluntary conservation easements and fee-simple land acquisition. Farmland, natural/ecological, scenic, recreational, and cultural-value tracts; river/creek frontage and greenway corridors. Landowner retains ability to sell/inherit under easement.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "The Nature Conservancy (TNC) \u2014 NC & SC chapters",
+   "type": "conservation_trusts",
+   "contact": "NC: nature.org/NC; land-protection staff incl. Margaret Southern margaret.southern@tnc.org (919-874-5685), Will Robinson will.robinson@tnc.org, Trevor Osterhaus t.osterhaus@tnc.org. SC: nature.org/SC (Southern Blue Ridge / Sassafras Mtn priority area). NC contact page: https://www.nature.org/en-us/about-us/where-we-work/united-states/north-carolina/contact-us/",
+   "geo": "Southern Blue Ridge is a named priority area in BOTH states \u2014 Western NC mountains and SC Blue Ridge (Sassafras/Jocassee, Pickens/Oconee). National player active in the footprint.",
+   "buys": "Large-landscape fee-simple purchase + easements; often buys strategic tracts and transfers to public ownership (National Forest, State Game Lands, parks). Targets ecologically significant, connectivity/corridor, and headwaters land \u2014 typically larger tracts, but takes strategic inholdings.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Catawba Lands Conservancy",
+   "type": "conservation_trusts",
+   "contact": "2400 Park Road, Suite 1, Charlotte, NC 28203; (704) 342-3330; info@catawbalands.org. Contact: https://catawbalands.org/who-we-are/contact-us/",
+   "geo": "Southern Piedmont NC 6-county area \u2014 in-footprint counties: GASTON and LINCOLN (also Catawba, Iredell, Mecklenburg, Union). Carolina Thread Trail lead org.",
+   "buys": "Fee-simple acquisition and conservation easements for public-benefit conservation land; farms, forests, stream buffers, and greenway/trail corridors (Carolina Thread Trail). Both small trail-connector parcels and larger natural tracts.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Spartanburg Area Conservancy (SPACE)",
+   "type": "conservation_trusts",
+   "contact": "100 E Main St, Suite 7, Spartanburg, SC 29306; (864) 948-0000. Contact: https://www.spartanburgconservation.org/contact . Team: https://www.spartanburgconservation.org/team",
+   "geo": "Spartanburg County, SC (in-footprint) and immediate community/watershed area.",
+   "buys": "Conservation easements, donations, and bargain sales (tax-advantaged). Watershed, wetlands, farms, forests, geological formations, natural habitat. Local-scale tracts.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Mainspring Conservation Trust",
+   "type": "conservation_trusts",
+   "contact": "Emmie Cornell, Land Conservation Director (general); Sophie Vazquez, Land Conservation Associate (Macon/Jackson/Swain). https://www.mainspringconserves.org/be-a-mainspring/conserve-your-property/ . Based Franklin, NC.",
+   "geo": "Six far-western NC counties (Cherokee, Clay, Swain, Macon, Jackson, Graham) + Rabun GA \u2014 Little Tennessee & Hiwassee basins. Western edge, adjacent-to-footprint (Transylvania/mountain overlap in Southern Blue Ridge).",
+   "buys": "Conservation easements AND fee-simple purchase of for-sale tracts to hold for public access or transfer to State Game Lands / National Forests. Farmland, forest, river/creek frontage, aquatic-priority land. Buys land outright when it comes on the market.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "NC Agricultural Development & Farmland Preservation Trust Fund (ADFP)",
+   "type": "conservation_trusts",
+   "contact": "NCDA&CS Farmland Preservation Division. Landowner Inquiry Form + applicant info: https://www.ncagr.gov/divisions/farmland-preservation/landowners and /applicants. Landowners must partner with a nonprofit land trust or county agency to apply.",
+   "geo": "Statewide NC \u2014 funds easements throughout the Western NC footprint counties via partner land trusts/counties.",
+   "buys": "Purchases AGRICULTURAL CONSERVATION EASEMENTS (development rights) on working farm/forest land. Minimums by use: 5 ac horticulture, 10 ac ag/row-crop/pasture, 20 ac forestry (or combination). Pays appraised easement value to landowner (disbursed via the applying entity after recording).",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "NC Land and Water Fund (NCLWF)",
+   "type": "conservation_trusts",
+   "contact": "nclwf.nc.gov; Acquisition Program: https://nclwf.nc.gov/grants/grant-administration/acquisition-program . Apply via NCLWF Field Representative. Deadline Mar 1 annually. Applicants = state agency, local govt, or conservation nonprofit (land trusts apply on landowners' behalf).",
+   "geo": "Statewide NC including all Western NC footprint counties (Buncombe, Henderson, Rutherford, McDowell, Cleveland, Polk, Gaston, Lincoln, Burke, Transylvania, Mitchell).",
+   "buys": "Grants that fund FEE-SIMPLE purchase or perpetual conservation easements \u2014 prioritizing riparian buffers, drinking-water/surface-water protection, ecological-diversity land, greenways, and military buffers. Funds the purchase price paid to landowners through partner land trusts.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "South Carolina Conservation Bank",
+   "type": "conservation_trusts",
+   "contact": "sccbank.sc.gov; Grant application instructions: https://www.sccbank.sc.gov/grant-application-instructions ; Land Trusts page: https://www.sccbank.sc.gov/land-trusts . Board meets quarterly; land trusts/govt agencies apply as recipients.",
+   "geo": "Statewide SC including the entire Upstate footprint (Greenville, Spartanburg, Anderson, Pickens, Oconee, Cherokee, Union, Laurens).",
+   "buys": "Competitive grants to fund ACQUISITION of interests in land (fee-simple and easements) \u2014 forest, farmland, wetlands, historic/archaeological, urban parks. Funds may be used only for land-acquisition costs (incl. closing), disbursed at closing. This pays the purchase money behind Upstate SC land-trust deals.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Upstate SC Alliance",
+   "type": "econ_dev_municipal",
+   "contact": "3 Research Dr, Suite 230, Greenville SC 29607; (864) 283-2300; info@upstatescalliance.com; site-selection intake at upstatescalliance.com/site-selection/. President/CEO John Lummus.",
+   "geo": "10-county Upstate SC region (Greenville, Spartanburg, Anderson, Pickens, Oconee, Cherokee, Union, Laurens + Abbeville, Greenwood) \u2014 covers ALL of our SC footprint",
+   "buys": "Regional marketing/lead-gen org that funnels corporate site searches to member county EDCs; targets industrial/manufacturing/data-center sites, typically 50-1,000+ acres with rail/interstate/power. Does not hold title itself but is the front door for corporate land demand across the SC footprint.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "South Carolina Department of Commerce (LocateSC / Buildings & Sites)",
+   "type": "econ_dev_municipal",
+   "contact": "1201 Main St, Suite 1600, Columbia SC 29201; (803) 737-0400; sccommerce.com/buildings-sites; free property listing/registration via locatesc.sccommerce.com. Global Business Development + site development divisions.",
+   "geo": "Statewide SC incl. all 8 Upstate footprint counties; converts well-located raw land into certified industrial parks",
+   "buys": "State agency that identifies, master-plans and helps assemble industrial land (excess infrastructure capacity, transport access); funds park infrastructure/roads/utilities. Interested in sites suitable for advanced manufacturing/logistics/data centers; vetted-site inventory.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Economic Development Partnership of North Carolina (EDPNC) \u2014 SelectSite / Megasite Readiness",
+   "type": "econ_dev_municipal",
+   "contact": "15000 Weston Pkwy, Cary NC 27513; (919) 447-7777; edpnc.com/find-a-site. Western NC existing-industry contact April Riddle, april.riddle@edpnc.com, (828) 772-9128.",
+   "geo": "Statewide NC; SelectSite program expanded WEST in Dec 2025 to fund sites in Burke, Mitchell (both in our footprint) + Alexander, Jackson, Wilkes for Helene recovery",
+   "buys": "State org that funds land acquisition + due diligence to make sites 'shovel-ready.' Megasite program = large tracts; SelectSite = smaller parcels often under 100 acres for advanced manufacturing. Program may provide funds for site acquisition by local applicants.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Economic Development Coalition for Asheville-Buncombe County (EDC)",
+   "type": "econ_dev_municipal",
+   "contact": "c/o Asheville Area Chamber, 36 Montford Ave, Asheville NC 28801; ashevillechamber.org/economic-development; meeting contact dmonstrola@ashevillechamber.org. Funded via AVL 5x5 Campaign.",
+   "geo": "Buncombe County / Asheville MSA \u2014 the WNC hot metro in our footprint",
+   "buys": "Public-private EDC handling site selection, relocations, expansions for manufacturing. Actively seeks flat, developable industrial land (noted scarcity of flat land in Asheville) and flags parcels to prospect companies when they become available. Manufacturing focus.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Greenville Area Development Corporation (GADC)",
+   "type": "econ_dev_municipal",
+   "contact": "301 University Ridge, Suite N-4300, Greenville SC 29601; (864) 235-2008; gogadc.com; Sites & Buildings at greenvilleeconomicdevelopment.com/sites-and-buildings/. President/CEO Mark Farris (org founded 2001 by County Council).",
+   "geo": "Greenville County SC \u2014 anchor of the Greenville-Spartanburg-Anderson MSA",
+   "buys": "County's primary EDC; helps assemble/identify undeveloped industrial land for expansion/relocation; works with industrial & business parks countywide. Targets manufacturing, HQ, logistics; ties into county industrial-park development.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "OneSpartanburg, Inc. (formerly Economic Futures Group)",
+   "type": "econ_dev_municipal",
+   "contact": "105 North Pine St, Spartanburg SC 29302; (864) 594-5000; onespartanburginc.com. Chief Economic Development Officer Katherine O'Neill.",
+   "geo": "Spartanburg County SC \u2014 part of the GSA hot metro",
+   "buys": "Public-private partnership (City + County + Chamber) providing advanced site-selection services; synchronizes industrial recruitment; targets manufacturing, distribution, and now data-center sites with interstate/rail/power. Large-acreage industrial parks.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Anderson County Economic Development (ACED)",
+   "type": "econ_dev_municipal",
+   "contact": "Anderson SC; Director Burriss Nelson bnelson@andersoncountysc.org (864) 260-4231; Asst Dir Kelly Parnell krparnell@andersoncountysc.org (864) 260-4064; Sr PM Commercial/Recruitment Cameron Ford ccford@andersoncountysc.org (864) 964-6746. acedsc.org.",
+   "geo": "Anderson County SC \u2014 third leg of GSA MSA",
+   "buys": "County ED office recruiting industry to locate/expand; maintains 'Available Sites' inventory; assembles and markets industrial land for manufacturing/commercial development. Full project-manager bench actively working recruitment deals.",
+   "regions": [
+    "upstate_sc"
+   ]
+  },
+  {
+   "name": "Cleveland County Economic Development Partnership (CCEDP)",
+   "type": "econ_dev_municipal",
+   "contact": "1750 E. Marion St, Shelby NC 28152 (mailing 137 S. Post Rd, Shelby NC 28152); chooseclevelandcountync.com/contact/. Executive Director Courtney Ashley.",
+   "geo": "Cleveland County NC (Shelby/Kings Mountain) \u2014 foothills footprint county",
+   "buys": "County EDP recruiting/expanding industry; assembles and markets industrial park land; NC statute lets it acquire/hold land for resale for industrial use. Manufacturing + logistics focus given I-85 corridor proximity.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Rutherford County Economic Development (public-private EDC)",
+   "type": "econ_dev_municipal",
+   "contact": "rutherfordncedc.com; Rutherford County, NC (Forest City/Rutherfordton/Spindale). Also county dept: rutherfordcountync.gov/departments/economic_development.",
+   "geo": "Rutherford County NC \u2014 foothills footprint county",
+   "buys": "Public-private entity (est. 2017) recruiting industry, marketing industrial sites/buildings and available land for manufacturing/distribution. County can assemble/hold land for resale for industrial use.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "McDowell Economic Development Association (MEDA)",
+   "type": "econ_dev_municipal",
+   "contact": "Universal Building, 634 College Dr, Marion NC 28752; (828) 652-9391; meda@mcdowelleda.org. Executive Director Chuck Abernathy.",
+   "geo": "McDowell County NC (Marion) \u2014 mountain footprint county; co-owns Great Meadows megasite with Burke",
+   "buys": "Recruits/expands industry to grow jobs + tax base; markets industrial land and the shared Great Meadows megasite; targets advanced manufacturing on large prepared tracts.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Henderson County Partnership for Economic Development (HCPED)",
+   "type": "econ_dev_municipal",
+   "contact": "Hendersonville NC; gohendersoncountync.org; board/staff at gohendersoncountync.org/who-we-are/. (contact via site 'Partner With Us').",
+   "geo": "Henderson County NC (Hendersonville) \u2014 Asheville MSA footprint county",
+   "buys": "County ED partnership recruiting/expanding business; markets industrial sites (Broadpointe and other parks) and available developable land for manufacturing; helps companies find sites to expand/relocate.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Lincoln County / Lincoln Economic Development Association (LEDA)",
+   "type": "econ_dev_municipal",
+   "contact": "lincolneda.org; Lincolnton NC; also City of Lincolnton ED at ci.lincolnton.nc.us/184/Lincoln-Economic-Development-Association.",
+   "geo": "Lincoln County NC (Lincolnton) \u2014 footprint county on Charlotte's western edge",
+   "buys": "Private nonprofit facilitating industrial, office and commercial development; markets industrial park land and available sites for manufacturing/logistics near the Charlotte metro fringe.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Gaston County Economic Development Commission (EDC)",
+   "type": "econ_dev_municipal",
+   "contact": "620 N. Main St, Belmont NC 28012 / 128 W. Main Ave, Gastonia NC 28052; staff directory at gastongov.com/Directory.aspx?did=139; gastonedc.com.",
+   "geo": "Gaston County NC (Gastonia/Belmont) \u2014 footprint county, I-85 Charlotte-Upstate corridor",
+   "buys": "County EDC recruiting industry; markets industrial parks (Apple Creek Corporate Center and others) and available industrial land; manufacturing + distribution focus on the I-85 corridor.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Polk County Economic Development",
+   "type": "econ_dev_municipal",
+   "contact": "35 Walker St, PO Box 308, Columbus NC 28722; (828) 894-2895; polkedc.com / polknc.gov/economic_development.",
+   "geo": "Polk County NC (Columbus/Tryon) \u2014 small foothills footprint county on the SC line",
+   "buys": "County ED office partnering with NC Commerce + community college on recruitment/training; markets available commercial/industrial land; smaller-scale industrial and commercial sites given rural character.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "NorthMark Strategies (data-center developer)",
+   "type": "econ_dev_municipal",
+   "contact": "northmarkstrategies.com/whats-new/announcement/; investment-advisory firm; Spartanburg project at 4000 South Pine St, Spartanburg SC. Route land offers through OneSpartanburg, Inc. (Katherine O'Neill) which brokered the deal.",
+   "geo": "Spartanburg County SC (first SC operation) \u2014 active in the GSA metro footprint",
+   "buys": "High-performance computing / data-center campuses. Bought a former Kohler manufacturing plant (~900,000 sf site) at 4000 S Pine St; seeks large power-served sites (pursuing 400 MW on-site generation). Prefers repurposable industrial sites with power capacity.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Cielo Digital Infrastructure (data-center developer)",
+   "type": "econ_dev_municipal",
+   "contact": "cielodigital.com; project at 000 Ford Road, Gaffney SC. Deal brokered via Cherokee County + SC Dept of Commerce; legal counsel Burr & Forman. Route offers through Cherokee County ED / SC Commerce.",
+   "geo": "Cherokee County SC (Gaffney) \u2014 first SC development; footprint county",
+   "buys": "300 MW data-center campus = four ~400,000 sf facilities + electrical substation on vacant land near the Broad River. Seeks large vacant tracts with major power/substation potential; ~$2.1B investment.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Global Location Strategies (GLS) \u2014 site selection consultant",
+   "type": "econ_dev_municipal",
+   "contact": "Greenville SC; globallocationstrategies.com; President/CEO Didi Caldwell. (industrial site selection + incentive negotiation).",
+   "geo": "Greenville-HQ'd; represents corporate/industrial clients siting across the Carolinas incl. our footprint",
+   "buys": "Consultant, not a title-holder \u2014 but drives corporate demand for large industrial/manufacturing/data-center sites (heavy-power, water, rail). Frequently sources large acreage in the Upstate/WNC for Fortune-scale manufacturers. Worth being on their radar as a land source.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  },
+  {
+   "name": "Quest Site Solutions \u2014 site selection consultant",
+   "type": "econ_dev_municipal",
+   "contact": "Greenville SC; questsitesolutions.com; principals Lindsey Cannon & Sarah White (ex-McCallum Sweeney). Acquired McCallum Sweeney Consulting.",
+   "geo": "Greenville-HQ'd; site readiness/certification + corporate location work across the Carolinas footprint",
+   "buys": "Consultant focused on industrial site development, site readiness and certification \u2014 advises both companies siting large tracts AND EDCs preparing sites. Key intermediary for large industrial land in the Upstate/WNC; interested in certifiable large acreage.",
+   "regions": [
+    "upstate_sc",
+    "wnc"
+   ]
+  }
+ ],
+ "directories": {
+  "production_homebuilders": [
+   "Land Advisors Organization \u2014 Greenville office (the dominant land brokerage matching Upstate SC tracts to national builders; brokered Taylor Morrison-Braxton Ridge and Meritage Carolinas deals). Their 'news' and 'brokers' pages are a live map of who's buying: landadvisors.com/news",
+   "Home Builders Association of Greenville (HBA) member directory \u2014 members.hbaofgreenville.com/directory (lists Dream Finders, Smith Douglas, Mungo, etc. with contacts)",
+   "Home Builders Association of Asheville / WNC (hba-wnc.org) \u2014 the equivalent for Buncombe/Henderson builders",
+   "NewHomeSource.com builder-by-market pages (newhomesource.com/communities/sc/greenville-spartanburg-area and /nc/asheville-area) \u2014 filter by builder to see every active community per metro",
+   "Homes.com / Zillow / Livabl 'New Construction' by county \u2014 cross-reference active community counts per builder",
+   "Builder Magazine / BuilderOnline.com 'Local Leaders' + 'Next 100' lists \u2014 ranks builders by closings per market (Greenville/Spartanburg ranked #34/#49 nationally)",
+   "Greater Greenville Association of REALTORS (GGAR) RETS agency directory \u2014 ggar.com (division office addresses/brokers)",
+   "County register-of-deeds / GIS grantee search (Buncombe, Greenville, Spartanburg, Anderson) \u2014 search builder LLC names as grantee to catch land buys in real time (e.g., D.R. Horton entities in Buncombe)",
+   "Local business journals: Greenville Business Magazine, Asheville Citizen-Times/AOL business, Upstate Business Journal \u2014 run builder land-purchase announcements",
+   "County/city planning & rezoning agendas (Buncombe, Henderson/Arden, Greenville, Spartanburg) \u2014 subdivision + rezoning submittals reveal builders acquiring land before it closes (e.g., DRH 'White Oak Townes' Arden application)",
+   "Fountain Inn / Simpsonville / Greer / Inman chamber member lists \u2014 hyper-local builder rosters for hot Upstate growth towns"
+  ],
+  "regional_local_builders": [
+   "Asheville Home Builders Association / Builders Association of the Blue Ridge Mountains (BABRM) \u2014 ashevillehba.com (1,200+ members; WNC builder directory covering Buncombe/Henderson/Transylvania/Madison)",
+   "WNC Parade of Homes \u2014 wncparadeofhomes.com/meet-the-builders (curated list of active Western NC production + custom builders)",
+   "Home Builders Association of Greenville \u2014 members.hbaofgreenville.com/directory (Upstate SC builders, remodelers, developers; searchable A-Z + by category)",
+   "Home Builders Association of South Carolina \u2014 hbaofsc.com/local-associations (rolls up all Upstate local HBAs: Greenville, Spartanburg, Anderson, Pickens)",
+   "Spartanburg HBA / Piedmont-area local HBAs (via HBAofSC local-associations list)",
+   "North Carolina Home Builders Association (NCHBA) \u2014 nchba.org/membership/find-your-local-association (find WNC local chapters: Asheville, Henderson County, Rutherford/Polk/McDowell, Cleveland, Burke)",
+   "Building Industry Association of Central SC \u2014 Land Development Council roster (business.biaofcentralsc.com) \u2014 where Mungo/Great Southern land staff are members",
+   "NewHomeSource builder & community directories \u2014 newhomesource.com/builders/nc/asheville-area and /sc/greenville-spartanburg-area (per-metro active builder + community counts, incl. build-on-your-lot lists)",
+   "Zillow & Homes.com Home Builder Profiles (per-metro builder rosters, e.g., Enchanted Homes GSP-Asheville-Anderson profile)",
+   "BuilderOnline / Builder Magazine Builder 100 + M&A coverage (builderonline.com) \u2014 tracks which regional builders are acquiring/being acquired and their land power bases",
+   "Southern Living Custom Builder Program directory (southernlivingcustombuilder.com) \u2014 luxury custom builders like Dillard-Jones active in WNC/Upstate",
+   "Local Realtor/land-broker builder guides: builderpeople.com (McAlister Realty, SK Builders' Upstate community feed) and builderguides.com (REALTOR-builder matchmaking, Carolinas)"
+  ],
+  "residential_land_developers": [
+   "Home Builders Association of Greenville member directory (Greenville/Pickens/Laurens) - members.hbaofgreenville.com/directory (Builders + Developers categories)",
+   "Home Builders Association of South Carolina - local associations list - hbaofsc.com/local-associations (Spartanburg, Anderson, Piedmont HBAs)",
+   "Builders Association of the Blue Ridge Mountains (BABRM) - bablueridge.com - WNC/Asheville developers + builders",
+   "Asheville Home Builders Association + WNC Parade of Homes builder roster - wncparadeofhomes.com/meet-the-builders",
+   "NCHBA 'Find Your Local Association' - nchba.org/membership/find-your-local-association (Henderson, Rutherford, Cleveland, Gaston, Burke local HBAs)",
+   "Upstate SC Alliance member/organization directory - upstatescalliance.com (regional developers e.g. Windsor Aughtry)",
+   "Greenville Chamber Real Estate Development directory - web.greenvillechamber.org (Real-Estate-Development category)",
+   "Asheville Area Chamber Real Estate Developer directory - web.ashevillechamber.org/Real-Estate/Real-Estate-Developer",
+   "County preliminary subdivision search tools (find who's platting NOW): Greenville County (greenvillecounty.org/apps/subdivisionsearch), Buncombe County Subdivisions/Development Projects (buncombenc.gov/810/Development-Projects), Henderson County Major Subdivision page",
+   "LandSearch / National Land Realty (Greenville HQ, 7001 Pelham Rd) 'development land' listings - identifies land brokers who feed developer deals",
+   "Private Mountain Communities / PrivateCommunities.com - roster of WNC + Upstate master-planned community developers",
+   "ULI Carolinas (Urban Land Institute) member developers active in Greenville-Spartanburg + Asheville corridors"
+  ],
+  "multifamily_developers": [
+   "Upper State Apartment Association (USAA) - upperstate.org - the Upstate SC (Greenville-Spartanburg) multifamily trade association since 1979; member directory of owners/developers/managers",
+   "South Carolina Apartment Association - sc-apt.org - statewide MF industry association; developer/owner members",
+   "Apartment Association of North Carolina (AANC) - aanconline.org - statewide NC MF association; lists developers/managers (e.g., Greystar) and regional affiliates",
+   "NAHB Multifamily Council - nahb.org/nahb-community/councils/multifamily-council - national directory of MF builders/developers/owners (member login for directory)",
+   "Greater Charlotte Apartment Association (GCAA) - greatercaa.org - covers Charlotte metro incl Gaston/Lincoln-area developers who reach into western NC footprint",
+   "apartmentassociations.com - master list of NC and SC apartment associations (find local/regional affiliates)",
+   "Colliers Greenville-Spartanburg Multifamily - colliers.com/en/research/greenville - quarterly MF reports naming most-active buyers/developers + a MF land brokerage team",
+   "NAI Earle Furman Multifamily Division (naiearlefurman.com) + Furman Capital Advisors - Upstate SC MF brokerage with relationships to 'most active buyers/sellers/operators'; source of who's transacting",
+   "Trinity Partners Greenville (trinity-partners.com/locations/greenville) - Upstate land + investment brokerage; land-site pipeline",
+   "Upstate Business Journal / GSA Business Report / Greenville Journal - upstatebusinessjournal.com - ongoing 'projects on the rise' + Dealmakers columns naming active MF developers each quarter",
+   "Mountain Xpress Development Roundup (mountainx.com) + Buncombe County & City of Asheville planning/rezoning agendas (buncombenc.gov, ashevillenc.gov) - names every MF developer filing rezoning/SUP applications in the Asheville metro",
+   "MultifamilyBiz.com / REBusinessOnline / Multi-Housing News - trade press that announces named developer groundbreakings across the Carolinas footprint"
+  ],
+  "commercial_retail_office": [
+   "ICSC (International Council of Shopping Centers) \u2014 icsc.com/find-and-connect/members + ICSC Carolinas / Southeast Conference & Deal Making directories (PDF exhibitor/attendee lists name every active retail developer + net-lease/QSR pad buyer in the region)",
+   "North Carolina CCIM Chapter (nc-ccim.org) + SC CCIM Chapter + findaccim.com \u2014 commercial investment members who broker/develop retail, office, MOB, and land",
+   "Upstate Business Journal \u2014 Dealmakers columns + annual 'Status update: Upstate commercial real estate projects' (upstatebusinessjournal.com) names developers, projects, and land buys each quarter",
+   "Colliers Greenville-Spartanburg 'Dealmakers' reports (Greenville Business Magazine) + Colliers/Avison Young/CBRE/Valbridge Greenville-Spartanburg-Asheville market teams \u2014 track who is buying commercial land",
+   "SCbiz News / SC Biz 'Hot Properties' commercial transaction roundups (scbiz.com) \u2014 recurring named commercial land + pad deals",
+   "Greenville Area Development Corporation (greenvilleeconomicdevelopment.com) + Upstate SC Alliance (upstatescalliance.com) member directories \u2014 developers active on Upstate sites",
+   "Asheville Area Chamber of Commerce Real Estate Developer directory (web.ashevillechamber.org) + Builders Association of the Blue Ridge Mountains (bablueridge.com) \u2014 WNC developers/builders",
+   "Nareit REIT directory (reit.com/investing/reit-directory) \u2014 net-lease REITs (Agree/ADC, FCPT, NNN REIT, Realty Income) with acquisition/development desks that buy QSR + retail pads nationally",
+   "CPOMP (Corporate Partners in Outpatient Medical Property, cpomp.org) member directory \u2014 medical-office developers/acquirers (e.g. Flagship, Montecito, Catalyst, Rendina)",
+   "TheBrokerList (thebrokerlist.com) \u2014 NC/SC leasing + investment-sales brokers filtered by NNN/build-to-suit/shopping-center specialty; Crexi + LoopNet 'company' pages to reverse-lookup active developers by market"
+  ],
+  "industrial_logistics": [
+   "Colliers | South Carolina \u2014 Upstate Industrial Team (Garrett Scott, John Montgomery, Brockton Hall, Dillon Swayngim), Spartanburg/Greenville: colliers.com/en/countries/united-states/cities/greenville/upstate-south-carolina-industrial-team \u2014 the dominant land-acq intermediary; their quarterly GSA Industrial Reports + 'Dealmakers' releases name nearly every active buyer",
+   "Greenville Area Development Corporation (GADC) \u2014 greenvilleeconomicdevelopment.com (Sites & Buildings, developer flyers like Magnolia Grove/Augusta Grove)",
+   "Upstate SC Alliance \u2014 upstatescalliance.com (regional 10-county economic development, tracks industrial site users/developers)",
+   "South Carolina Dept. of Commerce \u2014 sccommerce.com/news (expansion & land-deal announcements, BMW/automotive)",
+   "NAIOP Charlotte chapter (naiopclt.org) \u2014 250+ members covering Charlotte region AND Upstate SC; member directory of developers/owners/brokers",
+   "SIOR (Society of Industrial and Office Realtors) \u2014 sior.com member directory; filter Carolinas/Upstate industrial specialists (e.g., Clay Williams, NAI)",
+   "Upstate Business Journal 'Square Feet' + GSA Business Report + Greenville Business Magazine \u2014 ongoing industrial land-deal reporting",
+   "REBusinessOnline, Connect CRE, Commercial Property Executive, citybiz \u2014 national CRE trades that break Upstate/Carolinas industrial land acquisitions",
+   "Henderson County (gohendersoncountync.org) + Buncombe County (buncombenc.gov Economic Development) \u2014 WNC industrial sites/certified parks (Ferncliff, Garrison, Brown Site, SkyPoint)",
+   "NCsites / SelectSite (EDPNC) + Business North Carolina 'Industrial Parks NC' \u2014 WNC industrial land inventory and developer activity",
+   "LandSearch / Land.com / LoopNet (commercial-industrial filters by county) \u2014 to see which developers list/seek industrial land in each target county",
+   "Southern Carolina Regional Development Alliance (southerncarolina.org/properties/sites) \u2014 certified industrial sites and the developers building on them"
+  ],
+  "self_storage": [
+   "Self Storage Association (SSA) \u2014 selfstorage.org: national member directory of owners/operators/developers + Board of Directors list; the primary trade body for finding storage buyers.",
+   "Inside Self-Storage (ISS) \u2014 insideselfstorage.com: 'Acquisitions/Buying' news + monthly 'Self-Storage Development and Zoning Activity' roundups that name developers filing new projects (great for catching in-footprint entrants early).",
+   "Southeast Self Storage Association (SESSA) \u2014 regional SSA affiliate covering the Carolinas; member roster of regional operators/developers.",
+   "Modern Storage Media (modernstoragemedia.com) 'Sales & Acquisitions' \u2014 deal-flow news naming active buyers.",
+   "List Self Storage (listselfstorage.com) \u2014 self-storage marketplace + vendor/buyer profiles (e.g., NSA, brokers), used by principals to source deals.",
+   "Crexi & LoopNet self-storage-for-sale filters (by county: Asheville/Buncombe, Greenville, Spartanburg) \u2014 surfaces who is listing/buying and the brokers repping storage sites.",
+   "Storage brokerage desks that keep buyer lists: The Storage Acquisition Group, Roth Capital (direct buyer, no broker), Marcus & Millichap National Self Storage Group, and SkyView Advisors \u2014 each maintains vetted active-buyer rosters for the Carolinas.",
+   "County Technical Review Committee / Planning agendas (e.g., Asheville TRC, Greenville County, Spartanburg County) \u2014 earliest signal of which developer is acquiring a specific parcel; free public records.",
+   "Upstate Business Journal (upstatebusinessjournal.com) & Greenville Business Magazine 'Dealmakers' columns \u2014 name self-storage buyers/developers transacting in the Greenville-Spartanburg-Anderson MSA."
+  ],
+  "solar_utility_land": [
+   "SEIA (Solar Energy Industries Association) member directory \u2014 https://www.seia.org/directory (filter for Project Developers; national + regional players active in NC/SC)",
+   "NC Sustainable Energy Association (NCSEA) \u2014 https://www.energync.org/ , 300+ members, member directory (the authoritative NC clean-energy developer roster)",
+   "South Carolina Solar Council \u2014 https://www.scsolarcouncil.org/ (membership/sponsor list + Project Spotlight; the SC developer/EPC roster)",
+   "Upstate SC Alliance \u2014 https://www.upstatescalliance.com/ (economic-development announcements naming solar developers landing in Anderson/Greenville/Spartanburg \u2014 best signal for who is actively acquiring in Upstate SC)",
+   "SC Dept. of Commerce news / SC Governor's Office press releases \u2014 https://www.sccommerce.com/news & https://governor.sc.gov/news (announce each new solar investment + county + developer name)",
+   "SC Energy Office solar pages \u2014 https://solar.sc.gov/ (solar farms, agencies/organizations, developer references)",
+   "CleanView South Carolina solar farm map & project list \u2014 https://cleanview.co/solar-farms/south-carolina (project-level developer + acreage data)",
+   "Global Energy Monitor (gem.wiki) solar farm tracker \u2014 per-project pages listing owner/developer (e.g., Rutherford Farm) for NC/SC utility-scale sites",
+   "NC DEQ utility-scale solar reports & NC State Extension Farm Law solar pages \u2014 https://farmlaw.ces.ncsu.edu/energy/ (project + ordinance activity by county)",
+   "Duke Energy interconnection queue / NC Utilities Commission & SC PSC dockets \u2014 public filings reveal which developers have projects queued in specific footprint counties",
+   "Solar Power World supplier directory \u2014 https://www.solarpowerworldonline.com/suppliers/ (developer profiles incl. Southern Current)",
+   "Land-lease brokerage/marketplace listings (LandApp, US Light Energy, LandGate) \u2014 aggregate which developers are soliciting land by state/county"
+  ],
+  "manufactured_housing": [
+   "PESP Private Equity Manufactured Housing Tracker (pestakeholder.org/pesp-private-equity-manufactured-housing-tracker) \u2014 names 23+ PE-backed operators with park/lot counts and parent PE firms; best single source for institutional buyers and who backs them.",
+   "MHPHOA.com Investors directory (mhphoa.com/investors) \u2014 ~160 named park owners/operators/managers with HQ city+state and portfolio size; surfaces the NC-based operators (ACG-Cary, FG-Mooresville, MHP-Pineville) and lets you filter for Carolinas.",
+   "NC Manufactured & Modular Homebuilders Association / NCMHA (nc-mha.org; members.nc-mha.org active-member-directory; (919) 872-2740) \u2014 searchable member directory incl. Community Owner/Operator and Developer member categories in NC.",
+   "Manufactured Housing Institute \u2014 MHI (manufacturedhousing.org; NC state page at /location/north-carolina) \u2014 national trade body; member operators and state affiliates.",
+   "Marcus & Millichap Manufactured Housing / Esterson MHC Team (marcusmillichap.com/services/property-types/manufactured-housing; Glenn Esterson, Charlotte Uptown office, 201 S. Tryon St Ste 1220, Charlotte NC; estersonmhcteam.com; also mhpbroker.com / The Danny Group, Wagner MHC Group, Dorsey-Henderson Team) \u2014 dominant Southeast MHC brokerage; buyer pool + comps + who's transacting in NC/SC. Danny Newell's mhpbroker.com carries buyer criteria.",
+   "MobileHomeParkStore.com (mobilehomeparkstore.com \u2014 for-sale + park directory + buyer 'wanted' lists) and MHVillage (mhvillage.com/parks/nc, /parks/sc) \u2014 inventory + operator identification.",
+   "LoopNet / Crexi / CityFeet / Showcase (Costar) manufactured-housing 'for sale' filters \u2014 identify who is bidding/buying parks in Asheville/Greenville-Spartanburg-Anderson.",
+   "Northmarq MHC Group and MHCInvest.com (mhcinvest.com) \u2014 brokerage/lender channels that list active MHC buyers and lend to them (finds capitalized acquirers)."
+  ],
+  "timber_recreational": [
+   "REALTORS Land Institute - Carolinas Chapter (RLI): rliland.com/carolinas/Consumer-Resources/Find-a-Land-Consultant - directory of Accredited Land Consultants (ALC) in NC/SC; the single best directory for finding timber/recreational/ag land brokers and their buyer networks.",
+   "Land Trust Alliance member directory: landtrustalliance.org/land-trusts/explore - find every accredited land trust (conservation buyer) by state/county; filters to Foothills Conservancy, Conserving Carolina, Upstate Forever, Mainspring, CTNC, etc.",
+   "National Land Realty office/agent directory: nationalland.com/contact and /about - locate regional land brokers (buyer-network) county-by-county across NC/SC.",
+   "Whitetail Properties agent finder: whitetailproperties.com/find-an-agent/north-carolina and /south-carolina - hunting/recreational land specialists mapped to counties.",
+   "Mossy Oak Properties office finder: mossyoakproperties.com/find-office/north-carolina (and /south-carolina) - franchise land/timber brokerages by region.",
+   "LandWatch / Land & Farm / Lands of America (Land.com network): landwatch.com, landandfarm.com, land.com - filter by county + 'timberland'/'hunting'/'recreational'; also lists the brokers and repeat land-investor buyers active in each county.",
+   "FarmFlip / LandFlip / LandHub: farmflip.com, landflip.com - county-level farm & land listings and the brokers/buyers behind them.",
+   "Forisk Consulting: forisk.com - timber industry intelligence; tracks TIMO/REIT ownership, transactions, and who is actively buying timberland in the South (best directory of institutional timber buyers).",
+   "Land Trust for wildlife/game lands via NC Wildlife Resources Commission & SCDNR partners - state agencies co-acquire recreational/game-land tracts with the conservancies above (route large habitat tracts here).",
+   "NC Land and Water Fund (nclwf.nc.gov) & SC Conservation Bank - public funding sources that pair with land trusts to buy conservation/recreational forest tracts; grant lists reveal which buyers are actively closing.",
+   "American Forest Management / AFM Real Estate: afmrealestate.com/properties and americanforestmanagement.com - the largest forestry-services-backed land brokerage; connects institutional timber buyers to Carolina tracts.",
+   "AgWeb / Global AgInvesting & Agriculture Investment Marketplace (investinag.com) - news feeds that surface active TIMO/REIT/ag-land acquirers and recent Southeast timber transactions."
+  ],
+  "conservation_trusts": [
+   "Land Trust Alliance \u2014 Find a Land Trust: https://www.findalandtrust.org (filter by NC / SC; lists every member trust with service area)",
+   "Land Trust Accreditation Commission directory: https://landtrustaccreditation.org/directory and Accredited Land Trust Locator map: https://ltac.neonccm.com/map (accredited trusts = most credible active buyers)",
+   "South Carolina Land Trust Network (SCLTN): https://www.scltn.org \u2014 interactive map + directory of all 24 SC land trusts/conservancies (Upstate members)",
+   "Conservation Trust for North Carolina (CTNC): https://ctnc.org \u2014 statewide umbrella/partner network for NC land trusts; conservation-options + loan fund",
+   "American Farmland Trust \u2013 Farmland Information Center (FIC): https://farmlandinfo.org/farmland_information/ \u2014 profiles of land trusts doing farmland/easement work by state",
+   "Conservation Almanac (state program pages): https://conservationalmanac.org/programs/north-carolina/ and /south-carolina/ \u2014 catalog of state acquisition/easement funding programs",
+   "Land Conservation Assistance Network (LandCAN): https://www.landcan.org \u2014 local-resources directory of land trusts and conservation programs by county",
+   "NC Resilience Exchange funding database: https://www.resilienceexchange.nc.gov/find-funding/funding-database \u2014 lists NC conservation acquisition/easement funding sources (ADFP, NCLWF, etc.)",
+   "USDA-NRCS ACEP (Agricultural Conservation Easement Program) NC & SC pages: nrcs.usda.gov \u2014 federal easement money that partners with these trusts",
+   "GuideStar / Candid: search 'land conservation' + NC/SC to surface smaller/local conservancies not in the accreditation lists"
+  ],
+  "econ_dev_municipal": [
+   "Upstate SC Alliance member/organization directory (upstatescalliance.com/organization/...) \u2014 lists every county EDC in the 10-county Upstate footprint",
+   "LocateSC \u2014 SC Dept of Commerce buildings & sites portal (locatesc.sccommerce.com) \u2014 registers/lists industrial sites + the county EDCs marketing them",
+   "EDPNC Find-a-Site / Megasites + SelectSite pages (edpnc.com/find-a-site) \u2014 NC state site inventory and the local EDCs behind each",
+   "Site Selectors Guild partner directory (members.siteselectorsguild.com) \u2014 regional EDOs + the site-selection consultants that drive corporate land demand",
+   "NC Commerce Rural Economic Development Division + Prosperity Zones (commerce.nc.gov) \u2014 county/regional ED contacts for the WNC counties",
+   "Business North Carolina 'Industrial Parks NC' annual list (businessnc.com) \u2014 inventory of NC industrial parks and their developer/EDC owners",
+   "NC Economic Developers Association (NCEDA) member directory \u2014 every county/city ED professional in NC",
+   "SC Economic Developers' Association (SCEDA) member directory \u2014 SC county ED professionals",
+   "Appalachian Regional Commission (ARC) NC county list (arc.gov) \u2014 identifies WNC counties (Burke, Cleveland, McDowell, Rutherford, Polk) receiving ED funds",
+   "Trade & Industry Development region pages (tradeandindustrydev.com) \u2014 profiles of each regional/county EDO with contacts",
+   "Data Center Dynamics (datacenterdynamics.com) + Baxtel + Cleanview.co + Blackridge Research project lists \u2014 track named data-center developers/projects landing in the footprint",
+   "SC Governor + SC Commerce press releases (governor.sc.gov / sccommerce.com/news) \u2014 announce which developers are acquiring land in which SC counties",
+   "GroundBreak Carolinas (groundbreakcarolinas.com) \u2014 Carolinas commercial/industrial development news naming active buyers and consultants"
+  ]
+ }
+}
