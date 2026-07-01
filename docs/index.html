@@ -125,6 +125,18 @@
     </select>
   </div>
   <div class="filter-group">
+    <label>Strategy</label>
+    <select id="filter-strategy">
+      <option value="">All strategies</option>
+      <option value="LAND_WHOLESALE">Land wholesale</option>
+      <option value="WHOLESALE">Wholesale</option>
+      <option value="SUBJECT_TO">Subject-to</option>
+      <option value="FIX_FLIP">Fix &amp; flip</option>
+      <option value="GATOR">Gator</option>
+      <option value="_buyers">Has buyers</option>
+    </select>
+  </div>
+  <div class="filter-group">
     <label>Source</label>
     <select id="filter-source"><option value="">All sources</option></select>
   </div>
@@ -238,6 +250,18 @@
     <div class="detail-section" id="d-grade-section">
       <h3>Grade Rationale</h3>
       <div id="d-grade-rationale"></div>
+    </div>
+
+    <!-- Strategy fit -->
+    <div class="detail-section" id="d-strategy-section" style="display:none">
+      <h3>🎯 Strategy Fit</h3>
+      <div id="d-strategy"></div>
+    </div>
+
+    <!-- Buyers wanting this -->
+    <div class="detail-section" id="d-buyers-section" style="display:none">
+      <h3>🏢 Buyers Wanting This</h3>
+      <div id="d-buyers"></div>
     </div>
 
     <!-- Property details -->

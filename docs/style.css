@@ -1103,6 +1103,37 @@ footer strong { color: var(--text-2); font-weight: 600; }
 
 .hidden { display: none; }
 
+/* ---- Strategy-fit pills + buyer-match chip (cards) ---- */
+.strat-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.strat-chip {
+  display: inline-block; padding: 2px 8px; border-radius: var(--r-pill);
+  font-size: 10px; font-weight: 700; color: #fff;
+}
+.strat-chip.strat-land  { background: #15803d; }  /* land wholesale */
+.strat-chip.strat-whsl  { background: #2563eb; }  /* wholesale */
+.strat-chip.strat-subto { background: #b45309; }  /* subject-to */
+.strat-chip.strat-flip  { background: #be123c; }  /* fix & flip */
+.strat-chip.strat-gator { background: #7c3aed; }  /* gator */
+.buyer-chip {
+  display: inline-block; padding: 2px 8px; border-radius: var(--r-pill);
+  font-size: 10px; font-weight: 700; background: #0f172a; color: #fff; cursor: pointer;
+}
+
+/* ---- Detail panel: strategy + buyers ---- */
+.strat-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+.strat-why { font-size: 12px; color: var(--text-2, #475467); }
+.buyers-note { font-size: 12px; color: var(--text-2, #475467); margin-bottom: 8px; }
+.buyer-group { margin: 8px 0; }
+.buyer-group-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .03em; color: var(--text-2, #475467); margin-bottom: 3px;
+}
+.buyer-row { display: flex; flex-direction: column; padding: 4px 0; border-bottom: 1px solid var(--border, rgba(0,0,0,.06)); }
+.buyer-row a { font-weight: 600; color: var(--accent, #2563eb); text-decoration: none; }
+.buyer-row a:hover { text-decoration: underline; }
+.buyer-name { font-weight: 600; }
+.buyer-buys { font-size: 11px; color: var(--text-2, #475467); }
+
 /* Scrollbar polish (webkit) */
 *::-webkit-scrollbar { width: 12px; height: 12px; }
 *::-webkit-scrollbar-track { background: transparent; }

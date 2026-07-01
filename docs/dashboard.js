@@ -184,7 +184,7 @@ function initFilters() {
       ssel.appendChild(opt);
     });
 
-  ["search", "filter-state", "filter-county", "filter-type", "filter-contact", "filter-land", "filter-source", "filter-distress", "filter-grade", "filter-window", "filter-roi"].forEach((id) =>
+  ["search", "filter-state", "filter-county", "filter-type", "filter-contact", "filter-land", "filter-strategy", "filter-source", "filter-distress", "filter-grade", "filter-window", "filter-roi"].forEach((id) =>
     $(id).addEventListener("input", applyFilters),
   );
 
@@ -296,6 +296,7 @@ function applyFilters() {
   const land = $("filter-land").value;
   const src = $("filter-source").value;
   const contact = $("filter-contact").value;
+  const strategy = ($("filter-strategy") || {}).value || "";
   const distress = $("filter-distress").value;
   const minGrade = $("filter-grade").value;
   const minGradeRank = minGrade ? gradeOrder[minGrade] : 0;
@@ -331,6 +332,12 @@ function applyFilters() {
       if (distress === "HOT" && ds.tier !== "HOT") return false;
       if (distress === "HOTWARM" && ds.tier === "COLD") return false;
       if (distress === "STACK2" && !(ds.stack >= 2)) return false;
+    }
+    if (strategy) {
+      const sf = (l.raw && l.raw.strategy_fit) || null;
+      const bm = (l.raw && l.raw.buyer_match) || null;
+      if (strategy === "_buyers") { if (!(bm && bm.count)) return false; }
+      else if (!(sf && sf.tags && sf.tags.includes(strategy))) return false;
     }
     if (contact) {
       const r = l.raw || {};
@@ -492,6 +499,31 @@ function renderTable() {
 }
 
 // ------------- Cards render --------------------------------------------------
+// ---- Strategy-fit pills + buyer-match chip (this session's new intelligence) ----
+const STRATEGY_META = {
+  LAND_WHOLESALE: { label: "Land wholesale", cls: "strat-land" },
+  WHOLESALE: { label: "Wholesale", cls: "strat-whsl" },
+  SUBJECT_TO: { label: "Subject-to", cls: "strat-subto" },
+  FIX_FLIP: { label: "Fix & flip", cls: "strat-flip" },
+  GATOR: { label: "Gator", cls: "strat-gator" },
+};
+function strategyBuyerChips(l) {
+  const chips = [];
+  const sf = (l.raw && l.raw.strategy_fit) || null;
+  if (sf && sf.tags) {
+    sf.tags.forEach((t) => {
+      const m = STRATEGY_META[t];
+      if (m) chips.push(`<span class="strat-chip ${m.cls}" title="${(sf.reasons && sf.reasons[t]) || t}">${m.label}</span>`);
+    });
+  }
+  const bm = (l.raw && l.raw.buyer_match) || null;
+  if (bm && bm.count) {
+    const types = bm.by_type ? Object.keys(bm.by_type).length : 0;
+    chips.push(`<span class="buyer-chip" title="${bm.count} active buyers across ${types} categories — click for the list">🏢 ${bm.count} buyers want this</span>`);
+  }
+  return chips.length ? `<div class="strat-chips">${chips.join("")}</div>` : "";
+}
+
 function renderCards() {
   const grid = $("cards-grid");
   grid.innerHTML = filtered
@@ -556,8 +588,9 @@ function renderCards() {
       //     distressChips() suppresses these for COLD tier, so emit from here using
       //     the owner_mailing flags (the authoritative absentee source).
       const om = (l.raw && l.raw.owner_mailing) || {};
-      if (om.absentee) signalChips.push(`<span class="distress-chip absentee">absentee</span>`);
-      if (om.out_of_state) signalChips.push(`<span class="distress-chip absentee">out-of-state</span>`);
+      const lrc = (l.raw && l.raw.lrcpwa) || {};
+      if (om.absentee || lrc.absentee) signalChips.push(`<span class="distress-chip absentee">absentee</span>`);
+      if (om.out_of_state || (lrc.mailing && lrc.mailing.state && lrc.mailing.state !== "NC")) signalChips.push(`<span class="distress-chip absentee">out-of-state</span>`);
       // (4) Title-risk trap — senior lien may survive a junior foreclosure.
       const tr = (l.raw && l.raw.title_risk) || null;
       if (tr && tr.surviving_senior_debt_risk === true) {
@@ -575,6 +608,7 @@ function renderCards() {
           <div class="card-loc">${cardLoc}</div>
           ${distressChips(ds)}
           ${signalChipsHtml}
+          ${strategyBuyerChips(l)}
           <div class="card-meta">
             ${fmtType(l.listing_type)}
             ${l.opening_bid ? `<span>Bid ${fmtMoney(l.opening_bid)}</span>` : ""}
@@ -746,6 +780,44 @@ function openDetail(l) {
     ["Auction Status", l.auction_status || ""],
   ].filter(([_, v]) => v);
   $("d-grid").innerHTML = fields.map(([k, v]) => `<div class="lbl">${k}</div><div class="val">${v}</div>`).join("");
+
+  // Strategy fit — which exit strategies this lead fits, + why
+  const _sf = (l.raw && l.raw.strategy_fit) || null;
+  if (_sf && _sf.tags && _sf.tags.length) {
+    $("d-strategy-section").style.display = "block";
+    $("d-strategy").innerHTML = _sf.tags.map((t) => {
+      const m = STRATEGY_META[t] || { label: t, cls: "" };
+      return `<div class="strat-row"><span class="strat-chip ${m.cls}">${m.label}</span><span class="strat-why">${(_sf.reasons && _sf.reasons[t]) || ""}</span></div>`;
+    }).join("");
+  } else { $("d-strategy-section").style.display = "none"; }
+
+  // Buyers wanting this — active buyers grouped by type, with contact links
+  const _bm = (l.raw && l.raw.buyer_match) || null;
+  if (_bm && _bm.by_type) {
+    const TYPE_LABEL = {
+      production_homebuilders: "Production builders", regional_local_builders: "Regional builders",
+      residential_land_developers: "Land developers", multifamily_developers: "Multifamily developers",
+      commercial_retail_office: "Commercial developers", industrial_logistics: "Industrial / logistics",
+      self_storage: "Self-storage", solar_utility_land: "Solar / utility-scale",
+      manufactured_housing: "Manufactured housing", timber_recreational: "Timber / recreational",
+      conservation_trusts: "Conservation trusts", econ_dev_municipal: "Economic development",
+      land_flippers: "Cash land buyers", house_buyers: "Cash house buyers",
+    };
+    $("d-buyers-section").style.display = "block";
+    let bh = `<div class="buyers-note">${_bm.count} active buyers — ${_bm.note || "outreach list"}</div>`;
+    Object.entries(_bm.by_type).forEach(([type, buyers]) => {
+      bh += `<div class="buyer-group"><div class="buyer-group-title">${TYPE_LABEL[type] || type} (${buyers.length})</div>`;
+      bh += buyers.map((b) => {
+        const isUrl = b.contact && /^https?:\/\//.test(b.contact);
+        const nm = isUrl ? `<a href="${b.contact}" target="_blank" rel="noopener">${b.name} ↗</a>` : `<span class="buyer-name">${b.name}</span>`;
+        const extra = b.buys ? `<span class="buyer-buys">${b.buys}</span>` : "";
+        const ct = (!isUrl && b.contact) ? `<span class="buyer-buys">${b.contact}</span>` : "";
+        return `<div class="buyer-row">${nm}${extra}${ct}</div>`;
+      }).join("");
+      bh += `</div>`;
+    });
+    $("d-buyers").innerHTML = bh;
+  } else { $("d-buyers-section").style.display = "none"; }
 
   // Photos
   const photos = (l.raw && l.raw.zillow && l.raw.zillow.photos) || [];
