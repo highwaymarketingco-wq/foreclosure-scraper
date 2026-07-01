@@ -193,6 +193,12 @@ def _is_valid_street_address(addr: str | None) -> bool:
     return False
 
 
+# Heavy raw keys read ONLY by the detail panel (audited: absent from every
+# filter/sort/card-render path). Moved to the index-aligned listings_detail.json
+# so the initial board parse skips ~10MB of comps/vision arrays.
+LAZY_DETAIL_KEYS = ("vision", "foreclosure_sold_comps", "comps", "cama", "rent_comps")
+
+
 def _slim_raw(raw: dict | None) -> dict:
     if not isinstance(raw, dict):
         return {}
@@ -240,7 +246,26 @@ def write_artifact(
     meta_path = docs / "run_meta.json"
 
     payload = [_to_dict(li) for li in listings]
+
+    # Split the heavy, detail-panel-only raw keys (comps/vision arrays — the
+    # most deeply nested payload) into an index-aligned sidecar the dashboard
+    # fetches lazily on the first card open. Index alignment (not a per-lead id)
+    # is the join: both files are built from `payload` in the same order, so
+    # detail[i] belongs to listing[i]. Popping happens LAST (after _to_dict /
+    # _slim_raw / annotate_stale_links) so nothing re-adds these keys. Additive:
+    # if listings_detail.json is missing/mismatched, those panels render empty.
+    details = []
+    for rec in payload:
+        raw = rec.get("raw")
+        d = {}
+        if isinstance(raw, dict):
+            for k in LAZY_DETAIL_KEYS:
+                if k in raw:
+                    d[k] = raw.pop(k)
+        details.append(d)
     listings_path.write_text(json.dumps(payload, ensure_ascii=False, default=str), encoding="utf-8")
+    detail_path = docs / "listings_detail.json"
+    detail_path.write_text(json.dumps(details, ensure_ascii=False, default=str), encoding="utf-8")
 
     meta = {
         "run_time": datetime.utcnow().isoformat() + "Z",

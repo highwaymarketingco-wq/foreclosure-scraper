@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-07-01T07:53:18.769257Z",
+  "run_time": "2026-07-01T08:09:34.489079Z",
   "total": 16452,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "scheduled NC SOS registered-agent refresh"
+  "notes": "board split: lazy detail sidecar (comps/vision)"
 }

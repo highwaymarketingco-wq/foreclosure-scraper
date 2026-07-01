@@ -832,8 +832,31 @@ function initMap() {
 }
 
 // ------------- Detail panel ---------------------------------------------------
-function openDetail(l) {
+// Lazy detail load: the heavy comps/vision raw keys live in an index-aligned
+// listings_detail.json (split out of listings.json to speed initial parse).
+// Fetched once on the first card open, merged into LISTINGS in place (same
+// object refs as `filtered`, so re-opens are instant). Foreclosure board only;
+// degrades gracefully (empty panels) if the file is missing or length-mismatched.
+const _DETAILS_MERGED = {};
+async function ensureDetails() {
+  if (DATASET !== "foreclosure" || _DETAILS_MERGED[DATASET]) return;
+  _DETAILS_MERGED[DATASET] = true; // set first so concurrent opens don't double-fetch
+  try {
+    const r = await fetch(`listings_detail.json?t=${(META && META.run_time) || ""}`);
+    if (!r.ok) return;
+    const details = await r.json();
+    if (Array.isArray(details) && details.length === LISTINGS.length) {
+      for (let i = 0; i < LISTINGS.length; i++) {
+        const d = details[i];
+        if (d && Object.keys(d).length) LISTINGS[i].raw = Object.assign(LISTINGS[i].raw || {}, d);
+      }
+    }
+  } catch (e) { /* detail panels degrade gracefully */ }
+}
+
+async function openDetail(l) {
   if (!l) return;
+  await ensureDetails();
   const g = getGrade(l);
   const c = getCalc(l);
 
