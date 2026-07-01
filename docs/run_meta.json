@@ -1,11 +1,11 @@
 {
-  "run_time": "2026-07-01T19:10:37.771306Z",
-  "total": 16329,
+  "run_time": "2026-07-01T19:51:21.787313Z",
+  "total": 17003,
   "by_source": {},
   "by_state": {},
   "by_county_top": [],
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "board-wide owner-mailing contactability enrichment"
+  "notes": "merged 674 saved SC PublicIndex court leads"
 }
