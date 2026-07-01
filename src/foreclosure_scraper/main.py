@@ -792,6 +792,18 @@ async def run() -> int:
     except Exception:
         log.error("hud_reac_address.failed", traceback=traceback.format_exc())
 
+    # NC PTS Cloud land-records resolver — parcel# -> situs address + assessed
+    # value + owner + mailing for Henderson/Madison/Rutherford/Burke (the
+    # delinquent-tax leads land with a parcel but no address). Runs BEFORE geocode
+    # so the recovered street addresses get lat/lng (and then an aerial).
+    try:
+        from .enrichment_lrcpwa_parcel import enrich_lrcpwa_parcel
+        s = await enrich_lrcpwa_parcel(enriched)
+        if s:
+            enrichment_stats["lrcpwa"] = s
+    except Exception:
+        log.error("lrcpwa.failed", traceback=traceback.format_exc())
+
     # Geocoding fallback — fills lat/lng for any listing the county GIS didn't
     # return geometry for. Rate-limited per Nominatim's policy.
     try:

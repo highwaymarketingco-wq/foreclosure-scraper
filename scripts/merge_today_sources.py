@@ -184,6 +184,12 @@ async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
     import os as _os0
     _FAST = _os0.environ.get("MERGE_FAST") == "1"
     await _step("hud_reac_address", enrich_hud_reac_address(merged))  # ONE bulk query, safe
+    # NC PTS Cloud land-records: parcel# -> situs address + assessed value for the
+    # Henderson/Rutherford/Burke delinquent-tax leads (they land with no address).
+    # Reliable Azure-hosted JSON API (not the flaky county GIS), so it runs even in
+    # FAST mode — it's the thing that gives those leads an address to geocode/image.
+    from foreclosure_scraper.enrichment_lrcpwa_parcel import enrich_lrcpwa_parcel
+    await _step("lrcpwa_parcel", enrich_lrcpwa_parcel(merged))
     # geocode#1 is a per-lead network LOOP — on a flaky connection a single wedged
     # socket blocks the event loop and the budget-bail can't fire (observed tonight).
     # Skip in FAST so the post-scrape chain is local-only (CAMA CSV + pure-python calc).
