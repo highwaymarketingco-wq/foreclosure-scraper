@@ -1159,6 +1159,12 @@ async def run() -> int:
             enrichment_stats["incarceration"] = await enrich_incarceration(enriched)
         except Exception:
             log.error("incarceration.failed", traceback=traceback.format_exc())
+        # County-jail bookings (pre-trial/local holds the state rosters miss).
+        try:
+            from .enrichment_jail_bookings import enrich_jail_bookings
+            enrichment_stats["jail_bookings"] = await enrich_jail_bookings(enriched)
+        except Exception:
+            log.error("jail_bookings.failed", traceback=traceback.format_exc())
 
     # NC case-status: two-stage dispatch.
     #   Stage 1 (when NC_ECOURTS_USERNAME/PASSWORD set): authenticated
