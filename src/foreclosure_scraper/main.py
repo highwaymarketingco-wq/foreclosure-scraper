@@ -1993,6 +1993,18 @@ async def run() -> int:
     except Exception:
         log.error("derived_signals.failed", traceback=traceback.format_exc())
 
+    # Land-records PROPERTY PHOTOS — the county's building photo for
+    # Henderson/Madison/Rutherford/Burke leads, downloaded + hosted under
+    # docs/parcel_photos/. Runs AFTER distress scoring so it only spends on the
+    # worked leads (HOT/WARM or graded) that otherwise have no image.
+    try:
+        from .enrichment_lrcpwa_photo import enrich_lrcpwa_photo
+        s = await enrich_lrcpwa_photo(enriched)
+        if s and s.get("fetched"):
+            enrichment_stats["lrcpwa_photo"] = s
+    except Exception:
+        log.error("lrcpwa_photo.failed", traceback=traceback.format_exc())
+
     # RentCast AVM cross-check on top-N listings (authoritative AVM + comparables).
     # Only fires when RENTCAST_API_KEY is set.
     # Free tier (50 calls/mo) → 25 listings × 2 calls each.
