@@ -151,6 +151,10 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
             owner_name=owner,
             defendant=owner,
             parcel_id=parcel,
+            # The county's assessed value IS a real value (NC assesses ~market) —
+            # set it so these leads grade/score without needing GIS. calc caps
+            # confidence + data_quality flags it as assessed-basis.
+            market_value=assessed if (assessed and 1000 <= assessed <= 20_000_000) else None,
             foreclosure_process="tax",
             description=(f"{owner or ''} — {county} NC delinquent tax "
                          f"${a['owed']:,.0f} owed (parcel {parcel})")[:300],
