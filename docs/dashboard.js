@@ -22,6 +22,30 @@ const getCalc = (l) => (l.raw && l.raw.calc) || null;
 const gradeOrder = { A: 5, B: 4, C: 3, D: 2, F: 1 };
 
 // ------------- Load data -----------------------------------------------------
+// Fetch JSON, preferring a gzipped copy (~16x smaller). Robust to both GitHub
+// Pages behaviours: if the .gz is served as raw gzip we inflate it via
+// DecompressionStream; if the server already inflated it (Content-Encoding: gzip)
+// we parse the bytes directly. Any failure falls back to the plain .json.
+async function fetchJsonMaybeGz(base, bust) {
+  const q = bust ? `?t=${bust}` : "";
+  try {
+    const r = await fetch(`${base}.gz${q}`);
+    if (r.ok) {
+      const buf = new Uint8Array(await r.arrayBuffer());
+      const isGzip = buf.length > 1 && buf[0] === 0x1f && buf[1] === 0x8b;
+      if (isGzip) {
+        if (typeof DecompressionStream === "undefined") throw new Error("no DecompressionStream");
+        const stream = new Response(buf).body.pipeThrough(new DecompressionStream("gzip"));
+        return JSON.parse(await new Response(stream).text());
+      }
+      return JSON.parse(new TextDecoder().decode(buf)); // server already inflated
+    }
+  } catch (e) { /* fall through to plain .json */ }
+  const r2 = await fetch(`${base}${q}`);
+  if (!r2.ok) throw new Error(`${base} missing`);
+  return await r2.json();
+}
+
 async function loadDataset(name) {
   // Already loaded — restore from cache
   if (DS_CACHE[name]) {
@@ -49,12 +73,11 @@ async function loadDataset(name) {
         by_county_top: data.by_county_top,
       };
     } else {
-      const [listingsRes, metaRes] = await Promise.all([
-        fetch(`listings.json?t=${Date.now()}`),
+      const [listings, metaRes] = await Promise.all([
+        fetchJsonMaybeGz("listings.json", Date.now()),
         fetch(`run_meta.json?t=${Date.now()}`),
       ]);
-      if (!listingsRes.ok) throw new Error("listings.json missing");
-      LISTINGS = await listingsRes.json();
+      LISTINGS = listings;
       META = metaRes.ok ? await metaRes.json() : {};
     }
     DS_CACHE[name] = { listings: LISTINGS, meta: META };
@@ -869,9 +892,7 @@ async function ensureDetails() {
   if (DATASET !== "foreclosure" || _DETAILS_MERGED[DATASET]) return;
   _DETAILS_MERGED[DATASET] = true; // set first so concurrent opens don't double-fetch
   try {
-    const r = await fetch(`listings_detail.json?t=${(META && META.run_time) || ""}`);
-    if (!r.ok) return;
-    const details = await r.json();
+    const details = await fetchJsonMaybeGz("listings_detail.json", (META && META.run_time) || "");
     if (Array.isArray(details) && details.length === LISTINGS.length) {
       for (let i = 0; i < LISTINGS.length; i++) {
         const d = details[i];

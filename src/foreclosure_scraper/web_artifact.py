@@ -297,9 +297,17 @@ def write_artifact(
                 if k in raw:
                     d[k] = raw.pop(k)
         details.append(d)
-    listings_path.write_text(json.dumps(payload, ensure_ascii=False, default=str), encoding="utf-8")
+    import gzip
+    listings_bytes = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
+    listings_path.write_bytes(listings_bytes)
     detail_path = docs / "listings_detail.json"
-    detail_path.write_text(json.dumps(details, ensure_ascii=False, default=str), encoding="utf-8")
+    detail_bytes = json.dumps(details, ensure_ascii=False, default=str).encode("utf-8")
+    detail_path.write_bytes(detail_bytes)
+    # Also emit gzipped copies the dashboard fetches (16x smaller). The .json
+    # files remain the local source-of-truth + a fallback. mtime=0 keeps the gzip
+    # header deterministic so identical data produces identical bytes (no git churn).
+    (docs / "listings.json.gz").write_bytes(gzip.compress(listings_bytes, compresslevel=9, mtime=0))
+    (docs / "listings_detail.json.gz").write_bytes(gzip.compress(detail_bytes, compresslevel=9, mtime=0))
 
     meta = {
         "run_time": datetime.utcnow().isoformat() + "Z",
