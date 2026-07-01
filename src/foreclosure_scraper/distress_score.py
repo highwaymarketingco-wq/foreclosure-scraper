@@ -196,6 +196,10 @@ def _signals_for(li: Listing, prior_price: Optional[float] = None) -> list[tuple
         sig.append(("upset_bid", "FINANCIAL", 22))
     if (r.get("amount_owed") or {}).get("value"):
         sig.append(("recorded_debt", "FINANCIAL", 12))
+    if r.get("str_permit_lapsed"):
+        # revoked/expired short-term-rental permit = lost rental income, a
+        # financial motivation to sell (esp. where whole-house STRs are banned).
+        sig.append(("str_permit_lapsed", "FINANCIAL", 12))
     # legal
     if r.get("bankruptcy"):
         sig.append(("bankruptcy", "LEGAL", 18))
