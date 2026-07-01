@@ -2040,6 +2040,16 @@ async def run() -> int:
     except Exception:
         log.error("strategy_fit.failed", traceback=traceback.format_exc())
 
+    # County eviction-pressure market signal (LSC CCDI) — offline county lookup,
+    # market context for prioritization (aggregate, not a per-case lead).
+    try:
+        from .enrichment_eviction_market import enrich_eviction_market
+        s = enrich_eviction_market(enriched)
+        if s:
+            enrichment_stats["eviction_market"] = s
+    except Exception:
+        log.error("eviction_market.failed", traceback=traceback.format_exc())
+
     # Buyer-match — curated list of buyers wanting property in the lead's county
     # (land buyers / builders / cash house-buyers), so the card shows who to
     # assign the deal to. Local; from the buyer registry (no published buy box).
