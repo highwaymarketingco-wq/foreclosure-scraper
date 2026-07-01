@@ -48,6 +48,10 @@ from foreclosure_scraper.enrichment_property_kind import enrich_property_kind  #
 from foreclosure_scraper.enrichment_fhfa_value import enrich_fhfa_value  # noqa: E402
 from foreclosure_scraper.enrichment_title_risk import enrich_title_risk  # noqa: E402
 from foreclosure_scraper.enrichment_dew_liens import enrich_dew_liens  # noqa: E402
+from foreclosure_scraper.enrichment_hud_reac_address import enrich_hud_reac_address  # noqa: E402
+from foreclosure_scraper.enrichment_resolve_name_to_property import enrich_resolve_name_to_property  # noqa: E402
+from foreclosure_scraper.enrichment_tax_owed import enrich_tax_owed  # noqa: E402
+from foreclosure_scraper.enrichment_court_owner_verify import enrich_court_owner_verify  # noqa: E402
 from foreclosure_scraper.web_artifact import write_artifact  # noqa: E402
 from foreclosure_scraper.outreach import generate_outreach  # noqa: E402
 
@@ -160,33 +164,52 @@ async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
             print(f"  {name}: {r if isinstance(r, dict) else 'ok'}")
         except Exception as e:  # noqa: BLE001
             print(f"  {name}: ERROR {str(e)[:80]}")
-    await _step("geocode#1", enrich_geocode(merged))
+    # HUD REAC complex name -> real street + lat/lng (before geocode/parcel so the
+    # filled geo unlocks the GIS chain), then the standard address chain.
+    import os as _os0
+    _FAST = _os0.environ.get("MERGE_FAST") == "1"
+    await _step("hud_reac_address", enrich_hud_reac_address(merged))  # ONE bulk query, safe
+    # geocode#1 is a per-lead network LOOP — on a flaky connection a single wedged
+    # socket blocks the event loop and the budget-bail can't fire (observed tonight).
+    # Skip in FAST so the post-scrape chain is local-only (CAMA CSV + pure-python calc).
+    if not _FAST:
+        await _step("geocode#1", enrich_geocode(merged))
     # GIS steps: each individual query is already bounded (15-25s per-request
     # timeout + concurrency), so a hung county endpoint skips ONE lead, not the
     # batch. The wait_for here is only a GENEROUS pathological-hang backstop — NOT
     # a work budget — so big batches enrich to completion. Env-overridable.
     import os as _os
     _cap = lambda k, d: int(_os.environ.get(k, d))
-    await _step("parcel_from_geo", asyncio.wait_for(enrich_parcel_from_geo(merged, concurrency=16), timeout=_cap("MERGE_PFG_TIMEOUT", 10800)))
-    await _step("parcel_lookup", asyncio.wait_for(enrich_with_parcel_lookup(merged), timeout=_cap("MERGE_PL_TIMEOUT", 7200)))
-    await _step("gis_attrs", asyncio.wait_for(enrich_gis_attrs(merged, concurrency=16), timeout=_cap("MERGE_GIS_TIMEOUT", 14400)))
-    await _step("situs_address", asyncio.wait_for(enrich_situs_address(merged, concurrency=16), timeout=_cap("MERGE_SITUS_TIMEOUT", 7200)))  # parcel/GIS situs -> street_address
-    await _step("address_backfill", enrich_addresses_from_owner(merged))
-    await _step("aggressive_address", enrich_with_aggressive_address(merged))
-    await _step("parcel_reverse_geo", enrich_parcel_reverse_geo(merged))
-    await _step("geocode#2", enrich_geocode(merged))
-    await _step("owner_mailing", enrich_owner_mailing(merged))
-    # Images LAST — after every address/situs/geocode step, so the freshly-written
-    # addresses get an aerial. Goal: an image for every addressed lead. Mapillary
-    # off here (per-point street-view is slow; aerial+map+real give the coverage).
-    from foreclosure_scraper.enrichment_images import enrich_with_images
-    await _step("images", asyncio.wait_for(enrich_with_images(merged, use_mapillary=False), timeout=_cap("MERGE_IMAGES_TIMEOUT", 7200)))
-    # FHFA-HPI fallback value (free CSV AVM) — runs after gis_attrs/sale-price so it
-    # can rescale a known last sale to today's market; feeds the calc ARV ladder below.
-    await _step("fhfa_value", enrich_fhfa_value(merged))
-    # SC DEW lien cross-ref — attach UI-tax/benefit liens to matching owners by name
-    # (no standalone board rows; the sc_dew scraper is disabled).
-    await _step("dew_liens", enrich_dew_liens(merged))
+    # MERGE_FAST=1 — skip the ENTIRE per-lead GIS/address/image chain. Those steps
+    # (parcel_from_geo, parcel_lookup, gis_attrs, situs, owner-search backfill,
+    # aggressive-address, Nominatim reverse-geo, 2nd geocode, owner-mailing, images,
+    # fhfa, dew) hit gov GIS endpoints that intermittently EVENT-LOOP-BLOCK — a sync
+    # hang the asyncio.wait_for can NOT cancel (observed twice, 45min+ silent past a
+    # 15min timeout). We keep the proven-bounded value path: geocode#1 (budget-bailed),
+    # SC CAMA (bulk CSV), the name-resolver (budget-bailed) below, then calc/grade.
+    # GIS parcel/value/address depth fills on the next STABLE full run.
+    FAST = _os.environ.get("MERGE_FAST") == "1"
+    if not FAST:
+        await _step("parcel_from_geo", asyncio.wait_for(enrich_parcel_from_geo(merged, concurrency=16), timeout=_cap("MERGE_PFG_TIMEOUT", 10800)))
+        await _step("parcel_lookup", asyncio.wait_for(enrich_with_parcel_lookup(merged), timeout=_cap("MERGE_PL_TIMEOUT", 7200)))
+        await _step("gis_attrs", asyncio.wait_for(enrich_gis_attrs(merged, concurrency=16), timeout=_cap("MERGE_GIS_TIMEOUT", 14400)))
+        await _step("situs_address", asyncio.wait_for(enrich_situs_address(merged, concurrency=16), timeout=_cap("MERGE_SITUS_TIMEOUT", 7200)))  # parcel/GIS situs -> street_address
+        await _step("address_backfill", enrich_addresses_from_owner(merged))
+        await _step("aggressive_address", enrich_with_aggressive_address(merged))
+        await _step("parcel_reverse_geo", enrich_parcel_reverse_geo(merged))
+        await _step("geocode#2", enrich_geocode(merged))
+        await _step("owner_mailing", enrich_owner_mailing(merged))
+        # Images LAST — after every address/situs/geocode step. Mapillary off here.
+        from foreclosure_scraper.enrichment_images import enrich_with_images
+        await _step("images", asyncio.wait_for(enrich_with_images(merged, use_mapillary=False), timeout=_cap("MERGE_IMAGES_TIMEOUT", 7200)))
+        # FHFA-HPI fallback value + SC DEW lien cross-ref.
+        await _step("fhfa_value", enrich_fhfa_value(merged))
+        await _step("dew_liens", enrich_dew_liens(merged))
+    # name->property RESOLVER — pins obituary/probate/elderly NAME-ONLY leads to a
+    # parcel via the county GIS owner-name index. Also per-lead GIS, so in FAST mode
+    # it runs as a SEPARATE pass after the merge lands (decoupled from the risky GIS).
+    if not FAST:
+        await _step("resolve_name_to_property", enrich_resolve_name_to_property(merged))
     return merged
 
 
@@ -207,6 +230,11 @@ def main() -> int:
     # be OUTSIDE the async phase above).
     print("enrich_sc_cama:", enrich_sc_cama(merged))
     print("enrich_footprint_sqft:", enrich_footprint_sqft(merged))
+    # Strip wrong-property geo-snaps off court leads (defendant surname mismatch)
+    # BEFORE valuation so a stripped lead doesn't keep a bogus ARV.
+    print("enrich_court_owner_verify:", enrich_court_owner_verify(merged))
+    # Fold each tax source's owed amount into raw['tax_owed'] + cross-ref by parcel.
+    print("enrich_tax_owed:", enrich_tax_owed(merged))
 
     def _regrade(rows):
         vfail = 0

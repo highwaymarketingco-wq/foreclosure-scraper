@@ -45,8 +45,60 @@ from typing import Any
 import httpx
 import structlog
 
+from pathlib import Path
+
 from .enrichment_arcgis import NC_GIS, SCDOT_BASE, SC_LAYER
 from .http_client import client
+
+# ---------------------------------------------------------------------------
+# Persistent parcel/point -> GIS-attrs cache (Phase-2 hang/volume fix)
+# ---------------------------------------------------------------------------
+# A fresh scrape produces leads with no markers, so gis_attrs would re-query EVERY
+# parcel over the network — thousands of gov-GIS calls, the exact load that stalls on
+# a flaky connection. This disk cache keys resolved attrs by (state, county, parcel or
+# rounded lat/lng) and persists across runs, so only NET-NEW parcels hit the network.
+# Cuts per-run GIS volume ~10x. FORECLOSURE_GIS_CACHE=0 disables; FORECLOSURE_GIS_FORCE
+# still re-queries (and refreshes the cache) as before.
+_CACHE_PATH = Path(__file__).resolve().parent.parent.parent / ".cache" / "gis_attrs_cache.json"
+_ATTR_CACHE: dict[str, Any] = {}
+_CACHE_LOADED = False
+_CACHE_ON = os.environ.get("FORECLOSURE_GIS_CACHE", "1") != "0"
+
+
+def _norm_parcel(p: str) -> str:
+    return re.sub(r"[^0-9A-Za-z]", "", (p or "")).upper()
+
+
+def _cache_key(li) -> "str | None":
+    st = (li.state or "").upper()
+    cty = (li.county or "").replace(" County", "").strip().title()
+    if (li.parcel_id or "").strip():
+        return f"{st}|{cty}|P:{_norm_parcel(li.parcel_id)}"
+    if li.latitude and li.longitude:
+        return f"{st}|{cty}|G:{round(float(li.latitude), 5)},{round(float(li.longitude), 5)}"
+    return None
+
+
+def _load_cache() -> None:
+    global _CACHE_LOADED
+    if _CACHE_LOADED or not _CACHE_ON:
+        return
+    _CACHE_LOADED = True
+    try:
+        if _CACHE_PATH.exists():
+            _ATTR_CACHE.update(json.loads(_CACHE_PATH.read_text()))
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _save_cache() -> None:
+    if not _CACHE_ON:
+        return
+    try:
+        _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _CACHE_PATH.write_text(json.dumps(_ATTR_CACHE))
+    except Exception:  # noqa: BLE001
+        pass
 from .models import Listing
 
 log = structlog.get_logger()
@@ -401,6 +453,18 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
         base = _resolve_layer(li)
         if not base:
             return
+        # Cache hit — reuse a prior run's resolved attrs for this parcel/point; NO network.
+        key = _cache_key(li)
+        if not _force and key and key in _ATTR_CACHE:
+            cached = _ATTR_CACHE[key]
+            stats["cache_hit"] = stats.get("cache_hit", 0) + 1
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            li.raw.setdefault("gis", {})["queried"] = True
+            if cached:
+                stats["matched"] += 1
+                apply_gis_attrs(li, cached)
+            return
         async with sem:
             attrs = None
             net_ok = True
@@ -426,6 +490,8 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
                 if not isinstance(li.raw, dict):
                     li.raw = {}
                 li.raw.setdefault("gis", {})["queried"] = True
+                if key:  # cache the result (a match OR a confirmed no-match) for reuse
+                    _ATTR_CACHE[key] = attrs or {}
             elif not net_ok:
                 stats["net_err"] = stats.get("net_err", 0) + 1
             if not attrs:
@@ -440,8 +506,12 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
             stats["filled_acre"] += flags["acreage"]
             stats["filled_landuse"] += flags["land_use"]
 
+    _load_cache()
     async with client(timeout=20.0) as c:
         await asyncio.gather(*(one(c, li) for li in listings))
+    _save_cache()
+    stats["cache_hit"] = stats.get("cache_hit", 0)
+    stats["cache_size"] = len(_ATTR_CACHE)
 
     log.info("enrichment.gis_attrs.done", **stats)
     return stats

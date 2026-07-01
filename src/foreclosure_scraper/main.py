@@ -365,6 +365,18 @@ DATELESS_OK_SOURCES = {
     "counties_nc.cleveland_tax",                  # Cleveland NC tax/lis-pendens rows (dateless) — leak fix
     "counties_sc.sc_state_tax_lien",              # SC DOR state tax-lien registry (dateless) — leak fix
     "counties_sc.charleston_mie",                 # Charleston MIE roster rows (case#-only, dateless)
+    # 2026-06-30 — built-but-not-landing sources: their leads are dateless distress
+    # signals (elderly owners, storm damage, delinquent tax, obituaries) and were
+    # being SILENTLY DROPPED by _active_only for lack of a sale_date. That's why
+    # they read 0 on the board. Adding them makes them land on every run.
+    "counties_nc.buncombe_elderly",               # elderly long-tenure owners (GIS, dateless)
+    "counties_nc.asheville_helene",               # Helene Unsafe/Restricted placards (dateless)
+    "public_notices.gannett_obituaries",          # obituaries -> pre-probate heir leads (dateless)
+    "counties_nc.buncombe_delinquent_tax",        # Buncombe delinquent-tax list (dateless)
+    "counties_sc.spartanburg_delinquent_tax",     # Spartanburg delinquent-tax-sale list (dateless)
+    "counties_sc.cherokee_delinquent_tax",        # Cherokee delinquent-tax list (dateless)
+    "national.gsa_realproperty",                  # GSA real-property disposal (no auction date until scheduled)
+    "national.servicelink_auction",               # ServiceLink auction inventory (pre-schedule, dateless)
     "national.hud_reac_inspection",               # HUD REAC failing-inspection multifamily (no sale date)
     "national.hud_section8_contracts",            # HUD Section-8 contract-expiry multifamily (no sale date)
     "counties_nc.rutherford_tax",                 # NC tax-foreclosure (dateless in-rem/upset rows) — leak fix

@@ -180,9 +180,17 @@ async def client(
     if headers:
         h.update(headers)
     proxy = os.environ.get("PROXY_URL") or None
-    transport = _ThrottledTransport(httpx.AsyncHTTPTransport(retries=2))
+    # HARD-timeout hardening (flaky-connection safe). Bound CONNECT and POOL-acquire
+    # tightly: a wedged connect or an exhausted pool are the flaky-network stalls that
+    # otherwise freeze a whole per-lead enrichment batch (a float timeout leaves them
+    # loose, and the async budget-bail can't cancel a socket stuck below the loop).
+    # retries=0 removes the transport's connect-retry amplification — callers already
+    # wrap their own AsyncRetrying. All env-tunable.
+    _conn_to = float(os.environ.get("HTTP_CONNECT_TIMEOUT", "8.0"))
+    _pool_to = float(os.environ.get("HTTP_POOL_TIMEOUT", "8.0"))
+    transport = _ThrottledTransport(httpx.AsyncHTTPTransport(retries=0))
     async with httpx.AsyncClient(
-        timeout=timeout,
+        timeout=httpx.Timeout(timeout, connect=_conn_to, pool=_pool_to),
         follow_redirects=follow_redirects,
         headers=h,
         proxy=proxy,
