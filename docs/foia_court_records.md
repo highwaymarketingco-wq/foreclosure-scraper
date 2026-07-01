@@ -45,10 +45,17 @@ blank. That returns every case filed in the window (filtered by agency/subtype).
 | Partition (forced co-owner sale) | Common Pleas | `Partition` (440) | — |
 | Tax-lien distress | Common Pleas | `State Tax Lien` (432) | — |
 
-**Fewest clicks (recommended):** Court Agency = **All Agencies** + Date Type = `Case
-Filed` + your date range → Search → Save. Returns everything filed in the window; I
-filter foreclosure/eviction/partition/tax-lien on my end. One save per county.
-(If it's too many rows to load, use the per-lane rows above.)
+**Result cap — DON'T just widen the dates.** "All Courts" + a wide date range
+OVERFLOWS the portal's row cap, because All Courts dumps in every traffic/criminal
+case (95% noise for us). Two ways to stay under the cap:
+- **Recommended — narrow the case type, keep the dates wide:** set **Case SubType =
+  `Foreclosure`** (leave Court on All Courts, or set Common Pleas) + Date Type =
+  `Case Filed`. That's a few dozen rows/county, so one wide pull works. **First
+  (backfill) pull = last 6 months** (e.g. `01/01/2026 → 07/01/2026`); after that each
+  2x/week pull only needs **since your last save (3–4 days)**.
+- **Keep All Courts (no case-type filter):** then you MUST chunk dates small —
+  ~**1 week per search** (2–3 days in Spartanburg/Buncombe/Gaston). Start at the most
+  recent week, walk backward. Many more saves for the same leads; prefer the above.
 **Skip on this portal:** Divorce (104) + Probate (940) — those are Family/Probate
 Court, not in this Common Pleas index; they return empty here.
 
