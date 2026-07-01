@@ -1,11 +1,11 @@
 {
-  "run_time": "2026-07-01T09:59:25.128958Z",
-  "total": 16452,
+  "run_time": "2026-07-01T11:20:35.487418Z",
+  "total": 16329,
   "by_source": {},
   "by_state": {},
   "by_county_top": [],
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "catch-up: geo-only parcel/owner/situs resolution"
+  "notes": "helene same-parcel dedup (multi-building complexes -> one owner lead)"
 }

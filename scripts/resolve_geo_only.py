@@ -38,6 +38,58 @@ PROPERTY_GPS_SOURCES = {
 }
 
 
+import re
+
+_PLACARD_RANK = {"unsafe": 2, "restricted": 1}
+
+
+def _placard_severity(li) -> tuple[int, float]:
+    """(placard rank, damage %) from a Helene lead's description — bigger is worse."""
+    desc = li.description or ""
+    m = re.search(r"Helene damage:\s*([A-Za-z]+)\s+placard", desc)
+    rank = _PLACARD_RANK.get((m.group(1) if m else "").lower(), 0)
+    p = re.search(r"placard\s*-\s*([0-9]+)%", desc)
+    pct = float(p.group(1)) if p else 0.0
+    return rank, pct
+
+
+def dedup_helene_by_parcel(listings: list) -> int:
+    """Collapse asheville_helene leads that resolved to the SAME parcel into one
+    lead per owner/parcel (a multi-building complex is inspected per-structure but
+    is a single outreach target). Keep the most-severe placard; record how many
+    damaged buildings the parcel has. Returns the number of leads removed.
+
+    Mutating the list in place, so the caller's `listings` shrinks. Only touches
+    asheville_helene leads WITH a resolved parcel_id — everything else is left as-is.
+    """
+    from collections import defaultdict
+    groups: dict[tuple, list] = defaultdict(list)
+    for li in listings:
+        if li.source == "counties_nc.asheville_helene" and (li.parcel_id or "").strip():
+            groups[(li.parcel_id, li.county)].append(li)
+
+    drop: set[int] = set()
+    for grp in groups.values():
+        if len(grp) < 2:
+            continue
+        grp.sort(key=_placard_severity, reverse=True)
+        keep = grp[0]
+        rank, pct = _placard_severity(keep)
+        if not isinstance(keep.raw, dict):
+            keep.raw = {}
+        keep.raw["helene"] = {
+            "damaged_buildings": len(grp),
+            "worst_placard": "Unsafe" if rank == 2 else "Restricted" if rank == 1 else None,
+            "worst_damage_pct": pct or None,
+        }
+        for li in grp[1:]:
+            drop.add(id(li))
+
+    if drop:
+        listings[:] = [li for li in listings if id(li) not in drop]
+    return len(drop)
+
+
 def main() -> int:
     listings = []
     for d in json.loads((DOCS / "listings.json").read_text()):
@@ -74,11 +126,14 @@ def main() -> int:
         except Exception:  # noqa: BLE001
             pass
 
+    removed = dedup_helene_by_parcel(listings)
+    print(f"helene dedup: removed {removed} same-parcel duplicate leads", flush=True)
+
     a_p = sum(1 for li in listings if (li.parcel_id or "").strip())
     a_o = sum(1 for li in listings if (li.owner_name or "").strip())
     a_a = sum(1 for li in listings if (li.street_address or "").strip())
-    write_artifact(listings, {"notes": "catch-up: geo-only parcel/owner/situs resolution"}, docs_dir=DOCS)
-    print(f"wrote board | parcel +{a_p - b_p} owner +{a_o - b_o} addr +{a_a - b_a}", flush=True)
+    write_artifact(listings, {"notes": "catch-up: geo-only parcel/owner/situs resolution + helene dedup"}, docs_dir=DOCS)
+    print(f"wrote board | leads={len(listings)} | parcel +{a_p - b_p} owner +{a_o - b_o} addr +{a_a - b_a}", flush=True)
     return 0
 
 
