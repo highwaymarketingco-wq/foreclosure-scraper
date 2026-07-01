@@ -2167,6 +2167,16 @@ async def run() -> int:
     except Exception:
         log.error("new_listings.failed", traceback=traceback.format_exc())
 
+    # Re-resolve stale Fannie HomePath uuids (deep links rotate ~monthly) BEFORE the
+    # freshness prune, so a merely-rotated uuid isn't mistaken for a sold-out lead.
+    try:
+        from .enrichment_homepath_uuid import enrich_homepath_uuids
+        _hp = await enrich_homepath_uuids(enriched)
+        if _hp:
+            enrichment_stats["homepath_uuid"] = _hp
+    except Exception:
+        log.error("homepath_uuid.failed", traceback=traceback.format_exc())
+
     # Drop sold/removed snapshot-REO (Fannie) whose per-property SPA URL 404s once it
     # leaves inventory — stale carryover. Fail-safe (keeps list on error).
     try:

@@ -59,19 +59,56 @@ _UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
 # board leads are foreclosure/probate, not tax-delinquent) but exact-match with
 # no false positives.
 #
-# OUT: Cherokee (board stores a 13-digit numeric parcel, portal uses dashed —
-# no clean join). Anderson = 403 auth wall. Pickens = no bulk portal (qPublic
-# per-parcel card only). SC PublicIndex = reachable but ToS-prohibits scraping.
+# Cherokee joins too, but its board parcels arrive 13-digit NUMERIC (e.g.
+# sc_public_index_lis_pendens stores "0020000003000") while the portal's
+# Identification-No. is dashed "002-00-00-003.000". A per-county key normalizer
+# (see _norm_pid / PID_NORMALIZERS below) redashes the numeric board parcel so
+# the position-4 grid id joins exactly — verified live 2026-07-01.
+#
+# OUT: Anderson = 403 auth wall. Pickens = no bulk portal (qPublic per-parcel
+# card only). SC PublicIndex = reachable but ToS-prohibits scraping.
 QPAYBILL_COUNTIES: dict[tuple[str, str], str] = {
     ("SC", "Spartanburg"): "spartanburgcountytax",
     ("SC", "Oconee"): "oconeesctax",
     ("SC", "Laurens"): "laurenstreasurer",
     ("SC", "Union"): "uniontreasurer",
+    ("SC", "Cherokee"): "cherokeecountysctax",
 }
 
 # Statuses that count as an owed delinquent balance (exclude already-paid).
 _OWED_STATUSES = ("unpaid", "sold at tax sale", "delinquent", "bankruptcy")
 _TMS_RE = re.compile(r"\b\d-\d{2}-\d{2}-\d{3}\.\d{2}\b")
+
+
+def _norm_cherokee_pid(pid: str) -> str:
+    """Re-dash a Cherokee parcel to the portal's Identification-No. format.
+
+    Cherokee board parcels arrive two ways: already-dashed straight off the
+    tax-sale PDF (``029-00-00-028.001``), or 13-digit NUMERIC from the court
+    feed (``0020000003000`` via sc_public_index_lis_pendens). The qPayBill grid
+    only ever shows the dashed ``NNN-NN-NN-NNN.NNN`` id, so a numeric board
+    parcel never joins. Strip to digits and re-insert the fixed 3-2-2-3.3 dash
+    pattern. Anything that isn't exactly 13 digits (already-dashed ids, or the
+    rarer 16-digit sub-parcels) is returned unchanged — dashed ids already match
+    and mangling them would only break a working join.
+    """
+    digits = re.sub(r"[^0-9]", "", pid or "")
+    if len(digits) != 13:
+        return pid
+    return f"{digits[0:3]}-{digits[3:5]}-{digits[5:7]}-{digits[7:10]}.{digits[10:13]}"
+
+
+# (state, county-bare) -> parcel_id normalizer applied ONLY when building the
+# TMS join index, so the board key matches the portal's Identification-No.
+# Most counties store the dashed TMS already (identity); Cherokee needs re-dash.
+PID_NORMALIZERS: dict[tuple[str, str], "callable"] = {
+    ("SC", "Cherokee"): _norm_cherokee_pid,
+}
+
+
+def _norm_pid(state: str, county_bare: str, pid: str) -> str:
+    fn = PID_NORMALIZERS.get((state, county_bare))
+    return fn(pid) if fn else pid
 
 
 def _url(sub: str) -> str:
@@ -142,7 +179,9 @@ async def enrich_qpaybill_tax(listings: list[Listing]) -> dict:
     by_query: dict[tuple[str, str], list[Listing]] = defaultdict(list)
     tms_index: dict[tuple[str, str], list[Listing]] = defaultdict(list)
     for li in listings:
-        sub = QPAYBILL_COUNTIES.get((li.state or "", (li.county or "").replace(" County", "").strip()))
+        state = li.state or ""
+        county_bare = (li.county or "").replace(" County", "").strip()
+        sub = QPAYBILL_COUNTIES.get((state, county_bare))
         if not sub:
             continue
         if (li.raw or {}).get("tax_owed", {}).get("balance"):
@@ -151,8 +190,11 @@ async def enrich_qpaybill_tax(listings: list[Listing]) -> dict:
         pid = (li.parcel_id or "").strip()
         if not sn or not pid:
             continue
+        # index by the PORTAL id format so numeric board parcels (Cherokee)
+        # still join the dashed grid Identification-No.
+        pid_key = _norm_pid(state, county_bare, pid)
         by_query[(sub, sn)].append(li)
-        tms_index[(sub, pid)].append(li)
+        tms_index[(sub, pid_key)].append(li)
     counts["targets"] = sum(len(v) for v in by_query.values())
     queries = list(by_query.keys())[:_MAX_QUERIES]
     if not queries:

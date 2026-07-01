@@ -15,9 +15,17 @@ LOW-confidence STACK signal, meaningful only combined with other distress).
 Covered now (verified live 2026-07-01, free, no login/CAPTCHA):
   * Zuercher portal  — Cherokee SC (dob+charges), Anderson SC (name+charges, no dob)
   * CentralSquare P2C jqGrid — Cleveland NC (dob+charges)
+  * CentralSquare P2C (modern) — Buncombe NC (name+age+booking date+charge; the
+    public roster redacts DOB). This build is the "session/token handshake"
+    variant: the SPA at policetocitizen.com sets an XSRF-TOKEN cookie only after
+    an app-route GET, which we then echo back as the X-XSRF-TOKEN header on the
+    JSON /api/Inmates/<id> search POST. The endpoint caps Take at ~200 and never
+    fills TotalCount, so we page in blocks of 200 until a short page. Free,
+    compliant (open JSON-XHR + standard anti-forgery echo, no login/CAPTCHA/WAF
+    defeat). Verified live 2026-07-01: 542 in custody.
 Adding a county = one ROSTERS entry once its vendor endpoint is confirmed
-(Henderson NC Southern Software + Buncombe NC modern-P2C need a session/token
-handshake — deferred; see project_jail_booking_sources memory for endpoints).
+(Henderson NC Southern Software still needs a session/token handshake — deferred;
+see project_jail_booking_sources memory for endpoints).
 
 Sets raw['jail_booking'] (detail) + raw['incarceration'] (so distress_score's
 existing LEGAL incarceration signal, weight 8, picks it up). Free + compliant.
@@ -36,11 +44,15 @@ from .enrichment_incarceration import _name_parts, _owner_of
 
 log = structlog.get_logger()
 
-# (state, county, vendor, target) — target is the Zuercher subdomain or P2C base.
+# (state, county, vendor, target) — target is the Zuercher subdomain, the P2C
+# jqGrid base URL, or (for the modern CentralSquare P2C) the "<host>|<listId>"
+# pair whose XHR search is /api/Inmates/<listId>.
 ROSTERS = [
     ("SC", "Cherokee", "zuercher", "cherokee-so-sc"),
     ("SC", "Anderson", "zuercher", "anderson-so-sc"),
     ("NC", "Cleveland", "p2c_jqgrid", "http://74.218.167.200/p2c"),
+    ("NC", "Buncombe", "p2c_centralsquare",
+     "https://buncombecountyso.policetocitizen.com|23"),
 ]
 
 
@@ -114,9 +126,82 @@ async def _fetch_p2c_jqgrid(base: str) -> list[dict]:
     return out
 
 
+async def _fetch_p2c_centralsquare(target: str) -> list[dict]:
+    """Modern CentralSquare P2C (policetocitizen.com) current-inmate roster.
+
+    Handshake: GET an app route (/en/Inmates) so the SPA hands back an
+    XSRF-TOKEN cookie, then echo it as the X-XSRF-TOKEN header on the JSON
+    search POST to /api/Inmates/<listId>. The endpoint rejects Take>~200 with
+    a 400 and never populates TotalCount, so page in blocks of 200 until a
+    short page. DOB is redacted on the public feed; Age + ArrestDate survive.
+    Compliant: open JSON-XHR + standard anti-forgery echo, no login/CAPTCHA.
+    """
+    from curl_cffi.requests import AsyncSession
+    host, _, list_id = target.partition("|")
+    list_id = list_id or "23"
+    api = f"{host}/api/Inmates/{list_id}"
+    page_size = 200
+    out: list[dict] = []
+    try:
+        # verify=False mirrors the repo's other AsyncSession enrichers
+        # (gaston_rod, sc_divorce): it tolerates a TLS-intercepting proxy in the
+        # run environment, NOT a cert/WAF defeat on the source itself.
+        async with AsyncSession(impersonate="chrome", verify=False) as s:
+            # 1) establish the XSRF-TOKEN cookie via an app-route GET
+            await s.get(f"{host}/en/Inmates", timeout=25)
+            token = s.cookies.get("XSRF-TOKEN")
+            if not token:
+                log.warning("jail.p2c_cs_no_token", host=host)
+                return []
+            hdr = {"X-XSRF-TOKEN": token,
+                   "Content-Type": "application/json",
+                   "Accept": "application/json, text/plain, */*",
+                   "Referer": f"{host}/en/Inmates", "Origin": host}
+            skip = 0
+            while True:
+                body = {
+                    "FilterOptionsParameters": {
+                        "IntersectionSearch": True, "SearchText": "",
+                        "Parameters": []},
+                    "IncludeCount": True,
+                    "PagingOptions": {
+                        "SortOptions": [{"Name": "ArrestDate",
+                                         "SortDirection": "Descending",
+                                         "Sequence": 1}],
+                        "Take": page_size, "Skip": skip}}
+                r = await s.post(api, headers=hdr, json=body, timeout=60)
+                recs = (r.json() or {}).get("Inmates") or []
+                if not recs:
+                    break
+                for rec in recs:
+                    last = (rec.get("LastName") or "").strip().upper()
+                    first = (rec.get("FirstName") or "").strip().upper()
+                    if not last or not first:
+                        continue
+                    out.append({
+                        "last": last, "first": first,
+                        "dob": rec.get("DateOfBirth"),  # redacted on this feed
+                        "age": rec.get("Age"),
+                        "arrest_date": rec.get("ArrestDate"),
+                        "charge": (rec.get("PrimaryChargeDescription") or "")[:300]})
+                if len(recs) < page_size:
+                    break
+                skip += page_size
+                if skip > 5000:  # safety cap; roster is ~540
+                    break
+    except Exception as exc:  # noqa: BLE001
+        log.warning("jail.p2c_cs_fail", host=host, error=str(exc)[:120])
+        return []
+    return out
+
+
 async def _load_roster(state: str, county: str, vendor: str, target: str):
-    recs = await (_fetch_zuercher(target) if vendor == "zuercher"
-                  else _fetch_p2c_jqgrid(target))
+    if vendor == "zuercher":
+        recs = await _fetch_zuercher(target)
+    elif vendor == "p2c_centralsquare":
+        recs = await _fetch_p2c_centralsquare(target)
+    else:
+        recs = await _fetch_p2c_jqgrid(target)
     index: dict[tuple, dict] = {}
     for rec in recs:
         index.setdefault(_norm_key(rec["last"], rec["first"]), rec)
@@ -152,7 +237,8 @@ async def enrich_jail_bookings(listings: list[Listing]) -> dict:
         raw["jail_booking"] = {
             "county": county, "state": li.state,
             "matched_name": f"{parts[1]} {parts[0]}",
-            "roster_dob": hit.get("dob"), "arrest_date": hit.get("arrest_date"),
+            "roster_dob": hit.get("dob"), "roster_age": hit.get("age"),
+            "arrest_date": hit.get("arrest_date"),
             "charge": hit.get("charge"), "confidence": "name_only_low",
         }
         # Reuse the existing LEGAL incarceration distress signal.
