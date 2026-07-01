@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-07-01T13:14:13.203837Z",
+  "run_time": "2026-07-01T13:21:52.798088Z",
   "total": 16329,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "restore lazy-detail sidecar (regression fix) + load_board round-trip"
+  "notes": "bounded owner-mailing enrichment on HOT/WARM no-contact leads"
 }
