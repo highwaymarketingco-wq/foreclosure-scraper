@@ -360,9 +360,11 @@ function applyFilters() {
     if (contact) {
       const r = l.raw || {};
       const om = r.owner_mailing || {};
+      const sac = (r.sos_agent && r.sos_agent.best_contact_address) || (r.sos_agent && r.sos_agent.best_contact_name);
       if (contact === "phone" && !r.owner_phone) return false;
       if (contact === "mailing" && !om.mailing) return false;
-      if (contact === "contactable" && !(r.owner_phone || om.mailing)) return false;
+      if (contact === "contactable" && !(r.owner_phone || om.mailing || sac)) return false;
+      if (contact === "sos_entity" && !(r.sos_agent && r.sos_agent.best_contact_name)) return false;
       if (contact === "absentee" && !om.absentee) return false;
       if (contact === "out_of_state" && !om.out_of_state) return false;
       if (contact === "mortgage" && !(r.rod && r.rod.has_mortgage)) return false;
@@ -750,6 +752,12 @@ function renderCards() {
       const lrc = (l.raw && l.raw.lrcpwa) || {};
       if (om.absentee || lrc.absentee) signalChips.push(`<span class="distress-chip absentee">absentee</span>`);
       if (om.out_of_state || (lrc.mailing && lrc.mailing.state && lrc.mailing.state !== "NC")) signalChips.push(`<span class="distress-chip absentee">out-of-state</span>`);
+      // (3b) Entity-owned lead with a free NC SOS contact (registered agent /
+      //      officer) — no paid skip-trace needed to reach the owner.
+      const sa = (l.raw && l.raw.sos_agent) || {};
+      if (sa.sosid && sa.best_contact_name) {
+        signalChips.push(`<span class="distress-chip" style="color:#0a7d3a;border-color:#0a7d3a" title="NC SOS: ${sa.best_contact_name}${sa.best_contact_address ? " — " + sa.best_contact_address : ""}">📇 SOS contact</span>`);
+      }
       // (4) Title-risk trap — senior lien may survive a junior foreclosure.
       const tr = (l.raw && l.raw.title_risk) || null;
       if (tr && tr.surviving_senior_debt_risk === true) {
@@ -1341,14 +1349,30 @@ function openDetail(l) {
     .filter(([k, v]) => v != null && v !== "" && typeof v !== "object")
     .map(([k, v]) => [k.replace(/_/g, " "), v === true ? "Yes" : v]);
 
-  // Owner & Contact (mailing addr + absentee + any free/paid skip-trace)
+  // Owner & Contact (mailing addr + absentee + any free/paid skip-trace +
+  // NC SOS registered agent / officers = free contact for entity-owned leads)
   const _om = (l.raw && l.raw.owner_mailing) || {};
   const _st = (l.raw && l.raw.skip_trace) || {};
+  const _sa = (l.raw && l.raw.sos_agent) || {};
+  const _saRows = [];
+  if (_sa.sosid) {
+    if (_sa.best_contact_name)
+      _saRows.push(["Entity contact (SOS)",
+        _sa.best_contact_name + (_sa.best_contact_address ? " — " + _sa.best_contact_address : "")]);
+    if (_sa.registered_agent)
+      _saRows.push(["Registered agent",
+        _sa.registered_agent + (_sa.agent_is_service ? " (agent service — use officers/principal)" : "")]);
+    if (_sa.officers && _sa.officers.length)
+      _saRows.push(["Officers", _sa.officers.map((o) =>
+        `${o.title}: ${o.name}${o.address ? " (" + o.address + ")" : ""}`).join("; ")]);
+    if (_sa.principal_office_address) _saRows.push(["Principal office (SOS)", _sa.principal_office_address]);
+    if (_sa.status) _saRows.push(["SOS status", _sa.status]);
+  }
   setSec("d-contact-section", "d-contact", [
     ["Owner", _om.owner], ["Mailing address", _om.mailing],
     ["Absentee owner", _om.absentee], ["Out of state", _om.out_of_state],
     ["Phone", _st.phone], ["Email", _st.email],
-  ]);
+  ].concat(_saRows));
 
   // Distress Stack — full breakdown (only the tier badge was shown before)
   const _ds = getDistress(l);

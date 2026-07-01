@@ -76,6 +76,7 @@ RAW_KEEP = {
     "building_permits": "*",          # recent permits = positive, stale open = negative
     "bid4assets": "*",                # auction-site raw payload
     "sos_status": "*",                # NC SOS LLC dissolution status (when defendant is LLC)
+    "sos_agent": "*",                 # NC SOS registered agent + officers = free entity-owner contact
     "rent_comps_extra": "*",          # broader rent comp pool when strict was empty
     "rent_median_ppsf_extra": "*",
     "estimated_monthly_rent_extra": "*",

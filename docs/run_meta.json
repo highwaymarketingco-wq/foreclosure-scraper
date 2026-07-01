@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-07-01T06:56:29.546509Z",
+  "run_time": "2026-07-01T07:53:18.769257Z",
   "total": 16452,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "slim: buyer_match moved to client-side registry"
+  "notes": "scheduled NC SOS registered-agent refresh"
 }

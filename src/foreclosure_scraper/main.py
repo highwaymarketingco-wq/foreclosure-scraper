@@ -1500,6 +1500,18 @@ async def run() -> int:
         except Exception:
             log.error("sos_dissolution.failed", traceback=traceback.format_exc())
 
+    # NC SOS registered-agent + officer enrichment — for entity-owned NC leads,
+    # pull the free public registered agent / officers so a contact-less LLC lead
+    # gets a real mailable contact without a paid skip-trace. Stealth + slow, so
+    # gated OFF by default (SOS_AGENT=1); runs in the scheduled land-records pass.
+    try:
+        from .enrichment_sos_agent import enrich_with_sos_agent
+        s = await enrich_with_sos_agent(enriched)
+        if s:
+            enrichment_stats["sos_agent"] = s
+    except Exception:
+        log.error("sos_agent.failed", traceback=traceback.format_exc())
+
     # Expanded rent comps — for listings without strict like-for-like comps,
     # broaden to zip-level for-rent pool. Free via HomeHarvest.
     try:
