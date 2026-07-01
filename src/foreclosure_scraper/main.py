@@ -2005,6 +2005,17 @@ async def run() -> int:
     except Exception:
         log.error("lrcpwa_photo.failed", traceback=traceback.format_exc())
 
+    # Strategy-fit tags — label each lead with the exit strategies it fits
+    # (WHOLESALE / LAND_WHOLESALE / SUBJECT_TO / FIX_FLIP / GATOR) so the operator
+    # can filter the board by how they'd work it. Local, reads existing signals.
+    try:
+        from .enrichment_strategy_fit import enrich_strategy_fit
+        s = enrich_strategy_fit(enriched)
+        if s:
+            enrichment_stats["strategy_fit"] = s
+    except Exception:
+        log.error("strategy_fit.failed", traceback=traceback.format_exc())
+
     # RentCast AVM cross-check on top-N listings (authoritative AVM + comparables).
     # Only fires when RENTCAST_API_KEY is set.
     # Free tier (50 calls/mo) → 25 listings × 2 calls each.
