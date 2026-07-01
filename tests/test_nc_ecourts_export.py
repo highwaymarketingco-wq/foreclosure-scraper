@@ -172,6 +172,41 @@ def test_estate_single_party_caption():
     assert by_case["25E000512"]["party_names"] == ["ROY LEE ADAMS"]
 
 
+def test_estate_matter_of_caption_stripped():
+    # The most common real NC estate / special-proceeding wording nests the
+    # decedent under "IN THE MATTER OF THE ESTATE OF ..." — the resolver needs
+    # the bare person name, not the whole caption.
+    html = """
+    <table><thead><tr><th>Case Number</th><th>Style</th>
+      <th>Case Type</th><th>County</th></tr></thead>
+    <tbody>
+      <tr><td>25SP000411</td><td>IN THE MATTER OF THE ESTATE OF HAROLD JENKINS</td>
+          <td>Special Proceeding</td><td>Cleveland</td></tr>
+      <tr><td>25SP000412</td><td>IN THE MATTER OF THE GUARDIANSHIP OF EDNA MAE POOLE</td>
+          <td>Special Proceeding</td><td>Gaston</td></tr>
+    </tbody></table>"""
+    by_case = {r["case_number"]: r for r in mod.parse_nc_ecourts_html(html)}
+    assert by_case["25SP000411"]["defendant"] == "HAROLD JENKINS"
+    assert by_case["25SP000412"]["defendant"] == "EDNA MAE POOLE"
+
+
+def test_estate_prefix_regex_directly():
+    strip = lambda s: mod._ESTATE_PREFIX_RE.sub(" ", s).strip()
+    assert strip("IN THE MATTER OF THE ESTATE OF HAROLD JENKINS") == "HAROLD JENKINS"
+    assert strip("IN RE: ESTATE OF MARGARET P WHITMIRE") == "MARGARET P WHITMIRE"
+    assert strip("ESTATE OF ROY LEE ADAMS") == "ROY LEE ADAMS"
+    assert strip("IN THE MATTER OF THE GUARDIANSHIP OF EDNA MAE POOLE") == "EDNA MAE POOLE"
+
+
+def test_source_url_encodes_case_number():
+    # A caseNumber with spaces ("2024 CVS 000456") must be percent-encoded so the
+    # portal deep-link is a valid URL, not one with raw spaces.
+    li = mod.record_to_listing_dict({"defendant": "JANE DOE", "county": "Rutherford",
+                                     "case_number": "2024 CVS 000456"})
+    assert " " not in li["source_url"]
+    assert "caseNumber=2024%20CVS%20000456" in li["source_url"]
+
+
 def test_empty_input_returns_empty():
     assert mod.parse_nc_ecourts_html("") == []
     assert mod.parse_nc_ecourts_html("   ") == []

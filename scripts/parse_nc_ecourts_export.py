@@ -41,6 +41,7 @@ import json
 import re
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 from bs4 import BeautifulSoup
 
@@ -75,8 +76,18 @@ _ENTITY = re.compile(
 _CASE_RE = re.compile(r"\b(\d{2,4}\s?[A-Z]{2,4}\s?\d{3,7}(?:-\d{2,4})?)\b")
 _DATE_RE = re.compile(r"\b(\d{1,2}/\d{1,2}/\d{2,4})\b")
 # Estate/special-proceeding captions carry boilerplate around the person's name.
+# Handles the full family of NC estate / special-proceeding caption lead-ins:
+#   "ESTATE OF X", "IN RE ESTATE OF X", "IN RE: ESTATE OF X",
+#   "IN THE MATTER OF THE ESTATE OF X", "IN THE MATTER OF THE GUARDIANSHIP OF X",
+#   "IN THE MATTER OF THE FORECLOSURE OF ..." — strips the leading "in re" /
+#   "in the matter of", any "the", and up to two nested "<estate|matter|
+#   guardianship|foreclosure|administration> of [the]" clauses, leaving the name.
 _ESTATE_PREFIX_RE = re.compile(
-    r"^\s*(in\s+re:?\s*)?(the\s+)?(estate\s+of|matter\s+of|guardianship\s+of)\s*",
+    r"^\s*"
+    r"(?:in\s+re:?\s*)?"
+    r"(?:in\s+the\s+matter\s+of\s+)?"
+    r"(?:the\s+)?"
+    r"(?:(?:estate|matter|guardianship|foreclosure|administration)\s+of\s+(?:the\s+)?){0,2}",
     re.I)
 _ESTATE_SUFFIX_RE = re.compile(
     r"[,\s]+(deceased|decedent|an?\s+incompetent|a\s+minor|estate)\.?\s*$", re.I)
@@ -377,7 +388,7 @@ def record_to_listing_dict(rec: dict, slug: str = "counties_nc.nc_ecourts_manual
     return {
         "source": slug,
         "source_url": (
-            f"https://portal-nc.tylertech.cloud/Portal/#/search?caseNumber={case_number}"
+            f"https://portal-nc.tylertech.cloud/Portal/#/search?caseNumber={quote(case_number)}"
             if case_number else "https://portal-nc.tylertech.cloud/Portal/"
         ),
         "listing_type": "lis_pendens",  # generic court-distress; resolver is name-driven
