@@ -20,18 +20,13 @@ os.environ.setdefault("SOS_AGENT", "1")
 
 from foreclosure_scraper.models import Listing
 from foreclosure_scraper.enrichment_sos_agent import enrich_with_sos_agent
-from foreclosure_scraper.web_artifact import write_artifact
+from foreclosure_scraper.web_artifact import write_artifact, load_board
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
 
 
 def main() -> int:
-    listings = []
-    for d in json.loads((DOCS / "listings.json").read_text()):
-        try:
-            listings.append(Listing.model_validate(d))
-        except Exception:  # noqa: BLE001
-            pass
+    listings = load_board(DOCS)  # merges lazy-detail sidecar back so it round-trips
     before = sum(1 for l in listings if (l.raw or {}).get("sos_agent"))
     # skip leads already carrying an agent record so repeat runs advance the frontier
     todo = [l for l in listings if not (l.raw or {}).get("sos_agent")]

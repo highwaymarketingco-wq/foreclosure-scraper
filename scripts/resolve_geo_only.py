@@ -24,7 +24,7 @@ from foreclosure_scraper.enrichment_parcel_from_geo import enrich_parcel_from_ge
 from foreclosure_scraper.enrichment_gis_attrs import enrich_gis_attrs
 from foreclosure_scraper.enrichment_situs_address import enrich_situs_address
 from foreclosure_scraper.valuation import calc as vcalc, grading as vgrade
-from foreclosure_scraper.web_artifact import write_artifact
+from foreclosure_scraper.web_artifact import write_artifact, load_board
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
 
@@ -91,12 +91,7 @@ def dedup_helene_by_parcel(listings: list) -> int:
 
 
 def main() -> int:
-    listings = []
-    for d in json.loads((DOCS / "listings.json").read_text()):
-        try:
-            listings.append(Listing.model_validate(d))
-        except Exception:  # noqa: BLE001
-            pass
+    listings = load_board(DOCS)  # merges lazy-detail sidecar back so it round-trips
 
     targets = [
         li for li in listings

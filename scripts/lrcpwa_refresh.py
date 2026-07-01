@@ -20,18 +20,13 @@ from foreclosure_scraper.enrichment_lrcpwa_photo import enrich_lrcpwa_photo
 from foreclosure_scraper.enrichment_strategy_fit import enrich_strategy_fit
 from foreclosure_scraper.enrichment_buyer_match import enrich_buyer_match
 from foreclosure_scraper.valuation import calc as vcalc, grading as vgrade
-from foreclosure_scraper.web_artifact import write_artifact
+from foreclosure_scraper.web_artifact import write_artifact, load_board
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
 
 
 def main() -> int:
-    listings = []
-    for d in json.loads((DOCS / "listings.json").read_text()):
-        try:
-            listings.append(Listing.model_validate(d))
-        except Exception:  # noqa: BLE001
-            pass
+    listings = load_board(DOCS)  # merges lazy-detail sidecar back so it round-trips
     b_addr = sum(1 for l in listings if (l.street_address or "").strip())
     print(f"loaded {len(listings)} | before addr={b_addr}", flush=True)
 

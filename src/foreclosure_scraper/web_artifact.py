@@ -19,6 +19,39 @@ from .stale_link_fallback import annotate_stale_links
 log = structlog.get_logger()
 
 
+def load_board(docs_dir: Path | str = "docs") -> list[Listing]:
+    """Load the published board as Listing objects WITH the lazy-detail sidecar
+    merged back into each lead's raw.
+
+    listings.json is slim (the heavy comps/vision keys live in the index-aligned
+    listings_detail.json). Any incremental board-writer that reads listings.json
+    directly and re-runs write_artifact would drop that detail — the sidecar gets
+    rebuilt from raw, which no longer has those keys. Loading through this helper
+    merges detail[i] back into listing[i].raw first, so the round-trip preserves
+    it. Always use this instead of a hand-rolled json.loads loop in a board pass.
+    """
+    docs = Path(docs_dir)
+    records = json.loads((docs / "listings.json").read_text())
+    detail_path = docs / "listings_detail.json"
+    details: list = []
+    if detail_path.exists():
+        try:
+            details = json.loads(detail_path.read_text())
+        except Exception:  # noqa: BLE001
+            details = []
+    out: list[Listing] = []
+    for i, rec in enumerate(records):
+        if i < len(details) and isinstance(details[i], dict) and details[i]:
+            raw = rec.get("raw")
+            if isinstance(raw, dict):
+                raw.update(details[i])
+        try:
+            out.append(Listing.model_validate(rec))
+        except Exception:  # noqa: BLE001
+            pass
+    return out
+
+
 # Whitelist of `raw` sub-keys to keep in the output (keep file small + privacy-OK)
 RAW_KEEP = {
     "gis": ("owner", "mailing", "last_sale"),

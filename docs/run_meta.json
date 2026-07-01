@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-07-01T13:06:48.532941Z",
+  "run_time": "2026-07-01T13:14:13.203837Z",
   "total": 16329,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "honest Helene placard-severity distress scoring"
+  "notes": "restore lazy-detail sidecar (regression fix) + load_board round-trip"
 }
