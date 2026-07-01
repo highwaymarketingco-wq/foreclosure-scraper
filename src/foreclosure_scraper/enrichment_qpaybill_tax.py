@@ -50,18 +50,23 @@ _UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
 # (state, county) -> qPayBill subdomain. Add a county here once its portal is
 # verified AND its results Identification-No. matches our board parcel_id format.
 #
-# Spartanburg is the clean win: its qPayBill Identification No. IS the dashed TMS
-# we store, so results join by exact parcel_id (+408 balances live).
+# Join key = the results Identification-No. column. For a REAL-PROPERTY (land)
+# parcel it is the dashed parcel we store, so results join by exact parcel_id.
+# (Numeric idents like Oconee "15268" are MANUFACTURED-HOME/personal-property
+# tax accounts — different property, they simply never match a land lead, which
+# is correct.) Verified live: Spartanburg, Oconee, Laurens, Union all join by
+# exact parcel. Their non-Spartanburg yield is low (most of those counties'
+# board leads are foreclosure/probate, not tax-delinquent) but exact-match with
+# no false positives.
 #
-# Oconee/Laurens/Cherokee/Union qPayBill portals ALSO return real delinquent
-# balances (live-verified), but their Identification No. is an internal county
-# account id (e.g. Oconee "15268", Cherokee dashed) that does NOT match our
-# board parcel format — so results can't be reliably joined without a per-county
-# parcel<->account cross-reference. They also carry few tax-delinquent board
-# leads. Left out until a join key exists. Anderson = 403 auth wall; Pickens =
-# no bulk portal (qPublic per-parcel card only).
+# OUT: Cherokee (board stores a 13-digit numeric parcel, portal uses dashed —
+# no clean join). Anderson = 403 auth wall. Pickens = no bulk portal (qPublic
+# per-parcel card only). SC PublicIndex = reachable but ToS-prohibits scraping.
 QPAYBILL_COUNTIES: dict[tuple[str, str], str] = {
     ("SC", "Spartanburg"): "spartanburgcountytax",
+    ("SC", "Oconee"): "oconeesctax",
+    ("SC", "Laurens"): "laurenstreasurer",
+    ("SC", "Union"): "uniontreasurer",
 }
 
 # Statuses that count as an owed delinquent balance (exclude already-paid).
