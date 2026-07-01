@@ -55,6 +55,12 @@ DOC_OCR_ENABLED = os.environ.get("FORECLOSURE_DOC_OCR", "1") != "0"
 DOC_OCR_FORCE = os.environ.get("FORECLOSURE_DOC_OCR_FORCE", "0") == "1"
 DOC_OCR_MAX = int(os.environ.get("DOC_OCR_MAX", "400"))
 DOC_OCR_BUDGET_S = float(os.environ.get("DOC_OCR_BUDGET_S", "600"))
+# A document URL shared across MORE than this many leads is an AGGREGATE LIST
+# (a county tax-advertisement PDF, a MIE sale roster) — not a per-property
+# notice. OCRing it per-lead would burn quota and stamp the list's top row onto
+# every lead, so those are skipped. Per-property scanned notices (one distinct
+# doc per lead, e.g. Column/Cloudinary enotice images) are kept.
+DOC_OCR_MAX_SHARE = int(os.environ.get("DOC_OCR_MAX_SHARE", "3"))
 DOC_OCR_MODEL = os.environ.get("DOC_OCR_MODEL", GEMINI_VISION_MODEL)
 _MAX_DOC_BYTES = 12 * 1024 * 1024   # notices/deeds are small; cap defensively
 _MAX_PDF_TEXT_CHARS = 20000
@@ -64,7 +70,7 @@ _DOC_EXT = (".pdf", ".tif", ".tiff", ".jpg", ".jpeg", ".png", ".gif", ".bmp")
 _DOC_FIELDS = (
     "document_url", "doc_url", "notice_url", "notice_image", "doc_image",
     "instrument_image", "instrument_url", "pdf_url", "image_url", "scan_url",
-    "recorded_document_url", "deed_url",
+    "recorded_document_url", "deed_url", "source_pdf",
 )
 
 OCR_PROMPT = (
@@ -378,9 +384,19 @@ async def enrich_doc_ocr(listings: Iterable[Listing],
         return stats
 
     listings = list(listings)
-    targets = [li for li in listings
-               if _doc_urls(li) and (DOC_OCR_FORCE or not (isinstance(li.raw, dict) and li.raw.get("doc_ocr")))]
+    candidates = [li for li in listings
+                  if _doc_urls(li) and (DOC_OCR_FORCE or not (isinstance(li.raw, dict) and li.raw.get("doc_ocr")))]
+    # Aggregate-list guard: drop leads whose document URL is a shared list PDF
+    # (appears on more than DOC_OCR_MAX_SHARE leads) — OCRing a county tax-ad or
+    # sale roster per-lead is wasteful and stamps the top row onto every lead.
+    from collections import Counter
+    url_counts = Counter(_doc_urls(li)[0] for li in candidates)
+    aggregate = {u for u, c in url_counts.items() if c > DOC_OCR_MAX_SHARE}
+    targets = [li for li in candidates if _doc_urls(li)[0] not in aggregate]
     stats["targets"] = len(targets)
+    stats["skipped_aggregate"] = len(candidates) - len(targets)
+    if aggregate:
+        log.info("doc_ocr.aggregate_skipped", lists=len(aggregate), leads=stats["skipped_aggregate"])
     if not targets:
         return stats
 

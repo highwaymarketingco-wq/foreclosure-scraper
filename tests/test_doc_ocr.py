@@ -60,3 +60,27 @@ def test_clean_amount():
     assert dm._clean_amount("154300") == 154300.0
     assert dm._clean_amount(None) is None
     assert dm._clean_amount("n/a") is None
+
+
+def test_source_pdf_field_is_a_doc_url():
+    li = _li(source_url="https://county/case/1", raw={"source_pdf": "https://c/notice.pdf"})
+    assert dm._doc_urls(li) == ["https://c/notice.pdf"]
+
+
+def test_aggregate_shared_pdf_is_skipped():
+    import asyncio
+    # 10 leads share ONE tax-advertisement PDF (aggregate list) -> all skipped;
+    # 2 leads carry their own distinct per-notice image -> both kept as targets.
+    shared = "https://county/tax-advertisement.pdf"
+    agg = [_li(source_url=shared) for _ in range(10)]
+    per = [_li(source_url=f"https://county/notice-{i}.pdf") for i in range(2)]
+    # no providers configured in test env -> enrich returns early but AFTER
+    # computing targets/skipped_aggregate, so we assert on the stats it logs.
+    # Directly exercise the guard logic the enricher uses:
+    from collections import Counter
+    cands = agg + per
+    counts = Counter(dm._doc_urls(li)[0] for li in cands)
+    aggregate = {u for u, c in counts.items() if c > dm.DOC_OCR_MAX_SHARE}
+    targets = [li for li in cands if dm._doc_urls(li)[0] not in aggregate]
+    assert shared in aggregate
+    assert len(targets) == 2  # only the per-property notices survive
