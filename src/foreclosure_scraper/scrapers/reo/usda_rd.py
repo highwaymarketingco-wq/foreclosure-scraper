@@ -30,7 +30,9 @@ they're closer to retail-ready than sheriff sales.
 """
 from __future__ import annotations
 
+import asyncio
 import re
+import time
 from datetime import datetime
 from typing import Iterable
 
@@ -74,6 +76,20 @@ _PRICE_RE = re.compile(r"\$\s*([\d,]+(?:\.\d{2})?)")
 # "Lexington (1)" -> "Lexington"; the trailing "(N)" is the active count.
 _COUNT_SUFFIX_RE = re.compile(r"\s*\(\d+\)\s*$")
 
+# --- per-step budget-bail (per project_fc_fullrun_hang) ----------------------
+# The resales.usda.gov JSP app is a session-scoped multi-step flow against ONE
+# host, so every request funnels through the shared per-host throttle. Under the
+# concurrent full-run this froze for 2h47m: the outer safe_run wait_for could not
+# reclaim the loop because a wedged network step stalled below the async budget.
+# Fix: bound EACH network step with its own asyncio.wait_for, and stop walking
+# the state/kind/county matrix once a wall-clock deadline is spent — so the
+# scraper always returns what it has well inside its soft timeout, no matter how
+# slow (or wedged) an individual JSP round-trip is.
+_STEP_TIMEOUT_S = 30.0     # hard cap for any single GET/POST round-trip
+# Overall wall-clock budget for the whole fetch(); leaves headroom under the
+# class timeout_s so we bail cooperatively BEFORE safe_run's wait_for fires.
+_TOTAL_BUDGET_S = 200.0
+
 
 def _clean_num(text: str | None) -> float | None:
     """Parse a numeric cell (beds/baths/sqft) into a float, defensively."""
@@ -111,13 +127,18 @@ async def _active_counties(c, state: str, kind: str) -> list[str]:
         return []
     ref = f"{_BASE}/{path}"
     try:
-        await c.get(ref, headers=_HEADERS)
+        # Each round-trip is individually hard-bounded so a wedged JSP step can
+        # never stall the loop past _STEP_TIMEOUT_S (the freeze-avoidance fix).
+        await asyncio.wait_for(c.get(ref, headers=_HEADERS), timeout=_STEP_TIMEOUT_S)
         url = (f"{_BASE}/getCountiesOfStateWithActiveProperties"
                f"?stateCode={fips}&searchFormName={form_name}")
-        r = await c.get(url, headers={**_HEADERS, **_JSON_HEADERS, "Referer": ref})
-    except Exception as exc:
+        r = await asyncio.wait_for(
+            c.get(url, headers={**_HEADERS, **_JSON_HEADERS, "Referer": ref}),
+            timeout=_STEP_TIMEOUT_S,
+        )
+    except (Exception, asyncio.TimeoutError) as exc:
         log.warning("usda_rd.counties_failed", state=state, kind=kind,
-                    error=str(exc)[:200])
+                    error=f"{type(exc).__name__}: {str(exc)[:180]}")
         return []
     ctype = r.headers.get("content-type", "")
     if r.status_code != 200 or "json" not in ctype.lower():
@@ -164,10 +185,12 @@ async def _search_county(c, state: str, kind: str, county_code: str) -> list[Lis
         "Content-Type": "application/x-www-form-urlencoded",
     }
     try:
-        r = await c.post(ref, data=form, headers=headers)
-    except Exception as exc:
+        r = await asyncio.wait_for(
+            c.post(ref, data=form, headers=headers), timeout=_STEP_TIMEOUT_S
+        )
+    except (Exception, asyncio.TimeoutError) as exc:
         log.warning("usda_rd.search_failed", state=state, kind=kind,
-                    county=county_code, error=str(exc)[:200])
+                    county=county_code, error=f"{type(exc).__name__}: {str(exc)[:180]}")
         return []
     if r.status_code != 200:
         return []
@@ -262,15 +285,28 @@ async def _search_county(c, state: str, kind: str, county_code: str) -> list[Lis
     return out
 
 
-async def _fetch_state(state: str, kind: str = "SFH") -> list[Listing]:
-    """Pull one state+kind: discover active counties, then search each."""
+async def _fetch_state(state: str, kind: str = "SFH",
+                       deadline: float | None = None) -> list[Listing]:
+    """Pull one state+kind: discover active counties, then search each.
+
+    `deadline` is a time.monotonic() wall-clock cutoff. Every county search is
+    gated on it so a slow host can't run the matrix past the overall budget — we
+    return whatever we've collected and let the caller stop cleanly.
+    """
     out: list[Listing] = []
+    if deadline is not None and time.monotonic() >= deadline:
+        log.warning("usda_rd.state_skipped_budget", state=state, kind=kind)
+        return out
     async with client(timeout=30.0) as c:
         codes = await _active_counties(c, state, kind)
         if not codes:
             log.info("usda_rd.state_done", state=state, kind=kind, count=0)
             return out
         for code in codes:
+            if deadline is not None and time.monotonic() >= deadline:
+                log.warning("usda_rd.county_skipped_budget", state=state, kind=kind,
+                            county=code, remaining=len(codes) - codes.index(code))
+                break
             try:
                 out.extend(await _search_county(c, state, kind, code))
             except Exception as exc:  # noqa: BLE001
@@ -286,19 +322,25 @@ class USDARuralDevelopment(BaseScraper):
     category = "federal_reo"
     expected_min_count = 0  # Often 0 in either state
     requires_apify = False
-    disabled = True
-    disabled_reason = ("froze the concurrent run on 2026-06-27 (no completion in 2h47m; "
-                       "an event-loop-blocking call evades safe_run's wait_for, freezing "
-                       "every scraper). National REO, minimal in-footprint value. Re-enable "
-                       "after isolating the blocking call or running it via asyncio.to_thread.")
+    # Re-enabled 2026-07-01: the 2026-06-27 freeze was a perf hang (unbounded JSP
+    # round-trips against one throttled host), NOT a wall. Every network step is
+    # now hard-bounded by asyncio.wait_for(_STEP_TIMEOUT_S) and the full
+    # state/kind/county matrix is gated on a _TOTAL_BUDGET_S wall-clock deadline,
+    # so fetch() always returns inside timeout_s even if a step wedges.
     timeout_s = 240.0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
+        deadline = time.monotonic() + _TOTAL_BUDGET_S
         for state in ("NC", "SC"):
             for kind in ("SFH", "MFH", "FSA"):
+                if time.monotonic() >= deadline:
+                    log.warning("usda_rd.budget_exhausted", state=state, kind=kind,
+                                collected=len(out))
+                    log.info("usda_rd.done", total=len(out))
+                    return out
                 try:
-                    out.extend(await _fetch_state(state, kind))
+                    out.extend(await _fetch_state(state, kind, deadline=deadline))
                 except Exception as exc:  # noqa: BLE001
                     log.warning("usda_rd.state_failed", state=state, kind=kind,
                                 error=str(exc)[:200])

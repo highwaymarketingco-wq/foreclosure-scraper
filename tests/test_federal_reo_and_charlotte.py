@@ -35,6 +35,53 @@ def test_usda_scraper_class_metadata():
     assert s.expected_min_count == 0
 
 
+# ---- USDA re-enabled + freeze-hardening --------------------------------------
+# 2026-07-01: re-enabled after the 2026-06-27 concurrency freeze. The fix bounds
+# every JSP round-trip with asyncio.wait_for(_STEP_TIMEOUT_S) and gates the whole
+# state/kind/county matrix on a _TOTAL_BUDGET_S wall-clock deadline, so fetch()
+# always returns inside timeout_s even if an individual step wedges.
+
+def test_usda_is_re_enabled():
+    s = USDARuralDevelopment()
+    # Must be OFF the disabled list so safe_run actually runs it (not DORMANT).
+    assert s.disabled is False
+
+
+def test_usda_budget_bail_stops_matrix_without_network():
+    """A spent deadline makes fetch() return [] and touch NO network step."""
+    import foreclosure_scraper.scrapers.reo.usda_rd as u
+
+    # Force the wall-clock budget to be already exhausted the moment fetch starts.
+    with patch.object(u, "_TOTAL_BUDGET_S", -1.0), \
+            patch.object(u, "_fetch_state", new=AsyncMock()) as fake_state:
+        s = USDARuralDevelopment()
+        out = list(asyncio.run(s.fetch()))
+
+    assert out == []
+    # Deadline is spent before the first (state, kind) pair, so _fetch_state
+    # (the thing that opens the HTTP client) is never even called.
+    fake_state.assert_not_called()
+
+
+def test_usda_active_counties_step_timeout_is_swallowed():
+    """A wedged GET is bounded by _STEP_TIMEOUT_S and yields [] (never hangs)."""
+    import foreclosure_scraper.scrapers.reo.usda_rd as u
+
+    async def _never_returns(*a, **k):
+        await asyncio.sleep(3600)  # simulate a wedged JSP round-trip
+
+    fake_client = AsyncMock()
+    fake_client.get = _never_returns
+
+    async def _run():
+        # Shrink the per-step cap so the test is fast; the real cap is 30s.
+        with patch.object(u, "_STEP_TIMEOUT_S", 0.05):
+            return await u._active_counties(fake_client, "SC", "SFH")
+
+    codes = asyncio.run(_run())
+    assert codes == []
+
+
 # ---- Treasury parser end-to-end ---------------------------------------------
 
 TREASURY_FIXTURE = """

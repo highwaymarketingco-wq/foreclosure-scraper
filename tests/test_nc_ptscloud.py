@@ -46,3 +46,14 @@ def test_money():
     assert m._money("1,234.50") == 1234.50
     assert m._money("$0") is None
     assert m._money("") is None
+
+
+def test_stray_nul_byte_does_not_nuke_the_roll():
+    # Pitt's real extract carries a lone NUL inside a field; csv.DictReader would
+    # raise "line contains NUL" and drop the whole county. _parse_csv must strip
+    # it and still return the good rows.
+    dirty = _CSV.replace("10 OAK ST", "10 OAK ST\x00")
+    leads = m._parse_csv(dirty, "Pitt", "NC", "Pitt")
+    by = {l.parcel_id: l for l in leads}
+    assert set(by) == {"1234", "5678"}
+    assert by["1234"].raw["nc_ptscloud_delinquent_tax"]["principal_tax_due"] == 800.50

@@ -12,7 +12,9 @@ Several rosters expose full DOB, which we keep for future disambiguation (we
 still match name-only today since we have no owner DOB — so this stays a
 LOW-confidence STACK signal, meaningful only combined with other distress).
 
-Covered now (verified live 2026-07-01, free, no login/CAPTCHA):
+Two access shapes:
+
+BULK ROSTERS (fetch the whole current in-custody list once/run, index by name):
   * Zuercher portal  — Cherokee SC (dob+charges), Anderson SC (name+charges, no dob)
   * CentralSquare P2C jqGrid — Cleveland NC (dob+charges)
   * CentralSquare P2C (modern) — Buncombe NC (name+age+booking date+charge; the
@@ -23,9 +25,33 @@ Covered now (verified live 2026-07-01, free, no login/CAPTCHA):
     fills TotalCount, so we page in blocks of 200 until a short page. Free,
     compliant (open JSON-XHR + standard anti-forgery echo, no login/CAPTCHA/WAF
     defeat). Verified live 2026-07-01: 542 in custody.
-Adding a county = one ROSTERS entry once its vendor endpoint is confirmed
-(Henderson NC Southern Software still needs a session/token handshake — deferred;
-see project_jail_booking_sources memory for endpoints).
+
+PER-NAME SEARCH ROSTERS (no "show all"; we search each in-scope owner's last name):
+  * Gaston NC — New World / Tyler "Aegis" WebForms
+    (tepsweb.cityofgastonia.com/newworld.aegis.webportal/Corrections/InmateInquiry.aspx).
+    Classic ASP.NET postback: GET seeds __VIEWSTATE + __EVENTVALIDATION, POST
+    echoes them back with uxLastName/uxFirstName + uxSearch=Search. Results grid
+    columns are Photo | Full Name | In Custody | Race | Sex | DOB | Height |
+    Weight | Multiple Bookings | Facility. The search returns the full 3-year
+    booking HISTORY, so we keep only rows whose "In Custody" cell reads "Yes".
+    Exposes FULL DOB — the strongest disambiguator in this module. Verified live
+    2026-07-01: SMITH -> 146 rows, 2 currently in custody (Christopher Michael
+    DOB 7/16/1989, Jaquis Rahmad DOB 1/29/2001).
+  * Greenville SC — LANSA-for-the-Web WEBEVENT postback
+    (app.greenvillecounty.org/cgi-bin/lansaweb, proc JAW_00 / func JAW00EX).
+    GET the framed entry to get the session-scoped WEBEVENT action token + ~36
+    hidden fields; POST them back with ASC_NML (last), ASC_NMF (first) and
+    ASTDRENTST=SEARCH (what the page's Search link sets before HandleEvent). The
+    grid is current detainees only: Name (LAST, FIRST MIDDLE) | Book Date | Race
+    | Sex | Age | Height | Weight, headed by "Records Found: N". An Incapsula
+    script is present but passive — the page and POST both complete with plain
+    curl_cffi chrome impersonation (no WAF token solved/defeated). Greenville is
+    the largest SC jail population. Verified live 2026-07-01: SMITH -> 28 records.
+
+Adding a BULK county = one ROSTERS entry; a SEARCH county = one SEARCH_ROSTERS
+entry, once its vendor endpoint is confirmed (Henderson NC Southern Software
+still needs a session/token handshake — deferred; see project_jail_booking_sources
+memory for endpoints).
 
 Sets raw['jail_booking'] (detail) + raw['incarceration'] (so distress_score's
 existing LEGAL incarceration signal, weight 8, picks it up). Free + compliant.
@@ -53,6 +79,15 @@ ROSTERS = [
     ("NC", "Cleveland", "p2c_jqgrid", "http://74.218.167.200/p2c"),
     ("NC", "Buncombe", "p2c_centralsquare",
      "https://buncombecountyso.policetocitizen.com|23"),
+]
+
+# (state, county, vendor, target) for the PER-NAME search vendors — no bulk
+# "show all", so we search each in-scope owner's last name at match time.
+SEARCH_ROSTERS = [
+    ("NC", "Gaston", "aegis",
+     "https://tepsweb.cityofgastonia.com/newworld.aegis.webportal/Corrections/InmateInquiry.aspx"),
+    ("SC", "Greenville", "lansa",
+     "https://app.greenvillecounty.org/cgi-bin/lansaweb?procfun+JAW_00+JAW00EX+GP1+eng"),
 ]
 
 
@@ -195,6 +230,186 @@ async def _fetch_p2c_centralsquare(target: str) -> list[dict]:
     return out
 
 
+# ---- per-name search vendors -------------------------------------------------
+
+_HIDDEN_RE = re.compile(r'<input[^>]*type=["\']hidden["\'][^>]*>', re.I)
+_NAME_RE = re.compile(r'name=["\']([^"\']+)["\']')
+_VALUE_RE = re.compile(r'value=["\']([^"\']*)["\']')
+
+
+def _hidden_fields(html: str) -> dict:
+    """Pull every <input type=hidden> name/value (ASP.NET __VIEWSTATE etc.)."""
+    out: dict = {}
+    for m in _HIDDEN_RE.finditer(html or ""):
+        tag = m.group(0)
+        n = _NAME_RE.search(tag)
+        if not n:
+            continue
+        v = _VALUE_RE.search(tag)
+        out[n.group(1)] = v.group(1) if v else ""
+    return out
+
+
+def _cell_text(cell_html: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", cell_html or "")).replace(
+        "&nbsp;", " ").replace("&quot;", '"').strip()
+
+
+def _split_comma_name(name: str) -> Optional[tuple[str, str]]:
+    """'Smith, Christopher Michael' -> ('SMITH', 'CHRISTOPHER')."""
+    if not name or "," not in name:
+        return None
+    last, _, rest = name.partition(",")
+    toks = rest.strip().split()
+    if not toks or not last.strip():
+        return None
+    return last.strip().upper(), toks[0].strip().upper()
+
+
+async def _search_aegis(base: str, last: str, first: str = "") -> list[dict]:
+    """Gaston NC New World/Tyler Aegis InmateInquiry.aspx last-name search.
+
+    GET seeds __VIEWSTATE/__EVENTVALIDATION, POST echoes them with the ux* search
+    fields. The grid returns the full 3-year booking history, so we keep only the
+    rows whose "In Custody" cell reads "Yes". Full DOB is exposed. Compliant:
+    standard ASP.NET WebForms postback, no login/CAPTCHA/WAF defeat.
+    """
+    from curl_cffi.requests import AsyncSession
+    out: list[dict] = []
+    if not last:
+        return out
+    try:
+        async with AsyncSession(impersonate="chrome", verify=False) as s:
+            r = await s.get(base, timeout=30)
+            fields = _hidden_fields(r.text)
+            if "__VIEWSTATE" not in fields:
+                log.warning("jail.aegis_no_viewstate", base=base)
+                return []
+            fields.update({
+                "ctl00$DefaultContent$uxLastName": last,
+                "ctl00$DefaultContent$uxFirstName": first,
+                "ctl00$DefaultContent$uxJacketNumber": "",
+                "ctl00$DefaultContent$uxBookingNumber": "",
+                "ctl00$DefaultContent$uxFromDate": "",
+                "ctl00$DefaultContent$uxToDate": "",
+                "ctl00$DefaultContent$uxFacility": "",
+                "ctl00$DefaultContent$uxSearch": "Search"})
+            pr = await s.post(base, data=fields, timeout=45,
+                              headers={"Referer": base,
+                                       "Content-Type": "application/x-www-form-urlencoded"})
+            body = pr.text or ""
+    except Exception as exc:  # noqa: BLE001
+        log.warning("jail.aegis_fail", base=base, error=str(exc)[:120])
+        return []
+    for rowm in re.finditer(r"<tr[^>]*>(.*?)</tr>", body, re.S):
+        cells = re.findall(r"<td[^>]*>(.*?)</td>", rowm.group(1), re.S)
+        if len(cells) < 9:  # header/footer/padding rows
+            continue
+        name = _cell_text(cells[1])          # Full Name (LAST, FIRST MIDDLE)
+        parts = _split_comma_name(name)
+        if not parts:
+            continue
+        if _cell_text(cells[2]).upper() != "YES":  # In Custody flag
+            continue
+        last_n, first_n = parts
+        out.append({"last": last_n, "first": first_n,
+                    "dob": _cell_text(cells[5]) or None,     # full DOB
+                    "race": _cell_text(cells[3]),
+                    "sex": _cell_text(cells[4]),
+                    "arrest_date": None,  # not on the grid (lives on the detail page)
+                    "charge": ""})
+    return out
+
+
+_GVL_ROW_RE = re.compile(r"<tr[^>]*>(.*?)</tr>", re.S)
+_GVL_ACTION_RE = re.compile(r'action=["\']([^"\']*WEBEVENT[^"\']*)["\']', re.I)
+
+
+async def _search_lansa(entry: str, last: str, first: str = "") -> list[dict]:
+    """Greenville SC LANSA-for-the-Web WEBEVENT inmate search.
+
+    GET the framed entry -> session-scoped WEBEVENT action token + ~36 hidden
+    fields. POST them back with ASC_NML (last name) + ASTDRENTST=SEARCH (what the
+    page's Search link sets before HandleEvent). Grid is current detainees only:
+    Name | Book Date | Race | Sex | Age | Height | Weight. Compliant: replays the
+    page's own postback; the Incapsula script present on the page is passive (no
+    token solved/defeated).
+
+    We deliberately search by LAST NAME ONLY and filter first name client-side:
+    the page's first-name box (ASC_NMF) is an unreliable exact/normalized match
+    that returns 0 rows for names that plainly exist (verified: "SMITH, ALEX
+    MATTHEW" is in the roster, yet ASC_NMF="ALEX" yields nothing), so echoing it
+    would cause false negatives. The grid returns the alphabetical-by-first-name
+    page 1 (~15 rows); LANSA's JS-driven WEBEVENT paging does not replay cleanly
+    from a stateless POST, so for a very common surname a match beyond page 1 can
+    be missed. That only costs RECALL — every row returned is a real current
+    detainee (no false positives) — consistent with this module's LOW-confidence
+    stack-signal philosophy. `first` is accepted for signature symmetry, unused.
+    """
+    from curl_cffi.requests import AsyncSession
+    from urllib.parse import urlsplit, urlunsplit
+    out: list[dict] = []
+    if not last:
+        return out
+    sp = urlsplit(entry)
+    origin = urlunsplit((sp.scheme, sp.netloc, "", "", ""))
+    try:
+        async with AsyncSession(impersonate="chrome", verify=False) as s:
+            r = await s.get(entry, timeout=30,
+                            headers={"Referer": origin + "/inmate_search.htm"})
+            body = r.text or ""
+            am = _GVL_ACTION_RE.search(body)
+            if not am:
+                log.warning("jail.lansa_no_action", entry=entry)
+                return []
+            # LANSA renders many inputs (not just type=hidden); pull them all.
+            fields: dict = {}
+            for im in re.finditer(r"<input[^>]*>", body, re.I):
+                tag = im.group(0)
+                n = _NAME_RE.search(tag)
+                if not n:
+                    continue
+                v = _VALUE_RE.search(tag)
+                fields[n.group(1)] = v.group(1) if v else ""
+            fields["ASC_NML"] = last
+            fields["ASC_NMF"] = ""              # see docstring: unreliable, skip
+            fields["ASTDRENTST"] = "SEARCH"     # what the Search link sets
+            action_url = origin + am.group(1)
+            pr = await s.post(action_url, data=fields, timeout=45,
+                              headers={"Referer": entry,
+                                       "Content-Type": "application/x-www-form-urlencoded"})
+            rbody = pr.text or ""
+    except Exception as exc:  # noqa: BLE001
+        log.warning("jail.lansa_fail", entry=entry, error=str(exc)[:120])
+        return []
+    # Results table only: rows are Name | Book Date | Race | Sex | Age | Ht | Wt.
+    # A data row's first cell is "LAST, FIRST ..." and its second a mm/dd/yyyy.
+    for rowm in _GVL_ROW_RE.finditer(rbody):
+        cells = [_cell_text(c) for c in
+                 re.findall(r"<td[^>]*>(.*?)</td>", rowm.group(1), re.S)]
+        cells = [c for c in cells if c]
+        if len(cells) < 5:
+            continue
+        parts = _split_comma_name(cells[0])
+        if not parts or not re.match(r"\d{1,2}/\d{1,2}/\d{4}$", cells[1]):
+            continue
+        last_n, first_n = parts
+        age = cells[4] if len(cells) > 4 and cells[4].isdigit() else None
+        out.append({"last": last_n, "first": first_n, "dob": None,
+                    "age": age, "arrest_date": cells[1],  # Book Date
+                    "race": cells[2] if len(cells) > 2 else "",
+                    "sex": cells[3] if len(cells) > 3 else "", "charge": ""})
+    return out
+
+
+async def _search_vendor(vendor: str, target: str, last: str, first: str) -> list[dict]:
+    if vendor == "aegis":
+        return await _search_aegis(target, last, first)
+    if vendor == "lansa":
+        return await _search_lansa(target, last, first)
+    return []
+
+
 async def _load_roster(state: str, county: str, vendor: str, target: str):
     if vendor == "zuercher":
         recs = await _fetch_zuercher(target)
@@ -209,22 +424,50 @@ async def _load_roster(state: str, county: str, vendor: str, target: str):
     return (state, county), index
 
 
-async def enrich_jail_bookings(listings: list[Listing]) -> dict:
-    """Match resolved owner names against covered county jail rosters."""
-    covered = {(s, c) for s, c, _, _ in ROSTERS}
-    # Only bother if some in-scope lead sits in a covered county.
-    if not any((li.state, (li.county or "").replace(" County", "").strip().title()) in covered
-               for li in listings):
+def _apply_hit(li: Listing, county: str, first: str, last: str, hit: dict) -> None:
+    """Attach the jail_booking detail + reuse the LEGAL incarceration signal."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    raw["jail_booking"] = {
+        "county": county, "state": li.state,
+        "matched_name": f"{first} {last}",
+        "roster_dob": hit.get("dob"), "roster_age": hit.get("age"),
+        "arrest_date": hit.get("arrest_date"),
+        "charge": hit.get("charge"), "confidence": "name_only_low",
+    }
+    raw.setdefault("incarceration", {
+        "state": li.state, "source": f"{county} County jail roster",
+        "matched_name": f"{first} {last}", "confidence": "name_only_low"})
+    li.raw = raw
+
+
+async def enrich_jail_bookings(listings: list[Listing],
+                               max_searches_per_county: int = 200) -> dict:
+    """Match resolved owner names against covered county jail rosters.
+
+    Two lanes: BULK rosters (fetched once/run + indexed) and PER-NAME SEARCH
+    rosters (Gaston/Greenville), where we run one last-name lookup per in-scope
+    owner (paced, capped per county).
+    """
+    bulk_covered = {(s, c) for s, c, _, _ in ROSTERS}
+    search_covered = {(s, c): (v, t) for s, c, v, t in SEARCH_ROSTERS}
+    covered = bulk_covered | set(search_covered)
+
+    def _county(li: Listing) -> str:
+        return (li.county or "").replace(" County", "").strip().title()
+
+    if not any((li.state, _county(li)) in covered for li in listings):
         log.info("jail.no_targets")
         return {"matched": 0}
 
-    rosters = dict(await asyncio.gather(
-        *[_load_roster(s, c, v, t) for s, c, v, t in ROSTERS]))
-
     counts = {"matched": 0}
+
+    # ---- lane 1: bulk rosters (fetch each once, index by name) ----
+    bulk_needed = [(s, c, v, t) for s, c, v, t in ROSTERS
+                   if any((li.state, _county(li)) == (s, c) for li in listings)]
+    rosters = dict(await asyncio.gather(
+        *[_load_roster(s, c, v, t) for s, c, v, t in bulk_needed])) if bulk_needed else {}
     for li in listings:
-        county = (li.county or "").replace(" County", "").strip().title()
-        idx = rosters.get((li.state, county))
+        idx = rosters.get((li.state, _county(li)))
         if not idx or (li.raw or {}).get("jail_booking"):
             continue
         parts = _name_parts(_owner_of(li) or "")
@@ -233,19 +476,43 @@ async def enrich_jail_bookings(listings: list[Listing]) -> dict:
         hit = idx.get(_norm_key(*parts))
         if not hit:
             continue
-        raw = li.raw if isinstance(li.raw, dict) else {}
-        raw["jail_booking"] = {
-            "county": county, "state": li.state,
-            "matched_name": f"{parts[1]} {parts[0]}",
-            "roster_dob": hit.get("dob"), "roster_age": hit.get("age"),
-            "arrest_date": hit.get("arrest_date"),
-            "charge": hit.get("charge"), "confidence": "name_only_low",
-        }
-        # Reuse the existing LEGAL incarceration distress signal.
-        raw.setdefault("incarceration", {
-            "state": li.state, "source": f"{county} County jail roster",
-            "matched_name": f"{parts[1]} {parts[0]}", "confidence": "name_only_low"})
-        li.raw = raw
+        _apply_hit(li, _county(li), parts[1], parts[0], hit)
         counts["matched"] += 1
+
+    # ---- lane 2: per-name search rosters (one lookup per in-scope owner) ----
+    for (state, county), (vendor, target) in search_covered.items():
+        # De-dupe owner names so we hit the vendor once per distinct surname pair.
+        by_name: dict[tuple, list[Listing]] = {}
+        for li in listings:
+            if (li.state, _county(li)) != (state, county):
+                continue
+            if (li.raw or {}).get("jail_booking"):
+                continue
+            parts = _name_parts(_owner_of(li) or "")
+            if parts:
+                by_name.setdefault(_norm_key(*parts), []).append(li)
+        if not by_name:
+            continue
+        searched = 0
+        for _key, lis in by_name.items():
+            if searched >= max_searches_per_county:
+                break
+            parts = _name_parts(_owner_of(lis[0]) or "")
+            if not parts:
+                continue
+            last, first = parts
+            recs = await _search_vendor(vendor, target, last, first)
+            searched += 1
+            index: dict[tuple, dict] = {}
+            for rec in recs:
+                index.setdefault(_norm_key(rec["last"], rec["first"]), rec)
+            hit = index.get(_norm_key(last, first))
+            if hit:
+                for li in lis:
+                    _apply_hit(li, county, first, last, hit)
+                    counts["matched"] += 1
+            await asyncio.sleep(0.4)  # polite pacing
+        log.info("jail.search_roster", county=county, vendor=vendor, searched=searched)
+
     log.info("jail.done", matched=counts["matched"])
     return counts

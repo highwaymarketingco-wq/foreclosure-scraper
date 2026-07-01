@@ -1702,6 +1702,16 @@ async def run() -> int:
     except Exception:
         log.error("spartanburg_rod.failed", traceback=traceback.format_exc())
 
+    # Spartanburg DOT loan-amount OCR — turns raw['rod'] mortgage EXISTENCE into a
+    # dollar figure (free view_image PDF -> Gemini OCR) so the equity engine has a
+    # real payoff basis. HOT/WARM-first, capped, idempotent, budget-bailed.
+    try:
+        from .enrichment_dot_ocr import enrich_dot_ocr
+        s = await enrich_dot_ocr(enriched)
+        if s and "skipped" not in s: enrichment_stats["dot_ocr"] = s
+    except Exception:
+        log.error("dot_ocr.failed", traceback=traceback.format_exc())
+
     # NC absolute-divorce (CVD) distress, by owner party-name in the NC eCourts
     # Tyler portal (render path; 50B DV excluded). GATED OFF by default
     # (FORECLOSURE_NC_DIVORCE=1) — the portal Smart Search is AWS-WAF/CAPTCHA-
