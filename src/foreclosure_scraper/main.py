@@ -373,6 +373,7 @@ DATELESS_OK_SOURCES = {
     "counties_nc.asheville_helene",               # Helene Unsafe/Restricted placards (dateless)
     "public_notices.gannett_obituaries",          # obituaries -> pre-probate heir leads (dateless)
     "counties_nc.buncombe_delinquent_tax",        # Buncombe delinquent-tax list (dateless)
+    "counties_nc.nc_ptscloud_delinquent_tax",     # Madison/Henderson/etc PTS Cloud delinquent roll (dateless)
     "counties_sc.spartanburg_delinquent_tax",     # Spartanburg delinquent-tax-sale list (dateless)
     "counties_sc.cherokee_delinquent_tax",        # Cherokee delinquent-tax list (dateless)
     "national.gsa_realproperty",                  # GSA real-property disposal (no auction date until scheduled)
