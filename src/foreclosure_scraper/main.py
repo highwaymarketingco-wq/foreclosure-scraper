@@ -335,6 +335,7 @@ DATELESS_OK_SOURCES = {
     "counties_nc.nc_ecourts_estates",            # NC eCourts estate filings (no sale date)
     "counties_nc.nc_ecourts_divorce",            # NC eCourts divorce filings (no sale date)
     "counties_nc.nc_heir_estate_parcels",        # heir/estate owner-of-record parcels (GIS, dateless)
+    "counties_sc.spartanburg_vacant",            # Spartanburg City vacant registry (absentee+vacant, dateless)
     "counties.column_legal_notices",             # Column API SC estate/probate notices (no sale date)
     "law_firms.zacchaeus",                       # ZLS tax foreclosures (status-driven; upset/pending leads outlive sale date)
     "national.first_citizens_reo",               # First Citizens bank-owned REO listings
