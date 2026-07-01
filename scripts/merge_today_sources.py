@@ -52,7 +52,7 @@ from foreclosure_scraper.enrichment_hud_reac_address import enrich_hud_reac_addr
 from foreclosure_scraper.enrichment_resolve_name_to_property import enrich_resolve_name_to_property  # noqa: E402
 from foreclosure_scraper.enrichment_tax_owed import enrich_tax_owed  # noqa: E402
 from foreclosure_scraper.enrichment_court_owner_verify import enrich_court_owner_verify  # noqa: E402
-from foreclosure_scraper.web_artifact import write_artifact  # noqa: E402
+from foreclosure_scraper.web_artifact import write_artifact, load_board  # noqa: E402
 from foreclosure_scraper.outreach import generate_outreach  # noqa: E402
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
@@ -247,14 +247,14 @@ def main() -> int:
     # come on the stable weekly full run.
     import os as _osm
     _FAST = _osm.environ.get("MERGE_FAST") == "1"
-    raw = json.loads((DOCS / "listings.json").read_text())
-    existing, bad = [], 0
-    for d in raw:
-        try:
-            existing.append(Listing.model_validate(d))
-        except Exception:  # noqa: BLE001
-            bad += 1
-    print(f"existing dashboard: {len(existing)} ({bad} unparseable)")
+    # Load via load_board() so the lazy-detail sidecar (listings_detail.json:
+    # vision/comps/cama/foreclosure_sold_comps/rent_comps) is merged back into
+    # each lead's .raw. A plain json.loads of listings.json alone would strip
+    # those keys, and write_artifact would then re-emit an EMPTY sidecar,
+    # wiping the detail. load_board returns Listing objects with the sidecar
+    # already folded in (it silently skips unparseable records).
+    existing = load_board(DOCS)
+    print(f"existing dashboard: {len(existing)}")
 
     merged = asyncio.run(_resolve(existing, cfg))
 

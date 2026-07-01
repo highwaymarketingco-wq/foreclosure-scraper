@@ -12,13 +12,11 @@ from __future__ import annotations
 
 import argparse
 import csv
-import json
 from datetime import datetime
 from pathlib import Path
 
-from foreclosure_scraper.models import Listing
 from foreclosure_scraper.contact_ingest import ingest_contacts
-from foreclosure_scraper.web_artifact import write_artifact
+from foreclosure_scraper.web_artifact import write_artifact, load_board
 
 
 def main() -> None:
@@ -29,8 +27,7 @@ def main() -> None:
     args = ap.parse_args()
 
     docs = Path(args.docs)
-    listings = [Listing.model_validate(d)
-                for d in json.loads((docs / "listings.json").read_text())]
+    listings = load_board(docs)
     with open(args.csv_path, newline="", encoding="utf-8-sig") as f:
         rows = list(csv.DictReader(f))
 

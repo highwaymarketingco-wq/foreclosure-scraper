@@ -10,28 +10,24 @@ Usage: python scripts/prune_stale_reo.py
 """
 import asyncio
 import collections
-import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from foreclosure_scraper.models import Listing  # noqa: E402
 from foreclosure_scraper.enrichment_reo_freshness import prune_stale_reo  # noqa: E402
-from foreclosure_scraper.web_artifact import write_artifact  # noqa: E402
+from foreclosure_scraper.web_artifact import write_artifact, load_board  # noqa: E402
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
 
 
 def main() -> int:
-    raw = json.loads((DOCS / "listings.json").read_text())
-    listings, bad = [], 0
-    for d in raw:
-        try:
-            listings.append(Listing.model_validate(d))
-        except Exception:  # noqa: BLE001
-            bad += 1
-    print(f"loaded {len(listings)} ({bad} unparseable)")
+    # Load through load_board so the lazy-detail sidecar (listings_detail.json:
+    # vision/comps/cama/foreclosure_sold_comps/rent_comps) is merged back into
+    # each lead's .raw. A plain json.loads of listings.json would let
+    # write_artifact re-emit an empty sidecar and wipe the detail.
+    listings = load_board(DOCS)
+    print(f"loaded {len(listings)}")
 
     kept, stats = asyncio.run(prune_stale_reo(listings))
     print(f"prune: {stats} -> {len(kept)} kept")

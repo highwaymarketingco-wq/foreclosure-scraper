@@ -25,7 +25,7 @@ from foreclosure_scraper.enrichment_data_quality import enrich_data_quality  # n
 from foreclosure_scraper.enrichment_assessor_card import enrich_assessor_card  # noqa: E402
 from foreclosure_scraper.enrichment_multifamily_class import enrich_multifamily_class  # noqa: E402
 from foreclosure_scraper.enrichment_property_kind import enrich_property_kind  # noqa: E402
-from foreclosure_scraper.web_artifact import write_artifact  # noqa: E402
+from foreclosure_scraper.web_artifact import write_artifact, load_board  # noqa: E402
 from foreclosure_scraper.outreach import generate_outreach  # noqa: E402
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
@@ -36,18 +36,15 @@ def _countyless_national(li: Listing) -> bool:
 
 
 def main() -> int:
-    raw = json.loads((DOCS / "listings.json").read_text())
-    print(f"loaded {len(raw)} records")
-
-    listings, bad = [], 0
-    for d in raw:
-        try:
-            listings.append(Listing.model_validate(d))
-        except Exception as e:  # noqa: BLE001
-            bad += 1
-            if bad <= 3:
-                print(f"  skip (validate): {str(e)[:80]}")
-    print(f"re-hydrated {len(listings)} ({bad} unparseable)")
+    # Load through load_board() so the index-aligned lazy-detail sidecar
+    # (listings_detail.json: vision/comps/cama/foreclosure_sold_comps/rent_comps)
+    # is merged back into each lead's raw BEFORE write_artifact re-splits it.
+    # A raw json.loads of the slim listings.json would leave .raw without those
+    # keys, so the final write_artifact would emit an empty sidecar and wipe the
+    # detail. load_board returns validated Listing objects, silently dropping
+    # unparseable records (same as the old hydrate loop).
+    listings = load_board(DOCS)
+    print(f"loaded {len(listings)} records (sidecar merged)")
 
     before = len(listings)
     listings = [li for li in listings if not _countyless_national(li)]

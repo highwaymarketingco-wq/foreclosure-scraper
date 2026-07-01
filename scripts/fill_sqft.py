@@ -22,7 +22,7 @@ os.environ.setdefault("ASSESSOR_CARD_SKIP_RENDER", "1")
 from foreclosure_scraper.models import Listing                          # noqa: E402
 from foreclosure_scraper.enrichment_assessor_card import enrich_assessor_card  # noqa: E402
 from foreclosure_scraper.valuation import calc as vcalc, grading as vgrade     # noqa: E402
-from foreclosure_scraper.web_artifact import write_artifact             # noqa: E402
+from foreclosure_scraper.web_artifact import write_artifact, load_board # noqa: E402
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
 
@@ -32,13 +32,7 @@ def _real_sqft(li: Listing) -> bool:
 
 
 def main() -> int:
-    raw = json.loads((DOCS / "listings.json").read_text())
-    listings = []
-    for d in raw:
-        try:
-            listings.append(Listing.model_validate(d))
-        except Exception:  # noqa: BLE001
-            pass
+    listings = load_board(DOCS)
     before = sum(1 for li in listings if _real_sqft(li))
     print(f"loaded {len(listings)} | real sqft before: {before} | MAX={os.environ.get('ASSESSOR_CARD_MAX','300')} skip_render={os.environ.get('ASSESSOR_CARD_SKIP_RENDER')}")
 
