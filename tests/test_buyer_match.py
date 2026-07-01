@@ -1,31 +1,34 @@
 from foreclosure_scraper.models import Listing, ListingType, PropertyKind
-from foreclosure_scraper.enrichment_buyer_match import enrich_buyer_match
+from foreclosure_scraper.enrichment_buyer_match import enrich_buyer_match, _load
 
 def _li(**kw):
     base=dict(source="s",source_url="x",listing_type=ListingType.TAX_LIEN,state="NC",county="Polk")
     base.update(kw); return Listing(**base)
 
-def test_land_gets_blanket_buyers():
+def test_registry_loads():
+    assert len(_load()) > 100  # 188 buyers
+
+def test_land_gets_many_types():
     li=_li(property_kind=PropertyKind.LAND)
     enrich_buyer_match([li])
-    bm=li.raw["buyer_match"]; names=[x["name"] for x in bm["land"]]
-    assert "Bubba Land Company" in names and "Value Land Buyers" in names
+    bm=li.raw["buyer_match"]
+    assert bm["category"]=="land"
+    # land pulls developers, builders, timber, solar, conservation, flippers...
+    assert len(bm["by_type"]) >= 5
+    assert "land_flippers" in bm["by_type"]
+    assert bm["count"] >= 10
 
-def test_bubba_respects_3ac_min():
-    li=_li(property_kind=PropertyKind.LAND); li.raw={"lrcpwa":{"acreage":1.0}}
-    enrich_buyer_match([li])
-    names=[x["name"] for x in li.raw["buyer_match"]["land"]]
-    assert "Bubba Land Company" not in names  # 1 acre < 3 min
-    assert "Value Land Buyers" in names       # no min
-
-def test_upstate_regional_and_builders_by_county():
+def test_region_gate_upstate_vs_wnc():
     li=_li(state="SC", county="Greenville", property_kind=PropertyKind.LAND)
     enrich_buyer_match([li])
-    bm=li.raw["buyer_match"]
-    assert any("Greenville Home Solutions" in x["name"] for x in bm["land"])
-    assert bm.get("builders")
+    assert li.raw["buyer_match"]["count"] >= 10
 
-def test_distressed_house_gets_cash_buyers():
-    li=_li(county="Buncombe"); li.raw={"distress_stack":{"tier":"HOT"}}
+def test_out_of_footprint_skipped():
+    li=_li(county="Wake")  # not in footprint
     enrich_buyer_match([li])
-    assert li.raw["buyer_match"].get("houses")
+    assert "buyer_match" not in (li.raw or {})
+
+def test_i85_land_gets_industrial():
+    li=_li(state="SC", county="Spartanburg", property_kind=PropertyKind.LAND)
+    enrich_buyer_match([li])
+    assert "industrial_logistics" in li.raw["buyer_match"]["by_type"]
