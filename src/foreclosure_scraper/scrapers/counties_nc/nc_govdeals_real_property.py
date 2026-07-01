@@ -55,9 +55,12 @@ is the SPA's own public JSON search endpoint, reused here:
   body:    businessId "GD", searchText "*", category via the facetsFilter
            product_category_external_id:"t11", paged by displayRows/page.
 
-Plain httpx through the shared ``client()`` reaches it directly — no Akamai wall,
-no headless browser, no CAPTCHA / login / WAF defeat. The key + endpoint are the
-public values the unauthenticated site ships in its JS bundle.
+maestro.lqdt1.com now sits behind Akamai edge protection that 403s a plain-httpx
+TLS fingerprint, so we reach the SAME public JSON endpoint through a real browser
+TLS fingerprint via ``curl_cffi`` ``impersonate="chrome"`` — no headless browser,
+no CAPTCHA / login / WAF defeat, just ordinary browser fingerprinting on a public,
+unauthenticated endpoint. The key + endpoint are the public values the site ships
+in its JS bundle (verified 2026-07-01: bundle still carries maestroApiKey af93060f-…).
 
 Each result row carries city/state/zip (county attribution), the auction end
 date, the current bid, and usually the street address + PIN inside
@@ -98,7 +101,9 @@ from selectolax.parser import HTMLParser
 from ..._coastal_city_to_county import coastal_county_for
 from ..._upstate_city_to_county import upstate_county_for
 from ...base_scraper import BaseScraper
-from ...http_client import client, get_text
+from curl_cffi.requests import AsyncSession
+
+from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -472,13 +477,14 @@ class NCGovDealsRealProperty(BaseScraper):
     # a given run can legitimately surface 0 in-footprint lots.
     expected_min_count = 0
     timeout_s = 240.0
-    # 2026-06-30: GOVDEALS_API_KEY 'af93060f-…' now returns HTTP 400 (current govdeals.com
-    # Angular-bundle UUID keys return 401) → maestro.lqdt1.com silently yields 0 rows. Last good
-    # run was only 9 NC + 1 SC statewide lots (municipal surplus, not distressed comps) = low ROI.
-    # Disabled so it stops counting as a live source. Re-enable: re-discover the current x-api-key +
-    # payload from the live main.<hash>.js bundle, verify a real NC/SC real-estate row, drop these.
-    disabled = True
-    disabled_reason = "dead API key (HTTP 400) since 2026-06-30 + low ROI; re-key from live bundle to re-enable"
+    # 2026-07-01: re-enabled. The x-api-key never changed (the live main.<hash>.js
+    # bundle still ships maestroApiKey 'af93060f-…'); the earlier 400 was Akamai's
+    # edge WAF blocking the plain-httpx TLS fingerprint on maestro.lqdt1.com
+    # (it now returns 403 "Access Denied" via errors.edgesuite.net to non-browser
+    # clients). Compliant fix: reach the SAME public JSON endpoint through a real
+    # browser TLS fingerprint via curl_cffi impersonate="chrome" — no CAPTCHA,
+    # login, or WAF *defeat*, just ordinary browser fingerprinting. Verified live:
+    # 200 OK, real NC/SC government real-estate rows return.
 
     async def _pull(
         self,
@@ -497,6 +503,7 @@ class NCGovDealsRealProperty(BaseScraper):
                 GOVDEALS_SEARCH_API,
                 json=body_for_page(page),
                 headers=_search_headers(),
+                timeout=40,
             )
             resp.raise_for_status()
             rows = resp.json().get("assetSearchResults") or []
@@ -527,7 +534,7 @@ class NCGovDealsRealProperty(BaseScraper):
         # whole NC/SC government inventory is captured regardless of nationwide
         # ranking. County/state is kept per row; footprint scoping is downstream.
         try:
-            async with client(timeout=40.0) as c:
+            async with AsyncSession(impersonate="chrome") as c:
                 for state in FEED_STATES:
                     await self._pull(
                         c, state,

@@ -43,15 +43,17 @@ signal; the parser is still exercised on whatever HTML was fetched.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Iterable, Optional
 
 import structlog
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
+from . import nc_ecourts_lis_pendens as _lp
 
 log = structlog.get_logger()
 
@@ -503,69 +505,154 @@ def _dump(label: str, content: str) -> None:
 
 class NCECourtsDivorce(BaseScraper):
     slug = "counties_nc.nc_ecourts_divorce"
-    name = "NC eCourts Divorce (Tyler Odyssey Smart Search)"
-    # 2026-06-27: disabled — same AWS-WAF escalating CAPTCHA as estates (0 results,
-    # burns Gemini quota, logs errors every run). Non-sealed divorce isn't compliantly
-    # reachable any other free way; re-enable only if the portal drops the WAF.
-    disabled = True
-    disabled_reason = "NC eCourts AWS-WAF CAPTCHA unsolvable (divorce); no free alternative"
+    name = "NC eCourts Divorce (Tyler Odyssey Judgment Search)"
+    # Re-enabled: divorce judgments are served by the SAME public, unauthenticated
+    # NC Judgment Search JSON endpoint that nc_ecourts_lis_pendens already uses
+    # (POST .../NCJudgmentSearchService/search, no browser, no AWS-WAF, no CAPTCHA).
+    # The endpoint indexes "FAM - Divorce" causes with both spouse parties, county,
+    # and the judgment date — everything needed for an address-less motivated-seller
+    # lead. The old WAF-walled Smart Search browser flow below (_drive_divorce_search)
+    # is retained per the keep-bypass-code policy but is no longer used.
     category = "county_court"
-    expected_min_count = 0
+    expected_min_count = 5
     timeout_s = 600.0
     requires_apify = False
     optional = True
 
-    LOOKBACK_DAYS = 120
+    # Judgment-search pagination (mirrors nc_ecourts_lis_pendens).
+    JUDGMENT_LOOKBACK_DAYS = 120
+    JUDGMENT_PAGE_SIZE = 200
+    JUDGMENT_MAX_PAGES = 25
+
+    # Family causes that indicate a divorce judgment. Absolute-divorce and
+    # bed-and-board variants all share the "FAM - Divorce" cause prefix.
+    DIVORCE_CAUSE_PREFIX = "FAM - Divorce"
 
     async def fetch(self) -> Iterable[Listing]:
-        try:
-            from scrapling.fetchers import StealthyFetcher
-        except ImportError:
-            log.warning("nc_ecourts_divorce.scrapling_missing")
-            return []
-
-        if os.environ.get("NC_ECOURTS_SKIP") == "1":
-            log.info("nc_ecourts_divorce.skip_via_env")
-            return []
-
-        captured: list[dict] = []
-
-        async def page_action(page):
-            result = await _drive_divorce_search(page, TARGET_COUNTIES, self.LOOKBACK_DAYS)
-            captured.extend(result)
-
-        try:
-            await StealthyFetcher.async_fetch(
-                SEARCH_URL,
-                headless=True,
-                network_idle=True,
-                timeout=240000,
-                page_action=page_action,
-                solve_cloudflare=True,
-                google_search=True,
-                wait=5000,
-                retries=2,
-            )
-        except Exception as exc:  # noqa: BLE001
-            log.warning("nc_ecourts_divorce.fetch_fail", error=str(exc)[:200])
-            return []
+        end = datetime.now()
+        start = end - timedelta(days=self.JUDGMENT_LOOKBACK_DAYS)
 
         listings: list[Listing] = []
-        seen: set[str] = set()
-        for row in captured:
-            li = _row_to_listing(row, self.slug)
-            if li is None:
-                continue
-            key = (li.case_number or "", li.county or "",
-                   (li.plaintiff or "").lower(), (li.defendant or "").lower())
-            if key in seen:
-                continue
-            seen.add(key)
-            listings.append(li)
+        seen: set[tuple[str, str]] = set()
 
-        log.info("nc_ecourts_divorce.parsed", listings=len(listings),
-                 raw_rows=len(captured))
+        from ...http_client import client
+
+        async with client(timeout=45.0, headers=_lp.SERVICE_HEADERS) as c:
+            # Step 1: empty POST -> initial searchObject template.
+            try:
+                r = await c.post(_lp.SERVICE_URL, content=b"")
+            except Exception as exc:  # noqa: BLE001
+                log.warning("nc_ecourts_divorce.template_fail", error=str(exc)[:160])
+                return []
+            if r.status_code not in (200, 201):
+                log.warning("nc_ecourts_divorce.template_status", status=r.status_code)
+                return []
+            try:
+                body = r.json()
+                template = body.get("searchObject") or body
+            except Exception as exc:  # noqa: BLE001
+                log.warning("nc_ecourts_divorce.template_parse_fail", error=str(exc)[:160])
+                return []
+
+            # Step 2: page through the family/divorce judgments.
+            for pg in range(self.JUDGMENT_MAX_PAGES):
+                so = _lp._build_search_object(
+                    template,
+                    counties=_lp.TARGET_COUNTIES,
+                    from_date=start,
+                    to_date=end,
+                    page_from=pg * self.JUDGMENT_PAGE_SIZE,
+                    page_size=self.JUDGMENT_PAGE_SIZE,
+                )
+                try:
+                    r2 = await c.post(_lp.SERVICE_URL, content=json.dumps(so).encode())
+                    result = (r2.json() or {}).get("searchResult") or {}
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("nc_ecourts_divorce.page_fail", page=pg, error=str(exc)[:120])
+                    break
+                hits = result.get("hits") or []
+                if not hits:
+                    break
+                for hit in hits:
+                    li = self._judgment_hit_to_listing(hit)
+                    if li is None:
+                        continue
+                    key = (li.case_number or "", li.county or "")
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    listings.append(li)
+                total = result.get("totalHits") or 0
+                if (pg + 1) * self.JUDGMENT_PAGE_SIZE >= total:
+                    break
+
+        log.info("nc_ecourts_divorce.parsed", listings=len(listings))
         return listings
+
+    def _judgment_hit_to_listing(self, hit: dict) -> Optional[Listing]:
+        cause = hit.get("causeOfActionDesc") or ""
+        if not cause.startswith(self.DIVORCE_CAUSE_PREFIX):
+            return None
+        # Skip dead dispositions (dismissed/withdrawn/vacated divorces are not leads).
+        status = (hit.get("civilJudgmentStatus") or "").strip().lower()
+        if any(t in status for t in ("dismiss", "withdraw", "vacat", "denied")):
+            return None
+        case_number = (hit.get("caseNumber") or "").strip()
+        location = hit.get("location") or ""
+        county = _lp._strip_court_suffix(location)
+        if not case_number or not county:
+            return None
+
+        # Both spouses: the judgment index files them as debtor (defendant) and
+        # creditor (plaintiff). Either is a candidate owner of the marital home.
+        debtors = hit.get("debtors") or []
+        creditors = hit.get("creditors") or []
+        defendant = "; ".join(d.get("name", "") for d in debtors if d.get("name"))[:300] or None
+        plaintiff = "; ".join(c.get("name", "") for c in creditors if c.get("name"))[:300] or None
+        if not (defendant or plaintiff):
+            return None
+
+        od = hit.get("orderedDate")
+        ordered_iso = None
+        if od:
+            try:
+                ordered_iso = datetime.fromisoformat(od.replace("Z", "+00:00")).isoformat()
+            except (ValueError, TypeError):
+                ordered_iso = None
+
+        return Listing(
+            source=self.slug,
+            source_url=f"{_lp.APP_BASE}#/search?caseNumber={case_number}",
+            listing_type=ListingType.DIVORCE_NOTICE,
+            property_kind=PropertyKind.UNKNOWN,
+            state="NC",
+            county=county,
+            case_number=case_number,
+            plaintiff=plaintiff,
+            defendant=defendant,
+            sale_date=None,
+            description=f"{cause} judgment in {location}: {case_number}",
+            first_seen=datetime.utcnow(),
+            last_seen=datetime.utcnow(),
+            raw={
+                "nc_ecourts": {
+                    "cause": cause,
+                    "civilJudgmentStatus": hit.get("civilJudgmentStatus"),
+                    "caseID": hit.get("caseID"),
+                    "judgmentId": hit.get("judgmentId"),
+                    "orderedDate": od,
+                    "ordered_date_iso": ordered_iso,
+                    "location": location,
+                },
+                # distress_score.score reads relationship_signal.kind == "divorce"
+                # (LIFE_EVENT, weight 15) — this is what routes the lead into scoring.
+                "relationship_signal": {
+                    "kind": "divorce",
+                    "keyword": "nc_ecourts_divorce_judgment",
+                    "source": self.slug,
+                },
+            },
+        )
 
 
 # Quick local iteration:
