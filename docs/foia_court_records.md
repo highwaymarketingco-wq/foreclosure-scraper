@@ -17,12 +17,17 @@ data the portal won't show (e.g. judgment $ amounts).**
   **Court Agency** (Common Pleas / Family / Probate / Magistrate) → search → save the page.
 
 ### Case types to grab (each is a different motivated-seller trigger)
-| Lane | Why it's a lead | NC (eCourts) | SC (PublicIndex) |
+| Lane | Why it's a lead | NC (eCourts) | SC (PublicIndex — "Court Agency" dropdown) |
 |---|---|---|---|
-| **Foreclosure** | owner losing the property | Special Proceeding (power of sale) | Common Pleas → "Foreclosure" |
-| **Probate / Estate** | heirs inherit a house they'll sell | **Estates** (Clerk of Superior Court, E-files) | **Probate** court |
-| **Divorce** | forced sale / buy-out on split | Civil ▸ District ▸ Domestic (absolute divorce / equitable distribution) | **Family** court |
-| **Criminal** | owner incarcerated → vacant/distressed (low hit-rate, do last) | Criminal | General Sessions |
+| **Foreclosure** | owner losing the property | Special Proceeding (power of sale) | **Common Pleas** + **Master In Equity** (foreclosures are filed in Common Pleas and referred to the MIE — MIE also carries the sale + judgment $) |
+| **Eviction** | distressed landlord/tenant | (small claims / magistrate) | **[County] Magistrate** + **Magistrate Region #1/#2/#3** (grab all regions) |
+| **Probate / Estate** | heirs inherit a house they'll sell | **Estates** (Clerk of Superior Court, E-files) | NOT on PublicIndex — SC estates are in the separate county **Probate Court** (we already pull these another way) |
+| **Divorce** | forced sale / buy-out on split | Civil ▸ District ▸ Domestic | NOT on PublicIndex — SC **Family Court** is separate + largely access-restricted |
+| **Criminal** | owner incarcerated → vacant (low hit-rate, do last) | Criminal | General Sessions (felony) — skip unless time |
+
+**SC "Court Agency" dropdown — pick these:** Common Pleas, Master In Equity, and the
+county Magistrate + its Region #1/#2/#3. **Skip:** Bond Court, all Municipal courts
+(Cowpens/Duncan/Pacolet/City), Transfer Court, and (usually) General Sessions.
 
 ### Time estimate (be realistic)
 ~2 min per (county × case-type) search+save. Priorities:
