@@ -27,6 +27,9 @@ from .models import Listing
 _ENABLED = os.environ.get("BUYER_MATCH") == "1"  # dashboard matches client-side; off by default
 _CAP_PER_TYPE = int(os.environ.get("BUYER_MATCH_CAP", "4"))
 _DATA = Path(__file__).resolve().parent / "data" / "land_buyers.json"
+# Empirical layer built by scripts/build_buyer_registry.py from recorded deeds.
+_DISCOVERED = Path(__file__).resolve().parent / "data" / "discovered_cash_buyers.json"
+_LENDERS = Path(__file__).resolve().parent / "data" / "private_lenders.json"
 
 _WNC = {"Buncombe", "Henderson", "Rutherford", "McDowell", "Cleveland", "Polk",
         "Gaston", "Lincoln", "Burke", "Transylvania", "Mitchell", "Madison"}
@@ -56,6 +59,7 @@ _HOUSE_BUYERS = [
 ]
 
 _REGISTRY: list | None = None
+_DISCOVERED_CACHE: tuple[list, list] | None = None
 
 
 def _load() -> list:
@@ -66,6 +70,63 @@ def _load() -> list:
         except Exception:
             _REGISTRY = []
     return _REGISTRY
+
+
+def _load_discovered() -> tuple[list, list]:
+    """(cash_buyers, private_lenders) mined from recorded deeds. Empty if unbuilt."""
+    global _DISCOVERED_CACHE
+    if _DISCOVERED_CACHE is None:
+        try:
+            buyers = json.loads(_DISCOVERED.read_text()).get("buyers", [])
+        except Exception:
+            buyers = []
+        try:
+            lenders = json.loads(_LENDERS.read_text()).get("lenders", [])
+        except Exception:
+            lenders = []
+        _DISCOVERED_CACHE = (buyers, lenders)
+    return _DISCOVERED_CACHE
+
+
+def _discovered_for(li: Listing, region: str, category: str) -> dict:
+    """Surface the empirical layer for a lead: real recent buyers whose county/region
+    and land/improved appetite fit, plus (on distressed leads) private gator lenders."""
+    buyers, lenders = _load_discovered()
+    out: dict[str, list] = {}
+    county = (li.county or "").replace(" County", "").strip().title()
+    st = (li.state or "").upper()
+    want_land = category == "land"
+    active = []
+    for b in buyers:
+        cnts = b.get("counties") or {}
+        same_county = f"{county},{st}" in cnts
+        same_region = any(_region(k.split(",")[0]) == region for k in cnts)
+        if not (same_county or same_region):
+            continue
+        # Land leads -> land buyers; improved leads -> improved buyers (soft).
+        if want_land and b.get("buys") == "improved" and b.get("tier") != "active":
+            continue
+        active.append((same_county, b.get("deals", 0), b))
+    active.sort(key=lambda t: (not t[0], -t[1]))
+    picks = [b for *_x, b in active][:_CAP_PER_TYPE]
+    if picks:
+        out["recent_cash_buyers"] = [
+            {"name": b["name"], "deals": b.get("deals"),
+             "buys": b.get("buys"), "counties": list((b.get("counties") or {}).keys()),
+             "note": "bought here recently (recorded deed)"} for b in picks]
+    # Gator / private-lender lane — only on genuinely distressed/creative leads.
+    stack = (li.raw or {}).get("distress_stack") if isinstance(li.raw, dict) else None
+    tier = (stack or {}).get("tier")
+    fit = (li.raw or {}).get("strategy_fit", {}).get("tag") if isinstance(li.raw, dict) else None
+    if tier in ("HOT", "WARM") or fit in ("SUBJECT_TO", "FIX_FLIP", "GATOR", "WHOLESALE"):
+        gators = [lo for lo in lenders if lo.get("kind") == "individual"][:2] \
+            + [lo for lo in lenders if lo.get("kind") != "individual"][:_CAP_PER_TYPE]
+        if gators:
+            out["gator_lenders"] = [
+                {"name": lo["name"], "loans": lo.get("loans"), "kind": lo.get("kind"),
+                 "note": "active private/non-bank lender (recorded mortgage)"}
+                for lo in gators[:_CAP_PER_TYPE]]
+    return out
 
 
 def _region(county: str) -> str | None:
@@ -159,6 +220,9 @@ def enrich_buyer_match(listings: Iterable[Listing]) -> dict:
             houses = [h for h in _HOUSE_BUYERS if h.get("region") in (None, region)]
             if houses:
                 by_type["house_buyers"] = [{"name": h["name"], "contact": h["contact"], "buys": h["buys"]} for h in houses]
+
+        # Empirical layer: real recent buyers + gator lenders mined from deeds.
+        by_type.update(_discovered_for(li, region, category))
 
         if by_type:
             cnt = sum(len(v) for v in by_type.values())

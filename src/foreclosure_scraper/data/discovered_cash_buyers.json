@@ -1,0 +1,5162 @@
+{
+  "generated": "2026-07-01",
+  "window_days": 75,
+  "min_deals": 2,
+  "note": "Repeat entity grantees on recorded DEEDs = live cash buyers (wholesale dispo). Free ROD mining; contact via SoS registered-agent (LLC) or skip-trace.",
+  "buyers": [
+    {
+      "name": "ALBEMARLE U.S., INC.",
+      "deals": 25,
+      "tier": "active",
+      "counties": {
+        "Cleveland,NC": 25
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2445520",
+        "Cleveland,NC:1-2445534",
+        "Cleveland,NC:1-2447065"
+      ]
+    },
+    {
+      "name": "NVR INC",
+      "deals": 9,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 9
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5028-13-14-7242",
+        "Pickens,SC:5028-13-14-8841",
+        "Pickens,SC:5018-16-94-4901"
+      ]
+    },
+    {
+      "name": "OPENDOOR PROPERTY TRUST I",
+      "deals": 6,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 1,
+        "Cleveland,NC": 4,
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5018-08-78-4621",
+        "Cleveland,NC:1-2444584",
+        "Cleveland,NC:1-2444890"
+      ]
+    },
+    {
+      "name": "TWO BLUE STALLIONS LLC",
+      "deals": 5,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 5
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4065-07-58-6255",
+        "Pickens,SC:4054-15-74-0145",
+        "Pickens,SC:4044-12-96-3310"
+      ]
+    },
+    {
+      "name": "UNIVERSITY COTTAGES LLC",
+      "deals": 4,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 4
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4054-08-87-8920",
+        "Pickens,SC:4044-12-96-2031",
+        "Pickens,SC:4053-11-67-2244"
+      ]
+    },
+    {
+      "name": "2111 PACKARD LLC",
+      "deals": 3,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 3
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4054-11-55-2523",
+        "Pickens,SC:4054-14-44-9222",
+        "Pickens,SC:4054-15-54-0258"
+      ]
+    },
+    {
+      "name": "BELL PROPERTIES OF GREENVILLE LLC",
+      "deals": 3,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 3
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5122-04-64-4028",
+        "Pickens,SC:4192-05-28-3993",
+        "Pickens,SC:4195-00-56-6272"
+      ]
+    },
+    {
+      "name": "CMH HOMES, INC.",
+      "deals": 3,
+      "tier": "active",
+      "counties": {
+        "Burke,NC": 2,
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5119892",
+        "Burke,NC:1-5126485",
+        "Cleveland,NC:1-2448302"
+      ]
+    },
+    {
+      "name": "DNA VICTORY, LLC",
+      "deals": 3,
+      "tier": "active",
+      "counties": {
+        "Henderson,NC": 3
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3669057",
+        "Henderson,NC:1-3669059",
+        "Henderson,NC:1-3669065"
+      ]
+    },
+    {
+      "name": "GSP INVESTORS LLC",
+      "deals": 3,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 3
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5009-19-61-1592",
+        "Pickens,SC:4150-00-36-6097",
+        "Pickens,SC:5116-00-37-2256"
+      ]
+    },
+    {
+      "name": "HINKLE HOMES, LLC",
+      "deals": 3,
+      "tier": "active",
+      "counties": {
+        "Henderson,NC": 3
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3676338",
+        "Henderson,NC:1-3676342",
+        "Henderson,NC:1-3676346"
+      ]
+    },
+    {
+      "name": "LB FUTURES, LLC",
+      "deals": 3,
+      "tier": "active",
+      "counties": {
+        "Cleveland,NC": 3
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2446022",
+        "Cleveland,NC:1-2446024",
+        "Cleveland,NC:1-2446025"
+      ]
+    },
+    {
+      "name": "LENNAR CAROLINAS, LLC",
+      "deals": 3,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 1,
+        "Cleveland,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5029-08-89-1263",
+        "Cleveland,NC:1-2446314",
+        "Cleveland,NC:1-2451645"
+      ]
+    },
+    {
+      "name": "NEW DAY HOUSE BUYERS, LLC",
+      "deals": 3,
+      "tier": "active",
+      "counties": {
+        "Burke,NC": 3
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5119245",
+        "Burke,NC:1-5123085",
+        "Burke,NC:1-5126308"
+      ]
+    },
+    {
+      "name": "OPENDOOR PROPERTY J, LLC",
+      "deals": 3,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 1,
+        "Cleveland,NC": 1,
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4190-17-12-4292",
+        "Cleveland,NC:1-2447009",
+        "Henderson,NC:1-3674013"
+      ]
+    },
+    {
+      "name": "PJS PROPERTIES LLC",
+      "deals": 3,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 3
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5029-10-36-8380",
+        "Pickens,SC:5018-19-71-2384",
+        "Pickens,SC:5049-16-74-9629"
+      ]
+    },
+    {
+      "name": "STANLEY MARTIN HOMES LLC",
+      "deals": 3,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 3
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4066-00-70-9810",
+        "Pickens,SC:4056-17-10-3717",
+        "Pickens,SC:5120-17-11-5684"
+      ]
+    },
+    {
+      "name": "103 EASLEY LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5019-16-84-7011",
+        "Pickens,SC:5019-16-84-7011"
+      ]
+    },
+    {
+      "name": "ALTERMAN TIGER BLVD LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4044-16-84-0567",
+        "Pickens,SC:4044-16-84-0567"
+      ]
+    },
+    {
+      "name": "AMARX CONSTRUCTION, LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Henderson,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3670581",
+        "Henderson,NC:1-3679702"
+      ]
+    },
+    {
+      "name": "ANDERS PROPERTIES LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5140-18-32-2397",
+        "Pickens,SC:5029-15-63-5057"
+      ]
+    },
+    {
+      "name": "BLUE PINNACLE HOMES, LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Henderson,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3670341",
+        "Henderson,NC:1-3670849"
+      ]
+    },
+    {
+      "name": "BUILD-MORE CONSTRUCTION COMPANY LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Madison,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1696779",
+        "Madison,NC:1-1696780"
+      ]
+    },
+    {
+      "name": "CLAUDE DAVID THRONEBURG REVOCABLE LIVING TRUST DATED 01/21/2026",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Burke,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5120749",
+        "Burke,NC:1-5120752"
+      ]
+    },
+    {
+      "name": "CLEVELAND HILL HOMEOWNERS ASSOCIATION, INC.",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Cleveland,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2444416",
+        "Cleveland,NC:1-2450514"
+      ]
+    },
+    {
+      "name": "DETWEILER CONSTRUCTION, INC.",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Burke,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5118828",
+        "Burke,NC:1-5118829"
+      ]
+    },
+    {
+      "name": "GOLDMAN STREET LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4053-11-56-0271",
+        "Pickens,SC:4053-11-56-1415"
+      ]
+    },
+    {
+      "name": "GREAT SOUTHERN HOMES INC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4056-17-10-0354",
+        "Pickens,SC:5120-17-11-5684"
+      ]
+    },
+    {
+      "name": "HARRELSON PROPERTIES, LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Cleveland,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2447601",
+        "Cleveland,NC:1-2448594"
+      ]
+    },
+    {
+      "name": "HOLDER EDENS LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4098-14-44-0252",
+        "Pickens,SC:4098-14-44-0252"
+      ]
+    },
+    {
+      "name": "HOOK PROPERTIES, LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Burke,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5125900",
+        "Burke,NC:1-5126287"
+      ]
+    },
+    {
+      "name": "HUNTER QUINN HOMES LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4076-17-10-4682",
+        "Pickens,SC:4076-17-01-7865"
+      ]
+    },
+    {
+      "name": "J & J PROPERTIES OF PICKENS SC LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4162-00-96-2605",
+        "Pickens,SC:5133-04-63-7675"
+      ]
+    },
+    {
+      "name": "JDPK LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5006-02-56-6526",
+        "Pickens,SC:5006-02-56-8239"
+      ]
+    },
+    {
+      "name": "KM KELLER VENTURES LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4130-00-68-5550",
+        "Pickens,SC:4057-00-18-1112"
+      ]
+    },
+    {
+      "name": "LEGACY HOME OF RECOVERY THE",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4140-00-84-5481",
+        "Pickens,SC:4140-00-84-4723"
+      ]
+    },
+    {
+      "name": "LMC LEGACY HOLDINGS, LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Cleveland,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2446632",
+        "Cleveland,NC:1-2446633"
+      ]
+    },
+    {
+      "name": "LOBLOLLY 123 LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5130-00-56-5704 P/O",
+        "Pickens,SC:5130-00-56-5704 P/O"
+      ]
+    },
+    {
+      "name": "MARTIN BURG LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4074-00-36-8027",
+        "Pickens,SC:4074-00-35-5969"
+      ]
+    },
+    {
+      "name": "MDGEE, LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Cleveland,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2450436",
+        "Cleveland,NC:1-2450437"
+      ]
+    },
+    {
+      "name": "MULBERRY FARM-MADISON, LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Madison,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1694446",
+        "Madison,NC:1-1697346"
+      ]
+    },
+    {
+      "name": "NEWTON SCOTT SIGNATURE HOMES LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4064-06-28-1196",
+        "Pickens,SC:4064-06-27-8818 P/O"
+      ]
+    },
+    {
+      "name": "NTNWIN LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4053-11-67-4109",
+        "Pickens,SC:4054-18-21-8732"
+      ]
+    },
+    {
+      "name": "OAK & WILLOW BUILDERS, LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Cleveland,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2446717",
+        "Cleveland,NC:1-2446772"
+      ]
+    },
+    {
+      "name": "PHILADELPHIA PROPERTIES LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Cleveland,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448268",
+        "Cleveland,NC:1-2449493"
+      ]
+    },
+    {
+      "name": "RATHLEAD FARMS LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Cleveland,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2445513",
+        "Cleveland,NC:1-2450819"
+      ]
+    },
+    {
+      "name": "SECU*RE, INC.",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Burke,NC": 2
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Burke,NC:1-5120722",
+        "Burke,NC:1-5125830"
+      ]
+    },
+    {
+      "name": "SHEGLE ENTERPRISES LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5019-17-00-0330",
+        "Pickens,SC:5009-16-93-9926"
+      ]
+    },
+    {
+      "name": "SIRRINE ST FARMS LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4088-16-52-4401",
+        "Pickens,SC:4088-19-52-4401"
+      ]
+    },
+    {
+      "name": "SRE 2 LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5028-12-95-5190",
+        "Pickens,SC:5028-12-95-5190"
+      ]
+    },
+    {
+      "name": "THE MCCLANAHAN REVOCABLE TRUST",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Madison,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1696807",
+        "Madison,NC:1-1696817"
+      ]
+    },
+    {
+      "name": "THE MOONDANCE TRUST",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Henderson,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3675060",
+        "Henderson,NC:1-3675062"
+      ]
+    },
+    {
+      "name": "VILLAGE CLEMSON OWNER LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Pickens,SC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4044-11-66-9178",
+        "Pickens,SC:4044-11-66-9178"
+      ]
+    },
+    {
+      "name": "WESTERN CAROLINA DEVELOPERS LLC",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Burke,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5120287",
+        "Burke,NC:1-5123851"
+      ]
+    },
+    {
+      "name": "WINDSOR BUILT HOMES, INC.",
+      "deals": 2,
+      "tier": "active",
+      "counties": {
+        "Henderson,NC": 2
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3678827",
+        "Henderson,NC:1-3678829"
+      ]
+    },
+    {
+      "name": "1017 SMITH GROVE ROAD LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5008-00-82-1155"
+      ]
+    },
+    {
+      "name": "120 DANIEL DRIVE 14 LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4044-20-91-0397"
+      ]
+    },
+    {
+      "name": "1221 HOLDINGS INC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4171-00-75-7505"
+      ]
+    },
+    {
+      "name": "129 ARBORS COURT LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4055-12-76-7011"
+      ]
+    },
+    {
+      "name": "139 MCJUNKIN RD LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4065-05-08-3848"
+      ]
+    },
+    {
+      "name": "1495 GROUP, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3677696"
+      ]
+    },
+    {
+      "name": "28 EIGHTEEN LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4065-17-22-1075"
+      ]
+    },
+    {
+      "name": "280 TIMBERSIDE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1698879"
+      ]
+    },
+    {
+      "name": "289 ZION CHURCH RD LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5027-05-17-4157"
+      ]
+    },
+    {
+      "name": "304 LINWOOD LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2450864"
+      ]
+    },
+    {
+      "name": "403 A HILLCREST LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5019-11-66-5897"
+      ]
+    },
+    {
+      "name": "46 BEALE COURT, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3671720"
+      ]
+    },
+    {
+      "name": "5200 WILD TURKEY TRUST, DATED 03/25/2026",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Burke,NC:1-5123793"
+      ]
+    },
+    {
+      "name": "526 JOHNSON RD LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5027-09-17-6404"
+      ]
+    },
+    {
+      "name": "599 OVERLOOK DRIVE REVOCABLE TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3667909"
+      ]
+    },
+    {
+      "name": "AH NC PROPERTY HOLDINGS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3678719"
+      ]
+    },
+    {
+      "name": "ALAN B. TURNER AND JUDY L. RINEHART-TURNER FAMILY TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3672039"
+      ]
+    },
+    {
+      "name": "ALEXANDER V. PROPERTIES, L.L.C.",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3668328"
+      ]
+    },
+    {
+      "name": "ALRAY TIRE HOLDINGS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448847"
+      ]
+    },
+    {
+      "name": "ALTAIR LAND & FARM LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2444647"
+      ]
+    },
+    {
+      "name": "ALTANO PARTNERS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2445243"
+      ]
+    },
+    {
+      "name": "AMBER BIRCH TRUST DATED 4/1/2026",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448885"
+      ]
+    },
+    {
+      "name": "AMBER1 LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3670729"
+      ]
+    },
+    {
+      "name": "ANCOR ENTERPRISES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5008-10-45-6055"
+      ]
+    },
+    {
+      "name": "ANN G. BUTTS REVOCABLE TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3673862"
+      ]
+    },
+    {
+      "name": "APPLE HILL SUMMIT, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3672857"
+      ]
+    },
+    {
+      "name": "ARLEE HOMES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2446831"
+      ]
+    },
+    {
+      "name": "AS LUXE STAYS RIDGE 121SW LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Madison,NC:1-1698369"
+      ]
+    },
+    {
+      "name": "ASHEVILLE INDUSTRIAL OWNER III LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3668236"
+      ]
+    },
+    {
+      "name": "ASR GRAIN COMPANY LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2449266"
+      ]
+    },
+    {
+      "name": "AXE INVESTMENTS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448516"
+      ]
+    },
+    {
+      "name": "B & D SPECIALTY CONTRACTORS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4190-07-68-0253"
+      ]
+    },
+    {
+      "name": "B & G ENTERPRISES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3677195"
+      ]
+    },
+    {
+      "name": "BAKER FAMILY REVOCABLE TRUST DATED 06/10/2026",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5126466"
+      ]
+    },
+    {
+      "name": "BARKSDALE LANE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5059-13-13-4203"
+      ]
+    },
+    {
+      "name": "BARTON PROPERTIES 215 LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5028-12-95-5190"
+      ]
+    },
+    {
+      "name": "BAT CAVE PROVISIONS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3678565"
+      ]
+    },
+    {
+      "name": "BBH PROPERTY GROUP LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4044-20-81-7941215"
+      ]
+    },
+    {
+      "name": "BEACON PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5048-07-67-7743"
+      ]
+    },
+    {
+      "name": "BEAVER COMPANIES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448294"
+      ]
+    },
+    {
+      "name": "BELOUSOV RENTALS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4184-00-92-4261"
+      ]
+    },
+    {
+      "name": "BENTLY 2, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448756"
+      ]
+    },
+    {
+      "name": "BEST LUCK HOMES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5059-14-22-8644"
+      ]
+    },
+    {
+      "name": "BF REAL ESTATE HICKORY HOUSE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4141-00-11-2081"
+      ]
+    },
+    {
+      "name": "BHRE I LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2444326"
+      ]
+    },
+    {
+      "name": "BIG WOODS INVESTMENTS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3669067"
+      ]
+    },
+    {
+      "name": "BK RE HOLDINGS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5038-05-29-2512"
+      ]
+    },
+    {
+      "name": "BLUE BIRD POINT LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4064-18-41-4577"
+      ]
+    },
+    {
+      "name": "BLUE BUYS HOUSES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5122961"
+      ]
+    },
+    {
+      "name": "BLUE JAY LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4066-00-13-9010"
+      ]
+    },
+    {
+      "name": "BLUE RIDGE ACQUISITION GROUP LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5019-12-95-5773"
+      ]
+    },
+    {
+      "name": "BLUE RIDGE ACQUISTION GROUP LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4065-05-19-8413"
+      ]
+    },
+    {
+      "name": "BLUE RIDGE HOME CONSTRUCTION, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3672887"
+      ]
+    },
+    {
+      "name": "BRADSHAW'S INVESTMENTS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5122733"
+      ]
+    },
+    {
+      "name": "BRANDYWOOD HOMES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5123-00-06-6486 P/O"
+      ]
+    },
+    {
+      "name": "BROAD RIVER HOLDINGS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2449037"
+      ]
+    },
+    {
+      "name": "BROWN AND HARVELL LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5123-00-39-3957"
+      ]
+    },
+    {
+      "name": "BROWN HARVELL PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4099-00-32-0580"
+      ]
+    },
+    {
+      "name": "BRUCE E. GOSNELL REVOCABLE TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3679984"
+      ]
+    },
+    {
+      "name": "BUFFALO CREEK BUILDERS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448432"
+      ]
+    },
+    {
+      "name": "BULLZEYE SERVICES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5122046"
+      ]
+    },
+    {
+      "name": "BURKEMONT PROPERTY MANAGEMENT, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Cleveland,NC:1-2444892"
+      ]
+    },
+    {
+      "name": "BUTTERFLY HOME LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4048-00-35-1000"
+      ]
+    },
+    {
+      "name": "C JONES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4054-08-98-2623"
+      ]
+    },
+    {
+      "name": "C&M PROPERTY DEVELOPMENT, INC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2445013"
+      ]
+    },
+    {
+      "name": "CALHOUN DEVELOPMENT LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4064-05-09-5647"
+      ]
+    },
+    {
+      "name": "CAM INVESTMENT GROUP, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3678599"
+      ]
+    },
+    {
+      "name": "CARAS REVOCABLE MANAGEMENT TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3678349"
+      ]
+    },
+    {
+      "name": "CARBON CITY QUICK MART, INC.",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5122154"
+      ]
+    },
+    {
+      "name": "CAROL CLAYDON PAYNE LIVING TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3671262"
+      ]
+    },
+    {
+      "name": "CAROLINA LEGACY INVESTMENTS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3677336"
+      ]
+    },
+    {
+      "name": "CAROLINA VACATION RENTAL PARTNERS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2446145"
+      ]
+    },
+    {
+      "name": "CASAS CUSTOM HOMES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3672405"
+      ]
+    },
+    {
+      "name": "CECILE ANN DUVAL REVOCABLE TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3674014"
+      ]
+    },
+    {
+      "name": "CGMH LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4191-13-03-5527"
+      ]
+    },
+    {
+      "name": "CHEEK JOINT REVOCABLE TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3679986"
+      ]
+    },
+    {
+      "name": "CHESTER H. BRIGGS REVOCABLE TRUST DATED 05/05/2010",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5123082"
+      ]
+    },
+    {
+      "name": "CHILDERS ST. REAL ESTATE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2445652"
+      ]
+    },
+    {
+      "name": "CIRCLE F NORICK DRIVE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2447626"
+      ]
+    },
+    {
+      "name": "CLASS IV CABIN, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1694832"
+      ]
+    },
+    {
+      "name": "CLAYTON PROPERTIES GROUP INC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5017-00-93-0106"
+      ]
+    },
+    {
+      "name": "CLEMSON PAW PARTNERS",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4076-14-33-1848"
+      ]
+    },
+    {
+      "name": "CLICK PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5029-13-14-3378 P/O"
+      ]
+    },
+    {
+      "name": "CLIFFS AT KEOWEE SPRINGS OWNERS ASSOCIATION INC THE",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4039-00-57-7350 P/O"
+      ]
+    },
+    {
+      "name": "CLIFFS CLUB HOLDINGS LLC THE",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4039-00-44-4295"
+      ]
+    },
+    {
+      "name": "CLONINGER HOMES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Burke,NC:1-5120859"
+      ]
+    },
+    {
+      "name": "COLDBREW HOLDINGS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4191-13-04-4836"
+      ]
+    },
+    {
+      "name": "COLE AND JOESY PATE LIVING TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3676744"
+      ]
+    },
+    {
+      "name": "CONCORD INVESTMENTS GROUP LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3676552"
+      ]
+    },
+    {
+      "name": "COUNTRY SQUIRE MHP, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3678141"
+      ]
+    },
+    {
+      "name": "COVES END INVESTMENTS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4053-07-59-3864"
+      ]
+    },
+    {
+      "name": "CREEKSIDE PLACE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4064-09-07-3032"
+      ]
+    },
+    {
+      "name": "CRITERION PROPERTIES AND PROPERTY MANAGEMENT L.L.C.",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2450489"
+      ]
+    },
+    {
+      "name": "CROSSWELL FIRST BAPTIST CHURCH INC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5059-14-34-0131"
+      ]
+    },
+    {
+      "name": "CRUZ FAMILY TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3679998"
+      ]
+    },
+    {
+      "name": "D AND B OF SC LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5116-00-23-9488"
+      ]
+    },
+    {
+      "name": "D.A.M. ENTERPRISES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1695993"
+      ]
+    },
+    {
+      "name": "DAVID MILLER CONSTRUCTION, INC.",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5119495"
+      ]
+    },
+    {
+      "name": "DAVIDSON PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2444438"
+      ]
+    },
+    {
+      "name": "DAVIS FAMILY LAND, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3678191"
+      ]
+    },
+    {
+      "name": "DELLA MAE OHANIAN IRREVOCABLE TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1695812"
+      ]
+    },
+    {
+      "name": "DEVOE RENTALS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2445672"
+      ]
+    },
+    {
+      "name": "DFH LIBERTY LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5008-11-56-7220"
+      ]
+    },
+    {
+      "name": "DILLARD PROPERTIES OF CALDWELL COUNTY, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Burke,NC:1-5124719"
+      ]
+    },
+    {
+      "name": "DOGWOOD PINES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4044-11-75-3644047"
+      ]
+    },
+    {
+      "name": "DOMUS TR LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4066-00-01-1550"
+      ]
+    },
+    {
+      "name": "DONALD E. ELLIS LIVING TRUST, DATED MAY 14, 2026",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2449726"
+      ]
+    },
+    {
+      "name": "DOUBLE BLACK DEVELOPMENT, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2449175"
+      ]
+    },
+    {
+      "name": "DRB GROUP SOUTH CAROLINA LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5028-10-47-3042"
+      ]
+    },
+    {
+      "name": "DS THIRD AVE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3673064"
+      ]
+    },
+    {
+      "name": "DURHAM COMPANY OF EASLEY INC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4096-00-02-4324"
+      ]
+    },
+    {
+      "name": "DWIGHT GOODSON JENKINS AND JANIE PATTON JENKINS FAMILY TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1696702"
+      ]
+    },
+    {
+      "name": "E5 PROPERTY CLEMSON LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4054-18-32-1445"
+      ]
+    },
+    {
+      "name": "EARLE ENTERPRISES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4088-18-40-8686"
+      ]
+    },
+    {
+      "name": "EBOHNIE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2444418"
+      ]
+    },
+    {
+      "name": "ECC PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5029-18-31-2156"
+      ]
+    },
+    {
+      "name": "EESHA B LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2449963"
+      ]
+    },
+    {
+      "name": "EIRU ENTERPRISES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3668080"
+      ]
+    },
+    {
+      "name": "ELISE VAN AUDENHOVE TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3675547"
+      ]
+    },
+    {
+      "name": "ELIZABETH ANDERSON LIVING TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Madison,NC:1-1698203"
+      ]
+    },
+    {
+      "name": "ELK DELL REVOCABLE TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3677860"
+      ]
+    },
+    {
+      "name": "ELM 224 LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4044-11-75-3644"
+      ]
+    },
+    {
+      "name": "EMET LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Madison,NC:1-1697057"
+      ]
+    },
+    {
+      "name": "ENCLAVE AT DEAL ST PHASE 1, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448208"
+      ]
+    },
+    {
+      "name": "EPICUREAN HOLDINGS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5121033"
+      ]
+    },
+    {
+      "name": "ETHER SCREEN EQUITIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4054-09-05-2704"
+      ]
+    },
+    {
+      "name": "ETS RESTORE + CONSTRUCT LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3668341"
+      ]
+    },
+    {
+      "name": "EVOLUTION AVENUE, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5122501"
+      ]
+    },
+    {
+      "name": "FABLE FARM AND FORESTRY, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3675044"
+      ]
+    },
+    {
+      "name": "FAIRVIEW CUSTOM HOMES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4130-00-57-9853"
+      ]
+    },
+    {
+      "name": "FAMILY KEYS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4048-12-75-5277"
+      ]
+    },
+    {
+      "name": "FG COMMUNITIES AT HENDERSONVILLE DUNCAN HILL LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3667353"
+      ]
+    },
+    {
+      "name": "FINANCIAL GUARANTY CORPORATION, INC.",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3676157"
+      ]
+    },
+    {
+      "name": "FIRST-CITIZENS BANK & TRUST COMPANY",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5121041"
+      ]
+    },
+    {
+      "name": "FLAT GAP FORESTRY LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5121924"
+      ]
+    },
+    {
+      "name": "FLETCHER INVESTMENTS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5100-17-10-5944"
+      ]
+    },
+    {
+      "name": "FLINTLOCK, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3679738"
+      ]
+    },
+    {
+      "name": "FLORENCE A. SCARBOROUGH REVOCABLE TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3668190"
+      ]
+    },
+    {
+      "name": "FOI HOMES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4078-16-84-9966"
+      ]
+    },
+    {
+      "name": "FOOTHILLS FAMILY FINANCE, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5119737"
+      ]
+    },
+    {
+      "name": "FOX FAMILY BUILDERS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4130-00-77-1901"
+      ]
+    },
+    {
+      "name": "FRED PL CONCRETE & CONSTRUCTION LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1695237"
+      ]
+    },
+    {
+      "name": "GAIL P. PARTNEY REVOCABLE LIVING TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Madison,NC:1-1696866"
+      ]
+    },
+    {
+      "name": "GARNET & BLACK INVESTMENTS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2444748"
+      ]
+    },
+    {
+      "name": "GERALD KEITH SULLINS AND MICHELE CARTER SULLINS REVOCABLE TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3675425"
+      ]
+    },
+    {
+      "name": "GLENDA B. CHILDRES REVOCABLE TRUST, DATED 05/07/2026",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5121860"
+      ]
+    },
+    {
+      "name": "GOLDEN BAY HOLDINGS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4044-18-42-3371"
+      ]
+    },
+    {
+      "name": "GOODNOUGH PROPERTIES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1697515"
+      ]
+    },
+    {
+      "name": "GOT HOMES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2447961"
+      ]
+    },
+    {
+      "name": "GRAACE PROPERTIES II LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3667321"
+      ]
+    },
+    {
+      "name": "GRANDPOPPA FARMS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3680324"
+      ]
+    },
+    {
+      "name": "GREENE PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5121078"
+      ]
+    },
+    {
+      "name": "GREG PANNONE LIVING TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3667286"
+      ]
+    },
+    {
+      "name": "GROWFASTER LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5122789"
+      ]
+    },
+    {
+      "name": "GRV INVESTMENTS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5029-13-22-1913"
+      ]
+    },
+    {
+      "name": "H&M HOME SOLUTIONS",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5119799"
+      ]
+    },
+    {
+      "name": "HAMRICK-BENTON & CO. LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448886"
+      ]
+    },
+    {
+      "name": "HANVEY PROPERTY MANAGEMENT LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5038-10-46-9341"
+      ]
+    },
+    {
+      "name": "HAPPY VALLEY IN WNC LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3680699"
+      ]
+    },
+    {
+      "name": "HATCH FAMILY TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3675066"
+      ]
+    },
+    {
+      "name": "HATLEY POINTE, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1699199"
+      ]
+    },
+    {
+      "name": "HAYES OSGOOD LIVING TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1696083"
+      ]
+    },
+    {
+      "name": "HD DEV WORKS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3674530"
+      ]
+    },
+    {
+      "name": "HEAVEN BOUND PROPERTIES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3672692"
+      ]
+    },
+    {
+      "name": "HICKORY NUT FINISHING, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5121840"
+      ]
+    },
+    {
+      "name": "HIGH FIVE TEAM LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4059-17-20-3957"
+      ]
+    },
+    {
+      "name": "HIGHLAND MEADOWS NC, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3671041"
+      ]
+    },
+    {
+      "name": "HILL DEVELOPMENT LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5019-14-24-9290"
+      ]
+    },
+    {
+      "name": "HILLS SIDE PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4161-00-15-7885"
+      ]
+    },
+    {
+      "name": "HOMELAND BUILDERS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5110-14-33-3089"
+      ]
+    },
+    {
+      "name": "HORIZON BUILDERS CONSTRUCTION, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2449418"
+      ]
+    },
+    {
+      "name": "HUNTER BUILDING HOLDINGS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3669445"
+      ]
+    },
+    {
+      "name": "HUSBAND & WIFE HOMES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2445828"
+      ]
+    },
+    {
+      "name": "IBI WIMBERLY LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5028-12-85-0215"
+      ]
+    },
+    {
+      "name": "IGNACIO AMERICA LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4065-17-22-1075"
+      ]
+    },
+    {
+      "name": "IHC HOMES SC LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4048-00-47-7853"
+      ]
+    },
+    {
+      "name": "INDIGO BLUE INVESTMENTS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5028-12-85-0215"
+      ]
+    },
+    {
+      "name": "INDUSTRIAL MAINTENANCE & SANITATION, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5123597"
+      ]
+    },
+    {
+      "name": "INNOMAX HOME SOLUTIONS LLC 401K PLAN",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448662"
+      ]
+    },
+    {
+      "name": "INTEGRITY HOMES NC LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2445321"
+      ]
+    },
+    {
+      "name": "INVESTCAR LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2444394"
+      ]
+    },
+    {
+      "name": "J&L CAPITAL SOLUTIONS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3676244"
+      ]
+    },
+    {
+      "name": "J&P MOUNTAIN RENTALS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3668077"
+      ]
+    },
+    {
+      "name": "JAMES AND HEATHER WEBB REVOCABLE LIVING TRUST DATED MAY 27, 2026",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2451557"
+      ]
+    },
+    {
+      "name": "JASON M. WILDE LIVING TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3672651"
+      ]
+    },
+    {
+      "name": "JBC BUILDERS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2446811"
+      ]
+    },
+    {
+      "name": "JBON PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3678628"
+      ]
+    },
+    {
+      "name": "JET 169 LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4054-18-32-1445"
+      ]
+    },
+    {
+      "name": "JIMMY R. SUMMEY REVOCABLE TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3678880"
+      ]
+    },
+    {
+      "name": "JIREH CONSTRUCTION HOMES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2447259"
+      ]
+    },
+    {
+      "name": "JMK BUILDERS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3680060"
+      ]
+    },
+    {
+      "name": "JMK TRUE NORTH GROUP LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2450511"
+      ]
+    },
+    {
+      "name": "JNC HOME INVESTORS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5028-13-23-4806"
+      ]
+    },
+    {
+      "name": "JWA PROPERTY GROUP LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3668465"
+      ]
+    },
+    {
+      "name": "KELLYBROOK LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Burke,NC:1-5124500"
+      ]
+    },
+    {
+      "name": "KEOWEE RIVER CLUB LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4131-00-03-1154"
+      ]
+    },
+    {
+      "name": "KEYSTONE PROPERTY HOLDINGS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3670730"
+      ]
+    },
+    {
+      "name": "KFS SHELBY LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448499"
+      ]
+    },
+    {
+      "name": "KIN CAPITAL LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4097-06-28-6553"
+      ]
+    },
+    {
+      "name": "KINGS INVESTMENT PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3666950"
+      ]
+    },
+    {
+      "name": "KSVP 2 LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5048-05-17-8860"
+      ]
+    },
+    {
+      "name": "KTK INVESTMENTS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5038-05-09-5890"
+      ]
+    },
+    {
+      "name": "LA LEGACY LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5126243"
+      ]
+    },
+    {
+      "name": "LAKE FUN, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5121620"
+      ]
+    },
+    {
+      "name": "LAKE HOUSER CONSTRUCTION LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448755"
+      ]
+    },
+    {
+      "name": "LAKE HOUSER CONSTRUCTION, INC.",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448057"
+      ]
+    },
+    {
+      "name": "LAMPLIGHTER HOLDINGS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448757"
+      ]
+    },
+    {
+      "name": "LANE BLAIR INVESTMENTS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4097-00-24-6891"
+      ]
+    },
+    {
+      "name": "LAURA M PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4065-18-21-7572"
+      ]
+    },
+    {
+      "name": "LAVENDER INVESTMENTS, INC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448264"
+      ]
+    },
+    {
+      "name": "LAZARUS KM ZEBULON, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2447619"
+      ]
+    },
+    {
+      "name": "LEGACY HOMES OF THE UPSTATE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5028-05-29-4935"
+      ]
+    },
+    {
+      "name": "LEGACY LAND COMPANY, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5126051"
+      ]
+    },
+    {
+      "name": "LESLIE PICARD LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Madison,NC:1-1699060"
+      ]
+    },
+    {
+      "name": "LIBERTY INVESTMENT PARTNERS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4173-00-11-3355"
+      ]
+    },
+    {
+      "name": "LINDA DOLL CLUXTON REVOCABLE TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3667206"
+      ]
+    },
+    {
+      "name": "LITTLE POPLAR, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1698257"
+      ]
+    },
+    {
+      "name": "LJRE VENTURES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5018-08-88-2962"
+      ]
+    },
+    {
+      "name": "LUCAS BUILDERS UPSTATE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5028-07-59-1379"
+      ]
+    },
+    {
+      "name": "LYON CONSTRUCTION GROUP LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2447847"
+      ]
+    },
+    {
+      "name": "M & R CONSTRUCTION SERVICE, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5124400"
+      ]
+    },
+    {
+      "name": "M&B PROPERTY HOLDINGS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Burke,NC:1-5119474"
+      ]
+    },
+    {
+      "name": "M&P BETTER LIVING CLEMSON LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4054-09-26-0423"
+      ]
+    },
+    {
+      "name": "MACLINE PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3671017"
+      ]
+    },
+    {
+      "name": "MADISON COUNTY HOLDINGS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1698263"
+      ]
+    },
+    {
+      "name": "MAJC, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3667730"
+      ]
+    },
+    {
+      "name": "MAJESTY PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5049-19-51-3066"
+      ]
+    },
+    {
+      "name": "MANOR ON MAIN LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5019-16-94-4569"
+      ]
+    },
+    {
+      "name": "MARGUERITE ROSE MANICONE LIVING TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3678682"
+      ]
+    },
+    {
+      "name": "MARION AND WILLIAM WHITE LIVING TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3680075"
+      ]
+    },
+    {
+      "name": "MARK AND LAURA ROYCROFT REVOCABLE TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3673902"
+      ]
+    },
+    {
+      "name": "MARTHA VALADEZ AND JOHN HARTLEY ROLLER LIVING TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3679605"
+      ]
+    },
+    {
+      "name": "MASSA PROPERTIES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3675396"
+      ]
+    },
+    {
+      "name": "MASYN INVESTMENTS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3672155"
+      ]
+    },
+    {
+      "name": "MCCUEN REVOCABLE LIVING TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3679884"
+      ]
+    },
+    {
+      "name": "MICHAEL J. RAPIER III TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3670932"
+      ]
+    },
+    {
+      "name": "MILL PINE PRESERVE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5019-17-01-7182"
+      ]
+    },
+    {
+      "name": "MIRONOV HOLDINGS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3670054"
+      ]
+    },
+    {
+      "name": "MKW ENTERPRISES, INC.",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5119154"
+      ]
+    },
+    {
+      "name": "MONOMOY PROPERTIES KINGS MOUNTAIN NC, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448340"
+      ]
+    },
+    {
+      "name": "MONTYGMAN PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2447484"
+      ]
+    },
+    {
+      "name": "MOORE & SON SITE CONTRACTORS, INC.",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3674181"
+      ]
+    },
+    {
+      "name": "MOOSE HOLDINGS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5119937"
+      ]
+    },
+    {
+      "name": "MOTHERS WAY, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1696353"
+      ]
+    },
+    {
+      "name": "MOUNTAIN EXPRESS CARWASH 2 LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3675491"
+      ]
+    },
+    {
+      "name": "MOUNTAIN REST RIDGE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4065-17-22-1075022"
+      ]
+    },
+    {
+      "name": "MOUNTAINTOP TABLE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Madison,NC:1-1697055"
+      ]
+    },
+    {
+      "name": "MURANO COMPANY LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5019-15-53-8247"
+      ]
+    },
+    {
+      "name": "NAPLES 121, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3668526"
+      ]
+    },
+    {
+      "name": "NASK PARTNERS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4064-14-32-3792"
+      ]
+    },
+    {
+      "name": "NC SECOND JURISDICTION CHURCH OF GOD IN CHRIST, INC.",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3675723"
+      ]
+    },
+    {
+      "name": "NEAL GROUP SC LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4076-18-30-8231 P/O"
+      ]
+    },
+    {
+      "name": "NEAL GROUP SC LLC THE",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4076-18-30-8231 P/O"
+      ]
+    },
+    {
+      "name": "NEARBY CASH BUYERS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5009-10-35-4516"
+      ]
+    },
+    {
+      "name": "NEW LIFE RENOVATIONS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2445690"
+      ]
+    },
+    {
+      "name": "NEXJEN HOME SOLUTIONS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2449627"
+      ]
+    },
+    {
+      "name": "NIVEK SIRROM LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1696024"
+      ]
+    },
+    {
+      "name": "NORTH EDGE PROJECT, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3667422"
+      ]
+    },
+    {
+      "name": "NORTH POINT CUSTOM BUILDERS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448839"
+      ]
+    },
+    {
+      "name": "NOVA HOMES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4087-06-38-9257"
+      ]
+    },
+    {
+      "name": "OASIS CUSTOM HOMES INC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5136-00-80-4818"
+      ]
+    },
+    {
+      "name": "OLD SALUDA DAM STORAGE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5140-16-93-8824"
+      ]
+    },
+    {
+      "name": "ONEH2 REAL ESTATE, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5121493"
+      ]
+    },
+    {
+      "name": "ONEWAY SC LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4065-14-42-5635"
+      ]
+    },
+    {
+      "name": "OPULENTIA COOPERATIVE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4077-15-64-0043"
+      ]
+    },
+    {
+      "name": "OUR HOUSE INVESTMENTS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5120-00-55-6921"
+      ]
+    },
+    {
+      "name": "OZ REALTY, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448220"
+      ]
+    },
+    {
+      "name": "PARKERS PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5122604"
+      ]
+    },
+    {
+      "name": "PATRICIA ANN MATHIS AMARAL REVOCABLE TRUST DATED 05/04/2026",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5121528"
+      ]
+    },
+    {
+      "name": "PAUL E. SMITH JR., TRUST DATED 04/2024",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5123823"
+      ]
+    },
+    {
+      "name": "PEDRETTY'S CERAMIC TITLE AND FLOORING, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5124907"
+      ]
+    },
+    {
+      "name": "PH EASLEY LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5038-05-29-2512"
+      ]
+    },
+    {
+      "name": "PHOENIX LIBERTY SC INDUSTRIAL INVESTORS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4087-00-14-3754"
+      ]
+    },
+    {
+      "name": "PICKENS HEALTHCARE PROPERTIES INC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4049-00-87-1029"
+      ]
+    },
+    {
+      "name": "PICKENS TRAIL HOUSE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4196-00-47-3546"
+      ]
+    },
+    {
+      "name": "PIEDMONT PROPERTY RESCUE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Burke,NC:1-5123552"
+      ]
+    },
+    {
+      "name": "PJ PROPERTY LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5029-16-82-1641"
+      ]
+    },
+    {
+      "name": "POP HOMES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2449451"
+      ]
+    },
+    {
+      "name": "PRECISION ASPHALT AND PAVING, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2449420"
+      ]
+    },
+    {
+      "name": "QUEEN CITY PROPERTY SOLUTIONS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2445682"
+      ]
+    },
+    {
+      "name": "RAETCHI FAMILY TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1698028"
+      ]
+    },
+    {
+      "name": "RANE INVESTMENTS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4038-00-57-5028"
+      ]
+    },
+    {
+      "name": "RDL PROPERTIES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Burke,NC:1-5126435"
+      ]
+    },
+    {
+      "name": "RE HOME BUYERS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5028-17-21-3067"
+      ]
+    },
+    {
+      "name": "REDEEMED HOMES COMPANY LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4181-19-61-7525"
+      ]
+    },
+    {
+      "name": "RHYMER HOLDINGS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3675549"
+      ]
+    },
+    {
+      "name": "RISING MEADOW, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3673457"
+      ]
+    },
+    {
+      "name": "ROBIN S. RICE LIVING TRUST DATED JUNE 19, 2025",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1698222"
+      ]
+    },
+    {
+      "name": "ROBINSON OLIVIER, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1698496"
+      ]
+    },
+    {
+      "name": "ROYALA LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5039-06-39-9249"
+      ]
+    },
+    {
+      "name": "RUSSELL AND BRIANNE BRESSON LIVING TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3678787"
+      ]
+    },
+    {
+      "name": "S & N BUILDERS, INC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Burke,NC:1-5123828"
+      ]
+    },
+    {
+      "name": "S T ALLEN ENTERPRISES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5059-13-14-4247"
+      ]
+    },
+    {
+      "name": "SALUDA COMMUNITY LAND TRUST, INC.",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3680544"
+      ]
+    },
+    {
+      "name": "SAVOCA PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4185-15-73-0158"
+      ]
+    },
+    {
+      "name": "SC SPEEDWAY NORTH LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5049-08-88-4098"
+      ]
+    },
+    {
+      "name": "SCNC LAND CO.",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2450836"
+      ]
+    },
+    {
+      "name": "SCORA INVESTMENTS INC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5009-19-61-1592"
+      ]
+    },
+    {
+      "name": "SERAFIA HOLDINGS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2449656"
+      ]
+    },
+    {
+      "name": "SHERRILL INVESTMENTS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2451621"
+      ]
+    },
+    {
+      "name": "SHIVA INVESTORS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5029-19-71-0565"
+      ]
+    },
+    {
+      "name": "SHUPING PROPERTIES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5124523"
+      ]
+    },
+    {
+      "name": "SILLIMAN CAPITAL LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4087-06-48-7145"
+      ]
+    },
+    {
+      "name": "SILLIMAN PRIVATE LENDING LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4087-06-48-7145"
+      ]
+    },
+    {
+      "name": "SILVER CREEK COMMUNITY PROPERTY OWNERS ASSOCIATION, INC.",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Burke,NC:1-5122932"
+      ]
+    },
+    {
+      "name": "SILVER PINE CONSTRUCTION, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3675626"
+      ]
+    },
+    {
+      "name": "SIMPLE HOLDINGS USA INC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4123-00-97-2771"
+      ]
+    },
+    {
+      "name": "SKI THE RIDGES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1695506"
+      ]
+    },
+    {
+      "name": "SOUTHEAST ENERGY, L.L.C.",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3667556"
+      ]
+    },
+    {
+      "name": "SOUTHERN HOMES & ASSOCIATES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5048-07-68-9410"
+      ]
+    },
+    {
+      "name": "SOUTHERN MEDICAL INVESTMENTS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4064-14-32-3792"
+      ]
+    },
+    {
+      "name": "SPRINKLE CREEK PROPERTIES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1696402"
+      ]
+    },
+    {
+      "name": "SPRUCE TRAIL LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4132-00-23-0770"
+      ]
+    },
+    {
+      "name": "SUNNY POINT OF CENTRAL LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4065-07-59-7541"
+      ]
+    },
+    {
+      "name": "SUTPHIN & KANUPP BUILDERS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5118799"
+      ]
+    },
+    {
+      "name": "SUZANNE MAE HUSE BLEY LIVING TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3671021"
+      ]
+    },
+    {
+      "name": "SWEETB FARMS, INC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Madison,NC:1-1698606"
+      ]
+    },
+    {
+      "name": "TEAGHLACH LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Madison,NC:1-1698624"
+      ]
+    },
+    {
+      "name": "TERRA NOSTRA REAL ESTATE, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3678887"
+      ]
+    },
+    {
+      "name": "TERRAIN INVENTORY, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5122565"
+      ]
+    },
+    {
+      "name": "THE CLIFTON D. BLANKS III AND KATHLEEN O'SULLIVAN TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Madison,NC:1-1695636"
+      ]
+    },
+    {
+      "name": "THE CLOUGH FAMILY REVOCABLE TRUST DATED MAY 19, 2015",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2449918"
+      ]
+    },
+    {
+      "name": "THE GLENN AND RITA CARTER LIVING TRUST, DATED MAY 8, 2026",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2449986"
+      ]
+    },
+    {
+      "name": "THE MCDONALD TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1696060"
+      ]
+    },
+    {
+      "name": "THE PHARIS FAMILY TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3679572"
+      ]
+    },
+    {
+      "name": "THE RANDY ALVIN SHUFORD AND SANDRA FAYE SHUFORD REVOCABLE LIVING TRUST, U/D/O DECEMBER 16, 2024",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2448327"
+      ]
+    },
+    {
+      "name": "THE SHEILA AND RAY BRIDGES LIVING TRUST, DATED APRIL 30, 2026",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2447695"
+      ]
+    },
+    {
+      "name": "THE SPINNING LEAF GROUP, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2446941"
+      ]
+    },
+    {
+      "name": "THE TALLENT FAMILY TRUST DATED 04/30/2026",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5120965"
+      ]
+    },
+    {
+      "name": "THOMAS SC PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5059-13-14-2313 P/O"
+      ]
+    },
+    {
+      "name": "TIFFANY FAMILY REVOCABLE LIVING TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1696116"
+      ]
+    },
+    {
+      "name": "TIGER FLIP LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4054-13-24-2213"
+      ]
+    },
+    {
+      "name": "TJRH CAPITAL GROUP, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2445377"
+      ]
+    },
+    {
+      "name": "TPG AG EHC III DHI MULTI STATE 1 LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5039-14-24-8189"
+      ]
+    },
+    {
+      "name": "TPI, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1698609"
+      ]
+    },
+    {
+      "name": "TRADE IN HOLDINGS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2444461"
+      ]
+    },
+    {
+      "name": "TRENDY SOUTHERN HOMES INC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4065-17-22-1075"
+      ]
+    },
+    {
+      "name": "TRICKLE DOWN AI LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4054-09-05-2611"
+      ]
+    },
+    {
+      "name": "TRIPLE A LAND & HOME LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1699033"
+      ]
+    },
+    {
+      "name": "TRIPLE C BUILDERS, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1697966"
+      ]
+    },
+    {
+      "name": "TRIUMPH FORTY SIX REALTY TRUST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5107-00-40-8699"
+      ]
+    },
+    {
+      "name": "TRULY PROPERTIES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5121774"
+      ]
+    },
+    {
+      "name": "TRUMADE HOLDINGS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Burke,NC:1-5120833"
+      ]
+    },
+    {
+      "name": "TRUMAN BUILDERS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4162-00-90-3524"
+      ]
+    },
+    {
+      "name": "TRUST CONSULTANTS INC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4150-00-66-7488"
+      ]
+    },
+    {
+      "name": "TULE RIVER HOMEBUYER EARNED EQUITY AGENCY",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3680095"
+      ]
+    },
+    {
+      "name": "TWO BLUE STALLION LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4045-08-98-7331"
+      ]
+    },
+    {
+      "name": "TWO7ONE7 PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3672566"
+      ]
+    },
+    {
+      "name": "U S BANK TRUST NATIONAL ASSOCIATION TST",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5018-16-93-8299"
+      ]
+    },
+    {
+      "name": "UH PROPERTIES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3680306"
+      ]
+    },
+    {
+      "name": "UMEK VENTURES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2449849"
+      ]
+    },
+    {
+      "name": "VALUE RENTAL INVESTMENTS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2449151"
+      ]
+    },
+    {
+      "name": "VINA PROPERTIES USA LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4065-17-22-1075"
+      ]
+    },
+    {
+      "name": "VIPPERMAN REAL ESTATE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2447486"
+      ]
+    },
+    {
+      "name": "VIRUNGA LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4044-18-41-8881"
+      ]
+    },
+    {
+      "name": "VISTAS AND VENUES TOURING CO., LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Burke,NC:1-5126090"
+      ]
+    },
+    {
+      "name": "WALCH NC PROPERTIES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Madison,NC:1-1698071"
+      ]
+    },
+    {
+      "name": "WATERFRONT RENTAL CONSTRUCTION LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4181-19-61-3205"
+      ]
+    },
+    {
+      "name": "WDT HOLDINGS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:4182-08-98-6330"
+      ]
+    },
+    {
+      "name": "WESSON CONSTRUCTION, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2450848"
+      ]
+    },
+    {
+      "name": "WHISPERING STREAM RENOVATIONS INC.",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Henderson,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Henderson,NC:1-3667702"
+      ]
+    },
+    {
+      "name": "WHITE BUFFALO HOMES LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:5009-16-93-2307"
+      ]
+    },
+    {
+      "name": "WILD HORSE FAMILY, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Burke,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Burke,NC:1-5120831"
+      ]
+    },
+    {
+      "name": "WILLOW PARK INVESTMENT GROUP LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2445917"
+      ]
+    },
+    {
+      "name": "WOLF RIDGE ESTATE LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Madison,NC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Madison,NC:1-1697669"
+      ]
+    },
+    {
+      "name": "YOUR CHOICE HOME BUYERS LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Pickens,SC:5101-00-87-3174"
+      ]
+    },
+    {
+      "name": "Z GOLF FOOD & BEVERAGE SERVICES, LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Cleveland,NC": 1
+      },
+      "buys": "improved",
+      "sample_parcels": [
+        "Cleveland,NC:1-2447974"
+      ]
+    },
+    {
+      "name": "ZEN HOME OFFER LLC",
+      "deals": 1,
+      "tier": "single",
+      "counties": {
+        "Pickens,SC": 1
+      },
+      "buys": "land",
+      "sample_parcels": [
+        "Pickens,SC:4130-00-97-2362"
+      ]
+    }
+  ]
+}
