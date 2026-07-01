@@ -93,6 +93,37 @@ def test_non_nc_and_non_entity_skipped(monkeypatch):
     assert calls["n"] == 0
 
 
+def test_frontier_advances_and_propagates(monkeypatch):
+    monkeypatch.setattr(sa, "_ENABLED", True)
+    asked = {}
+
+    async def fake_batch(names):
+        asked["names"] = list(names)
+        return {n: {"sosid": "9", "best_contact_name": "New Owner"} for n in names}
+
+    monkeypatch.setattr(sa, "_batch_lookup", fake_batch)
+
+    def mk(owner, resolved=False):
+        raw = {"sos_agent": {"sosid": "1", "best_contact_name": "Prior"}} if resolved else {}
+        return Listing(source="x", source_url="u", listing_type=ListingType.FORECLOSURE_SALE,
+                       state="NC", county="Gaston", owner_name=owner, raw=raw)
+
+    a = mk("ACME LLC", resolved=True)   # already resolved on a prior pass
+    b = mk("ACME LLC")                  # co-owned, no profile yet -> should inherit A's
+    c = mk("BETA LLC")                  # genuinely new -> should hit the batch
+
+    out = asyncio.run(sa.enrich_with_sos_agent([a, b, c]))
+
+    # already-resolved ACME is NOT re-looked-up; only the new BETA hits the network
+    assert "BETA LLC" in asked["names"]
+    assert not any("ACME" in n for n in asked["names"])
+    # B inherits A's prior profile for free (no network)
+    assert b.raw["sos_agent"]["sosid"] == "1"
+    assert out["propagated"] == 1
+    # C resolved via the batch
+    assert c.raw["sos_agent"]["sosid"] == "9"
+
+
 def test_disabled_by_default(monkeypatch):
     monkeypatch.setattr(sa, "_ENABLED", False)
     li = Listing(source="x", source_url="u", listing_type=ListingType.FORECLOSURE_SALE,

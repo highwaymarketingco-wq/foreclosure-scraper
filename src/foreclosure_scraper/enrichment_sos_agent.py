@@ -281,11 +281,33 @@ async def enrich_with_sos_agent(listings: list[Listing], max_check: int = _MAX_C
                 or (raw.get("grade") or {}).get("tier") or "")
         return {"HOT": 0, "WARM": 1}.get(str(tier).upper(), 2)
 
+    # Names already resolved on a prior pass — skip them so each run advances
+    # the frontier to NEW entities instead of re-hitting the same top-priority
+    # names, and propagate a resolved profile to any co-owned lead that lacks
+    # one (same entity -> same registered agent; free, no network).
+    resolved_profiles: dict[str, dict] = {}
+    for li in listings:
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        sa = raw.get("sos_agent")
+        if isinstance(sa, dict) and sa.get("sosid"):
+            nm = _entity_of(li)
+            if nm and nm not in resolved_profiles:
+                resolved_profiles[nm] = sa
+
+    propagated = 0
     for li in listings:
         if li.state != "NC":
             continue
         name = _entity_of(li)
         if not name:
+            continue
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        if isinstance(raw.get("sos_agent"), dict):
+            continue  # already resolved on this lead
+        if name in resolved_profiles:
+            li.raw = raw
+            li.raw["sos_agent"] = resolved_profiles[name]
+            propagated += 1
             continue
         if name not in name_to_listings:
             ranked.append((_prio(li), name))
@@ -294,6 +316,7 @@ async def enrich_with_sos_agent(listings: list[Listing], max_check: int = _MAX_C
     ranked.sort(key=lambda t: t[0])
     names = [n for _, n in ranked][:max_check]
     counts["targets"] = len(names)
+    counts["propagated"] = propagated
     if not names:
         log.info("sos_agent.no_targets")
         return counts
