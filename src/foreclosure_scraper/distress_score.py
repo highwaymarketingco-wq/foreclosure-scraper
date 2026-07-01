@@ -21,10 +21,59 @@ Pure computation over the board; no scraping.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Optional
 
 from .models import Listing
+
+# ATC-45 Helene placard severity -> honest PROPERTY-signal weight. Calibrated
+# against the existing scale (generic distressed=10, code_enforcement=14,
+# bankruptcy=18, probate=20): a Restricted placard (limited entry, real damage)
+# sits just above generic distressed; an Unsafe red-tag (do-not-occupy, facing
+# major repair/teardown) sits above code enforcement. Helene leads have only the
+# PROPERTY category (stack=1) so they can never reach HOT on this alone — they
+# only tier up to WARM when combined with absentee ownership + severity.
+_HELENE_PLACARD_BASE = {"restricted": 12, "unsafe": 16, "destroyed": 20}
+
+
+def _helene_signal(li: Listing) -> Optional[tuple[str, str, int]]:
+    """Scaled distress signal for a Hurricane-Helene ATC-45 placard lead.
+
+    Replaces the flat generic 'distressed' (10) with a weight graded by placard
+    severity + damage % + how many structures on the parcel are damaged. Reads
+    the raw['helene'] meta set by the dedup pass, else parses the description.
+    Returns None for non-Helene leads.
+    """
+    if li.source != "counties_nc.asheville_helene":
+        return None
+    r = li.raw if isinstance(li.raw, dict) else {}
+    meta = r.get("helene") if isinstance(r.get("helene"), dict) else {}
+    desc = li.description or ""
+    placard = str(meta.get("worst_placard") or "").lower()
+    if not placard:
+        m = re.search(r"Helene damage:\s*([A-Za-z]+)\s+placard", desc)
+        placard = m.group(1).lower() if m else ""
+    base = _HELENE_PLACARD_BASE.get(placard)
+    if base is None:
+        return None
+    pct = meta.get("worst_damage_pct")
+    if pct is None:
+        p = re.search(r"placard\s*-\s*([0-9]+)%", desc)
+        pct = float(p.group(1)) if p else 0.0
+    try:
+        pct = float(pct)
+    except (TypeError, ValueError):
+        pct = 0.0
+    buildings = meta.get("damaged_buildings") or 1
+    w = base
+    if placard == "restricted" and pct >= 50:
+        w += 2
+    elif placard in ("unsafe", "destroyed") and pct >= 75:
+        w += 3
+    if isinstance(buildings, int) and buildings >= 3:
+        w += 2  # a multi-structure damaged complex is a larger repair burden
+    return (f"helene_{placard}", "PROPERTY", w)
 
 # MLS lifecycle statuses that signal a seller who couldn't (or stopped trying
 # to) move the property on the open market — a strong, fresh motivated-seller
@@ -134,7 +183,10 @@ def _signals_for(li: Listing, prior_price: Optional[float] = None) -> list[tuple
     lt = (li.listing_type.value if li.listing_type else "") if hasattr(li.listing_type, "value") else str(li.listing_type or "")
     if lt in _LISTING_TYPE_SIGNAL:
         cat, w = _LISTING_TYPE_SIGNAL[lt]
-        sig.append((lt, cat, w))
+        # A Helene placard lead gets a severity-graded signal instead of the
+        # flat generic 'distressed' (10).
+        hel = _helene_signal(li) if lt == "distressed" else None
+        sig.append(hel if hel else (lt, cat, w))
     # MLS-distress (stale_on_market / price_cut / withdrawn-expired)
     sig.extend(_mls_signals(li, prior_price=prior_price))
     # court / sale status

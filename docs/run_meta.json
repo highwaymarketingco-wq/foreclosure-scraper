@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-07-01T11:20:35.487418Z",
+  "run_time": "2026-07-01T13:06:48.532941Z",
   "total": 16329,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "helene same-parcel dedup (multi-building complexes -> one owner lead)"
+  "notes": "honest Helene placard-severity distress scoring"
 }

@@ -365,6 +365,8 @@ function applyFilters() {
       if (contact === "mailing" && !om.mailing) return false;
       if (contact === "contactable" && !(r.owner_phone || om.mailing || sac)) return false;
       if (contact === "sos_entity" && !(r.sos_agent && r.sos_agent.best_contact_name)) return false;
+      if (contact === "helene" && l.source !== "counties_nc.asheville_helene") return false;
+      if (contact === "helene_severe") { const h = heleneInfo(l); if (!h || h.placard !== "Unsafe") return false; }
       if (contact === "absentee" && !om.absentee) return false;
       if (contact === "out_of_state" && !om.out_of_state) return false;
       if (contact === "mortgage" && !(r.rod && r.rod.has_mortgage)) return false;
@@ -444,6 +446,23 @@ function gradeBadge(g) {
 }
 // ------------- Distress (HOT/WARM operator board) ---------------------------
 function getDistress(l) { return (l.raw && l.raw.distress_stack) || null; }
+
+// Hurricane-Helene ATC-45 placard info for a lead, from the dedup meta or the
+// description ("Helene damage: Unsafe placard - 90%"). Returns null if not Helene.
+function heleneInfo(l) {
+  if (!l || l.source !== "counties_nc.asheville_helene") return null;
+  const meta = (l.raw && l.raw.helene) || {};
+  let placard = meta.worst_placard || null, pct = meta.worst_damage_pct || null;
+  const buildings = meta.damaged_buildings || 1;
+  if (!placard) {
+    const m = /Helene damage:\s*([A-Za-z]+)\s+placard/.exec(l.description || "");
+    if (m) placard = m[1];
+    const p = /placard\s*-\s*([0-9]+)%/.exec(l.description || "");
+    if (p) pct = parseInt(p[1], 10);
+  }
+  if (!placard) return null;
+  return { placard, pct, buildings };
+}
 const distressLabel = {
   HOT:  { emoji: "🔥", cls: "hot",  txt: "HOT" },
   WARM: { emoji: "🌡", cls: "warm", txt: "WARM" },
@@ -757,6 +776,14 @@ function renderCards() {
       const sa = (l.raw && l.raw.sos_agent) || {};
       if (sa.sosid && sa.best_contact_name) {
         signalChips.push(`<span class="distress-chip" style="color:#0a7d3a;border-color:#0a7d3a" title="NC SOS: ${sa.best_contact_name}${sa.best_contact_address ? " — " + sa.best_contact_address : ""}">📇 SOS contact</span>`);
+      }
+      // (3c) Hurricane-Helene damage — show the ATC-45 placard severity so a
+      //      red-tagged / multi-building lead reads at a glance.
+      const hel = heleneInfo(l);
+      if (hel) {
+        const sev = hel.placard === "Unsafe" ? "#c0392b" : "#b8860b";
+        const bld = hel.buildings > 1 ? ` ×${hel.buildings} bldgs` : "";
+        signalChips.push(`<span class="distress-chip" style="color:#fff;background:${sev};border-color:${sev}" title="Hurricane Helene ATC-45 placard${hel.pct ? " — " + hel.pct + "% damage" : ""}${hel.buildings > 1 ? " across " + hel.buildings + " structures" : ""}">🌀 Helene: ${hel.placard}${hel.pct ? " " + hel.pct + "%" : ""}${bld}</span>`);
       }
       // (4) Title-risk trap — senior lien may survive a junior foreclosure.
       const tr = (l.raw && l.raw.title_risk) || null;
