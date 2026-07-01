@@ -104,10 +104,11 @@ NEW_SOURCES = {
     # net-new (2026-06-30 pm): funeral-home CMS obituary RSS (Frazer + ltobits) —
     # pre-probate heir leads, non-overlapping with the Gannett newspaper obituaries.
     "public_notices.funeral_home_rss",
-    # net-new (2026-06-30 night): NC PTS Cloud full delinquent-tax roll for the
-    # non-Buncombe W-NC counties (Madison/Henderson + Rutherford/Burke when posted)
-    # — closes the NC-vs-SC county-breadth gap; ~3k leads today.
+    # net-new (2026-06-30 night): NC delinquent-tax breadth — the full 105-369
+    # rolls for non-Buncombe W-NC counties, closing the NC-vs-SC gap. PTS Cloud
+    # API (Madison/Henderson ~3k) + county .gov PDFs (Lincoln/Catawba/McDowell ~9k).
     "counties_nc.nc_ptscloud_delinquent_tax",
+    "counties_nc.nc_county_pdf_delinquent_tax",
 }
 
 
