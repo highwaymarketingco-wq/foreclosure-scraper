@@ -51,8 +51,8 @@ SOURCE_SLUG = "counties_sc.sc_public_index_export"
 #   * "2026CP4201547"    - cleaned form emitted in a result anchor
 #   * "2026-CP-42-01547" - canonical dashed form
 # --------------------------------------------------------------------------- #
-CASE_RE_CLEAN = re.compile(r"\b(\d{4})([A-Z]{2})(\d{2})(\d{4,7})\b")
-CASE_RE_DASHED = re.compile(r"\b(\d{4})-([A-Z]{2})-(\d{2})-(\d{4,7})\b")
+CASE_RE_CLEAN = re.compile(r"\b(\d{4})([A-Z]{2})(\d{2})(\d{4,10})\b")
+CASE_RE_DASHED = re.compile(r"\b(\d{4})-([A-Z]{2})-(\d{2})-(\d{4,10})\b")
 
 # Title attribute we extract plaintiff/defendant from:
 #   title="  Plaintiff Name VS Defendant Name [, defendant, et al]"
@@ -106,6 +106,8 @@ def _county_from_case(case_number: str) -> str | None:
 # closest real ListingType and never invent enum values.
 # --------------------------------------------------------------------------- #
 _SUBTYPE_LANES: tuple[tuple[str, ListingType], ...] = (
+    # A recorded Lis Pendens notice (Type/Subtype both literally "Lis Pendens").
+    ("lis pendens", ListingType.LIS_PENDENS),
     # A filed CP foreclosure is a pre-sale lis pendens — matches the live
     # scraper's choice (ListingType.LIS_PENDENS), NOT FORECLOSURE_SALE (which is
     # the noticed auction, a later stage).
@@ -172,6 +174,7 @@ def parse_publicindex_html(
     html: str,
     default_county: str | None = None,
     keep_all_subtypes: bool = False,
+    lane_override: "ListingType | None" = None,
 ) -> list[Listing]:
     """Extract Listing rows from a saved SC Public Index SearchResults page.
 
@@ -211,6 +214,7 @@ def parse_publicindex_html(
     party_type_i = col_idx("party type")
     name_i = col_idx("name")
     judgment_i = col_idx("judgment", "judgment amount", "amount")
+    agency_i = col_idx("court agency", "agency")
 
     seen: set[str] = set()
 
@@ -225,8 +229,19 @@ def parse_publicindex_html(
             else ""
         )
 
-        # Map sub-type -> lane. Skip unknown lanes unless keep_all_subtypes.
-        lane = lane_for_subtype(subtype)
+        agency = (
+            cells[agency_i].text(strip=True).lower()
+            if agency_i is not None and agency_i < len(cells)
+            else ""
+        )
+
+        # Map to a lane. Priority: caller-forced override (single-lane exports
+        # named by the operator, e.g. a "possession" file) > sub-type text >
+        # court-agency heuristic (magistrate rows are ejectment/eviction, whose
+        # sub-type is the generic "Summons & Complaint" and won't match a needle).
+        lane = lane_override or lane_for_subtype(subtype)
+        if lane is None and "magistrate" in agency:
+            lane = ListingType.LIS_PENDENS  # summary-court ejectment (eviction)
         if lane is None:
             if not keep_all_subtypes:
                 continue

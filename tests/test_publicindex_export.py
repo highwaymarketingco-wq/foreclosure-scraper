@@ -225,6 +225,61 @@ def test_source_and_state_stamped():
 
 
 # --------------------------------------------------------------------------- #
+# Real-world formats (from live Spartanburg exports 2026-07-01): LP lis-pendens
+# numbers, 8-digit CV magistrate numbers, the generic "Summons & Complaint"
+# magistrate subtype, and the real 10-column grid incl. Court Agency.
+# --------------------------------------------------------------------------- #
+
+_REAL_HTML = """
+<html><body>
+<table id="ContentPlaceHolder1_SearchResults">
+  <tr>
+    <th>Name</th><th>Party Type</th><th>Case Number</th><th>Filed Date</th>
+    <th>Case Status</th><th>Disposition Date</th><th>Type</th><th>Subtype</th>
+    <th>Judgment #</th><th>Court Agency</th>
+  </tr>
+  <tr class="standardRow">
+    <td>1095 Simuel Road, Llc</td><td>Defendant</td>
+    <td title="HRH ENGINEERING VS 1095 Simuel Road, Llc"><a>2026LP4200339</a></td>
+    <td>05/12/2026</td><td>Pending</td><td></td><td>Lis Pendens</td><td>Lis Pendens</td>
+    <td></td><td>Common Pleas</td>
+  </tr>
+  <tr class="altRow">
+    <td>Anderson, Lorinna D</td><td>Defendant</td>
+    <td title="VILLAGE AT ANDERSON MILL HOA V Anderson, Lorinna D"><a>2026CV4210105780</a></td>
+    <td>06/24/2026</td><td>Pending</td><td></td><td>Civil</td><td>Summons &amp; Complaint</td>
+    <td></td><td>Spartanburg Magistrate</td>
+  </tr>
+</table>
+</body></html>
+"""
+
+
+def test_real_lis_pendens_and_magistrate_formats():
+    by_case = {
+        li.case_number: li
+        for li in parse_publicindex_html(_REAL_HTML, default_county="Spartanburg")
+    }
+    # "Lis Pendens" subtype now maps to the lane (previously fell to UNKNOWN).
+    lp = by_case["2026-LP-42-00339"]
+    assert lp.listing_type == ListingType.LIS_PENDENS
+    assert lp.county == "Spartanburg"
+    # 8-digit magistrate CV number is accepted (regex used to cap at 7) and the
+    # generic "Summons & Complaint" subtype is caught via the Magistrate agency.
+    cv = by_case["2026-CV-42-10105780"]
+    assert cv.listing_type == ListingType.LIS_PENDENS
+    assert cv.county == "Spartanburg"
+    assert cv.raw["sc_public_index"]["subtype"] == "Summons & Complaint"
+
+
+def test_lane_override_forces_lane():
+    lst = parse_publicindex_html(
+        _REAL_HTML, default_county="Spartanburg", lane_override=ListingType.TAX_LIEN
+    )
+    assert lst and all(li.listing_type == ListingType.TAX_LIEN for li in lst)
+
+
+# --------------------------------------------------------------------------- #
 # Compliance: the module must import NO fetcher.
 # --------------------------------------------------------------------------- #
 
