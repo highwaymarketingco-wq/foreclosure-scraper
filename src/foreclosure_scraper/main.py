@@ -2016,6 +2016,17 @@ async def run() -> int:
     except Exception:
         log.error("strategy_fit.failed", traceback=traceback.format_exc())
 
+    # Buyer-match — curated list of buyers wanting property in the lead's county
+    # (land buyers / builders / cash house-buyers), so the card shows who to
+    # assign the deal to. Local; from the buyer registry (no published buy box).
+    try:
+        from .enrichment_buyer_match import enrich_buyer_match
+        s = enrich_buyer_match(enriched)
+        if s:
+            enrichment_stats["buyer_match"] = s
+    except Exception:
+        log.error("buyer_match.failed", traceback=traceback.format_exc())
+
     # RentCast AVM cross-check on top-N listings (authoritative AVM + comparables).
     # Only fires when RENTCAST_API_KEY is set.
     # Free tier (50 calls/mo) → 25 listings × 2 calls each.

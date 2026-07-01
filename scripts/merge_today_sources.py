@@ -307,6 +307,8 @@ def main() -> int:
     print("distress score_board:", score_board(merged))
     from foreclosure_scraper.enrichment_strategy_fit import enrich_strategy_fit
     print("strategy_fit:", enrich_strategy_fit(merged))
+    from foreclosure_scraper.enrichment_buyer_match import enrich_buyer_match
+    print("buyer_match:", enrich_buyer_match(merged))
     # Multifamily classifier BEFORE property_kind backfill (mirrors main.py):
     # promote apartment/multi-unit distress, then guarantee non-UNKNOWN coverage.
     mfs = enrich_multifamily_class(merged)
