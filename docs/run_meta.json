@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-07-01T18:00:32.880500Z",
+  "run_time": "2026-07-01T18:09:09.060225Z",
   "total": 16329,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "scheduled NC SOS registered-agent refresh"
+  "notes": "board-wide owner-mailing contactability enrichment"
 }
