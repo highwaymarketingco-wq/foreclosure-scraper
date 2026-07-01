@@ -37,7 +37,9 @@ def test_to_listing_parcel_flag():
     li_pin = m._to_listing("A B", "90537", 100.0, "Lincoln", cfg_pin)
     li_acct = m._to_listing("C D", "33566", 100.0, "Catawba", cfg_acct)
     assert li_pin.parcel_id == "90537"
-    assert li_acct.parcel_id is None  # account #, not a GIS PIN
+    # Catawba's id is set as parcel_id (dedup key) but flagged non-GIS in raw
+    assert li_acct.parcel_id == "33566"
+    assert li_acct.raw["nc_county_pdf_delinquent_tax"]["id_is_parcel"] is False
     assert li_acct.raw["nc_county_pdf_delinquent_tax"]["county_id"] == "33566"
     assert li_pin.listing_type.value == "tax_lien"
 

@@ -109,7 +109,11 @@ def _to_listing(owner, ident, amt, county, cfg) -> Listing:
         county=county,
         owner_name=owner,
         defendant=owner,
-        parcel_id=ident if cfg.get("id_is_parcel") else None,
+        # Always set parcel_id — it's the county's unique identifier and the
+        # dedup key. For Catawba it's a tax ACCOUNT # (not a GIS PIN), flagged
+        # id_is_parcel=False in raw so GIS-by-parcel knows to skip it; without a
+        # parcel_id every Catawba row would collapse to the shared source_url.
+        parcel_id=ident,
         foreclosure_process="tax",
         description=(f"{owner or ''} — {county} NC delinquent tax "
                      f"${amt:,.0f} owed ({ident})")[:300],
