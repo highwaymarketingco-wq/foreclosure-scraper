@@ -13,10 +13,11 @@ already resolved to a parcel (no downstream GIS round-trip needed). It reuses th
 COUNTY_GIS field map + _query helper from enrichment_owner_mailing, so adding a
 county here is free once its parcel layer is in COUNTY_GIS.
 
-Scope: NC only. SC parcel layers in COUNTY_GIS either carry no queryable owner
-field (SCDOT statewide, Greenville) or serve a stale roll (Spartanburg CAMA
-Feb-2021), so an owner-name LIKE returns nothing usable — verified live. When a
-fresh SC owner layer opens up, drop its key into _NC_HEIR_COUNTIES.
+Scope: 11 NC + 4 Upstate SC counties (Spartanburg, Pickens, Laurens, Union) whose
+COUNTY_GIS owner layer retitles decedent parcels. Oconee's owner field does not
+retitle to HEIRS/ESTATE (0 hits) and is omitted; SCDOT-statewide + Greenville
+carry no queryable owner name. Add a county by dropping its key into _HEIR_COUNTIES
+once its COUNTY_GIS parcel layer is confirmed to return hits.
 
 Distress signal: emits ListingType.ESTATE_LEAD with raw['relationship_signal']
 = {kind: 'probate'} so distress_score scores it (LIFE_EVENT). Dateless — routed
@@ -38,10 +39,14 @@ from ...enrichment_owner_mailing import COUNTY_GIS, _query
 
 log = structlog.get_logger()
 
-# NC counties whose COUNTY_GIS layer exposes a queryable owner-name field.
-_NC_HEIR_COUNTIES = [
+# Counties whose COUNTY_GIS layer exposes a queryable owner-name field that
+# retitles decedent parcels to "<name> HEIRS" / "ESTATE OF". NC is broad; SC
+# adds the four Upstate layers that return real hits (Oconee's owner field does
+# not retitle -> 0, so it's omitted).
+_HEIR_COUNTIES = [
     "NC:Buncombe", "NC:Henderson", "NC:Rutherford", "NC:Gaston", "NC:Transylvania",
     "NC:Polk", "NC:Lincoln", "NC:Mitchell", "NC:Burke", "NC:McDowell", "NC:Cleveland",
+    "SC:Spartanburg", "SC:Pickens", "SC:Laurens", "SC:Union",
 ]
 
 # Owner-of-record patterns that indicate a decedent/heir title. HEIR catches
@@ -63,11 +68,11 @@ _ENTITY_SUFFIX = re.compile(
 
 def _is_decedent(owner: str) -> bool:
     u = (owner or "").upper()
-    if "HEIR" in u:
-        return True
-    if "ESTATE" in u and not _ENTITY_SUFFIX.search(owner or ""):
-        return True
-    return False
+    # An entity that merely contains HEIR/ESTATE in its NAME (e.g. "HEIRS LAW LLC",
+    # "REAL ESTATE HOLDINGS") is never a decedent — exclude entities from BOTH tokens.
+    if _ENTITY_SUFFIX.search(owner or ""):
+        return False
+    return "HEIR" in u or "ESTATE" in u
 
 
 def _county_name(key: str) -> str:
@@ -92,12 +97,17 @@ def _where(spec: dict, county: str) -> str:
     return where
 
 
+def _html(s: str) -> str:
+    """Strip embedded tags some SC layers put in owner/situs (Laurens: '<br>&')."""
+    return re.sub(r"<[^>]+>", " ", s or "")
+
+
 def _stitch(spec: dict, attrs: dict, fields_key: str) -> str | None:
     parts = []
     for f in spec.get(fields_key) or []:
         v = attrs.get(f)
         if v not in (None, "", " "):
-            parts.append(str(v).strip())
+            parts.append(_html(str(v)).strip())
     out = " ".join(p for p in parts if p).strip()
     return re.sub(r"\s+", " ", out) or None
 
@@ -106,13 +116,13 @@ def _owner(spec: dict, attrs: dict) -> str | None:
     for f in spec.get("owner") or []:
         v = attrs.get(f)
         if v and str(v).strip():
-            return str(v).strip()
+            return re.sub(r"\s+", " ", _html(str(v))).strip()
     return None
 
 
 class NCHeirEstateParcels(BaseScraper):
     slug = "counties_nc.nc_heir_estate_parcels"
-    name = "NC Heir / Estate Owner-of-Record Parcels (county GIS)"
+    name = "Heir / Estate Owner-of-Record Parcels (NC + Upstate SC county GIS)"
     category = "motivated_seller"
     expected_min_count = 5
     timeout_s = 240.0
@@ -122,10 +132,11 @@ class NCHeirEstateParcels(BaseScraper):
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         async with client(timeout=25.0) as http:
-            for key in _NC_HEIR_COUNTIES:
+            for key in _HEIR_COUNTIES:
                 spec = COUNTY_GIS.get(key)
                 if not spec:
                     continue
+                state = key.split(":", 1)[0]
                 county = _county_name(key)
                 where = _where(spec, county)
                 if not where:
@@ -149,13 +160,13 @@ class NCHeirEstateParcels(BaseScraper):
                         source_url=spec["url"],
                         listing_type=ListingType.ESTATE_LEAD,
                         property_kind=PropertyKind.UNKNOWN,
-                        state="NC",
+                        state=state,
                         county=county,
                         street_address=situs,
                         parcel_id=str(parcel).strip() if parcel else None,
                         defendant=owner,
                         sale_date=None,
-                        description=f"Heir/estate owner of record ({owner}) in {county} County, NC",
+                        description=f"Heir/estate owner of record ({owner}) in {county} County, {state}",
                         first_seen=datetime.utcnow(),
                         last_seen=datetime.utcnow(),
                         raw={
