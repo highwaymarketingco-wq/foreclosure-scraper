@@ -29,6 +29,29 @@ data the portal won't show (e.g. judgment $ amounts).**
 county Magistrate + its Region #1/#2/#3. **Skip:** Bond Court, all Municipal courts
 (Cowpens/Duncan/Pacolet/City), Transfer Court, and (usually) General Sessions.
 
+### SC PublicIndex — exact search settings (the date trick unlocks bulk pulls)
+The form REQUIRES a Last Name, Case #, **Date**, or Tax Map # (per its own JS). So
+for a bulk list you **search by DATE, not name**: set **Date Type = `Case Filed`**,
+**Beginning** = your last-pull date, **Ending** = today (`mm/dd/yyyy`), leave Last Name
+blank. That returns every case filed in the window (filtered by agency/subtype).
+
+| Lane | Court Agency | Case SubType | Also set |
+|---|---|---|---|
+| Foreclosure | Common Pleas | `Foreclosure` (420) | — |
+| Foreclosure — earliest signal | Common Pleas | (All) | Index Search radio → **Lis Pendens** |
+| Foreclosure sale/orders | **Master In Equity** | (All) | — |
+| Judgment $ amounts | Common Pleas | (All) | Index Search radio → **Judgments** |
+| Eviction | County **Magistrate** (+ Region #1/#2/#3) | `Possession` (450) | — |
+| Partition (forced co-owner sale) | Common Pleas | `Partition` (440) | — |
+| Tax-lien distress | Common Pleas | `State Tax Lien` (432) | — |
+
+**Fewest clicks (recommended):** Court Agency = **All Agencies** + Date Type = `Case
+Filed` + your date range → Search → Save. Returns everything filed in the window; I
+filter foreclosure/eviction/partition/tax-lien on my end. One save per county.
+(If it's too many rows to load, use the per-lane rows above.)
+**Skip on this portal:** Divorce (104) + Probate (940) — those are Family/Probate
+Court, not in this Common Pleas index; they return empty here.
+
 ### Time estimate (be realistic)
 ~2 min per (county × case-type) search+save. Priorities:
 - **Lean 2x/week pass (~20-30 min):** the 3 biggest counties (Buncombe, Gaston, Spartanburg)
