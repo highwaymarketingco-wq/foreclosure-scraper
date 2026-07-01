@@ -1744,6 +1744,16 @@ async def run() -> int:
     except Exception:
         log.error("tax_owed.failed", traceback=traceback.format_exc())
 
+    # Owner tenure — long-held property = high-equity proxy (the "held 7+ years"
+    # filter). Local, from the GIS/CAMA sale year. Feeds grade + outbound segmentation.
+    try:
+        from .enrichment_tenure import enrich_tenure
+        s = enrich_tenure(enriched)
+        if s:
+            enrichment_stats["tenure"] = s
+    except Exception:
+        log.error("tenure.failed", traceback=traceback.format_exc())
+
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:
         from .enrichment_life_events import enrich_life_events

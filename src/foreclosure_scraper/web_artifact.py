@@ -129,6 +129,7 @@ RAW_KEEP = {
     "resolved_from_name": "*",        # name->property resolver provenance {county, strategy, confidence}
     "_resolved_deep_enriched": "*",   # marker: resolved lead already got the same-run comps/Vision catch-up
     "tax_owed": "*",                  # normalized delinquent-tax balance {balance, kind, source, year, basis}
+    "tenure": "*",                    # owner tenure {years_held, long_tenure} — high-equity proxy
     "contact": "*",                   # ingested skip-trace contact {phones, emails, mailing, needs_dnc_scrub}
     "link_kind": "*",                 # 'record' (real per-record link) | 'search' (portal only)
     "search_url": "*",                # portal search page when there's no direct record link

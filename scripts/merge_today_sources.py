@@ -261,6 +261,9 @@ def main() -> int:
     # GIS-derived last-sale/deed-age + tax-runway from the full attr bag, BEFORE
     # equity so _payoff can use the recovered sale data on no-card SC counties.
     print("enrich_gis_derived:", enrich_gis_derived(merged))
+    # Owner tenure (long-held = high-equity proxy) — local, from the GIS sale year.
+    from foreclosure_scraper.enrichment_tenure import enrich_tenure
+    print("enrich_tenure:", enrich_tenure(merged))
     print("enrich_equity:", enrich_equity(merged))
     print("enrich_title_risk:", enrich_title_risk(merged))
     print("distress score_board:", score_board(merged))
