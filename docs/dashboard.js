@@ -197,7 +197,7 @@ function initFilters() {
       ssel.appendChild(opt);
     });
 
-  ["search", "filter-state", "filter-county", "filter-type", "filter-contact", "filter-land", "filter-strategy", "filter-source", "filter-distress", "filter-grade", "filter-window", "filter-roi"].forEach((id) =>
+  ["search", "filter-state", "filter-county", "filter-type", "filter-contact", "filter-land", "filter-strategy", "filter-arv", "filter-source", "filter-distress", "filter-grade", "filter-window", "filter-roi"].forEach((id) =>
     $(id).addEventListener("input", applyFilters),
   );
 
@@ -310,6 +310,7 @@ function applyFilters() {
   const src = $("filter-source").value;
   const contact = $("filter-contact").value;
   const strategy = ($("filter-strategy") || {}).value || "";
+  const arvc = ($("filter-arv") || {}).value || "";
   const distress = $("filter-distress").value;
   const minGrade = $("filter-grade").value;
   const minGradeRank = minGrade ? gradeOrder[minGrade] : 0;
@@ -350,6 +351,11 @@ function applyFilters() {
       const sf = (l.raw && l.raw.strategy_fit) || null;
       if (strategy === "_buyers") { if (!buyerCountForListing(l)) return false; }
       else if (!(sf && sf.tags && sf.tags.includes(strategy))) return false;
+    }
+    if (arvc) {
+      const cc = (l.raw && l.raw.calc) || {};
+      if (arvc === "comp" && cc.arv_confidence !== "HIGH") return false;
+      if (arvc === "noproxy" && (cc.arv_confidence === "LOW" || !cc.arv_expected)) return false;
     }
     if (contact) {
       const r = l.raw || {};
@@ -527,6 +533,10 @@ function strategyBuyerChips(l) {
       const m = STRATEGY_META[t];
       if (m) chips.push(`<span class="strat-chip ${m.cls}" title="${(sf.reasons && sf.reasons[t]) || t}">${m.label}</span>`);
     });
+  }
+  const cc = (l.raw && l.raw.calc) || {};
+  if (cc.arv_confidence === "HIGH") {
+    chips.push(`<span class="strat-chip strat-comp" title="ARV grounded in real sold comps — not a Zestimate/assessed-value proxy">✓ comp-backed ARV</span>`);
   }
   const bt = buyersForListing(l);
   const bcount = Object.values(bt).reduce((n, a) => n + a.length, 0);

@@ -1114,6 +1114,7 @@ footer strong { color: var(--text-2); font-weight: 600; }
 .strat-chip.strat-subto { background: #b45309; }  /* subject-to */
 .strat-chip.strat-flip  { background: #be123c; }  /* fix & flip */
 .strat-chip.strat-gator { background: #7c3aed; }  /* gator */
+.strat-chip.strat-comp  { background: #0e7490; }  /* comp-backed ARV (real sold comps) */
 .buyer-chip {
   display: inline-block; padding: 2px 8px; border-radius: var(--r-pill);
   font-size: 10px; font-weight: 700; background: #0f172a; color: #fff; cursor: pointer;
