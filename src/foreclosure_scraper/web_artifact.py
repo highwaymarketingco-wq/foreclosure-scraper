@@ -48,6 +48,7 @@ RAW_KEEP = {
     "condition_tier": "*",            # move_in_ready / cosmetic / major / gut
     "condition_source": "*",          # "vision-HIGH" / "vision-MEDIUM" / regex/age default
     "vision": "*",                    # full Claude Vision condition report
+    "doc_ocr": "*",                   # OCR of scanned legal-notice/deed docs: owner+address+debt$
     "rent_median_ppsf": "*",
     "estimated_monthly_rent": "*",
     "data_quality": "*",              # investor-facing caveats: synthetic_address / no_sqft / low_arv_confidence

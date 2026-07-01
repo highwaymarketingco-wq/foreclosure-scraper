@@ -1297,6 +1297,18 @@ async def run() -> int:
     except Exception:
         log.error("vision.failed", traceback=traceback.format_exc())
 
+    # Document OCR — lift the buried owner name + property address (+ debt $)
+    # out of scanned/legacy legal-notice & recorded-instrument documents. FREE,
+    # Gemini-first with GitHub/Groq fallback; text-layer PDFs parse locally.
+    # Only touches leads that carry a document URL and are missing those fields.
+    try:
+        from .enrichment_doc_ocr import enrich_doc_ocr
+        s = await enrich_doc_ocr(enriched)
+        if s:
+            enrichment_stats["doc_ocr"] = s
+    except Exception:
+        log.error("doc_ocr.failed", traceback=traceback.format_exc())
+
     # ---- Sold-comp pool enrichment (parallel mini-pipeline) ----
     # The sold pool runs through a STRIPPED pipeline: address-backfill
     # so we know the property, photos+images so Vision has something to

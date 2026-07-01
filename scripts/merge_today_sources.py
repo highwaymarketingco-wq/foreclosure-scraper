@@ -94,6 +94,16 @@ NEW_SOURCES = {
     "law_firms.zacchaeus",
     # net-new (2026-06-27): Greenwood newspaper + Spartanburg FLC tax-sale PDF
     "newspapers.index_journal", "counties_sc.spartanburg_flc",
+    # motivated-seller life-event + delinquency sources (2026-06-30): these were
+    # pipeline-wired (DATELESS_OK + main.py) but never added here, so the partial
+    # merge never LANDED them onto the board. The ~8.6k un-landed leads live here.
+    "counties_nc.buncombe_elderly", "counties_nc.buncombe_delinquent_tax",
+    "counties_nc.asheville_helene", "counties_sc.spartanburg_delinquent_tax",
+    "counties_sc.cherokee_delinquent_tax", "public_notices.gannett_obituaries",
+    "national.servicelink_auction", "national.gsa_realproperty",
+    # net-new (2026-06-30 pm): funeral-home CMS obituary RSS (Frazer + ltobits) —
+    # pre-probate heir leads, non-overlapping with the Gannett newspaper obituaries.
+    "public_notices.funeral_home_rss",
 }
 
 
@@ -210,11 +220,22 @@ async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
     # it runs as a SEPARATE pass after the merge lands (decoupled from the risky GIS).
     if not FAST:
         await _step("resolve_name_to_property", enrich_resolve_name_to_property(merged))
+        # Document OCR — free (Gemini/GitHub/Groq), lifts owner+address+debt$ out of
+        # scanned notice/deed docs. Per-lead network, so FAST landing skips it too.
+        from foreclosure_scraper.enrichment_doc_ocr import enrich_doc_ocr
+        await _step("doc_ocr", enrich_doc_ocr(merged))
     return merged
 
 
 def main() -> int:
     cfg = RuntimeConfig.from_env()
+    # FAST landing: also skip the two per-lead NETWORK steps in the sync value
+    # chain (footprint_sqft hits SC ArcGIS per-lead; assessor_card fetches cards).
+    # On a flaky link these turn a landing into a multi-hour slog. Leads still land
+    # fully valued via sc_cama + tax_owed + equity + tenure; these SC refinements
+    # come on the stable weekly full run.
+    import os as _osm
+    _FAST = _osm.environ.get("MERGE_FAST") == "1"
     raw = json.loads((DOCS / "listings.json").read_text())
     existing, bad = [], 0
     for d in raw:
@@ -229,7 +250,10 @@ def main() -> int:
     # Value + score chain (sync; enrich_assessor_card runs its own loop, so it must
     # be OUTSIDE the async phase above).
     print("enrich_sc_cama:", enrich_sc_cama(merged))
-    print("enrich_footprint_sqft:", enrich_footprint_sqft(merged))
+    if not _FAST:
+        print("enrich_footprint_sqft:", enrich_footprint_sqft(merged))
+    else:
+        print("enrich_footprint_sqft: SKIPPED (MERGE_FAST)")
     # Strip wrong-property geo-snaps off court leads (defendant surname mismatch)
     # BEFORE valuation so a stripped lead doesn't keep a bogus ARV.
     print("enrich_court_owner_verify:", enrich_court_owner_verify(merged))
@@ -251,12 +275,15 @@ def main() -> int:
         return vfail
     print(f"calc+grade ({_regrade(merged)} failures)")
 
-    s = enrich_assessor_card(merged)
-    print("enrich_assessor_card:", s)
-    if s:
-        touched = [li for li in merged if isinstance(li.raw, dict) and "assessor_card" in li.raw]
-        _regrade(touched)
-        print(f"re-graded {len(touched)} card-enriched leads")
+    if not _FAST:
+        s = enrich_assessor_card(merged)
+        print("enrich_assessor_card:", s)
+        if s:
+            touched = [li for li in merged if isinstance(li.raw, dict) and "assessor_card" in li.raw]
+            _regrade(touched)
+            print(f"re-graded {len(touched)} card-enriched leads")
+    else:
+        print("enrich_assessor_card: SKIPPED (MERGE_FAST)")
 
     # GIS-derived last-sale/deed-age + tax-runway from the full attr bag, BEFORE
     # equity so _payoff can use the recovered sale data on no-card SC counties.
