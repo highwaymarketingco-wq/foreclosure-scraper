@@ -1,9 +1,44 @@
-# Public-Records Request Templates — Court Case Data (NC + SC)
+# Court Case Data Playbook (NC + SC) — Manual Export + FOIA
 
-The one free route to the case-level data the online portals gate (captcha/ToS):
-**foreclosure filings at complaint stage + judgment/debt dollar amounts + evictions.**
-You (or a VA) send these; the clerk returns a list/report; drop the file in
-`~/foreclosure-scraper/` and I parse it into leads (owner → GIS → equity → board).
+Two compliant ways to pull the case-level court data the online portals gate. Both
+are things YOU do (a human is allowed to search public records); I only parse what
+you save. **Option A (live export) is faster; Option B (FOIA) is the fallback for
+data the portal won't show (e.g. judgment $ amounts).**
+
+---
+
+## OPTION A — Live portal export (fastest, ~do this 2x/week)
+
+### You do NOT pick a judge. You pick: County (Location) + Court + Case type + dates.
+- **NC eCourts** (portal-nc.tylertech.cloud): Smart Search → set **Location = [county]**,
+  **Case Category/Type** (below), a recent **date range** → Search → **File ▸ Save Page
+  As ▸ "Web Page, HTML Only"**. (Only some NC counties are live on eCourts yet — check yours.)
+- **SC PublicIndex** (publicindex.sccourts.org): accept disclaimer → pick **County** →
+  **Court Agency** (Common Pleas / Family / Probate / Magistrate) → search → save the page.
+
+### Case types to grab (each is a different motivated-seller trigger)
+| Lane | Why it's a lead | NC (eCourts) | SC (PublicIndex) |
+|---|---|---|---|
+| **Foreclosure** | owner losing the property | Special Proceeding (power of sale) | Common Pleas → "Foreclosure" |
+| **Probate / Estate** | heirs inherit a house they'll sell | **Estates** (Clerk of Superior Court, E-files) | **Probate** court |
+| **Divorce** | forced sale / buy-out on split | Civil ▸ District ▸ Domestic (absolute divorce / equitable distribution) | **Family** court |
+| **Criminal** | owner incarcerated → vacant/distressed (low hit-rate, do last) | Criminal | General Sessions |
+
+### Time estimate (be realistic)
+~2 min per (county × case-type) search+save. Priorities:
+- **Lean 2x/week pass (~20-30 min):** the 3 biggest counties (Buncombe, Gaston, Spartanburg)
+  × 3 lanes (foreclosure, estate, divorce) = 9 searches. Skip criminal.
+- **Full footprint pass (~60-90 min):** all 18 counties × 3 lanes. Better done weekly, or
+  split across a VA. Foreclosure + Estate are the highest ROI; divorce second; criminal last.
+Drop every saved `.html` in `~/foreclosure-scraper/`; I batch-parse them all at once.
+
+---
+
+## OPTION B — FOIA (for judgment $ + counties not live online)
+
+The one free route to data the portal DOESN'T show — **judgment/debt dollar amounts**,
+plus any county not yet on eCourts. You (or a VA) send these; the clerk returns a
+list/report; drop the file in `~/foreclosure-scraper/` and I parse it into leads.
 
 **Ask for it electronically** (CSV/Excel/PDF) — cheaper, faster, and I can parse it
 directly. NC/SC public-records law lets you inspect for free; copies run ~$0.25/page,
