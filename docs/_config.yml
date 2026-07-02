@@ -1,0 +1,11 @@
+# GitHub Pages (Jekyll) config — trim the DEPLOYED site so the Pages build stays
+# well under the 10-minute deploy timeout. These files stay in git (CI + local
+# scripts still read them); they're just excluded from what Pages publishes:
+#   - listings.json / listings_detail.json  -> the dashboard fetches the .gz copies
+#     (listings.json.gz / listings_detail.json.gz), which are NOT excluded.
+#   - parcel_photos/  -> not referenced by dashboard.js or index.html (49 MB dead weight).
+# Result: ~127 MB deploy -> ~8 MB.
+exclude:
+  - listings.json
+  - listings_detail.json
+  - parcel_photos
