@@ -813,6 +813,15 @@ function renderCards() {
       if (tr && tr.surviving_senior_debt_risk === true) {
         signalChips.push(`<span class="distress-chip" style="color:#fff;background:var(--danger);border-color:var(--danger)" title="Junior-lien foreclosure: a senior lien likely survives the sale. Bidding trap.">⚠ senior lien may survive</span>`);
       }
+      // (5) Corroboration — is the distress court-confirmed, or only flagged by a
+      //     single MLS/aggregator? Green = court-confirmed; amber = single-source
+      //     aggregator (unconfirmed); nothing otherwise.
+      const corr = (l.raw && l.raw.corroboration) || null;
+      if (corr && corr.court_confirmed) {
+        signalChips.push(`<span class="distress-chip" style="color:#fff;background:#0a7d3a;border-color:#0a7d3a" title="Confirmed by a court/authoritative filing: ${(corr.sources || []).join(", ")}">✅ ${corr.label}</span>`);
+      } else if (corr && corr.tier === "aggregator" && !corr.multi_source) {
+        signalChips.push(`<span class="distress-chip" style="color:#7c5e10;background:#fde68a;border-color:#f5cf6a" title="Only flagged by a single MLS/aggregator — not confirmed by any court/authoritative filing">⚠️ Single-source · ${l.source}</span>`);
+      }
       const signalChipsHtml = signalChips.length
         ? `<div class="distress-chips">${signalChips.join("")}</div>` : "";
       return `
@@ -1360,6 +1369,14 @@ async function openDetail(l) {
       const daysLeft = Math.max(0, 10 - Math.floor((now - sd) / 86400000));
       badges.push(`<span class="qbadge warn" title="NC 10-day upset bid window. Anyone can submit a 5%+ higher bid at the courthouse until the deadline.">⏱ Upset bid period (${daysLeft}d left)</span>`);
     }
+  }
+
+  // Corroboration — court-confirmed (green) vs single-source aggregator (amber).
+  const corr = (l.raw && l.raw.corroboration) || null;
+  if (corr && corr.court_confirmed) {
+    badges.push(`<span class="qbadge pos" title="Confirmed by a court/authoritative filing: ${(corr.sources || []).join(", ")}">✅ ${corr.label}</span>`);
+  } else if (corr && corr.tier === "aggregator" && !corr.multi_source) {
+    badges.push(`<span class="qbadge warn" title="Only flagged by a single MLS/aggregator — not confirmed by any court/authoritative filing">⚠️ Single-source · ${l.source}</span>`);
   }
 
   // Bankruptcy cross-reference — HIGH-PRIORITY signal: defendant on this

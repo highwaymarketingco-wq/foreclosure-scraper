@@ -165,6 +165,7 @@ RAW_KEEP = {
     "qa_flags": "*",                  # automated data-quality flags (dup_address, arv_below_asis, etc.)
     "last_sale": "*",                 # display-ready last sale {date, amount, basis, source} for the dashboard
     "also_seen_in": "*",              # every other source + link this property was seen at (kept on merge)
+    "corroboration": "*",             # court-confirmed vs single-source-aggregator flag {court_confirmed, tier, sources, label}
     "owner_mismatch": "*",            # court lead whose geo-snapped property was stripped (name-only, unverified)
     "resolved_from_name": "*",        # name->property resolver provenance {county, strategy, confidence}
     "_resolved_deep_enriched": "*",   # marker: resolved lead already got the same-run comps/Vision catch-up

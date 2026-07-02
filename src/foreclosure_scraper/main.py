@@ -2079,6 +2079,18 @@ async def run() -> int:
     except Exception:
         log.error("eviction_market.failed", traceback=traceback.format_exc())
 
+    # Corroboration flag — is each lead's distress CONFIRMED by a court/authoritative
+    # filing (public index / eCourts / MIE / law-firm roster / ROD), or only flagged
+    # by a single MLS/aggregator (realtor.com etc.)? Reads li.source + also_seen_in,
+    # stamps raw['corroboration'] {court_confirmed, tier, sources, label}. Local, offline.
+    try:
+        from .enrichment_corroboration import enrich_corroboration
+        s = enrich_corroboration(enriched)
+        if s:
+            enrichment_stats["corroboration"] = s
+    except Exception:
+        log.error("corroboration.failed", traceback=traceback.format_exc())
+
     # Buyer-match — curated list of buyers wanting property in the lead's county
     # (land buyers / builders / cash house-buyers), so the card shows who to
     # assign the deal to. Local; from the buyer registry (no published buy box).
