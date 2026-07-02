@@ -220,9 +220,12 @@ function initFilters() {
       ssel.appendChild(opt);
     });
 
-  ["search", "filter-state", "filter-county", "filter-type", "filter-contact", "filter-land", "filter-strategy", "filter-arv", "filter-source", "filter-distress", "filter-grade", "filter-window", "filter-roi"].forEach((id) =>
+  ["search", "filter-state", "filter-county", "filter-type", "filter-contact", "filter-land", "filter-strategy", "filter-arv", "filter-source", "filter-distress", "filter-signals", "filter-intent", "filter-grade", "filter-window", "filter-roi"].forEach((id) =>
     $(id).addEventListener("input", applyFilters),
   );
+  // Live-sync the intent slider's numeric readout as it drags.
+  const intentSlider = $("filter-intent");
+  if (intentSlider) intentSlider.addEventListener("input", () => { $("filter-intent-val").textContent = intentSlider.value; });
 
   document.querySelectorAll(".view-btn").forEach((btn) =>
     btn.addEventListener("click", () => {
@@ -290,6 +293,7 @@ function getSortValue(l, k) {
   if (k === "_max_bid") return (getCalc(l) || {}).max_bid_70 || 0;
   if (k === "_roi") return (getCalc(l) || {}).roi_pct;
   if (k === "_distress") return (getDistress(l) || {}).score || 0;
+  if (k === "_intent") return getIntent(l);
   return l[k];
 }
 
@@ -335,6 +339,8 @@ function applyFilters() {
   const strategy = ($("filter-strategy") || {}).value || "";
   const arvc = ($("filter-arv") || {}).value || "";
   const distress = $("filter-distress").value;
+  const minSignals = $("filter-signals") ? parseInt($("filter-signals").value) || 0 : 0;
+  const minIntent = $("filter-intent") ? parseInt($("filter-intent").value) || 0 : 0;
   const minGrade = $("filter-grade").value;
   const minGradeRank = minGrade ? gradeOrder[minGrade] : 0;
   const win = parseInt($("filter-window").value);
@@ -370,6 +376,10 @@ function applyFilters() {
       if (distress === "HOTWARM" && ds.tier === "COLD") return false;
       if (distress === "STACK2" && !(ds.stack >= 2)) return false;
     }
+    // List-stacking: distinct distress signals/sources hitting this property.
+    if (minSignals && getSignalCount(l) < minSignals) return false;
+    // Intent score (0-100 headline): hide anything below the slider threshold.
+    if (minIntent && getIntent(l) < minIntent) return false;
     if (strategy) {
       const sf = (l.raw && l.raw.strategy_fit) || null;
       if (strategy === "_buyers") { if (!buyerCountForListing(l)) return false; }
@@ -421,10 +431,12 @@ function applyFilters() {
     return true;
   });
 
-  // When the operator is filtering by distress, surface hottest-first
-  // regardless of the table-header sort (the board reads like a lead queue).
-  const effKey = distress ? "_distress" : sortKey;
-  const effDir = distress ? "desc" : sortDir;
+  // When the operator is filtering by distress / stack / intent, surface
+  // hottest-first regardless of the table-header sort (the board reads like a
+  // lead queue). Intent is the single headline rank, so it wins when set.
+  const rankByIntent = minIntent || minSignals;
+  const effKey = rankByIntent ? "_intent" : distress ? "_distress" : sortKey;
+  const effDir = (rankByIntent || distress) ? "desc" : sortDir;
   filtered.sort((a, b) => {
     let av = getSortValue(a, effKey);
     let bv = getSortValue(b, effKey);
@@ -469,6 +481,36 @@ function gradeBadge(g) {
 }
 // ------------- Distress (HOT/WARM operator board) ---------------------------
 function getDistress(l) { return (l.raw && l.raw.distress_stack) || null; }
+
+// ---- Lead signals: list-stacking + intent score (enrichment_lead_signals) ---
+function getSignalStack(l) { return (l.raw && l.raw.signal_stack) || null; }
+function getSignalCount(l) {
+  const ss = getSignalStack(l);
+  if (ss && typeof ss.count === "number") return ss.count;
+  // Fallback for pre-enricher snapshots: read the distress-stack signal list.
+  const ds = getDistress(l);
+  return ds && Array.isArray(ds.signals) ? ds.signals.length : 0;
+}
+function getIntent(l) {
+  const v = l.raw && l.raw.intent_score;
+  return typeof v === "number" ? v : 0;
+}
+// "🔥 N signals" chip — mirrors the distress-chip look; tooltip lists them.
+function signalStackChip(l) {
+  const n = getSignalCount(l);
+  if (n < 2) return "";  // only worth surfacing a real STACK
+  const ss = getSignalStack(l);
+  const list = ss && Array.isArray(ss.signals) ? ss.signals : [];
+  const tip = list.map((s) => String(s).replace(/_/g, " ")).join(", ");
+  return `<span class="distress-chip signal-stack" title="${n} distinct distress signals: ${tip}">🔥 ${n} signals</span>`;
+}
+// Small intent-score badge (0-100 headline), colored by band.
+function intentBadge(l) {
+  const v = getIntent(l);
+  if (!v) return "";
+  const band = (l.raw && l.raw.intent_band) || (v >= 70 ? "hot" : v >= 45 ? "warm" : v >= 20 ? "cool" : "cold");
+  return `<span class="intent-badge intent-${band}" title="Intent score ${v}/100 (${band}) — stacked distress + weighted score + grade">${v}</span>`;
+}
 
 // Hurricane-Helene ATC-45 placard info for a lead, from the dedup meta or the
 // description ("Helene damage: Unsafe placard - 90%"). Returns null if not Helene.
@@ -535,7 +577,7 @@ function renderTable() {
       const dateCell = isBkSource && cl && cl.date_filed ? cl.date_filed : fmtDate(l.sale_date);
       return `
     <tr class="${rowClass}" data-id="${i}">
-      <td>${(() => { const ds = getDistress(l); return ds && distressLabel[ds.tier] ? `<span class="tier-dot ${distressLabel[ds.tier].cls}" title="${ds.tier} · ${(ds.signals || []).join(', ')}"></span>` : ""; })()}${gradeBadge(g)}</td>
+      <td>${(() => { const ds = getDistress(l); return ds && distressLabel[ds.tier] ? `<span class="tier-dot ${distressLabel[ds.tier].cls}" title="${ds.tier} · ${(ds.signals || []).join(', ')}"></span>` : ""; })()}${gradeBadge(g)}${intentBadge(l)}</td>
       <td>${dateCell}</td>
       <td>${l.state || ""}</td>
       <td>${l.county || ""}</td>
@@ -777,6 +819,10 @@ function renderCards() {
       // (independent of distress tier) so a COLD lead still surfaces equity,
       // absentee status, and a senior-lien-survives bidding trap.
       const signalChips = [];
+      // (0) List-stacking — "🔥 N signals" when 2+ distinct distress signals hit
+      //     this property (enrichment_lead_signals). The single loudest lead tell.
+      const sscChip = signalStackChip(l);
+      if (sscChip) signalChips.push(sscChip);
       // (1) Equity — mirror the detail panel's value/pct + underwater colouring.
       const eq = (l.raw && l.raw.equity) || null;
       if (eq && eq.value != null) {
@@ -826,7 +872,7 @@ function renderCards() {
         ? `<div class="distress-chips">${signalChips.join("")}</div>` : "";
       return `
       <div class="card" data-id="${i}">
-        ${g ? `<div class="card-grade-corner">${gradeBadge(g)}</div>` : ""}
+        ${g ? `<div class="card-grade-corner">${gradeBadge(g)}${intentBadge(l)}</div>` : (getIntent(l) ? `<div class="card-grade-corner">${intentBadge(l)}</div>` : "")}
         ${ds && distressLabel[ds.tier] ? `<div class="card-distress-corner">${distressBadge(ds)}</div>` : ""}
         ${photo}
         <div class="card-body">
@@ -1513,7 +1559,94 @@ async function openDetail(l) {
   else if (_perm && typeof _perm === "object") _deeds = _deeds.concat(flat(_perm));
   setSec("d-deeds-section", "d-deeds", _deeds);
 
+  renderCrm(l);
+
   $("detail-panel").classList.remove("hidden");
+}
+
+// ------------- CRM-lite (per-lead status + notes + next action) --------------
+// A static-site CRM: state lives in the operator's own browser (localStorage),
+// keyed to a stable per-lead id (case_number > parcel_id > source_url) so the
+// same property re-opens with its saved status/notes across sessions and across
+// nightly board rebuilds. No backend, no PII leaves the machine.
+const CRM_STORE_KEY = "fc_crm_v1";
+const CRM_STATUSES = ["New", "Contacted", "Appointment", "Dead"];
+
+function crmKey(l) {
+  if (!l) return null;
+  if (l.case_number) return "case:" + l.case_number;
+  if (l.parcel_id) return "parcel:" + `${l.state || ""}:${l.parcel_id}`;
+  if (l.source_url) return "url:" + l.source_url;
+  return null;
+}
+function crmLoadAll() {
+  try { return JSON.parse(localStorage.getItem(CRM_STORE_KEY)) || {}; }
+  catch (e) { return {}; }
+}
+function crmSaveAll(all) {
+  try { localStorage.setItem(CRM_STORE_KEY, JSON.stringify(all)); return true; }
+  catch (e) { return false; }
+}
+function crmGet(key) { return (key && crmLoadAll()[key]) || null; }
+function crmSet(key, patch) {
+  if (!key) return null;
+  const all = crmLoadAll();
+  const rec = Object.assign({}, all[key], patch, { updated: new Date().toISOString() });
+  all[key] = rec;
+  crmSaveAll(all);
+  return rec;
+}
+
+let _crmKey = null;  // key of the lead the panel is currently showing
+function renderCrm(l) {
+  const sec = $("d-crm-section");
+  if (!sec) return;
+  _crmKey = crmKey(l);
+  const rec = crmGet(_crmKey) || {};
+  // Reflect saved status onto the buttons.
+  document.querySelectorAll("#d-crm-status .crm-status-btn").forEach((b) => {
+    b.classList.toggle("active", b.dataset.status === rec.status);
+  });
+  const dateEl = $("d-crm-date"); if (dateEl) dateEl.value = rec.next_action || "";
+  const notesEl = $("d-crm-notes"); if (notesEl) notesEl.value = rec.notes || "";
+  crmShowSaved(rec.updated);
+}
+function crmShowSaved(ts) {
+  const el = $("d-crm-saved");
+  if (!el) return;
+  el.textContent = ts ? `saved ${fmtDate(ts)}` : "";
+}
+// Wire the CRM controls once (delegated). Persists on every change.
+function initCrm() {
+  const statusRow = $("d-crm-status");
+  if (statusRow) {
+    statusRow.querySelectorAll(".crm-status-btn").forEach((b) =>
+      b.addEventListener("click", () => {
+        if (!_crmKey) return;
+        // Toggle off if the same status is clicked again.
+        const cur = (crmGet(_crmKey) || {}).status;
+        const next = cur === b.dataset.status ? "" : b.dataset.status;
+        const rec = crmSet(_crmKey, { status: next });
+        document.querySelectorAll("#d-crm-status .crm-status-btn").forEach((x) =>
+          x.classList.toggle("active", x.dataset.status === next));
+        crmShowSaved(rec.updated);
+      }),
+    );
+  }
+  const dateEl = $("d-crm-date");
+  if (dateEl) dateEl.addEventListener("change", () => {
+    if (!_crmKey) return;
+    crmShowSaved(crmSet(_crmKey, { next_action: dateEl.value }).updated);
+  });
+  const notesEl = $("d-crm-notes");
+  if (notesEl) {
+    let t = null;
+    notesEl.addEventListener("input", () => {
+      if (!_crmKey) return;
+      clearTimeout(t);  // debounce so we don't thrash localStorage per keystroke
+      t = setTimeout(() => crmShowSaved(crmSet(_crmKey, { notes: notesEl.value }).updated), 400);
+    });
+  }
 }
 
 // ------------- CSV export -----------------------------------------------------
@@ -1587,4 +1720,5 @@ function exportCsv() {
 }
 
 // ------------- Boot ----------------------------------------------------------
+initCrm();  // wire the CRM-lite controls once (static DOM, survives dataset swaps)
 loadData();

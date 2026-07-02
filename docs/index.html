@@ -162,6 +162,20 @@
     </select>
   </div>
   <div class="filter-group">
+    <label>Min signals 🔥</label>
+    <select id="filter-signals">
+      <option value="">Any</option>
+      <option value="2">2+ stacked</option>
+      <option value="3">3+ stacked</option>
+      <option value="4">4+ stacked</option>
+      <option value="5">5+ stacked</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Min intent <span id="filter-intent-val" class="filter-slider-val">0</span></label>
+    <input type="range" id="filter-intent" min="0" max="100" step="5" value="0" class="filter-slider">
+  </div>
+  <div class="filter-group">
     <label>Min Grade</label>
     <select id="filter-grade">
       <option value="">Any grade</option>
@@ -255,6 +269,26 @@
     <div class="quick-badges" id="d-quick-badges"></div>
   </div>
   <div class="detail-body">
+    <!-- CRM-lite: per-lead status + notes + next action (browser localStorage) -->
+    <div class="detail-section crm-block" id="d-crm-section">
+      <h3>📋 Lead CRM <span class="crm-hint">saved in this browser</span></h3>
+      <div class="crm-status-row" id="d-crm-status">
+        <button class="crm-status-btn" data-status="New">New</button>
+        <button class="crm-status-btn" data-status="Contacted">Contacted</button>
+        <button class="crm-status-btn" data-status="Appointment">Appointment</button>
+        <button class="crm-status-btn" data-status="Dead">Dead</button>
+      </div>
+      <div class="crm-fields">
+        <label class="crm-label">Next action
+          <input type="date" id="d-crm-date" class="crm-date">
+        </label>
+        <label class="crm-label">Notes
+          <textarea id="d-crm-notes" class="crm-notes" rows="3" placeholder="Call notes, offer, follow-up…"></textarea>
+        </label>
+        <div class="crm-saved" id="d-crm-saved"></div>
+      </div>
+    </div>
+
     <!-- Investor calculator -->
     <div class="detail-section calc-block">
       <h3>Investor Calculator</h3>

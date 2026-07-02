@@ -2,9 +2,29 @@
 
 Greenville + Greenwood dropped per scope narrowing 2026-05.
 
-Web app with bot-protected backend. Free read but blocks raw curl. We hit the
-internal API endpoint with a real-browser-style request; if blocked, the
-caller falls back to the free stealth-browser renderer (render.fetch_rendered).
+COMPLIANCE (verified live 2026-07-02): every in-footprint Kofile *.publicsearch.us
+host serves this robots.txt::
+
+    user-agent: *
+    Allow: /$
+    Disallow: /
+
+i.e. the site owner allows ONLY the bare root and disallows every other path —
+which includes the SPA search routes (/search, /results) and the internal JSON
+API (/api/search) this module would need. A `Disallow: /` is a machine-readable
+no-automation directive, so under the project's compliance line (render an OPEN,
+robots-ALLOWED page's own JS; never ride a CAPTCHA/login/WAF/robots-ban) this
+source is WALLED, not render-unlockable. The React SPA itself has no CAPTCHA and
+returns HTTP 200, but that does not override the robots ban.
+
+Therefore both public entry points below SHORT-CIRCUIT to [] on any host whose
+robots.txt disallows the search path (all of them today), rather than firing an
+httpx API probe or a stealth-render fallback at a robots-disallowed endpoint.
+The code is kept per policy so it flips on for free the day a county publishes a
+robots-clean endpoint (delete/relax the Disallow, or expose an Allow: /search).
+
+The map is registered in rod/enrich.py + nod_discovery.py; with the guard active
+these calls are compliant no-ops (0 rows), NOT a scraper bug.
 """
 from __future__ import annotations
 
@@ -13,6 +33,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Iterable
 
+import httpx
 from dateutil import parser as dateparser
 
 from ..http_client import client
@@ -21,6 +42,70 @@ from .models import RodDoc, normalize_doc_type
 KOFILE_COUNTIES = {
     ("SC", "Oconee"): "oconee.sc.publicsearch.us",
 }
+
+# The search paths we would need. `Disallow: /` covers all of them.
+_ROBOTS_SEARCH_PATHS = ("/search", "/results", "/api/search")
+
+# Env escape hatch for the day a host goes robots-clean: KOFILE_IGNORE_ROBOTS=1
+# skips the guard. Off by default — compliant-by-default.
+_IGNORE_ROBOTS = os.environ.get("KOFILE_IGNORE_ROBOTS", "0") == "1"
+
+
+def _path_disallowed(robots_body: str, path: str) -> bool:
+    """Minimal robots.txt evaluator for the `user-agent: *` group: True if `path`
+    is Disallowed and not overridden by a more-specific Allow. Kofile's rule set
+    is just `Allow: /$` + `Disallow: /`, so `/search` (not the bare root) is
+    disallowed. Kept deliberately small — only the wildcard group matters here."""
+    ua_star = False
+    allows: list[str] = []
+    disallows: list[str] = []
+    for raw in (robots_body or "").splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line or ":" not in line:
+            continue
+        field, _, value = line.partition(":")
+        field = field.strip().lower()
+        value = value.strip()
+        if field == "user-agent":
+            ua_star = value == "*"
+        elif ua_star and field == "allow":
+            allows.append(value)
+        elif ua_star and field == "disallow":
+            disallows.append(value)
+
+    def _matches(rule: str) -> bool:
+        if not rule:
+            return False
+        if rule.endswith("$"):  # exact-match anchor, e.g. "/$"
+            return path == rule[:-1]
+        return path.startswith(rule)
+
+    # Longest-match wins; Allow breaks ties (standard robots semantics).
+    best_dis = max((r for r in disallows if _matches(r)), key=len, default=None)
+    best_all = max((r for r in allows if _matches(r)), key=len, default=None)
+    if best_dis is None:
+        return False
+    if best_all is not None and len(best_all.rstrip("$")) >= len(best_dis):
+        return False
+    return True
+
+
+def _robots_blocks_search(host: str) -> bool:
+    """True if `host`'s robots.txt disallows the Kofile search paths for `*`.
+    Fails CLOSED (treats as blocked) if robots.txt is unreadable — we never
+    query a search endpoint we can't confirm is robots-allowed. Compliance guard,
+    not a bug: honoring robots is the whole point."""
+    if _IGNORE_ROBOTS:
+        return False
+    try:
+        r = httpx.get(f"https://{host}/robots.txt", timeout=15,
+                      follow_redirects=True)
+    except Exception:
+        return True  # can't confirm allowed -> don't query (fail closed)
+    if r.status_code != 200:
+        return True
+    body = r.text or ""
+    return any(_path_disallowed(body, p) for p in _ROBOTS_SEARCH_PATHS)
 
 # Kofile-side document type tokens we care about. Their API accepts a comma
 # or pipe joined list under `docTypes` — we send them all and let the server
@@ -77,6 +162,12 @@ async def search_by_name(state: str, county: str, name: str, max_docs: int = 50)
     if (state, county) not in KOFILE_COUNTIES:
         return []
     host = KOFILE_COUNTIES[(state, county)]
+
+    # Compliance guard: the search paths are robots-disallowed (Disallow: /) on
+    # every Kofile host today, so neither the httpx API probe nor the stealth
+    # render fallback below may fire — return a clean, compliant [] no-op.
+    if _robots_blocks_search(host):
+        return []
 
     # Try direct API. Kofile's search endpoint is /api/search?q=...
     api_url = f"https://{host}/api/search"
@@ -153,6 +244,9 @@ async def discover_recent_nods(
     if (state, county) not in KOFILE_COUNTIES:
         return []
     host = KOFILE_COUNTIES[(state, county)]
+    # Compliance guard: robots.txt disallows the search path — compliant no-op.
+    if _robots_blocks_search(host):
+        return []
     today = datetime.utcnow()
     from_date = today - timedelta(days=max(1, days_back))
 

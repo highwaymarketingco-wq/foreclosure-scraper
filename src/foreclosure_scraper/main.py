@@ -336,6 +336,7 @@ DATELESS_OK_SOURCES = {
     "counties_nc.nc_ecourts_divorce",            # NC eCourts divorce filings (no sale date)
     "counties_nc.nc_heir_estate_parcels",        # heir/estate owner-of-record parcels (GIS, dateless)
     "counties_sc.spartanburg_vacant",            # Spartanburg City vacant registry (absentee+vacant, dateless)
+    "counties_sc.spartanburg_condemned",         # Spartanburg condemned/dilapidated CAMA-condition signal (dateless)
     "counties_nc.asheville_str_permits",         # Asheville lapsed STR/homestay permits (motivated landlord, dateless)
     "counties.column_legal_notices",             # Column API SC estate/probate notices (no sale date)
     "law_firms.zacchaeus",                       # ZLS tax foreclosures (status-driven; upset/pending leads outlive sale date)
@@ -897,6 +898,16 @@ async def run() -> int:
         await enrich_gis_attrs(enriched)
     except Exception:
         log.error("gis_attrs.failed", traceback=traceback.format_exc())
+
+    # CAMA per-parcel condition/grade/year (open ArcGIS) — near-universal free
+    # condition layer; backfills year_built + a distressed-condition signal.
+    try:
+        from .enrichment_cama_condition import enrich_cama_condition
+        s = await enrich_cama_condition(enriched)
+        if s:
+            enrichment_stats["cama_condition"] = s
+    except Exception:
+        log.error("cama_condition.failed", traceback=traceback.format_exc())
 
     # Mine raw['gis_attrs_full'] for last-sale (amount/date/book/page) + deed-age +
     # owner-occupancy. Runs RIGHT AFTER gis_attrs (bag in memory) and BEFORE equity so
@@ -1480,6 +1491,17 @@ async def run() -> int:
         await enrich_with_fema_repetitive_loss(enriched)
     except Exception:
         log.error("fema_repetitive_loss.failed", traceback=traceback.format_exc())
+
+    # Hurricane Helene structural damage — parcel/address-matched county+FEMA
+    # damage-assessment layers (Spartanburg/Henderson/Buncombe). Free ArcGIS REST;
+    # TIME-SENSITIVE (these public layers decay). Kill switch: FORECLOSURE_HELENE_DAMAGE_OFF=1.
+    try:
+        from .enrichment_helene_damage import enrich_with_helene_damage
+        s = await enrich_with_helene_damage(enriched)
+        if s and s.get("matched"):
+            enrichment_stats["helene_damage"] = s
+    except Exception:
+        log.error("helene_damage.failed", traceback=traceback.format_exc())
 
     # Code enforcement violations — Charlotte 311 + other city open-data
     # portals. Active open violations are direct distress signal. Free
@@ -2090,6 +2112,16 @@ async def run() -> int:
             enrichment_stats["corroboration"] = s
     except Exception:
         log.error("corroboration.failed", traceback=traceback.format_exc())
+
+    # Lead signals — Goliath-parity list-stacking (# distinct distress signals per
+    # property) + a normalized 0-100 intent score. Runs LAST so it sees every signal.
+    try:
+        from .enrichment_lead_signals import enrich_lead_signals
+        s = enrich_lead_signals(enriched)
+        if s:
+            enrichment_stats["lead_signals"] = s
+    except Exception:
+        log.error("lead_signals.failed", traceback=traceback.format_exc())
 
     # Buyer-match — curated list of buyers wanting property in the lead's county
     # (land buyers / builders / cash house-buyers), so the card shows who to

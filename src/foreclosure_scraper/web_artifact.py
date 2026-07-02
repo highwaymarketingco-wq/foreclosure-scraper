@@ -166,6 +166,12 @@ RAW_KEEP = {
     "last_sale": "*",                 # display-ready last sale {date, amount, basis, source} for the dashboard
     "also_seen_in": "*",              # every other source + link this property was seen at (kept on merge)
     "corroboration": "*",             # court-confirmed vs single-source-aggregator flag {court_confirmed, tier, sources, label}
+    "signal_stack": "*",              # list-stacking: {count, signals[]} distinct distress signals per property
+    "intent_score": "*",              # normalized 0-100 seller-intent score
+    "intent_band": "*",               # hot/warm/cool/cold band
+    "condition_cama": "*",            # CAMA per-parcel condition/grade/year_built
+    "storm_damage": "*",              # Hurricane Helene damage-assessment match {damage_level, estimated_loss, ...}
+    "condemned": "*",                 # condemned/dilapidated flag from county condemned inventory
     "owner_mismatch": "*",            # court lead whose geo-snapped property was stripped (name-only, unverified)
     "resolved_from_name": "*",        # name->property resolver provenance {county, strategy, confidence}
     "_resolved_deep_enriched": "*",   # marker: resolved lead already got the same-run comps/Vision catch-up

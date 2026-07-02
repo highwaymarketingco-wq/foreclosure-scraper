@@ -1101,6 +1101,64 @@ footer strong { color: var(--text-2); font-weight: 600; }
 .tier-dot.hot  { background: #d92d20; box-shadow: 0 0 0 2px rgba(217,45,32,.18); }
 .tier-dot.warm { background: #e0a106; box-shadow: 0 0 0 2px rgba(224,161,6,.18); }
 
+/* ---- List-stacking chip ("🔥 N signals") — a louder distress-chip ---- */
+.distress-chip.signal-stack {
+  background: linear-gradient(135deg, #d92d20, #f97316);
+  color: #fff; border-color: transparent; font-weight: 800;
+}
+
+/* ---- Intent score badge (0-100 headline), banded by heat ---- */
+.intent-badge {
+  display: inline-block; margin-left: 5px; padding: 1px 6px;
+  border-radius: var(--r-pill); font-size: 10px; font-weight: 800;
+  color: #fff; vertical-align: middle; font-variant-numeric: tabular-nums;
+}
+.intent-badge.intent-hot  { background: linear-gradient(135deg, #d92d20, #f97316); }
+.intent-badge.intent-warm { background: linear-gradient(135deg, #b8860b, #e0a106); }
+.intent-badge.intent-cool { background: #2563eb; }
+.intent-badge.intent-cold { background: var(--muted-2, #98a2b3); }
+
+/* ---- Intent slider (filter bar) ---- */
+.filter-slider { width: 100%; min-width: 130px; accent-color: var(--accent, #2563eb); cursor: pointer; }
+.filter-slider-val {
+  font-variant-numeric: tabular-nums; font-weight: 700;
+  color: var(--accent, #2563eb);
+}
+
+/* ---- CRM-lite (detail panel) ---- */
+.crm-block .crm-hint {
+  font-size: 10px; font-weight: 600; color: var(--muted-2, #98a2b3);
+  margin-left: 6px; text-transform: none; letter-spacing: 0;
+}
+.crm-status-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+.crm-status-btn {
+  padding: 5px 12px; border-radius: var(--r-pill); cursor: pointer;
+  font-size: 12px; font-weight: 700;
+  background: var(--surface-2); color: var(--text-2, #475467);
+  border: 1px solid var(--border, rgba(0,0,0,.1));
+}
+.crm-status-btn:hover { border-color: var(--border-strong, rgba(0,0,0,.25)); }
+.crm-status-btn.active { color: #fff; border-color: transparent; }
+.crm-status-btn[data-status="New"].active         { background: #2563eb; }
+.crm-status-btn[data-status="Contacted"].active   { background: #b8860b; }
+.crm-status-btn[data-status="Appointment"].active { background: #15803d; }
+.crm-status-btn[data-status="Dead"].active        { background: #98a2b3; }
+.crm-fields { display: flex; flex-direction: column; gap: 10px; }
+.crm-label {
+  display: flex; flex-direction: column; gap: 4px;
+  font-size: 11px; font-weight: 700; color: var(--muted, #667085);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.crm-date, .crm-notes {
+  font: inherit; font-size: 13px; padding: 7px 9px;
+  border-radius: var(--r-sm, 6px);
+  border: 1px solid var(--border, rgba(0,0,0,.12));
+  background: var(--surface, #fff); color: var(--text, #101828);
+}
+.crm-notes { resize: vertical; min-height: 56px; }
+.crm-date:focus, .crm-notes:focus { outline: none; border-color: var(--accent, #2563eb); }
+.crm-saved { font-size: 10px; color: var(--muted-2, #98a2b3); min-height: 12px; }
+
 .hidden { display: none; }
 
 /* ---- Strategy-fit pills + buyer-match chip (cards) ---- */

@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-07-02T18:00:25.452216Z",
+  "run_time": "2026-07-02T22:54:05.171286Z",
   "total": 17003,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "scheduled NC SOS registered-agent refresh"
+  "notes": "lead-signals stamp: list-stacking + intent score"
 }
