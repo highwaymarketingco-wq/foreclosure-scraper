@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-07-02T01:43:33.080164Z",
+  "run_time": "2026-07-02T16:38:40.516064Z",
   "total": 17003,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "board-wide corroboration / court-confirmation flag"
+  "notes": "scheduled land-records refresh"
 }
