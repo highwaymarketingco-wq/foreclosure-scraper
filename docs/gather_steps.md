@@ -35,19 +35,23 @@ Per county:
 2. On the search form (PISearch.aspx), leave **Last Name blank**, set **Date Type = `Case Filed`**, **Beginning = 01/01/2026, Ending = 07/01/2026** (first pull; then last 3–4 days).
 3. Run these lanes (set the dropdowns, Search, save each):
 
-   | Lane | Court Type | Case Type | Case Sub-Type |
-   |---|---|---|---|
-   | Foreclosure | Circuit Court | Common Pleas | **Foreclosure (420)** |
-   | Lis Pendens | Circuit Court | **Lis Pendens** | All |
-   | Partition | Circuit Court | Common Pleas | **Partition (440)** |
-   | State Tax Lien | Circuit Court | **Liens** | **State Tax Lien (432)** |
-   | Judgments $ | Circuit Court | **Judgment** | Foreclosure (420) · Date Type = **Judgment Issued** |
-   | Eviction | **Summary Court** | All | **Possession (450)** |
+   | Lane | Court Type | Case Type | Case Sub-Type | Date Type |
+   |---|---|---|---|---|
+   | Foreclosure | Circuit Court | Common Pleas | **Foreclosure (420)** | **Case Filed** |
+   | Lis Pendens | Circuit Court | **Lis Pendens** | All | **Case Filed** |
+   | Partition | Circuit Court | Common Pleas | **Partition (440)** | **Case Filed** |
+   | Eviction | **Summary Court** | All | **Possession (450)** | **Case Filed** |
 
-4. **Save Page As ▸ HTML Only** → `~/foreclosure-scraper/` as e.g. `anderson_sc_foreclosure.html`.
-5. **If a lane says "maximum records exceeded"** (State Tax Lien + Judgment do this over 6 months): narrow the dates to **2 months** and re-save.
+   **All four lanes use Date Type = `Case Filed`** — do NOT use "Judgment Issued", it returns near-zero.
 
-**Spartanburg's 2 gaps** (they overflowed before — use `05/01/2026 → 07/01/2026`): the **State Tax Lien** and **Judgment** lanes above, at `https://publicindex.sccourts.org/Spartanburg/PublicIndex/`.
+   **SKIP these two** (learned 2026-07-01):
+   - **State Tax Lien (432)** — already pulled directly from the SC DOR lien registry (~8,000 liens). Redundant; don't gather.
+   - **Judgment $** — NOT a separate case-type search in this portal (420 lives under Common Pleas, there is no "Judgment" type holding it). Get judgment $ from the per-case **DETAIL** page (step 3) on hot leads only.
+
+4. **Save the results** → `~/foreclosure-scraper/` as e.g. `anderson_sc_foreclosure.html`.
+5. **If a lane says "maximum records exceeded"**: narrow the dates to ~2 months and re-run.
+
+**Saving from an automated (Cowork) session:** the native Chrome "Save As" is an OS window the browser tools can't click. Instead, after results render, grab the page HTML directly — evaluate `document.documentElement.outerHTML` and write it to `<county>_<lane>.html`. That's exactly what the parser reads (the `#ContentPlaceHolder1_SearchResults` table) — no Save dialog needed. (Manual browser: plain Ctrl-S → HTML Only still works.)
 
 ---
 
