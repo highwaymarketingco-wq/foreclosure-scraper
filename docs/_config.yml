@@ -2,10 +2,19 @@
 # well under the 10-minute deploy timeout. These files stay in git (CI + local
 # scripts still read them); they're just excluded from what Pages publishes:
 #   - listings.json / listings_detail.json  -> the dashboard fetches the .gz copies
-#     (listings.json.gz / listings_detail.json.gz), which are NOT excluded.
+#     (listings.json.gz / listings_detail.json.gz), which are re-included below.
 #   - parcel_photos/  -> not referenced by dashboard.js or index.html (49 MB dead weight).
 # Result: ~127 MB deploy -> ~8 MB.
+#
+# IMPORTANT: Jekyll's `exclude` matches by prefix (entry.start_with?(pattern)), so
+# excluding `listings.json` ALSO drops `listings.json.gz` (the gz name starts with
+# the excluded string). That silently 404'd the dashboard's data on the live site.
+# `include` overrides `exclude` in Jekyll, so we re-include the two .gz files the
+# dashboard actually fetches. Do NOT remove the include block.
 exclude:
   - listings.json
   - listings_detail.json
   - parcel_photos
+include:
+  - listings.json.gz
+  - listings_detail.json.gz
