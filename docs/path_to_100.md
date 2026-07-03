@@ -4,6 +4,26 @@ _Foreclosure / motivated-seller lead engine · 18 counties (Upstate SC + Western
 
 For every score, factor, source, enrichment, and identity-join: current fill-rate → what 100% requires → FREE routes → REAL 2026 paid-vendor pricing → feasibility (can/can't + why) → recurring cadence & cost → step-by-step manual playbook.
 
+---
+
+## 📖 START HERE — System Narrative (the whole thing in one page)
+
+**What it is:** a machine that finds distressed/motivated owners across Upstate SC + Western NC, values their homes for free, and hands you a ranked *who-to-call* list (17,003 leads). Backbone: *name → property → equity → contact.* Foreclosure was the first door; the real product is a **motivation engine** — every life event that forces a sale is a lead source.
+
+**The honest state:** excellent at **finding + valuing**, blind at **contacting** — only ~**2.2% resolve to a dialable phone**, so 17,003 collapses to **~370 truly reachable** without paying a skip-trace vendor. That single fact is the system's center of gravity. (Valuation also had real bugs — a GLA/sqft join error + a max-bid fee double-charge — so trust the confidence flags, not point estimates.)
+
+**Why the moat is speed + unique sources, NOT the list:** anyone can buy a foreclosure list; the saturated-mail floor converts at ~**0.2%**. The engine wins on ① **speed** (78% of deals go to the *first* responder → the <24h hot-signal SLA) and ② **unique sources** vendors don't package (incarceration, obituary pre-probate heirs, county code/tax pulls, GIS elderly/vacancy) — the assembly of dozens of free county endpoints is the defensible work.
+
+**Money model:** Tier 0 free (demo) · Tier 1 $300–700 (curated hot lists) · Tier 2 $2–4k (skip-traced first-mover leads). Underwrite at **~1 deal per 40–60 contacts**.
+
+**The 3 walls:** (1) the **contact wall** (2.2% free phone — "free-only may be the wrong constraint"; pay to enrich only the few hundred worth calling); (2) the **proof-of-conversion wall** (never run to a closed deal — ROI is modeled, not demonstrated); (3) the **seller-competition wall** (everyone can pull these records; the 0.2% floor is the default — escape it with speed + unique sources or converge to it).
+
+**The one decision that matters next (per two independent critics after 28 research rounds):** stop researching and **run the 25-lead pilot** — skip-trace just those 25, hit them inside the 24h SLA, measure contact/conversation/cost-per-answered-call against the 1-in-40–60 assumption; in parallel **ship the free bug-fixes** (ARV/GLA join + max-bid fee) so the pilot's numbers are trustworthy. Not more sources, not more counties — one small honest paid pilot that proves the deal math or kills it cheaply.
+
+_(Full 28-round research log in `path_to_100_deepdive.md`; phased build plan in `path_to_100_roadmap.md`.)_
+
+---
+
 ## ⚠️ Round-1 verification corrections (2026-07-02) — these SUPERSEDE figures below
 Independent re-fetch of every vendor's live pricing page. Full tables in `path_to_100_deepdive.md`.
 - **PropStream** — "free skip-trace" needs **Pro $199/mo** (or a **$30/mo Connect add-on**), NOT the $99 Essentials tier (which pays $0.12/contact). Don't budget "$99 + free tracing."

@@ -10234,3 +10234,79 @@ The instrument is proven when `docs/first_mover.json` shows a **populated `by_si
 ### Cost + effort
 
 $0 marginal on infrastructure — it's all local Python over `crm.json` and `listings.json`, folded into launchd crons that already run. The only real cost is **the physical mail for the probe**: 150 postcards at roughly $0.50–$0.90 each printed/stamped (USPS EDDM / cheap postcard vendors run about $0.40–$0.55 in postage + print), so **~$75–$135 per probe wave** — the single unavoidable spend, and the whole point, since response can't be measured without actually contacting. Build effort: **~1 focused day** — half a day for the CRM event functions + `stamp_lane` (A, the load-bearing change, plus a couple of tests mirroring `test_outreach.py`), and half a day for the probe drawer, metrics computer, and the dashboard panel (B–D), which are thin reads over existing structures.
+
+
+---
+
+# Deep-Dive Round 28 — Convergence Critic + System Narrative (2026-07-02)
+
+## Convergence Assessment (2nd independent critic)
+I'll produce this convergence assessment from what's given. This is an analytical judgment task, not a data-gathering one — I have the full 27-round arc summarized in the prompt, and my job is to grade R26/R27 against R25's blind spots and name the true residual. Let me write it tight.
+
+**CONVERGENCE ASSESSMENT — 2nd Independent Critic**
+
+## 1. Did R26/R27 close the R25 blind spots?
+
+- **Contactability (2.2% phone → ~370 reachable)** — **STILL-OPEN.** R26/R27 reframed around speed and unique sources but neither raised the reachable-contact count nor validated a skip-trace/enrichment path to move the 2.2%; ~370 is still the ceiling and no round proves those 370 numbers are correct/current/answerable.
+- **Proof-of-conversion** — **STILL-OPEN.** 27 rounds and zero closed deals, zero live-tested reply rate, zero cost-per-contract from THIS list. "78% first-responder" is a cited industry stat, not a measured outcome from this engine. This is the single biggest unretired risk.
+- **Seller-competition / mail-saturation** — **PARTIALLY.** R26 correctly identifies the 0.2% saturated-mail floor and pivots the moat to speed + unique sources. That's a sharper thesis, but "unique sources vendors don't sell" is asserted, not quantified — no round measures how many of the 17,003 are genuinely un-listed vs. also in PropStream/DataTree.
+- **Buyer-side (who buys the deal / disposition)** — **STILL-OPEN.** Entire arc is seller-lead-centric. If the operator is wholesaling, the buyers' list, assignment spread, and dispo velocity are unaddressed. No round proves the leads convert to *revenue* on the back end.
+- **Latency / freshness** — **PARTIALLY→CLOSED-on-design.** R27 designs hot-signal delta, signal_age, <24h SLA — genuinely closes the *design* gap. But it's spec, not a running clock; no round demonstrates the pipeline actually surfaces a signal within 24h end-to-end. Closed on paper, open in practice.
+- **Mail economics** — **PARTIALLY.** The 0.2% floor and cost-per-piece math are now explicit, but there's no unit-economics model tying spend → contacts → deals → margin. The math stops at "floor exists," not "here is break-even volume."
+
+## 2. The TRUE RESIDUAL (what actually decides if this makes money)
+
+1. **No conversion evidence at any point in the funnel.** Not one contact attempted against the real list. Reply rate, right-party-contact rate, appointment rate, contract rate — all still zero-observed. Everything downstream of "we have a list" is modeled, not measured. This is the residual that matters; the other 26 rounds are upstream of it.
+2. **The ~370 reachable number is itself unverified.** Phone match ≠ phone *correct* ≠ phone *answered by the owner*. A 2.2% match at unknown accuracy could be effectively <150 truly-reachable. Nobody dialed a sample of 50 to establish a real connect rate — a half-day test that would collapse most of the uncertainty.
+3. **"Unique sources" is an untested moat claim.** The value hinges on leads vendors *don't* have. No round cross-checked a sample against PropStream/DataTree/BatchLeads to prove non-overlap. If overlap is high, the speed edge is the only moat and it's operationally fragile (requires daily discipline, not code).
+4. **The operator/labor variable is absent.** ~370 reachable at first-responder speed implies someone dials fast, every day, with a script and CRM. Who? At what cost-per-hour? A "free" list with a $50/hr human caller has real unit economics nobody modeled.
+5. **Legal/DNC/TCPA exposure on cold-calling the phone-matched set** is noted historically but never resolved into an operating constraint — one bad-actor complaint can eat the margin of many deals.
+
+## CONVERGENCE VERDICT
+**More research is NOT warranted — the bottleneck is now execution.** The remaining unknowns (real connect rate, real reply rate, source-overlap, DNC exposure) cannot be closed by another round of desk analysis; they resolve only by dialing a 50-contact sample and measuring. Stop researching, run a live 50-lead pilot, and let observed conversion — not a 28th round — decide whether this makes money.
+
+## The Definitive System Narrative
+The task is clear: write a definitive one-page system narrative in markdown. I have all the substance I need from the detailed brief. No files to read, no tools to run. Let me write it.
+
+# The Free Motivated-Seller Engine — System Narrative
+
+## What it is
+
+It is a machine that finds distressed and motivated property owners across Upstate South Carolina and Western North Carolina, values their homes, and hands you a ranked list of who to talk to — built entirely on free public data, running on your own Mac, published to a GitHub-Pages dashboard. Today it holds **17,003 leads**. It does not buy houses; it tells you which houses to chase and why.
+
+The pipeline is a backbone: *name → property → equity → contact.* It pulls names from many motivation sources — foreclosure filings, probate, divorce, tax delinquency, elderly and incarcerated owners, vacant registries — then keys each one to a real parcel through county GIS and assessor records, pulls the sale/loan history to estimate equity, values the home against comps, and scores it. Foreclosure was just the first door; the real product is a *motivation engine* where every life event that forces a sale becomes a lead source.
+
+## The honest state
+
+Here is the truth a founder needs before spending a weekend on it. The engine is **excellent at finding and valuing, and blind at contacting.** It reliably identifies motivated owners and produces defensible ARV and equity numbers for free. But free public records almost never carry a phone number — only about **2.2%** of records resolve to a dialable phone, which collapses 17,003 leads down to roughly **370 actually reachable** owners without paying a skip-trace vendor. That single fact is the center of gravity of the whole system. The list looks enormous; the *workable* list is a few hundred.
+
+A second honesty: valuation has been stress-tested and had real bugs (a GLA/heated-sqft join error, and a max-bid calc that double-charged the selling fee, now 0.70→0.75). Trust the confidence flags, not the point estimates. The ARV is unbiased at the median but noisy.
+
+## Why the moat is speed and unique sources — not the list
+
+The instinct is that the list *is* the asset. It is not. Anyone can buy a foreclosure list, and mailing a saturated county floor converts at roughly **0.2%** — the list itself is a commodity that vendors already sell cheaper than your time. The engine wins on two things vendors can't replicate:
+
+1. **Speed.** Being the *first* responder to a fresh distress signal wins roughly **78%** of the deal. The system's edge is a hot-signal delta that flags brand-new filings, tracks `signal_age`, and enforces a <24-hour outreach SLA. You beat the mailer-in-bulk crowd by getting there first, not by having more names.
+2. **Unique sources.** The genuine moat is the motivation lanes vendors *don't* package and sell — incarceration/jail-booking feeds, obituary-driven pre-probate heirs, county-specific tax-delinquency and code-enforcement pulls, GIS-derived elderly-owner and vacancy signals. These are stitched together from dozens of free county endpoints that no single competitor bothers to assemble. That assembly is the defensible work.
+
+## The money model
+
+Run it as three stacked tiers:
+
+- **Tier 0 — $0.** The raw free list and dashboard. Self-serve, no contact enrichment. This is the demo and the top of the funnel, not the business.
+- **Tier 1 — $300–$700.** Curated, deduped, hot-signal lists with valuation and equity for a defined territory. This is the volume product for investors and agents who want speed without building the pipe.
+- **Tier 2 — $2,000–$4,000.** Enriched, contactable, first-mover leads with skip-traced phones and done-for-you targeting — where you've paid to break the 2.2% phone wall on the *good* leads only.
+
+Deal math to underwrite against: roughly **one closed deal per 40–60 contacts.** With ~370 reachable owners in inventory, that is a real but finite number of shots per cycle — which is exactly why speed and re-runs (fresh signals refilling the top) matter more than raw list size.
+
+## The three walls
+
+1. **The contact wall.** 2.2% free phone coverage. Everything downstream is gated by it. Skip-trace vendors solve it but cost money, which breaks the "free" thesis — so the honest reframing is: *free-only may be the wrong constraint.* Pay to enrich the few hundred leads worth calling; keep the rest free.
+2. **The proof-of-conversion wall.** The engine has never been run to a closed deal. Until a real pilot converts, the ROI is modeled, not demonstrated — and you cannot sell Tier 2 confidently on a model.
+3. **The seller-competition wall.** You are not the only person who can pull these records. The saturated-mail floor (0.2%) is what everyone else gets. Your escape from it is speed + unique sources; if you're slow or generic, you converge to the floor.
+
+## The one decision that matters next
+
+Stop researching and **run the 25-lead pilot.** Take the best 25 reachable leads, pay to skip-trace just those, hit them inside the 24-hour SLA, and measure contact rate, conversation rate, and cost-per-answered-call against the 1-in-40-to-60 assumption. In parallel, **ship the free bug-fixes** already identified — the ARV/GLA join and the max-bid fee correction — so the numbers the pilot leans on are trustworthy.
+
+That is the whole decision. Not more sources, not more counties, not a prettier dashboard. One small, honest, paid pilot that either proves the deal math or kills it cheaply. Everything else the 27 rounds explored is downstream of that one test.
