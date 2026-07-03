@@ -4109,3 +4109,313 @@ Typical NC end-to-end after sale day: **10 days minimum, extended 10 days per up
 - [G.S. 45-21.29 Orders for possession](https://www.ncleg.gov/enactedlegislation/statutes/html/bysection/chapter_45/gs_45-21.29.html)
 - [G.S. 45-21.31 (surplus proceeds) PDF](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_45/GS_45-21.31.pdf) · [G.S. 45-21.32 (special proceeding for surplus) PDF](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_45/GS_45-21.32.pdf)
 - [NC surplus-funds claim procedure (Pierce Law Group)](https://piercelaw.com/news/uncategorized/what-procedures-apply-for-claiming-surplus-funds-if-a-foreclosure-sale-yields-excess-proceeds-in-north-carolina/)
+
+
+---
+
+# Deep-Dive Round 12 — Competitor UX Teardown (features to copy, 2026-07-02)
+
+
+## Goliath Data (goliathdata.com)
+
+Goliath is the "AI-acquisitions-team" competitor: its whole pitch is a closed loop — a distress signal fires, the owner gets skip-traced + intent-scored, drops into a pipeline, and the "David" AI voice agent calls them, all inside one app. For our purposes the key split is: **the data/UX layer (list-building, scoring, signal feed, pipeline, inbox) is fully copyable in a static dashboard**, while **the "David calls them / texts them" layer is regulated telephony infrastructure we cannot host statically.**
+
+### Screen-by-screen feature inventory
+
+- **Command Center CRM (home)** — central hub. Top-of-screen it surfaces "the hottest sellers sit right at the top of your list" via seller-intent score; below it, integrated tasks with reminders and a "daily agenda." This is the landing dashboard, not a separate report.
+- **Intelligent List Builder** — operator sets parameters (location, price, equity, property type, distress signal, seller-intent-score threshold) and prospects auto-populate into named, saved lists. Core filter UI plus "filter by score threshold to focus your team."
+- **Real-Time Monitoring / Signals feed** — a time-stamped stream of seller signals: pre-foreclosure notices, tax delinquencies, probate filings, plus life-events (marriage licenses, job changes, family events). Each row shows **trigger type + timestamp + property address**; refreshed hourly from county/court data. This is the "be first" surface.
+- **Lead Scoring & Ranking / AI-ranked call list** — every owner is ranked and the UI "tells you why they need a call" (the score is explained, not just a number). Delivered as a **daily AI-ranked call list**; you can upload your own database and it flags hot vs. cold within it. Scores update in real time as underlying data changes.
+- **Unified Inbox** — "calls, texts, emails in one thread" per contact. Single conversation timeline across channels.
+- **Pipeline / Deal stages** — customizable pipelines ("adapted to your workflow"); a single live dashboard tracks every deal, notes, next steps, source, "who responded, what was said," and auto-flags stuck deals and overdue follow-ups. (Marketing implies drag-between-stages; not independently confirmed, but stage-based Kanban is the pattern.)
+- **Automations / Drip campaigns** — advanced workflows + automated multi-touch drip sequences (Growth tier and up), with auto-routing of a new lead "to the right rep."
+- **David – AI voice agent** — 24/7 inbound answering ("natural voice conversations, not robotic IVR"), speed-to-lead outbound calling on new leads, objection handling, months-long follow-up, and booking walkthroughs directly onto the calendar, then pushing qualified leads into the pipeline.
+- **Contract generation** — "generate, send, and track contracts from the same screen"; conversation → signed agreement without leaving the app.
+- **Skip-trace + DNC** — bulk skip-tracing (2.5k–10k/mo by tier) with results (phone, email, mailing address) auto-attached to the lead and cross-checked against DNC.
+- **Dialer / texting** — built-in click-to-call and SMS on every contact.
+- **KPI / activity dashboard** — real-time activity metrics, lead-source reporting, response tracking.
+
+### The 5–8 features worth COPYING
+
+1. **Seller-intent score with a "why" explanation, sorted to the top.** *What:* every property carries a 0–100 intent score AND a plain-language reason ("pre-foreclosure + 30yr owner + out-of-state"). *Why it helps:* the operator works a ranked list instead of eyeballing a table — the highest-probability call is always row 1. *FREE-to-build? Y.* We already have signal-stack chips and an intent slider; add a computed `intentScore` field + a `scoreReasons[]` array in listings.json, default-sort the table/cards by it, and render the reasons as the existing chips plus a one-line "why" caption. Pure client-side sort/derive.
+
+2. **AI-ranked DAILY call list (a distinct "work today" view).** *What:* a separate top-N screen, not the full table — "here are today's 20 calls, in order." *Why:* removes decision fatigue; the operator opens one view and starts dialing top-down. *FREE-to-build? Y.* Add a "Today's Call List" tab that filters to top-N by intentScore (and de-prioritizes anything already contacted, read from our localStorage CRM-lite). No backend — it's a saved view over the same JSON.
+
+3. **Time-stamped signal feed with trigger + timestamp + address.** *What:* a reverse-chronological "what changed" stream. *Why:* the freshness IS the edge in this space; a feed framing makes "new since yesterday" obvious. *FREE-to-build? Y (partial).* If listings.json carries a `signalDate`/`firstSeen` per signal, render a feed view sorted by date with a "NEW" badge for items whose date is within N days. The *hourly refresh* isn't copyable statically (see below), but the **feed presentation and new-item badging** are trivial and high-impact.
+
+4. **Score-threshold filtering to "focus the team."** *What:* a slider/threshold that hides everything below score X. *Why:* lets the operator collapse a 5,000-row board to the 80 worth touching this week. *FREE-to-build? Y.* This is a numeric extension of our existing intent slider — one range input bound to `intentScore`.
+
+5. **Stuck-deal / overdue-follow-up flagging in the pipeline.** *What:* pipeline auto-highlights deals with no activity in X days or a past-due next-step. *Why:* the leaks (leads going cold) are the whole point of a pipeline; passive Kanban doesn't surface them. *FREE-to-build? Y.* Our CRM-lite already stores stage + last-touched in localStorage; compute `daysSinceTouch` on render and paint the card red past a threshold, with an "Overdue" filter chip.
+
+6. **Contact-level unified activity timeline.** *What:* one chronological thread per contact (notes, stage changes, "next step"). *Why:* the operator sees the whole relationship at a glance before calling. *FREE-to-build? Y (notes/steps only).* Extend CRM-lite: per-listing localStorage array of `{ts, type, text}` entries rendered as a timeline in the property-detail drawer. We can capture notes, stage changes, and manual "logged a call" entries — we just can't auto-capture the actual call/text/email (that's infra).
+
+7. **Customizable saved pipeline stages (Kanban).** *What:* drag deals across named stages. *Why:* it's the mental model wholesalers already use; a board beats a status column. *FREE-to-build? Y.* A CSS-grid Kanban with HTML5 drag-drop, stage stored per-listing in localStorage. No server.
+
+8. **"Upload your own list, we score it" framing.** *What:* bring your DB, get hot-vs-cold flags. *Why:* meets operators where their data already is. *FREE-to-build? Y (client-side CSV import).* Add a client-side CSV drop that parses in-browser, runs our same scoring function, and renders it in the same table — nothing leaves the browser.
+
+### What genuinely requires a backend/vendor (can't do in a static site)
+
+- **David / any AI voice agent** — inbound answering, outbound speed-to-lead calling, live objection handling. Needs telephony (Twilio/carrier), an LLM voice pipeline, and STIR/SHAKEN call registration. Not static.
+- **Built-in dialer + SMS** — click-to-call and texting require a provisioned phone number, A2P 10DLC registration, and per-message/minute billing. Regulated infra.
+- **Hourly county/court data refresh** — the "be first" freshness relies on a server-side crawl pipeline running around the clock. A static site can only show whatever was baked into the last listings.json build. (Our own scraper stack produces the JSON offline — that's the backend, just not hosted in the dashboard.)
+- **Skip-tracing + DNC scrubbing** — resolving owner → phone/email requires a paid data vendor and a per-lookup API key that can't live in client JS. DNC checking is a licensed data feed.
+- **Auto-routing to reps / ad-platform integrations (Google/Facebook/CallTools/ReadyMode)** — inbound webhooks and OAuth server-side.
+- **Contract e-sign send/track** — generating a doc client-side is doable, but *sending for signature and tracking status* needs an e-sign vendor (DocuSign-class) and server state.
+- **Cross-device/team-shared state** — Goliath's pipeline is multi-seat and syncs. Our localStorage CRM-lite is single-browser; true shared state needs a DB.
+
+### Verdict: the single highest-value copy
+
+**The seller-intent score with an inline "why they need a call" explanation, used to default-sort a dedicated daily call list.** It is the one thing that converts our flat, filterable table into an *action queue* — the operator stops hunting and just works row 1 downward — and it is almost entirely already in our wheelhouse (chips + slider + a computed score field + a sorted saved view), 100% free to build client-side. Everything genuinely differentiated beyond that (David, dialer, hourly refresh, skip-trace) is regulated/paid infrastructure, not UX we can mirror.
+
+Sources: [goliathdata.com](https://goliathdata.com/), [Complete Guide to Wholesale Deal Tools](https://goliathdata.com/complete-guide-to-goliath-data-s-wholesale-deal-tools), [Pricing](https://goliathdata.com/pricing), [Data Pipelines product page](https://goliathdata.com/product/data-pipelines), [SoftwareAdvice – Goliath](https://www.softwareadvice.com/product/536319-Goliath/), [Capterra – Goliath](https://www.capterra.com/p/10035457/Goliath/)
+
+
+## PropStream
+
+### Screen-by-screen feature inventory
+
+- **Market entry + search bar.** Operator types an address, APN, ZIP, city, or county to set the working geography. This is the gate for every downstream tool. County/city/ZIP scope loads the map + result grid; a single address opens Property Detail directly.
+- **Map search + draw tool.** Interactive map with numbered pins; pins now surface estimated value, a photo, and property highlights on hover/tap without opening the record. A freehand **draw tool** lets you lasso an arbitrary polygon (neighborhood, subdivision, block) instead of relying on radius. **Heat-map overlays** recolor the map by value, foreclosure density, or rent. Pin numbers correspond 1:1 to rows in the list below.
+- **Filter panel (165+ filters).** Left/side panel grouped into categories: property characteristics (beds/baths, sqft, lot, year built, type), valuation/equity (estimated value, equity %, LTV), mortgage/lien (loan type, lender, rate, position), owner (owner-occupied vs absentee, corporate/LLC/trust, ownership length, mailing-address mismatch), distress/legal status (foreclosure stage, tax delinquency, liens, bankruptcy), and MLS status (on/off market, days on market, failed listing). Filters are additive and stackable (e.g., "divorce + pre-foreclosure").
+- **Quick Lists (20 pre-built lead lists).** One-click presets that pre-load filter bundles: Pre-Foreclosures, Auctions, Bank Owned, Bankruptcy, Tax Delinquent, Zombie Properties, Free & Clear, High Equity, Upside Down (negative equity), Divorce, Pre-Probate, Senior Owners, Cash Buyers, Flippers, Tired Landlords, Vacant, Vacant Land, On Market, Failed Listings.
+- **Result grid ("My Properties" style table).** Sortable/columned list mirroring the map. Columns include owner, value, equity, and status flags. Far-right "activity" columns show membership state: which **Marketing Lists** a record is on, whether it's in a **Marketing Campaign**, and whether it was already mailed / emailed / skip-traced.
+- **Property Detail page.** Full dossier per property: owner name(s) + mailing address, owner-occupancy flag, transaction/sale history, current mortgage(s) and lender, tax assessment records, foreclosure/lien/legal detail, and photos. Action buttons on this page: Save to list, Run Comps, view Opportunity/analysis, Skip Trace, and Send Postcard.
+- **Comparables & ARV tool.** A "Comparables & Nearby Listings" tab. Opens with **preset comp criteria** (sold within 12 months, within 0.5 mi, ±20% sqft) and lets you adjust sale-date range, distance (including redrawing the comp area on a map), sqft tolerance, transaction type (cash/financed/active/pending/contingent), and data source (Public Record, MLS, or both). Presents avg sale price, avg $/sqft, and avg days-on-market; comps are individually selectable, savable/editable, and exportable to PDF.
+- **List builder + list stacking.** Saved searches become named Marketing Lists. **Stacking** = sorting the "Marketing List" column descending so owners appearing on multiple lists float to the top (more lists = more motivation). Lists-within-lists and dedup/redundancy views live under Lead Automator.
+- **Lead Automator (list monitoring/automation).** Auto-adds new records that match a saved search and auto-removes records that no longer qualify, keeping lists live. Handles dedup and cross-list stacking.
+- **Skip trace (inline).** Button on the record / list; returns phones + emails for individuals, LLCs, corps, and trusts, with DNC and litigator flags attached.
+- **Marketing / campaigns (PropStream Connect).** A campaign = a bundle of outreach actions toward a goal. Channels: direct mail/postcards (from ~48¢, template-based or upload-your-own), email (~2¢ each, open/click tracking), custom landing pages per campaign, and Click-to-Dial + bulk Dialer Campaigns with softphone, AI-guided prompts, call notes, connection tracking, and team assignment.
+- **KPI / campaign dashboard.** Single view of calls made/connected, emails sent + open/click rates, and postcard delivery, plus per-campaign result analysis.
+- **Built-in calculators.** Rental cash-flow, fix-&-flip, rehab estimator, ADU, and financing (LoanGeek).
+- **Mobile / Driving-for-Dollars.** Bottom-center Drive icon → "Set Filters and Drive" (apply radius + filters, matching pins appear on map + list) or "Just Drive" (freestyle route with live GPS trail, tap any house to open its detail, save, comp, skip trace, or postcard on the spot). Optional drive recording saved to a Drive Log (24h / 7d / 30d / all) showing distance, time, and stops. "Free Scout" mode for quick lookups.
+
+### The 5–8 features worth COPYING
+
+1. **Quick Lists (one-click filter presets).** *What:* named buttons that instantly apply a distress/equity/life-event filter bundle. *Why:* an operator gets a usable target list in one click instead of hand-tuning filters. *Free-to-build? YES* — our records already carry the signal fields; define each preset as a saved filter object (a JSON of field predicates) and render them as chips. Our signal-stack already maps to these (pre-foreclosure, tax-delinquent, vacant, absentee, high-equity, probate/elderly), so this is mostly UI wiring over data we have.
+
+2. **Draw-on-map polygon filter.** *What:* lasso an arbitrary area; results = only points inside. *Why:* neighborhood/farm-area targeting beats county-wide noise. *Free-to-build? YES* — Leaflet/MapLibre + Leaflet.draw (or Turf.js `booleanPointInPolygon`) client-side against the listings GeoJSON; no backend.
+
+3. **Activity/status columns + list stacking by count.** *What:* per-record flags for which lists it's on and whether it's been contacted, with a "on how many lists" sort. *Why:* multi-list overlap is the single best motivation proxy, and contacted-flags prevent double-touch. *Free-to-build? YES* — compute an overlap count across our signal-stack chips and store per-record contact/list membership in localStorage (our CRM-lite already does this); expose a sortable "signals count" column, which is exactly stacking.
+
+4. **Property Detail dossier with action buttons.** *What:* one page consolidating owner, mortgage, tax, transaction history, photos + Save/Comp/Skip/Mail actions. *Why:* the operator decides and acts without tab-hopping. *Free-to-build? PARTIAL-YES* — the consolidated read-only dossier is fully free (render every field we hold in listings.json in a detail modal/card); the action buttons that *transact* (skip, mail) are not (see below), but "Save/tag/add-to-list" is free via localStorage.
+
+5. **Comps panel with adjustable criteria + $/sqft ARV.** *What:* nearby solds filtered by distance/sqft/recency, showing avg $/sqft and a derived value. *Why:* instant sanity-check on value without leaving the tool. *Free-to-build? YES if we ship comp data in listings.json.* We already compute ARV/comps server-side (the repo's comp sidecar); surface it: a detail-panel comp table with client-side sliders (distance/sqft/date) that recompute avg $/sqft × subject sqft live in JS. No live comp *pull* needed — read the pre-baked comps.
+
+6. **Heat-map overlay toggle.** *What:* recolor the map by value/distress/rent. *Why:* spot pockets at a glance. *Free-to-build? YES* — a MapLibre choropleth/heat layer keyed off fields already in the JSON; a simple toggle control.
+
+7. **Campaign/KPI dashboard (counts + statuses).** *What:* a strip summarizing list sizes, contacted vs not, by stage/source. *Why:* operator sees pipeline health at a glance. *Free-to-build? YES* — pure aggregation over the listings + localStorage CRM state; render as scorecards + a small chart.
+
+8. **Driving-for-Dollars route view (mobile).** *What:* GPS trail + tap-a-pin-to-act while driving. *Why:* field prospecting flows straight into the list. *Free-to-build? PARTIAL* — a responsive map that uses the browser `geolocation` API to show "you are here" + nearest listings and let you tag one is free and works on a phone browser; persistent turn-by-turn route *recording* across sessions is weak without a backend but can be faked with localStorage for a single session.
+
+### What genuinely requires a backend/vendor (can't do in a static site)
+
+- **Skip tracing** (phone/email append, DNC + litigator scrubbing) — a paid data vendor + server call; illegal/impractical client-side.
+- **Sending direct mail, email, and the dialer/softphone** — requires print-mail API, email-send infra with tracking pixels, and telephony (softphone/dialer) — all server + paid.
+- **Landing pages that capture leads** — need a form endpoint + storage.
+- **Live/continuously-refreshed data + Lead Automator auto-add/remove** — requires a crawling/ETL backend feeding the dataset on a schedule; our JSON is a static snapshot regenerated out-of-band.
+- **Live comp/MLS pulls** — MLS/public-record comp data behind licensing; we can only ship pre-baked comps, not query on demand.
+- **Cross-device shared team CRM** (assignment, shared notes) — localStorage is single-browser; true multi-user needs a DB + auth.
+
+### Verdict: the single highest-value copy
+
+**Quick Lists rendered as filter-preset chips, wired to a list-stacking "signals count" sort.** It's the core of PropStream's value proposition (turn a raw database into ranked motivated-seller lists in one click), it maps directly onto data and chips we already have, and it's 100% free to build in the static dashboard. Pairing one-click distress/equity/life-event presets with a sortable overlap-count column reproduces the exact workflow operators pay PropStream for — everything else (skip, mail, dialer, live refresh) is vendor-gated and out of scope for a static site.
+
+Sources: [PropStream Features](https://www.propstream.com/propstream-features), [Campaigns](https://www.propstream.com/campaigns), [How to Run Comps](https://www.propstream.com/how-to-run-comps-in-propstream), [List Stacking with Lead Automator](https://www.propstream.com/list-stacking-with-list-automator), [Manage Lists / Dedup](https://www.propstream.com/how-to-manage-your-lists-identify-duplicates-redundancies), [Driving for Dollars (Mobile)](https://www.propstream.com/driving-for-dollars-propstream-mobile), [Using the Drive function](https://www.propstream.com/using-the-drive-function-within-propstream-mobile), [Capterra](https://www.capterra.com/p/207196/PropStream/), [ReSimpli PropStream Review](https://resimpli.com/blog/propstream-review/)
+
+
+## PropertyRadar
+
+### Screen-by-screen feature inventory
+
+**Discover (search + criteria builder)** — Top-nav "Discover" opens a full-screen search. Left side is the **Add Criteria panel** with three entry paths: (1) **Quick Lists** (drill-down category tree), (2) a **Find Criteria** text box searching 250+/285+ criteria across categories (Location, Property, Owner, Value & Equity, Property Tax, Loans & Liens, Foreclosure, Transfer, Listing, My Data, Criteria from My Lists), (3) manual category browse. Selected criteria render as chips in a **criteria bar**; a **property count** sits to the right and updates live. A **Signal bar** shows record counts for the top-matching criteria in real time. **Radar AI** ("List-Building Assistant") is a chat box: describe the ideal prospect in plain English and it generates and applies the criteria set.
+
+**Map** — Search results render on a map with **draw tools** (polygon, box/rectangle, radius circle, or whole-map). Satellite/topography basemaps and heatmaps. Toggle between **Map / Grid / Card / Split** views. Geography can also be entered by city/county/ZIP with autocomplete.
+
+**Property & Owner Profile** — Blue address header with street-view thumbnail + interactive map (expandable to Street View / Bird's Eye), plus an **interest-level star rating**. Below: three **highlight cards** (Property: type/year/beds/baths/sqft/lot + status icons; Value: AVM/equity/purchase price/tenure; Contacts: owner names/ages/professions + phone/email availability icons + social links). Seven tabs: **Contacts** (phone status icons — green=active, yellow=opted-out/wrong/disconnected — plus skip trace), **Property** (Location/Site/Structure/Property Taxes with links to county assessor/tax sites and parcel maps), **Value & Equity** (valuation, **comparables** filterable For-Sale vs Recent-Sales, and an interactive **flip/hold investment analysis** tool), **Transactions** (current-owner vs all transactions, foreclosure docs, title checklist), **Listings** (aggregated with Zillow/Realtor/Redfin quick-links), **Neighborhood** (demographics, housing, housing risk, environment, neighbors at ZIP/county/state/national), **My Info** (photos/notes/files). Right rail: **My Lists** membership, editable **Status** pipeline labels, and an **Activities timeline** logging views, status changes, email opens, and mailing outcomes.
+
+**Comps / valuation** — Lives inside the Value & Equity tab (not a standalone screen): AVM, market value, market rent, filterable comparables, and the flip/hold analyzer.
+
+**List builder / stacking** — "Make List" from a search saves criteria as a **Dynamic List** (auto-refreshes as records change). Lists can be **created, refined, stacked, and excluded** against each other, and **segmented**. Import/match/append lets you upload CRM/spreadsheet exports, auto-match, and append missing phones/emails.
+
+**Skip-in-line / contact append** — No separate skip-trace vendor; phone/email icons on the Contacts card/tab are click-to-purchase per contact, or auto-appended in bulk via automations. Owner research resolves the real human behind LLCs/trusts.
+
+**Monitoring + Alerts (the differentiator — detail below)** — "Add Monitoring" on any list; drives new-match/status-change detection, notifications, and automations.
+
+**Campaigns / marketing** — Direct mail (postcards, next-business-day, no minimums), email/SMS/phone from built-in contact data, online display ads (ESPN/Forbes inventory), and **multi-channel sequences** with AI-personalized copy/timing.
+
+**CRM / pipeline** — Custom **Status** stages, **interest-level stars**, activity logging (calls/emails/notes/visits), property & owner **change history**, document storage, and **Kanban workflow boards** that trigger steps on property events.
+
+**Dialer** — No native dialer; phone is handled via click-to-call from mobile + dialer integrations over Zapier/webhooks.
+
+**KPI dashboard** — **Insights** analytics unlocked by monitoring (list composition, new-since counts, portfolio changes).
+
+**Alerts/monitoring** — see below.
+
+**Mobile / D4D** — Mobile app for on-site property/owner lookup, click-to-call/email/postcard, **address scanner**, **Drive for Dollars route planning with team tracking**, visit logging, and push notifications.
+
+### The 5–8 features worth COPYING
+
+1. **Quick Lists as a starting point, not a cage** — one click applies a named preset (Absentee Owner, High Equity >30%, Free & Clear, Vacant, Tired Landlord, Pre-Foreclosure, Zombie Foreclosure, Out-of-State Owner, Pre-Probate, Cash Buyer, etc.) that then remains fully editable. Why it helps: operators don't have to know which raw fields to combine; they pick an intent and refine. **FREE-to-build? Y** — hardcode a dozen named filter presets as JSON objects (`{name, description, filterState}`); clicking one hydrates your existing filter UI. Keep them editable afterward (don't lock the controls). This is the single easiest high-leverage copy.
+
+2. **Signal-count / live result counter on every criterion** — the count updates as you add/remove filters, and a signal bar shows how many records each top criterion would return. Why it helps: instant feedback on whether a list is too broad or empty before you commit. **FREE-to-build? Y** — you already load `listings.json` client-side; compute `filtered.length` on every filter change and show per-chip counts by test-applying each active filter in isolation.
+
+3. **Interest-level star rating + custom Status pipeline on each record** — lightweight per-property triage (stars) plus editable pipeline stages (Prospect → Qualified → …). Why it helps: turns a flat list into a worked pipeline without a real CRM. **FREE-to-build? Y** — extend your localStorage CRM-lite with a `stars` (0–5) and `status` field per RadarID; render as clickable stars + a status dropdown; add a Kanban view that groups by status. No backend.
+
+4. **Property profile with external quick-links + "purchase/reveal contact" pattern** — every profile deep-links to the county assessor, parcel map, Zillow/Realtor/Redfin, and Street View; contact icons show availability before you spend. Why it helps: one screen to triage + jump to authoritative sources; contact icons set expectations. **FREE-to-build? Y (links) / partial (contacts)** — build the card view into a detail modal with computed deep-links (assessor/GIS URL templates by county, Google Street View URL from lat/lng, Zillow search URL from address). The *reveal-a-phone* purchase step needs a data source, but showing a "has phone / has email" badge from whatever you already have in the JSON is free.
+
+5. **Comparables toggle (For-Sale vs Recent-Sales) + flip/hold analyzer** — inline comps you can flip between listings and sold, plus a simple ARV/rehab/hold calculator. Why it helps: valuation lives next to the lead, no spreadsheet. **FREE-to-build? Y** — you already carry comps/ARV in the board sidecar; render a comps sub-table with a For-Sale/Sold toggle and a small client-side calculator (inputs: purchase, rehab, ARV, fees → max bid / ROI). Pure JS.
+
+6. **"New Since" diff filter** — a date picker that shows only properties added to the list since a chosen date, with a new-count badge under the total. Why it helps: on every visit the operator sees only what changed. **FREE-to-build? Y (client-side approximation)** — stamp each row with a `first_seen` date when your JSON is regenerated (build-time), store the user's "last viewed" date in localStorage, and filter/badge on `first_seen > lastViewed`. Gives the same UX without a server.
+
+7. **Kanban workflow board over the same records** — the list, a table, a map, and a board are all views of one dataset; the board triggers next-steps by stage. Why it helps: matches how operators actually work leads. **FREE-to-build? Y** — add a board view that reads the same filtered array grouped by your `status` field, with drag-to-change-status writing back to localStorage.
+
+8. **CSV/record export + "send to Zapier/webhook" action in the row menu** — Why it helps: gets a lead out to the operator's tools in one click. **FREE-to-build? Partial** — CSV export you already have. A true webhook POST from a static site can't hold a secret, but you can offer a **"Copy as JSON" / mailto: / prefilled Zapier catch-hook URL** the user pastes their own hook into (stored in localStorage) — the browser `fetch`-POSTs to their endpoint. That's the free approximation of their Zapier export.
+
+### What genuinely requires a backend / vendor
+
+- **Real monitoring + scheduled re-crawl** — PropertyRadar re-runs each saved list's criteria against a nightly-updated 160M-property database, diffs it, and detects new matches and status changes. A static site has a frozen `listings.json`; true "watch this list and tell me when a new property qualifies" needs a server (or a scheduled job) re-fetching and diffing data. You can *approximate* it only across build regenerations (feature #6), not continuously.
+- **Push / immediate-email / daily-summary alerts** — sending email or mobile push on a trigger requires a mail service, a push service, and a server holding credentials. Impossible from GitHub Pages.
+- **Status-change event stream** (`Listing Status:Active:Pending`, new NOD/NTS, new loan, transfer) — requires ingesting the source data over time and computing field-level diffs server-side; the payload shape itself (field:old:new, up to 3 changes/event) is only meaningful with a persistent history store.
+- **Contact append / skip trace** (buying phones/emails) — third-party paid data; no client-side path.
+- **Direct mail, SMS, dialer, display ads** — all vendor-fulfilled (mail house, telephony, ad networks).
+- **Signed webhooks / API with a secret** — the Webhook Secret and API key can't live in public JS.
+- **Cross-device shared state** — their status/notes/interest sync across a team; localStorage is single-browser only. Team sync needs a backend.
+
+### Verdict: the single highest-value copy
+
+**Quick Lists** — named, one-click, intent-based filter presets that remain fully editable. It is trivial to build (a JSON array of filter states wired to your existing filter UI), and it collapses the entire "which of 285 criteria do I combine to find a tired absentee landlord with equity" problem into a single click. It is the feature that makes PropertyRadar feel powerful to non-expert operators, and it costs you nothing but a curated preset file. Pair it with the **live result counter (#2)** and the **interest-star + status pipeline (#3)** and your static dashboard reproduces ~80% of the perceived value of the paid discover-and-work-a-list loop; the only thing you structurally cannot copy is the *continuous* monitoring/alert engine, which is genuinely backend-bound.
+
+Sources: [Features Overview](https://www.propertyradar.com/features-overview), [Making a List](https://help.propertyradar.com/en/articles/3066571-making-a-list-of-properties-and-property-owners), [Quick List Glossary](https://help.propertyradar.com/en/articles/2447514-quick-list-glossary-2007-2025), [Monitoring Lists](https://help.propertyradar.com/en/articles/5215475-monitoring-lists), [Creating Alerts and Automations](https://help.propertyradar.com/en/articles/3526088-creating-alerts-and-automations), [Automations for Email Marketing](https://help.propertyradar.com/en/articles/9118861-automations-for-email-marketing), [Property and Owner Profile](https://help.propertyradar.com/en/articles/5730803-using-the-property-and-owner-profile), [Working with Webhooks](https://help.propertyradar.com/en/articles/7117007-working-with-webhooks), [Data Available for Zapier and Webhooks](https://help.propertyradar.com/en/articles/3526061-data-available-for-zapier-and-webhooks-integrations), [Integrations](https://help.propertyradar.com/en/articles/6971590-integrations)
+
+
+## BatchLeads + BatchData
+
+### Screen-by-screen feature inventory
+
+- **Search + Filters** — A geo-scoped property search (draw/type a zip, city, county, or APN) fronted by "130+ filters" grouped into ownership type (absentee, owner-occupied, out-of-state), distress signals (pre-foreclosure, tax-delinquent, code violation, liens, vacant, probate), physical (beds/baths/year built/lot/sqft), and financial (equity %, estimated value, mortgage). "1-click lead lists" are pre-built saved-filter templates. Output is a results table you save as a named List.
+- **Map view** — Built-in map for geographic targeting with pins; drives the mobile canvassing workflow (below). Reviews confirm it exists but it's a thinner screen than the table.
+- **Property detail page** — Owner details, mortgage info, equity %, property characteristics, APN/parcel insights, and tabbed sub-views. Tabs include **Comps**, **Lists and Tags** (which of your lists this property sits on), and skip-trace contact fields.
+- **Comps tool** — A **"Comps" tab on the property detail page** (reachable from search, a saved list, or mid-text in the inbox). Adjustable filters: property type, sqft (±250), year built (±10), listing status = SOLD only, location/subdivision. It lists recently sold comparables and shows a live **"Estimated Value"** panel that recomputes ARV as you check/uncheck comps (avg $/sqft of selected comps × subject sqft). "Set filter defaults" saves your comp rules; export the comp set to PDF/Excel (emailed to you).
+- **List-builder / stacking** — Lists live under **"My Lists."** Stacking is done by clicking **Filter** and dragging the **"List Count" / "Tag Count"** slider to 2+, which cross-references all saved lists and shows only properties appearing on ≥N lists. Results add **List Count** and **Tag Count** columns with sort arrows; any other filter layers on top.
+- **Skip trace (in-app)** — One click on a list pulls phones, emails, and social profiles for owners. Included monthly credits (10k Basic / 20k Pro / 50k Enterprise). Same engine sold standalone as BatchSkipTracing and via the BatchData API.
+- **Campaigns / marketing** — From a list you launch **SMS/text**, **direct-mail postcards**, and **ringless voicemail** without leaving the platform. SMS requires you to BYO carrier (Twilio/Plivo/SignalWire/Telnyx/Flowroute) and pay their per-message rates.
+- **Dialer** — Built-in click-to-dial with live AI prompts and property data mid-call ("Dialer AI," $89/mo add-on); serious multi-line power-dialing pushes you to the separate **BatchDialer** product.
+- **CRM / pipeline** — Manage conversations (a texting **inbox**), set follow-up tasks, and track deals through pipeline stages.
+- **BatchRank (scoring)** — ML propensity score over ~800 data points (equity, tax delinquency, liens, ownership tenure), bucketed into **High / Medium / Low** tiers so you work "most-likely-to-sell now" instead of alphabetically.
+- **KPI dashboard** — Light; reviews note there's no strong analytics layer beyond campaign/list counts.
+- **Mobile / D4D** — "Canvassing" app for driving-for-dollars: drop pins on distressed/vacant properties in the field (or virtually via street view), auto-tag, and push straight into a list for skip-trace + outreach.
+- **API split (BatchData)** — BatchData is API-first: `POST` **Property Search** (with a comps flag + aggregated-comparables metrics), **Property Skip Trace** (≤100 properties/call), and **BatchRank** scoring, all as REST endpoints. The pattern teams use: BatchLeads UI for the acquisition team's daily work; BatchData API for back-end bulk enrichment. Everything in the UI is a rendering of the same data the API exposes.
+
+### The 5–8 features worth COPYING
+
+1. **List-Count / Tag-Count slider for stacking** — *What:* one slider that filters the master board to properties present on ≥N signal lists; a sortable "signal count" column. *Why:* turns "which distress lists overlap" into a single ranking gesture — the core motivated-seller heuristic. *FREE-to-build? **Y.*** We already partially copied this. Finish it: derive a `stack_count` per row (count of true signal flags/source-lists), render it as a sortable column, and add a range-input slider bound to `stack_count >= N` that re-filters the table/map/cards client-side. Show the underlying matched signals in the detail drawer (their "Lists and Tags" tab).
+2. **BatchRank High/Med/Low tiering on top of the raw score** — *What:* collapse a continuous propensity score into 3 labeled tiers with color. *Why:* operators triage by bucket faster than by a 0–100 number; buckets map cleanly to "call now / drip / ignore." *FREE-to-build? **Y** (heuristic, not their ML).* We can't replicate 800-point ML, but we can compute a transparent weighted score from the flags we already have (equity, tax-delinq, lien, pre-foreclosure, vacancy, absentee) and bin it into High/Med/Low chips. Our intent slider already gestures at this — expose the tiering as the default sort.
+3. **"Set filter defaults" (saved views)** — *What:* persist a named set of filters/comp rules and reload instantly. *Why:* every operator re-runs the same 3–4 buy-box queries daily; re-selecting filters is friction. *FREE-to-build? **Y.*** Serialize the current filter state to a named entry in `localStorage` (same store as the CRM-lite), render a "Saved views" dropdown, write the active view into the URL hash so it's shareable/bookmarkable.
+4. **Property-detail Comps tab with live ARV recompute** — *What:* pick SOLD comps, watch an Estimated Value panel recalc avg-$/sqft × subject sqft as you toggle each comp. *Why:* the "is this a deal?" moment happens inside the detail view, not a spreadsheet. *FREE-to-build? **Partial-Y.*** If `listings.json` already carries per-property comps/ARV (our pipeline computes ARV), render them in the detail drawer with checkboxes and a JS recompute of avg-$/sqft on toggle. Fully **N** only if we lack comp records — then it's a data problem, not a UI one.
+5. **Export the current selection to CSV/PDF** — *What:* one button to email/download the working set. *Why:* hand-off to a VA, a mail house, or a partner. *FREE-to-build? **Y.*** CSV export we already have; add a "print to PDF" stylesheet (`@media print`) on the detail/comp view so the browser's Save-as-PDF produces a clean one-pager — no server.
+6. **Texting inbox as the CRM surface (conversation-centric, not row-centric)** — *What:* the pipeline is organized around threaded conversations with the owner, with comps/property data pinned beside the thread. *Why:* keeps the operator in one context (talk + data) instead of tab-hopping. *FREE-to-build? **Partial-Y** (state only, not sending).* We can store per-property notes, status, next-action date, and a manual "contact log" in `localStorage` and render it in the detail drawer beside the property facts. Actually *sending* SMS is the backend part (see below).
+7. **Driving-for-dollars pin-drop → auto-add-to-list** — *What:* in the field, tap a property to tag + enqueue it. *Why:* captures the highest-intent, human-verified distress signal (I physically saw the vacant house). *FREE-to-build? **Partial-Y.*** A static PWA page with the Geolocation API can center the map on the user and let them tap-to-flag a listing already in `listings.json`, writing a "field-verified" flag to `localStorage`. **N** for capturing net-new addresses off-map (needs a parcel lookup backend).
+
+### What genuinely requires a backend / vendor
+- **Skip tracing** — owner phone/email/social requires a paid data provider (BatchData/TLO-class); no free static path.
+- **Actually sending** SMS, RVM, postcards, or dialing — needs carrier/Twilio, a mail vendor, and (for SMS) 10DLC registration. We can build the *compose/queue/log* UI; the send is backend.
+- **The ML propensity model (true BatchRank)** — 800-point trained model over proprietary data; we can only approximate with a transparent weighted heuristic.
+- **Live comps/AVM and fresh distress data** — if not already baked into `listings.json` at build time, on-demand comps/AVM refresh needs an API. (Our pipeline pre-bakes it, so this is fine as long as the JSON carries it.)
+- **Real-time multi-user CRM sync** — `localStorage` is per-device/per-browser. Shared team pipeline, assignment, and permissions need a database + auth.
+
+### Verdict: the single highest-value copy
+**The List-Count/Tag-Count slider fused with a High/Med/Low tier chip.** It's the one thing BatchLeads does that directly converts "I have many distress lists" into "here are the 12 to call today," it's the exact concept we already partly built, and it is 100% free to finish in our static dashboard: compute `stack_count` and a transparent weighted `intent_score` per row, bin the score into three colored tiers as the default sort, and bind a slider to `stack_count >= N`. That single interaction is the core of what operators pay BatchLeads for, and we can own it entirely client-side.
+
+Sources: [BatchLeads list-stacking help doc](https://help.getbatch.co/en/articles/9787321-how-to-list-stack-why-it-s-important), [How to Comp & Evaluate in BatchLeads](https://batchleads.io/blog/how-to-comp-evaluate-properties-using-batchleads), [BatchRank FAQ](https://help.batchservice.com/en/articles/10968831-batchrank-faq-and-details), [BatchRank vs Lead Lists](https://batchdata.io/blog/batchrank-vs-traditional-lead-lists-data-driven-comparison), [RealEstateSkills BatchLeads review](https://www.realestateskills.com/blog/batch-leads-review), [DealflowAIStack BatchLeads review](https://dealflowaistack.com/batchleads-review/), [BatchData Property Search API](https://developer.batchdata.com/docs/batchdata/batchdata-v1/operations/create-a-property-search), [BatchData Property Skip Trace API](https://developer.batchdata.com/docs/batchdata/batchdata-v1/operations/create-a-property-skip-trace), [BatchLeads homepage](https://batchleads.io/).
+
+
+## DealMachine
+
+### Screen-by-screen feature inventory
+
+- **Map / Driving screen (mobile + desktop "Virtual D4D")** — Full-screen map with property pins. Pins are label-configurable (Address #, Owner Last Name, Owner Full Name, Equity %, Sale Price, or Estimated Value). Pre-drive you apply Quick Filters (vacant, absentee, tax-delinquent, high-equity, etc.) so target houses highlight before you leave. On desktop the same map supports "Virtual Driving for Dollars" — drag Street View / satellite around a neighborhood and pin houses from your desk.
+- **Route Tracking (mobile-first; visible on desktop map)** — Start Drive / End Drive buttons record a GPS breadcrumb, mileage, hours, and every property added on that run. Recorded routes overlay the map color-coded by age (green = last 6 mo, yellow = 6–12 mo, red = 1–2 yr) so a team never re-drives the same streets. All members' routes stack on one map for coverage visibility.
+- **Camera capture → instant lead (mobile-only)** — Snap a photo of a distressed house; the app geolocates it, pulls county/tax records, and creates a lead with owner name + mailing address in seconds. The photo is retained and can be dropped onto a postcard.
+- **Property / Lead Card (both)** — The detail screen holds owner history, mortgage info, equity, estimated value, tax status, and the photo, plus tabs into deal analysis, the Comps tool, and a full activity log. Action buttons: add tag, set status, assign owner, add task/note, skip/reveal contact, start mail, call.
+- **Owner contact reveal / "Unlimited Contact Info" + Private Investigator tool (both)** — Reveals phones, emails, and relatives/associated contacts, with a confidence indicator (blue/green/gray checkmarks) for match likelihood, plus demographics (age, marital status, income estimate, occupation).
+- **List Builder (desktop)** — Query a 150M+ property database with 70+ prebuilt Quick Filters and 700 filters / 287 exportable fields (cash buyers, free-and-clear, tax-delinquent, recently sold, high-equity, absentee). Daily county-record refresh. Save as reusable lists.
+- **AI Vision Builder (desktop)** — Scores every property in a drawn area from satellite + Street View imagery and auto-adds high-scoring ones to a list.
+- **List Stacking (desktop)** — Overlays multiple saved lists; a **stack count** on each lead shows how many lists it appears on, surfacing the most-motivated prospects.
+- **Comps tool (both)** — Recently-sold comparables for valuation, opened from the lead card.
+- **Mail Center / Mail Sequences (desktop)** — Template gallery (or custom / handwritten with property photo). Sequences send postcards at scheduled intervals with automated follow-up. Mail Queue = today's scheduled pieces; Calendar = past + upcoming pieces. Preview each piece before it mails.
+- **CRM / Pipeline (both)** — Status pipeline: New Prospect → With Marketing → Warm → Hot → Appointment Set → Under Contract → Won / Lost / Not Interested / Unqualified. Plus tags, tasks, reminders, notes, and lead-owner assignment.
+- **AI Dialer "Alma" (both, telephony-backed)** — Outbound calling with local-presence numbers (area-code match), live transcription, AI-suggested responses mid-call, AI voicemail drop (voice-cloned), and an intelligent follow-up queue that re-sorts leads by call outcome + sentiment.
+- **Team / route assignment (both)** — Assign territories and lead ownership; owner drives marketing + follow-up; all routes and statuses visible team-wide.
+
+**Mobile-only:** camera capture, GPS Start/End Drive route recording. **Desktop-only:** List Builder, AI Vision Builder, List Stacking, Mail Center authoring. **Both:** map, lead card, comps, contact reveal, CRM pipeline, dialer, Virtual D4D.
+
+### The 5–8 features worth COPYING
+
+1. **Configurable pin labels (Owner / Equity% / Est. Value on the map marker).** What it does: lets the operator read the single most decision-relevant number without opening a card. Why it helps: triage at a glance across dozens of pins. **FREE-to-build: Y** — our map already has markers; add a small dropdown that swaps the marker label/tooltip field, driven by a field-picker over listings.json.
+2. **Quick Filters as one-tap saved chips (vacant / absentee / high-equity / tax-delinquent).** What it does: collapses a multi-field filter into a single named button. Why it helps: operators re-run the same 4–5 segments constantly; chips remove the setup tax. **FREE-to-build: Y** — presets are just saved filter objects; render them as chips beside our existing filter UI, persist custom ones in localStorage.
+3. **List Stacking with a visible stack-count badge.** What it does: counts how many signal-lists/sources a property hits and surfaces the overlap. Why it helps: multi-signal properties are the highest-intent leads — this is exactly our "signal-stack" thesis made visual. **FREE-to-build: Y** — we already have signal-stack chips; compute a count from the signal array and show a numeric badge + a "sort by stack count" option. This is the cheapest, most on-strategy copy.
+4. **Route/coverage recency color-coding (green/yellow/red by age).** What it does: encodes freshness as color so stale territory is obvious. Why it helps: prevents re-working cold leads. **FREE-to-build: Y** — color pins/rows by a date field (e.g., days since listing/first-seen) using a 3-band scale; pure CSS on existing data.
+5. **Lead card status pipeline + tags + notes (CRM-lite).** What it does: moves a lead through named stages with attached tasks/notes. Why it helps: turns a list into a workflow the operator actually works. **FREE-to-build: Y** — we already have CRM-lite via localStorage; add a status enum, tag array, and note field per record keyed by property id, with a Kanban/filter-by-status view.
+6. **Confidence indicator on contact/skip data (blue/green/gray).** What it does: shows match likelihood before the operator trusts a number. Why it helps: saves wasted dials on bad matches. **FREE-to-build: Y (partial)** — if our data has any match-quality/score field we render a colored dot; if we only have presence/absence, a 2-state chip still helps. (Generating the confidence itself is backend — see below.)
+7. **Deal-analysis mini-panel on the card (equity = value − payoff, at-a-glance).** What it does: shows the money math inline. Why it helps: operator decides go/no-go without a spreadsheet. **FREE-to-build: Y** — compute from fields already in listings.json (ARV/est value − payoff/liens) and render a small readout on each card.
+8. **Mail-piece / outreach preview before send.** What it does: renders the postcard with the property photo/owner merge fields. Why it helps: catches merge errors, builds trust in the send. **FREE-to-build: Y (preview only)** — an HTML template that merges the selected record's fields into a printable card view; export/print is free. Actual mailing is backend.
+
+### What genuinely requires a backend / vendor (can't do in a static site)
+
+- **Live skip trace / "unlimited contact info" + Private Investigator lookups** — needs a paid data vendor and a server to hold the API key; can't ship keys in a static bundle.
+- **The 150M-property List Builder with daily county refresh** — a hosted database + ingestion pipeline; our static file is a snapshot, not a queryable national DB.
+- **AI Vision Builder scoring** — server-side calls to satellite/Street View imagery + an ML model.
+- **The AI Dialer end-to-end** — telephony (Twilio-class), local-presence number pool, live transcription, AI voicemail/voice-clone, sentiment routing. All server + vendor.
+- **Actually sending direct mail on a schedule** — a print-and-mail vendor + scheduler/queue (Mail Queue/Calendar). We can build the preview and the CSV/merge; we can't mail.
+- **Real GPS route recording + multi-user shared coverage map** — needs a mobile app with background location and a shared backend to sync team routes.
+- **Comps generation from live sold data** — pulling fresh comparables is a data-feed/backend job; we can only display comps already baked into the JSON.
+
+### Verdict: single highest-value copy
+
+**List Stacking with a visible stack-count badge (plus sort-by-stack-count).** It is the one DealMachine pattern that is both free to build on our existing signal-stack chips and directly advances our core value prop — surfacing multi-signal, highest-intent properties. It costs a few lines (count the signals array, render a badge, add a sort key) and gives operators the same "focus on the most-motivated leads first" behavior that DealMachine charges for.
+
+Sources: [DealMachine Features (help)](https://help.dealmachine.com/en/articles/10856855-dealmachine-features), [DealMachine Glossary (help)](https://help.dealmachine.com/en/articles/10829341-dealmachine-glossary), [DealMachine Dialer FAQ](https://help.dealmachine.com/en/articles/9400361-dealmachine-dialer-faq), [App Store listing](https://apps.apple.com/us/app/dealmachine-for-real-estate/id1136936300), [DealFlow AI review](https://dealflowaistack.com/dealmachine-review/), [ListWithClever review](https://listwithclever.com/dealmachine-reviews-driving-for-dollars-app/), [ResiMpli review](https://resimpli.com/blog/dealmachine-review/)
+
+
+## REsimpli
+
+REsimpli is the "all-in-one operating system" for real-estate wholesalers/investors: it fuses the lead CRM, a built-in phone system (dialer/SMS/RVM), list-pulling + list-stacking, driving-for-dollars, direct mail, skip tracing, cash-buyer management, drip automation, and — its actual differentiator — a Plaid-fed accounting layer that auto-computes cost-per-lead and cost-per-deal **by marketing channel**, so ROI attribution lives inside the CRM instead of QuickBooks.
+
+### Screen-by-screen feature inventory
+
+- **Lead list / search + filters (List Builder):** Pull lists with filters like absentee-owner, equity %, ownership date, vacancy, years-of-ownership. Leads are taggable by source, tag, and stage. This is REsimpli's data-acquisition front door (not just a filter over existing rows).
+- **List-stacking screen:** Upload multiple lists; the tool cross-references them and flags properties that appear on 2+ lists (a stack count / motivation score), surfacing the highest-overlap sellers and de-duping. Reviewers describe uploading batches and getting overlooked properties flagged "within minutes."
+- **Lead pipeline board:** Kanban with drag-and-drop stages (New Lead → Contacted → Qualified → Offer Made → Under Contract → Closed). Cards show notes, call logs, full contact history. Moving a card auto-generates task assignments tied to the new status.
+- **Lead detail / property profile:** One page per property/owner with history, tags, notes, and inline action buttons — call, text, drop RVM, skip trace, or send a direct-mail piece right from the profile.
+- **Dispo pipeline:** A separate contract-to-close disposition workflow (its own stages) plus **cash-buyer management** — a segmented buyer database you can text-blast by group.
+- **Dialer / SMS / RVM:** Built-in phone system (5 free numbers on base plans), call from browser or mobile, auto call-recording, outcome logging, templated + custom SMS, ringless voicemail. Numbers can be assigned per campaign (this is what powers channel attribution downstream).
+- **Driving-for-dollars (mobile/D4D):** Field app to drop a pin, snap photos, log owner info, and fire off a direct-mail piece to that address on the spot; everything syncs into the CRM.
+- **Direct mail:** 90+ built-in postcard/letter templates, send single pieces or campaigns; used both from D4D and from drip sequences.
+- **Skip tracing:** Pay-as-you-go, runs from the lead profile, returns phones/emails/addresses in seconds.
+- **Automation / drip campaigns:** Visual sequence builder with conditional logic that triggers SMS, email, RVM, direct mail, and task reminders based on lead response. Plus 9 built-in "AI Agents" (appointment-setting, follow-up, voicemail).
+- **KPI dashboard:** Real-time cards for leads-per-source, conversion rate, cost-per-lead, cost-per-deal, revenue by channel, open offers/purchases, outstanding tasks, plus a **team leaderboard** (calls made, appointments, offers, revenue per rep). Reviewers report seeing "$2,500 in marketing costs, $15,000 in revenue" laid out at a glance.
+- **Accounting layer:** Plaid bank sync imports all transactions; auto-tags some by bank data, user tags the rest by marketing channel (direct mail / PPC / radio / cold-call) and by property; generates income statements by category (marketing, legal, office, general).
+
+### The 5–8 features worth COPYING
+
+1. **List-stacking with a visible stack-count / motivation chip.** *What:* rank each property by how many of your source lists it appears on. *Why:* stack count is the single best free motivation proxy — highest-overlap = call first. *FREE-to-build? Y.* You already have signal-stack chips; add a computed `stack_count` (or overlap-of-source-tags) field to listings.json and a sortable "Stack" column + a chip that renders the count. Pure client-side sort/derive.
+2. **Marketing ROI-by-channel/list table (their crown jewel, minus the bank feed).** *What:* a grid with one row per source/list showing spend, leads, cost-per-lead (spend÷leads), deals, cost-per-deal (spend÷deals), revenue, ROI. *Why:* it tells the operator which list to buy more of — the highest-leverage decision they make. *FREE-to-build? Y (partially).* You can't auto-pull bank spend statically, but you can add a small editable "channel spend" JSON (or a localStorage-entered spend-per-source) and compute CPL/CPD/ROI live in a table, since your data already carries a `source` per listing. The math is division; the only thing you can't automate is the spend number — take it as a manual input.
+3. **Cost-per-lead / cost-per-deal as headline scorecards.** *What:* big KPI cards (CPL, CPD, deals, revenue) at top of dashboard. *Why:* gives the "where do I stand" glance REsimpli sells hardest. *FREE-to-build? Y.* Derive from your listings (count by source/stage) + the manual spend input above; render as scorecard tiles. No backend.
+4. **Pipeline stages with drag-and-drop (CRM-lite → CRM board).** *What:* Kanban of leads by stage. *Why:* turns your CRM-lite localStorage notes into an actual pipeline operators live in. *FREE-to-build? Y.* You already persist per-listing state in localStorage; add a `stage` field and a board view (columns = stages, cards = listings) with HTML5 drag-drop writing stage back to localStorage. No server.
+5. **Per-lead action panel on the property detail (call/text/mail buttons).** *What:* one-click outreach from the detail view. *Why:* collapses the "find lead → go do something" gap. *FREE-to-build? Y (as deep links).* You can't host a dialer, but you can render `tel:`, `sms:`, and a mailto/skip-trace-search link, plus a "copy mail-merge address block" button. Static, zero cost, 80% of the felt value.
+6. **Source/tag-driven saved views + segment filters.** *What:* filter and save "absentee + high-equity" style segments. *Why:* operators work segments, not the whole list. *FREE-to-build? Y.* Encode active filters into the URL hash (shareable, bookmarkable) and/or localStorage "saved views." Pure front-end.
+7. **Team-leaderboard-style activity counters (single-operator version).** *What:* counts of contacted / appointments-set / offers / closed. *Why:* progress visibility drives behavior. *FREE-to-build? Y.* Aggregate the localStorage stage/CRM data into count tiles. (Multi-user leaderboards need a backend — the solo counter does not.)
+8. **CSV round-trip for spend + notes (import back, not just export).** *What:* let the operator maintain spend-by-list and lead notes in a sheet and re-import. *Why:* sidesteps the missing backend for the one thing they must key in (spend). *FREE-to-build? Y.* Add a CSV/JSON import that merges a `source,spend` file into the ROI calc and hydrates localStorage.
+
+### What genuinely requires a backend / vendor
+
+- **Plaid bank-account sync and auto-transaction categorization** — needs OAuth, a server to hold tokens, and Plaid's paid API. The *ROI math* is free; the *automatic spend capture* is not. (Manual spend entry is the free substitute.)
+- **Built-in dialer, call recording, SMS, and ringless voicemail** — requires Twilio-class telephony, server-side webhooks, and per-message billing. Static sites can only launch `tel:`/`sms:` handoffs, not run the phone system or log call outcomes.
+- **Skip tracing** — proprietary paid data (phones/emails behind a per-hit API). Not derivable in-browser; best you do is a deep-link out to a search.
+- **Direct-mail send + templates + tracking** — a print/mail vendor and fulfillment backend. Free version = generate a printable/mail-merge address block, not actually mail it.
+- **Automation / drip sequences and AI agents** — need a scheduler, server-side timers, and message-sending infra; a static page can't fire timed SMS/RVM/mail.
+- **Cross-device / multi-user shared state** (real pipeline shared by a team, team leaderboard) — localStorage is per-browser; genuine multi-user needs a database + auth.
+
+### Verdict: the single highest-value copy
+
+**The marketing ROI-by-list/channel table with derived cost-per-lead and cost-per-deal.** It's REsimpli's genuine differentiator and the highest-leverage screen for an operator (it decides where the next marketing dollar goes), yet 90% of it is free to rebuild in a static dashboard: you already carry a `source` per listing, so the only missing input is spend-per-source — take that as a small manual/CSV-entered number and compute CPL, CPD, and ROI entirely client-side. You copy the decision-making value of their "accounting layer" while skipping the one paid dependency (Plaid) that isn't actually where the value lives.
