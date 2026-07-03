@@ -9528,3 +9528,128 @@ The mental model: **the dashboard filters find the lead; the local model writes 
 - **Privacy is the actual win, not intelligence.** The reason to run this locally isn't that a 4B model is smart — it's that owner names, addresses, and distress signals never leave the Mac. That's a legitimate and real benefit. Just size expectations to it: you're buying *private call-prep and letter-drafting*, not a private analyst.
 
 **Sources:** [Best Ollama Models for 8GB RAM 2026 – Local AI Master](https://localaimaster.com/blog/best-local-ai-models-8gb-ram), [Ollama on 8GB RAM 2026 – webscraft](https://webscraft.org/blog/ollama-na-8-gb-ram-yaki-modeli-pratsyuyut-u-2026?lang=en), [AnythingLLM vs Open WebUI 2026 – Local AI Master](https://localaimaster.com/blog/anythingllm-vs-open-webui), [Text-to-SQL LLM Accuracy 2026 – AIMultiple](https://research.aimultiple.com/text-to-sql/), [The Text-to-SQL Performance Cliff 2026 – Medium](https://medium.com/@visrow/the-text-to-sql-performance-cliff-2026-why-natural-language-to-sql-breaks-a7281a23dbea)
+
+
+---
+
+# Deep-Dive Round 25 — Capstone: Completeness Critic + Action List + Exec Summary (2026-07-02)
+
+
+## What the 24 rounds still miss
+
+- **No live proof any lead ever converted to a closed deal.** The entire thesis rests on 17,003 leads and modeled max-bids, but zero rounds cite a single actual contract signed, assignment sold, or dollar collected from this pipeline. A skeptical investor's first question is "show me one deal," and the deep-dive can't. *Why it matters:* everything downstream (ROI, per-lead value, conversion scripts) is projection on projection. *Cheapest close:* run 25 leads end-to-end manually this month and log the funnel (contacted → answered → appointment → contract → assignment). One real close, or one honest "zero after 25," reprices the whole model.
+
+- **Seller-side competition density is never measured.** Every distressed owner in 18 SC/NC counties is already getting 10-40 mailers/texts from national wholesalers (We Buy Houses, cash-buyer PPC, list-stackers buying the same public records). The rounds treat these leads as if we're first to them. *Why it matters:* free public data means everyone has it; the moat is contact-rate and speed, not the list. *Cheapest close:* skip-trace and call 20 leads, ask "how many other cash offers have you gotten this week?" — that number is the real competitive discount on every projection.
+
+- **The buyer side of wholesale is completely absent.** You can source and contract a property, but wholesaling only makes money if a cash end-buyer closes. No round validates that a ready buyers list exists for these specific rural/small-metro SC/NC submarkets, or at what assignment fee they'll actually pay. *Why it matters:* an unassignable contract is a liability (earnest money, legal exposure), not an asset. *Cheapest close:* build/verify a 15-buyer list per region from public deed records (who's actually been buying cash in these ZIPs) before sourcing another seller.
+
+- **Legal exposure of the acquisition strategy itself is under-examined.** R19 covered NC assignment licensing, but not: earnest-money risk on contracts you can't assign, "equitable interest" marketing rules, wholesaler disclosure statutes tightening nationwide, and whether contacting pre-foreclosure/probate owners triggers state foreclosure-consultant or unfair-practices laws. *Why it matters:* one AG complaint or one deal gone wrong can end the operation. *Cheapest close:* a single 1-hour paid consult with a SC and an NC real-estate attorney on wholesaler compliance beats 24 rounds of self-diagnosis.
+
+- **The ARV/valuation engine is measured against itself, not against reality.** R10/R23 found bias (Spartanburg +89%, Charleston -36%, HIGH tier +22%) — but "measured gap sold-comps 9.7%" means we lack sold comps on ~90% of leads, and the backtest set is small and self-selected. *Why it matters:* max-bid is only as good as ARV; a 36% county bias means systematically overpaying or missing every deal there. *Cheapest close:* pull 50 actual arms-length sales per county from the free assessor sales tables and compute true out-of-sample error per county before trusting any max-bid.
+
+- **"Free forever" is an unstressed assumption.** Nearly every source is a scraped government portal or a bypassed WAF/CAPTCHA. Counties reorg sites, add Cloudflare, or rate-limit constantly (the memory log is a graveyard of exactly this). No round models the maintenance burden or the day three core counties break at once. *Why it matters:* a pipeline that needs weekly scraper repair isn't free, it's a part-time engineering job with no SLA. *Cheapest close:* instrument every scraper with a freshness/last-success timestamp and a per-source break alert; measure actual mean-time-between-breakage over 60 days to get the true cost of "free."
+
+- **Contactability, not lead count, is the real bottleneck — and it's tiny.** Phone coverage is measured at 2.2%. You cannot call, text, or reach 97.8% of the 17,003. The whole engine's output is effectively a few hundred reachable leads. *Why it matters:* 17,003 is a vanity number; the funnel starts at ~370 contactable. *Cheapest close:* stop reporting raw lead count as the headline; make "reachable leads" (phone or mailing address good enough for direct mail) the primary KPI, and price one round of paid skip-trace (~$0.10-0.25/hit) against expected deal value — it may be the single highest-ROI spend and "free-only" may be the wrong constraint.
+
+- **Direct mail as the fallback channel is never costed or tested.** If only 2.2% have phones, mail is the default outreach — yet no round prices postage/printing/response-rate for these lists or checks address deliverability (vacant/probate properties often have bad mailing addresses). *Why it matters:* "free data" still needs a paid outreach channel to produce revenue; mail economics decide viability. *Cheapest close:* price a 200-piece test mailer (~$0.50-0.80/piece all-in) at an assumed 0.5-1% response and see if the unit economics survive.
+
+- **Owner-occupancy and equity are conflated with "motivated."** A pre-foreclosure or tax-delinquent owner with a full mortgage and no equity is unsellable at a wholesale discount; the rounds count them as leads. Measured equity coverage is only 6.9%, so we don't even know equity on 93%. *Why it matters:* the addressable list is the subset with both equity AND motivation, likely a small fraction of 17,003. *Cheapest close:* for the reachable subset, hand-verify equity via free assessor value + recorded mortgage/DoT amount, and report the true "equity + motivated + reachable" count — the only number that matters.
+
+- **Concentration risk in a handful of small counties is unaddressed.** 18 counties in one economic region means one local employer closing, one hurricane, or one court-system digitization change can swing the entire lead flow. *Why it matters:* investors price geographic concentration heavily; a single-region play has a fat tail. *Cheapest close:* compute the Herfindahl concentration of leads by county and by source, and name the top-3 single points of failure explicitly in the thesis rather than burying them.
+
+- **Skip-trace, DNC, and TCPA compliance for outreach is a legal blind spot.** The moment you call or text these leads you're in TCPA/DNC/state-mini-TCPA territory (SC and NC both have robotext exposure; TCPA damages are $500-1,500 per message). No round addresses consent, scrubbing, or manual-dial requirements. *Why it matters:* an automated texting blast to scraped numbers is a class-action magnet. *Cheapest close:* commit to manual-dial + DNC scrub from day one and write the one-paragraph compliance rule now, before any outreach tooling is built.
+
+- **No competitor actually runs this "free-data" model at scale — and that's a warning, not an opening.** R12 did UX teardowns of data vendors, but never asked why every serious wholesaler pays PropStream/BatchLeads/DealMachine ~$100-500/mo instead of scraping counties free. The answer (coverage, skip-trace bundling, phone match, maintenance, legal cover) is the thesis's actual competition. *Why it matters:* "everyone pays and we won't" is usually a sign the free path has hidden costs, not that everyone's dumb. *Cheapest close:* one month of PropStream ($99) as a benchmark — compare its phone-match and comp coverage head-to-head against the free engine on the same 100 leads; quantify exactly what the $99 buys.
+
+- **Data freshness/latency vs. the foreclosure clock is never quantified.** A pre-foreclosure lead has a legal timeline (R11 covered statutes but not our lag against them). If our scrape surfaces a filing 3 weeks after national vendors already mailed it, we're structurally last in line. *Why it matters:* in distressed acquisition, being 48 hours late = the deal is gone. *Cheapest close:* for 10 known filings, measure the gap between the recording date and the date our pipeline surfaced them; if it's more than a few days, latency is a bigger problem than coverage.
+
+- **The 17,003 has no dedup/liveness audit.** Across 90+ scrapers and many facets (probate/tax/foreclosure/divorce), the same property surfaces from multiple sources, and stale leads (already sold, redeemed, resolved) are never aged out. The true count of distinct, still-distressed, still-valid properties is unknown and almost certainly far below 17,003. *Why it matters:* a headline number inflated by duplicates and dead leads corrupts every per-lead metric. *Cheapest close:* dedup by parcel ID, then re-check a 100-lead sample against current status (sold? redeemed? occupied?) to estimate the live-and-distinct rate.
+
+- **Unit economics and operator hours per closed deal are never assembled into one P&L.** Rounds priced pieces (skip-trace, mail, tooling) but no round says: X reachable leads → Y contacts → Z appointments → 1 deal → $N assignment, minus all costs and A hours of labor. *Why it matters:* without a full funnel P&L, "path to 100" is a slogan, not a plan; the answer might be "the math doesn't clear minimum wage." *Cheapest close:* build one honest bottoms-up funnel model on a napkin using the measured 2.2% phone rate and industry-standard contact→deal ratios (~1-3%); it will immediately show whether 100 deals needs 10K or 10M leads.
+
+- **Second-order: success degrades the free sources.** If this engine scales and starts moving volume, counties notice the scraping load, national competitors copy the free-source list, and portals lock down — the strategy erodes precisely as it works. *Why it matters:* the moat is inversely correlated with usage; it's a commons that gets fished out. *Cheapest close:* accept free-data as a bootstrapping wedge, not a durable moat, and define now what the real defensible layer is (local relationships, speed-to-contact system, buyer network, brand with sellers) — that's where the actual business lives.
+
+- **No fraud/data-quality check on the government source itself.** Assessor values lag markets by 1-3 years, sales tables miss non-arms-length and unrecorded deals, and probate/foreclosure filings get withdrawn without the portal updating. The engine treats scraped fields as ground truth. *Why it matters:* garbage-in silently poisons ARV, equity, and motivation scoring at the same time. *Cheapest close:* spot-audit 30 records against a second free source (Zillow/Redfin listing status, GIS, or a phone call) and publish the field-level error rate so downstream scores carry an honest confidence.
+
+- **The operator/key-person and "who actually does the calling" question is missing.** The entire outreach + negotiation + disposition layer assumes a skilled human acquisitions rep exists. No round names who dials, negotiates distressed sellers, and manages buyers — or what that costs/whether it's the user. *Why it matters:* the data engine is maybe 20% of a wholesale business; the other 80% is sales execution the deep-dive never staffs. *Cheapest close:* decide explicitly — is this a lead-gen product sold to wholesalers, or an in-house acquisition operation? The answer changes the entire build, and it's never been stated.
+
+## ROI-Ranked Do-This-Next
+
+The docs are in `/Users/cashhigh/foreclosure-scraper/docs/`. I have everything I need from the round-by-round summary. Here is the definitive ranked list.
+
+| Rank | Action | Round | Cost | Effort | Impact | Why now |
+|------|--------|-------|------|--------|--------|---------|
+| 1 | Fix GLA double-count bug in valuation (sqft counted twice → inflated ARV) | R10 | Free | 1-2h | Very high — corrects systemic ARV inflation across all 17k leads | Every downstream max-bid and equity number is wrong until fixed; one code change, whole board recomputes |
+| 2 | Add ARV county-calibration table (Spartanburg +89%/−36% Charleston/HIGH-tier +22% bias) | R23 | Free | 3-5h | Very high — removes measured per-county bias, the #1 valuation error | Backtest already quantified the bias; a lookup multiplier is trivial and fixes the largest known accuracy gap |
+| 3 | Region-tuned max-bid (fix 0.70→0.75 selling-fee double-charge, per-strategy) | R14/R10 | Free | 2-3h | Very high — bad max-bid = bad/missed deals; direct $ impact | Formula bug is identified; correcting it changes which leads are actionable |
+| 4 | Wire NC AddressNC/OneMap situs resolver (Charleston split-field + addr-less ~18%) | R6 facts | Free | 4-6h | High — closes address gaps that block outreach + geocode + comps | Endpoints live-verified; the `_STREET_NUM/NAME` candidate miss is a known one-file fix |
+| 5 | DNC scrub gate before any outreach export | R13/R3 | Free (internal list) | 2-3h | High — legal/TCPA risk removal; protects the whole outreach layer | Must exist before first call/text goes out; cheap gate, uncapped downside if skipped |
+| 6 | Run Vision (condition scoring) at scale across the board | R10 facts | Free (local) | 4-8h compute | High — condition is 14% gap, the biggest completeness hole; drives repair/ARV | Model already built; just batch it; condition unlocks better max-bid and triage |
+| 7 | HUD SAFMR rent enrichment (rent per ZIP for rental/BRRRR math) | R15 | Free (HUD API) | 3-4h | High — adds rent to every property, enabling rental-strategy scoring | Free federal API, one join; unlocks a whole deal-strategy lane currently blank |
+| 8 | SeeClickFix / code-complaint net-new source | R15/R4 | Free | 4-6h | High — net-new motivated-seller signal (distress/vacancy proxy) | Fresh lead source at zero marginal cost; feeds the motivated-seller engine |
+| 9 | FSD/arv_confidence gating surfaced in dashboard + exports | R10 | Free | 2h | High — stops acting on noisy ARVs; trust signal per lead | Prevents bad decisions on low-confidence comps; cheap once calibration lands |
+| 10 | License-class gating in data model (assignment vs license today) | R16/R19 | Free | 3-5h | High — legal correctness by strategy; avoids H797 exposure | R19 confirmed NC assignment needs no license now; gate before scaling outreach |
+| 11 | Lis-pendens + divorce off NC eCourts Judgment JSON (compliant lane) | R18 facts | Free | 3-5h | High — revives two motivated-seller facets on a clean endpoint | Endpoint split resolved; JSON lane is ToS-safe and already parses |
+| 12 | Sold-comps enricher hardening (close 9.7% comps gap, cama/assessor fallback) | R10/R23 | Free | 4-6h | High — comps are the ARV backbone; fewer nulls = better valuation | ARV floor must read cama sales (known); directly improves #1/#2 accuracy |
+| 13 | Phone-append via free reverse/SoS-agent enricher pass (2.2% → higher) | R6 facts | Free | 3-5h | Med-high — phone is the worst gap (2.2%); no phone = no outreach | Backbone of outreach; NC SoS agent path already free and working |
+| 14 | $199 one-time skip-trace/scrub batch on the actionable subset | R3/R7 | $199 | 1h | High per-dollar — phone+DNC on the deals you'll actually work | Cheapest paid lever; scope to the ~top actionable slice, not all 17k |
+| 15 | Geocodio paid tier for the address-less remainder | R21/R6 | ~$0.50/1k | 1-2h | Med-high — closes the geocode tail after free resolvers | Only pay for what AddressNC (#4) can't resolve; small bill, unblocks comps |
+| 16 | RentCast API for rent + AVM cross-check on actionable leads | R21/R15 | ~$0.10/lookup | 2-3h | Med-high — validates ARV + adds rent where SAFMR too coarse | Second opinion on your #1 risk (valuation); pay per actionable lead only |
+| 17 | TrueNCOA / NCOA address-standardization pass before mailers | R21/R13 | ~$20/run | 1h | Med — deliverability for any direct-mail lane | Cheap; only needed once a mail campaign is real |
+| 18 | Phased outreach-execution layer (scripts per lead-type, R13) into a real cadence tool | R13/R3 | Free-low | 1-2 days | High — turns leads into contacts; the actual revenue step | Scripts written (R13); needs a runnable cadence; gate on #5/#13 first |
+| 19 | Dashboard build-out per R17 spec (filters, confidence, strategy tags) | R17 | Free (GH Pages) | 2-4 days | Med-high — operator usability; makes the 17k actionable | Data fixes (#1-3) must land first or you're sorting on wrong numbers |
+| 20 | Payoff/lien-balance reconstruction (surviving-lien + loan-amount OCR) | R9/R19 | Free | 1-2 wk | High but heavy — equity accuracy (6.9% gap) needs debt side | Equity = value − debt; debt side is the missing half; big build, defer behind quick wins |
+| 21 | Vacancy signal reconstruction (registries/USPS proxy where walls fell) | R9/R15 | Free | 1 wk | Med-high — vacancy is top motivation signal; several walls confirmed | Build only the confirmed-open sub-sources; skip the known walls |
+| 22 | HECM / reverse-mortgage facet (where reachable) | R15/R6 | Free | 4-6h | Med — targeted elderly-equity lane | Narrow but high-intent; cheap if the source is open |
+| 23 | Water/sewer-lien net-new source | R15 | Free | 4-6h | Med — municipal-distress signal, per-county availability varies | Incremental source; pursue in core counties only (per memory) |
+| 24 | FSBO net-new source ingestion | R15 | Free | 4-6h | Med — direct motivated-seller intent | Good signal but coverage/quality varies; batch after higher-ROI sources |
+| 25 | Data-engineering architecture refactor (license-class gating, pipeline modularization) | R16 | Free | 1-2 wk | Med — maintainability + enables gated exports | Pays off at scale, not urgent; do after the quick-win fixes prove out |
+| 26 | Vendor API integrations per R21 spec (ATTOM excluded — ToS breach) | R21/R5 | Varies (paid) | 1-2 wk | Med — fills remaining structured gaps | Only after free lanes exhausted; ATTOM stays OFF (R5 ToS finding) |
+| 27 | Local-AI chat layer over the board (R24) | R24 | Free (local) | 1 wk | Med — operator query UX, not accuracy | Nice-to-have; build last, after data is trustworthy |
+| 28 | Competitor-UX-teardown-driven dashboard polish (R12) | R12 | Free | 3-5 days | Low-med — parity features, diminishing returns | Cosmetic vs. the data fixes; lowest engine ROI |
+| 29 | SC-court / PublicIndex manual-export lane expansion | R9/R18 | Free (manual) | ongoing | Med but labor-bound — SC ToS wall makes this operator-driven | Keep as manual lane; don't over-invest engineering against the wall |
+| 30 | MH-titling / surviving-lien legal doc templates (R19) | R19 | Free | 3-5h | Low-med — closes deals in MH/lien edge cases | Only matters once those deal types are in active pipeline |
+
+**If you do only 5 things:** (1) fix the GLA double-count bug, (2) add the ARV county-calibration table, (3) correct the region-tuned max-bid selling-fee bug, (4) wire the NC AddressNC situs resolver, (5) add the DNC scrub gate before any outreach — all free, and together they fix the valuation core, unblock addresses, and make outreach legal.
+
+## v3 Executive Summary
+
+I'll load the artifact-design skill first since this is a deliverable document, then write the executive summary. Actually, the task asks me to return ONLY the markdown as my final response, not create an artifact. Let me write it directly.
+
+# Path-to-100 Program — Executive Summary (v3)
+
+## The Mission
+Turn a free, county-scale property-signal pipeline into a **motivated-seller lead engine**: find distressed and off-market owners across Upstate SC + Western NC (18 counties), value the property, estimate equity, and hand a rep an *actionable* call list. The backbone is always the same chain — **name → property → equity → contact** — and every distress type (foreclosure, probate, divorce, tax-delinquent, elderly, incarcerated, vacant) is just another *source* feeding that chain.
+
+## Where the Engine Is Today
+- **17,003 leads, 18 counties, $0/mo** running cost (free public sources, GitHub-Pages dashboard).
+- **Strong on FIND and VALUE (~90%).** Measured coverage gaps are small: sqft 6.6%, sold-comps 9.7%, equity 6.9%.
+- **Thin on CONTACT.** Phone coverage is **2.2%** — the engine can tell you *which* door to knock, rarely *how to reach* the owner. Condition data (14% gap) is the other soft spot.
+- **Bottom line:** we can *find and price* deals for free; we cannot *dial* them for free.
+
+## The 3 Hard Walls (confirmed, not bugs)
+1. **Contact data** — no free, compliant source of skip-traced phone/email at volume. This is the single binding constraint on ROI.
+2. **Court-record depth (SC)** — SC PublicIndex is ToS-no-scrape; foreclosure/exempt-deed detail and much civil-judgment data sit behind walls or state "no value" by statute.
+3. **Condition / occupancy** — no free feed for interior condition or reliable vacancy; must be inferred, never known.
+
+## The 3 Cost Tiers
+| Tier | Spend | What it buys |
+|---|---|---|
+| **Free** | **$0** | Everything today: find + value + equity. Fix the free bugs first. |
+| **Hybrid** | **~$300–700/mo** | A one-time/low-volume **scrub** (~$199 list clean) + targeted contact-append **only on the actionable subset**, not the whole 17k. |
+| **Full-op** | **~$2–4k/mo** | Full skip-trace at volume, premium court/condition feeds, and an outreach-execution layer (dialer/SMS/mail). Only justified once conversion on the subset is proven. |
+
+## The Single Biggest Surprise Finding
+The **live ARV valuation is county-mis-calibrated** — a real, measured bug, not model noise:
+- **Spartanburg runs ~+89% hot, Charleston ~−36% cold**, and the **HIGH-confidence tier is itself +22% biased.**
+- Consequences: without the fix, max-bid math is wrong *per county*, and the "HIGH confidence" flag rewards the most-biased comps. Root causes traced across the deep-dive: a **GLA sqft double-count**, a **max-bid selling-fee double-charge** (fixed 0.70→0.75), and an ARV floor that ignored assessor/CAMA sales.
+- **This must be fixed before any money is spent on contact** — buying phone numbers for mis-priced deals just funds bad offers faster.
+
+## Bottom-Line Recommendation
+**Ship Phase-0 free fixes, then buy contact only on the actionable subset.**
+1. **Phase-0 (free, do now):** correct the ARV county calibration + GLA/fee bugs, re-score confidence, and recompute the board. This is pure upside at $0.
+2. **Add the ~$199 scrub** to clean and dedupe the list once.
+3. **Buy contact data surgically** — append phone/email *only* to the top-ranked, correctly-valued, high-equity subset (Hybrid tier ~$300–700), never the full 17k.
+4. **Hold the Full-op $2–4k tier** until measured conversion on that subset justifies scaling. Do not pay to reach leads the engine can't yet price correctly.
+
+The engine's edge is a free, defensible find-and-value layer. Spend money *only* at the one wall that blocks revenue — contact — and *only* after the valuation is trustworthy.

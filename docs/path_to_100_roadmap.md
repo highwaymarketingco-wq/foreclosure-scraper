@@ -2,6 +2,18 @@
 
 _Synthesis of the 8-round deep-dive (verification → county matrix → outreach layer → net-new sources → vendor teardowns → 13 critic gaps → forum intel). Companion to `path_to_100.md` (the scope) and `path_to_100_deepdive.md` (the research log). Generated 2026-07-02._
 
+## ⭐ READ FIRST — v3 (R25 capstone)
+**The reality in 3 lines:** the engine *finds & values* deals for ~$0 (sqft/comps/equity gaps are small), but it **can't dial them for free** — phone is 2.2%, so the funnel really starts at **~370 reachable leads, not 17,003**. That single fact reframes everything: **contactability + proof-of-conversion are the bottleneck, not more data sources.**
+
+**The critic's 5 hardest challenges (do these before scaling anything):**
+1. **Prove one deal.** Run 25 reachable leads end-to-end this month and log the funnel. One close (or an honest zero) reprices the whole model — everything today is projection-on-projection.
+2. **"Reachable leads" is the only real KPI** — stop headlining 17,003. Price one round of paid skip-trace (~$0.10–0.25/hit) against expected deal value; **"free-only" may be the wrong constraint.**
+3. **Seller-side competition is unmeasured** — these owners already get 10–40 mailers/texts; the moat is contact-rate + speed, not the public list. Ask 20 owners "how many cash offers this week?"
+4. **The buyer side is absent** — an unassignable contract is a liability. Build a 15-buyer list per region from recorded cash-grantees *before* sourcing more sellers.
+5. **One 1-hour SC + NC attorney consult** on wholesaler/UDAP/foreclosure-consultant compliance beats 24 rounds of self-diagnosis.
+
+**Do-this-next (free, high-impact, in order):** ① GLA double-count fix ② ARV county-calibration table (Spartanburg +89% / Charleston −36% / HIGH-tier +22%) ③ region-tuned + per-strategy max-bid ④ NC AddressNC situs resolver ⑤ DNC scrub gate ⑥ run Vision at scale ⑦ HUD SAFMR rent ⑧ SeeClickFix source ⑨ FSD/arv_confidence gating ⑩ license-class gate (before any paid vendor). Full ROI-ranked table + v3 exec summary in `path_to_100_deepdive.md` (R25).
+
 ## How to read this
 Four phases, cheapest-and-highest-leverage first. Each item: **cost · effort · what it closes · expected lift.** Phase 0 is all free and should ship before a single dollar is spent. The **hard walls never move** (live payoff, SC Rule-610 court data, SC exempt-deed prices) — the roadmap gets *around* them, not through them.
 
