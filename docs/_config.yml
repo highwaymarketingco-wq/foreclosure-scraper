@@ -17,6 +17,7 @@ exclude:
   - parcel_photos
   - path_to_100.md
   - path_to_100_deepdive.md
+  - path_to_100_roadmap.md
 include:
   - listings.json.gz
   - listings_detail.json.gz
