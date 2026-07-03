@@ -7079,3 +7079,1137 @@ Per property, capture the full lien stack with dates, then compute survival and 
 *NOT legal advice — a research brief for counsel. Flag: (a) whether N.C.G.S. § 116B-78's finder cap/licensing reaches clerk-of-court foreclosure surplus (§ 45-21.32) vs. only Treasurer-held property is unsettled and should be confirmed with a NC opinion; (b) NC § 75-121's 50% test and SC's total absence of a foreclosure-consultant statute are the two facts most likely to change outcomes and should be re-verified against current session law.*
 
 **Primary sources:** [N.C.G.S. § 75-121 (foreclosure rescue prohibited)](https://law.justia.com/codes/north-carolina/chapter-75/article-5a/section-75-121/) · [Article 5A / § 75-120, 75-122 (ncleg)](https://www.ncleg.gov/Laws/GeneralStatuteSections/Chapter75) · [N.C.G.S. § 116B-78 property-finder cap (ncleg)](https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_116B/GS_116B-78.html) · [N.C.G.S. § 45-21.32 surplus special proceeding](https://law.justia.com/codes/north-carolina/chapter-45/article-2a/section-45-21-32/) · [SCRCP Rule 71(c)](https://www.sccourts.org/resources/judicial-community/court-rules/civil/rule-71/) · [S.C. Code § 12-51-130 tax overage/assignment](https://law.justia.com/codes/south-carolina/title-12/chapter-51/section-12-51-130/) · [SCUTPA § 39-5-20 / § 39-5-140](https://law.justia.com/codes/south-carolina/title-39/chapter-5/) · [SC Title 37 Ch. 5 (no consultant regime)](https://www.scstatehouse.gov/code/t37c005.php) · [NC Treasurer property-finder registration packet](https://www.nccash.gov/documents/forms-and-guides/property-finder-registration-packet/download)
+
+
+---
+
+# Deep-Dive Round 21 — Vendor API Integration Specs (build-ready, 2026-07-02)
+
+
+## RentCast — integration spec
+
+### What it fills (which Listing fields, keyed on what)
+- `market_value` / `arv_estimate` ← `/avm/value` `price` (+ `priceRangeLow`/`priceRangeHigh` → value confidence band)
+- `rent_estimate` (long-term) ← `/avm/rent/long-term` `rent` (+ `rentRangeLow`/`rentRangeHigh`)
+- `sale_comps` / `rent_comps` ← the `comparables[]` array on either AVM response (each carries price, distance, correlation, daysOld)
+- `beds` / `baths` / `sqft` / `year_built` / `property_type` / `lot_size` / `last_sale_price` / `last_sale_date` / `assessed_value` / `owner_name` / `owner_occupied` ← `/properties` record (structured public-record specs + last recorded sale + tax assessment + owner)
+- `on_market_flag` / `list_price` / `days_on_market` / `mls_status` ← `/listings/sale` (is the target actively listed, and at what asking price)
+
+Keying, matched to our missing-only backfill:
+- **Primary key = `address`** (full "Street, City, State, Zip" string). RentCast's own resolver keys on this and it is the highest-hit-rate path.
+- **Fallback key = `latitude`+`longitude`** for our ~18% address-less Charleston rows (resolved via the chascogis situs resolver first). AVM endpoints accept lat/lng directly; `/properties` and `/listings/sale` accept lat/lng+`radius` for an area search, so for a point lookup use a tight radius (~0.05 mi) and take the nearest.
+- **No parcel_id key.** RentCast has no `parcel_id` / TMS lookup param — do the parcel_id→address/lat-lng resolution upstream (we already do) and hand RentCast the address or coords. This is the one gap vs. our other enrichers.
+
+### Base URL + auth (exact header/param; how to get a key)
+- Base URL: `https://api.rentcast.io/v1`
+- Auth: header `X-Api-Key: <key>` on every request. No OAuth, no query-param key, no bearer token.
+- Get a key: create an account at `https://app.rentcast.io/app/api`, add a billing card, generate the key on the API dashboard. Free/developer tier = **50 API calls/month** (fine for dev + smoke tests, not production volume — a paid plan is required for the full pipeline). One key per environment; store in the pipeline secret store, not in code.
+- Optional param on all endpoints: `suppressLogging=true` to keep RentCast from logging your query params (worth setting for owner-name/PII lookups).
+
+### Key endpoint(s) — method, path, required params, example request
+All GET. `address` OR `latitude`+`longitude` is the required locator on every endpoint.
+
+1. **AVM value** — `GET /v1/avm/value`
+   Required: `address` (or `lat`+`lng`). Optional: `propertyType`, `bedrooms`, `bathrooms`, `squareFootage`, `maxRadius` (mi), `daysOld`, `compCount` (5–25, default 15), `lookupSubjectAttributes` (bool, default true).
+2. **AVM long-term rent** — `GET /v1/avm/rent/long-term` — same param set as `/avm/value`.
+3. **Property record** — `GET /v1/properties`
+   Locator params + `city`/`state`/`zipCode`, `radius` (≤100 mi), spec filters (`bedrooms`/`bathrooms`/`squareFootage`/`yearBuilt`/`lotSize`, all range/multi-value), `limit` (1–500, default 50), `offset`, `includeTotalCount`.
+4. **Sale listings** — `GET /v1/listings/sale`
+   Locator + `status` (Active/Inactive), `daysOld`, spec filters, `limit` (1–500, default 5 here), `offset`, `includeTotalCount`.
+
+Example (single-property AVM value backfill):
+```
+GET https://api.rentcast.io/v1/avm/value?address=123%20Main%20St%2C%20Asheville%2C%20NC%2C%2028801&compCount=10&suppressLogging=true
+X-Api-Key: <key>
+```
+Lat/lng fallback for address-less rows:
+```
+GET https://api.rentcast.io/v1/avm/value?latitude=35.5951&longitude=-82.5515&propertyType=Single%20Family&bedrooms=3&bathrooms=2&squareFootage=1450
+X-Api-Key: <key>
+```
+
+### Response schema — the exact JSON fields we map (path -> Listing field)
+`/avm/value` (object):
+- `price` → `market_value` (also feed `arv_estimate` input)
+- `priceRangeLow` → `market_value_low`
+- `priceRangeHigh` → `market_value_high`
+- `latitude` / `longitude` → confirm/backfill coords
+- `comparables[]` → `sale_comps`, each:
+  - `comparables[].id` → `comp_id`
+  - `comparables[].formattedAddress` → `comp_address`
+  - `comparables[].price` → `comp_price`
+  - `comparables[].listingType` → `comp_listing_type`
+  - `comparables[].listedDate` / `removedDate` → `comp_listed_date` / `comp_removed_date`
+  - `comparables[].daysOld` → `comp_days_old`
+  - `comparables[].distance` → `comp_distance_mi`
+  - `comparables[].correlation` → `comp_correlation` (0–1 similarity; array is sorted desc — use it as the comp weight/confidence)
+
+`/avm/rent/long-term` (object): `rent` → `rent_estimate`; `rentRangeLow`/`rentRangeHigh` → `rent_estimate_low`/`_high`; `comparables[]` same shape as above → `rent_comps`. Note: for Multi-Family this estimate is **per unit**, not whole-building — gate/annotate accordingly.
+
+`/properties` (array; take `[0]` for an address/point lookup): `id`, `formattedAddress`, `propertyType` → `property_type`, `bedrooms` → `beds`, `bathrooms` → `baths`, `squareFootage` → `sqft`, `lotSize` → `lot_size`, `yearBuilt` → `year_built`, `lastSalePrice` → `last_sale_price`, `lastSaleDate` → `last_sale_date`, `taxAssessments` (year-keyed map, each with `value`/`land`/`improvements`) → `assessed_value` (latest year), `owner.names[]`/`owner.type` → `owner_name`/`owner_type`, `ownerOccupied` (bool) → `owner_occupied`. (These are our cross-check against county GIS/CAMA, not a replacement — RentCast's public-record coverage is thin in parts of Western NC / Upstate SC.)
+
+`/listings/sale` (array): `id`, `formattedAddress`, `price` → `list_price`, `status` → `mls_status`, `listedDate` → `listed_date`, `daysOnMarket` → `days_on_market`, spec fields as above. Presence of an Active record → `on_market_flag=true`. Sorted by `lastSeenDate` desc.
+
+### Rate limits / batch / pagination / errors (retry/backoff, quota headers)
+- **Rate limit: 20 requests/second** (hard). No documented daily cap beyond your plan's monthly call quota. There are **no per-request quota headers**; track remaining monthly calls yourself against the plan limit.
+- **No batch endpoint** — one address per AVM call. Fan out concurrently but bound to ≤20 req/s (async semaphore below).
+- **Pagination**: `/properties` and `/listings/sale` use `limit` (max 500) + `offset`; set `includeTotalCount=true` to get the total in a response header for loop termination. AVM endpoints are single-object, no pagination.
+- **Errors** (top-level HTTP status):
+  - `200` success
+  - `400` missing/malformed params — do not retry, log the bad row
+  - `401` bad/missing `X-Api-Key` — do not retry, alert
+  - `404` no data matching query — **not an error for us**; treat as "no fill available," cache the miss so we don't re-hit
+  - `405` wrong method
+  - `429` rate-limit hit — retry with backoff
+  - `500` / `504` server error/timeout — retry with backoff
+- **Retry policy**: exponential backoff on `429`/`500`/`504` (e.g. 1s → 2s → 4s, ~4 tries, small jitter); treat `400`/`401`/`404` as terminal (no retry). Cache both hits and `404` misses to disk keyed on the resolved locator, per our disk-cache pattern.
+
+### License class (per R16: PUBLIC/PERMISSIVE/RESTRICTED_EPHEMERAL) + storage note
+- **RESTRICTED_EPHEMERAL.** RentCast is a paid commercial data vendor; its ToS restrict redistribution and bulk storage/resale of the licensed data, and MLS-sourced `/listings/*` records carry additional MLS display/retention restrictions. Do **not** persist AVM values, comps, or MLS listing fields as durable Listing columns for redistribution.
+- Storage note: keep RentCast-derived values in the ephemeral/enrichment layer with a `source='rentcast'` + `fetched_at` tag and a TTL (refresh, don't archive); this is the same treatment as other RESTRICTED_EPHEMERAL vendors and must be honored by the license-class gate before any external-facing export. The `/properties` public-record fields (beds/baths/sqft/sale history) are less sensitive but still arrive under RentCast's license — prefer our own county GIS/CAMA values as the durable source of record and use RentCast only to fill gaps.
+
+### Python async enricher skeleton
+```python
+import httpx, asyncio
+
+RENTCAST_BASE = "https://api.rentcast.io/v1"
+_sem = asyncio.Semaphore(15)  # stay under the 20 req/s ceiling
+_RETRY = {429, 500, 502, 503, 504}
+
+async def enrich_rentcast_value(listing, client: httpx.AsyncClient, api_key: str, cache):
+    if listing.get("market_value"):                    # missing-only backfill (R16)
+        return listing
+    loc = ({"address": listing["address"]} if listing.get("address")
+           else {"latitude": listing["lat"], "longitude": listing["lng"]})
+    ckey = f"rentcast:value:{sorted(loc.items())}"
+    if (hit := cache.get(ckey)) is not None:           # disk cache (incl. 404 misses)
+        return _apply(listing, hit)
+    params = {**loc, "compCount": 10, "suppressLogging": "true"}
+    headers = {"X-Api-Key": api_key}
+    for attempt in range(4):
+        async with _sem:
+            r = await client.get(f"{RENTCAST_BASE}/avm/value", params=params, headers=headers)
+        if r.status_code == 200:
+            cache.set(ckey, r.json()); return _apply(listing, r.json())
+        if r.status_code == 404:
+            cache.set(ckey, {}); return listing          # no data -> cache the miss
+        if r.status_code in (400, 401, 405):
+            return listing                               # terminal, don't retry
+        if r.status_code in _RETRY:
+            await asyncio.sleep(2 ** attempt); continue
+        return listing
+    return listing
+
+def _apply(listing, d):
+    if not d: return listing
+    listing["market_value"]      = d.get("price")
+    listing["market_value_low"]  = d.get("priceRangeLow")
+    listing["market_value_high"] = d.get("priceRangeHigh")
+    listing["sale_comps"] = [
+        {"address": c.get("formattedAddress"), "price": c.get("price"),
+         "distance_mi": c.get("distance"), "correlation": c.get("correlation"),
+         "days_old": c.get("daysOld")}
+        for c in (d.get("comparables") or [])
+    ]
+    listing["_rentcast_source"] = "rentcast"  # RESTRICTED_EPHEMERAL tag for the license gate
+    return listing
+```
+Swap `f"{RENTCAST_BASE}/avm/value"` → `/avm/rent/long-term` (map `rent`/`rentRangeLow`/`rentRangeHigh`), `/properties` (array → take `[0]`, map specs/sale/owner), or `/listings/sale` (array → `on_market_flag` + `list_price`/`days_on_market`) for the other three enrichers; the concurrency/retry/cache wrapper is identical.
+
+---
+
+Doc sources: base URL, auth header `X-Api-Key`, error table, and 20 req/s limit confirmed from the RentCast Response Codes reference and `developers.rentcast.io/llms.txt`; endpoint paths/params/response fields from the `/avm/value`, `/avm/rent/long-term`, `/properties`, and `/listings/sale` reference pages (`developers.rentcast.io/reference`); 50-calls/month free tier from the RentCast help center. Some doc pages are login-gated to WebFetch — the auth header, rate limit, and error codes above are from the publicly rendered Response Codes page and are authoritative; the AVM `comparables[]` object also returns per-comp `bedrooms`/`bathrooms`/`squareFootage`/`propertyType` spec fields (visible in the interactive playground) that I mapped generically as comp specs but could not enumerate exhaustively from the gated schema view.
+
+
+## Geocodio — integration spec
+
+### What it fills (which Listing fields, keyed on what)
+- **Forward** (address → coords): fills `latitude`, `longitude`, `formatted_address` (standardized), and the parsed `address_components` (number/street/city/state/postal/county). Keyed on the Listing's raw `address` string when `lat`/`lng` are missing.
+- **Reverse** (coords → address): fills `formatted_address` + parsed components. Keyed on the Listing's `lat`/`lng` when a clean street address is missing.
+- Also surfaces `accuracy` (0–1 confidence) and `accuracy_type` (`rooftop`, `range_interpolation`, `street_center`, `place`, `county`, `state`) — use these to gate whether the backfill is trustworthy (accept `rooftop`/`range_interpolation`; treat `place`/`county`/`state` as low-confidence, do not overwrite a better existing value). Optional `fields=census,cd,stateleg` appends FIPS/county/legislative data but each field multiplies your lookup count, so leave off for pure geocoding.
+
+### Base URL + auth (exact header/param; how to get a key)
+- Base URL: `https://api.geocod.io/v2/` (current version is **v2** as of 2026; the `v1.7` in the task brief is stale — v1.8/v1.9/v2 all live, use v2). v1.x paths still resolve if you need to pin, but v2 is the default.
+- Auth: append `?api_key=YOUR_KEY` as a query param (works for GET and POST). A `Authorization: Bearer YOUR_KEY` header is also accepted. Query param is simplest for both single and batch.
+- Get a key: self-serve signup at `https://dash.geocod.io/apikey`. No sales call. Free tier is immediate (2,500 lookups/day).
+
+### Key endpoint(s) — method, path, required params, example request
+- **Single forward** — `GET /geocode` — required `q` (full address) OR component params (`street`, `city`, `state`, `postal_code`).
+  ```
+  GET https://api.geocod.io/v2/geocode?q=1109+N+Highland+St,+Arlington+VA&limit=1&api_key=KEY
+  ```
+- **Batch forward** — `POST /geocode` — body is a JSON array of address strings (or a JSON object with your own keys → results echo those keys, which is ideal for joining back to a Listing by `parcel_id`). Up to 10,000 per call.
+  ```
+  POST https://api.geocod.io/v2/geocode?api_key=KEY
+  Content-Type: application/json
+  {"lead_abc": "1109 N Highland St, Arlington VA", "lead_def": "525 University Ave, Toronto ON"}
+  ```
+- **Single reverse** — `GET /reverse?q=LAT,LNG` (comma-joined). **Batch reverse** — `POST /reverse` with a JSON array/object of `"lat,lng"` strings.
+- `limit=1` on forward keeps one candidate per address (fewer bytes; still full accuracy).
+
+### Response schema — the exact JSON fields we map (path → Listing field)
+Single response: top-level `results[]`. Batch response: top-level `results[]` where each element has `query` (echoed input) + `response.results[]` (or, for object-keyed batch, `results` is an object keyed by your submitted keys, each holding `response.results[]`).
+Per-result object:
+```
+results[0].location.lat                      -> latitude
+results[0].location.lng                      -> longitude
+results[0].formatted_address                 -> formatted_address (standardized)
+results[0].accuracy                          -> geo_accuracy_score (0-1, gate)
+results[0].accuracy_type                     -> geo_accuracy_type   (gate: accept rooftop/range_interpolation)
+results[0].address_components.number         -> street_number
+results[0].address_components.formatted_street -> street
+results[0].address_components.city           -> city
+results[0].address_components.county         -> county   (present on US results)
+results[0].address_components.state          -> state
+results[0].address_components.zip            -> postal_code
+```
+Take `results[0]` only after confirming `accuracy_type` is acceptable; an empty `results[]` means no match (not an error).
+
+### Rate limits / batch / pagination / errors (retry/backoff, quota headers)
+- **Rate:** 1,000 lookups/min on Pay-as-you-go (Unlimited plan ~3,333/min, no daily cap). **Free tier: 2,500 lookups/day**, use-it-or-lose-it, no rollover. "Lookups" = addresses × (1 + number of appended `fields`); with no extra fields, 1 address = 1 lookup.
+- **Batch:** one POST of up to 10,000 addresses counts as N lookups but 1 HTTP request — vastly cheaper on the per-minute request budget than looping singles. Prefer batch for backfill runs.
+- **Pagination:** none — batch returns all results in one response body; there is no cursor.
+- **Errors:** `422` (unprocessable / could not geocode input — not retryable, treat as no-match), `403` (bad or unpermitted key), `429` (rate/quota exceeded — retryable with backoff), `5xx` (retryable). No documented quota headers; track your own daily counter to stay under 2,500 free. Backoff: on 429/5xx, exponential (e.g. 1s, 2s, 4s) with jitter, cap ~3 retries.
+
+### License class (per R16: PUBLIC / PERMISSIVE / RESTRICTED_EPHEMERAL) + storage note
+- **PERMISSIVE.** Geocodio explicitly permits storing and caching geocoded results with **zero restrictions** on rate, billing, or retention — results can be persisted indefinitely in our DB and disk cache. This is the key differentiator vs. Google/Mapbox (which forbid permanent storage). One carve-out: **Canadian** results return FSA-level postal only (full Canadian postal codes are license-restricted) — irrelevant to our NC/SC footprint. The 72-hour auto-delete applies only to files uploaded to their hosted *Spreadsheet/Lists* product, **not** to API responses, so our persisted enrichment is fine. Safe to write into the permanent Listing record and the disk cache.
+
+### Python async enricher skeleton (a real ~20-line httpx enricher stub matching our pattern)
+```python
+import httpx
+from .base import Enricher, cached  # your disk-cache decorator, keyed on the arg
+
+GEOCODIO_BASE = "https://api.geocod.io/v2"
+_ACCEPTED = {"rooftop", "range_interpolation", "intersection", "street_center"}
+
+class GeocodioEnricher(Enricher):
+    license_class = "PERMISSIVE"
+    fills = ("latitude", "longitude", "formatted_address")
+
+    def __init__(self, api_key: str, client: httpx.AsyncClient):
+        self.key, self.client = api_key, client
+
+    async def enrich(self, listing) -> dict:
+        if listing.latitude and listing.longitude:      # missing-only backfill
+            return {}
+        addr = (listing.address or "").strip()
+        if not addr:
+            return {}
+        return await self._geocode(addr)
+
+    @cached(ttl=None)                                    # persist forever; PERMISSIVE
+    async def _geocode(self, addr: str) -> dict:
+        r = await self.client.get(
+            f"{GEOCODIO_BASE}/geocode",
+            params={"q": addr, "limit": 1, "api_key": self.key},
+            timeout=15,
+        )
+        if r.status_code in (422,):                      # no-match, not retryable
+            return {}
+        r.raise_for_status()                             # 429/5xx -> caller backoff
+        res = (r.json().get("results") or [None])[0]
+        if not res or res.get("accuracy_type") not in _ACCEPTED:
+            return {}
+        loc = res["location"]
+        return {
+            "latitude": loc["lat"],
+            "longitude": loc["lng"],
+            "formatted_address": res["formatted_address"],
+            "geo_accuracy_score": res.get("accuracy"),
+        }
+```
+For bulk backfill, replace the per-lead `_geocode` with one `POST /geocode` sending a `{parcel_id: address}` object for up to 10k leads, then map `data["results"][parcel_id]["response"]["results"][0]` back onto each Listing — one HTTP call against the 1,000/min request budget instead of thousands.
+
+
+## TrueNCOA — integration spec
+
+### What it fills (which Listing fields, keyed on what)
+Batch USPS-CASS + NCOALink move-update for owner mailing addresses. Keyed per-lead on `parcel_id`/`address` (you build one TrueNCOA "file" per enrichment batch and carry your own `individual_id` = your lead PK so results join back 1:1). Fills:
+- `mailing_address_line_1`, `mailing_address_line_2`, `mailing_city`, `mailing_state`, `mailing_zip`, `mailing_zip4`, `mailing_dpbc` (standardized/CASS-corrected)
+- `ncoa_move_flag`, `ncoa_move_date`, `ncoa_move_type` (individual/family/business), `ncoa_new_address_*` (forwarding address when owner moved — high value for absentee/probate outreach)
+- `address_deliverable` / `cass_result` (Z-code / error), `dpv_confirmed`, `vacant_flag`, `mail_undeliverable_reason`
+- This is the move-update layer; use Smarty for real-time single-record DPV/RDI/vacant. TrueNCOA is the async, NCOA-licensed batch.
+
+### Base URL + auth (exact header/param; how to get a key)
+- Production: `https://api.truencoa.com` · Sandbox: `https://api.testing.truencoa.com` (fully functional, free, no charge until you export with real credits).
+- Auth = two **HTTP headers on every request**: `user_name: <api id or account email>` and `password: <api key or account password>`. No OAuth, no bearer token, no session step.
+- Get credentials: create a free account at truencoa.com, then Account → API; the same login works against the sandbox host. Free to develop; you're only charged credits when you export processed results (`View Credit Count` = `GET /accountbalance`).
+- **PAF requirement (hard gate):** USPS requires a Processing Acknowledgement Form per list owner. TrueNCOA auto-generates the PAF from your account. Critical constraint: **one org/list-owner per file** — do not mix owners in a single file. If you're processing on behalf of a client, set the list-owner via the `mailer` form param (or `[Org Name]` brackets in the file name); otherwise your own account name is used.
+
+### Key endpoint(s) — method, path, required params, example request
+Lifecycle: **create file → add records → submit → poll → (auto or manual) export → poll export → download.**
+
+1. Create file (returns file `Id`): `POST /files/{file_name}/index` — body `caption`, optional `mailer`, `processupdates=true` (enable NCOA updates), `parseRecords=true|false`.
+2. Upload records (bulk, JSON): `POST /files/{id}/records` with `Content-Type: application/json`, body = JSON array of record objects. (Also `?add=true` to append, `?url={webhook}` for completion callback.)
+3. Submit for processing: `PATCH /files/{id}/index?status=submit` (empty body).
+   - One-shot variant: `PATCH /files/{id}/index?status=submit&export_template=export_default` auto-creates the export when processing finishes (pair with a webhook).
+4. Poll processing: `GET /files/{id}/index` → read `Status` until `Processed`.
+5. Create export (returns a **new** `export_id`): `PATCH /files/{id}/index?status=export&export_template=export_default`.
+6. Poll export: `GET /files/{export_id}/index` → `Status` until `Exported`.
+7. Download: `GET /records/{export_id}/index?delimiter=tab&columns=[...]` (streaming, whole file one call) or `GET /files/{export_id}/records` (paged).
+
+```
+POST https://api.truencoa.com/files/leads_2026_07_02/records
+user_name: <id>
+password: <key>
+Content-Type: application/json
+
+[{"individual_id":"LEAD-8841","individual_first_name":"Christopher","individual_last_name":"Klimko",
+  "address_line_1":"3000 Westminster Ave","address_line_2":"","address_city_name":"Dallas",
+  "address_state_code":"TX","address_postal_code":"75205","address_country_code":"US"}]
+```
+Record input fields: `individual_id` (your PK — echoed back), `individual_first_name`, `individual_last_name`, `individual_full_name` (optional if `parseRecords`), `address_line_1`, `address_line_2`, `address_city_name`, `address_state_code`, `address_postal_code`, `address_country_code`.
+
+### Response schema — the exact JSON fields we map (path -> Listing field)
+Status objects (`GET /files/{id}/index`) — drive the poll loop:
+```json
+{ "Id":"838f191f-...","Status":"Parse","Name":"testapi","CreateDate":"/Date(1525813486657)/","RecordCount":3 }
+```
+- `Status` → job state machine: `Parse` → `Processing` → **`Processed`** (processing done) → after export PATCH: **`Exported`** (safe to download). Error states surface here too — treat any non-progressing/error `Status` as fail.
+- `Id` (from create) → your file handle; `Id` returned by the export PATCH → `export_id`.
+- `RecordCount` → sanity-check vs records posted.
+
+Downloaded records (`GET /records/{export_id}/index`, JSON array): your input fields come back **lower_snake_case**; TrueNCOA-added fields come back **Proper Cased With Spaces**. Map (per the Output File Guide data dictionary):
+- `individual_id` → join key back to your lead
+- `Address Line 1` / `Address Line 2` / `City Name` / `State Code` / `Postal Code` / `Zip + 4` / `Delivery Point Barcode` → `mailing_*` (CASS-standardized)
+- `Address Status` / CASS `Z` result / `DPV Footnote` → `address_deliverable`, `dpv_confirmed`, `vacant_flag`
+- `NCOA Move Applied` / `Move Type` / `Move Date` / `Move Effective Date` → `ncoa_move_flag`, `ncoa_move_type`, `ncoa_move_date`
+- `NCOA Address Line 1`/`City Name`/`State Code`/`Postal Code` (forwarding) → `ncoa_new_address_*`
+- Export templates you pass as `export_template`: `export_default` (ALL CAPS full layout), plus `Mailable`, `Non-Mailable`, `Updated`, `Basic` (proper-case). Or use `columns=[...]` on the streaming download to select exact fields.
+
+### Rate limits / batch / pagination / errors (retry/backoff, quota headers)
+- **Async job model, not per-call rate-limited.** Processing completes typically in ~4–7 minutes for normal files. No documented per-second cap or quota headers; the real limit is **NCOA credits** (`GET /accountbalance`) consumed at export.
+- **Batching:** post many records per `POST /files/{id}/records` call (JSON array); loop-append with `?add=true` for very large lists. One list-owner per file (USPS/PAF rule) — shard your batch by client/owner, not by size.
+- **Pagination:** streaming download (`/records/{export_id}/index`) pulls the whole file in one array (no range). The paged `/files/{export_id}/records` variant supports ranges if you need chunking.
+- **Errors/retry:** poll-based, so implement a bounded poll (e.g., every 20–30s, cap ~15 min) on `Status`; a stuck/error `Status` (not `Processed`/`Exported`) = fail-and-alert. Standard HTTP 401 (bad `user_name`/`password`), 4xx on malformed body. Use the **webhook** (`?url=` on upload/submit) instead of tight polling in production. Retries are safe on GET status/download; don't blindly re-submit (avoid double credit spend) — check `Status` first.
+
+### License class (per R16: PUBLIC/PERMISSIVE/RESTRICTED_EPHEMERAL) + storage note
+**RESTRICTED_EPHEMERAL.** NCOALink is USPS-licensed data under a PAF: move/forwarding results are contractually restricted to mailing use and carry a **retention limit** (USPS NCOA results are generally not to be retained/re-used beyond a short window, and the PAF governs list-owner scope). Store the CASS-standardized mailing fields and a boolean `ncoa_move_flag`/`move_date` for outreach, but treat the **forwarding/new address as short-lived** — do not warehouse it as a permanent enrichment, re-run per campaign, and honor the one-owner-per-file rule. Disk-cache the raw export only transiently; gate this enricher behind the license class check (this is not PUBLIC parcel data).
+
+### Python async enricher skeleton
+```python
+async def enrich_truencoa(client: httpx.AsyncClient, leads: list[dict]) -> dict[str, dict]:
+    H = {"user_name": TNC_ID, "password": TNC_KEY}
+    base = "https://api.truencoa.com"
+    fname = f"leads_{int(time.time())}"
+    # 1. create file (one list-owner per file)
+    fid = (await client.post(f"{base}/files/{fname}/index", headers=H,
+             data={"caption": fname, "processupdates": "true"})).json()["Id"]
+    # 2. upload only missing-mailing leads as JSON array (individual_id = our PK)
+    recs = [{"individual_id": L["id"], "individual_first_name": L.get("first",""),
+             "individual_last_name": L.get("last",""), "address_line_1": L["address"],
+             "address_city_name": L["city"], "address_state_code": L["state"],
+             "address_postal_code": L["zip"], "address_country_code": "US"} for L in leads]
+    await client.post(f"{base}/files/{fid}/records", headers=H, json=recs)
+    # 3. submit + auto-export via template
+    await client.patch(f"{base}/files/{fid}/index",
+                       params={"status": "submit", "export_template": "export_default"}, headers=H)
+    # 4. poll processing -> Processed, then locate export id
+    async def wait(_id, done):
+        for _ in range(45):  # ~15 min cap
+            st = (await client.get(f"{base}/files/{_id}/index", headers=H)).json()["Status"]
+            if st == done: return True
+            if st in ("Error", "Failed"): raise RuntimeError(f"TrueNCOA {st}")
+            await asyncio.sleep(20)
+        raise TimeoutError("truencoa poll")
+    await wait(fid, "Processed")
+    exp = (await client.patch(f"{base}/files/{fid}/index", params={"status": "export"}, headers=H)).json()["Id"]
+    await wait(exp, "Exported")
+    # 5. stream download, join back on individual_id
+    rows = (await client.get(f"{base}/records/{exp}/index", headers=H)).json()
+    return {r["individual_id"]: r for r in rows}
+```
+
+---
+
+## Smarty (US Street Address API) — integration spec
+
+### What it fills (which Listing fields, keyed on what)
+Real-time, single-record CASS/DPV address verification + deliverability. Keyed per-lead on `address` (freeform or component) and optionally back-joined via `input_id`; returns lat/lng that also cross-checks your `lat_lng`. Fills:
+- `mailing_address_line_1` (`delivery_line_1`), `mailing_address_line_2`, `mailing_city`, `mailing_state`, `mailing_zip`, `mailing_zip4`, `mailing_dpbc` (`delivery_point_barcode`)
+- `address_deliverable` (dpv_match_code), `vacant_flag` (`dpv_vacant`), `no_stat_flag` (`dpv_no_stat`), `cmra_flag` (`dpv_cmra`), `rdi` (Residential/Commercial), `zip_type`, `record_type`
+- `county_name`, `county_fips`, `carrier_route`, `congressional_district`, `latitude`, `longitude`, `geo_precision` (Rooftop/Parcel/Street/Zip), `time_zone`
+- Use for the fast missing-only backfill of deliverability + RDI + geocode; use TrueNCOA for the NCOA move layer.
+
+### Base URL + auth (exact header/param; how to get a key)
+- Host: `https://us-street.api.smarty.com` (HTTPS only).
+- **Secret-key auth (server-side — use this):** query params `auth-id=<id>&auth-token=<token>`, or preferably HTTP header `Authorization: Basic base64("<auth-id>:<auth-token>")`. Secret keys allow **both GET and POST**.
+- Embedded key (`key=<key>` + Referer allowlist) is browser-side only and GET-only — do **not** use for this pipeline.
+- Get keys: Smarty dashboard → API Keys (`/account/keys`); generate a Secret Key pair. Requires an active US Address Verification subscription (402 if none). Auth-id is shareable; auth-token is the secret.
+
+### Key endpoint(s) — method, path, required params, example request
+- Single: `GET /street-address` — required = one of {`street`+`city`+`state`} | {`street`+`zipcode`} | freeform `street`. Optional: `secondary`, `zipcode`, `candidates` (1–10), `match` (`strict`|`invalid`|`enhanced`), `input_id`.
+- Batch: `POST /street-address` — JSON array of up to **100** address objects (max 32 KB), same field names; each object may carry `input_id`.
+```
+GET https://us-street.api.smarty.com/street-address?street=3000+Westminster+Ave&city=Dallas&state=TX&candidates=1&match=enhanced&auth-id=ID&auth-token=TOKEN
+
+POST https://us-street.api.smarty.com/street-address     (Authorization: Basic ...)
+[{"input_id":"LEAD-8841","street":"3000 Westminster Ave","city":"Dallas","state":"TX","zipcode":"75205","candidates":1,"match":"enhanced"}]
+```
+Note: `match=enhanced` returns extra metadata but is a premium tier; default `strict` returns an **empty array `[]`** for undeliverable addresses — that empty result is itself your "not deliverable" signal.
+
+### Response schema — the exact JSON fields we map (path -> Listing field)
+Response is a JSON array; each candidate carries `input_id` and `input_index` for join-back.
+- `input_id` → lead PK · `delivery_line_1` → `mailing_address_line_1` · `delivery_line_2` → `mailing_address_line_2` · `last_line` → city/state/zip line · `delivery_point_barcode` → `mailing_dpbc`
+- `components.zipcode` + `components.plus4_code` → `mailing_zip` / `mailing_zip4` · `components.city_name` → `mailing_city` · `components.state_abbreviation` → `mailing_state` · `components.primary_number`/`street_name`/`street_suffix`/`secondary_*` → parsed street parts
+- `metadata.rdi` → `rdi` (Residential/Commercial) · `metadata.county_name` / `metadata.county_fips` → `county_name`/`county_fips` · `metadata.latitude` / `metadata.longitude` → `latitude`/`longitude` (cross-check `lat_lng`) · `metadata.precision` → `geo_precision` · `metadata.zip_type` → `zip_type` · `metadata.record_type` → `record_type` · `metadata.time_zone` → `time_zone` · `metadata.carrier_route`/`congressional_district` → optional
+- `analysis.dpv_match_code` (Y/S/D/N) → `address_deliverable` · `analysis.dpv_vacant` (Y/N) → `vacant_flag` · `analysis.dpv_no_stat` (Y/N) → `no_stat_flag` · `analysis.dpv_cmra` (Y/N) → `cmra_flag` · `analysis.dpv_footnotes` / `analysis.footnotes` → raw deliverability reason codes
+- Deliverability rule of thumb: keep only `dpv_match_code in {Y,S,D}` with `dpv_vacant != Y`; empty array = fail.
+
+### Rate limits / batch / pagination / errors (retry/backoff, quota headers)
+- **Batch:** ≤100 addresses **or** 32,768 bytes per POST, whichever first. No cursor pagination — you page by chunking your own list into ≤100-address POSTs.
+- **Rate limits:** plan-dependent throughput; no fixed public RPS. Respect **429 Too Many Requests** with exponential backoff + jitter (Smarty is fast; a bounded semaphore of a few concurrent requests is plenty).
+- **Status codes:** `200` success (array; may be `[]`) · `400` malformed/missing street · `401` bad credentials · `402` no active subscription · `413` payload >32 KB · `422` POST missing required street · `429` rate limited. Retry only 429/5xx; do not retry 4xx auth/format errors. No quota headers documented — track spend via dashboard.
+
+### License class (per R16: PUBLIC/PERMISSIVE/RESTRICTED_EPHEMERAL) + storage note
+**PERMISSIVE.** Smarty explicitly permits storing verified/standardized address results (no NCOA-style retention clause on CASS/DPV output). One caveat: the returned **rooftop `latitude`/`longitude`** may be governed by a separate coordinate license (`metadata.coordinate_license` = 0 or 1) — if `coordinate_license == 1` the geocode is licensed and should be treated as more restricted (don't redistribute), while the standardized address + DPV/RDI/vacant flags are safe to persist and disk-cache indefinitely. Gate the enricher as PERMISSIVE; store the standardized mailing fields and deliverability flags in the Listing, and cache by normalized input address to avoid re-billing.
+
+### Python async enricher skeleton
+```python
+async def enrich_smarty(client: httpx.AsyncClient, leads: list[dict]) -> dict[str, dict]:
+    url = "https://us-street.api.smarty.com/street-address"
+    auth = ("auth-id", SMARTY_ID); tok = {"auth-token": SMARTY_TOKEN}  # secret-key, POST allowed
+    out, sem = {}, asyncio.Semaphore(4)
+    async def one_batch(chunk):
+        payload = [{"input_id": L["id"], "street": L["address"], "city": L.get("city",""),
+                    "state": L.get("state",""), "zipcode": L.get("zip",""),
+                    "candidates": 1, "match": "enhanced"} for L in chunk]
+        async with sem:
+            for attempt in range(4):
+                r = await client.post(url, params={"auth-id": SMARTY_ID, "auth-token": SMARTY_TOKEN},
+                                      json=payload)
+                if r.status_code == 429 or r.status_code >= 500:
+                    await asyncio.sleep(2 ** attempt); continue
+                r.raise_for_status(); break
+            for c in r.json():                       # empty array => undeliverable, left unfilled
+                m, a = c.get("metadata", {}), c.get("analysis", {})
+                out[c["input_id"]] = {
+                    "mailing_address_line_1": c.get("delivery_line_1"),
+                    "mailing_zip": (c.get("components") or {}).get("zipcode"),
+                    "mailing_zip4": (c.get("components") or {}).get("plus4_code"),
+                    "rdi": m.get("rdi"), "county_name": m.get("county_name"),
+                    "latitude": m.get("latitude"), "longitude": m.get("longitude"),
+                    "geo_precision": m.get("precision"),
+                    "address_deliverable": a.get("dpv_match_code"),
+                    "vacant_flag": a.get("dpv_vacant"), "cmra_flag": a.get("dpv_cmra")}
+    await asyncio.gather(*[one_batch(leads[i:i+100]) for i in range(0, len(leads), 100)])
+    return out
+```
+
+---
+
+**Sources:** [TrueNCOA API V2 Postman collection](https://documenter.getpostman.com/view/2009332/UUxzA7SU) (endpoints/headers/status responses extracted from the collection JSON), [TrueNCOA API page](https://truencoa.com/api/), [TrueNCOA CLI](https://github.com/truencoa/cli) (status enum + input fields), [TrueNCOA Output File Guide](https://truencoa.com/wp-content/uploads/2023/11/TrueNCOA-Output-File-Guide-202311.pdf), [Smarty US Street API reference](https://www.smarty.com/docs/apis/us-street-api/reference), [Smarty authentication](https://www.smarty.com/docs/account/authentication).
+
+Note: TrueNCOA example status responses (`Status: Parse/Processed/Exported`, `Id`, `RecordCount`) and all endpoint paths/headers (`user_name`/`password`) are pulled verbatim from the live collection JSON, so they are authoritative. Smarty's full request/response schema is from the official public reference. The only non-verbatim items are the exact TrueNCOA output-column header strings (e.g. `NCOA Move Applied`, `NCOA Address Line 1`) — those come from the Output File Guide data dictionary (PDF, not re-fetched field-by-field here); confirm exact casing against that guide or one live sandbox export before hardcoding the download-column map.
+
+
+## BatchData (Property Skip Trace) — integration spec
+
+### What it fills (which Listing fields, keyed on what)
+- Keyed on the property, not the person: input is `propertyAddress` (street/city/state/zip), optionally plus owner `name`. This matches our per-lead backfill keyed on **address** (and derivable from `parcel_id`→address via the resolver). Do **not** key BatchData on `parcel_id`/lat-lng directly — it takes a postal address.
+- Fills: `owner_phone[]` (from `persons[].phoneNumbers[].number`), `owner_email[]` (from `persons[].emails[].email`), and per-number flags `dnc`, `phone_type` (Land Line / Mobile / VOIP), `phone_reachable`, `phone_score`. Also backfills/repairs `owner_name` (`persons[].name.full`) when GIS owner was blank, and litigation/DNC gates (`persons[].dnc`, `persons[].litigator`).
+- Missing-only rule: call only when `owner_phone`/`owner_email` are empty AND we have a usable address. One matched request = one billed record (`meta.matchCount`), so gating on missing-only is also cost control.
+
+### Base URL + auth (exact header/param; how to get a key)
+- Base URL: `https://api.batchdata.com/api/v1`
+- Auth: HTTP header `Authorization: Bearer <API_TOKEN>` plus `Content-Type: application/json`. No key in query/body.
+- Key: self-serve from the BatchData dashboard (app.batchdata.com → API / token section). Token is a long-lived Bearer; store in `BATCHDATA_API_TOKEN` env, never in the board sidecar. Billing is credit/record-based (matched records billed), so the token carries spend — treat as a secret.
+
+### Key endpoint(s) — method, path, required params, example request
+Synchronous (small batches, ≤ ~a few hundred records; blocks until results):
+- `POST /api/v1/property/skip-trace`
+
+Asynchronous (recommended for large jobs, avoids timeouts — submit → poll):
+- Submit: `POST /api/v1/property/skip-trace/async` → returns a job/queue id in the `status`/results envelope.
+- Poll: `GET /api/v1/queue/{id}` → returns job status and, when complete, the same results payload as the sync endpoint.
+
+Required body (both): a `requests` array; each item needs `propertyAddress` with `street`,`city`,`state`,`zip`. `name` is optional but sharply improves match rate.
+
+```bash
+curl -X POST https://api.batchdata.com/api/v1/property/skip-trace \
+  -H "Authorization: Bearer $BATCHDATA_API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "requests": [
+      { "propertyAddress": { "street": "123 Main St", "city": "Asheville", "state": "NC", "zip": "28801" },
+        "name": { "first": "Jane", "last": "Doe" } }
+    ]
+  }'
+```
+
+### Response schema — the exact JSON fields we map (path -> Listing field)
+Envelope: `{ "status": {...}, "results": { "meta": {...}, "persons": [...] } }`
+
+| JSON path | Listing field |
+|---|---|
+| `results.persons[].name.first` / `.last` / `.full` | `owner_name` (backfill only if blank) |
+| `results.persons[].phoneNumbers[].number` | append to `owner_phone[]` |
+| `results.persons[].phoneNumbers[].type` (`Land Line`/`Mobile`/`VOIP`) | `phone_type` (per number) |
+| `results.persons[].phoneNumbers[].dnc` (bool) | per-number `dnc` flag |
+| `results.persons[].phoneNumbers[].reachable` (bool) | `phone_reachable` |
+| `results.persons[].phoneNumbers[].tested` (bool) | `phone_tested` |
+| `results.persons[].phoneNumbers[].score` (int) | `phone_score` (rank which number to call first) |
+| `results.persons[].phoneNumbers[].carrier` | `phone_carrier` (optional) |
+| `results.persons[].emails[].email` | append to `owner_email[]` |
+| `results.persons[].dnc` (person-level bool) | `owner_dnc` gate |
+| `results.persons[].litigator` (bool, when present) | `owner_litigator` gate (suppress from SMS/dialer) |
+| `results.persons[].bankruptcy` / `.deceased` (when present) | motivation/suppression signals |
+| `results.meta.matchCount` | billed-records counter (log for cost) |
+| `results.meta.requestCount` / `results.meta.resultCount` | reconcile submitted vs matched |
+
+Note the persons array can hold multiple people per property (owner + associated). Take the highest-`score` mobile as primary; keep the rest in the arrays.
+
+### Rate limits / batch / pagination / errors (retry/backoff, quota headers)
+- Batch: send many records in one `requests[]` array rather than one call per lead — that is the intended shape and the cheapest per-record. For our per-lead missing-only pattern, buffer eligible leads and flush in chunks (e.g. 100–250/request); use the **async** endpoint above that size.
+- Pagination: results come back per submitted request item; the async job returns the full set from `GET /queue/{id}` — no cursor. Poll on an interval (e.g. 2–5 s, capped) until the job status is complete.
+- Errors: standard HTTP — `401` bad/missing Bearer, `422` malformed address/body, `429` rate/quota, `5xx` transient. Retry `429`/`5xx` with exponential backoff + jitter; do **not** retry `422` (fix the address). No documented quota header names surfaced in public docs — treat `429` as the backoff signal and rate-limit client-side.
+- Idempotency/cost: a re-submitted matched record bills again, so cache results to disk keyed by normalized address and honor missing-only so retries don't double-charge.
+
+### License class (per R16) + storage note
+- **RESTRICTED_EPHEMERAL.** This is purchased consumer PII (phones/emails, DNC, litigator, bankruptcy/deceased). Gate the enricher behind the license-class check; persist only to the encrypted/lead-scoped contact store, not the public board sidecar. Honor `dnc`/`litigator` before any dialer/SMS use, keep source+timestamp for provenance, and respect a re-verify TTL rather than treating contacts as permanent.
+
+### Python async enricher skeleton
+```python
+async def enrich_batchdata(lead: Listing, client: httpx.AsyncClient, cache: DiskCache) -> None:
+    if not license_allows(lead, "RESTRICTED_EPHEMERAL"):      # R16 gate
+        return
+    if (lead.owner_phone and lead.owner_email) or not lead.address:  # missing-only
+        return
+    ck = cache.key("batchdata", lead.norm_address)
+    body = cache.get(ck) or await _post_batchdata(client, lead)
+    if body is None:
+        return
+    cache.set(ck, body, ttl=CONTACT_TTL)
+    persons = body.get("results", {}).get("persons", [])
+    for p in persons:
+        if not lead.owner_name and p.get("name", {}).get("full"):
+            lead.owner_name = p["name"]["full"]
+        lead.owner_dnc = lead.owner_dnc or bool(p.get("dnc"))
+        lead.owner_litigator = lead.owner_litigator or bool(p.get("litigator"))
+        for ph in sorted(p.get("phoneNumbers", []), key=lambda x: x.get("score", 0), reverse=True):
+            lead.add_phone(ph["number"], type=ph.get("type"), dnc=ph.get("dnc"),
+                           reachable=ph.get("reachable"), score=ph.get("score"))  # dedups
+        for em in p.get("emails", []):
+            lead.add_email(em.get("email"))
+
+async def _post_batchdata(client, lead):
+    r = await client.post(
+        "https://api.batchdata.com/api/v1/property/skip-trace",
+        headers={"Authorization": f"Bearer {os.environ['BATCHDATA_API_TOKEN']}",
+                 "Content-Type": "application/json"},
+        json={"requests": [{"propertyAddress": lead.postal_address_dict(),      # {street,city,state,zip}
+                            **({"name": lead.owner_name_dict()} if lead.owner_name else {})}]},
+        timeout=30.0)
+    if r.status_code in (429, 500, 502, 503):
+        raise RetryableHTTP(r.status_code)          # caught by our backoff wrapper
+    r.raise_for_status()
+    return r.json()
+```
+
+---
+
+## DataZapp (Phone/Email Append) — integration spec
+
+### What it fills (which Listing fields, keyed on what)
+- Keyed on **name + mailing address** (`FirstName`,`LastName`,`Address`,`City`,`Zip`) — DataZapp is a reverse-append on a person at an address, not a parcel lookup. In our pipeline this fires only when we already have `owner_name` + address (from GIS/assessor); it will not resolve from `parcel_id`/lat-lng alone.
+- Phone Append → `owner_phone[]` with `phone_type` (`C`=cell, `H`=household/landline) and per-number DNC (`DoNotCall`, `CellDoNotCall`).
+- Email Append → `owner_email[]`.
+- Cheaper per-match than BatchData ($0.03/match), no phone reachability/score, no litigator flag — best as a **fallback/second-pass** appender when BatchData misses, or as the primary when budget-gated.
+
+### Base URL + auth (exact header/param; how to get a key)
+- Transport: JSON over `POST`. Endpoint host is issued with your account (of the form `https://<datazapp-api-host>/...`, e.g. an `api.datazapp.com` append path); the KB templates the URL as `<datazapp api endpoint URL>` and does not print the literal host.
+- Auth: **no header** — the credential is an in-body param `ApiKey`. Everything (key + module + data) posts as one JSON body.
+- Key: request from DataZapp support (sales@datazapp.com / account portal); prepaid credit balance drives billing. Store as `DATAZAPP_API_KEY`; because it rides in the body, keep request logging from capturing full payloads.
+
+### Key endpoint(s) — method, path, required params, example request
+One POST endpoint, behavior switched by `AppendModule` + `AppendType`.
+
+Phone Append:
+- `AppendModule`: `"PhoneAppendAPI"`
+- `AppendType`: `1`=cell, `2`=landline, `3`=both (single column), `5`=both (separate columns)
+- `DncFlag`: `"true"`/`"false"` (true = return DNC-scrubbed phones only)
+
+Email Append:
+- `AppendModule`: `"EmailAppend"`
+- `AppendType`: `1`=individual, `2`=household, `3`=combined
+
+```bash
+curl -X POST "https://<datazapp-api-host>/api/append" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ApiKey": "'"$DATAZAPP_API_KEY"'",
+    "AppendModule": "PhoneAppendAPI",
+    "AppendType": 5,
+    "DncFlag": "false",
+    "Data": [
+      { "FirstName": "Jane", "LastName": "Doe", "Address": "123 Main St", "City": "Asheville", "Zip": "28801" }
+    ]
+  }'
+```
+(Email call is identical with `"AppendModule":"EmailAppend"`, `"AppendType":1`, and no `DncFlag`.) There is also a bulk-file variant of Phone Append for large lists (submit file → retrieve), but the JSON `Data[]` body above is the one that fits our per-chunk enricher.
+
+### Response schema — the exact JSON fields we map (path -> Listing field)
+Envelope: `{ "Status": <int>, "Message": <str>, "Token": <str>, "ProcessedTime": <str>, "Data": [ ... ] }` (echoes each input row).
+
+Phone Append per-row:
+| JSON path | Listing field |
+|---|---|
+| `Data[].Matched` (`"True"`/`"False"`) | gate — skip row if not matched |
+| `Data[].Phone` | append to `owner_phone[]` (landline/household) |
+| `Data[].PhoneType` (`"C"`=cell, `"H"`=household) | `phone_type` |
+| `Data[].DoNotCall` (`"Yes"`/`"No"`) | DNC flag for `Phone` |
+| `Data[].Cell` | append to `owner_phone[]` (mobile) |
+| `Data[].CellDoNotCall` (`"Yes"`/`"No"`) | DNC flag for `Cell` |
+| `Data[].FirstName/LastName/Address/City/Zip` | echo (row-align to lead) |
+| `Data[].AlterFirstName/AlterLastName/AlterAddress...` | alternate/updated owner identity (optional) |
+| `Data[].Count` / top-level `Message` | matches returned / status text |
+
+Email Append per-row:
+| JSON path | Listing field |
+|---|---|
+| `Data[].Matched` (`"True"`/`"False"`) | gate |
+| `Data[].Email` | append to `owner_email[]` |
+| `Data[].FirstName/LastName/Address/City/Zip` | echo |
+
+Emails are **not verification-checked** (DataZapp says run their separate verify API) — mark appended emails `verified=false`.
+
+### Rate limits / batch / pagination / errors (retry/backoff, quota headers)
+- Batch: submit many rows in one `Data[]` array (that is the design — one call, N rows, response row-aligned by index). For big lists use the bulk-file Phone Append variant. No cursor pagination; the response returns all input rows.
+- Quota: billing is prepaid-credit, not per-minute rate; the real limit is balance. There are no documented `X-RateLimit` headers. Guard client-side and watch `Status`/`Message` for a low/empty-balance error rather than an HTTP 429.
+- Errors: check top-level `Status` (non-success int) + `Message` before reading `Data`. Because the key is in-body, a bad key returns an app-level error, not a 401. Retry only genuine transport `5xx`/timeouts with backoff; a `Matched:"False"` is a valid "no hit," not an error — do not retry it.
+- Idempotency/cost: each matched row bills, so cache by normalized name+address and run missing-only so a re-run doesn't re-charge.
+
+### License class (per R16) + storage note
+- **RESTRICTED_EPHEMERAL.** Purchased consumer phone/email PII with DNC flags. Same handling as BatchData: R16 gate, lead-scoped encrypted store (not the board sidecar), suppress `DoNotCall`/`CellDoNotCall`=`"Yes"` numbers from any dialer/SMS, keep source+timestamp, and TTL-refresh rather than persist forever. Emails carry `verified=false` until run through a verify pass.
+
+### Python async enricher skeleton
+```python
+async def enrich_datazapp(lead: Listing, client: httpx.AsyncClient, cache: DiskCache) -> None:
+    if not license_allows(lead, "RESTRICTED_EPHEMERAL"):          # R16 gate
+        return
+    if (lead.owner_phone and lead.owner_email):                   # missing-only
+        return
+    if not (lead.owner_name and lead.address):                    # needs name + address
+        return
+    ck = cache.key("datazapp", lead.owner_name, lead.norm_address)
+    body = cache.get(ck) or await _post_datazapp(client, lead)
+    if body is None or body.get("Status") not in (0, 1, 200):     # app-level status guard
+        return
+    cache.set(ck, body, ttl=CONTACT_TTL)
+    for row in body.get("Data", []):                              # single row for one lead
+        if str(row.get("Matched", "")).lower() != "true":
+            continue
+        if row.get("Cell"):
+            lead.add_phone(row["Cell"], type="cell",
+                           dnc=(row.get("CellDoNotCall") == "Yes"))
+        if row.get("Phone"):
+            lead.add_phone(row["Phone"], type=("cell" if row.get("PhoneType") == "C" else "landline"),
+                           dnc=(row.get("DoNotCall") == "Yes"))
+        if row.get("Email"):
+            lead.add_email(row["Email"], verified=False)
+
+async def _post_datazapp(client, lead):
+    r = await client.post(
+        f"{os.environ['DATAZAPP_API_HOST']}/api/append",         # host issued with your account
+        headers={"Content-Type": "application/json"},
+        json={"ApiKey": os.environ["DATAZAPP_API_KEY"],
+              "AppendModule": "PhoneAppendAPI", "AppendType": 5, "DncFlag": "false",
+              "Data": [lead.datazapp_row()]},                    # {FirstName,LastName,Address,City,Zip}
+        timeout=30.0)
+    if r.status_code in (500, 502, 503):
+        raise RetryableHTTP(r.status_code)
+    r.raise_for_status()
+    return r.json()
+```
+
+---
+
+**Doc-fidelity note:** BatchData's live reference (developer.batchdata.com) is a JS-rendered Stoplight SPA that WebFetch can't read; the base URL (`https://api.batchdata.com/api/v1`), Bearer auth, `POST /property/skip-trace`, async submit + `GET /queue/{id}` poll, the `requests[].propertyAddress` body, and the `results.persons[].{phoneNumbers,emails,dnc}` response shape are all confirmed from indexed doc excerpts and BatchData's own blog/Python examples. DataZapp does not publish literal endpoint hosts in its public KB (templated as `<datazapp api endpoint URL>`) and gives no formal rate-limit/quota-header spec — the request/response field names above are exact from the KB, but confirm the issued host and any account-specific throttles with DataZapp support before wiring prod.
+
+Sources:
+- [BatchData — Property Skip Trace](https://developer.batchdata.com/docs/batchdata/batchdata-v1/operations/create-a-property-skip-trace)
+- [BatchData — Property Skip Trace Async](https://developer.batchdata.com/docs/batchdata/batchdata-v1/operations/create-a-property-skip-trace-async)
+- [BatchData — Developer welcome / auth](https://developer.batchdata.com/docs/batchdata/welcome-to-batchdata)
+- [BatchData — Real Estate API documentation examples](https://batchdata.io/blog/real-estate-api-documentation-examples)
+- [DataZapp — Phone Append API User Guide](https://knowledgebase.datazapp.com/2024/06/18/phone-append-api-user-guide/)
+- [DataZapp — Email Append API](https://knowledgebase.datazapp.com/2024/06/20/email-append-api/)
+- [DataZapp — Phone Append API Bulk File Version](https://knowledgebase.datazapp.com/2024/10/11/phone-append-api-bulk-file-version/)
+- [DataZapp — APIs & Integrations index](https://knowledgebase.datazapp.com/apis/)
+
+
+## DNC.com (DNCScrub) — integration spec
+
+This is the vendor to build against for the **hard pre-dial gate**. The Full Scrub endpoint returns federal DNC, state DNC, wireless/VoIP line type, internal DNC, EBR, and calling-time restrictions in one call. The separate Litigator API is a lightweight add-on that only returns `IsLitigator`. Docs are public (not gated) at docs.dncscrub.com.
+
+### What it fills (which Listing fields, keyed on what)
+Keyed on **phone number** (10-digit), per-Listing missing-only. Fills:
+- `dnc_federal` / `dnc_state` (bool) — from `ResultCode` = `D`
+- `phone_line_type` — from `LineType` (`Wireless`/`VoIP`/`AllOther`) + `IsWirelessOrVoIP`
+- `is_wireless` (bool) — TCPA consent trigger for autodialed/SMS
+- `dnc_internal` (bool) — `ResultCode` = `P` (project DNC match)
+- `dnc_callable` (bool, the gate) — `True` only for `C`/`E`/`X`/`O`
+- `dnc_result_code` (raw letter, audit trail), `dnc_reason`, `dnc_scrubbed_at` (for the 31-day rescrub clock)
+- `dnc_litigator` (bool) — from the separate Litigator API (`IsLitigator`)
+
+### Base URL + auth (exact header/param; how to get a key)
+- **Full Scrub base:** `https://www.dncscrub.com` (Multiple-number RPC endpoint lives here)
+- **Data API base (single + litigator):** `https://dataapi.dncscrub.com/v1.4`
+- **Auth:** API key in the `loginId` HTTP header (preferred, keeps it out of logs) OR `?loginId=` query param. OAuth 2.0 is also supported (`/api-reference/other/oauth-token`) but the loginId header path is simplest for a backend enricher.
+- **Get a key:** paid account via dnc.com sales; key is issued in the DNCScrub dashboard. Not self-serve/free — this is the existential compliance vendor, so it's a contracted account.
+
+### Key endpoint(s) — method, path, required params, example request
+**Full Scrub (multiple):** `POST https://www.dncscrub.com/app/main/rpc/scrub`
+Required: `loginId` header; JSON body `phoneList` (comma-separated 10-digit, optional `|{id}` suffix per number), `version: "5"`. Optional: `output` (`json`|`csv`, default json), `projId`, `campaignId`. Max **10,000 numbers/request**; use POST above 10 numbers; SFTP for bigger loads.
+
+```bash
+curl -X POST https://www.dncscrub.com/app/main/rpc/scrub \
+  -H "loginId: $DNCSCRUB_KEY" -H "Content-Type: application/json" \
+  -d '{"phoneList":"7075276405|LSTG-8821,2012510414|LSTG-8822","version":"5","output":"json"}'
+```
+
+**Litigator (add-on):** `POST https://dataapi.dncscrub.com/v1.4/scrub/litigator`, body `{"phoneList":"2675466417,5039367187"}`, `loginId` header. Use POST above 100 numbers.
+
+### Response schema — the exact JSON fields we map (path -> Listing field)
+Full Scrub returns an array, one object per number:
+- `[].Phone` -> match key
+- `[].ResultCode` -> drives `dnc_callable` / `dnc_federal` / `dnc_internal` (see codes below) -> `dnc_result_code`
+- `[].IsWirelessOrVoIP` (`"1"`/`"0"`) -> `is_wireless`
+- `[].LineType` (`Wireless`/`VoIP`/`AllOther`) -> `phone_line_type`
+- `[].Reason` -> `dnc_reason` (e.g. `"National (USA) 2003-06-01;;;"`)
+- `[].Reserved` -> your `|{id}` echo (join back to `listing_id`)
+- `[].EBRType`, `[].CallingTimeRestrictions`, `[].DoNotCallToday` -> optional dial-window fields
+
+**ResultCode gate mapping (verified from Output Guide):**
+| Code | Meaning | callable? |
+|---|---|---|
+| `C` | Clean | ✅ |
+| `E`/`O`/`X` | EBR valid / EBR override / industry exemption | ✅ (with EBR proof) |
+| `D` | On DNC (federal/state) | ❌ |
+| `P` | Internal/Project DNC | ❌ |
+| `W`/`Y`/`L`/`F`/`G`/`H`/`V` | Wireless/VoIP variants | ❌ for autodial/SMS without consent |
+| `B`/`I`/`M` | Blocked / invalid / malformed | ❌ (bad number) |
+
+Litigator returns `[{"Phone":2675466417,"IsLitigator":true}]` -> `dnc_litigator`.
+
+### Rate limits / batch / pagination / errors
+No hard published QPS on Full Scrub; throughput is batch-oriented (10k/request, "200k records/minute" bulk). No pagination — full array returns in one body. Batch above 10k via SFTP, not the RPC. Errors surface as non-200 or a `Reason`-level flag; treat malformed (`M`) and blocked (`B`/`I`) as skip-not-retry. Wrap in a bounded retry (3 attempts, exponential backoff on 429/5xx/timeout). No documented quota headers — track spend against your contracted credit pool in the dashboard.
+
+### License class (per R16) + storage note
+**RESTRICTED_EPHEMERAL.** DNC/litigator status is a contractual, time-sensitive compliance signal. Persist only the derived gate fields (`dnc_callable`, `dnc_result_code`, `is_wireless`, `dnc_litigator`, `dnc_scrubbed_at`) with a **31-day TTL**; do not redistribute the underlying DNC list or cache raw responses beyond the rescrub window. Disk cache key = `phone + scrub_date`; entries older than 31 days are treated as expired and force a rescrub before any dial (see gate note below).
+
+### Python async enricher skeleton
+```python
+CALLABLE = {"C", "E", "O", "X"}  # everything else = do-not-dial
+
+async def enrich_dncscrub(listing, client: httpx.AsyncClient, cache) -> None:
+    phone = normalize_10(listing.phone)
+    if not phone or listing.get("dnc_callable") is not None:
+        return  # missing-only backfill
+    ck = f"dncscrub:{phone}"
+    if (hit := cache.get(ck)) and fresh_31d(hit["dnc_scrubbed_at"]):
+        listing.update(hit); return
+    r = await client.post(
+        "https://www.dncscrub.com/app/main/rpc/scrub",
+        headers={"loginId": DNCSCRUB_KEY, "Content-Type": "application/json"},
+        json={"phoneList": f"{phone}|{listing.id}", "version": "5", "output": "json"},
+        timeout=30.0,
+    )
+    r.raise_for_status()
+    rec = r.json()[0]
+    code = rec["ResultCode"]
+    out = {
+        "dnc_result_code": code,
+        "dnc_callable": code in CALLABLE,
+        "dnc_federal": code == "D",
+        "dnc_internal": code == "P",
+        "is_wireless": rec.get("IsWirelessOrVoIP") == "1",
+        "phone_line_type": rec.get("LineType"),
+        "dnc_reason": rec.get("Reason"),
+        "dnc_scrubbed_at": dt.datetime.utcnow().isoformat(),
+    }
+    cache.set(ck, out, ttl=31 * 86400)
+    listing.update(out)
+```
+
+---
+
+## TCPALitigatorList.com — integration spec
+
+Best-documented public API of the three (full request/response examples online, an official [PHP SDK](https://github.com/StreetYo/TCPA-SDK)). Strong on **litigator/TCPA-troll + complainer** data and offers federal + state DNC types, so it can serve as the whole gate or as a litigator-specific second opinion layered on DNCScrub.
+
+### What it fills (which Listing fields, keyed on what)
+Keyed on **phone number**, missing-only. Fills:
+- `dnc_litigator` (bool) — `tcpa` / `troll` in `status_array`
+- `dnc_federal` (bool) — `federal_dnc` in `status_array`
+- `dnc_state` (bool) — `state_dnc`
+- `dnc_complainer` (bool) — `dnc_complainers`
+- `dnc_callable` (bool, gate) — from top-level `clean` (`1`=callable, `0`=blocked)
+- `phone_line_type` — `phone_type` (`Landline`/`Mobile`/`Voip`)
+- `dnc_litigator_name` / `dnc_case_title` (optional context: `first_name`+`last_name`, `case_title`)
+- `dnc_scrubbed_at`
+
+### Base URL + auth (exact header/param; how to get a key)
+- **Base:** `https://api.tcpalitigatorlist.com` (backup `https://api101.tcpalitigatorlist.com`, emergencies only)
+- **Auth:** HTTP **Basic** (`api_username:api_password`). Send via `Authorization: Basic <b64>` (httpx `auth=(user, pw)`).
+- **Get a key:** purchase an API package at `tcpalitigatorlist.com/tcpa-litigator-list-api/` (credit-based; API Gold tier). Self-serve after purchase.
+
+### Key endpoint(s) — method, path, required params, example request
+**Mass scrub (≤3000 numbers, synchronous):** `POST /scrub/phones/`
+Body: `phones` (JSON array of strings), `type` (JSON array: `tcpa`/`dnc_fed`/`dnc_complainers`/`dnc_state`/`all`), `small_list: "true"`, optional `sub_user` (≤16 chars), `state` (array), `use_suppression_list`. Returns results immediately.
+**Big list (>3000, async):** same POST **without** `small_list` -> `{"status":"in_queue","job_key":"..."}`; poll `POST /scrub/phones/get/` with `key=job_key` (~10s interval) until `status != in_queue`.
+**Single:** `POST /scrub/phone/` with `phone_number`, `type`.
+
+```bash
+curl -u "$USER:$PASS" -X POST https://api.tcpalitigatorlist.com/scrub/phones/ \
+  --data-urlencode 'phones=["6319796917","6024223200"]' \
+  --data-urlencode 'type=["tcpa","dnc_fed","dnc_state"]' \
+  --data-urlencode 'small_list=true'
+```
+
+### Response schema — the exact JSON fields we map (path -> Listing field)
+Small-list returns `{"results":[ {...}, ... ]}`, one object per number:
+- `results[].phone_number` -> match key
+- `results[].clean` (`"1"`/`0`) -> `dnc_callable`
+- `results[].is_bad_number` (bool) -> inverse of callable (redundant check)
+- `results[].status_array` (e.g. `["federal_dnc","tcpa"]`) -> sets `dnc_litigator`/`dnc_federal`/`dnc_state`/`dnc_complainer`
+- `results[].phone_type` -> `phone_line_type`
+- `results[].status` (human string, e.g. `"TCPA | Federal DNC"`) -> `dnc_reason`
+- `results[].first_name`/`last_name`/`case_title` -> optional litigator context
+
+Clean numbers return the minimal `{"phone_number":..., "clean":"1"}`.
+
+### Rate limits / batch / pagination / errors
+- **Single endpoints:** 50 calls/sec/client. **Mass endpoints:** 5 calls/sec/client. Dedicated server ($250/mo) removes limits.
+- **Batch:** 3000/request synchronous; unlimited async via queue (790k in ~1–2 min per their benchmarks).
+- **Pagination:** none — async is job-key polling, not offset paging.
+- **Errors:** `{"error":"You do not have enough credits"}`; auth failure `{"code":"rest_forbidden","message":"...","data":{"status":401}}`. Retry 5xx/timeouts with backoff; do **not** retry the credit/auth errors (hard-fail and alert).
+
+### License class (per R16) + storage note
+**RESTRICTED_EPHEMERAL.** Credit-metered proprietary list; TOS bars redistribution. Store derived gate booleans only, **31-day TTL**, key on `phone + scrub_date`. Do not persist the litigator names/case titles beyond operational need (they're PII-adjacent list data) — keep only what the outreach gate requires.
+
+### Python async enricher skeleton
+```python
+async def enrich_tcpa_litigator(batch, client: httpx.AsyncClient, cache) -> dict:
+    # batch = list[Listing] missing dnc_callable; chunk to <=3000 upstream
+    phones = [normalize_10(l.phone) for l in batch if l.phone]
+    r = await client.post(
+        "https://api.tcpalitigatorlist.com/scrub/phones/",
+        auth=(TCPA_USER, TCPA_PASS),
+        data={"phones": json.dumps(phones),
+              "type": json.dumps(["tcpa", "dnc_fed", "dnc_state"]),
+              "small_list": "true"},
+        timeout=60.0,
+    )
+    r.raise_for_status()
+    out = {}
+    for rec in r.json().get("results", []):
+        sa = set(rec.get("status_array", []))
+        row = {
+            "dnc_callable": str(rec.get("clean")) == "1",
+            "dnc_litigator": bool(sa & {"tcpa", "troll", "nra"}),
+            "dnc_federal": "federal_dnc" in sa,
+            "dnc_state": "state_dnc" in sa,
+            "dnc_complainer": "dnc_complainers" in sa,
+            "phone_line_type": rec.get("phone_type"),
+            "dnc_reason": rec.get("status"),
+            "dnc_scrubbed_at": dt.datetime.utcnow().isoformat(),
+        }
+        out[rec["phone_number"]] = row
+        cache.set(f"tcpa:{rec['phone_number']}", row, ttl=31 * 86400)
+    return out  # caller merges by phone -> listing
+```
+
+---
+
+## RingScrub — integration spec
+
+**Not a standalone scrub API to build against for the gate.** RingScrub is a suppression-list *hosting/dialer-integration* platform: you upload your internal DNC/suppression lists and give call centers secured access to scrub against them, and for litigator data it **resells TCPALitigatorList.com's list under the hood** (confirmed on their tools page). There is no public REST scrub-endpoint doc comparable to the two above.
+
+### What it fills (which Listing fields, keyed on what)
+Only `dnc_internal` (your own uploaded suppression lists), keyed on phone. Federal/state DNC and litigator flags trace back to TCPALitigatorList data, so building the TCPALitigatorList integration directly is strictly better for this pipeline — you avoid a middle layer and get documented JSON.
+
+### Base URL + auth (exact header/param; how to get a key)
+No documented public API base URL or programmatic auth. Access is account-based via ringscrub.com (upload UI + dialer connectors). Treat as **no build-ready API** for our async httpx pattern.
+
+### Key endpoint(s)
+None published. Interaction is upload-driven (suppression lists) and dialer-side scrubbing, not a request/response enricher. If a contracted account exposes an endpoint, it would mirror the TCPALitigatorList shape it's built on — but that's unconfirmed and gated.
+
+### Response schema
+Not documented publicly. Best-known shape = the TCPALitigatorList `results[]` schema above, since that's the upstream source.
+
+### Rate limits / batch / pagination / errors
+Not published.
+
+### License class (per R16) + storage note
+**RESTRICTED_EPHEMERAL** by inheritance (litigator data is TCPALitigatorList's). Not applicable as a build target.
+
+### Python async enricher skeleton
+Not build-ready — **recommend dropping RingScrub and integrating TCPALitigatorList directly** (its documented upstream). Use RingScrub only if you need it as the *host* for your own internal suppression list feeding a specific dialer; that's an upload/ops task, not a pipeline enricher.
+
+---
+
+### Recommendation for the hard gate
+Build **DNCScrub (Full Scrub)** as the primary pre-dial gate — it's the one call that returns federal + state DNC + wireless line type + internal DNC + EBR, which is exactly what a `dnc_callable` gate needs. Layer **TCPALitigatorList** as the litigator/TCPA-troll enricher (its litigator coverage is the product's core competency and it's the best-documented). Skip **RingScrub** as an API target. Gate rule: a Listing is dial-eligible only if `dnc_callable == True AND dnc_litigator == False AND dnc_scrubbed_at within 31 days` — expire the cache at 31 days so any lead re-entering outreach is force-rescrubbed before dialing.
+
+**Docs used:**
+- [TCPALitigatorList API docs](https://tcpalitigatorlist.com/api-documentation/) · [API key/package](https://tcpalitigatorlist.com/tcpa-litigator-list-api/) · [PHP SDK](https://github.com/StreetYo/TCPA-SDK)
+- [DNCScrub Full Scrub — multiple](https://docs.dncscrub.com/api-reference/scrub/scrub-multiple.md) · [Output/result-code guide](https://docs.dncscrub.com/api-reference/scrub/output-guide.md) · [Litigator API](https://docs.dncscrub.com/api-reference/litigator/overview) · [Authentication](https://docs.dncscrub.com/api-reference/authentication.md)
+- [RingScrub tools](https://ringscrub.com/tools.html) (confirms TCPALitigatorList resale)
+
+
+## HUD FMR / SAFMR — integration spec
+
+### What it fills (which Listing fields, keyed on what)
+Rent comps for a Listing, keyed on **ZIP** (SAFMR) or county **FIPS** (metro FMR). Fills `fmr_efficiency`, `fmr_1br`, `fmr_2br`, `fmr_3br`, `fmr_4br`, `safmr_zip`, `fmr_metro_name`, `fmr_year`, `fmr_smallarea_status`. Feeds gross-rent/DSCR sanity checks on the valuation side. Keyed on the Listing's ZIP first (SAFMR ZIP-level), county FIPS as fallback (metro-level FMR).
+
+### Base URL + auth (exact header/param; how to get a key)
+- Base: `https://www.huduser.gov/hudapi/public/fmr`
+- Auth: `Authorization: Bearer <TOKEN>` header on every call.
+- Key: free. Create an account at huduser.gov, go to your profile → **Create New Token** (`https://www.huduser.gov/portal/dataset/fmr-api.html` links the token manager). One token covers FMR, IL, and USPS-ZIP-crosswalk APIs. No per-call param key; token is header-only.
+
+### Key endpoint(s) — method, path, required params, example request
+All GET.
+- `GET /fmr/data/{entityid}` — entityid = a 10-digit CBSA/metro code or a `{fips}99999` county code (e.g. Buncombe NC = `3702199999`). Optional `?year=YYYY`.
+- `GET /fmr/statedata/{stateCode}` — 2-letter state (e.g. `NC`), returns all counties + metros for that state, `?year=`.
+- `GET /fmr/listMetroAreas`, `GET /fmr/listCounties/{stateCode}`, `GET /fmr/listStates` — code lookups to resolve entity IDs (cache these once).
+- SAFMR: the same `/data/{entityid}` call returns a `data.basicdata` **array** (one row per ZIP) when the area is a Small Area FMR metro; for non-SAFMR areas `basicdata` is a single object.
+
+Example:
+```
+curl -H "Authorization: Bearer $HUD_TOKEN" \
+  "https://www.huduser.gov/hudapi/public/fmr/data/3702199999?year=2026"
+```
+
+### Response schema — the exact JSON fields we map (path → Listing field)
+```
+data.year                                  -> fmr_year
+data.metro_name                            -> fmr_metro_name
+data.smallarea_status  (1 = SAFMR)         -> fmr_smallarea_status
+data.basicdata[].zip_code                  -> safmr_zip  (match to Listing ZIP)
+data.basicdata[]."Efficiency"              -> fmr_efficiency
+data.basicdata[]."One-Bedroom"             -> fmr_1br
+data.basicdata[]."Two-Bedroom"             -> fmr_2br
+data.basicdata[]."Three-Bedroom"           -> fmr_3br
+data.basicdata[]."Four-Bedroom"            -> fmr_4br
+```
+Note: when `basicdata` is an object (non-SAFMR metro), read the same bedroom keys directly off `data.basicdata`. SAFMR files also expose 90%/110% payment-standard bounds per bedroom; the API `basicdata` returns the base FMR — if you need the bands, derive them (`* 0.9`, `* 1.1`) or pull the SAFMR flat file.
+
+### Rate limits / batch / pagination / errors
+No published hard rate limit; HUD is a low-QPS government host — throttle to ~1–2 req/sec and disk-cache aggressively (FMR data changes **once a year**, so cache TTL = 1 year / until the new FMR release each October). No batch endpoint; one entity per call. No pagination (whole area returns in one body). Errors: `401` (bad/expired token), `404` (unknown entityid), `429`/`503` under load → exponential backoff. Because it's annual data, the right pattern is: fetch the whole state once via `/statedata/{ST}`, cache to disk keyed by ZIP+FIPS, and never hit the network per-Listing.
+
+### License class (per R16) + storage note
+**PUBLIC** — U.S. federal government work product, no copyright, terms permit redistribution. **Persist freely** on the Listing row and in disk cache. No ephemerality constraint. Attribution "HUD USER" is courtesy, not required.
+
+### Python async enricher skeleton
+```python
+import httpx
+from .base import cached  # disk cache decorator, keyed on args
+
+HUD = "https://www.huduser.gov/hudapi/public/fmr"
+BR = {"Efficiency":"fmr_efficiency","One-Bedroom":"fmr_1br","Two-Bedroom":"fmr_2br",
+      "Three-Bedroom":"fmr_3br","Four-Bedroom":"fmr_4br"}
+
+@cached(ttl_days=365)
+async def _fetch_area(client, entityid, year):
+    r = await client.get(f"{HUD}/data/{entityid}", params={"year": year})
+    r.raise_for_status()
+    return r.json()["data"]
+
+async def enrich_fmr(listing, client: httpx.AsyncClient, token, year=2026):
+    if listing.get("fmr_2br"):            # missing-only backfill
+        return listing
+    entity = listing.get("county_fips") and f"{listing['county_fips']}99999"
+    if not entity:
+        return listing
+    client.headers["Authorization"] = f"Bearer {token}"
+    try:
+        data = await _fetch_area(client, entity, year)
+    except httpx.HTTPStatusError:
+        return listing
+    rows = data.get("basicdata")
+    rows = rows if isinstance(rows, list) else [rows]
+    row = next((x for x in rows if str(x.get("zip_code")) == str(listing.get("zip"))), rows[0])
+    listing.update({dst: row.get(src) for src, dst in BR.items()})
+    listing["fmr_metro_name"] = data.get("metro_name")
+    listing["fmr_year"] = data.get("year")
+    return listing
+```
+
+---
+
+## Census Geocoder — integration spec
+
+### What it fills (which Listing fields, keyed on what)
+Fills `lat`, `lng` (from `coordinates.y`/`.x`), `matched_address` (USPS-standardized), and — via the `geographies` return type — `census_tract`, `county_fips`, `state_fips`, `block`. Keyed on the Listing's **address string** (situs). This is the canonical way to backfill lat/lng and county FIPS for address-only Listings, and it directly feeds the HUD enricher above (FIPS) and any geometry/point-in-polygon lookups.
+
+### Base URL + auth (exact header/param; how to get a key)
+- Base: `https://geocoding.geo.census.gov/geocoder`
+- Auth: **none.** No key, no token, no header. Public and free.
+
+### Key endpoint(s) — method, path, required params, example request
+Single (GET):
+- `GET /locations/onelineaddress` — params: `address` (URL-encoded full string), `benchmark` (use `Public_AR_Current` or `4`), `format=json`. Returns coords only.
+- `GET /geographies/onelineaddress` — same plus `vintage` (e.g. `Current_Current` / `4`) and optional `layers`. Returns coords **and** census geographies (tract/county/state FIPS).
+
+Batch (POST, multipart) — the workhorse for a pipeline:
+- `POST /locations/addressbatch` (or `/geographies/addressbatch`) — multipart form: file field `addressFile` = CSV, plus `benchmark` (+ `vintage` for geographies) as form fields. **CSV columns, no header, exact order:** `Unique ID, Street address, City, State, ZIP`. Max **10,000 rows/file**. Returns CSV, not JSON.
+
+Example (single):
+```
+curl "https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress?address=100+Main+St%2C+Asheville%2C+NC+28801&benchmark=Public_AR_Current&vintage=Current_Current&format=json"
+```
+Example (batch):
+```
+curl --form addressFile=@leads.csv --form benchmark=Public_AR_Current \
+  https://geocoding.geo.census.gov/geocoder/locations/addressbatch --output out.csv
+```
+
+### Response schema — the exact JSON fields we map (single, `format=json`)
+```
+result.addressMatches[0].matchedAddress                                   -> matched_address
+result.addressMatches[0].coordinates.x                                    -> lng
+result.addressMatches[0].coordinates.y                                    -> lat
+result.addressMatches[0].geographies["Census Tracts"][0].GEOID            -> census_tract   (geographies endpoint)
+result.addressMatches[0].geographies["Counties"][0].GEOID                 -> county_fips     (5-digit state+county)
+result.addressMatches[0].geographies["States"][0].GEOID                   -> state_fips
+result.addressMatches[0].tigerLine.tigerLineId / side                     -> (optional provenance)
+```
+Empty `addressMatches` = no match (address ties can also return >1 match; take the first or treat multi-match as low-confidence). **Batch CSV output columns:** `Unique ID, input address, match status (Match/No_Match/Tie), match type (Exact/Non_Exact), matched address, lon,lat (comma-joined in one field), tigerline id, side`.
+
+### Rate limits / batch / pagination / errors
+No published per-key limit (no key exists), but the single endpoint is soft-throttled — keep single-address calls to ~10–20/sec with retries, or better, **route bulk work through addressbatch** (10k rows in one POST is dramatically more efficient than 10k GETs). No pagination. Errors: `400` (bad/unparseable address or missing benchmark), `500`/timeout under load — batch can take 30–120s for a full 10k file, so set a long read timeout and retry the whole file on failure. Occasional transient HTML error pages instead of JSON → guard your `.json()` parse.
+
+### License class (per R16) + storage note
+**PUBLIC** — U.S. Census Bureau, public domain, no restriction on storage or redistribution. **Persist `lat`/`lng`/FIPS/tract freely** on the Listing. No ephemerality. This is the ideal disk-cache target (address → coords is stable; cache indefinitely keyed on normalized address).
+
+### Python async enricher skeleton
+```python
+import httpx
+from .base import cached
+
+GEO = "https://geocoding.geo.census.gov/geocoder/geographies/onelineaddress"
+
+@cached(ttl_days=3650)  # address->geo is effectively permanent
+async def _geocode(client, address):
+    p = {"address": address, "benchmark": "Public_AR_Current",
+         "vintage": "Current_Current", "format": "json"}
+    r = await client.get(GEO, params=p, timeout=30)
+    r.raise_for_status()
+    return r.json()["result"]["addressMatches"]
+
+async def enrich_geocode(listing, client: httpx.AsyncClient):
+    if listing.get("lat") and listing.get("county_fips"):   # missing-only
+        return listing
+    addr = listing.get("address") or listing.get("situs")
+    if not addr:
+        return listing
+    try:
+        matches = await _geocode(client, addr)
+    except (httpx.HTTPError, ValueError):
+        return listing
+    if not matches:
+        return listing
+    m = matches[0]
+    listing["lat"] = m["coordinates"]["y"]
+    listing["lng"] = m["coordinates"]["x"]
+    listing["matched_address"] = m.get("matchedAddress")
+    g = m.get("geographies", {})
+    if g.get("Counties"):
+        listing["county_fips"] = g["Counties"][0]["GEOID"]
+    if g.get("Census Tracts"):
+        listing["census_tract"] = g["Census Tracts"][0]["GEOID"]
+    return listing
+```
+
+---
+
+## SeeClickFix (Open311) — integration spec
+
+### What it fills (which Listing fields, keyed on what)
+Neighborhood/property-condition signals: fills `scf_open_issues` (count of nearby open 311 issues), `scf_issue_types` (e.g. graffiti, pothole, abandoned vehicle, overgrown lot, illegal dumping), `scf_nearest_issue_m`, `scf_last_issue_at`. A cluster of code/nuisance reports near a parcel is a distress/vacancy corroborator. Keyed on the Listing's **lat/lng** (radius/bbox query) — so it runs *after* the Census geocoder. `place_url` (city slug) narrows the query; lat/lng is the actual filter.
+
+### Base URL + auth (exact header/param; how to get a key)
+- Base: `https://seeclickfix.com/api/v2`
+- Open311 mirror: `https://seeclickfix.com/open311/v2` (georeport/v2 spec).
+- Auth: **none for reads.** No key required for public issue GETs. **A descriptive `User-Agent` header is required** — requests without one may be rejected. (Write/POST needs OAuth; we only read.)
+
+### Key endpoint(s) — method, path, required params, example request
+Native v2 (richer, preferred), GET:
+- `GET /api/v2/issues` — geo params: `lat` & `lng` (+ implicit radius), or a bounding box, or `place_url=<city-slug>`. Filters: `status` (`open,acknowledged,closed,archived`), `after`/`before` (ISO 8601), `sort` (`created_at`), `page`, `per_page` (max 100).
+
+Open311, GET:
+- `GET /open311/v2/requests.json` — params: `lat`,`long`,`radius` (m), `service_code`, `status` (`open`/`closed`), `start_date`,`end_date`, `page`,`page_size`. Standardized but thinner schema.
+
+Example:
+```
+curl -H "User-Agent: FC-pipeline/1.0 (ops@highwaymarketingco.com)" \
+  "https://seeclickfix.com/api/v2/issues?lat=35.5951&lng=-82.5515&per_page=100&status=open,acknowledged&sort=created_at"
+```
+
+### Response schema — the exact JSON fields we map (native v2)
+```
+metadata.pagination.page / pages / next_page      -> pagination control
+issues[].id                                        -> (dedupe key)
+issues[].status                                    -> (filter: open/acknowledged)
+issues[].summary                                   -> scf_issue_types (collect distinct)
+issues[].description                               -> (optional context)
+issues[].address                                   -> (proximity sanity)
+issues[].lat / issues[].lng                        -> distance calc -> scf_nearest_issue_m
+issues[].created_at (ISO 8601)                     -> scf_last_issue_at (max)
+issues[].request_type.title / .organization        -> scf_issue_types (categorization)
+```
+Derived: `scf_open_issues` = count of `issues[]` within your radius after client-side distance filter; `scf_nearest_issue_m` = min haversine(listing, issue). Open311 `requests.json` equivalents: `service_request_id`, `status`, `service_name`, `description`, `address`, `lat`, `long`, `requested_datetime`.
+
+### Rate limits / batch / pagination / errors
+**~20 requests/minute.** Over limit → `HTTP 429` with a `Retry-After` header (honor it exactly); sustained abuse → `HTTP 403`. This is the binding constraint — you cannot per-Listing hammer it. Pattern: **one query per city/bbox**, page through (`metadata.pagination.next_page`, `per_page=100`), cache the whole city's open-issue set to disk (TTL ~24h), then match Listings against the cached set in-memory by distance. No JSON batch endpoint; pagination is the batching mechanism. Errors: `429`/`403` as above, `422` on bad params. Concurrency: keep it to 1 in-flight request with a ~3s spacing to stay under 20/min.
+
+### License class (per R16) + storage note
+**RESTRICTED_EPHEMERAL.** SeeClickFix data is third-party/vendor-owned (now CivicPlus), served under site ToS, not public domain. Treat as ephemeral: **store only derived aggregates** on the Listing (`scf_open_issues` count, `scf_issue_types` labels, `scf_nearest_issue_m`, `scf_last_issue_at`) — do **not** persist full issue bodies/descriptions or redistribute raw records. Disk cache is fine as a short-TTL working cache (24h), but it's a transient fetch cache, not a datastore of record. Always send the identifying User-Agent.
+
+### Python async enricher skeleton
+```python
+import httpx, math, time
+from .base import cached
+
+SCF = "https://seeclickfix.com/api/v2/issues"
+UA = {"User-Agent": "FC-pipeline/1.0 (ops@highwaymarketingco.com)"}
+
+def _haversine_m(a_lat, a_lng, b_lat, b_lng):
+    R = 6371000; p = math.pi/180
+    d = (math.sin((b_lat-a_lat)*p/2)**2 +
+         math.cos(a_lat*p)*math.cos(b_lat*p)*math.sin((b_lng-a_lng)*p/2)**2)
+    return 2*R*math.asin(math.sqrt(d))
+
+@cached(ttl_hours=24)                      # cache whole city, not per-listing
+async def _city_issues(client, place_url):
+    out, page = [], 1
+    while True:
+        r = await client.get(SCF, headers=UA, params={
+            "place_url": place_url, "status": "open,acknowledged",
+            "per_page": 100, "page": page})
+        if r.status_code == 429:
+            time.sleep(int(r.headers.get("Retry-After", 5))); continue
+        r.raise_for_status(); j = r.json()
+        out += j["issues"]
+        if not j["metadata"]["pagination"].get("next_page"): break
+        page += 1
+    return out
+
+async def enrich_scf(listing, client: httpx.AsyncClient, radius_m=300):
+    if listing.get("scf_open_issues") is not None or not listing.get("lat"):
+        return listing
+    issues = await _city_issues(client, listing["scf_place_url"])
+    near = [i for i in issues if i.get("lat") and
+            _haversine_m(listing["lat"], listing["lng"], i["lat"], i["lng"]) <= radius_m]
+    listing["scf_open_issues"] = len(near)
+    listing["scf_issue_types"] = sorted({i.get("summary") for i in near if i.get("summary")})
+    listing["scf_nearest_issue_m"] = min(
+        (_haversine_m(listing["lat"], listing["lng"], i["lat"], i["lng"]) for i in near),
+        default=None)
+    listing["scf_last_issue_at"] = max((i.get("created_at") for i in near), default=None)
+    return listing
+```
+
+**Ordering note for the pipeline:** run **Census geocoder → HUD FMR (needs county_fips) → SeeClickFix (needs lat/lng)**. All three are free; HUD needs a free Bearer token, the other two need no key (Census: nothing; SeeClickFix: a required User-Agent string).
+
+Docs: [HUD FMR API](https://www.huduser.gov/portal/dataset/fmr-api.html) · [SAFMR data](https://www.huduser.gov/portal/datasets/fmr/smallarea/index.html) · [Census Geocoding Services API](https://geocoding.geo.census.gov/geocoder/Geocoding_Services_API.html) · [SeeClickFix API v2](https://dev.seeclickfix.com/)
