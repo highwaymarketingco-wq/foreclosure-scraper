@@ -2739,3 +2739,361 @@ Two, and they only bite after you're already committed:
 - **Demote RVM from a primary/recommended channel to a "compliance-gated, consent-only" channel** with an explicit TCPA warning (FCC 2022 ruling, single-drop standing, $6.5MM NRS settlement). If it stays in the blueprint at all, it should carry a "documented prior express consent required — otherwise per-message legal exposure" flag rather than a deliverability comparison.
 - **Consolidate the mail vendors.** Note that OPLM and Ballpoint are one operation; present the real choice as "premium handwritten (OPLM/Ballpoint) vs. cheap self-serve volume (Wise Pelican)," and keep Stannp only as an unverified option — I found no substantive practitioner lived-experience for Stannp in REI wholesaling forums, so any Stannp claim in the blueprint is currently unsupported by community evidence.
 - **Evidence honesty:** Dialer spam-flagging and RVM/TCPA findings are strongly and directly sourced. Mail-vendor findings lean on a handful of genuine but thin BiggerPockets testimonials plus vendor/affiliate pages; Slybroadcast-vs-Drop-Cowboy deliverability rests mostly on vendor-adjacent comparisons, not raw user threads — treat those as directional, not proven.
+
+
+---
+
+# Deep-Dive Round 9 — Re-Attacking the Hard Walls (compliant reconstruction, 2026-07-02)
+
+
+## Live mortgage payoff / current unpaid balance
+
+### The wall (why it's "impossible" — restate precisely)
+The exact live payoff is a servicer-computed figure that exists only inside the servicer's system of record. By law (TILA §1639g / Reg Z §1026.36(c)(3)) only the borrower or their authorized agent can compel a written payoff statement, and the servicer must deliver it within 7 business days. It reflects: today's amortized principal, accrued per-diem interest since last payment, escrow shortfalls/advances, late fees, and any recording/reconveyance/statement fees. **None of that state is recorded publicly.** The public record captures only the *original* obligation (deed of trust: original principal, note date, sometimes rate/term) and *terminal* events (satisfaction/release, foreclosure). Everything between origination and today — actual payment history, prepayments, modifications, forbearance, escrow — is invisible. So the exact number is genuinely 0% recoverable from free data. The whole game is: how tight a **modeled estimate** can we put around it, and on what fraction of properties.
+
+### Reconstruction methods
+
+**1. Straight amortization from the recorded DOT (the baseline, already in `amortize.py`).**
+- **Mechanics:** Take recorded original principal `P₀`, note date `t₀`, term `n` (default 360). Rate `r`: use the recorded note rate if present; else Freddie PMMS 30-yr fixed annual average for the note year. Fixed payment `M = P₀·[c(1+c)ⁿ]/[(1+c)ⁿ−1]`, `c = r/12`. Balance after `k` payments: `B_k = P₀·[(1+c)ⁿ−(1+c)ᵏ]/[(1+c)ⁿ−1]`, `k` = months from `t₀` to today.
+- **Free data it needs:** ROD deed-of-trust index (have it), Freddie PMMS annual table (static, ~55 years, ships in-repo), note date.
+- **Accuracy — the honest picture:** The scheduled-balance curve is *exact for a never-prepaid, never-modified, fixed-rate fully-amortizing loan on time.* The error is entirely **prepayment** (extra principal + curtailments), which biases the true balance *below* the amortized estimate — amortization systematically **over-estimates** the live balance. Magnitude of that bias scales with loan age via the PSA/CPR curve: CPR ramps 0.2%→6% over the first 30 months then plateaus ~6%/yr in a neutral-rate world (much higher in a refi wave). Translating CPR to a balance gap: a seasoned loan 5–7 years in typically sits **8–18% below** its pure amortization schedule; a loan <18 months old is within **2–4%**; a 10-yr+ loan can be **25–40%** below schedule (and a large share are simply *gone* — refinanced/satisfied). So raw amortization is a **ceiling**, not a point estimate, and it drifts worse with age.
+
+**2. ROD-index correction layer — detect refis, seconds, and satisfactions to reset the baseline.** This is the single biggest accuracy lever and it's pure free ROD parsing.
+- **Satisfaction / release / reconveyance:** if a satisfaction is recorded against the DOT book/page, live balance = **$0 on that lien** (exact, 100%). Removes false positives from the board entirely.
+- **Refi detection:** a *newer* DOT from a different lender recorded on the same parcel, especially one whose amount ≈ the amortized balance of the old loan, means the old loan was paid off and replaced. Re-baseline `P₀`, `t₀`, `r` to the **most recent** DOT. This alone fixes the worst amortization errors, because it resets the clock. Rate-and-term refis reset principal near the old balance; cash-out refis reset it *higher* (recover home equity the owner pulled out — directly relevant to motivated-seller equity math).
+- **Second liens / HELOCs:** subordinate DOTs and "revolving/line of credit" DOTs stack on top. ~20–25% of owners with a first mortgage carry a second lien or HELOC. Sum the senior + junior recorded principals for **total lien load** (the number that actually matters for equity). HELOC balances are genuinely unknowable (revolving, can be $0 or maxed), so carry HELOCs as a **credit-limit ceiling** with a probabilistic utilization prior (~50% mean utilization is a defensible industry draw) rather than a point value.
+- **Free data it needs:** full grantor/grantee + document-type ROD index per parcel (Satisfaction, Deed of Trust, Assignment, Modification, Subordination). The repo already parses ROD indexes for several counties; this is a *classification pass over records already pulled.*
+- **Accuracy contribution:** turns a naive per-lien estimate into a *correct lien stack.* Satisfactions and detected refis are the high-value catches — they convert a wildly-wrong amortized number into either $0 or a freshly-baselined (low-age, high-accuracy) estimate.
+
+**3. LTV-at-origination priors as a sanity band / imputation when the DOT amount is missing.**
+- **Mechanics:** where original principal is present, no imputation needed. Where the DOT amount is redacted/missing but a sale price exists, impute `P₀ = LTV_prior × sale_price`. Priors by product/year: FHA purchases cluster ~96.5% LTV (statutory max, and most FHA borrowers hit it), conventional purchases bimodal at ~80% (piggyback/20%-down) and ~95% (low-down), VA up to 100%. Refis skew lower (~70–80% rate/term, higher for cash-out). Assign the prior by lender type (FHA/VA lenders identifiable from the beneficiary name) and doc year.
+- **Free data it needs:** recorded sale price (assessor/qPublic CARD — already captured for Pickens/Oconee per memory), beneficiary name, static LTV-prior table.
+- **Accuracy:** imputing `P₀` this way carries roughly ±10–15% on the origination amount itself, which then compounds with amortization/prepayment error. Use only as fallback; recorded `P₀` is far better.
+
+**4. MERS ServicerID for current-servicer identification (not balance, but the *actionable* adjacent field).**
+- **Mechanics:** MERS® ServicerID (mers-servicerid.org, free) returns the **current servicer and investor** given the 18-digit MIN — and the MIN is *printed on the recorded deed of trust* (MOM loans). The pipeline already downloads DOT images (per memory: "ROD document images are FREE"), so OCR the MIN off the DOT and query ServicerID. Lookup also works by property address or by name + last-4-SSN, but MIN is cleanest and we harvest it for free from the doc we already have.
+- **What it gives:** who to actually contact, and whether the loan is GSE-owned (investor field) — a proxy for loan age/refi-likelihood and for whether standard conforming amortization assumptions even apply.
+- **Accuracy:** servicer identity is *exact* when the loan is MERS-registered (the large majority of post-2005 originations). It does **not** yield a balance. Its value is skip-tracing the payoff-request path, not reconstructing the number.
+
+**5. Amortization + prepayment-expectation blend (the actual point estimate to ship).**
+- Instead of shipping the raw scheduled balance, ship `B̂ = B_scheduled × (1 − expected_cumulative_prepay(age, rate_environment, product))`. Build the prepay haircut from the PSA/CPR curve seasoned to the loan's age, tilted by whether the note rate is above/below the current market rate (in-the-money loans refi/curtail faster). This converts the systematic over-estimate bias into a roughly **unbiased** point estimate, at the cost of added variance. Report it with an explicit confidence band that widens with age.
+
+### How close can we REALISTICALLY get
+Exact live payoff: **0%** (irreducibly servicer-only). But a *modeled current-balance* estimate is achievable on a large share of the board, with accuracy that stratifies sharply by loan age and product:
+
+- **Satisfied/released liens:** exact $0, **~100% confidence** — and this is a real slice (removes dead liens from the board).
+- **Fresh loans (<2 yrs), fixed-rate, no second:** amortized balance is within **±3–5%** of true payoff. Prepayment hasn't ramped yet.
+- **Mid-age (2–7 yrs), fixed, first-lien only:** point estimate within **±8–15%** after applying the CPR prepay haircut; raw amortization alone runs ~5–15% high.
+- **Seasoned (7–15 yrs):** **±20–30%**, and a large fraction have silently refinanced — the refi-detection pass is what saves this bucket (re-baselines many into the "fresh loan" accuracy band).
+- **ARMs / HELOCs / cash-out / modified loans:** point estimate unreliable (**±30–50%+**); best we can honestly do is a **range** (lien-amount ceiling + utilization prior for HELOCs).
+
+**Net realistic claim:** *live payoff exact = 0%. But a ±10–15% modeled current-balance estimate is deliverable on the ~55–70% of liens that are fixed-rate, first-position, and either fresh or successfully re-baselined via ROD refi-detection; another ~15% resolve to exact $0 via satisfactions; the remaining ~15–30% (ARM/HELOC/cash-out/seasoned-unresolved) get a defensible range, not a point.* For the engine's real purpose — **equity estimation for motivated-seller targeting** — this is more than enough: equity = ARV − (Σ modeled lien balances), and a ±15% balance error on a lien that's 60–70% of value still cleanly separates high-equity from underwater targets.
+
+### Concrete build
+Extend the existing `amortize.py` into a **`payoff_estimator` enricher**, keyed on **parcel_id → lien stack** (not on the borrower):
+
+1. **`liens_from_rod(parcel_id)`** — pull all DOT/Assignment/Satisfaction/Modification/Subordination records for the parcel; build an ordered lien stack with position, `P₀`, `t₀`, rate (if indexed), lender, doc type, book/page.
+2. **`resolve_stack()`** — apply the correction layer: drop any lien with a matching Satisfaction (balance=0); detect refis (newer first-position DOT from new lender ⇒ retire older, re-baseline); flag seconds/HELOCs; classify HELOC vs closed-end second from doc language.
+3. **`estimate_balance(lien)`** — `B_scheduled` via existing amortization (PMMS-by-year fallback for missing rate), then multiply by `(1 − prepay_haircut(age_months, note_rate − current_pmms, product))`. HELOCs: return `credit_limit × utilization_prior` with the limit as an explicit ceiling field.
+4. **`servicer_from_mers(min)`** — OCR the 18-digit MIN off the already-downloaded DOT image (reuse the Gemini-first doc-OCR enricher), query MERS ServicerID by MIN (fallback: address), store current servicer + investor.
+5. **Emit per parcel:** `est_first_lien_balance`, `est_total_lien_load`, `heloc_ceiling`, `balance_confidence` (banded by age/product/resolution path), `lien_status` (active/satisfied/ref-baselined), `current_servicer`, `investor`. Feed `est_total_lien_load` into the equity calc (`equity = ARV − est_total_lien_load`), and surface `balance_confidence` alongside `arv_confidence` so downstream ranking can discount noisy liens.
+
+All inputs are already-captured free data (ROD index + free DOT images + static PMMS/LTV/CPR tables + free MERS ServicerID). No new paid source, no ToS/anti-bot issue.
+
+### What still can't be recovered (the true irreducible core)
+The genuinely unrecoverable residue, even with everything above:
+- **Exact per-diem accrued interest and the exact live principal** (servicer-only; requires the actual payment-posting ledger).
+- **Actual prepayment/curtailment history for a *specific* loan** — we can only apply a population-average CPR haircut; the individual deviation from that average is pure noise. A borrower who dumped a bonus into principal, or one who's been in forbearance not paying down at all, both look identical to us.
+- **Live HELOC/revolving balance** — can legitimately be anywhere from $0 to the full credit limit; no public signal narrows it.
+- **Escrow shortfalls/advances, late fees, forbearance/deferral balloons, and loan modifications not recorded** — these move the payoff by thousands and leave no public trace (modifications are sometimes recorded, often not).
+- **ARM current rate/balance** — the reset path depends on an unpublished index+margin history; scheduled amortization doesn't apply.
+
+These are the irreducible core: the live payoff exists only in the servicer's ledger, and TILA gives that ledger to the borrower, not to us. The compliant ceiling is a good *estimate* plus the correct *contact path* (servicer via MERS) — never the exact figure.
+
+
+## SC exempt-deed sale price (§12-24-40)
+
+### The wall (why it's "impossible" — restate precisely)
+Under S.C. Code §12-24-40, whole classes of deeds are **statutorily exempt** from the deed recording fee: mortgagee foreclosure and deed-in-lieu (§12-24-40(13)), IRC §1041 spousal transfers (4), partitions among co-owners (5), family-partnership/trust distributions without consideration (9), entity contributions (8), mergers (10/11), corrective/quitclaim confirmations (12), agent-to-principal (14), and nominal-value ($100 or less) deeds (1). Per **§12-24-70(2), the value is *not required to be stated* on the affidavit for an exempt deed — only the exemption reason.** So the index and the recorded instrument carry **$0 / no consideration** and a reason code. The distressed and off-market transfers we most care about (foreclosure sale, estate distribution to heirs, intra-family bargain sale) are *exactly* the exempt classes. There is no stamp to back-calculate from, no consideration field to read. The true sale price, if any changed hands, is legally unrecorded.
+
+Critically, though: **the price we actually need for the motivated-seller engine is not the historical exempt-transfer price — it is the property's *current market value / equity basis*.** The exempt deed destroyed a data point, but the underlying value is a modelable quantity. That reframing is what makes this wall ~85% reconstructible.
+
+### Reconstruction methods
+
+**Method A — Assessor appraised (market) value read directly.** In SC the assessor already maintains a full fair-market-value appraisal on every parcel; the 4%/6% assessment ratio (§12-43-220) is applied *on top of* that appraised value to get the taxable assessed value. The appraised value **is** a market-value estimate — no ratio inversion needed for the FMV itself; you only invert the ratio if a source hands you the *assessed* value (FMV = assessed ÷ 0.04 owner-occ / ÷ 0.06 non-owner-occ). 
+- *Math:* read `appraised_value` per parcel; if only `assessed_value` present, FMV = assessed / ratio, ratio inferred from the 4%/6% legal-residence flag. 
+- *Free data:* qPublic assessor CARD (Spartanburg/Pickens/Oconee already parsed in this repo), SCDOT/county GIS `appraised`/`market` fields, qPayBill. 
+- *Accuracy:* SC reassesses on a 5-year cycle (§12-43-217) with annual index adjustments; DOR requires the sales-ratio study to hold the median assessment ratio near 0.90–1.00 with a low coefficient of dispersion. So the mass-appraisal FMV runs **~±10–15% (median unbiased, but 5-yr staleness + no interior condition adds noise; foreclosures skew below appraised because of deferred maintenance the assessor hasn't seen).** Coverage ~95% of parcels. Effort: **low** — largely already built.
+
+**Method B — Prior non-exempt arms-length sale on the *same* parcel, HPI-scaled.** The exempt deed is almost never the *first* transfer. Pull the most recent **non-exempt** (stamped) sale on that PID from the assessor sale-history table, then roll it forward with the FHFA All-Transactions HPI for the parcel's MSA. 
+- *Math:* `price_now = last_arms_length_price × HPI(current_qtr) / HPI(sale_qtr)`. 
+- *Free data:* qPublic per-parcel sale-price/book-page history (live-verified in memory for Pickens/Oconee cards); FHFA HPI is free at MSA level (FRED `ATNHPIUS43900Q` Spartanburg, `ATNHPIUS24860Q` Greenville-Anderson, back to 1986) and FHFA publishes county- and ZIP-level annual HPI files. 
+- *Accuracy:* HPI is a repeat-sales index, so it captures the exact appreciation path — **~±8–12% when the prior sale is <10 yrs old and was itself arms-length**, degrading with age (renovation/decay drift the parcel off the area index) and unusable if the last stamped sale is >20 yrs or nonexistent. Coverage ~60–70% (parcels with a stamped sale on file). Effort: **medium** (need county HPI join + sale-validity parsing).
+
+**Method C — Nearest-neighbor arms-length imputation ($/sqft × subject sqft).** Comp model: take stamped, qualified sales within the same neighborhood/subdivision, same property class, last 12–18 months, compute median $/heated-sqft, multiply by subject heated sqft with light adjustments (age, lot, beds/baths). 
+- *Math:* `price = median($/sqft of k qualified comps) × subject_heated_sqft × adj_factors`. 
+- *Free data:* qPublic CARD heated-sqft (Pickens/Oconee expose it; this repo's `_STREET_NUM/NAME` + sqft parsing already exists), plus the qualified-sales set (see below). This is essentially the ARV model already in `calc.py`. 
+- *Accuracy:* standard mass-appraisal comp error, **~±10–18%**, better in tract subdivisions with homogeneous stock, worse for rural/unique parcels (Oconee/rural Anderson). Coverage ~85% (needs sqft + ≥3 nearby comps). Effort: **low–medium** — reuse ARV comp engine.
+
+**Method D — Deed-stamp back-calc where a stamp *does* exist.** Not applicable to the exempt deed itself (no stamp by law), but **the transfer *out* of the distressed situation is frequently NON-exempt.** A foreclosure deed to the bank is exempt, but the bank's subsequent REO resale to a buyer is a normal stamped sale — that *is* recoverable: `price = (stamps / 1.85) × 500` (bounded ±$500 by the fractional-unit rounding). Same for an heir who takes an exempt estate distribution then sells. So D reconstructs the *exit* price and, run in reverse, brackets the entry basis. 
+- *Accuracy:* **exact to within ±$250** (half a $500 unit) *when* a stamped downstream sale exists; ~30–40% of exempt-deed parcels get a stamped transfer within 3 yrs. Effort: **low** (arithmetic on the consideration/stamp field the ROD index already carries for non-exempt deeds).
+
+**Method E — Purchase-money DOT loan amount as a price *floor*.** On the *original* (pre-distress) acquisition, the recorded deed of trust states the loan principal. At typical 80–97% LTV, `price_floor = loan_amount / max_LTV`. The ROD document images are free-downloadable (per repo memory) and the loan amount OCRs cleanly from page 1. 
+- *Math:* `price_est ≈ loan / 0.90` (assume 90% LTV mode); floor = `loan / 0.97`. 
+- *Accuracy:* directional only — **±15–25%** because LTV is unknown per-loan and refis break the purchase-money assumption. Best used as a *sanity floor* and a cross-check on A/B/C, not a primary estimate. Coverage ~50% (parcels with a recorded DOT). Effort: **low** (reuse existing ROD-image OCR / `extract_lien_amounts.py`).
+
+**Which SC counties publish a qualified-sales flag:** SC's DOR-mandated sales-ratio study (RAB 02-7 lineage) forces every county to *classify* each sale as qualified (arms-length "good sale," code 00) vs. unqualified (foreclosure/family/estate/partial-interest), because unqualified sales must be dropped from the equalization ratio. That classification lives in the CAMA system. It surfaces publicly where the county runs **qPublic/Schneider with the Sales Search module** — **Spartanburg's qPublic explicitly exposes a "Sales Search" filterable by *qualified sales*, sale date, sale price, and property type** (confirmed). The same Schneider "Qualified"/"Sale Validity" boolean is exposed on Anderson, Pickens, Oconee, Cherokee, Laurens qPublic instances (all Schneider-hosted in this footprint); Union's card shows sales but no validity table. So for **6 of 7 SC counties** you can pull a per-sale qualified flag directly and never even *see* the exempt/unqualified transfers as comps — they self-filter.
+
+### How close can we REALISTICALLY get
+**Exact recovery of the actual exempt-transfer consideration: 0%** (it legally does not exist for foreclosure/family/estate deeds — often $0 truly changed hands). But the *operationally useful* number — current market value / equity basis of the parcel — is recoverable to **±10–15% on ~95% of parcels** via Method A alone, tightening to **±8–12% on ~60–70%** where a prior stamped sale exists (A∧B blend), and to **±$250 (near-exact) on the ~30–40%** that have any stamped downstream/related transfer (Method D). Ensemble (A as base, B/C as refiners when available, D as ground-truth override, E as floor) realistically delivers a **usable value estimate on ~95% of exempt-deed parcels at a median absolute error near ±10%.**
+
+### Concrete build
+Write `enrichers/sc_exempt_price_reconstructor.py`, keyed on **parcel_id (TMS)**, producing `reconstructed_value`, `method`, `confidence`, `low/high band`:
+1. **A (base):** read `appraised_value` from qPublic CARD / GIS; if only assessed present, divide by ratio from the 4%/6% legal-residence flag. Emit as the default.
+2. **B (refiner):** parse the CARD **sale-history table**, keep only rows where the qualified/validity flag = arms-length (drop exempt/unqualified), take the most recent, HPI-scale via a small cached FHFA MSA-HPI table (county→MSA map: Spartanburg→43900; Anderson/Pickens/Oconee/Greenville→24860; add county-HPI annual file for the rest). 
+3. **C (refiner):** feed the qualified comps into the existing `calc.py` ARV/$-per-sqft engine keyed on heated sqft + neighborhood. 
+4. **D (override):** if the ROD index shows a *stamped* (non-exempt) transfer on the PID, back-calc `(stamps/1.85)×500` and treat as ground truth for that date, re-project with HPI. 
+5. **E (floor):** OCR the purchase-money DOT loan amount (reuse `extract_lien_amounts.py`), set `value ≥ loan/0.97`. 
+6. **Blend:** confidence = f(method availability, prior-sale age, comp count); write via `web_artifact.load_board()` so the vision/comps/cama sidecar isn't wiped. Add a `qualified_sale` boolean to the sale-history parser so unqualified transfers are auto-excluded from *all* comp math engine-wide.
+
+### What still can't be recovered (the true irreducible core)
+1. **The actual dollars exchanged in a genuine bargain/gift intra-family transfer** — if Grandma deeded the house to her son for love-and-affection ($0 real consideration), there is no "price" to recover because none existed; only current FMV is knowable, and the *below-market intent* (the seller's actual motivation signal) is invisible.
+2. **The winning bid at a foreclosure auction** where the property went to a third party and the master-in-equity deed is exempt — the bid amount is sometimes in the court's report-of-sale (a separate lane), but is **not** in the deed/consideration record, so it's unrecoverable from the deed lane alone.
+3. **Interior condition / renovation state** — every method assumes the parcel tracks its area index or mass-appraisal; a gut-renovation or a fire-gutted shell moves the true value ±30–40% off every estimate above, and no free deed/assessor source captures interior condition. This is the same irreducible core that caps the ARV model, and it caps this one identically.
+
+Sources: [§12-24-40 & §12-24-70](https://www.scstatehouse.gov/code/t12c024.php), [SC DOR Deed Recording Fee](https://dor.sc.gov/tax-index/deed-recording-fee), [Aiken County 4%/6% classification](https://www.aikencountysc.gov/723/Classification-of-Real-Property), [Spartanburg qPublic Sales Search](https://qpublic.schneidercorp.com/Application.aspx?App=SpartanburgCountySC&Layer=Parcels&PageType=Search), [FHFA HPI datasets](https://www.fhfa.gov/data/hpi/datasets), [FRED Spartanburg MSA HPI](https://fred.stlouisfed.org/series/ATNHPIUS43900Q), [FRED Greenville-Anderson MSA HPI](https://fred.stlouisfed.org/series/ATNHPIUS24860Q)
+
+
+## SC early court data at scale (Rule 610)
+
+### The wall (why it's "impossible" — restate precisely)
+SC's unified court record system, **PublicIndex** (`publicindex.sccourts.org` / county subdomains under `sccourts.org/scjd/PublicIndex`), is the only *statewide, name-searchable* index of civil filings — including the **lis pendens** that opens every judicial mortgage foreclosure. Rule 610, SCACR and the site's own ToS bar automated scraping and expressly prohibit **commercial/bulk** harvesting; the search UI is `__doPostBack`/session-token gated and returns a ToS interstitial. So the *earliest* legal signal (the lis pendens, filed 20+ days before any complaint and months before the sale) is behind a compliant wall at the point where it is centralized. The blueprint's framing is: "you cannot get SC foreclosure filings early, at scale, compliantly." That framing is **true only for the centralized PublicIndex surface** — it is false for the *decentralized* county surfaces the same data re-emerges on.
+
+### Reconstruction methods (each: method, math/mechanics, free data it needs, realistic accuracy %, effort)
+
+**Method 1 — Master-in-Equity SALE ROSTER, published directly on the county site (the primary reconstruction).**
+- Mechanics: In SC, judicial foreclosures terminate in a Master-in-Equity (or special referee) **sale**, held first Monday/Tuesday monthly. The MIE publishes a **sale roster ~3 weeks before** each sale date. Several of the 7 counties post that roster *on the county's own domain* (not PublicIndex), which carries **no scrape-ToS wall** — it is an ordinary county-gov web asset.
+  - **Anderson** — CONFIRMED: PDFs at `andersoncountysc.org/wp-content/uploads/YYYY/MM/<Month-D-YYYY>-Sale-List.pdf`, one per sale date, plus separate "Results" PDFs. Predictable URL pattern; scanned/image PDFs → OCR needed.
+  - **Pickens** — CONFIRMED: `co.pickens.sc.us/departments/master_in_equity/sales_rosters.php` directly hosts Sales Rosters, **Deficiency Sales**, and **Results** PDFs, 2023→present, on the county domain. (Its FAQ *also* mentions PublicIndex as an alternate, but the county-hosted PDF is the compliant path.)
+  - **Spartanburg** — CONFIRMED via the newspaper channel (Method 3); the county site hosts the *cancellations* list and sale facts but routes the roster to the paper of record.
+  - **Oconee, Union, Laurens** — roster is routed to PublicIndex / Clerk records room, not county-hosted → fall to Methods 2–4.
+- Free data: county-gov HTTP(S), PDF OCR.
+- Accuracy: **exact 100%** of what's on the roster (case #, defendant/owner name, property address, TMS/tax-map #, sometimes judgment amount and attorney). Coverage = only cases that reached sale scheduling.
+- Effort: **Low.** Predictable URLs + monthly cadence + existing OCR enricher (project_doc_ocr).
+
+**Method 2 — MIE calendar / sale-DATE anchoring + parcel join.**
+- Mechanics: Every county publishes the *sale schedule* (first Monday, 11:00, courtroom). Roster is posted T-21 days. A cron keyed to "T-21 before each first-Monday" tells the human-gather step *exactly* which day to pull.
+- Free data: the sccourts MIE roster viewer (Court Agency → "Master in Equity") is the *statewide* fallback for Oconee/Union/Laurens; it is a court roster, not the ToS-walled name-search index. Human opens it on the scheduled day (compliant human-gather, not automated crawl).
+- Accuracy: 100% of scheduled sales, but **only ~3 weeks of lead time** (vs. the lis pendens' months). It is the *sale* signal, not the *filing* signal.
+- Effort: Low (cron + operator doc, mirrors project_manual_court_export_lane).
+
+**Method 3 — Newspaper legal-notice channel (the EARLIER, HTML-scrapeable signal).**
+- Mechanics: SC statute requires the Notice of Sale be **published 3 consecutive weeks** in the county's paper of record. These papers put notices **online as HTML**, outside PublicIndex, with no scrape-ToS.
+  - **Spartanburg → Spartan Weekly News** — CONFIRMED: `spartanweeklyonline.com/legal-notices/master-and-equity` lists each MIE notice as an HTML card (property address + case # + date) linking to an individual **HTML detail page** per notice (`/legal-notices/<address-slug>`) carrying the full statutory text (parties, TMS, judgment, sale terms). Fully parseable. Also runs in the Herald-Journal classifieds.
+- Math: publish window opens ~T-21; scrape the index page weekly, diff new slugs, fetch each detail page, regex the notice body for TMS/plaintiff/judgment-$.
+- Free data: newspaper HTML.
+- Accuracy: **~100% field extraction** on published notices; catches Spartanburg (largest of the 7) natively. Same pattern re-applies wherever a county's paper posts notices as HTML (need to map each county's paper of record).
+- Effort: Medium (per-paper parser; Spartan Weekly is a clean net-new build).
+
+**Method 4 — Lis pendens at the ROD? (tested — mostly CLOSED).**
+- Finding: SC foreclosure lis pendens is filed under §15-11-10 with the **"clerk of each county"** — which for foreclosure means the **Clerk of Court (PublicIndex)**, indexed in the judgment index, **not** recorded as a deed instrument at the free ROD (Register of Deeds/RMC). Greenville and other counties file "Foreclosures/Lis Pendens" through the Clerk of Court, confirming this. So the *free ROD portals we already scrape do not carry the foreclosure lis pendens* — this hoped-for earliest-signal shortcut is a **confirmed wall**, not a bug. (A *voluntary* lis pendens on other civil matters can be recorded at ROD, but the mortgage-foreclosure LP that we want lives with the Clerk.)
+- Accuracy of ROD path for foreclosure LP: **~0%.** Do not chase.
+
+**Method 5 — Model the filing-date from the sale-date (fill the lead-time gap).**
+- Mechanics: We recover the *sale* (Methods 1–3) but lose the months of lead time the lis pendens would have given. Backfill it statistically: SC judicial-foreclosure timeline from LP → sale is empirically ~**8–14 months** (contested longer). Once we have a corpus of matched (LP-date, sale-date) pairs — obtainable compliantly via one-time human PublicIndex lookups on *closed* cases — fit a distribution and impute an estimated original-filing window per new roster case. This does not create new leads; it *tags equity/urgency*.
+- Accuracy: filing-date estimate ±60–90 days on ~70% of cases; useful for prioritization, not for beating competitors to the earliest filing.
+- Effort: Low-med (join on existing board; one calc).
+
+### How close can we REALISTICALLY get
+- **The SALE roster (the actionable distressed-seller list): exact 100% capture across all 7 counties**, split by channel — county-hosted PDF (Anderson, Pickens), newspaper HTML (Spartanburg), statewide MIE roster viewer human-pull (Oconee, Union, Laurens; Cherokee via records-room/paper). Lead time **~21 days pre-sale**.
+- **The EARLIEST signal (lis pendens, months earlier): ~0% compliant recovery at scale.** It is centralized only in ToS-walled PublicIndex and is *not* at the free ROD. We recover it exactly **0 days early** in bulk; only per-case human lookups reach it.
+- Net: we get **100% of foreclosures that reach sale, at T-21**, and a **±60–90-day modeled filing date on ~70%** of them — but we structurally **cannot** get the true weeks-1-to-8 head start at scale.
+
+### Concrete build (what enricher/model to write, keyed on what)
+1. **`sc_mie_roster` scraper** (net-new, keyed on **county + sale-date**):
+   - Anderson adapter: build the `andersoncountysc.org/.../Month-D-YYYY-Sale-List.pdf` URL for each first-Tue/Thu, download, OCR (reuse project_doc_ocr Gemini-first chain), parse case#/owner/address/TMS/judgment.
+   - Pickens adapter: crawl `sales_rosters.php`, pull Roster + Deficiency + Results PDFs, same OCR/parse.
+   - Emit to board via `web_artifact.load_board()` (per board-writer rule).
+2. **`spartan_weekly_notices` scraper** (net-new, keyed on **notice-slug**): weekly GET of `/legal-notices/master-and-equity`, diff slugs, fetch each detail page, regex TMS/plaintiff/judgment/sale-date. Covers Spartanburg natively and earlier than the roster.
+3. **`sc_mie_roster_calendar` operator doc + cron** for Oconee/Union/Laurens/Cherokee: fires T-21 before each county's sale day, tells the operator the exact sccourts MIE-roster URL/date to open and save; offline parser ingests the saved page (mirrors project_manual_court_export_lane).
+4. **`filing_date_model`** enricher (keyed on **case_id**): impute LP→sale lead time from a fitted SC timeline distribution; write `est_lp_date` + `confidence`.
+5. **Paper-of-record map** (data file): resolve each of the 7 counties → its legal-notice newspaper + whether notices are posted as HTML (expand Method 3 beyond Spartanburg).
+
+### What still can't be recovered (the true irreducible core)
+- **The weeks-early lis-pendens head start, in bulk.** The only statewide, name-searchable, filing-time index is PublicIndex, and it is ToS/Rule-610-barred for automated + commercial-bulk use, and the foreclosure LP is *not* mirrored to the free ROD. No compliant surface centralizes SC foreclosure *filings* the way the MIE surfaces centralize foreclosure *sales*. We therefore permanently trade **lead time (months → ~21 days)** for compliance.
+- **Cases that die before sale** (reinstated, refinanced, dismissed, BK-stayed) never hit a roster → invisible to us, which is actually correct (they're no longer motivated sellers).
+- **Non-judicial-court civil signals in the same index** (e.g., partition-suit early stages, deficiency judgments not yet set for sale) remain PublicIndex-only until they schedule.
+
+
+## NC earlier foreclosure signal (pre-sale-calendar)
+
+### The wall (why it's "impossible" — restate precisely)
+Today's NC lane scrapes law-firm **sale calendars** (Brock & Scott, Hutchens, LOGS/Shapiro & Ingle, ALAW) plus tax-foreclosure listings. Those fire at the **notice-of-sale** stage: the sale is already advertised, the courthouse posting is up, and the property lands on the calendar ~20-25 days before the auction. By then the deadline funnel is nearly closed and every other buyer/wholesaler in the state sees the identical list. The "wall" is that the truly early events — the substitute-trustee appointment recorded at ROD, and the **notice-of-hearing (NOH)** that opens the `SP` special proceeding at the Clerk of Superior Court — are assumed to be locked behind the WAF-walled eCourts Smart Search (per memory: `project_nc_ecourts_endpoint_split` — estates/raw-SP browser is Akamai/WAF-walled; only the Judgment-Search JSON is open). So NC has no early, free, structured trigger comparable to a lis-pendens feed.
+
+### Reconstruction methods (each: the method, the math/mechanics, the free data it needs, realistic accuracy %, effort)
+
+NC power-of-sale timeline (statutory, G.S. 45-21.16 / Art. 2A), anchoring every method:
+```
+Default → Substitute Trustee appointed & RECORDED at ROD  ──► T-60 to T-90 before sale
+       → NOH filed, SP case opened at Clerk               ──► T-35 to T-55 before sale
+       → Hearing (NOH served ≥10d personal / ≥20d posted) ──► T-25 to T-35
+       → Notice of Sale posted + newspaper (≥20d)          ──► T-20 to T-25  ← TODAY'S LANE
+       → Sale/auction                                      ──► T-0
+       → Upset-bid rounds (10d each, resets)               ──► T+10, +20…
+```
+
+1. **Substitute-Trustee-Appointment mining at ROD (earliest free surface).**
+   Mechanics: Before a firm can foreclose, the beneficiary records a "Substitution of Trustee/Appointment of Substitute Trustee" (G.S. 45-10) naming the foreclosure firm as new trustee. This is a **recorded instrument at the Register of Deeds**, which we already scrape/OCR in the SC/NC counties. A recorded substitution naming Brock & Scott / Hutchens / Shapiro & Ingle / ALAW / Rogers Townsend as trustee is a ~95%-reliable pre-foreclosure flag: firms don't get substituted unless a POS foreclosure is imminent.
+   Free data: ROD grantor/grantee index + instrument-type filter (`SUBSTITUTION OF TRUSTEE`, `APPOINTMENT OF SUBSTITUTE TRUSTEE`) — the same AcclaimWeb / lrcpwa / NC OneMap-linked ROD portals already in the stack. The grantor = borrower (property → equity join works), grantee = the firm.
+   Accuracy: ~90-95% of these convert to an actual NOH filing within 30-90 days; a minority get cured/reinstated. Lead time: **T-60 to T-90 → 35-65 days earlier than the sale calendar.**
+   Effort: Medium. ROD instrument-type scraping already exists for several counties; needs a new instrument-type filter + a firm-name allowlist. Blocked in counties where ROD rebuild is pending (per `project_new_facet_scoping`).
+
+2. **eCourts Portal SP-case listing via the *compliant* Smart Search date/type filter (re-test the wall).**
+   Mechanics: Memory flags Smart Search as WAF-walled for *estates/raw-SP browsing*, but the split note distinguishes the **open Judgment-Search JSON** from the browser. The Portal's Smart Search *does* expose "Foreclosure (special proceeding)" as a non-confidential category under NCGS 7A-109(b). The compliant human-gather-then-parse-offline path (per `project_manual_court_export_lane`): operator runs a county + "Special Proceeding / Foreclosure" + filed-date-range search on portal-nc.tylertech.cloud, saves the result-list HTML, and an offline parser ingests `YYSPnnnnnn-xxx` case numbers + party names + filed date. This captures the **NOH filing** directly.
+   Free data: eCourts Portal result-list HTML (operator-saved; no ToS scrape). Case# + caption (borrower + firm) + filed date.
+   Accuracy: ~100% of true NOH filings that are non-confidential; near-1:1 with actual foreclosures. Lead time: **T-35 to T-55 → 15-30 days earlier than the calendar.** The list page has the case not the detail (per memory) — but caption + filed date + county is enough to key the lead and hand off to ROD for property/book-page.
+   Effort: Medium (operator SOP + list parser); Low incremental since the manual-export lane and parsers already exist.
+
+3. **Trustee-firm pending-sales lists parsed for the SP# + book/page (upgrade the existing lane, don't just read the calendar).**
+   Mechanics: The firm lists already carry **Court SP#, Case#, county, address, opening bid, and Book/Page** (confirmed live on Brock & Scott: fields = County, Sale Date/Time, `24SP000238-770`, `24-29191-FC01`, address, opening bid, `Book/Page 2166/47`). Firms post a property to their "pending sales" page **when the sale is scheduled but often before the newspaper run and sometimes carrying an earlier "sale date TBD / on hold" status** (LOGS explicitly flags "On Hold"). Polling these daily and diffing new SP#s catches a property a few days-to-weeks before it hits ncnotices/newspaper aggregators, and the Book/Page lets us join straight to the parcel without geocoding.
+   Free data: Brock & Scott (`/foreclosure-sales/?_sft_foreclosure_state=nc`, ~40+ counties incl. Gaston, Buncombe, Catawba), Hutchens (`sales.hutchenslawfirm.com/NCfcSalesList.aspx`), ALAW (`alaw.net/foreclosure-sales/north-carolina/`), Shapiro & Ingle/LOGS (`logs.com/nc-upcoming-sales-report.html` — **PowerBI embed, needs the stealth browser to extract, not clean HTML**).
+   Accuracy: 100% for scheduled sales; the lead over newspaper is only **~3-10 days** but the SP#/Book-Page enrichment value is high. Effort: Low-Medium (Brock/Hutchens/ALAW = clean HTML/aspx; LOGS = PowerBI stealth-render).
+
+4. **Newspaper NOH/Notice-of-Sale via ncnotices.com (NC Press Assn) as the county-complete backstop.**
+   Mechanics: Every POS sale must run in a general-circulation paper; NC Press Assn aggregates **all 100 counties free** with a "Foreclosure" category, 12-month rolling window. Confirmed the notice title itself carries the SP# (`26SP000016-950 NOTICE OF FORECLOSURE SALE`) plus record owner, deed-of-trust Book/Page, substitute trustee, and sale date/time.
+   Free data: ncnotices.com foreclosure category by county (no official API/RSS → operator-saved search pages or compliant HTML parse of the free result list).
+   Accuracy: ~100% county coverage (statutory requirement) but **latest surface — same T-20 to T-25 as the calendar**, so it's a coverage-completeness net, not an early signal. Effort: Low.
+
+### How close can we REALISTICALLY get (a number)
+- **Exact same-day-as-firm early signal: not the goal.** Realistic earlier signal:
+  - **ROD substitute-trustee mining → ~35-65 days earlier** than the current calendar lane, on the counties where ROD instrument-type search is live (today that's a subset — call it ~50-60% of the 11 NC counties given the pending ROD rebuild; buildable to ~80%+ as ROD comes online).
+  - **eCourts SP manual-export → 15-30 days earlier, ~100% of non-confidential NOH filings, all 11 counties** (Portal is statewide/Odyssey-complete as of Oct 2025), at the cost of an operator step.
+  - **Firm-list SP#/Book-Page upgrade → 3-10 days earlier + full enrichment**, ~clean HTML for 3 of 4 major firms.
+- Net: we can move the NC trigger from **T-22 (today) to roughly T-45 median** (eCourts NOH as the workhorse, ROD substitution as the bleeding edge), i.e. **~20-25 days of additional outreach runway on ~90-100% of in-footprint NC power-of-sale foreclosures**, with property/equity join via Book/Page rather than geocoding.
+
+### Concrete build (what enricher/model to write, keyed on what)
+1. `nc_substitute_trustee_scraper.py` — keyed on **ROD instrument-type = SUBSTITUTION/APPOINTMENT OF SUBSTITUTE TRUSTEE**, grantee ∈ firm allowlist {Brock & Scott, Hutchens, Shapiro & Ingle/LOGS, ALAW, Rogers Townsend, Nordman/other}. Emits borrower(grantor) + Book/Page(of the DoT referenced) + firm + record date. Reuses existing AcclaimWeb/lrcpwa ROD paths. `signal_stage="substitution"`, `est_sale_window = record_date + 60..90d`.
+2. `nc_ecourts_sp_parser.py` — offline parser for operator-saved eCourts Portal Smart-Search result lists filtered to **Special Proceeding / Foreclosure, filed-date range, per county**. Extracts `YYSPnnnnnn-xxx`, caption(borrower + firm), county, filed date. Slots into the existing `manual_court_export_lane`. `signal_stage="NOH_filed"`. Add a 3-firm-name trigger-list operator doc.
+3. `nc_trustee_firm_sales.py` (upgrade) — parse **SP# + Case# + Book/Page + opening bid + status(On Hold)** from Brock & Scott (WP `_sft` filter, clean), Hutchens (`NCfcSalesList.aspx`), ALAW; add a **PowerBI stealth-render** extractor for LOGS `nc-upcoming-sales-report.html`. Daily diff on SP# to flag net-new. Book/Page → parcel join (skip geocode).
+4. `nc_public_notices_backstop.py` — ncnotices.com "Foreclosure" category, per-county, dedup by SP# against #1-3; pure coverage net.
+Join key across all four: **SP# (`YYSPnnnnnn-CCC`) as the NC foreclosure primary key**, with Book/Page as the property join to the existing parcel/equity backbone. De-dup precedence: substitution → NOH → firm-list → newspaper (earliest wins, later stages enrich).
+
+Firm→county coverage map (the gap picture): Brock & Scott and Hutchens are statewide high-volume and both explicitly list **Gaston, Catawba, Buncombe-region** sales; LOGS/Shapiro & Ingle and ALAW are statewide but lower-volume. No single firm covers all 11; the **union of the 4 firm lists ≈ 85-90% of POS volume**, and the **eCourts SP feed + ncnotices backstop close the remaining firm-coverage gaps** (small local counsel firms — Mitchell, Polk, McDowell, Transylvania — that don't run public sale portals). That is exactly why methods #2 and #4 (court + newspaper, which are firm-agnostic and county-complete) are required alongside the firm lists.
+
+### What still can't be recovered (the true irreducible core)
+- **Pre-substitution default (missed payments / breach-letter / 30-60-90 delinquency).** The actual mortgage-default event lives with the servicer; no free public surface fires until the trustee substitution or NOH. That is the genuine irreducible core — we cannot beat ~T-90.
+- **Confidential/withheld SP filings** and any case a clerk marks non-public under 7A-109(b) never appear in Smart Search — a small residual.
+- **Detail-page contents behind the eCourts list** (full party addresses, service dates) require `__doPostBack` navigation the WAF blocks; we get caption + case# + filed date only from the saved list (per memory).
+- **Deals cured before sale** — a fraction of substitutions/NOHs reinstate and never reach auction; that's noise we accept in exchange for the 20-45 extra days, not something to eliminate.
+- **LOGS PowerBI internals** beyond what the rendered visual exposes (no clean JSON endpoint) — extractable via stealth render but brittle.
+
+
+## Owner phone at scale (compliant waterfall)
+
+### The wall (why it's "impossible" — restate precisely)
+Phone number is **not a public-record field** attached to a parcel or a deed. The property record gives you an **owner name + mailing address**; the phone lives only in (a) self-reported registration data, (b) telco/carrier files, or (c) aggregator "identity graphs" that stitch name+address→phone from purchased credit-header, telco, and app-SDK data. All three of the good sources are **paid**. The only free bulk phone in-footprint is the **NC voter file `full_phone_number` field**, which is self-reported-at-registration, exists only in NC (SC's public voter file has **no phone field at all**), and after you (1) restrict to owner-name matches, (2) drop the ~75-80% of NC voters who left it blank, and (3) discard dead landlines, collapses to the blueprint's **~2% usable-connect rate**. Free consumer reverse-lookup sites (TruePeopleSearch, TrueCaller, FastPeopleSearch) return a name/number but are **individual-lookup consumer tools** — TrueCaller hard-caps at 3 web lookups, all block bulk/API automation in ToS — so they are a **HOT-only manual lane**, not a scale source. There is no free bulk carrier/line-type feed.
+
+### Reconstruction methods (each: the method, math/mechanics, free data it needs, realistic accuracy %, effort)
+
+**M1 — Free NC voter phone join (the existing 2% floor, hardened).**
+Mechanics: normalize owner name → match against `ncvoter` `full_phone_number` on (last, first, res-address ZIP/city). NC layout confirms the field is `varchar(12)` "full phone number including area code." Free data: NC SBE statewide download (already wired). Realistic: field is populated for only ~20-25% of NC registrants and skews landline; after owner-name match + landline decay you keep **~2-4% as a live connect** in NC counties, **0% in SC**. Effort: **already built** — just add a line-type heuristic (strip obvious landline prefixes → tag "voter-cell-likely").
+
+**M2 — Business phone for LLC/trust-owned parcels via SoS (free, structurally different).**
+Mechanics: when `owner_name` matches an entity pattern (LLC, INC, TRUST, HOLDINGS, PROPERTIES), don't skip-trace a person — pull the **registered agent + principal office + officer** from **NC SoS free entity search** (already have the SoS registered-agent enricher in the stack) and, where present, the agent/office **published phone**. Many small landlord LLCs list a working cell as the agent phone. Free data: NC SoS entity search (free), SC SoS (captcha-walled per memory — use manual-gather fallback). Math: entity-owned share of a distressed board runs **~15-30%** of parcels; of those, agent/officer phone is recoverable for maybe **~40-55%** in NC. Net: recovers phone on **~8-15% of entity-owned rows for free**. Effort: **low** — extend the existing SoS enricher to emit the phone field it already sees.
+
+**M3 — HOT-only manual people-search (human-gather-then-parse-offline).**
+Mechanics: for the top-N HOT leads only (high equity + hard trigger), an operator runs TruePeopleSearch/FastPeopleSearch by name+city, copies the result block, and an offline parser extracts the "wireless" number. Free data: consumer sites (no automation — compliant only as manual lookup). Accuracy: these sites surface a plausible number on **~70-85%** of individuals, of which **~55-65%** connect. Effort: **medium, and it does not scale** — cap at ~20-40 lookups/day/operator to stay in consumer-use bounds. This is your **cost-per-connect champion for HOT** (labor only, ~$0 data).
+
+**M4 — Cheap bulk append (DataZapp) for the WARM body.**
+Mechanics: batch-upload name+address, get cell/landline back. Verified pricing: **3¢/match, $125 minimum (~4,000 records), DNC-scrubbed at no charge**, 2¢ at prepaid volume. Match/connect: DataZapp lands a number on ~**50-60%** of records; effective **mobile connect ~50-65%** per R7. Effort: **low** (CSV in/out). This is the **default WARM tier**.
+
+**M5 — Premium append (BatchData) only on WARM misses.**
+Mechanics: re-run the ~40-50% DataZapp missed through a higher-fill graph. BatchData has moved to **~$500/mo subscription** (legacy ~7¢/trace); higher fill + line-type + DNC. Reserve for WARM rows that DataZapp whiffed **and** clear an equity threshold. Effort: low, but gated on spend.
+
+### How close can we REALISTICALLY get (a number)
+Exact/free phone at scale: **~2-4% of NC rows, 0% of SC rows** (M1) plus **~8-15% of entity-owned rows** (M2) → blended **free ceiling ≈ 5-8% of the whole board** with a live-ish number, of which perhaps half connect (**~3-4% free connect**). Add the cheap tier and it jumps hard: **DataZapp append reaches a number on ~50-60% and a ~50-65% mobile connect → ~30-38% board-wide connect at ≤3¢/record.** Premium mop-up on the residual lifts total **reachable-with-a-live-mobile to ~55-65%** of the board. So: *free bulk is a ~5-8% sliver; the realistic answer is a tiered waterfall that converts a $125-per-4,000 spend into a 1-in-3 connect, and only pays premium rates on the equity-qualified residual.*
+
+### Concrete build (what enricher/model to write, keyed on what)
+Write **`phone_waterfall.py`**, keyed on `(owner_name, owner_mailing_address, parcel_state, lead_grade)`, running tiers in cost order and **stopping at first hit**:
+1. **Tier 0 (free, always):** `owner_name` entity-regex → if entity, call existing **SoS registered-agent enricher**, emit `phone` + `phone_source=sos_agent`. Else join to **NC `ncvoter.full_phone_number`**, emit `phone_source=nc_voter` with a landline/cell heuristic flag.
+2. **Tier 1 (free, HOT only):** emit a **`manual_lookup_queue.csv`** (name, city, parcel) for the top-N HOT leads → operator fills numbers by hand from a consumer people-search → offline parser ingests back. Rate-capped.
+3. **Tier 2 (cheap, WARM):** batch the Tier-0/1 misses to **DataZapp** (3¢, DNC-scrub on) via CSV; write back `phone_source=datazapp`, keep line-type.
+4. **Tier 3 (premium, gated):** only WARM+ rows where DataZapp missed **and** `equity ≥ threshold` → **BatchData**; `phone_source=batch`.
+Emit a **`cost_per_connect`** column = (tier spend) ÷ (rows that later connect), and a `dnc_flag` so texting/dialing honors scrub. Store `phone_confidence` = f(source, line_type, voter-field-age).
+
+### What still can't be recovered (the true irreducible core)
+- **SC free bulk phone is genuinely zero** — no voter phone field, SC SoS captcha-walled; every SC individual-owner phone must come from a **paid** append or manual lookup. That floor cannot be modeled away.
+- **The truly unlisted / VoIP-only / recently-ported / prepaid-burner owner** — no free or cheap graph has them; even premium tiers whiff on a hard residual of ~**15-25%** of individuals.
+- **Right-party verification** — an appended number is a *candidate*, not a confirmed owner-cell; without a paid identity-verify step you carry an inherent wrong-number rate (bad joins on common names, stale ports) that caps effective connect at the ~50-65% R7 figure no matter how much you spend. Free/cheap methods reduce cost-per-connect; they cannot eliminate the name→phone ambiguity that only right-party-verified (paid) data resolves.
+
+
+## Free Vacancy Detection
+
+### The wall (why it's "impossible" — restate precisely)
+The gold-standard vacancy signal is the USPS **Vacant Delivery Indicator** in the Delivery Sequence File Second Generation (DSF2), where the mail carrier who physically walks the route flags any address that has stopped collecting mail for **90+ consecutive days**. This is the only source that reflects a human eyeball on the actual doorstep, updated nightly, nationwide. It is gated behind a **DSF2 NCOALink Full-Service license (~$175k–$191k setup plus per-record fees)** and is legally restricted to CASS/PAVE-certified licensees for mail-processing use — you cannot buy the vacancy bit standalone, and resellers (Regrid, AccuZIP, BatchLeads) pass through the license cost. So the single best occupancy truth is a hard paywall for a free/compliant engine. The wall is real: **there is no free feed of the actual USPS vacant bit.**
+
+But USPS vacancy itself is a *lagging, noisy proxy for "distress"* — and that reframing is the whole crack in the wall. We don't actually need "is mail being collected"; we need "is this property likely non-owner-occupied / neglected / abandonment-trending," which is exactly what a motivated-seller engine wants. That target is reconstructable.
+
+### Reconstruction methods
+
+**1. Stacked distress proxy (the workhorse — reconstruct the *outcome*, not the USPS bit)**
+- **Method:** Score each parcel on additive independent signals we already scrape or can scrape free: (a) **absentee owner** = owner mailing address ≠ situs address (already built, task #16); (b) **tax-delinquent 1yr / 3yr+** (already have NC PTS Cloud + SC qPayBill/qPaybill balances); (c) **code violation / nuisance case** open; (d) **no homestead/owner-occupancy exemption** on the assessor card; (e) **long tenure + no recent permit** (last-sale >15yr ago, zero building permits = deferred-maintenance risk); (f) **out-of-state / >500mi owner** (deeper absentee); (g) **estate/probate/foreclosure overlay** (already in the board).
+- **Math/mechanics:** Logistic score, weights anchored to the literature. Tax delinquency is documented as "the single greatest indicator of property distress" and in the Savannah VAD study 3-yr tax delinquency + code violations were the two dominant labeling features. Absentee alone is weak (~most absentee owners are landlords with *occupied* rentals). The power is in the **AND**: absentee × 3yr-tax-delinquent × code-violation is where empirical vacancy concentrates. Model as P(vacant) = σ(β₀ + Σβᵢxᵢ) with the top-decile stack.
+- **Free data it needs:** all already in-repo except code-violation cases (Asheville code-enf built; others patchy).
+- **Realistic accuracy:** A *single* proxy is a poor vacancy predictor — absentee-only precision for vacancy is low (maybe 8–15%, since rentals dominate). But the **stacked top-decile** (3+ signals) reaches roughly **55–70% precision** against true vacancy, at low recall (you only flag the worst ~5–10% of parcels). That is *better than USPS for the distress use-case* because USPS misses vacant-but-mail-forwarded homes that your stack catches via tax/probate.
+- **Effort:** Low-medium — it's a scoring layer over existing enrichers plus one new column each for homestead-exemption flag and permit-recency.
+
+**2. "Return Service Requested" free mover-return (reconstruct USPS's own knowledge via your own mail)**
+- **Method:** On the **first physical outreach mailer**, print the ancillary endorsement **"Return Service Requested"** (or "Address Service Requested") above the address. If the piece is undeliverable, USPS returns it to you **with the reason code** ("Vacant," "No Mail Receptacle," "Attempted-Not Known," "Moved Left No Address / MLNA") at no extra charge on First-Class. You are effectively renting the carrier's eyeball one address at a time, for the price of a stamp you were already spending.
+- **Math/mechanics:** Batch #1 goes to the full lead list; ~2–4 weeks later the returns come back. Any piece stamped **VACANT / UMS / MLNA = confirmed occupancy failure**. Feed that back as a hard `usps_return_vacant=true` flag. This is the *actual* USPS vacant determination, obtained compliantly and free, just latency-shifted and only on addresses you mail.
+- **Free data it needs:** nothing external — it's an endorsement string + a returns-intake step (photograph/scan the stamped envelope, OCR the reason).
+- **Realistic accuracy:** **~95%+ on the addresses it covers** (it IS the carrier's flag), but only covers addresses you actually mailed, and only after one cycle of latency. Zero cost, fully compliant.
+- **Effort:** Trivial to add the endorsement; medium to build the returns-OCR intake (reuse the existing Gemini doc-OCR enricher, project_doc_ocr).
+
+**3. Municipal vacant-property / abandoned-building registries (free direct signal, where they exist)**
+- **Method:** Scrape the registry / code-enforcement case list for the cities that maintain one. **Spartanburg** has a registry (~5k entries per the blueprint). **Asheville** as of 2026 was only *proposing* a boarded-up-structure ordinance (running list of ~30 targets, not a public registry yet). Most of the 18 rural counties have **no** registry.
+- **Math/mechanics:** Direct join on address/parcel → `registry_vacant=true`. Where it exists it's authoritative.
+- **Free data:** Municode ordinance list to identify which jurisdictions have one; Accela Citizen Access (Buncombe) and county open-data ArcGIS hubs (Spartanburg Open Data) for the case tables.
+- **Realistic accuracy:** **~90% precision** where a registry exists (registries over-include recently-cured ones), but **coverage is maybe 1 of 18 counties today** (Spartanburg), so recall across the footprint is ~5–10%.
+- **Effort:** Low per-jurisdiction; the work is discovery (which cities have one).
+
+**4. Aerial / overgrown-lot & condition modeling (free imagery proxy for neglect)**
+- **Method:** Pull free imagery (USDA NAIP annual 0.6m aerials; county GIS ArcGIS aerial tiles; Google/Bing Static Maps thumbnails within ToS for one-off viewing) and score **overgrowth, tarped roof, no vehicle in drive, debris**. NAIP is public-domain and downloadable. Even without CV, a **vegetation-index (NDVI) spike over the parcel footprint** flags un-mowed lots.
+- **Math/mechanics:** Compute NDVI on the parcel polygon from NAIP 4-band; high vegetation *inside the building setback* + old sale = neglect proxy.
+- **Free data:** NAIP (free), parcel polygons (already have via NC OneMap / SCDOT / chascogis).
+- **Realistic accuracy:** Weak standalone (~20–30% precision — overgrowth ≠ vacant), but a useful **tiebreaker** that lifts the stacked model. Best on rural/large-lot parcels where mowing lapses are visible.
+- **Effort:** Medium-high (imagery pipeline + NDVI); defer unless top-decile leads need a final filter.
+
+**5. Utility-disconnect FOIA (reconstruct the "no active service" bit) — mostly a wall**
+- **Method:** FOIA the municipal water utility for a list of long-term **inactive/disconnected residential accounts** (a vacant house has water shut off). In principle a public record for a government-run utility.
+- **Reality:** Customer-level utility data (name, address, usage, account status) is **exempt as PII in most states' public-records law** — the search confirms names/addresses/usage are routinely redacted, and several states carve out utility-customer info explicitly. SC FOIA and NC public-records both let utilities withhold individually identifiable customer info. You might get **aggregate** disconnect counts by area, not address-level.
+- **Realistic accuracy:** Address-level = near-zero (blocked by privacy exemption); this is a confirmed wall, don't chase per-address.
+- **Effort:** High for near-zero yield. Skip.
+
+### How close can we REALISTICALLY get
+- **Exact free USPS vacant bit, per-address, on demand: 0%** (license-gated) — *except* via method #2, which recovers the true carrier flag at **~95%** but only on addresses you mail and with a 3–4 week lag.
+- **A usable vacancy/abandonment probability on ~100% of the board, computed today:** the stacked proxy (method #1) gives a **top-decile precision of roughly 55–70%** for "vacant or abandonment-trending," at low recall — i.e., you can confidently rank the worst ~5–10% of parcels. That is the honest number: **no exact flag, but a ±proxy that is right ~6-in-10 on the sharpest 5–10% of the list, and that self-corrects to ~95% on any address after one mail cycle.**
+- Net: for a **motivated-seller** engine (which cares about distress, not literal mail-collection), the reconstruction is *arguably as good as or better than* buying USPS, because USPS misses the tax/probate/absentee signal you already have.
+
+### Concrete build
+- **`vacancy_score` enricher**, keyed on **parcel_id** (fallback situs address), that reads existing board columns and emits `vacancy_score` (0–1) + `vacancy_signals` (list) + `vacancy_tier` (top-decile / mid / none). Weights: 3yr-tax-delinquent 0.30, open code-violation 0.25, absentee>500mi 0.15, no-homestead-exemption 0.10, last-sale>15yr & zero-permits 0.10, estate/foreclosure overlay 0.10. Calibrate the threshold on any addresses where method #2 later returns ground truth (closes the loop, makes it a learning model).
+- **Two new cheap columns** feeding it: `homestead_exemption` (assessor card boolean — already parse these cards) and `permit_recency` (last permit date from the Accela/county portals you already hit).
+- **`usps_return_vacant` intake**: add the "Return Service Requested" endorsement to the mailer template; build a returns-OCR step on the existing Gemini OCR enricher to parse the stamped reason code back onto the parcel. This is the highest-value, lowest-effort item — it literally gives you the real USPS flag for free.
+- **Spartanburg registry scraper** (Spartanburg County Open Data ArcGIS / code-enforcement) → `registry_vacant`. One-jurisdiction win, but it's the 5k the blueprint already named.
+- Defer NAIP/NDVI (#4) as an optional top-decile tiebreaker; skip utility FOIA (#5).
+
+### What still can't be recovered (the true irreducible core)
+- **Instant, per-address, whole-footprint occupancy truth** — the thing USPS DSF2 sells. Method #2 recovers it but only *after* you mail and *only* where you mail; you can never pre-filter the entire county to "occupied vs vacant" for free before spending a stamp.
+- **The specific vacant-but-current owner:** a house that is physically empty but whose owner is not tax-delinquent, not absentee, not in probate, still collects/forwards mail, and has no code case — a "clean vacant" (snowbird, recently-inherited-and-paid-off, between-tenants rental) — is **invisible to every free signal** and to the proxy stack. USPS would catch it; you won't, until the mailer bounces.
+- **Address-level utility disconnect status** — permanently walled by PII exemptions in SC/NC public-records law; only aggregate counts are obtainable, which are useless for lead-level targeting.
+- **Real-time change:** even USPS lags 90 days; your proxy lags to annual tax/assessor refresh. Nobody free has today's occupancy.
+
+**Sources:**
+- [HUD USER — USPS Vacancy Data](https://www.huduser.gov/portal/datasets/usps.html)
+- [NEOCANDO — USPS Vacancy Indicators](https://neocando.case.edu/resources/neocando/new%20docs/11-%20USPS%20Vacancy%20Indicators.pdf)
+- [Center for Community Progress — Delinquent Property Tax Enforcement](https://communityprogress.org/blog/delinquent-property-tax-enforcement-could-be-the-missing-piece-in-fighting-vacant-properties/)
+- [Liang et al. — Savannah VAD human-in-the-loop ML (arXiv 2407.11138)](https://arxiv.org/abs/2407.11138)
+- [USPS Postal Explorer — Ancillary Service Endorsements (507)](https://pe.usps.com/text/dmm300/507.htm)
+- [WLOS — Asheville abandoned-building ordinance proposal](https://wlos.com/news/local/abandoned-building-ordinance-proposed-reduce-fire-squatter-concerns-asheville-north-carolina)
+- [Reporters Committee — Public utility records / privacy exemptions](https://www.rcfp.org/open-government-sections/r-public-utility-records/)
+- [DistressIQ — absentee/vacancy signal-stacking hit rates](https://www.distressiq.ai/blog/absentee-owner-list-north-carolina)
