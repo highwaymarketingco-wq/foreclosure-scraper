@@ -951,3 +951,575 @@ Sources: [Redfin Data Center](https://www.redfin.com/news/data-center/), [FHFA U
 **Top pick to build next:** The **NC eCourts SP (power-of-sale) foreclosure filings** — it's the only source that surfaces *mortgage* foreclosures at the notice-of-hearing stage across all 18 NC counties, months earlier than the law-firm sale calendars that are the sole current path. It shares the exact stealth-browser pattern the repo already uses for the NC eCourts estates wall, so it's an incremental build on known infrastructure (accept it may hit the same Tyler SmartSearch WAF — compliant stealth only, no evasion). Immediate cheap win alongside it: add **Henderson, Lincoln, Burke, Polk** to the existing `nc_county_tax_foreclosure.COUNTY_PAGES` dict — four in-footprint in-house-foreclosing counties currently missed, using code that already exists. Everything else (Bid4Assets NC, trustee-foreclosuresalesonline, Anderson SC MIE PDFs, Rogers Townsend, Zacchaeus/Kania, ServiceLink/Xome, tax-deed aggregators) is either already covered, out-of-footprint, login/paywalled, or in-person-only.
 
 Relevant repo files: `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/scrapers/counties_nc/nc_ecourts_lis_pendens.py` (extend for SP), `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/scrapers/counties_nc/nc_county_tax_foreclosure.py` (add 4 counties to `COUNTY_PAGES`), `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/enrichment_upset_bid.py` (upgrade estimate→confirmed if report-of-sale is added).
+
+
+---
+
+# Deep-Dive Round 5 — Vendor Teardowns (integration-grade, 2026-07-02)
+
+
+## ATTOM Data
+
+### What we'd use it for (in this engine)
+ATTOM is the "fill-the-gaps" property-fundamentals layer, not a lead source. It maps cleanly onto our missing-only backfill: given a resolved `parcel_id`/`fips+APN`, `lat/lng`, or address, hydrate assessed/market value, 10-year sales history, current sale, deed/mortgage records, foreclosure/pre-foreclosure filings, and an AVM. It is strongest exactly where our county scrapers are weakest or walled — the SC recorded-$/loan-amount gaps, the "no sale price on distressed deeds" §12-24-70 dead-end, cross-county AVM comps, and the taxes-owed-adjacent assessment values. The persistent **ATTOM ID** is a genuinely useful join key across our county-fragmented records.
+
+What it does **not** do: no phone/skip-trace/homeowner-contact data (explicitly absent — competitors flag this as ATTOM's biggest gap). So it is a valuation/liens/history enricher, never the contact leg of `name→property→equity→contact`.
+
+### Exact plans/tiers + per-unit overage (2026, verify)
+Three distinct products — do not conflate them:
+
+- **Property Data API (transactional):** Pay-per-use. Billed on **API Reports produced, not calls made**. Example from ATTOM's own help doc: **$1,000/mo for 100,000 reports = $0.10/report**; overage bills at the **same $0.10/report**, no step-up. Third-party listings cite an entry point "around $500/mo," but real price is a **custom quote** after the trial. Only HTTP 200 responses count toward the quota.
+- **ATTOM Cloud / Bulk Licensing:** Custom-quoted. Snowflake/Databricks delivery, or **bulk CSV over FTP** (weekly/monthly/quarterly/annual). This is the only path that lets you **store data past 24h** (see ToS below).
+- **Property Navigator (UI tool, not API):** **$499/yr** Professional, annual only — **200 reports/mo + 2,000 list exports/mo**, 1 seat. Enterprise = custom. **No API access on either Navigator tier.** Irrelevant to us except as a cheap manual spot-check console.
+
+Critical billing gotcha: an "API Report" = **one property returned**, not one HTTP call. A radius/geo AVM call returning 1,000 properties = **1,000 reports**. Pagination is your cost lever (default/max 1,000 per page; docs elsewhere say 100 max per page — verify against your account).
+
+### API shape
+- **Base URL:** `https://api.gateway.attomdata.com/propertyapi/v1.0.0/`
+- **Auth:** static API key in header **`APIKey`** (no OAuth), plus `Accept: application/json` (or xml). Trivial to wire.
+- **Key endpoints:** `/property/detail`, `/property/expandedprofile`, `/assessment/detail`, `/sale/detail`, `/saleshistory/detail` (10-yr), `/attomavm/detail`, `/allevents/detail` (assessment+AVM+sales combined — cheapest way to get multiple facets per property). Foreclosure/pre-foreclosure filings live in separate foreclosure endpoints/packages (often gated to specific data packages — confirm on quote).
+- **Request:** GET with query params. Identify a property by `attomid`, `fips`+`APN`, `address1`+`address2`, or `postalcode`; geo by `latitude`+`longitude`+`radius`. Pipe-delimited multi-values (`propertytype=sfr|apartment`). Date windows via `startCalendarDate`/`endCalendarDate`.
+- **Response:** JSON/XML with a `status{code,total,page,pagesize}` envelope.
+- **Batch:** **No batch/bulk lookup on the transactional API** — it's one-property-per-call (geo endpoints return many, but you can't POST a list of parcels). True batch = the Bulk/Cloud product.
+- **Pagination:** `page` + `pageSize`, `orderBy` (e.g. `saleAmt+desc`, `distance`).
+
+### Rate limits + throughput
+ATTOM publishes **no explicit calls/sec or daily cap** in the docs or FAQ — throughput is governed by your contracted monthly report quota, and quota is only decremented on 200s. Practically, plan for low-concurrency, polite request pacing (our httpx enricher's existing per-lead sequential pattern is fine); confirm any burst ceiling with your rep since it's account-specific.
+
+### ToS for OUR use — this is the decisive section
+- **Caching/storage:** The API ToS **prohibits "caching or otherwise storing the ATTOM Content provided through the ATTOM API for a period of greater than twenty-four (24) hours."** Our pipeline is **disk-cached and persists resolved leads that auto-enrich indefinitely** — that is a **direct violation of the transactional API license.** This is the headline finding.
+- **Derivative DBs / redistribution:** Explicitly forbidden to "use the ATTOM Products to create, enhance or structure any database," to resell, sub-license, or publish any portion. Our board *is* a persistent database enhanced with enrichment — again, incompatible with the API tier.
+- **Marketing/owner outreach:** No explicit prohibition on contacting owners or marketing use found in the API terms (unlike credit-header/FCRA data, ATTOM property data isn't permissible-purpose-gated). So the *outreach* use is fine; the *storage* is the problem.
+- **Credentialing gate:** None. Trial access is granted for "internal evaluation" only.
+- **The clean path:** **Bulk/Cloud licensing explicitly exists to "store data for more than 24 hours"** and run your own calculations locally. For a persistent, cached, self-enriching board, **Bulk/Cloud is the only compliant ATTOM integration** — the API is only compliant for true real-time, throw-away-in-24h lookups.
+
+### Integration effort (Low/Med/High) + where it slots + build estimate
+- **API path: Low.** Static-key header auth, REST+JSON, mirrors our existing httpx enrichers exactly. Slots in as a new `attom_enricher` gated on missing value/sales/AVM, keyed on `fips+APN` (best) or address. **~0.5–1 day** to wire, map fields, and handle the `status.code` cases. But you'd have to **disable disk-caching and persistence for ATTOM fields specifically** to stay legal — which fights the whole architecture.
+- **Bulk/Cloud path: Medium–High.** CSV-over-FTP or Snowflake ingest, schedule a periodic pull, join on ATTOM ID/APN into the sidecar. **~2–4 days** plus a procurement/quote cycle. This is the architecturally correct fit but adds a batch-ETL lane we don't currently have.
+
+### Real-user gotchas / complaints
+- **Rating is genuinely mixed:** **Trustpilot 2.2/5 (15 reviews)**, **G2 ~3.8/5 (34)** — not the rosy 4.6 a first-glance search suggests. Complaints cluster on **customer service** ("staff blaming each other," per Trustpilot) and **pricing opacity**.
+- **No contact/phone data** — competitor BatchData marks ATTOM with an "X" on Homeowner Contact Information and on Phone/Address-Verification/Geocoding APIs. Independently corroborated by the neutral Dwellsy 2026 overview (no skip-trace mentioned). *(BatchData is a paid competitor — treat its framing as biased, but the contact-data gap checks out across neutral sources.)*
+- **Staleness reality:** ATTOM's own cadence is honest but slow: assessor/deed data follows **county release cycles** (variable, can lag months), sales trends **quarterly**, API data **weekly**. For our distress use case, ATTOM's foreclosure filings will often **trail our own county scrapers**, which hit the source directly.
+- **Pricing is sales-gated in practice:** despite "self-serve" marketing and a real 30-day API trial via cloud.attomdata.com, production pricing is a **custom quote** — you cannot get a firm production number without talking to sales.
+
+### Verdict: worth wiring? at what trigger volume?
+**Not worth wiring via the transactional API** — its 24-hour storage cap and no-derivative-database clause are fundamentally incompatible with our disk-cached, persistent, self-enriching board. Using it as designed would be a license breach.
+
+**Conditionally worth it via Bulk/Cloud licensing, but only at scale.** ATTOM adds no contact data (our actual bottleneck) and its distress signals lag our direct county scrapers, so it's a *valuation/history/liens* backfill, not a lead source. The trigger to license Bulk: when our free county+GIS+ROD stack has genuinely plateaued on **valuation/sales-history coverage** across the core WNC/Upstate-SC footprint AND lead volume is high enough that a **low-four-figure/month** ATTOM Cloud spend beats the analyst-hours of per-county card scraping — realistically **only if we outgrow the core footprint into statewide/multi-state**, where per-county scraping stops scaling. Below that, the **free 30-day API trial is worth burning purely to benchmark ATTOM's AVM and sales-history against our own comps engine** on a sample of the board — a valuation-calibration exercise, not a production integration.
+
+Sources: [ATTOM API docs](https://api.developer.attomdata.com/docs) · [API Report billing](https://cloud-help.attomdata.com/article/684-api-report) · [API Legal/ToS](https://api.developer.attomdata.com/legal) · [Bulk data](https://api.developer.attomdata.com/bulk) · [Property Navigator pricing](https://www.attomdata.com/solutions/property-navigator/pricing/) · [Property API FAQ](https://www.attomdata.com/solutions/property-data-api/faqs/) · [Dwellsy IQ 2026 overview](https://blog.iq.dwellsy.com/attom-data-overview-2026-property-ownership-and-market-data-explained/) · [BatchData comparison (competitor)](https://batchdata.io/attom-data-vs-batchdata) · [G2](https://www.g2.com/sellers/attom-data-solutions) · [TrustRadius pricing](https://www.trustradius.com/products/attom-data-solutions/pricing)
+
+
+## BatchData
+
+### What we'd use it for (in this engine)
+Two distinct jobs, and it's important to keep them separate:
+
+- **Skip trace (primary use):** the `name → property → equity → contact` backbone's final leg. Feed it a `parcel_id` or owner name + situs address, get back phone numbers (mobile/landline/VoIP with a reachability score), emails, current mailing address, plus DNC/litigator/bankruptcy/death flags. This is the paid fallback for the ~missing-contact rows that our free lanes (GIS owner, SoS agent, unclaimed-property) don't resolve. It slots in as a per-lead, missing-only enricher exactly like the existing httpx/curl_cffi enrichers.
+- **Property lookup/search (secondary, probably skip):** their property product overlaps almost entirely with what we already pull free from county GIS/CAMA/assessor cards and SCDOT. Their differentiators (nationwide 150M-property normalized schema, 300+ data points, mortgage/lien estimates, pre-foreclosure flags) are conveniences we've largely rebuilt county-by-county. The one genuinely additive property field is their **open-mortgage / estimated-equity** estimate, but we already compute `ARV − payoff − liens` from recorded docs, so paying for it is redundant in-footprint.
+
+Net: wire the **skip-trace endpoint only**; ignore property-search.
+
+### Exact plans/tiers + per-unit overage (2026, verify)
+Two separate price sheets — property data and skip tracing are billed independently.
+
+**Skip Tracing (subscription):**
+| Plan | Monthly | Included traces | Effective per-trace |
+|---|---|---|---|
+| Growth | $2,000 | 100,000 | $0.020 |
+| Professional | $5,000 | 300,000 | $0.0167 |
+| Scale | $10,000 | 750,000 | $0.0133 |
+| Enterprise 3M | $20,000 | 3,000,000 | $0.0067 |
+
+**Property Data (separate subscription):** Growth $1,000/100k → Enterprise $10,000/3M records.
+
+**Pay-as-you-go (the tier that actually matters for us):** ~**$0.02–$0.25 per record** self-serve, no monthly commitment — sign up free, pay per hit. Public sources cluster the PAYG skip-trace rate around **$0.02–$0.07/record at low volume**, sliding toward the $0.0067 floor only at 3M/mo. **Overage on subscription plans is not publicly disclosed** — this is a stated gap; you must get the per-record overage rate in writing before committing to a tier, because "included volume then silence" is where these contracts bite. **Match-based billing is the key ToS question to confirm:** several sources imply you pay per record *submitted*, not per *hit* — verify whether no-match rows are billed (industry norm is you pay for the query regardless of match).
+
+VERIFY all numbers live before quoting to anyone — the tier structure is stable across sources but the PAYG rate and overage terms are the soft spots.
+
+### API shape
+- **Base URL:** `https://api.batchdata.com/api/v1/`
+- **Auth:** `Authorization: Bearer <token>` + `Content-Type: application/json`. Token is generated from the dashboard (not OAuth — a static bearer key, trivial to drop into an env var alongside the existing enricher keys). `Accept: application/json` expected.
+- **Key endpoints:**
+  - `POST /api/v1/property/skip-trace` — **synchronous**, up to **100 properties/request**, returns results inline.
+  - `POST /api/v1/property/skip-trace-async` — **asynchronous**, returns immediately with only a `status` object; results delivered via webhook or polled.
+  - `GET /queue/:id` — poll async job results by job id.
+  - `POST /api/v1/phone/dnc` (a.k.a. `/dnc/scrub/`) — standalone DNC/litigator scrub on raw phone numbers.
+  - `POST /api/v1/property/search`, `/property/lookup` — the property product (skip for us).
+- **Request format (verified from a live payload):**
+  ```json
+  { "requests": [
+      { "propertyAddress": { "street": "1011 Rosegold St", "city": "Franklin Square", "state": "NY", "zip": "11010" } }
+  ] }
+  ```
+  APN and owner name are optional fields that materially improve match rate — **we have both** (`parcel_id`, owner), so we should always send them.
+- **Response format (verified):**
+  ```json
+  { "status": { "code": 200, "text": "OK" },
+    "results": {
+      "persons": [ {
+        "name": { "first": "...", "last": "..." },
+        "emails": [ { "email": "..." } ],
+        "phoneNumbers": [ { "number": "...", "carrier": "...", "type": "Mobile",
+                            "tested": true, "reachable": true, "score": 100 } ],
+        "dnc": ..., "litigator": ..., "bankruptcy": {...}, "death": {...},
+        "mailingAddress": {...}, "meta": { "matched": true, "error": false } } ],
+      "meta": { "results": { "requestCount": 1, "matchCount": 1, "noMatchCount": 0, "errorCount": 0 } }
+  } }
+  ```
+  The per-phone `score` (0–100) + `type` (Mobile/Landline/VoIP) + `reachable` is exactly what you want for ranking outreach targets and for TCPA-safe cold-call vs text routing.
+- **Batch:** 100 records/request (sync). For our board-scale runs you chunk to 100 and either loop sync or use the async endpoint.
+- **Pagination:** skip-trace itself isn't paginated (it's request-array in, results-array out, 1:1 by index). Property-search uses `take`/`skip`-style params. `meta.results` gives you `matchCount/noMatchCount/errorCount` for reconciliation.
+
+### Rate limits + throughput
+Officially **undocumented** — this is the single biggest integration unknown. What's known: 100 records/sync request; they explicitly tell high-volume users to use the async endpoint to avoid timeouts and to "stagger exports 30–60 min apart." Rate-limit responses exist (429-style) but no published calls/sec or daily cap. Claimed 99.8% uptime. Practically: treat throughput as unknown, build a token-bucket limiter + retry/backoff on 429, and start conservative (a few sync req/sec) until you observe their actual ceiling. Do NOT assume you can fire the whole board at once.
+
+### ToS for OUR use
+- **Skip-trace / marketing permissible:** Yes — this is their core market (real-estate investors cold-calling/texting property owners). They bake in DNC-registry checking, TCPA-litigator flagging, and mobile/landline distinction specifically so customers can run compliant outreach. Our motivated-seller outreach is squarely the intended use.
+- **Redistribution:** Standard for this category — you can *use* contacts for your own outreach, but **reselling/redistributing the raw data is prohibited**. Confirm the exact clause; if any client-facing product would expose BatchData contacts to a third party, that's a redistribution question.
+- **Storage/caching:** No explicit caching prohibition surfaced in docs, **but skip-trace data is perishable and you're likely contractually expected not to hoard/resell it.** Our disk cache is fine for de-duping re-queries; just don't treat a cached contact as fresh forever (see staleness below) and don't expose the cache as a dataset.
+- **Credentialing gate:** Skip-trace vendors increasingly gate PII behind a permissible-purpose attestation (GLBA/DPPA-style). BatchData is more self-serve than the credit-bureau-backed vendors, but **verify whether they require a signed permissible-use / end-user certification** before enabling the API — this can add days to onboarding. This is the most likely hidden onboarding friction.
+
+### Integration effort (Low/Med/High) + where it slots in + build estimate
+**Low.** It's a bearer-key JSON POST that maps 1:1 onto our existing enricher pattern — same shape as the httpx enrichers we already run.
+
+- Slots in as a new missing-only enricher in the resolved-lead enrichment pipeline, gated to fire **only** when (a) owner/parcel is resolved AND (b) free contact lanes returned nothing. Source-agnostic, exactly like the current gates.
+- Key on `parcel_id` (fallback owner+address) into the existing disk cache so a lead is never re-traced.
+- Send `propertyAddress` + APN + owner name (all fields we hold) to maximize match rate.
+- Persist `phoneNumbers[].score/type/reachable`, `dnc`, `litigator` so the outreach layer can rank and route (text VoIP/mobile, respect DNC).
+
+**Build estimate:** ~**0.5–1 day** for the sync path (client, cache key, gate, response mapper, 429 backoff, `meta` reconciliation, cost counter). **+0.5–1 day** if we need the async/webhook path for full-board runs (queue POST → webhook receiver or `GET /queue/:id` poller). Add unknown lead time for any permissible-use paperwork.
+
+### Real-user gotchas / complaints (cited)
+- **Is 76% RPC real? Treat it as a marketing ceiling, not your number.** The 76% "right-party contact" figure comes entirely from [BatchData's own site](https://batchdata.io/skip-tracing), which even independent comparison content restates uncritically. Independent framings put BatchLeads/BatchData in a **65–85% match-rate** band, and note match rate ≠ *good* rate ([Tracerfy comparison](https://www.tracerfy.com/Skip-Tracing-Comparison-Tool-Tracerfy-vs-PropStream-vs-BatchLeads)). Real-world "phone actually reaches the right person" will be well under 76% — budget on **effective cost per *valid* contact**, not per record.
+- **Accuracy complaints are real and specific.** A Trustpilot reviewer: *"Genuinely DOES NOT WORK. Phone numbers are all wrong, and even the owners are wrong a third of the time"* ([Trustpilot](https://www.trustpilot.com/review/batchskiptracing.com)). Overall Trustpilot skews positive, but the negative reviews cluster on wrong numbers + wrong owner identification and difficulty getting refunds. The independent [Real Estate Skills review](https://www.realestateskills.com/blog/batchskiptracing-review) is soft/promotional and provides **no verified match rate** and no head-to-head test data — don't rely on it.
+- **"Pricey for small users"** and **no built-in list-stacking** are the recurring structural gripes ([Real Estate Skills](https://www.realestateskills.com/blog/batchskiptracing-review)) — irrelevant to us since we're API-only, not using their UI.
+- **Hidden-fee risk = overage + no-match billing.** Overage rates aren't published and it's unclear whether no-match rows bill — both must be pinned in writing.
+- **Data staleness:** contact data is enriched from tier-one aggregators + a user feedback loop, but skip-trace PII decays fast (numbers reassigned, people move). The `tested`/`reachable`/`score` fields help, but re-trace stale rows on a cadence rather than trusting a cached hit indefinitely.
+- **Rebrand confusion:** BatchSkipTracing → BatchData, sister product BatchLeads. Docs, reviews, and blog examples inconsistently use `/v1/skiptrace`, `/api/v1/property/skip-trace`, and Stoplight mock URLs — **verify the exact live path against the current dashboard**, don't trust a blog snippet.
+
+### Verdict: worth wiring?
+**Yes for skip-trace, as a gated paid fallback — no for property data.** It's a Low-effort, well-shaped API that fills the one lane our free stack genuinely can't (owner phone/email at scale) and comes TCPA/DNC-aware out of the box, which we'd otherwise have to bolt on.
+
+**Trigger volume:** Stay **pay-as-you-go** until we're consistently skip-tracing **>~100k contacts/month**. The Growth subscription only breaks even vs PAYG at ~100k traces/mo ($2,000 ÷ $0.02); below that, subscription is dead money. Concretely:
+- **< ~5k/mo missing-contact rows:** PAYG, no contract. Wire it, cap it with a per-run spend limit, done.
+- **~100k+/mo sustained:** move to Growth/Professional — but only after getting **overage rate, no-match billing, and permissible-use requirements** in writing first.
+
+Because the pipeline is missing-only + cached + gated, our actual paid volume is a small fraction of the board, which keeps us firmly in PAYG territory and caps downside while we validate their real (not marketing) match rate on a live sample before scaling spend.
+
+
+## RentCast
+
+### What we'd use it for (in this engine)
+Primary gap-filler for **sqft + AVM (value) + long-term rent** on leads where the county GIS/assessor path came back null. Three independent single-property endpoints (`/properties`, `/avm/value`, `/avm/rent/long-term`) map cleanly to the missing-only backfill: call `/properties` when `square_footage`/`year_built`/`bedbath` is null, call `/avm/value` when `arv`/assessed fallback failed, call `/avm/rent/long-term` when you want a rent number for DSCR/hold underwriting. Each returns the comps array too, so it can also feed the comp-accuracy layer where your ROD/qPublic comps are thin. It is a genuine drop-in because it accepts a free-text `address` OR `latitude`/`longitude` — matching your parcel_id/owner/address keying (you resolve address or lat/lng, then pass it straight through).
+
+### Exact plans/tiers + per-unit overage (2026, verify)
+- **Developer** — $0/mo, 50 requests/mo, then $0.20/request
+- **Foundation** — $74/mo, 1,000 requests/mo, then $0.06/request
+- **Growth** — $199/mo, 5,000 requests/mo, then $0.03/request
+- **Scale** — $449/mo, 25,000 requests/mo, then $0.015/request
+- Enterprise custom above 25k.
+
+Billing unit = **one successful API request** (any 2xx). A `/properties` area call returning up to 500 records still counts as **one** request, which is the cheap way to bulk-pull. Each AVM estimate is one request. Verify current numbers at rentcast.io/api — they last revised AVM/pricing Aug 2025.
+
+### API shape
+- **Base URL:** `https://api.rentcast.io/v1`
+- **Auth:** API key in header `X-Api-Key: YOUR_KEY`. Self-serve key from the dashboard, no approval gate. JSON in/out, all GET.
+- **Key endpoints:**
+  - `GET /properties` — property records. Params: `address` (single-property exact match) OR area (`city`/`state`/`zipCode`, or `latitude`+`longitude`+`radius` ≤100mi), plus filters `propertyType`, `bedrooms`, `bathrooms`, `squareFootage`, `lotSize`, `yearBuilt`, `saleDateRange`. Returns `squareFootage`, `lotSize`, `yearBuilt`, `bedrooms`, `bathrooms`, sale history, owner name/mailing (owner-occupied flag), features, tax assessments.
+  - `GET /avm/value` — value estimate. Params: `address` OR `latitude`/`longitude`; `propertyType`; optional `bedrooms`/`bathrooms`/`squareFootage`, `compCount` (5–25, default 15), `maxRadius`, `daysOld`, `lookupSubjectAttributes` (default true — it self-fills subject attributes so you can pass address-only). Returns point estimate + `priceRangeLow`/`priceRangeHigh` + comparables[].
+  - `GET /avm/rent/long-term` — same param shape, returns rent estimate + range + rental comps[].
+  - Plus `/listings/sale`, `/listings/rental`, `/markets` (zip-level trend).
+- **Batch support:** **None.** No bulk/POST-array endpoint — one property per AVM call. The only "batch" lever is `/properties` area search (`limit` up to 500) when you can express the target as a geography rather than N discrete addresses.
+- **Pagination:** `limit` (1–500, default 50) + `offset`; `includeTotalCount` header for totals.
+
+### Rate limits + throughput
+**20 requests/second**, hard. No documented daily cap beyond your monthly quota. At 20 rps your ceiling is high enough that quota, not rate, is the binding constraint. Async httpx with a semaphore of ~15 concurrent is safe.
+
+### ToS for OUR use
+Strongly favorable — and note there are **two** documents; the one that governs the API is **rentcast.io/terms-api**, not the consumer platform EULA at /terms (the /terms EULA reads restrictive and is the wrong doc for this decision). The API License explicitly grants: (i) **"lawful direct marketing purposes"**; (ii) **store the API Data within your internal systems** (caching your disk cache is fine); (iii) **create derivative works** within internal systems; (iv) **"sublicensure, disclosure, display, resale and distribution of the API Data to third parties."** No attribution required. Restrictions that matter to us: don't use it in a jurisdiction that prohibits marketing use of public info, and **"do not send automated queries to any website"** (this targets scraping-through-the-API, not normal high-volume API calls — your pipeline usage is fine). Self-serve key, no credentialing gate.
+
+### Integration effort (Low/Med/High) + slot-in + build estimate
+**Low.** One async httpx client class, `X-Api-Key` header, three thin methods mirroring your existing enricher signature, keyed on the address/lat-lng you already resolve. Fits behind your missing-only gates exactly like the GIS/assessor enrichers, and its disk-cache key is just `(endpoint, normalized_address)`. **Build estimate: half a day** including cache wiring, 429/5xx retry with backoff, and a smoke test against 20 real NC/SC leads. The map is 1:1 with fields you already store (`square_footage`, `arv`, add `rent_estimate`+`rent_low`/`rent_high`).
+
+### Real-user gotchas / complaints
+- **Rural/low-density comps thin out.** The most consistent complaint across r/realestateinvesting and an independent BNBCalc review is that in rural/low-density markets comps thin out and rent/AVM usefulness drops — directly relevant to Western NC + Upstate SC core counties. AVM will return a wide `priceRangeLow/High`; treat a wide band as low confidence, same as your `arv_confidence` gating (source: bnbcalc.com RentCast Review 2026; r/realestateinvesting).
+- **No polygons/boundary data** and update cadence "not as frequent as some competitors" (noted even by Realie's own comparison piece).
+- **No STR/Airbnb, no MLS/PM integrations** — irrelevant to us (we only want sqft/AVM/rent numbers).
+- Independent reviews report rent estimates track local listings **better than Zillow's Zestimate** in metro/suburban markets; no published % error figure, so backtest against your own sold set before trusting it.
+- No reports of hidden fees or billing surprises; billing is transparent (1 request = 1 unit).
+
+### Verdict: worth wiring?
+**Yes — this is the better drop-in of the two.** Clean single-address AVM + rent endpoints, permissive marketing/caching/resale license, self-serve, 1:1 field map. Wire it at the **Foundation ($74) tier** the moment monthly gap-fill volume crosses ~1,000 lookups (below that the free 50 or pay-as-you-go $0.20 covers a smoke test). At **Growth ($199 / 5k @ $0.03 overage)** it's the natural home once you're backfilling a full board weekly. Rent estimate is a genuine net-new capability for the engine (you capture no rent anywhere today). Gate low-confidence AVMs by the returned price range, especially in rural core counties.
+
+---
+
+## Realie.ai
+
+### What we'd use it for (in this engine)
+Bulk **parcel + ownership + mortgage + sqft** enrichment, keyed the way your engine already keys: **by parcel_id (county APN/assessor ID), owner name, or address** — plus map-bounds/geo search. Its structural strength over RentCast is the **100-parcels-per-request area pull**, which is attractive for hydrating a whole county of leads in one call and for the name→property→owner backbone. AVM is a **secondary, still-rolling-out** product, so treat Realie primarily as a sqft/ownership/mortgage filler and only opportunistically as an AVM source.
+
+### Exact plans/tiers + per-unit overage (2026, verify)
+- **Free** — $0/mo, 25 requests/mo, then $0.15/request
+- **Tier 1** — $50/mo, 1,250 requests/mo, then $0.05/request
+- **Tier 2** — $150/mo, 6,000 requests/mo, then $0.03/request
+- **Tier 3** — $350/mo, 30,000 requests/mo, then $0.01/request
+
+All tiers include the same endpoints and data types and **up to 100 parcels per request**; overage is per-call above the included amount; unused requests do not roll over. Billing unit = **one API request**, and a request returning 100 parcels is billed as one — so at Tier 2, 6,000 requests × 100 parcels ≈ up to 600k parcels/mo, dramatically more records-per-dollar than RentCast **if** your targets can be expressed as area/bounds pulls rather than N single addresses. Verify at realie.ai/pricing and docs.realie.ai/api-reference/pricing.
+
+### API shape
+- **Base URL:** not published on the open docs pages I could reach; auth is "include this key in the headers of all requests" (header name not exposed publicly — confirm the exact header, likely `Authorization`/`x-api-key`, with support@realie.ai before build).
+- **Key endpoints (all JSON):**
+  - **Property Search** — paginated pull across a geographic area (the 100-parcels/request workhorse).
+  - **Address Lookup** — single address, "optimized for lower latency, real-time" (their headline is sub-10ms server-side).
+  - **Parcel ID Lookup** — by county parcel/assessor ID (maps to your `parcel_id` key).
+  - **Location Search** — lat/long + radius geospatial.
+  - **Premium Comparables Search** — comps for valuation/underwriting.
+  - Owner-name search to surface linked parcels/portfolios.
+- **Fields:** parcel geometry/polygons (a RentCast gap Realie fills), ownership, mortgage, zoning, building attributes incl. square footage, assessed/market value; **AVM** value estimate where covered.
+- **Batch support:** the **100-parcels-per-request** area/bounds pull is the batch mechanism — better than RentCast for wide geographic hydration. No documented POST-array of arbitrary addresses.
+- **Pagination:** cursor/page-based through large areas (Property Search is explicitly "pagination through large geographic areas"); exact param names not published — confirm at build.
+
+### Rate limits + throughput
+**1,200 requests/minute (20 rps)**, 429 on exceed; enterprise can raise it. Same effective ceiling as RentCast. Claimed server-side latency ~9.5ms (vendor benchmark, treat skeptically) is well below RentCast's cited ~439ms — if real, meaningfully faster per call under concurrency.
+
+### ToS for OUR use
+**Mixed / a real caution.** Their **/terms** contains an explicit anti-competition + anti-resale clause: you may **not** "aggregate, repackage, or resell our data or derived data products," nor build any product/API/database that "directly or indirectly competes." For an internal enrichment-and-outreach engine that consumes the data privately, that's likely fine, but the language is broad enough that **shipping enriched leads to third parties (e.g., selling a lead list) is a redistribution risk** — the opposite of RentCast's explicit resale grant. Caching/storage and marketing-use permissions are **not stated on the public pages I could reach** (only the competition/resale restriction is). If downstream resale or list-brokering is on the roadmap, get written confirmation from Realie (hello@realie.ai) on internal caching, marketing/solicitation use, and lead redistribution before committing. Attribution required if you ever publicly display their content.
+
+### Integration effort (Low/Med/High) + slot-in + build estimate
+**Medium.** The blocker isn't code complexity, it's **undocumented specifics** on the open docs: exact base URL, auth header name, pagination param names, and per-field response schema aren't publicly exposed (several doc/endpoint pages 404 or omit them), and the site rate-limited my requests. So there's a discovery/confirmation loop with support before the client is safe to build. Once confirmed, it slots in as (a) a `parcel_id`/`owner`-keyed enricher for the name→property backbone, and (b) a per-county bulk hydrator that pulls 100 parcels/call and updates many leads at once — a different shape from your current one-lead-at-a-time enrichers, so it needs a small "area pull → fan out to leads by parcel_id" adapter. **Build estimate: 1.5–2 days** (0.5 day support/schema confirmation + 1–1.5 day client, the area-pull adapter, cache keying, and smoke test).
+
+### Real-user gotchas / complaints
+- **AVM is limited and still rolling out** (their own materials describe AVM as "limited states, rolling out" — do not assume rural NC/SC AVM coverage; verify per-county before relying on it for ARV).
+- **AI-collected data** — they collect county records "using AI" across 3,100+ counties / 180M+ parcels; their own site carries the caveat that "responses generated using AI may contain mistakes." For rural NC/SC counties, coverage exists on paper but **field completeness (esp. sqft, mortgage) is the risk** — spot-check match rate on your actual core counties, because AI-parsed county data is exactly where nulls creep in.
+- **Thin independent review footprint** — reviews are dominated by Realie's own blog/comparison pages and a sparse Trustpilot; no independent match-rate benchmarks found. The 9.5ms latency and coverage claims are vendor-sourced.
+- Public docs are incomplete/gated (404s, rate-limiting) — a mild signal about developer-experience polish vs RentCast's fully open OpenAPI/`llms.txt`.
+
+### Verdict: worth wiring?
+**Conditionally, and second in line.** Realie wins on **records-per-dollar for bulk county hydration** (100 parcels/request) and adds **parcel polygons + mortgage + owner-portfolio** that RentCast lacks — genuinely useful for the name→property→equity backbone. But for the specific ask here (**drop-in sqft + AVM + rent gap-filler**), it's weaker: **AVM is partial/rolling-out, there is no rent estimate at all**, the resale/competition ToS is a redistribution risk, and the integration needs a support round-trip because public docs omit auth/base-URL/schema. **Wire RentCast first as the sqft+AVM+rent drop-in.** Add Realie only if/when you need (a) high-volume **per-county bulk** parcel/owner/mortgage hydration (trigger ~6,000 req/mo → Tier 2 $150), or (b) polygons/mortgage/owner-portfolio data — and only after confirming caching + lead-redistribution rights in writing.
+
+**Bottom line for the drop-in decision:** RentCast is the better gap-filler — it's the only one of the two with a rent estimate, has clean single-address AVM matching your keying, a permissive marketing/caching/resale license, self-serve keys, and fully open docs. Realie is the better *bulk parcel/ownership/mortgage* tool but is not a rent source, is only a partial AVM source, and carries redistribution ToS friction.
+
+Sources: [RentCast API pricing](https://www.rentcast.io/api) · [RentCast API docs/OpenAPI](https://developers.rentcast.io/) · [RentCast API License](https://www.rentcast.io/terms-api) · [BNBCalc RentCast Review 2026](https://www.bnbcalc.com/reviews/rentcast-review-2026) · [Realie pricing](https://www.realie.ai/pricing) · [Realie API docs](https://docs.realie.ai/api-reference/property-data) · [Realie pricing tiers doc](https://docs.realie.ai/api-reference/pricing) · [Realie ToS](https://www.realie.ai/terms) · [Realie best-APIs blog](https://blog.realie.ai/blog/exploring-the-best-u-s-property-data-apis-and-their-drawbacks)
+
+
+## TrueNCOA
+
+### What we'd use it for (in this engine)
+CASS standardization + DPV + NCOALink move-update on the mailing addresses we already resolve (owner name + situs/mailing address per lead). Concretely: before we drop a direct-mail piece on a motivated-seller lead (probate/divorce/tax-delinquent/absentee), run the owner's mailing address through TrueNCOA to (a) get a USPS-standardized, DPV-confirmed deliverable address, (b) catch the ~12%/yr who filed a change-of-address and forward to the new address, and (c) suppress undeliverable/vacant/moved-no-forward records so we stop paying postage on dead mail. This is a **batch, mail-prep step**, not a per-lead real-time enricher — it fits a "flush the outreach queue" job, not the missing-only inline backfill loop.
+
+### Exact plans/tiers + per-unit overage (2026, verify)
+- **Flat $20 per file, all-inclusive.** No recurring fee, no file-size limit, no per-record charge. CASS, DPV, both 18-month and 48-month NCOA are all bundled in that $20. (Source: TrueNCOA product pages; verify current price at checkout.)
+- Billing model is **charge-on-download**: you can submit, process, and view match stats for free; you are only charged the $20 when you export/download the finished file (`download=true` / `charge=` on the export call). No credits consumed until then.
+- No tiers, no overage table — it's genuinely one price per file regardless of 100 or 1,000,000 records. The only "unit" is a file.
+- Hard floor: **a file must contain at least 100 distinct records** to process (enforced in the CLI and API).
+
+### API shape — base URL, auth, endpoints, format, batch, pagination
+Reverse-engineered from the official CLI source (`github.com/truencoa/cli`, `Program.cs`) plus the Postman collection (`documenter.getpostman.com/view/2009332/UUxzA7SU`), since the marketing docs omit specifics.
+
+- **Base URL:** `https://api.truencoa.com/` (production), `https://api.testing.truencoa.com/` (sandbox). HTTPS required.
+- **Auth:** two custom request headers on every call — `user_name` and `password` (your account email + password, or API id + API key). No OAuth, no bearer token. Trivial to set in httpx headers.
+- **Format:** originally tab-delimited field POSTs; the API now also **accepts JSON on POST**, and supports CSV/JSON output.
+- **File-submit → poll → export → download flow** (the pattern you asked about):
+  1. **Add records:** `POST files/{file_name}/records?mailer={listOwnerName}` — body carries the record fields. Call repeatedly to append batches or single records into a named file you invent client-side (e.g. `outreach_{ticks}`). Required fields: `individual_id`, `individual_first_name`, `individual_last_name` (or `individual_full_name`), `address_line_1`, `address_line_2`, `address_city_name`, `address_state_code`, `address_postal_code`; optional `address_country_code`.
+  2. **Check ready-to-submit:** `GET files/{file_name}` → returns `{Name, Status, Id, RecordCount}`. Must be `Status == "Mapped"` and `RecordCount >= 100` before submit.
+  3. **Submit:** `PATCH files/{file_name}?status=submit`.
+  4. **Poll:** `GET files/{file_name}` in a loop. Status lifecycle: `Processing` → terminal `Processed` (success) / `Cancelled` / `Errored`. (CLI polls until status leaves `Processing`.) Typical completion **4–7 minutes**.
+  5. **Export:** `PATCH files/{file_name}?status=export&suppress={n}` → returns an export file `Id`; poll `GET files/{exportId}` until it leaves `Export`/`Exporting`.
+  6. **Download (paginated):** `GET files/{exportId}/records?page={n}&charge={0|1}` — **this is where pagination lives.** Page from 1, each response is `{Records:[...]}`; keep incrementing `page` until a page returns zero records. `charge=1` (or `download=true` in CLI) is what actually bills the $20.
+  7. **Reports (optional):** `GET files/{file_name}/reports?report_name={r}&format=pdf` for the USPS 3553/summary PDF.
+- **Batch support:** yes — you assemble the whole list into one named file via repeated record POSTs, then process as a batch. There is no synchronous "one address in, one address out" call; everything is file-oriented and async.
+
+### Rate limits + throughput
+No published per-second/per-minute rate limit — throughput is governed by the **async file model**, not call rate. End-to-end latency is dominated by the 4–7 min processing wait per file plus your record-upload loop. Practical shape: one file per outreach batch, a handful of files a day. This is not a high-QPS API and shouldn't be treated like one.
+
+### ToS for OUR use — this is the deciding constraint
+- **NCOALink is USPS-licensed and contractually restricted to mailing/mail-preparation purposes.** Per USPS: "NCOALink is used only for the purposes of mailing." COA (change-of-address) data carries Privacy-Act restrictions enforced through the PAF.
+- **Using NCOA move-data as a skip-trace / people-locator to *find where someone moved to* for phone/door outreach is outside the permitted use.** If your intent is "owner moved, get me their new address so I can chase them," that is the prohibited use case. The compliant use is: clean/forward/suppress addresses **on a list you are about to mail**.
+- **PAF (Processing Acknowledgment Form):** required by USPS for every processing. TrueNCOA **auto-generates and auto-fills the PAF** from your registration — no wet signature, no manual gating step before your first file. If you operate as an **agency/mailer on behalf of a client** (e.g. HighWay running mail for a client), USPS requires the **list owner / mailer name** on the PAF; you pass it either as `?mailer=` on the records POST or by embedding `[List Owner Name]` in the file name. Renewal is handled at the licensee (TrueNCOA) level; you re-attest via the registration on file. Verify the current PAF language in your account before going live.
+- **Storage/caching:** the deliverable is your list back — you keep and store the standardized/updated addresses. The restriction is on *purpose of use*, not on retention. (Verify no contractual re-distribution limit in your specific PAF.)
+
+### Integration effort (Low/Med/High) + slot-in + build estimate
+**Low–Medium.** Two custom headers, ~6 endpoints, a poll loop, and pagination — no OAuth, no SDK needed. It does **not** slot into the missing-only inline async enricher; it slots into a **separate batched "mail-prep" job** that runs against the outreach queue right before a mail campaign. Add a small async client (`submit → poll → export → paginate`), an `ncoa_status` / `deliverable_address` / `moved_flag` set of fields on the lead, and disk-cache keyed on normalized input address so you don't re-submit unchanged addresses. **Realistic build: 0.5–1 day** for the client + poll/pagination + field mapping; add ~half a day for the 100-record-minimum batching logic and PAF/mailer-name handling.
+
+### Real-user gotchas / complaints
+- **NCOA only catches movers who filed a USPS change-of-address.** TrueNCOA's own material concedes it "will NOT catch moves for consumers who did not complete a Change of Address form." NCOA matches ~94% of *forwarding-address filers*, but a large share of real-world moves (especially distressed/probate/vacant owners — exactly our targets) never file one, so **expect a low move-match rate on this population.** The value here is mostly CASS/DPV cleanup + suppressing undeliverables, not finding forwardings.
+- **100-record minimum** blocks ad-hoc small runs — you must batch.
+- **Charge-on-download** is a footgun in automation: set `charge`/`download` deliberately, or you'll either fail to get records (no credits) or bill yourself unexpectedly. (Documented in the CLI README's Payment note.)
+- API "docs" are effectively a Postman collection + the open-source CLI; there's no polished REST reference, so **the CLI source is the real spec.** Support is email/phone (`support@truencoa.com`); reviews are sparse (SaaSHub/G2 low volume) but positive on price and turnaround.
+- Sources: [How to get started with the NCOA API](https://truencoa.com/how-to-get-started-with-our-ncoa-api/); [TrueNCOA CLI (Program.cs)](https://github.com/truencoa/cli); [Postman collection](https://documenter.getpostman.com/view/2009332/UUxzA7SU); [PAF details](https://truencoa.com/processing-acknowledgment-form-paf-details/); [USPS NCOALink / PostalPro](https://postalpro.usps.com/mailing-and-shipping-services/NCOALink).
+
+### Verdict: worth wiring? at what trigger volume?
+**Only if/when we run our own physical direct mail.** For a mailing pipeline it's a no-brainer: $20/file flat, bundles CASS+DPV+NCOA, kills postage waste. But it is a **mail-hygiene tool, not a skip-trace lever** — using it to locate moved distressed owners is both low-yield (our targets rarely file COAs) and outside the permitted-use ToS. **Wire it when we commit to a mail channel and have ≥100 addresses per drop**; below that, or if outreach stays phone/digital only, skip it. Do **not** put it in the inline enrichment loop.
+
+---
+
+## Geocodio
+
+### What we'd use it for (in this engine)
+Rooftop-accurate forward geocoding of the ~18% of leads that arrive address-only / lat-lng-less, and reverse-geocoding of parcels we only have coordinates for — the exact gap our Charleston/SCDOT situs resolver leaves. Also a cheap, storage-legal source of **appended geo attributes** in the same call: Census tract/block + FIPS (`census`), timezone, congressional/state-leg district, and ACS demographics — useful for buy-box filtering and territory routing. It's a clean drop-in for the missing-only backfill pattern: if a lead has an address but no `(lat,lng)` or no census geo, call Geocodio; cache the result.
+
+### Exact plans/tiers + per-unit overage (2026, verify)
+Prices **changed Feb 1, 2026** (verify against your account email):
+- **Free tier (unchanged):** 2,500 lookups/day, no card. Does not roll over.
+- **Pay-as-you-go:** **$1.00 per 1,000 lookups** for US/CA/MX — **doubled from $0.50** on Feb 1, 2026. First 2,500/day still free.
+- **Flex (monthly):** Flex 350 $325/mo (350k credits) • Flex 650 $600/mo (650k) • Flex 850 $775/mo (850k); +250k credits per additional user. Annual = 2 months free + 10–20% off top-up credits.
+- **Self-Service Unlimited:** raised to **$1,350/mo** for new customers (was $1,000); additional instances **$1,000/mo** (was $700). Customers active as of Jan 31 2026 keep a **$100/mo legacy discount**. North-America+UK Unlimited starts ~$1,600/mo.
+- **Critical overage mechanic — appends are billed as lookups:** **Total lookups = addresses × (1 + number of appended field-categories).** One address + census + timezone = **3 lookups**. This silently triples cost if you request appends carelessly. (Verify: [pricing](https://www.geocod.io/pricing), [Feb 2026 update](https://www.geocod.io/updates/pricing-updates-2026/).)
+
+### API shape — base URL, auth, endpoints, format, batch, pagination
+- **Base URL:** `https://api.geocod.io/v1.9/` (current major; docs also show `/v2/`-style paths — pin the version you build against).
+- **Auth:** API key, either `?api_key=KEY` query param or `Authorization: Bearer KEY` header. Multiple keys per account for per-project usage tracking. Dead simple in httpx.
+- **Single forward (GET):** `GET /geocode?q=1109+N+Highland+St,Arlington+VA&api_key=…` — or component params `street/city/state/postal_code/country`.
+- **Batch forward (POST):** `POST /geocode` with a JSON array (or keyed object) of addresses — **up to 10,000 per request**; array input returns results in input order; keyed-object input returns keyed results (best for joining back to `parcel_id`). ~600s for a full 10k batch.
+- **Reverse:** `GET /reverse?q=38.9,-76.9` (single) and `POST /reverse` (batch up to 10,000 coords) — coords as `"lat,lng"`.
+- **Lists API (file jobs):** `POST/GET/DELETE /lists` — CSV/TSV/Excel, up to **10M lookups/list**, 1GB file cap, `{{A}} {{B}}` column-mapping templates, optional completion **webhook**. Note list-job data is auto-deleted 72h after processing (that's the *job artifact*, not a restriction on the results you keep).
+- **Response:** `results[]` each with `address_components`, `formatted_address`, `location:{lat,lng}`, `accuracy` (0–1 score), `accuracy_type` (`rooftop`, `range_interpolation`, `street_center`, `place`, `nearest_rooftop_match`, `intersection`, etc.), `source`, and a `stable_address_key`.
+- **Appends:** `&fields=census,timezone,cd,stateleg,acs-demographics,zip4,…` (comma-sep). Each category = +1 lookup (see billing note above).
+- **Pagination:** none in the classic sense — batch is bounded by the 10k/request cap; you chunk your own input into ≤10k blocks. For files, the Lists API is the async lane.
+
+### Rate limits + throughput
+- **Pay-as-you-go / Flex: 1,000 requests/minute** on the single-lookup endpoint. This counts **API calls, not lookups** — so a batch POST of 10,000 addresses is *one* request against the limit, which is how you go fast without tripping it.
+- **Unlimited plan: no rate limit**, dedicated resources, throughput capped only by hardware (~3,333 lookups/min observed).
+- No hard daily cap beyond the free tier's 2,500/day; on paid you just accrue billable lookups. For our volumes (batching the ~18% address-less), batch POSTs keep us far under any limit. (Source: [Geocodio rate-limit guide](https://www.geocod.io/what-happens-when-you-exceed-the-google-geocoding-api-rate-limit).)
+
+### ToS for OUR use
+- **Storage/caching is explicitly ALLOWED — this is Geocodio's headline differentiator.** Unlike Google/most geocoders, "there are no data storage restrictions on forward geocoding… use and re-use the data as needed." That means our disk-cache and permanent persistence of `(lat,lng)`/census on the lead is fully compliant. **One exception: UK reverse geocoding** carries upstream-licensing storage limits (irrelevant to us — we're US-only).
+- No mailing/marketing-purpose restriction; geocoding + skip-trace/marketing enrichment use is fine. No special credentialing gate — self-serve key.
+- Redistribution of raw geocodes as a competing dataset would be the only gray area; internal enrichment/outreach is squarely permitted. (Verify current [Terms](https://www.geocod.io/terms-of-use/).)
+
+### Integration effort (Low/Med/High) + slot-in + build estimate
+**Low.** One key, one header/param, JSON in/out, order-preserving or keyed batch that maps straight to `parcel_id`. Slots **directly into the missing-only inline enricher** (gate: address present AND lat/lng missing → call), and just as easily as a nightly **batch** job that collects all address-less leads and fires one ≤10k POST. Disk-cache keyed on normalized address (you already do this). **Realistic build: 2–4 hours** for the enricher + response mapping + cache + accuracy-threshold gate (drop/flag results with `accuracy < 0.8`). Add ~1 hour if you wire the Lists API + webhook for large recurring files.
+
+### Real-user gotchas / complaints
+- **The Feb 2026 100% price hike ($0.50 → $1.00/1k)** is the big one — budget the doubled rate and confirm whether any legacy discount applies. (Only Unlimited subscribers active by Jan 31 2026 got a grandfather discount; pay-as-you-go got none.)
+- **Appends-as-lookups billing** is the most common cost surprise: requesting several `fields` multiplies spend per record. Only append what you'll use.
+- **Accuracy reality:** on a random US sample expect **~70% rooftop, ~20% range-interpolated, ~10% other**; accuracy is best in dense metros and degrades on rural/new-construction/PO-box-style addresses — relevant since our footprint (Western NC / Upstate SC, rural parcels) skews toward the harder cases. **Gate on `accuracy_type == "rooftop"` and `accuracy >= 0.8`;** treat interpolated results as approximate for point-in-parcel work. Reviewers (G2/Capterra) confirm "great most of the time, occasional inaccurate address," and ask for better map-based verification and non-US/CA coverage.
+- Coverage is **US/CA/MX/UK only** — fine for us. Support is well-regarded (email, responsive); docs are genuinely good, which is the opposite of TrueNCOA.
+- Sources: [Geocodio API docs](https://www.geocod.io/docs/); [pricing](https://www.geocod.io/pricing); [Feb 2026 pricing update](https://www.geocod.io/updates/pricing-updates-2026/); [accuracy types & scores](https://www.geocod.io/guides/accuracy-types-scores); [G2 reviews](https://www.g2.com/products/geocodio/reviews); [Capterra reviews](https://www.capterra.com/p/239419/Geocodio/reviews/).
+
+### Verdict: worth wiring? at what trigger volume?
+**Yes — wire it now.** It's the cleanest fix for the ~18% address-less / lat-lng-less resolver gap, storage is legal (unlike Google), integration is a few hours, and free tier (2,500/day) likely covers steady-state — you'd only pay the $1/1k when a big backlog runs. **Trigger:** any run where the local SCDOT/Charleston resolver returns no coordinates → Geocodio fallback; batch the rest nightly. Even at paid rates the cost is trivial versus the leads it unlocks. Guardrails: request appends only when needed, and gate downstream logic on `accuracy_type`/`accuracy` so interpolated points don't pollute point-in-parcel matches.
+
+
+## Senzing
+
+### What we'd use it for (in this engine)
+Three specific jobs our current union-find can't do well:
+
+1. **LLC / trust / estate → human owner resolution.** When a foreclosure or tax-delinquent parcel is owned by "123 MAIN ST LLC" or "THE SMITH FAMILY TRUST," Senzing links that org record to the humans behind it (registered agent, officers, principals) via **disclosed relationships** — but only if we *feed* it those links (from our NC SoS agent enricher, ROD grantor/grantee, etc.). It does not scrape ownership; it resolves and persists the graph once we supply the edges.
+2. **Cross-source person dedup.** The core value. Right now our backbone keys on `parcel_id / owner / address` and joins with heuristics. Senzing takes the same John/Jon/J. Smith at three address variants across foreclosure + probate + tax-delinquent + obituary + SoS feeds and collapses them into **one persistent entity with a stable ENTITY_ID**, with no training and no hand-tuned rules — fuzzy name (Rob/Robert/Bob), phone `+1` normalization, partial/missing fields, DOB/SSN when present. This is exactly the person-dedup our union-find approximates and gets wrong on messy real-world variants.
+3. **Household / known-associate derived relationships.** Same-address, shared-phone → Senzing surfaces derived relationships (heirs living together, co-owners, spouses) that feed the motivated-seller scoring.
+
+Slots in as a **resolution layer that sits AFTER enrichment**, consuming the same per-lead records we already build, and emits an `entity_id` we write back to the board as a new join key.
+
+### Exact plans/tiers + per-unit overage (2026, verify)
+- **Evaluation / free:** Load and resolve **up to 100,000 DSRs free** (self-serve). Extendable to **1,000,000 free** by emailing [email protected] for a larger non-production license. This is the "free-100k" the brief references — it is the **Non-Production License**, explicitly limited to integration/testing, not production use ([EULA](https://senzing.com/end-user-license-agreement/)).
+- **Production:** Annual subscription priced on **Data Source Records (DSRs)**, billed **annually, upfront for the full term**. Only one public figure is posted: **$58,560/yr at 10M DSRs (~$5.86/DSR/yr)**, on a slider that runs 10M → 1B. No public per-tier table below 10M; you request a quote ([pricing](https://senzing.com/pricing/)).
+- **Overage / DSR counting mechanics (integration-critical):** A DSR = one mapped record loaded (one `DATA_SOURCE` + `RECORD_ID`). **Re-loading/updating a record with the same key REPLACES it and does NOT increment the count.** Searches and updates are excluded. **Deletes reduce** the count. So the free 100k is a *distinct-record* ceiling, not a call ceiling — our per-lead missing-only backfill pattern (idempotent re-writes) costs nothing extra ([DSRs explained](https://senzing.zendesk.com/hc/en-us/articles/115002897308-Data-Source-Records-DSRs-Explained)).
+- **Verify at quote time:** the sub-10M price curve and whether an "unlimited" support-style license exists (referenced in older docs, not on the current pricing page).
+
+**Reality for our footprint:** Western NC + Upstate SC distressed-lead volume is nowhere near 100k *distinct* people/orgs per year. We very likely live **entirely inside the free tier indefinitely**, which reframes the whole "is it worth the High effort" question — the cost is engineering time, not license dollars.
+
+### API shape
+Senzing is **not a hosted REST API you call over the network** — it's an **embedded engine (native C library + language bindings)** you run yourself. This is the single most important integration fact.
+
+- **No base URL / no vendor auth.** There is no API key, no OAuth, no rate limit imposed by a vendor. You link the SDK into your own process (or run their optional REST server / Docker container in *your* infra).
+- **Bindings:** Python, Java, .NET/C#, Go, C++ (v4). For us: the **Python SDK** (`sz-sdk-python-core`), which fits our async pipeline as a synchronous library wrapped in a thread executor.
+- **Backing store:** the engine **requires a database it owns** — PostgreSQL for the Docker quickstart (SQLite for tiny local eval). This is a real dependency: Senzing persists its resolved-entity graph in Postgres; it is *not* stateless.
+- **Key SDK calls (the "3 calls" model):**
+  - `add_record(data_source, record_id, json_record)` — upsert one record. `add_record_with_info(...)` returns JSON of which entities were affected/merged/split.
+  - `search_by_attributes(json_criteria)` — fuzzy search, returns candidate entities + match scores.
+  - `get_entity_by_entity_id(entity_id)` / `get_entity_by_record_id(...)` — pull the resolved entity, its member records, and relationships.
+  - `delete_record(...)`, `reevaluate_entity(...)`.
+- **Request format — the Senzing "entity spec" JSON** (this is where the real work is). Flat `FEATURES` array, one feature object per value:
+  ```json
+  {
+    "DATA_SOURCE": "FORECLOSURE",
+    "RECORD_ID": "parcel-0553-14-2201",
+    "FEATURES": [
+      { "RECORD_TYPE": "PERSON" },
+      { "NAME_TYPE": "PRIMARY", "NAME_FIRST": "Robert", "NAME_LAST": "Smith" },
+      { "ADDR_TYPE": "HOME", "ADDR_LINE1": "123 Main St", "ADDR_CITY": "Asheville", "ADDR_STATE": "NC", "ADDR_POSTAL_CODE": "28801" },
+      { "PHONE_NUMBER": "702-555-1212" },
+      { "DATE_OF_BIRTH": "1968-03-14" }
+    ]
+  }
+  ```
+  Orgs use `{"RECORD_TYPE":"ORGANIZATION"}` + `NAME_ORG`. Multiple names/addresses/phones = multiple objects, never nested lists; never mix parsed (`NAME_FIRST/LAST`) with unparsed (`NAME_FULL`) in one object ([entity spec](https://senzing.com/docs/entity_specification/index.html)).
+- **LLC→human via disclosed relationships (this is how it beats union-find):** you load the **company record AND each person record separately**, then link them with `REL_ANCHOR_*` / `REL_POINTER_*` features. The pointing record carries `REL_POINTER_DOMAIN`, `REL_POINTER_KEY`, `REL_POINTER_ROLE` (standardized roles: `PRINCIPAL_OF`, `OWNER_OF`, `EMPLOYED_BY`, `DIRECT_PARENT`, `ULTIMATE_PARENT`, `SPOUSE_OF`, etc.); the target carries `REL_ANCHOR_DOMAIN` + `REL_ANCHOR_KEY`. Once the person is its own record, Senzing **automatically resolves that same human across every other dataset we load** — so "principal of 123 MAIN ST LLC" gets fused with the same person appearing in a probate filing or obituary. That auto-fusion is the thing our union-find fundamentally cannot do without bespoke rules ([disclosed relationships](https://senzing.zendesk.com/hc/en-us/articles/360051209553-How-to-create-disclosed-relationships)).
+- **Batch/pagination:** batch load via their `sz-file-loader` reading **JSONL** (one entity-spec record per line), or loop `add_record` yourself. Search returns capped candidate lists; you page by tightening criteria. No cursor-based REST pagination because there's no REST layer by default.
+
+### Rate limits + throughput
+- **No vendor-imposed limits** — it's your process and your Postgres. Throughput is bound by **your CPU cores and DB tuning**. Senzing is genuinely built for scale (hundreds to thousands of records/sec/node with a tuned Postgres; near-real-time single-record `add_record`).
+- Practical caveat for us: the engine is **synchronous and stateful against a shared DB**. In our async httpx/curl_cffi pipeline it must run **behind a thread-pool executor / dedicated worker**, and concurrent `add_record` writes contend on the same Senzing datastore — you don't fan it out per-coroutine the way you do HTTP enrichers.
+
+### ToS for OUR use
+- **Skip-trace / marketing use:** Not contractually prohibited by the EULA — Senzing is source-agnostic infrastructure; it resolves whatever you load and takes no position on downstream marketing use. **The compliance obligation lives on OUR input data and OUR outreach** (same DNC/consent/state-solicitation rules that already govern the motivated-seller engine), not on Senzing. Senzing itself **ships no data** — there is nothing to redistribute from them.
+- **Redistribution:** You may not redistribute or let third parties access/copy the **Senzing software**; no reverse-engineering, no derivative works ([EULA](https://senzing.com/end-user-license-agreement/)). Nothing bars you from using or distributing **your own resolved output** — the entities are your data.
+- **Storage / caching:** Fully compatible with our model — Senzing is *designed* to persist resolved entities in your own DB indefinitely; caching entity_ids on our board is the intended pattern, not a violation.
+- **Credentialing gate:** **None for the free/eval tier** — self-serve download, no gatekeeping, no "who are you / what's your use case" wall for 100k. The **1M extension and production license are quote-gated** (email/contact required). No professional-license or data-broker credential is required to run the engine.
+
+### Integration effort (High) + where it slots + build estimate
+**High — and it's the correct call to flag it as the High-effort one.** The effort is *not* API glue (there's no API); it's:
+
+1. **Stand up + own a stateful service.** Add a Postgres instance and the Senzing runtime to our infra (Docker: `init-database` → `senzingsdk-runtime`). This alone breaks our "stateless free-only local scrapers" pattern — it's the first component that needs a managed DB and a long-lived process. Air-gapped/on-prem is supported but that's not our need.
+2. **Data mapping — the real cost.** Every source (foreclosure, probate, tax-delinquent, SoS, obituary, ROD) must be transformed from our internal lead schema into **Senzing entity-spec JSON**, with correct `DATA_SOURCE` codes, `RECORD_TYPE`, parsed name/addr/phone features, and — for LLC→human — the `REL_ANCHOR`/`REL_POINTER` disclosed-relationship edges wired from our SoS-agent and grantor/grantee data. Third-party and vendor guidance converge: **"Senzing does not fix bad data; it evaluates what it receives"** — accuracy comes from *our* profiling, cleansing, standardization, and threshold tuning, not from install ([Match Data Pro](https://matchdatapro.com/how-to-achieve-accurate-senzing-entity-resolution-in-2026/)). There is an AI-assisted mapping tool + MCP server now that reduces this, but the per-source mapping + relationship modeling is still the bulk of the work.
+3. **Wire-back.** After enrichment, push each lead as a record, read back `entity_id` + relationships, write to the board (respecting `load_board()` so the vision/comps/cama sidecar isn't wiped), and re-key downstream dedup on `entity_id`.
+
+**Realistic build estimate:** ~**1 week to a working single-source POC** on the free tier (Docker + Postgres + Python bindings + map foreclosure records + prove person-dedup on real data — Senzing markets this as a one-day POC, budget a week for our reality). **~3–4 weeks to production-grade** across all sources with disclosed-relationship LLC→human wiring, standardization pass, threshold tuning, async-worker integration, and board write-back. Plus ongoing: it's a **continuous** system (re-tune as sources are added), not fire-and-forget.
+
+### Real-user gotchas / complaints
+- **"Works out of the box" is half-true.** G2 reviewers do praise accuracy and say it rarely needs reconfiguration — but the same body of guidance stresses **accuracy is NOT guaranteed by install**; it "requires focus on data preparation, configuration, validation, and ongoing optimization" (G2 via [search](https://www.g2.com/products/senzing/reviews); [Match Data Pro](https://matchdatapro.com/how-to-achieve-accurate-senzing-entity-resolution-in-2026/)). Expect false positives from over-loading weak attributes and false negatives from dirty input. (Note: G2's review page returned HTTP 403 to direct fetch; specifics here are from the indexed summary, worth re-reading live before committing.)
+- **Data mapping to JSONL was the historic #1 pain** — repeatedly cited as "the hardest part." Senzing added an AI mapping tool + MCP server specifically to blunt this, which tells you how common the complaint was.
+- **Pricing rigidity.** The recurring G2 gripe is wanting "a more flexible pricing model" — the DSR-volume model and upfront-annual billing don't suit everyone. Irrelevant to us if we stay under 100k free, very relevant if we ever scale past 1M.
+- **Setup varies / DB dependency.** "Setup can be challenging but documentation is very good." The unspoken cost for us: it drags in a **PostgreSQL dependency and a stateful runtime**, which is a genuine architectural shift from our current free-only local-scraper posture.
+- **No data staleness risk from Senzing** — it holds no reference data; staleness is entirely a function of how fresh *our* feeds are. That's a point in its favor.
+
+### Verdict: worth wiring? at what trigger volume?
+**Worth wiring — but as a Phase-2 backbone upgrade, not a quick enricher, and only once volume/complexity justifies owning a stateful service.**
+
+- The **license cost is almost certainly $0** for us (Western NC + Upstate SC distressed leads sit well under 100k distinct entities/yr). So the decision is purely **engineering-time vs. capability**, not dollars — which materially improves the case.
+- **The unique capability is real and not replicable cheaply:** automatic, training-free cross-source person dedup + LLC/trust→human via disclosed relationships is exactly the `name→property→equity→contact` backbone weakness. Our union-find approximates it and mis-merges on real-world name/address noise; Senzing is purpose-built for precisely this.
+- **Trigger to build:** wire it when **(a)** we're routinely running **3+ overlapping person-indexed sources** (foreclosure + probate + tax-delinquent + SoS + obituary — we now are), AND **(b)** union-find mis-merges/mis-splits are demonstrably costing outreach quality (duplicate mailers, wrong-person contacts, missed heir links). That threshold is essentially met today.
+- **Do NOT build it** if the near-term win is just "one more field on existing leads" — the Postgres + stateful-runtime + per-source mapping overhead only pays off when entity resolution *itself* is the product, i.e., you're unifying the whole motivated-seller graph. Given the backbone is explicitly the mission, **recommend a 1-week free-tier POC** on the foreclosure + SoS + probate slice to measure lift over union-find before committing the 3–4 week production build.
+
+**Sources:** [Senzing pricing](https://senzing.com/pricing/) · [DSRs explained](https://senzing.zendesk.com/hc/en-us/articles/115002897308-Data-Source-Records-DSRs-Explained) · [EULA](https://senzing.com/end-user-license-agreement/) · [v4 Docker quickstart](https://senzing.com/docs/quickstart/quickstart_docker/) · [Entity specification](https://senzing.com/docs/entity_specification/index.html) · [Disclosed relationships how-to](https://senzing.zendesk.com/hc/en-us/articles/360051209553-How-to-create-disclosed-relationships) · [Match Data Pro accuracy guide](https://matchdatapro.com/how-to-achieve-accurate-senzing-entity-resolution-in-2026/) · [G2 reviews](https://www.g2.com/products/senzing/reviews) · [SDK deployment options](https://senzing.com/senzing-sdk-deployment-options/)
+
+
+## PropStream
+
+### What we'd use it for (in this engine)
+PropStream is a nationwide property-data + skip-trace UI (assessor/deed/MLS/foreclosure aggregation, owner phones/emails, comps, mail). In our pipeline the *only* plausible role is as a **human-operator research console** for one-off list-pulls and manual comps — NOT as a programmatic enricher. It does not fit the "per-lead missing-only backfill keyed on parcel_id/owner/address, disk-cached, called from async httpx" model at all, because there is no data API to call.
+
+### Exact plans/tiers + per-unit overage (2026, verify)
+- Base subscription ~**$99/mo** (annual) / higher month-to-month; "50 imports/exports of properties" included in the free trial.
+- **PropStream Connect** add-on: included on Pro & Elite; **$30/mo** add-on on Essentials. Bundles Skip Tracing, Click-to-Dial, Dialer Campaigns (up to 150 call attempts/day, 3 phone numbers), **Lead Automator** (monitor up to 50,000 properties, expandable to 1,200,000 for more), and **discounted Direct Mail (postcards "as low as 48¢")**.
+- Skip trace is priced per-record (historically ~$0.10–0.12/hit); direct mail per-piece. All UI-metered, not exposed as billable API units. *(Verify current per-record skip cost in-app — PropStream doesn't publish it cleanly.)*
+
+### API shape — base URL, auth, endpoints, format, batch, pagination
+**There is no public REST data API for subscribers.** Confirmed across the FAQ, ToS, and product pages: data comes OUT only via **manual CSV export from the UI** (My Properties / My Contacts → Export). The one "API" that exists is a **native outbound push to BatchDialer** ("Push-to-BatchDialer") that sends already-skip-traced records from the UI into a dialer — one-directional, to a specific partner, not a general data endpoint you can pull from. Zapier is not offered either; integration is CSV + BatchDialer push only.
+- Note: the `prostream.app` "Prostream API" that surfaces in search is an unrelated European product — do not confuse it with PropStream.
+- **No base URL, no auth token, no endpoints, no batch, no pagination** for our purposes. Programmatic path = **none**.
+
+### Rate limits + throughput
+N/A (no API). Practical constraint is UI export cadence + PropStream's **active anti-scraping monitoring** (see ToS). Skip trace and Lead Automator have their own daily/monthly UI caps tied to plan.
+
+### ToS for OUR use
+This is the disqualifier. PropStream's Terms of Use explicitly prohibit, for the standard subscription: **"marketing or telemarketing uses,"** "reproduction, reformatting, publication, distribution or dissemination… to any third party," **"extracting, selecting or drawing out any data element for any use,"** and "World Wide Web, Internet or online uses." They also state they **monitor search volume to prevent "data mining" and non-customary usage patterns.** A property-keyed enrichment pipeline that extracts data elements and feeds outreach is squarely against these terms; automating export would risk account termination. Skip-trace/marketing at scale requires "the appropriate subscription allowing such expanded use" — i.e., not the base plan.
+
+### Integration effort + where it slots + build estimate
+**Effort: High / effectively N/A.** The only automatable path is headless-browser UI scraping of exports, which the ToS forbids and which PropStream actively watches for. It does not slot into the async enricher layer. If used at all, it's an **operator tool** sitting *outside* the pipeline: a human pulls a CSV, drops it in an inbox dir, and an existing offline parser ingests it (the same manual-court-export lane pattern already in the repo). Build estimate for a compliant, non-API integration: **~0.5 day** to write a CSV-ingest normalizer mapping PropStream columns → our parcel/owner/address schema. Building a real programmatic enricher: **not viable**.
+
+### Real-user gotchas / complaints
+- **Skip-trace match rate is the recurring complaint.** BiggerPockets practitioners report ~**650 hits on a 5,000-record run** after stripping LLCs, and "**30 accurate numbers out of 100**"; match accuracy pegged at **60–80%** with stale numbers (>30 days) so a large share don't connect ([BiggerPockets: "Propstream Skip Trace sucks"](https://www.biggerpockets.com/forums/48/topics/1088608-propstream-skip-trace-sucks)). PropStream's own Feb-2026 "multi-sourced skip tracing" update ([PropStream news](https://www.propstream.com/news/updated-skip-tracing-experience-in-propstream-what-changed-and-how-to-use-it)) is an implicit admission of the historical accuracy gap.
+- No-refund posture on skip-trace misses.
+- Strength is breadth/price of the *underlying property data* and the built-in filters, not contact accuracy.
+
+### Verdict: worth wiring?
+**Do not wire into the pipeline — no API, and the ToS forbids exactly our use.** Keep it, if at all, as a **manual operator console** for ad-hoc comps and list QA, with any CSV brought in through the existing manual-ingest lane. Trigger volume to justify even that: only if an operator is already living in PropStream daily. For programmatic owner→contact enrichment, PropertyRadar (below) is the correct tool; PropStream is the wrong shape entirely.
+
+---
+
+## PropertyRadar
+
+### What we'd use it for (in this engine)
+This is the one of the three that's a **true programmatic enricher** and fits our model directly. Two high-value roles:
+1. **Address/parcel → owner + property enrichment**: feed a distressed address or APN, get owner name(s), mailing address, absentee flag, equity, value, beds/baths/sqft, tax status — backfilling the exact fields our GIS/assessor fallbacks miss.
+2. **Owner → phone/email append (skip trace)**: the `Persons`/append endpoints return contact info, and BiggerPockets consensus is these numbers are **"much more accurate than PropStream."**
+Slots cleanly as a `httpx` enricher gated on missing fields, disk-cached by RadarID/parcel/owner.
+
+### Exact plans/tiers + per-unit overage (2026, verify)
+| Plan | Price (annual/monthly) | Users | Included exports/mo | Included phone/email/mo | Export overage | Phone/email overage | API |
+|---|---|---|---|---|---|---|---|
+| Solo | $99 / $119 | 1 | 10,000 | 250 | 2¢/rec | 8¢/contact | ❌ |
+| Team | $199 / $249 | 3 | 25,000 | 500 | 1.5¢/rec | 6¢/contact | ❌ |
+| **Business** | **$549 / $599** | 10 | 50,000 | 2,500 | **1¢/rec** | **4¢/contact** | ✅ **Included** |
+
+Add-on discount: Team 25% off, Business 50% off. **API access is gated to the Business tier** — this is the real cost of entry (~$549–599/mo). Every property record returned with data = **1 export**, whether you pull 1 field or 50. *(Verify tiers/quotas at signup — PR adjusts these.)*
+
+### API shape — base URL, auth, endpoints, format, batch, pagination
+- **Base URL:** `https://api.propertyradar.com/v1`
+- **Auth:** Bearer token — `Authorization: Bearer {token}` (key from Account Settings). REST, JSON in/out, `Content-Type: application/json`.
+- **Key endpoints (tags):** **Properties** (search/purchase), **Persons** (owner + phone/email append), **Lists** (create/add/remove, saved criteria), **Imports** (address-match import → append owner data to your address list), plus Monitors/automations.
+- **Request format:** criteria array — `Criteria: [{ "name": "FieldName", "value": [...] }]`, 250+ fields (e.g. `ZipFive`, `AvailableEquity` as range `[[100000,null]]`, `PropertyType`, `Pool`). Range fields use nested `[[min,max]]`.
+- **The critical billing control:** `Purchase=0` returns **count only, free, no quota hit**; `Purchase=1` returns actual data and **bills as exports**. This maps perfectly to our missing-only pattern: preview with `Purchase=0`, then purchase only the records we actually need.
+- **Batch:** yes — the Import endpoint takes a list of addresses for bulk match/append; search returns thousands per request for bulk enrichment.
+- **Pagination:** `Start` + `Limit` offset paging (JSON REST). *(Exact `Limit` max lives in the interactive reference behind login; treat "thousands per request" as the design intent and page conservatively.)*
+
+### Rate limits + throughput
+PR does not publish a hard numeric req/sec cap in the public help center; the docs stress **quota discipline over rate discipline** — the binding constraint is your monthly export/append allowance and the no-refund rule ("accidentally return 10,000 records → 10,000 exports, non-refundable"). Practical guidance: single-threaded or low-concurrency, always preview with `Purchase=0` first, and let our disk cache prevent re-pulls. *(Confirm any per-second throttle in the authenticated reference before parallelizing.)*
+
+### ToS for OUR use
+Materially friendlier than PropStream for skip-trace/marketing (PR explicitly markets itself for list-building and direct-mail/marketing). **The catch is redistribution:** *"the PropertyRadar API is intended for end-users only — you can not use it to build applications you sell to others."* OAuth exists only for partner apps acting on behalf of shared PR customers. **Storage/caching for our own use is fine; reselling the data or exposing it in a product we sell is not.** Since our engine consumes contacts for our own outreach, we're inside the lines — but if this were ever productized for clients, each client would need their own PR credential (credentialing gate).
+
+### Integration effort + where it slots + build estimate
+**Effort: Low–Medium.** Clean REST + bearer + JSON is a natural fit for the existing `httpx` enricher base. Slots as a new enricher after GIS/assessor fallback, gated on missing owner/contact/equity, keyed on parcel/owner/address, disk-cached by RadarID. Build: **~1–1.5 days** — client wrapper (auth, `Purchase=0` preview → `Purchase=1` purchase, Start/Limit paging, quota-aware backoff, cache), field-mapping to our schema, and a quota guard so a bad run can't torch the monthly allowance. Add ~0.5 day to wire the Import/address-match path for bulk backfill.
+
+### Real-user gotchas / complaints
+- **G2 4.5/5 (34 reviews), Trustpilot 4.2/5** — strongest marks for data accuracy and monitoring ([G2](https://www.g2.com/products/propertyradar/reviews)).
+- Phone accuracy **"much more accurate than PropStream"** per BiggerPockets — the main reason to prefer it as our skip source.
+- Complaints: **~10–20% of foreclosure/auction records don't actually go through** (list staleness at the event level, not data-field error); occasional wrong owner/property fields; **strict no-refund policy even on reported data errors**; UI learning curve; one reviewer wanted "an open API instead of relying on Zapier."
+- **The financial gotcha is the export-counting model**: every returned record burns quota regardless of fields, and overages/purchases are non-refundable — so the `Purchase=0` preview discipline is not optional.
+
+### Verdict: worth wiring?
+**Yes — this is the enricher to build of the three.** It's the only one with a real, well-shaped data API and skip-trace-permissible ToS, and its contact accuracy beats PropStream. Economic trigger: the **$549–599/mo Business tier is the floor** (API-gated), so it's worth wiring once monthly enrichment volume clears roughly **3,000–5,000 property/contact pulls** (where the included 50k exports / 2,500 contacts + cheap 1¢/4¢ overages beat per-lookup one-off vendors). Below a few hundred leads/mo, the Business subscription is dead weight — stay on cheaper per-hit skip vendors until volume justifies it.
+
+---
+
+## Stannp
+
+### What we'd use it for (in this engine)
+Stannp is a **direct-mail execution API** — the "send a physical letter/postcard to this owner" step at the very *end* of the funnel, after a lead is scored, owner+mailing-address resolved, and selected for outreach. It's not an enricher (it adds no data to a lead); it's the **outbound action** the pipeline fires once a lead qualifies. Fits as a terminal step / side-effect, triggered per-lead, not part of the missing-only backfill.
+
+### Exact plans/tiers + per-unit overage (2026, verify)
+Pay-per-dispatched-item; **price includes print + postage + envelope** (color standard). US letter (8.5×11) pricing by plan × volume:
+
+| Volume | Free | Starter | Growth | Premium |
+|---|---|---|---|---|
+| ≤1,000 | $0.95 | $0.89 | $0.89 | $0.89 |
+| 1k–9,999 | $0.95 | $0.82 | $0.82 | $0.82 |
+| 10k–49,999 | $0.95 | $0.82 | $0.73 | $0.73 |
+| 50,000+ | $0.95 | $0.82 | $0.73 | **$0.69** |
+
+Add-ons: extra 1-sided sheet **+$0.08**, extra 2-sided **+$0.10**, **non-USPS-matched (unverified) address +$0.20**. Postcards run cheaper (PropStream quotes Stannp-class postcards "as low as 48¢"); *(verify postcard tier table + First Class upgrade in-app — the detailed-pricing page loads its calculator client-side).* Plan tier also sets your **rate limit** (below), so plan choice is driven by throughput, not just price.
+
+### API shape — base URL, auth, endpoints, format, batch, pagination
+- **Base URL:** `https://api-us1.stannp.com/v1` (US region; EU is `api-eu1`).
+- **Auth:** API key via **HTTP Basic** (`{API_KEY}:` as username, blank password) **or** `?api_key=` GET param. Simple, no OAuth.
+- **Format:** **multipart/form-encoded** (not JSON) — supports file uploads. Recipient as nested fields `recipient[firstname]`, `recipient[address1]`, etc.
+- **Key endpoints:**
+  - `POST /v1/letters/create` — create+send one letter. Params: `test` (bool → returns sample PDF, no charge), `recipient` (existing ID or new array), `template` (int, for mail-merge) OR `file` (PDF/DOC, ≤25 pp, as binary/URL/base64), `size` (`US-LETTER` / `US-LETTER-XL-WINDOW`), `duplex`, `clearzone`, `post_unverified`, `tags`, `addons` (`FIRST_CLASS`,`CONFIDENTIAL`).
+  - `POST /v1/letters/post` — post a pre-merged letter.
+  - `GET /v1/letters/get/:id` — retrieve status/record.
+  - `POST /v1/letters/cancel` — cancel before dispatch.
+  - Parallel `POST /v1/postcards/create` for postcards; group/mailing-list endpoints for uploading recipient batches.
+- **Response:** JSON — `{ "success": true, "data": { "id", "pdf", "cost", "status", "format", ... } }`; errors `{ "success": false, "error": "..." }`. Test mode returns `status:"test"` and the proof PDF URL.
+- **Batch:** two patterns — (a) one API call per recipient (fine at our volumes), or (b) upload a group/recipient list then run a campaign against a template. There's no single "bulk-array-in-one-call" letters endpoint; loop per-recipient or use the campaign/group flow.
+- **Webhooks:** yes — delivery, returned-mail, and QR-scan callbacks for status tracking (maps to our per-lead outreach state).
+
+### Rate limits + throughput
+Published and plan-tiered: **Free 60 req/min, Starter 300, Growth 600, Premium 2,000, Enterprise 3,000.** Every response carries `X-RateLimit-Limit` / `-Remaining` / `-Reset`. Since one call = one mailpiece in the per-recipient pattern, 300–600/min is ample for our lead volumes. Async fire from the pipeline with a small concurrency cap and honor the reset header.
+
+### ToS for OUR use
+Cleanest of the three. Direct mail to property owners for real-estate outreach is Stannp's core, explicitly-supported use case — **no skip-trace/marketing-permission problem** because Stannp is the *sender*, not a data provider. No redistribution issue (we're not reselling their data — there is none). We're responsible for the mailing list and CAN-SPAM/UOCAVA-style compliance of our own content; Stannp handles print/postage/USPS. `post_unverified` / +$0.20 unverified-address surcharge is the only nuance — feed it USPS-matched mailing addresses (which our resolver already produces) to avoid the fee and reduce returns.
+
+### Integration effort + where it slots + build estimate
+**Effort: Low.** Form-encoded + Basic auth over `httpx` is trivial. Slots as a **terminal outreach action** (not an enricher): after a lead is graded and an operator/rule approves mailing, call `letters/create` (or postcards), store the returned `id`, and reconcile status via `letters/get` or the webhook. Build: **~0.5–1 day** — client (auth, form-encode, `test=true` proofing path, cost capture, rate-limit header handling), a template or PDF-generation step for the mail piece, idempotency to avoid double-sends (Stannp has a dedupe guide), and webhook receiver for delivery/return status. Start every integration in `test=true` to validate the proof PDF before spending postage.
+
+### Real-user gotchas / complaints
+- **Trustpilot ~4+/47 reviews, mixed** ([Trustpilot](https://www.trustpilot.com/review/stannp.com)). Print/paper quality and support (named reps) praised; ease of use good.
+- **Delivery-time variance is the real risk**: one reviewer reported letters promised "within a week" taking **~2 months**, arriving after a time-limited offer expired — for time-sensitive foreclosure outreach, build in slack and don't put hard deadlines in the mail copy.
+- UI list-building clunky for tiny manual sends (45 min for 5 recipients) — irrelevant for us since we send via API, not the UI.
+- Watch the **+$0.20 unverified-address** surcharge and returns if mailing addresses aren't USPS-matched.
+
+### Verdict: worth wiring?
+**Yes, when the funnel actually mails.** It's the correct, low-effort, ToS-clean execution endpoint for physical outreach, and the per-piece economics ($0.69–0.89 letters incl. postage) are competitive. Trigger: wire it **once we're sending even ~50–100 pieces/mo** — the API pays for itself immediately vs. manual mail-merge, and there's no subscription floor (pay per item; plan tier only buys higher rate limits). Below a handful of pieces, hand-send; the moment mailing is recurring, Stannp is the automation.
+
+---
+
+### Bottom line for the pipeline
+- **PropertyRadar** = the only real *enricher* — wire it (Business tier, API-gated, ~$549+/mo) once contact/property backfill volume clears a few thousand pulls/mo. Best contact accuracy of the three.
+- **Stannp** = the *action* endpoint — wire it as the terminal direct-mail step; low effort, clean ToS, no subscription floor.
+- **PropStream** = **no programmatic path and ToS actively forbids our use**; keep only as a manual operator console feeding CSVs through the existing manual-ingest lane, never as an automated enricher.
