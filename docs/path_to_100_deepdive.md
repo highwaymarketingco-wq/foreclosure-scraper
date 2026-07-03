@@ -4872,3 +4872,578 @@ Value frame: **dignity, zero hassle, family stays in control, decide on your tim
 - **Code-violation:** highest-converting of the three because motivation is concrete and the owner is usually rational, not grieving. Expect roughly **4-8% response** on a targeted, multi-touch mailer to a clean code-violation list, and something like **1 signed contract per ~40-60 owners worked** once you filter for real equity and absentee/tired owners. Fast to contract once you connect.
 - **Incarcerated:** **low response and slow** — figure **1-3% reply** to facility mail, long lag (weeks per exchange), and heavy mechanical friction (notary, POA, verifying authority, occasional court approval). But the *few* who engage are highly motivated, so it's a low-volume/high-intent niche. Budget months per deal; the family-member side channel is where most of these actually close.
 - **Elderly:** deliberately slow, relationship-driven, **moderate response (~3-5%)** but a *long* runway from first contact to close, and a meaningful share should be walked *away from* or handed to family/attorney rather than contracted — that self-selection is a feature, not a loss. Realistic funnel: many warm conversations, few signatures, but the ones that close are clean, referral-generating, and defensible. Treat "we passed because the owner wasn't clearly capable" as a successful outcome, not a failed one.
+
+
+---
+
+# Deep-Dive Round 14 — Deal Financial Modeling per Strategy (2026-07-02)
+
+
+## Wholesale / Wholetail
+
+### The model (how the money is actually made, one paragraph)
+Wholesaling is a paper play, not a property play. You get a distressed house under a purchase contract at a deep discount, then transfer that contract (not the house) to a cash buyer/flipper for more than you owe the seller, pocketing the spread. You never take title, never rehab, and never carry the asset — your only capital at risk is the earnest money deposit (EMD). The profit is the assignment fee: the gap between your contract price with the seller and what the end-buyer will pay to step into your shoes. It works because the flipper is happy to pay you $5k–$15k to skip the acquisition grind (marketing, negotiating, chasing motivated sellers), and because you priced the contract low enough that even after your fee the flipper still clears their own 70%-of-ARV threshold. **Wholetail** is the adjacent variant: instead of assigning, you actually close on the house (usually a light/cosmetic property that a retail buyer can live in), do a broom-clean-to-light-refresh, and relist it on the MLS to capture retail-vs-cash spread yourself — more capital and time, bigger margin, and it wins whenever the house is clean enough that assigning at a wholesale discount leaves too much meat on the bone.
+
+### The underwriting formula (the exact max-offer / MAO equation with every cost line)
+Wholesale MAO is the flipper's max-bid minus your fee. Because the end-buyer underwrites to the 70% rule, your ceiling is *their* ceiling:
+
+```
+Buyer_MAO_70   = ARV * 0.70 - rehab
+Wholesale_MAO  = ARV * 0.70 - rehab - assignment_fee        (pure assignment)
+```
+
+The 0.70 is not sacred. In our softening/thin-comp rural markets (mobiles, non-metro Upstate/WNC) drop to **0.65 or 0.60** because comp data goes stale before close and buyer pools are shallow. Metro Asheville/Greenville with tight comps can support 0.70–0.72. For the **wholetail** path you underwrite it like a mini-flip on the *retail* exit, not a cash-buyer exit:
+
+```
+Wholetail_MAO = (ARV_retail * (1 - selling_costs%))         # net sale proceeds
+              - light_rehab
+              - holding_costs                                # taxes/insurance/utilities over ~2-4 mo
+              - financing_costs                              # if hard-money/transactional used
+              - target_profit
+Where selling_costs% ≈ 0.08–0.09  (listing agent 2.5–3% + concessions + SC/NC deed stamps
+   [$1.85/$500 in NC ≈ 0.37%, $3.70/$1,000 in SC ≈ 0.37%] + closing/title ~1%).
+```
+
+### Capital required + financing (down/EMD, hard-money points+rate 2026, holding months, total cash-in)
+**Pure assignment** is the near-zero-capital lane: your only cash-in is the **EMD** ($500–$2,500 typical on our price band; sometimes $100 on motivated-seller deals), plus marketing cost to source the lead. No down payment, no loan, no points, no holding. You get paid the assignment fee at the A-to-C closing table.
+
+**Double-close** (needed when the assignment fee is large enough that disclosing it on a single settlement statement would blow the deal, or when title/end-lender won't allow a visible assignment) requires you to fund the A-to-B purchase for minutes-to-hours. That is what **transactional funding** is for: 2026 pricing runs **1.5%–2.5% of the A-B price (≈$750 minimum), plus a $400–$900 processing/doc fee**, for same-day/24-hour money. Budget **$3,000–$6,000 extra** vs. a clean assignment once you add two sets of closing costs and sometimes double title insurance. On a $90k A-B price that's roughly $1,350–$2,250 in points + ~$700 fee ≈ **$2,000–$3,000 all-in** for the funding alone.
+
+**Wholetail** needs real acquisition capital. Either cash, or **hard money at 2026 terms: ~10%–12.5% interest + 2–3 points**, typically 85%–90% of purchase and often 100% of a light rehab, held **2–4 months**. On a $95k buy that's ~$1,900–$2,850 in points plus ~$800–$1,000/mo interest, so total cash-in (down + points + a few months carry + light rehab of $8k–$20k) commonly lands **$20k–$40k**.
+
+### Exit math + margins (realistic profit + the make-or-break variables)
+- **Assignment profit = the fee, full stop.** Realistic in our markets: **$5k–$15k** on entry-level SFR/mobile, and NC specifically shows some of the **highest average assignment fees in the country (~$20k+)** on good deals. National average assignment fee is **~$13k**; experienced operators run **$15k–$20k**.
+- **Make-or-break variables for assignment:** (1) **ARV accuracy** — every $10k you're wrong on ARV comes straight out of your fee, because the buyer's 70% ceiling moves with it; (2) **rehab estimate** — you must underwrite the flipper's number, not a rosy one, or your contract won't assign; (3) **buyer depth** — a fee only exists if a cash buyer actually closes; thin rural buyer pools kill deals; (4) **spread cushion** — if `ARV*0.70 - rehab` doesn't clear your seller price by at least ~$5k, there is no deal.
+- **Wholetail profit** is larger — you keep the retail-vs-wholesale gap yourself, commonly **$15k–$35k** net on our band — but you now eat **selling costs (~8–9%)**, **holding**, and **financing**, and you carry **market/DOM risk**. Wholetail wins when the house is clean/livable (retail buyer can finance it), comps are tight enough to trust the retail ARV, and the wholesale discount you'd have to give away exceeds your all-in cost to just sell it retail yourself.
+
+### A worked example (a real deal in our price band: ARV, rehab, all costs, the offer, the profit)
+Distressed SFR, Spartanburg County SC. **ARV = $180,000**, real **rehab = $35,000** (dated kitchen/bath, roof, HVAC — a true flip candidate, so *assign*, don't wholetail).
+
+- Buyer's ceiling: `180,000 * 0.70 - 35,000 = 126,000 - 35,000 = 91,000` → flipper max-bid **$91,000**.
+- Your target fee: **$10,000**.
+- **Wholesale MAO to the seller:** `91,000 - 10,000 = 81,000`. You lock the contract at or below **$81,000**, put down **$1,000 EMD**.
+- **Exit (assignment):** assign to a cash flipper for **$91,000**; end-buyer pays the $81k to the seller plus your **$10,000 assignment fee** at closing. **Profit = $10,000 on ~$1,000 at risk.**
+- **If instead the house were cosmetically clean** (say ARV $180k but only **$12,000 of paint/flooring/clean-out**): assigning at 70% would force the seller to ~$114k and leave a small assignment spread. Better to **wholetail**: buy at ~$118k (hard money, 2 pts + ~10.5%), spend $12k, hold 3 months (~$2.7k carry + ~$2.4k points + ~$1.5k taxes/ins/util), sell retail at $180k, net after ~8.5% selling costs (~$15.3k) ≈ `180,000 - 15,300 - 118,000 - 12,000 - 6,600 = 28,100` → **~$28k profit** vs. a ~$6k assignment fee. That gap is the whole reason wholetail exists.
+
+### Encode in the engine (the per-strategy max_bid formula / which grade factors change)
+- **Add two strategy-specific max-bid fields** alongside `max_bid_70`:
+  - `wholesale_mao = arv * disc - rehab - assignment_fee`, where `disc` is region-tuned: **0.70** metro Asheville/Greenville with `arv_confidence` high; **0.65** default Upstate/WNC; **0.60** rural mobiles / low `arv_confidence` / thin comp dispersion. `assignment_fee` scales with spread: default **$10k**, floor **$5k**, and let it rise toward **$15k–$20k** when `(arv*disc - rehab - seller_price) > 25k`.
+  - `wholetail_mao = arv*(1 - selling_costs_pct) - light_rehab - holding - financing - target_profit`, with `selling_costs_pct ≈ 0.085` (agent + NC/SC deed stamps ~0.37% + title/closing ~1%), triggered only when `rehab_level == light/cosmetic` AND `arv_confidence` high AND property is financeable (not a pre-'76 mobile a retail lender won't touch).
+- **Strategy router:** compute both; pick wholetail when `wholetail_profit > assignment_fee` **and** `capital_available >= wholetail_cash_in` **and** `arv_confidence >= high`; otherwise default to assignment (near-zero capital, near-zero risk).
+- **Grade factors that change per strategy:** for **assignment**, grade should reward *spread cushion* (`arv*disc - rehab - seller_price`) and **penalize low `buyer_pool_depth`** (rural = downgrade, since no buyer = no fee) and low `arv_confidence` (widen the discount, don't just trust the fee). For **wholetail**, grade must fold in **DOM/market-liquidity risk, holding cost, and financeability** (mobiles and heavy-rehab houses are auto-disqualified from the wholetail grade). Also flag a **`nc_wholesale_license_required` boolean**: for NC residential 1–4 unit deals, contracts on/after **Oct 1, 2025** (HB 797) treat wholesaling as brokerage activity — public *marketing* of the property/contract now needs a license, contracts must carry a **14-pt cancellation notice** and a **non-waivable 30-day homeowner right-to-cancel**, so assignment marketing should be gated to licensed disposition or routed to double-close/private-buyer-list only. **SC** (2024 Real Estate Practice Act revisions) is similar in spirit: assigning your equitable interest to a private buyer pool is fine, but **publicly advertising a residential property you don't own requires licensure** — so keep SC residential dispo on a private buyers list, not public MLS/Zillow marketing.
+
+**Sources:**
+- [Average Wholesale Assignment Fee 2026 by Location — RealEstateBees](https://realestatebees.com/statistics/average-wholesale-assignment-fee/)
+- [Real Estate Wholesale Formula / MAO 2026 — RealEstateSkills](https://www.realestateskills.com/blog/wholesale-formula)
+- [70% Rule 2026 Guide — Nestwise](https://www.nestwise.us/blog/the-70-percent-rule-real-estate-calculate-ma)
+- [Double Closing / Transactional Funding costs 2026 — RealEstateSkills](https://www.realestateskills.com/blog/double-closing)
+- [Transactional Funding pricing — DoubleClose.com](https://www.doubleclose.com/how-it-works/)
+- [NC HB 797 Residential Property Wholesaling Protection (eff. Oct 1, 2025) — NCLEG](https://www.ncleg.gov/Sessions/2025/Bills/House/PDF/H797v1.pdf)
+- [NC HB797 bill summary — UNC SOG Legislative Reporting Service](https://lrs.sog.unc.edu/billsum/h-797-2025-2026)
+- [Is Wholesaling Legal in North Carolina (2026) — RealEstateSkills](https://www.realestateskills.com/blog/wholesaling-real-estate-legal-north-carolina)
+- [SC Regulates Wholesaling in New RE License Law — SC REALTORS](https://screaltors.org/sc-regulates-wholesaling-in-new-re-license-law/)
+- [Real Estate Agent Commission 2026 — US Realty Training](https://www.usrealtytraining.com/blogs/real-estate-agent-commission)
+
+
+## Fix-and-Flip
+
+### The model (how the money is actually made, one paragraph)
+A flip captures the spread between the **as-is** price you can buy a distressed property for and its **after-repair value (ARV)** once renovated, minus every dollar it costs to buy, fix, hold, borrow, and re-sell. You are not paid for the house; you are paid for the *renovation delta* net of frictional cost. In our Upstate SC / Western NC band (ARV $80k–$300k), that spread is thin in absolute dollars, so the entire game is buying deeply enough below ARV that the 6 stacked cost buckets — acquisition closing, rehab, holding, financing, selling, and a contingency — all fit inside the delta with a real profit left over. The market has cooled into 2026 (Greenville ~57–64 DOM, Asheville ~67 DOM and 106 DOM in Q1), so the exit assumption must be conservative on both **sale price** and **months-to-sell**; those two variables, plus rehab overrun, are what turn a modeled winner into an actual loss.
+
+### The underwriting formula (the exact max-offer / MAO equation with every cost line)
+The **70% Rule** is only the napkin shortcut:
+```
+MAO_70 = 0.70 × ARV − Rehab
+```
+It bakes ~30% of ARV as a blanket allowance for *all* costs + profit. It works as a first-pass filter but systematically misprices the two ends of our band — it leaves too much margin on a clean $280k Asheville flip and not enough on a $95k rural mobile where fixed costs (title, insurance minimums, loan floors) eat a bigger % of ARV. The rigorous line-item MAO is:
+```
+MAO = ARV
+      − Rehab
+      − SellingCosts            (agent + concessions + seller closing)
+      − HoldingCosts            (taxes + insurance + utilities × months)
+      − FinancingCosts          (points + interest × months + junk fees)
+      − AcquisitionClosing      (buy-side title/attorney/recording/stamps)
+      − Contingency             (10–15% of Rehab)
+      − TargetProfit
+```
+Where, with 2026 numbers for our market:
+- **SellingCosts** = agent **5.5–6.0%** of resale ([~5.88% avg SC](https://listwithclever.com/real-estate-blog/seller-closing-costs-in-south-carolina/)) + buyer-agent/closing **concessions 2–3%** (routine in a 2026 buyer's market) + seller closing **1–2%** (SC deed stamps **$3.70/$1,000** + attorney) → budget **~9–10% of ARV** all-in.
+- **HoldingCosts** = property tax + hazard/vacant-build insurance (higher for unoccupied) + utilities, run over the **hold period** (rehab months + list-to-close). Budget **~$450–$700/mo** on a sub-$200k property.
+- **FinancingCosts** = **2–3 points** up front + **10–11% interest-only** on drawn balance × months + processing/legal (**~$1,700 + ~$1,900**) ([Stormfield 2026](https://stormfieldcapital.com/blog/fix-and-flip-loan-rates-pricing-2026/)).
+- **AcquisitionClosing** = buy-side title/attorney/recording **~1–1.5%** of purchase.
+- **Contingency** = **10–15% of Rehab** (non-negotiable in older Upstate/WNC housing stock).
+- **TargetProfit** = the greater of a **flat $25k floor** or **12–15% of ARV** (see grade section).
+
+### Capital required + financing (down/EMD, hard-money points+rate 2026, holding months, total cash-in)
+2026 fix-and-flip hard-money terms, verified across lenders:
+- **Rate:** 9–12% interest-only; ~**10.4% avg** late-2025, competitive floors ~9.99% ([Stormfield](https://stormfieldcapital.com/blog/fix-and-flip-loan-rates-pricing-2026/), [North Coast](https://www.northcoastfinancialinc.com/hard-money-loan-interest-rates/)). Use **10.5%** as the modeling default for a mid-experience borrower.
+- **Points:** **2–3** origination (1 pt only for seasoned repeat borrowers).
+- **Leverage:** up to **90% LTC** (purchase) + **100% of rehab**, capped by **70% LTARV** ([OfferMarket](https://www.offermarket.us/blog/hard-money-fix-and-flip-loans)). The 70% ARV cap is the binding constraint on most deals, not the 90% LTC.
+- **Term:** 12 months, interest-only, balloon.
+
+**Cash-in the deal actually requires** = the 10% purchase down payment + all points/junk fees + acquisition closing + holding + interest reserve + rehab contingency + any rehab draw float (lender reimburses rehab in arrears, so you front each phase). On a ~$150k-ARV Upstate deal that is roughly **$28k–$36k of your own cash**, even at 90/100 leverage — the leverage covers the *loan*, not the *frictions*, and the frictions are where new flippers run dry.
+
+**Hold period to underwrite (2026 velocity):** rehab **1.5–3 months** + list-to-under-contract **~2 months** (Greenville 57–64 DOM, Asheville ~67 DOM) + close **~30–45 days** = **model 6 months, stress-test 8**. Q1 2026 Asheville spiked to 106 DOM — for WNC deals, underwrite 7–8 months of holding + interest, not 4.
+
+### Exit math + margins (realistic profit + the make-or-break variables)
+National Q1 2026 flip ROI was **~25.4% gross** on ~$65k gross profit ([ATTOM](https://www.attomdata.com/news/market-trends/flipping/special-analysis-how-pricing-renovation-costs-and-timing-shaped-returns-in-q1-2026/)) — but that is **gross** (ARV − purchase − rehab only); **net** margins after holding/financing/selling are roughly **half** that, and 2026 was the thinnest flip environment since the Great Recession ([CNBC](https://www.cnbc.com/2026/03/24/home-flippers-see-smallest-profits-since-great-recession-data-firm-says.html)). In our price band a healthy deal nets **$20k–$40k**, i.e. **~12–18% of ARV net**. The three make-or-break variables, in order of destructive power:
+1. **Resale price accuracy** — a 5% ARV miss on a $150k flip is $7.5k straight off net, often 25–35% of the whole profit. Comp discipline (recent, arms-length, same submarket, condition-adjusted) is the single highest-leverage input.
+2. **Months-to-sell** — each extra month adds interest + taxes + insurance + utilities (~$1.7k–$2.2k/mo all-in on a $150k deal). Two months of 2026 slowdown = ~$4k, and it compounds carry risk. This is why WNC's 80–106 DOM readings must lower the max bid, not just the profit expectation.
+3. **Rehab overrun** — older Upstate/WNC stock hides foundation, roof, septic, knob-and-tube. Contingency of 10–15% is the buffer; blowing through it converts profit to loss faster than any other line.
+
+### A worked example (a real deal in our price band: ARV, rehab, all costs, the offer, the profit)
+**3/2 ranch, Greenville County Upstate SC. ARV = $150,000. Rehab = $35,000** (cosmetic + HVAC + roof patch). Hold = 6 months. Financing at 90% LTC / 100% rehab, 2.5 points, 10.5% interest-only.
+
+| Line | Amount | Basis |
+|---|---|---|
+| ARV (resale) | **$150,000** | conservative comp median |
+| − Selling costs | −$14,250 | 9.5% (5.75% agent + 2.5% concession + 1.25% closing/stamps) |
+| − Rehab | −$35,000 | scope of work |
+| − Rehab contingency | −$4,375 | 12.5% of rehab |
+| − Holding (6 mo) | −$3,600 | $600/mo tax+ins+utils |
+| − Financing: points | −$2,300 | 2.5 pts on ~$92k loan |
+| − Financing: interest | −$4,800 | ~$92k avg draw × 10.5% × 6 mo |
+| − Financing: junk fees | −$1,700 | processing/legal |
+| − Acquisition closing | −$1,200 | buy-side title/attorney |
+| **= Max supportable basis** | **$82,775** | ARV minus everything except profit |
+| − Target profit | −$25,000 | floor (16.7% of ARV) |
+| **= Maximum Allowable Offer** | **≈ $57,800** | line-item MAO |
+
+Napkin check: **MAO_70 = 0.70 × 150,000 − 35,000 = $70,000.** The line-item MAO ($57.8k) is **~$12k tighter** than the 70% Rule here — because a 6-month 2026 hold, real concessions, and full financing cost more than the flat 30% allowance assumes. **Buy at $57.8k, hit the model, and net profit ≈ $25k (16.7% of ARV / ~35–45% cash-on-cash on ~$30k cash-in).** Buy at the napkin $70k and the *same* deal nets ~$13k — a real profit on paper that a single month of extra DOM or a $5k rehab surprise wipes out.
+
+### Encode in the engine (the per-strategy max_bid formula / which grade factors change)
+Replace the flat `max_bid_70 = 0.70*ARV − rehab` with a **line-item flip MAO** and make each cost a market-driven parameter:
+```python
+def flip_mao(arv, rehab, hold_months=6):
+    selling      = arv * 0.095                       # agent+concession+SC closing/stamps
+    contingency  = rehab * 0.125
+    holding      = hold_months * (arv*0.048/12)      # ~$600/mo at $150k ≈ 0.048/yr proxy, or explicit tax+ins+utils
+    loan         = 0.90*(arv*0.40) + rehab           # est. drawn balance proxy; refine w/ actual purchase
+    financing    = loan*0.025 + loan*0.105*(hold_months/12) + 1700   # points + interest + junk
+    acq_closing  = 0.012 * (arv*0.40)                # buy-side, ~1.2% of purchase proxy
+    target_profit = max(25000, 0.15*arv)             # $25k floor OR 15% ARV, whichever greater
+    mao = arv - rehab - selling - contingency - holding - financing - acq_closing - target_profit
+    return min(mao, 0.70*arv - rehab)                # never exceed the 70% LTARV lender ceiling
+```
+**Grade factors that must change for flip:**
+- **DOM sensitivity (new):** pull county median DOM into `hold_months`. Greenville ~2 mo list + rehab; **WNC/Asheville forces hold_months = 7–8** (Q1 106 DOM). Longer hold → lower MAO → downgrade. This is the biggest single change.
+- **Profit-floor as a percent, not flat:** on sub-$120k ARV, `max(25000, 0.15*arv)` protects against fixed costs eating a low-dollar deal; on $250k+ ARV it scales profit up so the grade rewards bigger absolute spreads.
+- **Rehab-confidence multiplier:** widen `contingency` to 15% (from 12.5%) when property age > 40 yrs or specs are GIS-estimated rather than inspected — common in rural Upstate/WNC stock — which lowers MAO and grade on the riskiest rehabs.
+- **ARV-confidence gate:** flip grade should be **capped at B** whenever `arv_confidence` is low/noisy, because a 5% ARV miss is decisive at this margin; only high-confidence comps earn an A.
+- **Hard ceiling:** always clamp to `0.70*ARV − rehab` so the engine never bids above what a 2026 hard-money lender will actually fund at 70% LTARV.
+
+Sources: [Stormfield Capital 2026 fix-and-flip pricing](https://stormfieldcapital.com/blog/fix-and-flip-loan-rates-pricing-2026/), [OfferMarket 2026 hard money guide](https://www.offermarket.us/blog/hard-money-fix-and-flip-loans), [North Coast Financial rates](https://www.northcoastfinancialinc.com/hard-money-loan-interest-rates/), [ATTOM Q1 2026 flip returns](https://www.attomdata.com/news/market-trends/flipping/special-analysis-how-pricing-renovation-costs-and-timing-shaped-returns-in-q1-2026/), [CNBC flip-profit 2026](https://www.cnbc.com/2026/03/24/home-flippers-see-smallest-profits-since-great-recession-data-firm-says.html), [SC seller closing costs](https://listwithclever.com/real-estate-blog/seller-closing-costs-in-south-carolina/), [Greenville market update](https://www.greenvillerealestatehub.com/blog/greater-greenville-sc-real-estate-market-update-march-2026/), [Asheville/Buncombe Q1 2026 market](https://mymosaicrealty.com/blog/posts/2026/05/13/asheville-real-estate-market-update-insight-into-the-1st-quarter-2026-housing-market/).
+
+
+## BRRRR (Buy · Rehab · Rent · Refinance · Repeat)
+
+### The model (how the money is actually made, one paragraph)
+BRRRR is not an exit — it is a *capital-recycling* strategy. You buy distressed, force appreciation through rehab, stabilize with a tenant, then do a **cash-out refinance** against the new (higher) appraised value. The refi loan pays off your acquisition + rehab debt and, if the deal was bought right, returns most or all of your original cash so you can redeploy it into the next property. The profit is not a lump sum at sale; it is (1) the *trapped equity* you keep (ARV minus the new loan), (2) *monthly cash flow* the tenant pays after the new mortgage, and (3) long-term amortization/appreciation on a property you now own with little or none of your own money left in. The entire strategy lives or dies on one number: **all-in cost ≤ 75% of ARV**, because a DSCR cash-out refi in 2026 tops out at 75% LTV — so if your all-in is at or below 75% ARV, the refi hands back 100% of your cash ("infinite return"); every dollar above 75% is cash you leave stranded in the deal.
+
+### The underwriting formula (the exact max-offer / MAO equation with every cost line)
+The BRRRR max offer is the **75%-ARV all-in cap, worked backwards** to a purchase price. The binding constraint is that everything you spend before the refi must fit under 75% of ARV:
+
+```
+All-In Cost = Purchase + Rehab + Buy-Side Closing + Holding + HML Points + HML Interest
+Refi Loan Proceeds = 0.75 × ARV        (DSCR cash-out cap, 2026)
+Cash Left In = All-In Cost − (Refi Proceeds − Refi Closing Costs)
+
+BRRRR MAO (max purchase) solved for a full-capital-return deal:
+
+  MAO_brrrr = 0.75 × ARV
+              − Rehab
+              − Buy-Side Closing        (title/attorney/recording/EMD-related ≈ 2% of price)
+              − Holding Costs           (taxes, insurance, utilities over rehab+season months)
+              − HML Points              (2–3% of the hard-money loan)
+              − HML Interest            (rate/12 × loan × months held)
+              − Refi Closing Costs      (lender/title/appraisal ≈ 3–4% of the refi loan)
+              − Desired Cash Left In    (set to $0 for a "true" BRRRR; raise it to buy a better house)
+```
+
+Note this is **stricter than the 70% flip rule after accounting for carry** — the extra 5% of ARV headroom (75% vs 70%) is consumed by two rounds of financing cost (hard money *and* refi) that a flip doesn't pay. In practice you set `Desired Cash Left In` to $0 and treat any negative slack as "how much I must beat asking by."
+
+### Capital required + financing (down/EMD, hard-money points+rate 2026, holding months, total cash-in)
+**Acquisition + rehab (hard money, 2026 terms):**
+- Leverage: HML funds **~85–90% of purchase + 100% of rehab**, underwritten to **65–75% of ARV**. Experienced borrower band Q2 2026.
+- Rate: **9%–12%** interest-only (use **10.5%** as the modeling default for a repeat borrower); premier borrowers 8.5–11.25%.
+- Points: **2–3%** origination on the loan (use **2.5%**).
+- Term: 6–18 months, interest-only, balloon at refi.
+- **Down payment/skin:** ~10–15% of purchase + all closing/carry out of pocket. On our price band that's roughly **$12k–$30k cash** to get in.
+
+**Holding period:** rehab (1.5–3 mo) + lease-up (0.5–1 mo) + **6-month seasoning** the DSCR lender requires before it will lend on *appraised* value instead of cost. Budget **6–8 months of carry** even if the rehab is fast — the seasoning clock is the real gate.
+
+**Refinance (DSCR, 2026 terms):**
+- **75% LTV** cash-out cap on a stabilized SFR (700+ FICO, DSCR ≥ 1.0).
+- Rate: fixed **6.5%–7.5%** (cash-out sits 0.25–0.50% above rate-and-term; use **7.25%** for a 75% cash-out on a small rural loan — small-balance and rural add spread).
+- 30-yr amortization (or 40-yr / IO to juice DSCR), ~3–4% closing costs rolled or paid.
+- Requires DSCR ≥ 1.0–1.25: **NOI ÷ new PITI must clear 1.0**, or the lender caps LTV below 75% and you leave more cash in.
+
+**Total cash-in** on a clean deal = down payment + buy closing + carry + points + refi closing, *minus* refi cash-out. On a bought-right deal this nets to **near $0**; on a typical real deal expect **$8k–$20k left in**.
+
+### Exit math + margins (realistic profit + the make-or-break variables)
+BRRRR "profit" is three streams, not a sale check:
+1. **Trapped equity kept** = ARV − Refi Loan = **25% of ARV** you own free (e.g., $37.5k on a $150k ARV). This is real net worth but illiquid until sale/HELOC.
+2. **Monthly cash flow** = Rent − PITI − Reserves, where **Reserves ≈ 10% vacancy + 8% maintenance + 8% capex + ~8% management = ~30–35% of gross rent** gets consumed before/around debt service.
+3. **Amortization + appreciation** on a property with little of your cash left in → the "infinite return" once cash-in hits $0.
+
+**Make-or-break variables, in order of lethality:**
+- **The refi appraisal (ARV).** The whole model assumes the appraiser agrees with your ARV. A 10% miss ($150k→$135k) drops your 75% loan from $112.5k to $101k — **$11k more cash trapped**, instantly killing the "repeat."
+- **DSCR ≥ 1.0.** In our low-rent rural pockets a $1,440 rent against a 7.25% PITI on a ~$110k loan is *tight*. If DSCR < 1.0 the lender cuts LTV and you leave cash in regardless of value.
+- **The 1% rule vs. our reality.** The old "rent ≥ 1% of price/month" heuristic is **mostly unmet in our footprint**: a $150k ARV would need $1,500/mo. Greenville-Mauldin-Easley 3BR FMR is **$1,440** (~0.96%), Spartanburg 3BR **$1,640** (~1.09% — the one market that clears it), Asheville/Buncombe 3BR **$2,160** but against $250k–$300k values (~0.72–0.86%). **Metro Asheville and metro Greenville do NOT hit 1%**; the strategy still works there on *equity* and appreciation, but the *cash-flow* leg is thin-to-negative and must be underwritten conservatively. **Spartanburg and rural Upstate SC are the true cash-flowing BRRRR markets.**
+
+### A worked example (a real deal in our price band: ARV, rehab, all costs, the offer, the profit)
+**Spartanburg County 3/1 SFR, ~1,150 sqft, tax-delinquent lead.**
+
+| Line | Amount |
+|---|---|
+| **ARV** (comped, arms-length, ≤6mo) | **$150,000** |
+| Rehab (roof patch, HVAC, kitchen/bath refresh, paint/floor, mechanicals) | $30,000 |
+| Buy-side closing (~2% of price) | $2,400 |
+| Holding — 7 mo (taxes+ins+utils ≈ $450/mo) | $3,150 |
+| HML points (2.5% on ~$135k loan) | $3,375 |
+| HML interest (10.5% IO, ~$135k avg draw, 7 mo) | $8,270 |
+| Refi closing (~3.5% of $112.5k) | $3,940 |
+| **Total non-purchase costs** | **$51,135** |
+
+**Solve the MAO (target $0 cash left in):**
+`MAO = 0.75 × 150,000 − 51,135 = 112,500 − 51,135 = $61,365` → **offer ≈ $61,000.**
+
+**The deal at a $61,000 purchase:**
+- **All-in** = 61,000 + 30,000 + 2,400 + 3,150 + 3,375 + 8,270 = **$108,165** (72.1% of ARV ✓ under 75%).
+- **DSCR cash-out** = 0.75 × 150,000 = **$112,500** loan; minus $3,940 refi cost = **$108,560** net proceeds.
+- **Cash left in** = 108,165 − 108,560 = **−$395 → ~$0. You pull 100% of your capital back out.**
+- **Equity kept** = 150,000 − 112,500 = **$37,500** owned.
+- **Cash flow check:** rent **$1,640** (Spartanburg 3BR FMR). New PITI on $112,500 @ 7.25%/30yr = $767 P&I + ~$210 taxes/ins = **~$977**. Rent − PITI = **$663**; minus ~30% reserves ($492) = **~$171/mo true cash flow** with **DSCR ≈ 1.68 on P&I** (easily clears the 1.0 floor → 75% LTV holds).
+
+Result: ~$0 of your money left in a property you own with **$37.5k equity** and **~$170/mo** cash flow → **infinite cash-on-cash, repeat**. Run the identical deal at a $150k Asheville rent-to-value and the equity leg still works but cash flow goes flat/negative — flag those as *equity-play BRRRR*, not *cash-flow BRRRR*.
+
+### Encode in the engine (the per-strategy max_bid formula / which grade factors change)
+Add a distinct `max_bid_brrrr` alongside `max_bid_70`:
+
+```python
+# Strategy-specific BRRRR max bid (targets $0 cash left in via 75% DSCR cash-out)
+REFI_LTV        = 0.75          # DSCR cash-out cap, 2026
+HML_POINTS      = 0.025
+HML_RATE        = 0.105
+HML_MONTHS      = 7             # includes 6-mo seasoning gate
+REFI_CLOSE_PCT  = 0.035
+BUY_CLOSE_PCT   = 0.02
+HOLD_PER_MO     = 0.003 * arv   # taxes+ins+utils proxy, ~0.3%/mo of ARV
+
+hml_loan   = purchase * 0.88 + rehab            # 88% purchase + 100% rehab
+carry      = HML_MONTHS * HOLD_PER_MO
+hml_cost   = HML_POINTS * hml_loan + HML_RATE/12 * hml_loan * HML_MONTHS
+refi_proc  = REFI_LTV * arv * (1 - REFI_CLOSE_PCT)
+
+# solve purchase so all-in == refi proceeds (cash_left_in = 0):
+max_bid_brrrr = (refi_proc - rehab - carry - hml_cost) / (1 + BUY_CLOSE_PCT)
+
+engine_max_bid = min(max_bid_70, max_bid_brrrr)   # most conservative binds
+```
+
+**Grade-factor changes for the BRRRR path (in addition to ARV confidence and equity):**
+- **`rent_to_value` (new, decisive):** compute `monthly_rent / ARV`. Grade **A ≥ 1.0%**, **B 0.85–1.0%**, **C 0.70–0.85%**, **D < 0.70%**. Source `monthly_rent` from HUD SAFMR 3BR by county (Spartanburg $1,640, Greenville-Mauldin-Easley $1,440, Buncombe $2,160, else state 3BR FMR).
+- **`dscr_at_refi` (new gate):** `NOI / new_PITI` at 75% LTV & 7.25%. If **< 1.0 → downgrade one letter and cut effective refi LTV** in the max-bid solve until DSCR = 1.0 (this raises cash-left-in and lowers the bid automatically).
+- **`cash_left_in` (new output):** `all_in − refi_net_proceeds`. Grade **A ≤ $0**, **B ≤ $10k**, **C ≤ $20k**, **D > $20k** (a "trapped-capital" deal, not a true BRRRR).
+- **Reweight vs. flip:** BRRRR tolerates a **higher all-in ceiling (75% vs 70% ARV)** but is **more sensitive to ARV-appraisal risk and rent** — so `arv_confidence` and `rent_to_value` should carry more weight in the BRRRR grade than in the flip grade, while raw spread carries less.
+- **Tag the sub-type:** if `rent_to_value ≥ 0.9%` label **cash-flow BRRRR**; if `< 0.9%` but equity kept ≥ 20% ARV label **equity-play BRRRR** (Asheville/metro-Greenville) so the operator knows the cash-flow leg is thin.
+
+Sources: [DSCR Loan Rates 2026 (sistarmortgage)](https://sistarmortgage.com/blog/dscr-loan-requirements-and-rates), [DSCR rates June 2026 (HomeAbroad)](https://homeabroadinc.com/mortgages/dscr-loan-interest-rates/), [Fix-and-Flip Financing 2026 / 70% rule](https://www.ownluxuryhomes.com/markets/national/real-estate-investing/fix-and-flip-financing-2026), [Hard Money Loan Rates 2026 (Crestmont)](https://www.crestmontcapital.com/blog/hard-money-loan-rates-2026), [2026 Section 8 FMR SC (BNBCalc)](https://www.bnbcalc.com/section8/sc), [Buncombe County FMR (USHousingData)](https://www.ushousingdata.com/fair-market-rents/buncombe-county-nc)
+
+
+## Subject-To / Seller-Finance (wrap)
+
+### The model (how the money is actually made, one paragraph)
+The play is to acquire a distressed property **without paying off or refinancing the existing mortgage** — you take title (subject-to) or create a wrap note over it and keep the seller's legacy loan alive at its below-market rate. In 2026 the market rate is ~6.4–6.5% (Freddie Mac 30-yr avg 6.43% on 7/2/2026), but a huge overhang of 2020–2022 loans sits at 2.5–4%. That rate gap is the whole business. There are two distinct exits from the same acquisition: **(A) Buy-and-hold rental** — you inherit a $500–650/mo payment on a house that rents for $1,300–1,800 in Upstate SC / Western NC, so the sub-4% loan makes a marginal deal cash-flow like a paid-down one; the "profit" is the spread between market-rate debt service and the actual legacy payment, capitalized over the hold. **(B) Wrap / seller-finance flip** — you resell to a credit-challenged, self-employed, or foreign-national buyer on a new note at 8.5–10%, collect a down payment, and pocket the **monthly interest spread** between the wrap note you collect and the underlying loan you pay, plus a markup on price. Either way you acquire *near payoff* (little to no equity purchase price), because the value to the seller is debt relief and foreclosure-stopping, not a cash check.
+
+### The underwriting formula (the exact max-offer / MAO equation with every cost line)
+The binding constraint is **cash to close**, not ARV×0.70. Subject-to has no acquisition loan, so max offer is what you pay the seller in cash on top of taking over the debt:
+
+```
+Cash_to_Seller_MAX = Equity_Capture_Budget − Arrears − Reinstatement_Costs − Transfer/Closing − Repairs_to_Rentable
+where:
+  Equity_Capture_Budget = (ARV − Loan_Balance) × Capture_Fraction   # you never pay full equity; 0.30–0.50 typical, often $0–$3k "moving money"
+  Arrears                = missed payments + late fees (why they're selling)
+  Reinstatement_Costs    = attorney/foreclosure fees already accrued, if in default
+  Transfer/Closing       = deed prep, recording, title, insurance re-write (~$1,500–2,500)
+  Repairs_to_Rentable    = make-ready only (NOT full ARV rehab) for the hold; full rehab if wrap-flip to owner-occ
+```
+
+For the **wrap-flip exit**, the pricing equation flips to the note you originate:
+
+```
+Wrap_Note = Sale_Price_to_End_Buyer − Buyer_Down_Payment
+Monthly_Spread = P&I(Wrap_Note @ wrap_rate, wrap_amort) − P&I(Underlying_Balance @ legacy_rate, remaining_term)
+Equity_Markup  = Sale_Price_to_End_Buyer − (Loan_Balance + Your_Cash_In)
+```
+
+The deal is a GO only if the underlying loan **balance ≤ ~75% of ARV** (you need spread room to resell above it) AND the legacy rate is ≥ ~250 bps below the 6.4% market (i.e. ≤ ~4%) — below that threshold the spread evaporates and it's just a hard flip.
+
+### Capital required + financing (down/EMD, hard-money points+rate 2026, holding months, total cash-in)
+This strategy's edge is that it is **low-cash and needs no hard money** — the existing loan *is* the financing. Cash-in per deal:
+- **Cash to seller:** $0–$5,000 (moving money / equity capture) in a true distressed/low-equity deal; up to $10–15k if there's real equity to buy.
+- **Arrears/reinstatement:** the make-or-break line — $3,000–$12,000 to bring a defaulted Upstate/WNC loan current (roughly 3–8 missed payments at $500–900 + fees).
+- **Closing/transfer + insurance rewrite + servicing setup:** ~$2,000–$3,500. Use a **third-party servicer** (e.g. an RMLO/licensed servicer at ~$20–35/mo + setup) so payments to the underlying lender are documented and the buyer's taxes/insurance are escrowed.
+- **Make-ready repairs:** $0–$10,000 for a rental hold; a full rehab only if you're wrapping to an owner-occupant who's financing the fix into the price.
+- **Holding:** near-zero true "hold" — the tenant or wrap buyer covers debt service from month one. Vacancy risk is the exposure, ~1–3 months of the ~$500–900 payment as reserve.
+
+**Total realistic cash-in per deal: $6,000–$20,000**, versus $40k–$90k+ on a hard-money BRRRR/flip of the same house. If you ever *do* need short-term capital (double-close on a wrap), 2026 hard-money is ~**10–12% + 2–3 points**, 6–9 month terms — but the correct structure avoids it entirely.
+
+### Exit math + margins (realistic profit + the make-or-break variables)
+- **Hold exit:** the profit is the **debt-cost arbitrage**. A $130k-value house with a $110k loan at 3.5% carries ~$494/mo P&I; the same balance at today's 6.4% would cost ~$688/mo — a **~$194/mo synthetic cash-flow gift (~$2,300/yr)** on the debt alone, *plus* normal rent-minus-expense cash flow, *plus* amortization and appreciation. You're effectively buying a below-market-financed rental for a few thousand in reinstatement.
+- **Wrap-flip exit:** three profit streams — (1) **down payment** collected up front (5–10% of sale price = $6.5k–$16k), (2) **monthly interest spread** for the life of the note, (3) **back-end** when the buyer refis or the note pays off. Per the 2026 wrap benchmark: underlying $120k @ 3.5% = $539/mo, wrap note $160k @ 9% = $1,343/mo, a **$804/mo spread ($9,648/yr)** the servicer forwards to you.
+- **Make-or-break variables:** (1) **the legacy rate & balance** — if it's not ≤4% and ≤75% LTV of ARV, the model dies; (2) **arrears size** — a loan $15k in the hole can wipe your equity capture; (3) **due-on-sale**, addressed below; (4) **wrap-buyer default/re-marketing** — you must be able to re-take and re-sell; (5) **insurance** — the policy must be rewritten or the lender may be alerted on renewal.
+
+### The due-on-sale risk (real vs rare) and how operators mitigate
+The due-on-sale clause lets the lender **accelerate** (call the full balance) on transfer of title. It is **real but rarely exercised while payments stay current** — banks want the performing payment, not a foreclosure and litigation; enforcement historically has been near-zero on on-time loans. It is a *contract acceleration right, not fraud* (so long as you don't lie on an application), but it is a genuine tail risk that rises when rates are high — in 2026 a lender has a real incentive to recall a 3.5% loan and re-lend at 6.4%, so treat the risk as **materially higher than the pre-2022 lore suggests**. Mitigations operators stack:
+1. **Garn-St. Germain land trust:** deed the property into a trust *with the original borrower as beneficiary* (an inter-vivos trust transfer is an expressly exempt transfer under Garn-St. Germain), then quietly assign beneficial interest to your LLC. This lowers the *visibility* of the transfer; note the assignment of beneficial interest to a non-borrower is technically outside the exemption, so it reduces detection, not the underlying legal right.
+2. **Third-party servicer & keep it current:** never miss a payment; a servicer that remits from a neutral account avoids the "who is this new payer" flag.
+3. **Insurance handled correctly:** add your entity as *additional insured* rather than swapping the named insured off, which is the #1 way lenders discover a subject-to.
+4. **Reserves for acceleration:** hold enough (or a refi/liquidation plan) to pay off or resell within 30–60 days if a call notice ever comes. Underwrite every subject-to as if it *could* be called.
+
+### The seller-finance / wrap variant and legal-disclosure care in SC / NC
+The wrap is the **resale** leg: you sell to an end buyer and carry a note that wraps the underlying loan. This triggers federal and state consumer-lending law that raw subject-to does not:
+- **Dodd-Frank / SAFE Act:** selling to an **owner-occupant** in a 1–4 unit property makes you a creditor. Under the **3-property exemption** you may finance ≤3 properties/12 months without an MLO license only if the note is **fully amortizing (no balloon)**, fixed or ARM-fixed-for-5+-years with rate caps, and you **document the buyer's ability to repay**. Sell to **investors/non-owner-occupants** and Dodd-Frank's owner-occupant rules don't attach — a common structuring lane. To scale beyond 3/year, originate through a **licensed RMLO** who runs the ATR/QM underwriting; both SC (Office of the Commissioner of Consumer Finance / BFI) and NC (NCCOB) license via NMLS and treat repeat seller-financing as mortgage activity.
+- **State licensing:** SC and NC both require NMLS mortgage-broker/MLO licensing for anyone in the business of originating residential loans; a one-off owner-occupant wrap can fit the exemption, a program cannot — use an RMLO.
+- **Disclosure:** both states mandate a **Residential Property Condition Disclosure** on 1–4 unit transfers (SC RPCDS; NC RPOADS under G.S. Ch. 47E) — required even on installment/land-contract and option transfers in NC, so subject-to and wrap conveyances are **not** exempt. Failure to disclose known defects is independent litigation exposure. Convey by **warranty deed + deed of trust + promissory note**, record properly, and close through a **real-estate attorney** (both are attorney-close states in practice) to keep title clean and the disclosure trail defensible.
+
+### Encode in the engine (the per-strategy max_bid formula / which grade factors change)
+Add `subject_to` and `wrap` as distinct exit strategies with their own bid + grade logic instead of routing through `max_bid_70`:
+
+```python
+# Gate: only score subject-to/wrap when the underlying loan is known and cheap
+subto_eligible = (loan_balance is not None
+                  and legacy_rate is not None
+                  and legacy_rate <= 0.045                       # ≤4.5%, ~250bps under 6.4% mkt
+                  and loan_balance <= 0.75 * arv)                # spread + resale room
+
+# Subject-to (hold) max cash to seller — NOT ARV*0.70
+capture_frac = 0.35                                             # tune 0.30–0.50
+max_cash_to_seller = max(
+    0,
+    (arv - loan_balance) * capture_frac
+      - arrears                                                 # missed pmts + fees (NEW field)
+      - reinstatement_costs                                    # accrued FC/attorney (NEW field)
+      - transfer_closing_cost                                  # ~2000
+      - make_ready_repairs                                     # rentable, not full ARV rehab
+)
+
+# Wrap (seller-finance flip) economics
+wrap_note      = sale_price_to_end_buyer - buyer_down_payment
+monthly_spread = pmt(wrap_note, wrap_rate=0.09, term=360) \
+               - pmt(loan_balance, legacy_rate, remaining_term)
+wrap_annual_yield = (buyer_down_payment + monthly_spread*12) / cash_in
+```
+
+**Grade-factor changes for these strategies:**
+- **Replace the equity/discount factor** (`discount_to_arv`) with a **rate-spread factor**: `spread = market_rate(0.064) − legacy_rate`; grade A if ≥ 0.030, B if 0.020–0.030, F if < 0.015 or `loan_balance` unknown.
+- **Add a `cash_light` bonus:** low `total_cash_in` (< $12k) upgrades the grade — this is the strategy's core advantage vs BRRRR.
+- **Add an `arrears_ratio` penalty:** `arrears / (arv − loan_balance)`; > 0.5 downgrades (arrears eating the equity capture).
+- **Add a `due_on_sale_risk` flag** (informational, not disqualifying): raise it when `legacy_rate < 0.045` AND balance is large — the very deals worth doing carry the most call risk; require a reserves note.
+- **Add an `owner_occupant_wrap` compliance flag:** if exit = wrap to owner-occupant, force `no_balloon = True` and surface the 3-property/RMLO gate so the engine never grades a non-compliant note as A.
+- **LTV-of-ARV cap** replaces the 70% rule: reject when `loan_balance > 0.75 * arv` (no room to wrap/resell above the debt).
+
+**Sources:** [Norada – Due-on-Sale & Land Trusts](https://www.noradarealestate.com/blog/due-on-sale-clause/); [Royal Legal Solutions – Land Trust / Garn-St. Germain](https://royallegalsolutions.com/whats-the-due-on-sale-clause-how-do-i-avoid-it-with-a-land-trust/); [The Property CEO – Wraparound Mortgage 2026 Guide](https://thepropertyceo.com/blog/wraparound-mortgage-guide); [Deal Run – Wraparound Mortgages for Investors](https://dealrun.ai/blog/wrap-mortgage-explained); [Barnes Walker – Dodd-Frank Seller-Financing Restrictions](https://barneswalker.com/seller-financing-restrictions-under-the-dodd-frank-act/); [NoteInvestor – Dodd-Frank / SAFE Act owner financing](https://noteinvestor.com/notes-101/owner-financing-laws-dodd-frank-safe-act/); [Mack & Mack Law – Seller Financing in South Carolina](https://www.mackandmacklaw.com/blog/2024/12/seller-financing-in-south-carolina-what-you-must-know/); [NCCOB – Mortgage Lender/Broker Licensing](https://nccob.nc.gov/financial-institutions/mortgage/licensing-information/mortgage-lender-broker-licensing-requirements); [Freddie Mac PMMS / US News – 6.43% 30-yr, 7/2/2026](https://www.usnews.com/news/business/articles/2026-07-02/average-30-year-us-mortgage-rate-falls-to-6-43-its-lowest-level-in-seven-weeks).
+
+
+## Gator Lending (Transactional Funding, EMD Funding & Gap/Private Lending)
+
+### The model (how the money is actually made, one paragraph)
+The "gator" (Pace Morby's coinage) does not buy houses or find sellers. He rents his capital to the wholesalers, flippers, and creative-finance investors who do, for hours or days at a time, and gets paid a fee that is enormous as an annualized yield precisely because the hold is so short. Three products: (1) **EMD funding** — advancing the earnest-money deposit so an investor can lock a contract they can't yet fund, repaid at closing plus a flat fee; (2) **transactional / double-close funding** — wiring the full A-to-B purchase price for a same-day A-B-C double close so the wholesaler never uses their own money, repaid the same day out of the C (end-buyer) proceeds; and (3) **private / gap lending** — filling the shortfall between a hard-money loan and total project cost for a rehabber, secured by a note. The gator's edge is not construction skill or negotiation, it is (a) liquid cash on standby and (b) underwriting the *deal and the borrower* well enough that the money comes back. A data-rich operator wins here because the same lead database that sources motivated sellers also tells you which of the wholesalers working your market have real, closeable deals worth funding — you can verify the underlying property, the ARV, and the equity before your money ever leaves escrow.
+
+### The underwriting formula (the exact max-offer / MAO equation with every cost line)
+The gator has no "max bid" on a property — he has a **max exposure per deal** and a **fee floor per dollar-day of capital**. Two things must be true before funding:
+
+**1. Fee must clear the floor (transactional/double-close):**
+```
+Gator_fee          = max( flat_min , fee_pct × A_to_B_price )   [+ per-diem × days if hold > 0]
+Effective_yield    = Gator_fee / A_to_B_price × (365 / hold_days)
+FUND  IF  Gator_fee ≥ fee_floor  AND  Effective_yield ≥ target_annualized_yield
+```
+
+**2. Capital must be genuinely covered by a real end buyer (the risk gate):**
+```
+C_price (end buyer, funds committed)  ≥  A_to_B_price + Gator_fee + B_side_closing_costs
+Exposure_hours                        ≤  same-day for double close (A and C fund same table)
+```
+
+**For EMD funding**, the equation is a downside/refundability test, not an LTV test:
+```
+EMD_fee   = max( flat_min ($150–$500) , deposit_pct (10–20%) × EMD_amount )
+Fund IF:  contract still inside inspection/DD window (EMD refundable)  →  worst case = deposit returned
+          AND spread_to_C ≥ EMD_amount (buyer can absorb a lost deposit)
+          AND lien/title clean enough that A-B will actually close
+```
+
+**For gap/private lending** it reverts to a true ARV-based ceiling, protecting the position behind the senior hard-money loan:
+```
+Senior_HML + Gator_gap_note  ≤  0.75 × ARV      (combined LTV cap ~70–75%)
+Gator_gap_note                =  (Purchase + Rehab) − Senior_HML_proceeds
+Fund IF combined CLTV ≤ 0.75 × ARV  AND  exit (flip sale or refi) clears both notes
+```
+
+### Capital required + financing (down/EMD, points+rate 2026, holding months, total cash-in)
+The gator *is* the capital — his "cash-in" is the money he fronts, and his hold is measured in days, not months.
+
+| Product | Cash the gator fronts | What he charges (2026) | Hold |
+|---|---|---|---|
+| **EMD funding** | $1,000–$25,000 (typical SFR EMD $1k–$10k) | Flat **$150–$500**, or **10–20% of deposit**; per-diem ~**$25/day per $5k** | Days to ~2 weeks |
+| **Transactional / double close** | Full A-B price (in our band **$60k–$220k**) | **1% of A-B, $750 minimum**; tiers to 2% above $1M; some 1.5–3% | **Same day** (hours) |
+| **Gap / private lending** | The shortfall, often $10k–$60k | Note at **10–14% + 1–3 points** (2026 private-money) | 3–9 months |
+
+Because a compliant double close funds A and C at the **same escrow table on the same day**, the gator's actual dollars-at-risk exist for hours; the 1% fee is a ~365%+ annualized yield on that capital. EMD funding ties up smaller amounts for a few days at a flat fee that is often **another triple-digit annualized return**. The gator needs no hard-money leverage of his own — this is *his* dry powder deployed directly.
+
+### Exit math + margins (realistic profit + the make-or-break variables)
+The gator's "exit" is repayment out of escrow proceeds, booked as a line item on the settlement statement — he is paid before the wholesaler nets anything.
+
+- **Transactional profit per deal:** 1% of A-B. On a $120k A-B that is **$1,200 for a few hours of capital**; on a sub-$75k deal the **$750 minimum** dominates and the *yield* is even higher. A gator recycling $150k of capital through 2–4 double closes a month books **$2,400–$6,000/mo** on the same dollars.
+- **EMD profit per deal:** **$150–$1,000** flat per advance; a gator funding 15–20 EMDs a month runs **$3k–$12k/mo** on capital that mostly comes back within a week.
+- **Gap-lending profit:** 10–14% + points on a 3–9 month note — e.g., $40k gap at 12% + 2 pts = **$800 + ~$2,400 = ~$3,200 over ~6 months**, with a recorded lien as security.
+- **The make-or-break variables, in order:**
+  1. **Does the C-side buyer actually close?** For a double close this is existential — if the end buyer doesn't fund, the gator owns a house he never wanted. *Rule: no committed, proof-of-funds end buyer, no funding.*
+  2. **Is the EMD refundable when you advance it?** Fund inside the inspection window and the worst case is the deposit is simply returned. Fund a non-refundable EMD and a dead deal = **100% loss of the advance.**
+  3. **Title/lien surprises** on the A-side that blow the closing date and turn a same-day hold into a multi-week one (per-diem is the hedge).
+  4. **Borrower quality** — a wholesaler with a fake or wildly-optimistic ARV. This is exactly where a lead-engine operator has an unfair edge: verify the parcel, comps, and equity independently before wiring.
+
+### A worked example (a real deal in our price band)
+A wholesaler in Anderson County SC has a contract on a 3/2 SFR. He does not have the cash to close A-B and wants a double close.
+
+- **ARV (verified against comps):** $185,000
+- **A-B price (his contract with the seller):** **$120,000**
+- **C price (his end-buyer, a flipper, POF confirmed):** **$132,000**
+- **Rehab (end buyer's problem, not the gator's):** ~$30,000
+- **Wholesaler's gross spread:** $132k − $120k = $12,000, minus double-close costs (~$3,500) ≈ **$8,500 net to him**
+
+**Gator's side of the same deal:**
+- Capital fronted (A-B wire): **$120,000**, funded and repaid the **same day** through escrow
+- Transactional fee at **1%** of A-B: **$1,200**
+- Dollars-at-risk duration: hours; downside gated because C-side POF + committed buyer verified *before* funding
+- **Gator profit: $1,200 per deal**, ≈ **365%+ annualized** on the $120k for the hours it was out. Fund this wholesaler's next three deals the same month on the same recycled $120k → **~$3,600/mo** with the principal never permanently committed.
+
+Contrast an **EMD-only** version of the same deal: wholesaler needs a $5,000 EMD to lock the contract, gator advances it for a **$500 flat fee** (10%), repaid at the A-B closing 10 days later. **$500 for 10 days on $5,000 = ~365% annualized**, worst case (deal dies inside DD) the deposit comes back.
+
+### Encode in the engine (the per-strategy max_bid formula / which grade factors change)
+Gator lending is **not a max_bid strategy** — the property is a counterparty's, not ours. In the engine, add it as a **capital-deployment / origination scoring** lane keyed off deals *other people* are chasing, not off `max_bid_70`:
+
+- **Do NOT compute** `max_bid_70` or `wholesale_mao` for gator rows; those exit-price ceilings are irrelevant. The engine's role flips from "what do I offer" to "should I fund this and at what fee."
+- **New per-deal outputs:**
+  - `gator_txn_fee = max(750, 0.01 * a_to_b_price)` — floored at $750, the 2026 market minimum.
+  - `gator_emd_fee = max(150, clamp(0.10..0.20) * emd_amount)`.
+  - `gator_effective_yield = gator_fee / capital_fronted * (365 / hold_days)` — the gating metric; reject below `TARGET_YIELD` (set high, e.g. 100%+, since holds are ~1 day).
+  - `gator_max_exposure` — a hard per-deal cash cap = min(available_dry_powder, policy_cap).
+- **Grade factors that change (the fundable-signal, replacing property-condition weighting):**
+  - **Equity cushion of the underlying deal** (our existing `arv_confidence` and comps sidecar feed this) — high confidence that ARV > C-price makes the deal safe to fund. This *raises* grade.
+  - **Spread integrity:** `C_price − A_to_B_price − gator_fee > 0` must hold, and the spread must exceed the EMD amount for EMD deals. Fail = auto-reject, drop to F.
+  - **End-buyer / exit certainty** — a new binary factor: `end_buyer_committed` (POF verified). For transactional funding this is weighted highest; absent it, grade is capped low regardless of equity.
+  - **Refundability window** (EMD only) — `emd_refundable == true` at funding is a required gate; funding a non-refundable EMD downgrades the grade sharply because downside becomes total loss.
+  - **Title/lien cleanliness of the A-side parcel** (from our ROD/assessor enrichment) — open senior liens or clouded title that threaten the same-day close lower the grade and push toward per-diem pricing to hedge slippage.
+  - **Counterparty reliability** — a light reputation weight on the wholesaler; the engine's independent parcel/ARV verification is the substitute for trusting their numbers.
+
+Net: for gator rows the engine stops asking "how low must I buy" and starts scoring **fee-yield × downside-coverage**, where downside coverage = verified equity + committed end buyer + (for EMD) refundability. These are the only factors that move the grade.
+
+
+## Buy-at-Auction + Surplus-Funds Recovery
+
+### The model (how the money is actually made, one paragraph)
+This is two distinct businesses that share a data source (the foreclosure sale roster), and the engine should score them separately. **Sub-model A — buy-at-auction** is all-cash (or hard-money) acquisition of the deed on the courthouse steps at a discount to ARV, followed by a flip or hold; the edge is that most retail buyers can't or won't show up with certified funds and can't underwrite title risk, so the winning bid sits well below open-market value. Money is made on the spread between the auction price and the resale, net of everything you inherit (surviving senior liens, redemption exposure, eviction, unknown condition). **Sub-model B — surplus-funds recovery** is a *finder/recovery* business, not a real estate deal: when a foreclosure sale price exceeds the total debt + costs, the overage legally belongs to the former owner (then junior lienholders in priority), but the money sits with the court/clerk unclaimed. You locate the ex-owner, sign a contingency-fee recovery agreement, file the claim, and take a capped percentage. Zero property risk, near-zero capital, but heavily statute-regulated and margin-capped.
+
+### The underwriting formula (the exact max-offer / MAO equation with every cost line)
+
+**Sub-model A — auction max bid.** The auction max bid is *stricter* than a standard 70% MAO because you buy blind, inherit senior liens, and often eat redemption/eviction cost. Use:
+
+```
+MaxBid_auction = ARV
+              − Rehab
+              − SurvivingSeniorLiens        (1st-position taxes, senior mortgage, IRS/state liens that survive)
+              − RedemptionReserve            (SC tax-derived title only; see below)
+              − EvictionHoldover             ($2,500–$6,000: cash-for-keys + filing + lost months)
+              − TitleCureReserve             ($1,500–$5,000: quiet-title / lien discharge)
+              − SellingCosts                 (0.08 × ARV: agent 5% + SC/NC deed stamps + closing)
+              − FinanceCarry                 (points + interest over hold, if hard-money)
+              − TargetProfit                 (auction risk premium: 20–25% of ARV, NOT the 15% you'd accept on a negotiated deal)
+```
+
+The two lines that break auction deals and that a wholesale MAO ignores are **SurvivingSeniorLiens** and **RedemptionReserve**. Which liens survive is entirely a function of *what lien is foreclosing*:
+- **1st-mortgage (or 1st-priority tax) foreclosure** → junior mortgages, HELOCs, judgment liens, most mechanic's liens are **wiped out**; you take clean-ish title. This is the deal you want.
+- **Junior-lien foreclosure** (an HOA or 2nd-mortgage forecloses) → the **senior mortgage survives** and rides along; your "cheap" winning bid is on top of an intact first mortgage. This is the trap. `SurvivingSeniorLiens` can exceed ARV.
+- Property taxes and municipal liens are **super-priority in both states** and survive nearly everything → always subtract.
+- A federal (IRS) tax lien junior to the foreclosing mortgage is extinguished but carries a **120-day IRS right of redemption**; a properly-noticed non-IRS junior generally is not.
+
+**Sub-model B — surplus recovery net fee.**
+```
+NetRecoveryFee = min(ContractRate, StatutoryCap) × Overage − FilingCost − SkipTraceCost
+Overage        = FinalSaleBid − (JudgmentDebt + AccruedInterest + Costs + JuniorLiensPaidFromSurplus)
+```
+The former owner is only entitled to what remains **after junior lienholders are paid out of the surplus in priority order** — that's why you underwrite the *net* overage to the person, not the gross surplus.
+
+### Capital required + financing (down/EMD, hard-money points+rate 2026, holding months, total cash-in)
+
+**Sub-model A (capital-intensive):**
+- **Deposit at the sale.** *SC (Master-in-Equity):* **5% of the bid** in certified funds the same day, **balance in 30 days** or the deposit is forfeited and the property is re-noticed. *NC (power-of-sale/clerk):* high bid is subject to a **10-day upset-bid period**; any upset bid must exceed the standing bid by the greater of **5% or $750** and post that as a deposit — so in NC you don't own it clean for ~10+ days and can be outbid post-sale.
+- **Cash-in for a typical deal in our band ($150k ARV, $30k rehab):** winning bid ~$70k–$90k. If all-cash, that plus ~$5k reserves. If hard-money: **2026 fix-and-flip terms run 9.5%–13% interest + 1.5–3 points**, typically **~85–90% of purchase + 100% of rehab, 65–70% ARV cap**. Expect **~15–20% cash down + points + reserves**. Note many hard-money lenders **won't fund an auction purchase directly** (no inspection, must close in days) — investors often use a short-term cash/transactional-funding bridge, then refinance into the hard-money/DSCR loan post-sale.
+- **Holding period:** 4–6 months for a flip (rehab 2–3, list/close 2–3); add 1–2 months for eviction if occupied. Model **5 months carry**.
+- **Total cash-in, hard-money, this deal:** ~$12k–$18k down + ~$2k–$4k points + ~$4k–$6k interest over 5 mo + ~$5k reserves ≈ **$25k–$33k out of pocket**.
+
+**Sub-model B (near-zero capital):** cost per claim is skip-trace ($0 via the engine's own owner-resolver, or ~$5–$15 commercial) + filing/notary/postage (~$50–$200) + optional attorney to file the motion. No property, no financing, no holding cost. This is why it's the higher-ROI-on-cash lane even though the dollar profit per deal is smaller.
+
+### Exit math + margins (realistic profit + the make-or-break variables)
+
+**Sub-model A:** on a clean 1st-mortgage foreclosure bought right, target **$20k–$35k net** on a sub-$200k flip (≈13–20% of ARV). Make-or-break variables, in order: **(1) which lien is foreclosing** (junior-lien sale with a surviving 1st = instant loss); **(2) interior condition** — you usually can't get inside, so rehab is a guess and a $30k estimate can be $55k; **(3) occupancy/eviction** — a holdover owner adds 1–3 months and $3k–$6k; **(4) redemption/upset** — an NC upset bid can take the deal away after you've committed, and SC-tax-derived title carries the 12-month cloud; **(5) title defects** — improperly-noticed junior liens that *should* have been wiped but weren't.
+
+**Sub-model B:** margins are **statutorily capped**, and this is the compliance line:
+- **SC:** for *reported/unclaimed* surplus, **S.C. Code §27-18-360** voids any recovery agreement made **within 24 months** of the funds being reported to the Treasurer, and after that **caps the fee at 15% of the value returned**. Court-held foreclosure surplus (before it escheats) is governed by **SCRCP Rule 71 / §15-39-720** — claims filed with the Master within a set window — and practitioners generally hold fee agreements to that same reasonableness ceiling.
+- **NC:** there is **no statutory percentage cap**, but since **Jan 1, 2022, anyone who for a fee locates/recovers property distributable to an owner must be a licensed private investigator** (NC Private Protective Services Board, per N.C.G.S. §116B-53/78.1 definitions). Unlicensed "finders" charging 30–40% are operating illegally; as of early 2025 only a handful of entities were properly registered statewide. Practically, NC surplus is claimed through a **special proceeding under G.S. §45-21.32**, and many owners use an attorney (statutory/reasonable attorney fees) rather than a finder.
+- **Realistic recovery-business margin:** on a typical **$8k–$25k overage**, a compliant SC 15% fee nets **$1,200–$3,750 per claim** minus ~$100–$500 costs. It scales on **volume of the sale roster**, not per-deal size.
+
+### A worked example (a real deal in our price band)
+
+**Sub-model A — clean 1st-mortgage foreclosure, Spartanburg County SC.**
+- ARV (post-rehab, per comps): **$165,000**
+- Rehab (estimated blind, cosmetic + roof): **$32,000** (budget the +30% risk → underwrite $38,000)
+- Foreclosing lien: **1st mortgage** → juniors wiped; only **surviving super-priority county taxes $3,200** remain
+- Redemption reserve: **$0** (mortgage foreclosure, not a tax sale → no SC 12-month redemption)
+- Eviction holdover (occupied): **$4,000**
+- Title cure reserve: **$2,000**
+- Selling costs (0.08 × ARV): **$13,200**
+- Finance carry (hard-money, ~$80k principal, 3 pts + 11% × 5 mo): **$2,400 pts + $3,700 int ≈ $6,100**
+- Target profit (auction risk premium, 22% of ARV): **$36,300**
+
+Max bid = 165,000 − 38,000 − 3,200 − 0 − 4,000 − 2,000 − 13,200 − 6,100 − 36,300 = **$62,200.** Round the ceiling to **$62,000**; walk if bidding passes it.
+- **If won at $58,000:** SC deposit due same day = 5% = **$2,900**; balance $55,100 in 30 days. Actual rehab lands at $34,000 (under the $38k reserve). Sell at $165,000. Net profit ≈ 165,000 − 58,000 − 34,000 − 3,200 − 4,000 − 2,000 − 13,200 − 6,100 = **~$44,500** (≈27% of ARV — beat target because you bought $4k under ceiling and rehab came in under reserve).
+
+**Sub-model B — surplus on the same roster.** A different sale: judgment debt + costs = $92,000; property sold at auction for **$118,000**. Gross surplus = **$26,000**. One junior judgment lien of $6,000 is paid from surplus first → **net overage to former owner = $20,000**. You skip-trace the ex-owner (free via the engine's resolver), sign a **15% SC-compliant** recovery agreement, file under Rule 71. **Fee = $3,000**, less ~$250 filing/notary/mailing = **~$2,750 net, zero capital, ~60–90 days to disbursement.**
+
+### Encode in the engine (the per-strategy max_bid formula / which grade factors change)
+
+Add a strategy tag `auction` and a parallel `surplus` opportunity type, computed from the same sale-roster record.
+
+**1. `max_bid_auction` (new field, distinct from `max_bid_70`):**
+```
+max_bid_auction = arv
+                − rehab_reserve                 # rehab × 1.30 (blind-buy inflation)
+                − surviving_senior_liens         # from lien-stack capture, filtered by foreclosing-lien position
+                − redemption_reserve             # = 0 for mortgage FC; = f(assessed) only if title is SC-tax-derived
+                − eviction_reserve               # 0 if vacant flag; else 4000
+                − title_cure_reserve             # 2000 default
+                − 0.08 × arv                      # selling costs incl. SC/NC deed stamps
+                − finance_carry                   # points + rate × hold_months (2026: 11% + 3 pts, 5 mo default)
+                − 0.22 × arv                      # auction risk-profit premium (vs 0.15 negotiated)
+```
+
+**2. New required inputs / gates (these drive the grade):**
+- `foreclosing_lien_position` — **the single most important new factor.** If the foreclosure is a **junior lien** (HOA/2nd), set `surviving_senior_liens += senior_mortgage_balance` and **hard-cap the grade at D/F** unless senior payoff still leaves margin. Grade A/B requires a confirmed **1st-position** foreclosure.
+- `occupancy_flag` (vacant vs occupied) → toggles `eviction_reserve` and one grade notch.
+- `redemption_exposure` — boolean: true only when the deed derives from an **SC tax sale (12-mo redemption + extra 12-mo incontestability window)** or an **IRS 120-day** junior-lien situation; when true, apply `redemption_reserve` and **down-grade one letter** (capital is frozen/at-risk during the window). Mortgage foreclosures in both SC and NC = no equitable redemption → no penalty.
+- `state`/`upset_bid_risk` — for **NC**, flag that the winning bid is **not final for 10 days** and can be topped by a 5%-or-$750 upset; the engine should treat NC auction wins as *provisional* and not commit the full deal-flow until the upset window closes.
+
+**3. Surplus opportunity (`surplus_recovery`):** fire whenever `final_sale_bid > judgment_debt_total`. Compute:
+```
+gross_surplus   = final_sale_bid − judgment_debt_total
+net_overage     = gross_surplus − junior_liens_paid_from_surplus
+statutory_rate  = 0.15 if state == "SC" else attorney/PI-licensed model for NC
+projected_fee   = net_overage × statutory_rate − claim_costs
+compliance_flag = "SC:void<24mo of report" | "NC:requires_PI_license_or_attorney"
+```
+Grade the surplus lead on `net_overage × statutory_rate` (dollar yield) and set `outreach_priority = high` — these are near-zero-cost, high-ROI, and share the exact owner→contact backbone the rest of the engine already uses. Surface `compliance_flag` on every surplus record so outreach never signs a void SC agreement or an unlicensed NC finder deal.
+
+Sources: [NC upset-bid deposit G.S. 45-21.27](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_45/GS_45-21.27.pdf), [NC upset bid rules/deadlines](https://legalclarity.org/how-upset-bids-work-in-north-carolina-foreclosures/), [NC finder PI-license requirement](https://www.surplusfundsattorney.com/beware-of-finders), [NC surplus special proceeding G.S. 45-21.32](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_45/GS_45-21.32.pdf), [SC Master-in-Equity 5% deposit / 30-day close](https://charlestoncounty.org/Departments/Master-In-Equity/bidding.php), [SC surplus Rule 71](https://www.sccourts.org/resources/judicial-community/court-rules/civil/rule-71/), [SC §27-18-360 finder cap 15% / 24-mo void](https://law.justia.com/codes/south-carolina/title-27/chapter-18/), [SC tax-sale 12-month redemption](https://www.scstatehouse.gov/code/t12c051.php), [lien priority — juniors wiped/seniors survive](https://www.nolo.com/legal-encyclopedia/what-happens-liens-second-mortgages-foreclosure.html), [2026 hard-money rates & points](https://www.crestmontcapital.com/blog/hard-money-loan-rates-2026), [2026 fix-and-flip loan terms](https://www.welendllc.com/blog/fix-and-flip-loan-rates)
