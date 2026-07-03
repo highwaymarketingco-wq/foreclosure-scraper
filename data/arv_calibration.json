@@ -1,0 +1,17 @@
+{
+  "factors": {
+    "anderson": 1.0222,
+    "buncombe": 0.8946,
+    "charleston": 1.5714,
+    "cleveland": 1.0352,
+    "henderson": 1.3951,
+    "laurens": 1.2859,
+    "pickens": 1.0103,
+    "spartanburg": 0.5285,
+    "transylvania": 0.7408
+  },
+  "generated_by": "scripts/backtest_arv.py --emit-calibration",
+  "method": "factor = 1/(1+median_bias); counties with >=8 recorded-sale backtest rows; clamped [0.4, 2.5]",
+  "n_counties": 9,
+  "n_eligible_rows": 270
+}

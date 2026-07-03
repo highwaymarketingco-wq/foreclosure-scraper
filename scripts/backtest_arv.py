@@ -141,6 +141,26 @@ def collect() -> list[dict]:
     return out
 
 
+def build_calibration(items: list[dict], min_n: int = 8) -> dict[str, float]:
+    """Per-county ARV calibration factor = 1 / (1 + median_bias).
+
+    Corrects the measured systematic per-county ARV bias. Only counties with
+    >= min_n eligible backtest rows earn a factor (else no evidence). Clamped
+    to [0.4, 2.5] so one noisy county can't swing ARV wildly. Consumed by
+    valuation/calc.py:_arv_calibration_factor.
+    """
+    by_cty: dict[str, list[float]] = {}
+    for i in items:
+        by_cty.setdefault(str(i["county"]).strip().lower(), []).append(i["arv_err"])
+    factors: dict[str, float] = {}
+    for cty, errs in by_cty.items():
+        if not cty or cty == "(unknown)" or len(errs) < min_n:
+            continue
+        bias = median(errs)
+        factors[cty] = round(max(0.4, min(2.5, 1.0 / (1.0 + bias))), 4)
+    return factors
+
+
 def fmt_block(label: str, items: list[dict]) -> str:
     n = len(items)
     if n == 0:
@@ -173,10 +193,16 @@ def main() -> None:
 
     # --- ARV error overall ---
     errs = [i["arv_err"] for i in items]
+    aerr = [abs(e) for e in errs]
     print("ARV ERROR = (arv_expected - HPI_adjusted_recorded_sale) / adj_sale")
     print(f"  OVERALL  median={median(errs):+.1%}  "
           f"p25={pct(errs,0.25):+.1%}  p75={pct(errs,0.75):+.1%}  "
           f"within20%={sum(1 for e in errs if abs(e)<=0.20)/n:.0%}")
+    print(f"  MdAPE={median(aerr):.1%}  "
+          f"PPE10={sum(1 for e in aerr if e<=0.10)/n:.0%}  "
+          f"PPE20={sum(1 for e in aerr if e<=0.20)/n:.0%}  "
+          f"bias(signed median)={median(errs):+.1%}   "
+          f"(targets: MdAPE<10%, PPE10>60%, |bias|<3%)")
 
     # --- by confidence ---
     print("\nBY ARV_CONFIDENCE")
@@ -216,5 +242,29 @@ def main() -> None:
     print("\n" + "=" * 78)
 
 
+def emit_calibration() -> None:
+    items = collect()
+    factors = build_calibration(items)
+    out = {
+        "generated_by": "scripts/backtest_arv.py --emit-calibration",
+        "method": "factor = 1/(1+median_bias); counties with >=8 recorded-sale "
+                  "backtest rows; clamped [0.4, 2.5]",
+        "n_eligible_rows": len(items),
+        "n_counties": len(factors),
+        "factors": factors,
+    }
+    dest = Path(__file__).resolve().parent.parent / "data" / "arv_calibration.json"
+    dest.parent.mkdir(exist_ok=True)
+    dest.write_text(json.dumps(out, indent=2, sort_keys=True))
+    print(f"wrote {dest}  ({len(factors)} county factors from {len(items)} rows)")
+    for c, f in sorted(factors.items()):
+        arrow = "over-values → shrink" if f < 1 else "under-values → lift"
+        print(f"  {c:<16} ×{f}   ({arrow})")
+
+
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--emit-calibration" in sys.argv:
+        emit_calibration()
+    else:
+        main()

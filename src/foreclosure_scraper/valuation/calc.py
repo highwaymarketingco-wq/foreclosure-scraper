@@ -12,8 +12,10 @@ Outputs (per listing):
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, asdict
 from datetime import datetime
+from pathlib import Path
 
 from ..models import Listing, PropertyKind
 
@@ -67,6 +69,43 @@ MAX_LAND_PPA = 2_000_000  # $/acre
 # million phantom ARV. Above this ceiling the proxy is not trustworthy, so we
 # return ARV-unavailable (honest) instead of a fabricated number.
 MAX_PROXY_ARV = 2_000_000
+
+
+# ---- Per-county ARV calibration --------------------------------------------
+# The comp-$/sqft ARV carries a measured, systematic per-county bias (backtest:
+# some counties over-value ~+80-90%, others under-value ~-30%). A one-time
+# calibration multiplier per county (factor = 1 / (1 + median_bias), generated
+# by `scripts/backtest_arv.py --emit-calibration`) corrects it. Missing file or
+# an unknown county -> factor 1.0 (fully inert), so the engine is unchanged
+# until a calibration table is generated. Factors outside [0.4, 2.5] are
+# ignored as a safety guard against a bad table swinging ARV wildly.
+_CALIB_PATH = Path(__file__).resolve().parents[3] / "data" / "arv_calibration.json"
+_CALIB_CACHE: dict[str, float] | None = None
+
+
+def _load_arv_calibration() -> dict[str, float]:
+    """Load {normalized_county: factor}, cached. Safe if the file is absent."""
+    global _CALIB_CACHE
+    if _CALIB_CACHE is None:
+        try:
+            raw = json.loads(_CALIB_PATH.read_text())
+            factors = raw.get("factors", raw) if isinstance(raw, dict) else {}
+            _CALIB_CACHE = {
+                str(k).strip().lower(): float(v)
+                for k, v in factors.items()
+                if isinstance(v, (int, float))
+            }
+        except Exception:
+            _CALIB_CACHE = {}
+    return _CALIB_CACHE
+
+
+def _arv_calibration_factor(li: Listing) -> float:
+    county = (getattr(li, "county", None) or "").strip().lower()
+    if not county:
+        return 1.0
+    f = _load_arv_calibration().get(county, 1.0)
+    return f if 0.4 <= f <= 2.5 else 1.0
 
 
 def _plausible_living_sqft(li: Listing) -> float | None:
@@ -417,6 +456,18 @@ def compute(li: Listing) -> Calc:
 
     # ---- ARV range ------------------------------------------------------
     expected, low, high, arv_conf, arv_notes = _arv_signals(li)
+    # Per-county calibration — the single chokepoint every ARV tier flows
+    # through (each _arv_signals tier returns its own band, so apply here, not
+    # inside). Inert (factor 1.0) for any county without a calibration entry.
+    if expected is not None:
+        _cf = _arv_calibration_factor(li)
+        if _cf != 1.0:
+            expected = round(expected * _cf, -2)
+            low = round(low * _cf, -2) if low is not None else low
+            high = round(high * _cf, -2) if high is not None else high
+            arv_notes = list(arv_notes) + [
+                f"County calibration ×{_cf:.2f} (corrects measured {li.county} ARV bias)"
+            ]
     out.arv_low, out.arv_expected, out.arv_high = low, expected, high
     out.notes.extend(arv_notes)
 
