@@ -1,0 +1,341 @@
+/* ============================================================================
+   GOLIATH-STYLE PREMIUM LAYER  ·  loaded AFTER style.css (overrides via cascade)
+   - Enterprise real-estate-tech look: navy-first, blue+cyan accent, amber CTA
+   - Data table restyled as a scannable "signal feed"; KPI cards; pill controls
+   - Pure re-skin: every selector below already exists in the HTML/JS. No logic.
+   - Reversible: delete this file + its <link> and the old warm theme returns.
+   ============================================================================ */
+
+/* ---- Design tokens: crisp light (enterprise slate/blue) ------------------- */
+:root {
+  --bg:            #f5f7fb;
+  --surface:       #ffffff;
+  --surface-2:     #eef2f8;
+  --surface-hover: #e8eef7;
+
+  --border:        #e3e8f0;
+  --border-subtle: #eef2f7;
+  --border-strong: #cbd5e1;
+
+  --text:    #0f1729;
+  --text-2:  #334155;
+  --muted:   #64748b;
+  --muted-2: #94a3b8;
+
+  --accent:        #2563eb;
+  --accent-2:      #0ea5e9;
+  --accent-soft:   #e2edff;
+  --accent-strong: #1d4ed8;
+  --on-accent:     #ffffff;
+  --cta:           #f59e0b;
+  --cta-strong:    #d97706;
+
+  --success: #059669;
+  --warn:    #d97706;
+  --danger:  #dc2626;
+
+  --grade-A: #059669; --grade-A-bg: #d1fae5;
+  --grade-B: #2563eb; --grade-B-bg: #dbeafe;
+  --grade-C: #d97706; --grade-C-bg: #fef3c7;
+  --grade-D: #ea580c; --grade-D-bg: #ffedd5;
+  --grade-F: #dc2626; --grade-F-bg: #fee2e2;
+
+  --hot:  #dc2626; --hot-bg:  #fee2e2;
+  --warm: #d97706; --warm-bg: #fef3c7;
+  --cool: #2563eb; --cool-bg: #dbeafe;
+
+  /* type pills recolored to the blue/cyan/amber family */
+  --pill-fc-bg:#fee2e2; --pill-fc-fg:#b91c1c;
+  --pill-tx-bg:#fef3c7; --pill-tx-fg:#a16207;
+  --pill-au-bg:#e2edff; --pill-au-fg:#1e40af;
+  --pill-lp-bg:#ede9fe; --pill-lp-fg:#6d28d9;
+  --pill-re-bg:#cffafe; --pill-re-fg:#0e7490;
+  --pill-sh-bg:#ffe4e6; --pill-sh-fg:#be123c;
+  --pill-uk-bg:#eef2f7; --pill-uk-fg:#475569;
+
+  --shadow-xs: 0 1px 2px rgba(15,23,42,.06);
+  --shadow-sm: 0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.04);
+  --shadow-md: 0 6px 16px rgba(15,23,42,.09), 0 2px 5px rgba(15,23,42,.05);
+  --shadow-lg: 0 20px 45px rgba(15,23,42,.16), 0 6px 12px rgba(15,23,42,.07);
+
+  --map-filter: none;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* ---- Design tokens: deep-navy dark (the premium hero look) ---------------- */
+:root[data-theme="dark"] {
+  --bg:            #080b14;
+  --surface:       #0f1524;
+  --surface-2:     #151d30;
+  --surface-hover: #1b2438;
+
+  --border:        rgba(148,163,184,.14);
+  --border-subtle: rgba(148,163,184,.08);
+  --border-strong: rgba(148,163,184,.26);
+
+  --text:    #e6ecf7;
+  --text-2:  #aab6ca;
+  --muted:   #7a869b;
+  --muted-2: #59657c;
+
+  --accent:        #3b82f6;
+  --accent-2:      #22d3ee;
+  --accent-soft:   rgba(59,130,246,.18);
+  --accent-strong: #7cb0ff;
+  --on-accent:     #060912;
+  --cta:           #f59e0b;
+  --cta-strong:    #fbbf24;
+
+  --success: #34d399;
+  --warn:    #fbbf24;
+  --danger:  #f87171;
+
+  --grade-A: #34d399; --grade-A-bg: rgba(52,211,153,.15);
+  --grade-B: #60a5fa; --grade-B-bg: rgba(96,165,250,.15);
+  --grade-C: #fbbf24; --grade-C-bg: rgba(251,191,36,.15);
+  --grade-D: #fb923c; --grade-D-bg: rgba(251,146,60,.15);
+  --grade-F: #f87171; --grade-F-bg: rgba(248,113,113,.15);
+
+  --hot:  #f87171; --hot-bg:  rgba(248,113,113,.16);
+  --warm: #fbbf24; --warm-bg: rgba(251,191,36,.15);
+  --cool: #60a5fa; --cool-bg: rgba(96,165,250,.15);
+
+  --pill-fc-bg:rgba(248,113,113,.16); --pill-fc-fg:#fca5a5;
+  --pill-tx-bg:rgba(251,191,36,.15);  --pill-tx-fg:#fcd34d;
+  --pill-au-bg:rgba(59,130,246,.16);  --pill-au-fg:#93c5fd;
+  --pill-lp-bg:rgba(167,139,250,.16); --pill-lp-fg:#c4b5fd;
+  --pill-re-bg:rgba(34,211,238,.15);  --pill-re-fg:#67e8f9;
+  --pill-sh-bg:rgba(251,113,133,.16); --pill-sh-fg:#fda4af;
+  --pill-uk-bg:rgba(148,163,184,.14); --pill-uk-fg:#94a3b8;
+
+  --shadow-xs: 0 1px 2px rgba(0,0,0,.45);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.5);
+  --shadow-md: 0 8px 22px rgba(0,0,0,.45);
+  --shadow-lg: 0 24px 55px rgba(0,0,0,.6);
+
+  /* darken/blue the light Leaflet tiles so the map matches the navy shell */
+  --map-filter: invert(1) hue-rotate(185deg) brightness(.92) contrast(.92) saturate(.85);
+}
+
+/* ---- Base ----------------------------------------------------------------- */
+body {
+  background:
+    radial-gradient(1200px 600px at 15% -10%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%),
+    var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv02","cv03","cv04","ss01";
+}
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(1100px 520px at 12% -12%, rgba(59,130,246,.10), transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, rgba(34,211,238,.06), transparent 55%),
+    var(--bg);
+}
+
+/* ---- Top nav / header ----------------------------------------------------- */
+.app-header {
+  position: sticky; top: 0; z-index: 50;
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  padding: 12px 22px;
+}
+.brand { align-items: center; gap: 12px; }
+.brand-logo {
+  display: inline-grid; place-items: center;
+  width: 34px; height: 34px; border-radius: 9px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff; font-size: 18px; box-shadow: var(--shadow-sm);
+}
+.brand-logo svg { width: 19px; height: 19px; }
+.brand h1 { font-size: 16px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
+.subtitle { font-size: 11.5px; color: var(--muted); }
+.subtitle .dot { opacity: .5; }
+
+/* ---- Pill segmented controls (dataset / stage / view) --------------------- */
+.dataset-toggle, .stage-toggle, .view-toggle {
+  display: inline-flex; gap: 2px; padding: 3px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.ds-btn, .view-btn, .stage-btn {
+  border: 0; background: transparent; color: var(--text-2);
+  padding: 7px 13px; border-radius: 999px; cursor: pointer;
+  font-size: 12.5px; font-weight: 600; white-space: nowrap;
+  transition: color .16s, background .16s, box-shadow .16s;
+}
+.ds-btn:hover, .view-btn:hover, .stage-btn:hover { color: var(--text); background: var(--surface-hover); }
+.ds-btn.active, .view-btn.active, .stage-btn.active {
+  background: var(--surface); color: var(--accent); box-shadow: var(--shadow-xs);
+}
+:root[data-theme="dark"] .ds-btn.active,
+:root[data-theme="dark"] .view-btn.active,
+:root[data-theme="dark"] .stage-btn.active {
+  background: var(--accent-soft); color: var(--accent-strong); box-shadow: none;
+}
+.ds-count, .stage-count {
+  font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11px; opacity: .75;
+}
+.brand-meta .badge {
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2);
+  border-radius: 999px; padding: 5px 11px; font-size: 11.5px; font-weight: 600;
+}
+.theme-toggle {
+  width: 34px; height: 34px; border-radius: 9px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2);
+  cursor: pointer; display: inline-grid; place-items: center; transition: background .16s, color .16s;
+}
+.theme-toggle:hover { background: var(--surface-hover); color: var(--accent); }
+
+/* ---- KPI stat cards ------------------------------------------------------- */
+.stats { gap: 14px; padding: 18px 22px 6px; }
+.stat {
+  position: relative; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 15px 18px; box-shadow: var(--shadow-sm);
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.stat:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
+.stat::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(var(--accent), var(--accent-2));
+}
+.stat-num {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: 25px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; color: var(--text);
+}
+.stat-lbl {
+  margin-top: 4px; font-size: 10.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+}
+
+/* ---- Filter bar ----------------------------------------------------------- */
+.filters {
+  margin: 12px 22px 0; padding: 15px 16px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; box-shadow: var(--shadow-sm);
+}
+.filter-group label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--muted);
+}
+.filters input[type="text"], .filters select, .filters input[type="date"] {
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 9px; padding: 8px 10px; font-size: 13px;
+  transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.filters input[type="text"]:focus, .filters select:focus {
+  outline: 0; border-color: var(--accent); background: var(--surface);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.filter-slider { accent-color: var(--accent); }
+.filter-slider-val { font-family: var(--mono); color: var(--accent); font-weight: 700; }
+
+/* ---- Result bar + export -------------------------------------------------- */
+.result-bar {
+  margin: 14px 22px 8px; color: var(--muted); font-size: 13px;
+  font-weight: 500;
+}
+#result-count { font-family: var(--mono); color: var(--text-2); }
+.btn-link {
+  background: var(--accent); color: var(--on-accent); border: 0;
+  padding: 8px 14px; border-radius: 9px; font-weight: 600; font-size: 12.5px;
+  cursor: pointer; box-shadow: var(--shadow-xs); transition: background .16s, transform .12s;
+}
+.btn-link:hover { background: var(--accent-strong); transform: translateY(-1px); }
+:root[data-theme="dark"] .btn-link { color: #fff; }
+
+/* ---- The data table = the "signal feed" ---------------------------------- */
+.table-wrap {
+  margin: 0 22px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; box-shadow: var(--shadow-sm); overflow: auto;
+}
+#listings-table { border-collapse: separate; border-spacing: 0; width: 100%; }
+#listings-table thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--surface-2); color: var(--muted);
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  text-align: left; padding: 11px 12px; white-space: nowrap;
+  border-bottom: 1px solid var(--border); cursor: pointer; user-select: none;
+  transition: color .15s;
+}
+#listings-table thead th:hover { color: var(--text); }
+#listings-table thead th.sort-asc, #listings-table thead th.sort-desc { color: var(--accent); }
+#listings-table tbody td {
+  padding: 10px 12px; font-size: 13px; color: var(--text-2);
+  border-bottom: 1px solid var(--border-subtle); vertical-align: middle;
+}
+#listings-table tbody tr { cursor: pointer; transition: background .12s; }
+#listings-table tbody tr:hover { background: var(--surface-hover); }
+#listings-table td.num {
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  text-align: right; color: var(--text);
+}
+/* grade left-accent stripe on each row */
+#listings-table tbody tr.row-A td:first-child { box-shadow: inset 3px 0 0 var(--grade-A); }
+#listings-table tbody tr.row-B td:first-child { box-shadow: inset 3px 0 0 var(--grade-B); }
+#listings-table tbody tr.row-C td:first-child { box-shadow: inset 3px 0 0 var(--grade-C); }
+#listings-table tbody tr.row-D td:first-child { box-shadow: inset 3px 0 0 var(--grade-D); }
+#listings-table tbody tr.row-F td:first-child { box-shadow: inset 3px 0 0 var(--grade-F); }
+
+/* ---- Badges / pills ------------------------------------------------------- */
+.badge, .qbadge, .flag-pill, .confidence-pill, .btype-pill, .buyer-chip, .strat-chip {
+  border-radius: 999px; font-weight: 600; font-size: 11px; letter-spacing: .01em;
+}
+.grade-badge, .grade-circle, .gs-letter {
+  font-family: var(--mono); font-weight: 800; border-radius: 8px; letter-spacing: -.01em;
+}
+.grade-badge.A, .grade-circle.A, .row-A .gs-letter { background: var(--grade-A-bg); color: var(--grade-A); }
+.grade-badge.B, .grade-circle.B { background: var(--grade-B-bg); color: var(--grade-B); }
+.grade-badge.C, .grade-circle.C { background: var(--grade-C-bg); color: var(--grade-C); }
+.grade-badge.D, .grade-circle.D { background: var(--grade-D-bg); color: var(--grade-D); }
+.grade-badge.F, .grade-circle.F { background: var(--grade-F-bg); color: var(--grade-F); }
+.distress-badge.hot,  .hot  { color: var(--hot); }
+.distress-badge.warm, .warm { color: var(--warm); }
+.intent-hot  { background: var(--hot-bg);  color: var(--hot); }
+.intent-warm { background: var(--warm-bg); color: var(--warm); }
+.intent-cool, .intent-cold { background: var(--cool-bg); color: var(--cool); }
+
+/* ---- Cards view ----------------------------------------------------------- */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; box-shadow: var(--shadow-sm); overflow: hidden;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); border-color: var(--border-strong); }
+.card-roi.pos, .roi-pos, .pos { color: var(--success); }
+.card-roi.neg, .roi-neg, .neg { color: var(--danger); }
+
+/* ---- Detail panel (slide-in) --------------------------------------------- */
+#detail-panel {
+  background: var(--surface); border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+}
+#detail-panel .detail-section { border-top: 1px solid var(--border-subtle); }
+#detail-panel h2 { letter-spacing: -.02em; }
+.crm-status-btn.active, .crm-status-btn[aria-pressed="true"] {
+  background: var(--accent); color: var(--on-accent); border-color: var(--accent);
+}
+
+/* ---- Map ------------------------------------------------------------------ */
+#map, .mini-map { border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
+#view-map { margin: 0 22px; }
+.leaflet-tile { filter: var(--map-filter); }
+.leaflet-container { background: var(--surface-2); }
+
+/* ---- Footer --------------------------------------------------------------- */
+footer { color: var(--muted); border-top: 1px solid var(--border); }
+
+/* ---- Focus, scrollbars, motion ------------------------------------------- */
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px;
+}
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
