@@ -3639,3 +3639,473 @@ All free / already-in-repo:
 **Total effort: ~2.5–3 hours.** Low risk — every change either replaces a constant with a data-derived value or adds parallel fields; the existing lien/payoff/double-count guards are untouched.
 
 Relevant files: `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/valuation/calc.py` (constants L41-47, ARV L258-541, rehab L558-620, max_bid L641-720, cost stack L742-758), `/Users/cashhigh/foreclosure-scraper/scripts/backtest_arv.py` (validation harness).
+
+
+---
+
+# Deep-Dive Round 11 — 18-County Foreclosure Process + Timing Playbook (2026-07-02)
+
+
+## SC Judicial Foreclosure — Full Timeline (Master-in-Equity)
+
+South Carolina is a **100% judicial** foreclosure state. Every mortgage foreclosure runs through the Court of Common Pleas and is referred to the county **Master-in-Equity** (MIE) — a full-time judge in the 18-county footprint's larger counties (Spartanburg, Anderson, Buncombe-equivalent volume counties) and a **special referee** in the smaller ones (Union, Oconee, Polk, Mitchell, McDowell, etc.). There is **no non-judicial "power of sale"** path and, critically, **no post-sale statutory right of redemption** — once the sale is confirmed (or the upset-bid period closes) the owner's interest is extinguished ("Hammer Rule"). This makes the *pre-sale* window the entire acquisition game.
+
+### The process / timeline (numbered stages with statutory citations + typical days between stages)
+
+1. **Lis pendens recorded at the county ROD** — *SC Code §15-11-10.* Must be filed **no more than 20 days before** the complaint and **no less than 20 days before** the foreclosure decree; service within **60 days** of filing or it's void. This is the **earliest public event** and typically posts at the ROD the same day as, or days before, the summons/complaint. *(→ ~0 days; lead-time to sale ≈ 150–270+ days)*
+2. **Summons & Complaint filed** (Common Pleas) under SCRCP; the complaint must state whether a deficiency judgment is **sought or waived**. Served personally, or by publication if the owner can't be located. *(same day to ~5 days after lis pendens)*
+3. **Answer / default window** — defendant has **30 days** to answer (SCRCP Rule 12). Most owner-occupant foreclosures go to **default**. *(+30 days)*
+4. **Order of Reference to the Master-in-Equity** — compulsory in equity foreclosures per **Rule 71, SCRCP**. Case transfers to the MIE/special referee. *(+2–8 weeks after default, county-dependent)*
+5. **Merits hearing** — notice to all parties **at least 3 days before** the hearing. In SC counties with active foreclosure-intervention programs the borrower may be routed to mandatory **loss-mitigation/mediation** first, adding 60–120 days. *(variable)*
+6. **Judgment of Foreclosure + Order of Sale** — MIE fixes the debt, orders sale, and sets the **deficiency vs. no-deficiency** posture. *(entered at/after hearing)*
+7. **Notice of sale advertised** — *SC Code §15-39-650:* published **once a week for three consecutive weeks** immediately before the sale day. *§15-39-660:* the ad names the property, time/place, owner, and plaintiff, posted at **three public places incl. the courthouse door** plus a gazette. *(sale set ≈ 3–5 weeks out)*
+8. **The MIE sale** — held the **first Monday of the month** (rolls to Tuesday if a holiday) at the county courthouse/designated courtroom. Property is struck to the highest bidder; deposit required.
+9. **Deficiency branch (upset-bid period)** — *SC Code §15-39-720:* if a deficiency is sought, **bidding stays open until the 30th day after the sale** (exclusive of sale day); on that 30th day the property is **re-offered** and any upset bidder can raise. *SC Code §15-39-760:* if the complaint states **no deficiency demanded and the right is expressly waived**, §§15-39-720–750 do **not** apply — bidding **closes on sale day** (owner still gets a **20-day** compliance/settlement window per the MIE primer). *(+30 days deficiency / +0 days no-deficiency)*
+10. **Report of Sale & Confirmation** — MIE files the report; parties may **except within 10 days** (Rule 53(e)(2), SCRCP), then the sale is confirmed. *(+~10–30 days)*
+11. **Master's Deed delivered & recorded** — after the winning bidder complies, the MIE executes a **Master's Deed** (quitclaim-quality — conveys only the title before the court), recorded at the ROD. Title vests; **no redemption**. *(deed within days of compliance)*
+
+**Rule of thumb:** contested/default SC foreclosure runs **~150–270 days** from lis pendens to deed; add 30 days whenever deficiency is not waived.
+
+### Where each stage is PUBLICLY visible (free surface + lead-time before sale)
+
+| Stage | Free public surface | Lead-time before sale |
+|---|---|---|
+| **Lis pendens (Stage 1)** | **County ROD / Register of Deeds** index (recorded doc type "Lis Pendens" / "LP"). Earliest, cheapest, cleanest signal. | **~150–270+ days** — earliest possible |
+| Summons/Complaint, default, reference (2–4) | **SC Judicial Dept Public Index** (publicindex.sccourts.org) — Court Agency = "Common Pleas," case type foreclosure; docket shows filing, service, default, order of reference | ~120–210 days (but ToS-no-scrape wall) |
+| Judgment + Order of Sale (6) | Public Index docket entry; MIE case file | ~30–60 days |
+| **Notice of sale (7)** | **Legal-notice section of the local newspaper** (3 consecutive weeks) + **courthouse-door posting** + the county **MIE "Sale Roster"/salesbook** posted online ~3 weeks out | **~15–21 days** |
+| **Sale roster / salesbook (8)** | **County MIE web page** (e.g., Anderson & Spartanburg publish monthly "Sale List and Results" PDFs; smaller counties list on the MIE/Clerk page) + **SC Public Index → Court Agency = "Master in Equity" → roster** | Posted **~3 weeks** pre-sale; refreshed daily |
+| **Upset-bid window (9)** | MIE **sale results** list (shows winning bid + whether bidding remains open 30 days) | Sale day → **+30 days** (a second, post-sale acquisition window) |
+| Confirmation / Master's Deed (10–11) | ROD (Master's Deed recording) | Post-sale |
+
+**Practical hierarchy for lead-timing:** ROD lis pendens (earliest + free + scrapable) → newspaper legal notices (mid) → MIE monthly sale roster (latest, ~3 weeks, but highest-intent). Foreclosure-firm sale calendars (e.g., Rogers Townsend, Scott & Corley, Finkel, Brock & Scott, Riley Pope & Laney) mirror the MIE roster and sometimes post earlier.
+
+### How to WORK this stage (the acquisition move + best owner-motivation window)
+
+- **At lis pendens (best window):** ~5–9 months of runway before the owner loses everything with **no redemption**. Owner still holds title, occupancy, and full equity. This is the **pre-foreclosure / short-sale / subject-to / equity-purchase** sweet spot — motivation is rising but panic/shame hasn't frozen them. **Highest EV per lead.** Direct-mail + door + phone; lead with "you still have options and equity."
+- **After Order of Sale, during the 3-week advertisement:** owner now knows the exact sale date on the courthouse door and in the paper. Motivation peaks; runway is short. Move is a **fast cash close before the first Monday** or a same-day reinstatement help — you're racing the clock.
+- **At the MIE sale:** buy at auction (deposit + comply). Requires cash and title-risk tolerance (Master's Deed = no warranties; junior liens may or may not be wiped — verify the lien stack and whether it's a 1st-mortgage foreclosure).
+- **During the 30-day upset-bid period (deficiency cases only):** you can **upset the winning bid** by raising it and depositing per terms — a legitimate second bite when the third-party/plaintiff bid came in low relative to ARV. Watch **no-deficiency** cases: those close on sale day, so **no upset window** exists.
+- **Because there's no post-sale redemption**, do **not** waste outreach on owners after confirmation/deed — the door is closed. All owner-facing outreach must land **before the sale**.
+
+### Encode in the engine
+
+- **`sc_foreclosure_stage`** enum on each SC lead: `lis_pendens` → `complaint_filed` → `default` → `order_of_reference` → `judgment_order_of_sale` → `notice_advertised` → `sale_scheduled` → `upset_bid_open` → `sold_confirmed` → `deed_recorded`. Populate from ROD (LP), Public Index docket, newspaper legal notices, and the MIE monthly roster PDFs.
+- **`deficiency_waived` boolean** parsed from complaint / roster ("no deficiency demanded"). Drives the upset-bid logic: if `false`, set `upset_bid_deadline = sale_date + 30d` and keep the lead **HOT** for that window; if `true`, bidding closes sale day (no upset lane).
+- **`sale_date` + `days_to_sale`** derived field. **Urgency multiplier**, applied to base score:
+  - `lis_pendens` and >120 days out → **×1.4** (prime equity-purchase window, long runway, no redemption pressure yet) — this is the **peak-EV band**, not a low-priority early stage.
+  - `notice_advertised` / `sale_scheduled` (≤21 days) → **×1.8** (max motivation, short fuse).
+  - `upset_bid_open` (deficiency case, ≤30 days post-sale) → **×1.2** (auction-buyer lane, not owner-outreach).
+- **Prune rules:** (1) **Hard-drop / archive** any SC lead at `sold_confirmed` or `deed_recorded` — **no post-sale redemption**, owner outreach is dead. (2) **Suppress owner-facing outreach** once `sale_date` has passed *and* deficiency was waived (no upset window, owner interest extinguished). (3) De-dupe lis-pendens against Public Index case number so ROD-first and docket-first ingests collapse to one lead.
+- **Refresh cadence:** re-scrape each county **MIE sale roster monthly** (~3 weeks before first Monday) to advance `sale_scheduled` leads and capture new ones; poll ROD **weekly** for fresh lis pendens (the earliest, most valuable signal). The MIE "Results" PDFs also backfill `sold_confirmed` for pruning.
+
+**Sources:**
+- [SC Code §15-11-10 (lis pendens timing) — scstatehouse.gov](https://www.scstatehouse.gov/code/t15c011.php)
+- [SC Code §§15-39-650, -660, -720, -760 (advertisement, upset bids, deficiency waiver) — scstatehouse.gov](https://www.scstatehouse.gov/code/t15c039.php)
+- [A Primer for Mortgage Foreclosures in South Carolina (Judge Charles B. Simmons Jr.) — Charleston County MIE](https://www.charlestoncounty.gov/departments/master-in-equity/mortgage-forclosures-primer.php)
+- [Primer for Mortgage Foreclosures — Pickens County MIE](https://www.co.pickens.sc.us/departments/master_in_equity/primer_for_mortgage_foreclosures.php)
+- [SC Judicial Branch — Rule 71, SCRCP (reference to Master)](https://www.sccourts.org/resources/judicial-community/court-rules/civil/rule-71/)
+- [Anderson County Master-in-Equity — monthly Sale Lists & Results](https://www.andersoncountysc.org/departments-a-z/master-in-equity/)
+- [Spartanburg County — Foreclosure Sale / Master-In-Equity](https://www.spartanburgcounty.org/313/Foreclosure-Sale)
+- [Nolo — South Carolina Foreclosure Laws (no post-sale redemption)](https://www.nolo.com/legal-encyclopedia/south-carolina-foreclosure-laws-and-procedures.html)
+- [SC Code §15-39-720 (upset bids within thirty days) — Justia](https://law.justia.com/codes/south-carolina/title-15/chapter-39/section-15-39-720/)
+
+
+## NC Power-of-Sale Foreclosure — Full Timeline (18-County Engine: Buncombe, Gaston, Henderson, Rutherford, Cleveland, Burke, Lincoln, McDowell, Polk, Transylvania, Mitchell + SC counties)
+
+### The process / timeline (numbered stages with statutory citations + typical days between stages)
+
+North Carolina is a **non-judicial power-of-sale** state. The whole action runs as a *special proceeding before the Clerk of Superior Court* (NCGS §45-21.16(g)) — not a lawsuit before a judge. There is **no post-sale statutory redemption** after a power-of-sale foreclosure; the only redemption is the debtor's right to pay in full *during* the upset-bid window, and once that window closes "the rights of the parties to the sale become fixed" (NCGS §45-21.29A). That single fact is what makes NC a fast, deadline-driven state to work.
+
+1. **Default + demand/acceleration.** Borrower misses payments; servicer accelerates. No public filing. *Not visible.* (Typical: 90–120 days delinquent before anyone files.)
+
+2. **Pre-foreclosure notice (home loans / primary residence only).** Servicer must mail the borrower a resource/itemization notice **at least 45 days before** filing the notice of hearing (NCGS §45-102, Article 11). Not recorded, but it is the statutory floor: **a notice of hearing on a primary residence cannot legally appear until ≥45 days after this mailing.** *Not publicly visible, but it fixes the minimum lead time.*
+
+3. **Notice of Hearing filed with the Clerk (the earliest public trigger).** Trustee/substitute-trustee files a *notice of hearing* commencing the special proceeding (NCGS §45-21.16(a)). Must be **served ≥10 days before the hearing** by Rule-4 methods (certified/registered mail, personal service), OR **by sheriff posting on the property ≥20 days before the hearing** where publication would be authorized. **This filing is the single most valuable lead event** — it is the *earliest* public surface and sits ~4–8 weeks ahead of the sale.
+
+4. **Clerk's foreclosure hearing.** Clerk hears evidence and must find six elements — (i) valid debt + holder, (ii) default, (iii) right to foreclose, (iv) proper notice, (v) pre-foreclosure/Article-11 compliance if a home loan, (vi) not barred by servicemember protection §45-21.12A — then authorizes the sale (NCGS §45-21.16(d)). Debtor need not appear to preserve the right to pay off. *Typical: hearing is ~15–30 days after the notice-of-hearing filing.*
+
+5. **10-day appeal window.** The clerk's order is a judicial act appealable **within 10 days** to Superior/District Court, heard *de novo*; an appeal by an owner-occupant is stayed on posting a bond of **1% of the principal balance** (NCGS §45-21.16(d1)). Most are not appealed. *Adds ~10 days minimum before the trustee advertises.*
+
+6. **Notice of Sale posted + published.** After authorization, the trustee: (a) **posts** the notice at the courthouse public-notice area **≥20 days before the sale**; (b) **publishes in a county legal newspaper once a week for ≥2 successive weeks**, with the first-to-last publication span **≥7 days** and the **last publication ≤10 days before the sale**; (c) **mails** the notice first-class **≥20 days before sale** to every party entitled to §45-21.16 notice and to any tenant/"occupant" (NCGS §45-21.17(1)–(4)). *This sets the sale date ~20–30 days out from posting.*
+
+7. **The sale (auction at the courthouse).** Substitute trustee conducts a public auction (courthouse door/steps of the county where the land sits, NCGS §45-21.23). Highest bidder wins subject to upset. *Typical: total from notice-of-hearing filing to sale ≈ 45–90 days.*
+
+8. **Preliminary Report of Sale filed.** Person who held the sale must **file the report with the Clerk within 5 days** of the sale (NCGS §45-21.26). **This filing starts the upset-bid clock.**
+
+9. **10-day upset-bid window.** Any person may file an **upset bid** ≥ **5% over** the last bid, minimum **$750 increase**, with a 5%/$750 cash-or-certified deposit, by close of business on the **10th day** after the report (or last upset) is filed (NCGS §45-21.27(a)). **Each new upset bid restarts a fresh 10-day period** — there are no resales, only successive upset bids. If the 10th day is a weekend/holiday it rolls to the next business day. During this window the **borrower can still pay in full and redeem.**
+
+10. **Rights become fixed → Trustee's Deed.** When 10 days pass with no upset bid, **no confirmation hearing is required** and "the rights of the parties to the sale become fixed" (NCGS §45-21.29A). Trustee executes and records the **trustee's deed** to the final high bidder; sale proceeds are disbursed. **No redemption exists after this point.**
+
+11. **Possession / eviction.** Purchaser is entitled to possession as of deed delivery; a holdover owner/tenant is removed by eviction/writ of possession (NCGS §45-21.16(c)(8); §45-21.29 governs orders for possession). *Tenants get separate protections under the federal PTFA / NCGS §42-45.2.*
+
+**Rule of thumb total:** ~45-day pre-notice (home loans) → notice-of-hearing → sale is commonly **60–120 days**; add **~10–30 days** of upset-bid churn before the deed. From *first public signal (notice of hearing) to auction* is typically **~4–8 weeks**.
+
+### Where each stage is PUBLICLY visible (free surface + lead-time before sale)
+
+| Stage | Free public surface | Lead time before sale |
+|---|---|---|
+| Pre-foreclosure §45-102 notice | **None** (private mailing) | n/a — but proves sale is ≥45 days out for primary residences |
+| **Notice of Hearing (stage 3)** | **Clerk of Superior Court Special Proceedings index** (each county Clerk's office / eCourts). Filed as an "SP" special proceeding. **This is the earliest recordable signal.** Also surfaces on **substitute-trustee law-firm foreclosure calendars** (Hutchens, Brock & Scott, Shapiro, Rogers Townsend, etc.) which post upcoming NC sales by county | **~4–8 weeks** (longest lead) |
+| Clerk hearing date | Clerk's foreclosure hearing calendar (posted at courthouse / county Clerk) | ~3–5 weeks |
+| **Notice of Sale (stage 6)** | **Courthouse public-notice board** (posted ≥20 days out); **county legal newspaper legal-notices section** (published 2 weeks); **NCGS mandates newspaper publication** so aggregators like the county paper's public-notices site and **NC Press Assoc. ncnotices.com** carry it | **~20–30 days** |
+| Substitute-trustee firm sale roster | Trustee/law-firm websites list address, sale date, opening bid, file # | ~20–30 days (late but structured + clean) |
+| Report of sale + upset bids | **Clerk Special Proceedings file** (report within 5 days; each upset bid + notice of upset bid filed there) | Post-sale: the 10-day-restart window |
+| Trustee's deed | **Register of Deeds** (recorded deed = sale is final) | Post-sale (too late to work) |
+
+**Signal ranking for the engine:** the **Clerk's SP notice-of-hearing filing** is the golden earliest source (longest owner-motivation runway), and the **substitute-trustee firm calendars** are the cleanest structured mirror of it. The **newspaper/courthouse notice of sale** is later but confirms an imminent, hard sale date. The recorded trustee's deed is a trailing indicator only useful for post-sale REO/skip lists.
+
+### How to WORK this stage (the acquisition move + best owner-motivation window)
+
+- **Notice-of-hearing stage (BEST window).** This is the sweet spot: default is public but the owner still has **full ability to pay off, reinstate, sell, or take a subject-to/short-sale deal**, and the sale is still weeks out. Owner motivation is high (they just got served / posted) but panic-desperation hasn't set in. **Move:** mail/door-knock/skip-trace immediately on the SP filing; lead with "you have options before the [sale date]." Pull the deed-of-trust book/page from the notice to compute payoff. This is where the engine should spend most outreach budget.
+
+- **Between hearing and notice of sale.** Owner has lost the "will this really happen" doubt; reinstatement cost is climbing (attorney fees, costs taxed in). **Move:** reinstatement-math + fast-close cash offer. Motivation rising, equity intact if any.
+
+- **Notice-of-sale / final 20 days (HIGH urgency).** Hard sale date is set and published. Owner motivation peaks; this is the last clean window for a **pre-sale purchase** (buy the property or the note, or get the owner to deed it and reinstate). **Move:** urgent, deadline-anchored outreach ("sale is [date], X days left"). After this, control passes to the auction.
+
+- **Upset-bid window (10 days, post-sale).** The property sold at auction but **the borrower can still redeem by paying in full**, and any investor can **file an upset bid (5%/$750 min)** to take the winning position. **Two plays:** (1) as a buyer, file an upset bid if the opening/last bid is below your max; (2) approach the just-sold owner about redemption financing / surplus-funds recovery. This is a specialist, fast-moving lane.
+
+- **Post-deed.** No redemption; the only remaining plays are **surplus-funds recovery** for the former owner (if the sale exceeded the debt) and **REO/wholesale** to the winning bidder. Prune from active seller outreach.
+
+### Encode in the engine (stage field / urgency multiplier / prune rule)
+
+Add an `nc_foreclosure_stage` enum with a monotonically increasing urgency multiplier, driven by which public surface produced the record and its date fields:
+
+```
+STAGE                       source signal                         urgency_mult   window
+pre_notice_45day           (inferred only, home loans)            0.6            paydown likely
+notice_of_hearing_filed    Clerk SP index / trustee calendar      1.4  ← PRIME   weeks out, owner can still act
+hearing_authorized         clerk calendar past hearing date       1.6            appeal window / advertising
+notice_of_sale_published   courthouse/newspaper/ncnotices         2.0  ← PEAK    ≤20-30 days, hard date
+sale_held                  report of sale filed (Clerk)           1.3            upset-bid lane only
+upset_bid_open             upset-bid notice in Clerk file         1.5            10-day restart; redemption still live
+rights_fixed / deed        Register of Deeds trustee deed          0.0  → PRUNE  no redemption; REO/surplus only
+```
+
+Concrete encoding rules:
+- **`sale_date` field** parsed from the notice of sale (or trustee calendar). Compute `days_to_sale`. Apply an **escalating urgency curve**: multiplier ramps as `days_to_sale` drops from ~45 → 0, spiking inside the final **20-day** notice window.
+- **`nc_no_redemption = TRUE`** flag on all NC power-of-sale records so downstream logic never assumes a SC-style redemption grace period (contrast with SC judicial process). This is the key NC-vs-SC differentiator.
+- **Upset-bid tracker:** when a record hits `sale_held`, set a **10-day timer that RESETS on each new upset-bid filing** (§45-21.27 successive-bid rule); only transition to `rights_fixed` after 10 clean days. Do not prune during upset-bid churn — redemption is still legally possible.
+- **PRUNE rule:** once a **trustee's deed is recorded** (Register of Deeds) OR `rights_fixed` with no redemption, drop from *seller* outreach and, if `sale_price > debt`, route to a **surplus-funds** sub-list rather than deleting.
+- **De-dupe key:** the Clerk **SP file number** + deed-of-trust **book/page** (both appear in the §45-21.16 notice and §45-21.26 report) — use this to merge the same case as it moves from notice-of-hearing → notice-of-sale → upset-bid across different public surfaces, so one property isn't ingested as three leads.
+- **Earliest-ingest priority:** poll the **Clerk SP special-proceedings index and substitute-trustee firm calendars first** (longest lead), treat newspaper/`ncnotices.com` notice-of-sale as confirmation + hard-date enrichment, and treat Register-of-Deeds trustee deeds as the terminal/prune signal.
+
+**Statutes cited (all verified against ncleg.gov primary text):** §45-102 (45-day pre-foreclosure notice), §45-21.16 (notice + hearing; 10-day service, 20-day posting-service, 6 findings, 10-day appeal, 1% bond), §45-21.17 (notice of sale: 20-day courthouse posting, 2-week newspaper publication, 7-day span, last pub ≤10 days pre-sale, 20-day mailing), §45-21.23 (time/place of sale), §45-21.26 (report of sale within 5 days), §45-21.27 (upset bid: 5%/$750 min, 10-day window, successive-bid restart), §45-21.29 (orders for possession), §45-21.29A (no confirmation required; rights become fixed = no post-sale redemption).
+
+
+## SC + NC Tax Foreclosure & Redemption Windows
+
+### The process / timeline (numbered stages with statutory citations + typical days between stages)
+
+**SOUTH CAROLINA — "Alternate Procedure," SC Code Title 12, Chapter 51 (a certificate/redemption system, NOT a court judgment)**
+
+1. **Tax becomes delinquent** — county taxes go delinquent after Jan 15 (following the prior year's levy). Penalties accrue in steps; the account rolls to the Delinquent Tax Collector.
+2. **Execution issued + first notice** — the Treasurer issues an *execution* to the officer charged with collection, who mails the defaulting taxpayer and any grantee of record a delinquent-tax notice by **certified mail, return receipt requested–restricted delivery** (SC Code **§12-51-40(a)–(b)**).
+3. **Levy / seizure by posting** — if the certified notice is returned undelivered, the officer takes "exclusive physical possession" by **posting a "Seized … to be sold for delinquent taxes" sign on the premises** (§12-51-40(c)). This posting is the legal levy.
+4. **Advertisement** — the property is advertised in a newspaper of general circulation under the heading "Delinquent Tax Sale," with the delinquent taxpayer's name and description, **once a week for 3 consecutive weeks** for real property (§12-51-40(d)). Typically the 3 ad weeks run in **October**.
+5. **Tax sale (public auction)** — held at the county-set date, **almost always Oct/Nov** (many counties fix the first Monday of November or early December). Bidding starts at taxes+penalties+costs (§12-51-50).
+6. **12-MONTH REDEMPTION WINDOW opens** — from the sale date, the owner (or any grantee, mortgagee, or judgment creditor) may redeem for the bid + tiered interest: **3% (mo. 1–3), 6% (mo. 4–6), 9% (mo. 7–9), 12% (mo. 10–12)**, interest capped at the FLC bid amount (SC Code **§12-51-90(A)–(B)**). *This is the prime motivated-seller window — the owner still holds title the entire 12 months.*
+7. **Forfeited Land Commission (FLC) backstop bid** — if no third party bids, the officer enters a bid on behalf of the county **FLC** equal to all unpaid taxes/penalties/costs (SC Code **§12-51-55**); property that gets no outside bid is held by the FLC subject to the same redemption.
+8. **Tax deed to bidder** — if not redeemed within the 12 months, the officer executes and delivers a **tax title/deed** to the successful purchaser (SC Code **§12-51-130**; the deed is largely incontestable after a further limitations period). Occupancy/possession does not pass until the deed.
+
+*Typical spacing (SC):* Jan 15 delinquency → execution & certified notice (spring/summer) → 3-week ad (≈ Oct) → sale (≈ Nov) → **12-month redemption** → tax deed (≈ following Nov). Practical owner-motivation runway from first public ad to loss of title is roughly **13+ months**.
+
+**NORTH CAROLINA — two parallel tracks, NCGS Ch. 105, Art. 26. There is essentially NO post-sale redemption; the owner's only "redemption" is paying off *before* the sale/confirmation.**
+
+**Track A — In-Rem, NCGS §105-375 (fast, administrative, most-used in these counties):**
+1. **Delinquency + lien advertisement** — the annual tax-lien advertisement runs first; the collector may file the in-rem certificate **no earlier than 30 days after the tax liens were advertised** (§105-375(b)).
+2. **Certificate filed with Clerk of Superior Court** — collector files a certificate (taxpayer name, amount, years) with the **Clerk of Superior Court** (§105-375(b)); this is the docketing vehicle.
+3. **30-day pre-docketing notice** — at least **30 days before docketing**, notice is sent by **registered/certified mail, return receipt requested** to the taxpayer and lienholders, stating a judgment will be docketed, the proposed date, that execution will issue, and that the lien may be satisfied before judgment (§105-375(c)(1)–(3)). If no receipt in 10 days, the collector posts the property and **publishes "Notice of Docketing Judgment" in the newspaper once weekly for 2 weeks** (§105-375(c)(4)).
+4. **Judgment docketed** — the taxes/penalties/interest/costs become a **valid judgment against the property**, bearing **8% annual interest** (§105-375(d)).
+5. **Execution + sheriff's sale** — execution may issue **only after 3 months and before 2 years from the indexing of the judgment** (§105-375(i)); the sheriff sells at public auction.
+6. **Upset-bid period** — the sale stays open **10 days for upset bids** (raise by 5% or $750, whichever greater), then confirmation; sheriff's deed issues. **No statutory redemption after confirmation.**
+
+**Track B — Mortgage-Style, NCGS §105-374 (judicial; used for complex title/heirs):**
+1. Civil action "in the nature of an action to foreclose a mortgage," filed in the General Court of Justice where the property sits (§105-374).
+2. Complaint + service on all interests → judgment → **commissioner's sale**.
+3. Commissioner **reports the sale within 3 days**; a **10-day exceptions/increased-bid (upset) period** follows (§105-374); then confirmation and commissioner's deed.
+4. **Redemption right ends at confirmation** — before confirmation the owner can stop everything by paying **all taxes, penalties, interest, and costs** (§105-374 redemption-before-confirmation clause).
+
+*Typical spacing (NC in-rem):* lien ad → +30 days → certificate/notice → +30 days → docket judgment → **3 months minimum → 2 years max** to sale → 10-day upset → confirmation. The **owner's payoff window runs from the 30-day notice through the day before confirmation** — no year-long post-sale grace like SC.
+
+---
+
+### Where each stage is PUBLICLY visible (free surface) + lead-time before sale
+
+**SOUTH CAROLINA:**
+- **Newspaper "Delinquent Tax Sale" ad (§12-51-40(d))** — the definitive free list of every parcel: 3 consecutive weeks (≈ October). **Lead time ≈ 3–6 weeks before the Nov sale.**
+- **County Treasurer / Delinquent Tax webpages** — most in-footprint counties post the sale list PDF online alongside the paper ad. Verified live: **Spartanburg** ("2025 Tax Sale Info" + Real-Property-Tax-Sale-List PDF; also mirrored at goupstate.com), **Pickens** ("list available 3 weeks prior on the webpage"), **Oconee** (oconeesc.com/delinquent-tax/sale-list), plus Anderson/Cherokee/Union/Laurens treasurer pages. **Lead time: same 3-week window.**
+- **Bidder-registration deadline** (e.g., Pickens: signed form by 5 pm the Monday before sale) confirms the exact sale date.
+- **THE REDEMPTION LIST (highest-value surface)** — after the sale, the Delinquent Tax Office holds the **list of sold-but-not-yet-redeemed parcels for the full 12 months**. These owners **still own the home and are under a hard deadline**. Not always web-posted; obtainable by request/FOIA from the Treasurer. **Lead time: up to 12 months of a known, dated deadline.**
+- **ROD/assessor** confirms current owner + mailing address for skip-trace.
+
+**NORTH CAROLINA:**
+- **Annual tax-lien advertisement** — earliest free signal; the in-rem clock can't start until 30 days after it.
+- **"Notice of Docketing Judgment" newspaper publication (§105-375(c)(4))** — names parcels headed to judgment. **Lead time: months before any sale (3-month minimum after docketing).**
+- **Clerk of Superior Court — Special Proceedings / judgment docket** — the docketed in-rem judgment and §105-374 civil files are **public records** (often SP or CV file numbers) at the Clerk's office; searchable in person and via county foreclosure/tax-foreclosure listing pages. Verified county foreclosure pages: **Rutherford, Cherokee-NC**; **Buncombe/Gaston/Henderson** tax-administration and Clerk special-proceedings dockets. **Lead time: 3 months to 2 years after docketing — the widest runway in either state.**
+- **Notice of Sale / upset-bid postings** — sheriff/commissioner notices at the courthouse and in the newspaper; upset bids filed with the Clerk. **Lead time: sale date + 10-day upset window.**
+- **Law-firm tax-foreclosure calendars** — NC counties frequently outsource in-rem foreclosures to firms (e.g., Kania Law Firm serves much of Western NC) that publish **running parcel lists with sale dates online** — a clean, structured free surface.
+
+---
+
+### How to WORK this stage (the acquisition move + best owner-motivation window)
+
+**SC — the 12-month redemption list is the single best motivated-seller pool in either state.** The owner *still holds title*, has been publicly named as delinquent, and faces a fixed drop-dead date after which they lose the property for pennies. Move:
+- Pull the **sold-not-redeemed list**; skip-trace owner + mailing address (many are absentee).
+- **Best window = months 4–9 after the sale.** By then interest has climbed to 6–9% (real pressure), the shock has set in, and there's still enough runway to close a clean purchase or a redemption-assignment before the 12-month cliff. Months 10–12 are highest-urgency but risk running out of closing time.
+- Acquisition move: **buy the equity directly** (you get ARV − payoff − the redemption amount) OR take an **assignment of the winning bidder's tax-sale interest** under §12-51-90 as a backstop. Either way the pitch writes itself: "redeem now or lose the house."
+
+**NC — no post-sale grace, so work the pre-judgment / pre-confirmation runway, which is *long* (3 months–2 years).** Move:
+- Pull docketed in-rem parcels from the **Clerk / law-firm calendar** the moment the docketing notice publishes.
+- **Best window = right after judgment is docketed, before execution issues.** The owner can still stop everything by paying off (§105-375(i)/§105-374 redemption-before-confirmation), so they're motivated but not yet desperate — ideal for a below-ARV cash offer that clears the tax judgment and leaves them equity.
+- Second window: **during the 10-day upset-bid period** you can compete at auction, but that's a bidder play, not an off-market owner play.
+
+Across both: these owners are equity-rich, cash-poor, publicly flagged, and calendar-bound — the textbook motivated seller.
+
+---
+
+### Encode in the engine
+
+Add a `tax_fc_stage` enum field per lead, plus an `urgency_multiplier` and a `prune_rule`:
+
+- **`tax_fc_stage`** (state-aware ordered enum):
+  - SC: `sc_advertised` → `sc_sold_redeemable` → `sc_flc_held` → `sc_deed_issued`
+  - NC: `nc_lien_advertised` → `nc_notice_docketing` → `nc_judgment_docketed` → `nc_execution_issued` → `nc_sale_upset` → `nc_confirmed`
+- **`redemption_deadline`** (date): SC = sale_date + 365 days (hard). NC in-rem = execution-eligible date = judgment_docket_date + 90 days (soft, sale can slide to +730). Store both `earliest` and `latest`.
+- **`urgency_multiplier`** driven by days-to-deadline:
+  - SC `sc_sold_redeemable`: ramp with the statutory interest tiers — **1.0 (mo 1–3) → 1.4 (mo 4–6) → 1.8 (mo 7–9) → 2.5 (mo 10–12)**; this mirrors §12-51-90's 3/6/9/12% pressure curve.
+  - NC `nc_judgment_docketed`/`nc_execution_issued`: flat **1.6** (long runway, high certainty) rising to **2.2** once a Notice of Sale posts.
+  - `sc_advertised` / `nc_notice_docketing`: **1.2** (early, still redeemable, good for outreach but title not yet at risk).
+- **Prune rules:**
+  - **Hard-drop `sc_deed_issued` and `nc_confirmed`** — title has transferred; the owner is no longer a seller (route to the *new deed-holder* only if pursuing tax-deed resale).
+  - **De-prioritize `sc_flc_held`** unless targeting FLC-surplus/assignment deals (§12-51-55) — owner interest is thin.
+  - **Suppress redemption alerts once `redemption_deadline` < 21 days** in SC (insufficient time to close a purchase; flag only for redemption-assignment plays).
+  - **Re-check status weekly** for any lead in a live stage — a redemption or payoff silently flips these to dead, so cross-check the county redemption list / Clerk docket before every outreach batch to avoid contacting owners who already cured.
+
+**Sources:**
+- [SC Code §12-51-40](https://law.justia.com/codes/south-carolina/title-12/chapter-51/section-12-51-40/) · [§12-51-90](https://law.justia.com/codes/south-carolina/title-12/chapter-51/section-12-51-90/) · [§12-51-55](https://law.justia.com/codes/south-carolina/title-12/chapter-51/section-12-51-55/) · [SC Title 12 Ch. 51 (full)](https://www.scstatehouse.gov/code/t12c051.php)
+- [NCGS §105-375 (in rem)](https://www.ncleg.net/enactedlegislation/statutes/html/bysection/chapter_105/gs_105-375.html) · [NCGS §105-374 (mortgage-style)](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_105/GS_105-374.pdf)
+- [Spartanburg 2025 Tax Sale Info](https://www.spartanburgcounty.org/640/2025-Tax-Sale-Info) · [Pickens Delinquent Tax](https://www.co.pickens.sc.us/departments/delinquent_tax/index.php) · [Oconee Sale List](https://oconeesc.com/delinquent-tax/sale-list) · [Rutherford NC Foreclosure Process](https://rutherfordcountync.gov/departments/revenue_department_tax_administrator/foreclosure_information/foreclosure_process.php) · [Cherokee NC In-Rem Process](https://www.cherokeecounty-nc.gov/225/In-Rem-Foreclosure-Process) · [Nolo: SC property-tax default](https://www.nolo.com/legal-encyclopedia/what-happens-if-i-dont-pay-property-taxes-south-carolina.html)
+
+
+## The Outreach-Timing Map: Strike Windows by Foreclosure Stage (SC + NC)
+
+This section maps every foreclosure stage across South Carolina (judicial) and North Carolina (nonjudicial power-of-sale) to a strike window: owner-motivation level, days-of-window remaining, the correct acquisition play, and the urgency multiplier the engine should compute off `sale_date`. It synthesizes the process/surfacing/tactics detail from the per-stage playbooks into one operational timing layer.
+
+### The process / timeline (numbered stages with statutory citations + typical days between stages)
+
+Two different legal machines produce the same 7 economic stages. Track them with one `foreclosure_stage` enum but two `track` values (`SC_JUDICIAL`, `NC_POWER_OF_SALE`) because the surfacing points and clock speeds differ.
+
+1. **Pre-filing distress (both states).** Federal servicing rule bars referral until the borrower is 120+ days delinquent (12 C.F.R. § 1024.41). SC adds a consumer right-to-cure: 30-day cure notice under S.C. Code § 37-5-110 before acceleration on a consumer mortgage. NC requires a 45-day pre-foreclosure notice (N.C.G.S. § 45-102, sent via the State Home Foreclosure Prevention Project) before the notice of hearing. **Window: 30–120+ days of private distress before anything is filed.**
+2. **Case commencement / lis pendens (SC) vs Notice of Hearing (NC).**
+   - SC: plaintiff files a lis pendens (S.C. Code § 15-11-10 et seq.) no more than 20 days before the complaint, serves summons + complaint, and must include the foreclosure-intervention notice (S.C. Supreme Court Admin. Order 2011-05-02-01). Borrower's answer is due 30 days after service.
+   - NC: lender files a Notice of Hearing with the clerk of court (N.C.G.S. § 45-21.16), served 10 days (personal) to 20 days (posting) before the hearing.
+   - **SC filing → decree: commonly 90–180+ days.** NC filing → hearing: ~30–45 days.
+3. **Judgment (SC) / Clerk's authorization (NC).**
+   - SC: master-in-equity or special referee enters a foreclosure judgment/decree of sale (Rule 71, SCRCP) and sets sale terms, including whether a deficiency is sought.
+   - NC: clerk enters an order authorizing sale after finding valid debt, default, right to foreclose, and proper notice (N.C.G.S. § 45-21.16(d)). A primary-residence borrower can get up to a 60-day postponement (§ 45-21.16C).
+   - **SC judgment → sale: ~30–45 days.** NC order → sale: ~20–30 days.
+4. **Notice of sale.**
+   - SC: posted in 3 public places incl. the courthouse and published once a week for 3 consecutive weeks before sale.
+   - NC: served on borrower ≥20 days before sale and published once a week for 2 successive weeks, last publication ≤10 days before sale (N.C.G.S. § 45-21.17).
+   - **This is the ~21–30 day final runway before the auction.**
+5. **The sale / auction.**
+   - SC: judicial sale, almost always the **first Monday of the month** (next day if a holiday), conducted by the master-in-equity, special referee, or sheriff.
+   - NC: trustee/substitute-trustee auction at the county courthouse door, any business day the trustee sets.
+6. **Post-sale upset-bid window.**
+   - SC: if the lender **reserves a deficiency judgment**, bidding stays open until the **30th day after sale** (S.C. Code § 15-39-720); if deficiency is waived, the sale closes on sale day.
+   - NC: a **10-day upset-bid period** runs from the filing of the report of sale (N.C.G.S. § 45-21.27); every qualifying upset bid (≥5% and ≥$750 over) resets a fresh 10-day clock (§ 45-21.20). Borrower may redeem by paying in full any time before the period closes.
+   - **SC: 0 or 30 days. NC: 10 days, resettable.**
+7. **Confirmation / deed / post-confirmation.**
+   - SC: after the bidding period closes with no upset, the officer executes a deed; surplus over the debt is claimable within **45 days** of the filed statement of receipts and disbursements (S.C. Code § 15-39-650 / Rule 71).
+   - NC: once the upset period runs out, the trustee delivers a trustee's deed (N.C.G.S. § 45-21.29) and any surplus goes to junior lienholders then the borrower. **No post-sale statutory redemption in either state once the deed is delivered.**
+
+### Where each stage is PUBLICLY visible (free surface) + lead-time before sale
+
+| Stage | SC free surface | NC free surface | Lead-time before sale |
+|---|---|---|---|
+| Pre-filing distress | Not in court records — infer from tax-delinquency lists, NOD-equivalent breach letters (private), obituary/probate/divorce proxies | Same; plus 45-day § 45-102 notices are not public | 4–8+ months |
+| Case commencement | **Lis pendens** indexed at the county ROD/Register of Deeds; complaint on the Clerk of Court/Public Index (ToS-walled) | **Notice of Hearing** on the Clerk of Superior Court / eCourts file; special-proceedings (SP) docket | SC: 90–180 days; NC: ~45–75 days |
+| Judgment / order | Master-in-equity **sale roster/calendar** (county MIE page) once judgment entered | Clerk SP order; trustee/substitute-trustee firm's **foreclosure sale calendar** (law-firm websites) | SC: ~30–45 days; NC: ~20–30 days |
+| Notice of sale | Legal-notices section of the county **newspaper** (3 weeks); courthouse posting; MIE roster | County **newspaper** legal notices (2 weeks); trustee firm's sale list; clerk sale postings | **21–30 days — the hardest, most reliable signal** |
+| The sale | MIE roster shows result/high bidder | Trustee's **report of sale** filed with clerk | day 0 |
+| Upset bid | MIE roster "bidding open until [30th day]" if deficiency reserved | Clerk's **upset-bid record**; each new upset re-filed | SC: +30; NC: +10 (resetting) |
+| Post-confirmation | Deed recorded at ROD; **surplus-funds** statement filed (45-day claim) | Trustee's deed recorded; surplus reported to clerk | after sale |
+
+The load-bearing free surfaces for timing: (a) the **lis pendens / Notice of Hearing** index at ROD/clerk gives the earliest reliable lead (months out), and (b) the **newspaper legal notice + master-in-equity roster / trustee sale calendar** gives the precise `sale_date` 2–4 weeks out. The engine should key urgency off (b) and use (a) to enter the pipeline early.
+
+### How to WORK each stage (the acquisition move + best owner-motivation window)
+
+- **Pre-filing distress — motivation LOW-MED, months of runway.** Owner still has equity and control, denial is high. Play: **subject-to** or **traditional purchase / listing-avoidance** pitch; plant the relationship. Cheapest acquisition, highest optionality. Best when there's real equity to protect.
+- **Lis pendens / Notice of Hearing — motivation MED, 45–180 days.** Denial breaks once they're served. Play: **short sale** (if underwater) or **subject-to / equity purchase** (if equity). This is the sweet spot for negotiated deals — enough time to close a normal transaction, enough fear to make them answer.
+- **Judgment / clerk order — motivation MED-HIGH, 20–45 days.** Owner now knows a sale date is coming. Play: fast **cash purchase** or **subject-to**; start a **short-sale** only if the lender will postpone.
+- **The ~21–30 days before sale (notice of sale) — motivation HIGH, <30 days.** This is the peak strike window. Play: **cash-for-keys**, **assignment/wholesale to a cash buyer**, or **deed-in-lieu-adjacent** fast close. Too little time for a conventional short sale; lead with certainty and speed.
+- **At the sale — no owner play; investor play.** **Buy at auction** (SC first-Monday MIE sale; NC courthouse trustee sale). Bring certified funds; in SC know whether a deficiency is reserved (30-day upset risk).
+- **Post-sale upset-bid window — motivation VERY HIGH but SHRINKING control.** SC 30 days / NC 10 days (resettable). Owner may still redeem by paying in full. Plays: place an **upset bid** to win the asset; or approach the borrower for a redemption-financing / last-minute equity purchase if they can still pay off.
+- **Post-confirmation — owner motivation moot; new play is SURPLUS.** If the property sold for more than the debt, the former owner is owed **surplus funds** (SC 45-day claim window; NC surplus to clerk). Play: **surplus-funds recovery outreach** to the displaced owner — a distinct, high-conversion, post-eviction lead type.
+
+### Encode in the engine (stage field / urgency multiplier / prune rule)
+
+Add/confirm these fields on every foreclosure lead and compute urgency off `sale_date`:
+
+- **`foreclosure_stage`** enum: `pre_filing | lis_pendens_or_noh | judgment_or_order | notice_of_sale | at_sale | upset_bid | post_confirmation`, plus **`track`** = `SC_JUDICIAL | NC_POWER_OF_SALE`.
+- **`sale_date`** (from newspaper legal notice / MIE roster / trustee calendar) and **`days_to_sale = sale_date − today`**.
+- **`urgency_multiplier`** as a piecewise function of `days_to_sale` (the primary ranking lever):
+  - `days_to_sale ≤ 0` and stage `upset_bid`: **3.0** (SC 30-day / NC 10-day last-chance window — highest, but see prune).
+  - `1–14` days: **2.5**
+  - `15–30` days (the notice-of-sale runway): **2.0**
+  - `31–75` days (post-filing, pre-notice): **1.4**
+  - `76–180` days (lis pendens / NoH, pre-judgment): **1.15**
+  - pre-filing / no sale_date: **1.0** (base; rank on equity instead).
+- **`owner_motivation`** derived tier (`LOW/MED/HIGH/VERY_HIGH`) mirroring the multiplier, used to pick the `recommended_play` string (subject-to/short-sale early → cash-for-keys/assignment late → buy-at-sale → surplus-recovery post-sale).
+- **Deficiency flag (SC only):** `sc_deficiency_reserved` bool. If true, the real closing date is `sale_date + 30`; keep the lead HOT through the upset window instead of pruning at `sale_date`.
+- **Prune / transition rules:**
+  - When `days_to_sale` crosses 0, do **not** hard-prune. Transition to `upset_bid` and keep for SC 30 days (or +30 if deficiency reserved) / NC 10 days (extend on each detected new upset bid).
+  - When the **deed records** at ROD (confirmation), transition to `post_confirmation`, drop `urgency_multiplier` to 0 for acquisition, and **re-route to the surplus-funds lane** if `sale_price > total_debt` (SC 45-day claim clock; else prune after the claim window).
+  - Reset the NC upset clock (`sale_date` effectively +10) whenever a new upset bid is detected on the clerk record, since each resets the period (§ 45-21.27 / § 45-21.20).
+  - Suppress acquisition outreach (not surplus outreach) once `post_confirmation` + deed recorded, to avoid contacting owners who no longer control the asset.
+
+Sources:
+- [S.C. Code § 15-39-720 — Upset bids within thirty days (Justia)](https://law.justia.com/codes/south-carolina/title-15/chapter-39/section-15-39-720/)
+- [Charleston County — Primer for Mortgage Foreclosures in SC (Master-in-Equity)](https://www.charlestoncounty.gov/departments/master-in-equity/mortgage-forclosures-primer.php)
+- [Pickens County — Primer for Mortgage Foreclosures in SC](https://www.co.pickens.sc.us/departments/master_in_equity/primer_for_mortgage_foreclosures.php)
+- [SC Judicial Branch — Rule 71, SCRCP (master-in-equity references)](https://www.sccourts.org/resources/judicial-community/court-rules/civil/rule-71/)
+- [SC Supreme Court Administrative Order 2011-05-02-01 — Foreclosure Intervention Notice](https://www.sccourts.org/courtOrders/displayOrder.cfm?orderNo=2011-05-02-01)
+- [N.C.G.S. § 45-21.16 — Notice and hearing](https://www.ncleg.net/enactedlegislation/statutes/html/bysection/chapter_45/gs_45-21.16.html)
+- [N.C.G.S. § 45-21.27 — Upset bid on real property](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_45/GS_45-21.27.pdf)
+- [NC General Statutes Chapter 45 — Mortgages and Deeds of Trust](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/ByChapter/Chapter_45.pdf)
+- [Green Mistretta Law — NC Foreclosure Process Timeline (§ 45-102, § 45-21.16/.17/.27/.29)](https://greenmistrettalaw.com/what-to-expect-in-the-north-carolina-foreclosure-process/)
+- [Nolo — South Carolina Foreclosure Laws and Homeowner Rights (§ 37-5-110 right-to-cure)](https://www.nolo.com/legal-encyclopedia/south-carolina-foreclosure-laws-and-procedures.html)
+
+
+## Dead-Lead Detection & Board Pruning
+
+### The process / timeline (numbered stages with statutory citations + typical days between stages)
+
+A lead dies at one of six exit events. Each has a distinct statutory trigger, a distinct public artifact, and a distinct prune rule. Because the engine's mission is broader than foreclosure (probate, tax-delinquent, divorce, etc.), "dead" here means **the owner no longer controls the equity we were targeting, OR contacting them is unlawful.** The six exits:
+
+1. **Foreclosure sale completed + deed recorded (the hard death).**
+   - **SC (judicial / Master-in-Equity):** Sale held; if a deficiency was pled and not waived, bidding stays open through the **30th day after sale** for upset bids (S.C. Code **§15-39-720**, **§15-39-760**; SCRCP **Rule 71(b)**). If deficiency is waived in the pleadings/in writing, bidding **closes the day of sale** and the buyer has ~20 days to comply. Master then issues an **Order of Confirmation** and a **Master's/Title-to-Real-Estate deed** is recorded in the ROD. Owner is out. Days between sale and recorded deed: **~1–10 days (deficiency waived)** to **~35–60 days (deficiency sought → 30-day upset window + confirmation + recording lag).**
+   - **NC (power-of-sale, clerk of superior court):** Trustee holds sale, files **report of sale**; upset-bid period runs **10 days** (NCGS **§45-21.27**); *every* valid upset bid resets a fresh 10-day clock. When the last 10-day window closes with no further upset, the sale is final; trustee delivers/records the **trustee's deed** (NCGS **§45-21.29A**, **§45-21.30**). Days from first sale to recorded deed: **~11 days (no upset)** to **30–60+ days (upset chains).**
+
+2. **Upset bid final / sale confirmed (soft-lock, pre-deed).** In both states the equity is effectively gone once the upset window closes even before the deed hits ROD. NC: 10-day quiet after report of sale (§45-21.27). SC: 30th day passes with no upset, or same-day close on a waived-deficiency sale.
+
+3. **Owner redeemed — tax lane (SC).** Delinquent taxpayer / grantee / mortgage or judgment creditor may redeem within **12 months of the tax sale** (S.C. Code **§12-51-90**). Until the redemption period runs AND the tax deed is executed and recorded (**§12-51-130**), the *owner still owns it* — so a redeemed parcel is not dead as an owner lead, it is **reactivated** (they found money; motivation may drop). A tax deed recorded after non-redemption = dead (new owner). NC uses no tax-sale redemption; NC delinquent tax is a **judicial foreclosure** (NCGS §105-374) that ends like exit 1.
+
+4. **Case dismissed / withdrawn / voluntarily nonsuited.** Lender/trustee pulls the action or the clerk dismisses. NC: notice-of-hearing special proceeding withdrawn or denied before clerk of superior court. SC: lis pendens/complaint dismissed or case marked ended. This is a **soft death** — the distress signal is gone (loan cured or workout), so stop the *foreclosure* pitch, but the owner still owns.
+
+5. **Bankruptcy filed → automatic stay (DO-NOT-CONTACT).** The instant a petition is filed, **11 U.S.C. §362** imposes an automatic stay that halts the foreclosure and bars collection/communication. **Any mail/dial after this is a potential stay violation** — hard suppress, do not merely deprioritize.
+
+6. **Loan reinstated / satisfied / payoff recorded.** Debtor exercises contractual reinstatement (NC has no statutory reinstatement right; most Fannie/Freddie notes grant it) or pays off; **satisfaction of mortgage / cancellation of deed of trust** is recorded in ROD, or NCGS **§45-21.20** "satisfaction of debt before completion of sale" stops the sale. Distress gone.
+
+### Where each stage is PUBLICLY visible (free surface) + lead-time before sale
+
+| Exit event | Free confirming surface | Signal to scrape / match |
+|---|---|---|
+| **1/2. Sale + deed recorded** | **County ROD/Register of Deeds** grantor-grantee index. SC: instrument "Title to Real Estate," "Master's Deed," grantor = Master in Equity/Sheriff. NC: "Trustee's Deed," grantor = the substitute trustee/law firm. | New deed where **grantor = prior distressed owner or the court officer**, dated after the sale. This is the definitive kill signal. |
+| **2. Upset final (pre-deed)** | **NC clerk of superior court** special-proceeding file / SP index (report of sale + upset-bid notices, each stamped-filed). SC: **Master-in-Equity sales roster / results** (many counties post "sold/confirmed" columns). | NC: 10 quiet days after the last filed upset-bid notice = final. SC: 30 days past sale date with no upset entry, or "confirmed." |
+| **3. Tax redemption (SC)** | **County Delinquent Tax Collector "redeemed" list**; tax deed later in **ROD** (§12-51-130). | Parcel drops off the still-owed tax-sale list = redeemed (reactivate). Tax deed recorded = dead. |
+| **4. Dismissed/withdrawn** | **NC clerk SP file** (order dismissing / withdrawal); **SC clerk of court / lis pendens release** in ROD. Law-firm/trustee foreclosure calendars drop the file. | Case no longer appears on the trustee's upcoming-sale calendar AND no sale/deed recorded = withdrawn. |
+| **5. Bankruptcy stay** | **PACER Case Locator (pcl.uscourts.gov)** national name search — free for registered users, and fees waived under $30/qtr; **Multi-court VCIS phone (866-222-8029)** free. Districts: NC Western (Asheville/Charlotte covers our NC counties), SC District (Spartanburg/Greenville/Columbia divisions). | Debtor name (+ address corroboration) returns an **open** bk case → stay in effect. Case number, filed date, chapter. |
+| **6. Reinstated/satisfied** | **ROD:** recorded **Satisfaction of Mortgage** (SC) / **Cancellation of Deed of Trust** (NC). Trustee calendar drops the file with no sale. | Satisfaction/cancellation instrument recorded against the target loan = cured. |
+
+**Lead-time note:** Exits 1–2 are *terminal* (no lead-time to capture — they end the window). The value of detecting them is **avoiding wasted spend on an owner who is already out.** Exits 3–6 are *reversible/soft*; detecting them prevents mailing an owner who no longer has our motivation trigger.
+
+### How to WORK this stage (the acquisition move + best owner-motivation window)
+
+Dead-lead detection is a **defensive** move: it protects deliverability, cost-per-lead, and legal exposure, and it re-routes attention to still-live equity. Concrete moves:
+
+- **Post-sale, pre-eviction skim (exits 1/2):** When ROD shows a Trustee's/Master's deed to a **third-party investor** (not the beneficiary/plaintiff), the *former owner* is now a displaced-tenant lead (cash-for-keys / relocation), not an equity seller — route to a separate list, suppress from equity mailers. When the deed goes to the **lender/plaintiff** (REO), the owner lead is fully dead; the **new REO owner** may become a wholesale-buyer lead.
+- **Redemption reactivation (exit 3):** A parcel that drops off the SC delinquent list within the 12-month window means the owner found cash under pressure — motivation likely *fell*. Downgrade, don't delete; re-touch near the next tax cycle.
+- **Withdrawal workout (exit 4):** Case withdrawn usually = loan-mod/forbearance/reinstatement. Best window is **90–180 days later** — a meaningful share re-default; keep as a warm "prior-distress" lead on a slow drip, off the urgent cadence.
+- **Bankruptcy (exit 5):** Hard stop. The correct "move" is *no move* until the case closes/dismisses or the stay is lifted; a Chapter 7 no-asset case that closes in ~90 days can re-surface the property; a dismissed Ch.13 (very common) often *re-triggers* foreclosure — re-activate on dismissal.
+
+### Encode in the engine (stage field / urgency multiplier / prune rule)
+
+Extend the existing confirmed-sold logic into a single **`lifecycle_stage`** enum + **`suppress`** flags rather than deleting rows (deletion loses re-activation signal and the board sidecar per the load_board rule):
+
+```
+lifecycle_stage ∈ {
+  live, upset_pending, sold_confirmed, deed_recorded,
+  redeemed, dismissed_withdrawn, bankruptcy_stay,
+  reinstated_satisfied
+}
+```
+
+**Prune / suppress rules (urgency_multiplier applied to score):**
+
+1. **`deed_recorded`** (ROD grantor = prior owner OR court officer, instrument in {Trustee's Deed, Master's Deed, Title to Real Estate, Tax Deed}) → **HARD PRUNE**: `active=false`, `urgency_multiplier=0`, `suppress_all=true`. Retain row for buyer/displaced-tenant re-routing.
+2. **`sold_confirmed` / `upset_pending`** (SC: sale_date + 30d no-upset OR waived-deficiency same-day close; NC: last upset-bid filing + 10 quiet days) → **SOFT PRUNE**: `urgency_multiplier=0`, hold 15 days for the deed to appear, then promote to `deed_recorded`. Guards against mailing during the dead upset window.
+3. **`bankruptcy_stay`** (PACER/PCL name+address match to an OPEN case) → **HARD SUPPRESS, legal**: `suppress_all=true`, `do_not_contact=true`, tag `reason=362_stay`, store `bk_case_no` + `filed_date`. **Never delete** — set a re-check; on case **dismissed/closed**, flip back to `live` with a re-trigger.
+4. **`redeemed`** (SC parcel drops off delinquent-tax owed list, no tax deed) → **DOWNGRADE**: `urgency_multiplier≈0.3`, keep owner lead, schedule re-touch at next tax cycle.
+5. **`dismissed_withdrawn`** (off trustee calendar + no sale/deed within N days) → **DOWNGRADE**: `urgency_multiplier≈0.4`, move to slow "prior-distress" drip; set 120-day re-default re-check.
+6. **`reinstated_satisfied`** (ROD Satisfaction/Cancellation on target loan) → **SOFT PRUNE**: `urgency_multiplier≈0.2`; equity story intact but no distress trigger.
+
+**Implementation hooks:**
+- **ROD watcher (primary kill-switch):** nightly grantor-grantee delta per county; match new deeds/satisfactions/cancellations to board `parcel_id`/owner-name. This is the single highest-value pruner because it confirms exits 1, 2, 3(tax-deed), and 6 from one free surface. It also *extends* the current confirmed-sold check from "sale happened" to "**deed recorded to whom**" (lender vs third-party → different downstream list).
+- **Court-calendar delta (NC clerk SP index / SC Master roster):** detect `dismissed_withdrawn` and `upset_pending`→`sold_confirmed` transitions (drop-off + 10/30-day timers).
+- **PACER/PCL enricher (weekly, gated):** batch owner names from `live` foreclosure leads against the PACER Case Locator; open bk hit → `bankruptcy_stay` + `do_not_contact`. Keep volume under the $30/quarter fee-waiver threshold; VCIS phone as a free zero-cost fallback for spot checks.
+- **Idempotency + re-activation:** every prune writes `pruned_reason` + `pruned_date` + a `recheck_after` date; a dismissed bankruptcy or a dropped-off redemption flips the row back to `live` on the next run. Store all of this via `web_artifact.load_board()` so the vision/comps/cama sidecar is preserved.
+
+**Sources:** [S.C. Code §15-39-720 (upset bids, 30 days)](https://law.justia.com/codes/south-carolina/title-15/chapter-39/section-15-39-720/) · [SC Master-in-Equity foreclosure primer (Pickens Co.)](https://www.co.pickens.sc.us/departments/master_in_equity/primer_for_mortgage_foreclosures.php) · [NCGS §45-21.27 (upset bid, 10 days)](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_45/GS_45-21.27.pdf) · [NC Chapter 45 (power-of-sale, §45-21.20/.29A)](https://www.ncleg.net/enactedlegislation/statutes/html/bychapter/chapter_45.html) · [S.C. Code §12-51-90 (tax redemption, 12 months)](https://law.justia.com/codes/south-carolina/title-12/chapter-51/section-12-51-90/) · [11 U.S.C. §362 (automatic stay)](https://www.law.cornell.edu/uscode/text/11/362) · [PACER Case Locator](https://pcl.uscourts.gov/) · [NC foreclosure process (Nolo)](https://www.nolo.com/legal-encyclopedia/north-carolina-foreclosure-laws-procedures.html)
+
+
+## Buying at the Sale — The Operational Mechanics (SC MIE & NC Trustee Sale)
+
+### The process / timeline (numbered stages with statutory citations + typical days between stages)
+
+**SOUTH CAROLINA — Master-in-Equity judicial sale (SC Code Title 15 ch. 39; Title 29 ch. 3; SCRCP Rule 71)**
+
+1. **Sale day — public outcry auction.** Held by the Master-in-Equity (or Special Referee/Clerk) on that county's designated Sales Day, typically the **first Monday of the month** at the courthouse. Plaintiff opens with a credit bid; third parties bid over it. Governed by the order/judgment of foreclosure and SCRCP Rule 71(b).
+2. **5% good-faith deposit — same day.** The high bidder must post the deposit set in the judgment — **5% of the bid, in cash/certified funds, by 3:00 p.m. that same day**. Forfeited if the bidder fails to close. (Set by the foreclosure judgment; standard across MIE offices.)
+3. **Compliance window depends on whether a deficiency was demanded:**
+   - **Deficiency WAIVED → bidding closes immediately.** Winner has **~20 days to comply** (pay balance) — **SC Code § 15-39-760**.
+   - **Deficiency DEMANDED → 30-day upset-bid period.** The sale stays open **30 days** for upset bids — **SC Code § 15-39-720**. The plaintiff bids its maximum in the principal sale and **may NOT bid at the upset sale**; the property goes to the highest bidder at the reconvened upset sale.
+4. **Upset-bid sale (if applicable).** Reconvened ~30 days later; highest bidder wins and must post 5% / comply.
+5. **Deed delivery.** After compliance, the Master executes and records a **Master's Deed** conveying whatever title was before the court — **SCRCP Rule 71(b)**; typically recorded **10–14 days after compliance**.
+6. **Deficiency appraisal right (buyer-relevant because it caps the credit bid).** Within **30 days after the sale**, the defendant may apply for an **order of appraisal** — **SC Code § 29-3-680** — substituting FMV for the high bid to reduce the deficiency. Cannot be waived for a dwelling/consumer-credit transaction.
+
+**NORTH CAROLINA — Power-of-sale trustee foreclosure (N.C.G.S. Chapter 45, Article 2A)**
+
+1. **Sale day — trustee/substitute-trustee auction** at the county courthouse per the Notice of Sale (following the clerk's hearing under § 45-21.16).
+2. **Deposit at the fall of the hammer.** Trustee may require the high bidder to immediately deposit **the greater of 5% of the bid or $750** — **N.C.G.S. § 45-21.10(b)**.
+3. **Report of sale filed** with the Clerk of Superior Court, which **starts the 10-day upset-bid clock** — **§ 45-21.26 / § 45-21.27**.
+4. **10-day upset-bid period (§ 45-21.27).** Any person may upset by depositing with the clerk **≥5% of the upset amount but not less than $750**, and bidding **the last price + at least 5%, minimum $750 increase**. **Each valid upset bid resets a fresh 10-day clock.** Cycles until 10 days pass with no upset.
+5. **Rights become fixed / sale final (§ 45-21.29A).** When 10 days expire with no further upset, the last-highest bidder is the winner; the sale is final (no separate clerk "confirmation" hearing is required in NC power-of-sale — expiration of the upset period is what fixes rights).
+6. **Trustee's deed delivered** once the winner pays the balance per the Notice of Sale timeframe. **Default → resale** under the same procedures — **§ 45-21.30(c)** (defaulting bidder liable for the shortfall).
+
+Typical NC end-to-end after sale day: **10 days minimum, extended 10 days per upset** — plan on **10–30+ days** before the deed.
+
+### Where each stage is PUBLICLY visible (free surface + lead-time before sale)
+
+- **Sale calendars / roster (both states):** County **Master-in-Equity sales rosters** (SC — e.g., Charleston, Spartanburg, Horry publish monthly PDF/HTML rosters) and NC **Clerk of Superior Court foreclosure sale listings** + the plaintiff **law-firm foreclosure calendars** (Hutchens, Brock & Scott, Rogers Townsend, etc.). Lead-time: **2–4 weeks** before sale day (NC Notice of Sale posted 20 days out under § 45-21.17; SC judgment schedules the sale).
+- **Newspaper legal notices:** NC Notice of Sale published once a week for 2 weeks (§ 45-21.17); SC notice of sale published. Lead-time **~2–3 weeks**.
+- **Upset-bid activity (NC, free at clerk):** The **Report of Sale and each Notice of Upset Bid** are filed in the clerk's Special Proceedings file — walk-in or e-file docket shows the current high bid and the running 10-day deadline. Lead-time: **a live 10-day window you can jump into as a bidder or as an outreach trigger.**
+- **Upset-bid activity (SC):** MIE office tracks the 30-day upset period; roster flags "deficiency demanded" cases as remaining open.
+- **Post-sale deed (both):** **Register of Deeds** — Master's Deed (SC) / Trustee's Deed (NC) records within ~2 weeks; this is the public confirmation the property changed hands and, by comparison to the debt, whether **surplus** exists.
+- **Surplus deposits:** SC — statement of receipts/disbursements filed with the MIE; NC — surplus paid into the **Clerk of Superior Court** (§ 45-21.31) and, if unclaimed, ends up at **NC Dept. of State Treasurer (NCCash)** and **SC Palmetto Payback** unclaimed-property databases (already in the engine's cross-check).
+
+### How to WORK this stage (the acquisition move + best owner-motivation window)
+
+- **As a bidder:** Register early (SC MIE offices require a **registration form ~7 days before sale**; bring certified funds for the 5%/$750 deposit). In **NC, the upset-bid window is the real opening** — you don't need to attend the auction; monitor the clerk file and place an upset bid (last price + 5%/$750, deposit to clerk) any time in the live 10-day cycle. In **SC deficiency cases**, the 30-day upset sale is where third parties beat the plaintiff (plaintiff can't bid at upset).
+- **As an off-market acquirer (higher-margin play):** The **pre-sale window is the motivation peak** — owner is days from losing the home and equity. Target the **2–4 weeks between notice-of-sale/roster publication and sale day** with a cash offer that beats the auction net (payoff + costs). This is the classic "stop the sale" deal.
+- **Surplus-funds recovery as a distinct lead type:** After a sale where the bid exceeds debt + liens, the **former owner is owed the surplus** and usually doesn't know it. SC — claim filed with the MIE within **45 days of the statement of receipts/disbursements** (SCRCP Rule 71(c)); unclaimed after 45 days is deemed abandoned. NC — surplus sits with the **Clerk** and is claimed by **special proceeding** to determine entitlement (§ 45-21.32); stale funds flow to NCCash. The move: identify **overbid > total liens**, locate the displaced owner, and either broker recovery or use it as a warm door-opener. Best window: **immediately post-sale through the claim deadline.**
+
+### Encode in the engine (a stage field / urgency multiplier / prune rule)
+
+- **`sale_stage` enum:** `noticed` → `sale_scheduled` → `sold_pending_upset` (NC 10-day / SC 30-day) → `sold_final` → `deed_recorded`. Drive urgency off this.
+- **`urgency_multiplier`:** peak the score in the **`sale_scheduled` window (days-to-sale ≤ 30, rising as it approaches 0)** — that's the off-market motivation apex. Add a **secondary spike for `sold_pending_upset`** (NC especially) so live upset-bid targets surface.
+- **`upset_window_open` (bool) + `upset_deadline` (date):** for NC, compute from Report-of-Sale/last-upset date + 10 days; reset on each new upset notice. For SC deficiency cases, set 30 days from sale. Flag while open for bid-or-outreach action.
+- **New lead type `surplus_recovery`:** trigger when `winning_bid − (payoff + captured_lien_stack) > 0`. Fields: `estimated_surplus`, `claim_deadline` (SC = statement-filing + 45 days; NC = special-proceeding, watch escheat to NCCash/Palmetto Payback), `displaced_owner` (route to skip-trace). Cross-reference the existing NCCash/Palmetto Payback checker.
+- **Prune rule:** once `sale_stage = sold_final` **and** no positive surplus **and** owner-occupant already removed, **drop from active acquisition** (deal is gone) — but **retain** if `estimated_surplus > 0` (reclassify to `surplus_recovery`) or if it becomes bank-owned/REO for a separate resale lane.
+- **Occupant-removal flag (`possession_path`):** SC purchasers use a **Writ of Assistance** (return to the MIE court; sheriff ejects — *Griggs v. Griggs*); NC purchasers get an **Order for Possession** from the clerk (§ 45-21.29) after **10 days' notice** (30 days for 15+ unit residential), executed by the sheriff per summary-ejectment procedure **§ 42-36.2**. Store as an underwriting cost/time input on bidder-side deals.
+
+**Sources:**
+- [SC Code Title 29 ch. 3 (§ 29-3-680 appraisal)](https://www.scstatehouse.gov/code/t29c003.php) · [§ 29-3-680 (Justia)](https://law.justia.com/codes/south-carolina/title-29/chapter-3/section-29-3-680/)
+- [SCRCP Rule 71 (surplus, Master's Deed)](https://www.sccourts.org/resources/judicial-community/court-rules/civil/rule-71/)
+- [Charleston County MIE Foreclosure Primer (§ 15-39-720 / § 15-39-760, writ of assistance)](https://www.charlestoncounty.gov/departments/master-in-equity/mortgage-forclosures-primer.php) · [Pickens County MIE Primer](https://www.co.pickens.sc.us/departments/master_in_equity/primer_for_mortgage_foreclosures.php) · [Horry County Upset Bid Sales](https://www.horrycountysc.gov/departments/master-in-equity/upset-bid-sales/)
+- [N.C.G.S. Chapter 45, Article 2A (full)](https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/ByArticle/Chapter_45/Article_2A.html)
+- [G.S. 45-21.27 Upset bid / compliance bonds](https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_45/GS_45-21.27.html)
+- [G.S. 45-21.29 Orders for possession](https://www.ncleg.gov/enactedlegislation/statutes/html/bysection/chapter_45/gs_45-21.29.html)
+- [G.S. 45-21.31 (surplus proceeds) PDF](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_45/GS_45-21.31.pdf) · [G.S. 45-21.32 (special proceeding for surplus) PDF](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_45/GS_45-21.32.pdf)
+- [NC surplus-funds claim procedure (Pierce Law Group)](https://piercelaw.com/news/uncategorized/what-procedures-apply-for-claiming-surplus-funds-if-a-foreclosure-sale-yields-excess-proceeds-in-north-carolina/)
