@@ -8213,3 +8213,460 @@ async def enrich_scf(listing, client: httpx.AsyncClient, radius_m=300):
 **Ordering note for the pipeline:** run **Census geocoder → HUD FMR (needs county_fips) → SeeClickFix (needs lat/lng)**. All three are free; HUD needs a free Bearer token, the other two need no key (Census: nothing; SeeClickFix: a required User-Agent string).
 
 Docs: [HUD FMR API](https://www.huduser.gov/portal/dataset/fmr-api.html) · [SAFMR data](https://www.huduser.gov/portal/datasets/fmr/smallarea/index.html) · [Census Geocoding Services API](https://geocoding.geo.census.gov/geocoder/Geocoding_Services_API.html) · [SeeClickFix API v2](https://dev.seeclickfix.com/)
+
+
+---
+
+# Deep-Dive Round 22 — Operator Runbook / First-90-Days (2026-07-02)
+
+
+## The Daily Operator Workflow
+
+### The concrete practice (step-by-step, grounded in THIS dashboard/market)
+
+This is the one loop you run every weekday over the 17,003-lead board. It assumes the dashboard is the single source of truth: intent score, signal chips (foreclosure / probate / tax-delinquent / divorce / elderly / vacant / incarcerated), the resolved contact fields (name → property → equity → phone/mailing address), and the CRM-lite stage per lead.
+
+**0. Pre-flight (5 min, 8:00am).** Open the dashboard. Confirm last night's pipeline ran (lead count moved, new signal chips appeared, enrichment backfilled phones). If the count is frozen from yesterday, the run hung again (the known `run_local.sh` overnight-hang failure mode) — note it and work yesterday's list rather than block. Do NOT re-scrape or re-enrich mid-loop; the loop consumes the board, it doesn't build it.
+
+**1. Build the Work-Today call list (5 min).** Sort the board by intent score descending, then filter to **actionable + due today only**:
+- Stage in `{New, Attempt 1–5, Callback-due, Warm}` — exclude `DNC, Dead, Under-Contract, Closed`.
+- Has a phone (skip-trace resolved). No-phone-but-has-mailing-address leads route to the **mail queue**, not the dial list.
+- Callback/follow-up date ≤ today floats to the top regardless of score.
+- Fresh high-intent signals (a foreclosure notice or tax-delinquency that landed overnight) get a "hot" flag and go to the very top — recency is itself intent in this market.
+Take the **top 40–50** for the dial block. That is one operator's realistic day, not the whole board.
+
+**2. Dial block (2 hours, ~9:00–11:00am — the single most important block).** Local time zone matters: SC-Upstate/Western-NC sellers answer better mid-morning and 4:30–6:30pm than midday. Work top-down. For each lead, the dashboard row is your script cheat-sheet — lead with the signal, not "I buy houses":
+- Foreclosure → "I saw the notice on your Anderson County property and wanted to reach out before the sale date."
+- Probate/inherited → "I work with families who've inherited a property they don't want to keep up."
+- Tax-delinquent → "I help owners who've fallen behind on the county taxes find options."
+- **Log every single dial immediately** in CRM-lite — outcome (No Answer / Bad Number / Not Interested / Callback / Warm / Appointment), one-line note, next-action date. An unlogged dial is a lost dial. Bad numbers get flagged for re-skip-trace; DNC requests get stamped DNC on the spot (compliance, non-negotiable).
+- Reachability rule: **6–8 attempts across days/times before a lead is "Dead."** Most operators quit at 2. Space attempts, vary the time-of-day.
+
+**3. Inbound processing (30 min, right after the dial block, ~11:00–11:30am).** Callbacks, texts back, and "who is this" replies from earlier touches are the highest-value events of the day — they jump the queue. Return every inbound within the same block (speed-to-lead is the whole game). Qualify on the call: motivation, timeline, condition, mortgage/lien position, price expectation. If it's real, book the appointment and move stage to `Appointment` before hanging up.
+
+**4. CRM stage hygiene (15 min).** Sweep the day's touched leads and make sure every stage is current: `New → Attempt N → Warm → Appointment → Offer → Contract → Closed`, or the exit lanes `DNC / Dead / Not-Interested`. No lead should sit in `New` after you've dialed it. This is what keeps tomorrow's Work-Today list honest.
+
+**5. Queue tomorrow's mail (20 min, ~1:00pm).** Pull the high-intent leads that are **no-phone or 3+ unanswered dials** and drop them into the mail queue (postcard for volume, letter for the hottest probate/foreclosure signals). Mail and phone are a stack, not either/or — the seller who ignores the postcard answers the call two weeks later, and vice-versa. Export the queue to the mail-house CSV format. Keep a 3-touch cadence per lead before retiring.
+
+**6. Follow-up / nurture block (1 hour, ~2:00–3:00pm).** Work the `Warm` and `Callback` leads that aren't due today but are aging — a second call, a text, a "just checking in." This is where deals actually come from; raw first-dials rarely close. Re-engage anyone who went quiet 7–14 days ago.
+
+**7. End-of-day review (10 min, ~4:30pm).** Log the day's counts (dials, contacts, callbacks, appointments set, mail queued). Compare to your daily targets (below). Set the top 3 callbacks for tomorrow morning so the loop starts warm. Note any board/pipeline problems for the daytime-debug window (never debug the scraper during the dial block).
+
+### Numbers/benchmarks (real targets — response %, conversion %, cost, time)
+
+Grounded in 2025–2026 industry data, calibrated to a single operator (or one VA) working this board:
+
+**Dials & connects.** Live-answer/connect rate ~**12–16%** on skip-traced numbers ([iSpeedToLead](https://ispeedtolead.com/blog/real-estate-wholesaling-closing-rates-by-lead-source-benchmarks/), [Callin](https://callin.io/real-estate-wholesale-leads/)). A focused operator does **~60–80 manual dials/hour**, so the 2-hour block ≈ **120–160 dials → ~18–25 live contacts → ~4–6 real conversations → ~1–2 callbacks/appointments** on a good day. Expect **~8 attempts** to reach a given decision-maker ([ResiMpli](https://resimpli.com/blog/cold-calling-statistics/)).
+
+**Why this board beats cold lists.** Raw cold-call lists close at **0.5–2%**; **motivated-seller / distressed leads convert at 10–15% on 14–21 day cycles** vs. 2–5% over 45–60 days for cold ([Goliath Data](https://goliathdata.com/motivated-seller-leads-conversion-rate)). Your 17k are pre-scored on real distress signals — you should be living at the top of that range, so **guard the intent sort ruthlessly**.
+
+**Direct mail.** Motivated-seller mail responds at **1–5%** (vs. the 4.4% all-industry ANA/DMA average), higher with stacked signals and repeat touches ([MailPro](https://www.mailpro.org/post/direct-mail-response-rates/), [ResiMpli](https://resimpli.com/blog/direct-mail-marketing-for-real-estate-investors/)). Postcards run **$0.30–$0.70/piece**, letters up to **$2**. Budget ~**3 touches** per lead before retiring it.
+
+**SMS (if/when compliant, 10DLC-registered).** Warm/motivated lists reply at **30–45%** with **90–98% open rates** — far above cold-call response ([LaunchControl](https://launchcontrol.us/blogs/sms-for-real-estate-marketing/), [RevaGlobal](https://revaglobal.com/blog/text-message-marketing-for-real-estate-investors/)). Highest-leverage channel per hour if you can register properly.
+
+**Daily operator targets:** 120–160 dials · 18–25 contacts · 4–6 conversations · 1–2 appointments set · 50–100 mailers queued · 100% of touched leads logged and stage-current. Weekly: expect roughly **1 contract per ~40–60 quality contacts** at this lead quality — so ~1 deal every 1–2 weeks per full-time operator is a healthy pace off a board this size.
+
+**Market note:** distressed sales are ~**17% of transactions** in active markets right now ([RealEstateSkills](https://www.realestateskills.com/blog/direct-mail)) — the signal supply is real, so the bottleneck is worked-leads-per-day, not lead availability.
+
+### Tools/SOPs (what to use, what to hand a VA, the exact checklist)
+
+**Tools:** the GitHub-Pages dashboard (Work-Today view + CRM-lite) is the cockpit. Pair it with a dialer that logs back (or logs kept directly in CRM-lite), a mail-house that takes CSV upload, and — if compliant — a 10DLC-registered SMS tool. Never let a second CRM exist; the dashboard is the system of record.
+
+**Hand to a VA (the dial-and-log engine):**
+1. Open Work-Today, top 40–50, intent-sorted.
+2. Dial top-down, use the signal-specific opener shown on the row.
+3. Log outcome + note + next-action date on EVERY dial before moving on.
+4. Book callbacks/appointments straight onto the calendar; move stage to `Appointment`.
+5. Stamp DNC instantly on request; flag bad numbers for re-skip-trace.
+6. At day-end, fill the counts row and set tomorrow's top-3 callbacks.
+
+**Operator keeps (judgment work):** qualification calls, offer/price conversations, mail-vs-call routing decisions, DNC/compliance calls, and the EOD review. Never delegate the offer conversation or the compliance stamp.
+
+**Daily checklist (print it):**
+- [ ] Pipeline ran / board fresh
+- [ ] Work-Today built (top 40–50, intent-sorted, phone + due-today only)
+- [ ] 2hr dial block done, every dial logged
+- [ ] All inbound returned same-day
+- [ ] Every touched lead stage-current (nothing left in `New`)
+- [ ] Tomorrow's mail queued + exported
+- [ ] Warm/aging follow-ups worked
+- [ ] EOD counts logged, top-3 callbacks set
+
+### Common failure mode (what kills operators here + the guardrail)
+
+**The failure that kills operators here is dabbling instead of dialing** — cherry-picking "interesting" leads, chasing the board around by signal type, tinkering with the scraper, and never putting in a protected 2-hour dial block. The 17k board creates a false sense of infinite runway, so people optimize the list forever and under-work it, then conclude "the leads are bad." The leads aren't bad; **8 attempts** and a real dial cadence are simply never reached.
+
+**The guardrails:**
+1. **The dial block is sacred and time-boxed.** Same 2 hours daily, phone out of reach for everything else. If the pipeline is broken, work yesterday's list — do NOT spend the block debugging (that's the daytime window, and per the overnight-hang lesson, never touch the scraper during operating hours).
+2. **Log-or-it-didn't-happen.** An unlogged dial breaks the intent sort, the attempt-count, and tomorrow's Work-Today list — the whole system silently rots. One rule: no lead advances without a logged outcome and next-action date.
+3. **Work top-down, don't cherry-pick.** Trust the intent score; the discipline of the sort is the entire advantage of having a scored board over a spreadsheet.
+
+
+## VA Hiring, Delegation & SOPs
+
+### The concrete practice (step-by-step, grounded in THIS dashboard/market)
+
+**Draw the line first.** In this engine the principal keeps three things and nothing else: (1) live negotiation and offer conversations with sellers, (2) the buy/no-buy and max-bid decision (which the `calc.py` / `arv_confidence` layer already frames for you), and (3) final list selection (which signal tiers and counties go out this week). Everything upstream of a live seller conversation is a VA lane. The dashboard is built for exactly this split — the CRM-lite status field, signal chips, and intent score let a VA move a lead from "raw" to "ready-to-call" without you touching it, and let you filter to only `ready-to-call + intent >= X` when you sit down to dial.
+
+**The five VA lanes, in load order:**
+
+1. **Manual court-export gather** (highest value, hardest to automate). This is your existing manual lane: the VA opens SC PublicIndex and NC eCourts Smart Search in a stealth-friendly session, runs the saved searches per your operator docs (the 3 docs in `repo docs/` + the Desktop PDFs), saves the result pages as HTML into the inbound folder, and you run the offline parsers. Critically — per the endpoint-split memory — the saved list page has the case list but NOT the `__doPostBack` detail; the VA's job is to save the list pages, not to chase each detail record. Cadence: SC PublicIndex daily (new filings post overnight), NC eCourts Judgment JSON is already automated so the VA only covers the WAF-walled Smart Search estates/raw-SP pages.
+
+2. **County-card enrichment** (parcel → sqft/owner/sale-history). For any lead the auto-enricher couldn't resolve, the VA pulls the qPublic / lrcpwa / AcclaimWeb card by parcel_id and hand-keys heated sqft, last sale price/date, and owner name into the sidecar columns. Route by county the way the memory already documents: Pickens/Oconee cards expose full sale history as structured text; Charleston uses the chascogis address resolver; Spartanburg tax balances come from the qPayBill Unpaid search joined by TMS. Give the VA a one-page county-to-portal map so they never guess.
+
+3. **Skip-trace worksheet** (name → phone/email). The backbone of the whole engine is name→property→equity→contact, and the contact step is the VA's. They take resolved leads, run them through your chosen skip-trace source, and fill phone1/phone2/email + a confidence flag. This is pure worksheet work — a fixed input column, a fixed output column, a rejection rule (no hit after 2 sources = mark "no-contact," move on).
+
+4. **DNC + compliance scrub** (must happen BEFORE any dial or text). Every phone the VA skip-traces gets checked against the federal DNC registry and flagged; litigator/known-plaintiff numbers get dropped. This is a hard gate, not a nicety — a VA who skips it is manufacturing TCPA exposure. Make it a required column that must read "clean" before status can flip to `ready-to-call`.
+
+5. **List-cleaning + first-touch mail merge.** Dedupe by parcel_id (the engine's natural key — never dedupe by name, per the load_board discipline that keeps the sidecar intact), strip obvious dead records, then run the first-touch: mail-merge the initial postcard/letter batch or load the SMS/first-touch template. The VA sends touch #1 and touches #2–4 on the follow-up cadence; a live reply is where the VA STOPS and hands the lead to you.
+
+**What never leaves the principal:** the actual "would you take X for the house" conversation, the offer number, and the decision to walk. A VA can book the callback and confirm the appointment; they do not negotiate.
+
+### Numbers/benchmarks (real targets — response %, conversion %, cost, time)
+
+- **Pay ranges (OnlineJobs.ph, USD):** general list-cleaning/data-entry VA **$3–5/hr**; skip-trace + county-card research VA **$5–7/hr**; experienced real-estate cold-caller/appointment-setter **$7–12/hr** plus a per-appointment or per-deal bonus. Full-time (160 hrs/mo) lands roughly **$560–$1,100/mo** for the research-tier VA you want here. Upwork equivalents run 2–3× those hourly rates for comparable skill.
+- **Direct-mail response** (the yardstick for the first-touch lane): real-estate campaigns average **~1–2%** on cold motivated-seller lists, **3.32%** on better-targeted real-estate lists; **>2% is acceptable, >4% strong**. Expect **3–5 mailers per lead** — the follow-up cadence is not optional. Cost **~$0.40/postcard**, **$1–3/letter**; well-run campaigns run **$2,500–$5,000 per closed deal**. Your signal-scored 17,003-lead list should beat the cold-list 1–2% floor because you are mailing pre-qualified distress, not a blanket farm.
+- **Throughput to plan around:** a research VA cleans/enriches **~150–250 leads/day** (county-card lookups are the bottleneck, ~40–60/hr), or skip-traces **~200–300/day** on a worksheet. Budget **~2–3 weeks** to get one VA to unsupervised quality on your specific portals.
+- **QA target:** **95%+ field accuracy** on skip-trace and county-card lanes before you remove the daily spot-check. Audit **10% of every batch** in week 1, dropping to a **5% random sample** once they clear two clean weeks.
+- **Cost-per-ready-lead sanity check:** at $6/hr and ~200 enriched-and-scrubbed leads/day, your VA labor is **~$0.24/ready-to-call lead** — trivial against the $2,500–$5,000 cost-per-deal, which is why every lane above the seller conversation should be delegated.
+
+### Tools/SOPs (what to use, what to hand a VA, the exact checklist)
+
+**Where to hire:** OnlineJobs.ph for a dedicated full-time research VA (best price, real-estate cold-caller pool is deep, U.S.-Eastern-hours workers are common). Use Upwork only for a short paid trial task or a specialist you need for <20 hrs. Post a paid test project (clean + enrich 50 real leads from your dashboard) and hire from whoever nails accuracy, not speed.
+
+**Access hygiene:** give the VA a scoped login and their own folder in the inbound path — never your master credentials. County portals and PublicIndex are ToS-sensitive; the VA operates the manual-export lane exactly as your operator docs prescribe (stealth session, save-the-page, no bulk hammering) so you stay on the compliant side of the wall.
+
+**Hand the VA:**
+- The **county-to-portal map** (which portal per county, what field lives where — built straight from your source memory).
+- The **skip-trace worksheet** (input col: name+parcel_id+address → output cols: phone1, phone2, email, source, confidence, DNC-status).
+- The **first-touch templates** (postcard/letter/SMS) with merge fields locked.
+- A **Loom of you doing one full pass** on each lane, start to finish, narrated.
+
+**Training SOP:** Day 1 — watch the Looms, do 10 leads per lane with you watching. Days 2–5 — do 50/lane, you audit 100%. Week 2 — full volume, you audit 10%. Week 3 — audit drops to 5% random if accuracy ≥95%. Each SOP is one page: purpose, inputs, exact click-path, output columns, the reject rule, and one worked example.
+
+**The exact daily VA checklist:**
+1. Pull today's new raw leads from the dashboard (filter: status = raw).
+2. Run county-export gather per the manual lane; save list pages to inbound folder.
+3. Dedupe the day's batch by **parcel_id** (never name).
+4. County-card enrich unresolved leads → fill sqft, sale price/date, owner.
+5. Skip-trace → fill phone1/phone2/email + confidence.
+6. DNC scrub every phone → set DNC-status = clean/blocked; drop blocked.
+7. Flip status to **ready-to-call** ONLY when contact present AND DNC = clean.
+8. Send first-touch to today's `ready-to-mail` set; log touch number + date.
+9. Post the daily count (leads gathered / enriched / skip-traced / ready) in the shared log.
+
+### Common failure mode (what kills operators here + the guardrail)
+
+**The killer is letting the VA think, not do.** The instant a VA is allowed to judge "is this lead good?" or "should I dedupe these two?" they contaminate the board — the classic failure is deduping by owner name (which silently merges two different properties) or overwriting the board without going through `load_board`, wiping the vision/comps/cama sidecar you spent compute building. **Guardrail:** the VA's job is mechanical — parcel_id is the only dedupe key, every write goes through the board-loader path, and any lead that doesn't fit the worksheet rule gets flagged for you, never resolved by guess.
+
+**The second killer is skipping the DNC gate to hit a daily number.** A VA under a quota will flip leads to `ready-to-call` with an unchecked phone, and you'll dial into TCPA liability without knowing it. **Guardrail:** make DNC-status a hard, required field — the dashboard should refuse `ready-to-call` unless DNC reads "clean," so the compliance step is structurally impossible to skip rather than dependent on the VA remembering.
+
+**The third, quieter killer is no feedback loop.** Operators hire a VA, hand over the lanes, and never audit — accuracy drifts, skip-trace hit-rates rot, and you find out three months later when your call list is full of dead numbers. **Guardrail:** the 5% weekly random audit never fully goes away, and you track one number per lane (skip-trace hit-rate, county-card accuracy, first-touch response %) so drift shows up in a week, not a quarter.
+
+Sources: [OnlineJobs.ph Filipino VA Salary Guide](https://blog.onlinejobs.ph/filipino-virtual-assistants-salary-guide/), [eVirtualAssistants VA Rates 2026](https://www.evirtualassistants.com/virtual-assistant-rates.html), [MailMovers Direct Mail ROI & Response Rate Statistics 2025–2026](https://mailmovers.com/resources/direct-mail-roi-statistics), [REsimpli — Real Estate Direct Mail](https://resimpli.com/blog/the-power-of-real-estate-direct-mail/), [Ballpoint Marketing — Direct Mail ROI for Investors](https://ballpointmarketing.com/blogs/investing/direct-mail-roi-real-estate-investors)
+
+
+## Funnel KPIs To Hit
+
+### The concrete practice (step-by-step, grounded in THIS dashboard/market)
+
+Your engine is not a "list." It is a 17,003-row funnel where the top three stages (leads → contactable → worked) are already scored and free. The discipline is to stop admiring the 17,003 count and instead run a fixed weekly cohort through six gates, logging a number at each gate in the CRM-lite so the ratios are real, not vibes.
+
+1. **Define the worked cohort, not the total board.** 17,003 leads is the reservoir, not the funnel. Each week pull a *fresh worked cohort* — sort by intent score descending, filter to leads with a resolved phone (the name→property→equity→contact backbone already flags these), and take the top N you can actually touch. For a solo operator + 1 VA, N ≈ 400–600 skip-traced records/week is the realistic ceiling. Tag that cohort with a batch ID (`W2026-27`) so its ratios stay isolated. Never re-mix worked and untouched leads in one denominator — that is how operators fool themselves.
+
+2. **Stage 1 → 2: Leads → Contactable (data gate).** Not every high-intent lead has a good number. Track *phone-match rate* and *good-number rate* as a real stage. On distressed lists, expect ~60–75% of rows to resolve to at least one phone, and of those, ~50–65% to be a live mobile (the rest are landlines, disconnects, wrong-party). Chips like probate / tax-delinquent / vacant should each carry their *own* contactability rate — vacant-property owners are the hardest to reach and you want that visible, not blended.
+
+3. **Stage 2 → 3: Contactable → Reached (the connect gate — your #1 lever).** This is where most of the funnel dies, and it is the stage your dashboard should optimize hardest because contacts are the scarce resource. Multi-touch is mandatory: a single call attempt on a mobile connects far below the ceiling; the connect rate you want (50–65% eventual reach) only materializes after **6+ attempts across days/times**. Build the CRM-lite so a lead is not marked "no contact" until it has 6 logged attempts. Leads that get 6+ touches convert ~70% better than those that get fewer — this is the single most-cited, most-ignored number in the space.
+
+4. **Stage 3 → 4: Reached → Conversation.** A "reach" (someone picked up) is not a "conversation" (they engaged on the property). Your signal chips are the edge here: open every call referencing the *specific event* the lead was sourced from — "I saw the notice on the Anderson St property," "records showed the estate for [decedent]." Property-keyed sources (elderly-GIS, tax-delinquent) let you lead with the address; name-indexed sources (probate) let you lead with the situation. Log conversation Y/N. Target ~50–70% of reaches becoming a real conversation when the opener is event-specific; a generic "are you interested in selling" opener halves that.
+
+5. **Stage 4 → 5: Conversation → Appointment/Offer.** This is the human-skill gate, not a data gate. From genuine conversations, a competent operator books an appointment or gets enough to make an offer on ~10–20%. Log a `motivation` field (financial / timeline / condition / none) at this gate — leads with a named motivation are your entire deal supply; "none" leads should be dropped from the active cohort and left to nurture, not re-dialed.
+
+6. **Stage 5 → 6: Appointment/Offer → Contract → Close.** Offers-to-contract runs ~20–35% for disciplined operators who only offer on motivated + equity-positive leads (your valuation-calibration work — ARV floor from cama/assessor sales, max-bid at 0.75 — is what keeps offers credible instead of insulting). Contract-to-close runs ~70–90% net of fallout (title issues, seller cold feet, back-out). The whole-funnel truth to hold in your head: **~0.5–2% of a *worked* distressed list becomes a closed deal**, i.e., roughly **50–70 worked leads per deal**.
+
+7. **Instrument it as a live scorecard on the dashboard.** Add a "Funnel" view above the lead table showing this week's cohort with the six counts and the five conversion ratios, plus rolling cost-per-contact and cost-per-contract. If a ratio is blank because the stage isn't being logged, that stage is invisible and will silently break. The dashboard already has CRM-lite state — this is a reporting view over it, not new data collection.
+
+### Numbers/benchmarks (real targets — response %, conversion %, cost, time)
+
+Stage-by-stage targets, calibrated to 2026 distressed-seller reality:
+
+| Stage | Metric | Realistic target (worked distressed list) |
+|---|---|---|
+| Leads → Contactable | Phone-match / good-number | 60–75% match; 50–65% of those are live mobiles |
+| Contactable → Reached | Connect rate (after 6+ attempts) | 50–65% eventually reached; **single-attempt only ~10–15%** |
+| Reached → Conversation | Real conversation | 50–70% (event-specific opener) |
+| Conversation → Appt/Offer | Booked/offer-ready | 10–20% |
+| Appt/Offer → Contract | Signed | 20–35% |
+| Contract → Close | Funded | 70–90% |
+| **Whole funnel** | **Worked lead → close** | **0.5–2% (~50–70 leads per deal)** |
+
+Channel-level response benchmarks (for the top-of-funnel touch you choose):
+- **Direct mail:** ~0.5–1% response on cold lists; multi-touch (4–6 mailings) and segmentation push effective response materially higher. Mail + digital/text follow-up roughly doubles single-channel conversion.
+- **Cold call:** average rep connects on ~5% of *dials* (≈19 dials per contact); top quartile ~13% (≈8 dials). Per-*lead* eventual reach hits 50–65% only with the 6+ attempt cadence.
+- **SMS:** treat as high-legal-risk, not a core lane. Cold real-estate SMS deliverability has collapsed to ~20–45%, carriers (Twilio/Launch Control/OpenPhone) suspend cold-REI accounts without refund, and TCPA exposure is $500–$1,500 *per text*. This is the one place your "free pipeline" advantage can turn into a five-figure liability.
+
+Economics (build these into the scorecard):
+- **Skip trace:** ~$0.05–$0.25/record → **$20–$150 all-in cost per resolved lead** depending on enrichment depth.
+- **Cost per contact:** because ~50–65% of contactables get reached across 6+ touches, budget **~$1.50–$4 per reached seller** on a call-led model (dialer + skip trace + VA time), far cheaper than mail's ~$0.50–$1.00/piece × 4–6 touches.
+- **Assignment fee:** $5,000–$20,000/deal is the standard band.
+- **Cost per contract:** disciplined call-led operators land contracts in the low-thousands of all-in marketing/data cost; the industry rule of thumb is keep marketing cost per deal well under ~10–15% of the assignment fee.
+- **Response-time lever:** contacting within 5 minutes of any inbound signal makes qualification ~21× more likely than at 30 minutes — matters for any web-form or callback that comes off the dashboard.
+
+**Volume math to net 1–2 deals/month** (call-led, ~1% worked-lead→close):
+- Target: **1 deal** → ~50–70 worked leads → ~30–45 reached → ~20–30 conversations → ~3–5 appts/offers → ~1 contract.
+- Target: **2 deals/month** → **~120–140 worked leads/month** (≈30–35/week) fully run through 6+ touches. At a 1.5% conversion you need ~66 worked leads per deal → ~130/month.
+- Your reservoir (17,003) at 130 worked/month is **~10+ years of supply** before re-touch — so the binding constraint is *contact throughput*, never lead count. Staff and budget to the connect gate.
+
+### Tools/SOPs (what to use, what to hand a VA, the exact checklist)
+
+**Operator owns (weekly, ~30 min):**
+- Pull the week's cohort: sort dashboard by intent desc, filter `has_phone = true`, assign batch ID, cap at VA capacity (~400–600).
+- Read the scorecard from *last* week's batch; if any of the five ratios is below target, name the gate and fix that one thing (usually: not enough attempts logged, or a weak opener).
+- DNC + litigator scrub the calling list before any dials/texts (national DNC registry — non-negotiable, and the guardrail against TCPA).
+
+**Hand to the VA (the exact daily checklist):**
+1. Open today's slice of batch `W2026-XX` in the dashboard, top-intent first.
+2. For each lead, read the **signal chip(s)** and write the one-line opener referencing the specific event/address before dialing.
+3. Dial. If no answer, log attempt #, do **not** retire the lead until attempt 6; rotate call windows (morning / midday / early evening) across days.
+4. On reach, log: `reached=Y`, `conversation=Y/N`, `motivation=financial|timeline|condition|none`, `next_step`, and any callback datetime.
+5. Book appt/offer-review straight into the operator's calendar with the address in the title.
+6. End of day: update the batch's six counts so the scorecard refreshes.
+
+**Tooling:** a power/multi-line dialer (turns 19-dials-per-contact from a time sink into an hour); the existing skip-trace/enrichment pipeline for good-number rate; the dashboard's CRM-lite as the single source of truth (do not let the VA keep a shadow spreadsheet — split state kills the ratios). Keep SMS off unless/until you have documented consent and a compliant platform; if used, it is a *warm follow-up to people you already spoke to*, never a cold blast.
+
+### Common failure mode (what kills operators here + the guardrail)
+
+**The killer: measuring the reservoir instead of the worked cohort, and retiring leads at attempt one.** Operators stare at "17,003 leads" and conclude they have a deal problem when they actually have a *contact-throughput* problem — they touched 300 leads once, reached 40, and called the list "dead." The whole-funnel benchmark (~50–70 worked leads per deal, only after 6+ attempts) means a list looks barren precisely up until the point it starts producing, and most people quit inside that dead zone. Compounding it: chasing "none-motivation" leads on repeat dials because they're already loaded, which burns VA hours that should go to fresh high-intent rows.
+
+**The guardrail:** enforce a hard rule that no lead is marked "no contact / dead" until it has **6 logged, time-varied attempts**, and gate the weekly scorecard on *attempts-per-lead* as a leading indicator — if median attempts is under 4, the funnel ratios below it are meaningless and you fix cadence before touching anything else. Second guardrail: DNC/litigator-scrub every batch and keep cold SMS out of the core loop — the free-data cost advantage is real, but one TCPA class action (at $500–$1,500 per text) erases a year of assignment fees.
+
+Sources: [ReSimpli direct mail stats](https://resimpli.com/blog/direct-mail-statistics/), [Ballpoint Marketing RE direct mail](https://www.ballpointmarketing.com/blog/real-estate-direct-mail-response-rate/), [PropertyRadar cold calling 2025](https://www.propertyradar.com/blog/why-cold-calling-is-far-from-dead-in-2025), [Focus Digital cold call conversion](https://focus-digital.co/average-cold-call-conversion-rate/), [ReSimpli cold calling stats](https://resimpli.com/blog/cold-calling-statistics/), [REIkit marketing budget](https://www.reikit.com/wholesaling-houses/marketing/marketing-budget-needed-turn-wholesaling-leads-into-deals), [DealRun wholesaler pay per deal](https://dealrun.ai/blog/how-much-do-wholesalers-make-per-deal), [GoForClose text blasting reality check](https://www.goforclose.com/guides/text-blasting-real-estate), [DealRun SMS/TCPA guide](https://dealrun.ai/blog/sms-marketing-for-real-estate-investors)
+
+
+## The Fastest First-Deal Path
+
+### The concrete practice (step-by-step, grounded in THIS dashboard/market)
+
+You have 17,003 leads. That is the problem, not the asset. A cold board of 17k is a way to spend 60 days "organizing" and close nothing. The first deal comes from ruthlessly collapsing 17k down to ~120 phone-reachable, high-equity, low-competition records and working them like your rent depends on it. Here is the exact funnel.
+
+**Day 1-2: Cut the board to a "first-deal 500" using the fields the pipeline already scores.** Filter the board sequentially (these map to the engine's own facets and enrichment fields):
+
+1. **Signal type = the three highest-EV, lowest-competition facets first.** In priority order:
+   - **Absentee + vacant** (tax bill goes to a different address than the situs, and/or vacant-registry/USPS-vacant flag). These are the single best cold-start type: no emotional attachment, owner already gone, often zero mail competition because they never hit a foreclosure list. The engine already carries `owner_mailing != situs` and the Spartanburg ~5k vacant set plus HOA/absentee parsing.
+   - **High-equity pre-foreclosure, day 1-90 of the process** (lis pendens / NOD filed, NOT auction-imminent). You want equity ≥ 40% (ARV minus estimated payoff), which the valuation engine already computes with `arv_confidence`. Skip anything auction-dated inside 21 days — no time to close a first deal there.
+   - **Probate, day 30-120 after filing** (NC eCourts estates lane + Gannett obituary/heir set). Too early (< 30 days) the family is still grieving and no PR is appointed; too late (> 120) the wholesalers and "we buy probate" mailers have saturated. The 30-120 window is the reachable sweet spot.
+2. **Equity gate:** keep only equity ≥ 40% of ARV. No equity = no deal, no matter how motivated. This is the number one thing that separates a workable list from a wish list.
+3. **Contactability gate:** keep only records where the enrichment pipeline resolved a **phone number** (skip-trace/SoS-agent/owner-resolved). A lead you can only mail is a 60-day lead, not a 30-day lead. Sort so phone-present records float to the top.
+4. **Geography gate:** clamp to your 2-3 closest core counties (Spartanburg / Greenville / Buncombe or whichever you can drive to in < 45 min). You must be able to see the house this month.
+
+That sequence typically takes 17,003 → ~1,500 (three facets) → ~600 (equity) → ~250-400 (phone present) → your **first-deal 500** (realistically 300-500). Tag them in the CRM-lite as `SPRINT-01`.
+
+**Day 2-3: Line up disposition BEFORE you make an offer.** This is the step beginners skip and it is why they blow their first deal. Build a 5-10 name cash-buyer bench first:
+- Pull the last 6-12 months of **cash / non-owner-occupied purchases** in your target ZIPs (the engine's deed/assessor sales history already exposes book/page + buyer name; qPublic cards on Pickens/Oconee expose full sale-price history). The names that show up 3+ times as grantee are active flippers/landlords.
+- Skip-trace those buyer LLCs (NC SoS registered-agent enricher gives you agent + officer contact for free). Call each: "I'm going to have contracts in [county] this month — what's your buy box and max price per sq ft?" Write their box down.
+- This gives you a pre-sold exit. Your job on the seller side is now just "get it under contract below what my buyer already told me they'll pay."
+
+**Day 3-30: Work the touch sequence, phone-first.** Do NOT lead with mail on a 30-day clock; mail is a 4-8 week feedback loop. Sequence per lead:
+- **Touch 1 (Day 0): Call.** Reach ~25-35 fresh records/day. This is the whole game.
+- **Touch 2 (Day 0, no answer): Text** (ringless voicemail or SMS): "Hi [Name], I buy houses in [county] and can pay cash / close on your timeline for [situs]. Are you open to an offer? — [You]."
+- **Touch 3 (Day 2-3): Second call**, different time of day.
+- **Touch 4 (Day 5): Text again** + drop a yellow-letter/postcard as the async backstop.
+- **Touch 5-6 (Day 8, 14): Call.** Then move to the every-14-day drip and pull the next batch.
+- Log every outcome in the CRM-lite (`no-answer / callback / not-interested / DEAD / APPT`). The only status that matters this month is **APPT**.
+
+**Target math for the sprint:** work 300-500 leads over 3-4 weeks → ~5-8 solid seller conversations that reach "make me an offer" → 3-5 appointments/offers → **1 accepted contract.** Then hand it to a buyer off your pre-built bench and assign/close.
+
+### Numbers / benchmarks (real targets)
+
+Grounded in current (2024-2026) wholesale/investor benchmarks, adjusted for a warm, signal-scored, phone-first list (which beats blind cold lists 3-5x):
+
+| Metric | Blind cold-list benchmark | THIS board (signal-scored, phone-first) target |
+|---|---|---|
+| Cold-call **contact/pickup rate** | 8-12% of dials reach a person | 15-25% (better numbers via skip-trace/SoS) |
+| **Conversation → lead** (any interest) | ~5-8% of contacts | 10-15% on absentee/probate |
+| **Direct-mail response rate** | 0.5-1% (industry standard, ~0.5% typical) | 1-3% on tight absentee/probate lists |
+| **Leads → signed contract** | ~1-2% of leads worked | 2-4% on a clean high-equity list |
+| **Deals per 1,000 targeted contacts** | ~1-3 | ~3-6 |
+| **Touches to first contact** | 4-6 | 3-5 |
+| **Assignment fee, secondary/tertiary SC-NC metro** | — | **$8k-$15k** typical first deal (bigger on high-equity absentee) |
+| **Time to first contract, focused solo operator** | — | **30-60 days** (30 if phone-first, 45-60 if mail-led) |
+
+Concrete first-sprint expectation: **300-500 worked leads → 1 contract.** If you work only 50-100, statistically you may whiff — volume is the guardrail against variance. Budget **~$0 data cost** (the pipeline is free), maybe **$50-150** for skip-trace top-ups and postcards, and **20-30 focused calling hours/week**. That is the minimum viable operation: you, a phone, a filtered list, and a buyer bench.
+
+### Tools / SOPs (what to use, what to hand a VA, the exact checklist)
+
+**Your stack (all already in the system):**
+- The dashboard's **facet filters + equity/`arv_confidence` + phone-resolved fields** to build `SPRINT-01`.
+- The **CRM-lite** for status pipeline (`NEW → CONTACTED → APPT → CONTRACT → DEAD`).
+- Deed/assessor sales-history + **NC SoS agent enricher** to build the cash-buyer bench.
+- A dialer (even a phone + Google Voice) and an SMS/RVM tool; a state-specific **Assignment of Contract** + **Purchase & Sale Agreement** template (attorney-reviewed for SC/NC).
+
+**Hand a VA (offshore or part-time is fine):**
+- Skip-trace/verify phones on the `SPRINT-01` list (dedupe, drop disconnected, tag mobile vs landline).
+- Run **Touch 2 / Touch 4 SMS + RVM** on a script you approve; log responses.
+- First-pass dialing to *disposition only* (alive / wrong number / callback / warm) and book warm ones onto YOUR calendar. **You** take every warm/seller conversation and every offer — do not outsource the negotiation on deal #1.
+- Keep the CRM clean and pull the next 25/day batch each morning.
+
+**The exact daily checklist (pin this):**
+1. Pull next 25-35 phone-present `SPRINT-01` records.
+2. Confirm equity ≥ 40% and situs is in a drivable county (30-sec sanity check on each).
+3. Call. Log every outcome. Book APPTs on your calendar.
+4. Fire Touch-2 SMS/RVM to all no-answers.
+5. Re-drip yesterday's callbacks.
+6. For any APPT: comp it against your buyer bench's max price BEFORE the appointment, so you walk in with your number.
+7. On accepted offer: paper it same day, call your #1 buyer within the hour, assign.
+
+### Common failure mode (what kills operators here + the guardrail)
+
+**The killer: "list-building forever" + no exit.** Operators sit inside a 17k board tweaking filters, admiring signal chips, and running mail on a 6-week loop while never picking up the phone — then when someone *does* say yes, they have no cash buyer and no contract ready, panic, and lose the deal. Two specific traps:
+
+1. **No buyer lined up before contracting.** You get a yes, then spend 10 days finding a buyer, the seller cools off or a competitor closes, and the deal dies. **Guardrail: the cash-buyer bench (5-10 verified names with stated buy boxes) must exist on Day 3, before your first offer.** No bench = don't make offers yet.
+2. **Chasing motivation without equity, or working non-reachable leads.** A distressed owner with 5% equity cannot be helped and cannot pay you; a lead with no phone is a 60-day project. **Guardrail: hard gate every `SPRINT-01` record on equity ≥ 40% AND a resolved phone — if it fails either, it does not go in the sprint.** Also: never work auction-imminent (< 21 days) pre-foreclosures for your first deal; there is no runway to close.
+
+The meta-guardrail: **measure APPTs booked per week, not leads pulled.** If APPTs = 0 after a week, you have a contact problem (dial more, better times) or a list problem (wrong facet), not a "need more leads" problem. The board is not the bottleneck. Your dial count is.
+
+
+## Weekly & Monthly Cadence + the Reinvestment Loop
+
+### The concrete practice (step-by-step, grounded in THIS dashboard/market)
+
+Your machine already does the collection. `launchd` runs the full stealth-browser crawl (`run_local.sh`) **Tue + Fri 9:30am**, the daily API refresh churns REO so day-old listings don't 404, daily vision at 9:30, LRCPWA at noon, SOS-agent at 2pm. You never "gather leads" as a manual task — you *harvest the actionable subset* off a board that's already 17,003 records deep. The operator's job is the loop below, not the scraping.
+
+**WEEKLY — "Pull & Assign" (Tuesday after the crawl, ~45 min):**
+1. Confirm the run landed: `tail -1 docs/run_meta.json` and `docs/run_health.json` — check `record count ≈ prior week ± churn` and that no source silently went to 0 (Column-style silent death is your known failure; a source dropping from 300→0 is a bug, not a dry week).
+2. Open the dashboard, set **Stage = Prefore** (the `substitute_trustee|lis_pendens|rod_*` track — these are the owners who still hold the house and can still sell; REO is the bank, not a motivated seller) and **Distress = HOT**. HOT is gated: stacked 2+ distinct distress *categories* AND equity ≥ median AND a mailable owner. That gate is why HOT is your mail list and COLD is not.
+3. Add **min-signals ≥ 2** and **contact = contactable**. Sort by intent score (0–100 headline). Everything above threshold that's **NEW-this-run** is this week's fresh actionable set.
+4. Export that filtered slice to the skip-trace worksheet (`scripts/build_skiptrace_worksheet.py` → `docs/skiptrace_worksheet.csv`). Owner name + mailing address are already free-attached from GIS/voter/SOS, so most rows are *already mailable with zero spend* — only the address-less remainder goes to paid skip.
+5. In the CRM (`docs/crm.json`, `status: new/mailed/contacted/…`), flip everyone you're mailing this week to `mailed` with the date. This is what makes the ROI-by-list table real next month.
+
+**WEEKLY — KPI review (Friday, ~20 min):** Pull up the **ROI-by-list / by-source** view. One number decides everything: **cost-per-contract by source** (Prefore-trustee vs SC tax-sale vs probate vs Helene-placard vs REO). You are not looking at response rate in isolation — you're looking at which *source × county × signal-stack* actually put a signed contract on the board. Kill nothing yet; just rank.
+
+**MONTHLY — Budget cycle (1st of month, ~1 hr):**
+1. Freeze last month's numbers: contracts closed, mail sent, skip spend, per-source cost-per-deal.
+2. Rebuild the mail budget **only against the actionable subset** — HOT + WARM-with-equity, contactable, not already in an active 5-touch sequence. In this 18-county footprint that subset is typically a few hundred parcels/month, not 17k. Do **not** mail the whole board; the board is a funnel, not a mail list.
+3. Skip-trace *only the gap*: rows where free owner-mailing came back empty. At $0.10–$0.15/record you're spending on hundreds, not thousands.
+4. Feedback-loop review: promote the 1–2 sources with the best cost-per-deal to "always mail 3 touches," and demote the bottom sources to "mail once or drop." This is the only place you change the spend mix.
+
+**The reinvestment loop:** First deal's assignment fee is the flywheel fuel. Split it fixed: **~40% back into more mail volume** (more touches on the proven sources), **~20% into skip-trace depth** (phone append on the HOT tier so you can call, not just mail — calling a HOT lead converts far better than a postcard), **~20% into a VA** for skip-trace cleanup + mail-merge + CRM status hygiene, and the rest is profit/reserve. Each closed deal ratchets mail volume up on the sources that already paid, never on unproven ones.
+
+### Numbers/benchmarks (real targets)
+
+| Metric | Target for this system | Source/basis |
+|---|---|---|
+| Blanket direct-mail response | 1–2% | industry baseline |
+| **Stacked/targeted list response (your HOT tier)** | **3–9%** (tax-delinquent + absentee stacks run ~3x blanket) | Ballpoint / REsimpli 2025 |
+| Touches before response | **4–5** (99% of deals come after touch 1) | REsimpli |
+| Response → contract conversion | ~5–10% of responders | investor norm |
+| Deals per 1,000 mailed (proven list) | **1–3 contracts** | 2–3% response × ~10% close |
+| Skip-trace (gap only) | **$0.10–$0.15/record**, ~$0.02–$0.04 on credit plans | BatchData/REISkip/Lead Sherpa |
+| Postcard all-in | **$0.42–$0.65**; yellow letter **$0.54–$0.85** | Yellow Letter HQ / MPA 2026 |
+| Monthly mail budget (starting) | 300–600 pieces × ~$0.55 = **$165–$330** | actionable-subset sizing |
+| Break-even | **1 wholesale assignment ($5k–$15k typical) pays 15–90 months of mail** | — |
+| Time load | Weekly ~65 min (pull+KPI) + monthly ~1 hr | — |
+
+Rule of thumb to hold yourself to: if a source's **cost-per-contract > 25% of your average assignment fee**, it's demoted next month.
+
+### Tools/SOPs (what to use, what to hand a VA, the exact checklist)
+
+**You keep (judgment work):** the Stage/Distress/signal filtering, the source promote/demote decision, the reinvestment split, reading `run_health.json` for silent-death bugs.
+
+**Hand the VA a written SOP (they never touch the scraper):**
+```
+WEEKLY (Tue PM):
+□ Open dashboard, apply saved filter: Stage=Prefore, Distress=HOT, min-signals≥2, contact=contactable, NEW=on
+□ Export slice → skiptrace_worksheet.csv
+□ Run rows with blank owner_mailing through skip-trace tool; paste results back
+□ Mail-merge worksheet → this week's postcard batch; upload to mail vendor
+□ In CRM set every mailed parcel status=mailed + today's date + touch#
+MONTHLY (1st):
+□ Tally: contracts, mail sent, skip $ spent, per-source count → paste into ROI tab
+□ Advance any lead at touch 5 with no response → status=cold
+□ Flag any source that returned 0 this month (email me — likely a bug)
+```
+
+**System SOPs:** verify `launchctl list | grep foreclosure` shows all 5 agents loaded; the weekly ROI table is the by-source view already in `dashboard.js` (`by_source`, `roi_pct`, `posRoi`); board writes must go through `web_artifact.load_board()` (never raw write — it wipes the vision/comps sidecar).
+
+### Common failure mode (what kills operators here + the guardrail)
+
+**The killer: mailing the whole 17,003-row board instead of the gated actionable subset, once, and calling it a campaign.** Two ways this bleeds you out — (1) you blow the budget on COLD/unmailable/REO records that were never motivated sellers (REO owner is a bank), and (2) you send one touch and quit, when 99% of deals land on touch 4–5. Both feel like "direct mail doesn't work" and both are self-inflicted.
+
+**Guardrails:**
+- **Never mail below the HOT/WARM-equity + contactable gate.** The tier gate exists precisely so you don't pay to reach unreachable or unmotivated owners. If a filter isn't applied, don't export.
+- **Sequence, don't spray:** every mailed parcel gets a 4–5 touch cadence tracked by touch# in CRM before it's allowed to go `cold`. Budget for the sequence, not the send.
+- **Trust `run_health.json` over your gut on "slow weeks":** a source going 300→0 is the Column silent-death pattern (200 OK, 0 results on filter drift), not a quiet market. Investigate before you conclude the pipeline is fine.
+- **Reinvest only into proven sources.** New deal money scales the sources that already closed a deal; it does not fund experiments. Experiments come out of a fixed small R&D slice, not the reinvestment flywheel.
+
+Sources: [Ballpoint – RE direct mail response rate](https://www.ballpointmarketing.com/blog/real-estate-direct-mail-response-rate/), [REsimpli – direct mail for investors](https://resimpli.com/blog/direct-mail-marketing-for-real-estate-investors/), [BatchData pricing](https://batchdata.io/pricing), [Goliath – skip trace cost breakdown](https://goliathdata.com/skip-trace-cost-breakdown-for-real-estate-investors), [MPA – direct mail cost 2026](https://www.mailpro.org/post/how-much-does-direct-mail-cost/), [Yellow Letter HQ pricing via UPrinting/REmail](https://www.remaildirect.com/blog/direct-mail-cost-pricing-guide)
+
+
+## Budget & Staffing Model at 3 Scales
+
+### The concrete practice (step-by-step, grounded in THIS dashboard/market)
+
+This engine's edge is that lead acquisition is already $0 — the 17,003 SC-Upstate/Western-NC records, intent scores, and signal chips are sunk cost from the free pipeline. So every tier below spends money on exactly three things: **making the record contactable** (skip trace + DNC scrub), **touching it** (mail/SMS/dials), and **buying back your time** (a VA, then a dialer/CRM, then a second VA). You do not scale mail volume; you scale *depth of touch on the already-scored top of the board*. The tier you belong in is set by how many high-intent records you can physically work per month, not by how much cash you have.
+
+**Shared setup for all tiers (do once):**
+1. Rank the full board by intent score and signal-chip stack. In this market the highest-converting stack is **multi-signal overlap** — e.g. an absentee/out-of-state owner that is *also* tax-delinquent *also* in a probate/estate or pre-foreclosure lane. Those are the "3x response" segment. Filter the dashboard to records with 2+ stacked distress signals first; that is your A-list.
+2. Segment by county. Buncombe/Henderson/Rutherford (NC) and Spartanburg/Greenville/Anderson (SC) have the deepest free enrichment (tax balances, GIS owner, ROD deed images), so contact-info hit rates and equity math are strongest there. Work core counties before coastal/edge.
+3. Every tier runs the same funnel math: `records worked → contactable after skip+scrub → responses → qualified conversations → contracts → assignable deals`. You only change the top number and the per-touch spend.
+
+**Tier 1 — Solo bootstrap (~$200–500/mo).** You are the acquisitions person, dispositions person, and data person. No mail-at-scale — it's a money incinerator at this budget. Instead: pull the top ~1,000 A-list records/month, skip trace them, DNC-scrub, and **call + text them yourself** using a free/cheap dialer, supplemented with a *small* handwritten/yellow-letter drop (200–300 pieces) to the very top absentee-with-equity slice where you have no phone. You live in the dashboard's CRM-lite: log every disposition, set callbacks, work the pipeline daily.
+
+**Tier 2 — Solo + 1 VA (~$1–2k/mo).** The VA becomes your top-of-funnel dialer/texter and skip-trace operator, freeing you to only take live/warm conversations and run comps → offer → contract. You lift volume to ~2,000–3,000 records/month worked and add a real mail cadence (800–1,200 postcards/mo on 21–45 day repeat touches to the equity A-list). You now need a paid dialer so the VA is efficient.
+
+**Tier 3 — Small team (~$3–6k/mo).** Two VAs (one dedicated caller, one texter/lead-manager/skip-tracer), a real multi-line dialer + CRM/pipeline discipline, and mail scaled to 2,000–3,000 pieces/mo across the full stacked-signal board plus your best single-signal segments. At this tier you're working the top 4,000–6,000 records/month and the constraint becomes *your* capacity to underwrite and close, not lead flow.
+
+### Numbers/benchmarks (real targets — response %, conversion %, cost, time)
+
+Grounded in 2025–26 industry benchmarks, applied to this board (a *targeted, multi-signal-stacked* list, so use the high end of published ranges, not blanket-mail lows):
+
+| | **Tier 1 Solo** | **Tier 2 Solo+VA** | **Tier 3 Small team** |
+|---|---|---|---|
+| Monthly spend | **$200–500** | **$1,000–2,000** | **$3,000–6,000** |
+| Records worked/mo | ~1,000 | ~2,500 | ~5,000 |
+| Skip trace | $0.07–0.10/rec mid-tier (~$70–100/1k) | mid-tier (~$175–250) | premium $0.15–0.28/rec for multi-number (~$400–750) |
+| Cold-call/text contact→deal | 2–5% on skip-traced *targeted* owners (vs <0.5% random) | same, but ~2x volume | same, wider top-of-funnel |
+| Direct mail response | 1–5% blanket; **~3x that on stacked lists** (absentee + tax-delinquent) → target 3–6% on A-list | 3–6% | 3–5% blended across wider list |
+| Cost per deal (market avg) | $2,500–3,000 typical; **lower here** because leads are free — your CPD is mostly touch + labor | ~$1,500–2,500 | ~$1,500–2,000 |
+| Contacts needed per deal | ~120–150 conversations at ~2% | same | same |
+| **Expected deals/mo** | **0.5–1** (realistically 1 every 1–2 months) | **1–2** | **2–4** |
+| Time commitment | 15–25 hrs/wk (you do everything) | You ~15 hrs (warm only) + VA ~40 hrs | You underwriting/closing + 2 VAs ~80 hrs |
+
+**Cost lines that drive the tiers:**
+- **VA:** Philippine RE cold-call VA runs **$7–12/hr → ~$1,120–1,920/mo full-time**; a part-time 20 hr/wk VA lands ~$600–950/mo. This is the single line that defines Tier 2.
+- **Dialer/CRM:** Mojo single-line **$99/mo + $10 agent access**; triple-line ~$149; realistically **$150–300/mo** loaded with recording + a caller-ID number. BatchDialer/similar comparable.
+- **Mail:** ~**$0.40–0.70/postcard** all-in; yellow letters/handwritten higher but 3–5x response. A 1,000-piece touch ≈ $400–700.
+- **SMS/RVM (optional cheap lever):** RVM ~**$0.0175/message**; SMS a few cents — a great Tier-1 supplement when you have phones but no time to dial.
+
+**Break-even (assumes conservative $8,000 net per wholesale assignment in this market):**
+- **Tier 1:** break-even = ~1 deal every **16–40 months of spend**… i.e. a *single* deal covers 1–2+ years of cost. You are effectively break-even the first time you close. Realistic cadence: first deal in months 2–4.
+- **Tier 2:** monthly cost ~$1,500 → **one deal every ~5 months breaks even**; at 1–2 deals/mo you clear $6.5k–14.5k/mo net of marketing.
+- **Tier 3:** monthly cost ~$4,500 → break-even at **~1 deal every ~1.7 months**; at 2–4 deals/mo you net $11.5k–27.5k/mo. (One good deal with equity or a flip skews all of this sharply positive — these are wholesale-assignment floors.)
+
+### Tools/SOPs (what to use, what to hand a VA, the exact checklist)
+
+**Stack by tier:**
+- **Tier 1:** the free dashboard (list + intent + CRM-lite) · mid-tier skip trace ($0.07–0.10) · a free/cheap DNC scrub (scrub *every* list before any call/text — non-negotiable) · Google Voice or a $30/mo softphone · 200–300 yellow letters from a print-on-demand vendor.
+- **Tier 2:** add **Mojo/BatchDialer** (~$150–300/mo) · a mail vendor with cadence automation · optional RVM/SMS platform for the no-answer segment · the VA.
+- **Tier 3:** add multi-line dialer + a real pipeline CRM (or harden the dashboard's CRM-lite into stages) · premium multi-number skip trace · 2nd VA · a simple KPI sheet the lead-manager VA updates daily.
+
+**Exact VA onboarding checklist (hand this verbatim):**
+1. Log into the dashboard; filter to **intent score ≥ [threshold]** AND **2+ signal chips**, core counties first.
+2. Export the day's ~100–150 records; run skip trace; drop into dialer.
+3. **Run every number through DNC scrub before dialing.** Skip any scrubbed number.
+4. Dial the script; goal = reach owner, ask 4 qualifying Qs (own it free-and-clear?, condition?, timeline to sell?, price expectation?).
+5. Any "maybe/yes" → tag **WARM**, log notes, book the callback on the operator's calendar — do **not** negotiate.
+6. Text/RVM the no-answers with the approved template; log disposition.
+7. Update the KPI row: dials, contacts, warm leads, appointments set.
+
+**Operator-only (never delegate):** comps/ARV underwriting, offer price, live negotiation, contract, and dispositions to buyers. VAs feed the funnel; you close it.
+
+### Common failure mode (what kills operators here + the guardrail)
+
+**The #1 killer: burning cash on mail volume to escape the phone.** Operators at every tier over-index on postcards because dialing is uncomfortable — but this dashboard's whole advantage is that the leads are *free and pre-scored*, so the cheapest path to a deal is **calling/texting the stacked-signal A-list**, where skip-traced targeted contact converts at 2–5% vs <0.5% random. Spending $500 on blanket mail at Tier 1 (5-touch cadence = your entire budget on one segment before you've made 100 dials) is how solo operators go broke waiting on a 1% response. **Guardrail:** spend on touch in this order — (1) skip trace + DNC scrub the A-list, (2) dial/text it yourself or via VA, (3) *only then* mail the slice you have no phone for. Cap mail at ≤30% of the marketing budget until you've proven a repeatable cost-per-deal.
+
+**The #2 killer: graduating tiers on vibes instead of a trigger.** Hire the VA too early (before you've personally closed a deal and can't articulate a working script) and you pay $1,500/mo to have someone run a funnel you haven't validated. **The graduation triggers, explicitly:**
+- **Tier 1 → 2:** you've closed **≥1 deal**, have a script/disposition process that works, and are leaving A-list records uncalled every week purely for lack of hours. *Then* the VA buys back throughput you've proven converts.
+- **Tier 2 → 3:** your single VA is maxed (~2,500+ records/mo), you're consistently at **1–2 deals/mo**, and *your own* underwriting/closing time is now the bottleneck — you need the 2nd VA + dialer so the top of funnel keeps flowing while you close. Do not add fixed cost until the prior tier is throughput-bound, not idea-bound.
+
+**Sources:** [Ballpoint Marketing — Direct Mail ROI](https://ballpointmarketing.com/blogs/investing/direct-mail-roi-real-estate-investors), [REsimpli — Direct Mail Guide](https://resimpli.com/blog/direct-mail-marketing-for-real-estate-investors-the-ultimate-guide/), [8020REI — Skip Tracing Guide](https://8020rei.com/learn/motivated-sellers/skip-tracing-guide/), [Tracerfy — Skip Tracing for Call Centers](https://www.tracerfy.com/real-estate-skip-tracing-for-call-centers), [Deal Run — Skip Tracing Cost 2026](https://dealrun.ai/blog/skip-tracing-cost-guide), [Mojo Dialer Pricing](https://www.mojosells.com/pricing/), [Smart Outsourcing — PH VA Rates 2026](https://smartoutsourcingsolution.com/resource/virtual-assistant-eor-hourly-rates-philippines/), [KDCI — Filipino RE VA Salary](https://www.kdci.co/outsourcing-blog/post/how-much-is-a-real-estate-virtual-assistant-salary-philippines).
