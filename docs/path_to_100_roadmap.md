@@ -96,10 +96,48 @@ The working cost **dwarfs** data spend. One mail touch on 2,000 HOT/WARM ≈ **$
 - **Owner phone ceiling ~50–65% effective mobile** (R7 reality), interior condition, and name-only-unresolvable leads (~4–8%).
 
 ## Legal watch-items (confirm with counsel before scaling outbound)
-- **NC:** residential wholesaling may be **brokerage under Chapter 93A** (license required to market/assign a residential contract); community workaround = double-close. **Verify current NC law.**
+- **NC (corrected R19):** a **bona-fide contract assignment does NOT require a broker license today** (NCREC Nov-2023 bulletin). Unlicensed *brokerage* (Class 1 misd.) is only the red-line conduct: phantom-buyer/no-intent-to-close, marketing the *property* vs your *contract*, negotiating between the parties, or running a buyers-list as a business. **NC H 797 (2025)** would make *solicitation itself* licensed + add a 30-day homeowner cancel right — **passed House 103-0, stuck in Senate, NOT enacted**; re-check before each campaign. Compliant model: real principal buyer · market the contract not the house · disclose to seller · don't hold others' EMD · double-close when aggressive.
 - **SC:** if you market only the *contract*, you may be unable to *show the property* (no address/photos/access) — an operational deal-killer beyond licensing. UTPA governs the mail (no gov/court/bank-mimicking pieces).
 - **FCRA:** skip-traced data must **not** be used for tenant/credit/employment decisions.
 - **TCPA/DNC:** 31-day rescrub, manual-dial cold cells, retain consent records 5 years.
 
 ## Sequencing verdict
 Ship **Phase 0 (free) + Phase 0.5 (scrub)** now — that alone is the biggest jump and makes the board legally workable for ~$199/mo. Add **Phase 1** as free ceilings bite. Only turn on **Phase 2/3 spend** on the subset you'll actually work. The engine's edge stays the same: free, granular, per-county depth that the paid platforms can't match — with paid dollars spent *only* where free physically can't reach (phone at scale, mail send, and the legal scrub).
+
+---
+
+# v2 additions — folding in the deep-dive (R9–R19, with R18 corrections applied)
+
+## New FREE wins to add to Phase 0 (each verified in the deep-dive)
+| Item | Round | Note |
+|---|---|---|
+| **NC OneMap `AddressNC` point layer** | R4 | Closes address-less for all 11 NC counties. Highest-leverage free geo add. |
+| **SeeClickFix Open311 API** | R15 | Free JSON code/nuisance complaints (address+lat/lng) — Anderson, Spartanburg, Gastonia (+Hickory). |
+| **FSBO.com** | R15 | Owner name+phone+email in page JSON, no anti-bot — motivated seller *with* free contact. |
+| **NC §160A-314 water-sewer liens** (Clerk of Court) | R15 | Recorded lien w/ owner + exact unpaid amount. |
+| **HECM reverse-mortgage DOT detection** at ROD | R15 | Free elderly-owner-likely-to-sell signal. |
+| **Spartanburg county CAMA_Parcels FS** | R2 | Clean sqft/beds/sale/condition/mailing — use over corrupt SCDOT. |
+| **Henderson unmapped fields** (`HEATED_AREA`/sale/owner) | R2 | Already fetched, just not mapped into `_apply_attrs`. |
+| **Laurens SC bulk parcel layer** (`Pebble/TaxParcel/MapServer`) | R18 | Owner+Mailing+Sale_Price+Sqft (corrects earlier "cadastral-only"). |
+| **Polk NC card** (`assessor_cards/polk_nc.py`) | R2 | Already built — ensure it runs for every Polk lead. |
+| ~~Rutherford MapServer/6→7~~ | R18 | **RETRACTED** — Rutherford hosts no parcel service; genuine gap (use OneMap/lrcpwa). |
+
+## Engine SCORING fixes (free, from R10/R14)
+- **GLA double-count bug:** ARV uses raw median $/sqft; the marginal size adjustment is only ~30–60% of average $/sqft → derive coefficients from the local sold pool; add **bracketing** + **weighted reconciliation** (not median).
+- **Region-tuned + per-strategy max-bid:** replace flat 0.75 with disc **0.60 rural/mobile · 0.65 default · 0.70 metro**, and add `wholetail_mao` + a strategy router (R14).
+- **FSD-based 0–100 arv_confidence** (targets PPE10>75%, MdAPE 5–10%) replacing 3-tier HIGH/MED/LOW (R10).
+- **Payoff/equity model (R9, corrected R18):** amortize recorded DOT + a **ROD-index reclassification pass** (detect satisfactions/refis/2nds to re-baseline) + **MERS ServicerID** (MIN off MERS-as-mortgagee DOTs) + prepayment-haircut. A recorded satisfaction *strongly indicates* $0 (not exact). SC exempt-deed price is **not** cheaply reconstructable — accept "no recoverable stamp."
+- **Foreclosure-stage enum + urgency multiplier** (R11): SC = pre-sale only (no post-sale redemption), lis pendens filed with the **Clerk of Court** (not ROD); **prune-after-confirmation**; MIE sale day varies by court.
+
+## Architecture prerequisite for paid vendors (R16)
+- **License-class gating** (`licensing.py`, fail-closed) at the `_slim_raw`/`RAW_KEEP` chokepoint: PUBLIC persist+publish · PERMISSIVE persist/no-bulk-export (RentCast/Realie) · **RESTRICTED_EPHEMERAL** (ATTOM — raw never persists/publishes, only the *derived grade* survives) · INTERNAL_DERIVED. This is the prerequisite that makes adding ATTOM/paid data *compliant*. Plus delta-refresh tiers, per-vendor budget caps, batch-ETL SQLite-by-APN lane, and silent-death (Column 200+0) alarms.
+- **Correction:** Senzing free tier is **evaluation/PoC only** (not free production) — its Phase-1 "free entity resolution" is eval-only; production is paid per-DSR.
+
+## Dashboard build spec (R12/R17 — all free, static JS)
+Work-Today daily call list (intent-sorted, self-clearing) · intent-score + "why" reasons (default-sort intent-first) · signal feed w/ NEW badge · quick-list preset chips + saved views · drag-drop Kanban from CRM-lite · ROI-by-list KPI table · client-side CSV import.
+
+## Conversion + legal (R13/R19) — operating guardrails
+- Per-lead-type timing/scripts (probate day 30–120 mail-first; vacant/absentee 1–3 days; pre-foreclosure 0–60 by equity; sensitivity + SC/NC UDAP).
+- **NC assignment = no license today** (only red-line conduct is brokerage; watch H 797). **SC:** market the contract, not the property. **MH-titling:** flag missing affixation affidavit (chattel lien survives closing). **Surviving liens** feed max-bid. **FCRA:** skip data not for tenant/credit decisions.
+
+_Roadmap v2 sequencing unchanged: Phase 0 free (now bigger) → 0.5 DNC scrub $199 → 1 cheap paid (Geocodio/RentCast/TrueNCOA/Smarty; Senzing only for eval) → 2 targeted skip → 3 send. Add the license-class layer BEFORE any RESTRICTED vendor (ATTOM)._
