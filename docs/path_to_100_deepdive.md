@@ -9924,3 +9924,313 @@ Compute at day 45: **contact rate = live_contact / reachable**, **lead rate = in
 | **RED — Pivot/kill** | ≤1 live contact across 25 leads dialed 3x. | The board's contact data doesn't convert to conversations — the reachability claim is the flaw, not the market. Kill outbound; pivot the asset to a *data-licensing / lead-sale* model where you never have to reach the seller yourself. |
 
 **Why this is the cheapest possible de-risk**: it spends under $200 and 45 days to buy the one number the entire 17k-lead thesis is currently assuming without evidence — that a motivation signal plus a matched phone actually becomes a live seller who will talk. If it's GREEN, you have a repeatable, cost-known engine and a defensible scaling story. If it's RED, you learned it for $200 instead of building a call center on a false premise.
+
+
+---
+
+# Deep-Dive Round 27 — First-Mover System Design (speed + unique-source moat, 2026-07-02)
+
+
+## Near-Real-Time Hot-Signal Detection
+
+### The design (concrete, for THIS engine)
+
+The moat is speed, and speed dies in the gap between when a signal is *filed publicly* and when it lands on the Work-Today list. Today that gap is a full week for the highest-value unique sources: new lis pendens (`nc_ecourts_lis_pendens`, `sc_public_index_lis_pendens`), new probate/estate (`nc_ecourts_estates`, `sc_probate_net`, `gannett_obituaries`→`nc_heir_estate_parcels`), new tax-delinquency (`nc_ptscloud_delinquent_tax`, `spartanburg_delinquent_tax` via qPayBill), and jail bookings (the Zuercher/P2C/Citizen-Connect endpoints in the jail-booking memo). These are trapped on the Tuesday/Friday `run_local.sh` weekly crawl because they inherit `requires_render` behavior or live in the slow full run, while the *daily* job (`daily_api_refresh.py`) only touches `requires_render=False` REO — exactly the saturated, non-unique inventory that has zero speed advantage.
+
+The design splits the source universe into **three cadence tiers by perishability, not by render-cost**, and adds a **hot-signal delta lane** that runs independent of the full board rebuild:
+
+- **Tier H (hot, sub-daily):** the five signal families above where filing→first-mailer latency is the whole game. Poll on the fastest *free, non-blocked* cadence each endpoint tolerates:
+  - **Hourly (6/day, business hours):** JSON/API court + tax endpoints that are already `requires_render=False` and rate-tolerant — NC eCourts Judgment Search JSON (lis pendens + divorce, per the endpoint-split memo), the PTS Cloud delinquent-tax API (`bcpwa` tenants), qPayBill Spartanburg unpaid search, Zuercher/P2C/Citizen-Connect jail JSON. These are cheap GETs; hourly is invisible to the host and beats any vendor by ~30 days.
+  - **Daily (1/day):** stealth-browser or politeness-gated hot sources — SC PublicIndex lis pendens (ToS-sensitive, run once/day off-peak), `sc_probate_net`, `gannett_obituaries` (obits post daily but batch overnight), NC ROD substitute-trustee.
+- **Tier D (daily):** existing `daily_api_refresh.py` REO churn — unchanged, it solves a real 404-freshness problem but is not a speed moat.
+- **Tier W (weekly):** everything render-heavy and slow-moving (assessor CAMA, GIS heir parcels, buyer registry, backfills) stays on `run_local.sh`.
+
+The hot lane does **not** rebuild the whole board.** It runs each Tier-H scraper, diffs against a persistent `seen_keys` index, and appends only genuinely-new signals into the existing pipeline — reusing `mark_new_listings`' dedupe_key identity and the `merge_today_sources.py` enrichment chain (geocode → parcel → address → value → distress score) so a new lis pendens is address-resolved and intent-scored within the same run it's discovered.
+
+**signal_age** becomes a first-class field. Today the model has `first_seen` (ingestion time) but nothing captures *filing/recording/booking date* uniformly, so "how fresh is this distress event" is invisible. Add `event_date` (the government filing/recording/booking/publication date, parsed per-source) and compute:
+
+```
+signal_age_hours = ingested_at − event_date       # how stale the signal was when WE got it (pipeline latency KPI)
+signal_freshness_days = today − event_date         # how hot the LEAD is (drives intent score + call priority)
+```
+
+`signal_freshness_days` feeds the intent score directly: a lis pendens filed 2 days ago outranks one filed 40 days ago even at equal equity, because the 78%-first-responder window is still open on the fresh one.
+
+### What to build/change (files, cadence, data shape)
+
+**1. Model — add event_date + signal_age (`src/foreclosure_scraper/models.py`)**
+```python
+event_date: datetime | None = None      # gov filing/recording/booking/publication date (per-source)
+event_date_kind: str | None = None      # "lis_pendens_filed" | "estate_opened" | "tax_certified" | "jail_booked" | "obit_published"
+ingested_at: datetime = Field(default_factory=datetime.utcnow)
+```
+Add a derived helper `signal_age_hours` / `signal_freshness_days` in `distress_score.py`. Each Tier-H scraper populates `event_date` from the field it already parses (eCourts `fileDate`, qPayBill certify date, jail `bookingDate`, obit publish date) — this is a per-parser one-liner, ~5 sources.
+
+**2. Hot-signal delta runner (new `scripts/hot_signal_delta.py`)** — mirrors `merge_today_sources.py` but scoped to a `HOT_SOURCES` allowlist and driven by a persistent seen-index instead of the full board diff:
+```python
+HOT_SOURCES = {"nc_ecourts_lis_pendens","nc_ecourts_divorce","sc_public_index_lis_pendens",
+               "nc_ecourts_estates","sc_probate_net","gannett_obituaries",
+               "nc_ptscloud_delinquent_tax","spartanburg_delinquent_tax",
+               "cherokee_jail","cleveland_jail","henderson_jail"}   # jail = jail-booking memo endpoints
+```
+- Loads `data/seen_keys.json` = `{dedupe_key: {"first_seen": iso, "source": str, "event_date": iso}}`.
+- Runs only allowlisted scrapers (frequency filtered by a `--tier hourly|daily` flag reading each source's declared `hot_cadence`).
+- `new = [li for li in scraped if li.dedupe_key() not in seen_keys]`.
+- Runs the `merge_today_sources` enricher chain on `new` only, appends to `docs/listings.json` via `load_board()`/`write_artifact()` (respecting the sidecar-wipe rule from memory).
+- Stamps `li.raw["is_new"]=True`, `first_seen_run`, `event_date`, `signal_age_hours`.
+- Writes a compact **priority queue**: `docs/hot_queue.json`, an ordered list the dashboard renders as a live "New Since Last Check" strip above Work-Today.
+
+**Priority queue data shape (`docs/hot_queue.json`):**
+```json
+[{"dedupe_key":"nc-buncombe-24CV1234","source":"nc_ecourts_lis_pendens",
+  "type":"lis_pendens","event_date":"2026-07-01","event_kind":"lis_pendens_filed",
+  "signal_freshness_days":1,"signal_age_hours":18,
+  "address":"12 Oak St, Asheville NC","county":"Buncombe",
+  "equity_est":142000,"intent_score":94,"phone":"828-555-...",
+  "hot_rank":1,"detected_at":"2026-07-02T14:00Z"}]
+```
+`hot_rank` = sort by `intent_score` then ascending `signal_freshness_days` (freshest wins ties) — the literal call order.
+
+**3. launchd — two new agents (install via extended `install_local_schedule.sh`):**
+- `com.highway.foreclosure.hot.hourly` — `StartCalendarInterval` array, Minute 0, Hours 8–18 (11 fires/business day), runs `hot_signal_delta.py --tier hourly`.
+- `com.highway.foreclosure.hot.daily` — Hour 6 Minute 0, runs `hot_signal_delta.py --tier daily` (SC PublicIndex/probate/obits off-peak).
+- Keep Tier W weekly and Tier D daily-vision/REO as-is.
+
+**4. Delta index maintenance:** `seen_keys.json` is pruned to a rolling 120-day window (a lis pendens older than a redemption cycle is no longer "hot"; keeps the index small so hourly diffs stay sub-second).
+
+### The metric that proves it works
+
+**Primary — Median signal_age at first surface:** for each Tier-H lead, `ingested_at − event_date`. Target: **< 24h median** (vs. the current weekly worst-case of up to ~168h, and vendor monthly lists at ~15–45 days). Log it per run; chart the weekly median in the dashboard header. This is the moat made measurable.
+
+**Secondary — Freshness mix of the Work-Today list:** % of the daily call list with `signal_freshness_days ≤ 7`. Target ≥ 60%. If the call list is dominated by stale signals, the speed edge isn't reaching the phone.
+
+**Guardrail — new-signal yield & block rate:** count of genuinely-new dedupe_keys per hot run (proves delta isn't re-surfacing dupes) and HTTP-block/empty-200 rate per hot source (catches the silent-death failure mode from the Column memo before it costs a week of coverage).
+
+### Cost + effort
+
+**Cost: $0.** Every Tier-H endpoint is already built and free — this reschedules and delta-gates existing scrapers, adds no paid API. Hourly GETs against county JSON at business-hours-only are well within polite-use and already-proven-compliant patterns (curl_cffi impersonation where needed, per the Akamai/GovDeals memo). No cloud spend: launchd on the existing Mac.
+
+**Effort: ~1 focused day.**
+- Model fields + `signal_age` helper: ~1h.
+- Per-source `event_date` population (5–8 parsers, one line each): ~2h.
+- `hot_signal_delta.py` (forks `merge_today_sources.py`; reuses enricher chain, `load_board`, dedupe identity): ~3h.
+- `hot_queue.json` writer + dashboard "New Since Last Check" strip + median-signal_age header: ~2h.
+- Two launchd plists + `install_local_schedule.sh` extension + one live hourly smoke test per source: ~1h.
+
+**Main risk:** a hot source that silently 200s-with-zero-results (the Column failure mode) quietly zeroes a signal family; the block-rate guardrail above is the required mitigation, not optional.
+
+Files touched: `src/foreclosure_scraper/models.py`, `src/foreclosure_scraper/distress_score.py`, the ~5 Tier-H scraper parsers, new `scripts/hot_signal_delta.py`, `scripts/install_local_schedule.sh`, dashboard template in `scripts/regenerate_dashboard.py`, new `data/seen_keys.json` + `docs/hot_queue.json`.
+
+
+## The speed-to-first-contact loop
+
+### The design (concrete, for THIS engine)
+
+The moat is being the *first responder* (78% of sellers transact with whoever calls first), so the metric that matters is **wall-clock from a NEW hot+unique lead being scraped to it sitting at the top of Work-Today with a dialable number and an operator ping** — not board size. Today the engine can already *detect* newness (`new_listings.mark_new_listings` tags `raw.is_new` + `raw.first_seen_run`; `top_new_for_alert()` even ranks them lis-pendens-first) but that signal dead-ends: contact resolution runs board-wide in batch (`owner_mailing_refresh.py`, `fill_voter_phone.py` process all ~13k leads at conc=2, an hours-long pass), there is **no DNC scrub anywhere** (every phone is stuck `needs_dnc_scrub=True` and therefore un-dialable), and the only operator alert is one end-of-day SMTP email (`send_final_email.py`). A brand-new probate lead scraped Tuesday 9am currently isn't contactable until the whole board finishes enriching and a human opens the dashboard — days, not hours.
+
+The loop closes that. A new **`hot_new_fastlane`** stage runs at the END of every scrape job (weekly full, daily API `daily_api_refresh.py`, daily court `run_daily_court.sh`, daily vision), operating on **only the new-hot-unique slice** rather than the board:
+
+1. **Select the slice.** Filter to `raw.is_new == True` AND (tier HOT/WARM after `score_board`) AND source in the UNIQUE set (probate/heir/estate, incarceration/jail-booking, obituary/pre-probate, code-enforcement) — the sources list-vendors don't sell, per the R26 moat. This is typically 5–40 leads per run, not 13k, so an expensive per-lead pass is now cheap.
+2. **Priority-resolve owner→contact on the slice, synchronously.** Run the existing resolvers *first* on this handful, at higher concurrency, before the board-wide batch: `enrich_owner_mailing` (mailing + absentee), then `enrich_voter_phone` (the one free personal-phone source, NC), then `enrich_line_type` (LERG landline vs wireless → `tcpa_class callable | manual_only`). Because it's ~30 leads not 13k, this finishes in seconds-to-minutes instead of the hour-long board pass.
+3. **DNC scrub the new slice only** (see automatable-vs-paid below). Flip `needs_dnc_scrub → dnc_status: clear | listed | landline_exempt` so the number becomes *dialable* rather than perpetually blocked.
+4. **Stamp the fast-lane flag + write.** Set `raw.fastlane = {flag: "NEW — contact today", ready_at: <iso>, contact_ready: bool, sla_deadline: first_seen_run + 24h}` and re-`write_artifact` through `load_board` (per the board-writer memory rule, so the sidecar isn't wiped).
+5. **Fire the operator alert immediately** — not at 6pm. Push the top-N fastlane leads (reuse `top_new_for_alert()` ranking) to a real-time channel with name, property, tier, unique-source label, the dialable number, and a `truepeoplesearch` fallback link if no phone resolved.
+6. **Dashboard surfaces it.** `regenerate_dashboard.py` sorts `raw.fastlane.flag` present → pinned "Work Today — NEW" band above the normal Work-Today list, with a red SLA countdown that turns amber at 12h and red past 24h.
+
+**What is automatable free vs needs a paid skip on just the new-hot slice:**
+
+- **Free, fully automatable:** newness detection, tier scoring, owner→mailing (county GIS), NC voter-file phone, LERG line-type/TCPA routing, the fast-lane flag, dashboard pinning, and the operator push. **DNC: automate the free 90%** — a phone whose `line_type == landline` from the LERG lookup and whose owner is the party in an *active foreclosure/probate matter* is contactable under the established-business-relationship / transactional posture the engine already documents (8am–9pm local, manual dial). The genuinely free registry path is a **self-serve `donotcall.gov` account** (a seller/lister can register up to a cap of numbers and download scrub results free); wire that as a nightly batch scrub of the fastlane numbers only.
+- **Needs a cheap paid skip — but ONLY on the new-hot slice, so it stays nearly free:** the ~40–60% of new-hot leads where the free voter file misses (SC has no free personal-phone file; absentee/out-of-state owners; LLC-held). Route *only those* to a metered skip-trace (BatchData / IDI / a per-lookup API at roughly $0.07–0.25/hit). At 5–40 new-hot leads/day and maybe half needing a paid hit, that's **single-digit dollars a day** — the paid slice is bounded by newness, never the 13k board. Everyone else stays on the free skiptrace worksheet (`build_skiptrace_worksheet.py`) with TruePeopleSearch links for manual lookup.
+
+**The <24h contact SLA:** `sla_deadline = first_seen_run + 24h`. A lead is "SLA-met" the moment an operator logs a contact attempt against it (a `contacted_at` write, or the human clicks "called" in the dashboard). The loop's job is to make sure that within 24h of a hot-unique lead being scraped it is *ready to dial and visibly flagged*; the dashboard's red countdown enforces the human half.
+
+### What to build/change (files, cadence, data shape)
+
+- **New `src/foreclosure_scraper/fastlane.py`** — `run_fastlane(listings) -> dict`. Selects the slice (uses existing `raw.is_new`, `distress_stack.tier`, and a `UNIQUE_SOURCES` set), calls the three resolvers on the slice at `concurrency=6`, calls the new DNC scrub, stamps `raw.fastlane`, returns `{fastlane_count, contact_ready, sla_deadlines}`. Import `top_new_for_alert` for ranking.
+- **New `src/foreclosure_scraper/dnc_scrub.py`** — `scrub(listings) -> dict`. Two tiers: (a) free — mark `landline_exempt` from existing `owner_phone.line_type`, and batch-check the fastlane numbers against a cached `donotcall.gov` scrub download; (b) optional paid — `if os.environ.get("SKIPTRACE_API_KEY")`, look up only fastlane leads with no free phone. Writes `raw.owner_phone.dnc_status` (or `raw.contact.dnc_status`). Never relaxes the compliance posture; only *resolves* the flag.
+- **New `src/foreclosure_scraper/operator_alert.py`** — `push_fastlane(leads)`. Reuse the Gmail SMTP path from `send_final_email.py` for a **subject-line-per-batch** alert ("N NEW hot leads — contact today"), plus a local macOS push via `osascript -e 'display notification'` (zero-dependency, already the platform) and an optional `ntfy.sh` topic POST for phone push. Body = ranked list with dialable numbers.
+- **Wire it into every scrape entrypoint** (the load-bearing change): append `run_fastlane` + `push_fastlane` as the final step in `main.py` (after `mark_new_listings` + `score_board`), `daily_api_refresh.py`, `run_daily_court.sh`, and `run_daily_vision.sh`. This is what turns "detected new" into "contacted today."
+- **`scripts/regenerate_dashboard.py`** — add a pinned "Work Today — NEW (contact today)" band that sorts `raw.fastlane.flag` first, renders the SLA countdown, dialable number, `tcpa_class`, unique-source badge, and a manual-lookup link when `contact_ready == False`.
+- **New launchd cadence.** The weekly plist already fires the full run (which now ends in the fast-lane). Add a **daily court plist** `com.highway.foreclosure.dailycourt` (court/lis-pendens is the earliest, most time-sensitive unique signal) at, say, 07:00 so fresh filings hit Work-Today before the workday. Existing daily vision (09:30), lrcpwa (12:00), sosagent (14:00) plists already exist; each of those scrape jobs should call `run_fastlane` at its tail so any new-hot lead they surface gets the same treatment.
+- **Data shape added per lead** (`raw.fastlane`): `{ "flag": "NEW — contact today", "unique_source": "probate|jail|obituary|code", "tier": "HOT", "contact_ready": true, "phone": "+1…", "tcpa_class": "callable", "dnc_status": "clear", "first_seen_run": "<iso>", "sla_deadline": "<iso +24h>", "manual_lookup_url": "<tps link or null>" }`.
+
+### The metric that proves it works
+
+**Primary — median time-to-contact-ready (TTCR):** wall-clock from `first_seen_run` to `fastlane.ready_at` for hot-unique leads. Target **< 2 hours** (the resolver+scrub pass on a ~30-lead slice), versus today's effectively-infinite (never auto-resolved). Logged every run in the fast-lane stats and charted on the dashboard.
+
+**Primary — 24h contact-SLA hit rate:** share of hot-unique leads with a logged `contacted_at` within `sla_deadline`. This is the number tied directly to the R26 "first responder wins 78%" moat. Target **≥ 80%**. The dashboard's SLA countdown makes misses visible in real time.
+
+**Supporting — new-hot contact-ready coverage:** % of the fast-lane slice that reaches `contact_ready == True` (free + paid). If free voter/GIS gets ~50% and the metered paid slice lifts it to ~90%, that ratio proves the paid spend is buying reachability, not vanity.
+
+### Cost + effort
+
+**Cost:** Free path stays free — county GIS, NC voter file, LERG, `donotcall.gov` self-serve scrub, Gmail SMTP, and `osascript`/`ntfy` push cost $0. The only spend is the **bounded paid skip on the new-hot slice only**: at 5–40 new-hot leads/day with ~50% needing a paid lookup at ~$0.07–0.25/hit, that's **roughly $0.20–$5.00/day (~$6–150/month)**, and it scales with *new* leads, never the 13k board. If even that's undesirable, ship free-only and accept ~50% auto-reach with manual TruePeopleSearch for the rest.
+
+**Effort:** ~1–1.5 days. `fastlane.py` is mostly orchestration over resolvers that already exist and already run board-wide — the new work is the slice filter, running them on the slice first, and the flag. `dnc_scrub.py` free tier is a few hours (the paid tier is one `if API_KEY` branch). `operator_alert.py` reuses `send_final_email.py`'s SMTP plumbing. The dashboard band and the one new launchd plist are small edits. No new scrapers, no new infrastructure — this is a wiring job that connects `mark_new_listings` → resolvers → scrub → flag → push, a seam the codebase already left open with `top_new_for_alert()`.
+
+
+## Unique-source prioritization (de-emphasize the saturated buckets)
+
+### The design (concrete, for THIS engine)
+
+The board is 17,003 leads dominated by exactly the buckets national vendors sell turnkey. The top four sources by volume — `nc_county_pdf_delinquent_tax` (3,655), `buncombe_elderly` (3,505 senior-exemption), `spartanburg_delinquent_tax` (2,162), `nc_ptscloud_delinquent_tax` (1,284) — are tax-delinquent and senior-owner lists that PropStream and ListSource sell as one-click "Quick Lists" ([PropStream](https://www.propstream.com/propstream-lead-list-definitions), [PropStream 5 lists](https://www.propstream.com/real-estate-investor-blog/5-motivated-seller-lists-every-investor-should-pull)). Any REI in Asheville or Spartanburg with a $99/mo PropStream seat is mailing the same ~9,000 records. That is the 0.2% mail-floor saturation R26 identified, and the current `distress_score` is blind to it: a 3,655-record county tax PDF and a 128-record obituary-heir lead with identical financial signals tier the same. We are ranking on motivation and ignoring who else already has the name.
+
+The fix is a **`competition_score` (0.0–1.0 = fraction of vendors likely to already hold this lead)** computed per lead from its source facet, then folded into tiering as a multiplier on effective priority. Facets map to vendor availability directly:
+
+- **Vendor-sold (competition 0.9–1.0)** — tax-delinquent, senior/absentee, generic foreclosure/lis-pendens, REO. PropStream/ListSource/All The Leads all carry these. This is ~13,500 of our 17k leads. Demote to **fill**: worked only after the uncontested lanes are exhausted, or when a saturated lead *stacks* with an uncontested one on the same parcel (the one case where our multi-source dedupe beats a single-list buyer).
+- **Semi-contested (competition 0.4–0.6)** — probate/estate notices and divorce deeds. Vendors DO sell probate and divorce lists ([AgentAdvice probate sellers](https://www.agentadvice.com/best-probate-lead-sellers/)), but coverage is national-court-record-dependent and thin/late in rural WNC + Upstate SC, and All-The-Leads-style desks resell the same feed to multiple local buyers. Contested but not saturated.
+- **Uncontested (competition 0.05–0.2)** — the R26 moat. **No vendor has a national feed for these**, so they only exist because we scrape the county directly:
+  - `enrichment_jail_bookings` — county jail booking rosters (Cleveland P2C, Cherokee/Anderson Zuercher, Henderson Southern Software). **Genuinely uncontested**: no lead vendor sells "owner currently incarcerated." Currently only an 8-pt LEGAL signal, wildly under-weighted for how unique it is.
+  - `gannett_obituaries` (128) → **pre-probate heir leads before a probate case is even filed**. This beats the vendor probate feed *on time* — we reach the family in the death-to-filing gap the national feeds structurally miss.
+  - `asheville_helene` (529 ATC-45 placards) + `code_enforcement`/`condemned` — physical-condition distress from county placard/inspection data. No vendor has damage-placard feeds. Uncontested and hyper-local.
+  - Same-week court freshness on `nc_ecourts_lis_pendens` / `sc_public_index_lis_pendens` / law-firm trustee feeds (`brock_scott`, `hutchens`) — the lis-pendens *record* is a vendor product, but our **48-hour-fresh** version is not; vendors batch monthly. Here the moat is freshness, not the facet.
+
+So `competition_score` is `f(source_facet)` discounted by `freshness_days` — a fresh lis-pendens scores lower-competition than a stale one even though both are "vendor-sold" facets.
+
+Then priority is reframed: `effective_priority = distress_score × (1 + uniqueness_weight)` where `uniqueness_weight = 1 − competition_score`. A 128-record incarceration+equity lead (competition 0.1) now outranks a 3,655-record tax-delinquent lead (competition 0.95) at equal distress. The **Work-Today call list leads with the uncontested lanes**; saturated buckets fill the bottom.
+
+### What to build/change (files, cadence, data shape)
+
+1. **New module `src/foreclosure_scraper/competition_score.py`** — a static `SOURCE_COMPETITION` dict keyed by the exact source slugs already on the board (e.g. `counties_nc.nc_county_pdf_delinquent_tax: 0.95`, `counties_sc.spartanburg_delinquent_tax: 0.95`, `counties_nc.buncombe_elderly: 0.9`, `national.foreclosure_dot_com: 0.9`, `reo.*: 0.85`, `sc_probate_net`/`relationship_signal.divorce: 0.5`, `public_notices.gannett_obituaries: 0.1`, `enrichment_jail_bookings`/`incarceration: 0.05`, `asheville_helene`/`code_enforcement: 0.15`). `competition_score(li)` takes the **minimum** competition across the parcel's stacked sources (a lead that appears on both a tax list AND an obituary is as rare as its rarest source), then adds a freshness discount: `score = base − min(0.3, 0.02 × max(0, 30 − age_days))` for court/law-firm facets. Attach `raw['competition'] = {"score": x, "tier": "uncontested|semi|vendor", "rarest_source": slug}`.
+
+2. **Edit `distress_score.py::score_board`** — after computing the tier, compute `effective_priority` and store it in the `ds` dict. Add one gate: a lead cannot be **demoted below WARM purely for being uncontested**, but a HOT vendor-sold lead with `competition ≥ 0.9` and only one saturated signal gets a "FILL" flag so the call list can defer it. Do NOT change the HOT financial gates — this is a *sort/label* layer on top, not a rewrite of motivation logic (which is calibrated).
+
+3. **Edit `scripts/regenerate_dashboard.py`** — sort the Work-Today list by `effective_priority` not raw score; add a **"Uncontested" column/badge** (green = uncontested, grey = vendor-sold) and a filter toggle. Add a top-of-dashboard counter: "Uncontested HOT/WARM: N" — that number, not total leads, is the metric the operator should chase.
+
+4. **Cadence** — pure computation, no new scraping. Runs inside the existing daily `regenerate_dashboard` pass right after `score_board`. Zero added runtime. The `SOURCE_COMPETITION` dict is reviewed quarterly (or when a new source slug appears — add a test that fails if a board source has no competition mapping, mirroring the existing `test_source_health` pattern).
+
+Data shape added to each lead's `raw`:
+```
+"competition": {"score": 0.1, "tier": "uncontested", "rarest_source": "public_notices.gannett_obituaries"},
+"distress_stack": {..., "effective_priority": 41, "fill": false}
+```
+
+### The metric that proves it works
+
+**Contact-rate and response-rate split by competition tier, tracked in the attribution workbook.** The claim is that uncontested leads convert better *because we are the only or first caller*. Instrument it: tag every outreach with the lead's `competition.tier`, then measure **response rate (uncontested) ÷ response rate (vendor-sold)**. The design wins if uncontested lands materially above the ~0.2% saturated-mail floor — the R26 "78% transact with first responder" thesis predicts a multiple, not a few basis points. Secondary metric: **% of Work-Today calls that are uncontested-tier** should climb from today's implicit ~10% (128 obituary + jail + placards out of ~6,000 HOT/WARM) toward the majority of *dials*, even though they stay a minority of the *board*.
+
+### Cost + effort
+
+**Cost: $0.** No new data source, no new scrape, no API. One static dict + a sort key + a dashboard badge, all local computation inside the existing launchd daily pass.
+
+**Effort: ~half a day.** `competition_score.py` (~60 lines + the slug dict) is the bulk; the `score_board` and dashboard edits are ~20 lines each; one guard test. The only ongoing cost is maintaining the competition mapping when new source slugs land — bounded by the same source-health discipline already in the repo.
+
+Sources: [PropStream lead-list definitions](https://www.propstream.com/propstream-lead-list-definitions), [PropStream — 5 motivated-seller lists](https://www.propstream.com/real-estate-investor-blog/5-motivated-seller-lists-every-investor-should-pull), [AgentAdvice — best probate lead sellers](https://www.agentadvice.com/best-probate-lead-sellers/), [ReSimpli — list stacking](https://resimpli.com/blog/what-is-list-stacking-to-find-motivated-sellers/)
+
+
+## The compliant first-mover outreach sequence
+
+### The design (concrete, for THIS engine)
+
+The moat is speed on unique signals, but a same-day robo-text or auto-dial to a fresh distressed owner is exactly what gets a wholesaler sued under the TCPA and what makes owners screen the flood of vendor-list callers. So the sequence is built to be *first without being reckless*: the fastest touch is always the fully TCPA-exempt channel (physical mail — no consent required, no DNC scrub needed), and the human channels are gated behind a DNC scrub and a manual-dial rule (a real person pressing the keys, no ATDS, no prerecorded/AI voice). That combination is the only way to legally beat a first responder who is auto-blasting, because their auto-blast is the illegal part.
+
+Today the engine already produces the raw materials: `distress_score.py:score_board()` tiers every lead HOT/WARM with contactability as a hard gate for HOT, and `outreach.py` already emits `letter_text()` / `email_text()` / `sms_text()` plus a persistent CRM (`docs/crm.json`) and a mail-merge CSV (`docs/outreach_maillist.csv`) whose status survives the weekly re-scrape. What is missing is a *sequence*: a per-lead-type, day-indexed cadence that fires the exempt channel instantly, holds the human channel until a scrub clears, and escalates on a clock tied to the signal's decay (a probate window is months; a pre-foreclosure sale date is days). We layer that on as a scheduler over the existing CRM, not a rewrite.
+
+The three sequences differ because the legal footing and the emotional window differ:
+
+- **Pre-foreclosure / lis pendens / tax sale (imminent, dated event).** Day 0 (signal detected on the daily court/API run): API-mailed offer-to-purchase letter goes out same or next business day — the exempt channel, no scrub, uses the existing `letter_text()`. Day 0 also: the number is pushed to the DNC-scrub queue. Day 1 (scrub back, ~24h): a **manual** first call inside the first-mover window, script anchored on "you have options before the [sale_date]." Day 3: manual call #2 + a compliant SMS (consented-language, STOP footer already in `sms_text()`) only if the owner texted first or the number is a confirmed personal cell not on DNC. Day 7 and Day 14: second and third mail drops (mail never needs a scrub, so it carries the cadence). The whole point: the letter lands while the auto-dialers are still legally barred from calling.
+- **Probate / heir / estate (unique source, long fuse, high sensitivity).** Never lead with a call — an heir who just lost a parent and gets a same-week cold call is the #1 source of complaints and the fastest way to burn the source. Day 0: a softer, condolence-framed mailed letter (a probate-specific template variant, *not* the foreclosure `letter_text()`). Day 0: DNC scrub queued but call is held to Day 5–7 minimum. Day 7: manual call, "no rush, whenever the estate is ready." Day 21 and Day 45: follow-up mail. The speed advantage here is not hours, it's *being the only investor who mailed at all* because list-vendors don't sell probate — so a 48h mail still wins by weeks.
+- **Tax-delinquent (property-keyed, owner may be absentee).** Day 0: mailed letter to the `owner_mailing_address` (often out of county — the `absentee_owner` flag already gates this). Day 1: manual call after scrub. Day 5 / Day 12: mail. Absentee owners respond to mail far better than to calls, so mail carries the weight and the call is a bonus touch.
+
+Across all three, the sequence writes every touch into the existing CRM `history[]` array so the weekly re-scrape never re-mails a lead already three touches deep, and a reply flips status out of `new`/`queued` and freezes the automated cadence for a human.
+
+### What to build/change (files, cadence, data shape)
+
+- **New `src/foreclosure_scraper/sequence.py`** — the cadence engine. Reads the scored board + `crm.json`, and for each HOT/contactable lead computes `next_action` = the first pending step whose `due_date <= today`, keyed off `lead_type` (mapped from `ListingType`: `FORECLOSURE_SALE`/`LIS_PENDENS`/`TAX_SALE` → "urgent"; `PROBATE_NOTICE`/`ESTATE_LEAD` → "probate"; `TAX_LIEN` → "taxdelinquent"). Emits two artifacts: a **mail batch** (append to the existing `MAILLIST_PATH` CSV, one row per due mail step, deduped against `history`) and a **`docs/call_queue.json`** — the Work-Today manual-call list, only numbers with `dnc_status:"clear"` and `dnc_scrubbed_at` within 31 days.
+- **New template variants in `outreach.py`** — add `probate_letter_text()` (condolence framing, no "foreclosure/sale" language) and keep `letter_text()` for urgent. Extend the CRM record with three fields: `sequence_type`, `sequence_step` (int), `dnc_status` (`unknown`/`scrubbed_clear`/`scrubbed_dnc`), `dnc_scrubbed_at`. These slot into the existing `rec` dict written in `generate_outreach()`.
+- **DNC scrub step** — a `scripts/dnc_scrub.py` that takes the pending-call numbers and marks each `scrubbed_clear`/`scrubbed_dnc` + timestamp. Free path: the operator uses the FTC's free registered-Subscriber-Account access to telemarketing.donotcall.gov (free for the first 5 area codes, which covers the Upstate SC / WNC footprint) rather than a paid API. Numbers already flagged `absentee` with only a mailing address skip the scrub entirely (mail-only).
+- **Mail send** — wire the due-mail rows to a same/next-day mail API (Lob or PostGrid, ~$0.90–1.10 per letter all-in). One `scripts/send_mail_batch.py` posts the CSV rows and writes the returned `expected_delivery_date` back into `history`. This is the only recurring dollar cost.
+- **Cadence wiring (launchd).** The signal-detection already runs daily via `com.highway.foreclosure.dailyvision` + `com.highway.foreclosure.lrcpwa` and weekly via `com.highway.foreclosure.weekly`. Add one new agent `com.highway.foreclosure.sequence.plist` firing every morning (say 6:30am, before the operator's day): it runs `sequence.py` → `dnc_scrub.py` → `send_mail_batch.py`, so Day-0 mail is posted the same morning the signal appears and the fresh call queue is on the dashboard by 7am. The static dashboard gains a **Work-Today Call List** panel reading `call_queue.json`, each row showing owner first name, address, `sale_date` countdown, the manual-dial script line, and a one-click status flip.
+- **Data shape — one CRM record after the change:**
+  ```
+  { "status":"queued", "sequence_type":"urgent", "sequence_step":1,
+    "dnc_status":"scrubbed_clear", "dnc_scrubbed_at":"2026-07-02",
+    "history":[
+      {"at":"2026-07-02","event":"mail_sent","step":0,"channel":"letter"},
+      {"at":"2026-07-03","event":"call_due","step":1}
+    ] }
+  ```
+
+### The metric that proves it works
+
+**Signal-to-first-touch latency, measured per lead type, target median < 48h for mail and < 72h for the first manual call.** It is directly computable from the CRM: `first history[].at where channel in (letter,call)` minus `first_seen`. Because R26 established that ~78% of closes go to the first responder, the leading indicator that the moat is real is this latency distribution staying under the window while a second-order metric — **contact-rate and appointment-set-rate on probate/heir leads specifically** (the sources list-vendors don't sell) — runs measurably higher than on the saturated foreclosure list. If probate reply rate is not beating the foreclosure reply rate, the unique-source thesis is not paying off and the cadence timing needs to move. Track zero TCPA complaints / STOP-honored-within-10-days as the guardrail metric.
+
+### Cost + effort
+
+- **Effort:** ~1.5–2 days. `sequence.py` + CRM field extension + probate template ≈ 1 day (it is orchestration over functions and files that already exist — `score_board`, `generate_outreach`, `crm.json`, `outreach_maillist.csv`). DNC scrub script + mail-API wiring + the new launchd plist + dashboard call-list panel ≈ half a day. It reuses the existing daily launchd pattern and the persistent-CRM plumbing, so there is no new infrastructure.
+- **Cost:** Pipeline stays free (FTC DNC access is free for ≤5 area codes; scrub cadence is the compliance requirement, not a vendor cost). The only recurring spend is postage/print at ~$0.90–1.10 per mailed letter via Lob/PostGrid — and with the Upstate SC / WNC list already saturated to the 0.2% mail floor, volume is low and targeted (HOT/contactable only), so this is tens of dollars a week, not a mail-blast budget. No SMS platform cost, because SMS is deliberately demoted to a reply-only channel to stay clear of TCPA exposure.
+
+Sources: [FCC one-to-one consent rule vacated / final rule](https://www.consumerfinancialserviceslawmonitor.com/2025/09/fccs-final-rule-on-consent-kills-one-to-one-consent-requirement/), [TCPA opt-out rules effective April 11, 2025 (revocation honored within 10 days, DNC scrub every 31 days)](https://www.bclplaw.com/en-US/events-insights-news/the-tcpas-new-opt-out-rules-take-effect-on-april-11-2025-what-does-this-mean-for-businesses.html)
+
+
+## The saturation probe + first-mover metrics
+
+### The design (concrete, for THIS engine)
+
+The engine already emits everything the R26 thesis needs to be *measured* — it just never closes the loop. Every lead on the 17,003-row board carries `raw.distress_stack.signals` (the exact list: `probate`, `probate_deed`, `incarceration`, `senior_exemption`, `divorce`, `code_enforcement`, `court_sale`, `stale_on_market`, `price_cut`, etc.), a `source` prefix (`counties_nc`, `counties_sc`, `national`, `law_firms`, `public_notices`), and a `first_seen` timestamp. The CRM (`docs/crm.json`, keyed by `dedupe_key`) already persists `status` + a `history[]` event log across the weekly re-scrape. But today that log contains exactly one event type — `lead_created` — and `status` never leaves `new`. There is no record of *when we contacted*, *how the owner responded*, or *whether we were first*. So "we win on speed" is currently unfalsifiable.
+
+Two instruments fix that, both bolted onto structures that already exist:
+
+**(1) The saturation probe — a LANE-stratified A/B on response, not volume.** The point is not "did mail work" (R26 already proved generic mail is floored at 0.2% in Upstate SC / WNC). The point is: *does responding within N days beat the floor, and does it beat it more in the unique lanes than the generic ones?* So the probe is stratified by **lane**, which I define concretely from the signals above rather than by source:
+
+- **UNIQUE lanes** (the moat — list vendors don't sell these): `probate` / `probate_deed` (LIFE_EVENT), `incarceration` (LEGAL), `senior_exemption` (LIFE_EVENT), `divorce` (LIFE_EVENT), `code_enforcement` (PROPERTY), plus the obituary/pre-probate heir lane already built.
+- **GENERIC / control lanes** (what a $0.30/record list vendor also has): tax-delinquent, absentee/out-of-state-only (`owner_mailing.absentee` with no other stacked signal), plain `court_sale` foreclosure-sale-noticed.
+
+The probe draws **150 leads total: ~25 per lane across 3 unique + 3 generic lanes**, all HOT/WARM-eligible and contactable (`distress_stack.contactable == true`), then contacts every one *as fast as the pipeline surfaces it* through the existing outreach content, and logs the outcome. The comparison that matters is `response_rate(unique lane) − response_rate(generic lane)` at matched signal-age. If the unique lanes don't beat generic at equal speed, the moat is speed alone; if they do, the moat is speed × source and you fund the unique scrapers first.
+
+**(2) The ongoing first-mover metrics — four numbers computed off the CRM history log.** Once contact/response events are logged with timestamps, these fall out directly:
+
+- `signal_age_at_contact` = `contacted.at − first_seen`. The speed dial. Median and P90 per lane.
+- `response_rate_by_signal_age` = responded ÷ contacted, bucketed by age (0–1d, 2–3d, 4–7d, 8–14d, 15+d). This is the curve that proves speed matters — if it slopes down hard, first-mover is real; if flat, speed is a myth for this market.
+- `response_rate_by_lane` = the same ratio grouped by the lane taxonomy above. Drives the kill/double-down call.
+- `were_we_first` = a Y/N/unknown captured from the owner on the call ("have others reached out about the house?"). A single field, but it's the only *direct* read on the 78%-first-responder-wins claim; everything else is a proxy.
+
+The go/no-go rule is explicit and lives in the metric, not in a meeting: **a lane graduates to "double down" if response_rate ≥ 1.5% (3× the 0.5% floor) AND `were_we_first` ≥ 50% "yes"; it's killed if response_rate < 0.5% after ≥ 40 contacts logged in that lane.** Everything between is "keep probing."
+
+### What to build / change (files, cadence, data shape)
+
+**A. Extend the CRM event vocabulary + add response fields** — `src/foreclosure_scraper/outreach.py`. The CRM record already has `status` (with the full lifecycle `new→queued→contacted→…→won/dead`) and `history[]`; today only `lead_created` is ever appended. Add three helper writes so the operator (or a call-list action) can stamp real events, each carrying `at` (UTC ISO), and add flat fields the metrics read without walking history:
+
+```jsonc
+// docs/crm.json record (extends the existing shape)
+"parcel:NC:henderson:9559037725": {
+  "owner": "JONES, CYNTHIA T.", "county": "Henderson", "status": "contacted",
+  "first_seen": "2026-06-19T01:55:53Z",          // already exists
+  "lane": "probate",                              // NEW: stamped from distress_stack at lead_created
+  "probe_cohort": "2026-07-A",                     // NEW: null unless drawn into a probe batch
+  "contacted_at": "2026-06-20T14:02:00Z",          // NEW: first contact ts
+  "channel": "mail",                               // NEW: sms|mail|email|call
+  "responded_at": "2026-06-27T09:11:00Z",          // NEW: null until reply
+  "response": "callback",                          // NEW: callback|text_back|dead|dnc|null
+  "were_we_first": "yes",                          // NEW: yes|no|unknown (asked on call)
+  "history": [
+    {"at":"...","event":"lead_created"},
+    {"at":"...","event":"contacted","channel":"mail"},
+    {"at":"...","event":"responded","response":"callback","were_we_first":"yes"}
+  ]
+}
+```
+New functions: `mark_contacted(key, channel)`, `mark_responded(key, response, were_we_first)`, and `stamp_lane(li)` (derives `lane` from `distress_stack.signals` using a priority map: probate/incarceration/senior/divorce/code_enf win over generic tax/absentee). Wire `stamp_lane` into the existing `generate_outreach()` CRM upsert so *every* lead gets a lane at creation — zero extra operator work.
+
+**B. The probe drawer** — new `scripts/saturation_probe.py`. Reads `docs/listings.json` via `web_artifact.load_board()`, filters to contactable HOT/WARM, buckets by the lane map, random-samples ~25/lane into a dated cohort (`2026-07-A`), writes `docs/probe_cohort_2026-07-A.csv` (owner, mailing address, lane, channel, dedupe_key) for the mail-merge, and stamps `probe_cohort` + `lane` back into `crm.json`. One-shot per probe wave; re-run monthly to open a fresh cohort.
+
+**C. The metrics computer** — new `scripts/first_mover_metrics.py`. Pure read over `crm.json`; emits `docs/first_mover.json`:
+```jsonc
+{"generated_at":"...","by_lane":{"probate":{"contacted":24,"responded":2,"resp_rate":0.083,
+   "median_age_days":1.2,"first_yes":11,"first_no":1,"verdict":"double_down"}, ...},
+ "by_signal_age":{"0-1d":{"contacted":40,"resp_rate":0.075},"8-14d":{"contacted":31,"resp_rate":0.006}, ...},
+ "probe":{"unique_mean":0.061,"generic_mean":0.009,"lift":6.8}}
+```
+Run it in the **daily API/court/vision cron** (append one line to `scripts/run_daily_*.sh`) so the numbers refresh every morning with no new schedule.
+
+**D. Surface it on the board** — `scripts/regenerate_dashboard.py` + `docs/dashboard.js`. Add `first_mover.json` to the summary blob written by `write_artifact` (alongside the existing `by_source`), and add a single "First-Mover" panel to the dashboard header showing the by-lane response table with the green/red verdict chip. The dashboard already has a `filter-intent` control and per-lead `raw.distress_stack.signals`; add a `filter-lane` dropdown driven by the new `lane` field so the operator can pull "Work-Today, probate only."
+
+**E. Cadence.** Probe drawer = monthly one-shot (new cohort each wave). Event stamping = continuous, operator-driven from the call list. Metrics = daily via existing cron. First verdicts land after **~4–6 weeks** — enough for ≥40 contacts and a response window to close per lane.
+
+### The metric that proves it works
+
+The instrument is proven when `docs/first_mover.json` shows a **populated `by_signal_age` curve that monotonically declines** (response at 0–1d materially higher than at 8–14d) — that single curve is the falsifiable form of "speed wins." The *thesis* is proven when `probe.lift ≥ 3` (unique-lane response ≥ 3× generic-lane at matched age) with ≥ 40 contacts logged per lane and `were_we_first ≥ 50% yes` in at least one unique lane. Concretely: the day the dashboard shows `probate: resp_rate 0.083, median_age 1.2d, verdict double_down` next to `generic_tax: resp_rate 0.007, verdict kill`, the moat is measured, not asserted — and the kill/double-down calls are made by the number, not by opinion.
+
+### Cost + effort
+
+$0 marginal on infrastructure — it's all local Python over `crm.json` and `listings.json`, folded into launchd crons that already run. The only real cost is **the physical mail for the probe**: 150 postcards at roughly $0.50–$0.90 each printed/stamped (USPS EDDM / cheap postcard vendors run about $0.40–$0.55 in postage + print), so **~$75–$135 per probe wave** — the single unavoidable spend, and the whole point, since response can't be measured without actually contacting. Build effort: **~1 focused day** — half a day for the CRM event functions + `stamp_lane` (A, the load-bearing change, plus a couple of tests mirroring `test_outreach.py`), and half a day for the probe drawer, metrics computer, and the dashboard panel (B–D), which are thin reads over existing structures.
