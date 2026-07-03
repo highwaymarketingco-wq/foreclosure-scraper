@@ -3097,3 +3097,545 @@ But USPS vacancy itself is a *lagging, noisy proxy for "distress"* — and that 
 - [WLOS — Asheville abandoned-building ordinance proposal](https://wlos.com/news/local/abandoned-building-ordinance-proposed-reduce-fire-squatter-concerns-asheville-north-carolina)
 - [Reporters Committee — Public utility records / privacy exemptions](https://www.rcfp.org/open-government-sections/r-public-utility-records/)
 - [DistressIQ — absentee/vacancy signal-stacking hit rates](https://www.distressiq.ai/blog/absentee-owner-list-north-carolina)
+
+
+---
+
+# Deep-Dive Round 10 — Valuation Science (defensible ARV/rehab/max-bid, 2026-07-02)
+
+
+## ARV via the Sales-Comparison Adjustment Grid
+
+Our engine already has the skeleton of a grid (`enrichment_comps._adjust_comp`), but it uses fixed textbook constants (`BATH_ADJ=$5000`, `YEAR_ADJ=$400/yr`, `LOT_ADJ_PER_SQFT=$1`, `MARGINAL_GLA_FRAC=0.40`), covers only 4 lines (GLA/baths/lot/age), never brackets the subject, and `calc.py` reconciles by taking the plain **median** of adjusted $/sqft. A licensed appraiser does none of those things by rule of thumb — every dollar is **market-derived**, the subject is **bracketed**, and the final number is a **weighted reconciliation**, not a median. This section makes each of those defensible.
+
+### The professional method (how appraisers/AVMs/pros actually do it — concrete mechanics)
+
+**The grid.** The URAR/Form 1004 grid lays comps in columns and *elements of comparison* in rows, adjusted in a fixed sequence: **(1) transactional adjustments first** — property rights, financing, conditions of sale, then **date-of-sale / market conditions** — **(2) then property adjustments** — location, site/lot, GLA, age, condition, quality, room count (beds/baths), garage/carport, basement (and % finished), and amenities (pool, view, deck). Order matters: the time adjustment is applied to the raw sale price *before* physical adjustments, because you are first restating each comp at today's market, then adjusting the physical differences ([Fannie Mae B4-1.3-09](https://selling-guide.fanniemae.com/sel/b4-1.3-09/adjustments-comparable-sales); [MD Appraisers](https://mdappraisers.com/articles/sales-comparison-approach/)).
+
+**Sign convention.** Adjustments are made *to the comp, toward the subject*. If the comp is **superior** (bigger, newer, extra bath), subtract; if **inferior**, add. A comp 500 sqft larger than the subject gets a **negative** GLA adjustment ([LegalClarity](https://legalclarity.org/sales-comparison-approach-comps-adjustments-bracketing/)).
+
+**How each dollar is derived — three sanctioned methods, in order of rigor:**
+1. **Paired-sales (matched-pairs) analysis** — the primary method. Find two sales identical except one variable; the price gap ÷ the quantity difference is the adjustment. Two houses alike except one has a garage → the price delta *is* the market's garage value ([Chris Ponsar MAI](https://chrisponsar.com/2013/08/23/sales-comparison-adjustments-and-paired-sales/)).
+2. **Regression / grouped-data** — regress sale price on the feature to get its marginal coefficient. For GLA, the slope is the $/sqft adjustment.
+3. **Cost / depreciated-cost** — feature value ≈ depreciated cost to add it (RSMeans-style), used when paired data is thin (e.g., pools, decks).
+
+**The GLA number is the big one, and it is NOT the market $/sqft.** The size adjustment is the *marginal* contribution of a foot, not the average. Empirically it lands at **~30–60% of the average comp $/sqft**, decreasing as homes get bigger/older ([AppraisersForum](https://appraisersforum.com/forums/threads/gla-adjustments.228865/)). A published regression example computed a GLA slope of **$80.64/sqft = 47.1% of the average $/sqft**, matching the classic rule of thumb of "average $/sqft × 50%, capped ~$80" ([WorkingRE](https://www.workingre.com/a-spreadsheet-solution-for-estimating-gla-adjustments/)). Using the *full* $/sqft double-counts, because a bigger comp already sold for more in total — this is exactly the error a raw-median-$/sqft model makes.
+
+**Typical market-derived dollar amounts** (paired-sale medians, to sanity-bound the derivation):
+- Full bath **$5,000–$7,000**; half/¾ bath **$2,000–$3,000** ([Sacramento Appraisal Blog](https://sacramentoappraisalblog.com/2013/04/29/how-much-is-one-extra-bedroom-or-bathroom-worth-2/))
+- Bedroom **$5,000–$10,000** (weak/"filler" — bedroom count is confounded with GLA; appraisers warn against a standalone bed line)
+- Garage **$4,000–$5,000 per bay** (up to ~$10k/stall in some markets)
+- Condition **~5% of sale price per C-rating step** (C1–C6 scale); condition/upgrade adjustments **rarely exceed 10% of value** ([WorkingRE](https://www.workingre.com/a-spreadsheet-solution-for-estimating-gla-adjustments/); [Cleveland Appraisal Blog](https://clevelandappraisalblog.com/2019/11/14/how-appraisal-adjustments-work/))
+- Lot/site: non-linear, `value = a·(size)^b` with **b ≈ –0.7** (marginal acre worth less as lots grow), or a $/sqft rate capped at ~10% of price
+- Date-of-sale: `(effective_date − sale_date) × monthly market trend` — Fannie **requires** this be supported by an HPI or paired sales, not assumed zero ([Fannie Mae B4-1.3-09](https://selling-guide.fanniemae.com/sel/b4-1.3-09/adjustments-comparable-sales))
+
+**Gross/net adjustment limits.** The old **15% net / 25% gross / 10% line** guidelines (net adj ≤15% of comp price, gross ≤25%, any single line ≤10%) were **retired from the Fannie selling guide in 2014** — they were arbitrary, and adjustments must instead reflect the market ([McKissock](https://www.mckissock.com/blog/appraisal/appraisal-adjustments-types-methods-and-cheat-sheet/); [Fannie B4-1.3-09](https://selling-guide.fanniemae.com/sel/b4-1.3-09/adjustments-comparable-sales)). But they survive as an excellent **quality/weighting heuristic**: a comp needing >25% gross adjustment is too dissimilar to trust and should be down-weighted or dropped. Our code already implements a 25%-gross cap (`MAX_GROSS_ADJ_FRAC`); the improvement is to use it for *weighting*, not just clamping.
+
+**Bracketing.** Appraisers deliberately choose comps that fall on **both sides** of the subject for GLA, age, condition, and price — at least one larger and one smaller, one superior and one inferior. Bracketing proves the adjusted values converge from both directions and the answer isn't an extrapolation ([LegalClarity](https://legalclarity.org/sales-comparison-approach-comps-adjustments-bracketing/)).
+
+**Reconciliation — the step we skip.** The final value is **NOT the mean or median** of adjusted comps. A straight average "treats a weak comp the same as a strong one" ([NEREJ/Pastuszek](https://nerej.com/reconciliation-the-common-sense-approach-by-bill-pastuszek)). The appraiser weights toward the comps that (a) needed the **fewest and smallest** adjustments, (b) are **closest/most similar**, and (c) are **most recent** ([Birmingham Appraisal Blog](https://birminghamappraisalblog.com/faqs/appraisers-reconcile-value/); [McKissock weighted-mean](https://www.mckissock.com/blog/appraisal/weighted-mean-a-simple-appraisal-reconciliation-technique/)). Fannie's own **Collateral Underwriter** does this statistically via a regression-based model producing a supported value plus adjustment feedback.
+
+**Institutional accuracy targets** (what "defensible" means numerically): production AVMs aim for **PPE10 > 75%** (share of estimates within 10% of truth), **MdAPE ≈ 5–10%**, and **FSD ≤ 13% = high confidence, 13–20% = medium, >20% = low** (Freddie HVE bands) ([Clear Capital](https://www.clearcapital.com/blog-avm-testing-glossary/); [Freddie Mac Metrics Matter](https://sf.freddiemac.com/docs/pdf/fact-sheets/dougwhitepaper_metricsmatter.pdf)).
+
+### How to encode it in our engine (the algorithm/rules, keyed on the data we have)
+
+Replace the static-constant grid + median reconciliation with a **market-derived, bracketed, weighted grid**. Per subject, given the comp pool `raw['comps']` (each has `sold_price, sqft, beds, baths, lot_sqft, year_built, sold_date, distance_mi`) and the local sold pool from `enrichment_comps`:
+
+**Step 1 — Derive adjustment coefficients FROM THE LOCAL POOL (not constants).** Using the full same-kind sold pool for the county (already in memory in `enrich_with_comps`), fit each coefficient and pass them into `_adjust_comp`:
+- **GLA $/sqft:** OLS slope of `sold_price ~ sqft` over the pool (pool needs n≥10; use `numpy.polyfit` deg 1). **Clamp the slope to [0.30, 0.60] × median pool $/sqft** — that band is the empirical guardrail and stops a noisy small-sample regression from emitting a $5/sqft or $300/sqft coefficient. Fall back to `0.50 × median $/sqft` when n<10 (this replaces the fixed `MARGINAL_GLA_FRAC=0.40` with a *derived* fraction).
+- **Bath, garage, lot, age:** attempt a small multiple regression `sold_price ~ sqft + baths + garage + lot + age`; keep a coefficient only if it is the right sign and within a sane band, else fall back to the paired-sale medians above (bath $5–7k, garage $4–5k/bay, age via a derived $/yr, lot via `a·size^-0.7`). This matches WorkingRE's explicit advice: derive GLA statistically, set low-impact lines (bath/garage) from matched pairs/experience.
+
+**Step 2 — Time-adjust every comp FIRST.** `adj_time = sold_price × monthly_trend × months_since_sale`. Source `monthly_trend` free from the FHFA HPI we already pull (`raw['fhfa_value']`) or the pool's own median-$/sqft-by-month slope. This is a **new line we don't have** and is a Fannie *requirement*; on a 6-month comp window with 6%/yr appreciation it's a ~3% swing per comp.
+
+**Step 3 — Build the full grid** (extend `_adjust_comp`): add **beds** (small/optional, flagged as confounded), **garage** (from `raw['gis']`/HomeHarvest `parking`), **basement**, **condition** (comp condition tier we already infer via `_comp_condition_tier`, at ~5%/step), **quality**, and the **date-of-sale** line. Keep the running **gross** and **net**.
+
+**Step 4 — Bracketing check.** After adjusting, verify the comp set brackets the subject on GLA and price (≥1 comp with `sqft > subj` and ≥1 with `sqft < subj`; same for adjusted price). If not bracketed, set `bracketed=False` and cap ARV confidence at MEDIUM (extrapolation, not interpolation).
+
+**Step 5 — Weighted reconciliation (replace the median in `calc.py`).** Compute a weight per comp and take a **weighted mean of adjusted values**, not the median:
+```
+w_i = 1 / (1 + gross_adj_frac_i)        # fewest/smallest adjustments
+    × 1 / (1 + distance_mi_i / 5)        # closest
+    × 1 / (1 + months_since_sale_i / 6)  # most recent
+    × (0 if gross_adj_frac_i > 0.25 else 1)  # retired-but-useful 25% gross gate
+ARV = Σ(w_i · adjusted_value_i) / Σ(w_i)
+```
+This is exactly the appraiser's "give most weight to the comp needing the fewest adjustments" reduced to a formula, and mirrors CU's weighting logic. `calc._arv_signals` Tier-0/Tier-1 change from `median_ppsf × sqft` to consuming this weighted adjusted value; keep low/high as the min/max adjusted comp for the band.
+
+**Step 6 — Confidence from dispersion (FSD-style).** Set `arv_confidence` from the **coefficient of variation of the adjusted values** and bracketing: CV ≤ ~7% AND bracketed AND ≥3 comps AND max gross ≤25% → HIGH; CV ≤ ~15% → MEDIUM; else LOW. This replaces today's ad-hoc `ppsfs[-1]/ppsfs[0] >= 1.6` spread test with the institutional FSD bands (≤13% high / ≤20% medium).
+
+### Free data/params it needs
+
+Everything is already in the pipeline or computable — **no paid data**:
+- **Comp pool** (`enrichment_comps` HomeHarvest sold pool, $0) — already have; needed at pool scale (n≥10) for regression, which we already fetch per county.
+- **Per-comp fields** `sqft, beds, baths, lot_sqft, year_built, sold_date, parking/garage, distance_mi` — HomeHarvest already returns these; garage/parking and `sold_date` need to be threaded into the comp dicts (currently dropped).
+- **Monthly market trend** for the time adjustment — free from FHFA HPI (`raw['fhfa_value']`, already pulled) or derived from the pool's median-$/sqft-over-time regression.
+- **Condition tier** — already inferred (`_comp_condition_tier`, `raw['vision']`).
+- **Params (compiled-in, market-calibrated):** GLA fraction band `[0.30, 0.60]`, bath `$5–7k`, garage `$4–5k/bay`, condition `5%/step`, lot exponent `b=−0.7`, gross-gate `0.25`, FSD confidence bands `7%/15%`. Store in a `ADJUSTMENT_PARAMS` dict so `backtest_arv.py` can tune them against sold prices.
+- Optional lift: `numpy` (already a dep via pandas/HomeHarvest) for `polyfit`/`lstsq`.
+
+### Accuracy impact vs our current approach
+
+Our current path takes the **median of raw-or-lightly-adjusted $/sqft × subject sqft** with static constants and no time/bracketing/weighting. The three biggest defensibility gaps and their expected impact:
+- **Median → weighted reconciliation** removes the single largest source of appraisal-vs-model disagreement (a weak far/stale comp pulling the median). Weighting toward low-adjustment comps is what moves a model from "marketing AVM" toward "underwriting AVM"; institutional targets are PPE10 > 75% / MdAPE 5–10%. Our backtest note already shows ARV is *"unbiased-at-median but noisy"* — this attacks the noise directly and should tighten dispersion by roughly the CV of the dropped weak comps.
+- **Market-derived GLA slope (band-clamped)** replaces a fixed 0.40 fraction; on non-average-size subjects (the large-modest-$/sqft houses our rehab cap already flags) using a *derived* 0.47-ish slope vs a flat 0.40 or, worse, full $/sqft, is the difference between a defensible and an indefensible size line. Prevents systematic ARV error on the tails of the size distribution.
+- **Time adjustment** (currently **absent**) is a Fannie *requirement* and removes a ~half-window appreciation bias — on a 6-month window in a 6–10%/yr Carolina market that's a 1.5–2.5% ARV bias per comp, currently baked in silently.
+- **Bracketing + FSD-band confidence** converts our confidence label from heuristic to the same statistic (FSD ≤13/20%) lenders use, so `arv_confidence` becomes directly comparable to institutional confidence scores and `grading.py` gates on a defensible number.
+
+Net: this is the change that lets us say each ARV is "built like an appraisal" — market-derived lines, bracketed, weighted, with an FSD-style confidence — rather than "median of some comps."
+
+### Build (specific function/change + effort)
+
+- **`enrichment_comps.py` → new `_derive_adjustment_params(pool)`** (~40 lines): `numpy.polyfit` GLA slope + optional `numpy.linalg.lstsq` multiple regression; returns a params dict with band-clamps and paired-sale fallbacks. Called once per county pool in `enrich_with_comps` and passed into `_pick_3_comps`.
+- **`enrichment_comps._adjust_comp`** (rewrite, ~60 lines): accept derived params; add **time**, **beds**, **garage**, **basement**, **condition**, **quality** lines; keep running gross/net; emit per-comp `adjusted_value`, `gross_adj_frac`, `months_since_sale`. Thread `sold_date` + `parking` into the comp dicts in `_pick_3_comps` (currently dropped).
+- **`enrichment_comps._pick_3_comps`** (~20 lines): after adjusting, compute `bracketed` flag; **relax the "exactly 3, exact-bed" selection to deliberately bracket** (pick ≥1 larger, ≥1 smaller by GLA) instead of just closest-3.
+- **New `enrichment_comps._reconcile(comps)`** (~25 lines): weighted-mean formula above → returns `(arv_point, arv_low, arv_high, cv, bracketed)`; write to `raw['comp_reconciled_arv']` + `raw['comp_reconcile_meta']`.
+- **`calc._arv_signals`** (Tier-0/Tier-1, ~15 lines changed): consume `comp_reconciled_arv` instead of `comp_median_ppsf × sqft`; set `arv_confidence` from CV + bracketing (FSD bands) instead of the `1.6× spread` test.
+- **`scripts/backtest_arv.py`**: add a sweep over `ADJUSTMENT_PARAMS` (GLA band, gross-gate, weight exponents) scored by **PPE10 / MdAPE / bias** against the recorded-sales harness already there — so the params are *tuned*, not asserted.
+
+**Effort: ~1–1.5 days.** Medium. Reuses the existing pool fetch, comp dicts, condition inference, 25%-gross cap, and backtest harness; the genuinely new pieces are the regression-derived params, the time-adjustment line, bracket-aware comp selection, and the weighted reconciliation replacing the median. `numpy` is already available. Highest-ROI ordering: **(1) weighted reconciliation → (2) time adjustment → (3) derived GLA slope → (4) bracketing/FSD confidence.**
+
+
+## Comp SELECTION Science
+
+### The professional method (how appraisers/AVMs/pros actually do it — concrete mechanics)
+
+Comp selection is a **screen-then-weight** problem. The pro pipeline is a funnel: define a candidate pool, screen it down to arms-length lookalikes, adjust each survivor to the subject and to the valuation date, then reconcile a value (median/weighted) plus a defensible confidence from the *dispersion* of the survivors.
+
+**1. Proximity.** Fannie Mae (Selling Guide B4-1.3-08) dropped a hard mileage cap but still mandates "most proximate, recent, and similar," measured as a **straight-line distance in miles with a directional indicator** (e.g., "0.42 mi NW"), and requires comps from the **same market area / subdivision / project** when available because "sale activity from within the neighborhood is the best indicator of value." Practitioners operationalize this as a **tiered radius that adapts to sale density**: ≤0.5 mi (often same-subdivision) in dense suburbs, 1 mi standard (JVM: "within one mile … and not over any major barriers like freeways or rivers"), expanding to 2–5 mi rural — and never crossing a **physical/school-zone/jurisdiction boundary** even if the raw distance is short. AVMs formalize this as **distance-decay weighting** (IAAO AVM Standard) rather than a hard cutoff.
+
+**2. Recency + time adjustment.** The industry default is **90 days preferred, 6 months (180 d) standard, 12 months maximum**, and any comp >6 months old requires a written explanation (Fannie B4-1.3-08). Critically, a recent comp is *not* used at face value — its sale price is **time-adjusted to the valuation date** using a local price trend. The trend is derived from a **repeat-sales index** (FHFA/Freddie FMHPI methodology: same-property paired resales eliminate mix distortion) or a paired-sale/regression time coefficient, expressed as a monthly appreciation rate. A comp that sold 5 months ago in a market appreciating 6%/yr gets ≈ +2.5% (5 × 0.5%). Skipping this is the single biggest silent error in thin, trending markets.
+
+**3. Similarity screens (the "bracket").** Appraisers bracket the subject — carry comps both **above and below** on the key dimensions so the subject's value is interpolated, not extrapolated. Standard tolerances:
+- **GLA (living sqft): ±20%** (JVM/Fannie norm; a 1,500 sqft subject → 1,200–1,800 sqft comps). Some investors relax to ±25%.
+- **Bedrooms: exact** (bed count drives buyer pool and price bands non-linearly).
+- **Age/year built: ±10–15 yr** (proxy for systems age and build quality).
+- **Same style/design and quality/condition grade** (ranch vs 2-story, brick vs vinyl, C3 vs C5 UAD condition).
+- **Lot size** adjusted separately, not screened, unless it drives value (rural/waterfront).
+
+**4. Arms-length filtering.** IAAO ratio-study and mass-appraisal standards require screening out **non-market transactions before they touch the model**: nominal/$1 or family transfers, estate/foreclosure/REO, short sales, sheriff/tax deeds, quitclaims, inter-corporate transfers, and partial interests. **The exception that matters for a distressed engine:** when you are valuing a *distressed* subject for a *distressed exit*, REO/short comps are the correct comps for the "as-is distressed" number — but you value ARV (retail resale) off arms-length retail comps and derive the distress discount separately. Never blend the two into one median.
+
+**5. Dispersion, outlier trimming, and reconciliation.** After screening, pros discard fliers and reconcile. IAAO recommends **COD (coefficient of dispersion) as the variability statistic of choice** (more outlier-robust than COV/std-dev). Residential uniformity benchmarks: **COD 5–10 for newer/homogeneous tracts, 5–15 for other residential**, PRD 0.98–1.03, PRB −0.05 to +0.05. Outliers are trimmed by **IQR fence (drop $/sqft outside Q1−1.5·IQR … Q3+1.5·IQR)** or MAD (median ± 2–2.5·MAD), *not* mean ± SD (the outliers you want to drop inflate the SD and hide themselves).
+
+**6. Count + weighting that minimizes error.** Appraisal minimum is **3 closed comps** (Fannie); AVMs use **k-nearest-neighbor with k ≈ 3–10** and choose k by cross-validation (bias/variance trade-off). The winning weighting scheme in the mass-appraisal literature is a **Gaussian-kernel adaptive-bandwidth** weight over a composite distance (geographic + temporal + physical), e.g., GTCWR/GWR studies find the **Gaussian adaptive kernel most uniform by IAAO standards**. A well-selected comp AVM targets **error within 3–5% of actual sale price** (≤3% for "highly reliable"). Equal-weighted median of the *screened* set is the robust floor; distance/similarity-weighting on top buys accuracy only after screening is right.
+
+**7. Rural / thin markets.** When a tight screen yields <3 comps, pros **relax in a fixed priority order** and record which gate was relaxed (it drives confidence): expand radius (1→2→5→10 mi) *before* widening sqft band; extend the window (180→365 d) *before* dropping the arms-length screen; cross a subdivision boundary *before* crossing a school/market boundary. Land/rural is valued on **$/acre from land comps**, not $/sqft. IAAO explicitly allows using **post-calibration sales** when few sales exist. The relaxation ladder itself becomes the confidence signal — HIGH only if the tight screen held.
+
+### How to encode it in our engine (the algorithm/rules, keyed on the data we have)
+
+Our engine already implements most of this correctly. `enrichment_comps.py` runs a **staged funnel** (kind → geo gate ≤10 mi → zip-match → ±20% sqft band → exact beds → ±15 yr → style bucket) over a 180-day sold pool, and `enrichment_recorded_comps.py` runs the **Tier-0 recorded arms-length path** (county GIS point-buffer, price > $10k, sqft > 200, $/sqft ∈ [20, 800], median + p25/p75). `calc.py` reconciles by **median of `adjusted_ppsf`** with a p25–p75 band. The gaps to close are: (a) **time adjustment is missing**, (b) **outlier trim is implicit** (relies on median, no explicit IQR fence), (c) **weighting is flat** (no distance/similarity decay), (d) **confidence is count-based only**, not dispersion-based, and (e) the **relaxation ladder isn't logged** as a confidence input.
+
+Concrete rule set to encode:
+
+1. **Time-adjust every comp `$/sqft` to run date.** `adjusted_ppsf *= (1 + monthly_rate)^months_since_sale`, capped at ±15% total. Derive `monthly_rate` per (state, county) from a repeat-sales slope on the recorded-comp price series we already pull (regress `log(price)` on `sale_date`), fall back to a state constant, then FHFA regional. Store `time_adj_pct` per comp in the note.
+2. **Explicit outlier trim before median.** On the `ppsfs` series in `calc.py`, drop values outside the **IQR fence** (or MAD band when n<8, where IQR is unstable). Log `n_trimmed`.
+3. **Distance + similarity weighting.** Replace the plain median with a **weighted median** using a Gaussian kernel: `w = exp(−0.5·[(dist_mi/bw_d)² + (Δsqft%/0.20)² + (Δage/15)²])`, `bw_d` = adaptive (the k-th nearest distance). Beds mismatch already excluded upstream.
+4. **Dispersion-driven confidence.** Compute **COD** on the screened, time-adjusted `$/sqft` set: `COD = 100 · mean(|ppsf−median|)/median`. Confidence = HIGH if **≥5 comps AND COD ≤ 10 AND tight screen held**; MEDIUM if COD ≤ 15 or a relaxation gate fired; LOW otherwise. This replaces the current pure count threshold (`_MIN_COMPS_HIGH = 5`).
+5. **Log the relaxation ladder.** `enrichment_comps.py` already tracks `match_quality` ("zip+kind+geo" etc.); pass a `relaxed_gate` enum into `calc.py` and cap confidence at MEDIUM whenever radius/window/band was widened, matching the "explanation required" appraisal rule.
+6. **Keep the distressed/retail split.** ARV stays on arms-length retail comps (already the intent of Tier-0's `price > $10k` and the zip retail pool). Do **not** fold REO/short comps into ARV; if we later capture a distressed-comp pool, it feeds the as-is number only.
+
+### Free data/params it needs
+
+- **Time trend:** derived internally from the **recorded-comp price+date series we already query** (per-county GIS), a regressed monthly slope. External free fallbacks: **FHFA HPI** (metro/state, quarterly, free CSV) and **Freddie Mac FMHPI** (free monthly, MSA/state). No new scraping.
+- **Comp attributes:** already in the pool (sqft, beds, year_built, style, lat/lng, sale_date, price) from `enrichment_comps` (scraped) + county GIS (`enrichment_recorded_comps`).
+- **Params (constants):** `TIME_ADJ_CAP=0.15`, `IQR_K=1.5`, `MAD_K=2.5`, kernel bandwidth from k-th nearest, `COD_HIGH=10`, `COD_MED=15`, existing `SQFT_BAND_PCT=0.20`, `±15 yr`, `COMP_RADIUS_MILES=10.0`, `_MIN_COMPS_HIGH=5`. All free/computed; no API costs.
+
+### Accuracy impact vs our current approach
+
+- **Time adjustment** is the highest-yield fix: in a market moving 6–12%/yr, unadjusted 6-month-old comps carry a **1.5–6% directional bias** in ARV — exactly the band that flips a `max_bid_70` from profitable to underwater. This alone should move backtested median error toward the AVM **3–5% target**.
+- **IQR/MAD trimming + weighted median** typically cuts comp-set variance and pushes **COD down 2–4 points**, tightening the p25–p75 band the engine already reports.
+- **Dispersion-based confidence** stops the current failure mode where 5 *scattered* comps read HIGH; a HIGH tier will now mean COD ≤ 10, which is genuinely appraisal-grade uniformity and makes `arv_confidence` trustworthy for downstream bid sizing.
+- Net: each ARV becomes defensible as "median of k time-adjusted, IQR-trimmed, distance-weighted arms-length comps, COD = X" — the same sentence an AVM validation report uses.
+
+### Build (specific function/change + effort)
+
+- **`enrichment_recorded_comps.py`** (~40 lines): add `_county_monthly_appreciation(cfg, http)` — fit `log(price)~sale_date` OLS slope on the already-fetched sales, cache per (state, county); expose `raw["comp_time_trend"]`. **1–2 hr.**
+- **`valuation/calc.py`** (`_arv_signals`, ~50 lines): (a) new `_time_adjust(ppsf, months, rate, cap=0.15)`; apply to each comp before building the `ppsfs` series in both Tier-0 and Tier-1; (b) new `_trim_iqr(vals)` / `_mad_band(vals)` and call before `median`; (c) `_weighted_median(vals, weights)` with the Gaussian kernel; (d) new `_cod(vals, med)` and rewrite the confidence branch to use COD + `relaxed_gate` instead of count-only. **3–4 hr.**
+- **`enrichment_comps.py`** (~10 lines): surface the `relaxed_gate`/`match_quality` already computed into `raw["comp_match_quality"]` so `calc.py` can cap confidence. **30 min.**
+- **`scripts/backtest_arv.py`**: add COD + median-|error| reporting and an A/B toggle (`--time-adjust/--no-time-adjust`, `--trim/--no-trim`) to quantify each lever against sold prices before shipping. **1–2 hr.**
+- **Total ≈ 1 day.** All changes are pure functions on data already in `raw[...]`; no new sources, no API cost. Land path (`_land_arv`, $/acre) inherits the same trim + time-adjust helpers.
+
+**Sources:** [Fannie Mae B4-1.3-08 Comparable Sales](https://selling-guide.fanniemae.com/sel/b4-1.3-08/comparable-sales) · [IAAO Standard on AVMs](https://www.iaao.org/wp-content/uploads/Standard_on_Automated_Valuation_Models.pdf) · [IAAO Standard on Ratio Studies (COD/PRD/PRB)](https://www.iaao.org/wp-content/uploads/Standard_on_Ratio_Studies.pdf) · [JVM Lending — comps within 20% of size](https://www.jvmlending.com/blog/comps-must-be-within-20-of-size-of-subject-comp-criteria/) · [FHFA House Price Index (repeat-sales time trend)](https://www.fhfa.gov/data/hpi) · [Freddie Mac FMHPI](https://www.freddiemac.com/research/indices/house-price-index) · [GTCWR — geographically/temporally/characteristically weighted regression](https://www.researchgate.net/publication/323428418) · [MyHouseDeals — pull comps & calculate ARV](https://www.myhousedeals.com/blog/wholesaling/pull-comps-calculate-arv-investment-property)
+
+
+## Rehab Estimation Rubric
+
+### The professional method (how flippers/GCs/appraisers actually do it — concrete mechanics)
+
+Pros do not estimate rehab as a single per-sqft number. They use a **hybrid model**: a per-sqft baseline for the "spread-everywhere" cosmetic/finish work, **plus discrete line-item add-ons for the big-ticket systems** (which are per-unit or per-component, not per-sqft), **times a regional cost factor**, **plus a scope-scaled contingency**. This is the structure in J. Scott's *The Book on Estimating Rehab Costs* (BiggerPockets, the de-facto flipper standard) and it mirrors how RSMeans assembles a cost estimate (unit costs × quantities × a location factor).
+
+**1. Condition taxonomy → per-sqft finish bands (2026 national $, stick-built SFR).** The consensus 4–5 tier ladder across BiggerPockets, RealEstateSkills, FlipperForce and REIkit:
+
+| Tier | Scope | 2026 $/sqft (national) |
+|---|---|---|
+| Cosmetic / turnkey | Paint, fixtures, deep clean, maybe carpet; no walls opened | $10–25 |
+| Light | + flooring throughout, counters, light bath refresh | $25–40 |
+| Moderate | + kitchen & baths, windows, one major system serviced/replaced | $45–75 |
+| Heavy | + roof, full HVAC, partial electrical/plumbing, minor structural | $75–100 |
+| Full gut | To the studs: new electrical, plumbing, HVAC, drywall, roof, kitchen, baths | $90–150+ |
+
+The per-sqft number is understood to **already include** the systems that *typically* come with that tier (e.g. a gut includes a new roof and HVAC). You only add a big-ticket line item when a system's need deviates from what the tier assumes (e.g. a "light" cosmetic house that nonetheless needs a $12k roof).
+
+**2. Big-ticket systems are estimated as discrete units, not $/sqft**, because their cost is driven by count/age/severity, not floor area. 2026 national line items (median → typical range):
+
+| System | Typical 2026 cost | Trigger signal |
+|---|---|---|
+| Roof (asphalt, ~1,500–2,000 sqft) | $9,000–12,000 (range $7.5k–18k) | age ≥ 20 yr, "roof" flag |
+| HVAC full replace | $8,000–14,000 (range $5k–20k) | age ≥ 15 yr, no central air |
+| Electrical rewire / panel | $8,500 (rewire $10k–30k; panel-only $2k–4k) | year built ≤ 1970, "knob-and-tube," "no power" |
+| Plumbing repipe | $4,000–15,000 | galvanized/polybutylene era pre-1980, "no water" |
+| Foundation | $5,200 avg ($2.2k routine → $20k–80k structural) | "foundation/structural" flag |
+| Water heater | $1,600–1,850 | age ≥ 12 yr |
+| Windows (whole house) | ~$1,000/window × count; ~$8k–15k typical | single-pane, pre-1990 |
+| Kitchen (mid-range flip) | $15,000–30,000 | dated / gut |
+| Bath (mid-range, each) | $8,000–16,000 | dated / gut |
+
+The "**rule of thumb**" pros use to sanity-check: age-based life-expectancy. A roof lives ~20–25 yr, HVAC ~15 yr, water heater ~10–12 yr — so if `year_built + component_life < current_year` and nothing says it was replaced, budget the replacement. This is exactly the life-expectancy inspection logic J. Scott's 25-component checklist encodes.
+
+**3. Regional cost factor (RSMeans City Cost Index).** The national numbers above are pinned to a 30-city average = 100. RSMeans publishes a composite **total location factor** per metro. Verified from the RSMeans City Cost Index (Q-update location factor table), the **total (MAT+INST) index** for the engine's footprint:
+
+| Metro | Material idx | Install/labor idx | **Total idx** | Factor vs national |
+|---|---|---|---|---|
+| Charlotte NC | 98.4 | 72.1 | **87.0** | 0.87 |
+| Spartanburg SC | 97.7 | 70.2 | **85.8** | 0.86 |
+| Greenville SC | 97.5 | 70.0 | **85.6** | 0.86 |
+| Columbia SC | 98.8 | 67.6 | **85.3** | 0.85 |
+| Raleigh NC | 99.0 | 65.3 | **84.4** | 0.84 |
+| Asheville NC | 97.0 | 64.6 | **83.0** | 0.83 |
+
+The key mechanic: **materials cost ~national (97–99) but labor runs 30–36% below national (64–72)**. Since rehab labor is 40–60% of total rehab cost (per RealEstateSkills/DealRun), a blended Carolina rehab runs **~0.83–0.87 of the national figure**. The engine's current tables are Carolina-tuned but that calibration is undocumented and unpinned to a source; RSMeans makes it defensible and lets it flex per-county.
+
+**4. Contingency scales with scope** (the more walls you open, the more surprises). J. Scott / RealEstateSkills: **cosmetic 10% → moderate 15% → full gut 20–25%.** A flat 12.5% (current) under-pads gut jobs, where the actual variance is largest.
+
+### How to encode it in our engine (algorithm/rules, keyed on data we have)
+
+Replace the single `tier × $/sqft × contingency` with a **three-component sum**:
+
+```
+rehab_expected = ( base_psf[tier] × living_sqft              # cosmetic/finish spread
+                   + Σ system_addon[s]  for s in triggered_systems )  # big-ticket
+                 × region_factor(county)                     # RSMeans total idx / 100
+rehab_with_contingency = rehab_expected × (1 + contingency[tier])
+```
+
+**Rules, keyed on fields the engine already has (`year_built`, `condition_tier`, `flags`, `living_sqft`, `property_kind`, county):**
+
+1. **Tier** — keep `_condition_to_tier()` (Vision `condition_tier` → flags → year_built). It already produces the 5-tier ladder; just widen the year-built fallback into the roof/HVAC trigger logic below.
+2. **Systems add-on layer** — compute *incremental* system costs only when the tier's base $/sqft does **not** already assume them:
+   - roof: add if `age ≥ 20` AND tier ∈ {cosmetic, light} (heavy/gut already include it), or `"roof"` in flags without `"new roof"`.
+   - HVAC: add if `age ≥ 15` AND tier ∈ {cosmetic, light}, or `"no power/hvac"` flag.
+   - electrical: add if `year_built ≤ 1970` AND tier ∈ {cosmetic, light, moderate}.
+   - plumbing: add if `year_built ≤ 1980` AND tier ∈ {cosmetic, light, moderate}, or `"no water"`.
+   - foundation: **always** add on `"foundation/structural/termite"` flag regardless of tier (it's never in the base), using a wide $5k→$25k low/expected/high because it's the single biggest variance driver.
+3. **Region factor** — `region_factor(county)` from a lookup table of RSMeans total-idx/100 (Greenville 0.86, Spartanburg 0.86, Columbia 0.85, Charlotte 0.87, Asheville 0.83, default Carolina 0.85). Re-base the national tables to national numbers so the factor does real work; today's tables silently bake in ~0.85 already, so this is a refactor, not a re-price.
+4. **Contingency by tier** — `{cosmetic:0.10, light:0.10, moderate:0.15, heavy:0.20, gut:0.25}` replacing the flat 0.125.
+5. **Range** — `rehab_low/high` = same computation with the low/high column of each band **and** low/high of each triggered system, so the range widens correctly when a foundation flag is present (this is what makes the number "appraisal-defensible": the interval reflects real scope uncertainty, not a fixed ±).
+6. **Mobile homes** — keep the separate `MOBILE_REHAB_TIERS`; skip the roof/electrical/plumbing per-unit add-ons (manufactured systems are packaged/cheaper) and cap region factor effect.
+
+### Free data/params it needs
+
+- **RSMeans total location factors** — free from the RSMeans City Cost Index quarterly change-notice PDFs (already downloaded and parsed in this session: Greenville/Spartanburg/Columbia/Charlotte/Asheville/Raleigh values above). Hard-code a per-county dict; refresh annually from the free PDF. No paid RSMeans subscription needed for the composite factor.
+- **Line-item 2026 costs** — free national medians from Angi/HomeGuide/NerdWallet/Fixr (all captured above). Hard-code as constants; refresh yearly.
+- **Component life-expectancy constants** — free/standard (roof 20–25 yr, HVAC 15 yr, WH 12 yr, galvanized-plumbing pre-1980, knob-and-tube pre-1950, aluminum wiring 1965–73).
+- **Engine-side (already present):** `year_built`, `living_sqft`, `condition_tier` (Vision), `flags`, county, `property_kind`. Nothing new to scrape.
+
+### Accuracy impact vs current approach
+
+- **Current:** one $/sqft tier × sqft × flat 12.5%. It systematically **mis-prices two situations**: (a) a mostly-cosmetic house that needs one $10k system (under-estimates — the cosmetic $/sqft band never carries a roof), and (b) a gut with a foundation problem (under-pads — 12.5% vs the ~25% pros use). Backtest memory already flagged the calc as "noisy"; the largest residuals in flip rehab estimation are precisely the big-ticket systems, which a pure $/sqft model cannot see.
+- **Expected impact:** J. Scott's line-item + contingency method is the documented path from "ballpark" (±30–50%, typical for a raw $/sqft guess) to "budget-grade" (±10–15%, the walkthrough-with-scope standard). The system add-on layer directly attacks the fat right tail (foundation/roof/HVAC surprises) that drives underwriting losses. The RSMeans factor removes an undocumented ~0.85 magic number and makes each county's number **individually citable** to a published index — the single biggest "defensibility" win, since an appraiser/AVM reviewer can trace every number to Angi (line items), BiggerPockets/J. Scott (tiers + contingency), and RSMeans (regional factor).
+- **Net:** tighter central estimate on the common cosmetic/light cases, materially higher and better-padded estimates on the heavy/gut/foundation cases, and a range that actually widens with scope risk instead of a fixed ±.
+
+### Build (specific function/change + effort)
+
+In `valuation/calc.py`:
+
+1. **New constants** (~30 lines): `SYSTEM_ADDONS = {"roof":(7500,9500,18000), "hvac":(5000,9000,20000), "electrical":(4000,8500,30000), "plumbing":(4000,7500,15000), "foundation":(5000,12000,80000), "water_heater":(1200,1600,3900), "windows_full":(6000,10000,15000)}`; `CONTINGENCY_BY_TIER = {...}`; `REGION_FACTOR = {"Greenville":0.86, "Spartanburg":0.86, "Columbia":0.85, "Charlotte":0.87, "Asheville":0.83, ...}` with `DEFAULT_REGION_FACTOR = 0.85`. Re-base `REHAB_TIERS` to the national bands in the table above (so factor isn't double-counted).
+2. **New helper** `_triggered_systems(li, tier) -> list[tuple[str, low, exp, high]]` (~35 lines): applies the age/flag/year-built rules above; returns only *incremental* systems for the tier. Reuses `li.year_built`, `li.raw["flags"]`, `li.raw["vision"]`.
+3. **New helper** `_region_factor(li) -> float` (~8 lines): county → `REGION_FACTOR`, else default.
+4. **Rewrite the rehab block** in the main `compute()` path (~20 lines changed): `base = REHAB_TIERS[tier] × sqft`; add system tuples; multiply by region factor; apply tier contingency; set `rehab_low/expected/high`, `rehab_with_contingency`, and append a `notes` line itemizing which systems were added and the RSMeans factor used (for the audit trail).
+5. **Backtest** in `scripts/backtest_arv.py`: re-run against sold-comp residuals; confirm the system-add-on layer reduces error on the flagged/older-year_built subset without inflating the cosmetic subset.
+
+**Effort:** ~1–1.5 hrs (data/constants already gathered here). Isolated to `calc.py` + one backtest run; no scraper, schema, or enrichment changes. Must route board writes through `web_artifact.load_board()` per the board-writer rule when recomputing.
+
+**Sources:** [RealEstateSkills 2026 rehab guide](https://www.realestateskills.com/blog/estimating-rehab-costs), [BiggerPockets — How to Estimate Rehab Costs](https://www.biggerpockets.com/blog/how-to-estimate-rehab-costs), [J. Scott, *The Book on Estimating Rehab Costs* (25-component method)](https://store.biggerpockets.com/products/the-book-on-estimating-rehab-costs), [DealRun rehab $/sqft by city 2026](https://dealrun.ai/blog/how-much-rehab-cost-per-square-foot), [RSMeans City Cost Index](https://www.rsmeans.com/rsmeans-city-cost-index) (location factors parsed from the [RSMeans CCI location-factor PDF](https://www.rsmeans.com/media/wysiwyg/quarterly_updates/2021-CCI-LocationFactors-V2.pdf)), [Angi roof](https://www.angi.com/articles/how-much-does-it-cost-rewire-house.htm) / [HomeGuide HVAC & water heater](https://homeguide.com/costs/water-heater-installation-cost) / [Angi foundation](https://www.angi.com/articles/how-much-does-foundation-repair-cost.htm) line-item costs.
+
+
+## AVM Confidence / FSD Scoring
+
+### The professional method (how appraisers/AVMs/pros actually do it — concrete mechanics)
+
+Institutional AVMs do not report a categorical label; they report a **Forecast Standard Deviation (FSD)** and derive a numeric confidence score from it. The mechanics, standardized across the industry:
+
+- **FSD definition (Freddie Mac / Doug Gordon, *Metrics Matter*).** FSD is the AVM value's *expected proportional standard deviation around the actual subsequent sale price* for that specific property. It is a per-property forecast, not a model-fit statistic. An FSD of 0.10 means ~68% of true sale prices fall within ±10% of the estimate (1σ), ~80% within ±12.8% (1.28σ), ~95% within ±20% (2σ). This is the load-bearing fact: **FSD is literally the σ of a normal error distribution you can build a probable-value range from.**
+- **FSD → confidence bands (Freddie Mac Home Value Explorer, the canonical mapping).** HVE ties its confidence score directly to FSD: **FSD ≤ 13% = HIGH, 13%–20% = MEDIUM, > 20% = LOW.** Gordon explicitly warns against AVMs that base confidence on "number of local properties used" or "neighborhood range of values" *without* mapping to FSD — that is exactly the failure mode of our current 3-tier heuristic.
+- **Confidence score = 1 − FSD (Clear Capital, Veros).** ClearAVM posts Confidence = 1 − FSD (FSD 0.07 → 93 confidence). Veros VCS runs 75–100 and correlates monotonically to **P10** (share of estimates within ±10% of truth). The scale differs by vendor, which is why MISMO standardized it.
+- **MISMO Common Confidence Score (CCS), launched Sept 2025 — the current standard.** A vendor-agnostic **0–100** score calibrated to **P10** (probability the estimate is within ±10% of market value), deliberately avoiding "untenable" distributional assumptions. Benchmarks: **CCS 60+ = strong, 60–80 = typical, 95+ = rarely achievable.** This is the target semantics for our new score: *a number that estimates our own P10.*
+- **PPE / hit-rate vs accuracy tradeoff (Clear Capital glossary, academic exposition).** Two orthogonal axes: **accuracy** = MdAPE (median abs % error — hides tails) and MAPE / PPE10 / PPE20 (share within ±10/±20% — captures tails); **hit rate / coverage** = share of subjects the AVM will *score at all*. Good AVMs *decline to score* low-confidence subjects ("AVMs do not, and should not, produce results when they don't have strong confidence"). Raising the confidence floor trades coverage for accuracy — precisely the lever `grading.py` should pull.
+- **Cascade / ensemble (why lenders run several).** A **waterfall**: run AVM A, and if its FSD exceeds a threshold (e.g. **reject FSD > 20–25%**), fall through to AVM B, then C, taking the first that clears. Each rung has a *different independent method*, so a subject that one method values poorly (thin comps) may be well-covered by another (assessor model, HPI rescale). The engine already *has* a cascade (recorded comps → scraped comps → Zestimate → FHFA → tax → bid); today it only labels the winning rung, it doesn't score the rung's FSD or let a high-FSD rung fall through.
+- **When an AVM must be flagged unreliable.** Low comp density (n<3–5), high dispersion (comps disagree — a high coefficient of variation of $/sqft, CV = σ/μ), unique/atypical property (subject $/sqft or size far outside the comp cloud), stale data, and estimate far from the independent anchor (assessor). These are the exact inputs to FSD; a spiking CV directly inflates the standard error of the median $/sqft.
+
+### How to encode it in our engine (the algorithm/rules, keyed on the data we have)
+
+Replace the categorical `arv_confidence` with a **synthetic per-listing FSD** built from the comp statistics already computed, then map FSD → a 0–100 `arv_confidence` and back-derive the HIGH/MED/LOW label for backward compatibility. The design principle from Gordon: build confidence *from FSD*, not from ad-hoc factors.
+
+**Step 1 — Synthetic FSD from an error budget (variances add).** Model total forecast variance as the sum of independent error sources, each keyed on a field we already have in `raw`/`Listing`:
+
+```
+fsd² = base² + disp² + count² + geo² + sqft² + anchor² + method²
+FSD  = sqrt(min(fsd², 0.60²))          # cap at 60%
+```
+
+Component definitions (all data we already carry in `_arv_signals`):
+
+| Component | Source field | Value |
+|---|---|---|
+| `base` | method floor (irreducible market noise) | recorded comps 0.08; scraped comps 0.10; Zestimate 0.13; FHFA 0.18; tax×1.25 0.16; bid×2.4 0.28 |
+| `disp` | the adjusted-$/sqft series `ppsfs` (already sorted in Tier 1) | **CV-based**: `disp = clamp(0.5 × (p75_ppsf − p25_ppsf)/median_ppsf, 0, 0.30)`. The IQR/median of $/sqft *is* the empirical dispersion — this is the single biggest driver. |
+| `count` | `len(ppsfs)` / `rec['count']` | `0.15/sqrt(n)` (n≥1). n=1→0.15, n=3→0.087, n=6→0.061, n=10→0.047. Diminishing returns, standard-error shape. |
+| `geo` | `comps[0]['geo_anchored']` | 0.0 if geo-anchored (zip/radius), 0.07 if county-wide |
+| `sqft` | `living_sqft_estimated` + plausibility | 0.0 if true GLA; 0.06 if footprint-estimated; (implausible sqft already routes to a non-sqft rung) |
+| `anchor` | `arv_vs_assessed` (already computed) | 0.0 if 0.8–1.6× assessor; 0.05 if 0.6–0.8 or 1.6–2.5×; 0.12 if <0.6 or >2.5× (comps likely wrong submarket) |
+| `method` | floor/proxy flags | +0.10 if ARV was floored to county value or price-anchored (a non-clean comp read); +0.15 if proxy rung (bid/tax) |
+
+**Step 2 — FSD → 0–100 confidence (MISMO/ClearAVM semantics).** Use `confidence = round(100 × (1 − FSD))`, clamped to [0,100]. This gives a P10-interpretable score: FSD 0.08→92, 0.13→87, 0.20→80, 0.28→72, 0.40→60.
+
+**Step 3 — Derive the legacy label from Freddie HVE bands** (so nothing downstream breaks):
+
+```
+HIGH   if FSD ≤ 0.13     (confidence ≥ 87)
+MEDIUM if 0.13 < FSD ≤ 0.20  (80–86)
+LOW    if FSD > 0.20     (< 80)
+```
+
+**Step 4 — Build the probable-value range from FSD, not a flat ±15%.** Replace the hard-coded `expected*0.85 / *1.15` and `*0.90/*1.10` bands with `arv_low = expected×(1−FSD)`, `arv_high = expected×(1+FSD)` (the true 68% interval). Optionally add an 80% interval (`±1.28×FSD`) for the dashboard. This makes the range *self-consistent with the confidence number*.
+
+**Step 5 — Cascade gate (coverage/accuracy lever).** In the `_arv_signals` waterfall, after computing a rung's FSD, if `FSD > 0.25` **and a lower rung with a materially lower FSD exists**, fall through instead of returning. In `grading.py`, expose a single tunable **confidence floor** (e.g. suppress/soft-flag leads with `arv_confidence < 72`, i.e. FSD > 0.28) — that one knob trades board coverage for board accuracy, which is the professional hit-rate control.
+
+**Step 6 — Feed the confidence score into `max_bid_70` as a margin-of-safety, not just a display.** Pros bid more conservatively when the value is uncertain. Widen the discount as FSD rises: `bid_factor = 0.75 − k×max(0, FSD − 0.10)` (e.g. k=0.5 → FSD 0.20 knocks 5 pts off the 75%). This makes the bid itself risk-adjusted, mirroring how a cascade lender lowers LTV when confidence drops.
+
+### Free data/params it needs
+
+Everything is already computed or in-hand — **no new data source required**:
+- `ppsfs` adjusted-$/sqft series and `p25_ppsf`/`p75_ppsf` (recorded comps sidecar) — dispersion. Zero new cost.
+- comp `count`, `geo_anchored`, `radius_mi` — already in `raw['comps']` / `raw['recorded_comps']`.
+- `living_sqft_estimated`, plausibility band — already in `Listing`.
+- `arv_vs_assessed` — already computed in `compute()`.
+- Method/rung identity and floor/anchor flags — already produced as notes/flags.
+- **One-time calibration:** the component coefficients (base FSDs, the 0.15/√n, IQR multiplier) should be *fit* against `scripts/backtest_arv.py`'s recorded-sale ground truth so the reported FSD matches the realized error — this is exactly Gordon's mandated out-of-sample validation ("is 68% of sales within ±1 FSD?"). That harness already exists and already buckets by confidence, so calibration is free.
+
+### Accuracy impact vs our current approach
+
+- **Today:** `arv_confidence` is a 3-way label from an unvalidated additive heuristic (count<3, geo, 1.6× spread). It is *not* tied to realized error, cannot express "we're 85% sure," gives every HIGH the same trust regardless of a 1.61× vs 3× comp spread, and hard-codes a flat ±15% band unrelated to actual confidence. Gordon names this precise anti-pattern ("basing scores on… number of local properties… that does not correspond to expected performance").
+- **New:** a continuous FSD calibrated so the reported ±FSD interval empirically covers ~68% of recorded sales — the same reliability contract lenders demand and validate. Expected gains: (1) the `backtest` `within20%` and P10 rates become *predictable per lead* instead of a coin-flip inside a label; (2) the confidence floor becomes a real accuracy/coverage dial (raising it should measurably lift the HIGH bucket's within-20% rate, the whole point of the hit-rate tradeoff); (3) risk-adjusted `max_bid_70` should cut the sub-55%-of-resale auction-losing tail *further on low-confidence leads specifically* rather than uniformly. Benchmarks to target from the literature: **HIGH = FSD ≤ 13% (≈ CCS 87+), the Freddie HVE HIGH bar; a lead-grade floor around FSD 20–25% mirrors standard cascade rejection.** Since ARV feeds `max_bid_70`, `estimated_profit`, `roi_pct`, and `deal_status`, tightening confidence propagates to every downstream verdict.
+
+### Build (specific function/change + effort)
+
+1. **New `valuation/fsd.py`** with `fsd_from_comps(rung, ppsfs, p25, p75, median_ppsf, n, geo_anchored, sqft_est, arv_vs_assessed, floored, proxy) -> float` implementing the Step-1 error budget, and `fsd_to_confidence(fsd) -> int` / `fsd_to_label(fsd) -> str`. Pure functions, unit-testable. **~1 hr.**
+2. **Refactor `_arv_signals` in `calc.py`** so each rung returns `(expected, fsd, notes)` instead of a categorical conf; compute low/high as `expected×(1∓fsd)` (Step 4); add the Step-5 fall-through gate. Set `Calc.arv_fsd` (new field) + keep `arv_confidence` as the 0–100 int and add `arv_confidence_label` for the legacy HIGH/MED/LOW. **~2–3 hrs** (touches the 6 existing rungs + the floor/anchor MEDIUM-downgrade blocks in `compute()`, which become `fsd += penalty`).
+3. **Risk-adjusted bid** (Step 6): one line in the `max_bid_70` block scaling the 0.75 factor by FSD. Gate behind a flag so the backtest can A/B it. **~30 min.**
+4. **Calibrate** against `scripts/backtest_arv.py`: add a mode that reports, per FSD decile, the realized `within-FSD` coverage (should ≈68%) and P10; tune the seven coefficients until coverage matches. **~2 hrs.**
+5. **`grading.py`**: replace the label switch with a numeric `arv_confidence` threshold (single tunable floor). **~30 min.**
+
+Total ~6–7 hrs. Backward-compatible via the retained label field; every change is validated by the existing recorded-sale harness (Gordon's out-of-sample test), so the reported confidence is defensible as *calibrated*, not asserted.
+
+Sources: [Freddie Mac — *Metrics Matter* (Doug Gordon), HVE FSD bands](https://sf.freddiemac.com/docs/pdf/fact-sheets/dougwhitepaper_metricsmatter.pdf) · [Clear Capital — AVM Testing Glossary (FSD, P10, hit rate, MdAE/MAE)](https://www.clearcapital.com/blog-avm-testing-glossary/) · [Veros — Confidence Scores & AVM Accuracy](https://www.veros.com/building-trust-how-confidence-scores-enhance-avm-accuracy) · [Veros — MISMO Common Confidence Score (CCS)](https://www.veros.com/understanding-the-mismo-common-confidence-score-ccs-for-avms) · [MISMO — Confidence Score Standard launch (Sept 2025)](https://www.mismo.org/about-MISMO/news/2025/09/05/mismo-launches-confidence-score-standard-for-avms) · [AVMetrics — Forecasted Standard Deviation / cascade FSD>25% reject](https://www.avmetrics.net/tag/forecasted-standard-deviation/)
+
+
+## Backtesting & Calibration Methodology
+
+### The professional method (how appraisers/AVMs/pros actually do it — concrete mechanics)
+
+Institutional AVM validators and mass-appraisal offices do not "eyeball" a model against a handful of sales. They run a **sales-ratio study**: a structured statistical comparison of model estimates against actual arms-length sale prices, summarized by a standardized battery of metrics that separately capture *accuracy* (how close), *reliability* (how often close), and *bias* (systematic tilt). The governing standards are the IAAO **Standard on Ratio Studies** and **Standard on AVMs**, plus the lender-side testing playbooks (Clear Capital, Optival/Mercury, QuantPV).
+
+**1. Ground truth = arms-length sales only, index-adjusted for time.** The benchmark is the actual sale price of an arms-length transaction. Non-market transfers (foreclosure, deed-in-lieu, intra-family, quitclaim, "love and affection" $1 deeds) are excluded because they are not market value. Because sales happen over a window, each sale is **time-adjusted** to the common appraisal/estimate date with a market index. The core statistic is the **sales ratio = AVM estimate ÷ sale price** for each property; the whole discipline is the study of the distribution of that ratio.
+
+**2. The metric battery** (each has a role — accuracy, reliability, bias — and an institutional threshold):
+
+| Metric | Formula | What it measures | Institutional benchmark |
+|---|---|---|---|
+| **MdAPE** (median abs % error) | median of \|est−sale\|÷sale | central accuracy, outlier-robust | **< 5%** (strong AVM); < 10% acceptable |
+| **PPE10 / PE10** | share with \|error\| ≤ 10% | reliability / hit-in-band | **> 70%** |
+| **PPE20** | share with \|error\| ≤ 20% | tail reliability | **> 85–90%** |
+| **PE at 5/15/25%…** | share within each band | full error *distribution*, not one number | reported as a curve |
+| **Median error / mean error (signed)** | median of (est−sale)/sale | **BIAS** direction & size | ≈ **0%** (±1–2%) |
+| **FSD** (forecast standard deviation) | per-estimate σ of % error | *per-property* confidence | < 0.10 high-confidence; > 0.20 → escalate |
+| **Hit rate** | share of subjects that get an estimate | coverage | **> 90%** (mature US AVM) |
+| **Median ratio** | median(est÷sale) | level bias (IAAO) | **0.90–1.10** |
+| **COD** (coefficient of dispersion) | 100 × avg abs dev of ratios from median ratio ÷ median ratio | horizontal uniformity | residential **< 15** (5–10 for homogeneous) |
+| **PRD** (price-related differential) | mean ratio ÷ weighted-mean ratio | vertical equity (are cheap homes over-valued vs expensive?) | **0.98–1.03** |
+| **PRB** (price-related bias) | regression coeff of %ratio on value | vertical equity (modern) | **−0.05 to +0.05** |
+
+Key professional distinction the current harness misses: **accuracy (MdAPE), reliability (PPE), and bias (signed median error + PRD/PRB) are three separate axes.** A model can be accurate on average yet systematically over-value cheap houses (bad PRD) — which is exactly the failure mode of a `$/sqft × sqft` model, since $/sqft is nonlinear in size and price tier.
+
+**3. Blind / hold-out testing (the anti-gaming rule).** The estimate must be produced **without the model having seen the target sale**. Assessors hold out a random sample of sales; lenders demand *retrospective blind tests* (as-of a date before the sale, with that sale withheld) and prefer **refinance-appraisal or contract-price benchmarks** precisely because the vendor cannot reverse-engineer them from public records. Testing a model against a sale it was allowed to use as a comp (or that it was floored/anchored to) is circular and inflates apparent accuracy — the current harness already intuits this with its "floored"/`arv==amount` exclusion, which is the right instinct but only a partial guard.
+
+**4. Stratification is mandatory, not optional.** IAAO requires the ratio study be computed **within each stratum** — property type, price tier (deciles/quintiles), geography (county → market area → ZIP), condition, and vintage — because a blended national number hides compensating errors. A minimum of **~5–15 sales per stratum** is the practical floor for a stable median (below that, confidence intervals blow up and you report the CI, not a point estimate).
+
+**5. Outlier handling is defined, not ad hoc.** Ratio studies **trim** extreme ratios before computing dispersion, by a stated rule: drop ratios outside **1.5× IQR** (Tukey fences) or beyond **±3 standard deviations / a fixed ratio band (e.g. 0.5–2.0)**, and document how many were trimmed. This prevents one rural mis-comp from dominating — the harness currently defends against this only by using the median, which protects the center statistic but still lets outliers pollute the "within20%" and max-bid fractions.
+
+**6. Bias detection → correction (calibration).** When the signed median ratio drifts off 1.00, or PRD/PRB breaches range, the model is **recalibrated**: apply a multiplicative level adjustment per stratum (divide estimates by the stratum median ratio to re-center to 1.00), and if PRB is significant, fit a value-dependent correction. This is the loop that turns a backtest from a *report card* into a *feedback controller*. The prior calibration note in memory (the max-bid selling-fee double-charge fix, 0.70→0.75) is exactly this kind of correction — but it was found manually; the harness should surface it automatically.
+
+**7. Forward vs. backward testing.** *Backward/retrospective* (what the harness does — compare to a past recorded sale HPI-adjusted forward) validates the level. *Forward* testing (freeze today's estimates, wait for the next N sales, compare) is the gold standard because it is immune to any leakage. Pros run both and track metric **stability over time** (a model whose MdAPE is stable across vintages is trustworthy; one that's only good on old sales is overfit to stale comps).
+
+### How to encode it in our engine (the algorithm/rules, keyed on the data we have)
+
+Restructure `backtest_arv.py` from a single-median printer into a **ratio-study calibration harness** over the same `docs/listings.json` rows:
+
+1. **Compute the sales ratio per lead**: `ratio = arv_expected / adj_sale` (we already compute `arv_err`; ratio = `1 + arv_err`). Keep both, because the whole IAAO battery is defined on the ratio.
+
+2. **Emit the full metric battery, not just median+within20**:
+   - `MdAPE = median(|arv_err|)`, `MdE_signed = median(arv_err)` (bias), `Mean_signed` (bias, sensitive).
+   - `PPE10, PPE15, PPE20, PE05, PE25` = share within each band → print the whole PE curve.
+   - `median_ratio = median(ratio)`; **COD** = `100 * mean(|ratio − median_ratio|) / median_ratio`; **PRD** = `mean(ratio) / (Σ arv / Σ adj_sale)`; **PRB** = OLS slope of `(ratio − median_ratio)/median_ratio` on `0.5*ln(adj_sale)+0.5*ln(arv)`.
+   - **FSD proxy** per confidence tier = std-dev of `arv_err` within that tier (this is what makes `arv_confidence` *quantitative* instead of a label).
+
+3. **Trim before dispersion metrics**: drop ratios outside `[median − 1.5·IQR, median + 1.5·IQR]` (or a hard `0.5–2.0` band), count and report trimmed rows separately. Center statistics (median, MdAPE) use all rows; dispersion (COD, PRD, within%) uses the trimmed set — per IAAO.
+
+4. **Stratify and gate on n**: report every metric **by confidence tier, by county, by price quartile of `adj_sale`, and by sale-year vintage**. Only print a stratum with `n ≥ 8`; otherwise roll it into "thin strata" and report a bootstrap 90% CI on the median instead of a point value.
+
+5. **Bias → calibration output (the new payload)**: for each stratum, emit `suggested_level_factor = 1 / median_ratio`. If `|median_ratio − 1| > 0.03` or `PRD ∉ [0.98,1.03]` or `PRB ∉ [−0.05,0.05]`, flag `NEEDS_RECALIBRATION` and print the per-stratum multiplicative correction that `calc.py` should apply. This is the report-card → controller upgrade.
+
+6. **Harden the anti-leakage guard**: current exclusion is `"floored" in notes or arv==amount`. Extend to also drop any lead whose `adj_sale` sale is the *same transaction* the comp set drew from, and any lead where `arv_confidence == LOW` proxy was itself derived from `last_sale` (mark these `circular` and exclude), so PPE10 isn't inflated by self-reference.
+
+7. **Add a forward-test mode**: a `--freeze` flag that snapshots current `arv_expected` with a timestamp to a sidecar, so future sales can be scored against frozen estimates (true leakage-free forward validation) — the only fully honest accuracy number.
+
+### Free data/params it needs
+
+- **Already in `listings.json`** (zero new data): `arv_expected`, `arv_confidence`, `last_sale.{amount,date,basis}`, `max_bid_70`, `county`, `source`, `calc.notes`. The entire ratio battery, COD/PRD/PRB, trimming, and stratification run on fields we already persist.
+- **Better time index (free)**: replace the 6-anchor Carolina HPI table with the **FHFA All-Transactions House Price Index at the county or CBSA level** (FHFA publishes free quarterly CSVs) or **FHFA state HPI**, joined by county → CBSA. This removes the "snap to nearest anchor" quantization that adds noise to `adj_sale` and therefore to every metric. Zillow ZHVI (free CSV, ZIP-level) is an even finer alternative.
+- **Price-tier strata**: computed from `adj_sale` quartiles — no new data.
+- **Bootstrap CI for thin strata**: numpy only, no data.
+- **PRB regression**: `numpy.polyfit` / a 2-line OLS — no new dependency beyond numpy (add it; harness is currently pure-stdlib).
+
+### Accuracy impact vs our current approach
+
+The current harness reports exactly three things — overall median error, a coarse `within20%`, and a max-bid fraction — segmented only by confidence and county. It is a **level check on one axis (central accuracy)**. It is blind to the three failure modes that actually cost money in a $/sqft model:
+
+- **Vertical bias (over-paying on cheap/small houses).** A $/sqft model is structurally biased across price tiers; without **PRD/PRB and price-quartile strata**, the harness cannot see it. This is the single highest-value addition — it's the difference between "median looks fine" and "we systematically over-bid the bottom quartile by 12%." Institutional standard: PRD 0.98–1.03; a $/sqft model routinely lands 1.05–1.10 unmeasured.
+- **Dispersion / reliability.** `within20%` is one crude band. The **PE curve (5/10/15/20/25%) + COD** tells you whether "median +2%" hides a 22-COD spray of estimates (unusable) or a tight 9-COD cluster (institutional). Two models with identical medians can have wildly different COD — only the upgraded harness distinguishes them.
+- **Per-estimate confidence made real.** Today `arv_confidence` (HIGH/MEDIUM/LOW) is an assertion. Attaching an **empirical FSD per tier** turns it into a validated probability ("HIGH tier: FSD 0.08 → 68% within ±8%"), which is what lets the pipeline *route* LOW-FSD leads to manual review and *trust* HIGH-FSD max-bids — the same escalation logic institutional AVMs use.
+- **Outlier leakage into decision stats.** Untrimmed, the `within20%` and `max_bid_70/adj_sale` fractions are polluted by rural mis-comps; IAAO trimming + reporting trimmed count restores them.
+
+Net: the model's *point estimate* may already be "unbiased-at-median" per the prior calibration note, but its **defensibility** jumps from "we checked the median" to "MdAPE 6.1%, PPE10 68%, median ratio 1.01, COD 11.4, PRD 1.02, PRB +0.01, hit rate 91%, trimmed 4/210 — all within IAAO residential tolerances except PPE10 which is 2pts light in Buncombe." That is an appraisal-grade validation statement, and it *automatically emits the per-stratum recalibration factors* instead of requiring a human to notice the 0.70→0.75 class of error.
+
+### Build (specific function/change + effort)
+
+Rewrite `scripts/backtest_arv.py` (keep it read-only on `listings.json`; add numpy):
+
+1. **`ratio_stats(errs, ratios) -> dict`** — returns `{mdape, mde_signed, mean_signed, pe05, pe10, pe15, pe20, pe25, median_ratio, cod, prd, prb, fsd, n, n_trimmed}`. ~40 LOC. *(0.5 day)*
+2. **`trim_iqr(ratios) -> (kept, dropped)`** — 1.5×IQR fence, returns counts. ~10 LOC. *(trivial)*
+3. **`stratify(items) -> dict[stratum -> list]`** for confidence, county, `adj_sale`-quartile, and sale-vintage; `bootstrap_median_ci(vals)` for `n<8` strata. ~30 LOC. *(0.5 day)*
+4. **`calibration_report(strata)`** — per stratum: `suggested_level_factor = 1/median_ratio`, plus `NEEDS_RECALIBRATION` flag when median_ratio, PRD, or PRB breach IAAO bands; print the correction table. ~25 LOC. *(0.5 day)*
+5. **Swap the HPI table for FHFA county/CBSA HPI** — small loader `fhfa_factor(county, year)` reading a cached free CSV, fallback to current anchors when a county is missing. ~25 LOC + one-time CSV download. *(0.5 day)*
+6. **`--freeze` forward-test mode** — snapshot `{lead_id, arv_expected, ts}` to `docs/arv_snapshots.jsonl`; a `--score-frozen` pass matches later recorded sales to frozen estimates for leakage-free forward MdAPE/PPE. ~30 LOC. *(0.5 day)*
+7. **Harden circular-exclusion** in `collect()` — add `circular` tagging for LOW-proxy-from-last_sale rows. ~10 LOC. *(trivial)*
+
+**Total ≈ 3 days.** Highest-ROI first two hours: add **PRD/PRB + price-quartile strata + COD** (items 1 and 3) — that alone exposes the $/sqft vertical bias the current harness structurally cannot see, and it needs zero new data. `calc.py` then consumes the emitted per-stratum `level_factor` to re-center estimates (the same lever as the 0.70→0.75 fix, now data-driven and continuous). Cross-check every `calc.py` change by rerunning this harness — and per the existing board-writer rule, any recompute must load via `web_artifact.load_board()` so the vision/comps/cama sidecar is preserved.
+
+**Sources:**
+- [An Exposition of AVM Performance Metrics — Journal of Property Tax Assessment & Administration (Tandfonline)](https://www.tandfonline.com/doi/full/10.1080/15214842.2020.1757352)
+- [AVM Accuracy Explained: MdAPE, PPE10, FSD — QuantPV](https://quantpv.com/articles/ppe10-avm-accuracy-explained.html)
+- [A Lender's Guide to the Top 3 AVM Testing Methods — Clear Capital](https://www.clearcapital.com/blog-avm-testing-guide/)
+- [AVM Testing: A Short Glossary — Clear Capital](https://www.clearcapital.com/blog-avm-testing-glossary/)
+- [IAAO Standard on Ratio Studies](https://www.iaao.org/wp-content/uploads/Standard_on_Ratio_Studies.pdf)
+- [IAAO Standard on Automated Valuation Models](https://www.iaao.org/wp-content/uploads/Standard_on_Automated_Valuation_Models.pdf)
+- [Uniformity Standards — COD/PRD/PRB (Martin County exhibit of IAAO Table 2-3)](http://www.pa.martin.fl.us/data_files/CEAA/Exhibits/Exhibit%201-3.5%20Uniformity%20Standards%20-%20COD%20-%20PRD%20-%20PRB.pdf)
+- [The 70% Rule in House Flipping — RealEstateSkills](https://www.realestateskills.com/blog/what-is-70-rule-in-house-flipping)
+
+
+## Investor Math: 70% Rule, MAO, and a Cost-Stack-Derived Max Bid
+
+### The professional method (how appraisers/AVMs/pros actually do it — concrete mechanics)
+
+**The 70% rule is a heuristic, not a valuation.** Its "30% haircut" is a shorthand that bundles *profit target + every transaction cost* into one number so an investor can price a deal on a phone call. `MAO = 0.70 × ARV − repairs`. The industry-stated decomposition of the 30% is roughly **~15% investor profit + ~15% all-in costs** (holding, both-side closing, selling commission, financing, buffer) ([Amerisave](https://www.amerisave.com/learn/the-rule-in-house-flipping-what-it-means-for-real-estate-investors-in), [Lima One](https://www.limaone.com/70-rule-real-estate/)). The reason pros treat it as a *filter, not a bid* is that the 15% cost slug is only accurate for a mid-ARV ($150k–$400k), 6-month-hold, ~6% commission deal. Outside that box it is wrong, and every serious source says to **adjust the multiplier** ([BiggerPockets: 70% too aggressive in high-ARV](https://www.biggerpockets.com/forums/67/topics/297181-is-the-70-rule-too-aggressive-in-high-arv-markets)):
+
+| Condition | Multiplier pros use | Why |
+|---|---|---|
+| Hot market, DOM < 30d, fast turn | **0.75–0.80** | Low holding risk; 70% leaves money on the table |
+| Standard | **0.70** | The canonical mid-case |
+| Low ARV (< ~$150k) | **0.60–0.65** | Fixed $ costs (title ~$1,600, commission floor, insurance) are a *larger %* of a small deal |
+| Slow/luxury, 9–12mo hold | **0.60–0.65** | Holding + carrying eats the margin |
+
+(All four rows from [RealEstateSkills](https://www.realestateskills.com/blog/what-is-70-rule-in-house-flipping), [Amerisave](https://www.amerisave.com/learn/the-rule-in-house-flipping-what-it-means-for-real-estate-investors-in), [PropStream](https://www.propstream.com/news/what-is-the-70-rule-for-fix-and-flippers).)
+
+**The defensible version pros use for real bids is bottom-up (MAO = ARV − ALL costs − profit).** The institutional / hard-money-underwriter form is:
+
+```
+MAO = ARV − Repairs(×contingency) − AcquisitionCosts − HoldingCosts − SellingCosts − FinancingCosts − TargetProfit − SeniorLiens
+```
+
+The full cost stack, with benchmarked free-computable values ([REIkit cost stack](https://www.reikit.com/house-flipping-guide/fix-and-flip-project-costs-purchase-sale-holding), [InvestorsEdge](https://www.theinvestorsedge.com/blog/the-pros-guide-how-to-calculate-cost-on-a-fix-flip)):
+
+- **Acquisition/closing (buyer side):** title search + owner's + lender's title insurance + attorney + recording ≈ **1.5–3% of purchase price** ($1,600 title floor on a $100k home means small deals skew high). Auction buyers add a buyer's premium (**5–10%** at some venues).
+- **Holding (per month × months-to-sell):** property **taxes ≈ 1%/yr of assessed** (~0.083%/mo), **insurance $100–300/mo** (builder's risk), **utilities $200–500/mo**, **HOA $100+/mo**. Months-to-sell is set from **market velocity** (months-of-inventory / DOM), *not* a flat 6 ([REIkit](https://www.reikit.com/house-flipping-guide/fix-and-flip-project-costs-purchase-sale-holding), [AHL: budget holding costs](https://ahlend.com/docs/how-to-budget-for-holding-costs-on-a-flip/)).
+- **Financing (the big one, and the item the current engine most understates):** hard money = **7.5–18%/yr interest-only + 1–6 points** origination; LTV 70–80% of ARV ([REIkit](https://www.reikit.com/house-flipping-guide/fix-and-flip-project-costs-purchase-sale-holding), [OfferMarket HM guide](https://www.offermarket.us/blog/hard-money-fix-and-flip-loans)). Points hit the *loan* at close; interest accrues on drawn balance × months. This alone is 5–10% of profit.
+- **Selling:** agent commission **5–7% (use 6%)** + **buyer concessions ~2% of ARV** + seller closing/title ≈ **1%** ⇒ **~8–9% of ARV** ([REIkit](https://www.reikit.com/house-flipping-guide/fix-and-flip-project-costs-purchase-sale-holding)).
+- **Target profit:** flippers underwrite to **≥15% of ARV or ≥$25–30k**, whichever is greater on small deals.
+- **Repairs:** always **× 1.10–1.15 contingency** for hidden conditions.
+
+**Strategy changes the formula, not just the number:**
+
+| Strategy | Max-bid form | Key difference |
+|---|---|---|
+| **Fix-and-flip** | `ARV − repairs − full cost stack − 15% profit` | Pays both selling *and* holding for the full flip |
+| **Wholesale** | `MAO_flip − AssignmentFee` | Wholesaler bids *below* the flipper's MAO so the end-buyer still clears 70%. Fee rule-of-thumb: **up to ~50% of end-buyer projected profit**, floor $5–10k ([RealEstateSkills wholesale](https://www.realestateskills.com/blog/wholesale-formula)) |
+| **BRRRR** | `0.75 × ARV − repairs` (capital-recovery ceiling) | Sized so the **75% refi pulls 100% of capital out**; *no selling cost* (holds it), so tolerates a higher buy than flip ([RealEstateSkills BRRRR](https://www.realestateskills.com/blog/brrrr)) |
+| **Subject-to / gator** | `EquityToSeller + AssumedDebt`, funding cost = flat **$150–500 or ~$25/day** transactional | Buys the *equity*, takes title **subject to** existing mortgage; no new acquisition financing, so financing cost collapses to the gator/EMD fee ([RealEstateSkills gator](https://www.realestateskills.com/blog/gator-method), [Pinetree](https://pinetreefinancialpartners.com/the-gator-method/)) |
+
+### How to encode it in our engine (the algorithm/rules, keyed on the data we have)
+
+The engine *already* computes a bottom-up stack (`total_investment` = bid + closing + holding + selling) but keeps it **disconnected** from `max_bid_70`, which uses a hardcoded `0.75`. The fix is to **derive the multiplier from the stack** and expose per-strategy bids. Keyed on fields that already exist (`arv_expected`, `rehab_with_contingency`, `assessed`, `market_velocity.holding_months_est`, `senior_cost`, `li.opening_bid`, `raw.equity`):
+
+**1. Replace the fixed 0.75 with a cost-stack-implied multiplier per lead.** Compute the fee slug as a % of ARV, then set the effective multiplier so it embeds the *real* costs for this specific property:
+
+```
+sell_pct    = 0.08                         # 6% comm + ~2% concessions/seller-close
+close_pct   = 0.025                         # buyer-side title/attorney/recording
+hold_$      = (assessed*0.01/12            # taxes
+             + insurance_mo + utils_mo + hoa_mo) * holding_months   # from velocity
+finance_$   = points_pct*loan + hm_rate/12*loan*holding_months      # hard-money
+profit_$    = max(0.15*ARV, 25000)          # floor protects small deals
+implied_mult = 1 − sell_pct − close_pct − (hold_$+finance_$+profit_$)/ARV
+max_bid_flip = implied_mult*ARV − rehab_buy − senior_cost − surviving_payoff
+```
+
+This makes the multiplier **fall automatically** on low-ARV homes (fixed $ costs are a bigger % of ARV → implied_mult drops toward 0.60–0.65) and on slow-velocity leads (holding_months rises), and **rise** on fast, high-ARV leads — reproducing the professional adjustment table *from the property's own numbers* instead of a constant. Clamp `implied_mult` to **[0.55, 0.80]** as a guardrail.
+
+**2. Emit per-strategy bids** (new `Calc` fields), so the board can route each lead to the strategy that maximizes the defensible bid:
+- `max_bid_flip` — above.
+- `max_bid_brrrr = 0.75*ARV − rehab_buy − senior_cost` (no selling cost; capital-recovery ceiling).
+- `wholesale_mao = max_bid_flip − assignment_fee`, where `assignment_fee = clamp(0.40*est_profit_flip, 5000, 25000)` — already partially present (`wholesale_mao`, `wholesale_spread`); tie the fee to projected profit not a flat number.
+- `max_bid_subto` (only when `raw.equity.payoff_estimate` is MEDIUM+): `equity_to_seller + assumed_debt`, financing cost = flat gator fee, no acquisition financing line.
+- Report `recommended_strategy = argmax` and set `max_bid_70` = the flip bid (back-compat).
+
+**3. Holding cost fix (biggest current error):** today `holding = bid × 0.005 × months` (≈6% APR on bid). Replace with the **itemized carry + hard-money** model above. On a leveraged flip the true carrying rate is ~10–12% on the loan, so the current 6%-on-bid line understates carry by roughly 2–3×.
+
+### Free data/params it needs
+
+All free / already-in-repo:
+- `assessed` (county GIS — already used for tax proxy: **1%/yr**) → property tax carry.
+- `market_velocity.holding_months_est` (already computed from months-of-inventory / DOM) → months and the velocity-driven multiplier tilt.
+- **Hard-money constants** (published ranges, put in config): `HM_RATE = 0.11` (mid of 7.5–18%), `HM_POINTS = 0.03` (mid of 1–6), `HM_LTV = 0.75`.
+- **Fixed-$ carry defaults by property_kind:** insurance $150/mo, utilities $250/mo, HOA from data or $0 — all published REIkit midpoints.
+- `senior_cost`, `raw.equity.payoff_estimate`, `li.opening_bid` — already parsed.
+- No paid data required; every parameter is a published industry benchmark or an existing field.
+
+### Accuracy impact vs our current approach
+
+- **Current:** single fixed `0.75×ARV − rehab`, then lien/payoff nets; separate `total_investment` stack that never feeds the bid; holding as flat 6%-of-bid × months. The 2026-06 fix already moved median bid/resale from **57%→69%** and cut auction-losing (<55%) rate **45%→32%** by dropping the double-charged fee and using 0.75 — but that hardcoded 0.75 is only correct for the mid-ARV/mid-velocity case.
+- **Expected gain from the stack-derived multiplier:** it *tightens the tails* the fixed constant gets wrong. Low-ARV deals (where 0.75 currently over-bids because fixed $ costs aren't captured) drop into the 0.60–0.65 range that pros use — reducing over-bids that turn into money-pit losses. Slow-velocity rural leads (the exact case the backtest flags as heavy-tailed) get longer holds → lower bids → fewer negative-margin buys. Institutional AVM/underwriting practice is a full bottom-up stack; converging on it is what makes each `max_bid` **defensible line-by-line** ("here is the $X taxes, $Y hard-money interest, $Z commission") rather than "trust the 0.75."
+- **Financing correction** is the single largest $ accuracy improvement: understating carry 2–3× on leveraged deals directly inflates `estimated_profit`; fixing it de-inflates ROI to a number an actual lender would underwrite.
+
+### Build (specific function/change + effort)
+
+**File:** `src/foreclosure_scraper/valuation/calc.py`.
+
+1. **Add constants** (near lines 41–47): `HM_RATE=0.11`, `HM_POINTS=0.03`, `HM_LTV=0.75`, `INSURANCE_MO=150`, `UTILITIES_MO=250`, `PROFIT_PCT=0.15`, `PROFIT_FLOOR=25000`, `MULT_MIN=0.55`, `MULT_MAX=0.80`. *(~10 min)*
+2. **New helper `_implied_multiplier(arv, assessed, holding_months, property_kind) -> float`** returning the clamped stack-derived multiplier. *(~30 min)*
+3. **Rewrite the `max_bid_70` block** (lines ~641–652) to call `_implied_multiplier` instead of the literal `0.75`; keep the existing `senior_cost` / surviving-payoff subtraction unchanged. *(~20 min)*
+4. **Add `Calc` fields + per-strategy compute** `max_bid_flip / max_bid_brrrr / max_bid_subto / recommended_strategy`, and tie `assignment_fee` to `clamp(0.40*estimated_profit, 5000, 25000)`. *(~45 min)*
+5. **Fix holding in `total_investment`** (lines ~742–753): replace `bid*HOLDING_RATE_MONTH*months` with itemized carry + `HM_POINTS*loan + HM_RATE/12*loan*months` where `loan = HM_LTV*(bid+rehab)`. *(~30 min)*
+6. **Re-run** `scripts/backtest_arv.py` and recompute the board via `web_artifact.load_board()` (per board-writer rule) to confirm median bid/resale and <55% rate hold or improve. *(~20 min)*
+
+**Total effort: ~2.5–3 hours.** Low risk — every change either replaces a constant with a data-derived value or adds parallel fields; the existing lien/payoff/double-count guards are untouched.
+
+Relevant files: `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/valuation/calc.py` (constants L41-47, ARV L258-541, rehab L558-620, max_bid L641-720, cost stack L742-758), `/Users/cashhigh/foreclosure-scraper/scripts/backtest_arv.py` (validation harness).
