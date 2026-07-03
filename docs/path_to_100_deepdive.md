@@ -6631,3 +6631,451 @@ Corrections to apply
 - **Claim 4 (transactional funding):** Fix the fee wording — it's typically **1-2.5% of the A-B price OR a flat minimum (~$750-$1,000), whichever is greater**, not "1.5-2.5% *plus* a $400-900 fee." Avoid presenting the percent and the flat fee as additive. Same-day is correct.
 - **Claim 2 (BRRRR):** Add nuance — 75% cash-out returns capital only if all-in is **below** 75% ARV (net of closing costs); full 75% LTV generally requires 6-month seasoning (3-6 mo often caps at 70%); 2026 rates are pushing buy-in toward 65-70% of ARV.
 - **Claim 5 (probate window):** Keep "avoid the first 30 days," but reframe the upper bound — "~30-120 days" is a reasonable heuristic, not a sourced standard; soften to "roughly 1-4 months after filing, once the initial grief period passes."
+
+
+---
+
+# Deep-Dive Round 19 — Per-Facet Legal Deep-Dive (2026-07-02; research brief, not legal advice)
+
+
+## NC Wholesaler Licensing (Chapter 93A)
+
+### The rule (statute/rule cite + the operative language)
+
+**The license requirement — G.S. 93A-1:** "it shall be unlawful for any person, partnership, corporation, limited liability company, association, or other business entity in this State **to act as a real estate broker, or directly or indirectly to engage or assume to engage in the business of real estate broker or to advertise or hold himself or herself or themselves out as engaging in or conducting such business without first obtaining a license** issued by the North Carolina Real Estate Commission."
+
+**What counts as "broker" — G.S. 93A-2(a):** a broker is anyone who, "for a compensation or valuable consideration or promise thereof," **"sells or offers to sell, buys or offers to buy, … or negotiates the purchase or sale or exchange of real estate … for others."** The load-bearing phrase is *for others* and *for compensation*. Acting on your own account, for your own account, is not brokerage.
+
+**The self-dealing exception — G.S. 93A-2(c)(7):** the Chapter does not apply to "Any individual owner who personally leases or sells the owner's own property." (A contract purchaser holds equitable title, which is the doctrinal hook for the assignment being an owner-of-an-interest transaction, not a brokerage-for-others transaction.)
+
+**The NCREC's official position (November 2023 Bulletin, "Brokers & Consumers Should Beware of Unlicensed Activity in North Carolina"):** "A real estate license is **not** required in North Carolina for a **bona fide buyer to assign their rights and interests in a purchase contract to a third party.**" But the same bulletin lists conduct that *does* require a license (see below).
+
+**⚠️ RECENTLY CHANGED / UNSETTLED — H 797 (2025-2026), "Residential Property Wholesaling Protection":** This bill would amend G.S. 93A-2 to fold wholesaling into the broker definition — making it licensed activity to "solicit homeowners for purchase contracts of their property" (unless for the solicitor's own residence) and to "market or sell purchase contracts for residential property for consideration." It also adds a **non-waivable 30-day homeowner right to cancel**, a **14-point-font cancellation disclosure**, and a **10-business-day refund** requirement. **Status as of this brief: NOT law.** It passed the House 103-0 on 4/30/2025 and has sat in the Senate Rules and Operations Committee since 5/1/2025 with no further action. Proposed effective date is October 1, 2025 *if enacted*, applying to contracts on/after that date. **Counsel must re-check this bill's status before every campaign cycle** — if it passes, the compliant model below changes materially (solicitation itself becomes licensed activity, and the double-close does not cure the solicitation problem).
+
+### What it means operationally (what you can/can't do)
+
+**Legal without a license (today):** Enter a purchase contract as a genuine, intended buyer, then assign your equitable interest in that specific contract to an end-buyer for an assignment fee. You are transferring *your* interest, not brokering the seller's property for the seller.
+
+**What crosses into unlicensed brokerage — the NCREC's enumerated red-line conduct:**
+- "Soliciting and marketing to sellers that the wholesaler will purchase a property for cash **when the wholesaler has no intention of personally purchasing** the property, but instead plans to secure buyers for a fee" (the classic "phantom buyer" problem — you never intended to close).
+- "**Misrepresenting their ownership interest** in the property" (marketing the *property* rather than *your contract*).
+- "**Negotiating purchase contracts between a seller and a buyer**" (acting between the two parties).
+- "Collecting, handling and delivering due diligence fees and earnest money deposits **on behalf of third parties**."
+- "Soliciting and marketing of buyers generally, **unconnected to the transfer of a specific assigned purchase contract**" (running a buyers list as a business rather than assigning one deal you actually control).
+
+The dividing line: are you moving *your own contractual interest* (legal), or are you functioning as an intermediary earning a fee for connecting a seller and a buyer on a property you never intended to own (illegal brokerage)?
+
+### Penalties / enforcement (real consequences)
+
+- **Criminal — G.S. 93A-8:** "Any person violating G.S. 93A-1 shall upon conviction thereof be deemed guilty of a **Class 1 misdemeanor.**" (Up to 120 days, punishment tier by prior record; NCREC characterizes this as "only one step below a felony." Criminal cases are prosecuted by the local District Attorney.)
+- **Civil injunction — G.S. 93A-6(b):** the Commission, through the Attorney General's Office, may seek an **injunction in Superior Court** to halt the unlicensed activity.
+- **Fee forfeiture / unenforceability:** an unlicensed person generally cannot sue to recover a brokerage-type compensation, and a court can order **disgorgement** of an unlawfully earned fee.
+- **Enforcement path (per the NCREC bulletin):** a complaint triggers a Regulatory Affairs Division investigation → the Commission first tries to get the person **licensed** → failing that, seeks a **cease-and-desist consent agreement** → failing that, escalates to formal enforcement (injunction and/or DA referral).
+- **Note:** because you are unlicensed, the Commission cannot discipline a *license* — but it can and does refer for the criminal charge and injunction, and the record follows any future license application.
+
+### How to stay compliant (the concrete practice)
+
+1. **Be a real principal buyer.** Sign the purchase contract in your (or your entity's) name with genuine intent and ability to close. Do not market the property until you are under contract.
+2. **Market the contract, not the property.** All advertising and outreach to end-buyers must be framed as *assigning your contractual/equitable interest in a specific deal you already control*, never as listing or selling the seller's house.
+3. **Disclose the assignment to the seller** in writing (that you may assign, and that you are a buyer/investor, not their agent). Never represent that you act *for* the seller.
+4. **Don't touch other people's money.** Do not collect, hold, or deliver earnest money or due-diligence fees on behalf of the seller or end-buyer; keep escrow with a neutral attorney/closing agent.
+5. **Use the double-close where solicitation looks aggressive or ownership-marketing is a risk.** A back-to-back (A→B, then B→C) double-close makes you the actual titleholder for the second sale, so you are unambiguously selling *your own property* under the 93A-2(c)(7) owner exception rather than brokering. **This is the safer structure and is generally treated as compliant** — but it is a *cure for the "not a bona fide owner" problem, not a license substitute for solicitation.* It costs a second set of closing fees and requires funds (or transactional/"same-day" funding). **Caveat: if H 797 passes, the double-close does not cure the newly-licensed act of *soliciting homeowners* — the trigger moves upstream to marketing/solicitation, and even a double-closer would need a license and the cancellation-disclosure regime.**
+6. **Keep volume/pattern in mind.** A high-volume, systematic wholesaling operation reads far more like "engaging in the business of real estate broker" (the exact 93A-1 language) than an occasional principal assignment. The more it looks like a repeating fee-for-connection business, the higher the risk.
+7. **Get counsel to re-verify H 797's status before each solicitation campaign**, and — separately — confirm the parallel SC rule, since the operation spans Upstate SC where the analysis differs.
+
+### For engine: any field/flag to compute
+
+- `wholesale_structure` — enum: `assignment` | `double_close`. Default record-keeping field per deal.
+- `bona_fide_buyer_intent` — bool; require an affirmative attestation on any deal marketed before close (guards the "phantom buyer" 93A red-line).
+- `marketed_as_contract_not_property` — bool; QA flag on outreach copy (must describe assigning *the contract*, not selling *the house*).
+- `handled_third_party_funds` — bool; if true, flag as HIGH compliance risk (NCREC-enumerated violation).
+- `seller_assignment_disclosure_on_file` — bool; blocker if false.
+- `nc_h797_status` — enum: `pending` | `enacted`; a single global config flag. **If `enacted`:** (a) any `residential` + NC deal requires `broker_license_on_file=true` OR routes to a licensed partner; (b) auto-attach the 30-day cancellation clause (14-pt) and enforce the 10-business-day refund SLA; (c) block solicitation outreach on unlicensed accounts. Wire a monthly check against ncleg.gov/BillLookup/2025/H797.
+- `state` gate — this brief is NC-only; SC wholesaling has a separate statute/commission posture and must not inherit these flags.
+
+**NOT legal advice — research brief for counsel. Verify H 797's current status (it was engrossed and sitting in Senate Rules as of 5/1/2025) before relying on the "today" analysis.**
+
+Sources:
+- [G.S. 93A-1 (license required)](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_93A/GS_93A-1.pdf)
+- [G.S. 93A-2 (definitions & exceptions)](https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_93A/GS_93A-2.html)
+- [G.S. 93A-8 (penalty — Class 1 misdemeanor)](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_93A/GS_93A-8.pdf)
+- [NCREC Bulletin — Brokers & Consumers Should Beware of Unlicensed Activity in NC (Nov 2023)](https://bulletins.ncrec.gov/brokers-consumers-should-beware-of-unlicensed-activity-in-north-carolina/)
+- [H 797 (2025-2026) bill history/status — NCGA](https://www.ncleg.gov/BillLookup/2025/H797)
+- [H 797 bill summary — UNC SOG Legislative Reporting Service](https://lrs.sog.unc.edu/billsum/h-797-2025-2026)
+
+
+## SC Wholesaler Licensing + the "Can't Show the Property" Problem
+
+### The rule (statute/rule cite + the operative language)
+
+**South Carolina now defines and effectively bans unlicensed wholesaling by statute.** Act 204 of 2024 (H.4754), signed by Gov. McMaster, revised the Real Estate Practice Act (S.C. Code § 40-57-5 *et seq.*), **effective May 21, 2024**.
+
+- **§ 40-57-30(44) — definition of "wholesaling":** *"Having a contractual interest in purchasing residential real estate from a property owner, then marketing the property for sale to a different buyer prior to taking legal ownership of the property. Advertising or marketing real estate owned by another individual or entity with the expectation of compensation falls under the definition of 'broker' and requires licensure. 'Wholesaling' does not refer to the assigning or offering to assign a contractual right to purchase residential real estate."*
+
+- **§ 40-57-30(6) — definition of "broker"** captures anyone who, for compensation or with the intent/expectation of it, negotiates the sale/purchase of real estate or *"(f) advertises or otherwise represents to the public as being engaged in any of the foregoing activities."*
+
+- **§ 40-57-135 — the contract-marketing carve-out (the operative trap):** *"An advertisement that markets a contractual position to acquire real property from a person with either equitable or legal title and does not imply, suggest, or purport to sell, advertise, or market the underlying real property is permissible under this section."*
+
+- **§ 40-57-240 — owner exemption** is limited to *"the sale... of real estate by an unlicensed owner... if the interest being sold... is identical to the owner's legal interest."* (An equitable/contract interest is **not** identical to legal title, so a wholesaler does not qualify.)
+
+- **§ 40-57-350(A) — brokerage prohibition:** *"a real estate brokerage firm and its subagents are prohibited from engaging in, representing others in, or assisting others in the practice of wholesaling."* (So being licensed does **not** cure it — licensees are barred outright.)
+
+- **SCREC Advisory Opinion, Nov. 14, 2024** ("Advisory Opinion on Exceptions to Wholesaling") is the controlling agency interpretation and is quoted throughout below.
+
+### What it means operationally (what you can/can't do)
+
+**Does SC require a license to wholesale?** Effectively, yes — if you market the *property*. Marketing real estate you don't yet own, with expectation of compensation, is the practice of a "broker" and requires licensure. There is no unlicensed-wholesaler lane.
+
+The Commission breaks wholesaling into **four elements** (all must be present to be prohibited wholesaling): (1) a contractual interest to purchase residential real estate; (2) marketing/advertising the property before taking ownership; (3) expectation of compensation; (4) a legal instrument (e.g., assignment) used to transfer the interest for that compensation.
+
+**Assignment vs. double-close in SC:**
+- **The assignment itself is legal.** The statute expressly says wholesaling *"does not refer to the assigning or offering to assign a contractual right."* The REC confirms *"assigning a contractual interest is not automatically considered wholesaling."* What is banned is **marketing the property** while under contract, not the assignment mechanic.
+- **Assignments that are clearly fine (REC's own examples):** assigning your contract to a spouse, or to your own corporate entity/another person, *"There is no marketing, advertising, or expectation of compensation in such transactions."*
+- **Double-close (buy then resell on legal title) sidesteps the wholesaling definition entirely** — once you take legal ownership, you are the owner selling your identical legal interest, which is exactly what § 40-57-240 exempts. In SC, the double-close is the structurally safer path because it removes element (2) "prior to taking legal ownership." (Cost: two sets of closing costs, transfer fees, and funding for the A-B leg.)
+
+**The "can't show the property" trap — what you can legally advertise:** Almost nothing about the house. § 40-57-135 lets you market only the *contractual position*, and only if you do **not** "imply, suggest, or purport to" market the underlying real property. The REC states the two requirements are joined by "and" (both must be met) and then says the quiet part out loud:
+
+> *"the REC notes that advertising or marketing a contractual position without implying, suggesting, or purporting to sell, advertise, or market the underlying real property is practically impossible... there is no market for purchasing random contracts for unknown items."*
+
+The REC lists what will **cross the line** into illegal property-marketing if included in any ad for a "contractual position" — this is the concrete blacklist:
+1. A picture of the property/land/house
+2. A plat or survey
+3. Any description (rooms/bedrooms/bathrooms, square footage)
+4. Year built/rehabbed
+5. Condition of the property/improvements
+6. **The address, tax map number, or any whole/partial legal description**
+7. Rental income history
+8. The neighborhood or subdivision
+9. Any details related to the property or improvements
+
+"Marketing/advertising" is construed **very broadly**: *"MLS, social media, print media, Facebook groups, private email groups, verbal communication, etc."* — so a "private cash-buyer list" email blast counts, and even verbal disclosure of the address counts. The REC's only surviving compliant example is passive: someone *"is approached about contracts they hold on properties in a particular area, without making any effort to market or advertise the property for sale."* And a disclaimer does not save you: *"if someone could simply state through a disclaimer or header that they are only selling a contract... then there would have been no need to define wholesaling."*
+
+**Bottom line:** In SC you cannot run the classic wholesale model (get property under contract → blast the address/photos/specs to a buyer list → assign for a fee). That fact pattern is prohibited unlicensed brokerage.
+
+### Penalties / enforcement (real consequences)
+
+- **Criminal:** Unlicensed practice of a regulated profession under Title 40 is a **misdemeanor**; under S.C. Code **§ 40-1-200**, on conviction a violator *"must be imprisoned not more than one year or fined not more than fifty thousand dollars"* ($50,000). Acting as/advertising as a broker without an active license is separately unlawful under § 40-57-20.
+- **Administrative / civil:** The Real Estate Commission (through Title 40, Ch. 1 and Ch. 57) can investigate, hold disciplinary hearings, issue **cease-and-desist** orders, and impose fines/costs; unlicensed activity is *"subject to disciplinary action."* The general Title 40 board fine authority (§ 40-1-120) reaches administrative penalties per violation in addition to the criminal exposure.
+- **Transactional risk:** Beyond agency penalties, marketing that violates § 40-57-135 taints the deal — an unlicensed-brokerage taint can expose the wholesaler to rescission/compensation-recovery claims and unenforceability arguments from a counterparty.
+- **Licensee-specific:** If anyone on the team is a licensed broker/agent, § 40-57-350(A) makes *participating in or assisting* wholesaling a direct license-discipline violation (suspension/revocation), independent of the criminal statute.
+
+*Note: the exact per-violation administrative fine ceiling under Ch. 57's disciplinary sections (40-57-710 series) should be confirmed by counsel against the current codified text; the $50,000/1-year figure is the Title 40 Ch. 1 criminal backstop that applies to REC-regulated conduct.*
+
+### How to stay compliant (the concrete practice)
+
+1. **Prefer the double-close in SC.** Take legal title (even briefly, via transactional/same-day funding), then sell your identical legal interest as the owner under the § 40-57-240 exemption. This removes the "prior to taking legal ownership" element and takes the deal out of the wholesaling definition entirely.
+2. **If assigning, do NOT market the property — market nothing public at all.** No address, tax map number, photos, plat, sqft, beds/baths, condition, subdivision, rent roll, or "any details related to the real property," in **any** channel (MLS, social, Facebook groups, private buyer-list emails, texts, or verbal). A disclaimer will not save an ad that reveals the property.
+3. **Treat the disposition side as a genuinely private, non-marketed transfer** — e.g., an already-established relationship where the counterparty is buying *your position* and independently diligences the property, not a mass blast. Recognize the REC's view that compliant contract-only marketing is *"practically impossible,"* so the realistic compliant paths are (a) double-close, (b) get an SC broker license, or (c) assign to a spouse/own entity/known party with no marketing.
+4. **Do not use any licensed agent to help market/assign** the contract — § 40-57-350(A) bars licensees from assisting wholesaling, so co-opting an agent creates a second violation.
+5. **Written contract hygiene:** Keep purchase agreements clearly assignable, keep expectation-of-compensation off any public-facing material, and route all disposition communications through counsel-reviewed templates.
+6. **Have SC counsel bless the exact fact pattern before scaling** — this is a 2024 statute with a 2024 advisory opinion and essentially no case law yet (see below), so the enforcement posture is still forming.
+
+### Where the law is unsettled / recently changed
+
+- **New and largely untested:** The wholesaling ban is barely a year old (eff. May 21, 2024). There is **no reported SC case law** applying § 40-57-30(44) or § 40-57-135 yet — the Nov. 14, 2024 REC advisory opinion is the primary interpretive gloss, and advisory opinions are persuasive, not binding law. How aggressively the REC and solicitors pursue unlicensed wholesalers, and how courts read "imply, suggest, or purport," remains open.
+- **The § 40-57-135 carve-out is a near-dead letter by the REC's own admission** ("practically impossible"), so relying on "I only marketed the contract" is high-risk until a court says otherwise.
+
+### For engine: any field/flag to compute
+
+Per-lead / per-deal flags to compute in the pipeline:
+
+- `sc_wholesale_regulated` (bool) — true if property is **residential** real estate in SC (the statute is limited to "residential real estate"; commercial/land is arguably outside § 40-57-30(44) — flag `asset_class` and set false for non-residential to route those to a lighter-touch lane; confirm with counsel).
+- `disposition_strategy` (enum: `double_close` | `assign` | `wholetail_after_close`) — default SC residential to `double_close`.
+- `marketing_channel_risk` (enum/high-low) — flag any disposition asset that contains address, tax map/TMS, parcel_id, photos, plat, sqft, beds/baths, year built, condition, subdivision/neighborhood, or rent roll as `PROHIBITED_IF_UNLICENSED` when `disposition_strategy = assign` and state = SC.
+- `has_sc_broker_license` (bool) — if false AND `disposition_strategy = assign` AND any property detail is exposed publicly → `compliance_block = true`.
+- `buyer_relationship` (enum: `known_party` | `own_entity` | `spouse` | `public_list`) — REC-safe assignments require non-`public_list`; `public_list` + property detail = violation.
+- `state` gate — apply this entire ruleset only where `state = SC`; NC has its own (different) wholesaling regime and should not inherit these flags.
+- `residential_flag` join from assessor property-use code to drive `sc_wholesale_regulated`.
+
+**NOT legal advice — research brief for counsel.** Confirm current codified text of §§ 40-57-30(44), 40-57-135, 40-57-240, 40-57-350, and the Ch. 57/Ch. 1 penalty sections against the live statute before relying on any dollar figure or the residential-only scope.
+
+Sources:
+- [SCREC Advisory Opinion on Exceptions to Wholesaling, Nov. 14, 2024 (LLR)](https://llr.sc.gov/re/News/Wholesaling-Assignment-of-Contracts-Guidance.pdf)
+- [S.C. Code Title 40, Chapter 57 (SC Statehouse)](https://www.scstatehouse.gov/code/t40c057.php)
+- [S.C. Code § 40-1-200 — Unlawful practice (Justia)](https://law.justia.com/codes/south-carolina/title-40/chapter-1/section-40-1-200/)
+- [2023–2024 Bill H.4754 text (SC Legislature)](https://www.scstatehouse.gov/sess125_2023-2024/prever/4754_20240509.htm)
+- [SC REALTORS — "SC Regulates Wholesaling in New RE License Law"](https://screaltors.org/sc-regulates-wholesaling-in-new-re-license-law/)
+
+
+## Manufactured-Home Titling Detection (SC + NC)
+
+A manufactured home (MH) is born as **personal property** — a vehicle with a DMV certificate of title, exactly like a car. It only becomes **real property** (part of the land) if a specific statutory de-titling process is completed and a specific document is recorded at the Register of Deeds (ROD). Until that happens, the land and the home can have **two different owners**, the deed you buy conveys **only the dirt**, and the seller's recorded chain of title says nothing about who owns the box people live in. This is a deal-killer, and it is invisible unless you look for the right recorded instrument. The two states run parallel systems with different document names.
+
+### The rule (statute/rule cite + the operative language)
+
+**North Carolina — de-title (personal → real):** Two-step process. First, DMV cancellation under **G.S. 20-109.2**; then ROD recording under **G.S. 47-20.6**.
+
+- **G.S. 20-109.2 (surrender & cancellation of title):** the owner submits "*an affidavit to the Division that the manufactured home meets this definition and surrender[s] the certificate of title to the Division*" (DMV form **MVR-46G**, "Affidavit for Removal of Manufactured Home from Vehicle Registration Files"). "*Upon compliance with the procedures … the Division shall rescind and cancel the certificate of title.*" **Critically for a distressed deal:** "*the Division may not cancel the title without written consent from all secured parties*" — an unpaid MH lien blocks de-titling. The statute then directs: "*The affiant or secured party shall file the affidavit returned by the Division with the office of the register of deeds of the county where the real property is located.*"
+- **G.S. 47-20.6 (recording; legal effect):** triggered when the owner "*has surrendered the title … and the title has been cancelled by the Division of Motor Vehicles under G.S. 20-109.2.*" "*After the affidavit is recorded, the manufactured home becomes an improvement to real property.*" "*Upon recordation, the affidavit shall be indexed on the grantor index in the name of the owner of the manufactured home and on the grantee index in the [name of the] secured party or lienholder, if any.*" "*Thereafter, no conveyance of any interest, lien, or encumbrance shall attach to the manufactured home, unless … applicable to the real property … and … recorded in the office of the register of deeds.*"
+- **G.S. 20-109.2 also covers untitled homes** via a recorded **Declaration of Intent to Affix** at the ROD (for homes that never had a NC title).
+
+**South Carolina — de-title ("retire the title"):** single-filing model under **S.C. Code § 56-19-510** (Article 4, "Retirement of Title Certificate to Manufactured Homes"). The owner files with the ROD/clerk of court "*the Manufactured Home Affidavit for the Retirement of Title Certificate*" together with "*proof of ownership as evidenced by a copy of the most recent deed of record*" and the filing fee. "*The register of deeds or clerk of court [shall] record the affidavit as if it were a deed to real property with the homeowner being identified as grantor and give notification to the county assessor.*" The operative effect: "*Upon the filing of the affidavit, the manufactured home is to be treated for all purposes except condemnation as real property and title to the manufactured home is thereby vested in the lawful owner of the real property to which it is affixed.*" The affidavit itself carries a **statutory warning** that its execution and filing **transfers ownership of the home to the owner of the real property**. The original manufacturer's certificate of origin and the current SC title are delivered to **SCDMV**, which cancels the title.
+
+### What it means operationally (what you can/can't do)
+
+- **Default status is personal property.** If no de-title document was ever recorded, the MH is still a DMV/SCDMV vehicle. Buying the land by deed does **not** buy the home. NCREC's own bulletin: "*a contract that listed no personal property to be conveyed when … there was a manufactured home on the property would not convey title to the home if the unit was personal property.*"
+- **Two-owner risk is real.** The land can be titled to Person A while the MH title still sits with Person B (a prior owner, a repo lender, an heir, an ex-spouse). Your recorded ownership research on the parcel will look clean while the home is owned by someone not in the deal.
+- **A live MH lien freezes conversion.** In NC, DMV cannot cancel over a lienholder's objection; in SC the DMV title can't be surrendered clean while a lien rides on it. For your distressed/foreclosure targets, this is common — the seller literally cannot de-title until the chattel loan is satisfied.
+- **You CAN detect status for free.** The de-title event is a recorded ROD instrument in both states — searchable in the same free grantor/grantee land-records index you already scrape.
+
+### Penalties / enforcement (real consequences)
+
+The risk here is not a fine — it is **loss of the asset and an unmarketable/uninsurable title**:
+
+- **Deed conveys dirt only.** If the title was never retired, your recorded deed transfers the land; the home remains personal property owned by whoever holds the DMV title. You can be left having paid land-plus-home money for land alone, with a third party legally owning the structure.
+- **Title insurance excludes it.** Title underwriters will not insure the MH as part of the realty unless the de-title chain (DMV cancellation + recorded affidavit) is shown. The closing attorney either forces the retirement before closing or **excepts the manufactured home from coverage** — meaning no title policy on the most valuable component.
+- **Lender kill / no resale exit.** No conventional or land-home lender will lend on a home that is still chattel; your buyer can't get financing, so your resale is cash-only or dead.
+- **Undischarged chattel lien survives closing.** Because the lien lives on the DMV title (not in the land records), it is not extinguished by your real-property closing and can be enforced against the home after you own the land.
+
+### How to stay compliant (the concrete practice)
+
+1. **Assume every MH is personal property until proven otherwise.** Flag any parcel whose improvement is a manufactured/mobile/modular home.
+2. **Pull the ROD land-records index for the de-title instrument.** The recorded document is the proof:
+   - **NC:** search grantor/grantee index for a recorded **"Affidavit"** stemming from **G.S. 47-20.6 / MVR-46G**, or a **"Declaration of Intent to Affix"** (untitled homes). It is indexed with the homeowner as grantor.
+   - **SC:** search the deed/ROD index for the **"Manufactured Home Affidavit for the Retirement of Title Certificate"** (§ 56-19-510), recorded **as a deed with the homeowner as grantor**.
+3. **Cross-check the county assessor/tax record.** If the home is de-titled, the assessor taxes it **as part of the real property** (one real-property tax bill). A separate personal-property/"mobile home" tax account, a decal number, or a DMV/SCDMV title record is a strong signal it is **still chattel**.
+4. **If no retirement is recorded, treat the MH as a separate asset to be run down before closing:** obtain the DMV/SCDMV title, confirm the record owner, and identify/clear any title lien. In NC, all secured parties must consent in writing before DMV cancels.
+5. **Contract for it explicitly.** Per NCREC guidance, if the parties intend the home to convey, include it in the **personal-property portion** of the purchase agreement and take a **bill of sale + assignment of the certificate of title** at closing, in addition to the deed — do not rely on the deed alone.
+6. **Route the retirement through the closing attorney/title company** (surrender to DMV → cancellation → record the affidavit at ROD) so the home is realty before your resale, restoring insurability and financeability.
+
+### For engine: any field/flag to compute
+
+Per-lead fields to add to the property record:
+
+- `is_manufactured_home` (bool) — from assessor "building type"/style codes, GIS structure class, or listing keywords (manufactured, mobile, modular, MH, VIN/HUD-tag present).
+- `mh_titling_status` (enum: `real_property` | `personal_property` | `unknown`) — default `unknown`; set `real_property` **only** if a de-title instrument is found.
+- `mh_detitle_doc_found` (bool) + `mh_detitle_doc_ref` (book/page or instrument #, recording date) — populated by scanning the ROD grantor/grantee index for:
+  - NC: `"Affidavit"` tied to 47-20.6 / MVR-46G, or `"Declaration of Intent to Affix"`.
+  - SC: `"Manufactured Home Affidavit for the Retirement of Title Certificate"` / `"Affidavit for Retirement of Title"`.
+- `mh_separate_tax_account` (bool) — true if assessor shows a distinct mobile-home/personal-property tax bill or decal → chattel signal.
+- `mh_dmv_title_active` (bool/unknown) — whether a DMV/SCDMV title still exists (often not free-verifiable; leave `unknown` and rely on the ROD + tax signals).
+- `mh_chattel_lien_present` (bool) — pull from any UCC/title-lien signal; **blocks de-titling** (NC secured-party-consent rule).
+- **Derived risk flag `mh_deal_risk`** (high) — set when `is_manufactured_home = true` AND `mh_titling_status != real_property`. This flag means: **deed alone will not convey the home; title/lender problem at closing; requires bill-of-sale + title retirement before purchase/resale.** Route these leads to the attorney-review lane, not straight to offer.
+
+**Unsettled / recently-changed flags for counsel:** (1) The controlling NCREC bulletin is old (circa 2002) and predates refinements to the affidavit-recording regime — treat its procedural detail as directional, statute as controlling. (2) NC treats **untitled** homes (never DMV-titled) differently (Declaration of Intent path) — confirm which applies. (3) Both states' **severance** statutes (NC **G.S. 47-20.7**; SC **§ 56-19-550**, "Manufactured Home Severance Affidavit") let a de-titled home be **converted back** to personal property and re-titled by DMV — so a recorded retirement is not necessarily permanent; check for a later-recorded severance affidavit. (4) SC's lien handling uses a separate **Manufactured Home Lien Affidavit** — verify lien treatment per county ROD practice. Hand to closing counsel/title underwriter for the actual clearance in any live deal.
+
+Sources: [NC G.S. 47-20.6 (ncleg)](https://www.ncleg.net/enactedlegislation/statutes/html/bysection/chapter_47/gs_47-20.6.html) · [NC G.S. 20-109.2 (ncleg)](https://www.ncleg.gov/enactedlegislation/statutes/html/bysection/chapter_20/gs_20-109.2.html) · [NC G.S. 47-20.7 (ncleg)](https://www.ncleg.gov/enactedlegislation/statutes/html/bysection/chapter_47/gs_47-20.7.html) · [NC DMV Form MVR-46G](https://www.ncdot.gov/dmv/downloads/Documents/MVR-46G.pdf) · [NCREC Bulletin — MH Real or Personal Property](https://bulletins.ncrec.gov/manufactured-homes-real-or-personal-property/) · [SC Code § 56-19-510 (Justia)](https://law.justia.com/codes/south-carolina/title-56/chapter-19/section-56-19-510/) · [SC § 56-19-550 severance (Justia)](https://law.justia.com/codes/south-carolina/2013/title-56/chapter-19/section-56-19-550/) · [Greenville County ROD — Retirement of MH Title instructions](https://www.greenvillecounty.org/realproperty/PDF/RetirementOfMobileHomeTitle.pdf) · [NC REALTORS — Selling property that includes a manufactured home](https://www.ncrealtors.org/question/selling-property-that-includes-a-manufactured-home/) · [Smith Debnam — Mobile Homes and Real Property](https://www.smithdebnamlaw.com/article/mobile-homes-and-real-property-a-strained-relationship/)
+
+
+## Surviving-Lien-at-Foreclosure Matrix (SC / NC)
+
+*Research brief for counsel — NOT legal advice. This is a max-bid input: at a foreclosure sale you take title subject to every lien that survives, so any surviving lien is a dollar-for-dollar deduction from equity. Two questions decide survival: (1) which lien is being foreclosed, and (2) is your lien senior or junior to it. The universal rule is **first-in-time, first-in-right** — a foreclosure extinguishes all liens JUNIOR to the foreclosing lien and leaves all SENIOR liens on title. The exceptions below (tax super-priority, HOA safe-harbor limits, IRS redemption, mechanic's relation-back) are where the money and the mistakes are.*
+
+### The rule (statute/rule cite + operative language)
+
+**1. First vs. junior mortgage/deed of trust (both states — common law + Article 2A of NC Ch. 45 / SC judicial foreclosure).** A senior deed of trust's foreclosure wipes out all junior mortgages, deeds of trust, and other junior encumbrances; a junior lienholder's foreclosure leaves the senior mortgage on title. This is the baseline first-in-time rule and is not seriously disputed in either state.
+
+**2. Property-tax liens — SUPER-PRIORITY, always survive.**
+- **SC — S.C. Code § 12-49-10:** "All taxes, assessments and penalties legally assessed shall be considered and held as a debt payable to the county… and such taxes, assessments and penalties shall be a **first lien in all cases whatsoever upon the property taxed**, the lien to attach at the beginning of the fiscal year during which the tax is levied." ([scstatehouse.gov](https://www.scstatehouse.gov/code/t12c049.php))
+- **NC — G.S. 105-356:** ad valorem tax liens are "superior to all other liens, assessments, charges, rights, and claims of any and every kind" regardless of when created. A tax foreclosure (in rem or mortgage-style under G.S. 105-374/375) extinguishes junior liens including mortgages; a private mortgage foreclosure does NOT touch the tax lien. ([UNC SOG Coates' Canons](https://canons.sog.unc.edu/2012/09/tax-foreclosures-and-competing-liens/))
+
+**3. HOA / COA assessment liens.**
+- **NC PLANNED COMMUNITY — G.S. 47F-3-116(d):** "A claim of lien filed under this section is prior to all liens and encumbrances on a lot except (i) liens and encumbrances… **including… a mortgage or deed of trust on the lot, recorded before the filing of the claim of lien**… and (ii) liens for real estate taxes and other governmental assessments." And **(j):** "Where the holder of a first mortgage or first deed of trust… obtains title… as a result of foreclosure of a first mortgage or first deed of trust, the purchaser… **shall not be liable for the assessments against the lot which became due prior to the acquisition of title**." ([ncleg / FindLaw](https://codes.findlaw.com/nc/chapter-47f-north-carolina-planned-community-act/nc-gen-st-sect-47f-3-116/))
+- **NC CONDO — G.S. 47C-3-116(d) and (j):** identical operative language (prior-recorded mortgage and real-estate-tax exceptions; first-mortgage foreclosure purchaser not liable for pre-acquisition assessments). ([FindLaw](https://codes.findlaw.com/nc/chapter-47c-north-carolina-condominium-act/nc-gen-st-sect-47c-3-116.html))
+- **CRITICAL — NC has NO Uniform-Act 6-month super-priority slice.** North Carolina adopted the assessment-lien section of the Uniform Common Interest Ownership Act but **deliberately omitted the six-month priority-over-first-mortgage subsection** that Nevada, D.C., etc. have. In NC the HOA/COA lien is ALWAYS junior to a prior-recorded first mortgage — no carve-out.
+- **SC — Title 27, Ch. 30 (Homeowners Association Act) is SILENT on lien priority.** The Act (as amended through 2018/S.1145) governs recording of covenants, disclosure, and document access; it does **not** create a statutory assessment lien or grant it priority. SC HOA liens arise from the **recorded covenants (contract)** and take priority by first-in-time recording of the declaration. SC is **not a super-lien state** — "a bank foreclosure will take priority over a community association's lien and does not require the lender to provide any compensation to the association." ([scstatehouse.gov Title 27 Ch.30](https://www.scstatehouse.gov/code/t27c030.php); [Nolo SC](https://www.nolo.com/legal-encyclopedia/south-carolina-hoa-coa-foreclosures.html))
+
+**4. Municipal water/sewer/nuisance-abatement/demolition liens.**
+- **NC — G.S. 160A-193 (nuisance abatement) and 160D-1203:** the abatement cost "is a lien on the… premises… and shall have the **same priority and be collected as unpaid ad valorem taxes**." These carry Machinery Act (tax) priority — they survive a mortgage foreclosure. **Demolition** liens are junior to property-tax liens but still collected as taxes. **Note the split:** a nuisance lien on the *offending* parcel gets tax priority; a nuisance lien recorded against the owner's *other* property "is inferior to all prior liens and shall be collected as a money judgment." ([FindLaw 160A-193](https://codes.findlaw.com/nc/chapter-160a-cities-and-towns/nc-gen-st-sect-160a-193.html); UNC SOG)
+- **NC water/sewer:** unpaid utility charges are generally a contractual debt, NOT an automatic tax-priority lien, unless a special assessment under G.S. 160A-233 (special assessments — enforced with tax-lien priority and foreclosure). Verify per-municipality.
+- **SC:** municipal abatement/demolition/weed-cutting costs are typically assessed and collected **as property taxes** under local ordinance authority, giving them § 12-49-10 first-lien priority; utility charges are contractual. Confirm the specific ordinance.
+
+**5. IRS federal tax lien — survives with a 120-day redemption right.** **26 U.S.C. § 7425(d)(1):** in a sale to satisfy a lien "prior to that of the United States, the Secretary may redeem such property within the period of 120 days from the date of such sale or the period allowable for redemption under local law, whichever is longer." **§ 7425(b) / 26 CFR 400.4-1:** to extinguish the federal lien, the foreclosing party must give the IRS written notice **≥ 25 days before the sale** (if the NFTL was filed > 30 days before sale). **28 U.S.C. § 2410(c)** sets the redemption payoff. If notice is defective, the federal lien **survives the sale entirely.** ([26 USC 7425](https://www.law.cornell.edu/uscode/text/26/7425); [28 USC 2410](https://www.law.cornell.edu/uscode/text/28/2410))
+
+**6. State tax lien.**
+- **SC — SCDOR liens (Title 12):** recorded in the statewide DOR lien registry; priority runs from date of filing (first-in-time). Junior state liens are wiped by a senior mortgage/tax foreclosure; a state lien senior to the foreclosing lien survives.
+- **NC — G.S. 105-241.22 / 44-66:** state tax liens attach and rank by docketing/filing date; treated like judgment liens for priority, junior liens wiped by senior foreclosure.
+
+**7. Mechanic's / materialman's lien.**
+- **NC — G.S. Ch. 44A, Art. 2:** priority **relates back to the date of first furnishing of labor or materials at the site.** § 44A-13/44A-14: "The sale… shall pass all title and interest of the owner to the purchaser, good against all claims or interests recorded, filed or arising **after the first furnishing** of labor or materials." So a mechanic's lien can be SENIOR to (and survive) a later-recorded deed of trust — UNLESS the Notice to Lien Agent rules (§ 44A-11.2) cut off relation-back. This is a real trap: a construction-era deed of trust may be junior to a first-furnishing that predates it. ([NCGS Ch. 44A](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/ByChapter/Chapter_44a.pdf))
+- **SC — S.C. Code § 29-5-10 et seq.:** **NO relation-back.** SC follows strict first-in-time — "a properly filed mechanic's lien will not take priority over a previously recorded mortgage." Junior mechanic's lien is wiped by senior mortgage foreclosure; must be filed within 90 days of last furnishing and foreclosure suit + lis pendens within 6 months. ([scstatehouse.gov § 29-5-10](https://www.scstatehouse.gov/code/t29c005.php))
+
+**8. Judgment lien.**
+- **NC — G.S. 1-234:** a judgment becomes a lien on the debtor's real property when **docketed** in the county; priority by docketing date. Junior docketed judgments wiped by senior foreclosure; senior docketed judgment survives.
+- **SC — S.C. Code § 15-35-810:** enrolled/transcribed judgment is a lien for 10 years; priority by enrollment date; first-in-time. Junior wiped, senior survives.
+
+### What it means operationally (survival matrix)
+
+Read every row as: *"When the [foreclosing lien] forecloses, does the [other lien] survive?"* — plus the always-survivors.
+
+| Lien type | SC — survives a senior-mortgage foreclosure? | NC — survives a senior-mortgage foreclosure? | Key mechanic |
+|---|---|---|---|
+| **1st mortgage / DoT** | Yes if senior; wiped if junior | Same | First-in-time by recording |
+| **Junior mortgage / DoT** | **Wiped** by senior foreclosure | **Wiped** | Baseline |
+| **Property tax** | **ALWAYS survives** (§12-49-10 first lien) | **ALWAYS survives** (G.S. 105-356) | Super-priority, ignores recording order |
+| **HOA / COA assessment** | Wiped if covenant recorded after mortgage; **not a super-lien** — junior HOA lien gone | **Wiped** vs. prior first mortgage (47F/47C-116(d),(j)); **no 6-mo slice** | Buyer at 1st-mtg foreclosure takes free of pre-sale dues |
+| **Municipal nuisance/demolition** | Survives if assessed-as-taxes (per ordinance) | **Survives** (160A-193 = tax priority); demolition tax-collected | On offending parcel = tax priority |
+| **Water/sewer** | Contractual unless special-assessed | Contractual unless G.S. 160A-233 assessment | Verify per municipality |
+| **IRS federal tax** | **Survives 120 days** post-sale (redemption right) even when otherwise junior; survives entirely if no 25-day notice | Same | §7425 redemption + notice |
+| **State tax (DOR)** | Survives if senior; junior wiped | Survives if senior; junior wiped | First-in-time by filing/docketing |
+| **Mechanic's / materialman** | Junior wiped (no relation-back) | **May survive** a later DoT via first-furnishing relation-back | NC relation-back is the trap |
+| **Judgment** | Junior wiped; senior (earlier enrollment) survives | Junior wiped; senior (earlier docketing) survives | First-in-time |
+
+Practical takeaways at the sale: (a) **Always survives regardless of what you buy at:** county/city property taxes and NC nuisance/demolition liens. (b) **Survives even if it looks junior:** IRS lien for 120 days (you can be redeemed out — you get your money back plus statutory interest, but you lose the deal), and — in NC only — a mechanic's lien whose first-furnishing predates the foreclosed deed of trust. (c) **You take FREE of** HOA back-dues when you buy at a first-mortgage foreclosure in NC (statutory) and generally in SC (junior covenant lien wiped). (d) **If you buy at an HOA or junior-lien foreclosure,** you take **subject to** the senior first mortgage and all taxes — that mortgage is a live payoff, not wiped.
+
+### Penalties / enforcement (real consequences)
+
+These are financial-survival facts, not regulatory penalties: a surviving lien that you missed is a direct loss.
+- **Buy subject to a surviving senior mortgage** thinking it was wiped → you owe the full mortgage payoff or lose the property to the senior's foreclosure. Total loss of the purchase price.
+- **IRS redemption (§7425(d)):** within 120 days the U.S. can take the property from you by paying your bid + expenses + 6% interest. You don't lose money but you lose the asset and any rehab already spent that isn't reimbursable.
+- **Surviving tax / nuisance / demolition lien:** the county can tax-foreclose the property out from under you for a debt you didn't create.
+- **NC mechanic's relation-back:** you can win at a foreclosure of the construction lender's deed of trust and still find a materialman's lien senior to it, foreclosing ahead of your title.
+- **UPL / notice:** none of this creates licensing exposure for the buyer, but a foreclosing party that fails IRS notice or fails to join a junior lienholder as a party leaves that lien alive on the buyer's title.
+
+### How to stay compliant (concrete practice)
+
+1. **Order a title/lien search before every bid** and classify each lien as senior or junior to the foreclosing instrument by recording/docketing/filing date. This is the whole game.
+2. **Confirm which lien is foreclosing.** Reading the notice of sale, identify the foreclosing instrument (1st DoT? HOA? tax?) — everything junior to it dies, everything senior survives.
+3. **Always deduct, never assume wiped:** property taxes (SC 12-49-10 / NC 105-356), NC nuisance/demolition liens, and any recorded federal tax lien — treat as surviving until proven otherwise.
+4. **Check the IRS 25-day notice** was given (§7425(b)); if not, the federal lien survives your purchase. Even with proper notice, **reserve for the 120-day redemption window** before deploying rehab capital when an NFTL is present.
+5. **NC construction context:** pull the Notice-to-Lien-Agent / first-furnishing dates before bidding on any recently-built or recently-renovated property; a mechanic's lien may outrank the foreclosed deed of trust.
+6. **HOA back-dues:** in NC, if buying at a first-mortgage foreclosure you are statutorily clear of pre-sale assessments (47F/47C-116(j)) — do not let the association bill you for them; but you DO owe assessments accruing after your acquisition. In SC confirm the covenant recording date vs. the foreclosed mortgage.
+7. **Get counsel to run priority for any deal where** an IRS lien, a state tax lien, a NC mechanic's lien, or an HOA/junior foreclosure is present — these are the four fact patterns that flip outcomes.
+8. **Flag as unsettled / recently changed:** SC's HOA Act (Title 27 Ch. 30) is comparatively new (2018) and does NOT codify lien priority — priority still rests on covenant law and case law, so treat SC HOA-lien survival as fact-specific; and NC's Notice-to-Lien-Agent regime (post-2013) materially narrowed mechanic's relation-back, so pre-2013 assumptions are stale.
+
+### For engine: fields/flags to compute
+
+Per property, capture the full lien stack with dates, then compute survival and a lien-adjusted max bid:
+
+- `foreclosing_lien_type` (1st_mtg | jr_mtg | hoa | tax | mechanic | judgment) — drives which junior liens die.
+- `foreclosing_lien_priority_date` — recording/docketing/filing date of the instrument being foreclosed.
+- For each lien in the stack: `lien_type`, `lien_priority_date`, `lien_amount`, `is_senior_to_foreclosing_lien` (bool = lien_priority_date < foreclosing_lien_priority_date), `survives` (bool).
+- `surviving_lien_total` = Σ(lien_amount where survives) — the dollar figure to subtract from ARV/equity.
+- `always_survive_flags`: `property_tax_owed` (SC 12-49-10 / NC 105-356 — always survives), `nc_nuisance_demolition_lien` (NC — tax priority, always survives).
+- `irs_lien_present` (bool) + `irs_redemption_expires` = sale_date + 120 days → **hold-rehab-capital-until** date; `irs_25day_notice_given` (bool; if false → `irs_lien_survives_entirely` = true).
+- `nc_mechanic_relation_back_risk` (bool) = state==NC AND recent_construction AND mechanic_first_furnishing_date < foreclosing_lien_priority_date.
+- `hoa_backdues_wiped` (bool) = TRUE when foreclosing_lien_type==1st_mtg (NC statutory; SC if covenant junior); else buyer owes.
+- `state` (SC | NC) — toggles the mechanic's-lien relation-back rule (NC yes / SC no) and the HOA statutory-safe-harbor rule (NC codified / SC covenant-based).
+- `max_bid_lien_adjusted` = base_max_bid − surviving_lien_total − (irs_present ? redemption_carry_cost : 0).
+
+**Sources:** [S.C. Code § 12-49-10](https://www.scstatehouse.gov/code/t12c049.php) · [S.C. Title 27 Ch. 30 (HOA Act)](https://www.scstatehouse.gov/code/t27c030.php) · [S.C. Code § 29-5-10 (mechanic's)](https://www.scstatehouse.gov/code/t29c005.php) · [G.S. 47F-3-116 (NC Planned Community)](https://codes.findlaw.com/nc/chapter-47f-north-carolina-planned-community-act/nc-gen-st-sect-47f-3-116/) · [G.S. 47C-3-116 (NC Condo)](https://codes.findlaw.com/nc/chapter-47c-north-carolina-condominium-act/nc-gen-st-sect-47c-3-116.html) · [G.S. 160A-193 (NC nuisance lien)](https://codes.findlaw.com/nc/chapter-160a-cities-and-towns/nc-gen-st-sect-160a-193.html) · [NCGS Ch. 44A (mechanic's)](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/ByChapter/Chapter_44a.pdf) · [UNC SOG — Tax Foreclosures & Competing Liens](https://canons.sog.unc.edu/2012/09/tax-foreclosures-and-competing-liens/) · [26 U.S.C. § 7425](https://www.law.cornell.edu/uscode/text/26/7425) · [28 U.S.C. § 2410](https://www.law.cornell.edu/uscode/text/28/2410) · [Nolo — SC HOA/COA Foreclosures](https://www.nolo.com/legal-encyclopedia/south-carolina-hoa-coa-foreclosures.html)
+
+
+## FCRA / UDAP / TCPA Outreach-Compliance Checklist (Upstate SC + Western NC)
+
+*This is a research brief for counsel, not legal advice. Cites and operative quotes are drawn from primary sources (U.S. Code, NC General Statutes, SC Code, FTC rules, and 2025–2026 appellate decisions). Several TCPA points are actively unsettled — flagged inline.*
+
+### The rule (statute/rule cite + the operative language)
+
+**A. FCRA — permissible purpose is a closed list; skip-traced credit data cannot leak into decisions.**
+- **15 U.S.C. § 1681b(a)** limits when a "consumer report" may be furnished/used. The enumerated purposes are: court order/subpoena (a)(1); written consumer instructions (a)(2); and (a)(3) a credit transaction "involving the extension of credit to, or review or collection of an account of, the consumer" (a)(3)(A); **employment purposes** (a)(3)(B); **insurance underwriting** (a)(3)(C); a license/government benefit (a)(3)(D); investor/servicer valuation of credit risk (a)(3)(E); or "otherwise has a **legitimate business need** for the information — (i) in connection with a **business transaction that is initiated by the consumer**" (a)(3)(F)(i).
+- **§ 1681b(f):** "A person shall not use or obtain a consumer report for any purpose unless (1) the consumer report is obtained for a purpose for which the consumer report is authorized to be furnished under this section; and (2) the purpose is certified…by a prospective user."
+- Key limit: buying an off-market lead list, running skip-trace/people-search data, or pulling a "credit header" to find and rank distressed owners is **not** a (a)(3) purpose. Cold outreach to buy a house is not a "business transaction initiated by the consumer." Whether a given data product even *is* a "consumer report" turns on **§ 1681a(d)** (assembled/collected to serve as a factor in credit/insurance/employment eligibility). Public-record situs/tax/deed data and non-FCRA people-search identity data generally are *not* consumer reports — but the moment a vendor's terms say "credit," "FCRA-regulated," or "not for FCRA purposes," treat it as one.
+
+**B. UDAP — the deception/official-mail line.**
+- **SC:** SCUTPA, **S.C. Code § 39-5-20(a):** "Unfair methods of competition and unfair or deceptive acts or practices in the conduct of any trade or commerce are…unlawful." Courts follow FTC Act § 5 interpretations (§ 39-5-20(b)).
+- **NC:** UDTPA, **N.C. Gen. Stat. § 75-1.1(a):** "Unfair methods of competition in or affecting commerce, and unfair or deceptive acts or practices in or affecting commerce, are declared unlawful."
+- These reach *deceptive solicitation*: mail dressed up to look like a government notice, a foreclosure-court document, or a check; false claims of affiliation with the lender/county/court; fake urgency; misrepresenting value or the nature of the offer.
+
+**C. TCPA + state telemarketing/DNC.**
+- **TCPA, 47 U.S.C. § 227(b):** bars autodialed/prerecorded/artificial-voice calls and texts to cell phones without "prior express consent" (telemarketing content requires the heightened "prior express written consent" under FCC rules — *but see the "unsettled" flags below*). **§ 227(c)** governs the National DNC Registry and the required internal-DNC/company-specific do-not-call list.
+- **SC Telephone Privacy Protection Act, S.C. Code Title 37, Chapter 21 (2018)** — the current governing SC statute (supersedes the older ADAD provision, § 16-17-446). § 37-21-20 defines "telephone solicitation" as a call/text "offering or advertising a property, good, or service for sale," with exceptions for prior express written permission, established/personal business relationship, and political calls. § 37-21-30: no solicitation outside **8:00 a.m.–9:00 p.m.** at the consumer's location. § 37-21-50: no misleading/spoofed caller ID. § 37-21-70: honor prior "do not contact" requests and the National DNC Registry.
+- **NC, N.C. Gen. Stat. § 75-102:** "No telephone solicitor shall make a telephone solicitation to a telephone subscriber's telephone number if [it] appears in the…'Do Not Call' Registry" or if the subscriber "previously has communicated…a desire to receive no further telephone solicitations." Must identify solicitor at start of call; no caller-ID misrepresentation; no threats/profanity; must terminate if the subscriber states they are under 18.
+
+**D. Foreclosure-specific solicitation limits — the sharpest edge for this business.**
+- **NC "foreclosure rescue transaction," N.C. Gen. Stat. Ch. 75, Art. 5A (§ 75-120 et seq.):** a transaction is a prohibited "foreclosure rescue transaction" where a distressed homeowner transfers a principal residence, the buyer represents the transfer will help them "prevent, postpone, or reverse…foreclosure and…remain in the residence," and the seller keeps a tenancy/lease-option/repurchase interest — **unless the transferee pays at least 50% of fair market value** (certified appraisal within 120 days, delivered ≥7 days before the seller is obligated). Homeowner remedy: damages, rescission/void, declaratory/equitable relief. This targets sale-leaseback/"stay in your home" structures, not straight arm's-length purchase — but it is UDAP-linked and criminalizable.
+- **Federal MARS Rule / CFPB Regulation O, 12 C.F.R. Part 1015:** bans **advance fees** for mortgage-assistance-relief services (no fee until the homeowner has a written offer from the lender/servicer they accept) and requires disclosures that you are **not** associated with the government or the lender. Applies if outreach offers loan-mod/foreclosure-avoidance help rather than an outright purchase.
+- **SC:** no dedicated equity-purchaser/foreclosure-rescue statute — enforced through **SCUTPA (§ 39-5-20)** and criminal fraud. SC DCA has referred foreclosure-rescue operators for indictment.
+
+### What it means operationally (what you can/can't do)
+
+- **You CAN** build the lead engine from **public records** (deeds, lis pendens, tax delinquency, GIS/assessor, probate) and non-FCRA identity/people-search data, and use it to *decide whom to contact*. Targeting distressed owners is not itself illegal.
+- **You CANNOT** use any data pulled for a **credit/FCRA** purpose — or any product a vendor labels FCRA-regulated — to screen, rank, or decide *whether/how* to make an offer, or to make any tenant/credit/employment decision (e.g., if a seller becomes a lease-back tenant, you cannot pull their credit to qualify the tenancy without a permissible purpose + FCRA adverse-action process).
+- **Mail/ads cannot look official.** No county/court/lender lookalikes, no fake "final notice," no simulated checks, no implied government affiliation. Misrepresenting value, urgency, or your identity is a UDAP violation in both states.
+- **Calls/texts:** scrub every number against the **National DNC Registry** and your **internal DNC list** before dialing; honor opt-outs immediately and permanently; call/text only **8 a.m.–9 p.m.** local; never spoof caller ID; identify yourself at the top of the call. Manual, one-at-a-time dials to a residence are lowest-risk; **any autodialer/prerecorded/mass-text tooling triggers TCPA § 227(b) consent**, which cold foreclosure lists do not have.
+- **Foreclosure/"help you stay" offers:** if the pitch is "we'll stop your foreclosure / you can stay in the home," you are in NC Art. 5A and MARS/Reg O territory — the 50%-FMV floor, no advance fees, and mandatory "not affiliated with government/lender" disclosures apply. A clean, disclosed, arm's-length cash purchase avoids most of this; a sale-leaseback does not.
+
+### Penalties / enforcement (real consequences)
+
+- **FCRA:** civil liability for negligent noncompliance = actual damages (§ 1681o); **willful** = actual **or statutory damages of $100–$1,000 per consumer**, plus punitive damages and attorney's fees (§ 1681n). Obtaining a report under false pretenses / without permissible purpose can carry **criminal** liability (§ 1681q). FTC/CFPB enforcement on top.
+- **SCUTPA:** private action for **actual damages, trebled** for willful violations, plus attorney's fees (§ 39-5-140); AG civil penalties up to **$5,000 per willful violation** (§ 39-5-110).
+- **NC UDTPA:** **automatic treble damages** — "judgment shall be rendered…for treble the amount fixed by the verdict" (**§ 75-16**), plus attorney's fees (§ 75-16.1); AG civil penalties up to **$5,000 per knowing violation** (§ 75-15.2). Trebling is mandatory once a violation + injury is found — this is the single largest litigation exposure in the footprint.
+- **TCPA:** private right of action, **$500 per call/text**, trebled to **$1,500 for willful/knowing** violations (§ 227(b)(3)) — per message, class-action magnet.
+- **SC Telephone Privacy Protection Act (§ 37-21-80):** private action for actual losses **plus $1,000 per violation**, up to **$5,000 per willful violation**, plus fees/costs; AG enforcement (§ 37-21-90).
+- **NC § 75-102/telemarketing:** violation is an unfair trade practice → back into § 75-16 treble damages + § 75-15.2 penalties.
+- **NC foreclosure-rescue (Art. 5A) & MARS/Reg O:** rescission/void of the deal, damages, and UDAP treble exposure; MARS advance-fee/disclosure violations draw FTC/CFPB action and per-violation penalties. Foreclosure-rescue fraud has produced **criminal indictments** in SC.
+
+### How to stay compliant (the concrete practice)
+
+1. **Wall off FCRA data at ingestion.** Source lead data only from public records + explicitly-non-FCRA vendors. Get vendor terms in writing stating the product is **not a consumer report / not for FCRA-permissible purposes**; log the source per record. Never let a "credit" field touch offer logic.
+2. **No credit pulls on sellers/tenants** without a documented permissible purpose and consumer consent; if any lease-back/tenant screening occurs, run full FCRA adverse-action (§ 1681m) notices.
+3. **Mail/creative review:** every piece must state it is from your company, is a purchase solicitation, and is **not** from any court/county/lender/government body. Ban simulated checks, "urgent/official notice" styling, and any value or foreclosure-status claim you can't substantiate. Keep a claims-substantiation file.
+4. **Phone/text program:** license the National DNC Registry, scrub daily, maintain a persistent internal DNC, honor opt-outs immediately; restrict to 8 a.m.–9 p.m. local; accurate caller ID; opening ID script. **Default to manual dialing / no prerecords / no mass-text** on cold foreclosure lists — do not use an autodialer or ringless voicemail without vetted consent, given TCPA exposure.
+5. **Foreclosure offers:** keep pitches to **arm's-length cash purchase** with clear disclosure; avoid "stay in your home"/sale-leaseback structures unless counsel signs off on NC Art. 5A's 50%-FMV appraisal mechanics. **Never charge an advance fee** for any foreclosure-avoidance/loan-mod help (MARS/Reg O); if you touch that space, add the mandated "not government/lender affiliated, you can stop anytime, no fee to reject an offer" disclosures.
+6. **Recordkeeping:** retain call logs, DNC scrub timestamps, mail versions, data-source provenance, and consent artifacts — these are the defense in every one of the above regimes.
+
+### For engine: any field/flag to compute
+- `data_source_fcra_status` — enum per record: `public_record` | `non_fcra_peoplesearch` | `fcra_regulated_DO_NOT_USE`. Hard-block any record flagged fcra_regulated from entering the outreach queue.
+- `dnc_federal_scrubbed_at` / `dnc_internal_suppressed` (bool) — no dial/text may fire unless both are current (federal scrub timestamp within registry-refresh window).
+- `contact_window_ok` (bool) — computed from the target's local time; true only within 8 a.m.–9 p.m. at the property's timezone.
+- `channel_consent_level` — enum: `manual_call_ok` | `express_consent` | `express_written_consent` | `none`; gate any autodialer/prerecorded/bulk-SMS send on ≥ express_consent (flag as unsettled — see below).
+- `foreclosure_status` (bool) + `offer_type` (enum: `arms_length_cash` | `sale_leaseback` | `loan_mod_assist`) — if `sale_leaseback`, require NC Art. 5A 50%-FMV appraisal fields (`appraised_fmv`, `appraisal_date`, `offer_pct_of_fmv ≥ 0.50`); if `loan_mod_assist`, block advance-fee collection and require MARS disclosure set.
+- `mail_creative_compliance_reviewed` (bool) — no mail campaign ships to a record's jurisdiction without a passed deception/official-mail review.
+- `state` routing — apply SC (Title 37 Ch. 21, § 39-5-20) vs NC (§ 75-102, § 75-1.1, Ch. 75 Art. 5A) rule sets by property state, since penalties and the foreclosure-rescue statute differ.
+
+### Flags: unsettled / recently changed (hand to counsel)
+- **TCPA consent standard is in flux (2025–2026).** The FCC's **one-to-one consent rule was vacated** by the Eleventh Circuit (*IMC v. FCC*, Jan. 24, 2025; FCC declined to appeal, Apr. 2025) — bundled consent remains permissible. More significantly, the **Fifth Circuit (*Bradford v. Sovereign Pest Control*, Feb. 26, 2026)** and a **Maryland district court (*Bradley v. Dentalplans.com*, Mar. 20, 2026)** have **rejected the FCC's "prior express written consent" requirement** for telemarketing robocalls, holding the TCPA requires only "prior express consent" (oral or written). This creates a **circuit/enforcement split** — do **not** assume the old PEWC standard is dead nationwide; the safe operating posture is still to obtain express written consent (or avoid regulated tech entirely) until this settles. Confirm current FCC rule text and Fourth Circuit posture (which governs NC/SC) with counsel before relaxing anything.
+- SC's governing telemarketing statute is the **2018 Telephone Privacy Protection Act (Title 37 Ch. 21)**, not the older ADAD/§ 16-17-446 provision — verify counsel is working from the current title.
+
+**Primary sources:**
+- [15 U.S.C. § 1681b (LII)](https://www.law.cornell.edu/uscode/text/15/1681b)
+- [S.C. Code § 39-5-20 (Justia)](https://law.justia.com/codes/south-carolina/title-39/chapter-5/section-39-5-20/) · [SCUTPA Ch. 5 (statehouse)](https://www.scstatehouse.gov/code/t39c005.php)
+- [N.C. Gen. Stat. § 75-1.1 / § 75-16 / § 75-15.2 (ncleg)](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_75/GS_75-16.pdf) · [Ch. 75 Art. 5A foreclosure-rescue (ncleg)](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/ByArticle/Chapter_75/Article_5A.pdf)
+- [N.C. Gen. Stat. § 75-102 (ncleg)](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_75/GS_75-102.pdf)
+- [SC Telephone Privacy Protection Act, Title 37 Ch. 21 (statehouse)](https://www.scstatehouse.gov/code/t37c021.php) · [S.C. Code § 16-17-446 (Justia)](https://law.justia.com/codes/south-carolina/title-16/chapter-17/section-16-17-446/)
+- [FTC MARS Rule / CFPB Reg O 12 CFR 1015 compliance guide](https://www.ftc.gov/business-guidance/resources/mortgage-assistance-relief-services-rule-compliance-guide-business)
+- [11th Cir. vacates TCPA one-to-one consent rule (2025)](https://www.wiley.law/alert-UPDATE-11th-Circuit-Vacates-FCCs-One-to-One-TCPA-Consent-Rule) · [5th Cir. rejects PEWC requirement (2026)](https://www.womblebonddickinson.com/us/insights/alerts/fifth-circuit-rejects-application-fccs-prior-express-written-consent-requirement)
+
+
+## SC/NC Surplus-Funds Recovery + Foreclosure-Consultant Limits
+
+### The rule (statute/rule cite + operative language)
+
+**(1) Surplus / excess-proceeds recovery**
+
+- **NC mortgage/deed-of-trust foreclosure surplus** is paid to the clerk of superior court (**N.C.G.S. § 45-21.31**) and claimed via a special proceeding before the clerk (**N.C.G.S. § 45-21.32** — "Special proceeding to determine ownership of surplus"). § 45-21.32 lets the court "in its discretion, allow a reasonable attorney's fee for any attorney appearing in behalf of the party or parties who prevail, to be paid out of the funds in controversy." There is **no statutory finder-fee cap and no licensing requirement written into § 45-21.32 itself.**
+- **NC "property finder" cap — the one hard cap.** **N.C.G.S. § 116B-78** (NC Unclaimed Property Act, "Agreement to locate property between property finders and owners") governs any agreement whose "primary purpose is to locate, deliver, recover, or assist in the recovery of property that is distributable to the owner or presumed abandoned." Operative limits: the agreement is **"void and unenforceable"** unless it is in writing, notarized, and **"signed by a private investigator licensed under Chapter 74C… authorized to bind the property finder"**; and the finder's fee **"shall not exceed the lesser of one thousand dollars ($1,000) or twenty percent (20%) of the value of the property"** (net of fees actually incurred). The finder must **register annually with the State Treasurer and pay a $100 fee**, and an agreement is **void if entered into during the window from when the property became distributable to the owner until 24 months after it is paid to the Treasurer** (attorney agreements excepted). *Applicability boundary is the key issue — see below.*
+- **SC mortgage foreclosure surplus** is held by the sale officer and claimed under **SCRCP Rule 71(c)**: "Any party to the action, or any person who had a lien on the mortgaged premises at the time of the sale… may [claim]… within forty-five (45) days from the date of the filing of the statement of receipts and disbursements," else it is "abandoned and waived." **No finder-fee cap and no finder-licensing statute.**
+- **SC tax-sale overage — the assignment hook.** **S.C. Code § 12-51-130**: any overage "belongs to the owner of record immediately before the end of the redemption period **to be claimed or assigned according to law**," payable 90 days after deed execution, and **escheats to the governing body's general fund if "neither claimed nor assigned within five years"** of the auction. The phrase "or assigned" is the statutory permission for a purchase/assignment of the overage right.
+
+**(2) Foreclosure-rescue / distressed-property consultants**
+
+- **NC has a dedicated statute: Article 5A of Chapter 75, "Home Foreclosure Rescue Scams" (§§ 75-120 to 75-122).** § 75-120 defines a **"foreclosure rescue transaction"** as a transfer of the transferor's principal residence bundled with representations that it will prevent/postpone foreclosure and typically a repurchase/leaseback option. § 75-121: **"It is unlawful for a person other than the transferor to engage in, promise to engage in, arrange, offer, promote, solicit, assist with, or carry out a foreclosure rescue transaction… for financial gain… unless prior to or at the time of transfer, the transferee pays the transferor at least fifty percent (50%) of the fair market value of the property as determined by a certified appraiser."** The appraisal must be "performed no more than 120 days prior to the transfer" and "delivered to the transferor no less than seven days prior to the time the transferor becomes obligated to perform." Exempt transferees: family members, bona fide nonprofits, government, and chartered banks/credit unions/licensed mortgage lenders-servicers. § 75-122: **"A violation of G.S. 75-121 is a violation of G.S. 75-1.1"** (NC Unfair & Deceptive Trade Practices Act), and the homeowner may recover damages, **void the transaction**, and obtain declaratory/equitable relief (not enforceable against a bona fide purchaser for value).
+- **SC has NO dedicated foreclosure-consultant / equity-purchaser statute.** Title 37 Ch. 5 (consumer credit remedies) and Title 39 Ch. 5 (SCUTPA) do not contain a foreclosure-consultant regime. Distressed-homeowner misconduct in SC is reached only through the general **SC Unfair Trade Practices Act (§ 39-5-20)**, which on a willful violation allows the court to "award three times the actual damages" (§ 39-5-140).
+
+### What it means operationally (what you can/can't do)
+
+- **Buying property from an owner already in foreclosure (NC):** if the deal is structured as the classic rescue/leaseback with a promise to stop foreclosure, you are inside § 75-121 and **must pay ≥50% of certified-appraised FMV, with a timely appraisal delivered ≥7 days pre-close.** A straight arm's-length purchase at market that does NOT bundle a "we'll save your house / you can stay and buy it back" pitch is not a "foreclosure rescue transaction." The trigger is the rescue-and-leaseback structure, not merely that the seller is in default.
+- **Buying property from an owner in foreclosure (SC):** no equity-purchaser statute, so no 50%/appraisal mandate — but every solicitation and contract still runs under SCUTPA. Deceptive "we'll save your home" promises are exposed to treble damages.
+- **Surplus recovery, NC:** the safe, capped path is Treasurer-held unclaimed funds — but that path **requires a licensed PI, annual registration, the ≤ lesser-of-$1,000-or-20% fee, and respect for the 24-month blackout.** For **clerk-of-court foreclosure surplus (§ 45-21.32)**, the § 116B-78 cap does not cleanly apply on its face (it governs Treasurer-held/"presumed abandoned" property), so a contingency assignment is not expressly capped — **but this boundary is unsettled and the practical route is a fee "allowed by the clerk" as attorney fee, meaning you effectively need counsel, not a lay finder.**
+- **Surplus recovery, SC:** no cap and no finder license — a lay company can contract with the owner. But (a) the actual claim/petition and disbursement sit inside a real-estate/court process where **SC requires a licensed attorney to supervise real-estate closings and disbursement (UPL doctrine)**, so a non-lawyer running the claim risks unauthorized practice of law; and (b) the § 12-51-130 assignment window and 5-year escheat clock bound timing.
+
+### Penalties / enforcement (real consequences)
+
+- **NC § 75-121 violation → automatically a § 75-1.1 UDTPA violation:** treble damages, attorney's fees, and the transaction is **voidable by the homeowner.** UDTPA is aggressively litigated and the NC AG can act.
+- **NC property-finder violation (§ 116B-78):** the agreement is **"void and unenforceable"** — you collect nothing — plus operating as an unlicensed PI is a separate Chapter 74C violation (misdemeanor exposure) and unregistered finding violates the Treasurer's registration rule.
+- **SC:** SCUTPA willful violation = **treble actual damages + attorney's fees** (§ 39-5-140); AG enforcement and civil penalties for knowing violations. Running surplus/closing work without a supervising SC attorney risks a **UPL** finding.
+- **Escheat forfeiture (both):** miss the deadline (SC 45-day Rule 71(c) claim; SC 5-year tax-overage escheat; NC clerk-held funds ultimately escheat) and the fund is lost to the client — a malpractice/contract-liability exposure for you.
+
+### How to stay compliant (the concrete practice)
+
+- **Do not market "foreclosure rescue / we'll stop your foreclosure / sell-and-stay-and-buy-back" in NC.** If a deal has any leaseback/repurchase feature with a pre-foreclosure owner, treat § 75-121 as binding: order a certified appraisal ≤120 days old, deliver it ≥7 days before the owner is bound, and pay ≥50% FMV — or restructure to a plain arm's-length purchase with no rescue representations.
+- **Keep the two lanes separate:** (a) *acquisition* of distressed property = your engine's core, run it as ordinary purchases; (b) *surplus recovery* = route through a partnering SC/NC attorney on contingency rather than a lay finder agreement. In SC this also cures the UPL risk; in NC, use the § 45-21.32 attorney-fee mechanism for clerk-held surplus and reserve § 116B-78 (licensed PI, ≤20%/$1,000, registered) only for Treasurer-held unclaimed funds.
+- **Never touch NC Treasurer-held funds as a lay finder** — that path is PI-licensed, registered, capped, and blackout-restricted.
+- **Watch the deadlines** as data fields (below). **Flag for counsel** the open question of whether § 116B-78's cap reaches clerk-held foreclosure surplus; treat conservatively (assume a lawyer-led contingency) until an opinion resolves it.
+- Have SC/NC counsel paper the assignment/consultant agreements before any pre-foreclosure or surplus outreach.
+
+### For engine: any field/flag to compute
+
+- `state` (SC | NC) — routes to the correct rule set.
+- `lead_type` ∈ {acquisition, mortgage_foreclosure_surplus, tax_sale_overage, treasurer_unclaimed} — sets which regime applies.
+- `nc_rescue_risk_flag` = true when `state=NC` AND deal structure includes leaseback/repurchase OR marketing promises to prevent/postpone foreclosure → require 50%-FMV + certified appraisal fields (`appraisal_date`, `appraisal_delivered_date`, `appraised_fmv`, `offer_pct_of_fmv ≥ 0.50`).
+- `surplus_fee_cap_pct`: NC-Treasurer = 20% (and `≤ $1,000`); NC-clerk-surplus = "attorney-fee, court-allowed" (no fixed cap, counsel-gated); SC = none (counsel-gated for UPL).
+- `finder_license_required` = true for NC-Treasurer path (PI license + Treasurer registration); false for SC.
+- `attorney_required_flag` = true for SC surplus/closing work (UPL) and for NC clerk-held surplus fee mechanism.
+- Deadline clocks: `sc_rule71_claim_deadline` = statement-of-receipts date + 45 days; `sc_tax_overage_escheat` = auction date + 5 years; `sc_tax_overage_payable` = deed date + 90 days; NC `treasurer_finder_blackout_until` = distributable date + 24 months.
+- `assignment_allowed_flag` = true for SC tax overage (§ 12-51-130 "claimed or assigned"); use to distinguish assignable vs. claim-only funds.
+
+*NOT legal advice — a research brief for counsel. Flag: (a) whether N.C.G.S. § 116B-78's finder cap/licensing reaches clerk-of-court foreclosure surplus (§ 45-21.32) vs. only Treasurer-held property is unsettled and should be confirmed with a NC opinion; (b) NC § 75-121's 50% test and SC's total absence of a foreclosure-consultant statute are the two facts most likely to change outcomes and should be re-verified against current session law.*
+
+**Primary sources:** [N.C.G.S. § 75-121 (foreclosure rescue prohibited)](https://law.justia.com/codes/north-carolina/chapter-75/article-5a/section-75-121/) · [Article 5A / § 75-120, 75-122 (ncleg)](https://www.ncleg.gov/Laws/GeneralStatuteSections/Chapter75) · [N.C.G.S. § 116B-78 property-finder cap (ncleg)](https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_116B/GS_116B-78.html) · [N.C.G.S. § 45-21.32 surplus special proceeding](https://law.justia.com/codes/north-carolina/chapter-45/article-2a/section-45-21-32/) · [SCRCP Rule 71(c)](https://www.sccourts.org/resources/judicial-community/court-rules/civil/rule-71/) · [S.C. Code § 12-51-130 tax overage/assignment](https://law.justia.com/codes/south-carolina/title-12/chapter-51/section-12-51-130/) · [SCUTPA § 39-5-20 / § 39-5-140](https://law.justia.com/codes/south-carolina/title-39/chapter-5/) · [SC Title 37 Ch. 5 (no consultant regime)](https://www.scstatehouse.gov/code/t37c005.php) · [NC Treasurer property-finder registration packet](https://www.nccash.gov/documents/forms-and-guides/property-finder-registration-packet/download)
