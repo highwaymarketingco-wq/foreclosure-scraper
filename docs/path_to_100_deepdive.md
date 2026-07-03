@@ -6153,3 +6153,372 @@ def merge_forward(live: list[Listing], docs_dir="docs") -> tuple[list[Listing], 
 - Catch-up `count` > 0 with any `_resolved_deep_enriched` already set → indicates the flag isn't persisting (RAW_KEEP regression).
 
 **Cost control as paid vendors arrive (RentCast/Geocodio/BatchData/ATTOM):** treat every paid enricher exactly like Vision in the catch-up block — **gated on a persisted per-lead "already-billed" marker** (e.g. `raw.rentcast.fetched_run`, added to `RAW_KEEP` so it survives). Because persistence carries that marker forward and enrichers are missing-only, a paid vendor is called **at most once per lead per data-version**, never re-billed on carryover or re-runs. Add a global per-run spend cap env (`RENTCAST_MAX_PER_RUN`, mirroring `VISION_MAX_LISTINGS`/`SKIP_TRACE_MAX_PER_RUN`) and a `time-box` wrapper identical to the Vision `asyncio.wait_for(..., timeout=…)`. The idempotency invariants (P2/P3) are what make paid spend bounded and deterministic: without persisted markers, every weekly full crawl would re-bill the entire board.
+
+
+---
+
+# Deep-Dive Round 17 — Dashboard/Product Build Spec (2026-07-02)
+
+
+## Daily Call List (Work Today)
+
+### What it does (operator value, one paragraph)
+The "Work Today" tab collapses the entire board into a single ranked stack of exactly the leads an operator should dial right now: highest-intent, contactable, and not already worked. It hides anything already marked Contacted or Dead, and anything the operator explicitly snoozed to a future date via a next-action, so the list is self-clearing — dial through it top to bottom and it empties as the day goes. Each row surfaces only what a caller needs (name, phone, mailing address, intent score, why-now signal chips) plus a one-tap "Log call" that advances CRM status and drops the lead off the list immediately, so the operator never re-dials the same person or scrolls the whole board hunting for the next best call.
+
+### Data shape (what fields it needs in listings.json and/or the localStorage schema — be exact)
+Reads existing per-lead fields already in `listings.json`: `intent_score` (0–100 int), `owner_name`, `phone` (string; may be array — normalize to first non-empty), `mailing_address` (string), `situs_address`/`address`, `case_number`, `parcel_id`, and the signal/corroboration fields already used by the chips (`signal_stack`/`signals` array, `corroboration`). The stable lead key is the same one the CRM already uses: `case_number || parcel_id` (define once as `leadKey(l)`). No new pipeline fields are strictly required.
+
+localStorage CRM record (existing store, one key per lead — e.g. `crm:<leadKey>`), this feature reads/writes:
+```
+{
+  status: "New" | "Contacted" | "Dead" | "Won" | ...,   // existing enum
+  next_action_date: "YYYY-MM-DD" | null,                  // existing; used as snooze gate
+  notes: "...",                                           // existing
+  last_call_at: "2026-07-01T14:33:00Z",                   // NEW: ISO timestamp, stamped by Log call
+  call_count: 3                                           // NEW: int, incremented by Log call
+}
+```
+Only `last_call_at` and `call_count` are new, and both live in localStorage — no schema change to `listings.json`.
+
+### UI/behavior spec (the view, controls, sort/filter logic, empty states)
+- **Tab**: new top-nav tab "Work Today" alongside Table/Cards/Map, with a live count badge of eligible leads.
+- **Eligibility filter** (applied in order): (1) exclude if CRM `status` ∈ {Contacted, Dead, Won} (configurable set, default those three); (2) exclude if `next_action_date` is set AND `> today` (local date compare, `YYYY-MM-DD` string compare is safe); (3) keep leads with no CRM record (treated as New). Leads whose `next_action_date` is today or in the past are INCLUDED (they're due).
+- **Sort**: primary `intent_score` desc; tie-break by presence of a corroboration signal (corroborated first), then by `next_action_date` ascending (overdue rises), then `leadKey` for stability.
+- **Top-N control**: a small selector (25 / 50 / 100 / All), default 25, persisted to localStorage (`workToday:topN`). List is capped after sort.
+- **Row layout**: rank number, `owner_name`, one-line `situs_address`, then a right-aligned action cluster. Line two: click-to-call `tel:` phone link + mailing address + `intent_score` pill + signal-stack/corroboration chips (reuse existing chip render). If `next_action_date` is overdue, show a red "Due" / "Overdue N d" badge.
+- **"Log call" (one-tap)**: primary button per row. On click: set `status = "Contacted"`, stamp `last_call_at = now ISO`, increment `call_count`, and (optional) open a tiny inline "next action in N days" quick-set (Today+3 default) that writes `next_action_date`. The row then animates out (it's now ineligible). Provide a 5-second Undo toast that restores the prior CRM record snapshot.
+- **Secondary per-row actions**: "Skip" (writes `next_action_date = today+1`, no status change, drops it for today) and "Mark Dead" (status Dead). Both remove the row and honor the same Undo toast.
+- **Empty states**: (a) zero leads ever eligible → "No leads match. Lower the intent floor or import fresh data."; (b) all worked → a done state "You've cleared today's call list. N calls logged." reading `call_count` sums / a per-day counter; (c) filtered-empty because everything is snoozed → "Everything's snoozed. Next lead due <earliest future next_action_date>."
+- **Optional intent floor**: reuse the existing 0–100 intent slider as a floor on this tab (default 0) so operators can raise the bar; persist to `workToday:floor`.
+
+### Where it slots in dashboard.js
+- Register a new view alongside the existing `renderTable`/`renderCards`/`renderMap` dispatch: add `renderWorkToday(leads)` and a `'work-today'` case in the view switcher / tab click handler.
+- Add a pure helper `getCallList(leads, {topN, floor, excludeStatuses})` that does the eligibility filter + sort + cap; it consumes the same `getCrm(leadKey)` accessor the CRM-lite already uses, so no new persistence layer.
+- The "Log call"/"Skip"/"Mark Dead" handlers call the existing CRM mutator (`setCrm(leadKey, patch)`), then re-invoke `renderWorkToday` (or splice the row + update the tab badge). Reuse the existing chip-render and `intent_score` pill functions rather than duplicating markup.
+- Tab badge count = `getCallList(allLeads, {topN: Infinity, floor}).length`; recompute after every CRM mutation.
+
+### Effort + any precompute needed in the Python pipeline
+- **Effort**: ~half a day. Pure front-end: one render function, one pure selector, three small mutation handlers, an Undo toast, and CSS for the row/action cluster. No build step, no backend.
+- **Precompute**: none required — `intent_score`, phone, mailing address, and signals are already stamped by the existing enrichers (the intent-score enricher and the signal-stack/corroboration enrichers). `last_call_at` and `call_count` are runtime-only localStorage fields written by the UI, so no Python change. Optional nicety: have the phone-resolution enricher guarantee `phone` is a normalized single string (or `phone_primary`) so the row doesn't have to array-normalize at render time.
+
+
+## Intent score + "why" reasons, default-sorted
+
+### What it does (operator value, one paragraph)
+Every lead already carries a 0-100 `intent_score` and an `intent_band`, but the operator has to hover the badge or read the signal chips to understand *why* a lead scored the way it did. This feature makes the score self-explanatory: it stamps a short, ranked `intent_reasons` array on each listing ("pre-foreclosure + 30yr owner + out-of-state") and renders those reasons as small caption chips directly under the intent badge in the table row and on each card, so an operator scanning the queue can trust and triage the number at a glance without opening the detail panel. It also flips the board's default order from grade-first to intent-first, so the highest-intent leads sit at the top of the table and cards on load, turning the dashboard into a true lead queue the moment it opens.
+
+### Data shape (what fields it needs in listings.json and/or the localStorage schema — be exact)
+No localStorage change. One net-new field per listing, stamped by the Python enricher into `raw`:
+- `raw.intent_reasons` — `string[]`, already human-readable and ranked most-important-first, max 4 entries, each a short phrase (no trailing punctuation). Example: `["pre-foreclosure", "30yr owner", "out-of-state", "auction scheduled"]`. Empty array (`[]`) when score is 0 / cold.
+- Reuses existing fields unchanged: `raw.intent_score` (number 0-100), `raw.intent_band` (`"hot"|"warm"|"cool"|"cold"`), `raw.signal_stack.signals` (raw token array like `["absentee_owner","auction","recorded_debt"]` — the source material the reasons are humanized from).
+
+`intent_reasons` is a presentation string array distinct from `signal_stack.signals` (raw snake_case tokens): reasons are curated, ranked, capped, and phrased for a human. This keeps the dashboard dumb — it renders strings, it does not map tokens to labels.
+
+### UI/behavior spec (the view, controls, sort/filter logic, empty states)
+- **Reasons render (table + cards):** New helper `intentReasons(l)` returns `(l.raw && l.raw.intent_reasons) || []`. New helper `intentReasonChips(l)` builds, for a non-empty array, `<div class="intent-reasons">` of small `<span class="intent-reason-chip">` items (one per reason, styled like existing `.distress-chip` but muted/caption weight). Empty array → returns `""` (renders nothing; no empty container, no "no reasons" text).
+  - **Table:** in `renderTable()`, the cell that currently emits `intentBadge(l)` (line ~580) appends `intentReasonChips(l)` immediately after the badge in the same cell. On narrow layout the chip row wraps under the badge.
+  - **Cards:** in `renderCards()`, append `intentReasonChips(l)` in the chip cluster right after where `intentBadge`/`signalStackChip` are emitted (~line 824-836), so the "why" sits with the score.
+- **Default sort → intent desc:** change the two init lines from `sortKey = "_grade"` / grade-first to `sortKey = "_intent"`, `sortDir = "desc"`. The `_intent` sort key already exists in `getSortValue` (`return getIntent(l)`), so no new sort branch is needed. Grade remains a clickable column header; the operator can still re-sort.
+- **Header affordance:** ensure the Intent column `<th>` carries `data-sort="_intent"` and on load gets the `sort-desc` class (mirror the existing header-click handler at lines 240-249 so the default sorted column shows its arrow).
+- **Sort/filter interaction (unchanged, verify):** the existing `applyFilters()` override (`rankByIntent = minIntent || minSignals` → `effKey="_intent"`, `effDir="desc"`) already forces intent-first whenever the intent slider or min-signals filter is engaged. With the new default also `_intent desc`, behavior is consistent: board opens intent-ranked, stays intent-ranked while filtering by intent/signals, and only leaves intent order when the operator clicks a different column header.
+- **Tie-break:** when two leads share an `intent_score`, keep current stable behavior (equal → `return 0`); optionally add a secondary comparator in the `filtered.sort` block: on `av === bv` for `_intent`, fall back to `getDistress(x).score`. Low effort, nice-to-have.
+- **Empty states:** listing with `intent_score` 0 or missing → `intentBadge` already returns `""`; `intentReasonChips` returns `""`; row/card simply shows no intent badge and no reason chips (existing cold-lead look, unchanged). Pre-enricher snapshots lacking `intent_reasons` degrade to badge-only with no chips — no error.
+
+### Where it slots in dashboard.js (which render fn / new tab / new panel)
+No new tab or panel. Additions are localized:
+- New helpers `intentReasons(l)` + `intentReasonChips(l)` alongside `getIntent`/`intentBadge` (~lines 493-511).
+- `renderTable()` — extend the intent cell (~line 580).
+- `renderCards()` — extend the chip cluster (~lines 824-836).
+- Init block — change `sortKey`/`sortDir` defaults (lines 6-7) and set the default header arrow (~line 240 area).
+- `style.css` — add `.intent-reasons` (flex-wrap, gap) and `.intent-reason-chip` (small, low-emphasis caption chip) rules; reuse existing `.distress-chip` sizing as the base.
+
+### Effort + any precompute needed in the Python pipeline (which enricher stamps the field)
+Dashboard side: **~1-2 hours** (two helpers, two render insertions, two-line default-sort flip, a CSS block). Zero new data model, zero localStorage migration, no backend.
+
+Pipeline side: **~1-2 hours** in `src/foreclosure_scraper/enrichment_lead_signals.py`. Add a `_intent_reasons(li) -> list[str]` helper next to `_intent_score` (line 136) that maps the same evidence `_intent_score` already weighs — `signal_stack.signals` tokens plus the ownership/absentee facts — into ranked human phrases (e.g. token→label map: `absentee_owner`→"out-of-state" when `raw.gis.out_of_state` else "absentee owner", `auction`→"auction scheduled", `recorded_debt`→"recorded debt", plus a "Nyr owner" phrase derived from ownership tenure if available), ordered by the same weights that drive the score, truncated to 4. Stamp it in `enrich_lead_signals` right where the other fields are set (lines 219-225): `raw["intent_reasons"] = _intent_reasons(li)` (and `= []` in the failure/empty branch at lines 214-216). This is pure computation over already-collected signals — no new scrape, consistent with the module's existing zero-scrape contract. Re-running the enricher restamps the board; the dashboard reads the field with a safe `|| []` fallback so old and new snapshots both render.
+
+
+## Signal Feed w/ NEW Badge + Freshness
+
+### What it does (operator value)
+The Signal Feed is a reverse-chronological "what's new" river that turns the dashboard's single biggest edge — freshness — into something an operator sees the instant they open the app. Every lead is an entry sorted newest-first by when it entered the pipeline (`first_seen`), so the operator works the top of the feed and never re-chews cold inventory. Leads that arrived within the last N days wear a green **NEW** badge, and a persistent "**42 new since your last visit**" pill (backed by a stored last-visit timestamp) tells the operator exactly how much fresh signal landed while they were gone, with a one-click jump to that cutoff line in the feed. Because ingest is bursty (some days drop 800–1,000+ leads, most days a handful), the feed groups entries under day headers ("Today", "Yesterday", "Jun 9 — 1,038 new") so a 1,000-lead dump reads as one collapsible block instead of a wall, and the operator can triage the freshest county/source cohorts first.
+
+### Data shape
+
+**listings.json (already present — no new required fields):**
+- `first_seen` — naive ISO string, e.g. `"2026-06-09T11:56:56.897338"` (no timezone, no `Z`). This is the primary feed sort/date key. Parse as local: `new Date(first_seen)` works because there's no offset suffix.
+- `last_seen` — same format; used to compute a "re-listed / still-active" secondary indicator (if `last_seen` date > `first_seen` date, the lead has been re-seen since ingest).
+- Existing display fields the feed row reuses: `street_address`, `city`, `state`, `zip_code`, `source`, `listing_type`, `property_kind`, plus any of `judgment_amount`/`opening_bid`/`market_value` when non-null, and `raw.zillow.photo` for a thumbnail when present.
+- CRM/identity key (unchanged): the composite already used elsewhere — `case_number || parcel_id || source_url` (needed because ~15% of rows have neither `case_number` nor `parcel_id`; fall back to `source_url`, which is always present).
+
+**Optional precompute field (nice-to-have, not required):**
+- `signal_date` (string, ISO) — a pipeline-stamped "true signal event date" distinct from crawl-discovery date, for sources where the docket/filing date is known (lis_pendens filing date, `sale_date`, `upset_bid_deadline`). When present the feed sorts on `signal_date ?? first_seen`. Absent today; feed must work on `first_seen` alone.
+
+**localStorage schema (new keys):**
+```
+fc_last_visit         : string (ISO)  // timestamp written on unload/blur of the PREVIOUS session
+fc_last_visit_pending : string (ISO)  // this session's open time; promoted to fc_last_visit on exit
+fc_feed_new_days      : number         // operator-set N for the NEW window, default 3
+fc_feed_seen_ids      : optional — NOT used; freshness is timestamp-based, not per-id, to stay O(1)
+```
+Rationale for the two-key dance: if you overwrite `fc_last_visit` on load, "since last visit" is always 0. So on load you read `fc_last_visit` (the cutoff to compare against), then immediately stash `now` into `fc_last_visit_pending`; on `visibilitychange→hidden` / `beforeunload` you promote `pending → fc_last_visit`. First-ever visit: `fc_last_visit` is null → suppress the "since last visit" pill, show only the NEW badge.
+
+### UI/behavior spec
+
+**The view.** A new top-level tab **Feed** alongside Table / Cards / Map. Single scrolling column of compact rows, grouped under sticky day headers.
+
+- **Day header:** `Today · 6` / `Yesterday · 5` / `Jun 9, 2026 · 1,038`. Headers are click-to-collapse; any group with count ≥ 50 renders **collapsed by default** with a "Show 1,038" expander so burst-ingest days don't bury normal days. Collapse state is per-session (in-memory only).
+- **Feed row (left→right):** optional 40px thumbnail (`raw.zillow.photo`, lazy `loading="lazy"`, hidden if absent) · address block (`street_address`, then `city, state zip`) · `listing_type` + `source` chips (reuse existing chip styles) · `$` value if any non-null money field · relative-time (`"3d ago"`, computed from `first_seen`) · a right-aligned **NEW** badge when `daysSince(first_seen) < fc_feed_new_days`.
+- **"Since last visit" divider:** a full-width horizontal rule labeled **"↑ 42 new since your last visit"** injected between the last entry with `first_seen > fc_last_visit` and the first older one. A sticky pill in the tab header shows the same count and scrolls to the divider on click. Count = rows where `first_seen > fc_last_visit`.
+- **Controls (feed toolbar):**
+  - `NEW window` stepper (1/3/7/14 days) → writes `fc_feed_new_days`, re-renders badges live.
+  - `Group by` toggle: **Day** (default) | **Source** | **County/City** — regroups the same sorted list under different headers (source and city are the useful burst-day sub-cuts).
+  - `Mark all seen` button → promotes `pending → fc_last_visit = now` immediately and clears the divider/pill (operator says "I've triaged this").
+  - Feed respects the app's existing global filters (status, intent slider, corroboration, county, type). A small "Filtered" indicator shows when the active filter set is trimming the feed, with a "clear filters" shortcut.
+- **Row click / actions:** clicking a row opens the same detail drawer/modal the Table/Cards views use (same key), and exposes the existing inline CRM controls (status / notes / next-action) so the operator can dispose a lead without leaving the feed. Setting status to a "worked" value optionally dims the row (respect existing status styling).
+- **Sort:** fixed newest-first on `signal_date ?? first_seen`; ties broken by identity key for stable order. No user sort control (that's what Table is for) — Feed's contract is "chronological."
+- **Empty states:**
+  - No data at all → "No leads loaded."
+  - Filters exclude everything → "No leads match your filters — [clear filters]."
+  - Nothing newer than last visit → the pill reads "**Up to date — 0 new since {relative last-visit}**" and no divider is drawn.
+  - First-ever visit (no `fc_last_visit`) → no "since last visit" UI; a one-line hint "Freshness tracking starts now."
+
+### Where it slots in dashboard.js
+
+- **Tab registration:** add `'feed'` to wherever the view enum / tab list lives (the same place `'table' | 'cards' | 'map'` are registered) and to the view-switch handler that toggles container visibility.
+- **New render fn `renderFeed(rows)`** parallel to the existing `renderTable` / `renderCards`. It takes the already-filtered row array (reuse the shared `getFilteredRows()` / `applyFilters()` the other views call — do **not** re-implement filtering), then:
+  1. `sorted = rows.slice().sort(byFreshnessDesc)`,
+  2. `groups = groupBy(sorted, groupMode)` (helper new),
+  3. build day/source/city header + row DOM,
+  4. inject the since-last-visit divider by scanning for the `first_seen > fc_last_visit` boundary.
+- **New small helpers:** `daysSince(iso)`, `relTime(iso)`, `feedGroupKey(row, mode)`, `newSinceLastVisitCount(rows)`. Keep them near the other formatting utils.
+- **Visit-tracking wiring:** on init, read `fc_last_visit`, write `fc_feed_new_days` default if unset, stash `fc_last_visit_pending = nowISO()`. Add `document.addEventListener('visibilitychange', …)` + `window.addEventListener('beforeunload', promoteVisit)` once at boot (near existing global listeners). `promoteVisit()` writes `pending → fc_last_visit`.
+- **Reuse, don't fork:** the feed row's chips, money formatting, thumbnail lookup (`raw.zillow.photo`), detail-drawer opener, and CRM status/notes controls should all call the existing functions those other views already use, keyed by `case_number || parcel_id || source_url`.
+
+### Effort + precompute
+
+**Effort: ~S/M, pure front-end.** No backend, no build step. Roughly one `renderFeed` fn + 4 helpers + the two-key visit-tracking wiring + one toolbar. All state is `localStorage` and in-memory group/collapse state. Everything runs off `first_seen`, which is already in `listings.json` for 100% of rows, so **the feature ships with zero pipeline changes.**
+
+**Optional precompute (defer):** if you later want the feed to sort on true signal-event date rather than crawl-discovery date, add a `signal_date` field in the Python pipeline — stamped by the same per-source parser that already extracts dates (the lis_pendens/ecourts docket parsers, and the auction enrichers that set `sale_date`/`upset_bid_deadline`), falling back to `first_seen` when no event date is parseable. That's a one-line addition to each source's normalize step and a `signal_date = signal_date or first_seen` default in the final `web_artifact` board writer. The front-end already reads `signal_date ?? first_seen`, so shipping it later requires no dashboard change. Note the current `first_seen` values are naive (no timezone) — keep `signal_date` naive-ISO too for consistent `new Date()` parsing.
+
+
+## Quick-List preset chips + saved views
+
+### What it does (operator value, one paragraph)
+Gives the operator one-click entry into the highest-value slices of the board without hand-setting five separate filters. A row of preset chips (Pre-Foreclosure, Vacant, Absentee, High-Equity, Probate, Tax-Delinquent, 2+ Signals) each applies a canned combination of the filters that already exist — listing_type, the `raw.flags` signal set, the intent slider, and the corroboration/source-count control — so the operator goes from 4,000 raw listings to a working call-list in a single tap. Beyond the built-in presets, the operator can dial in any custom filter combination (say "Buncombe County + high-equity + intent ≥ 70 + status=New") and hit "Save view" to persist it as a named chip in localStorage, then recall it later or after a data refresh. This is the PropStream/PropertyRadar "Quick List" pattern: the presets teach a new user what the board can do, and the saved views let a power user rebuild their personal daily route in one click. Because presets are declarative filter states (not a separate query engine), they compose cleanly with the search box, map bounds, and CRM status filter already in place.
+
+### Data shape (what fields it needs in listings.json and/or the localStorage schema — be exact)
+No new fields required in `listings.json`. Presets read fields that already exist on every record:
+- `listing_type` — string enum: `lis_pendens`, `reo`, `foreclosure_sale`, `distressed`, `tax_sale`, `tax_lien`, `probate_notice`, `auction`, `unknown`.
+- `raw.flags` — array of strings; the signal backbone. Relevant values observed: `preforeclosure`, `bank_owned`, `absentee_owner`, `high_equity`, `low_equity`, `negative_equity`, `vacant`, `as-is`/`as is`, `fixer`, plus condition tags.
+- `raw.grade.overall_score` (0-100) and/or the existing intent value the 0-100 slider already reads — presets set the slider's numeric threshold.
+- Corroboration/source count — whatever the existing corroboration chips derive from (per the prompt these already exist). A preset just sets that control's value; if the count is not yet a stamped field, derive it inline from distinct `source` seen for the same `case_number`/`parcel_id` key (the same key the CRM uses).
+- `county` — string (note: `county` is frequently `null` at top level; the geo value is often under `raw.geo_attribution` or `raw.gis`). Presets that filter by signal do not need county; only user-saved views that add a county facet do.
+
+New localStorage key (separate from the CRM-lite store), exact schema:
+
+```
+localStorage["ql_saved_views_v1"] = JSON.stringify({
+  version: 1,
+  views: [
+    {
+      id: "uuid-or-timestamp-string",
+      name: "Buncombe high-equity hot",
+      createdAt: "2026-07-02T14:00:00.000Z",
+      pinned: true,                       // pinned views render as chips in the bar
+      filters: {                          // mirrors the app's live filter state object 1:1
+        listingTypes: ["lis_pendens"],    // multi-select
+        flagsAll: ["high_equity"],        // flags that must ALL be present (AND)
+        flagsAny: [],                     // flags where ANY present qualifies (OR)
+        flagsNone: ["negative_equity"],   // exclusion
+        intentMin: 70,                    // 0-100 slider low bound
+        intentMax: 100,
+        minSignals: 1,                    // 2+ Signals preset sets this to 2
+        county: "Buncombe",
+        state: null,
+        propertyKind: null,
+        crmStatus: ["New"],               // reads the CRM store's status field
+        search: "",
+        mapBoundsOnly: false
+      }
+    }
+  ]
+})
+```
+
+Built-in presets are NOT stored in localStorage — they are a hardcoded const array in `dashboard.js` using the same `filters` shape, so they always track the current data even after a pipeline schema change.
+
+### UI/behavior spec (the view, controls, sort/filter logic, empty states)
+- **Placement:** a single horizontal, wrap-on-mobile chip bar directly above the existing filter panel / view toggle, spanning table, cards, and map views (it sets filters, so it is view-agnostic).
+- **Two chip groups in one row:** (1) fixed preset chips, (2) pinned saved-view chips, then a `+ Save view` action and a `Views ▾` overflow menu for unpinned saved views.
+- **Preset definitions (exact filter mapping):**
+  - **Pre-Foreclosure** → `flagsAny:["preforeclosure"]` OR `listingTypes:["lis_pendens","foreclosure_sale"]`.
+  - **Vacant** → `flagsAll:["vacant"]`.
+  - **Absentee** → `flagsAll:["absentee_owner"]`.
+  - **High-Equity** → `flagsAll:["high_equity"]`, `flagsNone:["negative_equity","low_equity"]`.
+  - **Probate** → `listingTypes:["probate_notice"]` OR `source` starts with `derived.probate_deed`.
+  - **Tax-Delinquent** → `listingTypes:["tax_sale","tax_lien"]`.
+  - **2+ Signals** → `minSignals:2` (count = length of unique meaningful entries in `raw.flags` restricted to the "signal" whitelist, so cosmetic tags like `granite` don't inflate it).
+- **Toggle semantics:** clicking a chip sets the live filter state to that preset and marks the chip active (filled). Clicking the active chip clears back to the default/all state. Chips are single-select for presets by default; hold-modifier or a small "stack" affordance is out of scope for v1 — keep it single-select to match PropStream. Applying a preset visibly updates the existing filter controls (checkboxes, slider) so the operator sees what was set and can tweak from there.
+- **Result count:** each chip shows a live count badge, e.g. `High-Equity (87)`, computed from the full dataset on load and memoized; badge updates only on data reload, not on every keystroke, to stay cheap.
+- **Save view flow:** `+ Save view` snapshots the current live filter state, prompts for a name (inline text field, default = auto-summary like "high_equity · intent≥70 · Buncombe"), and writes to `ql_saved_views_v1`. A star/pin toggle on each saved view controls whether it shows as a chip vs. lives in the overflow menu. Right-click / kebab on a saved chip = Rename, Duplicate, Delete.
+- **Sort/filter logic:** presets and saved views only mutate the filter state object; the existing `applyFilters()` pipeline does all the actual row filtering, so sort order and search compose automatically. `flagsAll` = every listed flag must be in `raw.flags`; `flagsAny` = intersection non-empty; `flagsNone` = intersection empty; `minSignals` = whitelisted-flag count ≥ N; `intentMin/Max` bound the slider value; `crmStatus` reads the CRM-lite store by `case_number`/`parcel_id` key.
+- **Empty states:** if a preset/view yields 0 rows, show an inline banner in the result area — "No listings match [chip name]. Clear filter" with a one-click clear — rather than a blank table. If `ql_saved_views_v1` is empty, the saved-view region shows a muted hint "Save a filter combo to pin it here." If a saved view references a `county`/flag no longer present in the current data, still apply it (it just returns 0) and show the same empty banner; do not silently drop the view.
+
+### Where it slots in dashboard.js (which render fn / new tab / new panel)
+- **New render fn `renderQuickListBar()`** called once during initial render, mounted in a new `<div id="ql-bar">` inserted above the existing filter/toolbar container (not a new tab — it is a persistent bar across all three views).
+- **New consts:** `QL_PRESETS` (hardcoded array) near the top with the other config; `QL_STORE_KEY = "ql_saved_views_v1"`.
+- **New helpers:** `qlLoadViews()` / `qlSaveViews()` (localStorage read/write with try/catch and version guard, mirroring the existing CRM-lite persistence helpers), `qlApplyFilterState(state)` which writes into the app's existing live-filter object and calls the existing `applyFilters()` + re-render, and `qlCountForPreset(preset)` for the badge counts.
+- **Reuse, do not fork:** the chip click handler must funnel through the same `applyFilters()` / `render()` path the manual filter controls already use, so map bounds, search, CSV export, and CRM status filter all stay consistent. The "Save view" button reads the current live-filter object directly — no parallel state.
+- **CSV export:** no change needed; export already runs on the filtered set, so a preset/view narrows the export for free.
+
+### Effort + any precompute needed in the Python pipeline (which enricher stamps the field)
+- **Effort: ~0.5–1 day, front-end only.** Everything the presets need is already stamped: `listing_type` (source parser), `raw.flags` (the flag/condition enricher that emits `preforeclosure`, `absentee_owner`, `high_equity`, `vacant`, etc.), `raw.grade.overall_score` (the grading enricher), and the intent/corroboration values the existing chips already consume. No backend, no new fetch.
+- **Optional precompute (nice-to-have, not required):** stamp a top-level `signal_count` integer and a normalized `signals` array during the same enrichment pass that writes `raw.flags`, restricted to the motivation-signal whitelist (`preforeclosure, bank_owned, absentee_owner, high_equity, low_equity, negative_equity, vacant, tax_delinquent, probate`). This lets the **2+ Signals** preset and its count badge read one field instead of filtering `raw.flags` client-side each render, and makes the count stable/auditable. It is the same enricher that already builds `raw.flags` — one extra `len()` and a filtered copy, no new data source.
+- **Data hygiene to fold in:** the flag enricher emits both `as-is` and `as is`, and `high_equity` vs `low_equity`/`negative_equity` co-exist; normalize hyphen/space variants at stamp time so preset matching is exact. Also promote a usable `county` (from `raw.geo_attribution`/`raw.gis`) to the top level if saved-views-by-county are expected, since top-level `county` is largely `null` today.
+
+
+## Drag-drop Kanban pipeline (from CRM-lite)
+
+### What it does (operator value, one paragraph)
+Gives the operator a physical-feeling sales board where every lead is a card sitting in a stage column (New → Contacted → Appointment → Offer → Contract → Dead). Instead of opening each lead to bump its status, the operator drags the card from one column to the next and the stage change is written to localStorage instantly. Because the CRM-lite already tracks `next_action` and `next_action_date`, the board can surface neglect: any card with no touch in more than N days, or with an overdue next-action date, turns amber (and hard-overdue turns red), so the operator sees at a glance which deals are rotting. Column headers show live counts and summed estimated-equity, turning the board into a one-screen pipeline-value read. This is pure workflow acceleration over the data the operator already owns; it adds no new external data.
+
+### Data shape (what fields it needs in listings.json and/or the localStorage schema — be exact)
+No new `listings.json` fields are required. The board reads existing lead fields for card content (`case_number`/`parcel_id` as the stable key, `owner_name`, `situs_address`, `est_equity` or whatever equity field the cards already use, `intent_score`). It leans entirely on the existing CRM-lite localStorage record, which must carry these keys per lead (extend the current object if any are missing):
+
+```
+crm[leadKey] = {
+  status:            "new" | "contacted" | "appointment" | "offer" | "contract" | "dead",  // drives column
+  notes:             string,
+  next_action:       string,        // free text, existing
+  next_action_date:  "YYYY-MM-DD" | null,   // used for overdue detection
+  last_touched:      "YYYY-MM-DD" | null,   // NEW: stamped on any status change / note edit; drives stuck detection
+  stage_changed_at:  "YYYY-MM-DD" | null,   // NEW: stamped only on status change; "days in stage" chip
+  updated_at:        epoch ms       // existing bump field
+}
+```
+
+- `leadKey` = existing CRM key convention: `case_number || parcel_id`.
+- `status` values are the canonical lowercase stage slugs; keep a `STAGES` array as the single source of truth for order, labels, and column rendering. Any lead with no CRM record or an unrecognized `status` defaults to the `new` column (do not drop it).
+- `last_touched` / `stage_changed_at` are backfilled lazily: on first load, if absent, set them to `updated_at`'s date (or today if that too is missing) so existing leads don't all flash amber.
+- Stuck threshold `N` (days) lives in a `pipelinePrefs` localStorage key: `{ stuckDays: 7 }`, operator-editable from the board toolbar.
+
+### UI/behavior spec (the view, controls, sort/filter logic, empty states)
+- **New view mode "Pipeline"** added alongside Table / Cards / Map. Selecting it renders a horizontal row of 6 fixed columns (`overflow-x:auto`, columns `min-width:260px`, so it scrolls on narrow screens rather than wrapping).
+- **Column header:** stage label, a count badge, and summed equity (e.g. `Offer · 4 · $612k`). Dead column is visually muted.
+- **Card:** owner name (bold), situs address (truncated), intent-score chip, equity, a small "Xd in stage" chip, and a "next: <next_action> (date)" line when set. Card border/background tint: neutral by default, **amber** if `last_touched` older than `stuckDays` OR `next_action_date` is past-due, **red** if either is overdue by more than `2 × stuckDays`. A stuck card also shows a small clock badge.
+- **Drag-drop:** HTML5 native. Each card is `draggable="true"`; `dragstart` stashes `leadKey` in `dataTransfer` and adds a `.dragging` class. Each column is a drop target: `dragover` calls `preventDefault()` and adds a `.drop-hover` class; `drop` reads the key, writes `crm[key].status = columnStage`, stamps `stage_changed_at` and `last_touched` to today, bumps `updated_at`, persists, and re-renders only the two affected columns (or the whole board — cheap at this scale). No reordering within a column is persisted (order is computed, see sort).
+- **Sort within a column:** stuck-first, then by `intent_score` desc, then equity desc — so the cards that need attention float to the top of each stack. This is deterministic and recomputed on every render; intra-column drag position is not saved.
+- **Toolbar:** a `stuckDays` number input (writes `pipelinePrefs`), a "Stuck only" toggle (filters every column to just amber/red cards), and it **inherits the app's existing global filters** (county, intent slider, signal chips) — the board only renders leads that pass the current filter set, exactly like the other views.
+- **Empty states:** an empty column shows a dashed drop zone with muted text ("No leads in Contacted"). If the entire board is empty because filters exclude everything, show the app's standard "no results" message with a "clear filters" affordance. If CRM is completely empty (fresh operator), every lead renders in New — that is the expected cold-start, not an empty state.
+- **Touch/mobile note:** HTML5 DnD is unreliable on touch; keep each card's existing status `<select>` (or add a compact one on the card) as the always-available fallback path so stages can still be changed without dragging.
+
+### Where it slots in dashboard.js (which render fn / new tab / new panel)
+- Add `'pipeline'` to the view-mode switch that currently branches to `renderTable()` / `renderCards()` / `renderMap()`; add a matching toolbar button.
+- New top-level `renderPipeline(leads)` that: applies the same `getFilteredLeads()` the other renderers use, groups by `getCrm(key).status`, and calls a `renderColumn(stage, leadsInStage)` helper per stage.
+- New helpers: `getCrm(key)` / `setCrm(key, patch)` (reuse existing CRM read/write if present, extend to stamp `last_touched` + `stage_changed_at`), `isStuck(record, stuckDays)` returning `'ok' | 'amber' | 'red'`, and `pipelinePrefs` get/set.
+- Wire drag handlers in `renderColumn` via event delegation on the board container (one `dragstart`/`dragover`/`drop` listener set on the columns wrapper, reading `data-lead-key` and `data-stage` attributes) rather than per-card listeners, so re-renders don't leak handlers.
+- Reuse the existing card-detail click handler so clicking (not dragging) a card still opens the lead's detail/notes panel; distinguish click from drag with the native `dragstart`/`click` split (a completed drag suppresses the click).
+
+### Effort + any precompute needed in the Python pipeline (which enricher stamps the field)
+- **Pipeline / Python: none required.** All new fields (`status`, `last_touched`, `stage_changed_at`, `pipelinePrefs`) are client-side, born and mutated in localStorage; no enricher stamps anything and `listings.json` is unchanged. The board consumes existing emitted fields (`owner_name`, `situs_address`, equity, `intent_score`, `case_number`/`parcel_id`) only for display.
+- **Frontend effort: ~M (roughly half a day).** Bulk is CSS for the columns/cards and the DnD wiring; the state layer is a thin extension of the CRM-lite already in place. Two edge cases carry the risk: (1) lazy backfill of `last_touched`/`stage_changed_at` so legacy CRM records don't all render amber on first load, and (2) the click-vs-drag disambiguation on cards. Recommend a one-time migration pass on load that walks existing `crm` records and stamps the two new date fields from `updated_at`.
+
+
+## Marketing ROI-by-list KPI table + CSV import
+
+### What it does (operator value, one paragraph)
+Gives the operator a single-screen answer to "which lead list is actually paying off." It reads the CRM-lite records the operator has already been keeping (status, notes, next-action per property) and joins them to the listing's `source`/`listing_type`, then rolls everything up into a KPI grid: leads worked, contacts made, deals closed, response rate, and — once a per-list spend number is typed in — cost-per-lead, cost-per-contact, and cost-per-deal. Because the pipeline is a mix of scraped foreclosure/probate/tax lists (auction.com, Fannie HomePath, lis-pendens, law-firm feeds, etc.), this is the operator's REsimpli-style "marketing ROI by list" view without paying for REsimpli or standing up a backend. The second half is a CSV drop zone: the operator can pull a spend/response export out of their dialer or a mailer house, drag the file onto the dashboard, and it parses entirely in-browser (nothing is uploaded anywhere), scores those rows with the same formulas, and shows them as their own rows in the KPI table so external campaigns sit next to the scraped lists in one apples-to-apples comparison.
+
+### Data shape (what fields it needs in listings.json and/or the localStorage schema — be exact)
+
+**From `listings.json` (already present, no pipeline change required):** every listing row already carries `source` (e.g. `"national.fannie_homepath"`, `"counties_sc.sc_public_index_lis_pendens"`) and `listing_type` (e.g. `"lis_pendens"`, `"reo"`, `"foreclosure_sale"`). These two are the grouping dimensions. The join key to CRM is the existing composite `case_number` || `parcel_id` || `source_url` (same fallback chain the CRM-lite already uses for its localStorage key). No new listings field is needed for v1.
+
+**From the existing CRM-lite localStorage** — today it stores per-property `{status, notes, next_action}` keyed by the property key. To derive outcomes we need the KPI table to interpret `status` against a fixed outcome ladder. Formalize the CRM status vocabulary as an ordered enum stored in a small config object so counting is deterministic:
+
+```js
+// localStorage key: "fc_crm_status_vocab" (write once; editable in a settings panel)
+{
+  "new":        { rank: 0, isContact: false, isDeal: false },
+  "contacted":  { rank: 1, isContact: true,  isDeal: false },
+  "responded":  { rank: 2, isContact: true,  isDeal: false },
+  "appointment":{ rank: 3, isContact: true,  isDeal: false },
+  "offer":      { rank: 4, isContact: true,  isDeal: false },
+  "contract":   { rank: 5, isContact: true,  isDeal: true  },
+  "closed":     { rank: 6, isContact: true,  isDeal: true  },
+  "dead":       { rank: -1, isContact: false, isDeal: false }
+}
+```
+The CRM record itself gains nothing mandatory, but the KPI rollup reads `crm[key].status` and maps it through this vocab. If a status string is absent from the vocab it counts as a worked lead with `isContact=false` (so custom statuses degrade gracefully).
+
+**New localStorage: per-list spend.** One flat object keyed by dimension value:
+
+```js
+// localStorage key: "fc_campaign_spend_v1"
+{
+  "by": "source",                     // or "listing_type" — which dimension the numbers below key on
+  "spend": {                          // dollars, operator-entered
+    "national.fannie_homepath": 0,
+    "counties_sc.sc_public_index_lis_pendens": 450,
+    ...
+  },
+  "period": { "start": "2026-06-01", "end": "2026-06-30" }  // optional, for display only
+}
+```
+
+**New localStorage: imported CSV campaigns.** Each imported file becomes one virtual "list" whose rows are scored in-memory and (optionally) cached so they survive reload:
+
+```js
+// localStorage key: "fc_imported_campaigns_v1"
+[
+  {
+    id: "imp_1719900000000",           // Date.now() based
+    label: "June RVM blast",           // operator-typed or filename
+    spend: 1200,                       // operator-typed after import
+    importedAt: "2026-07-02T14:00:00Z",
+    columnMap: { status:"Disposition", contact:"Answered", deal:"Closed" }, // resolved header→role map
+    rows: [ { status:"responded", isContact:true, isDeal:false, /*passthrough*/ raw:{...} }, ... ]
+  }
+]
+```
+CSV parsing needs no fixed schema — the importer detects columns and lets the operator map three roles: **status/disposition**, **contacted?** (truthy = contact), **deal/closed?** (truthy = deal). Everything else is kept in `raw` for display but not scored. Nothing from the CSV ever leaves the browser; it lives only in this localStorage entry.
+
+### UI/behavior spec (the view, controls, sort/filter logic, empty states)
+
+**New "ROI" tab** alongside Table / Cards / Map. Two stacked panels.
+
+**Panel A — KPI table.**
+- Top control bar: a **"Group by"** segmented toggle (`Source` | `Listing type`), a **period display** (read-only, from spend config), and an **"Edit spend"** button.
+- One row per distinct dimension value **that has at least one CRM-touched listing** (don't render 4,000 untouched-source rows — an all-`new`/untouched list adds noise). Provide an **"Include untouched lists"** checkbox that, when on, also lists dimensions with zero CRM activity (spend-only rows, useful for "we paid and got nothing").
+- Columns: `List` · `Leads` (count of listings in that dimension that have any CRM record) · `Contacts` (records where mapped `isContact`) · `Deals` (records where `isDeal`) · `Response rate` (`Contacts / Leads`, shown as %) · `Deal rate` (`Deals / Leads`) · `Spend` (editable inline cell) · `Cost / lead` (`Spend / Leads`) · `Cost / contact` (`Spend / Contacts`) · `Cost / deal` (`Spend / Deals`).
+- **Divide-by-zero rules:** if a denominator is 0, render `—` not `Infinity`/`NaN`. If Spend is 0 or blank, cost columns render `—` (not $0) so "unpriced" is visually distinct from "free."
+- **Inline spend edit:** clicking a Spend cell turns it into a number input; on blur/Enter it writes `fc_campaign_spend_v1.spend[dimValue]` and recomputes that row's cost columns live. Changing the "Group by" toggle re-keys the whole spend object's `by` field and shows a one-line warning if switching dimensions would orphan previously-entered numbers (keep both keyed sub-objects rather than destroying data).
+- **Sort:** every column header sortable; default sort = `Cost / deal` ascending with `—` sorted last (so the best-ROI list floats to top, unpriced lists sink). Reuse the existing table sort comparator, adding a "nulls/dashes last" branch.
+- **Filter interaction:** the ROI table respects the dashboard's active global filters (county/state/type/intent slider) — i.e. `Leads` counts only listings currently passing the filter set, so the operator can ask "for my SC lis-pendens sub-slice, which source converts best." Show a small "(filtered)" badge in the header when any global filter is active.
+- **Footer TOTAL row:** sums Leads/Contacts/Deals/Spend and recomputes blended rates and blended cost-per-deal.
+- **Empty state:** if the CRM-lite has zero records → panel shows "No CRM activity yet. Set a status on some listings in the Table view, then come back to see cost-per-deal by list." with a button that switches to the Table tab.
+
+**Panel B — CSV import.**
+- A dashed **drop zone** ("Drop a campaign CSV here, or click to choose") plus a hidden `<input type="file" accept=".csv,text/csv">`.
+- On drop/select: read via `FileReader.readAsText`, parse in-browser (small hand-rolled CSV parser that handles quoted fields and commas-in-quotes — no library, no CDN, keeps CSP-clean). Show a **preview + column-mapper**: a table of the first 10 parsed rows with three `<select>` dropdowns above it — "Which column is status/disposition?", "Which is 'contacted'?", "Which is 'deal/closed'?" — each populated from the detected headers, plus a text input for the campaign **label** (pre-filled with the filename) and a number input for **spend**.
+- **Truthy detection** for contact/deal columns: treat `yes/y/true/1/won/closed/answered/connected` (case-insensitive) as true; blank/`no/n/false/0` as false. Status column value is lower-cased and matched against the status vocab; unmatched values still count as a worked lead.
+- **"Add to table"** button writes the entry into `fc_imported_campaigns_v1`, and the imported campaign immediately appears as extra rows in Panel A (visually tagged with an "imported" chip and their own label rather than a `source` value). Imported rows sort/compare identically to scraped-list rows.
+- **Manage imports:** a small list under the drop zone of previously imported campaigns with per-item "edit spend" and "remove" (removes from localStorage and from the table).
+- **Empty state:** drop zone with helper text; if a parse fails (no rows, or file isn't CSV) show an inline error "Couldn't read that file as CSV — check it has a header row" and keep the zone ready. Reassure inline: "Parsed on your device — nothing is uploaded."
+- **Privacy note:** a persistent one-liner under the panel title: "All CSV parsing happens in your browser. No file or row leaves this page."
+
+### Where it slots in dashboard.js (which render fn / new tab / new panel)
+- **Tab registration:** add `"roi"` to whatever `VIEWS` / view-switch array drives the Table/Cards/Map buttons, and a `case "roi": renderRoiTab()` branch in the central `renderView()` / `switchView()` dispatcher (the same place `renderTable()`, `renderCards()`, `renderMap()` are called).
+- **New render fns:** `renderRoiTab()` orchestrates two children — `renderRoiKpiTable(groupBy)` (Panel A) and `renderCsvImportPanel()` (Panel B). Keep them side-effect-free renderers that read from three helpers.
+- **New pure helpers (put next to the existing scoring/filter helpers):**
+  - `getCrmMap()` — already exists or trivially wraps the current localStorage CRM read.
+  - `rollupRoi(listings, crmMap, groupBy, spendConfig, statusVocab)` → returns an array of `{list, leads, contacts, deals, responseRate, dealRate, spend, cplead, cpcontact, cpdeal, isImported}` rows. This is the one function to unit-test. It must consume the **already-filtered** listings array (call it with `getFilteredListings()` output so global filters flow through automatically).
+  - `parseCsv(text)` → `{headers, rows}`; `scoreImportedRows(rows, columnMap, statusVocab)` → scored rows; both live near `rollupRoi` so imported and scraped rows share the same scoring path.
+- **localStorage accessors:** `loadSpendConfig()/saveSpendConfig()`, `loadImportedCampaigns()/saveImportedCampaigns()`, `loadStatusVocab()` (seed with the default enum on first read) — mirror the existing CRM localStorage accessor style/keys.
+- **Merge for the table:** in `renderRoiKpiTable`, concatenate `rollupRoi(...)` output with the mapped `fc_imported_campaigns_v1` entries before sorting/rendering, so both kinds of rows live in one `<tbody>`.
+- **Reuse:** the CSV **export** already in the app gives you a header-writing / cell-escaping routine — reuse its escaping logic in reverse for the parser, and reuse the existing sortable-`<table>` component and number-formatting helpers rather than writing new ones.
+
+### Effort + any precompute needed in the Python pipeline (which enricher stamps the field)
+- **Pipeline precompute: none required for v1.** `source` and `listing_type` are already stamped on every row by the ingest layer, and the CRM/spend/import data are entirely client-side. The feature ships as a pure `dashboard.js` + localStorage addition with zero pipeline change and no `listings.json` schema bump — consistent with the static/no-build constraint.
+- **Effort:** roughly **Medium — ~1 to 1.5 focused days.** Breakdown: `rollupRoi` + status-vocab mapping and the KPI `<table>` with inline-editable spend and divide-by-zero handling is the bulk (~half a day); the CSV drop zone + hand-rolled quoted-CSV parser + column-mapper UI + imported-campaign persistence is the other half; the tab wiring and reusing the existing sort/format/export helpers is small. No new dependencies (no PapaParse/CDN — a ~30-line RFC-4180-ish parser keeps it CSP-clean for GitHub Pages).
+- **Optional later precompute (v2, only if desired):** if the operator wants a canonical human-readable list label instead of the raw dotted `source` slug (e.g. "Fannie HomePath" instead of `national.fannie_homepath`), add a tiny `source_label` field in the ingest/normalize enricher (the same stage that already sets `source`) — a static slug→label dict. Purely cosmetic; the KPI math never needs it. Everything ROI-critical is already in the data.
