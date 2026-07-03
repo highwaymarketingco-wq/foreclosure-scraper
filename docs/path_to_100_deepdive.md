@@ -1523,3 +1523,1009 @@ Cleanest of the three. Direct mail to property owners for real-estate outreach i
 - **PropertyRadar** = the only real *enricher* — wire it (Business tier, API-gated, ~$549+/mo) once contact/property backfill volume clears a few thousand pulls/mo. Best contact accuracy of the three.
 - **Stannp** = the *action* endpoint — wire it as the terminal direct-mail step; low effort, clean ToS, no subscription floor.
 - **PropStream** = **no programmatic path and ToS actively forbids our use**; keep only as a manual operator console feeding CSVs through the existing manual-ingest lane, never as an automated enricher.
+
+
+---
+
+# Deep-Dive Round 6 — The 13 Completeness-Critic Gaps as Costed Sections (2026-07-02)
+
+
+## DNC / TCPA / Litigator Scrub
+
+### What it is & why it BLOCKS a close (even when the row is 100% filled)
+
+A perfectly enriched lead card — name, property, equity, verified cell phone — is a **legal liability, not an asset**, the instant you dial or text it without scrubbing. The phone number field is the single most dangerous cell on the card. Three overlapping problems turn a "ready" row into a lawsuit:
+
+1. **The number is on the National DNC Registry.** ~40% of US cell numbers are registered. A marketing call/text to a registered number without prior express written consent is a violation.
+2. **The number was reassigned.** ~100,000 mobile numbers are reassigned by carriers *every day*. The person on your card no longer owns it; the new owner never distressed a property and never consented. Each contact is a fresh violation.
+3. **The number belongs to a known TCPA litigator / "troll."** A small population of professional plaintiffs seed their numbers into distressed-property lists specifically to bait investors into dialing, then file. One litigator can single-handedly generate a class action.
+
+The exposure is not theoretical or trivial: the TCPA is **$500 per violation, trebled to $1,500 per willful/knowing violation, with no statutory cap**. "Per violation" means per call *and* per text — a 3-touch SMS drip to one bad number is 3× $1,500 = $4,500. At 17,003 leads, a single unscrubbed blast where even 2% of numbers are litigator/reassigned/DNC (≈340 numbers × 3 touches × $1,500) is **$1.53M of theoretical exposure** before a single deal closes. TCPA class-action filings hit 1,052 in the first half of 2025 alone (up 95% YoY). This is the fastest way to convert a free lead engine into a legal loss.
+
+State law compounds it. In **South Carolina specifically**, the *sourcing* of the number can itself be unlawful — see the legal subsection below — independent of the TCPA. So a Spartanburg tax-delinquent lead can carry two separate violations from one text.
+
+The engine's entire value proposition (property-keyed name→property→equity→**contact**→outreach) terminates at "contact." Without a scrub gate, the outreach step is the step that gets you sued.
+
+### Current state in the engine (is anything there?)
+
+Based on the file map (`outreach.py`, `crm.json`, `distress_score.py`, `enrichment_strategy_fit.py`, `models.py`, `source_health_tracker.py`), **nothing addresses this gap**:
+
+- `outreach.py` is the send layer — it is exactly where a pre-send scrub gate belongs, and per the assignment it currently dials/texts whatever phone the enrichment produced. There is no evidence of a DNC/litigator check between "row scored" and "message sent."
+- `models.py` has no field to persist scrub state. There is no `dnc_status`, `litigator_flag`, `reassigned_checked_at`, `wireless_flag`, `consent_basis`, or `scrub_expires_at` on the lead/contact model. Without these fields you cannot prove a safe-harbor defense and cannot enforce the 31-day rescrub window.
+- `crm.json` has no internal/company-specific Do-Not-Call suppression list. The TCPA independently requires you to honor your *own* internal DNC list across all channels; opt-outs from prior campaigns are not being captured or suppressed.
+- `enrichment_strategy_fit.py` decides channel fit but does not gate on phone type (wireless vs landline) or consent basis.
+- No `source_health_tracker.py` concept of "scrub freshness" exists, so numbers age past the 31-day window silently.
+
+Net: the phone number is enriched and handed to outreach **raw**. This is the highest-severity missing piece in the whole close-machinery layer.
+
+### What "solved" looks like (the concrete deliverable)
+
+A **mandatory pre-send scrub gate** that no message can bypass, plus the fields to prove it. Concretely:
+
+1. **New model fields** (`models.py`): `phone_type` (wireless/landline/voip), `dnc_federal` (bool), `dnc_state` (bool), `litigator_flag` (bool), `reassigned_flag` (bool), `internal_dnc` (bool), `consent_basis` (enum: none / EBR / PEWC), `last_scrubbed_at`, `scrub_source`, `scrub_result_id` (for the audit trail / safe-harbor proof).
+2. **A `scrub.py` module** that, given a phone list, returns the flags above and a retained result record.
+3. **A hard gate in `outreach.py`**: `if litigator_flag or dnc_federal or dnc_state or internal_dnc or reassigned_flag or last_scrubbed_at > 31 days → BLOCK`. Blocked ≠ deleted; the property stays in the pipeline for **mail** (see Gap 2) which has no TCPA exposure.
+4. **An internal DNC list** in `crm.json` that every inbound opt-out ("STOP", "do not call") writes to, honored across SMS/voice/every future run.
+5. **A 31-day rescrub cron** so numbers never go stale, wired into the existing weekly-run scheduler.
+6. **Retained scrub records** (the safe-harbor evidence + 5-year consent retention the TCPA requires).
+
+Definition of done: a text/call physically cannot leave `outreach.py` unless the number carries a fresh, clean scrub record.
+
+### FREE path (design/code) vs PAID path (vendor + real 2026 price)
+
+This gap is **cheap-to-solve, not free-to-solve** — the litigator and reassigned-number databases are proprietary and cannot be reproduced for free. But the *architecture* (the gate, the fields, the cron, the internal list) is 100% free code you already have the skeleton for.
+
+**FREE path (do all of this regardless):**
+- **Internal DNC suppression** — pure code, zero cost, and legally mandatory. Capture every opt-out, suppress forever, across channels.
+- **Landline/wireless split via free data** — the FCC/NANPA and free line-type lookups (e.g., the free tier of `phonenumbers` + carrier OCN data, or Twilio Lookup at ~$0.008/number if you want line-type only) let you route landlines (lower TCPA risk, ATDS rules differ) vs wireless.
+- **DNC-by-consent logic** — for probate/tax-delinquent/foreclosure leads you generally have **no** established business relationship and **no** prior express written consent, so the correct free default is: **mail-first, phone only after scrub**. Building that routing is free.
+- **Do NOT try to self-host the federal DNC registry.** Access to the official registry requires SAN registration and is restricted to sellers/telemarketers for their own area codes; it is not a general scrub source and mis-using it is its own violation.
+
+**PAID path (the part you genuinely must buy — it's cheap):**
+
+| Vendor | What it covers | Real 2026 price |
+|---|---|---|
+| **TCPA Litigator List** (tcpalitigatorlist.com) | 600K+ known litigators/attorneys/trolls **+ federal & state DNC** in one API scrub | Basic **$199/mo** = 200K scrubs incl., overage **$0.002**/scrub; API Gold **$499/mo** = 500K incl. at **$0.0012**; annual Basic **$2,029/yr**. This is the best-fit, lowest-friction option for this engine's volume. |
+| **DNC.com** (Contact Center Compliance) — DNCScrub + LitigatorScrub + **TCPA Reassigned ID** | Federal/state DNC, litigator scrub, and the reassigned-numbers check for safe harbor | Enterprise quote only (unpublished); heavier/pricier, aimed at large call centers. Overkill unless volume explodes. |
+| **Per-number scrub floors (market)** | Ad-hoc / single-list scrubs | ~**$0.01/number**, ~**$5 minimum** (TextP2P and similar) — fine for one-off lists, worse unit economics than a subscription at 17K+ volume. |
+| **Reassigned Numbers Database** (official FCC RND, reassigneddb.us) | The authoritative reassigned-number safe-harbor check | ~**$0.0025–$0.01/query** tiered; provides the *statutory* safe harbor that private lists don't. Add this once phone outreach volume justifies it. |
+
+**Recommended buy:** TCPA Litigator List **Basic $199/mo** covers litigator + federal + state DNC for this engine's whole 17K board with room to spare (200K scrubs/mo). Add the official **RND** on a per-query basis for reassigned-number safe harbor once you're actively dialing. All-in ≈ **$199–$250/mo** closes 90% of the exposure.
+
+### For LEGAL gaps: the actual SC/NC statutes and what they require
+
+**Federal — TCPA (47 U.S.C. §227) + FCC rules (47 CFR 64.1200):**
+- Prior Express Written Consent (PEWC) required for marketing calls/texts to wireless numbers using an autodialer or prerecorded voice.
+- National DNC scrub **every 31 days** (47 CFR 64.1200(c)(2)).
+- Maintain and honor an **internal DNC list** across all channels; process opt-outs within **10 business days**.
+- **Reassigned Numbers Database** query before dialing to claim safe harbor.
+- **Damages: $500/violation, up to $1,500 for willful/knowing, no cap** (47 U.S.C. §227(b)(3), (c)(5)).
+- 5-year consent-record retention.
+
+**South Carolina — S.C. Code §30-2-50 (the sourcing trap unique to this engine):**
+"A person or private entity **shall not knowingly obtain or use personal information obtained from a state agency, a local government, or other political subdivision of the State for commercial solicitation** directed to any person in this State." §30-2-30 defines *personal information* to include **name, home address, and home telephone number**, and *commercial solicitation* as "contact by telephone, mail, or electronic mail for the purpose of selling or marketing a consumer product or service." **Penalty: misdemeanor, fine up to $500 and/or up to one year imprisonment** per §30-2-50(B).
+
+Why this bites *this* engine directly: a large share of the SC leads are pulled from **county tax-delinquent rolls, assessor cards, ROD indexes, magistrate/court data, and qPublic** — i.e., "personal information obtained from a state agency, a local government, or other political subdivision." Using that name+address+phone for solicitation is squarely what §30-2-50 prohibits. **Note the exemptions in §30-2-30** (banking/insurance/securities, credit-union membership, continuing education, political use of voter data) — real-estate wholesale solicitation is *not* among them. This is a genuine compliance question to route to counsel, and at minimum argues for: (a) treating government-sourced SC contact info as solicitation-restricted, (b) leaning on **mail with public-record framing** and skip-traced (non-government-sourced) phone numbers rather than the government-sourced number, and (c) never bulk-texting off a raw county-sourced phone column.
+
+**North Carolina — N.C. Gen. Stat. §75-102 to §75-104 (Telephone Solicitations / NC Do Not Call):**
+- §75-102: No telephone solicitation to a number on the current federal DNC Registry (NC adopts the federal list), and none to anyone who has told you to stop; no calls before **8:00 a.m. or after 9:00 p.m.**; must comply with FTC Telemarketing Sales Rule §§310.3–310.5.
+- §75-104 penalties: **$500 first violation, $1,000 second, $5,000 each violation thereafter** — escalating and stacking on top of the federal $1,500.
+
+### Effort + build estimate
+
+**Low–Medium.** The vendor does the hard part (the databases). Your build is: `scrub.py` API client + result cache; ~7 new `models.py` fields + migration; the internal-DNC suppression list in `crm.json`; the hard gate + 31-day freshness check in `outreach.py`; a rescrub cron on the existing scheduler. **Estimate: 1.5–2.5 days** of engineering + ~$200/mo vendor. The legal/§30-2-50 review is a separate, higher-value ask to route to counsel (hours, not build time).
+
+### Recommended action
+
+1. **Immediately hard-gate `outreach.py`** so no SMS/voice can send without a scrub record — even a stub that blocks everything until scrub is wired is safer than today.
+2. Buy **TCPA Litigator List Basic ($199/mo)**; build `scrub.py` against its API; add the 7 model fields + migration.
+3. Stand up the **internal DNC list** and opt-out capture in `crm.json`; wire the **31-day rescrub** into the weekly scheduler.
+4. Default **SC government-sourced leads to mail-first**; flag §30-2-50 for a one-time counsel review before any SC phone campaign.
+5. Add the official **Reassigned Numbers Database** per-query check once active dialing begins, for statutory safe harbor.
+
+---
+
+## NCOA / CASS Mail Deliverability
+
+### What it is & why it BLOCKS a close (even when the row is 100% filled)
+
+When phone outreach is legally gated (Gap 1), **direct mail becomes the primary channel** for this engine — and mail has its own silent killer: **address rot**. Distressed-property owners are, by definition, the most mobile population in the mailing universe. They move out of the property, move in with relatives, land in a rental, or are in probate/incarceration/foreclosure limbo. The mailing address the county has on file is frequently *not where the person is*.
+
+The failure is invisible and expensive: **~34% of mail sent to unhygienic distressed-owner lists never reaches a live human** — it goes to a vacated property, a bad ZIP+4, an undeliverable-as-addressed record, or a person who filed a change-of-address a year ago. You pay full postage + print + list cost on every one of those pieces and get **zero** contact. On a 17,003-piece mailing at ~$0.70 all-in per piece, a 34% dead rate is **~$4,050 of spend that touched nobody** — per drop. Across a multi-touch mail sequence it compounds.
+
+Two distinct problems, two distinct fixes:
+
+- **CASS** (Coding Accuracy Support System) fixes the *address itself*: standardizes it to USPS format, appends ZIP+4, validates it via DPV (Delivery Point Validation) so you know the address is a real, deliverable point. Bad/incomplete addresses get corrected or flagged before you print.
+- **NCOA** (National Change of Address) fixes *where the person went*: matches your list against the USPS's live change-of-address database (18- and 48-month move data) and updates the address to the person's current one. This is the piece that specifically rescues the high-mobility distressed population.
+
+Without both, the mail-first strategy — which is your *compliant* strategy — quietly wastes a third of its budget and misses exactly the owners most likely to be motivated (the ones who already left).
+
+### Current state in the engine (is anything there?)
+
+Per the file map, **nothing addresses mail hygiene**:
+
+- The engine resolves and stores a mailing address (via GIS/assessor/OneMap/SCDOT resolvers noted in memory), but there is **no CASS standardization or DPV validation step** — addresses are stored as-resolved, not as-USPS-verified. `models.py` has no `cass_status`, `dpv_confirmed`, `zip4`, `address_deliverable`, or `vacant_flag`.
+- There is **no NCOA move-update step** — no `ncoa_move_flag`, `ncoa_new_address`, `ncoa_move_date`, or `moved` field. The engine cannot tell that an owner relocated, which is both a deliverability fix *and a motivation signal* (an owner who moved off a distressed property is often more motivated to sell it).
+- `outreach.py`'s mail path (if any) sends to raw resolved addresses.
+- `source_health_tracker.py` has no concept of list hygiene / bounce tracking, so there's no feedback loop on which sources produce undeliverable addresses.
+
+Net: mail deliverability is completely un-instrumented. Given that mail is the fallback for every phone-gated lead, this is a direct throughput leak.
+
+### What "solved" looks like (the concrete deliverable)
+
+A **hygiene pass that runs on any list before it's printed**, plus persisted results:
+
+1. **New `models.py` fields**: `cass_status`, `dpv_confirmed` (Y/N/vacant/no-stat), `zip4`, `carrier_route`, `ncoa_move_flag`, `ncoa_new_address`, `ncoa_move_date`, `address_deliverable` (final go/no-go), `last_hygiene_at`.
+2. **A `mail_hygiene.py` module** that runs the list through CASS+DPV+NCOA (via vendor API or batch upload) and writes those fields back.
+3. **A deliverability gate in `outreach.py`'s mail path**: suppress DPV-fails and known vacants from the *owner-at-property* mailing (or deliberately route vacants to an "absentee/vacant" template), and **substitute the NCOA new address** when a move is found.
+4. **Presort-ready output**: because CASS appends ZIP+4 and carrier route, the same pass makes the mailing **presort-eligible**, which is a hard postage discount (see below) — hygiene *pays for itself*.
+5. **Return-Service-Requested feedback loop**: physically encode RSR on the mailpiece so USPS returns corrected/undeliverable addresses for free, and pipe those corrections back into `source_health_tracker.py` to score which sources produce rot.
+
+Definition of done: no mailpiece prints against an address that hasn't been CASS+DPV validated and NCOA-updated, and undeliverables feed back automatically.
+
+### FREE path (design/code) vs PAID path (vendor + real 2026 price)
+
+Unlike the scrub gap, a **large chunk of this is genuinely free** because USPS itself gives you free hygiene mechanisms and free NCOA reporting.
+
+**FREE path:**
+- **Return Service Requested (the free trick).** Print the **"Return Service Requested"** endorsement on the mailpiece. For First-Class and (via ACS) other classes, USPS will **return the piece with the corrected/forwarding address, or notify you it's undeliverable — and for First-Class this address-correction service is free**. You mail once, and USPS hands you back a corrected list at no per-record charge. This is the single highest-ROI free move: it turns your first drop into a self-cleaning list. (Traditional ancillary-service endorsements on First-Class provide forwarding + address correction at no extra fee; ACS electronic correction is near-free at fractions of a cent.)
+- **TrueNCOA free report.** Upload your list to **TrueNCOA and get a 100% free report** showing 18/48-month move counts, vacancies, and invalid addresses through NCOA + CASS + DPV + RDI — you only pay if you want the corrected file exported. This lets you *quantify* your rot (confirm the ~34%) and validate the whole approach before spending a dollar.
+- **All the routing/gate/feedback code** (fields, suppression logic, RSR feedback loop, presort file formatting) is free code on your existing skeleton.
+
+**PAID path (cheap, and postage-discount-positive):**
+
+| Vendor | What it does | Real 2026 price |
+|---|---|---|
+| **TrueNCOA** | NCOA + CASS + DPV + RDI, corrected file export, flat all-inclusive | **$20 per file** flat (free report first; pay only to export corrections). Best fit for this engine's periodic batch model. |
+| **Melissa (Melissa Direct / Data)** | CASS standardization + NCOA move-update, bulk tiers | **$2.25 per 1,000 records** (24-month NCOA), **$2.95 per 1,000** (48-month); minimums **$40 / $50**. At 17K records ≈ **$38–$50** for a full 48-month pass. |
+| **Market range (any CASS+NCOA provider)** | Bundled hygiene | **$0.001–$0.05 per record** depending on volume/bundling. |
+
+**The postage offset:** running CASS makes the list **presort-eligible**. 2026 Marketing Mail letters run roughly **$0.372 at 5-digit presort vs ~$0.433 mixed AADC** — a ~**14%** postage spread. On 17,003 pieces that's ~**$1,040 saved per drop** in postage alone — an order of magnitude more than the ~$40–$50 hygiene cost. **Hygiene is net-negative cost.** You save more on postage than you spend cleaning, before counting the wasted print/postage you *avoid* on the 34% dead pieces.
+
+### For LEGAL gaps
+
+This gap is **operational/postal-regulatory, not a statutory liability** like Gap 1 — there is no SC/NC statute creating a private right of action for mailing a bad address. The governing rules are the **USPS Domestic Mail Manual** (Move Update standard, CASS certification, ancillary service endorsements like Return Service Requested), and for *presort discounts* USPS requires **NCOA Move-Update compliance within 95 days** of the mailing date. So the only "requirement" is a postal-pricing one: to claim the presort/marketing-mail discounts, your list must be Move-Update compliant (NCOA-processed) — which the paid path already satisfies. No consent or solicitation statute is triggered by mail hygiene itself (though the *content* of SC mail still implicates §30-2-50 from Gap 1, since "commercial solicitation" there explicitly includes contact "by mail").
+
+### Effort + build estimate
+
+**Low.** Most of the value is a free USPS mechanism (RSR) plus a ~$20–$50 batch API call. Build is: `mail_hygiene.py` (vendor batch upload/API + writeback), ~9 new `models.py` fields + migration, the DPV/vacant suppression + NCOA-substitution gate in the mail path, RSR endorsement on the mailpiece template, and the return feedback loop into `source_health_tracker.py`. **Estimate: 1–1.5 days** + trivial recurring vendor cost.
+
+### Recommended action
+
+1. **Add "Return Service Requested" to every mailpiece today** — free self-cleaning list, zero build beyond the template endorsement.
+2. **Upload the current board to TrueNCOA's free report** to quantify actual move/vacant/invalid rates and confirm the rot before scaling spend.
+3. Build `mail_hygiene.py` and run a full **CASS+NCOA pass** (TrueNCOA $20/file or Melissa ~$40–50 for 48-month) before the next drop; add the 9 model fields.
+4. **Gate the mail path** on DPV, substitute NCOA new addresses, and route confirmed vacants to a dedicated absentee template (vacancy is a *motivation* signal, not just a suppress).
+5. **Capture the presort discount** — the ~14% postage spread makes hygiene net-negative cost — and pipe RSR returns back into `source_health_tracker.py` to grade which sources produce address rot.
+
+---
+
+Sources:
+- [S.C. Code §30-2-50 (scstatehouse.gov)](https://www.scstatehouse.gov/code/t30c002.php) · [Justia 2024 §30-2-50](https://law.justia.com/codes/south-carolina/title-30/chapter-2/section-30-2-50/)
+- [N.C. Gen. Stat. §75-102](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_75/GS_75-102.pdf) · [§75-104](https://www.ncleg.gov/enactedlegislation/statutes/html/bysection/chapter_75/gs_75-104.html) · [NC Ch.75 Art.4](https://law.justia.com/codes/north-carolina/chapter-75/article-4/)
+- [TCPA Violations Penalties 2026 (Prospeo)](https://prospeo.io/s/tcpa-violations-penalties) · [DNC.com penalties](https://www.dnc.com/blog/what-are-penalties-associated-tcpa-violations) · [DNC.com TCPA Reassigned ID](https://www.dnc.com/tcpa-reassigned-id/) · [ActiveProspect DNC rules / 31-day](https://activeprospect.com/blog/do-not-call-rules/)
+- [TCPA Litigator List pricing](https://tcpalitigatorlist.com/) · [TextP2P scrub pricing](https://textp2p.com/contact-scrubs/) · [Reassigned Numbers Database](https://www.reassigneddb.us/)
+- [TrueNCOA pricing / free report](https://truencoa.com/pricing/) · [Melissa/NCOA+CASS provider pricing 2026 (DirectMail.io)](https://directmail.io/blog/best-ncoa-cass-providers-2026/) · [2026 USPS postage rates & presort (Mailpro)](https://www.mailpro.org/post/usps-postage-rates-2026/) · [USPS presort math (DirectMail.io)](https://directmail.io/blog/usps-postage-rates-2026-presort-dropship-commingle)
+
+
+## Gap 3 — Disposition & Cash-Buyer Sourcing
+
+### What it is & why it BLOCKS a close (even when the row is 100% filled)
+
+A perfectly-scored lead card tells you the property is worth acquiring. It does **not** tell you *who buys it from you and for how much*. In wholesale and gator, the deal is not closed when the seller signs — it's closed when an **end buyer** funds. A fully-enriched row with ARV, payoff, lien stack, equity, distress tier, contact, and a signed contract is still worth **$0** if you cannot find a cash buyer inside your inspection/assignment window. Disposition failure is the single most common way a "great lead" dies: you tie up a property at a good number, then discover you have no buyer, blow the closing date, and either lose your earnest money or eat a double-close you can't fund.
+
+The three sub-failures:
+
+1. **No buyer list.** You have 17,003 acquisition leads and zero curated demand. Every deal becomes a cold-start "who wants this?" scramble.
+2. **No buy-box match.** Even with a buyer list, a rural 40-acre timber tract and a Greenville infill teardown go to totally different buyers. Blasting the whole list is spam and burns your buyer relationships.
+3. **No assignment-fee realism.** You need to know what spread the market will actually bear *before* you lock a contract, so your max acquisition offer leaves room for a real fee. Lock too high and there is no assignable margin — the deal is dead on arrival regardless of how motivated the seller is.
+
+### Current state in the engine (what's actually there)
+
+More is built here than the "16 sections skipped the machinery" framing implies. Concretely, in `/Users/cashhigh/foreclosure-scraper`:
+
+- **`enrichment_buyer_match.py`** — a working dispo tagger. Matches each lead to buyers by `region` (WNC vs Upstate-SC) ∩ `category` (land / multifamily / commercial / residential) and writes `raw["buyer_match"]` onto the card. Gated behind `BUYER_MATCH=1`. It layers three sources: a hand-curated 188-buyer universe (`data/land_buyers.json`), direct "we-buy-land"/"we-buy-houses" flip lanes, and the empirical layer below.
+- **`scripts/build_buyer_registry.py`** — the FREE ROD-mined harvester. It already does exactly the "mine recent all-cash grantees" idea in the assignment: repeat **entity grantees on recorded DEEDs** = live cash buyers → `data/discovered_cash_buyers.json` (currently **423 discovered buyers**, ranked by deal count, generated 2026-07-01, 75-day window, min 2 deals). Non-bank grantees on **mortgages/deeds-of-trust** = private/gator lenders → `data/private_lenders.json`. Sources are the same free ROD indexes the engine already reaches (Acclaim/Harris, CCHS).
+- **`enrichment_buyer_match._discovered_for()`** already surfaces `recent_cash_buyers` (county/region + land-vs-improved appetite fit) and a `gator_lenders` lane that only fires on HOT/WARM or SUBJECT_TO/FIX_FLIP/GATOR/WHOLESALE strategy-fit leads (from `enrichment_strategy_fit.py`).
+- **`assessment.py`** has `max_bid_70()` (the 70%-rule acquisition ceiling: `0.70 * ARV − rehab − fees`).
+
+**The real gaps that remain** (this is what "solved" has to fill):
+
+1. **No contact resolution on the discovered buyers.** `discovered_cash_buyers.json` entries are `{name, deals, counties, buys, sample_parcels}` — an LLC name and a deal count, no phone/email/agent. You can't send to a name. (The comment in the build script even says "contact via SoS registered-agent or skip-trace" — that join is designed but not wired.)
+2. **Match is coarse (region ∩ category), not a real buy-box.** No price band, no acreage band, no beds/baths, no property-condition or ARV-range filter. So a buyer who only pays sub-$150k gets surfaced on a $600k lead.
+3. **No assignment-fee / spread realism anywhere.** Nothing computes the assignable spread or checks that `max_bid_70` leaves fee room. `assessment.py` sizes the *acquisition* ceiling but never the *disposition* margin.
+4. **No dispo packet / blast tooling.** No "email this deal to the N matched buyers" output equivalent to the seller-side `outreach.py` maillist.
+
+### What "solved" looks like (concrete deliverable)
+
+A `disposition.py` module + a `data/buyer_contacts.json` join that produces, for every HOT/WARM lead, a **ranked buyer shortlist with reachable contact and a realistic fee estimate**, plus a one-click dispo packet. Specifically:
+
+- **Buyer contact resolution.** Extend `build_buyer_registry.py` to run each discovered LLC grantee through the existing free **NC SoS registered-agent enricher** (`project_sos_agent_enricher` — agent + officers, free) and the free absentee/skip-trace path already in the engine, writing `phone/email/agent/mailing` back onto each buyer record. This turns 423 names into 423 contactable buyers.
+- **Real buy-box scoring.** Replace region∩category with a scored match: derive each buyer's implied buy-box from their `sample_parcels` (median sale price, price range, acreage range, land-vs-improved, county set — all already in the ROD/assessor data the engine holds), then score a lead against it. Surface top-5 by `(same_county, in_price_band, in_size_band, deal_count)`.
+- **Assignment-fee realism field.** Add `disposition_fee_estimate` to the card: `min(0.5 × projected_buyer_profit, market_cap)` where market_cap is a per-tier band, and a hard gate that flags any lead where `max_bid_70 − est_acquisition_price` leaves < a floor fee. 2026 market anchors to bake in: national average assignment fee ≈ **$13,000**, typical range **$5k–$20k**, and **North Carolina specifically runs high at ~$22k average** — so a WNC single-family in equity should model a $10k–$20k fee, while thin-margin or low-ARV rural land should model $3k–$8k and get flagged if the spread won't cover it. Rule of thumb to encode: a wholesaler captures up to ~50% of the end-buyer's expected profit.
+- **Dispo packet output.** A `docs/dispo_blast.csv` (buyer name, contact, matched leads) + a per-deal one-pager text (address, ARV, rehab, max buyer price, "why it fits your box") mirroring the seller-side `write_maillist()` pattern — generation local/free, sending left to operator.
+
+### FREE path vs PAID path
+
+**FREE (build):**
+- Cash-buyer sourcing is *already* free and mostly built — repeat-grantee ROD mining. The only new build is (a) the SoS/skip-trace **contact join** (both enrichers already exist in the engine), (b) buy-box **derivation from `sample_parcels`** (data already on hand), and (c) the **fee-realism field** in `assessment.py`. No new vendor.
+- This is the entire competitive point of the engine: paid tools sell you a cash-buyer list; you *mine your own* from the same public deed records, current and local, for $0.
+
+**PAID (vendor, real 2026 pricing) — only if you want a pre-packaged national buyer network or a JV dispo desk:**
+- **PropStream** ~$99/mo (cash-buyer search by area, skip-trace add-on).
+- **BatchLeads** — additional records / skip-trace credits at **~$0.04–$0.15/record**; plans bundle 250–1,000 skip credits/mo.
+- **Datazapp** skip-trace at **~$0.03/record**; **Tracerfy** pay-per-hit.
+- **Investorlift / dispo marketplaces** — subscription blast networks, generally **$300–$1,500/mo** tier depending on plan; only worth it once you have consistent inventory. For 17k leads with your own mined buyers, this is redundant at this stage.
+
+**Verdict:** stay FREE. The paid tools duplicate what the ROD harvester already produces; the only thing worth buying is cheap skip-trace credits (~$0.03–$0.04/record via Datazapp/BatchLeads) *if* the free SoS-agent join comes back thin on a given buyer.
+
+### LEGAL (this gap is where the 2026 statute changes bite hardest)
+
+Disposition = marketing/assigning a contract, and **both states changed the law in the last ~2 years specifically to regulate this.** This is not optional color; it constrains how the dispo module is allowed to operate.
+
+- **North Carolina — HB 797, effective October 1, 2025.** NC now defines **residential wholesaling as brokerage activity under Chapter 93A**, meaning soliciting, marketing a contract, or assigning/optioning a residential contract **requires a real estate broker license**. The law explicitly folds **double-closings** into the definition, closing the old workaround. It also grants the homeowner a **30-day right to cancel** the purchase contract, a right to a **full copy of the contract at signing**, and requires **refund of any payments within 10 business days** of cancellation. Practical impact on the engine: for NC residential leads, disposition-by-marketing must be done by a licensed broker, or restructured (buy-and-resell taking title, or true option). The dispo packet for NC residential should carry a compliance flag. (Statute background: NCGS Chapter 93A; disclosure duties under NCGS 47E-4.) Sources: [realestateskills.com NC wholesaling](https://www.realestateskills.com/blog/wholesaling-real-estate-legal-north-carolina), [NC HB797 BillTrack50](https://www.billtrack50.com/billdetail/1882901), [NCGS 47E-4](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_47E/GS_47E-4.pdf).
+
+- **South Carolina — 2023 Act (Bill 4754), Title 40 Chapter 57.** SC defines wholesaling as "having a contractual interest in purchasing residential real estate from a property owner, then **marketing the property for sale** to a different buyer prior to taking legal ownership." The key legal line for the dispo module: **it is not the assignment that is illegal — it is marketing the underlying property.** SC permits advertising a **contractual position** (your equitable interest) but **prohibits marketing the property itself** if you don't hold legal title, and the SC Real Estate Commission has ruled an equitable interest is **not** an owner's legal interest, so it does **not** exempt you from licensure. NCGS analog: SC licensed firms/subagents are outright **prohibited from wholesaling** (40-57-350 duties). Practical impact: for SC leads, dispo copy must market *the contract/assignment*, never "this house for sale" — the module's generated one-pager must be worded to the contract position. Sources: [SC REALTORS wholesaling guidance](https://screaltors.org/sc-regulates-wholesaling-in-new-re-license-law/), [LLR SCREC guidance PDF](https://llr.sc.gov/re/News/Wholesaling-Assignment-of-Contracts-Guidance.pdf), [SC Title 40 Ch 57](https://www.scstatehouse.gov/code/t40c057.php).
+
+**Encode into the module:** a `dispo_compliance` tag per lead — NC-residential → "broker license or take-title required (HB797)"; SC-residential → "market contract position only, never the property"; land/commercial → materially looser in both states (the statutes target *residential*). This keeps the free engine on the right side of the exact rules that were written to shut wholesalers down.
+
+### Effort + build estimate
+
+**Medium.** The hard parts (ROD buyer mining, gator lane, curated universe, matcher scaffold) exist. Remaining work:
+- Contact join (SoS-agent + skip-trace onto discovered buyers): ~0.5 day — both enrichers already exist.
+- Buy-box derivation from `sample_parcels` + scored match: ~1 day.
+- `disposition_fee_estimate` field + spread gate in `assessment.py`: ~0.5 day.
+- Dispo packet CSV + per-deal one-pager + compliance tags: ~0.5 day.
+- **Total ≈ 2.5 days.**
+
+### Recommended action
+
+Build FREE. Ship in this order: (1) wire the **contact join** so the 423 mined buyers become reachable — this is the highest-leverage half-day in the whole disposition gap; (2) add the **assignment-fee realism field + spread gate** to `assessment.py` so no lead gets contracted without provable margin (anchor to $13k national / ~$22k NC / $3k–$8k thin-land); (3) upgrade the matcher to a real **buy-box score**; (4) generate the **dispo packet** with per-state **compliance tags** baked in (NC HB797 take-title/broker flag; SC market-the-contract-only wording). Do not buy a dispo marketplace or buyer-list vendor — the engine already mines better, more local data for $0.
+
+---
+
+## Gap 4 — Outreach-Execution TCO (the true cost of *working* the leads)
+
+### What it is & why it BLOCKS a close (even when the row is 100% filled)
+
+Every one of the 16 data sections spent effort filling the card. **None** of them costed what it takes to *touch* the person on that card. This is the gap that quietly kills the whole engine's economics: a lead is free to *generate* but **not** free to *work**. Direct mail, skip-trace, ringless voicemail (RVM), and SMS all cost real money **per touch, per lead, per month** — and at 2–3k HOT/WARM leads on a multi-touch cadence, that working cost **dwarfs the data spend by roughly two orders of magnitude.**
+
+Why it blocks a close: if you don't model TCO, you will either (a) under-fund outreach and never reach enough sellers to close anything (a scored lead you never mailed is worth $0), or (b) over-fund it and torch your budget before a single assignment funds. And on SMS specifically, getting the cost/compliance model wrong isn't just expensive — it's **legal exposure at $500–$1,500 per message** under the TCPA. The engine's founding premise is "FREE," but that only ever applied to *data acquisition*. The moment you start *contacting*, "free" ends, and nothing in the codebase acknowledges it.
+
+### Current state in the engine
+
+There is **no cost model of any kind** in the repo. Confirmed by grep across `src/` and `scripts/` — the only `cost`/`max_bid`/`spread` hits are the acquisition-side `max_bid_70()` in `assessment.py` (deal underwriting, not outreach spend) and unrelated porsche-scraper `max_bid`. Specifically:
+
+- **`outreach.py`** *generates* content and a mail list (`docs/outreach_maillist.csv`) and tracks status in `docs/crm.json`, but its own docstring says: *"Actually SENDING (Gmail/Twilio/print-mail) is left to the operator."* It counts `contactable / with_phone / with_mailing` but attaches **no per-touch cost** and models **no cadence**.
+- **`crm.json`** has lifecycle statuses (`new → contacted → offer_made → … won/dead`) but **no cost-per-lead or spend-to-date** field. You cannot compute cost-per-contact or cost-per-deal from it.
+- **`source_health_tracker.py`** tracks *source* yield/health, not the *downstream working cost* of the leads a source produces — so you can't yet see that a source producing 500 phone-less rural leads costs far more to work (mail-only, no SMS/RVM) than one producing 500 phone-matched absentee owners.
+- No A2P 10DLC / TCPA cost or consent modeling anywhere, despite `outreach.py` generating `sms_text()`.
+
+**Bottom line:** the engine knows what to *say* to each lead across four channels and has zero idea what it *costs* to say it, or whether the budget survives contact with 2–3k leads.
+
+### What "solved" looks like (concrete deliverable)
+
+A `outreach_tco.py` module + a `docs/tco_model.json` config that produces a **full monthly working-cost model** and per-lead/per-channel costing wired into the CRM. Concretely:
+
+1. **Per-touch cost table** (config, editable) with 2026 real rates (below).
+2. **Cadence model** per tier: e.g. HOT = mail T0/T14/T30 + skip-trace once + RVM + SMS drip; WARM = mail T0/T21/T45 + skip-trace; COLD = single mail or none.
+3. **`monthly_working_cost(n_hot, n_warm)`** that rolls channel × cadence × volume into a monthly burn number and a **cost-per-lead-worked** and projected **cost-per-deal** (given a conversion assumption).
+4. **CRM spend fields**: stamp each `contacted` event with channel + unit cost so `crm.json` yields real cost-per-contact and cost-per-deal over time.
+5. **A budget guardrail**: given a monthly budget cap, tell the operator *how many* HOT/WARM leads can be fully worked this month — the missing "throttle" that keeps the FREE data engine from bankrupting itself on outreach.
+
+### The actual TCO model (2026 rates, load-bearing numbers)
+
+**Per-touch unit costs (verified 2026):**
+
+| Channel | Unit cost (2026) | Notes |
+|---|---|---|
+| Direct mail postcard (4×6) | **~$0.55–$0.65** all-in | Marketing Mail presort; $0.65 is a safe planning number for 5k–25k runs. Letters/yellow-letters run higher. |
+| Skip-trace (per record) | **~$0.03–$0.15**; premium ~$0.28 | Datazapp ~$0.03; BatchLeads ~$0.04–$0.15; premium skip ~$0.28 at ~72% hit. One-time per lead, not per touch. |
+| Ringless voicemail (RVM) | **~$0.05/drop** retail; **~$0.004** BYOC/wholesale | Drop.co ~$0.05; Drop Cowboy BYOC as low as $0.004. |
+| SMS | **~$0.004–$0.01/msg** + **$0.0031** compliance fee/msg | Plus A2P 10DLC carrier surcharges. |
+| A2P 10DLC registration | **~$48+ brand vetting, $15–17/campaign, $1.50–$10/mo** | One-time + monthly fixed, before you send a single legal text. |
+
+**Worked monthly model at 2,500 HOT/WARM (say 800 HOT + 1,700 WARM):**
+
+- **Direct mail** (the workhorse): HOT gets 3 touches/mo, WARM gets ~1.3/mo → ≈ (800×3 + 1,700×1.3) ≈ **4,610 pieces × $0.62 ≈ $2,860/mo**.
+- **Skip-trace**: one-time on the ~2,500 new/refreshed → 2,500 × $0.05 (blended) ≈ **$125** (amortized, mostly a first-month cost).
+- **RVM**: HOT only, ~2 drops/mo on the ~60% with a phone → 800×0.6×2 ≈ 960 drops × $0.05 ≈ **$48/mo** (retail) or ~$4 BYOC.
+- **SMS**: HOT only, TCPA-gated (see legal) → if run, ~800×0.6×2 ≈ 960 msgs × ~$0.007 ≈ **$7/mo** + 10DLC fixed ~$20/mo.
+- **Monthly working cost ≈ $2,900–$3,100**, dominated ~90% by **direct mail**.
+
+**Now the whole point — compare to data spend:** the entire engine's *data* cost is **$0** (free scrapers) plus trivial fixed infra. Even if you were paying for data, a premium data platform is ~$99/mo. So working the leads costs **~$3,000/mo vs ~$0–$100 of data** — the working cost is **~30–100× the data spend**, and scales linearly with lead count while data cost stays flat. Push to the full 3k HOT/WARM and mail alone clears **$3,400+/mo**. This is the number that actually governs whether the engine is viable, and it lives entirely outside every one of the 16 data sections.
+
+**Cost-per-deal sanity check:** at ~$3,000/mo working cost and a typical distressed-outreach conversion of ~0.5–1% of worked leads reaching a signed deal, 2,500 worked leads → ~12–25 contracts pipeline → a few closings/mo. Against a **$13k national / ~$22k NC** average assignment fee (Gap 3), the model closes comfortably positive — **but only if you throttle mail to the leads that actually justify a 3-touch cadence.** Blast all 17k and mail alone is >$10k/mo with most of it wasted on cold rows. The TCO model's real job is to enforce that throttle.
+
+### FREE path vs PAID path
+
+- **The model itself is FREE to build** — it's arithmetic + config, in-repo (`outreach_tco.py` + `tco_model.json` + CRM spend fields). No vendor.
+- **The touches are inherently PAID** — there is no free way to physically mail a postcard or send a compliant text at scale. The lever is not "free vs paid," it's **which vendor / which channel mix minimizes $/contact:**
+  - **Cheapest mail**: self-serve print-mail (Marketing Mail presort ~$0.55–$0.65) beats yellow-letter services.
+  - **Cheapest voice/SMS**: **BYOC (bring-your-own-carrier via Twilio/SIP)** on Drop Cowboy etc. cuts RVM to **~$0.004/drop** (vs $0.05 retail) — a 90% cut, worth it above ~5k drops/mo.
+  - **Cheapest skip**: Datazapp ~$0.03 / BatchLeads ~$0.04 vs premium $0.28 — use cheap tier first, premium only on HOT.
+
+### LEGAL (this gap carries direct per-message liability)
+
+Outreach execution is where **TCPA / A2P 10DLC** exposure lives, and it must be in the TCO model as both cost and constraint:
+
+- **A2P 10DLC is mandatory** for any business texting US numbers at scale — explicitly including real-estate wholesalers. Registration: **~$48+ brand vetting, $15–17/campaign, $1.50–$10/mo**, plus $0.003–$0.005/msg carrier surcharge. Lead-gen / high-risk-financial content is often **rejected outright** by carriers, which directly threatens cold seller-outreach texting.
+- **TCPA consent**: the FCC's one-to-one consent direction means cold-texting sellers **without prior express consent is high-risk**. Violation exposure is **$500/message (standard) and $1,500/message (willful)** — a single 10,000-message non-compliant blast is **$5M–$15M** theoretical exposure. Source: [messageiq TCPA/10DLC guide](https://messageiq.io/blogs/sms-marketing-laws/), [pitchprfct A2P 10DLC](https://www.pitchprfct.com/blog/a2p-10dlc-registration/).
+- **State-level**: NC and SC solicitation/telemarketing rules (and the NC HB797 homeowner-protection regime from Gap 3) further constrain cold seller contact.
+
+**Encode into the model:** treat **SMS as opt-in-gated and default-OFF** in the cadence; lead the HOT cadence with **direct mail + RVM** (RVM sits in a different, lower-risk regulatory bucket than SMS but is not risk-free — model it as such), and only layer SMS where you have a defensible consent basis. The compliance cost ($48 + ~$20/mo fixed for 10DLC) belongs as a line item; the *liability* belongs as a hard gate: no un-consented mass SMS, full stop.
+
+### Effort + build estimate
+
+**Low–Medium.** Pure in-repo arithmetic and config + light CRM wiring:
+- `tco_model.json` config (unit costs + per-tier cadence): ~0.25 day.
+- `outreach_tco.py` (`monthly_working_cost`, per-lead cost, cost-per-deal, budget-throttle): ~0.75 day.
+- CRM spend-stamping on `contacted` events + a cost rollup: ~0.5 day.
+- Dashboard/report line: ~0.25 day.
+- **Total ≈ 1.75 days.**
+
+### Recommended action
+
+Build the model FREE and immediately — it's cheap and it's the number that decides whether the whole engine pencils out. Specifically: (1) drop a `tco_model.json` with the 2026 rates above; (2) build `outreach_tco.py` to output **monthly working cost + cost-per-lead + a budget-throttle** ("at $X/mo you can fully work N HOT + M WARM"); (3) **stamp spend into `crm.json`** so real cost-per-deal accrues; (4) hard-code the **SMS-off-by-default TCPA gate** and carry the 10DLC fixed cost as a line item. The strategic takeaway to surface on the dashboard: **data is free, contact is not — mail is ~90% of the burn, working cost is ~30–100× data spend, so the engine's real constraint is a mail-throttle on HOT/WARM, not more leads.** Buy nothing to build the model; when you start sending, minimize $/touch via Marketing-Mail presort and BYOC voice/SMS.
+
+---
+
+**Files referenced (all absolute):**
+- `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/enrichment_buyer_match.py` (dispo matcher — exists)
+- `/Users/cashhigh/foreclosure-scraper/scripts/build_buyer_registry.py` (free ROD buyer/lender harvester — exists)
+- `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/data/discovered_cash_buyers.json` (423 mined cash buyers)
+- `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/data/private_lenders.json` (gator/private-lender lane)
+- `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/data/land_buyers.json` (188 curated buyers)
+- `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/assessment.py` (`max_bid_70` — acquisition math, no dispo-fee/spread)
+- `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/outreach.py` (content + maillist + CRM; no cost model)
+- `/Users/cashhigh/foreclosure-scraper/docs/crm.json` (lifecycle status; no spend fields)
+- `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/source_health_tracker.py` (source yield, not working cost)
+
+**To build (net-new):** `disposition.py` + `data/buyer_contacts.json` (Gap 3); `outreach_tco.py` + `docs/tco_model.json` + CRM spend fields (Gap 4).
+
+
+## Feedback loop / outcome tracking
+
+### What it is & why it BLOCKS a close (even when the row is 100% filled)
+
+Every score the engine produces — `distress_stack.tier` (HOT/WARM/COLD), `distress_stack.score`, the strategy-fit tags, the letter/copy that goes out — is a **prior belief** about what closes. Right now those beliefs are hand-set constants: `foreclosure_sale = 30`, `probate = 20`, `absentee = +8`, `senior_survives = −20`, HOT requires `stack≥2 AND equity≥med AND mailable` (all in `distress_score.py`). Nobody has ever checked those numbers against a single real outcome.
+
+A fully-filled row does not close itself. The operator only has so many stamps, calls, and hours per week; the score's *entire job* is to rank which of 17,003 rows gets worked first. If a `+8` for absentee or a `30` for foreclosure is wrong, the operator systematically spends the scarce outreach budget on rows that never convert and skips rows that would have. The row is perfect; the **triage that decides whether a human ever touches it** is running blind. That is the block: the engine optimizes a proxy (stacked distress) that has never been tied back to the target (a signed contract). ARV already got this treatment — `backtest_arv.py` proved the 70%-rule was double-charging the selling fee and the fix moved `0.70→0.75` (per memory `project_valuation_calibration`). The lead score has had no equivalent reckoning. Until it does, "HOT" is an assertion, not a measurement.
+
+There is a second, compounding cost: **source ROI is invisible.** `source_health_tracker.py` tells you a source is *alive* (produced listings) but never whether it produces *deals*. Spartanburg ROD and NC OneMap both "work." One may account for every won deal and the other zero, and today you cannot tell them apart, so you cannot cut the dead lane or double down on the live one.
+
+### Current state in the engine (is anything there? cite files if known)
+
+Partial, and it stops exactly where it would start being useful:
+
+- **`outreach.py` / `crm.json` capture disposition but never learn from it.** `VALID_STATUSES` includes the full lifecycle (`new → contacted → offer_made → negotiating → under_contract → won / dead / not_interested`) and `crm.json` persists `{status, notes, history}` keyed by `dedupe_key` so status survives the weekly re-scrape. But inspecting the live `crm.json`: **all 100+ records are `"status": "new"` with a single `lead_created` history event.** The lifecycle is a schema nobody fills, so even the raw material for a feedback loop (won vs dead labels) does not yet exist in practice.
+- **The CRM is not joined back to the signals at outcome time.** When a status *does* flip to `won` or `dead`, nothing snapshots *what the row looked like when it was scored* — its tier, score, signals, equity band, strategy tags, county, source. `distress_score.py` recomputes the stack fresh every run from current signals and overwrites `raw["distress_stack"]`; there is no frozen at-contact feature vector to correlate against the outcome later.
+- **`distress_score.py` weights are hard-coded literals**, never read from a fitted file. Same for the `enrichment_strategy_fit.py` thresholds (`eq >= 0.40`, `long_tenure` proxy).
+- **`source_health_tracker.py`** tracks per-source *volume* health only (zero-streak, sustained-bleed). No `won`/`contacted` join, so no per-source conversion or ROI.
+- **The precedent exists and works:** `scripts/backtest_arv.py` is the exact pattern — read the board read-only, treat recorded sales as ground truth, report **median** error (heavy-tailed, never mean), bucket by confidence and county, write nothing. A disposition backtest is the same harness pointed at CRM outcomes instead of recorded sales.
+
+So: the disposition *vocabulary* is there, the *plumbing to log it* is there, and the *backtest template* is there. What is missing is (a) the discipline/UX to actually set statuses, (b) a frozen at-contact feature snapshot, and (c) the re-fit script that closes the loop.
+
+### What "solved" looks like (the concrete deliverable)
+
+Three artifacts, mirroring the ARV loop:
+
+1. **Frozen outcome log — `docs/outcomes.jsonl`.** Append-only. Every time a CRM status transitions to a *terminal* state (`won`, `dead`, `not_interested`) — or a meaningful mid-funnel one (`contacted`, `offer_made`, `under_contract`) — write one line: `{dedupe_key, ts, from_status, to_status, county, source, tier, score, stack, categories, signals[], equity_band, strategy_tags[], absentee, out_of_state, contactable, arv_confidence}`. The feature fields are copied from `raw["distress_stack"]` / `raw["strategy_fit"]` **at the moment of transition**, so the label is bound to the features the operator actually saw. This is the one net-new piece of data collection and it is nearly free — `outreach.py` already writes `crm.json` on every run; add a `set_status(key, new_status)` helper that appends to the log on change.
+
+2. **Disposition backtest — `scripts/backtest_dispositions.py`** (read-only, writes nothing, exactly like `backtest_arv.py`). Reads `outcomes.jsonl` and reports, with small-n honesty:
+   - **Contact→won and worked→won rate by tier** (does HOT actually out-close WARM out-close COLD? If HOT ≈ WARM, the HOT gate is not earning its complexity).
+   - **Win rate by individual signal and by category** — the lift each signal carries, holding others roughly constant (start with simple per-signal contact-adjusted rates; a logistic fit once n supports it).
+   - **Win rate by strategy tag** (is WHOLESALE closing and SUBJECT_TO dead, or vice versa?).
+   - **Per-source conversion / ROI** — wons and under-contracts per 100 leads, per source. This is the lane-kill / double-down signal `source_health_tracker` can't give.
+   - Everything reported as rates with n shown, and **suppressed below a floor (e.g. n<10)** so the operator never re-tunes on noise.
+
+3. **A single fitted-weights file — `docs/score_weights.json`** — that `distress_score.py` reads at import (falling back to today's hard-coded defaults if the file is absent or thin). The backtest proposes updated weights; a human reviews the diff and commits the file. This keeps the loop **human-in-the-loop and auditable**, not an autonomous retrainer — the same posture as the ARV `0.70→0.75` change being a reviewed constant edit.
+
+"Solved" = you can answer *"do our HOT leads close more than our WARM leads, which signals actually predict a deal, and which source pays for itself"* with a number and an n, and the score weights are a reviewed file instead of guesses.
+
+### FREE path (design/code) vs PAID path (vendor + real 2026 price)
+
+**FREE (recommended — this is entirely modeling + code discipline, no vendor):**
+- Add `set_status()` + `outcomes.jsonl` appender to `outreach.py` (~40 lines).
+- Write `scripts/backtest_dispositions.py` by cloning `backtest_arv.py`'s structure (percentile/median helpers, bucketed `fmt_block`, small-n suppression) — the harness already exists, only the eligibility filter and the metrics change.
+- Make `distress_score.py` and `enrichment_strategy_fit.py` load thresholds from `score_weights.json` with the current literals as defaults.
+- Fitting stays deliberately simple: contact-adjusted win rates per bucket first; a scikit-learn `LogisticRegression` on the frozen feature vectors only once you have ~50+ terminal outcomes. scikit-learn is free and already the kind of dependency this repo tolerates. **The only real cost is time-to-signal**: you need dozens of dispositioned leads before the numbers mean anything, so the enabling move today is the logging, not the model.
+
+**PAID (not needed, listed for completeness):** a hosted CRM with built-in attribution/conversion analytics — REsimpli (~$99–$179/mo for REI), Podio + workflow add-ons, or a generic pipeline tool — would give disposition tracking and win-rate dashboards out of the box. But it replaces the free `crm.json`, adds a monthly bill, and still won't re-fit *your* distress weights, which is the actual goal. No vendor sells "re-fit my custom motivated-seller score against my closes." Skip it.
+
+### Effort + build estimate
+
+**Low–Medium.** Logging hook + `outcomes.jsonl` schema: ~half a day. `backtest_dispositions.py` cloned from the ARV harness: ~half a day. Weights-file plumbing in the two scorers: ~half a day. **~1.5 engineering days total.** The model itself waits on data and is another half-day once ~50 outcomes exist. The gating constraint is calendar time to accumulate labeled closes, not code.
+
+### Recommended action
+
+Ship the **logging half this week** — `set_status()` + `outcomes.jsonl` in `outreach.py` — because it is cheap and every day without it is a permanently unrecoverable outcome label. Enforce the discipline that operators actually set CRM statuses (the empty `crm.json` is the real blocker; a great backtest over zero labels is worthless). Clone `backtest_dispositions.py` now so it runs the moment data exists, and wire `distress_score.py` to read `score_weights.json` with today's constants as the committed default. Defer the logistic re-fit until you clear ~50 terminal dispositions; until then, run the plain per-tier/per-signal/per-source rate report and hand-adjust weights the way ARV was hand-corrected.
+
+---
+
+## Suppression & re-contact governance
+
+### What it is & why it BLOCKS a close (even when the row is 100% filled)
+
+Suppression is the pre-send gate that removes owners you are **not allowed to** or **should not** contact from the outgoing mail/SMS/call file: numbers on the Do-Not-Call registries, owners who already told you to stop, deceased owners, owners in an active bankruptcy stay, known TCPA/serial-plaintiff "litigators," and owners you contacted so recently that hitting them again reads as harassment. A perfectly enriched row makes this problem *worse*, not better: the more complete the contact data, the more channels you can fire, and the higher the legal exposure per row.
+
+This is the one gap on the list that can produce a **negative-value close** — not just a missed deal but a lawsuit that costs more than any deal makes. The exposure is concrete and per-message:
+
+- **South Carolina Telephone Privacy Protection Act (SC Code §37-21):** a private right of action of **$1,000 per violation**, raised to **up to $5,000 per violation for willful/knowing** violations, **plus the plaintiff's reasonable attorney's fees and court costs** (§37-21-80). A "telephone solicitation" is explicitly defined to include a **text or media message** to an SC-area-code wireless number for the purpose of offering to buy/sell property (§37-21-20) — so the engine's `sms_text()` is squarely in scope. §37-21-70 bars contacting anyone on the **National DNC Registry** or anyone who previously said stop (honored for **at least five years**); §37-21-30 limits calls to **8am–9pm** local without prior written consent.
+- **North Carolina (G.S. §75-102 et seq.):** private right of action of **$500 (1st) / $1,000 (2nd) / $5,000 (3rd and each thereafter within two years)**, plus **treble or punitive damages and attorney's fees**; the statute's "unsolicited telephone call" expressly includes **text** communications and honors the DNC registry and prior stop requests.
+- **Federal TCPA** sits on top: **$500 per call/text, $1,500 if willful**, no cap, every message a separate violation. Calls/texts *offering to buy the called party's real estate* are "telephone solicitations" subject to the National DNC rules — this is settled, and the wholesale-buyer letter/SMS is the textbook fact pattern plaintiff firms target.
+
+So on a 17,003-row board where many SC/NC cell numbers came from a free skip-trace, a single unsuppressed blast is not a compliance footnote — it is a stack of $500–$5,000 claims with fee-shifting that a serial litigator is *paid* to manufacture. And the "deceased owner" and "bankruptcy stay" cases are worse than illegal: texting a grieving heir a cash-offer for their dead parent's house, or an owner whose automatic stay makes the whole solicitation void, torches the deal and the reputation even where damages are arguable. The row is 100% filled; sending to it is the liability.
+
+### Current state in the engine (is anything there? cite files if known)
+
+**Effectively nothing. This is the most exposed gap of the two.**
+
+- **`outreach.py` builds the send file with zero suppression.** `generate_outreach()` marks a lead `contactable` on `owner AND (mailing_address OR phones)` and immediately drafts `sms`, `email`, `letter` and pushes every mailing address into `write_maillist()` → `docs/outreach_maillist.csv`. There is **no DNC check, no litigator check, no deceased check, no bankruptcy check, no prior-contact/frequency check** anywhere in the path. The only nod to compliance is the literal string `"Reply STOP to opt out."` appended inside `sms_text()` — which is a courtesy, not a suppression, and does nothing to stop the *first* unlawful text.
+- **The signals to suppress on are already in the pipeline but unused for suppression.** `distress_score.py` reads `r.get("bankruptcy")` (weight 18) and treats estate/probate (`SMITH PRICILLA R (EST)` appears verbatim in `crm.json`, and `relationship_signal.kind == "probate"`) purely as **motivation to contact more** — the exact opposite of a suppression flag. A bankruptcy stay and a deceased record are being scored as *hotter*, then mailed, with no guardrail.
+- **`crm.json` has the state to build re-contact governance but doesn't use it.** Every record carries `status`, `history[]`, `first_seen`, `last_seen`. A `not_interested` / `dead` status and a `contacted` timestamp are exactly what a suppression + frequency-cap join needs — but `outreach.py` never reads status back to *exclude* a lead, and (per the Feedback section) the statuses are all `new` anyway.
+- **No suppression list files exist** (`docs/dnc_suppression.csv`, `opt_outs.csv`, `litigators.csv`, `deceased.csv` — none present).
+
+### What "solved" looks like (the concrete deliverable)
+
+A single **pre-send suppression join** that every outbound row passes through before it can enter `outreach_maillist.csv` or any SMS/call file — `outreach.py` calls it and *cannot* emit a suppressed row. Concretely:
+
+1. **`suppression.py` with a `suppress(listings) -> (sendable, suppressed[with reason])`** function, called at the top of `generate_outreach()` and again inside `write_maillist()`. A row lands in `sendable` only if it clears **every** gate; suppressed rows get `raw["suppressed"] = {"reason": ..., "list": ...}` for audit and are written to a separate `docs/suppressed_log.csv` (never deleted — you must be able to prove why you didn't contact someone, and prove you *did* suppress a litigator).
+
+2. **Gates, in order (each a simple keyed join):**
+   - **Opt-out / stop (permanent):** any owner or phone in `docs/opt_outs.csv`, or any CRM record with status `not_interested`/`dead`, or history containing a stop event. Honored **5+ years** per SC §37-21-70. Channel-specific (an email opt-out doesn't clear an SMS).
+   - **Deceased:** owner name flagged `(EST)`, `LIFE ESTATE`, `estate`, probate `relationship_signal`, or on a `docs/deceased.csv` — **suppress the deceased individual as an SMS/call target**, and *re-route* to a heir/probate mail track with different copy rather than blasting the decedent's cell.
+   - **Bankruptcy stay:** `raw.get("bankruptcy")` truthy → suppress from *all* solicitation channels until confirmed discharged/dismissed. The automatic stay makes the solicitation legally void; this flag currently *raises* the score, so this gate is a direct inversion.
+   - **Litigator / serial-plaintiff scrub:** phone in `docs/litigators.csv`. Free seed list is thin; this is where the paid path earns its keep (below).
+   - **DNC:** phone on the National DNC Registry and SC/NC state DNC. This is the gate that legally *requires* a licensed data source to do at scale (below).
+   - **Frequency cap / re-contact governance:** if `crm.json` shows this `dedupe_key` was `contacted` within the cool-off window (e.g. 30 days for SMS/call, shorter for mail), suppress until the window clears. Pure `crm.json` read — free, and the single highest-ROI gate to add first because it needs no vendor.
+
+3. **Channel-aware:** mail (postcards/letters) is **not** a "telephone solicitation" and is largely outside TCPA/§37-21 — so the mail file can run with only opt-out + deceased + frequency gates, while **SMS and calls additionally require DNC + litigator + time-of-day.** The deliverable lets the mail lane keep flowing while the phone lane is gated, so compliance doesn't kill the #1 (mail) channel.
+
+"Solved" = it is **structurally impossible** for a suppressed owner to appear in an outbound file, every suppression is logged with a reason, and the phone lane is DNC/litigator-scrubbed before a single text sends.
+
+### FREE path (design/code) vs PAID path (vendor + real 2026 price)
+
+**FREE (the join, the governance, and the "cheap" gates):**
+- `suppression.py`, the ordered gate join, `suppressed_log.csv`, and channel-awareness are pure code (~1 day).
+- **Opt-out, deceased, bankruptcy, and frequency-cap gates are 100% free** — they read files and `crm.json` you already own. Deceased/probate/estate and bankruptcy flags are *already computed*; this just inverts their use from "score higher" to "don't call."
+- **Lead with the mail lane + frequency cap + opt-out gates**, which need no vendor and remove most of the harassment/reputation risk immediately.
+- A **free litigator seed** can be bootstrapped from public TCPA-plaintiff dockets, but it will be incomplete — treat it as belt-and-suspenders, not the primary defense.
+- **What free cannot legally do: scrub the National DNC Registry.** Access to the registry for scrubbing requires a paid, registered SAN (Subscription Account Number) via the FTC's telemarketing.donotcall.gov — there is no compliant free bulk-scrub. So the honest free posture is **"mail-first, and do not SMS/cold-call SC/NC cell numbers until the DNC gate is paid for."**
+
+**PAID (only for the DNC + litigator + reassigned-number gates on the phone lane — real 2026 prices):**
+- **National DNC Registry SAN (FTC):** the registry itself is government-run; fees are **per area code per year**, and access to the **first five area codes is free**, with a **2025–2026 fee of ~$81 per area code** above that and an annual **max around ~$22,000** for full national. For an 18-county SC/NC footprint you need only a handful of area codes (SC 803/864/854, NC 828/704/980/910…), so realistically **$0–$400/yr** — cheap and legally mandatory before any cold SMS/call.
+- **Commercial litigator + DNC + reassigned scrub (the practical buy):** vendors bundle National DNC, state DNC, known-litigator, and reassigned-number scrubs so you don't manage the SAN plumbing yourself.
+  - **TextP2P TCPA Litigator & DNC Scrub:** **$0.01 per non-unsubscribed number, $5.00 minimum** — cheapest observed, fine for the current ~17k board (~$170 to scrub the whole thing once, pennies on weekly deltas).
+  - **TCPALitigatorList / DNC.com / Blacklist Alliance:** per-record scrubs and monthly plans in the **~$0.01–$0.05/record** range plus small monthly minimums; Blacklist Alliance and DNC.com add continuously-updated known-litigator databases (the real value-add over raw DNC).
+- **FCC Reassigned Numbers Database** (to avoid texting a number that was ported to a new person who never consented — a common TCPA trap): FCC **cut query pricing 20% effective April 28, 2025** and added smaller tiers; short-term (1-month) and annual subscriptions exist with fractional-cent effective per-query costs at volume. For a weekly ~few-hundred-number delta this is a **low-tens-of-dollars/month** add, optional until SMS volume is real.
+
+Net: **under ~$200 one-time + pennies-per-week** buys the entire compliant phone lane (DNC SAN for the footprint's area codes + a per-record litigator/DNC/reassigned scrub via TextP2P or equivalent). That is trivially less than **one** $1,000 SC §37-21-80 violation, let alone a fee-shifted class claim.
+
+### For LEGAL gaps: statute + what it requires
+
+- **SC Code §37-21 (Telephone Privacy Protection Act):** §37-21-20 defines a "telephone solicitation" to include **texts** to SC-area-code wireless numbers offering to buy/sell property; §37-21-30 restricts calls to **8am–9pm** local absent prior written consent; §37-21-70 requires honoring the **National DNC Registry** and any prior stop request for **≥5 years**; §37-21-80 grants **$1,000/violation, up to $5,000 willful, + attorney's fees and costs**. *Requires:* National DNC scrub, an opt-out list honored 5 years, time-of-day gating, and accurate caller ID.
+- **NC G.S. §75-102 to §75-104 (Telephone Solicitations, Article 4):** covers **texts**, requires DNC-registry and prior-stop suppression, and provides **$500/$1,000/$5,000 escalating per-violation damages + treble/punitive + attorney's fees**. *Requires:* DNC scrub and honored opt-outs.
+- **Federal TCPA (47 U.S.C. §227 / 47 C.F.R. §64.1200):** real-estate-purchase calls/texts are "telephone solicitations" subject to National DNC; **$500/call, $1,500 willful**, uncapped. *Requires:* National DNC scrub, internal do-not-call list, and (for autodialed/prerecorded) prior express written consent — so any automated SMS blast needs consent the engine does not have, meaning **manual/one-to-one texting only, post-scrub.**
+
+Bankruptcy suppression is not §37-21/TCPA but the **automatic stay, 11 U.S.C. §362** — soliciting a debtor in an active case to sell collateral can be a stay violation; suppress until discharge/dismissal is confirmed.
+
+### Effort + build estimate
+
+**Low for the free join, Low-to-add for the paid gates.** `suppression.py` + ordered gates + logging + channel-awareness + `outreach.py` wiring: **~1 day.** Opt-out/deceased/bankruptcy/frequency gates are same-day (data already present). Paid gates are a thin API/CSV round-trip: registering the DNC SAN is paperwork (hours, plus the annual fee), and a TextP2P/DNC.com scrub is a **~half-day integration** (CSV out → scrub → CSV back → keyed join into `suppression.py`). **Total ~1.5–2 days**, most of it the free join.
+
+### Recommended action
+
+**Do this before the next outbound run — it gates legal risk, not deal flow.** Ship `suppression.py` with the four free gates (opt-out, deceased, bankruptcy, frequency-cap) and wire it as a hard filter in `generate_outreach()`/`write_maillist()` so no suppressed row can be emitted; invert the bankruptcy and estate/probate flags from "score higher" to "suppress phone / re-route to heir mail." Set the interim policy to **mail-first**: postcards and letters flow through the free gates now; **hold all cold SMS and calls to SC/NC cell numbers until the DNC + litigator scrub is live.** Then spend the ~$200: register a National DNC SAN for the footprint's area codes and run the board through TextP2P's $0.01/number litigator+DNC scrub, keyed back into the join. That converts the phone lane from an uncapped `$500–$5,000`-per-message liability into a compliant channel for a rounding-error cost. Keep `suppressed_log.csv` forever — the ability to prove you suppressed a litigator is itself the affirmative defense.
+
+**Key file paths:** `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/outreach.py` (where both gates wire in), `/Users/cashhigh/foreclosure-scraper/docs/crm.json` (dispositions all `new` today — the real blocker for the feedback loop), `/Users/cashhigh/foreclosure-scraper/scripts/backtest_arv.py` (the harness to clone for `backtest_dispositions.py`), `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/distress_score.py` (hard-coded weights to externalize + bankruptcy/estate flags to invert for suppression).
+
+
+## Lead Velocity / Urgency Tiering
+
+### What it is & why it BLOCKS a close (even when the row is 100% filled)
+
+A distressed-property lead is a **decaying asset**. The exact same lis-pendens row is worth a fortune in week 1 (owner just got served, 60-90 days of runway, every exit — subject-to, short-sale, cash-buyout, reinstatement-assignment — is still on the table) and worth almost nothing on sale-morning (owner is out of options, the property is about to transfer at auction, and your only remaining play is bidding against pros with cash). The engine today scores that row **identically on both days**. `distress_score.py` assigns `lis_pendens` a flat FINANCIAL weight of 28 forever; nothing in the tier logic reads how many days remain until `sale_date`. So a HOT row that is 4 days from the courthouse steps sorts next to a HOT row with 75 days of runway, and the operator — who can realistically work maybe 25-40 leads a week by phone/mail — has no signal telling them *which HOT lead will be dead by the time the postcard lands*.
+
+This blocks closes in three concrete ways even on a fully-enriched row:
+1. **Mail lead-time collision.** A first-class letter + owner response cycle is ~7-10 days. Any lead inside that window is unreachable by mail and must be worked by phone/door TODAY or not at all. The board doesn't flag it, so it gets a postcard that arrives after the sale.
+2. **New-this-run leads get buried.** `new_listings.py` already tags `is_new` and computes a `top_new_for_alert` list, but that lives in a *separate* alert path. The main distress board and the mail-merge (`outreach.py` → `write_maillist`) don't boost a brand-new lis-pendens over a stale one the operator already declined three runs ago. The freshest, highest-intent leads don't rise.
+3. **Wrong channel + wrong script.** A 60-day lead wants a soft "you have options" letter; a 5-day lead needs "I can close before Monday's sale, call me now." Without a days-until-sale band the outreach copy is one-size-fits-all (it is today — see `letter_text`/`sms_text`).
+
+### Current state in the engine
+
+Partial primitives exist but are **not wired into the score**:
+- **`models.py`** carries `sale_date`, `upset_bid_deadline`, `redemption_deadline`, and `first_seen` (line 224, `default_factory=datetime.utcnow`) — every input the urgency curve needs is already on the object.
+- **`enrichment_process_timing.py`** already labels NC power-of-sale vs SC judicial and stamps `redemption_deadline = sale_date + 365d` for SC tax sales. It computes the clock but never converts it to an urgency signal.
+- **`new_listings.py`** stamps `raw["is_new"]` + `raw["first_seen_run"]` and has `top_new_for_alert()` that ranks new leads by `(is_lis_pendens, sale_date)` — this is the *only* place `sale_date` currently drives priority, and it's siloed to the email alert.
+- **`distress_score.py`** — the actual operator board — has **zero** days-until-sale logic. `_LISTING_TYPE_SIGNAL` weights are static; `score_board()` never touches `sale_date`. The word "recency-aware" in the docstring refers only to the price-cut MLS diff, not to sale proximity.
+- **Pipeline order (main.py):** `process_timing` (1884) → `score_board` (2050) → `mark_new_listings` (2219) → `generate_outreach` (2289). An urgency multiplier belongs inside or immediately after `score_board`, and it can read `redemption_deadline` because `process_timing` already ran.
+
+Net: the data is present, the clock is computed, but the score is clock-blind.
+
+### What "solved" looks like (the concrete deliverable)
+
+A **velocity multiplier** applied inside `score_board()` plus a **`velocity` block** attached to each listing's `raw`, so every downstream consumer (board sort, mail-merge, email alert, outreach copy) reads the same urgency tier:
+
+```
+raw["velocity"] = {
+  "days_to_event": 6,            # min(sale_date, upset_bid_deadline, redemption_deadline) − today
+  "event": "foreclosure_sale",   # which clock is ticking
+  "urgency_tier": "IMMINENT",    # IMMINENT / URGENT / ACTIVE / EARLY / STALE / NO_CLOCK
+  "urgency_mult": 1.5,           # score multiplier
+  "new_this_run": true,          # from is_new
+  "channel_directive": "phone_or_door_only",  # mail can't arrive in time
+}
+```
+
+Concrete rules (all free, pure computation):
+- **Urgency bands** from `days_to_event`:
+  - `IMMINENT` ≤7d → mult **1.5**, `channel = phone_or_door_only` (mail dead)
+  - `URGENT` 8-21d → mult **1.35**, `channel = expedited_mail_ok`
+  - `ACTIVE` 22-45d → mult **1.15**
+  - `EARLY` 46-120d → mult **1.0** (the sweet spot for subject-to/short-sale — flag it, don't decay it)
+  - `STALE` past sale_date with no upset/redemption clock and not sold → mult **0.5** (likely transferred; demote)
+  - `NO_CLOCK` (no dated event, e.g. raw code-enforcement) → mult **1.0**, untouched
+- **New-this-run boost:** `is_new` AND lis-pendens (earliest signal) → additive **+6** before the multiplier, so a fresh early-access lead outranks a re-seen one at equal distress.
+- **NC upset-bid nuance:** if `upset_bid_deadline` is set and future, the deal is still *winnable* via a higher upset bid — keep it URGENT, not STALE, even past the sale date.
+- **SC redemption nuance:** an SC tax row inside its 12-month redemption window is a *pre-sale motivated-seller* lead, not a dead one — band it by months-to-deadline, and note the escalating redemption penalty (3%→6%→9%→12% per SC Code §12-51-90) as a talking point that *increases* owner motivation as the deadline nears.
+- **Outreach copy switch:** `generate_outreach` picks the letter/SMS variant off `urgency_tier` (IMMINENT = "close before the sale" script; EARLY = "you have options" script).
+- **Board + mail sort key** becomes `(tier_rank, urgency_tier_rank, new_this_run, score)` so IMMINENT-HOT-new floats to the very top.
+
+### FREE path vs PAID path
+
+**FREE (recommended — this is the whole gap).** ~120-160 lines: a new `velocity.py` (or an extension of `distress_score.py`) that computes `days_to_event` from the earliest of `sale_date` / `upset_bid_deadline` / `redemption_deadline`, maps to a band, and returns the multiplier + channel directive. `score_board()` applies `score *= urgency_mult` and stores the block; `new_listings.py` already supplies `is_new`. No new data, no scraping, no API. The legal timelines are already reflected in the data the scrapers pull.
+
+**PAID (what you're replicating, for scope-anchoring).** Investor lead desks charge for exactly this "which lead dies first" signal baked into their alerting: **PropStream** at **$99/mo** (Personal Basic, ≤10,000 leads) with pre-foreclosure/auction-date monitoring, or **BatchLeads** at **$119/mo** (skip-trace included) with list-stacking and status-change alerts. Neither exposes a per-lead *days-to-sale multiplier you can tune to your own 25-40-leads/week throughput* — you'd be paying $99-119/mo for a coarser version of a signal you can compute for free from data you already own. There is no reason to buy this.
+
+### Legal specifics (drive the urgency curve, not a compliance blocker)
+
+- **NC power-of-sale (NCGS §45-21):** notice of sale posted ≥20 days before the sale; sale date typically ~20 days after the clerk's hearing; then a **10-day upset-bid window (NCGS §45-21.27)** that *restarts* on each new upset bid. Implication: an NC lead is genuinely alive during the upset window — treat post-sale-but-in-upset as URGENT, not STALE.
+- **SC judicial foreclosure (Master-in-Equity, SC Rule 71):** after judgment, sale is advertised once a week for **3 consecutive weeks**; sales are usually the **first Monday** of the month. Post-sale, bidding stays open **30 days** if a deficiency judgment is sought, **20 days** to comply if waived — another live-deal window.
+- **SC tax-sale redemption (SC Code §12-51-90):** **12-month** redemption from the sale date; redemption cost escalates **3% / 6% / 9% / 12%** across the four quarters of that year. The rising penalty is itself a motivation curve — the closer to month 12, the more motivated the owner.
+
+### Effort + build estimate
+
+**Low.** New `velocity.py` module + one call site in `score_board` + a copy-variant switch in `outreach.py` + tests (band boundaries, upset-bid-not-stale, SC redemption band, new-this-run boost). **~1 day** including tests and a board/mail-merge re-sort.
+
+### Recommended action
+
+Build the FREE velocity multiplier now. It is the highest-leverage 1-day change in the acquisition layer: it reorders the entire operator board around *time-to-death*, routes IMMINENT leads to phone/door instead of a postcard that arrives too late, floats fresh lis-pendens to the top, and swaps outreach copy to match the clock — all from data already on the row. Add `raw["velocity"]` to the dashboard lead card and make it the primary sort. Wire the SC redemption-penalty escalation and NC upset-bid window in as talking points.
+
+---
+
+## Owner-Entity Portfolio Rollup
+
+### What it is & why it BLOCKS a close (even when the row is 100% filled)
+
+Distress clusters by **owner**, not by parcel. A landlord who stops paying is rarely behind on one property — they're behind on the whole portfolio. When a 6-unit landlord defaults, the engine surfaces **6 separate rows**, generates **6 separate letters** (`outreach.py` keys everything by per-parcel `dedupe_key`), writes **6 mail-merge lines**, and creates **6 CRM records** — with no signal anywhere that these are the *same seller*. That is a catastrophic mispricing of the opportunity:
+
+- **It's one phone call, not six.** A portfolio-in-distress owner is the single highest-value lead type in wholesaling — one conversation can close a **bulk deal** (all 6 at a blended discount) instead of six independent negotiations. The engine can't even see that the opportunity exists.
+- **The rows compete with themselves.** Six mid-tier parcels from one distressed owner scatter across the board and each looks like an ordinary single lead. Rolled up, "owner in default on 6 parcels, $X aggregate equity" is a top-of-board WARM→HOT bulk target. The whole is worth far more than the sum of the rows.
+- **Duplicate, self-defeating outreach.** Six letters to the same person (often the same mailing address) reads as spam, burns the first-impression, and wastes postage. Worse, the operator may call about parcel #1, mark it "not_interested" in the CRM, and never realize the *same owner* has 5 more distressed parcels sitting in the board because the CRM has no owner-level view.
+- **LLC blindness.** Investor owners hold under entity names ("SMITH HOLDINGS LLC," "BRC RENTALS LLC"). Without normalizing and grouping by entity, a portfolio owned through one LLC looks like unrelated strangers.
+
+### Current state in the engine
+
+The owner is captured but **never used as a grouping key**:
+- **`models.py`** has `owner_name` (line 219, GIS-backfilled record owner) and `defendant`. `dedupe_key()` groups strictly by **parcel/address/case** — never by owner.
+- **`distress_score.py`** groups by `_parcel_key()` only (line 265). Its cross-listing logic ("same property in foreclosure AND tax sale") is exactly the right pattern — but applied at the *parcel* level, one abstraction too low. There is no `_owner_key()`.
+- **`outreach.py`** has `_owner(li)` (line 67, reads skip-trace owner or defendant) — but it's used only to personalize a *single* letter's greeting and for `find_by_owner()` name search. CRM records (`crm.json`) are keyed per-parcel by `dedupe_key`; there is no owner-level record, no `properties[]` array, no portfolio status.
+- **`crm.json`** stores flat per-parcel `{status, owner, property, county, ...}` — the `owner` field exists on every record but nothing rolls records up by it.
+- **`source_health_tracker.py`, `enrichment_strategy_fit.py`** — unrelated to this gap.
+
+Net: every ingredient (owner_name, defendant, skip-trace owner, mailing address, per-parcel distress + equity) is on the rows. Nothing joins them.
+
+### What "solved" looks like (the concrete deliverable)
+
+An **owner-portfolio rollup pass** that runs after `score_board` and produces a portfolio object, plus a **de-duplicated, owner-aware outreach path**:
+
+```
+raw["portfolio"] = {
+  "owner_key": "llc:smithholdings",     # normalized entity key
+  "owner_display": "Smith Holdings LLC",
+  "parcel_count": 6,
+  "distressed_parcel_count": 6,
+  "portfolio_ids": ["parcel:NC:buncombe:...", ...6...],
+  "agg_equity": 412000,                 # sum of per-parcel equity
+  "agg_owed": 288000,
+  "is_bulk_target": true,               # >=3 distressed parcels, one owner
+  "portfolio_tier": "HOT",              # rolled-up tier
+  "primary_contact_key": "parcel:NC:buncombe:...",  # the one row to call on
+}
+```
+
+Concrete rules (all free):
+- **Owner-key normalization:** uppercase, strip punctuation, canonicalize entity suffixes (LLC/L.L.C./INC/LP/LLP/TRUST → one token), drop "ET AL / ETUX / ETVIR," normalize "LAST FIRST" vs "FIRST LAST" order, and join on **mailing address** as a secondary key to catch the same investor holding under two slightly-different names. Reuses the same normalization discipline already in `_normalize_parcel`/`dedupe_key`.
+- **Group + roll up:** bucket all listings by `owner_key`; a bucket with ≥2 distressed parcels becomes a portfolio; ≥3 flags `is_bulk_target`. Aggregate equity/owed/parcel-count and take the **max** distress tier across the group (a portfolio is at least as hot as its hottest parcel, and the bulk angle can tier it up).
+- **One primary contact, N properties:** pick a `primary_contact_key` (the highest-distress parcel with the best contact data). `generate_outreach` sends **one** bulk-offer letter to that owner listing all N properties, instead of N single letters. Mail-merge collapses to one row per owner.
+- **Owner-level CRM:** add an `owners` section to `crm.json` keyed by `owner_key`, holding `{status, properties[], notes, history}`. Marking an owner "not_interested" suppresses re-surfacing *all* their parcels; "negotiating" flags the whole portfolio as a live bulk deal. Per-parcel records still exist and back-link to the owner record.
+- **New bulk-deal outreach copy:** a `bulk_letter_text()` variant — "I understand you own several properties in the county that may be facing sale; I can make a single cash offer on all of them and close on your timeline."
+- **Board surfacing:** a portfolio bulk-target renders as one consolidated card ("Smith Holdings LLC — 6 distressed parcels, $412k agg equity, HOT") with the parcels nested, so the operator sees the bulk opportunity at a glance instead of six scattered rows.
+
+### FREE path vs PAID path
+
+**FREE (recommended — this is the whole gap).** ~150-200 lines: a new `portfolio.py` with `owner_key()` normalization + a `rollup_portfolios(listings)` pass called after `score_board`; ~40 lines added to `outreach.py` for owner-level CRM + the bulk letter + collapsed mail-merge; a consolidated portfolio card in the dashboard. Zero new data — it's a group-by over `owner_name`/`defendant`/skip-trace-owner + mailing address the rows already carry.
+
+**PAID (what you're replicating).** The "how many properties does this owner hold" signal is a headline paid feature: **PropStream** ($99/mo) and **BatchLeads** ($119/mo, now under PropStream's ownership) both sell **list stacking** and a *"quantity of properties owned"* filter to find portfolio owners, marketed with a "67% right-party contact rate." You would be renting a coarser, non-distress-aware version of a rollup you can compute exactly against *your own* 18-county distressed board for free. No purchase warranted.
+
+### Legal specifics
+
+No statute gates this gap — it is a pure data-join over public ownership records already ingested. The only legal-adjacent note is **outreach compliance**, which the portfolio path *improves*: collapsing six letters into one owner-level contact reduces duplicate-mailing spam risk, and the SMS path already carries the required opt-out ("Reply STOP") in `sms_text()`. (For entity owners, the registered-agent/officer contact from the existing SoS enricher can feed the primary-contact pick, but that's an enhancement, not a legal requirement.)
+
+### Effort + build estimate
+
+**Medium.** Owner-key normalization is the fiddly part (entity-suffix canonicalization, name-order heuristics, mailing-address secondary join, avoiding false-merges of common surnames — bound false-merges by requiring a shared mailing address when the name is a common non-entity surname). New `portfolio.py` + `outreach.py` changes + owner-level CRM schema migration + tests (LLC canonicalization, ≥3 bulk flag, tier rollup, no-false-merge on "SMITH" without shared address, single-letter collapse). **~1.5-2 days.**
+
+### Recommended action
+
+Build the FREE portfolio rollup after the velocity multiplier — it's the second-highest-leverage acquisition-layer change. Ship it in two steps: (1) `owner_key()` + `rollup_portfolios()` + `raw["portfolio"]` + the consolidated dashboard card (so the operator can *see* bulk targets); then (2) the owner-level CRM + single bulk-offer letter + collapsed mail-merge (so outreach stops sending six letters to one landlord). Guard against false-merges by requiring a shared mailing address to join two differently-spelled non-entity names. This converts the single most valuable lead type in wholesaling — a portfolio owner in distress — from six invisible scattered rows into one top-of-board bulk-deal call.
+
+---
+
+**Files referenced (all absolute):**
+- `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/distress_score.py` — parcel-only grouping (`_parcel_key`, L265), static type weights (`_LISTING_TYPE_SIGNAL`, L114), clock-blind `score_board` (L331)
+- `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/new_listings.py` — `is_new`/`first_seen_run` tagging + `top_new_for_alert` (siloed sale_date priority)
+- `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/enrichment_process_timing.py` — computes NC/SC timing + SC 12-mo `redemption_deadline` (L57-60), never converts to urgency
+- `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/outreach.py` — `_owner()` (L67) used only for greeting/name-search; CRM keyed per-parcel (L187); no owner rollup
+- `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/models.py` — `sale_date`/`upset_bid_deadline`/`redemption_deadline`/`first_seen` (L191-224), `owner_name` (L219), parcel-only `dedupe_key` (L228)
+- `/Users/cashhigh/foreclosure-scraper/docs/crm.json` — flat per-parcel records, `owner` field present but never grouped
+- `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/main.py` — pipeline order: process_timing (1884) → score_board (2050) → mark_new_listings (2219) → generate_outreach (2290)
+
+Sources: [SC foreclosure/Rule 71](https://www.sccourts.org/resources/judicial-community/court-rules/civil/rule-71/), [NC NCGS §45-21.27 upset bid](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/BySection/Chapter_45/GS_45-21.27.pdf), [NC foreclosure timeline](https://www.nolo.com/legal-encyclopedia/north-carolina-foreclosure-laws-procedures.html), [SC Code §12-51-90 redemption](https://law.justia.com/codes/south-carolina/title-12/chapter-51/section-12-51-90/), [PropStream/BatchLeads 2026 pricing](https://resimpli.com/blog/batchleads-vs-propstream/)
+
+
+## Gap 8 — Manufactured-Home Titling (SC / NC)
+
+### What it is & why it BLOCKS a close (even when the row is 100% filled)
+
+A manufactured home (MH) in the Carolinas has a split legal life. It can exist in one of two mutually exclusive states:
+
+- **Titled as a vehicle** — the home is chattel/personal property. Ownership lives on a certificate of title held by **SCDMV** or **NCDMV**, exactly like a car. The land underneath is a separate parcel with its own deed. Liens are recorded on the DMV title, not the deed.
+- **De-titled / affixed as real property** — the paper title has been surrendered and cancelled, an affidavit is recorded at the Register of Deeds, and the home merges into the real estate. Now it passes with the deed and is covered by real-property liens.
+
+The engine's lead card is keyed to the **parcel** — deed owner, assessor value, ROD liens, foreclosure filing. When the physical home on that parcel is still **DMV-titled as a vehicle**, every one of those parcel-keyed fields describes only the *dirt*. You can win the land at the foreclosure/tax sale and still not own the house sitting on it, because:
+
+- The MH owner of record (on the DMV title) may be a **different person** than the deed owner (classic scenario: buyer bought the home from a dealer, rents/owns the lot separately, or a family member holds title).
+- A **lienholder on the DMV title** (the MH retail installment lender — 21st Mortgage, Vanderbilt, Triad, a credit union) survives your real-estate foreclosure entirely, because it was never a real-property lien and was never named in the foreclosure. That lender can repossess and physically haul the home off your newly-bought lot.
+- At closing/assignment, the title company demands the **DMV title** to transfer the home. If it's lost, in someone else's name, or has an open lien, the deal dies on the table — after you've paid.
+
+This kills wholesale (you can't assign a home you don't control), subject-to (you can't take over a payment stream you can't verify), and fix-flip (you can't resell without clean title). A row that is 100% filled on the parcel side is still un-closeable if the MH title state is unknown or adverse. This is the single most common "clean-on-paper, dead-at-closing" failure mode in rural Upstate SC and Western NC, where a large share of the housing stock is manufactured.
+
+### Current state in the engine
+
+- **`enrichment_property_kind.py`** — detects that a property IS a manufactured home. It matches description keywords (`mobile home`, `manufactured home`, `double-wide`, line 39) and CAMA/assessor use-codes (`"MH "`, `"MH PARK"`, line 77) and tags `PropertyKind.MOBILE`. This is the *only* MH awareness in the pipeline.
+- **What is missing:** there is no field for **title state**. Nothing checks whether the home is DMV-titled-as-vehicle vs. de-titled-as-real-property. `models.py` has no `mh_title_status`, `mh_titled_owner`, `mh_dmv_lien`, or `mh_vin` field. `enrichment_title_risk.py` classifies the *foreclosing party's* seniority but says nothing about vehicle-title status. `distress_score.py` and `enrichment_strategy_fit.py` treat a MOBILE-kind lead identically to a stick-built house for scoring and strategy routing — so a separately-titled MH can be scored a top wholesale lead when it is actually un-closeable.
+
+So the engine knows "this is a mobile home" and knows nothing about the one fact that decides whether it can be closed.
+
+### What "solved" looks like (the concrete deliverable)
+
+A new `enrichment_mh_title.py` enricher plus 4–5 new `models.py` fields, populated for every `PropertyKind.MOBILE` (and any parcel whose CAMA record shows a MH improvement):
+
+- `mh_title_status`: one of `real_property_affixed` / `dmv_titled_vehicle` / `unknown`
+- `mh_titled_owner`: name on the DMV title (when discoverable) — surfaced when it ≠ deed owner
+- `mh_owner_mismatch`: bool — deed owner ≠ MH title owner
+- `mh_dmv_lien`: any lienholder recorded on the DMV title (survives real-estate foreclosure)
+- `mh_vin` / `mh_serial`, `mh_year`, `mh_make`
+- `mh_closeability_flag`: `clear` / `title-work-required` / `blocked`
+
+And a scoring/strategy hook: if `mh_title_status == dmv_titled_vehicle` or `mh_owner_mismatch`, `enrichment_strategy_fit.py` demotes wholesale/subject-to and routes the lead to "verify DMV title before spending a dollar," and the dashboard shows a red **"MH — separate title"** banner.
+
+**Detection logic (the free path is entirely about detecting affixture):**
+A MH is **real property (safe)** when an affixture/retirement affidavit is recorded at the ROD. It is **still a titled vehicle (danger)** when no such affidavit exists. So the deliverable detects the presence/absence of the recorded affidavit and, secondarily, checks how the county assessor lists the improvement.
+
+### FREE path vs PAID path
+
+**FREE path (design/code):**
+
+1. **Assessor CAMA record (primary, already reachable).** The engine already pulls county CAMA/GIS attributes (`enrichment_gis_attrs.py`, `enrichment_cama_condition.py`). MH-specific tells that are usually structured text on the card:
+   - A **DMV decal / registration number** or a "personal property" MH tax account (separate from the real-property parcel bill) ⇒ still titled as a vehicle. Several Upstate SC counties bill MH as a distinct personal-property account — that split billing is the free smoking gun.
+   - Assessor "building type / structure" = `MH` but assessed as **land-only** on the real-property card ⇒ home is not on the deed ⇒ likely still titled.
+   - A recorded **VIN/serial + year/make** on the card gives you the key to a DMV lookup.
+2. **ROD affidavit scan (definitive).** Search the county Register of Deeds index (the engine already scrapes multiple ROD systems — Aumentum, Spartanburg, Gaston, CCHS) for the recorded de-titling affidavit against the parcel's grantor/legal:
+   - **SC:** "Manufactured Home Affidavit for the Retirement of Title Certificate" recorded per **S.C. Code § 56-19-510** (indexed like a deed, grantor = homeowner). Its presence = real property, safe. Its **absence** on a parcel that carries a MH = titled vehicle, danger.
+   - **NC:** "Affidavit for permanent attachment" recorded per **G.S. 47-20.6** (the affidavit described in **G.S. 20-109.2**). Presence = affixed real property; absence = still NCDMV-titled personal property. NC also has form **MVR-46G** ("Removal of Manufactured Home from Vehicle Files") in the trail.
+3. **Free DMV/records lookups for owner + lien on the title:**
+   - **NCDMV** MH records are checkable by VIN/serial; a duplicate/records path exists and title cost is nominal (~$15–20). NC's own guidance is exactly this two-step: ROD for the affidavit, else NCDMV title system.
+   - **SCDMV** MH titles are managed by mail; SCDMV title fee is $15. The free discriminator is the ROD affidavit + the county's split MH personal-property tax account, which you already touch.
+4. **Wire into scoring.** Pure-Python rule in `enrichment_strategy_fit.py` / `distress_score.py`: `MOBILE` + no recorded affixture affidavit ⇒ set `mh_closeability_flag = title-work-required`, demote auto-wholesale, add dashboard banner. Zero new paid data.
+
+**Effort of free path: Med.** The affidavit-index search reuses existing ROD scrapers; the new work is (a) the CAMA "split MH account / land-only + MH structure" parser, (b) the affidavit-presence check, (c) the models fields + strategy hook.
+
+**PAID path (vendor + real 2026 price):**
+
+- **DataTree (First American)** — title chain & lien report that pulls both the real-property chain and can surface MH/VIN detail. Investor plans run roughly **$69/mo** with **per-report pull-down fees** on top (title chain & lien reports priced by state/county/tier). Good when you want a single API/report instead of parsing each county.
+- **Manufactured-home title service (e.g., Snickfish, MHISC dealers)** — they run the SCDMV/NCDMV title search and cure missing/mis-owned titles for you. Title-cure/lost-title work is a **flat per-home service fee, commonly ~$300–$1,000+** depending on how broken the chain is. This is a *closing-stage* spend, not a screening spend.
+- **TitlePoint / SiteX (Black Knight/ICE)** — enterprise title-plant products with per-search pricing negotiated by contract; overkill for this footprint versus DataTree.
+
+The free path answers the **screening** question ("is this closeable?") for $0; the paid path is only worth it at the **close** on a specific home you've already decided to pursue.
+
+### LEGAL citations (what each statute requires)
+
+- **SC — S.C. Code § 56-19-510 (Retirement of Title Certificate).** To convert a MH from vehicle to real property, the owner files with the county Register of Deeds/Clerk of Court a **"Manufactured Home Affidavit for the Retirement of Title Certificate"** in the statutory form, plus proof of ownership (recent deed) and the affidavit filing fee. The ROD records it **"as if it were a deed to real property"** (grantor = homeowner) and notifies the county assessor. On filing, the MH **"shall be treated for all purposes except condemnation as real property and title to the manufactured home is thereby vested in the lawful owner of the real property to which it is affixed."** **§ 56-19-520** governs releasing any existing DMV lien (Satisfaction Affidavit) as part of retirement. **No recorded § 56-19-510 affidavit = the home is still an SCDMV-titled vehicle.**
+- **NC — G.S. 20-109.2 (Surrender of Title) + G.S. 47-20.6 (Affidavit for permanent attachment).** The owner **surrenders the certificate of title to NCDMV, which cancels it under G.S. 20-109.2**; then the owner (or the first-security-interest holder) records the G.S. 20-109.2 affidavit at the ROD per **G.S. 47-20.6**. After recording, the MH **"becomes an improvement to real property,"** liens on it are perfected/prioritized as real-property liens, **"all existing liens on the real property are considered to include the manufactured home,"** and **"no conveyance… shall attach to the manufactured home, unless… applicable to the real property… and recorded in the office of the register of deeds."** This section **controls over G.S. 25-9-334** (UCC fixture priority). **No G.S. 20-109.2/47-20.6 affidavit = the home remains NCDMV-titled personal property**, its DMV lienholder is untouched by your real-estate foreclosure, and its title owner may differ from the deed owner.
+
+The operational rule the statutes give you: **the recorded ROD affidavit is the bright line.** Present ⇒ real property, safe to underwrite on the parcel. Absent ⇒ pull the DMV title before you bid.
+
+### Effort + build estimate
+
+**Med.** ~2–3 dev-days: `models.py` fields (0.25d); `enrichment_mh_title.py` — CAMA split-account / land-only-with-MH parser + ROD affidavit-presence check reusing existing ROD scrapers (1.5d); VIN capture + optional NCDMV/SCDMV lookup stub (0.5d); strategy/score hook + dashboard banner (0.5d). No new paid dependency.
+
+### Recommended action
+
+Build `enrichment_mh_title.py` on the FREE path and gate it to `PropertyKind.MOBILE` + any CAMA record showing a MH improvement. Ship the ROD-affidavit-presence check (SC § 56-19-510 / NC G.S. 20-109.2+47-20.6) as the primary signal, with the assessor split-billing / land-only-MH heuristic as corroboration. Wire `mh_closeability_flag` into `enrichment_strategy_fit.py` so a separately-titled MH is demoted out of auto-wholesale and shown with a red banner. Reserve DataTree/title-service spend for close-stage cure on homes you've already chosen to pursue. This closes the highest-frequency "clean-on-paper, dead-at-closing" gap in the Carolinas footprint.
+
+---
+
+## Gap 9 — Surviving-Lien-at-Foreclosure Max-Bid Math
+
+### What it is & why it BLOCKS a close (even when the row is 100% filled)
+
+When you buy at a foreclosure or tax sale, **you do not always take clean title.** Certain liens **survive the sale and ride along with the land**, becoming *your* debt the moment you win. Your true acquisition cost is the winning bid **plus every surviving lien.** If the engine's max-bid tells you to bid up to $120k but a super-priority HOA lien, a municipal water/sewer lien, and an IRS 120-day redemption right all survive, your real basis is higher and your margin can be negative before you've touched the rehab.
+
+Which liens survive is **not a property-level fact — it is a jurisdiction × lien-type × which-lien-is-foreclosing rules question.** The same $9,000 HOA lien is wiped in one state and survives in another. The engine currently treats "max bid" as a pure valuation output and never subtracts surviving debt, so **every bid recommendation on a lead that carries a surviving lien is overstated.** A 100%-filled row with ARV, rehab, comps, and a lien stack still produces a *wrong* max bid, because the math never asks "which of these liens do I inherit?"
+
+The five survival cases that matter in this footprint:
+
+1. **HOA/COA super-priority.** Some states give associations a limited "super-priority" slice that primes even the first mortgage and survives its foreclosure. **Neither SC nor NC is a super-lien state for HOAs** — this is the single most valuable calibration in the matrix (below).
+2. **Municipal water/sewer & special-district charges running with the land.** Utility/assessment liens that attach to the real property survive a sale and become the new owner's obligation.
+3. **SC tax-sale "subject to" / caveat emptor.** SC tax sales are AS-IS; certain interests survive and the buyer takes subject to them, and title isn't incontestable until the redemption + additional periods run.
+4. **IRS federal tax lien 120-day right of redemption.** After a non-judicial foreclosure of a senior lien, the U.S. can redeem the property for 120 days (26 U.S.C. § 7425(d)) — a cloud/claw-back on your title even when the sale nominally cleared the IRS lien.
+5. **Senior mortgage surviving a junior sale.** Already partially handled by `enrichment_title_risk.py` (the whole first mortgage survives an HOA/2nd/CU sale) — but its dollar value is never subtracted from the bid.
+
+### Current state in the engine
+
+- **`valuation/calc.py` and `assessment.py`** — `max_bid_70(arv, rehab, fees_pct=0.05)` computes `0.70 * ARV - rehab - (0.05*ARV)`. That's it. **No lien term. No survival logic.** It has no idea what's foreclosing or what survives.
+- **`enrichment_lien_stack.py`** — captures a lien stack (2nd mortgage / IRS / state-tax / HOA / judgment) onto the row. The data is collected but **never fed into the bid** — it's display-only.
+- **`enrichment_title_risk.py`** — classifies the foreclosing party as senior vs junior and sets `surviving_senior_debt_risk`. This is a **boolean flag, not a dollar subtraction**, and it only covers the senior-mortgage case, not HOA super-priority / municipal / IRS / tax-sale survival. Its own docstring even notes NC/SC tax sales "are usually super-priority" but routes municipal to manual — i.e., the survival question is punted to a human today.
+- **`enrichment_equity.py`** — does ARV − payoff − liens for an *equity* estimate, but that's the seller's equity, not the *buyer's* max-bid basis; the two are different calculations and the survival rules never enter either.
+
+**Net:** the engine *has the lien data* and *has a seniority flag*, but the max-bid function is blind to both. Every surviving lien is currently ignored in the number the operator actually bids on.
+
+### What "solved" looks like (the concrete deliverable)
+
+A **lien-survival rules table** (`lien_survival_rules.py`) — a static, versioned matrix keyed by `(state, foreclosure_type, lien_type)` → `survives: bool` + a note + a statute cite — feeding a new `surviving_lien_total` term into `max_bid_70`.
+
+New signature:
+```
+max_bid_70(arv, rehab, fees_pct=0.05, surviving_liens=0.0)
+    bid = 0.70*arv - rehab - fees - surviving_liens
+```
+`surviving_liens` is computed by a new `enrichment_max_bid_liens.py` that walks the already-captured `enrichment_lien_stack.py` entries, looks each up in the rules table given the row's state + foreclosure type + the `enrichment_title_risk.py` seniority result, sums the ones that survive, and attaches:
+- `surviving_lien_total` (dollars)
+- `surviving_lien_detail` (list of {lien_type, amount, survives, statute})
+- `irs_redemption_risk` (bool + 120-day window note)
+- `max_bid_liens_adjusted` (the corrected bid)
+
+The dashboard shows both the naive 70% bid and the **lien-adjusted** bid, with the surviving-lien line items and cites, so the operator sees exactly why the number dropped.
+
+### The state / lien-type survival matrix (the rules table)
+
+| Lien type | Which lien is foreclosing | SC — survives? | NC — survives? | Authority |
+|---|---|---|---|---|
+| **1st mortgage / DOT** | Junior lien (HOA, 2nd, CU, muni code-fine) sale | **Yes** — take subject to it | **Yes** — take subject to it | General priority; `enrichment_title_risk.py` |
+| **1st mortgage / DOT** | Senior 1st-mortgage sale | No (extinguished) | No (extinguished) | General priority |
+| **HOA / COA assessment** | 1st-mortgage foreclosure | **No** — SC is NOT a super-lien state; bank foreclosure primes HOA | **No** — foreclosing 1st-DOT purchaser "shall not be liable for the assessments… which became due prior to the acquisition of title" | SC: § 27-30-150 / § 27-31-210; **NC: G.S. 47F-3-116(d)&(j)** (no 6-mo super-priority, unlike NC condo 47C) |
+| **HOA / COA assessment** | HOA's own sale | **Yes** (the debt being foreclosed) — but 1st mortgage survives on top | **Yes** — but 1st DOT survives on top | Same |
+| **Property tax lien** | Any sale | **Yes — first lien, primes mortgages, survives** | **Yes — superior to all other liens, runs with the land** | **SC: Title 12 (12-49/12-51), tax lien is a first lien; NC: G.S. 105-356** |
+| **Municipal water/sewer / special-district assessment** | Any sale | **Yes** — runs with the land | **Yes** — G.S. 105-356 covers sanitary/sewer/watershed district charges as tax-priority liens running with the land | NC: **G.S. 105-356**; SC: local ordinance/utility lien |
+| **IRS federal tax lien** | Senior (non-IRS) lien sale, IRS given ≥25-day notice | Lien cleared BUT **120-day US redemption right survives** | Same | **26 U.S.C. § 7425(d)**; 28 U.S.C. § 2410 |
+| **IRS federal tax lien** | Sale with NO proper 25-day IRS notice | **Lien SURVIVES in full** | **Lien SURVIVES in full** | 26 U.S.C. § 7425; IRM 5.12.4 |
+| **State tax lien (SC DOR / NCDOR)** | Junior sale | Survives if senior in time | Survives if senior in time | recording-order priority |
+| **Mechanic's / judgment lien** | Senior sale | No if junior; survives if senior-recorded | No if junior; survives if senior-recorded | recording-order priority |
+
+The two highest-value calibrations this matrix bakes in: **(1) neither SC nor NC gives HOAs super-priority** — so a bank-foreclosure lead with a scary HOA balance does NOT need that balance subtracted (the old title-risk docstring's "usually super-priority" hedge is resolved to a hard rule), and **(2) property + municipal utility liens always survive and run with the land** — those must be subtracted on *every* sale type. The IRS 120-day right is modeled as a **redemption-risk flag + holding-cost/insurance haircut**, not a full subtraction, unless the 25-day notice was defective.
+
+### FREE path vs PAID path
+
+**FREE path (design/code):** The entire deliverable is a static rules table + arithmetic over data the engine already collects. Zero new data spend.
+- `lien_survival_rules.py`: hand-built matrix above, each cell carrying `survives` + `statute` + `note`. Versioned so a statutory change is a one-line edit.
+- `enrichment_max_bid_liens.py`: joins `enrichment_lien_stack.py` amounts × the row's `(state, foreclosure_type)` × `enrichment_title_risk.py` seniority → `surviving_lien_total`.
+- Patch `assessment.py` / `valuation/calc.py` `max_bid_70` to accept and subtract `surviving_liens`, and add the IRS 120-day flag.
+- **Amounts** come from what you already scrape: property-tax owed (`enrichment_tax_owed.py`, `enrichment_qpaybill_tax.py`), IRS/state liens (`enrichment_lien_stack.py`, `enrichment_dew_liens.py`, ROD lien scrapers). Where a specific HOA balance is unknown but the matrix says "wiped," you subtract $0 correctly anyway — the rules table saves you from needing the number.
+
+**PAID path (only for the amounts, never the rules):**
+- **DataTree title chain & lien report** (~$69/mo + per-report fee) to enumerate every recorded lien + amount when your free ROD scrape is thin.
+- **A title company / attorney title search** at close — flat **$100–$450** per property in NC/SC — to confirm the surviving stack before you wire funds. This is the correct place to spend, at close, on a deal you've already picked. The survival *rules* are free and public; only the per-property lien *amounts* are ever worth buying.
+
+### LEGAL citations (what each requires)
+
+- **SC HOA — NOT super-priority.** SC HOA/COA assessment liens are prior to most liens **except the first mortgage** (S.C. Code § 27-30-150 for the HOA Act; § 27-31-210 for horizontal-property/condo). A **bank foreclosure primes and extinguishes the HOA lien** (SC "is not a super lien state"). Subtract $0 for HOA on a first-mortgage sale.
+- **NC HOA — NOT super-priority (unlike NC condos).** **G.S. 47F-3-116(d):** the HOA claim of lien is prior to all liens "except… a mortgage or deed of trust… recorded before the filing of the claim of lien." **G.S. 47F-3-116(j):** a first-DOT foreclosure purchaser "**shall not be liable for the assessments against the lot which became due prior to the acquisition of title**" — the unpaid amounts become common expenses spread across all owners. No 6-month super-priority in 47F (that limited priority exists in some other states' condo acts, not NC planned communities). Subtract $0 for HOA on a first-mortgage sale.
+- **NC property + utility liens — survive, run with the land.** **G.S. 105-356(a):** the tax lien "is superior to all other liens, assessments, charges, rights, and claims of any and every kind in… real property regardless of… whether acquired prior or subsequent," and covers **sanitary/sewerage/watershed improvement district** charges; "priority… shall not be affected by transfer of title." **Always subtract.**
+- **SC property tax — first lien, survives.** SC ad valorem taxes are a **first lien on the property, senior to and taking priority over any mortgage**, attaching Dec 31 each year (Title 12, Ch. 49/51). SC tax sales are **caveat emptor / AS-IS**, and the tax deed is not incontestable until the 12-month redemption + an additional 12 months run (§ 12-51-90 redemption). **Always subtract taxes; flag the redemption/AS-IS cloud.**
+- **IRS 120-day redemption.** **26 U.S.C. § 7425(d):** where real property is sold to satisfy a lien **prior to the United States**, the U.S. may redeem within **120 days of the sale or the local-law redemption period, whichever is longer.** The foreclosing party must give the IRS **≥25 days' notice** to extinguish the federal tax lien; **if notice is defective, the lien is not discharged and survives in full** (IRM 5.12.4). Model as a redemption-risk flag (holding-cost/insurance haircut) normally, full subtraction if notice defective.
+
+### Effort + build estimate
+
+**Low–Med.** ~1.5–2 dev-days: `lien_survival_rules.py` matrix (0.5d, it's the table above with cites); `enrichment_max_bid_liens.py` join over existing lien-stack + title-risk (0.75d); `max_bid_70` signature patch + regression on the committed board so bids only *drop* where liens survive (0.25d); dashboard dual-bid + surviving-lien line items (0.5d). No new scrape, no new vendor.
+
+### Recommended action
+
+Build `lien_survival_rules.py` + `enrichment_max_bid_liens.py` on the FREE path and patch `max_bid_70` to subtract `surviving_lien_total`. Hard-code the two footprint-specific truths — **SC and NC HOA liens do NOT survive a first-mortgage foreclosure, and property + municipal utility liens ALWAYS survive and run with the land** — and model the **IRS § 7425(d) 120-day right** as a redemption-risk flag (full subtraction only when the 25-day notice was defective). Show the naive 70% bid and the lien-adjusted bid side by side with cited line items. Then recompute the committed board so no lead ever recommends a bid that ignores debt you'd inherit at the courthouse steps. Reserve DataTree / title-search spend for confirming lien *amounts* at close, never for the survival *rules*, which are free and statutory.
+
+---
+
+**File paths referenced (all under `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/`):**
+- `assessment.py` (lines 163–173: `max_bid_70`, no lien term — the Gap 9 fix site)
+- `valuation/calc.py` (valuation entry)
+- `enrichment_property_kind.py` (lines 39, 77: MH detection, no title-state — the Gap 8 build-on site)
+- `enrichment_title_risk.py` (senior/junior party classifier — boolean, no dollars)
+- `enrichment_lien_stack.py` (lien data captured, never fed to bid)
+- `enrichment_equity.py`, `enrichment_tax_owed.py`, `enrichment_qpaybill_tax.py`, `enrichment_dew_liens.py` (existing lien/tax amount sources to join)
+- `distress_score.py`, `enrichment_strategy_fit.py`, `models.py` (scoring/strategy/schema hooks)
+
+New files to create: `enrichment_mh_title.py` (Gap 8), `lien_survival_rules.py` + `enrichment_max_bid_liens.py` (Gap 9).
+
+
+## Gap 11: Legal/Compliance Posture (FCRA / UDAP / Wholesaler-Licensing / PII Retention)
+
+### What it is & why it BLOCKS a close (even when the row is 100% filled)
+A row can be perfectly scored — ARV, equity, payoff, distress score, verified phone, verified mailing address — and still be radioactive to *touch*. Compliance is the layer between "we know who to contact" and "we are legally allowed to contact them this way, using this data, and close the deal we intend." Four separate legal regimes each independently gate a close:
+
+1. **FCRA (15 U.S.C. §1681)** — the skip-traced phone/email/relative data on 15k+ owners was obtained for *lead generation*, which is a permissible use. But the moment that same data touches a decision about a person's **credit, tenancy, insurance, or employment eligibility**, it becomes a "consumer report" and the whole FCRA apparatus (permissible purpose, adverse-action notices, dispute rights) attaches. A subject-to or seller-finance deal where the engine evaluates the *seller's* ability to keep paying the underlying note, or a rent-back/lease-option where the former owner becomes a tenant, is exactly where an engine silently crosses that line.
+2. **UDAP — SC Unfair Trade Practices Act (SC Code §39-5-10 et seq.) and NC G.S. 75-1.1** — governs *how you solicit*. Deceptive mail ("YOUR HOME IS IN FORECLOSURE — ACT NOW" when it isn't, or mail dressed up to look like a government notice) is a per se violation. NC has a specific statute for mail generated off register-of-deeds records requiring a conspicuous disclaimer.
+3. **Wholesaler-licensing** — SC now *criminalizes* unlicensed residential wholesaling (see below); NC has a bill pending that would do the same. If the engine's entire exit strategy on a HOT lead is "assign the contract for a fee" and you market the property, you are practicing brokerage without a license.
+4. **PII data-retention / minimization** — holding names, phones, DOBs, and address history on 15k people who never consented and most of whom you will never contact is a standing liability (breach exposure, and a data-broker-registration question in a growing number of states). No retention policy = the pile only grows.
+
+Any one of these turns a "closed deal" into a rescinded contract, a treble-damages UDAP suit, an unlicensed-activity referral, or a data-breach notification. None of them show up on the lead card.
+
+### Current state in the engine
+Based on the file map (`outreach.py`, `crm.json`, `distress_score.py`, `enrichment_strategy_fit.py`, `models.py`, `source_health_tracker.py`): **essentially nothing exists for this gap.**
+- `outreach.py` sends SMS/email/mail but there is no evidence of a suppression/DNC list, a per-message compliance gate, or mail-template disclaimer injection.
+- `enrichment_strategy_fit.py` routes a row to wholesale / subject-to / fix-flip / gator / land, but there is no flag that says "this exit requires a license in this state" or "this exit turns the seller into a tenant → FCRA."
+- `models.py` almost certainly has no `consent_basis`, `data_source_permissible_purpose`, `retention_expiry`, or `suppressed` field on the owner/contact model.
+- `crm.json` has no documented legal-hold or purge lifecycle.
+- There is no `compliance.py`, no DNC scrub, no litigator/known-complainant scrub, and no written data-retention policy in the repo.
+
+This is the single highest-severity gap because it is the only one that can produce **personal legal liability and criminal referral**, not just a lost deal.
+
+### What "solved" looks like (the concrete deliverable)
+1. **A one-page written compliance policy** (`docs/COMPLIANCE.md`) covering: permissible-purpose statement for each data source, the FCRA firewall rule, the UDAP mail/SMS rules, per-state wholesaling posture, and the PII retention schedule. This is the artifact you hand a lawyer or a partner.
+2. **A `compliance.py` gate** that every outreach call in `outreach.py` must pass through, which:
+   - checks a **DNC/suppression list** (federal DNC + internal opt-outs + known-litigator list) and blocks;
+   - checks **quiet hours** by the contact's timezone (SMS/call);
+   - injects the required **mail/SMS disclaimers** based on the source of the record;
+   - blocks any channel to a contact whose `consent_basis` doesn't support it.
+3. **New fields on the contact/owner model** (`models.py`): `permissible_purpose`, `consent_basis`, `suppressed` (+ reason), `first_seen`, `retention_expiry`, `dnc_checked_at`.
+4. **An exit-strategy legal flag** in `enrichment_strategy_fit.py`: any row whose recommended play is *residential wholesale-and-market* in SC gets a hard `LEGAL_BLOCK` badge; subject-to / lease-option rows get an `FCRA_WATCH` badge.
+5. **A retention/purge job** that expires contact PII for rows never worked after N months.
+
+### FREE path vs PAID path
+**FREE (this is 90% discipline + code, and it is the recommended path):**
+- Write `docs/COMPLIANCE.md` yourself from the primary sources cited below. Cost: $0, ~1 day.
+- Build `compliance.py` as a pure-Python gate. Federal DNC scrub the free way: register as a subscriber and download the DNC list for your area codes (the National DNC Registry gives the first 5 area codes free; SC+NC upstate/western footprint is a handful of area codes — 803, 864, 828, 704, 336 — likely within or near the free tier). Quiet-hours and disclaimer injection are trivial code.
+- Known-litigator / TCPA-troll scrub: maintain an internal CSV; seed it from public TCPA-plaintiff lists.
+- PII retention/purge: a scheduled Python job. $0.
+
+**PAID (buy only what free can't cover well):**
+- **DNC + litigation scrub as a service:** *DNC.com* / *Contact Center Compliance (DNC Scrub)* — roughly **$0.008–$0.03 per number scrubbed** depending on volume, or plans from ~**$500/yr**. *Blacklist Alliance* (TCPA litigator + DNC scrub) is the wholesaling-industry default, roughly **$100–$300/mo**.
+- **Compliant SMS delivery:** if you SMS at volume you need 10DLC-registered A2P messaging (Twilio/Telnyx). Registration ~**$4 one-time brand + $1.50–$10/mo per campaign**; this is a hard requirement now, carriers block unregistered traffic.
+- **A 30-minute consult with an SC/NC real-estate attorney** to bless `docs/COMPLIANCE.md` and your assignment/marketing workflow: ~**$200–$400**. Cheapest insurance you will ever buy given SC criminalized this.
+
+### LEGAL gaps — statutes and what they require
+
+**SC residential wholesaling — now regulated/criminal.** The revised **SC Real Estate Practice Act, SC Code §40-57-5 et seq.**, signed May 2024, added **§40-57-30(44)** defining "wholesaling" as *having a contractual interest in residential real estate, then marketing the property for sale to a different buyer before taking legal ownership, with expectation of compensation.* Per the SC REC **Advisory Opinion (Nov 14, 2024)**: **assigning** a contract is legal, but **marketing the underlying property** without a license is not. **§40-57-135** permits marketing a *contractual position* only if it does *not* "imply, suggest, or purport to sell, advertise, or market the underlying real property" — and the REC states compliance is "practically impossible" if you disclose the address, photos, beds/baths, sqft, tax-map number, condition, or neighborhood. Unlicensed brokerage under §40-57 is a criminal offense (misdemeanor) plus civil penalties. **Engine requirement:** for SC residential HOT leads, the only compliant plays are (a) buy-and-hold/close-yourself, (b) double-close (take title first), or (c) a *silent* assignment with zero property marketing. The engine must not surface an SC residential row into any "market this deal" workflow.
+
+**NC wholesaling — legal today, bill pending.** Under **NC G.S. Chapter 93A** (Real Estate License Law), assigning your own purchase contract does *not* require a license today; but soliciting/marketing another's property for compensation is unlicensed brokerage. **NC House Bill 797 (2025-2026), the "Residential Property Wholesaling and We Buy Houses Homeowner Protection Act,"** would amend **G.S. 93A-2** to make residential wholesaling licensed brokerage and add a new **Article 8** giving the homeowner a **30-day right to cancel**, a **10-business-day refund** deadline, and a mandatory **14-point-font cancellation disclosure** in the contract — with failure to provide it a **per se UDAP violation**. **Status: NOT enacted** — referred to Senate Rules on May 1, 2025; would take effect Oct 1, 2025 for contracts on/after that date *if passed*. **Engine requirement:** track this bill; if it passes, NC flips to the SC posture and every NC purchase contract needs the cancellation clause.
+
+**UDAP mail — NC deed-record solicitation disclaimer.** NC law (Chapter 75) requires that any solicitation document generated from register-of-deeds records carry a conspicuous top-of-document statement that it is **not from a government agency** and that **no action is legally required.** Violation = unfair trade practice under **G.S. 75-1.1**, exposing you to **treble damages under G.S. 75-16.** SC's UTPA (**SC Code §39-5-140**) similarly allows treble damages + attorney's fees for willful deceptive practices. **Engine requirement:** `outreach.py` mail templates for records-sourced leads must auto-inject this disclaimer; no "looks like a foreclosure notice" mailers.
+
+**FCRA (15 U.S.C. §1681b).** A consumer report may only be pulled/used for an enumerated permissible purpose. Lead generation is fine; using skip-traced data to evaluate a person's eligibility for **credit (seller-financing/subject-to underwriting), tenancy (rent-back/lease-option), or insurance** converts it into FCRA-regulated use requiring permissible purpose + adverse-action notices. **Engine requirement:** a hard firewall — skip-traced fields are for *contact only*; any strategy that underwrites the seller must re-obtain data through an FCRA-compliant channel with consent.
+
+### Effort + build estimate
+**Med.** `docs/COMPLIANCE.md` + `compliance.py` gate + model fields + strategy-fit legal flags + purge job ≈ **2–3 focused days** of build. The attorney review and DNC-service signup are procurement, not engineering.
+
+### Recommended action
+1. **Today:** add the SC-residential `LEGAL_BLOCK` and subject-to `FCRA_WATCH` flags in `enrichment_strategy_fit.py` — this is a 1-hour change that stops the single worst outcome (marketing an SC residential wholesale deal).
+2. **This week:** write `docs/COMPLIANCE.md` from the statutes above; build `compliance.py` as a mandatory pre-send gate in `outreach.py` with DNC scrub, quiet hours, and NC/SC mail-disclaimer injection; add the model fields and purge job.
+3. **Before any paid outreach at volume:** 10DLC registration + a ~$300 attorney blessing of the assignment/marketing workflow and mail templates.
+4. **Ongoing:** put NC H797 on a watch (re-check each session's legal sweep); if it passes, add the 14-point cancellation clause to NC contracts.
+
+---
+
+## Gap 12: Per-Field Provenance & Staleness
+
+### What it is & why it BLOCKS a close (even when the row is 100% filled)
+A filled cell answers "what is the value?" Provenance answers "**where did it come from, and when — and can I still trust it?**" These are different questions, and the gap between them is where deals die at the closing table. A `sale_date` of "2019-03" that was true when scraped but is now the *prior* sale because the property resold, an `arv` computed off comps that are now 9 months stale, a `payoff` estimate from a loan balance that has amortized, a `phone` verified 14 months ago and now reassigned — each is a 100%-filled cell that is quietly **wrong**. You act on it (fire a mailer, make an offer, model equity), and the deal blows up: the "distressed" owner already sold, the "high-equity" spread evaporates because the ARV was old, the "verified" number is a stranger (TCPA exposure). Worse, without per-field timestamps you **cannot even audit** which decisions were made on rotten data, so you can't tell whether the engine is getting better or just louder.
+
+Freshness is not uniform across fields, which is the whole point: an `assessor_sqft` from 2021 is fine; a `foreclosure_status` from 2021 is worthless. A single row-level `last_updated` collapses these and hides the danger.
+
+### Current state in the engine
+- `models.py` most likely stores each field as a bare value with, at best, one row-level `scraped_at` / `last_updated`. There is no evidence of per-field `*_asof` timestamps or per-field `*_source`.
+- The MEMORY note *"Enrichment pipeline facts — resolved leads PERSIST + auto-enrich"* confirms fields get backfilled over time from different sources at different times — which is *exactly* the scenario that makes a single row timestamp misleading, because `phone` might be 3 days old while `sale_date` is 8 months old in the same row.
+- `distress_score.py` and the ARV/valuation calc consume these values with no staleness weighting — a stale comp counts the same as a fresh one (the valuation-calibration note tracks `arv_confidence` but that's noise/dispersion, not *age*).
+- `source_health_tracker.py` tracks *source* health but not *field-level* age on the board.
+
+Net: some coarse timestamp probably exists; **per-field provenance and staleness flags do not.**
+
+### What "solved" looks like (the concrete deliverable)
+1. **Per-field provenance triples.** For every material field, store `value`, `<field>_asof` (when this value was true/observed), and `<field>_source` (which scraper/source produced it). Implement as a small `Provenance` structure in `models.py` (a dict keyed by field, or parallel `_asof`/`_source` maps) so the board sidecar carries it without wiping — consistent with the MEMORY rule that board writers must use `load_board()`.
+2. **A staleness policy table** — a per-field max-age config, because fields decay at different rates:
+   - `foreclosure_status`, `auction_date`, `tax_delinquent_status`: **30 days** (hot, time-critical).
+   - `phone`, `email`: **90 days** (reassignment risk / TCPA).
+   - `arv`, `comps`, `payoff`: **120–180 days** (market drift).
+   - `sale_date`, `owner`, `mailing_address`: **180 days** (recheck for resale/transfer).
+   - `assessed_value`, `sqft`, `beds/baths`: **365 days** (slow-moving).
+3. **A `staleness_flag` per row** computed at board-compile time: `FRESH` / `AGING` / `STALE`, driven by whichever *decision-critical* field is oldest relative to its policy. A HOT lead whose `foreclosure_status` is >30 days old is auto-demoted / re-queued, not fired on.
+4. **Staleness-weighted valuation:** ARV and equity down-weight stale comps and surface a "valuation age" on the card, so a spread computed off old comps carries lower confidence.
+5. **A cheap re-verify queue:** the job that lists exactly which fields on which HOT rows have gone stale, so re-scraping is targeted (re-pull `foreclosure_status` on 40 rows) instead of re-crawling everything.
+
+### FREE path vs PAID path
+**FREE (this is the correct path — it is entirely internal plumbing):**
+- Add `_asof` / `_source` capture at the point each scraper writes a field. Every scraper already knows the current time and its own identity; this is a mechanical change to the write path. $0.
+- Staleness policy = a Python dict. `staleness_flag` = a function run at compile. Re-verify queue = a filter over the board. All $0.
+- Backfill for existing rows: seed `_asof` from the existing row-level timestamp where nothing better exists, and let the flag decay from there.
+
+**PAID (not needed for the mechanism; only relevant to *refreshing* stale data faster):**
+- Provenance/lineage frameworks (OpenLineage, Great Expectations for freshness assertions) are **free/open-source** — optional if you want formal data-quality tests, but overkill here.
+- The only real spend is on *re-acquisition* of stale fields, which is the cost of running your existing (mostly free) scrapers more often — compute, not license.
+
+There is no meaningful vendor purchase here. This gap is bought with engineering discipline, not dollars.
+
+### For LEGAL gaps
+Not a legal gap per se — but note the compliance overlap: a `phone_asof` older than ~90 days is a **TCPA risk signal** (number may be reassigned; the FCC reassigned-number database exists precisely for this). Staleness metadata is thus also a compliance input feeding Gap 11's `compliance.py` — an aged phone should trip a re-verify before any autodial/SMS.
+
+### Effort + build estimate
+**Low–Med.** The staleness policy, flag, and re-verify queue are **~1 day**. Threading `_asof`/`_source` through every scraper's write path is the bulk of the effort — **~1–2 days** depending on how many of the 75–91 scrapers write directly vs. through a shared `write_artifact`/`load_board` helper. If writes are centralized, it's a single choke-point change (Low); if scattered, it's mechanical but broad (Med).
+
+### Recommended action
+1. Add `_asof`/`_source` at the **shared board-write helper** first (biggest coverage for least work), then backfill the stragglers.
+2. Ship the **per-field staleness policy + row `staleness_flag`** and wire it into board compile so HOT rows with a stale decision-critical field are auto-demoted and pushed to the re-verify queue. This alone kills the "already-sold / stale-ARV" false-HOT problem.
+3. Feed `phone_asof` into Gap 11's compliance gate as a re-verify trigger.
+
+---
+
+## Gap 13: Source-Concentration Monitoring
+
+### What it is & why it BLOCKS a close (even when the row is 100% filled)
+Every individual row can be perfect while the *portfolio of rows* is one broken scraper away from collapse. If 40% of your HOT tier traces to a single source — say one Master-in-Equity (MIE) foreclosure roster, or the Column legal-notice API — then the day that source goes dark (site redesign, WAF, API filter drift, a paywall, a county switching vendors), your **deal flow craters** even though nothing on any existing card changed. This is a portfolio-risk / single-point-of-failure problem, and it is invisible at the row level by construction. The MEMORY history is full of exactly these silent deaths: *"Column source silent-death — API returns 200 + 0 results when filter format drifts,"* *"GovDeals Akamai bypass,"* *"eCourts WAF."* Each was a source that quietly stopped producing. If any of those had been carrying a plurality of your HOT leads, you'd have run dry without an alarm — because a source returning **zero rows** doesn't make any *existing* row look wrong; it just stops adding new ones.
+
+The close it blocks is the *next* close: no diversified top-of-funnel, no pipeline. A HOT tier that looks healthy today but is 40% dependent on a fragile roster is a business that stops originating deals the moment that roster hiccups.
+
+### Current state in the engine
+- `source_health_tracker.py` **exists** and is the natural home — but from the MEMORY notes it appears oriented to *per-source liveness/failure classification* (did source X run, did it error, why), per the *"Failure classification: know exactly why each source failed"* work. That answers "is source X up?" It does **not** answer "what % of my HOT tier depends on source X, and am I dangerously concentrated?"
+- The Column silent-death note is the tell: the tracker (or the pipeline) already had to learn that **200 + 0-results ≠ healthy.** That's a liveness fix. Concentration is the *next* layer: even a perfectly-live source can be a systemic risk if too much of the HOT tier rides on it.
+- There is no evidence of a **concentration metric on the HOT tier by source**, nor an alert when any single source exceeds a threshold, nor a "what breaks if this source dies" impact estimate.
+
+Net: liveness monitoring: **yes.** Concentration monitoring: **no.**
+
+### What "solved" looks like (the concrete deliverable)
+1. **A concentration metric, computed on the HOT tier, grouped by source.** At board-compile time, for the HOT (and optionally WARM) tier: `share_of_hot[source] = hot_rows_from_source / total_hot_rows`. Report the top sources by share and a concentration index (e.g., the max single-source share, plus an HHI across sources for an overall "how diversified" number).
+2. **A threshold alarm.** If any single source's share of HOT crosses, say, **35%**, raise a `CONCENTRATION_RISK` flag on the board summary and in the source-health report. Tunable.
+3. **A "source-down impact" projection.** For each top source, "if this went dark today, HOT tier drops from N to M (−X%)." This converts an abstract risk into a number a human acts on.
+4. **Trend, not just snapshot.** Track share-of-HOT per source over time so a source *drifting* toward dominance (or silently *declining* — the early signature of a silent death) is visible before it's a crisis. This pairs with `source_health_tracker.py`'s existing liveness: liveness catches "went to zero," concentration-trend catches "quietly falling / quietly dominating."
+5. **A diversification prompt.** When concentration is high, the report names the gap ("HOT tier is 41% Master-in-Equity rosters; add a second independent distress source in the same counties") so the fix is actionable, not just an alert.
+
+### FREE path vs PAID path
+**FREE (entirely the right path — this is a `groupby` over data you already have):**
+- Every HOT row already carries (or, per Gap 12, will carry) a `source`. The concentration metric is a `collections.Counter` / `groupby` at compile time. The threshold flag, HHI, impact projection, and trend log are all pure Python over the existing board. $0, and it lives naturally inside `source_health_tracker.py`.
+- Trend storage = append a small per-run JSON/CSV snapshot of `share_of_hot` per source. $0.
+
+**PAID (unnecessary for this gap):**
+- Generic monitoring/alerting stacks (Grafana, Metabase, a data-observability vendor like Monte Carlo/Bigeye) *could* visualize this, but they are wildly oversized for one metric on one board and most carry real cost (Monte Carlo/Bigeye are enterprise-priced, four-to-five figures/yr). **Do not buy anything here.** If you want a dashboard, the free tier of Metabase or a static HTML panel on the existing board render is more than enough.
+
+### For LEGAL gaps
+Not a legal gap. (Indirect tie: over-reliance on a single scraped source also concentrates *compliance* risk — if that one source is later deemed off-limits/ToS-walled, both your volume and your legal posture move together. Diversification is risk mitigation on both axes.)
+
+### Effort + build estimate
+**Low.** Concentration share + HHI + threshold flag + impact projection ≈ **half a day**, because the data is already on the board and `source_health_tracker.py` is the existing home. Adding the per-run trend snapshot and a line on the board render ≈ another **half day**. Call it **1 day total.**
+
+### Recommended action
+1. Add `concentration_by_source(tier="HOT")` to `source_health_tracker.py`; compute max-single-source share + HHI at every board compile.
+2. Fire a `CONCENTRATION_RISK` flag when any source exceeds **35%** of HOT, and print the "if this source dies, HOT −X%" impact line in the source-health report.
+3. Log per-run `share_of_hot` so drift (silent decline = early silent-death signal; silent rise = growing SPOF) is visible over time, complementing the existing liveness check.
+4. When the flag trips, treat "add one independent distress source in the same counties" as a standing backlog item — this is the concrete antidote and it aligns with the ongoing new-source hunting already in the task history.
+
+---
+
+### Sources
+- [SC LLR Real Estate Commission — Advisory Opinion on Exceptions to Wholesaling (Nov 14, 2024)](https://llr.sc.gov/re/News/Wholesaling-Assignment-of-Contracts-Guidance.pdf) — SC Code §40-57-30(44), §40-57-135
+- [South Carolina REALTORS — SC Regulates Wholesaling in New RE License Law](https://screaltors.org/sc-regulates-wholesaling-in-new-re-license-law/)
+- [NC General Assembly — House Bill 797 (2025-2026) bill lookup](https://www.ncleg.gov/BillLookup/2025/H797)
+- [UNC SOG Legislative Reporting Service — H797 bill summary](https://lrs.sog.unc.edu/billsum/h-797-2025-2026)
+- [NC General Statutes Chapter 93A — Real Estate License Law](https://www.ncleg.gov/EnactedLegislation/Statutes/PDF/ByChapter/Chapter_93A.pdf)
+- [NC General Statutes Chapter 75 — Monopolies, Trusts, and Consumer Protection (G.S. 75-1.1, 75-16)](https://www.ncleg.net/EnactedLegislation/Statutes/PDF/ByChapter/Chapter_75.pdf)
+- [FCRA permissible purpose overview (15 U.S.C. §1681b)](https://legalclarity.org/fcra-permissible-purposes-for-accessing-consumer-reports/)
+- [FTC — 40 Years of Experience with the Fair Credit Reporting Act](https://www.ftc.gov/sites/default/files/documents/reports/40-years-experience-fair-credit-reporting-act-ftc-staff-report-summary-interpretations/110720fcrareport.pdf)
