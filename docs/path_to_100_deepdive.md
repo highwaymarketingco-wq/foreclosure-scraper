@@ -8670,3 +8670,410 @@ Grounded in 2025–26 industry benchmarks, applied to this board (a *targeted, m
 - **Tier 2 → 3:** your single VA is maxed (~2,500+ records/mo), you're consistently at **1–2 deals/mo**, and *your own* underwriting/closing time is now the bottleneck — you need the 2nd VA + dialer so the top of funnel keeps flowing while you close. Do not add fixed cost until the prior tier is throughput-bound, not idea-bound.
 
 **Sources:** [Ballpoint Marketing — Direct Mail ROI](https://ballpointmarketing.com/blogs/investing/direct-mail-roi-real-estate-investors), [REsimpli — Direct Mail Guide](https://resimpli.com/blog/direct-mail-marketing-for-real-estate-investors-the-ultimate-guide/), [8020REI — Skip Tracing Guide](https://8020rei.com/learn/motivated-sellers/skip-tracing-guide/), [Tracerfy — Skip Tracing for Call Centers](https://www.tracerfy.com/real-estate-skip-tracing-for-call-centers), [Deal Run — Skip Tracing Cost 2026](https://dealrun.ai/blog/skip-tracing-cost-guide), [Mojo Dialer Pricing](https://www.mojosells.com/pricing/), [Smart Outsourcing — PH VA Rates 2026](https://smartoutsourcingsolution.com/resource/virtual-assistant-eor-hourly-rates-philippines/), [KDCI — Filipino RE VA Salary](https://www.kdci.co/outsourcing-blog/post/how-much-is-a-real-estate-virtual-assistant-salary-philippines).
+
+
+---
+
+# Deep-Dive Round 23 — Metrics / Eval / Backtest Layer (2026-07-02)
+
+
+## ARV Backtest & Calibration Harness
+
+### What to measure (the exact metric + formula)
+Upgrade the single "median error / within-20%" line into a full AVM eval suite, computed over the set of leads where a trustworthy sold price exists. Per error `eᵢ = (arv_expectedᵢ − actualᵢ) / actualᵢ`:
+
+- **MdAPE** (headline accuracy) = `median(|eᵢ|)`. The current script never prints this — it reports signed median (`-3.2%`), which hides magnitude. MdAPE is the industry-standard AVM accuracy metric (Zillow/CoreLogic report it).
+- **PPE10 / PPE20** (Percentage Predictions within Error) = `share of |eᵢ| ≤ 0.10` and `≤ 0.20`. PPE10 is the primary target; the script currently only has `within20%`.
+- **Bias** = `median(eᵢ)` (signed) and `mean(eᵢ)` (signed). Median for the robust center, mean to catch a fat tail pulling the pipeline. A persistent nonzero median = systematic over/under-valuation → correctable with a multiplier.
+- **Dispersion** = `p25(eᵢ), p75(eᵢ)`, and the **90% quantile spread** `p95(|eᵢ|)` for tail risk.
+- **FSD** (Forecast Standard Deviation proxy) = `(p75(|e|) − p25(|e|))/1.35` per segment, to publish a per-lead confidence band that ties back to `arv_confidence`.
+- **Segmented** every metric by: **price-tier** (`<$75k / $75–150k / $150–300k / $300k+` on `arv_expected`), **county**, **arv_confidence** (HIGH/MEDIUM/LOW), and **property_kind** (single_family / land / condo / mobile / multi_family / townhouse).
+
+### How to compute it in THIS system
+- **Script**: rewrite `scripts/backtest_arv.py` (repo root: `/Users/cashhigh/foreclosure-scraper/scripts/backtest_arv.py`). It already reads `docs/listings.json` read-only and has `pct()`/`median()` helpers — extend, don't replace.
+- **Board (predictions)**: `docs/listings.json` — the LIVE board, 17,003 rows, **13,467 with `raw.calc.arv_expected`** (12,479 MEDIUM / 399 HIGH / 589 LOW via `raw.calc.arv_confidence`), 30 counties, NC+SC. (Note: the `~/Downloads/listings-27620824992/listings.json` snapshot is stale — `arv_confidence`/`grade` come back `None` and it has 0 recorded-sale rows. Point the harness at the repo `docs/` copy, which is what backtest_arv.py already does.)
+- **Ground truth — two pools, use both, keep separate:**
+  1. **Recorded-sale proxy** (current method): `raw.last_sale.basis=='recorded_sale'`, HPI-adjusted to today. 650 rows qualify, **270 pass** the non-floored/retail filter. This is the volume pool.
+  2. **`docs/foreclosure_sold_pool.json`** — the ACTUAL sold pool (89 records). Only **29 have `raw.actual_sold_price`** (true hammer price); the other ~30 are `opening_bid` proxies and 41 are land with almost no `living_sqft` (4). **Gate the sold-pool test to `raw.actual_sold_price` present AND `property_kind` improved** — that is the ~29-row "gold" set. Join to the active board by `parcel_id`, else `source_url`, else normalized `street_address+zip`. Report the two pools as separate tables (proxy = large-N trend, gold = small-N truth); never pool them, because a hammer price ≈ 60–75% of retail ARV by design and would fake a downward bias.
+- **The region multiplier**: there is no single "region multiplier" constant today — ARV is `$/sqft × sqft` built in `_arv_signals()` (calc.py:258) from recorded comps → scraped comps → Zestimate → FHFA → tax×1.25 → opening_bid×2.4. The correction lever is a **per-segment calibration factor** applied to `comp_median_ppsf` / `comp_median_ppsf_recorded` (or as a post-multiplier on `arv_expected`) keyed by county (and price-tier). Compute it from the backtest, store it as a small JSON (`data/arv_calibration.json`), and have `_arv_signals` multiply by `factor[county]` (default 1.0).
+
+### The target / benchmark (what "good" looks like)
+Standard AVM bands (Zillow national on-market MdAPE ~2–3%, off-market ~7%; distressed/rural is looser):
+- **Overall PPE10 > 60%, stretch 75%** (per the mandate). **MdAPE < 10%.**
+- **|median bias| < 3%** per segment after calibration (an uncalibrated segment |bias| > 10% must be corrected).
+- **HIGH confidence must earn it**: HIGH PPE10 ≥ 70% and MdAPE ≤ 8%; if HIGH underperforms MEDIUM it's mislabeled.
+- **Baseline today (from the live run I just executed)** — this is what we're improving from:
+  - Overall: signed median −3.2%, `within20% = 36%` (so PPE20 ≈ 36%, well below target; MdAPE is currently unreported but clearly > 20%).
+  - HIGH n=61 med **+22.2%** (over-valuing), MEDIUM med −6.8%, LOW med −4.7% — **HIGH is the most biased tier, the opposite of what the label promises.**
+  - County bias is severe and directional: **Spartanburg +89.2%, Rutherford +79.3%, Transylvania +35.0%** (systematic over-valuation) vs **Charleston −36.4%, Henderson −28.3%, Laurens −22.2%** (systematic under-valuation). Anderson (−2.2%) and Cleveland (−3.4%) are already well-calibrated.
+
+### What you DO with it
+1. **Fit + ship the calibration table.** For each county with n ≥ 8, set `factor = 1 / (1 + median_bias)` so the corrected median bias → 0 (Spartanburg ×0.53, Rutherford ×0.56, Charleston ×1.57, Henderson ×1.39; Anderson/Cleveland ×1.0). Write `data/arv_calibration.json`, apply in `_arv_signals()`, then **recompute the whole board** (the memory rule: any calc.py change requires a board recompute) and re-run the harness to confirm each segment |bias| < 3% and overall PPE10 rises. Print the before/after calibration table as the harness's main artifact.
+2. **Fix the HIGH-confidence label.** HIGH at +22% bias means the "3+ agreeing geo-anchored comps" gate (calc.py:342–356) is passing comps that skew high. Either tighten the gate (require the sold-pool test to agree) or down-rank those to MEDIUM until HIGH PPE10 ≥ 70%.
+3. **Trust `arv_confidence` in downstream ranking** only for tiers that pass their PPE10 target; feed the per-segment FSD into the dashboard as an explicit ARV band instead of the flat ±15%.
+4. **Prioritize data-source fixes by segment loss.** Charleston's −36% under-valuation lines up with the known Charleston situs/`$/sqft` comp gap (SCDOT split-address bug in memory) — the backtest quantifies the dollar cost of not fixing it, which decides build priority.
+5. **Gate it in CI + track over time.** Run the harness on every board rebuild; alert if overall PPE10 drops below 55% or any calibrated segment's |bias| drifts back above 10% (comp market moved → refit factors). Append each run's headline metrics to a small history file so calibration drift is visible.
+
+Files: harness `/Users/cashhigh/foreclosure-scraper/scripts/backtest_arv.py`; predictions `/Users/cashhigh/foreclosure-scraper/docs/listings.json`; gold sold pool `/Users/cashhigh/foreclosure-scraper/docs/foreclosure_sold_pool.json`; ARV logic `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/valuation/calc.py` (`_arv_signals`, line 258); new calibration store `/Users/cashhigh/foreclosure-scraper/data/arv_calibration.json`.
+
+
+## Lead-to-Deal Funnel Metrics
+
+### What to measure (the exact metric + formula)
+
+The funnel is a fixed ordered sequence of 9 stages. Each lead occupies exactly one stage (its furthest-reached point), and every stage transition is timestamped in `history[]`. Map the app's `VALID_STATUSES` onto canonical funnel stages:
+
+| # | Funnel stage | CRM `status` / `history` event | Definition |
+|---|---|---|---|
+| 0 | **Leads** | any record exists | in `listings.json`, dedupe_key present |
+| 1 | **Skip-traced** | `contactable` (owner + phone/mailing) | `skip_traced` event |
+| 2 | **Attempted** | `queued` | first touch sent (SMS/mail/email) — `touch_sent` |
+| 3 | **Contacted** | `contacted` | owner reached / two-way confirmed — `contact_confirmed` |
+| 4 | **Conversation** | (sub-state of `contacted`) | real dialogue — `conversation` event |
+| 5 | **Appointment** | `negotiating` (early) | call/visit booked — `appt_set` |
+| 6 | **Offer** | `offer_made` | written offer delivered — `offer_made` |
+| 7 | **Contract** | `under_contract` | signed PSA — `under_contract` |
+| 8 | **Close** | `won` | deal funded/closed — `won` |
+
+Terminal off-ramps (`dead`, `not_interested`) are recorded but sit outside the ladder; they are the *explicit* leak drain.
+
+Two rate families, both computed per stage *k*:
+
+- **Stage conversion rate** `CVR_k = reached(stage_k) / reached(stage_{k-1})` — the pass-through of the *immediately prior* stage.
+- **Cumulative rate** `CUM_k = reached(stage_k) / Leads` — end-to-end yield.
+- **Drop-off (leak)** `LEAK_k = 1 − CVR_k` = the fraction lost at that step. The **bottleneck stage** = `argmax_k LEAK_k` weighted by volume entering it (`entering_k × LEAK_k` = absolute leads lost).
+
+`reached(stage_k)` counts every lead whose `history[]` contains stage_k's event *or any later stage's event* (monotonic: reaching Offer implies you were Contacted). This prevents skip-ahead status jumps from under-counting upstream stages.
+
+Velocity companion metric — **stage dwell time** `dwell_k = median(t_enter(k+1) − t_enter(k))` across leads, from the `history[]` timestamps (`at` field). A stage with a normal CVR but a runaway dwell time is a *stall*, not a leak, and needs a different fix (follow-up cadence vs. targeting).
+
+### How to compute it in THIS system (data source + script/enricher)
+
+**Source of truth = `docs/crm.json`**, keyed by `dedupe_key()`, joined to `docs/listings.json` (17,003 records) on the same key for segmentation attributes (`raw.grade.overall`, `raw.intent_band`, `raw.corroboration.tier`, `source`, `county`). The funnel is fully reconstructable from `history[]` timestamps — no separate touch DB needed.
+
+**Blocking prerequisite (the instrumentation gap).** Today every CRM record is `status:"new"` with a single `{"event":"lead_created"}` entry, so stages 2–8 are literally unmeasurable. The measurement layer cannot report on transitions the app never writes. Two code changes in `src/foreclosure_scraper/outreach.py` are required first:
+
+1. **Emit a `skip_traced` event** inside `generate_outreach()` when a lead first becomes `contactable` (owner + mailing/phone), so stage 1 is timestamped rather than inferred.
+2. **A `log_touch(key, event, channel, meta)` helper** that every outreach/disposition action calls, appending `{"at", "event", "channel", "outcome"}` to `history[]` and advancing `status` through the existing `VALID_STATUSES`. `touch_sent`, `contact_confirmed`, `conversation`, `appt_set`, `offer_made`, `under_contract`, `won`, `dead` become the event vocabulary. This is the "touch log" — it lives *inside* `history[]`, not a parallel file.
+
+**The report script** — a new `scripts/funnel_report.py` (sibling to `backtest_arv.py`, same `load_board()`/`load_crm()` convention flagged in memory so it never wipes sidecars):
+
+```
+crm  = outreach.load_crm()
+board = web_artifact.load_board()          # listings, for segment join
+STAGES = ["lead_created","skip_traced","touch_sent","contact_confirmed",
+          "conversation","appt_set","offer_made","under_contract","won"]
+reached = {s:set() for s in STAGES}
+for key, rec in crm.items():
+    events = {h["event"] for h in rec.get("history",[])}
+    # monotonic backfill: reaching stage i implies all i-1
+    hi = max((STAGES.index(e) for e in events if e in STAGES), default=0)
+    for i in range(hi+1): reached[STAGES[i]].add(key)
+# CVR, CUM, LEAK, absolute-lost per stage; repeat per segment
+```
+
+Segment the same computation by `raw.grade.overall` (A/B vs C/D/F), `raw.intent_band` (hot/warm vs cool/cold), `raw.corroboration.tier` (court-confirmed vs single-source aggregator), and `source` — because a funnel that leaks at "Contacted" for D-grade cold leads but converts A-grade hot leads is telling you the *targeting* is right and the *list* is wrong. Dwell times come from differencing consecutive `history[].at` timestamps.
+
+**Reality check on stage 0→1 today:** the join already computes it — **83 / 17,003 = 0.49% skip-traced-contactable, 0 with phones**. That single number is the loudest signal in the system right now and needs no new instrumentation to report.
+
+### The target / benchmark (what "good" looks like)
+
+Benchmarks for cold-outreach real-estate acquisition (motivated-seller / foreclosure direct-to-owner; industry norms from REI dispositions data, cross-checked against generic B2C cold-outreach funnels). Rates are stage-over-stage `CVR_k` unless noted:
+
+| Transition | Poor | Target (good) | Elite | THIS system now |
+|---|---|---|---|---|
+| Leads → **Skip-traced/contactable** | <40% | **60–75%** | 85%+ | **0.5%** ⚠ |
+| Skip-traced → **Attempted** (touched) | <70% | **90–100%** | 100% | 0% (not wired) |
+| Attempted → **Contacted** (reached) | <5% | **8–15%** | 20% (multi-touch) | — |
+| Contacted → **Conversation** | <40% | **55–70%** | 80% | — |
+| Conversation → **Appointment** | <20% | **30–40%** | 50% | — |
+| Appointment → **Offer** | <50% | **65–80%** | 90% | — |
+| Offer → **Contract** | <15% | **20–30%** | 40% | — |
+| Contract → **Close** | <60% | **75–85%** | 90%+ | — |
+
+**End-to-end cumulative benchmark:** a healthy motivated-seller funnel closes **~0.5–1.5% of skip-traced leads** (≈1 deal per 100–200 contactable owners). Below 0.3% cumulative = broken; above 2% = either an unusually warm list (court-confirmed + hot intent) or a data artifact to audit. Dwell-time targets: Attempted→Contacted median **≤10 days** (multi-touch cadence), Offer→Contract **≤14 days**, Contract→Close **≤35 days** (foreclosure-clock constrained — a dwell time exceeding the `sale_date` window means the lead ages out and is an automatic leak).
+
+The glaring gap: the **Leads→Skip-traced step (0.5% vs a 60–75% target) is the system's #1 leak by two orders of magnitude**, and it's the memory-flagged phone-coverage gap (`0 phones, 83 mailing`). No downstream funnel tuning matters until this stage is fixed, because everything below it is starved.
+
+### What you DO with it (the decision it drives)
+
+The funnel report drives a single weekly decision: **where to spend the next unit of engineering/operator effort.** The rule is *fix the stage losing the most absolute leads first* (`entering_k × LEAK_k`), not the worst-percentage stage.
+
+- **If the top leak is Leads→Skip-traced (today's case):** the decision is *build data coverage, not send more mail* — prioritize the phone/skip-trace enrichers (the memory-tracked SoS-agent, ROD, qPublic contact backfills). Sending outreach to 83 contactable leads while 16,920 sit un-skip-traced is optimizing the wrong stage. This is the current, unambiguous directive.
+- **If the leak is Attempted→Contacted (<8%):** the *channel or cadence* is wrong — add SMS (currently 0 phones = SMS impossible), increase touch count, or the list is stale (cross-check dwell time vs `sale_date`).
+- **If the leak is Contacted→Offer but A/B-grade + hot-intent leads convert fine:** the *list quality* is the problem — tighten intake toward `corroboration.tier == court_confirmed` and `intent_band in (hot,warm)`, and stop skip-tracing D/F cold leads (they cost enrichment budget and don't convert).
+- **If a stage has good CVR but runaway dwell:** it's a *follow-up discipline* problem, not targeting — the fix is cadence automation, not more leads.
+- **Per-source kill/scale decision:** join funnel yield back to `source` and `raw.corroboration`. A scraper whose leads never pass Contacted is a candidate to deprioritize; a source whose leads close at 2× the median gets scaled. This closes the loop from `backtest_arv.py` (is the *valuation* right?) to the funnel (are the *leads* actually convertible?) — together they tell you whether a bad outcome was a bad price or a bad list.
+
+**The weekly funnel report** (Monday, alongside the board refresh; a `scripts/funnel_report.py` run writing an `xlsx` tab per the memory output-format rule, never standalone HTML):
+1. **Funnel bar/step chart** — 9 stages, absolute counts + CVR label on each arrow, this-week vs last-week delta.
+2. **Leak table** — ranked by *absolute leads lost* per stage, with the bottleneck row highlighted and its recommended action.
+3. **Segment cut** — the same funnel split by grade (A/B vs C/D/F), intent band, and corroboration tier, so list-quality problems separate from execution problems.
+4. **Dwell/velocity row** — median days per transition vs target, with any stage exceeding its `sale_date`-implied deadline flagged red (aged-out leads).
+5. **Cohort trend** — cumulative Leads→Close % for the trailing 4 weekly lead cohorts, so you see whether changes are actually moving the end-to-end yield.
+6. **One headline number** — the current binding constraint. Today that headline reads: *"0.5% contactable (83/17,003); 0 phone numbers — top-of-funnel data coverage is the only stage worth working this week."*
+
+
+## Per-Source Yield Tracking
+
+### What to measure (the exact metric + formula)
+
+Track a per-source yield funnel for each of the 59 sources in the board, one row per `source` string (e.g. `counties_sc.spartanburg_delinquent_tax`). Six stage metrics plus two derived ratios and one portfolio risk index:
+
+1. **Leads/source** = `count(listings where primary source = s)`. Volume of raw supply.
+2. **%HOT/source** = `count(intent_band ∈ {hot,warm} AND source=s) / leads_s`. Quality of the raw supply. (`hot` is nearly empty at n=5, so treat HOT operationally as `hot ∪ warm` = 949 rows until `hot` populates.)
+3. **Contact-rate/source** = `count(source=s AND has owner_phone OR owner_mailing) / leads_s`. Actionability — a lead you can't reach yields nothing.
+4. **Appointment-rate/source** = `count(CRM leads from s with a history event in {contacted, appointment_set}) / count(CRM leads from s)`.
+5. **Deal-rate/source** = `count(CRM leads with event=deal_closed attributed to s) / count(CRM leads from s)`, where attribution credits **every** source in the lineage set `{primary source} ∪ {e.source for e in raw.also_seen_in}` (fractional 1/k credit per source, so a deal seen in 3 rosters gives 0.33 to each — avoids triple-counting corroborated deals).
+6. **Cost-per-actionable-lead (CPAL)/source** = `monthly_scrape_cost_s / actionable_leads_s`, where `actionable = HOT-or-warm AND contactable`, and `monthly_scrape_cost_s` = proxy compute/maintenance cost (run-minutes × unit cost + any paid API/key). Since this is a free-only stack, cost is dominated by **maintenance time and run-time**, not dollars — so also compute the free-stack analog: **effort-per-actionable-lead** = `(scraper LOC-maintained + weekly-failure-count) / actionable_leads_s`.
+
+**Source-concentration risk** = Herfindahl-Hirschman Index over each source's *share of actionable/HOT leads*: `HHI = Σ sᵢ²` where `sᵢ` = source i's fraction of all HOT-or-warm leads (decimal 0–1). Also report the top-1 share directly (the "if one MIE roster = 40% of HOT" test).
+
+### How to compute it in THIS system (data source + script)
+
+- **Data sources.** Stage 1–3 from `docs/listings.json` (17,003 rows): `source`, `raw.intent_band`, `raw.grade.financial`, `raw.owner_phone`, `raw.owner_mailing`, `raw.also_seen_in`. Stage 4–5 from `docs/crm.json` (dict keyed `parcel:STATE:county:PID` or `addr:...|STATE:county`); each record carries `status` + a `history[]` event log. `deal_closed` / `contacted` / `appointment_set` are new event types the CRM will emit as outcomes get logged (today `history` only holds `lead_created`, so stages 4–6 are wired but read zero until outreach starts writing events).
+- **The join.** CRM records don't store `source`. Join CRM→listing on the lead-key: reconstruct the same `parcel:`/`addr:` key from each listing (`parcel_id`+`county`+`state`, else normalized `street_address`+`zip`) and map it to the listing's `source` + `raw.also_seen_in`. That mapping is the attribution table.
+- **New script: `scripts/source_yield.py`** (READ-ONLY, mirrors `backtest_arv.py`'s pattern — load `listings.json` + `crm.json`, write nothing, print a table). It builds the source×stage matrix, the CRM key→source map, applies fractional `also_seen_in` deal credit, and computes HHI. Feed its output into `regenerate_dashboard.py` as a "Source Yield" panel. Run it on the same cadence as the daily refresh so yield trends with each `merge_today_sources.py` run.
+- **`also_seen_in` today.** Only 709/17,003 rows are multi-source; the corroboration graph is dominated by `buncombe_elderly` (appears as a secondary tag 763×) and the HUD feeds. So `also_seen_in` deal-attribution matters most for Buncombe/HUD overlap; for the other 58 sources primary-source credit ≈ full credit until lineage densifies.
+
+### The target / benchmark (what "good" looks like)
+
+- **%HOT/source:** board-wide base rate is 949/17,003 = **5.6%**. A source is *pulling its weight* at ≥2× base (≥11% HOT). Live leaders already clear this: `national.distressed` (202 HOT / 377 = **54%**), `sc_public_index_lis_pendens` (31/233 = **13%**), `spartanburg_delinquent_tax` (276/2,162 = **13%**). A source below ~3% HOT (e.g. the 3,505-row `buncombe_elderly` roster, which is broad-demographic not distress-event) is a **volume-not-value** source — keep only if contact-rate + deal-rate later justify it.
+- **Contact-rate/source:** target ≥60% reachable. (Board-wide only 1,446 rows carry `owner_phone` today — contact enrichment is the binding constraint, so low contact-rate flags an *enrichment* gap, not necessarily a bad source.)
+- **Appointment-rate:** ≥8% of contacted; **Deal-rate:** ≥1% of leads from event-driven sources (lis-pendens, distressed, tax-delinquent), <0.2% acceptable for broad rosters.
+- **CPAL / effort-per-actionable:** rank sources; the worst quartile by effort-per-actionable is the scrape-effort you cut. A free source that breaks weekly and yields <20 actionable leads/month is net-negative.
+- **Concentration (HHI):** borrow DOJ/EU market-concentration bands — **HHI < 0.15 = healthy/diversified, 0.15–0.25 = moderately concentrated, > 0.25 = concentrated/fragile**. Equivalent single-source rule: **no source > 25% of HOT supply, no top-3 > 50%.** Today `spartanburg_delinquent_tax` = 276/949 = **29% of HOT** and `distressed` = 202/949 = **21%** — top-2 alone = 50%, so the HOT pipeline is **already at the concentration ceiling** and Spartanburg breaching means one county tax portal outage would halve HOT supply. ([HHI formula & thresholds — DOJ / EU](https://www.justice.gov/atr/herfindahl-hirschman-index))
+
+### What you DO with it (the decision it drives)
+
+This is the **scrape-investment allocator**:
+
+- **Double down** on high-%HOT, high-deal-rate, low-effort sources — protect `national.distressed` (54% HOT) and the lis-pendens/tax-delinquent event feeds against breakage first; they are the yield engine.
+- **Fix contact, not source** where %HOT is high but contact-rate is low — route enrichment budget (SoS agent, voter-phone, owner-mailing enrichers) to those sources rather than deprecating them.
+- **Demote/deprioritize** volume-not-value rosters: if `buncombe_elderly` (3,505 leads, ~427 corroborated but sub-3% HOT) shows deal-rate near zero after a quarter of CRM outcomes, drop it from the daily run and reclaim its run-time/maintenance for a new event-driven county.
+- **De-risk concentration:** because top-2 sources = 50% of HOT and Spartanburg = 29%, the allocator's standing directive is **"add HOT supply outside Spartanburg + distressed"** — this is the concrete signal that says *build the next scraper in a new county's lis-pendens/tax lane, not a redundant roster.* Re-run `source_yield.py` after each new source lands and confirm HHI is trending down, not up.
+
+Files: `/Users/cashhigh/foreclosure-scraper/docs/listings.json`, `/Users/cashhigh/foreclosure-scraper/docs/crm.json`, new `/Users/cashhigh/foreclosure-scraper/scripts/source_yield.py` (pattern from `/Users/cashhigh/foreclosure-scraper/scripts/backtest_arv.py`), wired into `/Users/cashhigh/foreclosure-scraper/scripts/regenerate_dashboard.py`.
+
+
+## Cost-per-connect / cost-per-deal unit economics
+
+### What to measure (the exact metric + formula)
+The funnel-cost cascade for outbound acquisition. Each metric is a spend total divided by the count of outcomes at one funnel stage, computed per channel (mail / skip+call / SMS) and per list (source). Define every term up front so the ladder is unambiguous:
+
+- **Skip** = one owner record run through a skip-trace provider (returns phone/mailing).
+- **Contact attempt** = one outbound touch actually sent (a mailer dropped, a dial placed, an SMS delivered).
+- **Connect** = a live two-way conversation reached (person answers the phone / replies to text). Mail has no "connect" stage; its analog is a *response* (inbound call/text from a mailer).
+- **Lead / contact** = a connect that produces a real seller conversation (not a wrong number / DNC / "stop").
+- **Appointment** = a scheduled call or property walk with a decision-making owner.
+- **Contract** = a signed purchase agreement.
+- **Deal** = a contract that closes/assigns (revenue event).
+
+Formulas (all per channel, per list):
+
+```
+Cost-per-skip (CPS)          = skip_spend / skips_run
+Connect rate                 = connects / contact_attempts
+Cost-per-contact-attempt     = channel_spend / contact_attempts        # cost of one touch
+Cost-per-connect (CPC)       = channel_spend / connects
+                             ≈ cost_per_attempt / connect_rate         # the "skip cost / connect rate" identity
+Cost-per-lead (CPL)          = channel_spend / qualified_leads
+Cost-per-appointment (CPApp) = channel_spend / appointments
+Cost-per-contract (CPCon)    = channel_spend / contracts
+Cost-per-deal (CPD / CPA)    = total_marketing_spend / closed_deals
+Marketing ROI (channel)      = (assignment_profit_from_channel − channel_spend) / channel_spend
+```
+
+Per-list P&L (the REsimpli-style ledger — one row per source):
+```
+List P&L = Σ(deal gross profit from that source)
+         − (records × CPS)          # skip cost
+         − (attempts × cost/touch)  # mail postage / dial minutes / SMS segments
+         − (any list acquisition cost)          # $0 here — sourcing is free
+Cost per acquisition by list = list_marketing_spend / list_deals
+Return on marketing spend (ROMS) = list_gross_profit / list_marketing_spend   (target ≥ 5:1)
+```
+
+### How to compute it in THIS system (data source: listings.json / crm.json / sold pool; the script/enricher)
+The board already carries the *value* side (revenue potential) but nothing on the *spend* side or the *outcome* side — those come from CRM plus two small additions. Concretely:
+
+1. **Spend inputs** — a new `docs/spend.json` config, checked in, editable by hand: per-provider unit costs and per-channel touch costs, e.g.
+   ```json
+   {"skip": {"provider":"batch","cost_per_hit":0.12},
+    "mail": {"cost_per_piece":0.62},
+    "call": {"cost_per_dial":0.018,"dialer_seat_monthly":99},
+    "sms":  {"cost_per_segment":0.0079}}
+   ```
+   This mirrors how `backtest_arv.py` hard-codes `HPI_ANCHORS` — a small, auditable constant table, not a live API.
+
+2. **Outcome + activity events** — extend `crm.json`'s existing `history[]` array (today it only holds `{"at","event":"lead_created"}`). Add event types with a `channel` and `cost` stamp so cost accrues at the record level:
+   ```json
+   {"at":"...","event":"skiptraced","channel":"skip","cost":0.12,"hits":1}
+   {"at":"...","event":"contact_attempt","channel":"call","cost":0.018}
+   {"at":"...","event":"connect","channel":"call"}
+   {"at":"...","event":"appointment_set","channel":"call"}
+   {"at":"...","event":"contract_signed"}
+   {"at":"...","event":"deal_closed","gross_profit":18500}
+   ```
+   And advance `status` through the ladder `new → skiptraced → contacted → connected → appointment → contract → closed → dead`. The status distribution (today `{"new":101}`) becomes the funnel denominator set.
+
+3. **Per-list attribution** — join each `crm.json` record back to its board listing (via the parcel/addr key → `parcel_id`/`street_address`) to read `source` and the planned `raw.also_seen_in` lineage. A lead that appears in multiple lists gets its deal profit and spend split by **first-touch source** (the list that generated the touch that connected) so no channel is double-credited; `also_seen_in` is reported separately as an overlap diagnostic, not for P&L splitting.
+
+4. **The computing script** — a new read-only `scripts/unit_economics.py` built on the `backtest_arv.py` pattern (reads JSON, writes nothing, prints a report + emits `docs/unit_economics.json` for the dashboard). It walks `crm.json`, sums `history[].cost` by channel and by source, counts status transitions to get stage denominators, joins deal `gross_profit`, and prints the CPS→CPD cascade plus a per-list P&L table. Report **medians and rates, not means** for cost-per-connect and connect-rate (same heavy-tail discipline the ARV backtest already enforces), but use **totals** for the P&L ledger. `sold pool` (`raw.foreclosure_sold_comps` / recorded-sale ground truth) is not used here — it feeds ARV accuracy, not spend; the profit figure in `deal_closed` is the actual assignment/close, not modeled ARV.
+
+Gate on volume exactly like the backtest gates counties at `n>=5`: don't publish a channel/list CPA until it has **≥3 closed deals or ≥30 connects**, otherwise the ratio is noise.
+
+### The target / benchmark (what "good" looks like)
+Benchmarks for a healthy Carolina wholesale operation (list-driven, cold outbound), stated as ranges because they swing with market and list quality:
+
+| Metric | Healthy target | Red flag |
+|---|---|---|
+| Cost-per-skip | $0.07–$0.15/hit | > $0.25 (overpaying vendor) |
+| Connect rate — cold call | 8–15% of dials | < 5% |
+| Connect rate — SMS | 10–20% reply | < 6% |
+| Mail response rate | 0.5–2% inbound | < 0.3% |
+| Cost-per-connect (call) | $8–$25 | > $40 |
+| Cost-per-lead (qualified) | $60–$150 | > $250 |
+| Cost-per-appointment | $150–$400 | > $600 |
+| Cost-per-contract | $800–$2,000 | > $3,500 |
+| **Cost-per-deal (CPA)** | **$1,500–$4,000** | **> $6,000** |
+| Gross profit / deal (wholesale assignment) | $8,000–$20,000 | < $5,000 |
+| **ROMS (profit ÷ marketing spend)** | **≥ 5:1** (mail 3–7:1, skip+call 8–15:1, SMS 10–20:1) | **< 3:1** |
+| Marketing spend as % of gross profit | 10–20% | > 30% |
+
+Rule of thumb that ties the ladder together: at a $12k average assignment, a 5:1 ROMS means you can spend up to ~$2,400 all-in to make one deal. Because sourcing here is **free** (no list-buy line item — the engine's differentiator), the entire budget goes to skip + touches, so target CPA should land at the *low* end of these ranges (~$1,500–$2,500) and ROMS at the *high* end.
+
+### What you DO with it (the decision it drives)
+This metric decides **where the next marketing dollar goes and which lists to stop working.**
+
+1. **Kill or scale by list P&L.** Any source with ROMS < 3:1 across ≥3 deals (or CPA > $6k) gets deprioritized or dropped from the outbound queue; sources with ROMS > 8:1 get more skip budget and earlier position in the daily call list. This is the direct payoff of per-source lineage — the engine already tags every lead's `source`, so the P&L falls out for free once outcomes are logged.
+2. **Rebalance channels.** Compare cost-per-connect and downstream CPA across mail vs skip+call vs SMS. If SMS connects at $6 but converts appointments at half the rate of calls, the *blended* CPA — not the CPC — decides the mix. Shift spend to the channel with the lowest **cost-per-deal**, not the lowest cost-per-touch.
+3. **Diagnose the leak by stage.** Walking the cascade tells you *where* money dies: a healthy CPC but a blown cost-per-appointment means the connects are junk (bad list targeting → tighten the grade/intent filter before skipping); a healthy cost-per-appointment but blown cost-per-contract means a sales/scripting problem, not a data problem.
+4. **Set the skip-budget cap.** CPS × records must stay under (target CPA × expected deals). Since the board grades every lead A–D, spend skip dollars **only on A/B grades first** — the unit-economics report should show CPA *by grade tier* to confirm that A/B leads actually close cheaper, closing the loop back to whether the `raw.grade` model is worth trusting.
+5. **Board-level go/no-go.** If blended CPA creeps above gross-profit-per-deal ÷ 5, the whole outbound program is unprofitable at current conversion — the signal to pause spend and fix conversion (list quality or scripts) before pouring in more volume.
+
+---
+
+Grounding files: `/Users/cashhigh/Downloads/listings-27620824992/listings.json` (board, `raw.calc.*` money math + `raw.grade.*` + `source`), `/Users/cashhigh/foreclosure-scraper/docs/crm.json` (outcome layer — `status` + `history[]`, currently only `new`/`lead_created`), `/Users/cashhigh/foreclosure-scraper/scripts/backtest_arv.py` (read-only harness pattern to mirror for `scripts/unit_economics.py`). New files this design requires: `docs/spend.json` (unit-cost table), `docs/unit_economics.json` (emitted report), extended `crm.json` history events.
+
+
+## Signal Predictive-Power Analysis (the R6 feedback loop)
+
+### What to measure (the exact metric + formula)
+For each distress signal *s* (`foreclosure_sale`, `lis_pendens`, `tax_delinquent`, `tax_lien`, `tax_sale`, `probate`/`probate_deed`, `divorce`, `absentee_owner`, `out_of_state_owner`, `code_enforcement`, `distressed_condition`, `incarceration`, `2+-category stack`), compute the **lift** of that signal on the close rate:
+
+- **Base close rate** `p0 = won / (won + dead)` over all worked leads (leads that reached a terminal CRM status).
+- **Signal-conditional close rate** `p(s) = won_with_s / (won_with_s + dead_with_s)`.
+- **Lift(s) = p(s) / p0.** Lift > 1 = the signal predicts closing; lift < 1 = anti-signal; lift ≈ 1 = noise.
+- **Support** `n(s) = won_with_s + dead_with_s` (worked leads carrying the signal) — a lift is only trustworthy above a support floor.
+- **Wilson 95% lower bound** on `p(s)` (not the naive proportion) so a 3-of-4 fluke doesn't outrank a stable 40-of-90. Rank signals by the Wilson-LB of lift, not point lift.
+- **Multivariate weights**: fit a logistic regression `logit P(won) = β0 + Σ βs·[signal_s present] + β_stack·stack_count + controls (equity_band, arv_confidence, contactable)`. The fitted `βs` become the new signal weights; `exp(βs)` is the **adjusted odds ratio** (lift controlling for co-occurring signals — e.g. it strips out the fact that `tax_lien` and `tax_delinquent` fire together 36% of the time).
+
+A **lift table** (univariate) + a **fitted-coefficient table** (multivariate) are the two deliverables. The lift table is the human-readable diagnostic; the logistic coefficients are what actually replace the constants.
+
+### How to compute it in THIS system
+Data joins across the three existing files:
+- **Outcomes** — `docs/crm.json`, keyed by dedupe identity (`parcel:NC:henderson:9559037725`, `addr:…`, `case:…`). The label is `entry["status"]`: map `{won, under_contract} → 1`, `{dead, not_interested} → 0`; drop `{new, queued, contacted, offer_made, negotiating}` as censored/open (`VALID_STATUSES` already defines this vocabulary in `src/foreclosure_scraper/outreach.py`). Use `entry["history"]` timestamps for time-to-outcome and cohort cutoffs.
+- **Signals** — `docs/listings.json` (17,003 rows), `raw.signal_stack.signals` (list) and `raw.signal_stack.count`, plus `raw.distress_stack.categories`/`stack` for the 2+-category definition. Join CRM→listing on the same dedupe key (`_parcel_key()` in `distress_score.py` already builds `parcel:ST:county:id`; reuse it so keys match exactly).
+- **Controls** — `raw.equity_band` / `raw.distress_stack.equity_band`, `raw.data_quality.arv_confidence`, `raw.distress_stack.contactable`.
+
+**New script `scripts/signal_lift.py`**, mirroring `scripts/backtest_arv.py` (same hydrate-from-listings, load-json, print-histogram, git-commit-artifact skeleton):
+1. Load `crm.json`, keep terminal-status entries, attach `y ∈ {0,1}`.
+2. Join to `listings.json` by dedupe key → assemble a design matrix (one row per worked lead, one binary column per signal in the prevalence table above + `stack_count`).
+3. Emit `docs/signal_lift.json`: per signal `{n, won, dead, p_signal, base_rate, lift, wilson_lb, wilson_lift_lb}`.
+4. Fit logistic regression (`sklearn.linear_model.LogisticRegression(penalty="l2", C=…)`, L2-regularized because support is thin and signals are collinear); emit `{signal: beta, odds_ratio}` to `docs/signal_weights.json`.
+5. A follow-on patch step (parallel to `scripts/patch_distress_score.py`) reads `signal_weights.json` and **replaces the hard-coded `_LISTING_TYPE_SIGNAL` weights and the loose signal weights** (`recorded_debt=12`, `probate=20`, `code_enforcement=14`, `absentee +8`, `bankruptcy=18`, etc. in `distress_score.py`) with data-fitted values, rescaled to the same 0–30 range, then recomputes `intent_score`/`distress_score` over the board.
+
+**Blocking reality (measured today): `crm.json` has 101 leads, ALL `status:"new"`, every history event is `lead_created` — zero `won`/`dead`.** With no labels the regression cannot run. So the script must ship in two modes:
+- **Bootstrap mode (now, n_terminal = 0):** there is no close data, so DO NOT fit — instead emit the **instrumentation report**: coverage (`% of board that is a worked lead` ≈ 0.6%), the base-rate/prevalence table above (already computable), and a **statistical-power curve** ("you need ≥ N terminal outcomes with ≥ ~10 events per signal before a lift for that signal is trustworthy"). Use a weakly-informative **Bayesian prior** (Beta(α,β) per signal seeded from the current hand-tuned weight) so early partial data updates the weight smoothly instead of the regression thrashing on n=5.
+- **Live mode (once outcomes exist):** run the full lift-table + logistic fit on every scheduled refresh.
+
+The genuine first action this analysis forces is **making outcomes recordable**: the CRM lifecycle exists but is never advanced. Wire `outreach.py`'s `save_crm()` so operator dispositions (`won`/`dead`/`not_interested`) actually get written with timestamps — that is the input the entire feedback loop consumes.
+
+### The target / benchmark (what "good" looks like)
+- **Signal usefulness:** keep a signal in the score only if Wilson-LB lift **≥ 1.3** at **support n ≥ 30** (≥ ~10 `won` events). Direct-marketing/RE-wholesaling response benchmarks put a strong distress list at a **1–3% contact-to-close rate**; anything with lift **≥ 2** is a headline predictor, **0.7–1.3** is noise (candidate to drop from the score), **< 0.7** is an anti-signal (candidate to invert/penalize).
+- **The 2+-category stack should show the highest lift of any single feature** — that is the founding hypothesis of `distress_stack` ("STACKED-2+"); if the data does NOT show stack lift > 1, the tier logic is miscalibrated and needs rebuilding, not just re-weighting.
+- **Model quality:** logistic fit **AUC ≥ 0.65** out-of-fold (5-fold CV) to justify replacing constants; **Brier score** improving vs. the hand-tuned baseline; grades monotonic (A-grade close rate > B > C > D) — a non-monotone grade curve is a red flag.
+- **Data-volume gates:** ~**200 terminal outcomes** for a credible univariate lift table across the top ~8 signals; ~**500** before trusting the multivariate logistic coefficients (rule of thumb: ≥ 10 events per predictor, ~13 candidate predictors). Below that, stay in Bayesian-shrinkage mode.
+
+### What you DO with it (the decision it drives)
+1. **Re-weight the score from data, not intuition.** Replace the hand-tuned constants in `distress_score.py` (`_LISTING_TYPE_SIGNAL`, per-signal weights, the `+8` absentee / `+4` bonuses) with the fitted odds ratios, then re-run `patch_distress_score.py`-style recompute of `intent_score`/`distress_score` across all 17,003 rows. This closes the R6 loop: the board re-ranks itself off realized closes.
+2. **Prune and re-tier.** Signals with lift ≤ 1 and tight CIs get dropped from `intent_score` (stop paying enrichment cost to collect them); high-lift signals get promoted into the HOT gate. If, say, `tax_delinquent` (39% of board — the single biggest bucket) turns out low-lift, that reshapes which enrichers are worth running.
+3. **Reallocate acquisition effort.** Rank enrichers and sources by the lift of the signals they uniquely produce (via `raw.also_seen_in` lineage once populated) — fund the sources that feed high-lift signals, sunset those that only feed noise. This ties directly into per-source close-rate ROI.
+4. **Set the calibration cadence.** Refit on each scheduled board refresh; alert when a signal's lift drifts > 1 SD from its trailing estimate (market regime change). Until terminal outcomes exist, the single driving decision is operational: **advance CRM statuses on worked leads** so the loop has any signal at all — the analysis is otherwise correct but unfed.
+
+---
+Grounding files (all absolute):
+- `/Users/cashhigh/foreclosure-scraper/docs/listings.json` — 17,003 rows; `raw.signal_stack.{count,signals}`, `raw.intent_score`, `raw.intent_band`, `raw.distress_stack.{tier,stack,categories,equity_band,contactable}`
+- `/Users/cashhigh/foreclosure-scraper/docs/crm.json` — 101 entries, keyed by `parcel:/addr:/case:` dedupe id; **all `status:"new"`, 0 terminal outcomes** (the labels gap)
+- `/Users/cashhigh/foreclosure-scraper/docs/foreclosure_sold_pool.json` — 89 rows (auction sold prices; used by `backtest_arv.py`, not a close-outcome label source)
+- `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/distress_score.py` — hand-tuned weights to replace: `_LISTING_TYPE_SIGNAL` (foreclosure_sale=30, lis_pendens=28, tax_sale=30, probate_notice=20, …), plus per-signal `recorded_debt=12`, `probate=20`, `code_enforcement=14`, `bankruptcy=18`, absentee `+8`; `_parcel_key()` for the join; `score_board()` tier logic
+- `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/outreach.py` — `VALID_STATUSES` (`new,queued,contacted,offer_made,negotiating,under_contract,won,dead,not_interested`), `load_crm()`/`save_crm()` (the write path to instrument)
+- `/Users/cashhigh/foreclosure-scraper/scripts/backtest_arv.py` — harness pattern to mirror for the new `scripts/signal_lift.py`
+- `/Users/cashhigh/foreclosure-scraper/scripts/patch_distress_score.py` — recompute-and-republish pattern for the re-weighting patch step
+
+
+## The Eval/Reporting Surface
+
+### What to measure (the exact metric + formula)
+
+A single **static Analytics tab** in `docs/index.html` (a fourth nav pill beside Foreclosures / Multifamily / Land Buyers) that computes five instruments entirely client-side, with zero backend, from `listings.json(.gz)` + `crm.json` + the read-only `backtest_arv.py` output. The five instruments and their exact formulas:
+
+1. **Lead funnel (conversion rates between stages).** Stages come from `crm.json[key].status` unioned with board presence. Ordered pipeline: `on_board → contacted → responded → appointment → offer → under_contract → closed → dead`. For each adjacent pair, `stage_conversion(i) = count(status ≥ stage_{i+1}) / count(status ≥ stage_i)`, and end-to-end `board→closed = closed / on_board`. Time-in-stage `median_days(stage) = median over leads of (next_event.at − stage_entry.at)` read from `history[]`.
+
+2. **Per-source yield table (the generalized R17).** For each source slug `s` (primary `source` + every entry in `raw.also_seen_in[].source`), a row of:
+   - `leads(s)` = count where `s` appears,
+   - `unique_originator(s)` = count where `source == s` (this source first surfaced the lead),
+   - `gradeA_B_rate(s) = count(grade.overall ∈ {A,B} & s present) / leads(s)`,
+   - `funded_rate(s) = count(calc.arv_expected ≠ null & s present) / leads(s)`,
+   - `median_roi(s) = median(calc.roi_pct where s present & not null)`,
+   - `contact_rate(s) = count(crm.status ≥ contacted & s present) / leads(s)`,
+   - `close_rate(s) = count(crm.status = closed & s present) / leads(s)`,
+   - `corroboration_lift(s) = median_roi(leads where s ∈ also_seen_in AND source ≠ s) − median_roi(leads where source == s)` (does this source ADD value as a confirmer vs. as an originator),
+   - `yield_score(s) = close_rate(s) × median_profit(s)` = the dollar-weighted verdict per source.
+
+3. **ARV-calibration scorecard.** Straight from `backtest_arv.py`: `median_abs_pct_error = median(|arv_expected − adjusted_resale| / adjusted_resale)`; `bias = median((arv_expected − adjusted_resale) / adjusted_resale)` (signed — detects the double-charged-fee class of bug); `n_eligible` (backtest sample size); and a **calibration-by-confidence** breakout: median error partitioned by `data_quality.arv_confidence ∈ {HIGH, MEDIUM, LOW}` and by `calc.confidence`, so we can prove the confidence label is honest (HIGH must have tighter error than LOW).
+
+4. **Cost/health dashboard.** From `run_health.json` / `run_meta.json`: per-source `status` (ok / blocked / zero-results), `rows_returned`, `duration_s`, `last_success_at`. Cost per lead is compute-only here (all sources free), so the operative cost metric is **analyst-minutes and API-quota per net-new lead**: `cost_per_lead(s) = source_runtime_s(s) / net_new_leads(s)` and a **staleness heat strip** (`days_since_last_success` per source). This is the "is any source silently dead?" panel (grounds the Column-source-silent-death and SearchAtlas-quota-exhaustion failure modes already in the memory).
+
+5. **The R17 ROI-by-list rollup**, promoted into a headline table at the top of the Analytics tab: sources ranked by `yield_score` descending, with a **cumulative-coverage curve** (what % of closed deals came from the top-N sources) so the operator sees the Pareto (LSA-style ~5.5x concentration is the pattern to expect).
+
+### How to compute it in THIS system (data source / script / enricher)
+
+- **All client-side, in `dashboard.js`.** Add a `computeAnalytics(listings, crm)` function that runs once after the existing `fetchJsonMaybeGz("listings.json")` resolves, plus a new `fetch("crm.json?t=…")` (crm.json already ships in `docs/`, same directory as `listings.json.gz`, so it is already web-servable — no backend, no new endpoint). It reduces the in-memory arrays into the five instrument objects above and renders them into a new `#tab-analytics` panel gated behind a fourth `ds-btn`. No new build step: the existing GitHub-Pages-style static host already serves `docs/`.
+
+- **Source lineage** is read from `raw.also_seen_in` (written by `Listing.merge` in `models.py`) and `raw.corroboration.sources` (written by `enrichment_corroboration.py`) — both already populated every run, so the per-source table needs no new enricher.
+
+- **Grade / funded / ROI** read directly from `raw.grade.overall`, `raw.calc.arv_expected`, `raw.calc.roi_pct`, `raw.calc.estimated_profit`, `raw.data_quality.arv_confidence` — all present today (2,016 of 4,054 leads are ARV-funded, grade distribution D:2494 / C:1141 / B:291 / F:128, which becomes the first honest baseline the scorecard displays).
+
+- **Funnel + outcomes** read from `crm.json` `status` + `history[].event/at`. The one required upstream change: the CRM writer must stamp the outcome-stage events (`contacted`, `responded`, `appointment`, `offer`, `under_contract`, `closed`, `dead`) into `history[]` when the operator advances a lead — today it only records `lead_created`, `confirmed`, `scheduled`, `upset_bid`. Extending the status vocabulary is a one-line enum change; the dashboard reads whatever is there.
+
+- **ARV calibration** does NOT recompute in the browser — it is the **pre-computed output of `scripts/backtest_arv.py`**, which the run pipeline should dump to a new `docs/arv_backtest.json` (the script currently only prints; add a `--json docs/arv_backtest.json` sink so the number is versioned per run and the tab just fetches it). This keeps the heavy HPI-index join server-side and the browser cheap.
+
+- **A tiny `scripts/build_analytics.py`** (optional, runs in the existing daily pipeline) can pre-fold the per-source rollup into `docs/analytics.json` so a 4k–17k-row reduce never blocks first paint; the browser prefers `analytics.json` if present and falls back to computing live. Same pattern as the existing `listings_detail.json` split-for-speed already in `dashboard.js`.
+
+### The target / benchmark (what "good" looks like)
+
+- **Funnel:** board→contacted ≥ 60% (we control outreach), contacted→responded ≥ 15% (cold direct-mail/skip-trace norm is 1–3% response; phone-matched motivated-seller lists run 8–15%), responded→appointment ≥ 30%, appointment→offer ≥ 50%, offer→contract ≥ 20%. End-to-end **board→closed target ≥ 0.5–1%** of contacted leads (standard motivated-seller cold-list close rate; anything under 0.3% means the list is junk or the ARV/grade is mis-ranking).
+- **Per-source yield:** a source is **KEEP** if `funded_rate ≥ 40%` AND (`gradeA_B_rate ≥ 15%` OR `close_rate` in the top tercile); **WATCH** if funded but low-grade; **CUT** if `net_new_leads < 20/run` AND `close_rate = 0` after ≥ 90 days of exposure. Corroboration sources with positive `corroboration_lift` are kept even at low originator volume.
+- **ARV calibration:** `median_abs_pct_error ≤ 12%` overall (real estate AVM industry benchmark: Zillow Zestimate on-market MdAPE ≈ 2–3%, off-market ≈ 7%; a free-data distressed AVM at ≤ 12% is defensible), `|bias| ≤ 3%` (unbiased-at-median — matches the calibration finding already logged), and **monotonic error by confidence** (HIGH < MEDIUM < LOW). If HIGH-confidence error ever exceeds MEDIUM, the confidence label is lying and must be recalibrated.
+- **Cost/health:** every source `days_since_last_success ≤ 8` (weekly cadence + slack); any source at 0 rows for 2 consecutive runs flips red. `cost_per_lead` has no dollar target (free stack) but ranks sources by runtime-per-net-new-lead so a scraper burning 600s for 3 leads gets flagged for the budget-bail already in the pipeline.
+- **Coverage curve:** if the top-3 sources produce > 80% of closed deals, that is the signal to concentrate enrichment/outreach budget there and demote the long tail to background.
+
+### What you DO with it (the decision it drives)
+
+- **Weekly review ritual (Monday, ~15 min, same slot as the existing Reddit digests).** Look at, in order: (1) the **cost/health heat strip** — any red source gets a same-day scraper fix (this is the early-warning that catches silent-death before a month of missing leads); (2) the **funnel** — the lowest-converting adjacent stage is the week's operational focus (e.g., if contacted→responded is the floor, the outreach copy/channel changes, not the list); (3) **new-lead volume by source** vs. last week, to spot a source that quietly dropped from 200→0.
+- **Monthly review ritual (first Monday).** Look at: (1) the **per-source yield table + coverage curve** — CUT/KEEP/WATCH decisions on every source per the benchmarks above; a CUT means the scraper moves to a `disabled_sources` list (frees runtime, shortens the full run that already hangs at 8.5h); a KEEP with high yield gets its enrichers prioritized in the budget-bail order; (2) the **ARV-calibration scorecard trend** — if median error creeps past 12% or bias past 3%, that triggers a `calc.py` recalibration and a board recompute (exactly the loop already run for the 0.70→0.75 selling-fee fix), re-validated by re-running `backtest_arv.py`; (3) **confidence honesty** — if the by-confidence breakout goes non-monotonic, retune the `data_quality.arv_confidence` thresholds.
+- **Net effect:** the yield table tells you *which lists to keep buying/scraping*, the funnel tells you *where the outreach process leaks*, the calibration scorecard tells you *whether to trust the ARV/grade that ranks the whole board*, and the health strip tells you *whether the engine is even still running* — closing the loop from raw scrape to closed deal without a server.
+
+### What gets exported for the operator vs auto-computed
+
+- **Auto-computed (in-browser, every page load):** the funnel, per-source yield table, coverage curve, and the health strip — cheap reductions over data already in `listings.json` + `crm.json`, always live, never stale.
+- **Pre-computed server-side (per run, versioned):** the ARV-calibration scorecard (`docs/arv_backtest.json` from `backtest_arv.py --json`) and, optionally, the folded `docs/analytics.json` rollup — because the HPI-index join and a 17k-row reduce should not block first paint.
+- **Exported for the operator (one click from the Analytics tab):** a `analytics_export.csv` of the per-source yield table (Source, Leads, Funded%, GradeA/B%, Contact%, Close%, MedianROI, MedianProfit, YieldScore, DaysSinceSuccess) — this IS the R17 ROI-by-list table as a takeaway artifact for the weekly/monthly review, matching the existing `outreach_maillist.csv` / `porsche.csv` export pattern already in `docs/`.
+
+Relevant files (all absolute):
+- `/Users/cashhigh/foreclosure-scraper/docs/index.html`, `/Users/cashhigh/foreclosure-scraper/docs/dashboard.js`, `/Users/cashhigh/foreclosure-scraper/docs/style.css` — the static dashboard to add the `#tab-analytics` pill + `computeAnalytics()` to.
+- `/Users/cashhigh/foreclosure-scraper/docs/listings.json.gz`, `/Users/cashhigh/foreclosure-scraper/docs/crm.json`, `/Users/cashhigh/foreclosure-scraper/docs/run_health.json`, `/Users/cashhigh/foreclosure-scraper/docs/run_meta.json` — the client-side data sources (all already web-served from `docs/`).
+- `/Users/cashhigh/foreclosure-scraper/scripts/backtest_arv.py` — add a `--json docs/arv_backtest.json` sink for the calibration scorecard.
+- `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/enrichment_corroboration.py` and `models.py` — where `raw.corroboration.sources` / `raw.also_seen_in` (the per-source lineage the yield table reads) are written.
