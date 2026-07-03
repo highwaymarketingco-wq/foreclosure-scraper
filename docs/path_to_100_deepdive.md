@@ -4419,3 +4419,456 @@ REsimpli is the "all-in-one operating system" for real-estate wholesalers/invest
 ### Verdict: the single highest-value copy
 
 **The marketing ROI-by-list/channel table with derived cost-per-lead and cost-per-deal.** It's REsimpli's genuine differentiator and the highest-leverage screen for an operator (it decides where the next marketing dollar goes), yet 90% of it is free to rebuild in a static dashboard: you already carry a `source` per listing, so the only missing input is spend-per-source — take that as a small manual/CSV-entered number and compute CPL, CPD, and ROI entirely client-side. You copy the decision-making value of their "accounting layer" while skipping the one paid dependency (Plaid) that isn't actually where the value lives.
+
+
+---
+
+# Deep-Dive Round 13 — Per-Distress-Source Conversion Playbook (2026-07-02)
+
+
+## Probate / Inherited Property
+
+### Owner psychology & situation (what they're actually feeling/needing)
+The person you reach almost never says "I own a house." They say "I'm dealing with my mom's house." That distinction is the whole game. Emotionally they sit somewhere on a spectrum from raw grief to quiet relief to open resentment (the sibling who got stuck as executor and is doing all the work). What they share is **overwhelm plus friction**: the house is 200 miles away, it's full of 40 years of belongings, there's a sibling who "wants to keep it" but won't pay the taxes, the HVAC just died, and probate has to close before anyone can touch the money. They are not motivated by price the way a foreclosure owner is motivated by a deadline. They are motivated by **removal of hassle** and **fairness among heirs**.
+
+Key sub-situations that change everything:
+- **Executor / Personal Representative (PR)** is the only person with legal authority to sell before the estate closes. Talk to the wrong heir and you waste a month. In NC and SC the PR is named in the letters testamentary / letters of administration.
+- **Multiple heirs** = you are negotiating a group decision, often across states, often with old family tension. The "as-is, everyone gets a clean equal check, no one has to manage anything" frame is your leverage.
+- **Out-of-state heirs** are your single best segment. They cannot easily maintain, clean out, or show the property, they're paying to carry it, and a local buyer who "handles everything" is a genuine gift, not an intrusion.
+- **Vacant + full of stuff** is the universal pain. "You keep what matters, we handle the rest, nothing goes to the dump that you'd want" is the most repeated winning line among probate-specialist wholesalers (per BiggerPockets probate threads and the Sharon Vornholt / "Louisville Gals" probate REI material).
+
+### Best channel + TIMING (mail/call/text/door; how soon after the trigger; how many touches)
+**Channel priority: Mail first, then phone, then a soft second letter. Door-knocking is for the local vacant house only, and even then gently. Cold texting is the weakest and riskiest channel here (consent + tone).**
+
+**Timing — the real debate, resolved:** The seasoned probate-mail operators (this is the consistent view across BiggerPockets probate investing threads, the All The Leads / Chad Corbett training, and Sharon Vornholt's probate content) land on **do NOT hit them in the first ~30 days**, and do NOT wait until the estate is long closed either. The sweet spot is roughly **30–120 days after the filing/appointment of the PR**. Why:
+- Before ~30 days the family is in funeral-and-shock mode; a "buy your house" letter reads as vulture behavior and burns the lead.
+- By 30–90 days the practical pain has arrived: the carrying costs, the cleanout, the sibling coordination, the "why is this dragging on."
+- Probate itself takes months (NC and SC both run several months to over a year), so you are almost always contacting a live, still-open estate. You are early to the *pain*, not early to the *grief*.
+
+**Cadence:** This is a **long, low-frequency, high-respect** sequence, not a 9-touch blitz.
+- Touch 1: Letter at ~day 45–60 (handwritten-style, not a postcard, not "CASH FOR HOUSES").
+- Touch 2: Follow-up letter at ~day 90 if no response.
+- Touch 3: A single, calm phone call *if* you have a good number and only if you can be genuinely soft. Many probate closers actually prefer to let the mail pull the inbound call, because a warm inbound probate lead converts far better than a cold outbound one.
+- Optional Touch 4: A final "I'm still here whenever you're ready, no pressure" letter around day 150. Then stop and recycle to a light quarterly list.
+
+Postcards underperform letters badly here. This is a letter game.
+
+### The actual pitch / message (a real script skeleton)
+
+**Letter (the workhorse). Plain, personal, no urgency language.**
+
+> Dear [First Name],
+>
+> I'm sorry for the loss of [Mr./Mrs. Last Name — or "your loved one" if unsure]. I know this is a hard time and the last thing you probably want is one more thing to deal with.
+>
+> My name is [Name], and I'm a local buyer here in [Greenville / Asheville / county]. I help families who've inherited a house decide what to do with it — whether that's selling it as-is with nothing to fix or clean out, on a timeline that works for the estate.
+>
+> If keeping the house is right for your family, that's genuinely the best outcome and I hope you do. But if it's become a burden — taxes, upkeep, a house full of belongings, siblings in different states trying to coordinate — I can buy it in its current condition, handle the cleanout, and close whenever the estate is ready.
+>
+> There's no cost, no obligation, and no pressure. If it would help just to talk through your options, my direct number is [number].
+>
+> With sympathy,
+> [Name]
+
+**Phone opening (inbound or a soft outbound). Lead with empathy, not the offer.**
+
+> "Hi [Name], thanks for calling — first, I'm really sorry about your [mother/father]. Before anything about the house, how are you and the family holding up with everything?"
+> [Listen. Actually listen. Do not pivot to the house until they do.]
+> "It sounds like a lot to carry. Can I ask — where are things with the estate right now? Are you the personal representative, or is someone else handling that side?"
+> [This surfaces authority + timeline.]
+> **Value frame:** "Here's the only thing I do that's different: you don't fix anything, you don't clean anything out, you don't list it or do showings, and you don't pay a commission. Whatever's in the house, you take what matters to the family and I handle the rest. We close when the estate lets us, not on my clock."
+> **The ask (soft):** "Would it be helpful if I took a look and gave you a fair as-is number, just so you and your siblings have a real option on the table? No commitment either way."
+
+The winning value frame in one sentence, used by essentially every probate specialist: **"As-is, no cleanout, no commission, close on the estate's timeline, and a clean equal check for every heir."**
+
+### Top objections + responses
+
+- **"It's too soon, we just lost her."** → "I completely understand, and I'm sorry — I didn't mean to rush you. There's no timeline on my end at all. Would it be alright if I left you my number and you reach out whenever the family is ready, even if that's months from now?" (Then honor it. This restraint is what converts them later.)
+- **"We're keeping it / a sibling wants it."** → "That's great, honestly — a family home is worth keeping if you can. If the numbers ever stop working, or if not everyone's on the same page down the road, I'm here. No hard feelings." (Leave the door open; ~a third of "we're keeping it" probate houses come back to market.)
+- **"I can't sell yet, probate isn't done."** → "That's normal — most of the houses I buy are still in probate. I work on the estate's schedule, and I can even wait for the letters/authority to be finalized before we close. We can agree on price now and let the legal side catch up."
+- **"How do I know your offer is fair?"** → "Fair question. I'll walk you through exactly how I got the number — recent nearby sales and what it'd cost to bring it up to retail condition. And you're free to get a second opinion or a realtor's number to compare. I'd rather you feel good about it than feel pushed."
+- **"We're just going to list it with an agent."** → "That can absolutely be the right move if the house is in good shape and the family has time to handle showings and a cleanout. Where I tend to help is when the house needs work, it's full, or the heirs are spread out and just want it done. If that's not you, an agent's a great choice." (Never trash agents to a grieving family — it reads badly.)
+
+### Sensitivity / ethics / legal notes
+
+- **Grief comes first, always.** Do not use urgency, scarcity, or "distressed"/"desperate" language. Never imply the deceased. Never say "cash for houses" or "we buy ugly houses" to a probate lead — the tone alone loses respectable sellers.
+- **Contact the right person.** Only the PR/executor can sell before the estate closes. Pushing an heir with no authority to "sign something" can create a mess and is a reputational risk.
+- **Skip the raw-grief window.** The 30-day floor is an ethics line as much as a conversion tactic.
+- **SC solicitation limits:** South Carolina has a **Prohibited Deceptive Trade Practices in Real Estate / wholesaling disclosure environment** — if you're wholesaling (assigning the contract rather than closing), disclose that you intend to assign and that you are acting as a **wholesaler, not a licensed broker**. SC actively scrutinizes unlicensed brokering; marketing the *contract* rather than being the actual end buyer can cross into brokerage without a license. Keep intent-to-buy genuine or intent-to-assign disclosed. Do not represent yourself as a real estate agent.
+- **NC solicitation limits:** North Carolina similarly draws a hard line between buying for yourself and **brokering without a license** (NCREC enforces this). Wholesale assignments are legal but must be a genuine equitable-interest assignment with clear written disclosure; do not advertise a property you don't have under contract. NC also has a **funeral/death-record solicitation sensibility** — avoid anything that looks like you scraped an obituary to solicit (even though that's effectively the data source, the *presentation* must be respectful and never reference the death record).
+- **Do-Not-Call & texting:** Scrub outbound call numbers against the **federal DNC registry**; probate leads are frequently DNC-listed. Cold **texting without prior consent violates the TCPA** and is the fastest way to a complaint on a vulnerable-owner list — prefer mail-driven inbound over cold text entirely for this segment.
+- **Vulnerable owners:** Elderly surviving spouses and confused/newly-bereaved heirs warrant extra care. If someone seems unable to understand the transaction, slow down, encourage them to involve family or an attorney, and be willing to walk away. A deal that looks predatory is both an ethics failure and a lawsuit.
+- **No probate-record fabrication:** Reference "records show the property may be part of an estate," never a specific person's death certificate or case file details, in written outreach.
+
+### Realistic conversion expectation (response %, and the honest funnel to a contract)
+
+Probate is a **low-response, high-quality, long-cycle** channel. Honest numbers from operators who actually run it:
+
+- **Mail response rate: ~1–3%** on a clean, well-timed probate list (higher than blind absentee-owner mail because motivation is real, but still single digits). Handwritten-style letters at the right timing pull toward the top of that range.
+- **Of responders, ~30–50% are genuine conversations** (the rest are "remove me," "already sold," "just keeping it").
+- **Contact-to-appointment/offer: ~20–40%** of real conversations reach a real number-on-the-table.
+- **Offer-to-contract: ~10–20%**, dragged out because you're often waiting on the estate, sibling consensus, or letters of administration.
+- **Net: expect roughly 1 signed contract per ~700–1,500 pieces of well-targeted probate mail**, spread over a **60–180 day** cycle per deal. It is slow. The payoff is that probate deals tend to have **more equity and less competition** than most channels, and a respectful reputation compounds — probate attorneys, estate sale companies, and past sellers start *referring* you, which is where the real volume eventually comes from.
+
+The honest funnel, end to end: **1,000 letters → ~20 responses → ~8 real conversations → ~2–3 offers presented → ~1 contract**, with the contract closing 1–4 months later once the estate clears. Treat the first deal as the cost of building the referral engine, not as the whole return.
+
+
+## Divorce
+
+### Owner psychology & situation (what they're actually feeling/needing)
+A divorcing seller is not one motivated seller — they are **two people who no longer trust each other, jointly deciding to sell the one asset that ties them together.** The house is emotionally loaded (kids' bedrooms, the life they built) and financially loaded (usually the largest thing being split). What each side actually wants underneath the conflict is the same: **to be done.** To stop paying two housing costs, stop the fighting, stop having the ex's name on their mortgage, and get their share of the equity so they can start over.
+
+Key psychological facts that drive every tactic below:
+- **They're exhausted and decision-fatigued.** By the time the house comes up, they've been through months of lawyers, custody, and finances. A simple, low-conflict path is worth real money to them.
+- **They're hyper-alert to being taken advantage of.** Each spouse is watching to make sure the other isn't getting a better deal. Any hint that you favor one side, or that you're circling their misfortune, kills the deal instantly.
+- **They often can't afford to wait for retail.** Two households on one-and-a-half incomes, a mortgage neither can refinance alone, and a court that wants the asset liquidated. Speed and certainty can outweigh top dollar — which is exactly the wholesale value proposition.
+- **Most divorces do NOT end in a sale.** Per PropertyRadar's data, only **~25–35% of divorces result in a property sale**; the rest refinance one spouse out or award the house in the settlement. You are hunting a minority outcome, so qualification matters more than volume.
+
+### Best channel + TIMING (mail/call/text/door; how soon after the trigger; how many touches)
+**Timing is the entire game, and the public-record trigger is a trap.** Divorce filings are recorded first; the recorder document (the thing most lists sell) often surfaces *months to over a year* after the actual filing — PropertyRadar cites a competitor record dated Nov-2025 for a case filed Aug-2024, "over a year earlier… the deal window had long closed." By the time a name hits a bought "divorce list," the attorneys, CPAs, and the couple's own network have already been engaged.
+
+Practical timing rules:
+- **Sweet spot is roughly 60–120 days after the FILING date, not the decree.** Early enough that the property decision is still open; late enough that the "we'll try to keep the house" fantasy has met the refinance math. If your only date is a recorder/decree date, treat the lead as likely stale and lead with a soft, non-divorce touch to test whether the house is still in play.
+- **Channel = mail first, phone second, NEVER lead with a text or a door-knock.** Divorce is the most sensitive of all the trigger lists — a text or a knock reads as "someone is watching my worst moment." Mail gives them privacy and control over when to respond.
+- **Address BOTH parties, separately.** Send two identical letters, one to each spouse (they frequently live at different addresses by now). Mailing only the occupant hands the decision to one side and makes the other feel excluded, which they will use as a reason to say no.
+- **Cadence: 5–7 touches over ~120 days, every 21–30 days.** Consistent with the well-worn REI stat that most deals close on the 5th–12th contact. Mail → mail → (soft call if you have a good number and it's not on DNC) → mail → call. Slower and gentler than a foreclosure sequence.
+- **Phone is a callback-only or warm-only channel here.** Because of TCPA/DNC exposure (below), treat outbound dialing to divorce lists as high-risk. The safest phone contact is one that a mail piece *invited* — a call to your number that they initiated.
+
+### The actual pitch / message (a real script skeleton)
+The governing rule from every credible source (Icenhower, ALL THE LEADS): **do not mention the divorce and position yourself as the neutral, structured, fast option that lets both people move on.**
+
+**Direct-mail letter (send one to each spouse):**
+> "Hi [First Name] — my name is [Name] with [Company], and I buy homes here in [County]. I'm reaching out about [property address]. If you and any co-owner are thinking about selling, I can make a straightforward cash offer, close on the date that works for you, and handle the paperwork so it's simple for everyone involved. No repairs, no showings, no agent commissions. If the timing isn't right, no problem at all — just toss this. If it might help, call or text me directly at [number]."
+
+Note what it does: names the property (credible, not a mass blast), says **"any co-owner"** (acknowledges two owners without ever saying "divorce"), and sells **simplicity + certainty + a date you choose** — the three things a splitting couple actually needs.
+
+**Inbound call skeleton (once THEY reach out):**
+- **Opening / disarm:** "Thanks for calling — I know selling a house is a lot, so I'll keep this easy. Are you the only owner, or is there someone else on title I should loop in too?" *(Surfaces the two-decision-maker reality immediately and signals you'll treat both fairly.)*
+- **Neutral frame:** "Just so you know how I work — if there are two owners, I keep both of you equally in the loop and I stay completely neutral on anything between you. My only job is a clean sale and a fair number you both agree on."
+- **Value frame:** "The reason people in your spot call me is certainty. I give you one number, one closing date, no financing that can fall through, and I split the proceeds to whatever the two of you or the court direct — so nobody has to trust the other side to 'handle it.'"
+- **The ask (soft, structured):** "If I look at the property and send you both the same written offer plus a simple net sheet showing exactly what each side walks away with, would that be useful — even if you decide to list instead?"
+
+The **net sheet is the closing tool** (ALL THE LEADS): a one-page "here's what each of you nets" defuses the "is my ex getting a better deal?" fear better than any pitch, because it makes the split transparent and equal on paper.
+
+### Top objections + responses
+- **"We're going to try to keep the house."** → "Totally fair, and I hope that works out. A lot of people find the refinance doesn't pencil on one income — if that happens, keep my number. I can give you both a firm cash number in writing today so you have a real fallback, not just a maybe."
+- **"We need to run everything through our attorneys."** → "Good — you should. I *want* your attorneys involved; it protects everyone. I'll send the offer and net sheet to both of you and your attorneys at the same time so there are no side conversations." *(Attorney involvement is your friend here, not an obstacle — it signals neutrality and legitimacy.)*
+- **"My ex and I can't agree on anything."** → "That's exactly why a fixed cash offer helps — there's nothing to negotiate between you two. One price, split the way you or the court decide. It takes the argument off the table."
+- **"How did you get my name?"** → "Property records — I look for owners in [area] who might be open to selling. If it's not you, I'll take you right off my list, no problem." *(Never say 'I saw you filed for divorce.')*
+- **"We can get more with an agent."** → "You very well might, and I'll tell you honestly if listing is your better move. What I offer instead is speed and certainty — a set date, no repairs, no showings with two schedules to coordinate, and no deal falling apart on financing. Some people in a split value 'done' over 'maximum.' If you don't, list it — no hard feelings."
+
+### Sensitivity/ethics/legal notes (what NOT to say; SC/NC solicitation limits; grief/vulnerable-owner care)
+- **Never reference the divorce, the filing, the ex, or "your situation."** PropertyRadar is explicit: avoid "I noticed you're getting divorced." It's invasive, it can feel threatening, and it poisons trust. Market to the *property owner*, not to the *divorce.*
+- **Never take sides or carry messages between spouses.** The instant one side thinks you're the other's guy, you lose both. Stay the neutral third party in every word and every document; send everything to both parties simultaneously.
+- **Vulnerable-owner care:** these people are grieving a marriage and under financial stress — a textbook vulnerable state. Keep pressure low, honor "not interested" on the first ask, and be genuinely willing to tell someone that listing is their better option. Predatory-feeling tactics not only fail here, they generate complaints.
+- **NC is now a hard legal wall — this is the big one.** Effective **October 1, 2025, North Carolina requires a real estate license to wholesale residential property**, and the law defines "wholesaling" to include *soliciting homeowners* and marketing/assigning contracts. It also gives NC homeowners a **30-day right to cancel** and a right to a full copy of the contract at signing. For your Western NC counties, an unlicensed assignment-style approach is now a licensing-law problem — route NC divorce deals through a licensed person or an actual purchase (buy-and-hold/flip), not a naked contract flip.
+- **SC:** wholesaling remains legal but you must not cross into unlicensed brokerage (marketing *the property* vs. marketing *your equitable interest in a contract you actually intend to close*).
+- **TCPA / DNC on both sides of the border:** scrub every number against the **National Do-Not-Call Registry** before any call; **no autodialers, no ringless voicemail, no bulk/mass texting without prior express written consent** — penalties run roughly **$500–$1,500 per call/text.** Divorce lists are exactly where a careless SMS blast becomes a complaint. Keep phone contact to DNC-scrubbed manual dials or, better, inbound calls your mail invited.
+- **Data hygiene:** because divorce records are sparse and stale (PropertyRadar: "fewer than 5% of divorces ever get recorded"), verify the person still owns the property and it hasn't already sold/refinanced before you spend a touch — mailing a resolved case is both wasteful and, if the wording is off, offensive.
+
+### Realistic conversion expectation (response %, and the honest funnel to a contract)
+Set expectations low and precise — divorce is a **high-value, low-yield, long-timeline** lane, not a volume channel:
+- **Mail response rate: ~0.5–1.5%** of pieces mailed, in line with cold direct-mail to trigger lists. Expect the good responses to cluster after touch 4–5.
+- **Of divorces on your list, only ~25–35% ever produce a sale at all** (PropertyRadar), and only a *fraction* of those are off-market — because attorneys, agents, CPAs, and personal networks are already competing for the listable ones by the time public records surface.
+- **Honest funnel, per ~1,000 verified/fresh divorce-owner mail targets (two pieces each):** roughly **8–15 inbound responses → 4–8 real two-party conversations → 2–4 that are genuinely in the "sell now" 25–35% and where you clear the second decision-maker → ~1 contract.** So plan on **roughly a 0.1% mail-to-contract rate**, meaningfully worse than pre-foreclosure, offset by larger equity spreads and less competition *when you catch timing right.*
+- **The single biggest yield lever is not the script — it's data freshness and the two-party close.** Prioritize leads where the filing is 2–4 months old and you can reach *both* owners; deprioritize decree-dated/recorder-dated leads (likely already sold or settled). And build the **attorney-referral flywheel in parallel** — a handful of local family-law attorneys who trust you as the neutral, fast option will out-produce any cold list, because they hand you the deal *at the exact moment* the couple decides to sell, before it ever becomes a public record.
+
+Sources: [PropertyRadar — Chasing Divorce Public Records](https://www.propertyradar.com/blog/chasing-divorce-public-records-real-estate-deals), [ALL THE LEADS — Divorce Lead Playbook (ATL 540)](https://www.alltheleads.com/divorce-lead-strategy-540/), [Icenhower — Real Estate Scripts for Divorce](https://therealestatetrainer.com/real-estate-scripts-for-divorce-converting-marketing-to-divorced-couples/), [NC REALTORS — Working with Divorcing Couples](https://www.ncrealtors.org/working-with-divorcing-couples/), [Real Estate Skills — Wholesaling Legal in NC (Oct 2025 license law)](https://www.realestateskills.com/blog/wholesaling-real-estate-legal-north-carolina), [REDX — Agent's Guide to DNC/TCPA](https://www.redx.com/blog/agents-dnc-list-tcpa-guide/)
+
+
+## Pre-Foreclosure / Foreclosure
+
+This is the most legally loaded lead type in the whole engine. In North Carolina, taking an advance fee to "help" a defaulting owner negotiate with their lender is a Class 2 misdemeanor under the debt-adjusting statute (G.S. 14-423/424), and the classic "rescue" pattern — advance-fee consultant, or a sale-leaseback where you take title and promise they can buy it back — is exactly what state AGs and the NCLC model statute exist to prosecute. You are not a rescuer, a negotiator, or a consultant. You are a cash buyer offering to purchase the house outright. Keep that line bright and everything downstream gets easier.
+
+Split the list by equity before you write a single letter — the two groups need opposite pitches:
+- **High-equity** (owe well under market): sell-and-walk-with-cash, or a subject-to where you take over payments. The house is an asset they can still cash out.
+- **Underwater / thin-equity** (owe at or above market): there's no cash to hand them. The product is a graceful exit — short-sale coordination or a clean deed that stops the bleeding and protects their credit. Do not dangle cash you can't deliver.
+
+### Owner psychology & situation (what they're actually feeling/needing)
+The dominant emotions are shame, fear, and avoidance — in that order. By the time a lis pendens hits the record, the owner has usually spent months not opening mail, dodging their servicer's robo-dialer, and telling no one. They feel judged and cornered. Critically, **most default owners believe they have no options and no time** — they think the sheriff is coming next week. Both are usually false (SC runs ~6 months from lis pendens to sale; NC power-of-sale is similar), and correcting that misbelief is the single most powerful thing you can do. The high-equity owner's tragedy is that they'll often let the house go to auction and lose $60K of trapped equity purely out of paralysis — they don't realize the equity is theirs to capture if they sell before the gavel. The underwater owner mostly wants the shame to stop and to not get chased for a deficiency. The need underneath all of it: to feel like a person handling a hard situation with dignity, not a deadbeat being harvested.
+
+### Best channel + TIMING (mail/call/text/door; how soon after the trigger; how many touches)
+Timing is keyed to **stage, not lead age**:
+
+- **Lis pendens just filed (0–60 days, "calm options" window):** Lead with **mail**, first-class handwritten-style, not a postcard screaming FORECLOSURE (that's the shame trigger — they'll trash it). Follow with a soft call/text 5–7 days later. This is the relationship-building window; the message is "you have more time and more options than you think." Do not create urgency here — you'll read as a vulture.
+- **Mid-case (60 days to ~3 weeks pre-sale):** Multi-touch cadence. This is where deals actually close — practitioners consistently report the **3rd–5th touch** converts, not the first, because the owner's denial cracks over time. Rotate channels: mail → call → text → and for your highest-equity targets, a **door knock**. Door is the highest-conversion channel for pre-foreclosure specifically because it defeats the avoidance (they can ignore a phone; a calm person on the porch gets a conversation) — but only for high-equity where the deal justifies the effort.
+- **~3 weeks to sale (urgent window):** Now urgency is honest, so you can use it. Call and door first, mail is too slow. The frame flips from "you have options" to "there's a real deadline but a real solution — here's exactly what has to happen in the next X days."
+
+Plan **5–8 touches** across 60–90 days for a mid-stage lead. Stop the second they say stop — see legal notes.
+
+### The actual pitch / message (a real script skeleton)
+
+**First-touch letter (lis pendens, calm window):**
+> "Hi [First name] — my name is [X] and I buy houses here in [County]. I saw in the county records that there's a case starting on [Street]. I know that's a stressful thing to get mail about, so I'll be straight with you: I'm not with your bank, I'm not a lawyer, and I'm not selling anything. I'm a local buyer. If at some point selling the house on your terms — before any court date — would help you walk away with cash in hand instead of losing it at auction, I'd be glad to make you a fair cash offer, no obligation. If not, I genuinely hope it works out. My number is [X] if it's ever useful."
+
+**Call / door opener (mid-stage):**
+> "Hi, are you [Name]? I'll only take a second — I'm [X], I'm a local homebuyer, and I'm reaching out because it looks like the house may be headed toward a court sale. Most folks in this spot don't realize they've actually got a few months and a couple of real options. Can I ask — is your plan to try to keep the house, or would selling it and walking away with something in your pocket be a relief at this point?"
+
+- **Value frame (high-equity):** "Right now, if it goes to auction, that equity you've built — could be $40, $60, $80K — mostly evaporates. If you sell before the sale, that's yours. I can close on your timeline, as-is, no repairs, no agent fees, and we're done before the court date."
+- **Value frame (underwater):** "You probably owe close to what it's worth, so there's no big check here — I want to be honest about that. What I *can* do is take it off your hands cleanly, work with your lender on a short sale so this doesn't wreck your credit for the next seven years, and get you out from under it. That's the win here — the fresh start, not a payday."
+- **The ask:** always soft and binary — "Would it be worth 15 minutes to see what a real offer looks like? Zero obligation." Never "sign today."
+
+### Top objections + responses
+- **"How did you get my information / is this even legal?"** → "It's all public — the county files these cases in the open record, that's the only reason I know. Nothing private, and you're under no obligation to talk to me at all."
+- **"I'm going to keep the house / I'm working it out with my bank."** → "That's genuinely the best outcome and I hope it works. If the loan mod or reinstatement comes through, ignore me completely. I'm just the backup plan if it doesn't — want me to leave my number in case?"
+- **"You're just trying to steal my house / lowball me."** → "Fair concern, there are people who do that. I'll show you my numbers on paper — the ARV, the repairs, the payoff — so you see exactly how I get to the offer. And you can walk away at any point. I only make money if this actually helps you more than the auction would."
+- **"I don't have any equity, why are you even calling?"** → (underwater) "You might be right, and if so a cash offer isn't the answer — a short sale is, and I coordinate those so it doesn't cost you and it protects your credit. Worth a conversation before the bank decides for you."
+- **"Just take over my payments and I'll stay" / sale-leaseback ask.** → Decline the leaseback. "I can't do a deal where you sell it and keep living there hoping to buy it back — that structure gets people hurt and it's exactly what the state watches for. If I buy it, you'd be moving on. Let's talk about a clean sale instead."
+
+### Sensitivity / ethics / legal notes (what NOT to say; SC/NC solicitation limits; grief/vulnerable-owner care)
+- **NC is the hard line.** Do not offer to negotiate, modify, delay, or "work out" the loan with their lender for any fee — that's foreclosure-assistance/debt-adjusting and it's criminal in NC (G.S. 14-423/424). You *buy houses*; you don't *save* them. Never collect any upfront fee, ever, in either state.
+- **No sale-leaseback / "deed it to me and rent it back and buy it later" deals.** This is the textbook equity-strip that foreclosure-rescue-fraud statutes target. Even if the owner asks for it, decline.
+- **Never imply you're affiliated with the lender, the court, a government agency, or a "foreclosure prevention program."** No fake urgency ("you must act today" when they have three months), no claiming you can stop the foreclosure, no guaranteeing outcomes.
+- **Put it in writing, plainly.** Contracts should be clear, no pressure to sign on the spot, and honor any right to cancel. If an owner tells you to stop contacting them, stop — log it and suppress across all channels (TCPA/DNC and basic decency both apply to your call/text cadence).
+- **Vulnerable-owner care.** Foreclosure overlaps heavily with the elderly, the recently widowed, the sick, and the just-divorced. If you sense someone is confused, grieving, or clearly not competent to transact, slow down and route them to a HUD-approved housing counselor rather than to a contract — both because it's right and because a deal that looks like elder/duress exploitation is a lawsuit and a reputation kill. Tone throughout: calm, unhurried, "here's a door if you want it," never "sign before it's too late."
+
+### Realistic conversion expectation (response %, and the honest funnel to a contract)
+Pre-foreclosure is a low-response, high-value channel — the equity per closed deal is large, but the list is small and heavily worked by competitors and agents. Honest funnel on a well-targeted, equity-filtered list:
+- **Direct mail:** ~1–3% response (call/text-back), lower if your piece looks like spam-mail, higher with handwritten-style + local + calm tone.
+- **Cold call / text:** ~3–8% conversation rate on connects, but connect rates are low (bad numbers, avoidance) — budget skip-tracing and multiple attempts.
+- **Door knock (high-equity, mid/late stage):** by far the best — 20–40% of answered doors turn into a real conversation because it beats avoidance.
+- **Conversation → appointment/offer:** ~20–30% of genuine conversations.
+- **Offer → signed contract:** ~20–35%, and a chunk of those still die (owner reinstates, lender mods, they can't emotionally let go, or a competing wholesaler outbids).
+
+Net: from a clean 100-lead equity-filtered pre-foreclosure batch worked hard for 60–90 days, expect a small handful of real conversations and roughly **1–3 contracts** — but each is high-margin, so the channel earns its keep on dollars-per-deal, not on volume. Track by stage: your late-window door knocks and your 3rd–5th touches are where the contracts actually come from.
+
+
+## Tax-delinquent / tax-sale redemption
+
+### Owner psychology & situation (what they're actually feeling/needing)
+There are two distinct sub-personas here, and the pitch is different for each:
+
+1. **Pre-sale delinquent** (behind on taxes, not yet sold at auction). Usually a slow-burn hardship: fixed-income senior, inherited/probate property nobody wants to pay on, out-of-state heir, medical or job disruption, or a landlord who quietly stopped caring. Dominant feelings are avoidance and shame, not panic. Many have mentally checked out of the property. They throw away mail because they get "dozens of people wanting to pay cash" (a real homeowner quote from BiggerPockets). They do not think of themselves as being in a "tax problem" yet — they think of it as a bill they'll get to.
+
+2. **Post-sale, in the 12-month redemption window** (SC). This is the sharper opportunity and where the "redemption clock" frame lives. The property was already sold at the county's delinquent tax sale; a third party holds the winning bid. The owner still legally owns it and can redeem, but if they do nothing for 12 months they lose the entire property — and all their equity — for the price of back taxes. Here the feeling is a mix of denial ("that can't really happen") and quiet dread. Most genuinely do not understand that a $4,000 tax bill can vaporize $120,000 of equity. That knowledge gap is your entire value proposition.
+
+The core need for both: a way out that lets them **walk with cash instead of losing everything to the county**, handled quietly, without a lawyer, without an auction crowd, without judgment.
+
+### Best channel + TIMING (mail/call/text/door; how soon after the trigger; how many touches)
+This is a **multi-touch, multi-channel** list — single mailers get thrown out. Practitioner consensus (RealEstateSkills, BiggerPockets) is that most deals close on the 2nd–4th contact, so build a sequence, not a blast.
+
+- **Primary: direct mail + phone, layered.** Mail warms the name; the phone (after skip-trace) does the actual converting. The most-upvoted BiggerPockets take is that mailers alone underperform and skip-trace-then-call is where deals actually come from.
+- **Door-knock** only for local, safe, higher-equity parcels — it converts best but doesn't scale.
+- **SMS** only on A2P/10DLC-registered, opt-in-compliant routes. Treat it as a supporting touch, never the opener.
+
+**Timing by trigger:**
+- *Pre-sale delinquent:* start once the parcel appears on the published delinquent list (SC counties advertise before the fall sale). The sweet spot is the **60–90 days before the scheduled tax sale** — enough runway to close, enough urgency to matter.
+- *Post-sale redemption:* **do NOT lead in the first days after the sale.** Owners are still in denial and the clock is long. The high-conversion window is **months 7–11 of the 12-month redemption period** — late enough that the reality has set in and the redemption interest has climbed to 9–12%, early enough that you can still close and either redeem-and-buy or take assignment before the deed issues. A light touch around month 3–4 to plant the seed, then intensify from month 7.
+
+**Cadence (14–21 day sequence per push):**
+- Day 1: Letter (plain, personal-looking) + queue the call
+- Day 3–5: First call
+- Day 7: Second letter with a simple "here are your options" sheet
+- Day 10–12: Second call
+- Day 14–21: Final touch (call or door)
+
+Then recycle the non-responders into the next monthly push. Roughly 200–300 parcels per hot list, 30–50 calls/week is the practitioner working rhythm.
+
+### The actual pitch / message (a real script skeleton)
+Lead with empathy and a problem you can name, not "I buy houses cash." The delinquency is public record, so you can reference it — but do it gently and factually, never accusingly.
+
+**Mail (letter, post-sale redemption version — the sharpest one):**
+> "Dear [First Name],
+> I'm a local investor here in [County], and I noticed your property at [address] came up in the county's tax sale this past [month]. I don't know if anyone has explained this clearly, but you still have the right to keep it or sell it — for now. That right ends [redemption deadline date].
+> If you do nothing, the county process can take the home for the back taxes, and any value above what's owed goes with it. I'd rather see that money stay with you.
+> I help owners in exactly this spot pay off what's owed and walk away with cash in hand instead of losing it. No cost to talk, and if it's not a fit I'll tell you straight.
+> Call or text me directly: [name / cell]."
+
+**Phone opener (works for both personas):**
+> "Hi [Name], this is [Name] — I'm a local investor, not the county and not a collector. I'm calling because your place on [street] showed up on the county's delinquent tax list, and I help folks in that spot before it turns into a bigger problem. Do you have two minutes?"
+
+**Value frame:**
+> "Here's the honest situation: the taxes owed are small next to what the house is worth. If it goes all the way through the county's process, that difference doesn't come back to you. I can pay the taxes off and get you cash for the equity, or if you'd rather keep it I can point you to the redemption route. Either way you don't lose it for nothing."
+
+**Ask (soft, information-first):**
+> "Would it help if I ran the numbers — what's owed, what it's worth, and what you'd actually walk away with — and just showed you? No obligation."
+
+The consistent thread: **you are the person who explains the clock and hands them a way to not lose the equity.** That framing is honest and it's the reason this list converts.
+
+### Top objections + responses
+- **"I'm going to pay the taxes / I've got it handled."** → "That's great, and honestly the best outcome for you. If you're redeeming, here's the exact deadline and the number to call at the treasurer's office so no one runs the clock out on you. If plans change, keep my number." (You lose nothing by being useful; a chunk of these come back.)
+- **"You're just a vulture trying to steal my house for the taxes."** → "Fair thing to be worried about — that's actually what the county process itself does if nobody acts. I'm the opposite: I only make money if you walk away with money. If the numbers don't leave you better off, I'll tell you not to sell." Name the fear, then invert it.
+- **"How much can you even give me?"** → Don't quote blind. "Depends on condition and what's owed — let me confirm the payoff and comps and I'll give you a real number, not a lowball to reel you in." 
+- **"I get ten of these letters a week."** → "I believe it. Difference is I'm local and I'm calling about your specific deadline — [date] — not a mass list. Most of those people can't explain what happens after that date. I can."
+- **"I want to keep the house."** → Genuinely help them redeem. Offer to walk them to the treasurer, or if they're short the redemption cash, that's a different (and legitimate) deal conversation. Do not push a sale on someone who can and wants to keep it.
+
+### Sensitivity/ethics/legal notes (what NOT to say; SC/NC solicitation limits; grief/vulnerable-owner care)
+- **The equity-stripping trap is the ethical line.** The reason this list is lucrative is the exact reason to be careful: an owner can lose six figures of equity over a four-figure tax bill. Do not exploit that ignorance — surface it. Offer a fair price relative to real equity, and always tell them redemption is an option. A "give me the house for back taxes plus a few hundred" deal on an unsophisticated senior is how investors end up in the news and in front of a judge.
+- **Vulnerable owners:** disproportionately elderly, recently bereaved (probate/inherited parcels), or cognitively declining. Slow down. Never create false urgency beyond the *real* statutory deadline. If someone seems confused or heirs are in conflict, encourage them to loop in family or a lawyer — pushing a signature on a confused owner is both wrong and voidable.
+- **SC redemption mechanics — get them right or you'll mislead people:** Under SC Code §12-51-90, the owner (or a grantee/creditor) has **12 months from the tax-sale date** to redeem by paying taxes, costs, penalties, and interest that steps up by quarter — **3% (months 1–3), 6% (4–6), 9% (7–9), 12% (10–12)**. During redemption the winning bidder has **no ownership rights and legally cannot enter or contact the owner** about the bid — so if you *hold* a tax-sale bid, your outreach must be as an investor offering to help, not as the "new owner." You can **assign your bidder's interest** before redemption ends (filed with the tax collector), which is the compliant path to move a position. If you're approaching the *original owner*, you're not restricted the same way, but never imply you already own it.
+- **NC is different — don't reuse SC copy.** North Carolina uses **judicial tax foreclosure (mortgage-style)**, and there is **no post-sale statutory redemption year like SC's**; the owner's window to pay is **up to the upset-bid/confirmation of the court sale**, after which redemption is generally gone. So in NC the honest frame is "before the court confirms the sale," not "you have 12 months." Using SC's redemption-clock language in NC is factually wrong and could be seen as deceptive.
+- **Solicitation limits:** honor DNC — scrub the federal/state Do-Not-Call registry before dialing skip-traced cells, and SMS only via compliant 10DLC with opt-out honored. Both states restrict recorded/auto-dialed calls; use manual dialing for these lists. Avoid any wording that reads as offering *legal or tax advice* ("you must," "the law requires you to sell") — point them to the treasurer or an attorney for that.
+- **What NOT to say:** no "the county is coming to evict you tomorrow" scare tactics beyond the real timeline; no implying you represent or are affiliated with the county/treasurer; no "sign today or lose everything" pressure; no quoting a redemption deadline in NC as if it were SC's 12 months.
+
+### Realistic conversion expectation (response %, and the honest funnel to a contract)
+This is a **higher-intent but small** list, so the percentages beat generic absentee lists but the raw numbers are modest.
+
+- **Mail response:** ~1–3% typical for cold real-estate direct mail; tax-delinquent tends to land at the **higher end (roughly 2–5%)** because the pain is concrete and dated — but only with multi-touch. One-and-done mail sits near the bottom of that range.
+- **Phone (skip-traced):** far better contact economics — roughly **5–10% of dials reach a live, relevant owner conversation**, and this channel is where practitioners say the deals actually originate.
+- **Honest funnel** (illustrative, per ~250-parcel push): 250 parcels → skip-trace to phone → ~30–50 calls/week → **~8–15 real conversations** → **~3–6 owners who'll let you run numbers / do an appointment** → **~1–2 contracts**. Roughly a **0.5–1% parcel-to-contract** rate on a well-worked, multi-touch list, higher on the post-sale redemption sub-segment because the deadline does the persuading for you.
+- **Where it breaks:** owners who intend to redeem (you should *help* them, not fight it — they're not your deal), heir/title tangles that stall closing, and low-equity parcels where the tax debt eats the margin. Score parcels on **equity above tax owed** before you spend a stamp; a delinquent parcel with no equity is not a lead.
+
+Sources: [BiggerPockets — Direct Mail to Tax Delinquent Properties](https://www.biggerpockets.com/forums/93/topics/239423-direct-mail-message-to-tax-deliquent-properties), [RealEstateSkills — Wholesaling Tax Delinquent Properties](https://www.realestateskills.com/blog/wholesaling-tax-delinquent-properties), [SC Code §12-51-90 (Justia)](https://law.justia.com/codes/south-carolina/title-12/chapter-51/section-12-51-90/), [Orangeburg County SC — Redemption of Property Sold](https://www.orangeburgcounty.org/365/Redemption-of-Property-Sold).
+
+
+## Vacant / absentee / tired landlord
+
+### Owner psychology & situation (what they're actually feeling/needing)
+This is the most receptive cold-outreach segment, but "absentee" is really three overlapping mindsets, and your copy lands differently for each:
+
+- **The tired landlord** is the highest-conviction sub-type. They're not in financial distress; they're in *emotional* distress. They're exhausted by the 2am calls, the eviction they just lost, the turnover repair that ate a year of cash flow, the property-management percentage. The Urban Institute / practitioner consensus is that ~80% of non-owner-occupant landlords sell at some point — you're just trying to catch them in the week they've decided they're done. They need permission to quit and an exit that doesn't feel like they failed. Money matters, but *relief and finality* matter more.
+- **The out-of-state / inherited absentee** owns something they never chose and can't manage from a distance. A rental in Greenville, SC while they live in Denver; a house they inherited in Rutherford County, NC that's sat vacant since a parent died. They feel a low-grade guilt-and-nuisance about it. They need someone competent to make the problem disappear without a plane ticket.
+- **The vacant-property holder** is bleeding — taxes, insurance, code-enforcement letters, a roof they haven't seen — on an asset producing nothing. Vacancy is the single strongest motivation trigger of the three because the pain is monthly and rising.
+
+Across all three, the receptivity advantage is real: because the *mailing address differs from the property address*, your mail reaches them at home, at the kitchen table, away from the property they're avoiding. That physical separation is exactly why this list beats owner-occupant lists.
+
+### Best channel + TIMING (mail/call/text/door; how soon after the trigger)
+This segment is the exception to "door-knock everything" — you often can't door-knock, because they're in another state. Lead with **mail + phone**, layered.
+
+- **Primary: direct mail to the tax/mailing address** (not the property). This is the whole edge of the segment: the letter forwards to where they actually live. Use a plain, hand-addressed-look letter or yellow-letter style, not a glossy postcard, for the tired-landlord and inherited sub-types; postcards are fine for the vacant/high-volume tier.
+- **Layer cold calls** after a skip-trace. Plan for 50–85% usable phone numbers on a clean absentee list, far lower on old/inherited data. Contact rate 5–12%; aim for a meaningful conversation on 5–20% of live connects.
+- **SMS only with caution** — see legal notes. It performs but carries the most exposure; many operators have pulled back from it.
+- **Door-knock only the in-footprint absentees** (owner in Spartanburg, rental in Greer). For those it's a strong differentiator because nobody else shows up in person.
+
+**Cadence (the 8–12 week multi-touch sequence practitioners actually run):**
+1. **Touch 1 — Mail, within 1–3 days of the trace/trigger.** First letter to mailing address.
+2. **Touch 2 — Call, days 3–10.** Skip-traced number.
+3. **Touch 3 — Second mail piece, weeks 2–4.** Different format/message than #1.
+4. **Touch 4 — Call again, week 4.**
+5. **Touch 5+ — rotate mail/call every ~2–4 weeks through week 12**, optional consented SMS.
+
+Do not treat one touch as a test. Most closed deals come from follow-up, not first contact — budget **10–15 conversations/offers per deal**, and expect **0.5–3% call-back on cold mail**. For a *trigger* like a fresh vacancy code notice or a new eviction filing, compress the front of the cadence (mail day 1, call day 2).
+
+### The actual pitch / message (a real script skeleton)
+
+**Direct-mail letter (tired landlord / inherited — plain, first-person):**
+> "Hi [First Name] — I'm a local buyer here in [County]. I'm reaching out because I'd like to buy your property at [property address]. I buy as-is — you don't fix anything, clean anything out, or deal with showings, and I can close on your timeline. If you've got a tenant in place, that's fine, I'll take it with the tenant. If you've ever thought about being done with this one, I'd love to make you a straightforward cash offer. My direct line is [number] — call or text me anytime. — [Name]"
+
+**Cold-call open (calm, local human — not a call center):**
+> "Hi, is this [Name]? I'm [Name], I'm a local buyer here in [area] — I'm calling about your property over on [street]. Did I catch you at an okay time?"
+
+**Value frame (say the pain out loud, then let them vent — silence is your tool):**
+> "The reason I called — I talk to a lot of folks who own a rental they're a little tired of. The tenants, the repairs, the taxes, the management cut… at some point it stops being worth the headache. Is that where you're at with this one, or are you still happy holding it?" *(Then stop talking. Let them tell you.)*
+
+**The ask (lock a concrete next step, never "think about it"):**
+> "Here's what I can do: I'll pay all the closing costs, buy it exactly as it sits — tenant and all — and give you one number you actually walk away with, on a date you pick. Would it be worth a quick offer? I can have a real number to you by [day]."
+
+The value frame that closes this segment is **net proceeds + certainty**, not headline price: a lower number they walk away with, on a date they can count on, with no repairs and no deal falling through, beats a higher listed price wrapped in cost and uncertainty.
+
+### Top objections + responses
+- **"Your price is too low."** → "That's fair — let me ask it differently. If I cover all closing costs and buy it as-is with the tenant in place, what net number would actually make this worth it to you?" *(Reframe to net-in-pocket; surface their real floor.)*
+- **"I'll just list it with an agent."** → "You totally could, and if that's your best move I'll tell you so. The difference is you'd clear it out, make it show-ready, wait on financing, and pay commission. I'm certainty and speed with none of that — worth having both numbers side by side?"
+- **"I've got a tenant / it's occupied."** → "Perfect, keep them — I buy tenant-occupied all the time, you don't have to give notice or turn it over. That's actually easier for me."
+- **"How'd you get my number/address?"** → "Public property records — I'm a local buyer, not a call center. If you'd rather I not reach out again, just say the word and you're off my list for good." *(Direct + immediate opt-out builds trust and is compliant.)*
+- **"I'm not interested."** → "No problem at all. Can I ask — is it 'not this year,' or 'never'? If it's timing, I'll check back down the road." *(Sorts dead from dormant so you can re-cadence.)*
+
+### Sensitivity/ethics/legal notes (what NOT to say; SC/NC limits; vulnerable-owner care)
+- **Scrub the DNC Registry at least every 31 days** before calling; violations run $500–$1,500 each. You generally have **no Established Business Relationship** with a cold absentee, so the EBR exemption does not cover you. TCPA suits rose ~27% into 2026 — this is not theoretical.
+- **SMS is the highest-risk channel.** Marketing texts require prior express written consent under TCPA; cold-texting a skip-traced number you have no consent for is the classic wholesaler exposure. Do not blast SMS to raw absentee lists. Lead with mail/call; reserve texts for people who have replied or given a number to text.
+- **Inherited/vacant-because-of-death overlaps with probate.** If the "absentee" reason is a recent death, treat it with the grief-and-vulnerable care of a probate lead: never open with the deceased's name, never imply urgency ("before you lose it"), and don't pitch the estate before you know who has authority to sell.
+- **Do NOT say:** anything implying you're rescuing them from foreclosure they didn't mention, any "act now or lose it" pressure, or that you're an agent/appraiser if you're not. Don't misrepresent how you got their info.
+- **NC/SC specifics:** Neither NC nor SC requires a real-estate license merely to buy property for your own account, but if you're *wholesaling the contract* you're skating close to unlicensed brokerage — keep messaging as a principal ("I'd like to buy your property"), not "I'll find a buyer for you." SC's telemarketing rules track federal DNC/TCPA; NC's Telephone Solicitations statute (NCGS §75-100 et seq.) adds state DNC obligations and identification requirements on calls. Identify yourself and your company honestly on every call, honor opt-outs immediately and permanently, and keep a suppression list.
+
+### Realistic conversion expectation (response %, and the honest funnel)
+- **Cold mail:** ~0.5–3% call-back rate. On a tight absentee list (out-of-state + high equity + long hold, or +vacant/tax-delinquent stacked), push toward the high end.
+- **Cold calls:** 5–12% contact rate; of live connects, 5–20% become a real conversation; ~3–5% of *contacts* set an appointment/offer.
+- **Funnel to contract (per ~1,000-record absentee campaign, multi-touch over 8–12 weeks):** ~1,000 pieces → ~15–30 inbound/meaningful conversations → ~10–15 offers → **~1 contract.** Tired-landlord and vacant sub-lists convert at the top of these ranges; inherited-with-stale-data at the bottom (skip-trace hit rate drops to 10–30%).
+- **Bottom line:** the segment's edge is *receptivity and mail-forwarding reach*, not a magic script. Deals come from disciplined follow-up and list stacking (out-of-state mailing address + high equity + vacancy/tax signal), not from one clever letter.
+
+Sources:
+- [RealEstateSkills — Wholesaling Cold Calling Script](https://www.realestateskills.com/blog/wholesaling-cold-calling-script)
+- [BiggerPockets — Cold Calling / Scripts for Tired Landlords (forum)](https://www.biggerpockets.com/forums/432/topics/494678-motivated-seller-leads-cold-calling-or-scripts-for-tired-landl)
+- [Goliath Data — Calling Landlords Without Triggering Defensiveness](https://goliathdata.com/respectful-landlord-cold-calling)
+- [Vulcan7 — Ultimate Guide to Absentee Owner Lists](https://www.vulcan7.com/2025/07/the-ultimate-guide-to-absentee-owner-lists-in-real-estate-prospecting/)
+- [ResidentialCoop — Skip Tracing to Source Off-Market Sellers (cadence + response rates)](https://residentialcoop.com/using-skip-tracing-to-source-off-market-sellers/)
+- [ActiveProspect — TCPA Text Message Rules 2026](https://activeprospect.com/blog/tcpa-text-messages/)
+- [DNC.com — Real Estate Agents: Are You DNC Compliant?](https://www.dnc.com/blog/real-estate-agents-are-you-dnc-compliant)
+- [ClickPoint — 2026 Guide to TCPA, One-to-One Consent, CAN-SPAM & State Regulations](https://blog.clickpointsoftware.com/tcpa-one-to-one-consent-can-spam-state-regulations)
+
+
+## Code-violation / incarcerated / elderly-downsizing owners
+
+These are three distinct "cannot-maintain" owners who share one trait: the property has become a burden they physically or legally cannot fix, and the wrong touch reads as predatory. Each needs its own who-do-you-actually-talk-to answer and its own hard legal line.
+
+---
+
+### Owner psychology & situation (what they're actually feeling/needing)
+
+**Code-violation owner.** Usually an out-of-area landlord, a tired local owner, or an heir who inherited a house they never wanted. The mailbox is now a stream of citations from Spartanburg / Greenville / Anderson code enforcement or an NC municipality (overgrown lot, junk/debris, unsafe structure, open/vacant). What they feel is *low-grade dread and avoidance*: fines accrue daily or per-notice, some jurisdictions convert unpaid fines to a lien on the property, and the "abate or demolish" letter is the one that finally scares them. They are not sad; they are annoyed and trapped. The need is simple: **make the problem and the fines stop without me spending money or a Saturday I don't have.** That is your entire value proposition. They often don't know a lien is attaching, so "these fines can become a lien that follows you even after you sell / can grow past what the lot is worth" is genuinely useful information, not a scare tactic.
+
+**Incarcerated owner.** The property is decaying while they sit inside, often with no one collecting rent, a family member squatting or "watching it," taxes going unpaid, and a real fear of losing it to tax sale before release. Emotionally: powerlessness and distrust of anyone who shows up wanting their asset while they can't verify anything. They also have *time*, a phone/tablet, and often a strong motive to convert a frozen asset into commissary money or a nest egg for release. The need: **turn a property I can't manage into cash, through someone I can trust, while I'm behind glass.**
+
+**Elderly downsizing / can't-maintain owner.** Long-time owner, often widowed, house is paid off or nearly so, stairs and yard have become the enemy, and family lives out of state. Feelings run deep here: grief, pride, loss of independence, fear of being "taken," and fear of being a burden. They frequently are *not* the decision-maker alone; an adult child, a POA agent, or increasingly a court-appointed guardian/conservator is. The need is rarely "top dollar" — it's **dignity, certainty, simplicity, and not getting ripped off**: no showings, no repairs, flexible move-out, someone who treats them like a person.
+
+---
+
+### Best channel + TIMING (mail/call/text/door; how soon after the trigger; how many touches)
+
+**Code-violation.** Channel: **direct mail first, then phone/text, door last.** These owners are often absentee, so door-knocking frequently hits a tenant or empty house. Timing: the sweet spot is **after the second or third citation but before the abatement/demolition hearing** — early enough that fines are a nuisance, late enough that they're motivated. Watch the code-enforcement calendar; a scheduled hearing is your best trigger. Cadence: a **5-7 touch sequence over 60-90 days** (letter → letter → call/text → letter → call), because these decisions are procrastinated, not refused. A short handwritten-style yellow-letter outpulls a polished postcard here.
+
+**Incarcerated.** Channel: **physical mail to the facility is the primary and often only compliant first touch.** You cannot cold-call a prison. Practitioners send a plain letter, or a message through the facility's e-messaging system (JPay / GTL/ViaPath / Securus) if you can find the inmate via the SCDC or Federal BOP / county-jail locator. Expect the owner to respond by **collect call** — set up a service that accepts them. Timing: mail as soon as you've confirmed incarceration and ownership; there is no "too early," and tax-sale deadlines make speed valuable. Cadence: **2-3 letters spaced ~3 weeks apart**; mail moves slowly and gets read slowly inside. Parallel track: **locate and contact the family member managing the property** (see below) — they are frequently the faster path.
+
+**Elderly.** Channel: **mail to open the door, phone to build the relationship, in-person to close — never lead with a hard door-knock on an elderly owner.** The most durable channel is actually **the adult child / POA agent**, reached by mail or phone, not the senior directly. Timing: elderly leads are relationship sales, not trigger sales; there's no clock, so **slow down deliberately**. Cadence: fewer, warmer touches (**3-4 over several months**), and the moment a family member surfaces, pivot all substantive conversation to them. If the owner shows any confusion, that's a signal to *slow down and involve family*, not to push.
+
+---
+
+### The actual pitch / message (a real script skeleton — opening line, value frame, ask)
+
+**Code-violation letter (skeleton):**
+> "Hi [Name] — I noticed the property at [address] has some open notices from [City] code enforcement. I buy houses in [county] as-is, and I handle the cleanup, the repairs, and the code paperwork myself so those fines stop adding up. You wouldn't fix anything, clean anything, or pay closing costs. If it's easier to just be done with it, I can make you a cash offer this week. Is [address] something you'd consider selling? — [Name], [phone]."
+
+Value frame: **I make the citations and the liability disappear.** Ask: a soft yes/no on selling, not a price.
+
+**Incarcerated owner letter (skeleton) — deliberately plain and respectful:**
+> "Mr./Ms. [Name], I'm a local real estate buyer in [county]. I understand you own the property at [address]. I'm writing because I may be able to buy it from you for cash, which some owners in your situation use to cover taxes before a tax sale or to have funds waiting when they're out. There's no cost to you, and everything can be handled by mail through the facility with a notary. If you'd like to talk, you can reach me collect at [phone] or write me at [address]. No pressure and no rush — I just wanted you to know the option exists."
+
+Value frame: **liquidity and protection from tax-sale loss, handled entirely by mail.** Ask: "call or write me if you want to talk." Never imply urgency or that they'll "lose everything" — that reads as coercion of a captive person.
+
+**Elderly / family-agent script (phone, to the adult child or POA):**
+> "Hi [Name], I reached out about your mom's house on [street]. I'm not trying to rush anyone — I know this is a lot. A few families I've worked with wanted to sell without cleaning it out, without repairs, and on their own timeline so mom could move when *she's* ready. If that's something you're weighing, I can walk you through what that looks like, and you can decide with your mom and your attorney. Would it help if I put the numbers in writing so you can look at them together?"
+
+Value frame: **dignity, zero hassle, family stays in control, decide on your timeline.** Ask: permission to send something in writing they can review *with the senior and counsel* — never a same-day signature.
+
+---
+
+### Top objections + responses
+
+**Code-violation**
+- *"I'll just fix it myself."* → "You totally can. Most owners I talk to just don't have the weekend or the contractor. If you'd rather hand it off, my offer covers the fines and the work — either way the notices stop."
+- *"The fines aren't my problem, it's the tenant."* → "I hear you. The city attaches those to the property, not the tenant, so at sale they can come out of your proceeds. If you sell to me as-is I take that on."
+
+**Incarcerated**
+- *"How do I even sign anything from here?"* → "By mail. You sign a power of attorney or the deed in front of the facility notary — most charge a few dollars — and mail me the originals. I've done it this way before." (True: facilities offer notary service, typically a small per-signature fee.)
+- *"How do I know you won't rob me while I'm stuck in here?"* → "Fair question. Everything goes through a licensed title company / closing attorney who holds the funds and pays you — not me handing you cash. You can have a family member or your own lawyer review it."
+
+**Elderly / family**
+- *"We're not ready to sell."* → "Completely understand, and there's no deadline from me. I'll leave my info; if it ever gets to be too much, call me and we'll go at whatever pace works."
+- *"Are you trying to lowball my mother?"* → "I get why you'd ask. That's exactly why I'd rather you and your mom review the numbers in writing, with your attorney if you want. If it's not fair, throw it out."
+
+---
+
+### Sensitivity/ethics/legal notes (what NOT to say; SC/NC solicitation limits; grief/vulnerable-owner care)
+
+**Across all three:** In both SC and NC, wholesaling means you must **actually contract to buy (equitable interest) and assign — you cannot market or broker someone else's property without a real estate license.** Advertising "I'll sell your house for you" instead of "I'll buy it" crosses into unlicensed brokerage. Keep the pitch as a *purchase*, not a listing service.
+
+**Code-violation — foreclosure/distressed-owner overlap.** If the property is *also in active foreclosure* and owner-occupied, you may fall under SC's foreclosure/equity-purchaser rules: an "equity purchaser" who buys a foreclosed primary residence must use a written contract with statutory disclosures and a right of cancellation, and the obligations survive the deed transfer (owner can still sue after signing over). Do **not** promise to "stop the foreclosure" or collect any upfront fee for consulting — that's the classic foreclosure-consultant trap. Just make a clean cash-purchase offer. ([SC foreclosure/equity-purchaser overview](https://www.legalwiz.com/foreclosure-protection-foreclosure-consultant-laws-2/))
+
+**Incarcerated — capacity and coercion are the whole ballgame.**
+- Confirm the owner has **legal capacity** and is signing **voluntarily**; a captive audience makes coercion claims easy, so keep every message pressure-free and documented. Never imply they'll lose the house unless they act now.
+- The correct instruments are a **notarized POA or a directly executed/notarized deed** through the facility notary; a valid, recorded POA with real-property authority is required before an agent can sign a deed. ([selling while incarcerated — POA mechanics](https://kdshomebuyers.net/articles/sell-house-while-incarcerated))
+- Watch for a **court-appointed conservator or co-owner** — if one exists, they, not the inmate, may control the sale, and some sales need court approval. Verify who actually holds authority before you contract.
+- If a **family member** claims to speak for the owner, get proof (a recorded POA) before treating them as the decision-maker; a relative's say-so is not authority to convey.
+
+**Elderly — the brightest red lines, in both states.**
+- **POA self-dealing is prohibited.** Under NC's Uniform Power of Attorney Act (Ch. 32C), an agent generally **cannot create an interest in the principal's property for the agent** (or someone the agent supports) unless the POA expressly authorizes it, and gifting is capped. So **never buy from, or route a discount to, the POA agent themselves** — a below-market sale to the agent (or to you with a kickback to the agent) is voidable self-dealing and a red flag for fraud. ([NC Ch. 32C self-dealing/gift limits](https://law.justia.com/codes/north-carolina/chapter-32c/article-3/section-32c-3-301/)) Also confirm the POA grants **real-property authority and is recorded** with the Register of Deeds before any agent-signed deed.
+- **Financial exploitation of a vulnerable adult is a felony.** SC's Omnibus Adult Protection Act makes knowingly exploiting a vulnerable adult — including through **undue influence, duress, or misuse of a power of attorney** for another's advantage — a felony (up to 5 years and/or a $5,000 fine, plus restitution). NC has parallel exploitation-of-an-older/disabled-adult statutes. A lowball deal extracted from a confused senior is not just a bad look; it's chargeable. ([SC §43-35-85 penalties](https://law.justia.com/codes/south-carolina/title-43/chapter-35/section-43-35-85/))
+- **Undue-influence hygiene, in practice:** if the owner shows any confusion or memory issues, **stop and insist on family and independent counsel**; put every number in writing so it can be reviewed cold; never get a same-visit signature; encourage (don't discourage) them to have their own attorney; and keep the offer defensibly fair — the closer to market and the more transparent, the harder any exploitation claim is to make.
+- **What NOT to say** to any of these three: no "you'll lose everything," no "sign today or the deal's gone," no "don't bother telling your kids/lawyer," no promise to "save" them from foreclosure for a fee, and nothing that implies you're brokering rather than buying.
+
+---
+
+### Realistic conversion expectation (response %, and the honest funnel to a contract)
+
+- **Code-violation:** highest-converting of the three because motivation is concrete and the owner is usually rational, not grieving. Expect roughly **4-8% response** on a targeted, multi-touch mailer to a clean code-violation list, and something like **1 signed contract per ~40-60 owners worked** once you filter for real equity and absentee/tired owners. Fast to contract once you connect.
+- **Incarcerated:** **low response and slow** — figure **1-3% reply** to facility mail, long lag (weeks per exchange), and heavy mechanical friction (notary, POA, verifying authority, occasional court approval). But the *few* who engage are highly motivated, so it's a low-volume/high-intent niche. Budget months per deal; the family-member side channel is where most of these actually close.
+- **Elderly:** deliberately slow, relationship-driven, **moderate response (~3-5%)** but a *long* runway from first contact to close, and a meaningful share should be walked *away from* or handed to family/attorney rather than contracted — that self-selection is a feature, not a loss. Realistic funnel: many warm conversations, few signatures, but the ones that close are clean, referral-generating, and defensible. Treat "we passed because the owner wasn't clearly capable" as a successful outcome, not a failed one.
