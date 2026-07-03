@@ -15,7 +15,7 @@ Every one of these is free code against sources we already touch. Ordered by lev
 | # | Item | Effort | Closes | Expected lift |
 |---|---|---|---|---|
 | 0.1 | **Wire NC OneMap `AddressNC` point layer** (resolve parcel_id/lat-lng → street address for all 11 NC counties) | Low (1 resolver) | address-less leads (~39%) | geo/address **+15–25 pts** across NC |
-| 0.2 | **Rutherford NC `MapServer/6`→`MapServer/7` (PS_VIEW, `addr_field="Physical_Address"`)** | **1 line** | a "hard-ceiling" county | situs+sqft+value+sale+owner for a whole county |
+| 0.2 | **Laurens SC: wire the `Pebble/TaxParcel/MapServer` bulk layer** (Owner+Mailing+Sale_Price+Sqft) — _replaces the RETRACTED Rutherford "one-line fix" (no parcel service exists there; Rutherford stays a real gap → use OneMap/lrcpwa)_ | Low | SC specs+sale for a whole county | free specs where R2 said "cadastral-only" |
 | 0.3 | **Henderson NC: map the already-fetched `HEATED_AREA`/`TOTAL_PROP_VALUE`/`PKG_SALE_*`/`PROPERTY_OWNER`** into `_apply_attrs` | Low | sqft/value/sale gap | free specs for a top county |
 | 0.4 | **Spartanburg: pull specs/sale/condition from county `CAMA_Parcels` FeatureServer** (clean) instead of corrupt SCDOT | Low-Med | SC sqft/sale/condition | biggest SC county fully specced free |
 | 0.5 | **Cleveland NC: parse `clevelandcountytaxes.com`** per-parcel → situs + tax-due + WebGIS pid | Med | situs gap + tax-owed | situs for a no-situs county |
