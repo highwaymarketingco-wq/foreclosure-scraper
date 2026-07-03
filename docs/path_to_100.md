@@ -4,6 +4,19 @@ _Foreclosure / motivated-seller lead engine · 18 counties (Upstate SC + Western
 
 For every score, factor, source, enrichment, and identity-join: current fill-rate → what 100% requires → FREE routes → REAL 2026 paid-vendor pricing → feasibility (can/can't + why) → recurring cadence & cost → step-by-step manual playbook.
 
+## ⚠️ Round-1 verification corrections (2026-07-02) — these SUPERSEDE figures below
+Independent re-fetch of every vendor's live pricing page. Full tables in `path_to_100_deepdive.md`.
+- **PropStream** — "free skip-trace" needs **Pro $199/mo** (or a **$30/mo Connect add-on**), NOT the $99 Essentials tier (which pays $0.12/contact). Don't budget "$99 + free tracing."
+- **IDI idiCORE** — the gate is **GLBA/DPPA**, and idiCORE is explicitly **NOT** usable for FCRA purposes. The "FCRA gate" wording below is backwards.
+- **Spokeo** — it **does** have a bulk/enterprise API (People Intelligence API, quote-only); only the consumer tier is ToS-restricted. "No bulk API" below is wrong.
+- **Smarty free tier** — a **one-time 1,000-lookup / 42-day trial**, NOT 250/mo recurring. ($17/1k→$485/170k paid anchors + $45 rooftop-geocode start still hold.)
+- **Estated** — dead as a standalone (absorbed into ATTOM); don't quote its legacy $179/$449/$1,799 tiers.
+- **HouseCanary** — self-serve API is **$0.50/call, no published minimum** (+ a Pro $79/mo tier missed); the "six-figure minimum" is legacy-enterprise only.
+- **CourtListener API** — default rate cut hard **May 2026** (~5 req/min for new/anon users); RECAP archive still permanently free. **PACER 2027:** per-page **$0.10→$0.12**, waiver **$30→$40/qtr**.
+- **EDDM** — the "$0.27–$0.52" is postage-only; true all-in loaded ≈ **$0.50–$0.80/piece** (USPS rate rise Jul 12 2026).
+- **Google Street View / Google Geocoding** — imagery/geocodes are **caching-ToS-restricted** (can't warehouse). Regrid API is **$500–$2,000/mo** (bulk-nationwide ~$80k/yr is an unverified guess). CoreLogic is now **Cotality**; its "$12k/yr" is one self-reported datapoint, not a median.
+- **Verified accurate ✅:** RentCast, Realie, TrueNCOA $20/file, Senzing 100k-free, Geocodio ($0.50→$1.00 Feb-2026, storage-allowed), Canopy/MLS Grid/Trestle, HUD SAFMR, Zillow ZORI, DataZapp 3¢, Tracerfy 2¢, PropStream/DealMachine/REsimpli tier prices, PropertyRadar Business, All-The-Leads/US-Probate/Warren-Group, US Title Records $29/$95/$375, Street View tier rates, RVM $0.012–$0.05.
+
 
 ## Contents
 
