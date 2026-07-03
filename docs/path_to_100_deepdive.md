@@ -5553,3 +5553,603 @@ Top pick to build next: **The HECM detector on your existing ROD ingest** — a 
 **Flagged walls (do not evade):** Opendoor/Offerpad resale inventory sits mostly in metro Charlotte/Raleigh (outside your Western-NC/Upstate-SC core) and has no free structured feed — skip. FDIC Property Listing Site ([fdicrealestatelistings.com](https://www.fdicrealestatelistings.com)) is verified **empty nationwide** (May 2026 update: "No Properties At This Time") and its state filter has no NC/SC — dead until a covered-bank failure, not worth building now. HomeSteps/HomePath/Hubzu/Xome have **no public API**; they are browse-only sites — treat as HTML scrapes and check each site's robots/ToS before automating (never bypass anti-bot).
 
 **Top pick to build next:** SC Forfeited Land Commission (FLC) assignment lists — it is the only source here where a public institution is itself the seller, it is the deepest-distress tier (owner already forfeited, no bidder took it), the lists are free structured per-county PDFs with parcel IDs that join straight into your existing SC parcel/assessor pipeline, and it is genuinely net-new versus your tax-delinquent lane. Pair it with the HOA-plaintiff lis-pendens filter as a near-zero-cost add on court data you already pull.
+
+
+---
+
+# Deep-Dive Round 16 — Data-Engineering Architecture (2026-07-02)
+
+
+## ToS-Compliant Caching & Storage (per-field provenance + license-class gating)
+
+### The problem (what breaks without it)
+
+Today every enricher writes freely into `Listing.raw` (an untyped `dict[str, Any]`), the enriched objects persist to `docs/listings.json` + `listings_detail.json` via `write_artifact()`, resolved leads **persist and auto-re-enrich** across runs (per the enrichment-pipeline facts), and disk caches hold raw upstream responses indefinitely. That is exactly correct behavior for free/public data (county GIS, SCDOT, Census, court records) and exactly *non*-compliant the moment a paid vendor enters. ATTOM's bulk/API license forbids storing raw records beyond ~24h and forbids building a derivative database from them; RentCast/Realie permit persistence of returned values under their terms but still forbid *redistribution* of raw bulk. The pipeline currently has:
+
+- **No notion of who owns a value.** `market_value`, `living_sqft`, `owner_name` can come from GIS (persist forever) or, once ATTOM is wired, from ATTOM (must expire in 24h) — and the merged `Listing` can't tell them apart, so `Listing.merge()` and `write_artifact()` treat them identically.
+- **A published artifact that is a redistribution.** `docs/listings.json` is a public web board. Publishing an ATTOM-sourced `market_value` there is a straight ToS violation (public redistribution of licensed raw data), even though publishing a *derived grade* computed from it is fine.
+- **Sticky caches and sticky sidecars.** The disk cache and the index-aligned `listings_detail.json` sidecar have no TTL tied to license; a licensed raw response cached on Monday is still on disk (and reloaded by `load_board()` into next run) 30 days later.
+- **Silent contamination on merge.** Because `_deep_merge_dict` blends `raw` across sources, one ATTOM field leaks into a record whose provenance otherwise looks free — and there is no way to purge just the ATTOM-derived leaves later.
+
+Without a license-class model, the first paid vendor turns a compliant free pipeline into a licensing liability, and there is no mechanical way to prove which stored bytes are allowed to be there.
+
+### The design (concrete pattern, keyed to this pipeline's shape)
+
+Three coordinated mechanisms, all bolted onto structures that already exist (`raw`, the `enrich()` loop, `_slim_raw`/`RAW_KEEP`, `write_artifact`, `load_board`, the disk cache):
+
+**1. License class is a property of the *source*, declared once.** Every enricher/scraper already has a stable `source` slug. Attach a `LicenseClass` to each slug in one registry. Four classes:
+
+| Class | Persist raw? | Publish raw to `docs/`? | Cache raw on disk? | Examples |
+|---|---|---|---|---|
+| `PUBLIC` | yes, forever | yes | yes, long TTL | county GIS, SCDOT, Census, court records, ROD images |
+| `PERMISSIVE` | yes | **derived only** (values ok in detail sidecar, not bulk-exported) | yes, moderate TTL | RentCast, Realie, Geocodio, BatchData |
+| `RESTRICTED_EPHEMERAL` | **no** (24h scratch only) | **never raw; derived-only** | **encrypted, ≤24h TTL, auto-purged** | ATTOM (bulk/API), any "no-store / no-derivative-DB" vendor |
+| `INTERNAL_DERIVED` | yes | yes | n/a | grade, equity, max_bid, distress_score computed *by us* |
+
+**2. Per-field provenance sidecar inside `raw`.** Stop storing bare values whose origin is ambiguous. Every enricher that writes a field also stamps its provenance under a reserved `raw["_prov"]` key, keyed by the *canonical Listing field name* (or `raw` subkey path). Provenance is: `{source, license, fetched_at, expires_at|null, published_ok}`. This is the load-bearing new data shape and it is additive — nothing else in `raw` changes.
+
+**3. "Derived-only" storage mode for RESTRICTED sources.** A restricted enricher never lands its raw value on the persisted `Listing`. It lands the value in an **in-memory, run-scoped scratch dict**, the compute step (`valuation/calc`, `distress_score`) consumes it to produce an `INTERNAL_DERIVED` value (a grade, an ARV, an equity number), stamps *that* derived value with provenance `derived_from: [attom]`, and the scratch is dropped at end of run. What persists is the number we computed, not the number ATTOM gave us. If ATTOM says `market_value=412000` and we grade the deal `A-`, only `A-` (and `arv_confidence`) survives; `412000` never touches `listings.json`, `listings_detail.json`, or the long-lived cache.
+
+The clean split falls straight out of the table: **RentCast/Realie/Geocodio → `PERMISSIVE` → their values persist on the `Listing` and render in the detail sidecar** (they permit storage of returned values, just not public bulk redistribution — so they're gated out of a future bulk/CSV export, not out of the board). **ATTOM → `RESTRICTED_EPHEMERAL` → only the derived grade/equity persists;** the raw comps/AVM live ≤24h in an encrypted cache and are purged.
+
+### Implementation (files/functions to add or change; data shapes)
+
+**New file `src/foreclosure_scraper/licensing.py`** — the single source of truth:
+
+```python
+from enum import Enum
+from datetime import datetime, timedelta, timezone
+
+class LicenseClass(str, Enum):
+    PUBLIC = "public"
+    PERMISSIVE = "permissive"
+    RESTRICTED_EPHEMERAL = "restricted_ephemeral"
+    INTERNAL_DERIVED = "internal_derived"
+
+# license → policy knobs, so behavior is data not scattered ifs
+LICENSE_POLICY = {
+    LicenseClass.PUBLIC:               dict(persist=True,  publish_raw=True,  bulk_export=True,  cache_ttl=timedelta(days=30)),
+    LicenseClass.PERMISSIVE:           dict(persist=True,  publish_raw=True,  bulk_export=False, cache_ttl=timedelta(days=7)),
+    LicenseClass.RESTRICTED_EPHEMERAL: dict(persist=False, publish_raw=False, bulk_export=False, cache_ttl=timedelta(hours=24)),
+    LicenseClass.INTERNAL_DERIVED:     dict(persist=True,  publish_raw=True,  bulk_export=True,  cache_ttl=None),
+}
+
+# EVERY source slug is classified here. Unknown slug -> hard fail (fail-closed),
+# so a new enricher can't ship without a license decision.
+SOURCE_LICENSE: dict[str, LicenseClass] = {
+    # public
+    "enrichment_arcgis": LicenseClass.PUBLIC, "scdot_situs": LicenseClass.PUBLIC,
+    "nc_onemap": LicenseClass.PUBLIC, "sc_assessor_cama": LicenseClass.PUBLIC,
+    "enrichment_comps": LicenseClass.PUBLIC,  # HomeHarvest/Realtor public
+    # permissive paid
+    "rentcast": LicenseClass.PERMISSIVE, "realie": LicenseClass.PERMISSIVE,
+    "geocodio": LicenseClass.PERMISSIVE, "batchdata": LicenseClass.PERMISSIVE,
+    # restricted paid
+    "attom": LicenseClass.RESTRICTED_EPHEMERAL, "attom_bulk": LicenseClass.RESTRICTED_EPHEMERAL,
+    # our own compute
+    "calc": LicenseClass.INTERNAL_DERIVED, "distress_score": LicenseClass.INTERNAL_DERIVED,
+}
+
+def license_of(source: str) -> LicenseClass:
+    try:
+        return SOURCE_LICENSE[source]
+    except KeyError:
+        raise LicenseError(f"unclassified source {source!r} — add it to SOURCE_LICENSE")
+
+def stamp(li, field: str, source: str, *, now=None):
+    """Write raw['_prov'][field] and set expires_at from policy."""
+    now = now or datetime.now(timezone.utc)
+    pol = LICENSE_POLICY[license_of(source)]
+    ttl = pol["cache_ttl"]
+    li.raw.setdefault("_prov", {})[field] = {
+        "source": source,
+        "license": license_of(source).value,
+        "fetched_at": now.isoformat(),
+        "expires_at": (now + timedelta(hours=24)).isoformat()
+                      if not pol["persist"] else None,
+        "published_ok": pol["publish_raw"],
+    }
+```
+
+**Provenance data shape on a persisted `Listing`** (only the `_prov` block is new):
+
+```json
+"raw": {
+  "gis": {"year_built": 1998},
+  "arv": 305000, "grade": "A-",
+  "_prov": {
+    "market_value":  {"source":"rentcast","license":"permissive","fetched_at":"...","expires_at":null,"published_ok":true},
+    "living_sqft":   {"source":"enrichment_arcgis","license":"public","expires_at":null,"published_ok":true},
+    "arv":           {"source":"calc","license":"internal_derived","published_ok":true,"derived_from":["attom","enrichment_comps"]}
+  }
+}
+```
+
+**Change `enrichment.py` — orchestration wraps every enricher call.** The `enrich()` loop and each `enrichment_*` module today mutate `li` and `li.raw` directly. Introduce a thin writer they must call instead of bare assignment:
+
+```python
+def set_field(li, field, value, source):
+    lc = license_of(source)
+    if LICENSE_POLICY[lc]["persist"]:
+        setattr(li, field, value) if hasattr(li, field) else li.raw.__setitem__(field, value)
+        stamp(li, field, source)
+    else:
+        # RESTRICTED: never touch the persisted Listing. Park in run-scoped scratch.
+        _restricted_scratch[li.dedupe_key()][field] = value  # module-level, cleared per run
+```
+
+The restricted-vendor enricher (new `enrichment_attom.py`) writes only via the scratch branch; then a **derive step** (call it inside `enrich()` after all enrichers, or in `valuation/calc`) reads `_restricted_scratch`, computes ARV/equity/grade, calls `set_field(li, "arv", val, source="calc")` (which persists, `INTERNAL_DERIVED`), and finally `_restricted_scratch.clear()` in a `finally`. This matches the "recompute board after calc.py changes" discipline already in the valuation-calibration memory.
+
+**Change `web_artifact.py::_slim_raw` / `_to_dict` — publish gate.** `_slim_raw` already whitelists `raw` via `RAW_KEEP`. Extend it to drop any field whose `_prov[field].published_ok` is false, and to strip `_prov` itself from the public artifact:
+
+```python
+def _slim_raw(raw):
+    prov = (raw or {}).get("_prov", {})
+    out = {}
+    for k, keep in RAW_KEEP.items():
+        v = raw.get(k)
+        if v is None: continue
+        p = prov.get(k)
+        if p and not p["published_ok"]:   # licensed raw -> never leaves the box
+            continue
+        out[k] = v if keep == "*" else {sk: v[sk] for sk in keep if sk in v}
+    return out            # note: _prov intentionally NOT copied out
+```
+
+Also gate the top-level `Listing` columns in `_to_dict`: for each publishable model field, if its `_prov` says `published_ok=False`, null it in the dumped dict (belt-and-suspenders in case a `PERMISSIVE`/`RESTRICTED` value ever landed on a first-class column).
+
+**Change `load_board()` — TTL sweep on the way in.** `load_board()` is the re-entry point every incremental run uses. Before returning, drop any `raw[field]` whose `_prov[field].expires_at` is in the past (defense in depth; restricted values should never have persisted, but this guarantees expiry even if one leaks). Emit a counter for anything it had to purge.
+
+**Change the disk cache.** Key each cache entry's TTL off `license_of(source)`'s `cache_ttl`. Restricted responses go to a separate `cache/restricted/` dir written with `0600`, encrypted at rest (Fernet key in the keychain, not the repo), and a launchd `daily` purge job deletes anything past `expires_at`. Free responses keep the current long-lived plain cache.
+
+**New `scripts/license_audit.py`** — walks `listings.json` + `listings_detail.json` + `cache/`, asserts (a) no field with `published_ok=False` appears in the public artifacts, (b) no `restricted_ephemeral` provenance persists anywhere, (c) every `_prov.source` is classified. Wire into the existing `run_health.json` so a violation surfaces on the health dashboard like source-health alarms already do.
+
+### Guardrails (limits/alarms/idempotency)
+
+- **Fail-closed classification.** `license_of()` raises on an unknown slug; CI test (mirroring `test_source_health.py`) asserts every registered enricher slug has a `SOURCE_LICENSE` entry. A new paid vendor physically cannot ship without a license decision.
+- **Two independent publish gates + one load gate + one audit.** `_slim_raw` (raw), `_to_dict` (columns), `load_board` (TTL purge on entry), and `license_audit.py` (post-write assertion) are redundant on purpose — a single-point bug can't leak licensed data all the way to the public board without a second gate or the audit catching it. `license_audit` failing sets a `run_health` alarm and, ideally, blocks the `write_artifact` publish.
+- **24h hard expiry, enforced three ways.** Restricted values (a) never persist to the `Listing` at all, (b) live only in run-scoped `_restricted_scratch` cleared in a `finally`, (c) their cache entries carry `expires_at` and a daily launchd purge deletes them. Even a total logic failure caps exposure at one day.
+- **Bulk-export flag stops the second-order leak.** `PERMISSIVE` data persists and renders, but `bulk_export=False` means a future CSV/API export of the board filters it out — RentCast/Realie values are for *our* screen, not for redistribution. The export path checks `LICENSE_POLICY[...]["bulk_export"]`.
+- **Idempotent stamping + merge safety.** `stamp()` overwrites `_prov[field]` on every write, so re-running an enricher just refreshes provenance (no drift). Add a rule to `Listing.merge()`: when two sources set the same field, keep the value and copy its winning source's `_prov` entry alongside — so `_deep_merge_dict` blending `raw` can never leave a value whose provenance points at the wrong (or a more-permissive) source. A restricted value can never win a merge onto a persisted field because `set_field` never puts it there in the first place.
+- **Cost control couples to this.** Because provenance records `fetched_at` per field per source, a per-vendor call counter is free to derive — cap ATTOM/RentCast calls per run and per day, alarm at 80% of the monthly budget from the same counters the license layer already writes.
+
+
+## Incremental / Delta Refresh — Tiered TTL + Change-Detection Queue
+
+### The problem (what breaks without it)
+The board is ~17k leads. Every enricher is per-lead "missing-only" backfill, which is correct for *net-new fields* but does nothing once a field is populated — so today the only way to catch a changed value (a new REO status, a lien satisfied, a sale recorded) is a full re-enrich, and the full weekly crawl already hangs 8.5h (`project_fc_fullrun_hang`). When paid vendors arrive (RentCast/Geocodio/BatchData/ATTOM-bulk), "re-enrich the board" becomes "re-bill the board": 17k parcels × N vendors × monthly is O(board) API spend, most of it re-buying data that hasn't changed. Worse, the three data classes have wildly different volatility — a parcel's `heated_sqft` and geometry never change, its `assessed_value`/`lien_balance` change roughly annually, but `sale_date`/`REO_flag`/`auction_status` can flip day-to-day. A single refresh cadence either wastes money re-pulling static specs daily or misses perishable status flips monthly. Without a tier model you cannot say "cost = O(new + changed)"; you can only say "cost = O(board × cadence)."
+
+### The design (concrete pattern, keyed to this pipeline's shape)
+Three moving parts layered *on top of* the existing missing-only enrichers, not replacing them.
+
+**1. Field-tier registry.** Every enrichable field is tagged with a volatility tier and a TTL. This is the policy table the whole system reads from:
+
+| Tier | Examples | TTL | Refresh trigger | Cost posture |
+|---|---|---|---|---|
+| `static` | `heated_sqft`, `year_built`, `lot_geometry`, `parcel_id`, `situs_lat/lng`, `beds/baths` | ∞ (pull once, cache forever) | only if `null` or a manual `force` | free; never re-bill |
+| `slow` | `assessed_value`, `arv`, `lien_balance`, `tax_owed`, `owner_name`, `mailing_addr` | 30–90d | TTL expiry OR upstream-index change | monthly-ish, batched |
+| `perishable` | `sale_date`, `reo_flag`, `auction_status`, `listing_status`, `foreclosure_stage` | 1–3d | daily source diff | daily, source-native only |
+
+The tier decides *cadence*; a per-field `provenance` record (source, fetched_at, cost_cents, content_hash) decides *whether the value actually moved*. Missing-only stays the floor: static fields are pulled exactly once and are effectively missing-only forever. Slow/perishable add TTL-expiry and change-detection on top.
+
+**2. Change-detection = content hash + source-side cursor, not blind re-pull.** Two-level so you rarely pay to discover "nothing changed":
+- *Source-cursor level (free, coarse):* for source-native feeds you already scrape (SCDOT layers, ROD/CAMA cards, court JSON, jail/booking endpoints, qPublic parcel cards), each daily/weekly crawl produces a per-parcel `raw_content_hash` (sha256 of the normalized source record). If the hash equals last cycle's, that parcel is **unchanged** — it never enters the enrich queue and costs $0. Only parcels whose source hash moved, plus genuinely net-new parcels, become "dirty."
+- *Field level (guards paid vendors):* a paid vendor is only called for a field that is (a) `null`, or (b) past-TTL **and** the parcel is dirty from a cheaper upstream signal. You never spend an ATTOM/BatchData call just because 30 days elapsed on a parcel nothing else touched — TTL expiry marks a field *eligible*, the dirty-bit makes it *actually queued*. That's the difference between O(board) and O(changed).
+
+**3. Delta queue over the existing missing-only enrichers.** Instead of iterating the whole board, each scheduled run builds a work queue of `(parcel_id, field, tier, reason)` rows and the enrichers drain *that*. The queue is the single choke point where cost, rate, and idempotency are enforced. Reasons: `net_new`, `null_backfill`, `ttl_expired+dirty`, `manual_force`. launchd cadence maps to tiers: the daily API/court/vision job drains `perishable` + `net_new`; a monthly job drains `slow`; `static` is only ever touched by `net_new`/`force`. The weekly full crawl becomes a *source-diff producer* (emits hashes and net-new parcels) rather than a re-enricher — which also directly relieves the 8.5h hang, because 95%+ of parcels short-circuit on an unchanged hash before any geocode/comps CPU spin.
+
+### Implementation (files/functions to add or change; data shapes)
+
+**New: `field_tiers.py`** — the registry, single source of truth.
+```python
+# tier, ttl_days (None = forever), preferred sources cheapest-first
+FIELD_TIERS = {
+  "heated_sqft":   Tier("static", None,  ["cama","qpublic"]),
+  "lot_geometry":  Tier("static", None,  ["scdot","arcgis"]),
+  "assessed_value":Tier("slow",   45,    ["cama","rentcast"]),
+  "lien_balance":  Tier("slow",   30,    ["rod_ocr","attom"]),
+  "tax_owed":      Tier("slow",   30,    ["qpaybill","county_pdf"]),
+  "sale_date":     Tier("perishable", 2, ["scdot","court_json"]),
+  "reo_flag":      Tier("perishable", 1, ["court_json","govdeals"]),
+}
+def is_eligible(field, prov, now, dirty, force=False): ...  # null | past-TTL&dirty | force
+```
+
+**New: `provenance.py`** — per-field metadata sidecar, keyed alongside `listings_detail.json` (do NOT stuff into the slim `listings.json`). Extend `web_artifact.load_board`/`write_artifact` so provenance rides with the detail sidecar and is never clobbered (same discipline as `project_board_writer_load_board`).
+```json
+// listings_provenance.json  {parcel_id: {field: {...}}}
+"37-11-04-018": {
+  "assessed_value": {"value":214000,"source":"cama","fetched_at":"2026-06-02T…",
+                     "cost_cents":0,"content_hash":"9f2c…","ttl_days":45},
+  "reo_flag":      {"value":true,"source":"court_json","fetched_at":"2026-07-01T…",
+                     "cost_cents":0,"content_hash":"a71b…"}
+}
+```
+
+**New: `delta_queue.py`** — `build_queue(board, provenance, source_hashes, now)` returns the dirty worklist; `raw_content_hash(source_record)` normalizes+hashes a source pull; `mark_dirty(parcel_ids)` from source-diff. Emits `queue.jsonl` (auditable, resumable):
+```json
+{"parcel_id":"37-11-04-018","field":"reo_flag","tier":"perishable","reason":"ttl_expired+dirty","eligible_sources":["court_json"]}
+```
+
+**Change: existing enrichers** — instead of `for lead in board: if lead.get(field) is None: fetch()`, they consume `delta_queue.drain(tier=...)`. The missing-only check moves *into* `is_eligible` (the `null` branch), so behavior is a strict superset of today. After a fetch, write provenance with the new `content_hash`; if the hash equals the prior one, record `fetched_at` (TTL resets) but leave the value untouched and log a `no-change` (this is how you measure how much you'd have overpaid).
+
+**Change: launchd plists** — daily job calls `build_queue(tiers=["perishable"])` + net-new; add a monthly plist for `["slow"]`; weekly crawl runs in `--hash-only` mode (produce `source_hashes` + net-new list, no enrichment).
+
+**New vendor adapters** — `vendors/rentcast.py`, `batchdata.py`, `attom_bulk.py`, `geocodio.py` behind a common `Vendor.fetch(parcel, field) -> (value, cost_cents)`; ATTOM/BatchData bulk endpoints take the *whole dirty batch* in one call, not per-parcel, so batch the queue by vendor before draining.
+
+### Guardrails (limits/alarms/idempotency)
+- **Per-run + per-month spend caps, per vendor.** `MAX_SPEND_CENTS[vendor]` checked before each batch; drain stops and the remaining queue persists to `queue.jsonl` (resumable next run) rather than blowing the budget. Sum `cost_cents` from provenance for a live month-to-date meter; alarm (push notification) at 80% of cap.
+- **Idempotency by content_hash + fetched_at.** Re-running a job is a no-op for anything already fresh: eligibility re-checks provenance, so a crashed/re-fired run never double-bills. `queue.jsonl` lines carry a run-id so a resumed drain skips completed rows.
+- **TTL jitter** (±15%) so slow-tier fields don't all expire the same day and stampede a vendor; caps daily spend variance.
+- **Dirty-rate alarm.** If a source's unchanged-hash rate drops toward 0 (everything looks "changed"), that's a normalization bug or a source schema drift (cf. `project_column_source_silent_death` 200+0-results) inflating cost — alarm before it bills the whole board. Symmetrically, alarm if net-new + dirty ever exceeds a sane fraction of the board (e.g. >20%) in one cycle: fail closed, don't auto-drain a full-board re-bill.
+- **`--force` is explicit and scoped.** Manual full re-enrich requires `--force --field X` (or `--parcel`); there is no code path where a routine schedule re-pulls a `static` field or bulk-refreshes past-TTL fields that aren't dirty.
+- **Provenance write safety.** All queue/provenance writes go through `load_board`→mutate→`write_artifact` so the vision/comps/cama sidecars are never wiped; provenance is a separate file so a slim `listings.json` publish can't drop it.
+- **Cost observability.** Every run appends a `{run_id, vendor, calls, cost_cents, no_change_calls, changed_calls}` line to `refresh_ledger.jsonl` — `no_change_calls` is the wasted-spend estimate you're driving to zero and the proof the tier model is paying for itself.
+
+
+## Per-vendor budget caps & cost controls
+
+### The problem (what breaks without it)
+Every paid vendor you're weighing (RentCast, Geocodio, BatchData, ATTOM-bulk) bills per-call or per-record, and this pipeline's whole shape is designed to *maximize* calls: weekly full crawl fans thousands of listings across ~30 enrichers, `main.run()` awaits them in sequence, each with its own retry/backoff, and the missing-only gate re-attempts every field that's still blank on *every* daily refresh. That is exactly the loop that turns a $0.007 geocode into a four-figure surprise. Concrete failure modes with no controls:
+
+- **Runaway retry storm.** A vendor 5xx or a Scrapling adapter that starts returning empty makes the missing-only gate think the field is still unfilled, so tomorrow's `daily_api_refresh.py` retries the same 4,000 leads — forever, because the field never fills. Free sources make this merely slow; a paid vendor makes it a recurring invoice.
+- **Full-crawl amplification.** The weekly crawl has no memory that it already paid for a lead last week; without a cost ledger it re-buys skip-trace on leads that haven't changed.
+- **No pre-flight visibility.** You cannot answer "what will tonight's launchd run cost me?" before it runs. The first signal is the vendor's monthly bill.
+- **Cost applied to junk.** Today `enrich()` skip-traces everything with an address. Paying BatchData to skip-trace a COLD lead (out-of-scope county leaked via zip fallback, or a sold-confirmed property) is pure waste — the actionable set is a small fraction of the board.
+- **No kill switch.** The SOS breaker (`enrichment_sos_dissolution.py`) protects against *time* (Cloudflare hangs) but nothing protects against *spend*. A misconfigured `max_check` or a pricing change has no circuit that trips on dollars.
+
+### The design (concrete pattern, keyed to this pipeline's shape)
+Four layers, each mirroring a pattern already in the repo so it's idiomatic and testable:
+
+**1. Cost ledger = the meter, implemented as a decorator/wrapper around the vendor HTTP call.** Do not scatter counting logic into each enricher. Add one module, `cost_ledger.py`, that exposes an async context-managed `meter(vendor, unit_cost, units=1)` and an `@metered(vendor, unit_cost)` wrapper. Every paid call routes through it — the same way every headless render already routes through `render.py`. The meter does three things atomically: (a) checks the vendor's remaining budget *before* the spend and raises `BudgetExceeded` if the call would breach the cap, (b) records the spend to an on-disk ledger keyed by `(vendor, billing_month)`, (c) attaches `cost_usd` to the lead's `raw["cost"]` list for per-lead accounting. Because the pipeline is single-process async under launchd, an in-process counter flushed to a JSON sidecar (same load/save shape as `enrichment_gis_attrs.py`'s `_load_cache`/`_save_cache`) is sufficient — no external DB.
+
+**2. Per-vendor monthly cap + spend-counter circuit breaker.** Reuse the SOS breaker's exact state-machine shape (`{"tripped": bool, ...}` checked at the top of the per-item coroutine). Instead of counting `consec_fail`, the vendor breaker counts `spent_usd` against `monthly_cap_usd`. When `spent >= cap`, the breaker trips: every subsequent `meter()` for that vendor short-circuits to a no-op that logs `cost_ledger.cap_reached` and leaves the field unfilled (free sources already filled what they could; the paid enricher just stops). The breaker is *per-vendor* so BatchData tripping doesn't starve Geocodio. A soft threshold (e.g. 80% of cap) emits a warning alarm without stopping.
+
+**3. The HOT/WARM gate as the primary cost lever.** This is the highest-leverage control and it's nearly free because `distress_score.py` already computes the tier. Move the expensive vendor enrichers (skip-trace, ATTOM detail, address append) to run *after* `distress_score`, and filter their input to `tier in {"HOT","WARM"}` (plus a contactability check the module already does). This is a **gate, not a breaker** — it shrinks the billable population from "every lead with an address" to "leads worth calling," typically a small single-digit fraction of the board. Free enrichers (GIS, county CAMA, geocode-via-Census) stay upstream and unconditional so the tier is well-populated *before* the gate. This ordering also feeds the breaker: paid spend is now proportional to actionable volume, not crawl volume.
+
+**4. Dry-run / estimate mode.** Add `--estimate` (env `COST_ESTIMATE=1`). In this mode every `meter()` call *counts the units it would bill* and records to a projection ledger instead of hitting the network. `main.run()` then prints a per-vendor projected-spend table and the number of leads that would pass the HOT/WARM gate, and exits before any paid call. This is the pre-flight the current design lacks — run it against tonight's deduped board and see the invoice before launchd does.
+
+### Implementation (files/functions to add or change; data shapes)
+
+**New: `src/foreclosure_scraper/cost_ledger.py`**
+```python
+# Static vendor pricing + caps. Env overrides for tuning without a deploy.
+VENDORS: dict[str, VendorSpec] = {
+    "rentcast":  VendorSpec(unit_cost=0.008, monthly_cap_usd=50.0,  soft_frac=0.8),
+    "geocodio":  VendorSpec(unit_cost=0.0005,monthly_cap_usd=20.0,  soft_frac=0.8),
+    "batchdata": VendorSpec(unit_cost=0.07,  monthly_cap_usd=150.0, soft_frac=0.8),
+    "attom":     VendorSpec(unit_cost=0.0,   monthly_cap_usd=0.0),  # flat bulk; cap = call-count guard
+}
+
+class BudgetExceeded(Exception): ...
+
+class CostLedger:
+    """One instance per run. Loads month-to-date spend from a JSON sidecar,
+    accumulates in-process, flushes on close. Same load/save shape as
+    enrichment_gis_attrs._load_cache/_save_cache."""
+    def spent(self, vendor) -> float: ...
+    def remaining(self, vendor) -> float: ...
+    def tripped(self, vendor) -> bool: ...           # spent >= cap
+    def record(self, vendor, units, li=None): ...     # adds to month total + li.raw["cost"]
+
+@asynccontextmanager
+async def meter(ledger, vendor, units=1, li=None, estimate=False):
+    spec = VENDORS[vendor]
+    would_cost = spec.unit_cost * units
+    if ledger.tripped(vendor):
+        raise BudgetExceeded(vendor)                  # breaker open -> caller skips
+    if ledger.spent(vendor) + would_cost > spec.monthly_cap_usd:
+        ledger.mark_tripped(vendor); log.warning("cost_ledger.cap_reached", vendor=vendor)
+        raise BudgetExceeded(vendor)
+    if estimate:
+        ledger.record_projection(vendor, units); yield; return
+    yield                                             # real network call happens here
+    ledger.record(vendor, units, li)
+    if ledger.spent(vendor) >= spec.monthly_cap_usd * spec.soft_frac:
+        log.warning("cost_ledger.soft_threshold", vendor=vendor, spent=ledger.spent(vendor))
+```
+
+**Ledger sidecar shape** — `.cache/cost_ledger.json` (gitignored, alongside existing caches):
+```json
+{
+  "2026-07": {
+    "batchdata": {"units": 214, "usd": 14.98, "leads_charged": 214, "tripped": false},
+    "geocodio":  {"units": 3901, "usd": 1.95, "tripped": false},
+    "rentcast":  {"units": 640, "usd": 5.12, "tripped": false}
+  }
+}
+```
+
+**Per-lead cost accounting** — append to the existing `li.raw` dict (the same place `sos_status` and other enrichers already write), so it flows into `listings_detail.json` for audit:
+```python
+li.raw.setdefault("cost", []).append({"vendor": "batchdata", "usd": 0.07, "step": "skiptrace"})
+# roll-up field: li.raw["cost_total_usd"]
+```
+
+**Change: each paid enricher** (the new `enrichment_rentcast.py`, `enrichment_batchdata_skiptrace.py`, etc.) wraps its network call:
+```python
+try:
+    async with meter(ledger, "batchdata", units=1, li=li, estimate=EST):
+        resp = await client.post(...)
+except BudgetExceeded:
+    counts["skipped_over_budget"] += 1
+    continue     # leave field blank; free sources already tried
+```
+
+**Change: `main.py run()`** — three edits:
+- Instantiate one `ledger = CostLedger.for_month()` near the top of `run()` and thread it into the paid enrichers (mirror how `enriched` is threaded).
+- **Reorder** so paid enrichers run *after* `distress_score` is computed, and gate their input list: `hot_warm = [li for li in enriched if (li.raw.get("distress") or {}).get("tier") in ("HOT","WARM")]`. Pass `hot_warm`, not `enriched`, to skip-trace/RentCast/ATTOM-detail.
+- If `COST_ESTIMATE=1`, after building `hot_warm` print the projection table (`ledger.projection_report()`) and `return 0` before the paid block.
+
+**Change: `daily_api_refresh.py`** — construct the same `CostLedger.for_month()` (so the daily refresh shares the *same* month-to-date counter as the weekly crawl — the cap is monthly across all run types, which is the whole point). Guard the missing-only retry so a field that has been attempted-and-failed N times for a lead is marked `cost_giveup` in `li.raw` and not re-billed indefinitely.
+
+**New tests** (mirror existing `tests/` per-enricher style): cap-trip stops further calls; estimate mode makes zero network calls; per-lead `cost` accumulates; month rollover resets the counter; HOT/WARM gate reduces the input population.
+
+### Guardrails (limits/alarms/idempotency)
+- **Hard per-vendor monthly cap** enforced *before* the call — a breach raises `BudgetExceeded`, never silently overspends. Caps live in `VENDORS` with `${VENDOR}_MONTHLY_CAP_USD` env overrides so you can throttle without a code change.
+- **Global daily circuit** in addition to per-vendor monthly: `COST_DAILY_CAP_USD` (sum across vendors) trips the whole paid layer for the rest of the run — a backstop against a single misbehaving new vendor. Same trip/short-circuit shape as the SOS breaker.
+- **Soft-threshold alarm** at 80% of any cap logs `cost_ledger.soft_threshold` (surface it in the launchd run's log summary / health sweep like `scripts/health_sweep.py` already does).
+- **Idempotency / no double-billing:** the meter records spend only *after* a successful `yield`; a raised exception inside the call records nothing. Combine with a per-lead per-vendor dedup key (`cost_charged:{vendor}` flag in `li.raw`) so a lead already skip-traced this cycle is never re-billed even if it re-enters the loop.
+- **Retry-storm cap:** vendor calls get bounded retries (reuse the existing backoff), and a lead that fails a paid enricher `MAX_VENDOR_ATTEMPTS` times is flagged `cost_giveup` and excluded from future missing-only retries — this is what stops the daily refresh from re-buying the same permanently-unfillable field.
+- **Estimate-before-spend is mandatory for new vendors:** the launchd wrapper (`scripts/run_daily_api_refresh.sh` / `run_local.sh`) runs one `COST_ESTIMATE=1` pass and echoes the projection into the log before the real run, so every night's projected spend is recorded even when caps aren't hit.
+- **Fail-open on free, fail-closed on paid:** a tripped breaker or ledger error must never crash the pipeline or block free enrichment — it degrades to "field left blank," exactly like the SOS breaker leaves `sos_status` unset. The board still publishes; it just publishes without the paid signal that would have blown the budget.
+
+**Real seams referenced:** `src/foreclosure_scraper/enrichment_sos_dissolution.py` (breaker state-machine to copy), `main.py::run()` (enricher orchestration + reorder point), `distress_score.py` (HOT/WARM/COLD tier the gate keys on, already computed), `enrichment.py::enrich()` (batched Apify skip-trace, the first thing to move behind the gate), `enrichment_gis_attrs.py::_load_cache/_save_cache` (JSON-sidecar pattern for the ledger), `scripts/daily_api_refresh.py` (shares the monthly counter), `scripts/health_sweep.py` (alarm surfacing).
+
+
+## Batch-ETL lane for bulk vendor data
+
+### The problem (what breaks without it)
+The current engine is shaped entirely around **per-lead, missing-only, async backfill**: an enricher takes one lead, does one network call (httpx/curl_cffi/Scrapling), caches the response on disk, and writes the field back. Bulk licenses invert every one of those assumptions. ATTOM Cloud and Realie bulk ship a **whole state/county as one CSV or Snowflake table** — millions of parcel rows, most of which will never match a lead on the board. If you force that shape through the per-lead lane you get three failures:
+
+- **Cost/rate blowup mis-modeled.** Per-lead vendors are priced per call; bulk is priced per *license/file*. Running a "RentCast-style" per-lead loop against an ATTOM bulk entitlement either isn't possible (no per-parcel API on that tier) or pays per-call rates for data you already own in the file. The cost governor built for per-call has no concept of "one $X file, then free local reads forever."
+- **Latency and event-loop starvation.** A 3-million-row CSV parsed inside the async refresh cycle blocks the loop, balloons memory, and turns a 20-minute daily refresh into an OOM. Bulk ingestion is a batch job, not a coroutine.
+- **No point-in-time truth / silent drift.** A bulk file is a *snapshot* keyed to a vendor extract date. Without a versioned store you can't answer "which ATTOM vintage produced this AVM," can't diff last month's file against this month's, and can't roll back a bad load. The per-lead disk cache (keyed by URL/lead) can't represent "the Buncombe County ATTOM extract as of 2026-06-30."
+- **APN join is unsolved.** ATTOM, Realie, county CAMA, and the engine's own leads each format the parcel number differently (dashes, leading zeros, book-page, 10-digit TMS vs raw). A per-lead enricher hides this; a bulk join makes it the entire problem — a 5% APN-normalization miss on a 3M-row file is 150k unjoinable parcels.
+
+### The design (concrete pattern, keyed to this pipeline's shape)
+Two lanes that meet at a **local store**, never at the network:
+
+```
+BATCH-ETL LANE (weekly/monthly, own launchd job)          PER-LEAD LANE (existing, unchanged shape)
+──────────────────────────────────────────────           ─────────────────────────────────────────
+ acquire → stage → normalize(APN+fips) → load(parquet)     load_board → for lead: missing-only enrichers
+       → validate → promote(atomic) → manifest                             ├─ httpx/curl_cffi/Scrapling (network)
+                          │                                                 └─ BulkJoinEnricher (NO network) ◄─┐
+                          └──────────────── local store (SQLite index + parquet) ───────────────────────────┘
+```
+
+- **The Batch-ETL lane is a separate process on its own launchd cadence** (bulk vintages update monthly/quarterly, not daily). It runs the classic ELT stages, and its *only* output is a local, versioned columnar store. It never touches `listings.json` or `load_board`.
+- **The store is the contract.** One canonical layout keyed by `(apn_norm, fips)`: parquet partitioned by `fips` for scan-free county reads, plus a thin SQLite index for the point lookups the join actually does. Each vendor gets its own namespace and its own `vintage` (extract date + file hash) so multiple vendors and multiple snapshots coexist.
+- **The bridge is one new enricher that speaks the per-lead protocol but does zero network I/O.** `BulkJoinEnricher` is registered in the *same* enricher chain as RentCast/Geocodio. Because the chain is already **missing-only**, ordering it *before* the paid per-lead vendors means every field the bulk file can supply is filled from local disk for free, and the paid API is only called for the residue the file couldn't cover. This is the cost lever: **a $ per-file license displaces $ per-call spend**, and the existing missing-only gate enforces it with no new logic.
+- **Coexistence with `load_board`/`write_artifact` is by strict separation.** The batch lane writes only to the store. The per-lead lane still reads leads via `load_board()` and publishes via `write_artifact()` exactly as today, so the sidecar (vision/comps/cama) is never touched by batch — honoring the "board-writers must use load_board" rule by *not being a board-writer at all*.
+
+### Implementation (files/functions to add or change; data shapes)
+
+New package `batch_etl/` (own entrypoint, own launchd plist):
+
+- `batch_etl/acquire.py` — `fetch_bulk(vendor, entitlement) -> RawExtract`. Two backends: `s3_sftp_pull()` for ATTOM Cloud delivered files, `snowflake_unload()` (`COPY INTO @stage` → download) for Realie/Snowflake. Streams to `staging/{vendor}/{vintage}/` on disk; never loads whole file into RAM. Records `sha256` + row count.
+- `batch_etl/normalize.py` — the load-bearing module.
+  - `normalize_apn(raw, fips, vendor) -> str`: strips separators, restores county-specific leading-zero width, maps vendor quirks (book-page → parcel where needed). Reuses the same rule the SCDOT/Charleston TMS resolver already relies on so batch and per-lead agree on APN shape.
+  - `resolve_fips(state, county) -> fips5`: county-name/alias → 5-digit FIPS.
+  - Emits an `unjoinable_apn` reject stream (rows that fail normalization) to a quarantine parquet + a count, so a normalization regression is *visible*, not silent.
+- `batch_etl/load.py` — `write_store(vendor, vintage, rows)`: writes `store/{vendor}/fips={fips}/data.parquet` via pyarrow (chunked, bounded memory) and upserts the SQLite index. **Atomic promote:** write to `store/_staging/…`, `fsync`, then rename into place; flip `current_vintage` in the manifest last. A crashed load never leaves a half-written store the join can read.
+- `batch_etl/manifest.py` — `store_manifest.json`: `{vendor: {current_vintage, path, rows, sha256, loaded_at, schema_version, coverage_fips: [...]}}`. Single source of truth for "what's live."
+- `batch_etl/validate.py` — gate before promote: row-count within ±N% of prior vintage, join-rate against current board ≥ threshold, required columns non-null ≥ threshold. Fail → don't promote, keep prior vintage, alarm.
+
+Store shapes:
+
+- **Parquet row** (`store/{vendor}/fips=NNNNN/data.parquet`): `apn_norm` (str, PK-within-fips), `fips`, `vendor`, `vintage`, then vendor payload columns (`avm_value`, `avm_confidence`, `beds`, `baths`, `sqft`, `last_sale_price`, `last_sale_date`, `owner_occupied`, `lat`, `lng`, …). Snappy-compressed, sorted by `apn_norm`.
+- **SQLite index** (`store/index.db`): `CREATE TABLE parcel_index(apn_norm TEXT, fips TEXT, vendor TEXT, vintage TEXT, row_path TEXT, row_offset INT, PRIMARY KEY(apn_norm, fips, vendor));` — turns the per-lead join into an O(1) indexed lookup instead of a parquet scan. Rebuilt on each promote.
+
+Changes to the existing per-lead lane:
+
+- `enrichers/bulk_join.py` — new `BulkJoinEnricher(Enricher)` implementing the existing enricher interface (`async def enrich(lead) -> dict`). It is **sync-work-only** wrapped for the loop: `await asyncio.to_thread(self._lookup, lead)`. `_lookup` normalizes the lead's APN+fips with the *same* `normalize_apn`, hits `parcel_index`, reads the parquet row, returns only fields the lead is missing. On miss → returns `{}` (lead falls through to paid per-lead vendors). No `httpx`, no disk *response* cache (the store *is* the cache).
+- Enricher registry (wherever the chain is ordered): insert `BulkJoinEnricher` **ahead of** RentCast/Geocodio/BatchData so free local fills happen before any paid call. Tag each written field with `source_vendor`+`vintage` in the lead's provenance so the board can show data lineage and calc.py can weight confidence.
+- Nothing in `web_artifact.py`/`load_board`/`write_artifact` changes.
+
+### Guardrails (limits/alarms/idempotency)
+- **Idempotency by content hash.** Re-running acquire on the same delivered file (same `sha256`) is a no-op past the manifest check; load is idempotent because promote is a full atomic swap of a vintage, not an in-place mutate. Safe to re-run after a crash.
+- **Cost control at the entitlement boundary.** Bulk cost is incurred *only* in `acquire.py`, gated by a per-vendor monthly budget in config (`max_bulk_pulls_per_month`, `allowed_fips`) — you can only pull counties in your license footprint and only N times/period. The per-lead governor is untouched; because `BulkJoinEnricher` runs first and is free, **paid per-call spend can only ever go down** when a bulk vendor is added. Emit `bulk_fill_rate` (fraction of leads a vendor satisfied locally) so you can see the license paying for itself.
+- **Join-rate + drift alarms.** After each promote, compute join-rate against the live board and row-count delta vs prior vintage; alarm (and refuse to promote) if join-rate drops below floor or `unjoinable_apn` count spikes — that catches an APN-normalization regression or a vendor schema change before it poisons enrichment.
+- **Point-in-time + rollback.** Prior vintage is retained (keep last K); manifest flip is the only promotion act, so rollback = flip `current_vintage` back. Every enriched field carries `(vendor, vintage)` provenance, so a later-discovered bad extract is fully traceable and reversible.
+- **Freshness contract.** Manifest carries `loaded_at` + vendor `as_of`; `BulkJoinEnricher` refuses a store older than a configured TTL and logs stale-store (so a dead batch launchd job surfaces instead of silently serving months-old AVMs).
+- **Lane isolation / no lock contention.** Batch writes to `_staging` then renames; the per-lead lane only ever opens the store read-only (SQLite `mode=ro`, parquet mmap). The two launchd jobs never write the same path, so a mid-refresh promote can't corrupt an in-flight read — the reader either sees the old vintage or, after rename, the new one, never a torn file.
+
+
+## Per-source health monitoring & silent-death alarms
+
+### The problem (what breaks without it)
+
+The pipeline crawls 90+ registered sources, and a source can stop producing without ever throwing. The three observed failure modes all evade the current guards:
+
+1. **HTTP-200-zero:** the Column legal-notice API returned `200 + 0 results` when its timestamp filter format drifted (~June 2026). `safe_run` records `last_outcome="OK"`, `by_source[slug]=0`, so it lands in the generic `errors` list as an indistinguishable "legit empty."
+2. **Post-change empty:** a scraper whose selector/endpoint moved after a site redesign returns `[]`. Same signature as a genuinely quiet week.
+3. **WAF onset / slow bleed:** a source that yielded ~50/run starts returning 5 (partial block, pagination truncation). `n=5` clears `expected_min_count`, so no regression fires and nothing is logged.
+
+What exists today catches only fragments. `main.py:618` flags a **single-run** `n < expected_min_count` regression. `source_health_tracker.evaluate_source` already handles two cross-run modes well (`dead` = ≥2 consecutive zeros on a reliable source; `bleeding` = sustained <40% of median). And `run_local.sh:136-153` has two **whole-run** guards (`count_drop_alert` grep, `TOTAL < 200`). But there are four gaps: (a) the single-run regression is invisible unless the operator reads `run_health.json`; (b) there's no per-run **diff vs last run** showing which specific sources moved; (c) there's no **concentration** guard — if 40% of HOT comes from one source and it goes dark, the total stays healthy and no alarm fires because carryover/other sources mask it; (d) the `run_local.sh` guard is a single global floor, not per-source. A source can die for weeks inside a 5,000-listing board and never surface.
+
+### The design (concrete pattern, keyed to this pipeline's shape)
+
+Four additive layers, all built on the existing `by_source: Counter`, `expected` dict, `source_outcomes` (`last_outcome`/`last_reason` from `safe_run`), and the `docs/source_history.json` rolling store. Nothing new is invented where a hook already exists — `source_health_tracker` is extended, not replaced.
+
+**Layer 1 — Outcome-aware zero classification (kills the HTTP-200-zero blind spot).** The core defect is that a `0` with `outcome="OK"` is treated as legit-empty. Thread `source_outcomes` into the tracker so it can distinguish *earned* zeros (scraper ran clean, site truly had nothing) from *suspicious* zeros (ran clean but a source that has real history now returns nothing). A suspicious zero on a reliable source is a **single-run** dead-alarm candidate — it should not need 2 consecutive weeks when the source's own baseline says it never legitimately hits 0. This is exactly the Column case: `outcome=OK, n=0, baseline=~40, reliable=True` → alarm on run 1, not run 3.
+
+**Layer 2 — Per-source expected-yield baselines with a per-run diff.** `source_history.json` already stores rolling counts; add a computed **baseline band** per source (rolling median of non-zero runs, plus a robust low-bound = `median × BLEED_RATIO`). On each run, emit a `source_diff` structure: for every slug, `{prev, cur, baseline, delta, delta_pct, verdict}` where verdict ∈ `ok | new | recovered | zero_suspicious | zero_expected | bleeding | dead | spike`. `spike` (cur > 3× baseline, e.g. a dedup break or a scraper double-appending) is a real corruption signal worth catching alongside drops. This diff is the artifact the operator actually reads: "these 3 sources changed materially," not "here are 90 numbers."
+
+**Layer 3 — Source-concentration / HOT-dependency monitor.** The board's value is the HOT/WARM tier from `distress_score`, and leads carry their full source set via `also_seen_in`/corroboration. Compute, per run, the **HOT contribution share** of each source: fraction of HOT leads for which that slug is the *primary or sole* source (sole = would-disappear-if-source-died, i.e. no other slug in the corroboration set). Two alarms: (a) **concentration** — any single source exceeds `HOT_CONCENTRATION_MAX` (e.g. 35%) of sole-sourced HOT leads → structural fragility warning even while healthy; (b) **HOT-blackout** — a source that was ≥`HOT_MATERIAL_MIN` (e.g. 15%) of sole-sourced HOT last run drops to a `dead`/`bleeding` verdict this run → escalate to CRITICAL regardless of total board size, because carryover will mask it in the raw count. This is the guard that fires when "40% of HOT comes from one source that goes dark" even though `TOTAL` looks fine.
+
+**Layer 4 — Per-source floor in `run_local.sh` + escalation.** The wrapper's `TOTAL < 200` global floor stays as a backstop, but the authoritative per-source verdict is computed in Python and surfaced to the shell via a machine-readable exit signal. `main.py` already sets `RC=2` semantics through the `count_drop_alert` log grep; extend that: the tracker writes a top-level `"critical": true` into `run_health.json` when any Layer-1/2/3 CRITICAL fires, and `run_local.sh` greps `run_health.json` for it (not just the log line). CRITICAL means: publish still happens (dashboard shouldn't go dark — carryover covers it) but the run exits `RC=2` and pushes an ntfy alarm naming the dead sources.
+
+**Alerting path (reuse what's wired).** `_send_ntfy` already exists and is free (ntfy.sh, no account). Keep it as the push channel. Add the same alarm text to the weekly email — `email_sender.py` already renders `by_source`; give it a top "⚠️ Source alarms" block sourced from `run_health.json["source_alarms"]` so the alarm rides the email the operator already opens. Severity tiers map to existing `run_health._severity`: `ALARM`→4 (already handled), and the new concentration warning slots at 2 (action item, not a fire).
+
+### Implementation (files/functions to add or change; data shapes)
+
+**`source_health_tracker.py` — extend, don't rewrite.**
+- Change the signature to accept outcomes and prior counts:
+  `update_source_health(by_source, expected, docs_dir, outcomes: dict[str,tuple[str,str]] | None = None) -> dict`.
+- Extend `evaluate_source(counts, expected_min=0, outcome="OK")`:
+  - New first branch — **suspicious single-run zero**: `if cur == 0 and outcome == "OK" and reliable and baseline >= SUSPICIOUS_ZERO_BASELINE_MIN: return {"kind":"zero_suspicious", "severity":"critical", ...}`. This is the Column fix — no 2-run wait when the source's own history says 0 is impossible-clean. If `outcome != "OK"` (blocked/timeout/render), *don't* alarm here — that's an acknowledged failure the existing status handles.
+  - Keep existing `dead` and `bleeding` branches.
+  - Add **`spike`**: `if baseline > 0 and cur > baseline * SPIKE_RATIO: return {"kind":"spike", ...}` (dedup/double-append corruption).
+- New pure function `source_diff(hist, by_source, outcomes) -> dict[str, dict]` returning the Layer-2 structure `{slug: {prev, cur, baseline, delta, delta_pct, verdict}}`.
+- New constants: `SUSPICIOUS_ZERO_BASELINE_MIN = 5`, `SPIKE_RATIO = 3.0`, `HOT_CONCENTRATION_MAX = 0.35`, `HOT_MATERIAL_MIN = 0.15`.
+- `_send_ntfy` unchanged; add `critical` count to the push title.
+
+**New `source_concentration.py` (Layer 3).**
+- `hot_source_shares(listings) -> dict[str, dict]`: iterate active listings where `distress_score` tier == HOT; for each, derive the source set from `enrichment_corroboration` (`li.source` + `also_seen_in` slugs); a lead is **sole-sourced** to slug X if `source_count == 1`. Return `{slug: {"hot_sole": n, "hot_any": m, "sole_share": n/total_hot}}`.
+- `concentration_alarms(shares, prev_shares) -> dict`: emit `concentration` (sole_share > `HOT_CONCENTRATION_MAX`) and `hot_blackout` (prev sole_share ≥ `HOT_MATERIAL_MIN` and this-run verdict ∈ {dead, zero_suspicious, bleeding}). Persist `prev_shares` in a new key inside `source_history.json` (`"hot_shares"`) so it's one file, one write.
+
+**`main.py` — wire at the summary-assembly site (~line 603-670, after tier/distress scoring is done so HOT is known).**
+- Pass `outcomes=source_outcomes` into `update_source_health`.
+- After distress scoring, call `hot_source_shares(active)` + `concentration_alarms(...)`; merge results into `summary["source_alarms"]` and set `summary["source_status"][slug] = "ALARM: <kind>"` so the existing `run_health._severity` promotes them to 4/2.
+- Add `summary["source_diff"] = source_diff(...)` and `summary["critical"] = any(a["severity"]=="critical" for a in alarms)`.
+
+**`run_health.py` — surface it.**
+- In `write_health_artifact`, add top-level `"critical": summary.get("critical", False)`, `"source_diff": summary.get("source_diff", {})`, and a `"concentration": summary.get("concentration", {})` block. `_severity` already returns 4 for `ALARM` — no change needed there.
+
+**`run_local.sh` — per-source escalation (extend lines 136-153).**
+- After the run, before the publish block, add a `jq`-free grep on the artifact:
+  `if grep -q '"critical": true' "$ROOT/docs/run_health.json"; then echo "==> ⚠️ CRITICAL source alarm(s) — see run_health.json source_alarms"; RC=2; fi`
+- Keep the `count_drop_alert` grep and `TOTAL < 200` floor as backstops. Publish still runs on CRITICAL (carryover keeps the board full); only a hard `RC` from a crash suppresses publish.
+
+**Data shapes (added to `docs/source_history.json`, one file):**
+```json
+{
+  "newspapers.column_legal_notices": {
+    "counts": [41, 44, 39, 0],
+    "baseline": 41, "reliable": true,
+    "alarm": {"kind": "zero_suspicious", "severity": "critical",
+              "current": 0, "baseline": 41, "outcome": "OK",
+              "reason": "0 listings, ran clean (outcome=OK), baseline ~41 — silent 200-zero, source likely broken"}
+  },
+  "hot_shares": {"national.auction_dot_com": {"sole_share": 0.38, "hot_sole": 152}}
+}
+```
+
+### Guardrails (limits/alarms/idempotency)
+
+- **False-positive suppression (the whole module's design principle):** every alarm still requires real history — `reliable = non-zero_frac ≥ 0.5`, `len(counts) ≥ 2`, and baselines computed from non-zero runs only. New/seasonal/sparse sources never alarm. The one aggressive path (single-run `zero_suspicious`) is double-gated on `outcome == "OK"` AND `baseline ≥ 5` AND `reliable`, so it can only fire on a source that has demonstrably never legitimately returned 0.
+- **Outcome gate prevents double-alarming:** `blocked`/`paywall`/`render`/`timeout` zeros are handled by the existing `source_status` severity ladder and are explicitly excluded from Layer-1 — you never get both a "blocked" acknowledgment and a "dead" alarm for the same slug.
+- **Concentration thresholds are warnings, not gates:** `concentration` (>35% sole HOT) logs at severity 2 and does not set `RC=2`; only `hot_blackout` (a material HOT source actually going dead/bleeding this run) escalates to CRITICAL. This stops a legitimately dominant-but-healthy source from crying wolf every week.
+- **Idempotency:** `update_source_health` is a pure append-and-evaluate over a single JSON file with `HISTORY_CAP=12`; re-running the same run appends one more count but never corrupts prior state. Concentration `hot_shares` is overwritten (last-run snapshot), not appended — bounded size. Because the board-writer rule requires `web_artifact.load_board()`, keep `source_history.json` **outside** the listings sidecar so it's never wiped by `write_artifact`.
+- **Never fail the run:** the entire tracker stays wrapped in the existing top-level `try/except` that logs `source_health.failed` and returns `{}` — a monitoring bug can raise an alarm but can never take down the crawl or block publish.
+- **Alarm-storm cap:** `_send_ntfy` truncates body to 3500 chars and titles with the count; add a `MAX_NTFY_SOURCES = 10` so a mass-block event (e.g. IP-level WAF hitting 30 sources at once) sends one "30 sources alarmed — likely network/IP block, not per-source" digest rather than 30 lines, which also correctly points the operator at the real (shared) root cause.
+- **Paid-vendor readiness:** when RentCast/Geocodio/ATTOM enrichers come online, register each as a "source" slug in `source_history.json` too — a vendor silently returning `200 + empty` (quota exhausted, key rotated, plan downgraded) is the identical failure class and the same `zero_suspicious` logic catches it, which is directly load-bearing once those calls cost money per request.
+
+
+## Resolved-lead persistence, auto-enrich & sidecar discipline
+
+### The problem (what breaks without it)
+The board is regenerated from scratch every run. Scrapers return *this week's* upstream inventory; enrichment is per-lead, missing-only, and disk-cached. Four failure modes destroy accumulated work if persistence and file discipline are not enforced as invariants:
+
+1. **Enrichment amnesia.** A name-only court/probate lead gets resolved to an address+parcel in run N (via `resolve_name_to_property`), then deep-enriched (comps, Vision, equity) in the same run. In run N+1 the upstream court source may not re-emit that row (case aged off the docket page), or re-emits it *without* the resolved parcel. If the board is rebuilt only from live scraper output, that lead — and its expensive Vision/comps/equity work — vanishes. The engine paid Anthropic Vision + geocode budget for a lead that evaporates.
+2. **Slim/sidecar de-sync wipes vision/comps.** `write_artifact()` splits the board into `listings.json` (slim) and an **index-aligned** `listings_detail.json` sidecar holding `LAZY_DETAIL_KEYS = (vision, foreclosure_sold_comps, comps, cama, rent_comps)`. Those keys are *popped out of `raw`* on write. Any board-writer that reads `listings.json` directly with `json.loads` and re-runs `write_artifact` sees a `raw` with those keys already gone, rebuilds the sidecar from an empty source, and **silently zeroes every lead's Vision report and comps** — the single most expensive data on the board. This is exactly the class of bug that motivated `load_board()` and the "8 scripts fixed" board-writer audit.
+3. **Index-misalignment corruption.** The join between the two files is **positional**, not id-based: `detail[i]` belongs to `listing[i]`. Any pass that filters, sorts, appends, or reorders `listings.json` after the sidecar is built — but before the next `write_artifact` — silently pairs each lead with *another lead's* Vision report. There is no id to catch it; the panels just render wrong data confidently.
+4. **Non-convergent re-runs.** Same-run catch-up (`resolved_catchup`) re-runs the address-gated enrichers on freshly-resolved leads. Without an idempotency marker, a full weekly run re-Visions and re-comps every already-covered resolved lead, re-spending metered API budget and (worse) with paid vendors coming in, re-billing RentCast/ATTOM on data it already has.
+
+### The design (concrete pattern, keyed to this pipeline's shape)
+
+**A. Persistence = prior-board merge-forward, keyed by `dedupe_key()`.** Introduce one authoritative persistence step at the *front* of the pipeline (before dedupe/enrichment) that is the mirror of `write_artifact`:
+
+- `prior = load_board(docs_dir)` — always through the sidecar-merging helper, never raw `json.loads`. This reconstitutes each prior lead with its Vision/comps merged back into `raw` (the existing `load_board` already does `raw.update(details[i])`).
+- Build `prior_by_key: dict[str, Listing]` via `li.dedupe_key()`.
+- After live scraping + carryover, **left-join live onto prior**: every prior lead whose `dedupe_key` is *not* re-seen this run is replayed into the working set with a `raw.carryover`/`raw.persisted` marker (distinct from source-outage carryover: this is per-lead continuity, not source-zero papering). When a live lead *does* match a prior key, **merge prior `raw` into live `raw` missing-only** so resolved-parcel/Vision/comps/CRM/`_resolved_deep_enriched` survive even if the live re-scrape is a thinner record.
+
+This makes persistence *source-agnostic*: it keys on the property identity, not on which scraper produced it. A lead resolved from a probate name in run N persists and continues auto-enriching in run N+1 even though probate never re-emits it, because the address branch of `dedupe_key()` now matches it against nothing live and it carries forward.
+
+**B. Auto-enrich on persisted leads = the existing missing-only gates, unchanged.** Because enrichers are already "missing-only + disk-cached", once a persisted lead is back in the working set it flows through every global enricher pass and only fills gaps. No new enrichment code is needed — persistence *feeds the existing gates*. The one addition: persisted-but-stale leads (e.g., a resolved lead that never got Vision because run N timed out) get their empty keys filled on run N+1 for free.
+
+**C. Same-run catch-up stays, guarded by `_resolved_deep_enriched`.** The current block (main.py ~1773–1822) is the correct pattern: select `resolved_from_name.confidence == "unique_match"` AND has `street_address|parcel_id` AND NOT `_resolved_deep_enriched`, re-run the address-gated enrichers on that subset only, then stamp `_resolved_deep_enriched = True`. The stamp is in `RAW_KEEP` so it *persists*, which — combined with (A) — means a lead is deep-enriched exactly once across its lifetime, not once per run.
+
+**D. Sidecar discipline = one write path, one read path, positional-integrity assertions.**
+- **Single writer:** `write_artifact` is the only function allowed to pop `LAZY_DETAIL_KEYS` and emit the two files. It already does this correctly (pops LAST, after `_to_dict`/`_slim_raw`/`annotate_stale_links`).
+- **Single reader:** `load_board` is the only sanctioned way to read the board back into a pass. Forbid raw `json.loads(listings.json)` in any board-writing script (lint rule below).
+- **Alignment invariant:** the two files must always be built from the same `payload` list in the same order, and any post-sidecar-build reordering is prohibited. Enforce with assertions at write time.
+
+### Implementation (files/functions to add or change; data shapes)
+
+**1. `web_artifact.py` — harden the write with invariants (new `_assert_board_integrity`).**
+```python
+def _assert_board_integrity(payload: list[dict], details: list[dict]) -> None:
+    # I1 length parity (positional join precondition)
+    assert len(payload) == len(details), \
+        f"sidecar length mismatch: {len(payload)} listings vs {len(details)} details"
+    # I2 no LAZY_DETAIL_KEYS left in slim raw (they must have been popped)
+    for i, rec in enumerate(payload):
+        raw = rec.get("raw") or {}
+        leaked = [k for k in LAZY_DETAIL_KEYS if k in raw]
+        assert not leaked, f"listing[{i}] leaked heavy keys into slim: {leaked}"
+    # I3 detail entries are dicts and only ever hold LAZY_DETAIL_KEYS
+    for i, d in enumerate(details):
+        assert isinstance(d, dict), f"detail[{i}] not a dict"
+        extra = set(d) - set(LAZY_DETAIL_KEYS)
+        assert not extra, f"detail[{i}] has non-lazy keys: {extra}"
+```
+Call it in `write_artifact` immediately after the pop loop, before writing bytes. Also compute and store a **manifest** for cross-run alignment checking:
+```python
+meta["board_digest"] = {
+    "n": len(payload),
+    "detail_n": len(details),
+    "keys_digest": hashlib.sha1(  # order-sensitive: catches silent reorders
+        "".join(r.get("id") or r.get("source_url") or "" for r in payload).encode()
+    ).hexdigest(),
+    "detail_nonempty": sum(1 for d in details if d),
+}
+```
+
+**2. `web_artifact.py` — add `assert_no_detail_regression(prev_meta, new_meta)`.** A publish-gate that refuses to overwrite the board when the new run drops a large fraction of previously-populated Vision/comps sidecars (the exact symptom of a de-sync bug):
+```python
+def assert_no_detail_regression(prev: dict, new: dict, floor: float = 0.5) -> None:
+    p, n = prev.get("board_digest", {}), new.get("board_digest", {})
+    if p.get("detail_nonempty", 0) >= 20 and \
+       n.get("detail_nonempty", 0) < p["detail_nonempty"] * floor:
+        raise BoardRegressionError(
+            f"sidecar detail collapsed {p['detail_nonempty']}→{n['detail_nonempty']}; "
+            "likely a raw-json board-writer wiped comps/vision")
+```
+Wire into `main.py` right before the final `write_artifact(enriched, summary)`: read the pre-existing `run_meta.json`, build the new meta first, and gate. On breach: log, skip the overwrite, keep the last-good board (fail-safe, mirrors the carryover philosophy).
+
+**3. New `persistence.py` — `merge_forward(live, docs_dir)`.** The front-of-pipeline persistence step.
+```python
+def merge_forward(live: list[Listing], docs_dir="docs") -> tuple[list[Listing], dict]:
+    prior = load_board(docs_dir)                       # sidecar-merged
+    prior_by_key = {}
+    for li in prior:
+        k = li.dedupe_key()
+        if k: prior_by_key.setdefault(k, li)
+    live_keys = {li.dedupe_key() for li in live if li.dedupe_key()}
+    # (a) merge prior raw into re-seen live leads, missing-only
+    for li in live:
+        pk = prior_by_key.get(li.dedupe_key())
+        if pk: _merge_raw_missing_only(li.raw, pk.raw)  # never clobber live
+    # (b) replay prior leads not seen live this run
+    carried = []
+    for k, pk in prior_by_key.items():
+        if k not in live_keys:
+            pk.raw.setdefault("persisted", {})["last_seen_run"] = pk.raw.get(
+                "first_seen_run")
+            carried.append(pk)
+    return live + carried, {"persisted": len(carried), "prior": len(prior_by_key)}
+```
+`_merge_raw_missing_only` must **never** overwrite a live key with a prior value (live scrape is fresher for volatile fields like `court_balance_due`), but **must** carry non-volatile resolved/enriched keys (`resolved_from_name`, `_resolved_deep_enriched`, `vision`, `comps`, `crm`, `first_seen_run`). Encode that as a `VOLATILE_KEYS` denylist (always take live) vs everything else (fill missing). Place `merge_forward` after carryover, before dedupe — dedupe then collapses any prior/live pair that shares a *different* key branch (parcel vs address) and `_merge_raw_missing_only` on the dedupe side keeps continuity.
+
+**4. `main.py` — reads through the sanctioned path only.** Replace any `json.loads(docs/"listings.json")` in board passes with `load_board()`. The catch-up block already keys on the persisted `_resolved_deep_enriched` flag — no change except ensuring it runs *after* `merge_forward` so previously-resolved leads that carried forward are correctly skipped.
+
+**5. Lint guard — `tests/test_board_writer_discipline.py`.** Static grep test: no module under `scripts/` or `src/` that also calls `write_artifact` may call `json.loads` on `listings.json` without going through `load_board`. This codifies the "board-writers must use load_board" rule as CI, not memory.
+
+### Guardrails (limits/alarms/idempotency)
+
+**Idempotency invariants (assert in `tests/test_persistence_invariants.py`):**
+- **P1 — convergence:** `write_artifact(load_board())` is a fixed point. Load the board, immediately re-write it, and assert `listings.json` + `listings_detail.json` are byte-identical (the gzip `mtime=0` already makes this deterministic). If a round-trip changes bytes, a writer is mutating on read.
+- **P2 — catch-up runs once:** a lead with `_resolved_deep_enriched == True` is never selected by the `resolved_catchup` filter. Assert on a fixture where the flag is set.
+- **P3 — no clobber:** `_merge_raw_missing_only(live, prior)` never changes a key already present in `live`; every `VOLATILE_KEY` in the result equals the live value.
+- **P4 — positional integrity:** `len(listings.json) == len(listings_detail.json)` and `detail[i]` keys ⊆ `LAZY_DETAIL_KEYS` for all `i` (the `_assert_board_integrity` checks, run as a test on the committed board).
+- **P5 — persistence monotonicity:** total board count never drops below `prior_count − (aged_off + superseded + dropped_invalid)`; an unexplained drop trips an alarm.
+
+**Alarms (into `run_health` / `run_meta.json`):**
+- `board_digest.detail_nonempty` decreasing >50% run-over-run → **BoardRegressionError**, block the overwrite, keep last-good board, surface in the run email.
+- `persisted` count in `merge_forward` stats spiking (e.g. >40% of the board is carried, not live) → upstream scrapers are broadly failing; flag distinct from single-source carryover.
+- Catch-up `count` > 0 with any `_resolved_deep_enriched` already set → indicates the flag isn't persisting (RAW_KEEP regression).
+
+**Cost control as paid vendors arrive (RentCast/Geocodio/BatchData/ATTOM):** treat every paid enricher exactly like Vision in the catch-up block — **gated on a persisted per-lead "already-billed" marker** (e.g. `raw.rentcast.fetched_run`, added to `RAW_KEEP` so it survives). Because persistence carries that marker forward and enrichers are missing-only, a paid vendor is called **at most once per lead per data-version**, never re-billed on carryover or re-runs. Add a global per-run spend cap env (`RENTCAST_MAX_PER_RUN`, mirroring `VISION_MAX_LISTINGS`/`SKIP_TRACE_MAX_PER_RUN`) and a `time-box` wrapper identical to the Vision `asyncio.wait_for(..., timeout=…)`. The idempotency invariants (P2/P3) are what make paid spend bounded and deterministic: without persisted markers, every weekly full crawl would re-bill the entire board.
