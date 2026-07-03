@@ -20,6 +20,11 @@ exclude:
   - path_to_100_roadmap.md
   - goliath_teardown.md
   - completeness_audit.md
+  - gap_ledger.md
+  - rei_operator_playbook.md
+  - hermes_blueprint.md
+  - social_research_addendum.md
+  - strategy_sources_buyers_playbook.md
 include:
   - listings.json.gz
   - listings_detail.json.gz

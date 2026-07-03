@@ -69,6 +69,35 @@ def _norm_parcel(p: str) -> str:
     return re.sub(r"[^0-9A-Za-z]", "", (p or "")).upper()
 
 
+def _parcel_variants(parcel: str) -> list[str]:
+    """Parcel-id spellings to try against a GIS id field, best-first.
+
+    County GIS layers store parcels inconsistently: some keep the dashed form
+    the tax PDF uses (1728-00-87-8115), others store it clean (172800878115),
+    and some carry a `.NNN` sub-parcel suffix (Georgetown TMS). These layers
+    match on an exact `=` (no LIKE), so a single raw spelling silently returns
+    0 rows against a layer that stores a different form. We try each spelling
+    until one hits. Raw form is first so existing matches are unaffected.
+    """
+    p = (parcel or "").strip()
+    if not p:
+        return []
+    out: list[str] = []
+
+    def _add(x: str) -> None:
+        x = (x or "").strip()
+        if x and x not in out:
+            out.append(x)
+
+    _add(p)                         # raw, e.g. dashed-store layers
+    _add(_norm_parcel(p))           # clean alnum, e.g. `parno` / `PIN`
+    if "." in p:                    # drop a .NNN sub-parcel suffix
+        base = p.split(".", 1)[0]
+        _add(base)
+        _add(_norm_parcel(base))
+    return out
+
+
 def _cache_key(li) -> "str | None":
     st = (li.state or "").upper()
     cty = (li.county or "").replace(" County", "").strip().title()
@@ -253,7 +282,8 @@ async def _query_point(c: httpx.AsyncClient, base: str, lat: float, lng: float,
 
 
 _PARCEL_FIELDS = ("PIN", "TMS", "REID", "PARCELNUMBER", "TAXPIN", "PARNO",
-                  "PARID", "MAPNUMBER", "pid", "parno", "PARCEL", "PARCEL_ID")
+                  "PARID", "MAPNUMBER", "pid", "parno", "PARCEL", "PARCEL_ID",
+                  "PARCELID", "GPIN", "ACCOUNT", "ACCOUNTNO")
 _LAYER_FIELDS_CACHE: dict[str, list[str]] = {}
 
 
@@ -279,25 +309,27 @@ async def _query_parcel(c: httpx.AsyncClient, base: str, parcel: str,
     fields = await _layer_fields(c, base, raise_on_net_error=raise_on_net_error)
     flow = {f.lower(): f for f in fields}
     cands = [flow[p.lower()] for p in _PARCEL_FIELDS if p.lower() in flow]
-    pv = parcel.strip().replace("'", "''")
+    variants = _parcel_variants(parcel)
     for fld in cands:
-        try:
-            r = await c.get(base, params={
-                "where": f"{fld}='{pv}'", "outFields": "*",
-                "returnGeometry": "false", "resultRecordCount": "1", "f": "json",
-            }, timeout=15.0)
-            if r.status_code != 200:
+        for pv0 in variants:
+            pv = pv0.replace("'", "''")
+            try:
+                r = await c.get(base, params={
+                    "where": f"{fld}='{pv}'", "outFields": "*",
+                    "returnGeometry": "false", "resultRecordCount": "1", "f": "json",
+                }, timeout=15.0)
+                if r.status_code != 200:
+                    continue
+                data = r.json()
+                feats = data.get("features") or []
+                if feats and feats[0].get("attributes"):
+                    return dict(feats[0]["attributes"])
+            except httpx.HTTPError as e:
+                if raise_on_net_error:
+                    raise _GISNetworkError from e
                 continue
-            data = r.json()
-            feats = data.get("features") or []
-            if feats and feats[0].get("attributes"):
-                return dict(feats[0]["attributes"])
-        except httpx.HTTPError as e:
-            if raise_on_net_error:
-                raise _GISNetworkError from e
-            continue
-        except ValueError:
-            continue
+            except ValueError:
+                continue
     return None
 
 
