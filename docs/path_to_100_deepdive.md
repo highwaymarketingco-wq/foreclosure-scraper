@@ -153,3 +153,342 @@ _Companion to path_to_100.md. Each round appends new research. Round 1 = adversa
 - **EDDM $0.27–$0.52 mixes up postage-only vs all-in** — postage is ~$0.24–$0.26/piece (USPS increase Jul 12, 2026), but true loaded EDDM (print + production) is ~$0.50–$0.80/piece.
 - **Nearmap "low-5-figure minimum" is unverified** — the quote-only annual model is confirmed, but no published minimum exists; flag as estimate.
 - **Google Street View Static caching is ToS-restricted** — you generally cannot store/warehouse the imagery, which matters if the plan was to build a persistent photo library; the pricing tiers themselves (10k free, then $7.00/$5.60/$4.20/$2.10/$0.53 per 1k) are exact matches.
+
+
+---
+
+# Deep-Dive Round 2 — Per-County Free-Source Matrix (18 counties, 2026-07-02)
+
+
+### Spartanburg, SC
+County seat: Spartanburg. Assessor/GIS platform: **county-hosted Esri ArcGIS** (`maps.spartanburgcounty.org`, full-CAMA FeatureServer) + shared SCDOT layer 42 + qPublic-Schneider card (AppID 857). Register of Deeds = Logan Systems ("The Lookup").
+
+| Layer | Free endpoint / portal (URL or repo const) | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| (1) Assessor/CAMA bulk | Open-Data CSV `sc_assessor_cama.SC_CAMA["Spartanburg"].csv_url` (`arcgis.com/.../1f190ebd48c1402a918c3bc315431a1b/data`) **and** live FeatureServer `spartanburg_condemned.LAYER` = `maps.spartanburgcounty.org/server/rest/services/GIS/CAMA_Parcels/FeatureServer/0` | open JSON/CSV | ✅ `LivingArea` | ✅ `BedRooms`/`FullBaths`+`HalfBaths` | ✅ `SaleAmount` (live) / `SaleDate` | ✅ `ConditionFactor`+`CDUC`/`BuildingGrade` | ✅ `TaxpayerName`+mailing `StreetAddress/City/State/Zip` | The single best SC bulk layer. This county FeatureServer is CLEAN — use it over SCDOT. |
+| (2) qPublic/Schneider CARD | `qpublic_render._CFG["Spartanburg"]` AppID=857 LayerID=16069 card PageID=7149; KeyValue = dashed MAP (`7170204100`→`7-17-02-041.00`) | browser (stealth) — Cloudflare Turnstile + "Agree" gate | ✅ heated/finished sqft | ✅ | ✅ sales grid | ⚠️ grade only | ❌ | Redundant here: the open CSV/FeatureServer already give the same fields without rendering. |
+| (3) GIS parcel polygon + situs | SCDOT shared `enrichment_arcgis.SCDOT_BASE` layer **42**; county polygon = CAMA_Parcels FS/0 | open JSON | ✅ (county FS) / ❌ SCDOT | ✅ (county FS) | ⚠️ **SCDOT `SaleAmount` is corrupt** (uninitialized doubles ~$1.07–1.27B; capped by `_MAX_PLAUSIBLE_SALE`) | ✅ (county FS) | ✅ | Situs split on SCDOT (`StreetNumber`+`StreetName`); county FS has full attrs — prefer it. |
+| (4) GIS address-point | Not separately wired; situs comes from CAMA_Parcels polygon centroid | open JSON | n/a | n/a | n/a | n/a | n/a | No dedicated address-point layer needed — polygon situs is complete. |
+| (5) Register of Deeds index | `rod/logan_render.py` → `search.spartanburgdeeds.com` (Logan "The Lookup", DataTables AJAX) | browser (render, guest session) | ❌ | ❌ | ❌ (index carries no $) | ❌ | grantor/grantee names | Browserless Logan path is reverse-engineered but county index sits in an empty-index/QC state for date-sweeps → name-search render only (`enrichment_spartanburg_rod`, ~25s/owner, capped). |
+| (6) ROD document images | Same Logan portal, per-document image view | browser | ❌ | ❌ | ❌ | ❌ | ❌ | Images viewable; loan amount only via OCR of the deed-of-trust PDF (`enrichment_doc_ocr`). |
+| (7) Tax bill / delinquent-tax | `spartanburg_delinquent_tax.PDF_URL` (`spartanburgcounty.gov/DocumentCenter/View/11161`) + FLC `spartanburg_flc.PDF_URL` (View/104130); **balances SOLVED via qPayBill** (memory `project_qpaybill_tax`, +408, join by TMS) | open PDF + browser (qPayBill) | ❌ | ❌ | ❌ | ❌ | owner name on list | Only SC county where per-parcel tax-owed $ is reliably captured. |
+| (8) Condemned/code/vacant | Condemned FS `maps.spartanburgcounty.org/.../GIS/Condemned_Properties/MapServer` (`spartanburg_condemned.py`); vacant registry `spartanburg_vacant.LAYER` (`services9.arcgis.com/HoRra3ATPLGmyjn6/...`, ~5k) | open JSON | via CAMA join | via CAMA join | — | ✅ condemned flag | ✅ | Both live-wired. Vacant-registry ~5k parcels is a strong distress signal. |
+
+**Biggest free gap here:** Recorded loan/mortgage balance (equity denominator) — the ROD index has no $ and the date-sweep index is in a county-side empty state, so payoff must be OCR'd per-deed.
+**Cheapest fix:** Run the existing name-search render (`logan_render`) HOT/WARM-first, feed the deed-of-trust PDF to `enrichment_doc_ocr` for the original loan amount, then amortize.
+
+---
+
+### Anderson, SC
+County seat: Anderson. Assessor/GIS platform: **county-hosted Esri ArcGIS** (`propertyviewer.andersoncountysc.org`) + shared SCDOT layer 4; assessor card = ACPASS (login-walled); Register of Deeds = `andersondeeds.com` public-access portal (no repo adapter yet).
+
+| Layer | Free endpoint / portal (URL or repo const) | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| (1) Assessor/CAMA bulk | `sc_assessor_cama.SC_CAMA["Anderson"].layer_url` = `propertyviewer.andersoncountysc.org/arcgis/rest/services/NewPropertyViewer/MapServer/5` (117,435 parcels, `MRKT_VALUE>0`) + `Parcel_Sales/MapServer/0` | open JSON (self-signed cert → repo uses `CERT_NONE`) | ❌ **no heated-sqft field on ANY Anderson GIS layer** | ❌ | ✅ `SALE_PRICE`/`SAPRIC`, `SALEDATE` epoch-ms, `SATYPE` | ❌ | ✅ owner + `PHYS_ADDR` | `assessor_cards/anderson_sc.py` is intentionally **price-only**. TMS = 10-char zero-padded parcel_id. |
+| (2) qPublic/Schneider CARD | ❌ Anderson is NOT on Schneider qPublic | n/a | — | — | — | — | — | Assessor card lives in ACPASS instead (row below). |
+| (3) GIS parcel polygon + situs | SCDOT shared layer **4** (auto-detects `PHYS_ADDR`); value alias `MRKT_VALUE`, `SALE_PRICE`, `SALE_YEAR`, `DBOOK/DPAGE` | open JSON | ❌ | ❌ | ✅ (SCDOT value/sale aliases wired) | ❌ | ✅ | `parcel_resolver._SC_KEY_FIELD["Anderson"]=("TMS",)` resolves parcel key from lat/lng. SCDOT sale numerics OK here (unlike Spartanburg). |
+| (4) GIS address-point | Situs from parcel polygon (`PHYS_ADDR`); no separate point layer wired | open JSON | n/a | n/a | n/a | n/a | n/a | Polygon situs is clean; no gap. |
+| (5) Register of Deeds index | `andersondeeds.com` public-access (TMS / name / street search, images back to ~1980) | browser | ❌ | ❌ | ⚠️ deed shows consideration/stamps but no $ in the index grid | ❌ | grantor/grantee | **No repo adapter** — not Acclaim/Cott/Aumentum/Logan. Net-new build candidate. |
+| (6) ROD document images | Same `andersondeeds.com` portal, unofficial image view free | browser | ❌ | ❌ | ❌ | ❌ | ❌ | Loan amount only via OCR of the recorded deed-of-trust image. |
+| (7) Tax bill / delinquent-tax | ACPASS tax search `acpass.andersoncountysc.org/p_tax_search.htm`; MIE roster `anderson_master_in_equity.PAGE_URL` (`andersoncountysc.org/departments-a-z/master-in-equity/`) | browser / open PDF | ❌ | ❌ | ❌ | ❌ | owner | Tax-owed $ per parcel not yet captured for Anderson (unlike Spartanburg qPayBill). |
+| (8) Condemned/code/vacant | ❌ no free condemned/vacant ArcGIS layer found | — | — | — | — | — | — | Anderson publishes no queryable code-enforcement/vacant feed. |
+
+**Biggest free gap here:** Heated square feet — it exists ONLY inside the ACPASS assessor card, which is login/registration-walled (`real_prop_search.htm` renders a login gate); no Anderson GIS/CAMA layer carries `LivingArea`.
+**Cheapest fix:** Derive footprint sqft from the parcel-polygon/building geometry (`enrichment_footprint_sqft`) as a proxy, and pull true beds/year-built opportunistically if an ACPASS guest session is achievable; otherwise accept price-only + footprint.
+
+---
+
+### Pickens, SC
+County seat: Pickens. Assessor/GIS platform: **qPublic-Schneider** (AppID 927) for GIS + card; shared SCDOT layer 39; separate `pickensassessor.org`; Register of Deeds = Harris **AcclaimWeb** (`pickensscrod.us`).
+
+| Layer | Free endpoint / portal (URL or repo const) | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| (1) Assessor/CAMA bulk | ❌ no free bulk CAMA — `sc_assessor_cama` notes Pickens GIS parcel layers are **cadastral only** (no value/sqft table); not in `SC_CAMA` | — | ❌ | ❌ | ❌ | ❌ | ❌ | Bulk value/specs are NOT downloadable; only per-parcel via the qPublic card (row 2). |
+| (2) qPublic/Schneider CARD | `qpublic_render._CFG["Pickens"]` AppID=927 LayerID=18058 card PageID=8077, search 8076; KeyValue = **R-account** (e.g. `R0022220`) resolved via address typeahead | browser (stealth) — **Cloudflare Turnstile + "Agree" gate** | ✅ (heated/finished sqft on card) | ✅ | ✅ sales grid | ⚠️ grade | ❌ | Per memory (`project_sc_deed_ocr_yield`): Pickens qPublic CARD exposes heated sqft + full sale-price/book-page history as structured text (live-verified). This is the ONLY structured path to Pickens sqft. |
+| (3) GIS parcel polygon + situs | SCDOT shared layer **39** (auto-detects `LOCADD`); value `ACTUALVAL`, sale `SALEP`, `SALEDT` epoch-ms | open JSON | ❌ | ❌ | ✅ (SCDOT `SALEP`/`SALEDT` wired) | ❌ | ✅ | `parcel_resolver` **omits Pickens** — its assessor key is an R-account not carried in SCDOT, so card must resolve via address search, not lat/lng→key. |
+| (4) GIS address-point | Situs from SCDOT polygon `LOCADD`; no separate point layer | open JSON | n/a | n/a | n/a | n/a | n/a | Polygon situs sufficient. |
+| (5) Register of Deeds index | `rod/acclaim.ACCLAIM_COUNTIES["Pickens"]` = `pickensscrod.us/AcclaimWeb` — search by Record Date, Document Type, **Consideration** (`sc_rod_acclaim.py`) | open (cookies required, no login, no Cloudflare) | ❌ | ❌ | ⚠️ **Consideration searchable** (LowerBound/UpperBound) but GridResults JSON **omits the $** (memory) | ❌ | grantor/grantee | Best-behaved SC ROD of the three — browserless httpx works. |
+| (6) ROD document images | Same AcclaimWeb portal — recorded images free-downloadable | open | ❌ | ❌ | ❌ | ❌ | ❌ | Deed-of-trust loan amount via OCR (`enrichment_doc_ocr` / `extract_lien_amounts.py`). |
+| (7) Tax bill / delinquent-tax | `pickens_tax_sale.PAGE_URL` (`co.pickens.sc.us/departments/delinquent_tax/`, PDF via Revize 301) + MIE roster `pickens_master_in_equity.PAGE_URL` (`.../master_in_equity/sales_rosters.php`) | open PDF (impersonate) / browser | ❌ | ❌ | ❌ | ❌ | owner on list | Delinquent-tax list + MIE sold-price rosters both wired. Per-parcel tax-owed $ not captured. |
+| (8) Condemned/code/vacant | ❌ no free condemned/vacant layer found | — | — | — | — | — | — | Pickens publishes no queryable code-enforcement/vacant feed. |
+
+**Biggest free gap here:** Bulk CAMA (value + heated sqft at scale) — every free Pickens GIS layer is cadastral-only, so the ONLY structured value/sqft/sale source is the qPublic card, which is behind Cloudflare Turnstile and requires per-parcel stealth rendering (~expensive, R-account resolution).
+**Cheapest fix:** Grade-gate the qPublic render to HOT/WARM leads only and resolve the R-account via the address typeahead (already built in `qpublic_render`); take value/sale from the free SCDOT layer 39 (`ACTUALVAL`/`SALEP`) as the cheap first pass, reserving the card for sqft on qualified leads.
+
+---
+Key repo paths referenced: `src/foreclosure_scraper/enrichment_arcgis.py` (`SCDOT_BASE`, `SC_LAYER`, `FIELD_ALIASES`, `_MAX_PLAUSIBLE_SALE`), `sc_assessor_cama.py` (`SC_CAMA`), `parcel_resolver.py` (`_SC_KEY_FIELD`), `assessor_cards/anderson_sc.py`, `assessor_cards/qpublic_render.py` (`_CFG`), `rod/acclaim.py` (`ACCLAIM_COUNTIES`), `rod/logan_render.py`, `enrichment_spartanburg_rod.py`, and `scrapers/counties_sc/{spartanburg_condemned,spartanburg_vacant,spartanburg_delinquent_tax,spartanburg_flc,pickens_tax_sale,pickens_master_in_equity,anderson_master_in_equity}.py`.
+
+
+### Oconee, SC
+County seat Walhalla. Assessor/GIS platform: **SCDOT shared MapServer** (SC_Parcels layer 37, value-bearing) + **qPublic-Schneider** SPA card (AppID 1030) for sqft.
+
+| Layer | Free endpoint / portal (URL or repo const) | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| 1. Assessor/CAMA bulk | SCDOT layer 37 (`SCDOT_BASE` + `SC_LAYER["Oconee"]=37`); fields `CURRENT_VA`, `TOTALASMT`, `RESIDENTIA`, `OWNERNAME`, `FullAdd`, `TMS_NUMBER` | ✅ open JSON | ❌ no sqft field on layer | ❌ | ❌ (no SALEP/SALEDT column present) | ❌ | ⚠️partial (`ADDRESS1-3`/`CITY`/`STATE`/`ZIP` = owner-mail, but no ArcGIS owner adapter wired) | Live-verified: `CURRENT_VA>0` on **61,608** parcels — value IS free here. `sc_assessor_cama` calls Oconee "NOT VIABLE for bulk" but that predates finding value on SCDOT; sqft/sale still absent → card needed |
+| 2. qPublic/Schneider CARD | `qpublic.schneidercorp.com` AppID=1030 LayerID=21692 PageID=9258 (`qpublic_render.py` Oconee cfg; `_RENDER_COUNTIES`) | ⚠️ browser-render (Cloudflare Turnstile + "Agree"); plain curl **403** (JA3 block) | ✅ (Total Heated SF) | ✅ | ✅ (Sales grid) | ✅ (grade/CDU) | ⚠️partial | Per-parcel render ~30s–3min, hard-capped; keyed by dashed TMS (already dashed in feed). Fixture `oconee_card.html` proves parser fills sqft + arms-length price |
+| 3. GIS parcel polygon + situs | SCDOT layer 37; situs = `FullAdd` (single) or `HOUSE_NO`+`STREET_NAM` | ✅ open JSON | — | — | — | — | — | Auto-detects cleanly (not in `SC_SITUS` overrides). `parcel_resolver` keys on `TMS_NUMBER`/`PARCEL_NO` for lat/lng→TMS |
+| 4. GIS address-point layer | ❌ none wired; SCDOT parcel centroid (`X`/`Y`) is the only point | ⚠️partial | — | — | — | — | — | No dedicated county address-point FeatureServer found; parcel centroid suffices for resolver |
+| 5. Register of Deeds index | Kofile `oconee.sc.publicsearch.us` | ⚠️ browser + free account | ❌ | ❌ | ⚠️ consideration on some deeds | ❌ | grantor/grantee names | Index from 1957. No repo adapter (repo ROD path is Acclaim/Cott only; Oconee is on Kofile publicsearch) |
+| 6. ROD document images | `oconee.sc.publicsearch.us` (images 1/1/2002→present) | ⚠️ browser + free account | — | — | scanned deed $ (OCR) | — | — | Image OCR is the free loan-amount path but gated behind login/render; not wired |
+| 7. Tax bill / delinquent-tax | qPayBill `oconeesctax.qpaybill.com/Taxes/TaxesDefaultType4.aspx` (`QPAYBILL_COUNTIES["Oconee"]`); + tax-sale PDF (`oconee_tax_sale.py`) + FLC FeatureServer (`Assignment_Availability/FeatureServer` layers 0/1, `oconee_forfeited_land.py`) | ✅ open (portal ASP.NET + FS JSON) | ❌ | ❌ | ❌ | ❌ | owner name on tax-sale list | qPayBill delinquent **balance** joins by dashed TMS (verified live); numeric idents = mfd-home. FLC FS is the "Oconee free CSV/JSON" from memory |
+| 8. Condemned/code/vacant | ❌ none found free | ❌ | — | — | — | — | — | No public condemned/vacant registry endpoint located (unlike Spartanburg) |
+
+**Biggest free gap here:** heated sqft — SCDOT layer 37 carries value but no living-area field, so sqft only comes from the per-parcel qPublic card, which is 403-walled to plain HTTP and needs a slow Cloudflare-solving render.
+**Cheapest fix:** run the existing `qpublic_render` Oconee adapter on-demand for grade-gated leads (already built + capped); no new endpoint needed.
+
+### Cherokee, SC
+County seat Gaffney. Assessor/GIS platform: **SCDOT shared MapServer** (layer 11, **cadastral-only**) + **qPublic-Schneider** server-rendered HTML card (AppID 908 — separate app from the SPA counties).
+
+| Layer | Free endpoint / portal (URL or repo const) | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| 1. Assessor/CAMA bulk | SCDOT layer 11 (`SC_LAYER["Cherokee"]=11`) | ✅ open JSON but ⚠️ cadastral-only | ❌ | ❌ | ❌ | ❌ | ⚠️partial (`MailingAdd`, `ZipCode` only) | Live-verified: fields are `SHEET1__*` cryptic sub-columns + `Acres` + `MailingAdd` — **no value, no sqft, no sale price**. `owner_mailing` explicitly **skips Cherokee (qPublic-only)**; `parcel_resolver` omits it ("cryptic sheet sub-fields") |
+| 2. qPublic/Schneider CARD | `qpublic.schneidercorp.com` AppID=908 LayerID=17379 PageID=7808 (`assessor_cards/cherokee_sc.py`, `_CARD`) | ⚠️ server-rendered HTML — fetchable via **curl_cffi chrome impersonation** (plain httpx 403 = JA3, not real CF); falls back to StealthyFetcher | ✅ (Total Heated SF) | ⚠️partial | ✅ (Sales grid: date/price/deed book/grantor) | ✅ | ❌ | Best-case: NOT a full SPA, so cheaper than Oconee/Union render. Keyed by dashed TMS `NNN-NN-NN-NNN.NNN`; address-only lead → None (ASP.NET viewstate search, no clean GET) |
+| 3. GIS parcel polygon + situs | SCDOT layer 11 | ⚠️partial | — | — | — | — | `MailingAdd` (mail, not situs) | **No situs street field** on the layer — layer 11 has mailing addr only, so situs must come from card or elsewhere |
+| 4. GIS address-point layer | ❌ none wired | ❌ | — | — | — | — | — | No county address-point FeatureServer located |
+| 5. Register of Deeds index | SC Land Records `sclandrecords.com` (Cherokee); repo `cott_recordroom` slug `cherokeesc` **302'd** (not confirmed) | ⚠️ browser | ❌ | ❌ | ⚠️ consideration on some | ❌ | grantor/grantee | Index from 1/3/1995, images from 9/25/2002. Repo's Cott RecordRoom is wired only for Union, not Cherokee |
+| 6. ROD document images | `sclandrecords.com` (images 2002→present) | ⚠️ browser | — | — | scanned deed $ (OCR) | — | — | Free viewable but not wired; OCR path unbuilt for Cherokee |
+| 7. Tax bill / delinquent-tax | qPayBill `cherokeecountysctax.qpaybill.com` (`QPAYBILL_COUNTIES["Cherokee"]`) + delinquent PDF (`cherokee_delinquent_tax.py`, `cherokeecountysc.gov/delinquent-tax/`) | ✅ open (portal + plain-HTTP .gov PDF) | ❌ | ❌ | ❌ | ❌ | owner name on list | qPayBill needs Cherokee-specific re-dash (`_norm_cherokee_pid`: 13-digit numeric → `NNN-NN-NN-NNN.NNN`) or numeric board parcels never join. PDF list only published ~Oct–Dec |
+| 8. Condemned/code/vacant | ❌ none found free | ❌ | — | — | — | — | — | No public endpoint located |
+
+**Biggest free gap here:** everything structured except tax — Cherokee's SCDOT layer is cadastral-only (no value/sqft/sale/situs), so value, sqft, sale price AND situs all funnel through the one qPublic card; there is no bulk fallback.
+**Cheapest fix:** the card is server-rendered HTML, so run `cherokee_sc.py` via curl_cffi chrome impersonation (already built, no browser) — cheapest render in the trio; only needs a resolved dashed TMS, which the tax-sale PDF and lis-pendens feed supply.
+
+### Union, SC
+County seat Union. Assessor/GIS platform: **SCDOT shared MapServer** (layer 44 — schema-rich but data-sparse) + **qPublic-Schneider** SPA card (AppID 861) + **Cott RecordRoom** ROD.
+
+| Layer | Free endpoint / portal (URL or repo const) | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| 1. Assessor/CAMA bulk | SCDOT layer 44 (`SC_LAYER["Union"]=44`); fields incl. `SQFT_TOTAL`,`SQFT_BASEM`,`TOT_MARKET`,`STREET_NUM`,`STREET_NAM`,`NAME_1`,`Address_1-3` | ✅ open JSON | ⚠️partial → effectively ❌ | ❌ | ❌ | ❌ | ⚠️partial (`Address_1-3` owner-mail present) | Live-verified: schema **lists** `SQFT_TOTAL` but `SQFT_TOTAL>0` = **1 of 18,745** (all-null/garbage) → no usable sqft. `TOT_MARKET>0` = **4,579 (~24%)** → partial value. This is exactly memory's "sqft column but no data" |
+| 2. qPublic/Schneider CARD | `qpublic.schneidercorp.com` AppID=861 LayerID=16112 PageID=7168 (`qpublic_render.py` Union cfg) | ⚠️ browser-render (SPA + Cloudflare); plain curl **403** | ✅ ("Living Area" incl. basement) | ⚠️partial | ⚠️ (memory: sqft yes but **no sales table** on Union card) | ⚠️partial | ⚠️partial | `key:"search"` — resolve by **address search** (no clean parcel GET), the hardest key strategy of the three. Render-class, hard-capped |
+| 3. GIS parcel polygon + situs | SCDOT layer 44; situs = `STREET_NUM`+`STREET_NAM` (split) | ✅ open JSON | — | — | — | — | `Address_1` is `C/O` owner-mail (test guards against picking it as situs) | Live: `STREET_NAM` populated on **15,171 (~81%)** → situs IS free here. `parcel_resolver` keys `Map_Number`/`ParcelID` |
+| 4. GIS address-point layer | ❌ none wired | ❌ | — | — | — | — | — | Parcel `CentroidX/Y` only; no dedicated address-point FS found |
+| 5. Register of Deeds index | Cott RecordRoom `recordroom.cottsystems.com/unionsc` (`COTT_RR_COUNTIES[("SC","Union")]="unionsc"`, `cott_recordroom.py` / `sc_rod_cott.py`) | ✅ browserless — DataTables JSON, guest access (HTTP 200 live) | ❌ | ❌ | ❌ (index has no $) | ❌ | grantor/grantee | Wired + tested: sweeps deeds-of-distribution/probate + liens. **No consideration $ in index** |
+| 6. ROD document images | RecordRoom doc images (`unionsc`) | ⚠️ viewable | — | — | scanned deed $ (OCR) | — | — | Images free but OCR loan-amount path not wired for Union |
+| 7. Tax bill / delinquent-tax | qPayBill `uniontreasurer.qpaybill.com` (`QPAYBILL_COUNTIES["Union"]`) + `sc_tax_delinquent`/roster | ✅ open (portal ASP.NET) | ❌ | ❌ | ❌ | ❌ | owner name | Delinquent **balance** joins by dashed parcel — verified live joining |
+| 8. Condemned/code/vacant | ❌ none found free | ❌ | — | — | — | — | — | No public endpoint located |
+
+**Biggest free gap here:** heated sqft — SCDOT layer 44 dangles `SQFT_TOTAL` in the schema but only 1 parcel is populated, and the Union qPublic card is resolve-by-address-search (no parcel GET) behind a Cloudflare SPA, making sqft the single hardest free field in this county.
+**Cheapest fix:** pull partial value + situs free from SCDOT layer 44 (`TOT_MARKET`/`STREET_NAM`, ~24%/~81% coverage) to cut card demand, and reserve the address-search `qpublic_render` Union render only for high-grade leads that still lack sqft.
+
+Repo memory correction worth noting: the "Oconee free CSV" is the **FLC/forfeited-land FeatureServer JSON** (`Assignment_Availability/FeatureServer`), not a CAMA extract; Oconee CAMA **value** is actually free from SCDOT layer 37 (`CURRENT_VA`, 61,608 parcels), which post-dates the `sc_assessor_cama` "NOT VIABLE" note.
+
+Sources: [Oconee ROD publicsearch](https://oconee.sc.publicsearch.us/), [Oconee ROD dept page](https://oconeesc.com/departments/register-of-deeds), [SC Land Records (Cherokee ROD)](https://www.sclandrecords.com/), [Cherokee ROD dept page](https://cherokeecountysc.gov/register-of-deeds/)
+
+
+### Laurens, SC
+County seat Laurens; assessor/GIS = SCDOT shared statewide layer (SC_LAYER=30) + county-hosted Laurens ArcGIS ("Pebble" — `laurenscountygis.org/arcgis`). No CAMA building layer on GIS; heated sqft is qPublic-only.
+
+| Layer | Free endpoint / portal (URL or repo const) | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| (1) Assessor/CAMA bulk layer | ❌ none — SCDOT `SC_LAYER["Laurens"]=30` + Pebble parcel layer carry parcel attrs only | open JSON | ❌ | ❌ | ✅ | ❌ | ⚠️ | No building/CAMA table published bulk; SC has no bulk Condition anywhere (per `enrichment_cama_condition.py`). SCDOT gives value/deed only. |
+| (2) qPublic/Schneider parcel CARD | ⚠️ Laurens qPublic per-parcel card (Schneider) — no bulk API | browser / per-parcel | ✅ | ✅ | ✅ | ⚠️(card only) | ✅ | The ONLY free path to heated sqft + beds/baths here; one parcel at a time, not batched. Repo `assessor_cards/laurens_sc.py` deliberately uses ArcGIS instead and stays price-only. |
+| (3) GIS parcel polygon + situs | `laurenscountygis.org/arcgis/.../Pebble/TaxParcel/MapServer/5` (situs `Property_A`/`Property_Address`); `.../Pebble/PropertyParcel/MapServer/5` = card const | open JSON | ❌ | ❌ | ✅ (`Sale_Price`,`Deed_Book/Page`) | ❌ | ✅ (`Owner`,`Mailing_Address`,`Mailing_City_State_ZIP`) | Live-verified: parcel layer fields = TMS/Owner/Mailing/Sale_Price/Sale_Date/Deed_Book/Deed_Page/Property_Address. Repo situs override `SC_SITUS["Laurens"]="Property_A"`. |
+| (4) GIS address-point layer | `Pebble/PropertyParcel/MapServer/0` = `AddressPoint` | open JSON | ❌ | ❌ | ❌ | ❌ | ❌ | Live-verified layer 0 exists (situs point geocode); no attributes beyond address. |
+| (5) Register of Deeds index | Logan "The Lookup" — `search.laurensdeeds.com` (NameSearch.php) | browser / name-required | ❌ | ❌ | ⚠️ (deed type only) | ❌ | ❌ | Older Logan = NAME-REQUIRED, no name-less instrument-type sweep (`rod/logan.py` note). SC foreclosure is judicial → ROD holds only POST-sale/probate/tax deeds. Not yet in `LOGAN_COUNTIES`. |
+| (6) ROD document images | Logan image order via same host | browser, pay-per-image | ❌ | ❌ | ❌ | ❌ | ❌ | Index free; scanned images pay-walled. Repo policy: never order images. |
+| (7) Tax bill / delinquent-tax portal | `laurenstreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx` — `QPAYBILL_COUNTIES[("SC","Laurens")]` | open ASP.NET form (no login) | ❌ | ❌ | ❌ | ❌ | ✅ (name) | Live-verified 200. Joins by exact dashed TMS = board `parcel_id`; delinquent balance = sum of Unpaid rows. Low Laurens yield (mostly non-tax leads) but exact-match, no false positives. |
+| (8) Condemned/code/vacant layer | ❌ none free published | — | ❌ | ❌ | ❌ | ❌ | ❌ | No county code-enforcement / vacant-registry feed found (matches statewide SC finding). |
+
+**Biggest free gap here:** heated sqft + beds/baths — SC publishes no bulk CAMA layer, so square footage exists only on the per-parcel qPublic card (can't be batched), while GIS is price/owner-only.
+**Cheapest fix:** add a Laurens qPublic-card adapter under `assessor_cards/` (mirror the Pickens/Greenville pattern) to pull heated sqft + beds/baths per-parcel for the handful of Laurens leads, keeping the existing ArcGIS card for the price side.
+
+### Buncombe, NC
+County seat Asheville; assessor/GIS = county-run ArcGIS (`gis.buncombecounty.org`) + hosted CAMA FeatureServer + Spatialest record card. Richest NC county — the one NC county with a **bulk CAMA Condition column**.
+
+| Layer | Free endpoint / portal (URL or repo const) | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| (1) Assessor/CAMA bulk layer | `services6.arcgis.com/VLA0ImJ33zhtGEaP/.../Real Estate Appraisal Residential Building 2024/FeatureServer/0` — `CAMA_SOURCES[("NC","Buncombe")]` | open JSON, no render | ✅ (`SqFeet`) | ✅ (`Bedroom`,`FullBath`,`HalfBath`) | ❌ (no sale on this table) | ✅ (`Condition` N/G/R/F/P/U + `Grade`) | ❌ | Live-verified all fields present. PIN-join (pad to 15). This is the CDU/condition column that makes Buncombe the richest NC county. |
+| (2) qPublic/Schneider parcel CARD | ❌ N/A — Buncombe uses **Spatialest** record card, not qPublic | render-walled | ✅ | ✅ | ✅ | ⚠️ | ❌ | `prc-buncombe.spatialest.com/api/v1/recordcard/{PIN}` returns 403 "Direct API access not permitted" + Laravel 419 CSRF to httpx → repo uses StealthyFetcher SPA render (`assessor_cards/buncombe_nc.py`). Gives `TotalFinishedArea`+specs+transfer history but is the slow path; prefer layer (1)+(3). |
+| (3) GIS parcel polygon + situs | `gis.buncombecounty.org/.../property_bc_dis/MapServer/1` (situs `Address`); PIN-resolve layer `bcmap_vt/MapServer/0` (`pinnum`,`propcard`) | open JSON | ❌ | ❌ | ⚠️ | ⚠️ | ✅ | `NC_GIS["Buncombe"]` addr_field `Address`; owner-mailing layer = `property_bc_dis/MapServer/1` in `enrichment_owner_mailing.py`. Value fields (TotalMarketValue/AppraisedValue) present. Live-verified layers Property(1)+Centerline(12). |
+| (4) GIS address-point layer | Buncombe hosted addresses org `services.arcgis.com/aJ16ENn1AaqdFlqx` (200) + Street Centerline (`property_bc_dis/12`) | open JSON | ❌ | ❌ | ❌ | ❌ | ❌ | Situs point/centerline geocode; PIN resolution already handled via `bcmap_vt/0`. |
+| (5) Register of Deeds index | `registerofdeeds.buncombenc.gov/External/LandRecords/protected/v4` — Aumentum/Cott eSearch v4, `AUMENTUM_COUNTIES[("NC","Buncombe")]` | open (no login/CAPTCHA) | ❌ | ❌ | ⚠️ (deed type/book-page) | ❌ | ⚠️ (grantor/grantee names) | Live 302→app. Free name/date index; grid Type column renders full words (`rod/aumentum.py`). Lien EXISTENCE only. |
+| (6) ROD document images | Same Aumentum host, image viewer | browser, free-view/scanned | ⚠️ | ❌ | ❌ | ❌ | ❌ | NC recorded deed-of-trust PDFs are free-downloadable (per memory `project_rod_document_images`); OCR for loan amount. Index carries no $. |
+| (7) Tax bill / delinquent-tax portal | `tax.buncombecounty.org` (bill search / property record) | browser (301→portal) | ❌ | ❌ | ❌ | ❌ | ✅ | Public tax-bill lookup; `enrichment_tax_owed` has no bulk-balance API for Buncombe (taxes-owed remains a gap per `project_enrichment_pipeline_facts`). |
+| (8) Condemned/code/vacant layer | ⚠️ Asheville code-enforcement (city) — built per `project_gap_analysis_2026-07-01`; countywide vacant registry ❌ | open/scrape | ❌ | ❌ | ❌ | ❌ | ❌ | City of Asheville code-enf covered; no county-wide vacant/condemned feed. |
+
+**Biggest free gap here:** owner-occupancy / delinquent-tax BALANCE — the CAMA + GIS + ROD stack is unusually complete, but no free bulk API returns the actual dollars-owed on the tax bill (only per-parcel browser lookup).
+**Cheapest fix:** none needed for structure/condition (layer 1 is best-in-footprint); for tax balance, add a per-parcel `tax.buncombecounty.org` bill-search parse for the small lead set, or accept the existing owner-mailing absentee flag as the occupancy proxy.
+
+### Gaston, NC
+County seat Gastonia; assessor/GIS = direct county ArcGIS (`cogserver.gastonianc.gov`) + Spatialest card (plain httpx) + DevNet Wedge tax site. Unusually self-contained: one parcel layer carries situs+sqft+sale+value+owner.
+
+| Layer | Free endpoint / portal (URL or repo const) | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| (1) Assessor/CAMA bulk layer | `cogserver.gastonianc.gov/serverweb/rest/services/Parcels/GastonCountyParcels/MapServer/0` — `NC_GIS["Gaston"]` | open JSON | ⚠️ (`SQFT`, often 0 on vacant/exempt) | ❌ | ✅ (`SALESAMT`,`SALEDATE`,`DEED_BOOK/PAGE`,`DEEDTYPE`) | ❌ | ✅ (`CURR_ADDR1/2`,`PHYSSTRADD`) | Live-verified 51 fields incl `TOTVAL`. One layer does situs+sqft+sale+value+owner. `SQFT` unreliable (sample row = 0) → repo pairs with Spatialest for authoritative finished area. |
+| (2) qPublic/Schneider parcel CARD | ❌ N/A — Gaston uses **Spatialest** card, no render needed | open JSON (CSRF-primed) | ✅ (`AREA_GROSS`=heated) | ✅ (`XBEDRM`,`XBATHS`,`XHBATHS`) | ⚠️ (card omits sales) | ❌ | ❌ | `property.spatialest.com/nc/gaston/api/v1/recordcard/{PID}` — plain httpx, CSRF token from SPA root (`assessor_cards/gaston_nc.py`). Best heated-sqft + specs source here. |
+| (3) GIS parcel polygon + situs | Same `GastonCountyParcels/MapServer/0` (situs `PHYSSTRADD`) | open JSON | see (1) | ❌ | ✅ | ❌ | ✅ | Live sample: `PHYSSTRADD='1516 N WELDON ST'`. Owner-mailing layer in `enrichment_owner_mailing.py` = this same MapServer/0. |
+| (4) GIS address-point layer | `cogserver.gastonianc.gov/serverweb/rest/services/MAD/GastoniaAddressPoints` (+ `MAD/CityRes_AdrSrch`) | open JSON | ❌ | ❌ | ❌ | ❌ | ❌ | Live-verified MAD folder = Master Address Data address points; situs geocode fallback. |
+| (5) Register of Deeds index | `deeds.gastongov.com/external/LandRecords/protected/v4` — Aumentum eSearch v4, `AUMENTUM_COUNTIES[("NC","Gaston")]`; also free name-index at `gastonnc.courthousecomputersystems.com` (`enrichment_gaston_rod.py`) | open (no login/CAPTCHA) | ❌ | ❌ | ⚠️ (deed type/book-page) | ❌ | ⚠️ (grantor/grantee) | Two free ROD paths. CCHS path needs 3-step session seed (GET / → GET LRIndex → POST ExecuteSearch); gated `FORECLOSURE_GASTON_ROD=1`. Gaston Type codes are terse (per `rod/aumentum.py`). Lien existence only. |
+| (6) ROD document images | Aumentum/CCHS image viewer | browser, free-view scanned | ⚠️ | ❌ | ❌ | ❌ | ❌ | NC deed-of-trust PDFs free-downloadable (OCR for loan amount, `project_rod_document_images`); index has no $. |
+| (7) Tax bill / delinquent-tax portal | `gastonnc.devnetwedge.com/parcel/view/{PID}/{YEAR}` — `_DEVNET` in `assessor_cards/gaston_nc.py` | open HTML | ⚠️ (Base Living Area fallback) | ❌ | ✅ (Transfer History table) | ❌ | ⚠️ | Live 200. DevNet Wedge = the sales-history + tax-bill source the Spatialest card lacks; parsed by `_parse_devnet_sales`. Delinquent-balance column is on the tax-bill tab (per-parcel). |
+| (8) Condemned/code/vacant layer | ❌ none free published (Gaston `Planning`/`PubSafety` ArcGIS folders exist but no vacant/condemned feed confirmed) | — | ❌ | ❌ | ❌ | ❌ | ❌ | `cogserver` has Planning + PubSafety folders; no verified condemned/vacant layer. Not chased. |
+
+**Biggest free gap here:** appraiser CONDITION/CDU — Gaston publishes sqft, sale, value, and specs freely, but no bulk (or even card) Condition rating like Buncombe's, so structural distress must come from the Vision photo classifier instead.
+**Cheapest fix:** none for data completeness (Gaston is the most self-contained of the three via GIS + Spatialest + DevNet); to firm up `SQFT`, always prefer the Spatialest `AREA_GROSS` over the flaky parcel-layer `SQFT`, which the card adapter already does.
+
+---
+Repo files grounding this: `assessor_cards/{laurens_sc,buncombe_nc,gaston_nc}.py`, `enrichment_arcgis.py` (SC_LAYER/SC_SITUS/NC_GIS), `enrichment_owner_mailing.py`, `enrichment_cama_condition.py` (`CAMA_SOURCES`), `enrichment_qpaybill_tax.py` (`QPAYBILL_COUNTIES`), `enrichment_gaston_rod.py`, `rod/{aumentum,logan}.py`. All portal endpoints live-verified 2026-07-02.
+
+
+### Henderson, NC
+County seat: Hendersonville. Assessor/GIS platform: **ArcGIS Hosted (county-run `gisweb.hendersoncountync.gov`)** — a full CAMA-joined parcel FeatureServer; assessor card via Spatialest Laravel API; ROD via CCHS classic-ASP.
+
+| Layer | Free endpoint / portal (URL or repo const) | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| 1. Assessor/CAMA bulk layer | `gisweb.hendersoncountync.gov/arcgis/rest/services/Parcels/FeatureServer/0` (repo `NC_GIS["Henderson"]`) | ✅ open ArcGIS JSON | ✅ `HEATED_AREA` | ❌ no beds/baths on layer | ✅ `PKG_SALE_PRICE`+`PKG_SALE_DATE`+`DEED_BOOK/PAGE` | ❌ no CDU/condition | ✅ `PROPERTY_OWNER`+`OWNER_MAIL_1..ZIP` | 91-field CAMA layer, live-verified. Repo **under-uses it** — only maps `addr_field=LOCATION_ADDR`; sqft/value/sale/owner all present and should be wired. Bonus: `DEED_URL`/`PLAT_URL` deep-links, `Centroid_Lat/Long`. |
+| 2. qPublic/Schneider parcel CARD | ❌ n/a — Henderson uses Spatialest, not qPublic. Card = `property.spatialest.com/nc/henderson/api/v1/recordcard/{REID}` (repo `assessor_cards/henderson_nc.py`) | ⚠️ browser-ish (plain httpx once Laravel CSRF primed) | ✅ `HEATED_AREA` | ⚠️ baths only (`BATH_FULL/HALF`); no beds | ✅ full `SALE_PRICE`/`DEED_DATE`/`BOOK`/`PAGE`/`STAMPS` history | ❌ | ⚠️ owner name in sales rows | Needs 419-avoiding CSRF prime; REID≠PIN, resolved via `api/v2/search`. Redundant with the FeatureServer for most fields. |
+| 3. GIS parcel polygon + situs | Same FeatureServer/0 (`LOCATION_ADDR` + `PHYADDR_STR_*` split fields) | ✅ open JSON | — | — | — | — | ✅ | Situs both as full `LOCATION_ADDR` and component `PHYADDR_STR_NUM/DIR/STR/TYPE`. Polygon geometry → centroid for map pins. |
+| 4. GIS address-point layer | Not needed (situs on parcel layer). County E911 address points exist under `gisweb.hendersoncountync.gov` but parcel layer already resolves address | ✅ open (parcel layer) | — | — | — | — | — | No separate point layer required; situs auto-resolves. |
+| 5. Register of Deeds index | CCHS `us4.courthousecomputersystems.com/hendersonncnw/` (repo `rod/cchs.py` → `("NC","Henderson"):("us4","HendersonNCNW","hendersonnc")`) | ⚠️ browser flow (classic-ASP `SearchService.asp`, free, plain httpx) | ❌ | ❌ | ⚠️ excise/`mo` (money) per instrument | ❌ | ✅ grantor/grantee | Session-bootstrap → search by instrument type (FCL/LIS-P/trustee deeds). Index only, no $ price (excise only). |
+| 6. ROD document images | CCHS `application.asp?cmd=image_link&…&tif2pdf=true` — surfaced directly in FeatureServer's `DEED_URL` field | ✅ open (deep-linked PDF) | — | — | — | — | — | Deed image PDFs are FREE (matches memory `project_rod_document_images`); OCR for loan amount. `DEED_URL` gives a ready book/page image link per parcel. |
+| 7. Tax bill / delinquent-tax portal | Foreclosure sales: `hendersoncountync.gov/tax/page/tax-foreclosure-sales` (repo `henderson_tax.py`). Delinquent roll: **NC PTS Cloud** `bcpwa.ncptscloud.com` X-Tenant `Henderson` (repo `nc_ptscloud_delinquent_tax.py`) | ✅ open (HTML table + JSON blob API) | ❌ | ❌ | ⚠️ opening bid on FCL sales | ❌ | ⚠️ owner on rolls | Henderson is a **live valid tenant** on bcpwa; delinquent CSV auto-lights when county posts a blob. Amount-owed IS captured here (rare — most counties don't expose $). |
+| 8. Condemned/code/vacant layer | ❌ none free-verified | ❌ | — | — | — | — | — | No public condemned/vacant registry or code-enforcement feed found for Henderson (matches the confirmed NC-wide vacancy/code wall in memory). |
+
+**Biggest free gap here:** beds/baths — the CAMA FeatureServer omits room counts and the Spatialest card only gives baths, so bedroom count never resolves free.
+**Cheapest fix:** wire the already-open Henderson FeatureServer's `HEATED_AREA`/`TOTAL_PROP_VALUE`/`PKG_SALE_*`/`PROPERTY_OWNER` into `_apply_attrs` (they're fetched but unmapped today); accept baths-only from the Spatialest card and leave beds null.
+
+---
+
+### Rutherford, NC
+County seat: Rutherfordton. Assessor/GIS platform: **ArcGIS (county-run `gis.rutherfordcountync.gov`, VTS/NCPTS-backed)**; assessor card + parcel resolve via NCPTS Cloud `lrcpwa.ncptscloud.com`; ROD via Cott Systems.
+
+| Layer | Free endpoint / portal (URL or repo const) | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| 1. Assessor/CAMA bulk layer | **NET-NEW:** `gis.rutherfordcountync.gov/server/rest/services/MapMetricsServiceRutherford/MapServer/7` (`PS_VIEW`) | ✅ open ArcGIS JSON, live-verified | ✅ `Heated_Area` | ❌ no beds/baths | ✅ `Package_Sale_Price/Date`+`Deed_Book/Page`+`Revenue_Stamp` | ❌ no CDU | ✅ `Property_Owner`+`Owner_Mailing_Address_1..Zip` (out-of-state = absentee) | **Refutes repo TODO.** Repo points at layer 6 (geometry+MBL/PIN/REID only, `addr_field=None`); layer 7 is a full CAMA polygon layer that closes the whole Rutherford situs+value+sqft+owner gap in one endpoint. Address-LIKE confirmed working. |
+| 2. qPublic/Schneider parcel CARD | ❌ n/a — no qPublic. Card = `lrcpwa.ncptscloud.com/api/getParcelDetails?ParcelId=` (repo `assessor_cards/rutherford_nc.py`, header `X-Tenant: Rutherford`) | ✅ open JSON (X-Tenant required; bare call 500s) | ✅ `heatedArea` | ✅ `bedrooms`+`bathFull/bathHalf` | ✅ `packageSalePrice`+full `deeds[]` history | ❌ | ✅ mailing via lrcpwa parcel enricher | This card is the ONLY free source that gives **beds** for Rutherford. Key = internal `ParcelId` (small int), resolved via `SimpleParcelSearch`. |
+| 3. GIS parcel polygon + situs | `MapServer/7` (PS_VIEW, situs) or `MapServer/6` (Parcel Polygons, geometry+PIN only per repo `NC_GIS["Rutherford"]`) | ✅ open JSON | — | — | — | — | ✅ (layer 7) | Repo uses layer 6 (no situs). Switch situs/geometry source to layer 7. |
+| 4. GIS address-point layer | `MapServer/0` (`Structures`, `FullAddress`+`TAXPIN`+`MBL`+`Lat/Long`) | ✅ open JSON | ❌ | ❌ | ❌ | ❌ | ❌ | E911 structure points; useful to reverse-resolve address↔PIN and get precise lat/long. Also `MapServer/3` `SALES_FINAL` (point) has `PHYSICAL_ADDR`+`YEAR_BUILT`+`BLDG_SIZE`+`PRICE`+`SALE_DATE`. |
+| 5. Register of Deeds index | Cott `cotthosting.com/NCRUTHERFORDEXTERNAL/LandRecords/protected/v4` (repo `rod/cott.py`) | ⚠️ browser flow (ASP.NET viewstate form, free) | ❌ | ❌ | ⚠️ excise/consideration per doc | ❌ | ✅ grantor/grantee | Name-search over recorded instruments (FCL/lis-pendens/substitute-trustee). Index only. |
+| 6. ROD document images | Cott RecordRoom (`cott_recordroom.py`) / Cott v4 image viewer | ⚠️ browser | — | — | — | — | — | Recorded deed/DoT PDFs downloadable free via Cott viewer; OCR for loan amount. |
+| 7. Tax bill / delinquent-tax portal | Foreclosure sales: `rutherfordcountync.gov/departments/revenue_department_tax_administrator/foreclosure_sale_dates.php` (repo `rutherford_tax.py`). Delinquent: bcpwa X-Tenant `Rutherford` (repo `nc_ptscloud_delinquent_tax.py`) | ✅ open (HTML + JSON API) | ❌ | ❌ | ⚠️ current/upset bid on FCL | ❌ | ⚠️ owner | Rutherford is a **valid bcpwa tenant standing by** — no delinquent export blob posted yet, auto-lights when county publishes. |
+| 8. Condemned/code/vacant layer | ❌ none free-verified | ❌ | — | — | — | — | — | No public condemned/vacant/code feed found. |
+
+**Biggest free gap here:** condition/CDU — no free source (GIS layers, lrcpwa card, or ROD) exposes a condition/CDU grade for Rutherford, so as-is-vs-renovated can't be inferred without a photo.
+**Cheapest fix:** re-point `NC_GIS["Rutherford"]` from `MapServer/6` (`addr_field=None`) to `MapServer/7` PS_VIEW with `addr_field="Physical_Address"` — one-line change unlocks situs+sqft+value+sale+owner-mailing for the whole county; keep the lrcpwa card as the beds source.
+
+---
+
+### Cleveland, NC
+County seat: Shelby. Assessor/GIS platform: **ArcGIS (county `gis.clevelandcounty.com`, geometry-only Tax layer)**; assessor card via WebGIS/Hurt&Proffitt static PropertyCard; ROD via CCHS classic-ASP.
+
+| Layer | Free endpoint / portal (URL or repo const) | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| 1. Assessor/CAMA bulk layer | `gis.clevelandcounty.com/arcgis/rest/services/Tax/Tax/MapServer/1` (`Parcel Area`; repo `NC_GIS["Cleveland"]`) | ✅ open JSON, but CAMA-poor | ❌ | ❌ | ⚠️ `GIS_DeedBook_Page` only (no $) | ❌ | ⚠️ `GIS_Owner1/Owner2` (no mailing addr) | Repo comment ("GIS_PID/GIS_PIN only") is slightly stale — layer actually adds `GIS_Owner1/2`, `GIS_DeedBook_Page`, `GIS_Calculated_Acres`, `GIS_X/Y_Coord`. **Still no situs, no sqft, no value, no sale $.** Only 3 layers in whole Tax service; no CAMA layer exists free. |
+| 2. qPublic/Schneider parcel CARD | ❌ n/a — no qPublic. Card = `webgis.net/nc/cleveland/PropertyCard.php?pid={PID}` (repo `assessor_cards/cleveland_nc.py`) | ✅ open (static server-rendered `<pre>` text) | ✅ `MAIN FIN AREA` | ✅ `#BED`+`#BTH`/`#HBTH` | ✅ full SALES HISTORY (book/page/date/instrument/**amount**/disqualified) | ⚠️ market-adjust factor in FMV line (not a true CDU) | ❌ | **Best free card of the three** — sqft+beds+baths+FMV+arms-length-flagged sale $. BUT keyed by WebGIS internal `pid` (small int); **no static address→pid endpoint** (search is a JS/ArcGIS SPA), so address-only leads can't resolve → this is the county's core wall. |
+| 3. GIS parcel polygon + situs | `Tax/MapServer/1` (polygon geometry + PIN; **no situs field**) | ✅ open JSON | — | — | — | — | ⚠️ owner only | Geometry + parcel-id + centroid usable; situs must come from elsewhere (tax portal / ROD / card). |
+| 4. GIS address-point layer | ❌ none exposed — only `Tax`, `Basemap`, `Imagery`, `Planning`, `Utilities` folders; no queryable address-point service (root lists only `SampleWorldCities`) | ❌ | — | — | — | — | — | No free E911 address-point service → no address↔pid bridge, which is what blocks the WebGIS card for address-only leads. |
+| 5. Register of Deeds index | CCHS `us5.courthousecomputersystems.com/clevelandnc/` (repo `rod/cchs.py` → `("NC","Cleveland"):("us5","ClevelandNCNW","clevelandnc")`) | ⚠️ browser flow (classic-ASP `SearchService.asp`, free, plain httpx) | ❌ | ❌ | ⚠️ excise/`mo` per instrument | ❌ | ✅ grantor/grantee | Same CCHS pattern as Henderson (shared `us5` install with Burke). Name/instrument search; index only. |
+| 6. ROD document images | CCHS `application.asp?cmd=image_link…tif2pdf=true` (clevelandnc app) | ✅ open (deep-linked PDF) | — | — | — | — | — | Deed image PDFs free; OCR for loan amount. |
+| 7. Tax bill / delinquent-tax portal | `clevelandcountytaxes.com` / `taxes.clevelandcountytreasurer.org` (search by acct/owner/parcel/address). Foreclosure sales: `clevelandcounty.com/.../find_tax_foreclosures…/index.php` (repo `cleveland_tax.py`) | ⚠️ browser (public lookup, no login) | ❌ | ❌ | ⚠️ opening bid on FCL; tax due on portal | ❌ | ⚠️ owner | Cleveland is **NOT a bcpwa tenant** (repo note: runs Government Window / DEVNET Wedge lineage). Delinquent-tax lookup is a public web search, not a bulk API → per-parcel only, no free bulk roll. Foreclosure page carries situs+parcel+file# (partly closes the situs gap for distressed leads). |
+| 8. Condemned/code/vacant layer | ❌ none free-verified | ❌ | — | — | — | — | — | No public condemned/vacant/code-enforcement feed found. |
+
+**Biggest free gap here:** situs address for non-distressed leads — the GIS parcel layer has no situs field and there's no free address-point service, so a PIN or owner name can't be turned into a street address (and the rich WebGIS card can't be reached) without the county's JS-only address search.
+**Cheapest fix:** scrape the public `clevelandcountytaxes.com` per-parcel lookup (owner/parcel/address → situs + tax due + the WebGIS `pid`), then feed that `pid` into the already-built `PropertyCard.php` card for sqft/beds/baths/sale $ — bridges the missing address-point layer without touching the JS SPA.
+
+---
+
+**Cross-county note for the pipeline:** the two highest-value, lowest-effort wins are both one-line registry edits in `enrichment_arcgis.py` `NC_GIS`: (1) Rutherford → re-point to `MapServer/7` `PS_VIEW` with `addr_field="Physical_Address"` (unlocks situs+sqft+value+sale+owner-mailing, currently `None`); (2) Henderson → its FeatureServer already returns `HEATED_AREA`/`TOTAL_PROP_VALUE`/`PKG_SALE_*`/`PROPERTY_OWNER` but only `LOCATION_ADDR` is consumed — those aliases just need adding so the open data is actually applied. Cleveland remains genuinely CAMA-poor at the GIS layer; its value lives in the WebGIS card, gated only by the missing address→pid bridge.
+
+
+### Burke, NC
+County seat: Morganton. Assessor/GIS platform: **Farragut/NCPTS Cloud (lrcpwa land-records SPA)** + a hosted Esri Tax_Parcels layer + a separate Morganton city ArcGIS Server. Burke is a live `X-Tenant` on the lrcpwa cluster (verified 441 hits for "main").
+
+| Layer | Free endpoint / portal (URL or repo const) | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| (1) Assessor/CAMA bulk layer | lrcpwa `getParcelDetails?ParcelId=` (X-Tenant: Burke), repo `enrichment_lrcpwa_parcel.BASE` + rutherford_nc card `_DETAILS` | ✅ open JSON | ✅ `heatedArea`/`buildings[0].heatedArea` (live: id=763→1089, id=2000→1443) | ❌ null in Burke feed (Rutherford has them; Burke's CAMA leaves beds/bath/yearBuilt empty) | ✅ `packageSalePrice`+`packageSaleDate`+`deedBook/Page` (live: id=406→$110k 2017) | ❌ no CDU/condition field exposed | ✅ owner + full mailing via lrcpwa `mailingAddress*` | Best single free source here; card-quality data behind one header |
+| (2) qPublic/Schneider parcel CARD | ❌ Burke is not a qPublic/Schneider county | n/a | — | — | — | — | — | Not on Schneider; lrcpwa is the equivalent |
+| (3) GIS parcel polygon + situs | Hosted `services3.arcgis.com/axQ4OCSpcxALIQsV/.../Tax_Parcels/FeatureServer/0` (repo `enrichment_arcgis` Burke, addr_field `LOCATION_ADDR`) | ✅ open JSON, polygon | ❌ no sqft field | ❌ | ⚠️partial `DEED_DATE/BOOK/PAGE` only (no price) | ❌ | ✅ `PROPERTY_OWNER`+`OWNER_MAIL_1..ZIP` | Full situs in `LOCATION_ADDR` (also split PHYADDR_* fields) |
+| (4) GIS address-point layer | Morganton `gis.morgantonnc.gov/.../General/Parcels_Only/FeatureServer/0` (repo `enrichment_owner_mailing` NC:Burke) | ✅ open JSON, polygon (not points) | ❌ | ❌ | ❌ | ❌ | ✅ `Property_Owner`+`Owner_MA*` | No true address-point layer found; situs = `Property_Address`/`PA_*` split |
+| (5) Register of Deeds index | CourtComp Systems `us5.courthousecomputersystems.com/BurkeNC2/` (also `burke.courtcompsys.com/burkeNC/`) | ⚠️partial browser (HTTP 200, ASP index UI, no JSON API) | — | — | ⚠️ consideration sometimes indexed | — | grantor/grantee names | Free public index; must be screen-scraped/manual, no bulk feed |
+| (6) ROD document images | Same CourtComp portal (image view per instrument) | ⚠️partial browser | — | — | — | — | — | Images free to view; per-doc, no bulk download API |
+| (7) Tax bill / delinquent-tax portal | `burkenctax.com/TaxSearch/` (bills); delinquent roll via lrcpwa/bcpwa `X-Tenant: Burke` (repo `nc_ptscloud_delinquent_tax` — valid tenant, no live export blob yet) | ✅ tax-search browser; ✅ delinquent auto-lights-up when county posts extract | — | — | — | — | owner | Delinquent-$ present when bcpwa blob appears; today yields 0 |
+| (8) Condemned/code/vacant layer | ❌ none found free | ❌ | — | — | — | — | — | No public code-enforcement/vacant GIS feed for Burke |
+
+**Biggest free gap here:** beds/baths — Burke's CAMA feed leaves them null even though the same lrcpwa platform serves them for Rutherford, so there's no free structured bed/bath anywhere in-county.
+**Cheapest fix:** parse the free CourtComp ROD deed text or accept sqft-only; beds/baths aren't worth a paid data buy at this county's volume.
+
+### Lincoln, NC
+County seat: Lincolnton. Assessor/GIS platform: **County-hosted ArcGIS Server** (`arcgisserver.lincolncountync.gov`, "RevalLayers" CAMA + "Server_TaxParcelViewerSP" parcels). NOT an lrcpwa/Farragut tenant and NOT qPublic.
+
+| Layer | Free endpoint / portal | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| (1) Assessor/CAMA bulk layer | `arcgisserver.lincolncountync.gov/.../RevalLayers/MapServer/24` (repo card `lincoln_nc.py` `_QUERY`; alias "Appraised Parcels") | ✅ open JSON | ✅ `MAINAREASQFT` (heated/main area) | ❌ layer has no bed/bath/yearBuilt fields | ✅ `SALEPRICE`+`SDATE`+`DEEDBK/PG/YR`+`QUALIFIEDCODE` | ⚠️partial `QUALIFIEDCODE` (sale qualification, not a CDU condition grade) | ✅ `NAME1/NAME2`+`ADDRESS1/2/CITY/STATE/ZIP` | One row/parcel (current owner + most-recent recorded sale); has a `VACANT` flag |
+| (2) qPublic/Schneider parcel CARD | ❌ not a Schneider county | n/a | — | — | — | — | — | RevalLayers is the CAMA equivalent |
+| (3) GIS parcel polygon + situs | `arcgisserver.lincolncountync.gov/.../Server_TaxParcelViewerSP/MapServer/0` (repo `enrichment_arcgis` + `owner_mailing` NC:Lincoln, situs `PHYSICALADDR`, parcel `PIN`) | ✅ open JSON, polygon | ❌ (sqft lives on RevalLayers/24) | ❌ | ⚠️partial deed refs only | ❌ | ✅ owner + mailing | Primary situs/parcel resolver layer |
+| (4) GIS address-point layer | ❌ no dedicated point layer wired; situs comes from parcel `PHYSICALADDR` | ❌ | — | — | — | — | — | Parcel-centroid geometry is used as the point |
+| (5) Register of Deeds index | CourtComp/CourtHouseComputerSystems `courthousecomputersystems.com/lincolnnc/` (also lincolnrod.com land-records) | ⚠️partial browser (HTTP 200, ASP UI) | — | — | ⚠️ consideration sometimes | — | grantor/grantee | Free public index, no bulk/JSON |
+| (6) ROD document images | Same CourtComp portal | ⚠️partial browser | — | — | — | — | — | Free per-doc view; no bulk API |
+| (7) Tax bill / delinquent-tax portal | Bills: `lincolncountytax.com` / lincolncountync.gov Online Payments. Delinquent roll: **county .gov PDF** `lincolncountync.gov/DocumentCenter/View/25558/2025-TAXES...` (repo `nc_county_pdf_delinquent_tax` layout `name_id_amt`, id=4-6-digit PIN) | ✅ bills browser; ✅ delinquent PDF open (parsed) | — | — | — | — | owner (from PDF) | Not an ncptscloud tenant, so no API roll; the annual PDF advert is the free delinquent source |
+| (8) Condemned/code/vacant layer | ⚠️partial — RevalLayers/24 exposes a `VACANT` field (land-vacancy flag, not condemnation) | ✅ open JSON | — | — | — | — | — | No code-enforcement/condemned feed; `VACANT` ≠ distressed condition |
+
+**Biggest free gap here:** beds/baths + structure condition — the Reval CAMA layer simply omits those columns, and there's no qPublic card to fall back on, so only sqft/value/sale come free.
+**Cheapest fix:** none needed for sqft/sale/value (all free on RevalLayers/24); for beds/baths, defer to the paid/estimated path rather than the ROD.
+
+### McDowell, NC
+County seat: Marion. Assessor/GIS platform: **Esri ArcGIS Online hosted parcel layer** (`services9.arcgis.com/ETP7IuCigkUz7iI9/.../McDowell_Parcels`) + BTServices tax portal + custom ROD. NOT lrcpwa, NOT qPublic.
+
+| Layer | Free endpoint / portal | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| (1) Assessor/CAMA bulk layer | Hosted `services9.arcgis.com/ETP7IuCigkUz7iI9/.../McDowell_Parcels/FeatureServer/0` (repo `enrichment_arcgis`/`owner_mailing` NC:McDowell, parcel `parno`) | ✅ open JSON | ❌ no sqft field (only `struct`/`structno`/`structyear` counts) | ❌ | ❌ `saledate`/`transfdate` present but **no price field** | ❌ | ✅ `ownname/ownname2`+`mailadd/munit/mcity/mstate/mzip` | Thin GIS-only CAMA; value via `parval`/`presentval` (land+imp) |
+| (2) qPublic/Schneider parcel CARD | ❌ not Schneider — county runs `webgis.net/nc/McDowell` (WebGIS/GoMaps) | ⚠️partial browser | ⚠️ card may show sqft in WebGIS viewer | ⚠️ possibly | ⚠️ possibly | ⚠️ possibly | owner | WebGIS.net has no clean JSON API; the richer CAMA card is only in the HTML viewer, not the hosted layer |
+| (3) GIS parcel polygon + situs | Same `McDowell_Parcels` layer, situs `siteadd` (+ split `sadd*` fields) | ✅ open JSON, polygon | ❌ | ❌ | ❌ | ❌ | ✅ | Best free situs/owner source |
+| (4) GIS address-point layer | ❌ no separate point layer in this org (services9 is a shared Esri org; only the one McDowell parcel layer) | ❌ | — | — | — | — | — | Use parcel centroid; NC OneMap `siteadd` is the statewide fallback |
+| (5) Register of Deeds index | `search.mcdowelldeeds.com/index.php` ("The Lookup", records from 1971) | ⚠️partial browser (HTTP 200, custom PHP search) | — | — | ⚠️ consideration sometimes | — | grantor/grantee | Free public index; no bulk/JSON, must screen-scrape |
+| (6) ROD document images | `mcdowelldeeds.com` image view per instrument | ⚠️partial browser | — | — | — | — | — | Free per-doc; no bulk download API |
+| (7) Tax bill / delinquent-tax portal | Bills: BTServices `bttaxpayerportal.com/itspublicmd` (HTTP 200). Delinquent roll: **county .gov PDF** `mcdowellnc.gov/departments/tax-collections/.../ADVERTISEMENT-LIST-FINAL-2025.pdf` (repo `nc_county_pdf_delinquent_tax` layout `parcel_amt_owner`) | ✅ tax portal browser; ✅ delinquent PDF open (parsed) | — | — | — | — | owner + amount owed (from PDF) | Delinquent lane already built; BT portal has current bills but no clean bulk export |
+| (8) Condemned/code/vacant layer | ❌ none found free | ❌ | — | — | — | — | — | `struct=0`/no-structure in the parcel layer is the only vacancy proxy |
+
+**Biggest free gap here:** sale price AND heated sqft — the hosted parcel layer carries `saledate` but no price and no sqft, and there's no qPublic card or lrcpwa feed to recover them, so distressed-equity math has no free structured comp/size input in-county.
+**Cheapest fix:** OCR the free `mcdowelldeeds.com` recorded-deed images for consideration (existing `enrichment_doc_ocr`) and/or read sqft off the WebGIS.net HTML card per parcel; both are free but slower than a JSON pull.
+
+
+### Polk, NC
+County seat **Columbus**. Assessor/GIS platform: **ArcGIS Hosted (Esri Online org `23uf7jKvz6SRPFWJ`)** for parcels + a per-parcel PDF "Property Record Card" off the county GIS box; ROD is **Cott Systems (cotthosting.com)**.
+
+| Layer | Free endpoint / portal (URL or repo const) | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| (1) Assessor/CAMA bulk layer | `services1.arcgis.com/23uf7jKvz6SRPFWJ/.../Parcels/FeatureServer/0` (repo `enrichment_owner_mailing.COUNTY_GIS["NC:Polk"]` / `assessor_cards.polk_nc._BASE`) | ✅ open JSON | ❌ not on layer | ❌ | ⚠️ `DEED_BOOK`/`DEED_PAGE`/`DEED_YEAR` only, no price | ⚠️ `NEIGHBORHOOD_CLASS` only | ✅ `OWNAM1-3`+`OWADR1/OWCITY/OWSTA/OWZIPA` | Carries `LAND_VALUE`, `BUILDING_VALUE`, `TOTAL_TAX_VALUE`, and rare **`TOTAL_TAX_OWED`** (delinquent-$ direct). No structural specs. |
+| (2) qPublic/Schneider parcel CARD | none | ❌ | — | — | — | — | — | Polk is not on qPublic/Schneider (probe 403 = not that platform). Card = the PDF below, not qPublic. |
+| (3) GIS parcel polygon + situs | same FeatureServer/0, `addr_field=PHYSICAL_STREET_ADDRESS` (repo `enrichment_arcgis.NC_GIS["Polk"]` -> `.../TaxParcels/FeatureServer/0`) | ✅ open JSON, polygon geom | ❌ | ❌ | ❌ | ❌ | ✅ | Situs via `PHYSICAL_STREET_ADDRESS` / `PHYSICAL_LOCATION`. |
+| (4) GIS address-point layer | not separately used | ⚠️partial | — | — | — | — | — | Repo resolves situs off the parcel polygon; no dedicated address-point layer wired. |
+| (5) Register of Deeds index | `cotthosting.com/ncpolkexternal/LandRecords/protected/v4` (repo `rod/cott.py COTT_COUNTIES["NC:Polk"]`) | ⚠️ browser-form (ASP.NET viewstate; repo posts it browserless) | — | — | ⚠️ deed book/page, no $ in index | — | grantor/grantee names | Cott/Manatron name-search flow; `SrchName.aspx` 302s (session bootstrap). Shares parser w/ `aumentum.py`. |
+| (6) ROD document images | Cott image viewer (same tenant) | ⚠️ browser/paywall-ish | — | — | — | — | — | Scanned deed/DoT PDFs reachable per-doc; loan $ only via OCR of the DoT image (repo `enrichment_doc_ocr.py`). No $ in index. |
+| (7) Tax bill / delinquent-tax portal | `polknc.gov/upcoming_auction.php` (repo `counties_nc/polk_tax.py`, Kania Law Firm list) ✅; **`TOTAL_TAX_OWED` on GIS layer (1)** ✅ | ✅ open (auction HTML + GIS field) | — | — | — | — | — | Best-in-cohort: tax-owed is a live GIS field, no portal scrape needed. `polknc.org/tax_administration` = 404 (stale link in `stale_link_fallback`; use `.gov`). |
+| (8) Condemned/code/vacant layer | none found | ❌ | — | — | — | — | — | No public condemned/code-enforcement/vacant feature service for Polk. |
+
+**Biggest free gap here:** heated sqft + beds/baths — absent from every JSON layer; only obtainable by fetching and OCR/parsing the per-parcel `PropertyRecordCard` PDF (`http://parcels.polknc.org:8080/<TMS>.pdf`), which is slow and page-by-page.
+**Cheapest fix:** already built — `assessor_cards/polk_nc.py` resolves the PDF URL from GIS and pdfplumber-parses "Finished Area" + the sales-price block; just ensure it runs for every Polk lead.
+
+### Transylvania, NC
+County seat **Brevard**. Assessor/GIS platform: **county-hosted Esri ArcGIS Server** (`gis.transylvaniacounty.org`) — the single richest layer in this cohort; ROD is **Logan Systems ("The Lookup")**.
+
+| Layer | Free endpoint / portal (URL or repo const) | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| (1) Assessor/CAMA bulk layer | `gis.transylvaniacounty.org/server/rest/services/Parcels/MapServer/2` (repo `enrichment_owner_mailing.COUNTY_GIS["NC:Transylvania"]` + `enrichment_recorded_comps` config) | ✅ open JSON | ✅ `HEATED_SQ_` (populated on 19,397/31,765 = every improved parcel) | ✅ `BEDROOMS`,`BATHS`,`HALF_BATHS` | ✅ `SALE_PRICE`+`SALE_DATE` (yyyymm) + `SALE_QUALI`/`SALE_INST` | ✅ `QualityFactor`,`EYB`,`AYB`,`EXT_WALL_1/2`,`ROOF_COVER`,`HEAT_CODE`,`AIR_COND_C` | ✅ `OWNER_NAME`+`ADDRESS_1/2/3` (ADDRESS_3=situs, ADDRESS_1=owner) | Full CAMA in one open layer. `ASSESSED_V`,`LAND_VALUE`,`BUILDING_V` present. This is the county with recoverable $/sqft comps (`RECORDED_COMP_CONFIG`). |
+| (2) qPublic/Schneider parcel CARD | none | ❌ | — | — | — | — | — | Not on qPublic (probe 403). CAMA card data is already inline in layer (1), so no card needed. |
+| (3) GIS parcel polygon + situs | same MapServer/2, `addr_field=ADDRESS_3` (repo `enrichment_arcgis.NC_GIS["Transylvania"]`) | ✅ open JSON, polygon geom | ✅ | ✅ | ✅ | ✅ | ✅ | Situs = `ADDRESS_3` / `LEGAL_ADDR`. Same layer as (1). |
+| (4) GIS address-point layer | not separately needed | ⚠️partial | — | — | — | — | — | Situs is on the parcel layer; no separate address-point layer wired. |
+| (5) Register of Deeds index | `search.transylvaniadeeds.com` (repo `rod/logan.py LOGAN_COUNTIES["NC:Transylvania"]`) | ✅ browserless (200; repo drives instrument-type date-range sweep w/ `DISTRESS_CODES`) | — | — | ⚠️ deed stamp only, not sale price | — | grantor/grantee names | Logan pick-list loads cleanly — supports the name-less distress sweep (FCL/LIS-P/TR-D…). |
+| (6) ROD document images | Logan doc viewer (same host) | ⚠️ per-doc render | — | — | — | — | — | Scanned deed/DoT PDFs; loan-$ via OCR only. Index has no $. `Report_URL` on GIS is null (0/31,765) — no per-parcel card link. |
+| (7) Tax bill / delinquent-tax portal | `tax.transylvaniacounty.org` (live, 200); auction PINs via `transylvaniacounty.org/news` (repo `nc_govdeals_real_property.parse_transylvania_notices`) | ⚠️ portal browser / ✅ news-feed HTML | — | — | — | — | — | Not a nc_ptscloud/PTS tenant (repo note: runs Government Window / DEVNET). Tax-owed $ not exposed on GIS (unlike Polk). |
+| (8) Condemned/code/vacant layer | none found | ❌ | — | — | — | — | — | No public condemned/vacant service; Helene damage layer also unavailable for this county. |
+
+**Biggest free gap here:** current delinquent tax-owed dollars — there's no open field (GIS layer has value but not tax owed) and the county tax portal is Government Window (browser/bot-walled), so per-parcel balances aren't free-scrapable.
+**Cheapest fix:** parse the county legal-notice/news feed (already wired) for tax-foreclosure PINs, then read the sale/opening-bid from the notice text — it substitutes for a delinquent-balance pull for the parcels that actually matter.
+
+### Mitchell, NC
+County seat **Bakersville**. Assessor/GIS platform: **county-hosted Esri ArcGIS Server** (`mapping.mitchellcountync.gov`, WebMapNew); ROD is **Logan Systems**; tax billing is **Government Window**.
+
+| Layer | Free endpoint / portal (URL or repo const) | Access | heated sqft | beds/baths | sale $ | condition/CDU | owner-mailing | Notes / wall |
+|---|---|---|---|---|---|---|---|---|
+| (1) Assessor/CAMA bulk layer | `mapping.mitchellcountync.gov/arcgis/rest/services/WebMapNew/MapServer/12` (repo `enrichment_owner_mailing.COUNTY_GIS["NC:Mitchell"]`) | ✅ open JSON | ❌ not on layer | ❌ | ⚠️ `Deed_Date`+`DeedBook`/`DeedPage`, no price | ⚠️ `PropClas` only | ✅ `Owner1/2`+`MailAddr/City/State/Zip` | Value present as `Land`/`Dwelling`/`Total`. No structural specs, no sale price — thinnest CAMA of the three. |
+| (2) qPublic/Schneider parcel CARD | none | ❌ | — | — | — | — | — | Not on qPublic (probe 403); `mitchell.northcarolinaassessors.com` dead (000). No third-party CAMA card. |
+| (3) GIS parcel polygon + situs | same MapServer/12, `addr_field=LocAddr` (repo `enrichment_arcgis.NC_GIS["Mitchell"]`) | ✅ open JSON, polygon geom | ❌ | ❌ | ❌ | ❌ | ✅ | Situs `LocAddr` sometimes street-name-only; repo `enrichment_parcel_reverse_geo` uses this layer for lat/lng→parcel. |
+| (4) GIS address-point layer | not separately wired | ⚠️partial | — | — | — | — | — | No dedicated address-point layer identified; situs off parcel polygon only. |
+| (5) Register of Deeds index | `search.mitchelldeeds.com` (repo `rod/logan.py LOGAN_COUNTIES["NC:Mitchell"]`) | ✅ browserless (200; pick-list loads, distress sweep supported) | — | — | ⚠️ deed book/page, no $ | — | grantor/grantee names | Standard Logan distress codes work here. |
+| (6) ROD document images | Logan doc viewer (same host) | ⚠️ per-doc render | — | — | — | — | — | Scanned deed/DoT PDFs; loan-$ via OCR only. |
+| (7) Tax bill / delinquent-tax portal | `mitchellnctax.governmentwindow.com` (403 to httpx = live but bot-walled); GIS `Total` = assessed, not owed | ⚠️ walled (Government Window bot-block) | — | — | — | — | — | NOT a PTS/nc_ptscloud tenant (repo note). No free delinquent-$ path; `mitchellcounty.org` returns 523 (Cloudflare). |
+| (8) Condemned/code/vacant layer | none found | ❌ | — | — | — | — | — | No public condemned/code/vacant service. |
+
+**Biggest free gap here:** structural specs (heated sqft, beds/baths) and sale price — none exist on any Mitchell free JSON layer, and there is no qPublic card or PDF property-record card to fall back to (unlike Polk).
+**Cheapest fix:** value the property from GIS `Total`/`Dwelling` assessed values (already captured) and borrow $/sqft from a Transylvania/Burke recorded-comps median, since Mitchell has no free per-parcel sqft or sale source to build its own comps from.
