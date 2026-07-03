@@ -64,3 +64,6 @@ docs/outreach_maillist.csv
 data/ncvoter/
 docs/skiptrace_worksheet.csv
 .cache/
+
+# scraper WAF/debug dumps (noise, regenerated per run)
+debug/

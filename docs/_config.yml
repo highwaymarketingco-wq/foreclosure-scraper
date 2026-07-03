@@ -18,6 +18,8 @@ exclude:
   - path_to_100.md
   - path_to_100_deepdive.md
   - path_to_100_roadmap.md
+  - goliath_teardown.md
+  - completeness_audit.md
 include:
   - listings.json.gz
   - listings_detail.json.gz
