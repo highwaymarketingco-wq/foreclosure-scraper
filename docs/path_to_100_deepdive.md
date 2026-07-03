@@ -9077,3 +9077,454 @@ Relevant files (all absolute):
 - `/Users/cashhigh/foreclosure-scraper/docs/listings.json.gz`, `/Users/cashhigh/foreclosure-scraper/docs/crm.json`, `/Users/cashhigh/foreclosure-scraper/docs/run_health.json`, `/Users/cashhigh/foreclosure-scraper/docs/run_meta.json` — the client-side data sources (all already web-served from `docs/`).
 - `/Users/cashhigh/foreclosure-scraper/scripts/backtest_arv.py` — add a `--json docs/arv_backtest.json` sink for the calibration scorecard.
 - `/Users/cashhigh/foreclosure-scraper/src/foreclosure_scraper/enrichment_corroboration.py` and `models.py` — where `raw.corroboration.sources` / `raw.also_seen_in` (the per-source lineage the yield table reads) are written.
+
+
+---
+
+# Deep-Dive Round 24 — Local-AI 'Chat With Your Leads' Layer (spec, 2026-07-02)
+
+
+## The data model for query-over-the-board
+
+### The design (concrete, for THIS board on an 8GB Mac)
+
+The board is `listings.json` (currently 4,054 auction/foreclosure records; the "17k" is the full motivated-seller board this scales to). Each record already carries flat fields (`street_address`, `city`, `county`, `state`, `assessed_value`, `market_value`, `judgment_amount`, `opening_bid`, `living_sqft`, `year_built`, `listing_type`, `source`) plus a nested `raw` blob holding the derived intelligence: `raw.grade.overall_score`, `raw.grade.financial_score`, `raw.flags`, `raw.condition_tier`, `raw.calc.confidence`, `raw.data_quality`. The task's named fields map onto real ones — **equity** = `market_value − judgment_amount − lien stack`, **intent_score** = `raw.grade.overall_score`, **signals** = `raw.flags` + `listing_type`, **CRM stage** = a new `crm_stage` field you add.
+
+The core design decision: **do NOT dump each lead into a vector store and call it RAG.** Build a **two-store hybrid**:
+
+1. **A relational store (SQLite) = the source of truth and the filter engine.** One row per lead, every scalar field as a typed, indexed column. This answers the ~85% of operator questions that are actually filters/aggregations.
+2. **A vector store (LanceDB, embedded, on-disk) = the semantic layer**, holding one embedding per lead over a *narrow natural-language summary*, with the same lead fields duplicated as filterable metadata columns. This answers the ~15% of fuzzy/conceptual questions and enables filter-then-search.
+
+Both keyed by a stable `lead_id` (hash of `source_url` or `parcel_id`+`address`). One build script writes both. SQLite is the arbiter; the vector store never returns a number the operator acts on without the SQLite row behind it.
+
+### What runs locally (models/tools + sizes + the 8GB fit)
+
+On an 8GB Mac, unified memory is the whole budget and macOS takes ~2.4GB, leaving **~5.6GB** for everything. The build is deliberately lopsided — a tiny embedder, a small chat model, and stores that live on disk:
+
+| Component | Choice | RAM/size | Why |
+|---|---|---|---|
+| Embedder | **`nomic-embed-text`** via Ollama | 274MB on disk, ~0.5–1GB resident | 768-dim, 8k context, top MTEB-per-MB; `mxbai-embed-large` (670MB, 1024-dim) is bigger for no operator-relevant gain here |
+| Vector store | **LanceDB** (embedded) | disk-based, memory-mapped, ~50MB for 17k×768 float32 | Native metadata pre-filtering + on-disk means it never fights the chat model for RAM; ChromaDB is fine too but leans in-memory |
+| Relational store | **SQLite** (stdlib) | ~15–30MB file, near-zero RAM | The real workhorse; indexed columns answer filters instantly |
+| Chat model | **Llama 3.2 3B** or **Qwen2.5 3B**, Q4 | ~2–2.6GB resident | Only invoked to (a) turn a question into a filter and (b) narrate the returned rows |
+| Chat UI | Open WebUI or AnythingLLM | negligible | Points at Ollama + the two stores |
+
+**The 8GB fit works because the embedder and chat model are never both hot in a query, and the stores are on disk.** Embeddings are computed once at build time (~5–10 min for 17k on CPU/Metal), then that model can unload. At query time you hold one 3B chat model (~2.5GB) + LanceDB's memory-mapped pages + SQLite — comfortably inside 5.6GB with headroom for the browser UI. A 7B chat model also fits (~4.5GB Q4) but leaves the machine tight; stay at 3B.
+
+### How it works (the flow, with an example)
+
+**Build (once, then incremental on each scraper run):** load `listings.json` → flatten `raw.*` into columns → compute `equity`, `equity_pct`, `absentee` → write every lead as a SQLite row → for each lead render a **one-paragraph NL summary** and embed it → write the vector + duplicated metadata to LanceDB.
+
+The per-lead summary template (this is the "document"):
+
+> *"Single-family foreclosure at 10383 Singletree Ln, Davidson NC 28036 (Mecklenburg County). Auction.com listing, cosmetic condition. Market value $X, judgment $Y, estimated equity $Z (~N%). Overall grade D (60), financial 50, location 60. Flags: auction, non-refundable deposit risk. ARV confidence LOW — square footage missing. CRM stage: new."*
+
+**Query — two modes, a router picks:**
+
+- **Structured mode (the default).** Operator asks *"show me single-family in Mecklenburg with equity over $75k, grade B or better, not yet contacted."* The 3B model translates this to `SELECT * FROM leads WHERE county='Mecklenburg' AND property_kind='single_family' AND equity>75000 AND overall_score>=80 AND crm_stage='new' ORDER BY equity DESC`. SQLite returns exact rows. No embeddings touched. **Correct, complete, and reproducible.**
+- **Semantic mode.** Operator asks something fuzzy: *"which of my Upstate leads look like tired absentee landlords who'd take a quick cash offer?"* — a concept, not a column. Here you **filter first in the metadata** (`county IN (upstate set) AND absentee=true`), then vector-search the summaries within that subset for the notion of a burned-out landlord, and hand the top ~15 rows to the 3B model to explain. Filter-then-search keeps the vector search over hundreds, not 17k, so a small model stays accurate.
+
+The rule: numbers and lists come from SQLite; only genuinely open-ended "which of these feel like…" questions go through the vector path, and even those are filtered down first.
+
+**Why most operator questions are FILTERS, not RAG.** RAG exists to find a needle of *unstructured text* buried in a corpus. This board is already structured — every fact an operator cares about (county, equity, score, stage, flags, sale date) is a typed field. "Top 20 by equity in Buncombe," "everything with an upset-bid deadline this week," "grade A that I haven't called," "count by county," "auctions with non-refundable deposit risk" are all `WHERE`/`ORDER BY`/`GROUP BY` — deterministic, exact, and instant. Pushing those through embeddings is strictly worse: a vector search over "high equity" returns *approximately* high-equity leads, silently drops matches, can't sum or count, and can't sort by a number. RAG only earns its keep for the residual fuzzy questions where the operator is reasoning over the *prose* of the summary rather than a field. Design for the 85% first; the vector store is the specialist you call for the 15%.
+
+### Limits / honest caveats (what an 8GB local setup can't do well)
+
+- **The 3B model is a decent text-to-SQL translator, not a reliable analyst.** It will occasionally mis-map a phrase to the wrong column or invent a filter. Mitigation: give it the exact schema + enum values in the system prompt, constrain it to a whitelist of columns, and **show the operator the generated WHERE clause** before running — treat it as a natural-language front-end to SQL, not an oracle.
+- **Semantic quality is only as good as the summary template.** The model can only "find tired landlords" if that signal is *written into* the per-lead paragraph. Fields you don't verbalize (or don't have — half these records have null `living_sqft`, `bedrooms`, `assessed_value`) are invisible to semantic search. Garbage-in shows up as confident-but-empty answers.
+- **No multi-hop reasoning across the whole board.** "Rank counties by average equity and tell me which trend is emerging" needs an aggregate + a judgment call; a 3B model will fumble the aggregation. Do the aggregation in SQL, feed it the small result table, let the model narrate only.
+- **Embeddings are stale until you rebuild.** Every scraper run changes the board; the vector store must be re-embedded (incrementally, by `lead_id`) or semantic answers reference leads that moved stage or sold. SQLite can be updated live; the vector layer needs a refresh step.
+- **Context window caps how many leads it can "see" at once.** A 3B model can reason over maybe 15–40 summaries per answer, not thousands. This is exactly why filtering must happen in the store, not the model — the LLM narrates a small, pre-filtered result set, it never ingests the board.
+- **Don't expect 7B+ quality.** Fancy synthesis, nuanced scoring, or writing polished outreach copy at scale strains a 3B model on 8GB. For those, the local layer drafts and a bigger model (or you) finishes. The local setup's honest sweet spot is **private, instant filter-and-look-up over the board**, with light semantic search on top — not a full analyst.
+
+Sources: [Ollama embedding models 2026 (morphllm)](https://www.morphllm.com/ollama-embedding-models), [nomic-embed-text](https://ollama.com/library/nomic-embed-text), [mxbai-embed-large](https://ollama.com/library/mxbai-embed-large), [LanceDB vs ChromaDB](https://aicoolies.com/comparisons/lancedb-vs-chromadb), [Vector DB comparison 2026 (4xxi)](https://4xxi.com/articles/vector-database-comparison/)
+
+
+## Natural-Language → Dashboard Filter (the killer feature)
+
+### The design (concrete, for THIS board on an 8GB Mac)
+
+One small local model does exactly one job: turn an English sentence into a **filter object** (JSON) that the existing dashboard already knows how to apply. No embeddings, no vector store, no RAG, no "chat." The model never sees all 17,003 leads and never generates prose — it only fills in a fixed set of filter slots. Your JavaScript does the actual filtering, sorting, and rendering, exactly as it does today when someone clicks a filter button.
+
+The whole feature is three moving parts:
+
+1. **A search box** added to the board's filter bar (`<input id="nl-search">` + a "Go" button).
+2. **A local endpoint** — Ollama running `qwen2.5:3b-instruct` on `127.0.0.1:11434`, called with a **JSON Schema** in the `format` field so the output is *guaranteed* to be a syntactically valid object matching your schema (grammar-constrained decoding at the token level — the model physically cannot emit a stray field name or unquoted number).
+3. **An apply function** in `dashboard.js` that takes that object and runs the same in-memory `.filter()` / `.sort()` you already use for button clicks.
+
+The model is a **translator, not a database.** It converts "high-equity vacant probate leads in Spartanburg under $150k with a phone" into structured slots. Your code — which already holds the array of leads — does the matching. This is the 80/20 because 90% of the value ("let me query my board in English") comes from the one capability an 8GB model is genuinely reliable at: constrained field extraction into a known schema.
+
+The filter object is closed-vocabulary and derived directly from your real lead fields (`county`, `city`, `state`, `property_kind`, `listing_type`, `opening_bid`/`judgment_amount`/`assessed_value`, plus the enriched `equity`, `intent_score`, `signals[]`, `crm_stage`, and a `has_phone` flag). Because the vocabulary is closed, a 3B model hits it reliably — it's picking from a menu, not reasoning.
+
+### What runs locally (models/tools + sizes + the 8GB fit)
+
+**Tools:**
+- **Ollama** (latest) — one-line install, auto-detects Apple Silicon Metal, exposes `POST /api/chat` and `/api/generate` with a `format` field that accepts a full JSON Schema and enforces it via llama.cpp GBNF grammar. This is the piece that makes an 8GB setup viable: constrained decoding both guarantees valid JSON *and* runs faster (measured ~5–6x faster than unconstrained, because the model stops spending tokens deciding on formatting).
+- **The static dashboard** — plain HTML/JS, no framework needed. `fetch()` to localhost.
+
+**Model — the key choice for 8GB:**
+- **Primary: `qwen2.5:3b-instruct` (Q4_K_M, ~2.0 GB on disk, ~2.5–3 GB resident).** Qwen 2.5 is the class leader for structured output at small sizes — it's been explicitly trained on JSON/table generation and in field-extraction tests hit ~94% vs ~87% for a comparable Llama. At 3B it leaves comfortable headroom on an 8GB machine that's also running Chrome + the OS. Latency for a one-sentence → small-object extraction is roughly 0.5–2 s.
+- **Fallback if you want more headroom for phrasing quirks: `qwen2.5:7b-instruct` (Q4_K_M, ~4.7 GB).** It *fits* on 8GB but only barely — with a browser open you'll be tight and may swap. Use it only if the 3B mis-slots your phrasing in testing. Do **not** reach for 14B/27B/32B "best structured-output" models you'll see recommended for 2026 — those target 16GB+ and won't fit.
+
+**The 8GB math (why 3B, not 7B):** macOS + Chrome with the dashboard already eats ~4–5 GB. A 3B-Q4 model (~2.5–3 GB working set) sits on top of that with margin. A 7B-Q4 (~5 GB working set) pushes total demand past 8 GB once the browser is loaded, forcing memory compression/swap that spikes latency. The task doesn't need 7B — slot-filling from a closed vocabulary is easy; you're buying reliability from *constrained decoding + a good small model*, not from raw parameter count.
+
+**Nothing else runs.** No embedding model, no vector DB, no Open WebUI/AnythingLLM for this feature. Those are for the (separate, heavier) "chat with your leads" idea. This feature is deliberately lighter — that's why it's the 80/20.
+
+### How it works (the flow, with an example)
+
+**The JSON Schema (the contract — passed to Ollama's `format`):**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "county":        { "type": ["string","null"], "enum": ["Spartanburg","Rutherford","Cleveland","Polk","Buncombe","Henderson", null] },
+    "state":         { "type": ["string","null"], "enum": ["NC","SC", null] },
+    "property_kind": { "type": ["string","null"], "enum": ["single_family","multi_family","land","commercial", null] },
+    "listing_type":  { "type": ["string","null"], "enum": ["auction","tax_sale","probate","pre_foreclosure", null] },
+    "signals":       { "type": "array", "items": { "type": "string", "enum": ["vacant","probate","tax_delinquent","absentee","divorce","elderly","incarcerated"] } },
+    "price_max":     { "type": ["number","null"] },
+    "price_min":     { "type": ["number","null"] },
+    "equity_min":    { "type": ["number","null"] },
+    "intent_min":    { "type": ["number","null"] },
+    "has_phone":     { "type": ["boolean","null"] },
+    "crm_stage":     { "type": ["string","null"], "enum": ["new","contacted","negotiating","under_contract","dead", null] },
+    "sort_by":       { "type": ["string","null"], "enum": ["equity","intent_score","opening_bid","sale_date", null] },
+    "sort_dir":      { "type": ["string","null"], "enum": ["asc","desc", null] }
+  },
+  "required": ["county","state","property_kind","listing_type","signals","price_max","price_min","equity_min","intent_min","has_phone","crm_stage","sort_by","sort_dir"],
+  "additionalProperties": false
+}
+```
+
+Every field is `required` and nullable — this forces the model to emit the full object every time (Ollama's grammar enforces it), so your JS never hits an undefined key. `null` = "user didn't constrain this." `enum`s pin the county/signal vocabulary to your real values so the model can't invent `"Greenville"` or a misspelled signal.
+
+**The system prompt (short and rule-based — no chain-of-thought needed):**
+
+```
+You convert a real-estate lead search into a filter object.
+Output ONLY the object matching the schema. Do not explain.
+Rules:
+- Map every request field to a schema slot. Unmentioned slots = null (arrays = []).
+- "under $150k" / "below 150k" -> price_max: 150000. "over"/"at least" -> price_min.
+- "high equity" (no number) -> equity_min: 100000. "high intent" -> intent_min: 70.
+- "with a phone" / "reachable" / "has contact" -> has_phone: true.
+- vacant/probate/tax delinquent/absentee/divorce/elderly/incarcerated -> add to signals.
+- County names map to the county enum; if a city is named, leave county null (JS resolves city).
+- "best"/"hottest"/"top" with no field -> sort_by: "intent_score", sort_dir: "desc".
+Return the full object with all keys present.
+```
+
+**The wiring in `dashboard.js`:**
+
+```js
+async function nlSearch(text) {
+  const res = await fetch("http://127.0.0.1:11434/api/chat", {
+    method: "POST",
+    body: JSON.stringify({
+      model: "qwen2.5:3b-instruct",
+      stream: false,
+      format: FILTER_SCHEMA,          // the schema object above
+      options: { temperature: 0 },     // deterministic slot-filling
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user",   content: text }
+      ]
+    })
+  });
+  const f = JSON.parse((await res.json()).message.content); // guaranteed valid by `format`
+  applyFilter(f);   // <-- your existing render path
+}
+
+function applyFilter(f) {
+  let rows = ALL_LEADS.filter(L =>
+    (f.county       == null || L.county === f.county) &&
+    (f.state        == null || L.state === f.state) &&
+    (f.property_kind== null || L.property_kind === f.property_kind) &&
+    (f.listing_type == null || L.listing_type === f.listing_type) &&
+    (f.price_max    == null || (L.opening_bid ?? L.assessed_value ?? Infinity) <= f.price_max) &&
+    (f.price_min    == null || (L.opening_bid ?? L.assessed_value ?? 0) >= f.price_min) &&
+    (f.equity_min   == null || (L.equity ?? 0) >= f.equity_min) &&
+    (f.intent_min   == null || (L.intent_score ?? 0) >= f.intent_min) &&
+    (f.has_phone    !== true || hasPhone(L)) &&
+    (f.crm_stage    == null || L.crm_stage === f.crm_stage) &&
+    (f.signals.length === 0  || f.signals.every(s => (L.signals ?? []).includes(s)))
+  );
+  if (f.sort_by) rows.sort((a,b) =>
+    ((b[f.sort_by] ?? 0) - (a[f.sort_by] ?? 0)) * (f.sort_dir === "asc" ? -1 : 1));
+  renderTable(rows);           // the same function your button filters already call
+  showFilterChips(f);          // render active constraints as removable chips (trust + edit)
+}
+```
+
+**Worked example.** User types: *"high-equity vacant probate leads in Spartanburg under $150k with a phone."* Ollama returns (validated against the schema):
+
+```json
+{ "county":"Spartanburg","state":"SC","property_kind":null,"listing_type":"probate",
+  "signals":["vacant","probate"],"price_max":150000,"price_min":null,
+  "equity_min":100000,"intent_min":null,"has_phone":true,"crm_stage":null,
+  "sort_by":"equity","sort_dir":"desc" }
+```
+
+`applyFilter` runs against the in-memory board, renders (say) 23 rows sorted by equity, and shows chips: `Spartanburg ✕ · probate ✕ · vacant ✕ · ≤$150k ✕ · equity ≥$100k ✕ · has phone ✕`. The user can click any chip to drop a constraint — so even when the model over- or under-constrains, correction is one click, and the chips make the model's interpretation *visible* instead of a black box.
+
+### Limits / honest caveats (what an 8GB local setup can't do well)
+
+- **It parses intent, it doesn't compute answers.** Ask "which county has the best average margin?" and this feature can't answer — that's aggregation/analysis, not filtering. It only narrows the existing list. Keep the scope to "filter/sort my board."
+- **Constrained decoding guarantees valid JSON, not correct semantics.** The grammar forces a well-formed object; it does *not* guarantee the model chose the *right* slot. A 3B model will occasionally mis-map ("under 150k" → `price_min`) or miss an implied signal. Mitigation is baked into the design: `temperature 0`, tight enum vocabulary, and **visible editable chips** so a wrong slot is obvious and one-click fixable. Treat output as a draft filter, not gospel.
+- **Fuzzy/subjective phrasing is weak.** "Good deals," "motivated sellers," "nice areas" have no defined slot. You must encode those as rules in the prompt (e.g., "motivated" → `intent_min: 70`) or they'll be dropped. The vocabulary is only as rich as the mappings you write.
+- **Numeric thresholds are conventions, not intelligence.** "High equity" → `100000` is a hardcoded guess in the prompt. If your board's equity distribution differs, tune the number. The model isn't inferring your portfolio's percentiles.
+- **First call is slow (cold load).** Ollama loads the model into memory on first request (a few seconds on 8GB); subsequent calls are ~0.5–2 s. Fire a tiny warm-up request on page load so the first real search feels instant.
+- **8GB is the real ceiling.** With Chrome + the dashboard open, you're committed to the 3B model. If you also try to run the separate "chat with your leads" stack (7B + embeddings + a vector DB) *at the same time*, you'll swap hard. This feature is designed to be the one that fits — don't co-run the heavy stack with it on this machine.
+- **New enum values need a code touch.** Add a county or a new signal type to the board and you must add it to the schema `enum` and (ideally) the prompt rules. It's not self-updating from the data. Cheap to maintain, but not zero.
+- **City → county resolution lives in your JS, not the model.** The schema deliberately leaves `county: null` when a city is named, because a 3B model shouldn't be trusted to memorize which county every town is in. Keep a small city→county lookup in the dashboard and resolve it after the model returns.
+
+**Sources:** [Ollama structured outputs (format + JSON Schema)](https://ollama.com/blog/structured-outputs) · [Ollama structured outputs with Pydantic, 2026](https://jangwook.net/en/blog/en/ollama-structured-outputs-pydantic-local-llm-guide-2026/) · [Best local LLMs for 8GB RAM, 2026](https://ai-jupyter.com/local-ai-models/best-local-llm-for-8gb-ram) · [Best local LLMs for structured output — Qwen, 2026](https://insiderllm.com/guides/structured-output-local-llms/) · [Constraining LLMs with structured output: Ollama + Qwen](https://www.glukhov.org/llm-performance/ollama/llm-structured-output-with-ollama-in-python-and-go/) · [Local LLMs on Apple Silicon, 2026](https://www.sitepoint.com/local-llms-apple-silicon-mac-2026/)
+
+
+## Local embeddings + vector store on 8GB
+
+### The design (concrete, for THIS board on an 8GB Mac)
+
+Two truths shape this design. First, the real file is `/Users/cashhigh/Downloads/listings-27620824992/listings.json` — **4,054 records, 19 MB**, with structured fields (`street_address`, `city`, `county`, `opening_bid`, `judgment_amount`, `assessed_value`, `market_value`, `auction_status`, `plaintiff/defendant`, `description`, `sale_date`, etc.). Not 17k. Second, on a corpus this small the embedding index is a **rounding error in RAM** — the question is not "can it fit" (it trivially does) but "does semantic search earn its keep over pure filtering." Answer: for ~90% of queries, no; build it only for the free-text minority.
+
+Concrete stack for the semantic-search sidecar:
+
+- **Embed model:** `nomic-embed-text` (v1.5) via Ollama — 274 MB on disk, 768-dim output, 8,192-token context.
+- **Vector store:** **`sqlite-vec`** — a single `.db` file, zero server, brute-force/flat over 4k rows. No HNSW build, no daemon.
+- **What gets embedded:** one composite text string per listing, not the raw JSON. Template: `"{property_kind} in {city}, {county} County {state}. {auction_status}. Opening bid ${opening_bid}, judgment ${judgment_amount}, assessed ${assessed_value}. {description} {legal_description}"`.
+- **Where it lives:** script 2 (enrich) writes `leads.db` with two tables — `listings` (all structured fields, for SQL filtering) and `vec_listings` (the `sqlite-vec` virtual table holding the 768-dim vector + rowid). One file, ships next to `listings.json`.
+- **Routing:** the chat layer runs a **filter-first router**. Structured predicate in the query (county, bid range, status, date, equity) → pure SQL, no embeddings touched. Only fuzzy/conceptual language ("distressed rural land near water," "messy title situations," "estates where the heirs probably want out fast") → embed the query, ANN over `vec_listings`, then re-join to structured rows.
+
+### What runs locally (models/tools + sizes + the 8GB fit)
+
+| Component | Tool | Disk | RAM when active |
+|---|---|---|---|
+| Embed model | `nomic-embed-text` v1.5 (Ollama) | 274 MB | ~500–700 MB resident during a batch |
+| Vector store | `sqlite-vec` (SQLite extension) | index ~13 MB | ~13 MB mmap'd |
+| Index file total | `leads.db` (structured + vectors) | ~30–35 MB | negligible |
+
+**The 8GB RAM math, honestly:**
+- **Index size on disk:** 4,054 rows × 768 dims × 4 bytes (float32) = **~12.5 MB** of raw vectors. Call it ~13 MB with `sqlite-vec` overhead. This is smaller than the source JSON. It is nothing.
+- **RAM to *search* it:** `sqlite-vec` does a flat scan; it memory-maps the file. Peak working set for a query is single-digit MB. You could hold 50 boards this size in RAM.
+- **RAM to *build* it:** the constraint is not the index, it's running Ollama's embed model concurrently with the 7–8B chat model the user wants for "chat with your leads." `nomic-embed-text` needs ~0.5–0.7 GB; a 7B chat model at Q4 needs ~4.5–5 GB. On 8GB (of which macOS + apps already eat 2.5–3 GB), you **cannot comfortably hold both resident at once**. The fix is temporal separation: script 2 builds the whole index in a batch run (embed model loaded, chat model not), then unloads. At chat time only the chat model + `sqlite-vec` (no embed model needed except to embed the incoming query — a single 768-dim vector, which briefly reloads nomic for <1s or is kept warm since it's tiny).
+- **Build time:** 4,054 short strings through `nomic-embed-text` on an M1/M2 at Ollama defaults lands around **5–12 minutes** (throughput improves ~40% at batch 128 vs 32, and MLX beats llama.cpp by ~50% if you use an MLX path — but at 4k rows even the slow path is a coffee break, not an overnight job). This runs once per full data refresh, not per query.
+
+### How it works (the flow, with an example)
+
+1. **Script 1 (scrape)** → produces `listings.json` (already exists).
+2. **Script 2 (enrich)** → loads JSON, writes structured rows into `leads.db`, builds the composite text per row, calls Ollama `/api/embed` in batches, writes vectors into `vec_listings`. One-time cost per refresh.
+3. **Script 3 (chat)** → the router. Query comes in:
+   - *Structured example:* "Buncombe County auctions with opening bid under $150k still active" → router detects county + numeric + status → **pure SQL**, `WHERE county='Buncombe' AND opening_bid < 150000 AND auction_status='active'`. Embeddings never touched. Sub-millisecond, exact, no hallucination surface.
+   - *Semantic example:* "raw acreage parcels out in the county that look like tired inherited land" → no clean predicate. Router embeds the query string with nomic → runs `sqlite-vec` KNN over the 4k vectors → gets top-40 rowids → joins back to structured fields → hands that shortlist to the 7B chat model to summarize. The vector step here is doing the one thing SQL can't: matching "tired inherited land" against `property_kind='Vacant Land'` + `description` mentioning estate/heirs/probate + high acreage, without you having pre-tagged that concept.
+
+### Limits / honest caveats (what an 8GB local setup can't do well)
+
+- **Semantic search is the minority case, and it's the weak link — not the RAM.** On 4k rows the honest recommendation is: **build the structured SQL layer first, and treat the vector index as optional.** Most real questions about a foreclosure board ("which county, what bid, what date, what status, how much equity") are filters, and filters on 4k rows are instant and *correct*. Embeddings buy you fuzzy concept-matching for a small slice of queries and add a moving part that can return plausible-but-wrong neighbors.
+- **Garbage-in on `description`.** The embedding quality is only as good as the composite text. Many of these records have sparse or boilerplate `description`/`legal_description` (auction notices, not listing copy). Semantic search over thin text mostly re-ranks on city/county/type — which SQL already does exactly. Where the text *is* rich, it helps; where it's a one-line legal blurb, the vector adds little.
+- **You can't keep embed + chat + a reranker all resident on 8GB.** No cross-encoder reranker tier (that'd be a third model). You get bi-encoder retrieval only, so top-k recall is decent but precision-at-1 is soft. Mitigate by pulling top-30–40 and letting the chat model filter, not by adding models.
+- **`nomic-embed-text` is fine but not SOTA.** For pure GPU-memory-constrained baselines `all-MiniLM` (46 MB, 384-dim) is even lighter and would also fit trivially — the RAM savings are irrelevant at 4k rows, so pick nomic for the longer context and better retrieval, not to save memory you don't need to save.
+- **Re-embed on every refresh.** No incremental magic here worth the complexity at this scale; when script 1 pulls a fresh board, script 2 just rebuilds `leads.db` from scratch in a few minutes. Cheap.
+- **Bottom line for the spec round:** the vector store is genuinely free on RAM (13 MB) and cheap to build (minutes), so it's not *risky* to include — but it is **not the thing that makes this useful**. The SQL filter layer is. Recommend shipping semantic search as a clearly-scoped "fuzzy search" mode on top of a filter-first router, not as the primary retrieval path.
+
+Sources: [morphllm Ollama embedding benchmarks](https://www.morphllm.com/ollama-embedding-models), [ollama.com/library/nomic-embed-text](https://ollama.com/library/nomic-embed-text), [Local Embeddings on Apple Silicon (Contra Collective)](https://contracollective.com/blog/local-embeddings-apple-silicon-nomic-bge-qwen3-m5-max-2026), [sqlite-vec local vector search (DEV)](https://dev.to/aairom/embedded-intelligence-how-sqlite-vec-delivers-fast-local-vector-search-for-ai-3dpb), [Chroma vs LanceDB for side projects (agntup)](https://agntup.com/chroma-vs-lancedb-best-vector-database-for-side-projects-in-2026/)
+
+
+## Ollama Model Fit for an 8GB Mac
+
+### The design (concrete, for THIS board on an 8GB Mac)
+
+The job is narrow: turn one English sentence ("cheap single-family in Spartanburg with a bid under 100k") into a **JSON filter object** that a Python function applies to `listings.json` (17,003 leads with `county`, `state`, `property_kind`, `opening_bid`, `equity`, `intent_score`, `signals`, CRM `stage`). The model never sees the 17k rows and never does math — it only classifies the sentence into fields. That is a small, bounded task, so the right pick is **small and fast, not big and smart**.
+
+**Chosen model: `qwen2.5:3b-instruct-q4_K_M`** (~1.9 GB on disk, ~2.5–3 GB resident). It is the sweet spot for NL→filter on 8GB: strong instruction-following and JSON discipline for its size, leaves 4–5 GB free for macOS + your browser + the Python process, and returns a filter in well under a second.
+
+- **Primary:** `qwen2.5:3b-instruct-q4_K_M` — best structured-extraction quality per GB at this tier.
+- **Faster fallback (if you want more headroom / snappier):** `llama3.2:3b-instruct-q4_K_M` (~2 GB) — comparable size, slightly weaker on strict JSON but very fast.
+- **Tiny fallback (heavy multitasking / older M1 Air):** `gemma2:2b-instruct-q4_K_M` (~1.6 GB) — fits with the most room to spare; good enough for this constrained task.
+- **Do NOT default to 7B here.** `qwen2.5:7b-instruct-q4_K_M` (~4.7 GB) *runs* on 8GB but leaves almost no room — it swaps the moment AnythingLLM/Open WebUI and Chrome are open, and you gain nothing on a task a 3B nails. `phi-3.5-mini` (3.8B) is fine but offers no edge over qwen2.5:3b for pure JSON classification and is a touch slower.
+
+Pin the model with a `Modelfile` (`temperature 0`, `num_ctx 2048` — you never need more context to parse one sentence, and small context = less RAM and faster first token).
+
+### What runs locally (models/tools + sizes + the 8GB fit)
+
+| Component | What | On-disk | Resident RAM |
+|---|---|---|---|
+| Runtime | Ollama (Metal backend) | ~50 MB | ~0.3 GB overhead |
+| **Model (pick 1)** | **qwen2.5:3b-instruct q4_K_M** | **~1.9 GB** | **~2.5–3 GB** |
+| alt | llama3.2:3b-instruct q4_K_M | ~2.0 GB | ~2.6 GB |
+| alt | gemma2:2b-instruct q4_K_M | ~1.6 GB | ~2.2 GB |
+| Chat UI (optional) | AnythingLLM or Open WebUI | — | ~0.4–0.8 GB |
+| Your Python filter script | applies JSON to listings.json | — | ~0.2 GB |
+
+**The 8GB fit:** qwen2.5:3b at q4_K_M holds the whole model + KV cache in roughly **3 GB of unified memory**. With ~2 GB for macOS and ~1 GB for a browser tab + the chat UI + Python, you sit near **6–6.5 GB of 8 GB** — no swap thrash. The 7B at 4.7 GB would push you to ~8 GB+ and start paging.
+
+**Why q4_K_M specifically:** it is the standard 4-bit-with-mixed-precision quant Ollama ships by default. Rule of thumb on Apple Silicon: resident RAM ≈ *(params in B) × ~0.6–0.7 GB* at q4_K_M, plus a few hundred MB of KV cache. So 3B ≈ ~2 GB weights, 7B ≈ ~4.5 GB weights. Going below q4 (q3/q2) saves little at 3B and measurably degrades JSON reliability — not worth it. Going above (q5/q6) costs RAM you don't have. **q4_K_M is the right floor and ceiling for this box.**
+
+**Speed expectation (M1/M2/M3, 8GB, Metal — the 8/16GB tier stays on Metal, NOT the 32GB+ MLX path):**
+- **3B q4_K_M: ~20–40 tokens/sec.** A filter JSON is ~30–60 tokens, so **well under a second** per query.
+- gemma2:2b: even faster, ~30–45 tok/s.
+- 7B q4_K_M for reference: ~15–20 tok/s and a much heavier memory footprint — slower *and* riskier on 8GB.
+
+**Crucial reliability lever — use Ollama's `format` (constrained JSON decoding), not a plain prompt.** Passing a JSON schema in `format` forces the sampler to only emit tokens that can legally continue valid JSON. This does two things: it makes even a 3B model emit **parseable, schema-valid** output every time (no "here's your JSON:" preamble to strip), and it is *faster* than free-text generation because the model skips formatting decisions. This is what makes a 3B viable for the whole task.
+
+### How it works (the flow, with an example)
+
+1. You type in the chat UI (or a CLI): *"single-family foreclosures in Spartanburg with an opening bid under $100k"*
+2. A one-shot prompt tells qwen2.5:3b: *"Output ONLY a JSON filter with keys county, state, property_kind, max_opening_bid, min_equity, min_intent_score, signals. Omit keys not mentioned."* — sent with `format` set to that JSON schema and `temperature 0`.
+3. Model returns (in ~0.5s):
+```json
+{"county":"Spartanburg","property_kind":"single_family","max_opening_bid":100000}
+```
+4. Your **Python script** — not the model — loads `listings.json`, applies that filter (`county=="Spartanburg" and property_kind=="single_family" and opening_bid<100000`), and prints the matching rows. On this real board that returns the Spartanburg single-family subset of the 509 Spartanburg leads with a bid under 100k.
+5. Result table renders in the UI. The model touched one sentence; Python touched the 17k rows. Nothing left the Mac.
+
+The split is the whole point: **the LLM is a translator, the code is the query engine.** That keeps the model's job tiny (so a 3B is plenty) and keeps all math/filtering deterministic and auditable.
+
+### Limits / honest caveats (what an 8GB local setup can't do well)
+
+- **Not a RAG "chat with all 17k leads."** An 8GB box cannot embed + hold the full board in context for open-ended Q&A ("summarize every high-equity lead and rank them"). It does **NL→filter over structured fields** well; it does **freeform reasoning across thousands of rows** poorly. Keep it to the filter pattern.
+- **No 7B+ comfortably.** 7B q4_K_M technically loads but co-existing with a browser + chat UI causes swap and lag. Don't fight it — 3B is the ceiling for a smooth experience here.
+- **MLX 2× speedup does NOT apply to you.** The 2026 Ollama MLX backend needs **32 GB** unified memory; 8GB/16GB Macs stay on Metal. Plan around the ~20–40 tok/s Metal numbers, not MLX marketing figures.
+- **Ambiguity / fuzzy intent.** A 3B will occasionally mis-map vague phrasing ("good deals," "hot leads") to the wrong field or invent a key. Mitigate with: `format` schema (rejects invalid keys), `temperature 0`, a fixed few-shot example in the system prompt, and a Python guard that ignores any key not in your allowlist.
+- **First query is slow.** Model load into RAM takes a few seconds on the first call after idle; keep Ollama warm (`OLLAMA_KEEP_ALIVE`) so subsequent filters stay sub-second. Every extra concurrent app steals from the same 8 GB, so close heavy tabs during use.
+- **Context is tiny by design.** `num_ctx 2048` is deliberate — it saves RAM and speeds first-token. Don't paste long documents into this chat; it's a sentence-parser, not a document reader.
+
+### The exact commands
+
+```bash
+# 1. Pull the model (once) — ~1.9 GB download
+ollama pull qwen2.5:3b-instruct-q4_K_M
+#   alternates:
+#   ollama pull llama3.2:3b-instruct-q4_K_M
+#   ollama pull gemma2:2b-instruct-q4_K_M
+
+# 2. Sample call: NL -> JSON filter, constrained + deterministic
+curl http://localhost:11434/api/chat -d '{
+  "model": "qwen2.5:3b-instruct-q4_K_M",
+  "stream": false,
+  "options": { "temperature": 0, "num_ctx": 2048 },
+  "format": {
+    "type": "object",
+    "properties": {
+      "county":         { "type": "string" },
+      "state":          { "type": "string" },
+      "property_kind":  { "type": "string" },
+      "max_opening_bid":{ "type": "number" },
+      "min_equity":     { "type": "number" },
+      "min_intent_score": { "type": "number" },
+      "signals":        { "type": "array", "items": { "type": "string" } }
+    }
+  },
+  "messages": [
+    { "role": "system", "content": "You convert a real-estate lead search into a JSON filter. Use ONLY these keys: county, state, property_kind, max_opening_bid, min_equity, min_intent_score, signals. Omit any key the user did not mention. Do not add commentary." },
+    { "role": "user", "content": "single-family foreclosures in Spartanburg with an opening bid under $100k" }
+  ]
+}'
+# -> {"county":"Spartanburg","property_kind":"single_family","max_opening_bid":100000}
+```
+
+Sources:
+- [Ollama on 8GB RAM — best models 2026 (webscraft.org)](https://webscraft.org/blog/ollama-na-8-gb-ram-yaki-modeli-pratsyuyut-u-2026?lang=en)
+- [Ollama VRAM / RAM requirements table 2026 (localaimaster.com)](https://localaimaster.com/blog/ollama-model-ram-vram-table)
+- [Ollama MLX on Apple Silicon — 32GB minimum (ollama.com/blog/mlx)](https://ollama.com/blog/mlx)
+- [Local LLM benchmarks on Apple Silicon M1–M5 (modelpiper.com)](https://modelpiper.com/blog/local-llm-benchmarks-apple-silicon)
+- [Ollama structured JSON output + format param (serverman.co.uk)](https://www.serverman.co.uk/ai/ollama/ollama-structured-json-output/)
+- [Small LLM structured-extraction benchmark 2026 (LLMStructBench, arxiv 2602.14743)](https://arxiv.org/abs/2602.14743)
+- [Ollama structured outputs with Pydantic (jangwook.net, 2026)](https://jangwook.net/en/blog/en/ollama-structured-outputs-pydantic-local-llm-guide-2026/)
+
+
+## AnythingLLM vs Open WebUI vs a custom 3-script pipeline
+
+### The design (concrete, for THIS board on an 8GB Mac)
+
+For a 17,003-lead JSON board on an 8GB Mac, pick by what the layer is actually *for*:
+
+- **AnythingLLM** = a packaged desktop app (single `.dmg`) that bundles a chat UI, a built-in vector database (LanceDB), an embedder, and an Ollama connector. You drop `listings.json` into a "workspace," it chunks + embeds it, and you chat against it with RAG out of the box. Zero code.
+- **Open WebUI** = a polished ChatGPT-style web front end for Ollama. It has a document/RAG feature ("Knowledge") but it is a Docker/pip service, heavier, and its RAG is a secondary feature bolted onto a chat UI. Best when you want a *chat product* with many models/users, not a data-analysis tool.
+- **Custom 3-script pipeline** = `cleaner.py` (normalize the 17k JSON rows into flat text/CSV records), `run.py` (orchestrator: load board, build the retrieval index or just filter, POST to `localhost:11434/api/chat`), and a query script (ask a question, get an answer + the rows it used). No UI, full control over how leads are matched.
+
+**The recommendation for this specific board: the custom 3-script pipeline is the right primary build, with AnythingLLM as the zero-effort fallback if the user wants a clickable UI this week. Open WebUI is the weakest fit here** — its strength is multi-model chat UX, not querying 17k structured records.
+
+The reason is the data shape. This board is **structured** (address, owner, equity, intent_score, signals, county, CRM stage). The most common real questions are filter/aggregate questions: *"show me Buncombe leads over intent 80 with a foreclosure signal still in New stage."* Generic RAG (embed everything, retrieve top-k by semantic similarity) is bad at that — it retrieves *similar-sounding* rows, not *all rows matching a threshold*, and silently drops leads. The custom pipeline can do a real structured pre-filter first, then hand only the matching rows to the model. AnythingLLM and Open WebUI can't be told "filter equity > X" — they just semantic-search.
+
+### What runs locally (models/tools + sizes + the 8GB fit)
+
+Everything below runs on-device via **Ollama** (localhost:11434). The 8GB ceiling is the hard constraint — macOS + apps already eat 3-4GB, so the model + its context must fit in roughly **4-4.5GB usable**.
+
+| Component | Pick for 8GB | On-disk | RAM at runtime |
+|---|---|---|---|
+| LLM (chat/answer) | `llama3.2:3b` or `qwen2.5:3b` (Q4) | ~2GB | ~3-3.5GB |
+| Smaller/faster fallback | `qwen2.5:1.5b` or `llama3.2:1b` | ~0.8-1.3GB | ~1.5-2GB |
+| Embedder (only if doing RAG) | `nomic-embed-text` (768-dim) | ~275MB | ~0.5GB |
+| Vector store | LanceDB (AnythingLLM) or a local FAISS/`sqlite-vec` file (custom) | tiny | negligible |
+| Runtime | Ollama (native Apple-silicon build, Metal) | — | — |
+
+Notes on the 8GB fit:
+- **A 7B/8B model is a bad idea on 8GB.** Even at Q4 it needs ~5.5-6GB and will swap hard once you add context; expect slowness and beachballs. Stay at **3B**. It's genuinely capable for "read these 20 lead rows and summarize / draft outreach."
+- **Do the heavy lifting in code, not in the model's context.** 17k rows is ~5-15MB of text — you cannot stuff that into a 3B model's context window (typically 4k-8k tokens usable before it degrades on 8GB). Both the custom pipeline and AnythingLLM solve this the same way: only a handful of retrieved/filtered rows ever reach the model.
+- **Embedding 17k rows is a one-time ~few-minute job** with `nomic-embed-text` on Apple silicon, then it's cached. The custom pipeline can often **skip embeddings entirely** for structured queries (filter in pandas, feed matches to the model), which is lighter and more accurate for this board.
+
+### How it works (the flow, with an example)
+
+**Custom pipeline (recommended):**
+1. `cleaner.py` reads `docs/listings.json`, flattens each of the 17,003 leads into one clean record (`"123 Oak St, Buncombe | owner: J. Smith | equity: $180k | intent: 88 | signals: foreclosure, tax-delinquent | stage: New"`), writes a normalized `leads.parquet`/CSV. Runs offline, no model.
+2. `run.py` loads that file. For a query it does a **structured pre-filter** (county == Buncombe, intent >= 80, signal contains "foreclosure", stage == "New") to get, say, 42 rows. Only those 42 (or top-N of them) get formatted into a prompt and POSTed to `localhost:11434/api/chat` with a system instruction like "you are analyzing saved real-estate leads; answer only from the rows provided."
+3. Query script prints the model's answer **plus the exact rows it was given**, so every claim is auditable.
+
+Example: *"Draft a first-touch text for my 5 highest-intent Buncombe foreclosure leads."* → `run.py` filters to Buncombe + foreclosure, sorts by intent_score, takes 5, sends those 5 records + the drafting instruction to `llama3.2:3b`, returns 5 tailored messages, each tied to a named row.
+
+**AnythingLLM (fallback, clickable):** Install the app → point it at your local Ollama → create a "Leads" workspace → drag in `listings.json` → it chunks + embeds into LanceDB → you type questions in the chat box and it semantic-retrieves the closest chunks and answers. Good for open-ended *"tell me about this lead"* questions; weaker for *"give me all leads above threshold X."*
+
+### Limits / honest caveats (what an 8GB local setup can't do well)
+
+- **8GB caps you at ~3B models.** They're fine for summarizing/drafting over a few retrieved rows, but they hallucinate more than a frontier model, are weaker at multi-step numeric reasoning, and can miscount. Treat totals/aggregations as a job for code (pandas), not the model — have the pipeline compute the number and let the model only phrase it.
+- **Pure RAG (AnythingLLM / Open WebUI) will silently under-answer threshold and "list all" questions.** Top-k semantic retrieval returns the *most similar* rows, not *every matching* row, so "how many leads over $200k equity" is unreliable. This is the single biggest reason to prefer the custom pipeline for a structured board.
+- **You cannot fit 17k rows in context.** Any approach must retrieve/filter down to a handful first; the model never "sees the whole board" at once, so cross-board analytics ("what's my average intent by county") must be computed in code and only narrated by the model.
+- **Speed:** expect roughly 15-40 tokens/sec on a 3B model on 8GB Apple silicon, slower if anything else is memory-hungry. Fine for one analyst asking questions; not a multi-user service. Open WebUI's multi-user framing is wasted here and its Docker overhead eats RAM you don't have.
+- **Setup-effort ranking:** AnythingLLM (lowest — install a .dmg, drag a file) < custom pipeline (a day of scripting, but exactly fits the data) < Open WebUI (Docker/pip service to stand up and maintain for features you won't use).
+- **Compliant framing holds for all three:** everything runs on `localhost` via Ollama, no API keys, no outbound calls, nothing leaves the Mac; the tools only parse a JSON file of already-collected, human-saved data. The custom pipeline is the *easiest to prove* compliant because you can read every line of the three scripts and confirm the only network call is to `127.0.0.1:11434`. AnythingLLM/Open WebUI are also local but are large third-party codebases, so "no data leaves the machine" rests on trusting (or network-sandboxing) the app rather than reading ~200 lines of your own code.
+
+
+## Operator Queries + Real Value: What You'd Actually Ask the Board, and Whether Local AI Beats Just Filtering
+
+### The design (concrete, for THIS board on an 8GB Mac)
+
+Your questions fall into three buckets, and the whole feasibility argument turns on sorting them correctly. The board (`listings-27620824992/listings.json`, 4,054 records — note: the file is 4,054, not 17,003) has clean structured columns: `defendant` (owner), `county`, `city`, `state`, `opening_bid`, `market_value`/`assessed_value`, `property_kind`, `street_address`, plus a rich `raw` sidecar — `raw.grade.overall_score` (this is your intent_score, 0–100), `raw.flags` (the signal tags: `absentee_owner`, `vacant`, `high_equity`, `preforeclosure`, `bank_owned`, `fire damage`, etc.), `raw.calc` (ARV/rehab/confidence), and `raw.condition_tier`.
+
+The design splits queries by what machinery each actually needs:
+
+1. **Filter/aggregate queries** (the "who/how many/which" questions) → answered by **deterministic code over the JSON**, not by an LLM. A ~120-line `query.py` that loads the JSON into a pandas DataFrame (flattening `raw.grade` and `raw.flags` into columns) and exposes ~10 canned functions: `hottest(n)`, `owners_with_multiple()`, `filter(county=, max_price=, flags=[], kind=)`. This is the workhorse and it involves zero AI.
+2. **Generation queries** (the "summarize/draft" questions) → the local LLM's real job. Ollama running **Qwen3.5 4B** or **Gemma 4 E2B** (Q4_K_M), fed *one already-selected record* as context. No retrieval, no SQL — just "here's a JSON blob, write prose."
+3. **Natural-language-to-filter** (letting the operator *type* query #1 in English instead of clicking) → the only part that needs an LLM to translate intent into a filter. This is where local models are weakest and where I'd constrain hard (see caveats).
+
+The three-script pipeline the operator touches: `query.py` (the deterministic engine), `chat.py` (thin CLI: routes a typed question — if it matches a known filter pattern, run code; if it's "summarize/draft," call Ollama with the selected record), and the existing board writer. AnythingLLM/Open WebUI is optional chrome on top for a chat box, but the value lives in `query.py`.
+
+### What runs locally (models/tools + sizes + the 8GB fit)
+
+- **Ollama** (runner) — negligible idle footprint.
+- **Qwen3.5 4B, Q4_K_M** (~2.8–3.2 GB weights) as the generation model, or **Gemma 4 E2B** if you want more headroom. 3–4B is the confirmed comfort zone for 8GB; Q4_K_M is the only sensible quant — a 4B-Q4 beats a 7B-Q2 every time. ([Local AI Master](https://localaimaster.com/blog/best-local-ai-models-8gb-ram), [webscraft](https://webscraft.org/blog/ollama-na-8-gb-ram-yaki-modeli-pratsyuyut-u-2026?lang=en))
+- **The 8GB fit:** weights (~3 GB) + KV cache (~1–2 GB) + macOS (~2–3 GB) leaves you thin but workable *if you keep the browser closed*. Critical design choice: **the model never ingests the 4,054-record board.** It only ever sees the one record you're summarizing or the ~20 rows for a "draft to these owners" batch. That keeps context tiny and dodges the swap-to-disk death that a 13B model or a full-board RAG index would cause.
+- **No vector DB needed for the core value.** RAG (LanceDB in AnythingLLM) is only worth it for the fuzzy "find leads *like* this narrative" query, and on structured columns it's strictly worse than a filter — embedding-similarity can't reliably answer "under $100k in Anderson." Skip it for v1.
+
+### How it works (the flow, with an example)
+
+Take your five real questions and route each:
+
+- **"Who are my 20 hottest calls today"** → **pure filter.** `df.sort_values('grade_overall_score', ascending=False).head(20)`. No AI. Returns a ranked table with owner, address, county, score, top flag. This is the single most-used query and it's just a sort.
+- **"Any owner with 2+ distressed parcels"** → **pure aggregate.** `df.groupby('defendant').filter(lambda g: len(g) >= 2)`. No AI. (Portfolio owners are gold — multiple doors, one conversation.)
+- **"Vacant absentee under $100k in Anderson"** → **pure filter, compound.** `county=='Anderson' & opening_bid<100000 & 'vacant' in flags & 'absentee_owner' in flags`. No AI. This is *exactly* a dashboard filter; the only reason to route it through chat is if typing is faster than clicking four controls.
+- **"Summarize this lead for my call"** → **generation (needs the LLM).** You've already picked the record in #1. `chat.py` passes that one record's JSON to Qwen3.5. Example output: *"10383 Singletree Ln, Davidson NC (Buncombe-area). Owner Andrew John Grein. Auction/foreclosure, non-refundable deposit risk. Grade D (60) — thin data: no living_sqft, no ARV, no bid yet. Flags: absentee owner. Angle: absentee + pre-auction timing; lead with 'are you looking to sell before the sale date.'"* This is the model earning its keep — turning 38 columns into a 4-sentence call-open in ~5–8 seconds.
+- **"Draft a probate letter for this owner"** → **generation (needs the LLM), templated.** Feed the record + a fixed letter skeleton; the model fills owner name, property, and a soft distressed-seller opener. **Caveat:** your board's `listing_type` is foreclosure/auction, not probate — a true probate lane lives in a different source, so this query only works on records that actually carry a probate/estate signal.
+
+The mental model: **the dashboard filters find the lead; the local model writes about the lead.** Selection is deterministic; prose is generative.
+
+### Limits / honest caveats (what an 8GB local setup can't do well)
+
+- **The blunt truth: 4 of your 5 example queries are filters your dashboard already does.** "Hottest 20," "2+ parcels," "vacant absentee under $100k" need zero AI — they're sorts and WHERE-clauses. If your board already has column filters and sort, a local LLM adds **nothing** to these except a chat box. The honest value of local AI here is *narrow*: it's the two generation queries (summarize, draft) plus the convenience of typing instead of clicking. Don't buy a local-model stack to do what a filtered spreadsheet does.
+- **Natural-language-to-filter is the risky part.** Letting the operator *type* "vacant absentee under 100k Anderson" and having the model translate it to a filter is real work, but small local models are unreliable at it: 3–4B text-to-SQL sits around 65–75% execution accuracy on clean benchmarks and **collapses to 10–20% on messy real schemas** — and worse, "the same question asked twice can produce correct output one run and wrong the next." ([aimultiple](https://research.aimultiple.com/text-to-sql/), [Medium – Text-to-SQL Performance Cliff](https://medium.com/@visrow/the-text-to-sql-performance-cliff-2026-why-natural-language-to-sql-breaks-a7281a23dbea)). A silently-wrong filter ("under $100k" that quietly drops the county) hands you the wrong call list and you'd never know. **Mitigation:** don't do free-form text-to-SQL. Constrain the model to emit a filter *only* from a fixed vocabulary (known county names, the ~35 real flag values, a price number), then execute that filter in code and **echo the parsed filter back** ("Filtering: Anderson, ≤$100k, flags: vacant + absentee → 14 matches") so the operator sees what it did. If parsing is ambiguous, fall back to the dashboard.
+- **Summaries can hallucinate fields the record doesn't have.** A 4B model will happily invent a bedroom count or an equity figure when `living_sqft` and ARV are null (and on this board they frequently are — `confidence: LOW`). Mitigation: the prompt must say "only use provided fields; if a field is null, say 'unknown'," and summaries stay non-authoritative — a call-prep aid, not a data source.
+- **Throughput is one-at-a-time.** ~5–8 sec/summary at 8GB. Summarizing your top 20 is ~2 minutes of sequential generation — fine as a morning batch, not interactive-instant. Drafting 200 letters is a coffee-break job, not real-time.
+- **No whole-board reasoning.** The model can't answer "what's the pattern across all 4,054 leads" because it never sees them all — that's an aggregate for `query.py`, not the LLM. Anything requiring the model to *hold the dataset in its head* is off the table at this size.
+- **Privacy is the actual win, not intelligence.** The reason to run this locally isn't that a 4B model is smart — it's that owner names, addresses, and distress signals never leave the Mac. That's a legitimate and real benefit. Just size expectations to it: you're buying *private call-prep and letter-drafting*, not a private analyst.
+
+**Sources:** [Best Ollama Models for 8GB RAM 2026 – Local AI Master](https://localaimaster.com/blog/best-local-ai-models-8gb-ram), [Ollama on 8GB RAM 2026 – webscraft](https://webscraft.org/blog/ollama-na-8-gb-ram-yaki-modeli-pratsyuyut-u-2026?lang=en), [AnythingLLM vs Open WebUI 2026 – Local AI Master](https://localaimaster.com/blog/anythingllm-vs-open-webui), [Text-to-SQL LLM Accuracy 2026 – AIMultiple](https://research.aimultiple.com/text-to-sql/), [The Text-to-SQL Performance Cliff 2026 – Medium](https://medium.com/@visrow/the-text-to-sql-performance-cliff-2026-why-natural-language-to-sql-breaks-a7281a23dbea)
