@@ -391,6 +391,16 @@ DATELESS_OK_SOURCES = {
     "newspapers.post_and_courier",                # Charleston legal notices (pre-auction, no sale date)
     "newspapers.carolina_coast",                  # coastal NC/SC legal notices (pre-auction)
     "counties_nc.brunswick_legal_notices",        # Brunswick legal-notice PDFs (sale_date best-effort, often None)
+    # Manual public-records court/land lane (2026-07-04 ingest of fresh_court_leads.json):
+    # these motivated-seller signals are dateless by nature (a lis-pendens/probate has no
+    # sale date; a land/FSBO listing has no auction date), so without the whitelist a full
+    # run would drop the merged carryover as "dateless historic roster."
+    "counties_sc.sc_public_index",                # SC PublicIndex court cases (foreclosure/lis-pendens/probate)
+    "counties_sc.sc_public_index_export",         # SC PublicIndex manual-export lane (same, operator-saved)
+    "national.landwatch",                         # land-for-sale listings (no auction date)
+    "national.landandfarm",                       # land-for-sale listings (no auction date)
+    "national.cash_buyer_deeds",                  # recorded cash-buyer deeds (dateless)
+    "national.craigslist_fsbo",                   # FSBO listings (dateless)
 }
 
 
