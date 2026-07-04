@@ -144,23 +144,29 @@ async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
     from foreclosure_scraper.enrichment_lrcpwa_parcel import enrich_lrcpwa_parcel
     await _step("lrcpwa_parcel", enrich_lrcpwa_parcel(merged))
     if not FAST:
-        await _step("geocode#1", enrich_geocode(merged))
-        await _step("parcel_from_geo", asyncio.wait_for(enrich_parcel_from_geo(merged, concurrency=16), timeout=_cap("MERGE_PFG_TIMEOUT", 1800)))
-        await _step("parcel_lookup", asyncio.wait_for(enrich_with_parcel_lookup(merged), timeout=_cap("MERGE_PL_TIMEOUT", 1800)))
-        await _step("gis_attrs", asyncio.wait_for(enrich_gis_attrs(merged, concurrency=16), timeout=_cap("MERGE_GIS_TIMEOUT", 2400)))
-        await _step("situs_address", asyncio.wait_for(enrich_situs_address(merged, concurrency=16), timeout=_cap("MERGE_SITUS_TIMEOUT", 1800)))
-        await _step("address_backfill", enrich_addresses_from_owner(merged))
-        await _step("aggressive_address", enrich_with_aggressive_address(merged))
-        await _step("parcel_reverse_geo", enrich_parcel_reverse_geo(merged))
+        # EVERY per-lead step is wait_for-bounded so the whole run is guaranteed to
+        # reach write_artifact (no overnight wedge). Caps tuned to finish in ~2h.
+        await _step("geocode#1", enrich_geocode(merged))  # own 600s internal budget-bail
+        await _step("parcel_from_geo", asyncio.wait_for(enrich_parcel_from_geo(merged, concurrency=16), timeout=_cap("MERGE_PFG_TIMEOUT", 900)))
+        await _step("parcel_lookup", asyncio.wait_for(enrich_with_parcel_lookup(merged), timeout=_cap("MERGE_PL_TIMEOUT", 600)))
+        await _step("gis_attrs", asyncio.wait_for(enrich_gis_attrs(merged, concurrency=16), timeout=_cap("MERGE_GIS_TIMEOUT", 900)))
+        await _step("situs_address", asyncio.wait_for(enrich_situs_address(merged, concurrency=16), timeout=_cap("MERGE_SITUS_TIMEOUT", 900)))
+        # address_backfill WEDGED 2.8h uncancellable on 7.8k targets — skippable +
+        # hard-capped. situs (above) + resolve_name (below) are the better address
+        # sources for court/defendant leads anyway.
+        if os.environ.get("MERGE_SKIP_ADDR_BACKFILL") != "1":
+            await _step("address_backfill", asyncio.wait_for(enrich_addresses_from_owner(merged), timeout=_cap("MERGE_ADDR_TIMEOUT", 300)))
+        await _step("aggressive_address", asyncio.wait_for(enrich_with_aggressive_address(merged), timeout=_cap("MERGE_AGG_TIMEOUT", 300)))
+        await _step("parcel_reverse_geo", asyncio.wait_for(enrich_parcel_reverse_geo(merged), timeout=_cap("MERGE_PRG_TIMEOUT", 300)))
         await _step("geocode#2", enrich_geocode(merged))
-        await _step("owner_mailing", enrich_owner_mailing(merged))
+        await _step("owner_mailing", asyncio.wait_for(enrich_owner_mailing(merged), timeout=_cap("MERGE_OM_TIMEOUT", 300)))
         from foreclosure_scraper.enrichment_images import enrich_with_images
-        await _step("images", asyncio.wait_for(enrich_with_images(merged, use_mapillary=False), timeout=_cap("MERGE_IMAGES_TIMEOUT", 2400)))
+        await _step("images", asyncio.wait_for(enrich_with_images(merged, use_mapillary=False), timeout=_cap("MERGE_IMAGES_TIMEOUT", 1500)))
         await _step("fhfa_value", enrich_fhfa_value(merged))
         await _step("dew_liens", enrich_dew_liens(merged))
-        await _step("resolve_name_to_property", enrich_resolve_name_to_property(merged))
+        await _step("resolve_name_to_property", asyncio.wait_for(enrich_resolve_name_to_property(merged), timeout=_cap("MERGE_RNP_TIMEOUT", 900)))
         from foreclosure_scraper.enrichment_doc_ocr import enrich_doc_ocr
-        await _step("doc_ocr", enrich_doc_ocr(merged))
+        await _step("doc_ocr", asyncio.wait_for(enrich_doc_ocr(merged), timeout=_cap("MERGE_OCR_TIMEOUT", 300)))
     return merged
 
 
@@ -175,8 +181,10 @@ def main() -> int:
     merged = asyncio.run(_resolve(existing, cfg))
 
     print("enrich_sc_cama:", enrich_sc_cama(merged))
-    if not _FAST:
+    if not _FAST and os.environ.get("MERGE_SKIP_SQFT") != "1":
         print("enrich_footprint_sqft:", enrich_footprint_sqft(merged))
+    else:
+        print("enrich_footprint_sqft: SKIPPED")
     print("enrich_court_owner_verify:", enrich_court_owner_verify(merged))
     print("enrich_tax_owed:", enrich_tax_owed(merged))
 
@@ -195,13 +203,15 @@ def main() -> int:
         return vfail
     print(f"calc+grade ({_regrade(merged)} failures)")
 
-    if not _FAST:
+    if not _FAST and os.environ.get("MERGE_SKIP_CARD") != "1":
         s = enrich_assessor_card(merged)
         print("enrich_assessor_card:", s)
         if s:
             touched = [li for li in merged if isinstance(li.raw, dict) and "assessor_card" in li.raw]
             _regrade(touched)
             print(f"re-graded {len(touched)} card-enriched leads")
+    else:
+        print("enrich_assessor_card: SKIPPED")
 
     print("enrich_gis_derived:", enrich_gis_derived(merged))
     from foreclosure_scraper.enrichment_tenure import enrich_tenure
