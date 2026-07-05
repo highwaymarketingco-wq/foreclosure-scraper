@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-07-05T16:21:44.101897Z",
+  "run_time": "2026-07-05T16:47:14.653950Z",
   "total": 19701,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "scheduled land-records refresh"
+  "notes": "finish_images: aerial+map coverage for precise-point leads (no-network, use_mapillary=0)"
 }
