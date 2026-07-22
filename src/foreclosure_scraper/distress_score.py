@@ -367,9 +367,11 @@ def score_board(listings: list[Listing], previous_path: Optional[Path] = None) -
         # equity + contactability (best across the group)
         eq = next((b for li in active for b in [_equity_band(li)] if b in ("high", "med")), None) \
             or next((b for li in active for b in [_equity_band(li)] if b), None)
-        absentee = any((li.raw or {}).get("owner_mailing", {}).get("absentee") for li in active)
-        oos = any((li.raw or {}).get("owner_mailing", {}).get("out_of_state") for li in active)
-        mailable = any((li.raw or {}).get("owner_mailing", {}).get("mailing") for li in active)
+        # owner_mailing is usually a dict but some sources emit a bare string; guard it.
+        _oms = [om for li in active for om in [(li.raw or {}).get("owner_mailing")] if isinstance(om, dict)]
+        absentee = any(om.get("absentee") for om in _oms)
+        oos = any(om.get("out_of_state") for om in _oms)
+        mailable = any(om.get("mailing") for om in _oms)
         if absentee:
             score += 8
         if oos:
@@ -378,8 +380,9 @@ def score_board(listings: list[Listing], previous_path: Optional[Path] = None) -
         # foreclosure where a senior bank mortgage likely SURVIVES the sale is a
         # bidding trap, not a clean acquisition — penalize it and keep it out of HOT.
         senior_survives = any(
-            (li.raw or {}).get("title_risk", {}).get("surviving_senior_debt_risk")
+            tr.get("surviving_senior_debt_risk")
             for li in active
+            for tr in [(li.raw or {}).get("title_risk")] if isinstance(tr, dict)
         )
         if senior_survives:
             score -= 20

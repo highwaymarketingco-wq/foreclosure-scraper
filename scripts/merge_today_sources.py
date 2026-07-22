@@ -302,21 +302,27 @@ def main() -> int:
     # Owner tenure (long-held = high-equity proxy) — local, from the GIS sale year.
     from foreclosure_scraper.enrichment_tenure import enrich_tenure
     print("enrich_tenure:", enrich_tenure(merged))
-    print("enrich_equity:", enrich_equity(merged))
-    print("enrich_title_risk:", enrich_title_risk(merged))
-    print("distress score_board:", score_board(merged))
+    # Each scoring/tagging step is wrapped: one lead's edge-case data must never
+    # crash the run before write_artifact — a multi-hour scrape has to always land.
+    def _safe(label, fn):
+        try:
+            r = fn()
+            if isinstance(r, dict):
+                r = {k: v for k, v in r.items() if k not in ("examples", "skipped_examples")}
+            print(f"{label}:", r)
+        except Exception as e:  # noqa: BLE001
+            print(f"{label}: ERROR {type(e).__name__}: {str(e)[:120]}")
     from foreclosure_scraper.enrichment_strategy_fit import enrich_strategy_fit
-    print("strategy_fit:", enrich_strategy_fit(merged))
     from foreclosure_scraper.enrichment_buyer_match import enrich_buyer_match
-    print("buyer_match:", enrich_buyer_match(merged))
-    # Multifamily classifier BEFORE property_kind backfill (mirrors main.py):
-    # promote apartment/multi-unit distress, then guarantee non-UNKNOWN coverage.
-    mfs = enrich_multifamily_class(merged)
-    print("enrich_multifamily_class:", {k: v for k, v in mfs.items()
-                                        if k not in ("examples", "skipped_examples")})
-    enrich_property_kind(merged)
-    print("enrich_derived_signals:", enrich_derived_signals(merged))
-    print("enrich_data_quality:", enrich_data_quality(merged))
+    _safe("enrich_equity", lambda: enrich_equity(merged))
+    _safe("enrich_title_risk", lambda: enrich_title_risk(merged))
+    _safe("distress score_board", lambda: score_board(merged))
+    _safe("strategy_fit", lambda: enrich_strategy_fit(merged))
+    _safe("buyer_match", lambda: enrich_buyer_match(merged))
+    _safe("enrich_multifamily_class", lambda: enrich_multifamily_class(merged))
+    _safe("enrich_property_kind", lambda: enrich_property_kind(merged))
+    _safe("enrich_derived_signals", lambda: enrich_derived_signals(merged))
+    _safe("enrich_data_quality", lambda: enrich_data_quality(merged))
 
     # Final post-enrich dedupe — mirrors main.py's H1 FIX (main.py ~896). The
     # dedupe at _resolve() ran BEFORE parcel/GIS backfill filled parcel_id, so
