@@ -314,7 +314,11 @@ async def main() -> int:
         import subprocess
         root = str(Path(__file__).parent.parent)
         try:
-            subprocess.run(["git", "add", "docs/listings.json", "docs/listings_detail.json", "docs/run_meta.json"], cwd=root, check=False)
+            # Include the .gz twins — the dashboard fetches the gzipped files, so
+            # committing only the .json left GitHub Pages serving a stale gzip.
+            subprocess.run(["git", "add", "docs/listings.json", "docs/listings.json.gz",
+                            "docs/listings_detail.json", "docs/listings_detail.json.gz",
+                            "docs/run_meta.json"], cwd=root, check=False)
             if subprocess.run(["git", "diff", "--staged", "--quiet"], cwd=root).returncode != 0:
                 subprocess.run(["git", "commit", "-q", "-m",
                                 f"daily api refresh: {len(merged)} listings ({time.strftime('%Y-%m-%d')})"],

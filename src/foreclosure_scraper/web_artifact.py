@@ -7,6 +7,7 @@ Writes:
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -240,6 +241,71 @@ def _is_valid_street_address(addr: str | None) -> bool:
 LAZY_DETAIL_KEYS = ("vision", "foreclosure_sold_comps", "comps", "cama", "rent_comps")
 
 
+def _identity_keys(rec: dict):
+    """Stable cross-run identity keys for a published record, unique-first.
+
+    Used to carry a lead's prior sidecar detail (vision/comps/cama) across a
+    FULL re-scrape, where index alignment is meaningless (order + count change
+    every run). source_url is the most unique; parcel_id is a reliable gov id;
+    (street_address, county) is the last-resort fallback. First match wins at
+    lookup, so a wrong low-uniqueness collision can only occur when the more
+    unique keys are absent — and only ever backfills a missing detail panel.
+    """
+    keys: list[str] = []
+    su = rec.get("source_url")
+    if isinstance(su, str) and su.strip():
+        keys.append("u:" + su.strip())
+    pid = rec.get("parcel_id")
+    if isinstance(pid, str) and pid.strip():
+        keys.append("p:" + pid.strip().lower())
+    addr = rec.get("street_address")
+    cnty = rec.get("county")
+    if isinstance(addr, str) and addr.strip() and isinstance(cnty, str) and cnty.strip():
+        keys.append("a:" + addr.strip().lower() + "|" + cnty.strip().lower())
+    return keys
+
+
+def _load_prior_details_by_key(docs: Path) -> dict:
+    """Map identity-key -> prior sidecar detail dict from the currently-published
+    board, so write_artifact can preserve vision/comps/cama for leads that
+    persist across runs but weren't re-enriched this run.
+
+    Without this, a completed full run (which only re-visions a capped subset)
+    writes details[i]={} for every un-re-visioned lead, WIPING the sidecar for
+    the ~29k leads it didn't touch. Keyed by identity (not index) so it survives
+    the reordering a full re-scrape produces. Returns {} if the board is absent
+    or unreadable (fresh publish, or first run) — never raises.
+    """
+    lp = docs / "listings.json"
+    dp = docs / "listings_detail.json"
+    if not lp.exists() or not dp.exists():
+        return {}
+    try:
+        recs = json.loads(lp.read_text())
+        dets = json.loads(dp.read_text())
+    except Exception:  # noqa: BLE001
+        return {}
+    out: dict = {}
+    for i, rec in enumerate(recs):
+        if i >= len(dets):
+            break
+        d = dets[i]
+        if not isinstance(d, dict) or not d or not isinstance(rec, dict):
+            continue
+        for key in _identity_keys(rec):
+            out.setdefault(key, d)  # first (most unique) key wins
+    return out
+
+
+def _atomic_write_bytes(path: Path, data: bytes) -> None:
+    """Write bytes atomically: a temp file in the same dir + os.replace, so a
+    kill mid-write leaves the PRIOR file intact instead of a truncated,
+    corrupt one. os.replace is atomic within a filesystem."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_bytes(data)
+    os.replace(tmp, path)
+
+
 def _slim_raw(raw: dict | None) -> dict:
     if not isinstance(raw, dict):
         return {}
@@ -295,6 +361,11 @@ def write_artifact(
     # detail[i] belongs to listing[i]. Popping happens LAST (after _to_dict /
     # _slim_raw / annotate_stale_links) so nothing re-adds these keys. Additive:
     # if listings_detail.json is missing/mismatched, those panels render empty.
+    # Prior sidecar, keyed by identity — lets a full re-scrape (which only
+    # re-visions a capped subset) KEEP vision/comps/cama for the leads it
+    # didn't touch this run, instead of overwriting details[i] with {}.
+    # Fresh detail from THIS run always wins; prior only backfills missing keys.
+    prior = _load_prior_details_by_key(docs)
     details = []
     for rec in payload:
         raw = rec.get("raw")
@@ -303,18 +374,32 @@ def write_artifact(
             for k in LAZY_DETAIL_KEYS:
                 if k in raw:
                     d[k] = raw.pop(k)
+        if prior:
+            pri = None
+            for key in _identity_keys(rec):
+                if key in prior:
+                    pri = prior[key]
+                    break
+            if pri:
+                for k in LAZY_DETAIL_KEYS:
+                    if k not in d and k in pri:
+                        d[k] = pri[k]
         details.append(d)
     import gzip
     listings_bytes = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
-    listings_path.write_bytes(listings_bytes)
     detail_path = docs / "listings_detail.json"
     detail_bytes = json.dumps(details, ensure_ascii=False, default=str).encode("utf-8")
-    detail_path.write_bytes(detail_bytes)
+    # Atomic writes (temp + os.replace) so a kill mid-write can never leave a
+    # truncated 100MB+ file — the prior good file survives. git history is the
+    # rollback backup for a completed-but-bad write (the count-drop guard flags
+    # those before publish).
+    _atomic_write_bytes(listings_path, listings_bytes)
+    _atomic_write_bytes(detail_path, detail_bytes)
     # Also emit gzipped copies the dashboard fetches (16x smaller). The .json
     # files remain the local source-of-truth + a fallback. mtime=0 keeps the gzip
     # header deterministic so identical data produces identical bytes (no git churn).
-    (docs / "listings.json.gz").write_bytes(gzip.compress(listings_bytes, compresslevel=9, mtime=0))
-    (docs / "listings_detail.json.gz").write_bytes(gzip.compress(detail_bytes, compresslevel=9, mtime=0))
+    _atomic_write_bytes(docs / "listings.json.gz", gzip.compress(listings_bytes, compresslevel=9, mtime=0))
+    _atomic_write_bytes(docs / "listings_detail.json.gz", gzip.compress(detail_bytes, compresslevel=9, mtime=0))
 
     meta = {
         "run_time": datetime.utcnow().isoformat() + "Z",
@@ -327,7 +412,7 @@ def write_artifact(
         "errors": summary.get("errors", []),
         "notes": summary.get("notes", ""),
     }
-    meta_path.write_text(json.dumps(meta, ensure_ascii=False, default=str, indent=2), encoding="utf-8")
+    _atomic_write_bytes(meta_path, json.dumps(meta, ensure_ascii=False, default=str, indent=2).encode("utf-8"))
 
     log.info("web_artifact.written", listings=len(listings), bytes=listings_path.stat().st_size)
     return listings_path, meta_path

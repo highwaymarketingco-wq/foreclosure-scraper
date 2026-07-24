@@ -22,6 +22,16 @@ if [[ " ${FULL_RUN_DAYS//,/ } " == *" $(date +%u) "* ]]; then
   exit 0
 fi
 
+# Belt-and-suspenders: also skip if a weekly full run / merge is STILL alive —
+# e.g. a Tuesday run that hung (or now, with caffeinate, just ran long) past
+# midnight into Wednesday, a non-full-run day. Two board-writers racing
+# docs/listings.json + the git push corrupts the publish. One writer at a time.
+if pgrep -f "foreclosure_scraper.__main__|-m foreclosure_scraper|run_local.sh" >/dev/null \
+   || pgrep -f "merge_today_sources.py" >/dev/null; then
+  echo "==> a weekly full run / merge is active; skipping daily-vision to avoid a double board-writer." | tee -a "$LOG"
+  exit 0
+fi
+
 # Don't let two passes run at once (e.g. a long manual run overlapping the
 # scheduled 7:30am job) — they'd double-score and could race the git publish.
 LOCK="$ROOT/logs/.daily-vision.lock"

@@ -124,8 +124,14 @@ uv run python -m playwright install chromium >>"$LOG" 2>&1 || true
 uv run scrapling install >>"$LOG" 2>&1 || true
 
 # ---- run the pipeline ------------------------------------------------------
+# caffeinate -is: hold OFF idle sleep (-i) and system sleep (-s) for the whole
+# multi-hour run. The board froze for ~3 weeks because the laptop slept mid-run
+# and the pipeline never reached the artifact write. This is the single biggest
+# reliability fix short of an always-on host. caffeinate propagates the child's
+# exit code, so RC=$? below stays correct. (A closed lid on battery can still
+# sleep — a plugged-in machine with the lid open is the reliable setup.)
 START=$(date +%s)
-uv run python -m foreclosure_scraper >>"$LOG" 2>&1
+caffeinate -is uv run python -m foreclosure_scraper >>"$LOG" 2>&1
 RC=$?
 END=$(date +%s)
 
@@ -159,7 +165,12 @@ fi
 # live dashboard; now the local run must do it. Only publish on a healthy
 # run so we never overwrite a good dashboard with a broken/empty one.
 if [[ "$RC" -eq 0 && -f "$ROOT/docs/listings.json" ]]; then
-  PUB_FILES=(docs/listings.json docs/run_meta.json docs/run_health.json
+  # Include the .gz twins + the detail sidecar — the dashboard fetches
+  # listings.json.gz + listings_detail.json.gz, so committing only the .json
+  # left GitHub Pages serving a STALE gzip after every run.
+  PUB_FILES=(docs/listings.json docs/listings.json.gz
+             docs/listings_detail.json docs/listings_detail.json.gz
+             docs/run_meta.json docs/run_health.json
              docs/foreclosure_sold_pool.json docs/multifamily.json)
   if command -v git >/dev/null 2>&1; then
     cd "$ROOT"

@@ -46,10 +46,27 @@ def test_incremental_rewrite_preserves_lazy(tmp_path):
     assert detail[0]["comps"][0]["sold_price"] == 200000
 
 
-def test_naive_reload_would_drop_lazy(tmp_path):
-    # documents the bug: reading listings.json directly (not load_board) loses lazy
+def test_naive_reload_now_preserves_lazy(tmp_path):
+    # write_artifact now backfills the prior sidecar by IDENTITY (source_url /
+    # parcel_id / addr+county), so even a naive reload that never called
+    # load_board keeps the lazy detail. This is the safety net for the full run,
+    # which builds `enriched` fresh (no sidecar in raw) and only re-visions a
+    # capped subset — without this it wiped vision/comps for ~29k leads/run.
+    # load_board is still preferred (it merges detail into raw for in-memory use).
     write_artifact([_lead(0)], {"notes": "t"}, docs_dir=tmp_path)
     naive = [Listing.model_validate(d) for d in json.loads((tmp_path / "listings.json").read_text())]
     write_artifact(naive, {"notes": "pass 2 naive"}, docs_dir=tmp_path)
     detail = json.loads((tmp_path / "listings_detail.json").read_text())
-    assert not detail[0], "naive reload should have dropped lazy (this is why load_board exists)"
+    assert detail[0].get("comps"), "sidecar-preserve should keep lazy detail across a naive re-write"
+    assert detail[0].get("vision")
+    assert detail[0]["comps"][0]["sold_price"] == 200000
+
+
+def test_fresh_detail_wins_over_prior_sidecar(tmp_path):
+    # The identity backfill must never override detail the current run DID produce.
+    write_artifact([_lead(0)], {"notes": "t"}, docs_dir=tmp_path)
+    fresh = _lead(0)
+    fresh.raw["vision"] = {"parsed": True, "_provider": "gemini", "tier": "NEW"}
+    write_artifact([fresh], {"notes": "pass 2 fresh"}, docs_dir=tmp_path)
+    detail = json.loads((tmp_path / "listings_detail.json").read_text())
+    assert detail[0]["vision"].get("tier") == "NEW", "fresh vision must win over prior sidecar"

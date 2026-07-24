@@ -401,6 +401,10 @@ DATELESS_OK_SOURCES = {
     "national.landandfarm",                       # land-for-sale listings (no auction date)
     "national.cash_buyer_deeds",                  # recorded cash-buyer deeds (dateless)
     "national.craigslist_fsbo",                   # FSBO listings (dateless)
+    "national.estate_sales",                      # Estate sale events (dateless)
+    "national.sheriff_sales",                     # Sheriff sale listings (dateless)
+    "national.nc_upset_bids",                     # NC upset bid period listings (dateless)
+    "national.jail_bookings",                     # County jail booking rosters (dateless)
 }
 
 
@@ -587,9 +591,29 @@ def _active_only(li: Listing, horizon_days: int) -> bool:
     return cutoff_past <= sale <= cutoff_future
 
 
+def _safe_pred(fn, li, default: bool) -> bool:
+    """Evaluate a per-listing predicate defensively. A single malformed lead
+    (e.g. a bare str where a dict was expected — the class of bug that silently
+    killed whole runs before write_artifact) returns `default` instead of
+    raising and discarding a multi-hour run. Only the one bad lead is affected."""
+    try:
+        return bool(fn(li))
+    except Exception:  # noqa: BLE001
+        log.error("orchestrator.predicate_failed",
+                  fn=getattr(fn, "__name__", str(fn)),
+                  source=getattr(li, "source", None),
+                  traceback=traceback.format_exc())
+        return default
+
+
 async def run() -> int:
     _setup_logging()
     cfg = RuntimeConfig.from_env()
+    # Per-enrichment stats for the health artifact. Declared HERE (not mid-run)
+    # so the early enrichers that populate it — hud_reac_address, lrcpwa — don't
+    # hit UnboundLocalError (which the surrounding try/except silently swallowed,
+    # losing those stats + logging a false "failed"). One dict for the whole run.
+    enrichment_stats: dict[str, dict] = {}
 
     scrapers = all_scrapers()
     # FORECLOSURE_ONLY_SOURCES=substr,substr — restrict to matching slugs (for a scoped
@@ -691,26 +715,28 @@ async def run() -> int:
     # popouts via raw.foreclosure_sold_comps. The active pipeline stays
     # focused on actionable inventory.
     from .enrichment_foreclosure_sold_comps import is_sold_pool_candidate
-    sold_pool_raw = [li for li in raw if is_sold_pool_candidate(li)]
-    active_raw = [li for li in raw if not is_sold_pool_candidate(li)]
+    sold_pool_raw = [li for li in raw if _safe_pred(is_sold_pool_candidate, li, False)]
+    active_raw = [li for li in raw if not _safe_pred(is_sold_pool_candidate, li, False)]
     log.info("orchestrator.partitioned",
              active=len(active_raw), sold_pool=len(sold_pool_raw))
 
     # Filter to scope (counties we care about) — applies to both partitions
-    in_area = [li for li in active_raw if _in_scope(li)]
+    in_area = [li for li in active_raw if _safe_pred(_in_scope, li, False)]
     log.info("orchestrator.in_scope", count=len(in_area),
              pruned=len(active_raw) - len(in_area))
-    sold_pool = [li for li in sold_pool_raw if _in_scope(li)]
+    sold_pool = [li for li in sold_pool_raw if _safe_pred(_in_scope, li, False)]
     log.info("orchestrator.sold_pool_in_scope",
              count=len(sold_pool), pruned=len(sold_pool_raw) - len(sold_pool))
 
     # Active only
-    active = [li for li in in_area if _active_only(li, cfg.sale_horizon_days)]
+    active = [li for li in in_area
+              if _safe_pred(lambda x: _active_only(x, cfg.sale_horizon_days), li, False)]
     log.info("orchestrator.active", count=len(active), pruned=len(in_area) - len(active))
 
     # Flip-candidate filter — drop super-luxury SFR (>$750k without 2+ acres,
-    # and anything >$1.5M outright). Multi-family + land bypass.
-    flip_able = [li for li in active if _flip_candidate(li)]
+    # and anything >$1.5M outright). Multi-family + land bypass. Default keep on
+    # error so a filter crash never silently drops a good lead.
+    flip_able = [li for li in active if _safe_pred(_flip_candidate, li, True)]
     log.info("orchestrator.flip_filtered", count=len(flip_able),
              pruned=len(active) - len(flip_able))
     active = flip_able
@@ -727,8 +753,13 @@ async def run() -> int:
                         source=slug, scraped=scraped_n,
                         note="OK with rows but 0 reached the dashboard post-filter")
 
-    # Dedupe across sources
-    deduped = dedupe(active)
+    # Dedupe across sources — guarded so a merge-key edge case can't discard the
+    # run; on failure ship the un-deduped active set (worse dupes, not a lost run).
+    try:
+        deduped = dedupe(active)
+    except Exception:
+        log.error("orchestrator.dedupe_failed", traceback=traceback.format_exc())
+        deduped = active
     log.info("orchestrator.deduped", count=len(deduped), pruned=len(active) - len(deduped))
 
     # Pulled-sale detection (dad's #6): listings that existed last week
@@ -752,8 +783,16 @@ async def run() -> int:
     # County GIS enrichment (free, pure HTTP) — fills parcel ID, owner, zoning,
     # year built, beds/baths, sqft, tax value, last-sale book/page from county
     # ArcGIS REST. Covers 23 of 25 counties.
-    enriched = await enrich_gis(valid)
-    log.info("orchestrator.gis_enriched", count=len(enriched))
+    # Guarded like the court/Zillow phases: a malformed county GIS JSON must not
+    # raise out of the whole run before the artifact write. On failure keep the
+    # validated (un-GIS-enriched) leads and press on — downstream enrichers +
+    # the write still run.
+    try:
+        enriched = await enrich_gis(valid)
+        log.info("orchestrator.gis_enriched", count=len(enriched))
+    except Exception:
+        log.error("gis_enrich.failed", traceback=traceback.format_exc())
+        enriched = valid
 
     # Court-records enrichment. NC now uses Tyler's working JSON search API in
     # BATCH (fast, compliant) + matches by case number — replacing the broken
@@ -949,8 +988,8 @@ async def run() -> int:
     except Exception:
         log.error("aggressive_address.failed", traceback=traceback.format_exc())
 
-    # Capture per-enrichment stats for the per-run health artifact.
-    enrichment_stats: dict[str, dict] = {}
+    # (enrichment_stats is declared at the top of run() so the earlier
+    # hud_reac_address / lrcpwa enrichers can populate it without UnboundLocalError.)
 
     # SC lis-pendens GIS resolver — for any SC lis-pendens still on a
     # placeholder address, decode the authoritative venue county from the
@@ -1032,11 +1071,15 @@ async def run() -> int:
     from .validation import normalize_county as _norm_county
     _county_fixed = 0
     for _li in enriched:
-        if _li.county:
-            _canon = _norm_county(_li.county)
-            if _canon != _li.county:
-                _li.county = _canon
-                _county_fixed += 1
+        try:
+            if _li.county:
+                _canon = _norm_county(_li.county)
+                if _canon != _li.county:
+                    _li.county = _canon
+                    _county_fixed += 1
+        except Exception:
+            log.error("county_normalize.failed", source=getattr(_li, "source", None),
+                      traceback=traceback.format_exc())
     if _county_fixed:
         log.info("orchestrator.county_normalized", fixed=_county_fixed)
 
@@ -1049,7 +1092,10 @@ async def run() -> int:
     # parcel_lookup filled parcel_id, after lis_pendens_resolver filled
     # street_address — gives the key the data it needs to actually merge.
     pre_dedupe2_count = len(enriched)
-    enriched = dedupe(enriched)
+    try:
+        enriched = dedupe(enriched)
+    except Exception:
+        log.error("orchestrator.dedupe2_failed", traceback=traceback.format_exc())
     log.info(
         "orchestrator.dedupe2",
         before=pre_dedupe2_count,
@@ -1082,7 +1128,12 @@ async def run() -> int:
     _pre_pending = len(enriched)
     _kept = []
     for li in enriched:
-        verdict = _resolve_pending(li)
+        try:
+            verdict = _resolve_pending(li)
+        except Exception:
+            log.error("oceanfront_repass.failed", source=getattr(li, "source", None),
+                      traceback=traceback.format_exc())
+            verdict = None  # keep the lead on error
         if verdict is None or verdict:
             _kept.append(li)
     enriched = _kept
@@ -1123,7 +1174,7 @@ async def run() -> int:
         # County resolved to something we don't track at all -> off-footprint leak.
         return not in_scope(li.county, li.state)
     _pre_scope = len(enriched)
-    enriched = [li for li in enriched if not _denied_now(li)]
+    enriched = [li for li in enriched if not _safe_pred(_denied_now, li, False)]
     if _pre_scope != len(enriched):
         log.info("orchestrator.scope_repass", dropped=_pre_scope - len(enriched))
 
@@ -1138,7 +1189,7 @@ async def run() -> int:
         return (src.startswith("national.") or src.startswith("reo.")) \
             and not (li.county or "").strip()
     _pre_natl = len(enriched)
-    enriched = [li for li in enriched if not _countyless_national(li)]
+    enriched = [li for li in enriched if not _safe_pred(_countyless_national, li, False)]
     if _pre_natl != len(enriched):
         log.info("orchestrator.drop_countyless_national", dropped=_pre_natl - len(enriched))
 
@@ -1152,13 +1203,17 @@ async def run() -> int:
     # left intact (see _situs_is_junk).
     _situs_nulled = 0
     for li in enriched:
-        if _situs_is_junk(li.street_address):
-            if not isinstance(li.raw, dict):
-                li.raw = {}
-            li.raw["situs_nulled"] = li.street_address  # keep original for audit
-            li.raw["situs_quality"] = "low"
-            li.street_address = None
-            _situs_nulled += 1
+        try:
+            if _situs_is_junk(li.street_address):
+                if not isinstance(li.raw, dict):
+                    li.raw = {}
+                li.raw["situs_nulled"] = li.street_address  # keep original for audit
+                li.raw["situs_quality"] = "low"
+                li.street_address = None
+                _situs_nulled += 1
+        except Exception:
+            log.error("situs_sanity.failed", source=getattr(li, "source", None),
+                      traceback=traceback.format_exc())
     if _situs_nulled:
         log.info("orchestrator.situs_sanity_nulled", count=_situs_nulled)
 
@@ -2290,6 +2345,37 @@ async def run() -> int:
         enrichment_stats["source_link"] = enrich_source_link(enriched)
     except Exception:
         log.error("source_link.failed", traceback=traceback.format_exc())
+
+    # FEMA disaster declaration flag (Helene IA registrations by county).
+    try:
+        from .enrichment_fema_disaster import fetch_helene_disaster_data
+        fema_data = await fetch_helene_disaster_data()
+        if fema_data:
+            enrichment_stats["fema_disaster"] = {"declarations": len(fema_data)}
+            for li in enriched:
+                if not isinstance(li.raw, dict):
+                    li.raw = {}
+                li.raw["fema_disaster"] = fema_data
+    except Exception:
+        log.error("fema_disaster.failed", traceback=traceback.format_exc())
+
+    # Opportunity Zone flag (point-in-polygon against HUD OZ layer).
+    try:
+        from .enrichment_opportunity_zone import enrich_opportunity_zones
+        s = await enrich_opportunity_zones(enriched)
+        if s:
+            enrichment_stats["opportunity_zone"] = s
+    except Exception:
+        log.error("opportunity_zone.failed", traceback=traceback.format_exc())
+
+    # USPS vacancy flag (census-tract-level vacancy rate by ZIP).
+    try:
+        from .enrichment_usps_vacancy import enrich_usps_vacancy
+        s = await enrich_usps_vacancy(enriched)
+        if s:
+            enrichment_stats["usps_vacancy"] = s
+    except Exception:
+        log.error("usps_vacancy.failed", traceback=traceback.format_exc())
 
     # Outreach stack — owner contact actions (letter/email/SMS), a postcard
     # mail-merge CSV, and persistent CRM status. Runs after skip-trace +
