@@ -90,6 +90,7 @@ RAW_KEEP = {
     "estimated_monthly_rent": "*",
     "data_quality": "*",              # investor-facing caveats: synthetic_address / no_sqft / low_arv_confidence
     "parcel_resolution": "*",         # parcel + centroid reverse-geo (Cleveland NC / Cherokee SC fallback)
+    "situs_road_only": "*",           # road name for a parcel with NO house number — CONTEXT, never mailable
     "lis_pendens_resolution": "*",    # SC lis-pendens GIS resolver provenance
     "rod_docs": "*",                  # ROD recorded documents (deeds, mortgages, satisfactions)
     "lien_priority": "*",             # senior/junior liens + super-priority warnings
@@ -213,11 +214,45 @@ _ROAD_SUFFIX_RE = re.compile(
     re.IGNORECASE,
 )
 
+# "No house number assigned" sentinels that county layers put in the house-number
+# slot of an otherwise real road ("99999 MEADOW RD", "0 CEDAR SPRINGS RD"). NC
+# alone publishes 17,788 parcels as "99999 <ROAD>" and 285,716 as "0 <ROAD>", and
+# SC's split situs uses PROP_ST_NO="0" for the same thing — every one of them a
+# vacant / unnumbered lot. They are NOT mailable, but they lead with digits, so
+# _HOUSE_NUM_RE waves them through and they reach the mail merge, the geocoder
+# and the board looking like fact. Rejected outright: falling through to the
+# road-suffix rule would just re-accept them on the strength of the "RD".
+# NOTE: no re.ASCII — GIS situs strings carry non-breaking spaces, and an
+# ASCII-only \s let "0\xa0MEADOW RD" slip straight through this guard.
+_PLACEHOLDER_HOUSE_NUM_RE = re.compile(r"^(?:0+|9{4,})(?:\s| )+\S")
+
+
+def is_pinpointable_address(addr: str | None) -> bool:
+    """True only when `addr` identifies ONE BUILDING — i.e. it leads with a real
+    house number.
+
+    STRICTER than _is_valid_street_address on purpose. That one answers "is this
+    a plausible address string" and deliberately accepts bare rural roads via the
+    road-suffix rule ("MEADOW RD", "NC HWY 9"), which is right for display.
+
+    But a bare road is NOT a building. Geocoding it returns the ROAD CENTROID, so
+    anything that spends money or asserts fact per-property must use this gate
+    instead. Measured on the live board: 1,237 addressed leads are numberless and
+    84% of them still return Street View imagery — of a random stretch of road,
+    which would then be attached to the lead and condition-graded as if it were
+    the house. Use this for Street View targeting, mail merges, and any
+    "resolved" marker; use _is_valid_street_address for rendering.
+    """
+    if not _is_valid_street_address(addr):
+        return False
+    return bool(_HOUSE_NUM_RE.match(str(addr).strip()))
+
 
 def _is_valid_street_address(addr: str | None) -> bool:
-    """True if `addr` looks like a real street address (house number or a
-    recognized rural road form), False for court-doc/lien placeholders and
-    empties. Defensive: bad input -> False, never raises."""
+    """True if `addr` looks like a real, mailable street address (house number or
+    a recognized rural road form), False for court-doc/lien placeholders,
+    no-house-number sentinels and empties. Defensive: bad input -> False, never
+    raises."""
     if not isinstance(addr, str):
         return False
     s = addr.strip()
@@ -225,6 +260,8 @@ def _is_valid_street_address(addr: str | None) -> bool:
         return False
     low = s.lower()
     if any(m in low for m in _INVALID_ADDR_MARKERS):
+        return False
+    if _PLACEHOLDER_HOUSE_NUM_RE.match(s):
         return False
     if _HOUSE_NUM_RE.match(s):
         return True

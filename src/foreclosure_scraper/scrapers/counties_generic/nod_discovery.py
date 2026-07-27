@@ -11,12 +11,9 @@ This complements `counties.sitemap_walker` (which walks county.gov pages
 for already-scheduled sales) by surfacing the upstream pre-foreclosure
 trigger event.
 
-KNOWN ISSUE (2026-05-14): CCHS migrated all `/searchonline.asp` endpoints to
-a new iframe-based app at `/{county}NCNW/application.asp`. The cchs.py
-adapter has not been updated yet, so Burke / Lincoln / Cleveland return 0.
-Other vendors (Aumentum, Cott, Kofile) may have similar issues but haven't
-been individually verified post-migration. Until adapters are rewritten,
-this scraper returns 0 across all counties without crashing.
+NOD discovery via the rod/ vendor adapters (Aumentum, CCHS, Cott, Kofile,
+Logan). Each adapter sweeps the last `days_back` days of recordings for its
+county's ROD and returns RodDoc objects matching NOD/NOS/Lis Pendens doc types.
 """
 from __future__ import annotations
 
@@ -80,16 +77,15 @@ def _build_description(d: RodDoc) -> str:
 
 
 def _build_source_url(d: RodDoc) -> str:
-    """Best-effort link back to the ROD vendor. We don't always have a stable
-    deep-link, so we emit the search-page root keyed by vendor."""
+    """Best-effort link back to the ROD vendor search page."""
     state, county = d.state, d.county
     if (state, county) in cchs.CCHS_COUNTIES:
-        slug = cchs.CCHS_COUNTIES[(state, county)]
-        return f"https://us5.courthousecomputersystems.com/{slug}/searchonline.asp"
+        host, app, _root = cchs.CCHS_COUNTIES[(state, county)]
+        return f"https://{host}.courthousecomputersystems.com/{app}/realestatesearch.asp"
     if (state, county) in aumentum.AUMENTUM_COUNTIES:
-        return f"{aumentum.AUMENTUM_COUNTIES[(state, county)]}/SrchDocType.aspx"
+        return f"{aumentum.AUMENTUM_COUNTIES[(state, county)]}/SrchName.aspx"
     if (state, county) in cott.COTT_COUNTIES:
-        return f"{cott.COTT_COUNTIES[(state, county)]}/SrchDocType.aspx"
+        return f"{cott.COTT_COUNTIES[(state, county)]}/SrchName.aspx"
     if (state, county) in kofile.KOFILE_COUNTIES:
         return f"https://{kofile.KOFILE_COUNTIES[(state, county)]}/"
     return ""

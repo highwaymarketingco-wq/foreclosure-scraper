@@ -64,7 +64,11 @@ from foreclosure_scraper.web_artifact import write_artifact, load_board  # noqa:
 from foreclosure_scraper.outreach import generate_outreach  # noqa: E402
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
-FRESH = DOCS / "fresh_court_leads.json"
+# Default source file, overridable via FRESH_FILE (relative to repo root or absolute).
+_ff = os.environ.get("FRESH_FILE")
+FRESH = (Path(_ff) if _ff and Path(_ff).is_absolute()
+         else (DOCS.parent / _ff) if _ff
+         else DOCS / "fresh_court_leads.json")
 
 # Terminal / closed dispositions — the matter is resolved, not an actionable lead.
 # Mirrors main._active_only's terminal set.

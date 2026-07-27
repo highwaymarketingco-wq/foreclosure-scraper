@@ -24,11 +24,14 @@ from . import deed_stamp
 from .models import RodDoc, normalize_doc_type
 
 # (state, county) -> (host, app_slug, root_slug). Burke + Cleveland share the
-# us5 classic-ASP install. Lincoln (us4 LincolnNC2, ASP.NET-MVC) is intentionally
-# omitted — its flow differs; the dispatcher tolerates the miss.
+# us5 classic-ASP install. Lincoln runs the SAME classic-ASP SearchService.asp
+# flow on us4/LincolnNCNW (verified live 2026-07-03: search returns recordcount,
+# getall returns real <r> rows with grantor/grantee/book-page/doc#). The separate
+# us4/LincolnNC2 ASP.NET-MVC install is NOT used — it's a different app surface.
 CCHS_COUNTIES = {
     ("NC", "Burke"): ("us5", "BurkeNCNW", "burkenc"),
     ("NC", "Cleveland"): ("us5", "ClevelandNCNW", "clevelandnc"),
+    ("NC", "Lincoln"): ("us4", "LincolnNCNW", "lincolnnc"),
     ("NC", "Madison"): ("us4", "MadisonNCNW", "madisonnc"),
     ("NC", "Henderson"): ("us4", "HendersonNCNW", "hendersonnc"),
 }

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
@@ -28,7 +29,30 @@ log = structlog.get_logger()
 # uncapped board (1000s of leads/comps) makes this phase run for HOURS — the root cause of
 # the overnight full-run not finishing. Cap leads enriched per call (highest distress-tier
 # first); override via env for a supervised daytime run that wants fuller coverage.
-_PHOTO_MAX_TARGETS = int(os.environ.get("FORECLOSURE_PHOTO_MAX_TARGETS") or "500")
+#
+# Photos are the UPSTREAM unlock for Vision: a lead with no photo can never be
+# condition-graded, no matter how high VISION_MAX_LISTINGS goes. On the current
+# board ~10.1k leads have an address but <3 photos while this cap only reached
+# 500 of them per run (see logs/local-run-*: photos.capped processing=500
+# skipped=9636) — a ~5% bite. Measured throughput is ~19 leads/min (500 leads in
+# 26m34s on 4 threads), so the honest limiter here is TIME, not a count.
+#
+# So: the count cap goes to 2500 (high enough that it stops being the binding
+# limiter) and a real wall-clock budget is added below. TRADEOFF: the phase now
+# runs to its budget (~40 min) instead of stopping at ~26 min, and returns
+# ~750-800 leads/run instead of 500. Lower FORECLOSURE_PHOTO_MAX_SECONDS to buy
+# the time back; raise it on a supervised daytime run to go deeper.
+_PHOTO_MAX_TARGETS = int(os.environ.get("FORECLOSURE_PHOTO_MAX_TARGETS") or "2500")
+# HARD wall-clock bound on the phase. Checked per lead inside the worker, so
+# after the deadline every remaining lead returns immediately and only the <=N
+# already-in-flight lookups finish. 0 = unlimited (not recommended overnight).
+# NOTE: the budget is PER CALL, not per process. main.run() calls this three
+# times (active board, sold-comp pool, resolver catch-up), so the worst case
+# for a full run is 3 x this value — in practice only the active-board call
+# is big enough to reach the deadline (the other two run tens of leads).
+_PHOTO_MAX_SECONDS = float(os.environ.get("FORECLOSURE_PHOTO_MAX_SECONDS") or "2400")
+# Realtor.com's public API is free — keep the politeness ceiling low by default.
+_PHOTO_WORKERS = int(os.environ.get("FORECLOSURE_PHOTO_WORKERS") or "4")
 
 
 import re as _re
@@ -182,19 +206,34 @@ async def enrich_with_address_photos(listings: list[Listing]) -> None:
 
     # Bound runtime — HomeHarvest does up to 6 slow calls per lead. Process the
     # highest-priority leads first and cap; log the skip (never silently drop).
+    # Sort ALWAYS (not just when over the count cap): the wall-clock deadline
+    # below can cut the tail off even an under-cap batch, and when that happens
+    # the leads that got done must be the HOT/WARM ones, not whatever order the
+    # board happened to be in.
     all_needing = len(targets)
+    targets.sort(key=_photo_priority)
     if all_needing > _PHOTO_MAX_TARGETS:
-        targets.sort(key=_photo_priority)
         targets = targets[:_PHOTO_MAX_TARGETS]
         log.info("photos.capped", processing=_PHOTO_MAX_TARGETS,
                  skipped=all_needing - _PHOTO_MAX_TARGETS, total_needing=all_needing)
 
-    log.info("photos.start", target_count=len(targets), total=len(listings))
+    log.info("photos.start", target_count=len(targets), total=len(listings),
+             budget_s=_PHOTO_MAX_SECONDS, workers=_PHOTO_WORKERS)
 
     loop = asyncio.get_event_loop()
     matched = 0
+    # Wall-clock deadline. Enforced INSIDE the worker rather than by cancelling
+    # the gather: these are thread-pool futures, and an abandoned gather would
+    # still block on ThreadPoolExecutor shutdown until every queued lead ran.
+    # Checking here makes post-deadline leads no-ops that drain instantly.
+    deadline = (time.monotonic() + _PHOTO_MAX_SECONDS) if _PHOTO_MAX_SECONDS > 0 else None
+    # list.append is atomic under the GIL — safe to count from worker threads.
+    skipped_budget: list[int] = []
 
     def _process(li: Listing) -> int:
+        if deadline is not None and time.monotonic() > deadline:
+            skipped_budget.append(1)
+            return 0
         d = _by_address_lookup(
             li.street_address, li.city, li.state, li.zip_code
         )
@@ -239,10 +278,13 @@ async def enrich_with_address_photos(listings: list[Listing]) -> None:
                 li.year_built = int(yb)
         return 1
 
-    with ThreadPoolExecutor(max_workers=4) as pool:
+    with ThreadPoolExecutor(max_workers=_PHOTO_WORKERS) as pool:
         results = await asyncio.gather(
             *(loop.run_in_executor(pool, _process, li) for li in targets),
             return_exceptions=True,
         )
     matched = sum(r for r in results if isinstance(r, int))
-    log.info("photos.done", targets=len(targets), matched=matched, miss=len(targets) - matched)
+    attempted = len(targets) - len(skipped_budget)
+    log.info("photos.done", targets=len(targets), attempted=attempted,
+             matched=matched, miss=max(attempted - matched, 0),
+             skipped_budget=len(skipped_budget))

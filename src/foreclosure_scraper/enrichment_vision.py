@@ -546,7 +546,16 @@ GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions"
 GITHUB_MODELS_MODEL = os.environ.get("GITHUB_MODELS_MODEL", "openai/gpt-4o-mini")
 # Groq — free tier, very fast. Vision model names change; override via env.
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODEL = os.environ.get("GROQ_VISION_MODEL", "meta-llama/llama-4-scout-17b-16e-instruct")
+# Verified live 2026-07-27 against GET /openai/v1/models: llama-4-scout is GONE
+# (404 "does not exist or you do not have access"), and qwen3.6-27b is now the
+# ONLY catalog entry with "image" in input_modalities. It is a reasoning model:
+# left alone it burns the whole token budget on a <think> block and never emits
+# JSON, and response_format=json_object 400s (json_validate_failed). It only
+# returns a parseable condition JSON with reasoning_effort="none" — hence
+# GROQ_EXTRA_BODY below. Free-tier TPM is 8k and one prompt+photo is ~5.4k, so
+# roughly one call/minute; the delay is paced to match.
+GROQ_MODEL = os.environ.get("GROQ_VISION_MODEL", "qwen/qwen3.6-27b")
+GROQ_EXTRA_BODY = {"reasoning_effort": "none"}
 # Ollama — local, unlimited, free. qwen2.5vl:3b > moondream and still fits 8GB.
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 OLLAMA_MODEL = os.environ.get("OLLAMA_VISION_MODEL", "qwen2.5vl:3b")
@@ -564,24 +573,44 @@ CLOUDFLARE_MODEL = os.environ.get("CLOUDFLARE_VISION_MODEL", "@cf/mistralai/mist
 
 # NVIDIA NIM — OpenAI-compatible. ONE free key reaches MANY hosted vision models,
 # and NIM rate-limits PER MODEL (~40 RPM each), so registering N vision models =
-# N parallel free lanes in the pool. List = the models verified working for
-# property-photo description on 2026-06-19 (dropped kimi-k2.6/phi-4-mm/step-3.7/
-# qwen3.5-122b which errored or returned garbage). Override via NVIDIA_VISION_MODELS.
+# N parallel free lanes in the pool (8 lanes here ≈ 320 RPM of free headroom).
+#
+# REFRESHED 2026-07-27. The previous list was written 2026-06-19 and 7 of its 13
+# entries had since been retired — llama-4-maverick, mistral-small-4-119b,
+# mistral-large-3-675b, ministral-14b, qwen3.5-397b, gemma-3n-e4b/e2b all
+# answered HTTP 410 "has reached its end of life" and no longer appear in
+# GET /v1/models at all. Those dead lanes are what ate the vision queue.
+#
+# Every model below was verified with a REAL single-image call on 2026-07-27:
+# the actual production prompt + a real rdcpix listing photo (webp normalized to
+# JPEG by _fetch_image_bytes, same as production), and only counted as working
+# if _parse_json_response returned a dict containing condition_tier.
+#
+# Probed and REJECTED, do not re-add without re-probing:
+#   404 "Function ... not found for account" (listed but not deployed to this
+#       key): google/gemma-3-12b-it, google/gemma-3-4b-it,
+#       microsoft/phi-3-vision-128k-instruct, moonshotai/kimi-k2.6,
+#       nvidia/cosmos-reason2-8b, nvidia/vila, nvidia/neva-22b,
+#       microsoft/kosmos-2, adept/fuyu-8b, google/deplot
+#   500 "multimodal processing is not enabled": nvidia/nemotron-3-ultra-550b-a55b,
+#       nvidia/nemotron-3-super-120b-a12b
+#   400 not multimodal: mistralai/mistral-nemotron
+#   400 no text input: nvidia/nemotron-parse
+#   claims it cannot see the image: z-ai/glm-5.2
+#   read timeout on the full prompt (180s and 300s, twice): google/gemma-4-31b-it,
+#       deepseek-ai/deepseek-v4-flash, deepseek-ai/deepseek-v4-pro
+#   "DEGRADED function cannot be invoked": stepfun-ai/step-3.7-flash
+# Override via NVIDIA_VISION_MODELS.
 NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 NVIDIA_VISION_MODELS = [m.strip() for m in os.environ.get("NVIDIA_VISION_MODELS", ",".join([
-    "mistralai/mistral-small-4-119b-2603",
-    "mistralai/mistral-medium-3.5-128b",
-    "meta/llama-4-maverick-17b-128e-instruct",
-    "minimaxai/minimax-m3",
     "meta/llama-3.2-11b-vision-instruct",
-    "nvidia/nemotron-nano-12b-v2-vl",
-    "qwen/qwen3.5-397b-a17b",
-    "mistralai/mistral-large-3-675b-instruct-2512",
-    "mistralai/ministral-14b-instruct-2512",
-    "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
-    "google/gemma-3n-e4b-it",
-    "google/gemma-3n-e2b-it",
     "meta/llama-3.2-90b-vision-instruct",
+    "nvidia/nemotron-nano-12b-v2-vl",
+    "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+    "minimaxai/minimax-m3",
+    "mistralai/mistral-medium-3.5-128b",
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
+    "google/diffusiongemma-26b-a4b-it",
 ])).split(",") if m.strip()]
 
 
@@ -595,6 +624,32 @@ def _is_quota_msg(msg: str) -> bool:
     msg = msg.lower()
     return ("429" in msg or "resource_exhausted" in msg or "quota" in msg
             or "exceeded" in msg or "rate limit" in msg)
+
+
+CONDITION_TIERS = ("move_in_ready", "cosmetic", "major", "gut")
+
+
+def _canonical_tier(result: Optional[dict]) -> Optional[str]:
+    """Normalize `result["condition_tier"]` in place and return it, or None.
+
+    Weaker models echo the prompt's literal ``condition_tier=null`` instruction,
+    or answer with the string "null"/"none"/"n/a" instead of a real JSON null.
+    Anything that isn't one of the four canonical tiers becomes None, so every
+    reader (the override rule, the null-tier re-queue) agrees on what counts as
+    an actual grade.
+    """
+    if not isinstance(result, dict):
+        return None
+    ct = result.get("condition_tier")
+    if isinstance(ct, str):
+        s = ct.strip().lower()
+        if "=" in s:                       # "condition_tier=null" -> "null"
+            s = s.split("=", 1)[1].strip()
+        ct = s if s in CONDITION_TIERS else None
+    elif ct not in CONDITION_TIERS:
+        ct = None
+    result["condition_tier"] = ct
+    return ct
 
 
 def _finalize(parsed: Optional[dict], provider: str, model: str, n: int,
@@ -656,7 +711,8 @@ class _OpenAICompatBackend:
     """GitHub Models or Groq — both speak the OpenAI chat/completions API
     with base64 data-URL images."""
     def __init__(self, name: str, url: str, key: str, model: str,
-                 http: httpx.AsyncClient, cap: int = 4, delay: float = 1.0):
+                 http: httpx.AsyncClient, cap: int = 4, delay: float = 1.0,
+                 extra_body: Optional[dict] = None):
         self.name = name
         self.url = url
         self.key = key
@@ -664,6 +720,10 @@ class _OpenAICompatBackend:
         self.http = http
         self.cap = cap
         self.delay = delay
+        # Provider-specific request fields (e.g. Groq needs reasoning_effort
+        # "none" or its qwen3.6 vision model never stops thinking long enough
+        # to emit the JSON). Merged into the body verbatim.
+        self.extra_body = extra_body or {}
 
     async def assess(self, li: Listing, payloads, urls) -> Optional[dict]:
         content = [{"type": "text", "text": f"{SYSTEM_PROMPT}\n\n{_user_prompt(li)}"}]
@@ -672,6 +732,7 @@ class _OpenAICompatBackend:
             content.append({"type": "image_url", "image_url": {"url": f"data:{m};base64,{b64}"}})
         body = {"model": self.model, "max_tokens": MAX_TOKENS, "temperature": 0.2,
                 "messages": [{"role": "user", "content": content}]}
+        body.update(self.extra_body)
         try:
             r = await self.http.post(self.url, json=body, timeout=90.0,
                                      headers={"Authorization": f"Bearer {self.key}",
@@ -810,11 +871,15 @@ async def _build_backends(http: httpx.AsyncClient) -> list:
         backends.append(_OpenAICompatBackend("github", GITHUB_MODELS_URL, gh,
                                              GITHUB_MODELS_MODEL, http, cap=4, delay=1.0))
 
-    # Groq — free, fast. Only if a key is present.
+    # Groq — free, fast, but the free tier caps qwen3.6-27b at 8k tokens/minute
+    # and one prompt+photo is ~5.4k, so pace it ~1 call/min (delay=45) instead
+    # of the old 2s, which just bought a 429 on every second call. cap=1 for the
+    # same token-budget reason. reasoning_effort=none is REQUIRED (see GROQ_MODEL).
     gq = os.environ.get("GROQ_API_KEY")
-    if gq:
+    if gq and GROQ_MODEL:
         backends.append(_OpenAICompatBackend("groq", GROQ_URL, gq, GROQ_MODEL,
-                                             http, cap=4, delay=2.0))
+                                             http, cap=1, delay=45.0,
+                                             extra_body=GROQ_EXTRA_BODY))
 
     # OpenRouter — free tier, one key reaches many free vision models.
     ork = os.environ.get("OPENROUTER_API_KEY")
@@ -838,9 +903,9 @@ async def _build_backends(http: httpx.AsyncClient) -> list:
                                              CLOUDFLARE_MODEL, http, cap=2, delay=1.0))
 
     # NVIDIA NIM — ONE free key, MANY vision models, each its own ~40 RPM lane.
-    # Verified live: 13 models hit back-to-back on one key with zero 429s, so the
-    # per-model limits stack into many parallel free lanes — typically the single
-    # biggest contributor in the pool.
+    # The per-model limits stack into parallel free lanes, so this is typically
+    # the single biggest contributor in the pool. All 8 models re-verified with
+    # a real single-image call on 2026-07-27 (see NVIDIA_VISION_MODELS).
     nv = os.environ.get("NVIDIA_API_KEY")
     if nv:
         for m in NVIDIA_VISION_MODELS:
@@ -902,16 +967,26 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
     """
     targets = [li for li in listings if _select_image_urls(li)]
     # Prioritize the most actionable listings for the (free-quota-bounded)
-    # Vision budget: soonest sale date first, then listings with an opening
-    # bid (real auctions), so the cap covers the best leads — not whatever
-    # happened to be first.
+    # Vision budget: soonest sale date first, then never-scored leads, then
+    # listings with an opening bid (real auctions), so the cap covers the best
+    # leads — not whatever happened to be first.
+    #
+    # The never-scored key sits BELOW sale date on purpose. Dated leads keep
+    # exact date order (an imminent sale that gained photos since last week
+    # still gets re-read), but the huge date-less tail — where most of the
+    # board lives — spends the cap on leads that have NO condition read yet
+    # instead of re-grading ones that already do. That is what turns a raised
+    # cap into new coverage rather than repeat work.
     def _vpri(li: Listing):
         from datetime import datetime as _dt
         sd = li.sale_date
         if sd is not None and hasattr(sd, "tzinfo") and sd.tzinfo is not None:
             sd = sd.replace(tzinfo=None)
         has_date = 0 if sd else 1
-        return (has_date, sd or _dt.max, 0 if li.opening_bid else 1)
+        raw = li.raw if isinstance(li.raw, dict) else {}
+        already_scored = 1 if raw.get("vision") else 0
+        return (has_date, sd or _dt.max, already_scored,
+                0 if li.opening_bid else 1)
     targets.sort(key=_vpri)
     if max_listings:
         targets = targets[:max_listings]
@@ -935,24 +1010,13 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
             return
         if not isinstance(li.raw, dict):
             li.raw = {}
-        # Normalize condition_tier: weaker models sometimes echo the prompt's
-        # literal "condition_tier=null" instruction, or return the string
-        # "null"/"none"/"n/a" instead of a real JSON null. Coerce any value
-        # that isn't one of the four canonical tiers to None.
-        ct_raw = result.get("condition_tier")
-        if isinstance(ct_raw, str):
-            s = ct_raw.strip().lower()
-            if "=" in s:                       # "condition_tier=null" -> "null"
-                s = s.split("=", 1)[1].strip()
-            result["condition_tier"] = s if s in (
-                "move_in_ready", "cosmetic", "major", "gut") else None
+        ct = _canonical_tier(result)
         li.raw["vision"] = result
         usage = result.pop("_usage", None) or {}
         total_in += usage.get("input_tokens", 0) or 0
         total_out += usage.get("output_tokens", 0) or 0
-        ct = result.get("condition_tier")
         conf = (result.get("confidence") or "").upper()
-        if ct in ("move_in_ready", "cosmetic", "major", "gut") and conf in ("HIGH", "MEDIUM"):
+        if ct and conf in ("HIGH", "MEDIUM"):
             old = li.raw.get("condition_tier")
             li.raw["condition_tier"] = ct
             li.raw["condition_source"] = f"vision-{conf}"
@@ -960,6 +1024,7 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
                 overrides += 1
 
     scored = 0
+    ungraded = 0
     by_backend: dict[str, int] = {}
 
     def _apply2(li: Listing, result: Optional[dict]) -> None:
@@ -969,6 +1034,28 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
             scored += 1
             prov = result.get("_provider", "?")
             by_backend[prov] = by_backend.get(prov, 0) + 1
+
+    def _record_ungraded(li: Listing, result: dict) -> None:
+        """Every available backend answered but NONE actually graded the
+        property (condition_tier came back null — 7 of 9 lanes did that on a
+        real-photo probe, and a basemap-only listing legitimately yields null
+        everywhere).
+
+        Such a report must NOT land in raw["vision"]: that key is exactly what
+        needs_vision()/_vpri treat as "already scored", so a weak lane's null
+        would permanently lock the lead out of ever being graded properly.
+        Park it under raw["vision_unscored"] instead — that key is absent from
+        web_artifact.RAW_KEEP, so it never reaches the published board and the
+        lead comes back un-scored (and re-gradable) on the next run.
+        """
+        nonlocal ungraded, total_in, total_out
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        usage = result.pop("_usage", None) or {}
+        total_in += usage.get("input_tokens", 0) or 0
+        total_out += usage.get("output_tokens", 0) or 0
+        li.raw["vision_unscored"] = result
+        ungraded += 1
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as http:
         backends = await _build_backends(http)
@@ -999,6 +1086,138 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
         # and move on. Covers fetch(≤15s) + provider POST(≤90s) with margin.
         item_timeout = float(os.environ.get("VISION_ITEM_TIMEOUT", "150"))
 
+        # HARD failures (410 end-of-life, 404 unknown model, unparseable reply,
+        # item timeout) are NOT quota problems, so the cooldown/strike path
+        # above never saw them. Before this block they fell straight through to
+        # _apply2(li, None) and the listing was DROPPED for the whole run — one
+        # dead backend permanently ate one queue slot per failure. The
+        # 2026-07-27 pass lost 1,222 of 1,500 slots that way (only 278 scored)
+        # because 7 retired NIM models + a 404 Groq model kept eating the queue.
+        #
+        # Two bounded guards fix it:
+        #   1. Re-queue a hard-failed listing so a HEALTHY backend can still
+        #      score it — at most VISION_MAX_REQUEUE times, so a fully dead
+        #      pool can never loop forever.
+        #   2. Retire the backend after VISION_BACKEND_HARD_FAILS CONSECUTIVE
+        #      hard failures (a success resets the counter), mirroring the
+        #      quota strike system. This is what stops a 410 model from eating
+        #      the queue at all.
+        #
+        # The budget is PER-BACKEND, not global. A global 1+2 budget was still
+        # losing listings: INTERMITTENT lanes (verified live — mistral-medium-
+        # 3.5-128b answered 1 of 4 real calls, llama-3.2-11b-vision 3 of 4)
+        # never rack up max_hard_fails CONSECUTIVE failures, so they never
+        # retire and keep drawing work; three bounces off flaky lanes burned a
+        # listing's whole budget while a HEALTHY backend sat idle right there
+        # (60-listing stress test scored only 57).
+        #
+        # Rule: each backend may attempt a given listing ONCE, plus
+        # VISION_MAX_REQUEUE extra retries once every live lane has had its
+        # turn. So for every listing
+        #     attempts <= len(backends) + VISION_MAX_REQUEUE
+        # which is finite and independent of how flaky any lane is. A fully
+        # dead pool still terminates twice over, because each backend also
+        # retires after max_hard_fails consecutive hard failures.
+        max_requeue = int(os.environ.get("VISION_MAX_REQUEUE", "2"))
+        max_hard_fails = int(os.environ.get("VISION_BACKEND_HARD_FAILS", "5"))
+
+        # Per-listing state keyed by id(li). id() is the one key that is unique
+        # BY CONSTRUCTION here: `targets` holds a strong reference to every
+        # listing for the whole call, so no id can be recycled mid-run and two
+        # distinct listings can never collide. Do NOT be tempted to key this by
+        # source_url — 652 source_urls are shared by 19,392 board leads (one
+        # ArcGIS URL by 3,293), so a url-keyed budget would let one lead spend
+        # thousands of others' attempts. See test_attempt_budget_key_is_per_object.
+        tried: dict[int, set[int]] = {}       # id(li) -> backend indexes that ran it
+        tries: dict[int, int] = {}            # id(li) -> attempts spent (the hard cap)
+        attempt_cap = len(backends) + max_requeue
+        # API-backend indexes still able to take work; a retired or finished
+        # worker drops out, so "another lane could serve this listing" never
+        # counts a lane that is already gone. Floor lanes are deliberately NOT
+        # in here: a floor worker sits idle until every API worker has exited,
+        # so counting it as "a lane that will come for this listing" would park
+        # the API lanes waiting for a worker that is itself waiting for them.
+        live_idx: set[int] = {i for i, b in enumerate(backends)
+                              if not getattr(b, "is_floor", False)}
+        # Listings the API pool exhausted its attempts on, held for the floor
+        # (None when no floor backend is configured, so they are given up on).
+        floor_pending: Optional[list[Listing]] = (
+            [] if any(getattr(b, "is_floor", False) for b in backends) else None)
+        attempts = {"n": 0}                   # completed backend calls (watchdog progress)
+
+        def _requeue(li: Listing, idx: int) -> bool:
+            """Put a failed/ungraded listing back on the queue if attempts are
+            left. Returns True if re-queued.
+
+            One flat cap — len(backends) + VISION_MAX_REQUEUE — is what makes
+            the bound provable no matter how the pool hands the listing around:
+            one turn per lane plus a few spares. The pop-side preference below
+            is what keeps the spares from being spent on the same lane twice.
+            """
+            k = id(li)
+            if tries.get(k, 0) >= attempt_cap:
+                return False
+            queue.put_nowait(li)
+            return True
+
+        # ...and on the pop side, PREFER a listing this lane hasn't tried. The
+        # scan is bounded (never walks the whole queue — it can be 19k items),
+        # defers at most scan_limit-1 items to the back, and never drops one,
+        # so it cannot livelock or CPU-spin.
+        scan_limit = max(1, int(os.environ.get("VISION_REQUEUE_SCAN", "8")))
+
+        def _take(idx: int, allow_repeat: bool) -> Optional[Listing]:
+            deferred: list[Listing] = []
+            chosen: Optional[Listing] = None
+            for _ in range(scan_limit):
+                try:
+                    li = queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+                if idx not in (tried.get(id(li)) or ()):
+                    chosen = li
+                    break
+                deferred.append(li)
+            if chosen is None and allow_repeat:
+                # Everything nearby was already tried by THIS lane. Only take a
+                # repeat for a listing no other live lane could serve better —
+                # that lane will pop it on its own next tick.
+                for i, li in enumerate(deferred):
+                    seen = tried.get(id(li)) or set()
+                    if not any(j not in seen for j in live_idx if j != idx):
+                        chosen = deferred.pop(i)
+                        break
+            for d in deferred:
+                queue.put_nowait(d)
+            return chosen
+
+        # An empty queue does NOT mean the run is over: another worker may still
+        # be mid-call (or in its inter-call delay) on a listing that is about to
+        # be re-queued. If the fast HEALTHY lane exits at that moment, the
+        # re-queued listing is left to the flaky lanes only — the exact way work
+        # goes missing. So a worker with nothing to pop idles while any peer is
+        # still holding an item, and only re-attempts a listing it has already
+        # tried once the whole pool has gone idle (i.e. no lane that hasn't
+        # tried it is coming). Terminating: every queued listing still has
+        # attempts left by construction, total attempts are capped, and each
+        # holder finishes within item_timeout — so inflight reaches 0, the queue
+        # drains, and every idler exits. The sleep keeps it off the CPU.
+        inflight = {"n": 0}
+        idle_tick = float(os.environ.get("VISION_IDLE_TICK", "0.05"))
+
+        async def _next(idx: int) -> Optional[Listing]:
+            idle_ticks = 0
+            while True:
+                li = _take(idx, allow_repeat=(inflight["n"] <= 0 and idle_ticks >= 2))
+                if li is not None:
+                    return li
+                if _past_deadline():
+                    return None
+                if queue.empty() and inflight["n"] <= 0:
+                    return None
+                await asyncio.sleep(idle_tick)
+                idle_ticks = idle_ticks + 1 if inflight["n"] <= 0 else 0
+
         # Optional wall-clock cap so a long run (esp. the slow local floor)
         # can't overrun into the next scheduled pass. 0 = unlimited.
         import time as _time
@@ -1015,16 +1234,24 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
         # worker waits until every API backend has retired, then drains the rest.
         api_active = {"n": sum(1 for b in backends if not getattr(b, "is_floor", False))}
 
-        async def api_worker(backend) -> None:
+        async def api_worker(backend, idx: int) -> None:
             strikes = 0
+            hard_fails = 0
+            holding = False
             try:
                 while True:
+                    # Release the previous item BEFORE asking for the next one,
+                    # so a worker never counts itself as in-flight while idling.
+                    if holding:
+                        inflight["n"] -= 1
+                        holding = False
                     if _past_deadline():
                         return
-                    try:
-                        li = queue.get_nowait()
-                    except asyncio.QueueEmpty:
+                    li = await _next(idx)
+                    if li is None:
                         return
+                    inflight["n"] += 1
+                    holding = True
                     res = None
                     try:
                         payloads, urls = await asyncio.wait_for(
@@ -1036,6 +1263,8 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
                         strikes = 0
                     except QuotaExhausted:
                         strikes += 1
+                        # Nothing was assessed, so this does NOT spend one of
+                        # the listing's per-backend attempts.
                         queue.put_nowait(li)
                         if strikes >= max_strikes:
                             log.info("vision.backend_retired", backend=backend.name,
@@ -1049,26 +1278,71 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
                         log.warning("vision.item_timeout", backend=backend.name, remaining=queue.qsize())
                     except Exception as exc:
                         log.warning("vision.worker_error", backend=backend.name, error=str(exc)[:140])
-                    _apply2(li, res)
+                    # This lane has now had its turn at this listing.
+                    tried.setdefault(id(li), set()).add(idx)
+                    tries[id(li)] = tries.get(id(li), 0) + 1
+                    attempts["n"] += 1
+                    if res is not None:
+                        # The call went through and parsed, so the lane is
+                        # ALIVE even if it declined to grade the property.
+                        hard_fails = 0
+                        if _canonical_tier(res):
+                            _apply2(li, res)
+                        elif not _requeue(li, idx):
+                            # Every live lane declined — keep the report as a
+                            # diagnostic but leave the lead formally un-scored.
+                            log.info("vision.listing_ungraded", backend=backend.name,
+                                     source_url=li.source_url)
+                            _record_ungraded(li, res)
+                    else:
+                        # HARD failure (410/404/parse-fail/timeout). Hand the
+                        # listing to another backend instead of dropping it,
+                        # and count a strike against THIS backend.
+                        hard_fails += 1
+                        if not _requeue(li, idx):
+                            if floor_pending is not None:
+                                # The local floor exists precisely to finish what
+                                # the API pool could not. Park it there (once —
+                                # the floor never re-queues) instead of on the
+                                # shared queue, which the API lanes would keep
+                                # popping past their attempt cap.
+                                floor_pending.append(li)
+                            else:
+                                log.info("vision.listing_given_up", backend=backend.name,
+                                         source_url=li.source_url,
+                                         attempts=tries.get(id(li), 0),
+                                         lanes=len(tried.get(id(li)) or ()))
+                                _apply2(li, None)
+                        if hard_fails >= max_hard_fails:
+                            log.info("vision.backend_retired_hard", backend=backend.name,
+                                     hard_fails=hard_fails, remaining=queue.qsize())
+                            return
                     if getattr(backend, "delay", 0):
                         await asyncio.sleep(backend.delay)
             finally:
+                if holding:
+                    inflight["n"] -= 1
+                live_idx.discard(idx)
                 api_active["n"] -= 1
 
-        async def floor_worker(backend) -> None:
-            # Wait for the API pools to finish; bail early if they drain it all.
+        async def floor_worker(backend, idx: int) -> None:
+            # Wait for the API pools to finish; bail early if they drain it all
+            # AND left nothing parked for the floor.
             while api_active["n"] > 0:
-                if queue.empty():
+                if queue.empty() and not floor_pending:
                     return
                 await asyncio.sleep(3)
-            log.info("vision.floor_active", backend=backend.name, remaining=queue.qsize())
+            log.info("vision.floor_active", backend=backend.name,
+                     remaining=queue.qsize(), parked=len(floor_pending or ()))
             while True:
                 if _past_deadline():
                     return
-                try:
-                    li = queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    return
+                li = _take(idx, allow_repeat=True)
+                if li is None:
+                    if floor_pending:
+                        li = floor_pending.pop()
+                    else:
+                        return
                 payloads, urls = await _fetch_image_blocks(li, http)
                 if not payloads:
                     continue
@@ -1077,12 +1351,22 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
                 except Exception as exc:
                     log.warning("vision.worker_error", backend=backend.name, error=str(exc)[:140])
                     res = None
-                _apply2(li, res)
+                tried.setdefault(id(li), set()).add(idx)
+                tries[id(li)] = tries.get(id(li), 0) + 1
+                attempts["n"] += 1
+                # The floor is the last resort — no re-queue from here. A null
+                # tier still must not be written as a score (see _record_ungraded).
+                if res is None:
+                    _apply2(li, None)
+                elif _canonical_tier(res):
+                    _apply2(li, res)
+                else:
+                    _record_ungraded(li, res)
 
         worker_tasks = [
             asyncio.create_task(
-                floor_worker(b) if getattr(b, "is_floor", False) else api_worker(b))
-            for b in backends
+                floor_worker(b, i) if getattr(b, "is_floor", False) else api_worker(b, i))
+            for i, b in enumerate(backends)
         ]
 
         # Heartbeat + no-progress watchdog. Even a single wedged worker (sync
@@ -1093,13 +1377,18 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
         stall_limit = float(os.environ.get("VISION_STALL_SECONDS", "360"))
 
         async def watchdog() -> None:
-            last_scored, last_progress = -1, _time.monotonic()
+            # Progress = completed backend calls, NOT just `scored`. A pass that
+            # is working fine but grading nothing (basemap-only listings answer
+            # condition_tier=null everywhere) must not be mistaken for a wedged
+            # worker and aborted.
+            last_seen, last_progress = -1, _time.monotonic()
             while any(not t.done() for t in worker_tasks):
                 await asyncio.sleep(60)
-                log.info("vision.heartbeat", scored=scored, queue=queue.qsize(),
+                log.info("vision.heartbeat", scored=scored, attempts=attempts["n"],
+                         queue=queue.qsize(),
                          live_workers=sum(1 for t in worker_tasks if not t.done()))
-                if scored > last_scored:
-                    last_scored, last_progress = scored, _time.monotonic()
+                if attempts["n"] > last_seen:
+                    last_seen, last_progress = attempts["n"], _time.monotonic()
                 elif _time.monotonic() - last_progress > stall_limit:
                     log.warning("vision.stall_abort", scored=scored, queue=queue.qsize(),
                                 idle_s=int(_time.monotonic() - last_progress))
@@ -1121,6 +1410,7 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
         "vision.done",
         targets=len(targets),
         scored=scored,
+        ungraded=ungraded,          # answered but condition_tier null everywhere
         by_backend=by_backend,
         unscored_remaining=leftover,
         overrides=overrides,

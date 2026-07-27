@@ -67,3 +67,6 @@ docs/skiptrace_worksheet.csv
 
 # scraper WAF/debug dumps (noise, regenerated per run)
 debug/
+
+# local sidecar backups (not for commit)
+backups/

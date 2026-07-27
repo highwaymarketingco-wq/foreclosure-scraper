@@ -67,7 +67,15 @@ load CLOUDFLARE_ACCOUNT_ID "$SECRETS/cloudflare_account_id.txt"
 load NVIDIA_API_KEY        "$SECRETS/nvidia_api_key.txt"
 
 export VISION_PROVIDER=gemini
-export VISION_MAX_LISTINGS="${VISION_MAX_LISTINGS:-1500}"   # let daily quota be the limiter
+# Let the free DAILY QUOTA (and the 4h wall clock below) be the limiter, not an
+# arbitrary count. 1500 was NOT letting quota be the limiter: every recent pass
+# drained its 1500 and exited with unscored_remaining=0 in 5-17 minutes out of a
+# 4-hour budget (logs/daily-vision-*.log: 972 scored in 999s, 976 in 1006s, 956
+# in 991s). The board only holds ~5.9k photo-bearing leads, so 6000 covers the
+# entire eligible universe in one pass and hands the stop back to quota/time.
+# TRADEOFF: the daily pass now runs ~60-110 min instead of ~17 — still well
+# inside the 4h budget and finished long before the next scheduled job.
+export VISION_MAX_LISTINGS="${VISION_MAX_LISTINGS:-6000}"
 export VISION_INTER_CALL_DELAY="${VISION_INTER_CALL_DELAY:-4}"
 # Free-tier 429s are usually PER-MINUTE rate limits, not daily exhaustion. Keep a
 # rate-limited backend cooling-down-and-retrying instead of retiring it after 2

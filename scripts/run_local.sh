@@ -86,19 +86,41 @@ export ASSESSOR_CARD_MAX="${ASSESSOR_CARD_MAX:-400}"
 
 # Enrichment budget — keep the run finishing in a sane window. The cloud
 # run died at 4h partly on a Gemini-quota Vision spiral; locally we use
-# Anthropic (set above) and cap Vision so the run completes. Raise
-# VISION_MAX_LISTINGS later for deeper condition coverage. ROD deed
+# Anthropic (set above) and cap Vision so the run completes. ROD deed
 # enrichment stays OFF (broken vendor portals = 27 min for 0 matches).
-# Vision budget — now FREE Gemini with 4-account key rotation. The vision
-# code runs one parallel stream per key, so throughput ≈ keys / delay.
-# Cap at 800 (prioritized by soonest sale date) to stay within Gemini's
-# free per-day quota across 4 keys; ~4s/key pacing keeps each under its
-# per-minute rate limit → ~800 scored in ~15 min. Unscored fall back to
-# the regex/age condition tier.
-export VISION_MAX_LISTINGS="${VISION_MAX_LISTINGS:-800}"
+#
+# Vision budget — the pool is FREE and 26 backends wide (9 Gemini keys +
+# GitHub Models + Groq + Mistral + Cloudflare + 13 NVIDIA NIM lanes), one
+# worker per backend off a shared queue. Measured drain: ~90 listings/min
+# (logs/daily-vision-*.log). 800 was a paid-Anthropic-era number and left
+# most of the free capacity unused — the board carries ~5.9k photo-bearing
+# leads, so 800/run could never cover it.
+#
+# 2500 (prioritized: soonest sale date, then never-scored) ≈ 28 min at the
+# measured rate. TRADEOFF: ~15 min more wall clock than the 800 cap for
+# ~3x the condition coverage. Unscored fall back to the regex/age tier.
+export VISION_MAX_LISTINGS="${VISION_MAX_LISTINGS:-2500}"
 export VISION_INTER_CALL_DELAY="${VISION_INTER_CALL_DELAY:-4}"
-# Generous wall-clock cap so it can finish the 800 but can never hang.
-export VISION_MAX_SECONDS="${VISION_MAX_SECONDS:-1800}"
+# Wall-clock cap — THE stop. The count above only sets how much we try; this
+# is what guarantees the phase ends. 45 min covers 2500 at the measured rate
+# with headroom for a degraded pool, and can never hang the run.
+export VISION_MAX_SECONDS="${VISION_MAX_SECONDS:-2700}"
+# Sold-comp pool gets its own (smaller) cap + budget so it can't eat the
+# active-listing pass; ~89-400 comps ≈ a few minutes.
+export SOLD_POOL_VISION_MAX_LISTINGS="${SOLD_POOL_VISION_MAX_LISTINGS:-400}"
+export SOLD_POOL_VISION_MAX_SECONDS="${SOLD_POOL_VISION_MAX_SECONDS:-600}"
+# Catch-up pass for leads the name-resolver just gave an address to.
+export VISION_CATCHUP_MAX_LISTINGS="${VISION_CATCHUP_MAX_LISTINGS:-1500}"
+export VISION_CATCHUP_MAX_SECONDS="${VISION_CATCHUP_MAX_SECONDS:-900}"
+
+# Photo gallery budget — the UPSTREAM unlock for Vision (no photo = no
+# condition grade, whatever the Vision cap is). ~10.1k board leads have an
+# address but <3 photos and the old 500 cap reached 5% of them per run.
+# HomeHarvest is slow (~19 leads/min on 4 threads), so the honest limiter is
+# the 40-min wall clock, not the count: expect ~750-800 leads/run.
+# TRADEOFF: ~14 min more wall clock than the old count-capped ~26 min.
+export FORECLOSURE_PHOTO_MAX_TARGETS="${FORECLOSURE_PHOTO_MAX_TARGETS:-2500}"
+export FORECLOSURE_PHOTO_MAX_SECONDS="${FORECLOSURE_PHOTO_MAX_SECONDS:-2400}"
 # Keep rate-limited vision backends alive (cooldown+retry) instead of retiring
 # them after 2 strikes — a too-low threshold killed the whole Gemini fleet in
 # ~2 min. See run_daily_vision.sh for the rationale.

@@ -524,9 +524,13 @@ class NCECourtsDivorce(BaseScraper):
     JUDGMENT_PAGE_SIZE = 200
     JUDGMENT_MAX_PAGES = 25
 
-    # Family causes that indicate a divorce judgment. Absolute-divorce and
-    # bed-and-board variants all share the "FAM - Divorce" cause prefix.
-    DIVORCE_CAUSE_PREFIX = "FAM - Divorce"
+    # Family causes that indicate a divorce or property-division judgment.
+    # Absolute-divorce and equitable-distribution variants both can force a
+    # marital-home sale. 2026-07-03 Task #52: added FAM - Equitable Distribution.
+    DIVORCE_CAUSES = (
+        "FAM - Divorce",
+        "FAM - Equitable Distribution",
+    )
 
     async def fetch(self) -> Iterable[Listing]:
         end = datetime.now()
@@ -591,7 +595,7 @@ class NCECourtsDivorce(BaseScraper):
 
     def _judgment_hit_to_listing(self, hit: dict) -> Optional[Listing]:
         cause = hit.get("causeOfActionDesc") or ""
-        if not cause.startswith(self.DIVORCE_CAUSE_PREFIX):
+        if cause not in self.DIVORCE_CAUSES:
             return None
         # Skip dead dispositions (dismissed/withdrawn/vacated divorces are not leads).
         status = (hit.get("civilJudgmentStatus") or "").strip().lower()

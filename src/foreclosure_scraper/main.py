@@ -1357,6 +1357,32 @@ async def run() -> int:
     except Exception:
         log.error("photos.failed", traceback=traceback.format_exc())
 
+    # County assessor / CAMA drive-by photo — FREE, no API key. Works for
+    # PARCEL-ONLY leads that have no street address, which Street View can never
+    # reach, so it runs first and Street View only pays for what it misses.
+    # Gated by FORECLOSURE_ASSESSOR_PHOTO; capped + wall-clock bounded.
+    try:
+        from .enrichment_assessor_photo import enrich_assessor_photo
+        s = await enrich_assessor_photo(enriched)
+        if s:
+            enrichment_stats["assessor_photo"] = s
+    except Exception:
+        log.error("assessor_photo.failed", traceback=traceback.format_exc())
+
+    # Google Street View Static — a real street-level shot of the ACTUAL house,
+    # which is the image the Vision grader actually needs. PAID API, so it is OFF
+    # unless FORECLOSURE_STREETVIEW=1 AND a key is present; it calls the FREE
+    # metadata endpoint first, reuses cached photos, and is fenced by per-run,
+    # per-month and cross-process spend caps. Runs after the free photo sources
+    # so it never buys an image we already have.
+    try:
+        from .enrichment_streetview import enrich_streetview
+        s = await enrich_streetview(enriched)
+        if s:
+            enrichment_stats["streetview"] = s
+    except Exception:
+        log.error("streetview.failed", traceback=traceback.format_exc())
+
     # Image fallback — ensure 100% have at least an OSM static-map of the address
     # (free, no API key). Real Zillow/Realtor photos win when present.
     # Runs before Vision so raw.images.real (the list Vision reads from) is
@@ -1372,19 +1398,35 @@ async def run() -> int:
     # per listing depending on photo count. Skipped silently when no key.
     # Runs AFTER photos+images so it sees the full 5-6 photo gallery.
     #
-    # Budget guard: VISION_MAX_LISTINGS env caps the number of API calls.
-    # Default 600 ≈ $12-18 max per run (Sonnet 4.5 pricing). Without this
-    # cap, an unexpected listing-count spike could blow past the Anthropic
-    # spend budget for the week before anyone notices.
+    # ---- MAIN BOARD vision pass (the one the operator sees on the dashboard).
+    #
+    # Budget guard: VISION_MAX_LISTINGS caps the number of API calls; the
+    # 600 default dated from the paid-Anthropic era (600 ≈ $12-18/run on
+    # Sonnet 4.5). The pool is now FREE and much wider — 9 Gemini keys +
+    # GitHub Models + Groq + Mistral + Cloudflare + 13 NVIDIA NIM lanes = 26
+    # parallel backends. Measured drain rate on that pool is ~90 listings/min
+    # (logs/daily-vision-*: 1500 targets consumed in 800-1000s, every run
+    # ending unscored_remaining=0), so 600 was leaving most of the free
+    # capacity — and most of the board's ~5.9k photo-bearing leads — on the
+    # table. Default is now 2500.
+    #
+    # TRADEOFF: a higher cap = more condition coverage but a longer phase.
+    # 2500 listings ≈ 28 min at the measured rate (vs ~13 min for 800). The
+    # wall-clock budget below is what makes that safe: it is the real stop,
+    # the count cap only decides how much we *try*.
+    #
     # HARD wall-clock cap: a rate-limited (429) API key can otherwise stall
     # Vision for hours and hang the whole run before it ever writes the Sheet
     # (observed 2026-06-17: 47/250 scored in 18h on a throttled key). Vision
     # is best-effort condition scoring — listings it doesn't reach fall back
     # to the regex/age condition tier. So we time-box it and ALWAYS proceed.
+    # Raised 900s -> 1800s so the bigger cap can actually be realized; a
+    # partially-finished pass still keeps every result it applied (results
+    # are written onto each listing as they land, not at the end).
     try:
         from .enrichment_vision import enrich_with_vision
-        vision_cap = int(os.environ.get("VISION_MAX_LISTINGS", "600"))
-        vision_budget_s = float(os.environ.get("VISION_MAX_SECONDS", "900"))  # 15 min
+        vision_cap = int(os.environ.get("VISION_MAX_LISTINGS", "2500"))
+        vision_budget_s = float(os.environ.get("VISION_MAX_SECONDS", "1800"))  # 30 min
         try:
             await asyncio.wait_for(
                 enrich_with_vision(enriched, max_listings=vision_cap),
@@ -1458,15 +1500,36 @@ async def run() -> int:
             except Exception:
                 log.error("sold_pool.images_failed",
                           traceback=traceback.format_exc())
-            # Vision condition assessment — separate (smaller) cap from
-            # the active pipeline so sold-comp Vision can't cannibalize
-            # active-listing Vision budget.
+            # ---- SOLD-COMP POOL vision pass. Separate (smaller) cap from the
+            # active pipeline so sold-comp Vision can't cannibalize active-
+            # listing Vision budget. 100 was below the pool's own size on a
+            # good week (the pool runs a few hundred recent sales), so comps
+            # showed condition for only the first 100. 400 covers a normal
+            # pool; at the measured ~90 listings/min drain that is ~5 min.
+            # TRADEOFF: more comps carry a condition read (better like-for-
+            # like matching) at the cost of a few minutes of phase time.
+            # This call previously had NO wall-clock wrapper of its own — it
+            # relied on enrich_with_vision's internal VISION_MAX_SECONDS,
+            # which is unset (= unlimited) outside run_local.sh. Raising the
+            # count cap without a time bound is exactly what hangs a run, so
+            # it is now time-boxed like the main pass.
             try:
                 from .enrichment_vision import enrich_with_vision as _ev
                 sold_vision_cap = int(os.environ.get(
-                    "SOLD_POOL_VISION_MAX_LISTINGS", "100"
+                    "SOLD_POOL_VISION_MAX_LISTINGS", "400"
                 ))
-                await _ev(sold_pool, max_listings=sold_vision_cap)
+                sold_vision_budget_s = float(os.environ.get(
+                    "SOLD_POOL_VISION_MAX_SECONDS", "600"
+                ))
+                try:
+                    await asyncio.wait_for(
+                        _ev(sold_pool, max_listings=sold_vision_cap),
+                        timeout=sold_vision_budget_s,
+                    )
+                except asyncio.TimeoutError:
+                    log.warning("sold_pool.vision_time_capped",
+                                budget_s=sold_vision_budget_s,
+                                note="proceeding; unscored comps keep regex/age condition")
             except Exception:
                 log.error("sold_pool.vision_failed",
                           traceback=traceback.format_exc())
@@ -1871,11 +1934,23 @@ async def run() -> int:
                     log.error("resolved_catchup.enricher_failed",
                               fn=getattr(_fn, "__name__", "?"),
                               traceback=traceback.format_exc())
-            # Vision is API-metered — cap + time-box exactly like the main pass.
+            # ---- CATCH-UP vision pass (freshly name-resolved leads only).
+            # Vision is API-metered — cap + time-box exactly like the main
+            # pass, but with its OWN knobs: this subset can be thousands of
+            # leads after a big resolver run (~4k in the 2026-07 _parcel_
+            # variants fix), and sharing VISION_MAX_LISTINGS meant the main
+            # pass's cap silently governed here too. The real limiter was the
+            # hardcoded 300s (≈450 listings at the measured ~90/min drain),
+            # so the budget goes to 900s and the count cap gets its own env.
+            # TRADEOFF: up to +10 min on runs where the resolver unlocked a
+            # large batch; 0 extra when it resolved nothing (list is empty).
             try:
-                _vcap = int(os.environ.get("VISION_MAX_LISTINGS", "600"))
+                _vcap = int(os.environ.get(
+                    "VISION_CATCHUP_MAX_LISTINGS",
+                    os.environ.get("VISION_MAX_LISTINGS", "1500")))
+                _vbudget = float(os.environ.get("VISION_CATCHUP_MAX_SECONDS", "900"))
                 await asyncio.wait_for(
-                    _vis_enrich(reenrich, max_listings=_vcap), timeout=300.0)
+                    _vis_enrich(reenrich, max_listings=_vcap), timeout=_vbudget)
             except Exception:
                 log.error("resolved_catchup.vision_failed",
                           traceback=traceback.format_exc())

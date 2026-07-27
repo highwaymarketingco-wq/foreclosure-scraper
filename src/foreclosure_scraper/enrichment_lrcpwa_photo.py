@@ -38,8 +38,15 @@ from .enrichment_lrcpwa_parcel import BASE, TENANTS, _county
 log = structlog.get_logger(__name__)
 
 _ENABLED = os.environ.get("FORECLOSURE_LRCPWA_PHOTO") != "0"
-_MAX = int(os.environ.get("LRCPWA_PHOTO_MAX", "2000"))
-_BUDGET_S = float(os.environ.get("LRCPWA_PHOTO_BUDGET_S", "1200"))
+# Count cap + wall-clock budget. This one was already the best-behaved of the
+# image phases (budget enforced per lead inside `one()`), and it is NOT the
+# bottleneck — recent runs saw targets=23 because _worth_photo gates on a
+# distress tier / letter grade in 4 PTS-Cloud counties. Raised anyway so a
+# future backfill (or the address-resolver unlocking a batch of parcels) isn't
+# silently truncated. TRADEOFF: at ~2 leads/s with 6-way concurrency the budget,
+# not the count, is what ends this phase — 1800s worst case, typically seconds.
+_MAX = int(os.environ.get("LRCPWA_PHOTO_MAX", "6000"))
+_BUDGET_S = float(os.environ.get("LRCPWA_PHOTO_BUDGET_S", "1800"))
 _THUMB = int(os.environ.get("LRCPWA_PHOTO_THUMB", "640"))
 _DEFAULT_DIR = Path(__file__).resolve().parent.parent.parent / "docs" / "parcel_photos"
 

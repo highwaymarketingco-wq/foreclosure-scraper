@@ -194,9 +194,23 @@ def apply_situs_address(li: Listing, attrs: dict[str, Any], addr_field: str | No
         name_s = re.sub(r"\s+", " ", str(name).strip()) if name not in (None, "") else ""
         if name_s and any(ch.isalpha() for ch in name_s):
             num_s = re.sub(r"\s+", " ", str(num).strip()) if num not in (None, "") else ""
-            if num_s and set(num_s) == {"0"}:   # SCDOT vacant parcels carry PROP_ST_NO="0"
-                num_s = ""
-            raw_addr = f"{num_s} {name_s}".strip() if num_s else name_s
+            # No-house-number sentinels: SCDOT vacant parcels carry PROP_ST_NO="0",
+            # NC publishes "99999". Previously the number was simply dropped and the
+            # BARE ROAD was written as street_address — but a road is not a building.
+            # It is unmailable, it geocodes to the road centroid, and (worst) it
+            # marks the lead "has an address" so it is never resolved properly again.
+            # Keep the road as CONTEXT only and leave street_address unset so the
+            # lead stays in the resolution queue.
+            if not num_s or set(num_s) <= {"0"} or set(num_s) == {"9"} and len(num_s) >= 4:
+                if not isinstance(li.raw, dict):
+                    li.raw = {}
+                li.raw["situs_road_only"] = {
+                    "road": name_s,
+                    "reason": "no_house_number" if not num_s else f"sentinel_house_number:{num_s}",
+                    "note": "road centroid only — not a building, never mail or Street View this",
+                }
+                return 0
+            raw_addr = f"{num_s} {name_s}".strip()
 
     if raw_addr in (None, "", " "):
         return 0

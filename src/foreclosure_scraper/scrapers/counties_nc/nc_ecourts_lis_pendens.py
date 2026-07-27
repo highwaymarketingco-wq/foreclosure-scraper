@@ -111,6 +111,11 @@ FORECLOSURE_CAUSES = {
     "CV - Lien",
     "CV - Federal Tax Lien",
     "CV - Tax Delinquency",
+    # 2026-07-03 Task #52: expanded per per-county case-type-code map.
+    # These causes attach a lien to real property or signal a forced sale.
+    "CV - Transcript of Judgment",          # judgment lien on real property (NCGS 1-234)
+    "CV - NC Certificate of Tax Liability",  # NC DOR state tax lien (NCGS 105-242)
+    "CV - Condemnation",                      # government taking; forced seller
 }
 
 # AngularJS app expects a Tyler-style header set. Use Title-case keys to
@@ -229,11 +234,17 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
             # in calendar days and only the deadline-day filing time
             # matters (handled by the clerk of court).
 
-    # Pick listing type: explicit lis pendens vs lien
+    # Pick listing type based on the cause.
     if "Lis Pendens" in cause:
         listing_type = ListingType.LIS_PENDENS
+    elif "Tax" in cause or "Tax Liability" in cause:
+        listing_type = ListingType.TAX_LIEN
     elif "Lien" in cause:
         listing_type = ListingType.TAX_LIEN if "Tax" in cause else ListingType.LIS_PENDENS
+    elif "Condemnation" in cause:
+        listing_type = ListingType.LIS_PENDENS
+    elif "Transcript of Judgment" in cause:
+        listing_type = ListingType.LIS_PENDENS
     else:
         listing_type = ListingType.LIS_PENDENS
 

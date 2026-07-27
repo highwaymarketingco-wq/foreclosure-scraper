@@ -39,6 +39,7 @@ value, or owner — the downstream GIS-attrs track consumes the new parcel_id.
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import Any, Optional
 
 import structlog
@@ -94,20 +95,18 @@ def _clean_parcel(pid: Any) -> str:
     return s
 
 
-async def _point_query(
-    c, layer_query_url: str, lat: float, lon: float, out_fields: str = "*"
-) -> Optional[dict[str, Any]]:
-    """Run a point-in-polygon ArcGIS query; return the first feature's
-    attributes, or None."""
-    params = {
-        "geometry": f"{lon},{lat}",
-        "geometryType": "esriGeometryPoint",
-        "inSR": 4326,
-        "spatialRel": "esriSpatialRelIntersects",
-        "outFields": out_fields,
-        "returnGeometry": "false",
-        "f": "json",
-    }
+# Half-width of the fallback envelope, in degrees. ~5.5 m at NC/SC latitude —
+# tight enough that it lands inside the intended parcel, wide enough to survive
+# the server's spatial-index tolerance. Measured on 25 live geo-only leads:
+# 5e-5 -> 13 unique / 4 ambiguous / 8 empty; 1e-4 -> 14 unique / 9 ambiguous.
+# The bigger box buys one extra hit and more than doubles ambiguity, so 5e-5 it is.
+_ENVELOPE_HALF_DEG = 5e-5
+
+
+async def _arc_query(c, layer_query_url: str, params: dict) -> Optional[list]:
+    """GET an ArcGIS /query and return its feature list (None on any failure).
+    ArcGIS reports failure as HTTP 200 + an `error` key, so status alone is not
+    enough — a token-required response looks exactly like an empty result set."""
     try:
         r = await c.get(layer_query_url, params=params, timeout=25.0)
         if r.status_code != 200:
@@ -115,10 +114,56 @@ async def _point_query(
         data = r.json()
         if "error" in data:
             return None
-        feats = data.get("features") or []
+        return data.get("features") or []
     except Exception:  # noqa: BLE001
         return None
-    if not feats:
+
+
+async def _point_query(
+    c, layer_query_url: str, lat: float, lon: float, out_fields: str = "*"
+) -> Optional[dict[str, Any]]:
+    """Resolve the parcel polygon containing (lat, lon) — point first, then a
+    tiny envelope.
+
+    NC OneMap's NC1Map_Parcels currently answers EVERY esriGeometryPoint query
+    with HTTP 200 and zero features — verified 2026-07-27 against Buncombe,
+    downtown Asheville and downtown Raleigh, on a layer that reports 5,938,639
+    parcels and happily returns rows for an attribute query. A silent
+    always-empty spatial filter, not a coverage gap. The identical query with
+    geometryType=esriGeometryEnvelope returns the right parcel, so we retry as a
+    ~5.5 m box around the same point.
+
+    The envelope result is accepted ONLY when it matches exactly one parcel.
+    A box straddling a boundary returns several, and picking features[0] there
+    would write a confidently wrong neighbouring parcel onto the lead — worse
+    than leaving it unresolved. Point-in-polygon needs no such guard because it
+    is unique by construction.
+    """
+    base = {
+        "geometryType": "esriGeometryPoint",
+        "geometry": f"{lon},{lat}",
+        "inSR": 4326,
+        "spatialRel": "esriSpatialRelIntersects",
+        "outFields": out_fields,
+        "returnGeometry": "false",
+        "f": "json",
+    }
+    feats = await _arc_query(c, layer_query_url, base)
+    if feats:
+        return dict(feats[0].get("attributes") or {})
+    if feats is None:
+        return None  # hard failure (HTTP error / ArcGIS error) — don't re-hit
+
+    d = _ENVELOPE_HALF_DEG
+    env = dict(base)
+    env["geometryType"] = "esriGeometryEnvelope"
+    env["geometry"] = json.dumps({
+        "xmin": lon - d, "ymin": lat - d, "xmax": lon + d, "ymax": lat + d,
+        "spatialReference": {"wkid": 4326},
+    })
+    env["resultRecordCount"] = 2  # only need to know "exactly one" vs "several"
+    feats = await _arc_query(c, layer_query_url, env)
+    if not feats or len(feats) != 1:
         return None
     return dict(feats[0].get("attributes") or {})
 
@@ -142,9 +187,20 @@ async def _parcel_from_point_sc(c, li: Listing) -> str:
     return _clean_parcel(pid)
 
 
+# The matched OneMap record already carries the SITUS address, city and ZIP —
+# the very fields the next enricher would otherwise re-query a county layer for.
+# `siteadd` / `scity` / `szip` are names enrichment_arcgis._ADDR_FIELD_CANDIDATES
+# and enrichment_situs_address already recognise, so stashing the bag lets
+# enrich_situs_address resolve the address from cache with ZERO extra HTTP.
+_NC_OUT_FIELDS = (
+    "parno,cntyname,siteadd,sunit,scity,sstate,szip,"
+    "saddno,saddpref,saddstname,saddsttyp,saddstsuf,ownname,parval"
+)
+
+
 async def _parcel_from_point_nc(c, li: Listing) -> str:
     attrs = await _point_query(
-        c, NC_ONEMAP_PARCELS, li.latitude, li.longitude, out_fields="parno,cntyname"
+        c, NC_ONEMAP_PARCELS, li.latitude, li.longitude, out_fields=_NC_OUT_FIELDS
     )
     if not attrs:
         return ""
@@ -155,7 +211,81 @@ async def _parcel_from_point_nc(c, li: Listing) -> str:
     got = str(attrs.get("cntyname") or "").strip().title()
     if want and got and want != got:
         return ""
-    return _clean_parcel(attrs.get("parno"))
+    pid = _clean_parcel(attrs.get("parno"))
+    if pid and isinstance(li.raw, dict) and not li.raw.get("gis_attrs_full"):
+        # Only when absent: a county-layer bag stashed by gis_attrs is richer
+        # than the statewide one and must not be clobbered.
+        cleaned = _clean_nc_situs(attrs)
+        li.raw["gis_attrs_full"] = cleaned
+        road = cleaned.get(_NC_ROAD_ONLY_KEY)
+        if road:
+            # Surface the road as CONTEXT ONLY, never as an address. Keyed to
+            # nothing: it is written onto the very Listing whose own point
+            # matched this parcel, so no cross-lead fan-out is possible, and the
+            # parcel_id it is stamped with is the unique id of that same parcel.
+            li.raw[_NC_ROAD_ONLY_KEY] = {
+                "road": road,
+                "city": cleaned.get("scity") or None,
+                "zip": cleaned.get("szip") or None,
+                "parcel_id": pid,
+                "source": "nc_onemap_point",
+                "mailable": False,
+                "note": "NC parcel has no assigned house number (vacant/unnumbered lot)",
+            }
+    return pid
+
+
+# NC's "no house number assigned" sentinels. 17,788 parcels carry siteadd
+# "99999 <ROAD>" and 285,716 carry "0 <ROAD>" — all vacant land / undeveloped
+# lots / unnumbered building lots. Passed through, "99999 MEADOW RD" reads as a
+# real street address (it starts with digits, so every downstream validator
+# accepts it) and would be mailed, geocoded and shown on the board as fact.
+_NC_NO_NUMBER_SENTINELS = ("99999", "0")
+
+# Where the bare road goes once the sentinel is stripped. NOT `siteadd`:
+# `siteadd` is the field enrichment_situs_address reads to WRITE
+# li.street_address (it is in enrichment_arcgis._ADDR_FIELD_CANDIDATES), and a
+# numberless road ("MEADOW RD") is not a mailable address — yet it satisfies
+# web_artifact._is_valid_street_address via the road-suffix rule, so writing it
+# would (a) publish it as the property's address, (b) send it to the geocoder
+# and a mail merge, and (c) make scripts/resolve_addresses classify the lead
+# "resolved" and checkpoint it as done FOREVER, killing any later chance at the
+# real address. The road still locates the parcel roughly and pairs with
+# parcel_id + coords, so it is kept here as provenance instead.
+_NC_ROAD_ONLY_KEY = "situs_road_only"
+
+
+def _clean_nc_situs(attrs: dict[str, Any]) -> dict[str, Any]:
+    """Sanitize NC OneMap situs fields. Returns a copy; caller's dict untouched.
+
+    A sentinel house number means the parcel has NO assigned address, so the
+    address fields are emptied rather than patched: `siteadd` is blanked (an
+    empty situs is skipped by every address writer) and the bare road is parked
+    under `situs_road_only` with a `situs_no_house_number` flag. Real addresses
+    ("801 BILTMORE  AVE") only get their double spaces collapsed.
+    """
+    out = dict(attrs)
+    raw = str(out.get("siteadd") or "").strip()
+    if raw:
+        head, _, rest = raw.partition(" ")
+        road = " ".join(rest.split())
+        if head in _NC_NO_NUMBER_SENTINELS:
+            # No house number exists for this parcel -> there is no address to
+            # write. Keep the road as context under its own key.
+            out["siteadd"] = ""
+            out["situs_no_house_number"] = True
+            if road:
+                out[_NC_ROAD_ONLY_KEY] = road
+        else:
+            out["siteadd"] = " ".join(raw.split())
+    num = str(out.get("saddno") or "").strip()
+    if num in _NC_NO_NUMBER_SENTINELS:
+        out["saddno"] = ""
+        out["situs_no_house_number"] = True
+    for f in ("saddstname", "scity"):
+        if out.get(f):
+            out[f] = " ".join(str(out[f]).split())
+    return out
 
 
 async def _resolve_one(c, li: Listing, counts: dict) -> None:
@@ -164,6 +294,11 @@ async def _resolve_one(c, li: Listing, counts: dict) -> None:
     if not (li.state and li.county and _in_box(li)):
         return
     counts["queried"] += 1
+    # Normalize raw BEFORE the lookup — _parcel_from_point_nc stashes the
+    # matched attribute bag into it, and would silently skip that on a lead
+    # whose raw isn't a dict yet.
+    if not isinstance(li.raw, dict):
+        li.raw = {}
     if li.state == "SC":
         pid = await _parcel_from_point_sc(c, li)
     elif li.state == "NC":
@@ -173,8 +308,6 @@ async def _resolve_one(c, li: Listing, counts: dict) -> None:
     if not pid:
         return
     li.parcel_id = pid
-    if not isinstance(li.raw, dict):
-        li.raw = {}
     li.raw["parcel_from_geo"] = {
         "source": "scdot_point" if li.state == "SC" else "nc_onemap_point",
         "lat": li.latitude,
