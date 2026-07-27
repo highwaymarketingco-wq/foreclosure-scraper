@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-07-23T18:00:31.508921Z",
+  "run_time": "2026-07-27T16:22:13.103702Z",
   "total": 30003,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "scheduled NC SOS registered-agent refresh"
+  "notes": "scheduled land-records refresh"
 }
