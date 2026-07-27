@@ -70,3 +70,72 @@ def test_fresh_detail_wins_over_prior_sidecar(tmp_path):
     write_artifact([fresh], {"notes": "pass 2 fresh"}, docs_dir=tmp_path)
     detail = json.loads((tmp_path / "listings_detail.json").read_text())
     assert detail[0]["vision"].get("tier") == "NEW", "fresh vision must win over prior sidecar"
+
+
+# --- regression: ambiguous identity keys must NEVER carry detail across -------
+# The sidecar backfill originally trusted source_url as "most unique". On the real
+# board 652 source_urls are shared by 19,392 leads (one ArcGIS URL by 3,293; county
+# PDF rolls give every lead the same URL), so first-wins handed ONE property's
+# vision report to 985 unrelated leads — wrong condition grades, wrong ARV, and
+# permanently removed from the scoring queue. Caught in review 2026-07-27.
+
+def _rec(url, addr, county, parcel=None):
+    li = Listing(source="x", source_url=url, listing_type=ListingType.FORECLOSURE_SALE,
+                 state="NC", county=county, parcel_id=parcel, street_address=addr,
+                 raw={"grade": {"overall": "B"}})
+    return li
+
+
+def test_shared_source_url_does_not_fan_out_vision(tmp_path):
+    """Leads sharing a source_url must not inherit each other's vision.
+
+    Each lead here still has a UNIQUE street_address, so lead A legitimately
+    keeps its own report through that key — the bug was B and C also receiving it.
+    """
+    a = _rec("http://county.gov/roll.pdf", "1 Main St", "Burke")
+    a.raw["vision"] = {"condition_tier": "gut", "_provider": "gemini"}
+    b = _rec("http://county.gov/roll.pdf", "2 Oak Ave", "Burke")
+    c = _rec("http://county.gov/roll.pdf", "3 Pine Rd", "Burke")
+    write_artifact([a, b, c], {"notes": "t"}, docs_dir=tmp_path)
+
+    # Re-write with NO vision in raw (simulates a pass that did not re-vision).
+    board = [_rec("http://county.gov/roll.pdf", "1 Main St", "Burke"),
+             _rec("http://county.gov/roll.pdf", "2 Oak Ave", "Burke"),
+             _rec("http://county.gov/roll.pdf", "3 Pine Rd", "Burke")]
+    write_artifact(board, {"notes": "t2"}, docs_dir=tmp_path)
+    detail = json.loads((tmp_path / "listings_detail.json").read_text())
+    assert detail[0].get("vision"), "the owning lead keeps its report via its unique address"
+    assert not detail[1].get("vision"), "lead B must not inherit A's vision via the shared URL"
+    assert not detail[2].get("vision"), "lead C must not inherit A's vision via the shared URL"
+
+
+def test_shared_url_as_only_key_carries_nothing(tmp_path):
+    """When the shared source_url is the ONLY available key (no address, no
+    parcel — the real county-PDF-roll shape), no detail may carry at all."""
+    a = _rec("http://county.gov/roll.pdf", None, None)
+    a.raw["vision"] = {"condition_tier": "gut", "_provider": "gemini"}
+    b = _rec("http://county.gov/roll.pdf", None, None)
+    write_artifact([a, b], {"notes": "t"}, docs_dir=tmp_path)
+
+    board = [_rec("http://county.gov/roll.pdf", None, None),
+             _rec("http://county.gov/roll.pdf", None, None)]
+    write_artifact(board, {"notes": "t2"}, docs_dir=tmp_path)
+    detail = json.loads((tmp_path / "listings_detail.json").read_text())
+    got = [bool(d.get("vision")) for d in detail]
+    assert got.count(True) == 0, (
+        f"an ambiguous-only key leaked vision to {got.count(True)} leads; it must carry to none")
+
+
+def test_unique_parcel_id_still_carries_detail(tmp_path):
+    """The safe key must keep working — the fix must not disable the backfill."""
+    a = _rec("http://county.gov/roll.pdf", "1 Main St", "Burke", parcel="PARCEL-1")
+    a.raw["vision"] = {"condition_tier": "gut", "_provider": "gemini"}
+    b = _rec("http://county.gov/roll.pdf", "2 Oak Ave", "Burke", parcel="PARCEL-2")
+    write_artifact([a, b], {"notes": "t"}, docs_dir=tmp_path)
+
+    board = [_rec("http://county.gov/roll.pdf", "1 Main St", "Burke", parcel="PARCEL-1"),
+             _rec("http://county.gov/roll.pdf", "2 Oak Ave", "Burke", parcel="PARCEL-2")]
+    write_artifact(board, {"notes": "t2"}, docs_dir=tmp_path)
+    detail = json.loads((tmp_path / "listings_detail.json").read_text())
+    assert detail[0].get("vision"), "unique parcel_id must still carry prior detail"
+    assert not detail[1].get("vision"), "the other parcel must not inherit it"

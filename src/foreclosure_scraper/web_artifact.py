@@ -242,14 +242,20 @@ LAZY_DETAIL_KEYS = ("vision", "foreclosure_sold_comps", "comps", "cama", "rent_c
 
 
 def _identity_keys(rec: dict):
-    """Stable cross-run identity keys for a published record, unique-first.
+    """Candidate cross-run identity keys for a published record.
 
     Used to carry a lead's prior sidecar detail (vision/comps/cama) across a
     FULL re-scrape, where index alignment is meaningless (order + count change
-    every run). source_url is the most unique; parcel_id is a reliable gov id;
-    (street_address, county) is the last-resort fallback. First match wins at
-    lookup, so a wrong low-uniqueness collision can only occur when the more
-    unique keys are absent — and only ever backfills a missing detail panel.
+    every run).
+
+    CAUTION — a key here is only a CANDIDATE, never trusted on its own. None of
+    these is unique by construction: on the live board 652 source_urls are shared
+    by 19,392 leads (one ArcGIS service URL alone is shared by 3,293, and county
+    PDF rolls give every lead in the file the same URL), and 82 address+county
+    pairs collide on placeholders like "0 no address assigned". Callers MUST
+    discard any key claimed by more than one record — see _unique_key_map. An
+    earlier version trusted source_url as "most unique" and handed one property's
+    vision report to 985 unrelated leads.
     """
     keys: list[str] = []
     su = rec.get("source_url")
@@ -285,6 +291,7 @@ def _load_prior_details_by_key(docs: Path) -> dict:
         dets = json.loads(dp.read_text())
     except Exception:  # noqa: BLE001
         return {}
+    unique = _unique_key_map(recs)
     out: dict = {}
     for i, rec in enumerate(recs):
         if i >= len(dets):
@@ -293,8 +300,25 @@ def _load_prior_details_by_key(docs: Path) -> dict:
         if not isinstance(d, dict) or not d or not isinstance(rec, dict):
             continue
         for key in _identity_keys(rec):
-            out.setdefault(key, d)  # first (most unique) key wins
+            if unique.get(key):
+                out[key] = d
     return out
+
+
+def _unique_key_map(recs: list) -> dict:
+    """key -> True only when EXACTLY ONE record in `recs` claims it.
+
+    An ambiguous key cannot identify a lead, so carrying detail across it hands
+    one property's vision/comps report to every other lead behind the same key.
+    Counting first (rather than first-wins) is what makes the backfill safe.
+    """
+    freq: dict = {}
+    for rec in recs:
+        if not isinstance(rec, dict):
+            continue
+        for key in _identity_keys(rec):
+            freq[key] = freq.get(key, 0) + 1
+    return {k: (n == 1) for k, n in freq.items()}
 
 
 def _atomic_write_bytes(path: Path, data: bytes) -> None:
@@ -366,6 +390,11 @@ def write_artifact(
     # didn't touch this run, instead of overwriting details[i] with {}.
     # Fresh detail from THIS run always wins; prior only backfills missing keys.
     prior = _load_prior_details_by_key(docs)
+    # Guard BOTH sides: a key can be unique in the prior board yet ambiguous in
+    # what we are about to write (e.g. a re-scrape that pulled 3,293 leads from
+    # one ArcGIS URL). Carrying detail across it would fan one report out to all
+    # of them, so only keys unique on BOTH sides are allowed to match.
+    payload_unique = _unique_key_map(payload) if prior else {}
     details = []
     for rec in payload:
         raw = rec.get("raw")
@@ -377,7 +406,7 @@ def write_artifact(
         if prior:
             pri = None
             for key in _identity_keys(rec):
-                if key in prior:
+                if payload_unique.get(key) and key in prior:
                     pri = prior[key]
                     break
             if pri:
