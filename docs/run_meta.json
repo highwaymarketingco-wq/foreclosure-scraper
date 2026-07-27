@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-07-27T18:27:07.937297Z",
+  "run_time": "2026-07-27T19:44:41.421969Z",
   "total": 30003,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "live photo+vision smoke"
+  "notes": "expanded vision pool run"
 }

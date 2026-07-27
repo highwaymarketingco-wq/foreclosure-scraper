@@ -544,6 +544,24 @@ def _build_gemini_client():
 # GitHub Models — free tier, uses the existing `gh` token (or GITHUB_MODELS_TOKEN).
 GITHUB_MODELS_URL = "https://models.github.ai/inference/chat/completions"
 GITHUB_MODELS_MODEL = os.environ.get("GITHUB_MODELS_MODEL", "openai/gpt-4o-mini")
+# Verified 2026-07-27 on 4 real property photos (4 trials each). GitHub Models
+# rate-limits per model TIER, so each id is its own lane rather than sharing one
+# bucket. Ordered best-grading first; several return a PERFECT 4-distinct tier
+# ordering across the 4 photos, which is better discrimination than most NIM lanes.
+GITHUB_VISION_MODELS = [m.strip() for m in os.environ.get("GITHUB_VISION_MODELS", ",".join([
+    "openai/gpt-4o",                                   # 4/4, perfect ordering (high tier)
+    "meta/llama-4-maverick-17b-128e-instruct-fp8",     # 4/4, perfect ordering, 4.1s
+    "mistral-ai/mistral-small-2503",                   # 4/4, perfect ordering, 3.2s, LOW tier
+                                                       # = best quota-per-quality here
+    "openai/gpt-4.1",                                  # 4/4 (high tier)
+    "openai/gpt-4o-mini",                              # 4/4 across three runs (low tier)
+    "openai/gpt-4.1-mini",                             # 4/4 (low tier)
+    "meta/llama-4-scout-17b-16e-instruct",             # 4/4 on retest
+    "mistral-ai/mistral-medium-2505",                  # 4/4 (low tier)
+])).split(",") if m.strip()]
+# Rejected: openai/gpt-4.1-nano answered move_in_ready for 3 of 4 including a
+# cluttered doublewide — non-null but confidently wrong. Paid-gated (never called):
+# gpt-5 family, o1/o3/o4-mini.
 # Groq — free tier, very fast. Vision model names change; override via env.
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 # Verified live 2026-07-27 against GET /openai/v1/models: llama-4-scout is GONE
@@ -565,7 +583,30 @@ OPENROUTER_MODEL = os.environ.get("OPENROUTER_VISION_MODEL", "meta-llama/llama-3
 # Mistral — free "Experiment" tier: ~1B tokens/month, no card (2 RPM). Pixtral
 # is deprecated; the current maintained vision model is mistral-small-latest.
 MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
-MISTRAL_MODEL = os.environ.get("MISTRAL_VISION_MODEL", "mistral-small-latest")
+MISTRAL_MODEL = os.environ.get("MISTRAL_VISION_MODEL", "mistral-medium-latest")
+# Verified 2026-07-27. Mistral rate-limits PER CANONICAL MODEL (confirmed live from
+# x-ratelimit-limit-req-minute headers), so each of these is a genuinely separate
+# free lane — this is the largest free capacity found anywhere in the sweep.
+#   ministral-3b   750 RPM / 1.3M TPM   <- highest capacity of ANY provider tested
+#   ministral-8b   188 RPM / 625k TPM
+#   mistral-medium  50 RPM /  25k TPM   <- best QUALITY (only Mistral model with a
+#                                          perfect 4-distinct tier ordering)
+#   mistral-large    4 RPM / 250k TPM
+# CAUTION: mistral-small-latest / magistral-small-latest / mistral-vibe-cli-fast /
+# mistral-small-2603 are ALIASES sharing ONE 50 RPM bucket (proved live: calls to one
+# decremented the others' remaining count). They are one lane, not four — and
+# mistral-small-latest (the OLD default here) graded a brand-new 2021 build as
+# "cosmetic", so quality was poor too. Hence the default moved to mistral-medium.
+MISTRAL_VISION_MODELS = [m.strip() for m in os.environ.get("MISTRAL_VISION_MODELS", ",".join([
+    "mistral-medium-latest",   # best quality
+    "ministral-8b-latest",     # 4/4 twice, 188 RPM
+    "ministral-3b-latest",     # 3/4 twice, 750 RPM — the capacity workhorse
+    "mistral-large-latest",    # 4/4 but only 4 RPM, so it sits at the back
+])).split(",") if m.strip()]
+# Excluded: ministral-14b (4/4 non-null but answered "major" for 3 of 4 incl. a
+# well-maintained ranch); magistral-medium (returns list-shaped content that crashes
+# the current parser, 5 RPM, deprecating); mistral-small-2506 (great grader, 300 RPM,
+# but DEPRECATES 2026-07-31 — days away, so not worth wiring).
 # Cloudflare Workers AI — 10k neurons/day free; needs account id + token.
 # mistral-small-3.1-24b has strong vision and (unlike Llama-3.2-vision) needs
 # NO one-time license-agreement click, so it works on a fresh token immediately.
@@ -602,16 +643,45 @@ CLOUDFLARE_MODEL = os.environ.get("CLOUDFLARE_VISION_MODEL", "@cf/mistralai/mist
 #   "DEGRADED function cannot be invoked": stepfun-ai/step-3.7-flash
 # Override via NVIDIA_VISION_MODELS.
 NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
+# RE-VERIFIED 2026-07-27 with the STRICT bar: 4 real property photos from the
+# board, production SYSTEM_PROMPT + parser, and a model only counts if it returns
+# a REAL non-null condition_tier on >=3 of 4. "Responds with JSON" is NOT enough —
+# see the blindness note below.
 NVIDIA_VISION_MODELS = [m.strip() for m in os.environ.get("NVIDIA_VISION_MODELS", ",".join([
-    "meta/llama-3.2-11b-vision-instruct",
-    "meta/llama-3.2-90b-vision-instruct",
-    "nvidia/nemotron-nano-12b-v2-vl",
-    "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
-    "minimaxai/minimax-m3",
-    "mistralai/mistral-medium-3.5-128b",
-    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
-    "google/diffusiongemma-26b-a4b-it",
+    # --- 4/4 real tiers, well grounded (cite specifics from the actual photo) ---
+    "nvidia/nemotron-nano-12b-v2-vl",                 # 8/8, ~9.6s. Best NIM lane.
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",  # 8/8, ~8.4s. Tied best.
+    # --- net-new, verified this round ---
+    "nvidia/ising-calibration-1.5-31b",               # 4/4, ~7.0s (fastest chat route)
+    "thinkingmachines/inkling",                       # 4/4, ~18.5s. Was wrongly written
+                                                      # off as a timeout; a 300s retry proved
+                                                      # it fine. Pessimism bias (skews 'major').
+    # --- meets the bar but biased; keep at the back of the rotation ---
+    "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",        # 3/4, over-optimistic (move_in_ready)
+    "meta/llama-3.2-90b-vision-instruct",             # 5/8, slow (~20s) but honest: returns
+                                                      # LOW-confidence nulls rather than guessing
 ])).split(",") if m.strip()]
+# DROPPED 2026-07-27, do NOT re-add without re-probing:
+#   mistralai/mistral-medium-3.5-128b — DEAD: 4/4 read timeouts even at 300s (it also
+#     timed out on a 96x96 image). It was configured and silently contributed nothing.
+#   meta/llama-3.2-11b-vision-instruct — 1/4 real tiers, worst configured performer.
+#   minimaxai/minimax-m3 — 2/4. It genuinely SEES the photo but then returns null because
+#     it judges a street view not to be a "real listing photo". Prompt-interpretation
+#     failure, so a prompt tweak could recover it — until then it just burns a slot.
+#   google/diffusiongemma-26b-a4b-it — 2/4, and one trial took 101.8s (over the 90s timeout).
+#
+# BLIND-BUT-CONFIDENT — these return HTTP 200 with perfectly parseable JSON while not
+# seeing the image at all, which is the single most dangerous failure mode here (a
+# confident tier on an unseen photo silently corrupts condition -> rehab -> ARV):
+#   openai/gpt-oss-120b, openai/gpt-oss-20b ("there's no image attached")
+#   z-ai/glm-5.2 (states it has no multimodal capability)
+#   deepseek-ai/deepseek-v4-pro ("no actual property photos, only a generic basemap")
+# NEVER register these as vision lanes. The _looks_blind() guard below is the backstop.
+#
+# ENTITLEMENT (settled, stop re-chasing): the 404 "Function ...: Not found for account"
+# models are not a routing problem. The alternate ai.api.nvidia.com/v1/vlm/{org}/{model}
+# route resolves to the same NVCF function UUID and returns the same 404, and those UUIDs
+# are absent from this account's NVCF registry. They are simply not entitled to this key.
 
 
 class QuotaExhausted(Exception):
@@ -652,9 +722,40 @@ def _canonical_tier(result: Optional[dict]) -> Optional[str]:
     return ct
 
 
+# A model that cannot actually SEE the attached image but answers anyway is the
+# most dangerous backend failure mode here: it returns HTTP 200 and perfectly
+# parseable JSON, so every other guard passes, and a confident condition_tier on an
+# unseen photo silently corrupts condition -> rehab estimate -> ARV -> max bid.
+# Measured 2026-07-27: openai/gpt-oss-120b and gpt-oss-20b reply "there's no image
+# attached", z-ai/glm-5.2 says it has no multimodal capability, and deepseek-v4-pro
+# reported "no actual property photos, only a generic basemap or Realtor placeholder"
+# on 4 real house photos. Those ids are unregistered, but this catches any future one.
+_BLIND_MARKERS = (
+    "no image", "not attached", "no photo", "cannot see", "can't see", "unable to see",
+    "no actual property photo", "don't have access to", "do not have access to",
+    "no multimodal", "not multimodal", "unable to view", "cannot view",
+    "as a text-based", "i'm unable to process image",
+)
+
+
+def _looks_blind(parsed: dict) -> bool:
+    """True when the reply reads like the model never received the image."""
+    blob = " ".join(
+        str(parsed.get(k) or "") for k in ("summary", "notes", "reasoning", "description", "raw")
+    ).lower()
+    return any(m in blob for m in _BLIND_MARKERS)
+
+
 def _finalize(parsed: Optional[dict], provider: str, model: str, n: int,
               urls: list[str], usage: Optional[dict] = None) -> Optional[dict]:
     if not parsed:
+        return None
+    # Blind-but-confident backstop: drop the result entirely rather than let an
+    # unseeing model's tier reach the board. Returning None routes the listing to
+    # another backend, exactly like any other hard failure.
+    if _looks_blind(parsed):
+        log.warning("vision.backend_blind", provider=provider, model=model,
+                    note="reply indicates the image was not received — result discarded")
         return None
     if usage:
         parsed["_usage"] = usage
@@ -866,10 +967,14 @@ async def _build_backends(http: httpx.AsyncClient) -> list:
             log.warning("vision.sdk_missing", provider="gemini", hint="pip install google-genai")
 
     # GitHub Models — free, uses the gh token if GITHUB_MODELS_TOKEN/GITHUB_TOKEN set.
+    # ONE LANE PER MODEL: GitHub rate-limits per model tier, so registering N verified
+    # models gives N parallel free lanes instead of one (was a single gpt-4o-mini lane).
     gh = os.environ.get("GITHUB_MODELS_TOKEN") or os.environ.get("GITHUB_TOKEN")
     if gh:
-        backends.append(_OpenAICompatBackend("github", GITHUB_MODELS_URL, gh,
-                                             GITHUB_MODELS_MODEL, http, cap=4, delay=1.0))
+        for m in (GITHUB_VISION_MODELS or [GITHUB_MODELS_MODEL]):
+            short = m.split("/")[-1][:28]
+            backends.append(_OpenAICompatBackend(f"github:{short}", GITHUB_MODELS_URL, gh,
+                                                 m, http, cap=2, delay=2.0))
 
     # Groq — free, fast, but the free tier caps qwen3.6-27b at 8k tokens/minute
     # and one prompt+photo is ~5.4k, so pace it ~1 call/min (delay=45) instead
@@ -887,12 +992,22 @@ async def _build_backends(http: httpx.AsyncClient) -> list:
         backends.append(_OpenAICompatBackend("openrouter", OPENROUTER_URL, ork,
                                              OPENROUTER_MODEL, http, cap=4, delay=3.0))
 
-    # Mistral — free Experiment tier (Pixtral, ~1B tok/mo) but only 2 RPM,
-    # so pace it ~30s/call; the cooldown handles any 429 spillover.
+    # Mistral — free tier, and rate limits are PER CANONICAL MODEL (verified live from
+    # the x-ratelimit-limit-req-minute headers), so each verified model is its own lane.
+    # The old single "mistral" lane at delay=30 was sized for a believed 2 RPM; the real
+    # limits are far higher (ministral-3b is 750 RPM), so pace per model instead.
+    _MISTRAL_DELAY = {           # seconds between calls, from the measured RPM
+        "ministral-3b-latest": 0.5,     # 750 RPM
+        "ministral-8b-latest": 1.0,     # 188 RPM
+        "mistral-medium-latest": 2.0,   #  50 RPM
+        "mistral-large-latest": 16.0,   #   4 RPM
+    }
     mk = os.environ.get("MISTRAL_API_KEY")
     if mk:
-        backends.append(_OpenAICompatBackend("mistral", MISTRAL_URL, mk,
-                                             MISTRAL_MODEL, http, cap=4, delay=30.0))
+        for m in (MISTRAL_VISION_MODELS or [MISTRAL_MODEL]):
+            backends.append(_OpenAICompatBackend(f"mistral:{m[:24]}", MISTRAL_URL, mk,
+                                                 m, http, cap=2,
+                                                 delay=_MISTRAL_DELAY.get(m, 30.0)))
 
     # Cloudflare Workers AI — 10k neurons/day free. Needs account id + token.
     cf_tok = os.environ.get("CLOUDFLARE_API_TOKEN")

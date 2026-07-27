@@ -270,3 +270,28 @@ def test_all_dead_pool_with_requeue_disabled_terminates(pool, monkeypatch):
     pool(dead)
     _run([_mk_listing(i) for i in range(50)])
     assert sum(b.calls for b in dead) == 15
+
+
+# --- regression: a model that cannot SEE the image must never produce a grade ---
+# Measured 2026-07-27: gpt-oss-120b/20b, glm-5.2 and deepseek-v4-pro return HTTP 200
+# with parseable JSON while blind to the attached photo. A confident tier on an unseen
+# photo silently corrupts condition -> rehab -> ARV -> max bid.
+
+def test_blind_reply_is_discarded():
+    from foreclosure_scraper.enrichment_vision import _finalize
+    for blob in ["There's no image attached, but generally...",
+                 "I cannot see the image provided.",
+                 "There are no actual property photos, only a generic basemap.",
+                 "I do not have access to the photo."]:
+        out = _finalize({"condition_tier": "cosmetic", "confidence": "HIGH", "summary": blob},
+                        "test", "blind-model", 1, ["u"])
+        assert out is None, f"blind reply must be discarded, got: {out}"
+
+
+def test_sighted_reply_survives():
+    from foreclosure_scraper.enrichment_vision import _finalize
+    out = _finalize({"condition_tier": "major", "confidence": "HIGH",
+                     "summary": "Brick ranch with a sagging porch roof and overgrown yard."},
+                    "test", "good-model", 1, ["u"])
+    assert out and out["condition_tier"] == "major"
+    assert out["_provider"] == "test"
