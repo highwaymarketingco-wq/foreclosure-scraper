@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-07-27T19:44:41.421969Z",
+  "run_time": "2026-07-29T23:25:27.335376Z",
   "total": 30003,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "expanded vision pool run"
+  "notes": "free supply run: addresses+assessor+streetview+vision"
 }
