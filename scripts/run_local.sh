@@ -79,6 +79,14 @@ export PYTHONUNBUFFERED=1
 export SKIP_TRACE_PROVIDER="${SKIP_TRACE_PROVIDER:-free}"
 export FREE_SKIPTRACE_PHONE_MAX="${FREE_SKIPTRACE_PHONE_MAX:-40}"
 
+# Photo supply (operator-enabled 2026-07-29): free assessor drive-by photos +
+# Street View at 300/run (= the Google-side daily quota; monthly ledger clamped
+# under the 10k free tier — STREETVIEW_ALLOW_PAID stays unset, so \$0.00).
+export FORECLOSURE_ASSESSOR_PHOTO="${FORECLOSURE_ASSESSOR_PHOTO:-1}"
+export FORECLOSURE_STREETVIEW="${FORECLOSURE_STREETVIEW:-1}"
+export STREETVIEW_MAX="${STREETVIEW_MAX:-300}"
+load GOOGLE_MAPS_API_KEY "$SECRETS/google_maps_api_key.txt"
+
 # Assessor property-card enricher — ON for the weekly run. The default cap
 # (150) is below the ~280 live targets, so raise it to 400 to cover them all.
 export ASSESSOR_CARD_ON="${ASSESSOR_CARD_ON:-1}"
