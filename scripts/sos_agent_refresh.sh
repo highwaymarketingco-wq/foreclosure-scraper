@@ -25,9 +25,11 @@ export SOS_AGENT_BREAKER_FAILS="${SOS_AGENT_BREAKER_FAILS:-6}"
 
 # commit ONLY if the board data changed (not run_meta's timestamp) — a walled
 # run rewrites listings.json byte-identical and must not commit.
-git add docs/listings.json docs/listings.json.gz \
-        docs/listings_detail.json docs/listings_detail.json.gz
-if ! git diff --cached --quiet -- docs/listings.json docs/listings_detail.json; then
+# .gz twins only — the uncompressed listings.json/.detail.json are gitignored
+# (over GitHub's 100MB limit; load_board rebuilds from the .gz). The board-change
+# gate now checks the .gz (deterministic gzip: identical data -> identical bytes).
+git add docs/listings.json.gz docs/listings_detail.json.gz
+if ! git diff --cached --quiet -- docs/listings.json.gz docs/listings_detail.json.gz; then
   git add docs/run_meta.json
   git commit -q -m "Scheduled SOS pass: +NC entity registered-agent contacts
 

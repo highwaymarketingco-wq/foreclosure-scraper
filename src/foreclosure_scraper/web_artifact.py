@@ -20,6 +20,27 @@ from .stale_link_fallback import annotate_stale_links
 log = structlog.get_logger()
 
 
+def read_board_json(path: Path | str):
+    """Read a board JSON file, transparently falling back to its ``.gz`` twin.
+
+    The uncompressed docs/listings.json (~97MB) is NOT committed to git — it
+    exceeds GitHub's 100MB/file limit, and the dashboard only ever loads the
+    gzipped copy. The local runner regenerates the plain .json every write, so on
+    that machine this reads the plain file directly. Everywhere else (a fresh
+    clone, a cloud CI/patch job, disaster recovery) only the committed .gz exists,
+    so we decompress that instead. Either way the whole system can rebuild the
+    board from just the 6MB .gz — nothing depends on the big file being present.
+    """
+    p = Path(path)
+    if p.exists():
+        return json.loads(p.read_text())
+    gz = p.with_name(p.name + ".gz")
+    if gz.exists():
+        import gzip as _gzip
+        return json.loads(_gzip.decompress(gz.read_bytes()).decode("utf-8"))
+    raise FileNotFoundError(f"{p} (and {p.name}.gz) not found")
+
+
 def load_board(docs_dir: Path | str = "docs") -> list[Listing]:
     """Load the published board as Listing objects WITH the lazy-detail sidecar
     merged back into each lead's raw.
@@ -30,14 +51,17 @@ def load_board(docs_dir: Path | str = "docs") -> list[Listing]:
     rebuilt from raw, which no longer has those keys. Loading through this helper
     merges detail[i] back into listing[i].raw first, so the round-trip preserves
     it. Always use this instead of a hand-rolled json.loads loop in a board pass.
+
+    Reads via read_board_json, so it works from either the plain .json (local
+    runner) or the committed .gz (fresh clone / cloud) — see that helper.
     """
     docs = Path(docs_dir)
-    records = json.loads((docs / "listings.json").read_text())
+    records = read_board_json(docs / "listings.json")
     detail_path = docs / "listings_detail.json"
     details: list = []
-    if detail_path.exists():
+    if detail_path.exists() or (detail_path.with_name(detail_path.name + ".gz")).exists():
         try:
-            details = json.loads(detail_path.read_text())
+            details = read_board_json(detail_path)
         except Exception:  # noqa: BLE001
             details = []
     out: list[Listing] = []

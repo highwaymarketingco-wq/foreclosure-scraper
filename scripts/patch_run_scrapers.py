@@ -540,7 +540,8 @@ async def main() -> int:
     listings_path = ROOT / "docs" / "listings.json"
     sold_pool_path = ROOT / "docs" / "foreclosure_sold_pool.json"
     run_health_path = ROOT / "docs" / "run_health.json"
-    if not listings_path.exists():
+    from foreclosure_scraper.web_artifact import read_board_json
+    if not (listings_path.exists() or listings_path.with_name("listings.json.gz").exists()):
         log.error("patch_run.no_listings_file", path=str(listings_path))
         return 1
 
@@ -548,7 +549,7 @@ async def main() -> int:
     # so any listings that fail today's scope (e.g. counties added to
     # SCOPE_DENY_COUNTIES after this row was first scraped) get dropped
     # rather than persisted indefinitely.
-    raw_data = json.loads(listings_path.read_text())
+    raw_data = read_board_json(listings_path)  # falls back to listings.json.gz
     existing: list[Listing] = []
     skipped = scope_dropped = 0
     for d in raw_data:

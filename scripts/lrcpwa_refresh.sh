@@ -16,8 +16,10 @@ if pgrep -f "merge_today_sources.py" >/dev/null \
 fi
 /Users/cashhigh/.local/bin/uv run python scripts/lrcpwa_refresh.py || { echo "pass failed rc=$?"; exit 1; }
 # commit + push the refreshed board (+ any new photos)
-git add docs/listings.json docs/listings.json.gz \
-        docs/listings_detail.json docs/listings_detail.json.gz \
+# .gz twins only — the uncompressed listings.json/.detail.json are gitignored
+# (over GitHub's 100MB limit; load_board rebuilds from the .gz). Naming an
+# ignored path in git add fails the whole command.
+git add docs/listings.json.gz docs/listings_detail.json.gz \
         docs/run_meta.json docs/parcel_photos 2>/dev/null
 if ! git diff --cached --quiet; then
   git commit -q -m "Scheduled land-records refresh: lrcpwa addresses/values/photos + tags

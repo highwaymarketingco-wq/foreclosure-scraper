@@ -195,11 +195,11 @@ fi
 # live dashboard; now the local run must do it. Only publish on a healthy
 # run so we never overwrite a good dashboard with a broken/empty one.
 if [[ "$RC" -eq 0 && -f "$ROOT/docs/listings.json" ]]; then
-  # Include the .gz twins + the detail sidecar — the dashboard fetches
-  # listings.json.gz + listings_detail.json.gz, so committing only the .json
-  # left GitHub Pages serving a STALE gzip after every run.
-  PUB_FILES=(docs/listings.json docs/listings.json.gz
-             docs/listings_detail.json docs/listings_detail.json.gz
+  # Commit the .gz twins the dashboard actually fetches. The uncompressed
+  # listings.json/.detail.json are gitignored (over GitHub's 100MB/file limit,
+  # excluded from Pages); load_board rebuilds from the .gz. A gitignored path in
+  # `git add` fails the whole command, so they must NOT be listed here.
+  PUB_FILES=(docs/listings.json.gz docs/listings_detail.json.gz
              docs/run_meta.json docs/run_health.json
              docs/foreclosure_sold_pool.json docs/multifamily.json)
   if command -v git >/dev/null 2>&1; then

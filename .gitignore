@@ -70,3 +70,9 @@ debug/
 
 # local sidecar backups (not for commit)
 backups/
+
+# The uncompressed board JSONs exceed GitHub 100MB/file and are NOT served by
+# Pages (docs/_config.yml excludes them; dashboard loads the .gz). Kept LOCAL only;
+# load_board falls back to the committed .gz on a fresh clone. See web_artifact.read_board_json.
+docs/listings.json
+docs/listings_detail.json

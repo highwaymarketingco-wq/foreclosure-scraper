@@ -116,7 +116,8 @@ async def main() -> int:
         log.error("patch.no_listings_file", path=str(listings_path))
         return 1
 
-    raw_data = json.loads(listings_path.read_text())
+    from foreclosure_scraper.web_artifact import read_board_json
+    raw_data = read_board_json(listings_path)  # falls back to listings.json.gz
     log.info("patch.loaded", listings=len(raw_data))
 
     # Hydrate

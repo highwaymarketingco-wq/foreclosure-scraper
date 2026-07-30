@@ -95,12 +95,15 @@ async def main() -> int:
 
     path.write_text(json.dumps(data, ensure_ascii=False, default=str), encoding="utf-8")
     print(f"[{time.strftime('%H:%M:%S')}] wrote {path} — {tagged} listings carry court detail", flush=True)
+    import gzip as _gz  # regen the .gz the dashboard fetches (listings.json is gitignored)
+    _p = Path("docs/listings.json")
+    (_p.parent / "listings.json.gz").write_bytes(_gz.compress(_p.read_bytes(), compresslevel=9, mtime=0))
 
     if os.environ.get("COURT_PUBLISH", "1") == "1":
         import subprocess
         root = str(Path(__file__).parent.parent)
         try:
-            subprocess.run(["git", "add", "docs/listings.json"], cwd=root, check=False)
+            subprocess.run(["git", "add", "docs/listings.json.gz"], cwd=root, check=False)
             if subprocess.run(["git", "diff", "--staged", "--quiet"], cwd=root).returncode != 0:
                 subprocess.run(["git", "commit", "-q", "-m",
                                 f"daily court detail: {tagged} cases ({time.strftime('%Y-%m-%d')})"],

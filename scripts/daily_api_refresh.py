@@ -317,10 +317,12 @@ async def main() -> int:
         import subprocess
         root = str(Path(__file__).parent.parent)
         try:
-            # Include the .gz twins — the dashboard fetches the gzipped files, so
-            # committing only the .json left GitHub Pages serving a stale gzip.
-            subprocess.run(["git", "add", "docs/listings.json", "docs/listings.json.gz",
-                            "docs/listings_detail.json", "docs/listings_detail.json.gz",
+            # .gz twins only (the dashboard fetches those). The uncompressed
+            # listings.json/.detail.json are gitignored — over GitHub's 100MB
+            # limit, excluded from Pages; load_board rebuilds from the .gz. A
+            # gitignored path in git add fails the whole command, so keep it out.
+            subprocess.run(["git", "add", "docs/listings.json.gz",
+                            "docs/listings_detail.json.gz",
                             "docs/run_meta.json"], cwd=root, check=False)
             if subprocess.run(["git", "diff", "--staged", "--quiet"], cwd=root).returncode != 0:
                 subprocess.run(["git", "commit", "-q", "-m",
