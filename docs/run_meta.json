@@ -1,11 +1,11 @@
 {
-  "run_time": "2026-07-30T19:08:25.528854Z",
-  "total": 30003,
+  "run_time": "2026-07-30T19:17:14.442487Z",
+  "total": 29946,
   "by_source": {},
   "by_state": {},
   "by_county_top": [],
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "daily vision pass: 4273 of 30003 listings have a vision report"
+  "notes": "competition high-tags + dead-court prune"
 }

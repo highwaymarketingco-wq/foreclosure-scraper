@@ -123,7 +123,16 @@ def _classify(slugs: list[str]) -> tuple[str, str, bool]:
 
 
 def enrich_competition(listings: Iterable[Listing]) -> dict:
-    """Stamp raw['competition'] on every lead. Returns distribution stats.
+    """Stamp raw['competition'] on leads. Returns distribution stats.
+
+    SIZE NOTE: docs/listings.json is committed to git, which has a hard 100 MB
+    per-file limit, and the board already sits near it. A per-lead tag on all
+    ~30k leads (esp. the 'sources' list) added ~3.7 MB and pushed the file over,
+    so we persist ONLY the actionable 'high' leads (widely-published trustee sale
+    lists — dad's point: those draw the most bidders). 'medium'/'low' are the
+    uninformative middle/quiet default; they are counted in stats but NOT stamped,
+    so absence of the tag == not-high. Tag kept minimal (no 'sources' list —
+    that is already recoverable from raw['also_seen_in']).
 
     Transparent tag only — never mutates grade / tier / intent. Idempotent."""
     stats = {"tagged": 0, "high": 0, "medium": 0, "low": 0, "widely_published": 0}
@@ -132,18 +141,17 @@ def enrich_competition(listings: Iterable[Listing]) -> dict:
         if not slugs:
             continue
         level, reason, widely = _classify(slugs)
-
-        if not isinstance(li.raw, dict):
-            li.raw = {}
-        li.raw["competition"] = {
-            "level": level,
-            "reason": reason,
-            "widely_published": widely,
-            "sources": sorted(slugs),
-        }
-
-        stats["tagged"] += 1
         stats[level] += 1
         if widely:
             stats["widely_published"] += 1
+        # Only the 'high' (widely-published / crowded) leads carry the tag — the
+        # signal the operator asked for — to stay under git's 100 MB file limit.
+        if level != "high":
+            if isinstance(li.raw, dict):
+                li.raw.pop("competition", None)  # clear any stale full-shape tag
+            continue
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["competition"] = {"level": "high", "reason": reason}
+        stats["tagged"] += 1
     return stats
