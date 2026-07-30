@@ -168,6 +168,7 @@ RAW_KEEP = {
     "last_sale": "*",                 # display-ready last sale {date, amount, basis, source} for the dashboard
     "also_seen_in": "*",              # every other source + link this property was seen at (kept on merge)
     "corroboration": "*",             # court-confirmed vs single-source-aggregator flag {court_confirmed, tier, sources, label}
+    "competition": "*",               # publication-reach/competition tag {level, reason, widely_published, sources}
     "signal_stack": "*",              # list-stacking: {count, signals[]} distinct distress signals per property
     "intent_score": "*",              # normalized 0-100 seller-intent score
     "intent_band": "*",               # hot/warm/cool/cold band

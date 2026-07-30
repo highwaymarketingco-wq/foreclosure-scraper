@@ -2253,6 +2253,19 @@ async def run() -> int:
     except Exception:
         log.error("corroboration.failed", traceback=traceback.format_exc())
 
+    # Competition / publication-reach tag — a widely-published trustee sale list
+    # (Hutchens et al.) draws many bidders (more competitive), while a lone quiet
+    # off-market signal (tax-delinquent / code-enforcement / probate, no other
+    # source) is one nobody else is watching (low competition). Transparent tag
+    # only; never changes a grade/tier. Reads li.source + also_seen_in. Offline.
+    try:
+        from .enrichment_competition import enrich_competition
+        s = enrich_competition(enriched)
+        if s:
+            enrichment_stats["competition"] = s
+    except Exception:
+        log.error("competition.failed", traceback=traceback.format_exc())
+
     # Lead signals — Goliath-parity list-stacking (# distinct distress signals per
     # property) + a normalized 0-100 intent score. Runs LAST so it sees every signal.
     try:
