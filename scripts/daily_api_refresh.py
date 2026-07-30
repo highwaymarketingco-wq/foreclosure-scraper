@@ -243,10 +243,13 @@ async def main() -> int:
 
     # Prune sold/removed Fannie REO (per-property SPA URL 404s once the uuid leaves
     # inventory). The daily refresh already re-scrapes Fannie, so this is cheap.
+    # NOTE: no local `import asyncio` here — it shadowed the module-level import,
+    # making `asyncio` function-local and crashing main() at its FIRST use
+    # (UnboundLocalError at the gather above). And main() is already async, so
+    # this must await, not asyncio.run() (which raises inside a running loop).
     try:
-        import asyncio
         from foreclosure_scraper.enrichment_reo_freshness import prune_stale_reo
-        merged, _pstats = asyncio.run(prune_stale_reo(merged))
+        merged, _pstats = await prune_stale_reo(merged)
         if _pstats.get("pruned"):
             print(f"[{time.strftime('%H:%M:%S')}] prune_stale_reo: {_pstats}", flush=True)
     except Exception as e:  # noqa: BLE001
