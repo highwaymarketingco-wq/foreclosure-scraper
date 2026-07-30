@@ -30,9 +30,9 @@ does and read the cell bootstrap. The parser (:func:`parse_wac_cells`) is pure a
 network-free so it is unit-tested against a saved fixture.
 
 Firm coverage is STATEWIDE NC ("from the mountains to the coast"). Rows outside
-the Western-NC / Upstate-SC footprint are dropped downstream. ALAW publishes a
-sibling SC workbook at ``/foreclosure-sales/south-carolina/`` (not built here —
-the operator asked for NC).
+the Western-NC / Upstate-SC footprint are dropped downstream. ALAW also publishes a sibling SC workbook at
+``/foreclosure-sales/south-carolina/`` (SC Upstate is core footprint); both pages
+flow through the same state-aware parser.
 """
 from __future__ import annotations
 
@@ -50,8 +50,15 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = __import__("structlog").get_logger()
 
-# Human-facing public page — used as the stable source_url and the embed-URL source.
+# Human-facing public pages — used as the stable source_url and the embed source.
+# ALAW publishes a workbook per state via the same anonymous Office embed; the
+# parser is state-aware (reads "NC - County" / "SC - County"), so both flow through
+# the same path. SC is Upstate-core for us; NC is statewide (Cleveland/Gaston etc).
 WP_PAGE_URL = "https://www.alaw.net/foreclosure-sales/north-carolina/"
+WP_PAGES = (
+    "https://www.alaw.net/foreclosure-sales/north-carolina/",
+    "https://www.alaw.net/foreclosure-sales/south-carolina/",
+)
 
 # Pull the SharePoint Office-embed URL out of the WP page iframe. The real markup
 # lazy-loads it via data-lazy-src (and repeats it in a <noscript> src).
@@ -273,10 +280,10 @@ async def _render_capture(embed_url: str) -> str:
 
 
 class Alaw(BaseScraper):
-    """Albertelli Law (ALAW) — NC statewide foreclosure sales (SharePoint embed)."""
+    """Albertelli Law (ALAW) — NC statewide + SC foreclosure sales (SharePoint embed)."""
 
     slug = "law_firms.alaw"
-    name = "Albertelli Law (ALAW) — NC Foreclosure Sales"
+    name = "Albertelli Law (ALAW) — NC + SC Foreclosure Sales"
     category = "law_firm"
     timeout_s = 180.0
     # The firm's sheet sits between manual refreshes and can be empty or dated;
@@ -284,19 +291,23 @@ class Alaw(BaseScraper):
     expected_min_count = 0
 
     async def fetch(self) -> Iterable[Listing]:
-        try:
-            page = await get_text(WP_PAGE_URL, timeout=45.0)
-        except Exception as exc:  # noqa: BLE001
-            log.warning("alaw.page_fetch_failed", error=str(exc)[:200])
-            return []
-        embed = _discover_embed_url(page)
-        if not embed:
-            log.warning("alaw.no_embed_url")
-            return []
-        wac = await _render_capture(embed)
-        if not wac:
-            log.warning("alaw.no_wac_capture")
-            return []
-        rows = parse_wac_cells(wac, WP_PAGE_URL)
-        log.info("alaw.parsed", count=len(rows))
-        return rows
+        # NC statewide + SC (Upstate is core footprint). Each page is independent:
+        # a failure on one must not lose the other, so per-page try/except.
+        out: list[Listing] = []
+        for url in WP_PAGES:
+            try:
+                page = await get_text(url, timeout=45.0)
+                embed = _discover_embed_url(page)
+                if not embed:
+                    log.warning("alaw.no_embed_url", page=url)
+                    continue
+                wac = await _render_capture(embed)
+                if not wac:
+                    log.warning("alaw.no_wac_capture", page=url)
+                    continue
+                rows = parse_wac_cells(wac, url)
+                log.info("alaw.parsed", page=url, count=len(rows))
+                out.extend(rows)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("alaw.page_failed", page=url, error=str(exc)[:200])
+        return out
