@@ -9,6 +9,11 @@ if pgrep -f "run_local.sh|-m foreclosure_scraper|merge_today_sources" >/dev/null
   osascript -e 'display notification "A run is already in progress — leaving it alone." with title "Foreclosure Engine"' 2>/dev/null
   exit 0
 fi
+# Also never start a full run while a court-page ingest is mid-write (both write the board).
+if pgrep -f "ingest_saved.sh|ingest_publicindex_files|ingest_fresh_court_leads|parse_nc_ecourts" >/dev/null 2>&1; then
+  osascript -e 'display notification "A court-page ingest is finishing — try the run again in a minute." with title "Foreclosure Engine"' 2>/dev/null
+  exit 0
+fi
 
 mkdir -p logs
 osascript -e 'display notification "Starting the full run. It takes several hours — you can close this and keep working." with title "Foreclosure Engine started"' 2>/dev/null
