@@ -1070,6 +1070,25 @@ _PROVIDER_PRICING = {
 }
 
 
+def _needs_vision(li: Listing) -> bool:
+    """A listing needs a vision pass if it has usable imagery AND is not already
+    scored. Skipping already-scored leads makes the pass IDEMPOTENT — the
+    full-run board-persist merge carries a matched lead's prior raw["vision"]
+    onto the fresh Listing, and this gate then keeps the (free-tier-bounded)
+    vision budget from re-grading work already done.
+
+    Escape hatch: VISION_REGRADE_SCORED=1 restores the old behavior (re-read
+    already-scored leads too — e.g. an imminent sale that gained fresh photos),
+    letting the _vpri sort decide order instead of skipping outright.
+    """
+    if not _select_image_urls(li):
+        return False
+    if os.environ.get("VISION_REGRADE_SCORED", "0") == "1":
+        return True
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    return not raw.get("vision")
+
+
 async def enrich_with_vision(listings: list[Listing], max_listings: int | None = None) -> None:
     """Run vision condition assessment on listings with usable imagery.
     Overrides condition_tier with the photo-derived value when confidence
@@ -1079,8 +1098,11 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
       - "anthropic" (default): Claude Sonnet 4.5, ~$0.01-0.03/listing
       - "gemini": Gemini 2.0 Flash, FREE on -exp model up to 1500 req/day
     Caller controls budget by max_listings.
+
+    Already-scored leads are skipped (idempotent) unless VISION_REGRADE_SCORED=1
+    — see _needs_vision.
     """
-    targets = [li for li in listings if _select_image_urls(li)]
+    targets = [li for li in listings if _needs_vision(li)]
     # Prioritize the most actionable listings for the (free-quota-bounded)
     # Vision budget: soonest sale date first, then never-scored leads, then
     # listings with an opening bid (real auctions), so the cap covers the best

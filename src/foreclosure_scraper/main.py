@@ -762,6 +762,36 @@ async def run() -> int:
         deduped = active
     log.info("orchestrator.deduped", count=len(deduped), pruned=len(active) - len(deduped))
 
+    # ---- Cumulative-board persistence (FULLRUN_PERSIST, default ON) ----------
+    # A full run rebuilds the board from a fresh scrape (~22k). Publishing that
+    # alone REPLACES the ~30k cumulative board: it drops every persisted lead
+    # not re-scraped this run (the non-re-scrapable manual sc_public_index_export
+    # lane + any source that produced fewer rows) — tripping the count-drop guard
+    # so run_local.sh skips the publish — and it re-grades matched leads from
+    # scratch, burning free vision quota on work already done.
+    #
+    # merge_prior_board folds the prior published board (load_board: sidecar +
+    # .gz aware) into the fresh scrape via the SAME dedupe(): fresh scrape fields
+    # win, prior enrichment (vision/images/gis) is carried onto matched fresh
+    # leads (so the now-idempotent vision pass skips them), and prior-only leads
+    # are kept but AGED through the existing raw["pulled_sale"] miss counter
+    # (dropped when terminal or after N misses). This is the additive equivalent
+    # of scripts/merge_today_sources.py, run inline in the full pipeline.
+    #
+    # Guarded so a merge failure FALLS BACK to fresh-only behavior (below) rather
+    # than crashing the 14h run.
+    persist_applied = False
+    if os.environ.get("FULLRUN_PERSIST", "1") != "0":
+        try:
+            from .board_persist import merge_prior_board
+            deduped, persist_stats = merge_prior_board(deduped)
+            log.info("orchestrator.board_persist", **persist_stats)
+            # If load_board found no prior board (first run), fall through to the
+            # pulled-sales enricher below — nothing was persisted/aged here.
+            persist_applied = persist_stats.get("prior_count", 0) > 0
+        except Exception:
+            log.error("board_persist.failed", traceback=traceback.format_exc())
+
     # Pulled-sale detection (dad's #6): listings that existed last week
     # but didn't show up this run get tagged raw['pulled_sale'] with
     # presumed_withdrawn=True and kept on the dashboard for up to 4
@@ -769,12 +799,17 @@ async def run() -> int:
     # ~half of all scheduled foreclosure sales before they auction
     # (BK, settlement, refinance, postponement). Without this, those
     # silently disappear from the dashboard.
-    try:
-        from .enrichment_pulled_sales import enrich_with_pulled_sales
-        deduped, pulled_stats = enrich_with_pulled_sales(deduped)
-        log.info("orchestrator.pulled_sales", **pulled_stats)
-    except Exception:
-        log.error("pulled_sales.failed", traceback=traceback.format_exc())
+    #
+    # SKIPPED when board-persist ran: merge_prior_board subsumes this — it ages
+    # prior-only leads through the SAME pulled_sale counter, off the fuller
+    # load_board() snapshot. Running both would double-increment the miss count.
+    if not persist_applied:
+        try:
+            from .enrichment_pulled_sales import enrich_with_pulled_sales
+            deduped, pulled_stats = enrich_with_pulled_sales(deduped)
+            log.info("orchestrator.pulled_sales", **pulled_stats)
+        except Exception:
+            log.error("pulled_sales.failed", traceback=traceback.format_exc())
 
     # Link reachability — drop any listing whose URL is dead
     valid = await validate(deduped, workers=cfg.link_check_workers)
