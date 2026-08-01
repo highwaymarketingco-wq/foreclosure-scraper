@@ -1,14 +1,15 @@
-"""Per-name jail-booking SEARCH rosters — Gaston NC Aegis + Greenville SC LANSA.
+"""Per-name jail-booking SEARCH roster — Greenville SC LANSA.
 
-Unlike the bulk rosters (fetch-all + index), these two vendors have no "show
-all", so the enricher runs one last-name lookup per in-scope owner:
+Unlike the bulk rosters (fetch-all + index), this vendor has no "show all", so
+the enricher runs one last-name lookup per in-scope owner: a LANSA WEBEVENT
+postback where the GET seeds the session WEBEVENT action token + hidden fields
+and the POST echoes them with ASC_NML + ASTDRENTST=SEARCH. The grid is current
+detainees only: Name | Book Date | Race | Sex | Age | Ht | Wt.
 
-  * Gaston  — New World/Tyler Aegis InmateInquiry.aspx: ASP.NET WebForms postback
-    (__VIEWSTATE/__EVENTVALIDATION echo). The grid is the full 3-year booking
-    HISTORY, so we keep only rows whose "In Custody" cell reads "Yes". Full DOB.
-  * Greenville — LANSA WEBEVENT postback: GET seeds the session WEBEVENT action
-    token + hidden fields, POST echoes them with ASC_NML + ASTDRENTST=SEARCH.
-    Grid is current detainees only: Name | Book Date | Race | Sex | Age | Ht | Wt.
+Gaston NC used to live in this lane on the New World "Aegis"
+InmateInquiry.aspx postback; that app was retired (it now 302s to
+Shared/Default.aspx) and Gaston moved to the bulk Tyler InmateInquiry grid —
+see tests/test_jail_bookings_new_counties.py.
 
 All HTTP is mocked so tests never touch the live servers.
 """
@@ -17,7 +18,6 @@ from __future__ import annotations
 import pytest
 
 from foreclosure_scraper.enrichment_jail_bookings import (
-    _search_aegis,
     _search_lansa,
     enrich_jail_bookings,
 )
@@ -59,65 +59,6 @@ def _patch_session(monkeypatch, get_html, post_html):
     import curl_cffi.requests as ccr
     monkeypatch.setattr(ccr, "AsyncSession", lambda *a, **k: fake)
     return fake
-
-
-# --------------------------------------------------------------------------- #
-# Aegis (Gaston) fixtures                                                       #
-# --------------------------------------------------------------------------- #
-AEGIS_FORM = (
-    '<form action="InmateInquiry.aspx" method="post">'
-    '<input type="hidden" name="__VIEWSTATE" value="VS123" />'
-    '<input type="hidden" name="__EVENTVALIDATION" value="EV456" />'
-    '<input type="text" name="ctl00$DefaultContent$uxLastName" />'
-    '<input type="submit" name="ctl00$DefaultContent$uxSearch" value="Search" />'
-    '</form>'
-)
-
-
-def _aegis_row(name, in_custody, race, sex, dob):
-    return (
-        "<tr>"
-        '<td><img src="../GetImage.aspx" /></td>'
-        f'<td><a href="InmateSummary.aspx?ID=1">{name}</a></td>'
-        f"<td>{in_custody}</td>"
-        f"<td>{race}</td><td>{sex}</td><td>{dob}</td>"
-        "<td>6' 0&quot;</td><td>205.0 lbs</td><td>&nbsp;</td><td>&nbsp;</td>"
-        "</tr>"
-    )
-
-
-def _aegis_results(rows):
-    return "<table>" + "".join(rows) + "</table>"
-
-
-@pytest.mark.asyncio
-async def test_aegis_keeps_only_in_custody_and_captures_dob(monkeypatch):
-    post = _aegis_results([
-        _aegis_row("Smith, Christopher Michael", "Yes", "White", "Male", "7/16/1989"),
-        _aegis_row("Smith, Adrian John", "&nbsp;", "Black", "Male", "7/8/1960"),  # released
-        _aegis_row("Smith, Jaquis Rahmad", "Yes", "Black", "Male", "1/29/2001"),
-    ])
-    fake = _patch_session(monkeypatch, AEGIS_FORM, post)
-    recs = await _search_aegis("https://host/InmateInquiry.aspx", "SMITH")
-    # only the two "Yes" rows survive
-    assert {(r["first"], r["last"]) for r in recs} == {
-        ("CHRISTOPHER", "SMITH"), ("JAQUIS", "SMITH")}
-    chris = next(r for r in recs if r["first"] == "CHRISTOPHER")
-    assert chris["dob"] == "7/16/1989"      # full DOB captured
-    # the POST echoed the ASP.NET tokens + search fields
-    _, data, _ = fake.posts[0]
-    assert data["__VIEWSTATE"] == "VS123"
-    assert data["__EVENTVALIDATION"] == "EV456"
-    assert data["ctl00$DefaultContent$uxLastName"] == "SMITH"
-    assert data["ctl00$DefaultContent$uxSearch"] == "Search"
-
-
-@pytest.mark.asyncio
-async def test_aegis_bails_without_viewstate(monkeypatch):
-    fake = _patch_session(monkeypatch, "<html>no form here</html>", "<html/>")
-    recs = await _search_aegis("https://host/InmateInquiry.aspx", "SMITH")
-    assert recs == []
-    assert fake.posts == []  # never posts without a __VIEWSTATE token
 
 
 # --------------------------------------------------------------------------- #
@@ -177,22 +118,22 @@ async def test_lansa_bails_without_action(monkeypatch):
 # End-to-end: enrich_jail_bookings drives the search lane + sets both signals  #
 # --------------------------------------------------------------------------- #
 @pytest.mark.asyncio
-async def test_end_to_end_gaston_match(monkeypatch):
-    post = _aegis_results([
-        _aegis_row("Harris, Michael Dean", "Yes", "White", "Male", "3/2/1975"),
+async def test_end_to_end_greenville_match(monkeypatch):
+    post = _lansa_results([
+        _lansa_row("HARRIS, MICHAEL DEAN", "03/02/2026", "W", "M", "51"),
     ])
-    _patch_session(monkeypatch, AEGIS_FORM, post)
-    li = Listing(source="test", source_url="http://x", state="NC",
-                 county="Gaston County",
+    _patch_session(monkeypatch, LANSA_FORM, post)
+    li = Listing(source="test", source_url="http://x", state="SC",
+                 county="Greenville County",
                  raw={"owner_mailing": {"owner": "HARRIS MICHAEL"}})
     res = await enrich_jail_bookings([li])
     assert res["matched"] == 1
     jbk = li.raw["jail_booking"]
-    assert jbk["county"] == "Gaston" and jbk["state"] == "NC"
+    assert jbk["county"] == "Greenville" and jbk["state"] == "SC"
     assert jbk["matched_name"] == "MICHAEL HARRIS"
-    assert jbk["roster_dob"] == "3/2/1975"     # full DOB flows through
+    assert jbk["arrest_date"] == "03/02/2026"
     assert jbk["confidence"] == "name_only_low"
-    assert li.raw["incarceration"]["source"] == "Gaston County jail roster"
+    assert li.raw["incarceration"]["source"] == "Greenville County jail roster"
 
 
 @pytest.mark.asyncio
@@ -212,14 +153,14 @@ async def test_end_to_end_greenville_no_match_untouched(monkeypatch):
 @pytest.mark.asyncio
 async def test_search_lane_dedupes_same_surname_pair(monkeypatch):
     """Two leads with the same owner name hit the vendor once, both get flagged."""
-    post = _aegis_results([
-        _aegis_row("Jones, Robert Lee", "Yes", "Black", "Male", "5/5/1980"),
+    post = _lansa_results([
+        _lansa_row("JONES, ROBERT LEE", "05/05/2026", "B", "M", "46"),
     ])
-    fake = _patch_session(monkeypatch, AEGIS_FORM, post)
+    fake = _patch_session(monkeypatch, LANSA_FORM, post)
     lis = [
-        Listing(source="t", source_url="http://a", state="NC", county="Gaston",
+        Listing(source="t", source_url="http://a", state="SC", county="Greenville",
                 raw={"owner_mailing": {"owner": "JONES ROBERT"}}),
-        Listing(source="t", source_url="http://b", state="NC", county="Gaston",
+        Listing(source="t", source_url="http://b", state="SC", county="Greenville",
                 raw={"owner_mailing": {"owner": "JONES ROBERT"}}),
     ]
     res = await enrich_jail_bookings(lis)

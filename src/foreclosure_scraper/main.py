@@ -359,6 +359,18 @@ DATELESS_OK_SOURCES = {
     # divorce + probate categories). Service-by-publication divorces
     # and Notice-to-Creditors probate notices typically have no sale_date.
     "public_notices.ncnotices",
+    # scpublicnotices.com — SC legal notices (foreclosure summons, tax sale,
+    # delinquent tax, estate/creditors). The Details.aspx body is CAPTCHA-walled,
+    # so we only get the grid's truncated preview, which rarely reaches the sale
+    # paragraph — 3 of 565 rows carried a parseable sale_date on 2026-07-31.
+    "counties_sc.sc_public_notices",
+    # ncnotices.com county-filtered lane — foreclosure / tax-foreclosure /
+    # NCGS 105-369 tax-lien-ad / estate notices. Full body is CAPTCHA-gated so no
+    # row carries a sale_date; without this entry _active_only drops all of them.
+    "public_notices.nc_notices_counties",
+    # Kania tax-foreclosure filings — filed, then await a scheduled sale date
+    # (37 of 56 rows dateless on 2026-07-31).
+    "law_firms.kania",
     # Relationship-deeds enrichment — derives PROBATE_NOTICE / DIVORCE_NOTICE
     # listings from ROD recordings (executor's deeds, quitclaim + $0
     # divorce transfers). These are leads, not auctions — no sale_date.

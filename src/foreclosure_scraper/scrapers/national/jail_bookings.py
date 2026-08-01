@@ -11,12 +11,29 @@ Supported systems (all free, public, no auth):
     with XSRF token handshake, ~540 in custody)
   - CentralSquare P2C jqGrid — Cleveland NC (classic ASP.NET jqGrid)
   - Zuercher Portal — Cherokee SC, Anderson SC (JSON API)
+  - Southern Software Citizen Connect — Henderson NC (PHP AJAX "current
+    confinements" roster; publishes FULL DOB on every record)
+  - Tyler New World InmateInquiry — Gaston NC (plain GET form + HTML grid;
+    publishes FULL DOB on every record)
 
 Each system returns current in-custody inmates. We extract:
   - Inmate name (last, first)
-  - DOB (if exposed — Buncombe redacts, Cleveland/Cherokee expose it)
+  - DOB (if exposed — Buncombe redacts; Cleveland/Cherokee/Henderson/Gaston
+    publish it in full, which is the point: DOB is the single biggest lift to
+    downstream skip-trace match rates)
   - Booking/arrest date
   - Primary charge description
+  - Release status (in-custody flag + scheduled release date where published)
+
+NOT covered — Spartanburg SC: the Sheriff's Office "Bookings Search"
+(spartanburgsheriff.org/258/Bookings-Search) 302s to
+http://mugshots.spartanburgsheriff.org/, a legacy PHP roster
+(/myscripts/mugshot_card.php?number=<id>) whose host stopped answering on both
+:80 and :443. DNS still resolves (34.239.50.64) but the ports are closed, and
+the Internet Archive's last successful capture is 2026-03-08 — i.e. the portal
+is offline, not bot-walled. Spartanburg is not a Zuercher / P2C / JailTracker
+tenant either, so there is no substitute host today. Re-check the redirect
+target periodically; when it answers again, add a roster entry here.
 
 The scraper follows the BaseScraper pattern with async fetch() returning
 Iterable[Listing]. Uses curl_cffi (chrome impersonation) for systems that
@@ -29,13 +46,12 @@ robots.txt on the host anyway and fail-closed if disallowed.
 from __future__ import annotations
 
 import asyncio
-import json
+import html
+import math
 import re
 from datetime import datetime, timezone
 from typing import Iterable
-from urllib.parse import urljoin
 
-import httpx
 import structlog
 
 from ...base_scraper import BaseScraper
@@ -47,8 +63,11 @@ log = structlog.get_logger()
 # County roster configurations
 # ---------------------------------------------------------------------------
 # (state, county, vendor, target)
-# vendor: "p2c_centralsquare" | "p2c_jqgrid" | "zuercher"
-# target: Zuercher subdomain, P2C base URL, or "host|listId" for modern P2C
+# vendor: "p2c_centralsquare" | "p2c_jqgrid" | "zuercher" | "citizen_connect"
+#         | "tyler_inmate_inquiry"
+# target: Zuercher subdomain, P2C base URL, "host|listId" for modern P2C,
+#         "AgencyID|JMSAgencyID" for Citizen Connect, or the app base URL for
+#         Tyler New World InmateInquiry.
 
 ROSTERS: list[tuple[str, str, str, str]] = [
     # Buncombe NC — CentralSquare P2C modern (policetocitizen.com SPA)
@@ -67,7 +86,25 @@ ROSTERS: list[tuple[str, str, str, str]] = [
     # Anderson SC — Zuercher Portal
     # Verified live: JSON API at /api/portal/inmates/load
     ("SC", "Anderson", "zuercher", "anderson-so-sc"),
+
+    # Henderson NC — Southern Software Citizen Connect
+    # Verified live 2026-07-31: 182 in custody, full DOB on 182/182.
+    ("NC", "Henderson", "citizen_connect", "HendersonCoNC|NC0450000"),
+
+    # Gaston NC — Tyler New World InmateInquiry (replaces the retired
+    # newworld.aegis.webportal InmateInquiry.aspx, which now 302s away).
+    # Verified live 2026-07-31: 695 in custody, full DOB on 695/695.
+    ("NC", "Gaston", "tyler_inmate_inquiry",
+     "https://tepsweb.cityofgastonia.com/NewWorld.InmateInquiry/GastonCounty"),
 ]
+
+# Southern Software hosts every Citizen Connect tenant off one origin; the
+# AgencyID query param selects the agency and seeds the PHP session.
+CITIZEN_CONNECT_BASE = "https://cc.southernsoftware.com"
+
+# Generational suffixes to drop before deciding which token is the surname.
+_NAME_SUFFIXES = frozenset(
+    {"JR", "SR", "II", "III", "IV", "V", "JUNIOR", "SENIOR"})
 
 # ---------------------------------------------------------------------------
 # Name parsing helpers
@@ -88,6 +125,29 @@ def _split_comma_name(name: str) -> tuple[str, str] | None:
     return last.strip().upper(), toks[0].strip().upper()
 
 
+def _split_space_name(name: str) -> tuple[str, str] | None:
+    """'MICHAEL LEE ABSHER' -> ('ABSHER', 'MICHAEL').
+
+    Citizen Connect prints one flat "first middle last" string. The first token
+    is the given name and the last the surname; trailing generational suffixes
+    are dropped first so 'BOBBY DEAN ABEE JR' still yields ('ABEE', 'BOBBY').
+    Compound surnames collapse to their final word, which is what the owner-name
+    normalizer downstream does too.
+    """
+    toks = [t for t in re.split(r"\s+", (name or "").strip().upper()) if t]
+    while len(toks) > 2 and _norm_alpha(toks[-1]) in _NAME_SUFFIXES:
+        toks.pop()
+    if len(toks) < 2:
+        return None
+    return toks[-1], toks[0]
+
+
+def _strip_tags(fragment: str) -> str:
+    """Flatten an HTML fragment to collapsed, entity-decoded plain text."""
+    txt = re.sub(r"<[^>]+>", " ", fragment or "")
+    return re.sub(r"\s+", " ", html.unescape(txt)).strip()
+
+
 def _parse_date(s: str | None) -> datetime | None:
     """Parse common date formats from jail rosters."""
     if not s:
@@ -100,8 +160,10 @@ def _parse_date(s: str | None) -> datetime | None:
             return datetime.strptime(s[:len(fmt) + 5], fmt) if "T" in fmt else datetime.strptime(s, fmt)
         except (ValueError, TypeError):
             continue
-    # US format
-    for fmt in ("%m/%d/%Y", "%m/%d/%y"):
+    # US format — bare dates, 24h stamps (Citizen Connect) and 12h stamps
+    # (Tyler New World).
+    for fmt in ("%m/%d/%Y", "%m/%d/%y", "%m/%d/%Y %H:%M",
+                "%m/%d/%Y %I:%M %p", "%m/%d/%Y %I:%M:%S %p"):
         try:
             return datetime.strptime(s, fmt)
         except (ValueError, TypeError):
@@ -279,6 +341,235 @@ async def _fetch_p2c_centralsquare(target: str) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Southern Software Citizen Connect (Henderson NC)
+# ---------------------------------------------------------------------------
+
+_CC_CARD_SPLIT = '<div class="card booking-card">'
+_CC_NAME_RE = re.compile(r'<h5 class="mb-0">([^<]+)</h5>')
+_CC_ROW_RE = re.compile(
+    r'<span class="detail-label">([^<]*)</span>\s*'
+    r'<span class="detail-value[^"]*">([^<]*)</span>')
+_CC_CHARGE_RE = re.compile(
+    r'<div class="charge-details"><div>(.*?)<span class="charge-agency"', re.S)
+_CC_TOTAL_RE = re.compile(r"Total Inmates:.*?>(\d+)<", re.S)
+_CC_SHOWING_RE = re.compile(r"Showing\s+\d+-(\d+)\s+of\s+(\d+)\s+inmates")
+_CC_PAGE_SIZE = 20
+
+
+def _parse_citizen_connect_cards(html_text: str) -> list[dict]:
+    """Parse the booking cards out of one fetch_current_confinements.php page."""
+    out: list[dict] = []
+    for card in (html_text or "").split(_CC_CARD_SPLIT)[1:]:
+        nm = _CC_NAME_RE.search(card)
+        if not nm:
+            continue
+        parts = _split_space_name(html.unescape(nm.group(1)))
+        if not parts:
+            continue
+        last, first = parts
+        fields = {k.strip().rstrip(":"): html.unescape(v).strip()
+                  for k, v in _CC_ROW_RE.findall(card)}
+        charges = [_strip_tags(c) for c in _CC_CHARGE_RE.findall(card)]
+        charges = [c for c in charges if c]
+        # "36 years / W / M" -> "36"
+        age = (fields.get("Demographics", "").split(" years")[0].strip()
+               or None)
+        out.append({
+            "last": last, "first": first,
+            "dob": fields.get("Date of Birth") or None,
+            "age": age,
+            "arrest_date": (fields.get("Booked")
+                            or fields.get("Arrest Date/Time") or None),
+            "charge": "; ".join(charges)[:300],
+            # This feed is the CURRENT-confinements list, so every row is a
+            # person still in custody; the vendor publishes no release column.
+            "release_status": "in_custody",
+        })
+    return out
+
+
+async def _fetch_citizen_connect(target: str) -> list[dict]:
+    """Southern Software Citizen Connect current-confinements roster.
+
+    target is "<AgencyID>|<JMSAgencyID>", e.g. "HendersonCoNC|NC0450000".
+
+    Handshake: the AJAX endpoint answers 500 "Session AgencyID not set" unless a
+    PHP session has already been seeded, so GET the booking-search page once
+    (?AgencyID=...) and reuse the session cookie. Page 1 posts JMSAgencyID; the
+    vendor's own pager then posts IDX=<1-based page> against the same session.
+    Full DOB is published on every card. Free + compliant: this is the page's
+    own XHR, no login, no CAPTCHA, no WAF token.
+    """
+    from curl_cffi.requests import AsyncSession
+
+    agency, _, jms = target.partition("|")
+    page_url = f"{CITIZEN_CONNECT_BASE}/bookingsearch/index.php?AgencyID={agency}"
+    api = (f"{CITIZEN_CONNECT_BASE}/bookingsearch/fetchesforajax/"
+           "fetch_current_confinements.php")
+    hdr = {"X-Requested-With": "XMLHttpRequest", "Referer": page_url}
+    out: list[dict] = []
+
+    try:
+        async with AsyncSession(impersonate="chrome", verify=False) as s:
+            await s.get(page_url, timeout=30)
+            r = await s.post(api, headers=hdr, timeout=60, data={
+                "JMSAgencyID": jms, "search": "", "agency": "", "sort": "name"})
+            body = r.text or ""
+            if "booking-card" not in body:
+                log.warning("jail_scraper.citizen_connect_empty", agency=agency)
+                return []
+            out.extend(_parse_citizen_connect_cards(body))
+
+            tm = _CC_TOTAL_RE.search(body)
+            sm = _CC_SHOWING_RE.search(body)
+            total = int(tm.group(1)) if tm else (
+                int(sm.group(2)) if sm else len(out))
+            pages = min(math.ceil(total / _CC_PAGE_SIZE) if total else 1, 60)
+            for page in range(2, pages + 1):
+                await asyncio.sleep(0.3)  # polite pacing
+                pr = await s.post(api, headers=hdr, timeout=60, data={
+                    "IDX": page, "search": "", "agency": "", "sort": "name"})
+                recs = _parse_citizen_connect_cards(pr.text or "")
+                if not recs:
+                    break
+                out.extend(recs)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("jail_scraper.citizen_connect_fail", agency=agency,
+                    error=str(exc)[:120])
+        return out
+
+    log.info("jail_scraper.citizen_connect_ok", agency=agency, count=len(out))
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Tyler New World InmateInquiry (Gaston NC)
+# ---------------------------------------------------------------------------
+
+_TNW_ROW_RE = re.compile(r"<tr[^>]*>(.*?)</tr>", re.S)
+_TNW_CELL_RE = re.compile(r'<td class="([A-Za-z]+)">(.*?)</td>', re.S)
+_TNW_DETAIL_RE = re.compile(r"Inmate/Detail/(\d+)")
+_TNW_SHOWING_RE = re.compile(
+    r"Showing\s*(\d+)\s*to\s*(\d+)\s*of\s*(\d+)", re.S)
+_TNW_FIELD_RE = re.compile(r'<span id=([A-Za-z]+)>(.*?)</span>', re.S)
+_TNW_MAX_PAGES = 30
+
+
+def _parse_tyler_rows(html_text: str) -> list[dict]:
+    """Parse the in-custody grid of a Tyler New World InmateInquiry page."""
+    out: list[dict] = []
+    for rowm in _TNW_ROW_RE.finditer(html_text or ""):
+        row = rowm.group(1)
+        cells = {k: _strip_tags(v) for k, v in _TNW_CELL_RE.findall(row)}
+        if not cells.get("Name"):
+            continue
+        parts = _split_comma_name(html.unescape(cells["Name"]))
+        if not parts:
+            continue
+        last, first = parts
+        in_custody = cells.get("InCustody", "").upper() == "YES"
+        if not in_custody:
+            continue
+        det = _TNW_DETAIL_RE.search(row)
+        sched = cells.get("ScheduledReleaseDate") or None
+        out.append({
+            "last": last, "first": first,
+            "dob": cells.get("DateOfBirth") or None,
+            "arrest_date": None,   # booking date lives on the detail page
+            "charge": "",          # charges live on the detail page
+            "release_status": (f"scheduled_release {sched}" if sched
+                               else "in_custody"),
+            "scheduled_release": sched,
+            "facility": cells.get("HousingFacility") or None,
+            "detail_id": det.group(1) if det else None,
+        })
+    return out
+
+
+def _parse_tyler_detail(html_text: str) -> dict:
+    """Pull booking date + charge list off one Inmate/Detail page.
+
+    The page lists the subject's whole booking history newest-first; the open
+    booking is the first one with an empty Release Date.
+    """
+    body = html_text or ""
+    charges = [_strip_tags(v) for _, v in
+               re.findall(r'<td class="(ChargeDescription)">(.*?)</td>', body, re.S)]
+    charges = [c for c in charges if c]
+    booking_date = None
+    for block in body.split('<div class="Booking">')[1:]:
+        fields = {k: _strip_tags(v) for k, v in _TNW_FIELD_RE.findall(block)}
+        if fields.get("ReleaseDate"):
+            continue
+        booking_date = fields.get("BookingDate") or None
+        break
+    return {"arrest_date": booking_date, "charge": "; ".join(charges)[:300]}
+
+
+async def _fetch_tyler_detail(base: str, detail_id: str) -> dict:
+    """Fetch one Tyler Inmate/Detail page and return {arrest_date, charge}.
+
+    Kept standalone so the enricher can hydrate only the rows it actually
+    matched to an owner (one GET each) instead of the whole 700-row roster.
+    """
+    from curl_cffi.requests import AsyncSession
+
+    try:
+        async with AsyncSession(impersonate="chrome", verify=False) as s:
+            r = await s.get(f"{base}/Inmate/Detail/{detail_id}", timeout=45)
+        return _parse_tyler_detail(r.text or "")
+    except Exception as exc:  # noqa: BLE001
+        log.warning("jail_scraper.tyler_detail_fail", detail_id=detail_id,
+                    error=str(exc)[:120])
+        return {}
+
+
+async def _fetch_tyler_inmate_inquiry(base: str, detail_limit: int = 0) -> list[dict]:
+    """Tyler New World InmateInquiry current in-custody roster.
+
+    The search form is a plain GET, so `?InCustody=True&Page=<n>` returns the
+    whole roster 100 rows at a time. The grid carries FULL DOB, the in-custody
+    flag and the scheduled release date. Booking date and charges are only on
+    the per-inmate detail page, so they are fetched for at most `detail_limit`
+    records (0 = grid only) to keep one run to a handful of requests.
+
+    Free + compliant: a public GET form, no login, no CAPTCHA, no WAF token.
+    """
+    from curl_cffi.requests import AsyncSession
+
+    out: list[dict] = []
+    try:
+        async with AsyncSession(impersonate="chrome", verify=False) as s:
+            page = 1
+            while page <= _TNW_MAX_PAGES:
+                r = await s.get(f"{base}?InCustody=True&Page={page}", timeout=60)
+                body = r.text or ""
+                recs = _parse_tyler_rows(body)
+                if not recs:
+                    break
+                out.extend(recs)
+                sm = _TNW_SHOWING_RE.search(body)
+                if not sm or int(sm.group(2)) >= int(sm.group(3)):
+                    break
+                page += 1
+                await asyncio.sleep(0.3)  # polite pacing
+
+            for rec in out[:max(detail_limit, 0)]:
+                if not rec.get("detail_id"):
+                    continue
+                await asyncio.sleep(0.3)
+                dr = await s.get(f"{base}/Inmate/Detail/{rec['detail_id']}",
+                                 timeout=45)
+                rec.update(_parse_tyler_detail(dr.text or ""))
+    except Exception as exc:  # noqa: BLE001
+        log.warning("jail_scraper.tyler_fail", base=base, error=str(exc)[:120])
+        return out
+
+    log.info("jail_scraper.tyler_ok", base=base, count=len(out))
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Vendor dispatcher
 # ---------------------------------------------------------------------------
 
@@ -291,6 +582,10 @@ async def _fetch_roster(state: str, county: str, vendor: str, target: str) -> li
             return await _fetch_p2c_jqgrid(target)
         elif vendor == "p2c_centralsquare":
             return await _fetch_p2c_centralsquare(target)
+        elif vendor == "citizen_connect":
+            return await _fetch_citizen_connect(target)
+        elif vendor == "tyler_inmate_inquiry":
+            return await _fetch_tyler_inmate_inquiry(target)
     except Exception as exc:  # noqa: BLE001
         log.warning("jail_scraper.fetch_error", county=county, vendor=vendor,
                     error=str(exc)[:160])
@@ -318,6 +613,12 @@ def _to_listing(rec: dict, state: str, county: str) -> Listing:
         source_url = "https://cherokee-so-sc.zuercherportal.com/"
     elif state == "SC" and county == "Anderson":
         source_url = "https://anderson-so-sc.zuercherportal.com/"
+    elif state == "NC" and county == "Henderson":
+        source_url = (f"{CITIZEN_CONNECT_BASE}/bookingsearch/"
+                      "index.php?AgencyID=HendersonCoNC")
+    elif state == "NC" and county == "Gaston":
+        source_url = ("https://tepsweb.cityofgastonia.com/"
+                      "NewWorld.InmateInquiry/GastonCounty?InCustody=True")
     else:
         source_url = ""
 
@@ -346,6 +647,9 @@ def _to_listing(rec: dict, state: str, county: str) -> Listing:
                 "age": rec.get("age"),
                 "booking_date": booking_date.isoformat() if booking_date else None,
                 "charge": charge,
+                "release_status": rec.get("release_status") or "in_custody",
+                "scheduled_release": rec.get("scheduled_release"),
+                "facility": rec.get("facility"),
                 "vendor": "jail_bookings_scraper",
             },
         },

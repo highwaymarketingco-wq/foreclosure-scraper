@@ -33,6 +33,7 @@ from typing import Iterable
 
 from dateutil import parser as dateparser
 
+from ..._upstate_city_to_county import upstate_county_for
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
 
@@ -79,12 +80,36 @@ def _parse_date(raw: str | None) -> datetime | None:
         return None
 
 
-def _clean_county(office: str | None) -> str | None:
-    """'Onslow County Tax Office' -> 'Onslow'."""
+#: The "Tax Office" column is not always a county. ZLS also collects for
+#: municipalities ("City of Laurinburg", "Town of Plymouth") and occasionally
+#: names a court ("Wake County General Courts of Justice"). Tagging those
+#: strings as the county produces a county that matches nothing downstream, so
+#: we normalize the county cases and return None for municipalities (the city
+#: parsed out of the address then attributes them instead).
+_MUNICIPALITY_RE = re.compile(r"^\s*(?:city|town|village)\s+of\s+(.+?)\s*$", re.I)
+_COUNTY_OFFICE_RE = re.compile(r"^\s*(.+?)\s+county\b", re.I)
+
+
+def _municipality(office: str | None) -> str | None:
+    """'City of Laurinburg' -> 'Laurinburg'; anything else -> None."""
     if not office:
         return None
+    m = _MUNICIPALITY_RE.match(office)
+    return m.group(1).strip() or None if m else None
+
+
+def _clean_county(office: str | None) -> str | None:
+    """'Onslow County Tax Office' -> 'Onslow'.
+
+    'Wake County General Courts of Justice' -> 'Wake' (the word 'County' is
+    mid-string, not a suffix). 'City of Laurinburg' -> None (not a county).
+    """
+    if not office or _municipality(office):
+        return None
+    m = _COUNTY_OFFICE_RE.match(office)
+    if m:
+        return m.group(1).strip() or None
     s = re.sub(r"\s+tax\s+office\s*$", "", office, flags=re.IGNORECASE).strip()
-    s = re.sub(r"\s+county\s*$", "", s, flags=re.IGNORECASE).strip()
     return s or None
 
 
@@ -111,6 +136,7 @@ def _row_to_listing(row: dict, slug: str) -> Listing | None:
         return None
 
     county = _clean_county(row.get("office"))
+    municipality = _municipality(row.get("office"))
     parcel = (row.get("parcel") or "").strip() or None
     addr_full = _clean_address(row.get("addr"))
     if not parcel and not addr_full:
@@ -126,8 +152,17 @@ def _row_to_listing(row: dict, slug: str) -> Listing | None:
         else:
             street = addr_full
 
+    # Municipal collections carry no county. Attribute them from the city in
+    # the address so an in-footprint town (e.g. a City of Shelby row =
+    # Cleveland County) survives the scope gate instead of being dropped on a
+    # bogus "City of Shelby" county tag.
+    if county is None:
+        county = upstate_county_for(city or municipality, "NC")
+
     zls_raw = {
         "status": status,
+        "tax_office": (row.get("office") or "").strip() or None,
+        "municipality": municipality,
         "upset_deadline": (row.get("upset") or "").strip() or None,
         "current_bid": (row.get("current_bid") or "").strip() or None,
         "notice_url": (row.get("notice_url") or "").strip() or None,

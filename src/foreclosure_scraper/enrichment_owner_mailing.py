@@ -488,10 +488,20 @@ async def enrich_owner_mailing(listings: list[Listing], max_concurrency: int = 4
             return True  # SCDOT covers all 46 SC counties
         return False
 
+    def _has_mailing(li) -> bool:
+        # owner_mailing is usually a dict but some sources (spartanburg_vacant,
+        # spartanburg_condemned, spartanburg_delinquent_tax) emit a bare string
+        # that IS the mailing address. `or {}` can't rescue a truthy str, so an
+        # unguarded .get() raised AttributeError and killed the whole pass.
+        om = (li.raw or {}).get("owner_mailing")
+        if isinstance(om, dict):
+            return bool(om.get("mailing"))
+        return bool(om)
+
     targets = [li for li in listings
                if _reachable(li)
                and (li.street_address or li.parcel_id)
-               and not ((li.raw or {}).get("owner_mailing") or {}).get("mailing")]
+               and not _has_mailing(li)]
     if not targets:
         return {"queried": 0, "resolved": 0}
     sem = asyncio.Semaphore(max_concurrency)
