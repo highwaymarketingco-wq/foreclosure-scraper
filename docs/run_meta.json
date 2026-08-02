@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-08-02T17:34:12.806367Z",
+  "run_time": "2026-08-02T18:04:34.461966Z",
   "total": 25576,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "daily vision pass: 7479 of 25576 listings have a vision report"
+  "notes": "scheduled NC SOS registered-agent refresh"
 }
