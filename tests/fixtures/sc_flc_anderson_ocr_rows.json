@@ -1,0 +1,74 @@
+[
+ {
+  "item": "",
+  "parcel_id": "TAX MAP #",
+  "owner_name": "DEFAULTER",
+  "address": "STREET ADDRESS",
+  "city": "CITY",
+  "amount": "ASSIGNMENT PRICE"
+ },
+ {
+  "item": "998",
+  "parcel_id": "126-05-17-005",
+  "owner_name": "",
+  "address": "300 Hill Street in Homeland Park",
+  "city": "",
+  "amount": "46,128.08"
+ },
+ {
+  "item": "279",
+  "parcel_id": "150-02-09-009",
+  "owner_name": "",
+  "address": "403 Hall Street in Anderson",
+  "city": "",
+  "amount": "9,937.18"
+ },
+ {
+  "item": "2745",
+  "parcel_id": "072-02-01-008",
+  "owner_name": "LOPEZ",
+  "address": "790 Mountain View Drive in Anderson",
+  "city": "",
+  "amount": "1,281.65"
+ },
+ {
+  "item": "2541",
+  "parcel_id": "130-00-02-027",
+  "owner_name": "GARRETT",
+  "address": "135 Tucker Drive in Starr",
+  "city": "",
+  "amount": "708.81"
+ },
+ {
+  "item": "3054",
+  "parcel_id": "044-10-01-016",
+  "owner_name": "WILLIAMSON",
+  "address": "1714 Old Denver School Road in Anderson",
+  "city": "",
+  "amount": "560.27"
+ },
+ {
+  "item": "2444",
+  "parcel_id": "243-08-06-002",
+  "owner_name": "COYLE",
+  "address": "209 Holiday Street in Pelzer",
+  "city": "",
+  "amount": "822.99"
+ },
+ {
+  "item": "2759",
+  "parcel_id": "253-00-11-027",
+  "owner_name": "MARTIN",
+  "address": "127 Orr Ashley Road near Honea Path",
+  "city": "",
+  "amount": "744.10"
+ },
+ {
+  "item": "",
+  "parcel_id": "",
+  "owner_name": "",
+  "address": "ASSIGNMENTS FROM THIS LIST CONSIST OF MOBILE HOMES ONLY.",
+  "city": "",
+  "amount": ""
+ }
+]

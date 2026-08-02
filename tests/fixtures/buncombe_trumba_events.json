@@ -1,0 +1,327 @@
+[
+ {
+  "eventID": 157314158,
+  "template": "Tax Foreclosures - All",
+  "title": "GRIFFIN DUNN PROPERTIES",
+  "description": "0.09 ACRES, MORE OR LESS&#160;",
+  "location": "",
+  "webLink": "<a href=\"https://www.buncombecounty.org/governing/depts/tax/tax-foreclosures.aspx\" target=\"_blank\" rel=\"noopener\" title=\"https://www.buncombecounty.org/governing/depts/tax/tax-foreclosures.aspx\">www.buncombecounty.org&#8230;</a>",
+  "startDateTime": "2022-01-18T11:00:00",
+  "endDateTime": "2022-01-28T17:00:00",
+  "dateTimeFormatted": "Tuesday, January 18, 11am&nbsp;&ndash; Friday, January 28, 2022, 5pm&nbsp;EST",
+  "allDay": false,
+  "startTimeZoneOffset": "-0500",
+  "endTimeZoneOffset": "-0500",
+  "canceled": false,
+  "openSignUp": false,
+  "reservationFull": false,
+  "pastDeadline": true,
+  "pastCancelDeadline": true,
+  "requiresPayment": false,
+  "refundsAllowed": false,
+  "waitingListAvailable": false,
+  "customFields": [
+   {
+    "fieldID": 58700,
+    "label": "Opening/Current Bid",
+    "value": "5,587.16",
+    "type": 4
+   },
+   {
+    "fieldID": 58702,
+    "label": "Redeemed",
+    "value": "No",
+    "type": 3
+   },
+   {
+    "fieldID": 53433,
+    "label": "Case Number",
+    "value": "21 CVD 03272",
+    "type": 0
+   },
+   {
+    "fieldID": 53451,
+    "label": "PIN lookup",
+    "value": "<a href=\"https://gis.buncombecounty.org/buncomap/Default.aspx?PINN=966738953300000\" target=\"_blank\" rel=\"noopener\" title=\"https://gis.buncombecounty.org/buncomap/Default.aspx?PINN=966738953300000\">gis.buncombecounty.org&#8230;</a>",
+    "type": 6
+   },
+   {
+    "fieldID": 58710,
+    "label": "Property Type",
+    "value": "Land &amp; Structures",
+    "type": 17
+   },
+   {
+    "fieldID": 58703,
+    "label": "Fire District",
+    "value": "REYNOLDS",
+    "type": 17
+   }
+  ],
+  "permaLinkUrl": "https://taxforeclosures.buncombenc.gov/foreclosure-details.aspx?trumbaEmbed=view%3Devent%26eventid%3D157314158",
+  "eventActionUrl": "https://www.trumba.com/eventactions/tax-foreclosures-all#/actions/mvfduhnj1yrnjzf1zeerbvjt21",
+  "categoryCalendar": "Tax|Tax Foreclosures - All",
+  "registrationTransferTargetCount": 0,
+  "regAllowChanges": true
+ },
+ {
+  "eventID": 157320773,
+  "template": "Tax Foreclosures - All",
+  "title": "CLEAR BRANCH BAPTIST CHURCH",
+  "description": "0.83 ACRES, MORE OR LESS&#160;",
+  "location": "",
+  "webLink": "<a href=\"https://www.buncombecounty.org/governing/depts/tax/tax-foreclosures.aspx\" target=\"_blank\" rel=\"noopener\" title=\"https://www.buncombecounty.org/governing/depts/tax/tax-foreclosures.aspx\">www.buncombecounty.org&#8230;</a>",
+  "startDateTime": "2022-01-26T11:30:00",
+  "endDateTime": "2022-02-04T17:00:00",
+  "dateTimeFormatted": "Wednesday, January 26, 11:30am&nbsp;&ndash; Friday, February 4, 2022, 5pm&nbsp;EST",
+  "allDay": false,
+  "startTimeZoneOffset": "-0500",
+  "endTimeZoneOffset": "-0500",
+  "canceled": false,
+  "openSignUp": false,
+  "reservationFull": false,
+  "pastDeadline": true,
+  "pastCancelDeadline": true,
+  "requiresPayment": false,
+  "refundsAllowed": false,
+  "waitingListAvailable": false,
+  "customFields": [
+   {
+    "fieldID": 58700,
+    "label": "Opening/Current Bid",
+    "value": "31,000",
+    "type": 4
+   },
+   {
+    "fieldID": 58702,
+    "label": "Redeemed",
+    "value": "No",
+    "type": 3
+   },
+   {
+    "fieldID": 53433,
+    "label": "Case Number",
+    "value": "21 CV 3721",
+    "type": 0
+   },
+   {
+    "fieldID": 53451,
+    "label": "PIN lookup",
+    "value": "<a href=\"https://gis.buncombecounty.org/buncomap/Default.aspx?PINN=063623822700000\" target=\"_blank\" rel=\"noopener\" title=\"https://gis.buncombecounty.org/buncomap/Default.aspx?PINN=063623822700000\">gis.buncombecounty.org&#8230;</a>",
+    "type": 6
+   },
+   {
+    "fieldID": 58710,
+    "label": "Property Type",
+    "value": "Land &amp; Structures",
+    "type": 17
+   },
+   {
+    "fieldID": 58703,
+    "label": "Fire District",
+    "value": "BROAD RIVER",
+    "type": 17
+   }
+  ],
+  "permaLinkUrl": "https://taxforeclosures.buncombenc.gov/foreclosure-details.aspx?trumbaEmbed=view%3Devent%26eventid%3D157320773",
+  "eventActionUrl": "https://www.trumba.com/eventactions/tax-foreclosures-all#/actions/gwpbnpbvgpejks406uyewkte52",
+  "categoryCalendar": "Tax|Tax Foreclosures - All",
+  "registrationTransferTargetCount": 0,
+  "regAllowChanges": true
+ },
+ {
+  "eventID": 157887861,
+  "template": "Tax Foreclosures - All",
+  "title": "CLEAR BRANCH BAPTIST CHURCH",
+  "description": "0.83 ACRES, MORE OR LESS&#160;&#160;",
+  "location": "",
+  "webLink": "<a href=\"https://www.buncombecounty.org/governing/depts/tax/tax-foreclosures.aspx\" target=\"_blank\" rel=\"noopener\" title=\"https://www.buncombecounty.org/governing/depts/tax/tax-foreclosures.aspx\">www.buncombecounty.org&#8230;</a>",
+  "startDateTime": "2022-02-09T12:00:00",
+  "endDateTime": "2022-03-28T17:00:00",
+  "dateTimeFormatted": "Wednesday, February 9, 12pm&nbsp;&ndash; Monday, March 28, 2022, 5pm&nbsp;EDT",
+  "allDay": false,
+  "startTimeZoneOffset": "-0500",
+  "endTimeZoneOffset": "-0400",
+  "canceled": false,
+  "openSignUp": false,
+  "reservationFull": false,
+  "pastDeadline": true,
+  "pastCancelDeadline": true,
+  "requiresPayment": false,
+  "refundsAllowed": false,
+  "waitingListAvailable": false,
+  "customFields": [
+   {
+    "fieldID": 58700,
+    "label": "Opening/Current Bid",
+    "value": "$156,000",
+    "type": 4
+   },
+   {
+    "fieldID": 58702,
+    "label": "Redeemed",
+    "value": "No",
+    "type": 3
+   },
+   {
+    "fieldID": 53433,
+    "label": "Case Number",
+    "value": "21 CV 3721",
+    "type": 0
+   },
+   {
+    "fieldID": 53451,
+    "label": "PIN lookup",
+    "value": "<a href=\"https://gis.buncombecounty.org/buncomap/Default.aspx?PINN=063623822700000\" target=\"_blank\" rel=\"noopener\" title=\"https://gis.buncombecounty.org/buncomap/Default.aspx?PINN=063623822700000\">gis.buncombecounty.org&#8230;</a>",
+    "type": 6
+   },
+   {
+    "fieldID": 58710,
+    "label": "Property Type",
+    "value": "Land &amp; Structures",
+    "type": 17
+   },
+   {
+    "fieldID": 58703,
+    "label": "Fire District",
+    "value": "BROAD RIVER",
+    "type": 17
+   }
+  ],
+  "permaLinkUrl": "https://taxforeclosures.buncombenc.gov/foreclosure-details.aspx?trumbaEmbed=view%3Devent%26eventid%3D157887861",
+  "eventActionUrl": "https://www.trumba.com/eventactions/tax-foreclosures-all#/actions/0g0d4wp3mre93mvw354y5c384b",
+  "categoryCalendar": "Tax|Tax Foreclosures - All",
+  "registrationTransferTargetCount": 0,
+  "regAllowChanges": true
+ },
+ {
+  "eventID": 157887579,
+  "template": "Tax Foreclosures - All",
+  "title": "JOSEPHINE SMITH",
+  "description": "12.24 ACRES, MORE OR LESS / BARNARDSVILLE HWY&#160; &#160; &#160; &#160; &#160; &#160; &#160;&#160;",
+  "location": "",
+  "webLink": "<a href=\"https://www.buncombecounty.org/governing/depts/tax/tax-foreclosures.aspx\" target=\"_blank\" rel=\"noopener\" title=\"https://www.buncombecounty.org/governing/depts/tax/tax-foreclosures.aspx\">www.buncombecounty.org&#8230;</a>",
+  "startDateTime": "2022-02-11T11:00:00",
+  "endDateTime": "2022-03-23T13:00:00",
+  "dateTimeFormatted": "Friday, February 11, 11am&nbsp;&ndash; Wednesday, March 23, 2022, 1pm&nbsp;EDT",
+  "allDay": false,
+  "startTimeZoneOffset": "-0500",
+  "endTimeZoneOffset": "-0400",
+  "canceled": false,
+  "openSignUp": false,
+  "reservationFull": false,
+  "pastDeadline": true,
+  "pastCancelDeadline": true,
+  "requiresPayment": false,
+  "refundsAllowed": false,
+  "waitingListAvailable": false,
+  "customFields": [
+   {
+    "fieldID": 58700,
+    "label": "Opening/Current Bid",
+    "value": "$93,767.03",
+    "type": 4
+   },
+   {
+    "fieldID": 58702,
+    "label": "Redeemed",
+    "value": "Yes",
+    "type": 3
+   },
+   {
+    "fieldID": 53433,
+    "label": "Case Number",
+    "value": "21 CVD 3313",
+    "type": 0
+   },
+   {
+    "fieldID": 53451,
+    "label": "PIN lookup",
+    "value": "<a href=\"https://gis.buncombecounty.org/buncomap/Default.aspx?PINN=977547418800000\" target=\"_blank\" rel=\"noopener\" title=\"https://gis.buncombecounty.org/buncomap/Default.aspx?PINN=977547418800000\">gis.buncombecounty.org&#8230;</a>",
+    "type": 6
+   },
+   {
+    "fieldID": 58710,
+    "label": "Property Type",
+    "value": "Land &amp; Structures",
+    "type": 17
+   },
+   {
+    "fieldID": 58703,
+    "label": "Fire District",
+    "value": "BARNARDSVILLE",
+    "type": 17
+   }
+  ],
+  "permaLinkUrl": "https://taxforeclosures.buncombenc.gov/foreclosure-details.aspx?trumbaEmbed=view%3Devent%26eventid%3D157887579",
+  "eventActionUrl": "https://www.trumba.com/eventactions/tax-foreclosures-all#/actions/0cuu32hg30rz9mu05mty2j0kwv",
+  "categoryCalendar": "Tax|Tax Foreclosures - All",
+  "registrationTransferTargetCount": 0,
+  "regAllowChanges": true
+ },
+ {
+  "eventID": 157548348,
+  "template": "Tax Foreclosures - All",
+  "title": "RAYANNA LINGERFELDT ARTHUR",
+  "description": "0.59 ACRES, MORE OR LESS",
+  "location": "",
+  "webLink": "<a href=\"https://www.buncombecounty.org/governing/depts/tax/tax-foreclosures.aspx\" target=\"_blank\" rel=\"noopener\" title=\"https://www.buncombecounty.org/governing/depts/tax/tax-foreclosures.aspx\">www.buncombecounty.org&#8230;</a>",
+  "startDateTime": "2022-02-14T11:30:00",
+  "endDateTime": "2022-02-16T17:00:00",
+  "dateTimeFormatted": "Monday, February 14, 11:30am&nbsp;&ndash; Wednesday, February 16, 2022, 5pm&nbsp;EST",
+  "allDay": false,
+  "startTimeZoneOffset": "-0500",
+  "endTimeZoneOffset": "-0500",
+  "canceled": false,
+  "openSignUp": false,
+  "reservationFull": false,
+  "pastDeadline": true,
+  "pastCancelDeadline": true,
+  "requiresPayment": false,
+  "refundsAllowed": false,
+  "waitingListAvailable": false,
+  "customFields": [
+   {
+    "fieldID": 58700,
+    "label": "Opening/Current Bid",
+    "value": "6,000",
+    "type": 4
+   },
+   {
+    "fieldID": 58702,
+    "label": "Redeemed",
+    "value": "Yes",
+    "type": 3
+   },
+   {
+    "fieldID": 53433,
+    "label": "Case Number",
+    "value": "21 CV 3399",
+    "type": 0
+   },
+   {
+    "fieldID": 53451,
+    "label": "PIN lookup",
+    "value": "<a href=\"https://gis.buncombecounty.org/buncomap/Default.aspx?PINN=966887205900000\" target=\"_blank\" rel=\"noopener\" title=\"https://gis.buncombecounty.org/buncomap/Default.aspx?PINN=966887205900000\">gis.buncombecounty.org&#8230;</a>",
+    "type": 6
+   },
+   {
+    "fieldID": 58710,
+    "label": "Property Type",
+    "value": "Land &amp; Structures",
+    "type": 17
+   },
+   {
+    "fieldID": 58703,
+    "label": "Fire District",
+    "value": "RICEVILLE",
+    "type": 17
+   }
+  ],
+  "permaLinkUrl": "https://taxforeclosures.buncombenc.gov/foreclosure-details.aspx?trumbaEmbed=view%3Devent%26eventid%3D157548348",
+  "eventActionUrl": "https://www.trumba.com/eventactions/tax-foreclosures-all#/actions/shrtzxabh0mx04zun0pha0gbn3",
+  "categoryCalendar": "Tax|Tax Foreclosures - All",
+  "registrationTransferTargetCount": 0,
+  "regAllowChanges": true
+ }
+]

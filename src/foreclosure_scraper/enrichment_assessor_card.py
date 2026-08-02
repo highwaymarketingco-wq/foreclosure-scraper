@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import threading
 
 import structlog
 
@@ -250,15 +251,54 @@ async def _aenrich(listings: list[Listing]) -> dict:
     return stats
 
 
+def _run_in_worker_thread(coro_factory) -> dict:
+    """Run an async pass on its OWN loop in a worker thread.
+
+    Used when the caller already has a running loop: a second loop cannot be
+    started on the same thread (``asyncio.run`` raises "cannot be called from a
+    running event loop", and ``new_event_loop().run_until_complete`` raises
+    "Cannot run the event loop while another loop is running"). A dedicated
+    thread has no running loop, so ``asyncio.run`` there is legal.
+    """
+    result: dict = {}
+    error: list[BaseException] = []
+
+    def _target() -> None:
+        try:
+            result.update(asyncio.run(coro_factory()))
+        except BaseException as exc:  # noqa: BLE001 — re-raised on the caller's thread
+            error.append(exc)
+
+    t = threading.Thread(target=_target, name="assessor-card", daemon=True)
+    t.start()
+    t.join()
+    if error:
+        raise error[0]
+    return result
+
+
+async def aenrich_assessor_card(listings: list[Listing]) -> dict:
+    """Async entrypoint — await this from inside an async orchestrator."""
+    if os.environ.get("ASSESSOR_CARD_ON", "").lower() not in ("1", "true", "yes"):
+        return {}
+    return await _aenrich(listings)
+
+
 def enrich_assessor_card(listings: list[Listing]) -> dict:
-    """Sync entrypoint for the orchestrator. No-op unless ASSESSOR_CARD_ON is set."""
+    """Sync entrypoint for the orchestrator. No-op unless ASSESSOR_CARD_ON is set.
+
+    Await-safe: when a loop is already running on this thread (the orchestrator
+    calls this from inside async code) the pass is handed to a worker thread
+    with its own loop instead of trying — and failing — to nest a second loop.
+    Callers that are themselves async should await ``aenrich_assessor_card``.
+    """
     if os.environ.get("ASSESSOR_CARD_ON", "").lower() not in ("1", "true", "yes"):
         return {}
     try:
-        return asyncio.run(_aenrich(listings))
+        asyncio.get_running_loop()
     except RuntimeError:
-        loop = asyncio.new_event_loop()
-        try:
-            return loop.run_until_complete(_aenrich(listings))
-        finally:
-            loop.close()
+        # No loop on this thread — the plain sync path.
+        return asyncio.run(_aenrich(listings))
+    log.info("assessor_card.offloaded_to_thread",
+             reason="called from a running event loop")
+    return _run_in_worker_thread(lambda: _aenrich(listings))

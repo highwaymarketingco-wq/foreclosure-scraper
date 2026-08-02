@@ -371,6 +371,11 @@ DATELESS_OK_SOURCES = {
     # Kania tax-foreclosure filings — filed, then await a scheduled sale date
     # (37 of 56 rows dateless on 2026-07-31).
     "law_firms.kania",
+    # Buncombe tax-foreclosure calendar. Trumba's startDateTime is BIDDING-BEGINS,
+    # not the sale, so past-dated rows are still live bids; the scraper withholds
+    # sale_date in that case and keeps it in raw.buncombe_tax.bidding_begins_iso.
+    # Without this line _active_only discarded 33 of 33 fetched parcels.
+    "counties_nc.buncombe_tax",
     # Relationship-deeds enrichment — derives PROBATE_NOTICE / DIVORCE_NOTICE
     # listings from ROD recordings (executor's deeds, quitclaim + $0
     # divorce transfers). These are leads, not auctions — no sale_date.

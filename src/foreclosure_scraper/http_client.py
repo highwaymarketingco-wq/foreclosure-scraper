@@ -124,6 +124,19 @@ def take_block_signal() -> "tuple[int, str] | None":
     return h[0] if h else None   # first block recorded this run
 
 
+def clear_block_signal() -> None:
+    """Forget blocks recorded so far — for a scraper that RECOVERED from one.
+
+    Mutates the holder list in place rather than rebinding the ContextVar, so
+    the change is visible to safe_run in the parent task (a `.set()` inside the
+    child context would not propagate back). Call this only after a fetch tier
+    actually succeeded: an unrecovered block must still surface as BLOCKED.
+    """
+    h = _block_holder.get()
+    if h is not None:
+        h.clear()
+
+
 # Process-wide memory of hosts that returned a _BLOCK_CODES status to PLAIN httpx
 # at least once. Once a host is known to fingerprint-block, get_text(impersonate=
 # True) skips the doomed plain attempt and goes straight to the curl-cffi tier —
@@ -175,7 +188,11 @@ async def client(
     follow_redirects: bool = True,
     headers: dict | None = None,
     impersonate_browser: bool = True,
+    http2: bool = True,
 ) -> AsyncIterator[httpx.AsyncClient]:
+    """Shared throttled client. Pass ``http2=False`` for the rare host whose CDN
+    answers an ordinary HTTP/1.1 request but not httpx's HTTP/2 one (see
+    law_firms.mewborn_deselms) — everything else keeps HTTP/2."""
     h = dict(DEFAULT_HEADERS)
     if headers:
         h.update(headers)
@@ -195,7 +212,7 @@ async def client(
         headers=h,
         proxy=proxy,
         transport=transport,
-        http2=True,
+        http2=http2,
     ) as cli:
         yield cli
 

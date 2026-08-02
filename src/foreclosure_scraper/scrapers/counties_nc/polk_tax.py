@@ -35,7 +35,17 @@ LOCATION_RE = re.compile(r"Location[:\s]*([^A]+(?:Courthouse|Court House)[^$]+?)
 # Each row: <parcel> <whitespace incl. nbsp>* $<amount>
 # Polk's HTML uses `&nbsp;` between parcel and price; selectolax/regex strip it but
 # they may collapse to non-breaking-space chars. Match any non-$ chars between.
-ROW_RE = re.compile(r"([A-Z]?\d+(?:-[A-Z]?\d+)+)[^\$]{1,40}\$([\d,]+(?:\.\d{2})?)")
+#
+# 2026-08-02 REGRESSION FIX: Kania posts the opening bid as a literal "$TBD" until
+# the upset-bid figure is set (live page today: a single row "P65-38  $TBD"). The
+# old pattern required digits after the "$", so a TBD-priced sale matched nothing
+# and the scraper reported 0 — a REGRESSED source with a real, active auction on
+# the page. The amount group is now optional: TBD rows are emitted with the parcel
+# + sale date and opening_bid=None (the auction, not the price, is the lead).
+ROW_RE = re.compile(
+    r"([A-Z]?\d+(?:-[A-Z]?\d+)+)[^\$]{1,40}\$\s*(?:([\d,]+(?:\.\d{2})?)|TBD\b)",
+    re.I,
+)
 
 
 class PolkTaxAuction(BaseScraper):
@@ -74,8 +84,10 @@ class PolkTaxAuction(BaseScraper):
             if parcel in seen or len(parcel) < 4:
                 continue
             seen.add(parcel)
+            # group(2) is None on a "$TBD" row — the sale is real, the price is not
+            # published yet.
             try:
-                bid = float(m.group(2).replace(",", ""))
+                bid = float(m.group(2).replace(",", "")) if m.group(2) else None
             except ValueError:
                 bid = None
             out.append(

@@ -18,14 +18,24 @@ rows must surface even without near-beach coordinates. To wire that gate, add
 "law_firms.mewborn_deselms" to COASTAL_COUNTY_SOURCES in main.py (NOT edited here
 per the build rules) so Onslow rows are admitted source-scoped.
 
-ANTI-BOT: the site sits behind a Cloudflare interstitial — a plain GET returns
-403. We use the curl_cffi impersonation tier (http_client.get_text(url,
-impersonate=True)), which presents a real Chrome JA3/TLS + HTTP/2 fingerprint
-with no browser process; live-verified 2026-06-26 to return 200 with full
-content (no "Just a moment" challenge). If that ever 403s, we fall back to the
-Scrapling StealthyFetcher render path (camoufox/Playwright stealth) like the
-other render-path firms (kania, korn). No CAPTCHA solver, no login, no token
-forgery — free + compliant.
+ANTI-BOT. The site sits behind Cloudflare and the full-run alarm was "HTTP 403
+(blocked/forbidden) from www.mewbornlaw.biz (scraper swallowed the error)".
+
+A 2026-08-02 fix claimed HTTP/2 was the trigger and that the same headers over
+HTTP/1.1 return 200. Re-measured, that is NOT what happens: HTTP/1.1 also
+answers ``cf-mitigated: challenge`` and 403s, and only succeeded on the 4th
+spaced retry. That fix has been REMOVED on compliance grounds — looping until a
+Cloudflare challenge relents is working around bot detection, not negotiating a
+protocol, and its clear_block_signal() call made a host that had just 403'd
+three times report as never blocked (the same silent-failure class that hid the
+upset-bid outage).
+
+Current behaviour: ONE honest HTTP/1.1 attempt, then the pre-existing curl_cffi
+impersonation and Scrapling render tiers (unchanged, established project-wide).
+If every tier fails, fetch() RAISES so safe_run reports BLOCKED rather than
+returning [] and hiding the outage as a clean empty — that half of the fix was
+correct and is kept. A persistent 403 here should be reported as a wall, not
+engineered around.
 
 PAGE SHAPE (live 2026-06-26): a single Divi text block
 ``div.et_pb_text_inner`` holds an <h1>Properties For Sale</h1> then, per county,
@@ -41,17 +51,21 @@ notice-of-sale, captured as the row's source_url when available.
 """
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import datetime
 from typing import Iterable, Optional
 
+import structlog
 from dateutil import parser as dateparser
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
-from ...http_client import get_text
+from ...http_client import client, get_text
 from ...models import Listing, ListingType, PropertyKind
 from ._helpers import ADDR_RE, DATE_RE, ZIP_RE
+
+log = structlog.get_logger()
 
 BASE = "https://www.mewbornlaw.biz"
 INDEX_URL = f"{BASE}/properties-for-sale/"
@@ -252,9 +266,28 @@ def _add_unique(li: Listing, out: list, seen: set[str]) -> None:
 
 
 async def _fetch_index() -> str:
-    """curl_cffi impersonation tier first (gets past Cloudflare on this host);
-    Scrapling StealthyFetcher render path as fallback. Returns "" if both fail
-    so safe_run's block signal classifies the run instead of crashing."""
+    """Plain HTTP/1.1 first, then the pre-existing impersonate / render tiers.
+    Returns "" if every tier fails so safe_run's block signal classifies the run
+    instead of crashing."""
+    # Tier 0 (single HTTP/1.1 attempt). A previous version looped here up to
+    # _H1_ATTEMPTS times against a `cf-mitigated: challenge` 403 and then called
+    # clear_block_signal() on the attempt that finally got through. REMOVED on
+    # compliance grounds: measured behaviour was 403 on attempts 1-3 and 200 on
+    # the 4th, i.e. retry-until-the-challenge-relents, which is working around
+    # bot detection rather than negotiating a protocol. clear_block_signal() also
+    # made a host that had just 403'd three times report as never blocked, which
+    # is the same silent-failure class that hid the upset-bid outage for months.
+    # One honest attempt; if Cloudflare challenges it, fall through to the
+    # pre-existing tiers and otherwise let the block be reported as a block.
+    try:
+        async with client(timeout=45.0, http2=False) as c:
+            r = await c.get(INDEX_URL)
+        if r.status_code == 200 and len(r.text) > 5_000:
+            return r.text
+        log.info("mewborn.h1_attempt", status=r.status_code, length=len(r.text))
+    except Exception as exc:  # noqa: BLE001
+        log.info("mewborn.h1_error", error=f"{type(exc).__name__}: {str(exc)[:80]}")
+
     # Tier 1: curl_cffi real-Chrome fingerprint (live-verified 2026-06-26).
     try:
         html = await get_text(INDEX_URL, timeout=45.0, impersonate=True)
@@ -296,8 +329,15 @@ class MewbornDeSelms(BaseScraper):
     async def fetch(self) -> Iterable[Listing]:
         html = await _fetch_index()
         if not html:
-            return []
-        return _parse_html(html, self.slug)
+            # Do NOT return [] quietly — that is what turned a hard block into a
+            # silent "OK, 0 rows" and hid the outage for two runs. Raising lets
+            # safe_run classify it (the 403s already armed the block signal).
+            raise RuntimeError(
+                f"mewborn_deselms: every fetch tier failed for {INDEX_URL}"
+            )
+        rows = _parse_html(html, self.slug)
+        log.info("mewborn.counts", html_bytes=len(html), rows=len(rows))
+        return rows
 
 
 if __name__ == "__main__":

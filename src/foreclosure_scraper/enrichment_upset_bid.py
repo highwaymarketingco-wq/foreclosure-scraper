@@ -34,6 +34,13 @@ What this enrichment does:
   2. Set li.upset_bid_deadline = sale_date + 10 days
 
 What this enrichment does NOT do:
+  * It does NOT touch a listing whose raw.upset_bid was PUBLISHED by the
+    source (raw.upset_bid["source"] == "published" — set by
+    scrapers.national.nc_upset_bids from a clerk/county/firm feed that
+    prints the actual close date). Every successful upset restarts a
+    fresh 10-day clock, so a published close date legitimately sits weeks
+    past the sale date; the sale_date+10 rule below would judge those
+    "outside the window" and null out a real, still-open deadline.
   * It does NOT cause listings to survive the active-only filter on
     its own — that's main._active_only's job (state-aware past cutoff).
   * It does NOT scrape clerk-of-court "Notice of Sale" / "Report of
@@ -101,6 +108,7 @@ def enrich_upset_bid(listings: list[Listing]) -> dict[str, Any]:
         "tag_cleared_outside_window": 0,
         "no_sale_date": 0,
         "non_nc": 0,
+        "published_skipped": 0,
     }
     now = datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -108,6 +116,13 @@ def enrich_upset_bid(listings: list[Listing]) -> dict[str, Any]:
         stats["scanned"] += 1
         if li.state != "NC":
             stats["non_nc"] += 1
+            continue
+        # A source that PRINTS the close date beats a date we derive. Stacked
+        # upsets restart the 10-day clock, so the published deadline routinely
+        # sits outside sale_date+10 and the derived rule would delete it.
+        existing_raw = li.raw.get("upset_bid") if isinstance(li.raw, dict) else None
+        if isinstance(existing_raw, dict) and existing_raw.get("source") == "published":
+            stats["published_skipped"] += 1
             continue
         sd = _naive_utc(li.sale_date)
         if sd is None:

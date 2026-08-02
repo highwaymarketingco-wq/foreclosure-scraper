@@ -42,7 +42,7 @@ def test_dedups_repeated_docket_in_same_court():
         scraper = CourtListenerBankruptcy()
         with patch(
             "foreclosure_scraper.scrapers.national.courtlistener_bankruptcy._fetch_court",
-            new=AsyncMock(side_effect=lambda c, court, tok: (
+            new=AsyncMock(side_effect=lambda c, court, tok, deadline=None: (
                 dockets_with_dupe if court == "ncwb" else []
             )),
         ), patch(
@@ -73,7 +73,7 @@ def test_keeps_same_docket_across_different_courts():
         }
         with patch(
             "foreclosure_scraper.scrapers.national.courtlistener_bankruptcy._fetch_court",
-            new=AsyncMock(side_effect=lambda c, court, tok: per_court.get(court, [])),
+            new=AsyncMock(side_effect=lambda c, court, tok, deadline=None: per_court.get(court, [])),
         ), patch(
             "foreclosure_scraper.scrapers.national.courtlistener_bankruptcy._load_token",
             return_value="fake",
