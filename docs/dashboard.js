@@ -690,6 +690,86 @@ function buyersForListing(l) {
 }
 function buyerCountForListing(l) { return Object.values(buyersForListing(l)).reduce((n,a)=>n+a.length,0); }
 
+// ---------------------------------------------------------------------------
+// "Everything We Found" — completeness backstop.
+// The panel above renders ~47 curated blocks, but the pipeline writes ~100 to
+// raw. The rest (amount_owed, tenure, life_events, per-county tax detail, ...)
+// was collected and then silently dropped on the floor. This renders EVERY raw
+// block not already covered, so adding a source can never again mean adding
+// data nobody can see.
+// ---------------------------------------------------------------------------
+const _EV_COVERED = new Set([
+  "calc","grade","data_quality","distress_stack","condition_tier","corroboration",
+  "link_kind","flood","market_velocity","signal_stack","intent_score","intent_band",
+  "gis","zillow","strategy_fit","comp_median_ppsf","owner_mailing","flags","last_sale",
+  "geo_imprecise","rod","condition_source","tax_owed","foreclosure_sold_comp_summary",
+  "title_risk","equity","owner_phone","stale_case","also_seen_in","relationship_signal",
+  "lrcpwa","search_url","estimated_monthly_rent","code_enforcement","courtlistener","epa",
+  "skip_trace","upset_bid","bankruptcy","sos_agent","rod_docs","incarceration",
+  "owner_mismatch","sc_tax_delinquent","liens","sold_confirmed","fema_repetitive_loss",
+  "vision","comps","cama","rent_comps","foreclosure_sold_comps","images","outreach","crm",
+]);
+// Plumbing, not insight — safe to hide.
+const _EV_NOISE = new Set([
+  "is_new","link_check","qa_flags","_resolved_deep_enriched","fallback_links",
+  "link_may_be_stale","refresh_misses","last_refresh_seen","carryover","pulled_sale",
+]);
+const _EV_MONEY = /(amount|owed|value|price|bid|balance|tax|debt|rent|cost|due)/i;
+
+function _evLabel(k) {
+  return k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+function _evFmt(k, v) {
+  if (v === null || v === undefined || v === "") return "";
+  if (typeof v === "number" && _EV_MONEY.test(k) && Math.abs(v) >= 100) {
+    return "$" + v.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  }
+  if (typeof v === "boolean") return v ? "yes" : "no";
+  if (Array.isArray(v)) {
+    if (!v.length) return "";
+    return v.map((x) => (x && typeof x === "object" ? _evFmt(k, x) : String(x))).filter(Boolean).join(" · ");
+  }
+  if (typeof v === "object") {
+    const rows = Object.entries(v)
+      .filter(([, vv]) => vv !== null && vv !== undefined && vv !== "" && !(Array.isArray(vv) && !vv.length))
+      .map(([kk, vv]) => `<span class="ev-sub"><em>${_evLabel(kk)}:</em> ${_evFmt(kk, vv)}</span>`);
+    return rows.join(" ");
+  }
+  const s = String(v);
+  return /^https?:\/\//.test(s)
+    ? `<a href="${s}" target="_blank" rel="noopener">${s.length > 60 ? s.slice(0, 60) + "…" : s}</a>`
+    : s;
+}
+
+function renderEverything(l) {
+  const raw = (l && l.raw) || {};
+  const extra = Object.keys(raw).filter((k) => {
+    if (_EV_COVERED.has(k) || _EV_NOISE.has(k)) return false;
+    const v = raw[k];
+    if (v === null || v === undefined || v === "") return false;
+    if (Array.isArray(v) && !v.length) return false;
+    if (typeof v === "object" && !Array.isArray(v) && !Object.keys(v).length) return false;
+    return true;
+  }).sort();
+
+  if (!extra.length) { $("d-everything-section").style.display = "none"; return; }
+  $("d-everything-section").style.display = "block";
+  $("d-everything-count").textContent = `${extra.length} more from ${l.source || "this source"}`;
+
+  // Money/urgency blocks first — those are the ones you act on.
+  const hot = extra.filter((k) => _EV_MONEY.test(k) || /delinquent|condemn|divorce|life_event|evict|distress|storm|lien|nod|sold/i.test(k));
+  const rest = extra.filter((k) => !hot.includes(k));
+  const row = (k) => {
+    const body = _evFmt(k, raw[k]);
+    return body ? `<div class="ev-row"><div class="ev-key">${_evLabel(k)}</div><div class="ev-val">${body}</div></div>` : "";
+  };
+  const hotHtml = hot.map(row).join("");
+  const restHtml = rest.map(row).join("");
+  $("d-everything").innerHTML =
+    (hotHtml ? `<div class="ev-hot">${hotHtml}</div>` : "") +
+    (restHtml ? `<details class="ev-details"${hotHtml ? "" : " open"}><summary>${rest.length} more detail${rest.length === 1 ? "" : "s"}</summary>${restHtml}</details>` : "");
+}
+
 // Precomputed buyer(name) -> matching listing indices, built on first entering the view.
 let _BUYER_LISTINGS = null;
 function buildBuyerListingIndex() {
@@ -1089,18 +1169,24 @@ async function openDetail(l) {
   const _bcount = Object.values(_bt).reduce((n, a) => n + a.length, 0);
   if (_bcount) {
     $("d-buyers-section").style.display = "block";
-    let bh = `<div class="buyers-note">${_bcount} active buyers — outreach list (no published buy box). Full list + reverse-match in the <strong>Land Buyers</strong> tab.</div>`;
-    Object.entries(_bt).forEach(([type, buyers]) => {
-      bh += `<div class="buyer-group"><div class="buyer-group-title">${BUYER_TYPE_LABEL[type] || type} (${buyers.length})</div>`;
-      bh += buyers.map((b) => {
+    // Collapsed by default and names-only: this registry is the SAME on every
+    // property, so expanding its prose on each card buried the property-specific
+    // findings. The full blurbs live in the Land Buyers tab (and in each row's tooltip).
+    const _names = Object.entries(_bt).map(([type, buyers]) => {
+      const rows = buyers.map((b) => {
         const isUrl = b.contact && /^https?:\/\//.test(b.contact);
-        const nm = isUrl ? `<a href="${b.contact}" target="_blank" rel="noopener">${b.name} ↗</a>` : `<span class="buyer-name">${b.name}</span>`;
-        return `<div class="buyer-row">${nm}${b.buys ? `<span class="buyer-buys">${b.buys}</span>` : ""}</div>`;
-      }).join("");
-      bh += `</div>`;
-    });
-    $("d-buyers").innerHTML = bh;
+        const t = b.buys ? ` title="${String(b.buys).replace(/"/g, "&quot;")}"` : "";
+        return isUrl
+          ? `<a href="${b.contact}" target="_blank" rel="noopener"${t}>${b.name} ↗</a>`
+          : `<span class="buyer-name"${t}>${b.name}</span>`;
+      }).join(" · ");
+      return `<div class="buyer-row"><span class="buyer-group-title">${BUYER_TYPE_LABEL[type] || type}</span> ${rows}</div>`;
+    }).join("");
+    $("d-buyers").innerHTML =
+      `<details class="ev-details"><summary>${_bcount} matching buyers — hover a name for what they buy, full detail in the <strong>Land Buyers</strong> tab</summary>${_names}</details>`;
   } else { $("d-buyers-section").style.display = "none"; }
+
+  renderEverything(l);
 
   // Photos
   const photos = (l.raw && l.raw.zillow && l.raw.zillow.photos) || [];

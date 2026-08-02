@@ -1221,3 +1221,20 @@ footer strong { color: var(--text-2); font-weight: 600; }
 *::-webkit-scrollbar-track { background: transparent; }
 *::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: var(--r-pill); border: 3px solid var(--bg); }
 *::-webkit-scrollbar-thumb:hover { background: var(--muted-2); }
+
+/* ---- "Everything We Found": the completeness backstop on each property ---- */
+.ev-count{font-size:11px;font-weight:400;color:#8a8f98;margin-left:6px}
+.ev-hot{margin-bottom:8px}
+.ev-row{display:grid;grid-template-columns:180px 1fr;gap:10px;padding:4px 0;border-bottom:1px solid rgba(128,128,128,.12);font-size:12px;align-items:start}
+.ev-row:last-child{border-bottom:none}
+.ev-key{color:#8a8f98;font-weight:500}
+.ev-val{word-break:break-word;line-height:1.45}
+.ev-hot .ev-key{color:#c2410c}
+.ev-hot .ev-val{font-weight:600}
+.ev-sub{display:inline-block;margin-right:10px}
+.ev-sub em{color:#8a8f98;font-style:normal}
+.ev-details{margin-top:6px}
+.ev-details>summary{cursor:pointer;font-size:12px;color:#8a8f98;padding:4px 0;user-select:none}
+.ev-details>summary:hover{color:inherit}
+.ev-details[open]>summary{margin-bottom:4px}
+@media (max-width:700px){.ev-row{grid-template-columns:1fr;gap:2px}}
