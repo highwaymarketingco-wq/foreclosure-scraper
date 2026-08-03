@@ -106,12 +106,17 @@ CITIES: tuple[tuple[str, str, str, str], ...] = (
     ("NC", "Henderson", "Fletcher", "fletchernc.org"),
     ("NC", "Henderson", "Mills River", "millsriver.org"),
     ("NC", "Rutherford", "Rutherfordton", "rutherfordton.net"),
-    ("NC", "Rutherford", "Forest City", "townoffc.org"),
+    # townoffc.org no longer resolves (DNS failure). The www host is required:
+    # bare townofforestcity.com answers 301 with a 162-byte body, which the
+    # len(content) < 200 guard below silently discards.
+    ("NC", "Rutherford", "Forest City", "www.townofforestcity.com"),
     ("NC", "Rutherford", "Spindale", "townofspindale.com"),
     ("NC", "Rutherford", "Lake Lure", "townoflakelure.com"),
     ("NC", "Cleveland", "Shelby", "cityofshelby.com"),
     ("NC", "Cleveland", "Kings Mountain", "cityofkm.com"),
-    ("NC", "Cleveland", "Boiling Springs", "boilingspringsnc.com"),
+    # boilingspringsnc.com no longer resolves; the town moved to .gov.
+    ("NC", "Cleveland", "Boiling Springs", "boilingspringsnc.gov"),
+    ("NC", "Cleveland", "Grover", "townofgrovernc.com"),
     ("NC", "Polk", "Columbus", "columbusnc.com"),
     ("NC", "Polk", "Tryon", "tryon-nc.com"),
     ("NC", "Gaston", "Gastonia", "gastonianc.gov"),
@@ -131,6 +136,10 @@ CITIES: tuple[tuple[str, str, str, str], ...] = (
     ("NC", "Mitchell", "Spruce Pine", "townofsprucepine.org"),
     ("NC", "Burke", "Morganton", "morgantonnc.gov"),
     ("NC", "Burke", "Valdese", "townofvaldese.com"),
+    ("NC", "Burke", "Drexel", "townofdrexel.org"),
+    # Rutherford College (Burke) and Chimney Rock (Rutherford) are deliberately
+    # absent: no municipal website resolves for either as of 2026-08-03 (six
+    # candidate domains each, all DNS failures). Do not re-add without a live 200.
 )
 
 QUERIES = (
