@@ -1,0 +1,53 @@
+{
+  "_note": "Lincoln County NC Server_Tables. The taxpayer table (MapServer/10) also carries TCSSN1/TCSSN2 on the live public layer; those fields are deliberately absent from this fixture and from the enricher's outFields list. Never capture them.",
+  "bridge": {
+    "displayFieldName": "PIN",
+    "fields": [
+      {"name": "PIN", "type": "esriFieldTypeString"},
+      {"name": "OWNERID", "type": "esriFieldTypeString"},
+      {"name": "COOWNERID", "type": "esriFieldTypeString"}
+    ],
+    "features": [
+      {"attributes": {"PIN": "3633246157", "OWNERID": "0309770", "COOWNERID": "0309770"}},
+      {"attributes": {"PIN": "3602373054", "OWNERID": "", "COOWNERID": "0195049"}},
+      {"attributes": {"PIN": "3625271987", "OWNERID": "0000001", "COOWNERID": ""}}
+    ]
+  },
+  "taxpayer": {
+    "displayFieldName": "TCNAM1",
+    "fields": [
+      {"name": "TCTXID", "type": "esriFieldTypeString"},
+      {"name": "TCNAM1", "type": "esriFieldTypeString"},
+      {"name": "TCADR1", "type": "esriFieldTypeString"},
+      {"name": "TCADR2", "type": "esriFieldTypeString"},
+      {"name": "TCCITY", "type": "esriFieldTypeString"},
+      {"name": "TCSTA", "type": "esriFieldTypeString"},
+      {"name": "TCZIPA", "type": "esriFieldTypeString"},
+      {"name": "TCACDE", "type": "esriFieldTypeInteger"},
+      {"name": "TCPEXT", "type": "esriFieldTypeInteger"},
+      {"name": "TCPHON", "type": "esriFieldTypeInteger"},
+      {"name": "TCACD2", "type": "esriFieldTypeInteger"},
+      {"name": "TCPEX2", "type": "esriFieldTypeInteger"},
+      {"name": "TCPHN2", "type": "esriFieldTypeInteger"}
+    ],
+    "features": [
+      {"attributes": {
+        "TCTXID": "0309770", "TCNAM1": "FEDERAL NATIONAL MORTGAGE",
+        "TCADR1": "PO BOX 650043", "TCADR2": "", "TCCITY": "DALLAS",
+        "TCSTA": "TX", "TCZIPA": "75265-0043",
+        "TCACDE": 801, "TCPEXT": 487, "TCPHON": 3801,
+        "TCACD2": 0, "TCPEX2": 0, "TCPHN2": 0}},
+      {"attributes": {
+        "TCTXID": "0195049", "TCNAM1": "MORETZ AUSTIN THOMAS",
+        "TCADR1": "PO BOX 73", "TCADR2": "", "TCCITY": "LINVILLE FALLS",
+        "TCSTA": "NC", "TCZIPA": "28647",
+        "TCACDE": 828, "TCPEXT": 783, "TCPHON": 905,
+        "TCACD2": 704, "TCPEX2": 274, "TCPHN2": 9014}},
+      {"attributes": {
+        "TCTXID": "0000001", "TCNAM1": "PLACEHOLDER RECORD",
+        "TCADR1": "", "TCADR2": "", "TCCITY": "", "TCSTA": "", "TCZIPA": "",
+        "TCACDE": 999, "TCPEXT": 999, "TCPHON": 9999,
+        "TCACD2": 0, "TCPEX2": 0, "TCPHN2": 0}}
+    ]
+  }
+}

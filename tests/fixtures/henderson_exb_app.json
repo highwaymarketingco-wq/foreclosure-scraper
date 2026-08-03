@@ -1,0 +1,12 @@
+{
+ "exbVersion": "1.19.0",
+ "dataSources": {
+  "7c89c21f8cf6401bbb71560ab9c09ab8": {
+   "type": "WEB_MAP",
+   "itemId": "7c89c21f8cf6401bbb71560ab9c09ab8",
+   "id": "7c89c21f8cf6401bbb71560ab9c09ab8",
+   "portalUrl": "https://hendersoncounty.maps.arcgis.com",
+   "sourceLabel": "Delinquent Real Property Tax Collection Map, Henderson County NC"
+  }
+ }
+}

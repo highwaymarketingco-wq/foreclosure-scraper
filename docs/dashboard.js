@@ -1588,10 +1588,20 @@ async function openDetail(l) {
     if (_sa.principal_office_address) _saRows.push(["Principal office (SOS)", _sa.principal_office_address]);
     if (_sa.status) _saRows.push(["SOS status", _sa.status]);
   }
+  // raw.owner_phone is where EVERY phone actually lives (voter file, county-published
+  // parcel tables, skip trace). It drives the "has phone" filter and the CSV export, and
+  // it is listed in _EV_COVERED as already-rendered — but this block used to read only
+  // raw.skip_trace.phone, so no phone was visible in the detail card at all. That hid
+  // 3,840 voter numbers before the county-phone lane added ~2,100 more.
+  const _op = (l.raw && l.raw.owner_phone) || {};
+  const _phone = _op.phone
+    ? `${_op.phone} (${_op.source || "unknown source"}${_op.line_type && _op.line_type !== "unknown" ? ", " + _op.line_type : ""}${_op.needs_dnc_scrub ? " — DNC scrub required" : ""})`
+    : _st.phone;
+  const _alts = (_op.alternates || []).map((a) => a && a.phone ? `${a.phone} (${a.source || "?"})` : null).filter(Boolean);
   setSec("d-contact-section", "d-contact", [
     ["Owner", _om.owner], ["Mailing address", _om.mailing],
     ["Absentee owner", _om.absentee], ["Out of state", _om.out_of_state],
-    ["Phone", _st.phone], ["Email", _st.email],
+    ["Phone", _phone], ["Other numbers", _alts.join(" · ")], ["Email", _st.email],
   ].concat(_saRows));
 
   // Distress Stack — full breakdown (only the tier badge was shown before)

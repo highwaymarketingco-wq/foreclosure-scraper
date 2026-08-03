@@ -1,0 +1,468 @@
+{
+ "objectIdFieldName": "OBJECTID",
+ "globalIdFieldName": "",
+ "geometryType": "esriGeometryPolygon",
+ "spatialReference": {
+  "wkid": 102100,
+  "latestWkid": 3857
+ },
+ "hasZ": false,
+ "fields": [
+  {
+   "name": "REID",
+   "alias": "REID",
+   "type": "esriFieldTypeString",
+   "length": 20
+  },
+  {
+   "name": "PIN",
+   "alias": "PIN",
+   "type": "esriFieldTypeString",
+   "length": 14
+  },
+  {
+   "name": "PROPERTY_OWNER",
+   "alias": "PROPERTY_OWNER",
+   "type": "esriFieldTypeString",
+   "length": 150
+  },
+  {
+   "name": "LOCATION_ADDR",
+   "alias": "LOCATION_ADDR",
+   "type": "esriFieldTypeString",
+   "length": 100
+  },
+  {
+   "name": "PHYADDR_CITY",
+   "alias": "PHYADDR_CITY",
+   "type": "esriFieldTypeString",
+   "length": 35
+  },
+  {
+   "name": "PHYADDR_ZIP",
+   "alias": "PHYADDR_ZIP",
+   "type": "esriFieldTypeString",
+   "length": 5
+  },
+  {
+   "name": "OWNER_MAIL_1",
+   "alias": "OWNER_MAIL_1",
+   "type": "esriFieldTypeString",
+   "length": 50
+  },
+  {
+   "name": "OWNER_MAIL_2",
+   "alias": "OWNER_MAIL_2",
+   "type": "esriFieldTypeString",
+   "length": 50
+  },
+  {
+   "name": "OWNER_MAIL_3",
+   "alias": "OWNER_MAIL_3",
+   "type": "esriFieldTypeString",
+   "length": 50
+  },
+  {
+   "name": "OWNER_MAIL_CITY",
+   "alias": "OWNER_MAIL_CITY",
+   "type": "esriFieldTypeString",
+   "length": 50
+  },
+  {
+   "name": "OWNER_MAIL_STATE",
+   "alias": "OWNER_MAIL_STATE",
+   "type": "esriFieldTypeString",
+   "length": 20
+  },
+  {
+   "name": "OWNER_MAIL_ZIP",
+   "alias": "OWNER_MAIL_ZIP",
+   "type": "esriFieldTypeString",
+   "length": 6
+  },
+  {
+   "name": "TOTAL_PROP_VALUE",
+   "alias": "TOTAL_PROP_VALUE",
+   "type": "esriFieldTypeDouble"
+  },
+  {
+   "name": "ACREAGE",
+   "alias": "ACREAGE",
+   "type": "esriFieldTypeDouble"
+  },
+  {
+   "name": "Centroid_Latitude",
+   "alias": "Centroid_Latitude",
+   "type": "esriFieldTypeDouble"
+  },
+  {
+   "name": "Centroid_Longitude",
+   "alias": "Centroid_Longitude",
+   "type": "esriFieldTypeDouble"
+  },
+  {
+   "name": "LAND_CLASS",
+   "alias": "LAND_CLASS",
+   "type": "esriFieldTypeString",
+   "length": 50
+  },
+  {
+   "name": "HEATED_AREA",
+   "alias": "HEATED_AREA",
+   "type": "esriFieldTypeInteger"
+  },
+  {
+   "name": "DEED_DATE",
+   "alias": "DEED_DATE",
+   "type": "esriFieldTypeDate",
+   "length": 8
+  }
+ ],
+ "features": [
+  {
+   "attributes": {
+    "REID": "500487",
+    "PIN": "0601332696",
+    "PROPERTY_OWNER": "WOLFE, ANDREW THOMAS",
+    "LOCATION_ADDR": "0 NO ADDRESS ASSIGNED",
+    "PHYADDR_CITY": "HENDERSONVILLE",
+    "PHYADDR_ZIP": "28792",
+    "OWNER_MAIL_1": "PO BOX 15",
+    "OWNER_MAIL_2": null,
+    "OWNER_MAIL_3": null,
+    "OWNER_MAIL_CITY": "EDNEYVILLE",
+    "OWNER_MAIL_STATE": "NC",
+    "OWNER_MAIL_ZIP": "28727",
+    "TOTAL_PROP_VALUE": 1100.0,
+    "ACREAGE": 0.14,
+    "Centroid_Latitude": 35.39020646,
+    "Centroid_Longitude": -82.34467247,
+    "LAND_CLASS": "VACANT LAND",
+    "HEATED_AREA": null,
+    "DEED_DATE": 1782148647000
+   }
+  },
+  {
+   "attributes": {
+    "REID": "9970187",
+    "PIN": "0601970510",
+    "PROPERTY_OWNER": "PATRICIA A JONES TRUST;JONES, PATRICIA A. TRUSTEE",
+    "LOCATION_ADDR": "0 NO ADDRESS ASSIGNED",
+    "PHYADDR_CITY": "HENDERSONVILLE",
+    "PHYADDR_ZIP": "28792",
+    "OWNER_MAIL_1": "17420 SW 54TH ST",
+    "OWNER_MAIL_2": "",
+    "OWNER_MAIL_3": "",
+    "OWNER_MAIL_CITY": "SOUTHWEST RANCHES",
+    "OWNER_MAIL_STATE": "FL",
+    "OWNER_MAIL_ZIP": "33331",
+    "TOTAL_PROP_VALUE": 29000.0,
+    "ACREAGE": 0.49,
+    "Centroid_Latitude": 35.40110777,
+    "Centroid_Longitude": -82.32598833,
+    "LAND_CLASS": "VACANT LAND",
+    "HEATED_AREA": null,
+    "DEED_DATE": 1374638460000
+   }
+  },
+  {
+   "attributes": {
+    "REID": "1001771",
+    "PIN": "0601975215",
+    "PROPERTY_OWNER": "CHIMNEY ROCK ESTATES, HOA",
+    "LOCATION_ADDR": "0 NO ADDRESS ASSIGNED",
+    "PHYADDR_CITY": "HENDERSONVILLE",
+    "PHYADDR_ZIP": "28792",
+    "OWNER_MAIL_1": "146 SOUTHERN SCENIC HTS",
+    "OWNER_MAIL_2": null,
+    "OWNER_MAIL_3": null,
+    "OWNER_MAIL_CITY": "HENDERSONVILLE",
+    "OWNER_MAIL_STATE": "NC",
+    "OWNER_MAIL_ZIP": "28792",
+    "TOTAL_PROP_VALUE": 41500.0,
+    "ACREAGE": 1.1,
+    "Centroid_Latitude": 35.4005794,
+    "Centroid_Longitude": -82.32428157,
+    "LAND_CLASS": "VACANT LAND",
+    "HEATED_AREA": null,
+    "DEED_DATE": 1782402226000
+   }
+  },
+  {
+   "attributes": {
+    "REID": "1010102",
+    "PIN": "0613073387",
+    "PROPERTY_OWNER": "GILKERSON, DREW;GILKERSON, LEYDA",
+    "LOCATION_ADDR": "0 NO ADDRESS ASSIGNED",
+    "PHYADDR_CITY": "GERTON",
+    "PHYADDR_ZIP": "28735",
+    "OWNER_MAIL_1": "737 FITE RD",
+    "OWNER_MAIL_2": "",
+    "OWNER_MAIL_3": "",
+    "OWNER_MAIL_CITY": "WATERTOWN",
+    "OWNER_MAIL_STATE": "TN",
+    "OWNER_MAIL_ZIP": "37184",
+    "TOTAL_PROP_VALUE": 43700.0,
+    "ACREAGE": 1.41,
+    "Centroid_Latitude": 35.45578428,
+    "Centroid_Longitude": -82.32372282,
+    "LAND_CLASS": "VACANT LAND",
+    "HEATED_AREA": null,
+    "DEED_DATE": 1561734840000
+   }
+  },
+  {
+   "attributes": {
+    "REID": "500984",
+    "PIN": "0623059712",
+    "PROPERTY_OWNER": "TAYLOR, JULIA HEIRS",
+    "LOCATION_ADDR": "0 NO ADDRESS ASSIGNED",
+    "PHYADDR_CITY": "HENDERSONVILLE",
+    "PHYADDR_ZIP": "28792",
+    "OWNER_MAIL_1": "13 WESTSIDE DR",
+    "OWNER_MAIL_2": "",
+    "OWNER_MAIL_3": "",
+    "OWNER_MAIL_CITY": "CHARLESTON",
+    "OWNER_MAIL_STATE": "SC",
+    "OWNER_MAIL_ZIP": "29412",
+    "TOTAL_PROP_VALUE": 29000.0,
+    "ACREAGE": 0.68,
+    "Centroid_Latitude": 35.45242487,
+    "Centroid_Longitude": -82.28810741,
+    "LAND_CLASS": "VACANT LAND",
+    "HEATED_AREA": null,
+    "DEED_DATE": 1507125600000
+   }
+  },
+  {
+   "attributes": {
+    "REID": "401186",
+    "PIN": "9526551128",
+    "PROPERTY_OWNER": "MAY, KENNETH F EST",
+    "LOCATION_ADDR": "0 NO ADDRESS ASSIGNED",
+    "PHYADDR_CITY": "HENDERSONVILLE",
+    "PHYADDR_ZIP": "28739",
+    "OWNER_MAIL_1": "4301 MINK RD",
+    "OWNER_MAIL_2": "",
+    "OWNER_MAIL_3": "",
+    "OWNER_MAIL_CITY": "SARASOTA",
+    "OWNER_MAIL_STATE": "FL",
+    "OWNER_MAIL_ZIP": "34235",
+    "TOTAL_PROP_VALUE": 40800.0,
+    "ACREAGE": 1.07,
+    "Centroid_Latitude": 35.24953505,
+    "Centroid_Longitude": -82.60090696,
+    "LAND_CLASS": "VACANT LAND",
+    "HEATED_AREA": null,
+    "DEED_DATE": -19857480000
+   }
+  },
+  {
+   "attributes": {
+    "REID": "1010327",
+    "PIN": "9527884288",
+    "PROPERTY_OWNER": "DION HOLDINGS LLC ANC LLC",
+    "LOCATION_ADDR": "0 NO ADDRESS ASSIGNED",
+    "PHYADDR_CITY": "HENDERSONVILLE",
+    "PHYADDR_ZIP": "28739",
+    "OWNER_MAIL_1": "511 SMOKEY PARK HWY",
+    "OWNER_MAIL_2": "STE B1",
+    "OWNER_MAIL_3": "",
+    "OWNER_MAIL_CITY": "CANDLER",
+    "OWNER_MAIL_STATE": "NC",
+    "OWNER_MAIL_ZIP": "28715",
+    "TOTAL_PROP_VALUE": 16000.0,
+    "ACREAGE": 1.6,
+    "Centroid_Latitude": 35.28571659,
+    "Centroid_Longitude": -82.59137846,
+    "LAND_CLASS": "VACANT LAND",
+    "HEATED_AREA": null,
+    "DEED_DATE": 1216699260000
+   }
+  },
+  {
+   "attributes": {
+    "REID": "1008000",
+    "PIN": "9537095062",
+    "PROPERTY_OWNER": "ARETE INVESTMENT STRATEGIES, LLC",
+    "LOCATION_ADDR": "0 NO ADDRESS ASSIGNED",
+    "PHYADDR_CITY": "HENDERSONVILLE",
+    "PHYADDR_ZIP": "28739",
+    "OWNER_MAIL_1": "6151 DEL MAR DR",
+    "OWNER_MAIL_2": null,
+    "OWNER_MAIL_3": null,
+    "OWNER_MAIL_CITY": "PORT ORANGE",
+    "OWNER_MAIL_STATE": "FL",
+    "OWNER_MAIL_ZIP": "32127",
+    "TOTAL_PROP_VALUE": 19500.0,
+    "ACREAGE": 1.95,
+    "Centroid_Latitude": 35.28791849,
+    "Centroid_Longitude": -82.58447775,
+    "LAND_CLASS": "VACANT LAND",
+    "HEATED_AREA": null,
+    "DEED_DATE": 1571162820000
+   }
+  },
+  {
+   "attributes": {
+    "REID": "9975083",
+    "PIN": "9548676649",
+    "PROPERTY_OWNER": "GARCIA, OLIVER MANZANAREZ",
+    "LOCATION_ADDR": "0 NO ADDRESS ASSIGNED",
+    "PHYADDR_CITY": "HENDERSONVILLE",
+    "PHYADDR_ZIP": "28739",
+    "OWNER_MAIL_1": "106 LEVEL STONE DR",
+    "OWNER_MAIL_2": null,
+    "OWNER_MAIL_3": null,
+    "OWNER_MAIL_CITY": "EAST FLAT ROCK",
+    "OWNER_MAIL_STATE": "NC",
+    "OWNER_MAIL_ZIP": "28726",
+    "TOTAL_PROP_VALUE": 6000.0,
+    "ACREAGE": 0.7,
+    "Centroid_Latitude": 35.3132994,
+    "Centroid_Longitude": -82.53168513,
+    "LAND_CLASS": "VACANT LAND",
+    "HEATED_AREA": null,
+    "DEED_DATE": 1781883315000
+   }
+  },
+  {
+   "attributes": {
+    "REID": "1001870",
+    "PIN": "9559594520",
+    "PROPERTY_OWNER": "RAMIREZ, JOSE WILLIAM TREJO",
+    "LOCATION_ADDR": "24 SPRING SIDE CT",
+    "PHYADDR_CITY": "HENDERSONVILLE",
+    "PHYADDR_ZIP": "28791",
+    "OWNER_MAIL_1": "PO BOX 1254",
+    "OWNER_MAIL_2": null,
+    "OWNER_MAIL_3": null,
+    "OWNER_MAIL_CITY": "FLAT ROCK",
+    "OWNER_MAIL_STATE": "NC",
+    "OWNER_MAIL_ZIP": "28731",
+    "TOTAL_PROP_VALUE": 65000.0,
+    "ACREAGE": 0.1,
+    "Centroid_Latitude": 35.34670073,
+    "Centroid_Longitude": -82.50376137,
+    "LAND_CLASS": "VACANT LAND",
+    "HEATED_AREA": null,
+    "DEED_DATE": 1782158308000
+   }
+  },
+  {
+   "attributes": {
+    "REID": "104711",
+    "PIN": "9568985952",
+    "PROPERTY_OWNER": "GRAHAM, HELEN R;YARN, RANDALL",
+    "LOCATION_ADDR": "0 NO ADDRESS ASSIGNED",
+    "PHYADDR_CITY": "HENDERSONVILLE",
+    "PHYADDR_ZIP": "28792",
+    "OWNER_MAIL_1": "760 LITTLE CREEK RD",
+    "OWNER_MAIL_2": null,
+    "OWNER_MAIL_3": null,
+    "OWNER_MAIL_CITY": "HENDERSONVILLE",
+    "OWNER_MAIL_STATE": "NC",
+    "OWNER_MAIL_ZIP": "28792",
+    "TOTAL_PROP_VALUE": 26000.0,
+    "ACREAGE": 0.11,
+    "Centroid_Latitude": 35.31904101,
+    "Centroid_Longitude": -82.45489347,
+    "LAND_CLASS": "VACANT LAND",
+    "HEATED_AREA": null,
+    "DEED_DATE": 1428292860000
+   }
+  },
+  {
+   "attributes": {
+    "REID": "9906139",
+    "PIN": "9577984987",
+    "PROPERTY_OWNER": "TOWERY, NETTIE ELIZABETH HEIRS",
+    "LOCATION_ADDR": "204 GULL AVE",
+    "PHYADDR_CITY": "EAST FLAT ROCK",
+    "PHYADDR_ZIP": "28726",
+    "OWNER_MAIL_1": "204 GULL AVE",
+    "OWNER_MAIL_2": null,
+    "OWNER_MAIL_3": null,
+    "OWNER_MAIL_CITY": "EAST FLAT ROCK",
+    "OWNER_MAIL_STATE": "NC",
+    "OWNER_MAIL_ZIP": "28726",
+    "TOTAL_PROP_VALUE": 38700.0,
+    "ACREAGE": 0.34,
+    "Centroid_Latitude": 35.29265946,
+    "Centroid_Longitude": -82.42052139,
+    "LAND_CLASS": "AUX IMPROVEMEN",
+    "HEATED_AREA": null,
+    "DEED_DATE": 1122818400000
+   }
+  },
+  {
+   "attributes": {
+    "REID": "9929018",
+    "PIN": "9671846446",
+    "PROPERTY_OWNER": "RAY, THOMAS;SOWRY, HEATHER",
+    "LOCATION_ADDR": "0 NO ADDRESS ASSIGNED",
+    "PHYADDR_CITY": "HENDERSONVILLE",
+    "PHYADDR_ZIP": "28791",
+    "OWNER_MAIL_1": "650 E SUNSET DR",
+    "OWNER_MAIL_2": null,
+    "OWNER_MAIL_3": null,
+    "OWNER_MAIL_CITY": "HENDERSONVILLE",
+    "OWNER_MAIL_STATE": "NC",
+    "OWNER_MAIL_ZIP": "28791",
+    "TOTAL_PROP_VALUE": 175000.0,
+    "ACREAGE": 13.0,
+    "Centroid_Latitude": 35.39019224,
+    "Centroid_Longitude": -82.42742946,
+    "LAND_CLASS": "VACANT LAND",
+    "HEATED_AREA": null,
+    "DEED_DATE": 1784143650000
+   }
+  },
+  {
+   "attributes": {
+    "REID": "300467",
+    "PIN": "9681030858",
+    "PROPERTY_OWNER": "KNOX, CAROLINE ADMINISTRATOR;HARPER, EDNA V ESTATE",
+    "LOCATION_ADDR": "482 HARPER RD",
+    "PHYADDR_CITY": "HENDERSONVILLE",
+    "PHYADDR_ZIP": "28792",
+    "OWNER_MAIL_1": "16 TOWNE PLACE DR",
+    "OWNER_MAIL_2": "SUITE 100",
+    "OWNER_MAIL_3": "",
+    "OWNER_MAIL_CITY": "HENDERSONVILLE",
+    "OWNER_MAIL_STATE": "NC",
+    "OWNER_MAIL_ZIP": "28792",
+    "TOTAL_PROP_VALUE": 50000.0,
+    "ACREAGE": 1.92,
+    "Centroid_Latitude": 35.38852326,
+    "Centroid_Longitude": -82.42263761,
+    "LAND_CLASS": "RES-SINGLE FAMILY",
+    "HEATED_AREA": 960,
+    "DEED_DATE": 1429538400000
+   }
+  },
+  {
+   "attributes": {
+    "REID": "301249",
+    "PIN": "9681045997",
+    "PROPERTY_OWNER": "ROGEL, JUAN NAVA;NAVA, JENNIFER GRICE",
+    "LOCATION_ADDR": "0 NO ADDRESS ASSIGNED",
+    "PHYADDR_CITY": "HENDERSONVILLE",
+    "PHYADDR_ZIP": "28792",
+    "OWNER_MAIL_1": "PO BOX 794",
+    "OWNER_MAIL_2": null,
+    "OWNER_MAIL_3": null,
+    "OWNER_MAIL_CITY": "HENDERSONVILLE",
+    "OWNER_MAIL_STATE": "NC",
+    "OWNER_MAIL_ZIP": "28793",
+    "TOTAL_PROP_VALUE": 3100.0,
+    "ACREAGE": 0.26,
+    "Centroid_Latitude": 35.39155987,
+    "Centroid_Longitude": -82.42086708,
+    "LAND_CLASS": "VACANT LAND",
+    "HEATED_AREA": null,
+    "DEED_DATE": 1781880091000
+   }
+  }
+ ]
+}

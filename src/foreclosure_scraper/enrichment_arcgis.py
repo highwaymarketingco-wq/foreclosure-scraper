@@ -95,23 +95,67 @@ NC_GIS: dict[str, dict[str, Any]] = {
         "addr_field": None,
     },
     "Cleveland": {
-        # GIS_PID/GIS_PIN only; no address field on this layer.
-        # TODO: locate a Cleveland County situs feature service.
-        "url": "https://gis.clevelandcounty.com/arcgis/rest/services/Tax/Tax/MapServer/1/query",
-        "addr_field": None,
+        # WAS Tax/Tax/MapServer/1 (60,245 rows, GIS_PID/GIS_PIN/GIS_Owner* only,
+        # NO address field) — so every Cleveland query returned [] and the county
+        # sat at 1.2% parcel_id / 1.2% deed on the board. The Basemap service
+        # carries the joined COUNTY_* CAMA extract (verified live 2026-08-03:
+        # 70,059 rows, situs 99.4%, owner 99.4%, mailing+city+state+zip 99.4%).
+        #
+        # TRUNCATION: the upstream CAMA extract hard-caps COUNTY_ADDRESS,
+        # COUNTY_OWNER_1 and COUNTY_MAILING_ADDRESS at 20 chars (measured over
+        # all 70,059 rows: 9,032 / 23,539 / 11,893 rows sit at exactly len 20 and
+        # NONE exceed it). Two of the three are repairable from sibling columns on
+        # this same layer — see _repair_cleveland(). COUNTY_MAILING_ADDRESS has no
+        # untruncated sibling and is the residual wall.
+        "url": "https://gis.clevelandcounty.com/arcgis/rest/services/Basemap/Parcels/MapServer/0/query",
+        "addr_field": "COUNTY_ADDRESS",
+        "out_fields": (
+            "GIS_PID,GIS_PIN,GIS_Owner1,GIS_Owner2,GIS_Calculated_Acres,"
+            "GIS_Deeded_Acres,COUNTY_PID,COUNTY_ADDRESS,COUNTY_OWNER_1,"
+            "COUNTY_OWNER_2,COUNTY_MAILING_ADDRESS,COUNTY_CITY,COUNTY_STATE,"
+            "COUNTY_ZIP,COUNTY_LAND_VALUE,COUNTY_BUILDING_VALUE,"
+            "COUNTY_TOTAL_VALUE,COUNTY_DEED,COUNTY_PAGE,COUNTY_ACRES,"
+            "LOCATE_ADDRESS"
+        ),
     },
     "Polk": {
         "url": "https://services1.arcgis.com/23uf7jKvz6SRPFWJ/arcgis/rest/services/TaxParcels/FeatureServer/0/query",
         "addr_field": "PHYSICAL_STREET_ADDRESS",
     },
     "Gaston": {
-        "url": "https://cogserver.gastonianc.gov/serverweb/rest/services/Parcels/GastonCountyParcels/MapServer/0/query",
+        # WAS cogserver.gastonianc.gov (the CITY of Gastonia server) MapServer/0:
+        # alive but a thinner, staler copy — 115,066 rows and no bed/bath, no
+        # vacancy flag, no prior-year owner, no precomputed lat/lng.
+        # The COUNTY's own service is the authority (verified live 2026-08-03):
+        # 117,565 rows, PHYSSTRADD situs 99.97%, Latitude/Longitude 100%,
+        # XBEDRM/XBATHS 73.7%, plus the VacantImpro / CURR_STATE / PRVYRNAME1
+        # columns the cohort flags in _cohort_flags() are built from.
+        # NOTE the layer id is 11, NOT 0 — /FeatureServer/0 returns HTTP 500;
+        # Parcels is the only layer published on this service and it is id 11.
+        "url": "https://gis.gastoncountync.gov/publicgis/rest/services/PublicGIS/Parcels/FeatureServer/11/query",
         "addr_field": "PHYSSTRADD",
+        "out_fields": (
+            "PIN,PID,AKPAR,PHYSSTRADD,CURR_NAME1,CURR_NAME2,CURR_ADDR1,"
+            "CURR_ADDR2,CURR_CITY,CURR_STATE,CURR_ZIPCODE,JAN1_NAME1,"
+            "PRVYRNAME1,PRVYRNAME2,FMV_LAND,FMV_IMPRV,FMV_TOTAL,TOTVAL,"
+            "DEED_BOOK,DEED_PAGE,SALEDATE,SALE_DAY,SALE_MTH,SALE_YEAR,"
+            "SALESAMT,YEARBLT,SQFT,XBEDRM,XBATHS,XHBATHS,CALCAC,DEEDAC,"
+            "VacantImpro,property_use,STRUCTTYPE,Latitude,Longitude,ZIP"
+        ),
     },
     "Transylvania": {
-        # ADDRESS_1 stores the owner's name, ADDRESS_3 stores the situs.
+        # This layer has NO situs column. Verified live 2026-08-03 on real rows:
+        #   OWNER_NAME = owner 1        ADDRESS_1  = owner 2's NAME (not an address)
+        #   ADDRESS_3  = owner MAILING street   CITY/STATE/ZIP_CODE = MAILING city/st/zip
+        #   LEGAL_ADDR = a legal description ("LOT 1 Whitewater Cove 2.00")
+        # addr_field was "ADDRESS_3", which LIKE-matched the property's street
+        # against the OWNER'S MAILING address — a match there means the owner
+        # happens to live on a similarly-named street, not that we found the
+        # parcel. Set to None: parcel_id + centroid are still useful and a wrong
+        # parcel_id corrupts the dedupe key. Mailing/owner for this county is
+        # handled properly in enrichment_owner_mailing.COUNTY_GIS["NC:Transylvania"].
         "url": "https://gis.transylvaniacounty.org/server/rest/services/Parcels/MapServer/2/query",
-        "addr_field": "ADDRESS_3",
+        "addr_field": None,
     },
     "McDowell": {
         "url": "https://services9.arcgis.com/ETP7IuCigkUz7iI9/arcgis/rest/services/McDowell_Parcels/FeatureServer/0/query",
@@ -222,14 +266,24 @@ FIELD_ALIASES = {
     # not a parcel identifier. Multiple parcels recorded in the same book all
     # get the same value, which then poisons the dedupe key. Removed.
     "parcel_id": ("PIN", "TMS", "REID", "PARCELNUMBER", "parno", "pinnum",
-                  "MAPNUMBER", "pid", "PARID", "pid_long", "PARNO"),
+                  "MAPNUMBER", "pid", "PARID", "pid_long", "PARNO",
+                  # Cleveland Basemap: GIS_PID == COUNTY_PID (the tax account no.)
+                  "GIS_PID"),
     "owner_name": ("OwnerName", "OWNAM1", "Owner1", "PROPERTY_OWNER",
                    "full_owner_name", "owner", "ownname", "NAME1", "OWNER_NAME",
                    "Name1", "Name", "OWNER", "NAMECO",
                    # coastal NC: Onslow=OWNER1, Pender=NAME, Dare(WFS)=own1
-                   "OWNER1", "NAME", "own1"),
+                   "OWNER1", "NAME", "own1",
+                   # Gaston county layer 11 = CURR_NAME1; Cleveland Basemap =
+                   # COUNTY_OWNER_1, but GIS_Owner1 is the SAME name untruncated
+                   # so it is listed first (see _repair_cleveland).
+                   "GIS_Owner1", "CURR_NAME1", "COUNTY_OWNER_1"),
     "mailing_addr": ("txt_mailaddr1", "MailAddr", "OWNER_MAIL_1", "mailadd",
-                     "Mailing_Address", "OwnerMailingAddress"),
+                     "Mailing_Address", "OwnerMailingAddress",
+                     # Gaston county layer 11 = CURR_ADDR1 (owner mailing, NOT
+                     # the situs — PHYSSTRADD is the situs);
+                     # Cleveland Basemap = COUNTY_MAILING_ADDRESS.
+                     "CURR_ADDR1", "COUNTY_MAILING_ADDRESS"),
     "site_address": ("PropertyLocation", "siteadd", "Property_Address", "LocAddr",
                      "LOCATION_ADDR", "PHYS_ADDR", "PHYADDR",
                      "PHYSICAL_STREET_ADDRESS", "SITUS_ADDR", "ADDRESS_1",
@@ -237,16 +291,22 @@ FIELD_ALIASES = {
                      # coastal NC: Carteret=PropertyAddress, Onslow=PHYSICALADDRESS,
                      # Pender=PROPERTY_ADDRESS, Dare(WFS)=propertyaddress
                      "PropertyAddress", "PHYSICALADDRESS", "PROPERTY_ADDRESS",
-                     "propertyaddress"),
+                     "propertyaddress",
+                     # Cleveland Basemap: LOCATE_ADDRESS is the untruncated
+                     # situs, COUNTY_ADDRESS the 20-char-capped one.
+                     "LOCATE_ADDRESS", "COUNTY_ADDRESS"),
     "acreage": ("Acreage", "ACRES", "gisacres", "ACREAGE", "LegalAc",
-                "DEEDED_ACRES", "Acres", "ACRE", "Acres_Calc"),
+                "DEEDED_ACRES", "Acres", "ACRE", "Acres_Calc",
+                # Gaston county layer 11 = CALCAC/DEEDAC; Cleveland = COUNTY_ACRES
+                "CALCAC", "DEEDAC", "COUNTY_ACRES", "GIS_Calculated_Acres"),
     "year_built": ("taxYearBui", "AYB", "YearID", "structyear", "YEARBLT",
                    "YEAR_BUILT", "YearBuilt", "year_built", "EFFYR",
                    # coastal NC: Carteret=Y_BLT_HOUSE, Brunswick=ActualYearBuilt,
                    # Dare(WFS)=yrblt
                    "Y_BLT_HOUSE", "ActualYearBuilt", "yrblt"),
-    "bedrooms": ("BEDROOMS", "BedRooms", "Bedrooms", "BEDS"),
-    "bathrooms": ("BATHRMS", "BATHS", "Bathrooms", "FullBaths", "BathRoom"),
+    "bedrooms": ("BEDROOMS", "BedRooms", "Bedrooms", "BEDS", "XBEDRM"),
+    "bathrooms": ("BATHRMS", "BATHS", "Bathrooms", "FullBaths", "BathRoom",
+                  "XBATHS"),
     "living_sqft": ("HEATED_SQ_", "SQFEET", "TotLiving", "TotalLiving", "BLDGSQFT",
                     "BUILDING_S", "HeatedSqFt", "BLDGSF",
                     # coastal NC: Carteret=HtdSqFt, Onslow=HEATEDSQUAREFEET,
@@ -263,14 +323,21 @@ FIELD_ALIASES = {
                   "ACTUALVAL", "APPRAISAL", "Appraised", "Tota_Mark", "Total_Val",
                   # Oconee=CURRENT_VA (total appraised, 560 leads value 3%->99%).
                   # NOT TOTALASMT — that's the annual assessed/levy figure, would corrupt ARV.
-                  "CURRENT_VA"),
+                  "CURRENT_VA",
+                  # Gaston county layer 11 = FMV_TOTAL (TOTVAL is the same
+                  # figure on the older city layer); Cleveland = COUNTY_TOTAL_VALUE.
+                  "FMV_TOTAL", "TOTVAL", "COUNTY_TOTAL_VALUE"),
     "deed_book": ("DEEDBK", "Deed_Book", "DEED_BK", "DeedBook", "DB",
                   # SC SCDOT: Charleston=DEED_BOOK_, Anderson=DBOOK,
                   # Beaufort=Book, Laurens=DEEDBOOK
-                  "DEED_BOOK_", "DBOOK", "Book", "DEEDBOOK"),
+                  "DEED_BOOK_", "DBOOK", "Book", "DEEDBOOK",
+                  # Gaston county layer 11 = DEED_BOOK; Cleveland = COUNTY_DEED
+                  "DEED_BOOK", "COUNTY_DEED"),
     "deed_page": ("DEEDPG", "Deed_Page", "PAGE", "DeedPage", "DP",
                   # SC SCDOT: Anderson=DPAGE, Beaufort=Page, Laurens=DEEDPAGE
-                  "DPAGE", "Page", "DEEDPAGE"),
+                  "DPAGE", "Page", "DEEDPAGE",
+                  # Gaston county layer 11 = DEED_PAGE; Cleveland = COUNTY_PAGE
+                  "DEED_PAGE", "COUNTY_PAGE"),
     "sale_date": ("SaleDate", "SALEDATE", "DEED_YEAR", "SaleYear", "Sale_Year",
                   # SC SCDOT: Pickens=SALEDT (epoch ms), Charleston=RECORDED_D
                   # (epoch ms; DOC_DATE is the instrument date), Anderson=SALE_YEAR,
@@ -282,11 +349,15 @@ FIELD_ALIASES = {
                     # SC SCDOT: Pickens=SALEP, Charleston/Anderson=SALE_PRICE,
                     # Laurens=Considerat (True_Sale is a Y/N flag, not an amount).
                     # (Beaufort/Georgetown SalePrice already above.)
-                    "SALEP", "SALE_PRICE", "Considerat"),
+                    "SALEP", "SALE_PRICE", "Considerat",
+                    # Gaston county layer 11
+                    "SALESAMT"),
     "zoning": ("Zoning", "ZONING", "ZONE", "ZoneCode", "zone_code", "PRIM_ZONE"),
-    "land_value": ("landval", "Land", "LANDVAL", "LandValue", "Land_Val"),
+    "land_value": ("landval", "Land", "LANDVAL", "LandValue", "Land_Val",
+                   "FMV_LAND", "COUNTY_LAND_VALUE"),
     "improvement_value": ("improvval", "Dwelling", "BLDG_VAL", "ImpValue",
-                          "Improvement", "STRUCT_VAL"),
+                          "Improvement", "STRUCT_VAL",
+                          "FMV_IMPRV", "COUNTY_BUILDING_VALUE"),
     "city": ("CITY", "City", "PROP_CITY", "MAIL_CITY"),
     "zip": ("ZIP", "Zip", "PROP_ZIP", "ZIPCODE", "ZipCode", "MAIL_ZIP"),
 }
@@ -319,6 +390,76 @@ def _stitch_situs(attrs: dict[str, Any]) -> str | None:
     if not name:
         return None
     return " ".join(parts)
+
+
+def _repair_cleveland(attrs: dict[str, Any]) -> None:
+    """Undo Cleveland's upstream 20-char CAMA truncation, in place.
+
+    Cleveland's Basemap/Parcels layer joins a CAMA extract whose COUNTY_ADDRESS,
+    COUNTY_OWNER_1 and COUNTY_MAILING_ADDRESS columns are hard-capped at 20
+    characters. Measured over all 70,059 rows (2026-08-03): 9,032 / 23,539 /
+    11,893 rows sit at exactly len 20 and not one row of any of the three
+    exceeds it, which is the signature of a fixed-width cap rather than
+    genuinely short values.
+
+    Two of the three have an untruncated sibling column on the SAME layer:
+      COUNTY_ADDRESS  -> LOCATE_ADDRESS (max len 34; recovers 6,011 of the 8,547
+                         truncated-and-comparable rows, 70.3%)
+      COUNTY_OWNER_1  -> GIS_Owner1     (max len 50; differs on 28,757 rows,
+                         20,796 of which are longer than 20 chars)
+    We take the sibling only when it is strictly LONGER, so a blank or
+    abbreviated sibling can never downgrade a good value.
+
+    COUNTY_MAILING_ADDRESS has NO untruncated sibling anywhere on this service —
+    17.1% of mailing street lines stay clipped. COUNTY_CITY/STATE/ZIP are not
+    truncated (max 15/2/10), so the mail piece still routes; it is the street
+    line that may be short. That is a genuine upstream wall, not a bug here.
+    """
+    def _better(dst: str, src: str) -> None:
+        cur = str(attrs.get(dst) or "").strip()
+        alt = str(attrs.get(src) or "").strip()
+        if alt and alt != "<Null>" and len(alt) > len(cur):
+            attrs[dst] = alt
+
+    _better("COUNTY_ADDRESS", "LOCATE_ADDRESS")
+    _better("COUNTY_OWNER_1", "GIS_Owner1")
+    _better("COUNTY_OWNER_2", "GIS_Owner2")
+
+
+def _cohort_flags(attrs: dict[str, Any]) -> dict[str, bool]:
+    """Derive the vacant / absentee / owner-changed cohorts from a parcel row.
+
+    Verified live against Gaston's 117,565-row layer with returnCountOnly
+    (2026-08-03):
+        vacant                     VacantImpro='Vacant'          21,380
+        absentee                   CURR_STATE not in ('NC','')   10,340
+        vacant AND absentee                                       2,962
+        owner changed this year    PRVYRNAME1 <> CURR_NAME1       4,764
+
+    Only emitted when the underlying column is actually present, so a county
+    without the column gets no flag rather than a false negative. `absentee`
+    deliberately excludes the 43 blank-state rows: a blank mailing state is
+    unknown, not out-of-state. (Counting blanks as absentee is what turns the
+    verified 10,340 into 10,383 / the 2,962 both-cohort into 2,997.)
+    """
+    out: dict[str, bool] = {}
+
+    vac = attrs.get("VacantImpro")
+    if vac not in (None, "", "<Null>"):
+        out["vacant"] = str(vac).strip().upper() == "VACANT"
+
+    state = attrs.get("CURR_STATE")
+    if state is not None:
+        st = str(state).strip().upper()
+        if st and st != "<NULL>":
+            out["absentee"] = st != "NC"
+
+    prev = str(attrs.get("PRVYRNAME1") or "").strip()
+    curr = str(attrs.get("CURR_NAME1") or "").strip()
+    if prev and curr:
+        out["owner_changed"] = prev.upper() != curr.upper()
+
+    return out
 
 
 def _street_keywords(street: str) -> str:
@@ -403,11 +544,19 @@ async def _arcgis_query(
     addr_field: str | None,
     street: str,
     house_no: str | None = None,
+    out_fields: str = "*",
 ) -> list[dict[str, Any]]:
     """Run an address LIKE query, auto-detecting the address field if needed.
 
     Returns list of dicts with both 'attributes' and a derived '_centroid' (lat,lng)
     when geometry is available.
+
+    `out_fields` defaults to "*" for the counties whose alias coverage depends on
+    pulling whatever the layer happens to expose. Counties wired with an explicit
+    column list pass it here so the request names exactly the fields we consume —
+    that is the standing safeguard against a county quietly publishing a
+    sensitive column (Lincoln NC has historically exposed TCSSN1/TCSSN2 on a
+    public layer) and having it land in li.raw via a blanket "*".
     """
     # Brunswick has no single situs column. Match on StreetName only and rebuild
     # the full situs from HouseNumber/StreetDirection/StreetName/StreetType on read.
@@ -432,7 +581,7 @@ async def _arcgis_query(
         where = f"UPPER({addr_field}) LIKE UPPER('{pat.replace(chr(39), chr(39)+chr(39))}')"
         params = {
             "where": where,
-            "outFields": "*",
+            "outFields": out_fields,
             "returnGeometry": "true",          # need centroid for map markers
             "outSR": "4326",                    # request WGS84 lat/lng directly
             "resultRecordCount": "8",
@@ -454,6 +603,10 @@ async def _arcgis_query(
                     situs = _stitch_situs(attrs)
                     if situs:
                         attrs["SITUS_ADDR"] = situs
+                # Cleveland ships a 20-char-truncated CAMA join; swap in the
+                # untruncated sibling columns before any alias reads them.
+                if "COUNTY_ADDRESS" in attrs or "COUNTY_OWNER_1" in attrs:
+                    _repair_cleveland(attrs)
                 # Centroid from polygon rings or point geometry
                 geom = f.get("geometry") or {}
                 cx = cy = None
@@ -693,6 +846,18 @@ def _apply_attrs(li: Listing, attrs: dict[str, Any]) -> int:
             gis["mailing"] = str(mailing).strip()
             filled += 1
 
+    # Vacant / absentee / owner-changed cohorts. These are lead SIGNALS, not
+    # descriptive attributes, so they're written even when the parcel match was
+    # not confident enough for parcel_id — a wrong flag costs an operator one
+    # look, a wrong parcel_id corrupts the dedupe key.
+    flags = _cohort_flags(attrs)
+    if flags:
+        gis = li.raw.setdefault("gis", {})
+        for k, v in flags.items():
+            if k not in gis:
+                gis[k] = v
+                filled += 1
+
     # Recorded deed/book/page + last sale info
     deed_b = _pick(attrs, FIELD_ALIASES["deed_book"])
     deed_p = _pick(attrs, FIELD_ALIASES["deed_page"])
@@ -772,6 +937,7 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
                 counts["fields_filled"] += _apply_attrs(li, best)
             return
 
+        out_fields = "*"
         if li.state == "SC":
             layer = SC_LAYER.get(county_clean)
             if not layer:
@@ -787,15 +953,31 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
             if not cfg:
                 return
             base = cfg["url"]
-            # Auto-detect by default (robust against schema drift). But honor the
-            # Brunswick concat sentinel, which auto-detect can't reconstruct.
-            addr_field = cfg["addr_field"] if cfg.get("addr_field") == _BRUNSWICK_CONCAT else None
+            out_fields = cfg.get("out_fields") or "*"
+            cfg_addr = cfg.get("addr_field")
+            if cfg_addr == _BRUNSWICK_CONCAT:
+                # Concat sentinel — auto-detect can't reconstruct it.
+                addr_field = cfg_addr
+            elif cfg_addr is None:
+                # addr_field=None is the documented "this layer has NO situs
+                # column" marker. It used to fall through to _detect_addr_field
+                # anyway, which is how Transylvania ended up LIKE-matching the
+                # property street against ADDRESS_1 — a field that holds the
+                # SECOND OWNER'S NAME on that layer. There is nothing correct to
+                # match on here, and a bad match writes a wrong parcel_id into
+                # the dedupe key, so skip the county's address path entirely.
+                return
+            else:
+                # Auto-detect (robust against schema drift); the configured
+                # string documents what we expect it to land on.
+                addr_field = None
         else:
             return
 
         async with sem:
             counts["queried"] += 1
-            results = await _arcgis_query(c, base, addr_field, li.street_address, house_no)
+            results = await _arcgis_query(c, base, addr_field, li.street_address,
+                                          house_no, out_fields=out_fields)
             if not results:
                 return
             counts["matched"] += 1

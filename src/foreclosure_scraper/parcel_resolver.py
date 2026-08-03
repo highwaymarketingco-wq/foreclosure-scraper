@@ -29,11 +29,34 @@ _SC_KEY_FIELD = {
 }
 
 
+def _from_bulk_roll(li) -> str | None:
+    """Offline situs-address -> parcel key from the cached county assessor roll
+    (sc_parcel_mailing: Spartanburg + Anderson). Tried BEFORE the SCDOT point
+    query because SCDOT's SC_Parcels is now token-walled and because a lead with
+    a street address but no lat/lng never reaches the geometry path at all."""
+    try:
+        addr = getattr(li, "street_address", None)
+        if not addr:
+            return None
+        from . import sc_parcel_mailing as pm
+        county = (li.county or "").strip().title()
+        if (li.state, county) not in pm.SC_ROLLS or not pm.has_data(li.state, county):
+            return None
+        return pm.resolve_parcel_key(li.state, county, street_address=addr,
+                                     zip_code=getattr(li, "zip_code", None))
+    except Exception:  # noqa: BLE001 — table absent/unreadable: fall through to SCDOT
+        return None
+
+
 async def resolve_sc_parcel_key(li) -> str | None:
     """Return the county parcel key for an SC lead, from li.parcel_id if present,
-    else by point-querying SCDOT with the lead's lat/lng. None if unresolvable."""
+    else from the cached county assessor roll, else by point-querying SCDOT with
+    the lead's lat/lng. None if unresolvable."""
     if li.parcel_id:
         return li.parcel_id
+    local = _from_bulk_roll(li)
+    if local:
+        return local
     layer = SC_LAYER.get(li.county)
     fields = _SC_KEY_FIELD.get(li.county)
     if layer is None or not fields or li.latitude is None or li.longitude is None:

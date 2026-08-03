@@ -371,6 +371,19 @@ DATELESS_OK_SOURCES = {
     # Kania tax-foreclosure filings — filed, then await a scheduled sale date
     # (37 of 56 rows dateless on 2026-07-31).
     "law_firms.kania",
+    # Henderson foreclosure parcels — the list is a definitionExpression of REIDs
+    # inside an ArcGIS Web Experience, not a page. Parcels in foreclosure carry no
+    # published sale date; the sale posture lives in the county's court file.
+    "counties_nc.henderson_foreclosure_parcels",
+    # Henderson code violations (nuisance, solid waste, vehicle graveyard). A live
+    # violation is a standing condition, not a dated event.
+    "counties_nc.henderson_code_violations",
+    # Multi-year arrears history (Buncombe 2009-2026, Oconee DT2023-25, Pickens).
+    # An arrears record is "owes for N years", which has no sale date by nature.
+    "counties.multi_year_delinquent_tax",
+    # Rutherford Sturgis/Avalon delinquent bills. Currently inert behind a robots
+    # wall (returns 0 either way), but required the moment the vendor relaxes it.
+    "counties_nc.rutherford_wildfire_tax",
     # Buncombe tax-foreclosure calendar. Trumba's startDateTime is BIDDING-BEGINS,
     # not the sale, so past-dated rows are still live bids; the scraper withholds
     # sale_date in that case and keeps it in raw.buncombe_tax.bidding_begins_iso.
@@ -1860,6 +1873,19 @@ async def run() -> int:
         if s: enrichment_stats["voter_phone"] = s
     except Exception:
         log.error("voter_phone.failed", traceback=traceback.format_exc())
+
+    # County-PUBLISHED owner phone + mailing, joined on parcel id (Buncombe Accela
+    # ParcelOwner = 73,965 numbers; Lincoln taxpayer table). Runs AFTER voter_phone so it
+    # never clobbers a voter match (identical number -> corroborated_by, different number ->
+    # alternates), and BEFORE line_type so the new numbers get classified in the same pass.
+    # These are county-published, NOT consented: every record carries
+    # county_published/consent="none"/needs_dnc_scrub=True. No dialing is built.
+    try:
+        from .enrichment_county_phone import enrich_county_phone
+        s = await enrich_county_phone(enriched)
+        if s and "skipped" not in s: enrichment_stats["county_phone"] = s
+    except Exception:
+        log.error("county_phone.failed", traceback=traceback.format_exc())
 
     # Classify each owner_phone (free LERG lookup) -> line_type + tcpa_class so landlines become a
     # compliant call lane; runs AFTER voter_phone so it sees the numbers it just set.

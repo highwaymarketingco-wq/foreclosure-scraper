@@ -1,0 +1,1284 @@
+{
+ "SearchToken": "0503C7289B8C6D31A538608EF62C7F79",
+ "TotalRecords": 6,
+ "Records": [
+  {
+   "OwnerAddress": {
+    "ZipExtension": "",
+    "InCareOfName": "",
+    "Line1": "5500 FISH HATCHERY RD",
+    "Line2": "",
+    "Line3": "",
+    "City": "PELION",
+    "State": "SC",
+    "Zip": "29123"
+   },
+   "OwnerName1": "307PEARTREE LLC",
+   "OwnerName2": "",
+   "OwnerName3": "",
+   "Description": "RIVERBEND HIGHLANDS LO524 PL10-122",
+   "CountyCode": "RUTHE",
+   "BillKey": 1131432,
+   "AbstractType": "REI",
+   "Bill": "0000018346-2025-2025-0000-00",
+   "BillYear": 2025,
+   "BillType": "REG",
+   "RecordNumber": "0000018346",
+   "Acres": null,
+   "ParcelNumber": "232588",
+   "ExtractDate": "",
+   "FlagsString": "DLQ,OUTLAW,ADVERTISED",
+   "Flags": [
+    {
+     "AllowPayment": true,
+     "Blacklist": false,
+     "Description": "DELINQUENT",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "CSSClass": null
+    },
+    {
+     "AllowPayment": false,
+     "Blacklist": false,
+     "Description": "OUTSIDE LAW FIRM",
+     "Message": "PLEASE CONTACT KANIA LAW FIRM (828)252-8010",
+     "CSSClass": null
+    },
+    {
+     "AllowPayment": true,
+     "Blacklist": false,
+     "Description": "ADVERTISED",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "CSSClass": null
+    }
+   ],
+   "ChangeDate": "05182026 09:56:30",
+   "RunID": null,
+   "LineItems": [
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "RAFEE",
+     "LevyTypeDescription": "Rutherford County RA Fee",
+     "TaxDistrictCode": "G01",
+     "LevyAmount": 45.0,
+     "LevyAmountDue": 45.0,
+     "CreateDate": "07122025 16:13:52",
+     "ChangeDate": "07122025 16:13:52",
+     "RunID": null,
+     "TaxingUnit": "RUTHERFORD COUNTY"
+    },
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "TAX",
+     "LevyTypeDescription": "Tax",
+     "TaxDistrictCode": "F04",
+     "LevyAmount": 284.67,
+     "LevyAmountDue": 284.67,
+     "CreateDate": "07122025 16:13:52",
+     "ChangeDate": "07122025 16:13:52",
+     "RunID": null,
+     "TaxingUnit": "BILLS CREEK SERV DISTRICT"
+    },
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "TAX",
+     "LevyTypeDescription": "Tax",
+     "TaxDistrictCode": "G01",
+     "LevyAmount": 1520.45,
+     "LevyAmountDue": 1520.45,
+     "CreateDate": "07122025 16:13:52",
+     "ChangeDate": "07122025 16:13:52",
+     "RunID": null,
+     "TaxingUnit": "RUTHERFORD COUNTY"
+    },
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "UDASMFEE2",
+     "LevyTypeDescription": "SOLID WASTE FEE",
+     "TaxDistrictCode": "G01",
+     "LevyAmount": 190.0,
+     "LevyAmountDue": 190.0,
+     "CreateDate": "07122025 16:13:52",
+     "ChangeDate": "07122025 16:13:52",
+     "RunID": null,
+     "TaxingUnit": "RUTHERFORD COUNTY"
+    },
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "ADVT",
+     "LevyTypeDescription": "Advertisement",
+     "TaxDistrictCode": "G01",
+     "LevyAmount": 2.0,
+     "LevyAmountDue": 2.0,
+     "CreateDate": "05182026 09:56:30",
+     "ChangeDate": "05182026 22:00:12",
+     "RunID": null,
+     "TaxingUnit": "RUTHERFORD COUNTY"
+    }
+   ],
+   "FilePaymentHistory": {},
+   "Values": {
+    "CurrentBillDueAmount": 2040.12,
+    "TotalCost": 2.0,
+    "TotalCostDue": 2.0,
+    "Discount1": {
+     "Date": "09022025",
+     "Amount": 0.0
+    },
+    "Discount2": {
+     "Date": "",
+     "Amount": 0.0
+    },
+    "BillInterest": {
+     "Date": "08032026",
+     "BeginDate": "2026-01-06T00:00:00",
+     "FreezeDate": null,
+     "Due": 117.33
+    },
+    "RealValue": 334900.0,
+    "PersonalValue": 0.0,
+    "ExemptValue": 0.0,
+    "DeferredValue": 0.0,
+    "UseValue": 334900.0,
+    "TaxReliefValue": 0.0,
+    "TaxableValue": 334900.0,
+    "TotalDueNoDiscount": 2159.45,
+    "BaseTax": 0.0,
+    "Penalty": 0.0,
+    "Interest": 0.0,
+    "Assessed": null,
+    "Appraised": null,
+    "OriginalAmountDue": 2040.12,
+    "AmountDue": 2159.45
+   },
+   "SitusAddress": {
+    "Line1": "307 PEARTREE DR LAKE LURE NC 28746",
+    "Line2": null,
+    "Line3": null,
+    "City": null,
+    "State": null,
+    "Zip": null
+   },
+   "VIN": {
+    "Value": ""
+   },
+   "PlateNumber": {
+    "Value": ""
+   },
+   "ShowBreakdown": false,
+   "Client": "5b88e44b-0038-4361-8c53-7ce1343ad3ad",
+   "IDHash": "F553E641661E359666ED3BE2193A4C48",
+   "Hash": "9CD623D727BBC106D5B80962FB4E677B9A731CC063AC4DBFA372951AA262F417",
+   "Version": 370,
+   "BillingID": "232588",
+   "LastUpdated": "2026-08-03T09:29:43.7687448Z",
+   "BillDate": "2025-09-01T00:00:00",
+   "ExpireDate": null,
+   "DueDate": "2025-09-01T00:00:00",
+   "Blacklist": null,
+   "PaymentCategory": 1,
+   "IDs": {
+    "ID1": {
+     "Name": "Year",
+     "Value": "2025",
+     "Private": false
+    },
+    "ID2": {
+     "Name": "Receipt",
+     "Value": "0000018346-2025-2025-0000-00",
+     "Private": false
+    },
+    "ID3": {
+     "Name": "Parcel ID",
+     "Value": "232588",
+     "Private": false
+    },
+    "ID4": {
+     "Name": "Type",
+     "Value": "Property",
+     "Private": false
+    },
+    "ID5": null
+   },
+   "Year": 2025,
+   "Name": "307PEARTREE LLC",
+   "RecordType": "Property",
+   "Payment": {
+    "Date": null,
+    "PaymentStatus": "Unpaid",
+    "PaymentStatusOther": null,
+    "Status": "Unpaid",
+    "Amount": 0.0,
+    "AllowPayment": false,
+    "AllowPartialPayment": true,
+    "AllowPrePayment": false,
+    "AllowOverPayment": false,
+    "MinimumPartialPayment": 0.0,
+    "PayerName": null,
+    "PaymentLog": {}
+   },
+   "CartPaymentAmount": 2159.45,
+   "RequiresAuthentication": false,
+   "Locked": false,
+   "RequiresGetDelinquents": false,
+   "isDelinquent": false,
+   "AuthenticationValues": {},
+   "NotificationsSent": null
+  },
+  {
+   "OwnerAddress": {
+    "ZipExtension": "",
+    "InCareOfName": "",
+    "Line1": "1801 CAMPBELL OAKS DRIVE",
+    "Line2": "",
+    "Line3": "",
+    "City": "LAWRENCE",
+    "State": "GA",
+    "Zip": "30045"
+   },
+   "OwnerName1": "1801 CAPITAL VENTURES LLLP",
+   "OwnerName2": "",
+   "OwnerName3": "",
+   "Description": "GREYROCK 1A LO243 PH2A PL26-115",
+   "CountyCode": "RUTHE",
+   "BillKey": 1143171,
+   "AbstractType": "REI",
+   "Bill": "0000012631-2025-2025-0000-00",
+   "BillYear": 2025,
+   "BillType": "REG",
+   "RecordNumber": "0000012631",
+   "Acres": null,
+   "ParcelNumber": "1638529",
+   "ExtractDate": "",
+   "FlagsString": "DLQ,ADVERTISED",
+   "Flags": [
+    {
+     "AllowPayment": true,
+     "Blacklist": false,
+     "Description": "DELINQUENT",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "CSSClass": null
+    },
+    {
+     "AllowPayment": true,
+     "Blacklist": false,
+     "Description": "ADVERTISED",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "CSSClass": null
+    }
+   ],
+   "ChangeDate": "05182026 09:56:32",
+   "RunID": null,
+   "LineItems": [
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "TAX",
+     "LevyTypeDescription": "Tax",
+     "TaxDistrictCode": "F18",
+     "LevyAmount": 5.4,
+     "LevyAmountDue": 5.4,
+     "CreateDate": "07122025 16:23:15",
+     "ChangeDate": "07122025 16:23:15",
+     "RunID": null,
+     "TaxingUnit": "LAKE LURE RURAL SERV DIST"
+    },
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "TAX",
+     "LevyTypeDescription": "Tax",
+     "TaxDistrictCode": "G01",
+     "LevyAmount": 27.24,
+     "LevyAmountDue": 27.24,
+     "CreateDate": "07122025 16:23:15",
+     "ChangeDate": "07122025 16:23:15",
+     "RunID": null,
+     "TaxingUnit": "RUTHERFORD COUNTY"
+    },
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "ADVT",
+     "LevyTypeDescription": "Advertisement",
+     "TaxDistrictCode": "G01",
+     "LevyAmount": 2.0,
+     "LevyAmountDue": 2.0,
+     "CreateDate": "05182026 09:56:32",
+     "ChangeDate": "05182026 22:00:12",
+     "RunID": null,
+     "TaxingUnit": "RUTHERFORD COUNTY"
+    }
+   ],
+   "FilePaymentHistory": {},
+   "Values": {
+    "CurrentBillDueAmount": 32.64,
+    "TotalCost": 2.0,
+    "TotalCostDue": 2.0,
+    "Discount1": {
+     "Date": "09022025",
+     "Amount": 0.0
+    },
+    "Discount2": {
+     "Date": "",
+     "Amount": 0.0
+    },
+    "BillInterest": {
+     "Date": "08032026",
+     "BeginDate": "2026-01-06T00:00:00",
+     "FreezeDate": null,
+     "Due": 2.12
+    },
+    "RealValue": 6000.0,
+    "PersonalValue": 0.0,
+    "ExemptValue": 0.0,
+    "DeferredValue": 0.0,
+    "UseValue": 6000.0,
+    "TaxReliefValue": 0.0,
+    "TaxableValue": 6000.0,
+    "TotalDueNoDiscount": 36.76,
+    "BaseTax": 0.0,
+    "Penalty": 0.0,
+    "Interest": 0.0,
+    "Assessed": null,
+    "Appraised": null,
+    "OriginalAmountDue": 32.64,
+    "AmountDue": 36.76
+   },
+   "SitusAddress": {
+    "Line1": "0 GLEN RIDGE TRL LAKE LURE NC 28746",
+    "Line2": null,
+    "Line3": null,
+    "City": null,
+    "State": null,
+    "Zip": null
+   },
+   "VIN": {
+    "Value": ""
+   },
+   "PlateNumber": {
+    "Value": ""
+   },
+   "ShowBreakdown": false,
+   "Client": "5b88e44b-0038-4361-8c53-7ce1343ad3ad",
+   "IDHash": "FE4D897A1D4D7675D59882A2EF7C8AF3",
+   "Hash": "186C0FD3BA0675FD5F7771DAC46B5E790EC224BDCB42864A3AC0D6B734EB4936",
+   "Version": 367,
+   "BillingID": "1638529",
+   "LastUpdated": "2026-08-03T09:29:57.7849994Z",
+   "BillDate": "2025-09-01T00:00:00",
+   "ExpireDate": null,
+   "DueDate": "2025-09-01T00:00:00",
+   "Blacklist": null,
+   "PaymentCategory": 1,
+   "IDs": {
+    "ID1": {
+     "Name": "Year",
+     "Value": "2025",
+     "Private": false
+    },
+    "ID2": {
+     "Name": "Receipt",
+     "Value": "0000012631-2025-2025-0000-00",
+     "Private": false
+    },
+    "ID3": {
+     "Name": "Parcel ID",
+     "Value": "1638529",
+     "Private": false
+    },
+    "ID4": {
+     "Name": "Type",
+     "Value": "Property",
+     "Private": false
+    },
+    "ID5": null
+   },
+   "Year": 2025,
+   "Name": "1801 CAPITAL VENTURES LLLP",
+   "RecordType": "Property",
+   "Payment": {
+    "Date": null,
+    "PaymentStatus": "Unpaid",
+    "PaymentStatusOther": null,
+    "Status": "Unpaid",
+    "Amount": 0.0,
+    "AllowPayment": false,
+    "AllowPartialPayment": true,
+    "AllowPrePayment": false,
+    "AllowOverPayment": false,
+    "MinimumPartialPayment": 0.0,
+    "PayerName": null,
+    "PaymentLog": {}
+   },
+   "CartPaymentAmount": 36.76,
+   "RequiresAuthentication": false,
+   "Locked": false,
+   "RequiresGetDelinquents": false,
+   "isDelinquent": false,
+   "AuthenticationValues": {},
+   "NotificationsSent": null
+  },
+  {
+   "OwnerAddress": {
+    "ZipExtension": "",
+    "InCareOfName": "",
+    "Line1": "1801 CAMPBELL OAKS DRIVE",
+    "Line2": "",
+    "Line3": "",
+    "City": "LAWRENCE",
+    "State": "GA",
+    "Zip": "30045"
+   },
+   "OwnerName1": "1801 CAPITAL VENTURES LLLP",
+   "OwnerName2": "",
+   "OwnerName3": "",
+   "Description": "GREYROCK 1A LO243 PH2A PL26-115",
+   "CountyCode": "RUTHE",
+   "BillKey": 1143171,
+   "AbstractType": "REI",
+   "Bill": "0000012631-2024-2024-0000-00",
+   "BillYear": 2024,
+   "BillType": "REG",
+   "RecordNumber": "0000012631",
+   "Acres": null,
+   "ParcelNumber": "1638529",
+   "ExtractDate": "",
+   "FlagsString": "DLQ,ADVERTISED",
+   "Flags": [
+    {
+     "AllowPayment": true,
+     "Blacklist": false,
+     "Description": "DELINQUENT",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "CSSClass": null
+    },
+    {
+     "AllowPayment": true,
+     "Blacklist": false,
+     "Description": "ADVERTISED",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "CSSClass": null
+    }
+   ],
+   "ChangeDate": "05182026 09:56:32",
+   "RunID": null,
+   "LineItems": [
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "TAX",
+     "LevyTypeDescription": "Tax",
+     "TaxDistrictCode": "F18",
+     "LevyAmount": 5.4,
+     "LevyAmountDue": 5.4,
+     "CreateDate": "07122025 16:23:15",
+     "ChangeDate": "07122025 16:23:15",
+     "RunID": null,
+     "TaxingUnit": "LAKE LURE RURAL SERV DIST"
+    },
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "TAX",
+     "LevyTypeDescription": "Tax",
+     "TaxDistrictCode": "G01",
+     "LevyAmount": 27.24,
+     "LevyAmountDue": 27.24,
+     "CreateDate": "07122025 16:23:15",
+     "ChangeDate": "07122025 16:23:15",
+     "RunID": null,
+     "TaxingUnit": "RUTHERFORD COUNTY"
+    },
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "ADVT",
+     "LevyTypeDescription": "Advertisement",
+     "TaxDistrictCode": "G01",
+     "LevyAmount": 2.0,
+     "LevyAmountDue": 2.0,
+     "CreateDate": "05182026 09:56:32",
+     "ChangeDate": "05182026 22:00:12",
+     "RunID": null,
+     "TaxingUnit": "RUTHERFORD COUNTY"
+    }
+   ],
+   "FilePaymentHistory": {},
+   "Values": {
+    "CurrentBillDueAmount": 32.64,
+    "TotalCost": 2.0,
+    "TotalCostDue": 2.0,
+    "Discount1": {
+     "Date": "09022025",
+     "Amount": 0.0
+    },
+    "Discount2": {
+     "Date": "",
+     "Amount": 0.0
+    },
+    "BillInterest": {
+     "Date": "08032026",
+     "BeginDate": "2026-01-06T00:00:00",
+     "FreezeDate": null,
+     "Due": 2.12
+    },
+    "RealValue": 6000.0,
+    "PersonalValue": 0.0,
+    "ExemptValue": 0.0,
+    "DeferredValue": 0.0,
+    "UseValue": 6000.0,
+    "TaxReliefValue": 0.0,
+    "TaxableValue": 6000.0,
+    "TotalDueNoDiscount": 36.76,
+    "BaseTax": 0.0,
+    "Penalty": 0.0,
+    "Interest": 0.0,
+    "Assessed": null,
+    "Appraised": null,
+    "OriginalAmountDue": 32.64,
+    "AmountDue": 100.0
+   },
+   "SitusAddress": {
+    "Line1": "0 GLEN RIDGE TRL LAKE LURE NC 28746",
+    "Line2": null,
+    "Line3": null,
+    "City": null,
+    "State": null,
+    "Zip": null
+   },
+   "VIN": {
+    "Value": ""
+   },
+   "PlateNumber": {
+    "Value": ""
+   },
+   "ShowBreakdown": false,
+   "Client": "5b88e44b-0038-4361-8c53-7ce1343ad3ad",
+   "IDHash": "00000000000000000000000000000000",
+   "Hash": "186C0FD3BA0675FD5F7771DAC46B5E790EC224BDCB42864A3AC0D6B734EB4936",
+   "Version": 367,
+   "BillingID": "1638529",
+   "LastUpdated": "2026-08-03T09:29:57.7849994Z",
+   "BillDate": "2025-09-01T00:00:00",
+   "ExpireDate": null,
+   "DueDate": "2025-09-01T00:00:00",
+   "Blacklist": null,
+   "PaymentCategory": 1,
+   "IDs": {
+    "ID1": {
+     "Name": "Year",
+     "Value": "2025",
+     "Private": false
+    },
+    "ID2": {
+     "Name": "Receipt",
+     "Value": "0000012631-2025-2025-0000-00",
+     "Private": false
+    },
+    "ID3": {
+     "Name": "Parcel ID",
+     "Value": "1638529",
+     "Private": false
+    },
+    "ID4": {
+     "Name": "Type",
+     "Value": "Property",
+     "Private": false
+    },
+    "ID5": null
+   },
+   "Year": 2025,
+   "Name": "1801 CAPITAL VENTURES LLLP",
+   "RecordType": "Property",
+   "Payment": {
+    "Date": null,
+    "PaymentStatus": "Unpaid",
+    "PaymentStatusOther": null,
+    "Status": "Unpaid",
+    "Amount": 0.0,
+    "AllowPayment": false,
+    "AllowPartialPayment": true,
+    "AllowPrePayment": false,
+    "AllowOverPayment": false,
+    "MinimumPartialPayment": 0.0,
+    "PayerName": null,
+    "PaymentLog": {}
+   },
+   "CartPaymentAmount": 36.76,
+   "RequiresAuthentication": false,
+   "Locked": false,
+   "RequiresGetDelinquents": false,
+   "isDelinquent": false,
+   "AuthenticationValues": {},
+   "NotificationsSent": null
+  },
+  {
+   "OwnerAddress": {
+    "ZipExtension": "",
+    "InCareOfName": "",
+    "Line1": "642 WHITAKER ROAD",
+    "Line2": "",
+    "Line3": "",
+    "City": "SHELBY",
+    "State": "NC",
+    "Zip": "28152"
+   },
+   "OwnerName1": "ABEE, FRANCES B 'LT'",
+   "OwnerName2": "",
+   "OwnerName3": "",
+   "Description": "1984 SEA 12X65",
+   "CountyCode": "RUTHE",
+   "BillKey": 1185889,
+   "AbstractType": "IND",
+   "Bill": "0000057063-2025-2025-0000-00",
+   "BillYear": 2025,
+   "BillType": "REG",
+   "RecordNumber": "0000057063",
+   "Acres": null,
+   "ParcelNumber": "",
+   "ExtractDate": "",
+   "FlagsString": "DLQ",
+   "Flags": [
+    {
+     "AllowPayment": true,
+     "Blacklist": false,
+     "Description": "DELINQUENT",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "CSSClass": null
+    }
+   ],
+   "ChangeDate": "01062026 05:02:10",
+   "RunID": null,
+   "LineItems": [
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "LLFEE",
+     "LevyTypeDescription": "Late List Penalty",
+     "TaxDistrictCode": "F10",
+     "LevyAmount": 0.1,
+     "LevyAmountDue": 0.1,
+     "CreateDate": "07122025 16:59:57",
+     "ChangeDate": "07122025 16:59:57",
+     "RunID": null,
+     "TaxingUnit": "CLIFFSIDE SERVICE DISTRICT"
+    },
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "LLFEE",
+     "LevyTypeDescription": "Late List Penalty",
+     "TaxDistrictCode": "G01",
+     "LevyAmount": 0.46,
+     "LevyAmountDue": 0.46,
+     "CreateDate": "07122025 16:59:57",
+     "ChangeDate": "07122025 16:59:57",
+     "RunID": null,
+     "TaxingUnit": "RUTHERFORD COUNTY"
+    },
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "TAX",
+     "LevyTypeDescription": "Tax",
+     "TaxDistrictCode": "F10",
+     "LevyAmount": 1.01,
+     "LevyAmountDue": 1.01,
+     "CreateDate": "07122025 16:59:57",
+     "ChangeDate": "07122025 16:59:57",
+     "RunID": null,
+     "TaxingUnit": "CLIFFSIDE SERVICE DISTRICT"
+    },
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "TAX",
+     "LevyTypeDescription": "Tax",
+     "TaxDistrictCode": "G01",
+     "LevyAmount": 4.56,
+     "LevyAmountDue": 4.56,
+     "CreateDate": "07122025 16:59:57",
+     "ChangeDate": "07122025 16:59:57",
+     "RunID": null,
+     "TaxingUnit": "RUTHERFORD COUNTY"
+    }
+   ],
+   "FilePaymentHistory": {},
+   "Values": {
+    "CurrentBillDueAmount": 6.13,
+    "TotalCost": 0.0,
+    "TotalCostDue": 0.0,
+    "Discount1": {
+     "Date": "09022025",
+     "Amount": 0.0
+    },
+    "Discount2": {
+     "Date": "",
+     "Amount": 0.0
+    },
+    "BillInterest": {
+     "Date": "08032026",
+     "BeginDate": "2026-01-06T00:00:00",
+     "FreezeDate": null,
+     "Due": 0.41
+    },
+    "RealValue": 0.0,
+    "PersonalValue": 1005.0,
+    "ExemptValue": 0.0,
+    "DeferredValue": 0.0,
+    "UseValue": 0.0,
+    "TaxReliefValue": 0.0,
+    "TaxableValue": 1005.0,
+    "TotalDueNoDiscount": 6.54,
+    "BaseTax": 0.0,
+    "Penalty": 0.0,
+    "Interest": 0.0,
+    "Assessed": null,
+    "Appraised": null,
+    "OriginalAmountDue": 6.13,
+    "AmountDue": 6.54
+   },
+   "SitusAddress": {
+    "Line1": "894 SCRUGGS RD FOREST CITY NC 28043",
+    "Line2": null,
+    "Line3": null,
+    "City": null,
+    "State": null,
+    "Zip": null
+   },
+   "VIN": {
+    "Value": ""
+   },
+   "PlateNumber": {
+    "Value": ""
+   },
+   "ShowBreakdown": false,
+   "Client": "5b88e44b-0038-4361-8c53-7ce1343ad3ad",
+   "IDHash": "729DC9BF9038518F588EA1FD5691AE20",
+   "Hash": "D7CABF0F38AE02D6F8B75510C31374249B6E5597E79024545AA1E5B1F1C52CF6",
+   "Version": 368,
+   "BillingID": "BillPK-1185889",
+   "LastUpdated": "2026-08-03T09:31:18.8531624Z",
+   "BillDate": "2025-09-01T00:00:00",
+   "ExpireDate": null,
+   "DueDate": "2025-09-01T00:00:00",
+   "Blacklist": null,
+   "PaymentCategory": 1,
+   "IDs": {
+    "ID1": {
+     "Name": "Year",
+     "Value": "2025",
+     "Private": false
+    },
+    "ID2": {
+     "Name": "Receipt",
+     "Value": "0000057063-2025-2025-0000-00",
+     "Private": false
+    },
+    "ID3": {
+     "Name": "Parcel ID",
+     "Value": "",
+     "Private": false
+    },
+    "ID4": {
+     "Name": "Type",
+     "Value": "Property",
+     "Private": false
+    },
+    "ID5": null
+   },
+   "Year": 2025,
+   "Name": "ABEE, FRANCES B 'LT'",
+   "RecordType": "Property",
+   "Payment": {
+    "Date": null,
+    "PaymentStatus": "Unpaid",
+    "PaymentStatusOther": null,
+    "Status": "Unpaid",
+    "Amount": 0.0,
+    "AllowPayment": false,
+    "AllowPartialPayment": true,
+    "AllowPrePayment": false,
+    "AllowOverPayment": false,
+    "MinimumPartialPayment": 0.0,
+    "PayerName": null,
+    "PaymentLog": {}
+   },
+   "CartPaymentAmount": 6.54,
+   "RequiresAuthentication": false,
+   "Locked": false,
+   "RequiresGetDelinquents": false,
+   "isDelinquent": false,
+   "AuthenticationValues": {},
+   "NotificationsSent": null
+  },
+  {
+   "OwnerAddress": {
+    "ZipExtension": "9671",
+    "InCareOfName": "",
+    "Line1": "162 HAWTHORNE LN APT C",
+    "Line2": "",
+    "Line3": "",
+    "City": "FOREST CITY",
+    "State": "NC",
+    "Zip": "28043"
+   },
+   "OwnerName1": "A&F ELECTRICAL SERVICES LLC",
+   "OwnerName2": "",
+   "OwnerName3": "",
+   "Description": "GAP : 2015 HOND 4 DOOR SEDAN",
+   "CountyCode": "RUTHE",
+   "BillKey": 1192756,
+   "AbstractType": "BUS",
+   "Bill": "0140423524-2025-2025-0000-00",
+   "BillYear": 2025,
+   "BillType": "REG",
+   "RecordNumber": "0140423524",
+   "Acres": null,
+   "ParcelNumber": "",
+   "ExtractDate": "",
+   "FlagsString": "GAPBILL,DLQ",
+   "Flags": [
+    {
+     "AllowPayment": true,
+     "Blacklist": false,
+     "Description": "DELINQUENT",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "CSSClass": null
+    }
+   ],
+   "ChangeDate": "01062026 05:02:49",
+   "RunID": null,
+   "LineItems": [
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "TAX",
+     "LevyTypeDescription": "Tax",
+     "TaxDistrictCode": "F06",
+     "LevyAmount": 3.94,
+     "LevyAmountDue": 3.94,
+     "CreateDate": "08212025 07:56:13",
+     "ChangeDate": "08212025 07:56:13",
+     "RunID": null,
+     "TaxingUnit": "SHILOH DANIELTOWN OAK SERV D"
+    },
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "TAX",
+     "LevyTypeDescription": "Tax",
+     "TaxDistrictCode": "G01",
+     "LevyAmount": 22.38,
+     "LevyAmountDue": 22.38,
+     "CreateDate": "08212025 07:56:13",
+     "ChangeDate": "08212025 07:56:13",
+     "RunID": null,
+     "TaxingUnit": "RUTHERFORD COUNTY"
+    }
+   ],
+   "FilePaymentHistory": {},
+   "Values": {
+    "CurrentBillDueAmount": 26.32,
+    "TotalCost": 0.0,
+    "TotalCostDue": 0.0,
+    "Discount1": {
+     "Date": "09022025",
+     "Amount": 0.0
+    },
+    "Discount2": {
+     "Date": "",
+     "Amount": 0.0
+    },
+    "BillInterest": {
+     "Date": "08032026",
+     "BeginDate": "2026-01-06T00:00:00",
+     "FreezeDate": null,
+     "Due": 1.71
+    },
+    "RealValue": 0.0,
+    "PersonalValue": 11830.0,
+    "ExemptValue": 0.0,
+    "DeferredValue": 0.0,
+    "UseValue": 0.0,
+    "TaxReliefValue": 0.0,
+    "TaxableValue": 11830.0,
+    "TotalDueNoDiscount": 28.03,
+    "BaseTax": 0.0,
+    "Penalty": 0.0,
+    "Interest": 0.0,
+    "Assessed": null,
+    "Appraised": null,
+    "OriginalAmountDue": 26.32,
+    "AmountDue": 28.03
+   },
+   "SitusAddress": {
+    "Line1": "162 HAWTHORNE LANE FOREST CITY NC 28043",
+    "Line2": null,
+    "Line3": null,
+    "City": null,
+    "State": null,
+    "Zip": null
+   },
+   "VIN": {
+    "Value": ""
+   },
+   "PlateNumber": {
+    "Value": ""
+   },
+   "ShowBreakdown": false,
+   "Client": "5b88e44b-0038-4361-8c53-7ce1343ad3ad",
+   "IDHash": "54BE56D23783180A92CCDB0BBDC1D327",
+   "Hash": "57181FB900A9EF7A23159F1EC310A5E092ED65B998C4190AD0CB28C30D48CCB6",
+   "Version": 327,
+   "BillingID": "BillPK-1192756",
+   "LastUpdated": "2026-08-03T09:31:40.9191814Z",
+   "BillDate": "2025-09-01T00:00:00",
+   "ExpireDate": null,
+   "DueDate": "2025-09-01T00:00:00",
+   "Blacklist": null,
+   "PaymentCategory": 1,
+   "IDs": {
+    "ID1": {
+     "Name": "Year",
+     "Value": "2025",
+     "Private": false
+    },
+    "ID2": {
+     "Name": "Receipt",
+     "Value": "0140423524-2025-2025-0000-00",
+     "Private": false
+    },
+    "ID3": {
+     "Name": "Parcel ID",
+     "Value": "",
+     "Private": false
+    },
+    "ID4": {
+     "Name": "Type",
+     "Value": "Property",
+     "Private": false
+    },
+    "ID5": null
+   },
+   "Year": 2025,
+   "Name": "A&F ELECTRICAL SERVICES LLC",
+   "RecordType": "Property",
+   "Payment": {
+    "Date": null,
+    "PaymentStatus": "Unpaid",
+    "PaymentStatusOther": null,
+    "Status": "Unpaid",
+    "Amount": 0.0,
+    "AllowPayment": false,
+    "AllowPartialPayment": true,
+    "AllowPrePayment": false,
+    "AllowOverPayment": false,
+    "MinimumPartialPayment": 0.0,
+    "PayerName": null,
+    "PaymentLog": {}
+   },
+   "CartPaymentAmount": 28.03,
+   "RequiresAuthentication": false,
+   "Locked": false,
+   "RequiresGetDelinquents": false,
+   "isDelinquent": false,
+   "AuthenticationValues": {},
+   "NotificationsSent": null
+  },
+  {
+   "OwnerAddress": {
+    "ZipExtension": "",
+    "InCareOfName": "",
+    "Line1": "5609 WEDDINGTON MATTHEWS RD",
+    "Line2": "",
+    "Line3": "",
+    "City": "WEDDINGTON",
+    "State": "NC",
+    "Zip": "28104"
+   },
+   "OwnerName1": "380 PLAZA LLC",
+   "OwnerName2": "",
+   "OwnerName3": "",
+   "Description": "PL43-234",
+   "CountyCode": "RUTHE",
+   "BillKey": 1157486,
+   "AbstractType": "REI",
+   "Bill": "0009001400-2025-2025-0000-99",
+   "BillYear": 2025,
+   "BillType": "REG",
+   "RecordNumber": "0009001400",
+   "Acres": null,
+   "ParcelNumber": "",
+   "ExtractDate": "",
+   "FlagsString": "DLQ,ADVERTISED",
+   "Flags": [
+    {
+     "AllowPayment": true,
+     "Blacklist": false,
+     "Description": "DELINQUENT",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "CSSClass": null
+    },
+    {
+     "AllowPayment": true,
+     "Blacklist": false,
+     "Description": "ADVERTISED",
+     "Message": "FOR QUESTIONS CONTACT COUNTY TAX OFFICE (828)287-6000",
+     "CSSClass": null
+    }
+   ],
+   "ChangeDate": "05182026 09:56:35",
+   "RunID": null,
+   "LineItems": [
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "RAFEE",
+     "LevyTypeDescription": "Rutherford County RA Fee",
+     "TaxDistrictCode": "G01",
+     "LevyAmount": 45.0,
+     "LevyAmountDue": 0.0,
+     "CreateDate": "07122025 16:35:31",
+     "ChangeDate": "01082026 13:08:55",
+     "RunID": null,
+     "TaxingUnit": "RUTHERFORD COUNTY"
+    },
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "TAX",
+     "LevyTypeDescription": "Tax",
+     "TaxDistrictCode": "C08",
+     "LevyAmount": 822.88,
+     "LevyAmountDue": 16.46,
+     "CreateDate": "07122025 16:35:31",
+     "ChangeDate": "01082026 13:08:55",
+     "RunID": null,
+     "TaxingUnit": "TOWN OF SPINDALE"
+    },
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "TAX",
+     "LevyTypeDescription": "Tax",
+     "TaxDistrictCode": "L08",
+     "LevyAmount": 69.5,
+     "LevyAmountDue": 1.39,
+     "CreateDate": "07122025 16:35:31",
+     "ChangeDate": "01082026 13:08:55",
+     "RunID": null,
+     "TaxingUnit": "TOWN OF SPINDALE LIBRARY"
+    },
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "TAX",
+     "LevyTypeDescription": "Tax",
+     "TaxDistrictCode": "G01",
+     "LevyAmount": 631.06,
+     "LevyAmountDue": 12.62,
+     "CreateDate": "07122025 16:35:31",
+     "ChangeDate": "01082026 13:08:55",
+     "RunID": null,
+     "TaxingUnit": "RUTHERFORD COUNTY"
+    },
+    {
+     "CountyCode": "RUTHE",
+     "LevyType": "ADVT",
+     "LevyTypeDescription": "Advertisement",
+     "TaxDistrictCode": "G01",
+     "LevyAmount": 2.0,
+     "LevyAmountDue": 2.0,
+     "CreateDate": "05182026 09:56:35",
+     "ChangeDate": "05182026 22:00:12",
+     "RunID": null,
+     "TaxingUnit": "RUTHERFORD COUNTY"
+    }
+   ],
+   "FilePaymentHistory": {
+    "1719546": {
+     "CountyCode": "RUTHE",
+     "BillKey": 1157486,
+     "PaymentKey": 1719546,
+     "TransactionGroupNumber": 1008181,
+     "TransactionCreateDate": "01082026 13:08:55",
+     "PaidBy": "380 PLAZA LLC",
+     "PaidAmount": 1568.44,
+     "InterestThroughDate": "01082026",
+     "TransactionType": "PAYMENT",
+     "TransactionStatus": "PROCESSED",
+     "ChangeDate": "01082026 13:08:55",
+     "CheckNumber": "112",
+     "ProcessedBy": "MORROW, ADRIA",
+     "RunID": null,
+     "Distribution": [
+      {
+       "CountyCode": "RUTHE",
+       "BillKey": 1157486,
+       "PaymentKey": 1719546,
+       "DistributionType": "TAX",
+       "DistributionCode": "",
+       "TaxDistrictCode": "L08",
+       "DistributionAmount": 68.11,
+       "RunID": null
+      }
+     ]
+    }
+   },
+   "Values": {
+    "CurrentBillDueAmount": 30.47,
+    "TotalCost": 2.0,
+    "TotalCostDue": 2.0,
+    "Discount1": {
+     "Date": "09022025",
+     "Amount": 0.0
+    },
+    "Discount2": {
+     "Date": "",
+     "Amount": 0.0
+    },
+    "BillInterest": {
+     "Date": "08032026",
+     "BeginDate": "2026-01-06T00:00:00",
+     "FreezeDate": null,
+     "Due": 1.37
+    },
+    "RealValue": 139000.0,
+    "PersonalValue": 0.0,
+    "ExemptValue": 0.0,
+    "DeferredValue": 0.0,
+    "UseValue": 139000.0,
+    "TaxReliefValue": 0.0,
+    "TaxableValue": 139000.0,
+    "TotalDueNoDiscount": 33.84,
+    "BaseTax": 0.0,
+    "Penalty": 0.0,
+    "Interest": 0.0,
+    "Assessed": null,
+    "Appraised": null,
+    "OriginalAmountDue": 1568.44,
+    "AmountDue": 33.84
+   },
+   "SitusAddress": {
+    "Line1": "838 OAKLAND RD SPINDALE NC 28160",
+    "Line2": null,
+    "Line3": null,
+    "City": null,
+    "State": null,
+    "Zip": null
+   },
+   "VIN": {
+    "Value": ""
+   },
+   "PlateNumber": {
+    "Value": ""
+   },
+   "ShowBreakdown": false,
+   "Client": "5b88e44b-0038-4361-8c53-7ce1343ad3ad",
+   "IDHash": "B5688DD066F80D736E66913B16B295B4",
+   "Hash": "B12EC6CEBCB15DC70A72B6A730763DCBEC3F1D2D25FD23FEC5F516EBF40BCC7C",
+   "Version": 380,
+   "BillingID": "1215531",
+   "LastUpdated": "2026-08-03T09:30:21.6440178Z",
+   "BillDate": "2025-09-01T00:00:00",
+   "ExpireDate": null,
+   "DueDate": "2025-09-01T00:00:00",
+   "Blacklist": null,
+   "PaymentCategory": 1,
+   "IDs": {
+    "ID1": {
+     "Name": "Year",
+     "Value": "2025",
+     "Private": false
+    },
+    "ID2": {
+     "Name": "Receipt",
+     "Value": "0009001400-2025-2025-0000-00",
+     "Private": false
+    },
+    "ID3": {
+     "Name": "Parcel ID",
+     "Value": "1215531",
+     "Private": false
+    },
+    "ID4": {
+     "Name": "Type",
+     "Value": "Property",
+     "Private": false
+    },
+    "ID5": null
+   },
+   "Year": 2025,
+   "Name": "380 PLAZA LLC",
+   "RecordType": "Property",
+   "Payment": {
+    "Date": "2026-01-08T00:00:00",
+    "PaymentStatus": "Unpaid",
+    "PaymentStatusOther": null,
+    "Status": "Unpaid",
+    "Amount": 1568.44,
+    "AllowPayment": false,
+    "AllowPartialPayment": true,
+    "AllowPrePayment": false,
+    "AllowOverPayment": false,
+    "MinimumPartialPayment": 0.0,
+    "PayerName": null,
+    "PaymentLog": {}
+   },
+   "CartPaymentAmount": 33.84,
+   "RequiresAuthentication": false,
+   "Locked": false,
+   "RequiresGetDelinquents": false,
+   "isDelinquent": false,
+   "AuthenticationValues": {},
+   "NotificationsSent": null
+  }
+ ],
+ "Facets": {
+  "Status": {
+   "Items": [
+    {
+     "Key": "Unpaid",
+     "DocCount": 29319
+    }
+   ]
+  },
+  "Type": {
+   "Items": [
+    {
+     "Key": "Property",
+     "DocCount": 29319
+    }
+   ]
+  },
+  "Years": {
+   "Items": [
+    {
+     "Key": "2025",
+     "DocCount": 7365
+    },
+    {
+     "Key": "2024",
+     "DocCount": 5709
+    },
+    {
+     "Key": "2023",
+     "DocCount": 4691
+    },
+    {
+     "Key": "2022",
+     "DocCount": 2694
+    },
+    {
+     "Key": "2021",
+     "DocCount": 1396
+    },
+    {
+     "Key": "2020",
+     "DocCount": 1818
+    },
+    {
+     "Key": "2019",
+     "DocCount": 2368
+    },
+    {
+     "Key": "2018",
+     "DocCount": 1685
+    },
+    {
+     "Key": "2017",
+     "DocCount": 813
+    },
+    {
+     "Key": "2016",
+     "DocCount": 780
+    }
+   ]
+  }
+ }
+}

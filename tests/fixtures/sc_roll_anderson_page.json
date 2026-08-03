@@ -1,0 +1,575 @@
+{
+ "objectIdFieldName": "OBJECTID",
+ "globalIdFieldName": "",
+ "geometryType": "esriGeometryPolygon",
+ "spatialReference": {
+  "wkid": 102100,
+  "latestWkid": 3857
+ },
+ "fields": [
+  {
+   "name": "OBJECTID",
+   "alias": "OBJECTID",
+   "type": "esriFieldTypeOID"
+  },
+  {
+   "name": "TMS",
+   "alias": "TMS",
+   "type": "esriFieldTypeString",
+   "length": 11
+  },
+  {
+   "name": "OWNER",
+   "alias": "OWNER",
+   "type": "esriFieldTypeString",
+   "length": 40
+  },
+  {
+   "name": "OWNER_ADDR",
+   "alias": "OWNER_ADDR",
+   "type": "esriFieldTypeString",
+   "length": 31
+  },
+  {
+   "name": "CITY",
+   "alias": "CITY",
+   "type": "esriFieldTypeString",
+   "length": 25
+  },
+  {
+   "name": "ZIPCODE",
+   "alias": "ZIPCODE",
+   "type": "esriFieldTypeString",
+   "length": 9
+  },
+  {
+   "name": "DBOOK",
+   "alias": "DBOOK",
+   "type": "esriFieldTypeString",
+   "length": 6
+  },
+  {
+   "name": "DPAGE",
+   "alias": "DPAGE",
+   "type": "esriFieldTypeString",
+   "length": 6
+  },
+  {
+   "name": "PHYS_ADDR",
+   "alias": "PHYS_ADDR",
+   "type": "esriFieldTypeString",
+   "length": 43
+  },
+  {
+   "name": "SALE_PRICE",
+   "alias": "SALE_PRICE",
+   "type": "esriFieldTypeDouble"
+  },
+  {
+   "name": "PREV_OWNER",
+   "alias": "PREV_OWNER",
+   "type": "esriFieldTypeString",
+   "length": 38
+  },
+  {
+   "name": "MRKT_VALUE",
+   "alias": "MRKT_VALUE",
+   "type": "esriFieldTypeDouble"
+  },
+  {
+   "name": "SALE_YEAR",
+   "alias": "SALE_YEAR",
+   "type": "esriFieldTypeInteger"
+  },
+  {
+   "name": "IMPRV",
+   "alias": "IMPRV",
+   "type": "esriFieldTypeString",
+   "length": 5
+  },
+  {
+   "name": "RATIO",
+   "alias": "RATIO",
+   "type": "esriFieldTypeString",
+   "length": 5
+  }
+ ],
+ "features": [
+  {
+   "attributes": {
+    "OBJECTID": 1,
+    "TMS": "60501002",
+    "OWNER": "GLENN BETTY                             ",
+    "OWNER_ADDR": "3701 OLD DOBBINS BRIDGE RD     ",
+    "CITY": "FAIR PLAY  SC",
+    "ZIPCODE": "29643",
+    "DBOOK": "11384 ",
+    "DPAGE": "140",
+    "PHYS_ADDR": "3701 OLD DOBBINS BRIDGE  ",
+    "SALE_PRICE": 10,
+    "PREV_OWNER": "GLENN BETTY                           ",
+    "MRKT_VALUE": 75930,
+    "SALE_YEAR": 2014,
+    "IMPRV": "1",
+    "RATIO": "RC"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 2,
+    "TMS": "692401005",
+    "OWNER": "CLEM MELISSA L + PAUL J                 ",
+    "OWNER_ADDR": "300 SPRINGSIDE CIR             ",
+    "CITY": "ANDERSON  SC",
+    "ZIPCODE": "29625",
+    "DBOOK": "4612  ",
+    "DPAGE": "192",
+    "PHYS_ADDR": "SPRINGSIDE        300 SPRINGSIDE CIR       ",
+    "SALE_PRICE": 5,
+    "PREV_OWNER": "MARTIN MELISSA L                      ",
+    "MRKT_VALUE": 225270,
+    "SALE_YEAR": 2002,
+    "IMPRV": "2",
+    "RATIO": "R"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 3,
+    "TMS": "730004002",
+    "OWNER": "HARPER PATRICIA                         ",
+    "OWNER_ADDR": "202 VICKERY DR                 ",
+    "CITY": "ANDERSON  SC",
+    "ZIPCODE": "29626",
+    "DBOOK": "15851 ",
+    "DPAGE": "196",
+    "PHYS_ADDR": "202 VICKERY DR           ",
+    "SALE_PRICE": 135000,
+    "PREV_OWNER": "ADUKAY LLC                            ",
+    "MRKT_VALUE": 133790,
+    "SALE_YEAR": 2022,
+    "IMPRV": "1",
+    "RATIO": "C"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 4,
+    "TMS": "910002047",
+    "OWNER": "RUNION JOSHUA SEAN + BRANDI COUCH       ",
+    "OWNER_ADDR": "115 HICKORY LN                 ",
+    "CITY": "PENDLETON  SC",
+    "ZIPCODE": "29670",
+    "DBOOK": "12696 ",
+    "DPAGE": "264",
+    "PHYS_ADDR": "115 HICKORY LN           ",
+    "SALE_PRICE": 62720,
+    "PREV_OWNER": "MULLIKIN MARTHA E ET AL               ",
+    "MRKT_VALUE": 354500,
+    "SALE_YEAR": 2017,
+    "IMPRV": "1",
+    "RATIO": "RC"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 5,
+    "TMS": "910002052",
+    "OWNER": "MCGLOHON CHARLES N + TRACY H            ",
+    "OWNER_ADDR": "940 MILLWEE CRK RD             ",
+    "CITY": "PENDLETON  SC",
+    "ZIPCODE": "296708823",
+    "DBOOK": "13606 ",
+    "DPAGE": "312",
+    "PHYS_ADDR": "940 MILLWEE CREEK RD     ",
+    "SALE_PRICE": 128800,
+    "PREV_OWNER": "SMITH BRUCE L + JENNIFER C            ",
+    "MRKT_VALUE": 563110,
+    "SALE_YEAR": 2018,
+    "IMPRV": "3",
+    "RATIO": "AR"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 6,
+    "TMS": "930010003",
+    "OWNER": "SKATELAND OF SOUTH CAROLINA INC         ",
+    "OWNER_ADDR": "4142 CLEMSON BLVD              ",
+    "CITY": "ANDERSON  SC",
+    "ZIPCODE": "296211108",
+    "DBOOK": "20P   ",
+    "DPAGE": "603",
+    "PHYS_ADDR": "",
+    "SALE_PRICE": 25000,
+    "PREV_OWNER": "CROMER A EUGENE + LARRY E WHITE       ",
+    "MRKT_VALUE": 101900,
+    "SALE_YEAR": 1985,
+    "IMPRV": "0",
+    "RATIO": "C"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 7,
+    "TMS": "931501015",
+    "OWNER": "STORE MASTER FUNDING V LLC              ",
+    "OWNER_ADDR": "4324 WADE HAMPTON BLVD STE B   ",
+    "CITY": "TAYLORS  SC",
+    "ZIPCODE": "29687",
+    "DBOOK": "11335 ",
+    "DPAGE": "203",
+    "PHYS_ADDR": "CLEMSON BLVD DEV  105 INTERSTATE BLVD      ",
+    "SALE_PRICE": 1700000,
+    "PREV_OWNER": "OLD MILL STREAM 2 LLC                 ",
+    "MRKT_VALUE": 2227600,
+    "SALE_YEAR": 2014,
+    "IMPRV": "1",
+    "RATIO": "C"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 8,
+    "TMS": "460201054",
+    "OWNER": "JAMES JOSEPH FRANCIS JR REV TRUST       ",
+    "OWNER_ADDR": "16 HEMINGFORD CIR              ",
+    "CITY": "SIMPSONVILLE  SC",
+    "ZIPCODE": "29681",
+    "DBOOK": "13770 ",
+    "DPAGE": "286",
+    "PHYS_ADDR": "THE SHOALS        231 BAYVIEW LN           ",
+    "SALE_PRICE": 175000,
+    "PREV_OWNER": "REGISTER MARK                         ",
+    "MRKT_VALUE": 213820,
+    "SALE_YEAR": 2019,
+    "IMPRV": "1",
+    "RATIO": "C"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 9,
+    "TMS": "460201055",
+    "OWNER": "KIZER DONALD M + HEATHER ZIEGLER        ",
+    "OWNER_ADDR": "239 DOCKSIDE WAY               ",
+    "CITY": "ANDERSON  SC",
+    "ZIPCODE": "29625",
+    "DBOOK": "16472 ",
+    "DPAGE": "308",
+    "PHYS_ADDR": "THE SHOALS        235 HARBOR DR            ",
+    "SALE_PRICE": 5,
+    "PREV_OWNER": "KIZER HEATHER ZIEGLER + DONALD MYERS  ",
+    "MRKT_VALUE": 187740,
+    "SALE_YEAR": 2022,
+    "IMPRV": "1",
+    "RATIO": "C"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 10,
+    "TMS": "470102066",
+    "OWNER": "CRUZ BERMUDEZ LUCISBEL + TYLER P POTTS  ",
+    "OWNER_ADDR": "503 EDGEWATER DR               ",
+    "CITY": "ANDERSON  SC",
+    "ZIPCODE": "296265107",
+    "DBOOK": "13976 ",
+    "DPAGE": "285",
+    "PHYS_ADDR": "BRIDGEWATER       503 EDGEWATER DR         ",
+    "SALE_PRICE": 340000,
+    "PREV_OWNER": "TAYLOR BRYAN H + WENDY T              ",
+    "MRKT_VALUE": 385470,
+    "SALE_YEAR": 2019,
+    "IMPRV": "1",
+    "RATIO": "R"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 11,
+    "TMS": "470102067",
+    "OWNER": "DORSEY JAMES H JR                       ",
+    "OWNER_ADDR": "505 EDGEWATER DR               ",
+    "CITY": "ANDERSON  SC",
+    "ZIPCODE": "29625",
+    "DBOOK": "16542 ",
+    "DPAGE": "256",
+    "PHYS_ADDR": "BRIDGEWATER       505 EDGEWATER DR         ",
+    "SALE_PRICE": 1,
+    "PREV_OWNER": "DORSEY JAMES H JR + JENNY V           ",
+    "MRKT_VALUE": 416210,
+    "SALE_YEAR": 2021,
+    "IMPRV": "1",
+    "RATIO": "R"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 12,
+    "TMS": "940006047",
+    "OWNER": "MSC PROPERTY HOLDINGS LLC               ",
+    "OWNER_ADDR": "101 CONCORD CIR                ",
+    "CITY": "ANDERSON  SC",
+    "ZIPCODE": "29621",
+    "DBOOK": "15915 ",
+    "DPAGE": "291",
+    "PHYS_ADDR": "NORTH PARK COMMERC                         ",
+    "SALE_PRICE": 135000,
+    "PREV_OWNER": "SCOTT CRAIG B                         ",
+    "MRKT_VALUE": 75310,
+    "SALE_YEAR": 2022,
+    "IMPRV": "0",
+    "RATIO": "C"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 13,
+    "TMS": "490101007",
+    "OWNER": "TRABOOKIS CHRISTOPHER G + GERALDINE C   ",
+    "OWNER_ADDR": "5 WOODS EDGE CT                ",
+    "CITY": "GREENVILLE  SC",
+    "ZIPCODE": "29615",
+    "DBOOK": "17N   ",
+    "DPAGE": "956",
+    "PHYS_ADDR": "OAK TERRACE EXT                            ",
+    "SALE_PRICE": 0,
+    "PREV_OWNER": "N/A                                   ",
+    "MRKT_VALUE": 106000,
+    "SALE_YEAR": 1973,
+    "IMPRV": "0",
+    "RATIO": "C"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 14,
+    "TMS": "550002001",
+    "OWNER": "GILLIARD MARY ET AL                     ",
+    "OWNER_ADDR": "920 OPRY HOUSE RD              ",
+    "CITY": "STARR  SC",
+    "ZIPCODE": "296849485",
+    "DBOOK": "04L   ",
+    "DPAGE": "180",
+    "PHYS_ADDR": "",
+    "SALE_PRICE": 0,
+    "PREV_OWNER": "N/A                                   ",
+    "MRKT_VALUE": 48250,
+    "SALE_YEAR": 1914,
+    "IMPRV": "0",
+    "RATIO": "A"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 15,
+    "TMS": "550002003",
+    "OWNER": "HEMMER AARON + LORI                     ",
+    "OWNER_ADDR": "1005 OPRY HOUSE RD             ",
+    "CITY": "STARR  SC",
+    "ZIPCODE": "29684",
+    "DBOOK": "13836 ",
+    "DPAGE": "25",
+    "PHYS_ADDR": "",
+    "SALE_PRICE": 1,
+    "PREV_OWNER": "ALEXANDER GARY L + HELLAN S           ",
+    "MRKT_VALUE": 243720,
+    "SALE_YEAR": 2019,
+    "IMPRV": "1",
+    "RATIO": "A"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 16,
+    "TMS": "550002004",
+    "OWNER": "MAULDIN NARCIO C TRUSTEE + ROBERT C LIFE",
+    "OWNER_ADDR": "102 RUCKER RD                  ",
+    "CITY": "ANDERSON  SC",
+    "ZIPCODE": "29624",
+    "DBOOK": "850   ",
+    "DPAGE": "66",
+    "PHYS_ADDR": "",
+    "SALE_PRICE": 5,
+    "PREV_OWNER": "COWAN ROBERT C TRUSTEE                ",
+    "MRKT_VALUE": 448590,
+    "SALE_YEAR": 1989,
+    "IMPRV": "0",
+    "RATIO": "A"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 17,
+    "TMS": "620503016",
+    "OWNER": "LEE RUBY YVONNE                         ",
+    "OWNER_ADDR": "709 ANDERSON RD                ",
+    "CITY": "PENDLETON  SC",
+    "ZIPCODE": "296709187",
+    "DBOOK": "1901  ",
+    "DPAGE": "25",
+    "PHYS_ADDR": "709 ANDERSON RD          ",
+    "SALE_PRICE": 5,
+    "PREV_OWNER": "LEE CONSTANCE YVETTE                  ",
+    "MRKT_VALUE": 11000,
+    "SALE_YEAR": 1994,
+    "IMPRV": "0",
+    "RATIO": "C"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 18,
+    "TMS": "620503018",
+    "OWNER": "WEBB ANNIE MAE                          ",
+    "OWNER_ADDR": "2013 REFUGE RD                 ",
+    "CITY": "PENDLETON  SC",
+    "ZIPCODE": "296709491",
+    "DBOOK": "867   ",
+    "DPAGE": "12",
+    "PHYS_ADDR": "2013 REFUGE RD           ",
+    "SALE_PRICE": 1750,
+    "PREV_OWNER": "                                      ",
+    "MRKT_VALUE": 11000,
+    "SALE_YEAR": 1989,
+    "IMPRV": "0",
+    "RATIO": "R"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 19,
+    "TMS": "640201005",
+    "OWNER": "LANDRETH JOHNNY C JR                    ",
+    "OWNER_ADDR": "PO BOX 138                     ",
+    "CITY": "LA FRANCE  SC",
+    "ZIPCODE": "29656",
+    "DBOOK": "3716  ",
+    "DPAGE": "48",
+    "PHYS_ADDR": "9 SECOND ST              ",
+    "SALE_PRICE": 1,
+    "PREV_OWNER": "LANDRETH JOHNNY C SR                  ",
+    "MRKT_VALUE": 10300,
+    "SALE_YEAR": 2000,
+    "IMPRV": "1",
+    "RATIO": "C"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 20,
+    "TMS": "390601043",
+    "OWNER": "BROWN MICHAEL S III + CHELSEY N         ",
+    "OWNER_ADDR": "237 BROWN RD                   ",
+    "CITY": "PENDLETON  SC",
+    "ZIPCODE": "29670",
+    "DBOOK": "13572 ",
+    "DPAGE": "98",
+    "PHYS_ADDR": "237 BROWN RD             ",
+    "SALE_PRICE": 10,
+    "PREV_OWNER": "BROWN MICHAEL STEVE SR                ",
+    "MRKT_VALUE": 196460,
+    "SALE_YEAR": 2018,
+    "IMPRV": "1",
+    "RATIO": "R"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 21,
+    "TMS": "290101014",
+    "OWNER": "MATHIS SAMUEL EDWARD + JACQUELINE M FARM",
+    "OWNER_ADDR": "PO BOX 1807                    ",
+    "CITY": "GREER  SC",
+    "ZIPCODE": "29652",
+    "DBOOK": "11184 ",
+    "DPAGE": "225",
+    "PHYS_ADDR": "WIDEWATER                                  ",
+    "SALE_PRICE": 10,
+    "PREV_OWNER": "MATHIS MARY ELLEN C                   ",
+    "MRKT_VALUE": 128400,
+    "SALE_YEAR": 2013,
+    "IMPRV": "0",
+    "RATIO": "C"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 22,
+    "TMS": "290101015",
+    "OWNER": "MATHIS SAMUEL EDWARD + JACQUELINE M FARM",
+    "OWNER_ADDR": "PO BOX 1807                    ",
+    "CITY": "GREER  SC",
+    "ZIPCODE": "29652",
+    "DBOOK": "11184 ",
+    "DPAGE": "225",
+    "PHYS_ADDR": "WIDEWATER         145 HUDGINS LAKE RD      ",
+    "SALE_PRICE": 10,
+    "PREV_OWNER": "MATHIS MARY ELLEN                     ",
+    "MRKT_VALUE": 128400,
+    "SALE_YEAR": 2013,
+    "IMPRV": "0",
+    "RATIO": "C"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 23,
+    "TMS": "340101077",
+    "OWNER": "DICKERSON PEGGY M                       ",
+    "OWNER_ADDR": "19A HARTWELL VILLAS            ",
+    "CITY": "ANDERSON  SC",
+    "ZIPCODE": "29626",
+    "DBOOK": "11487 ",
+    "DPAGE": "124",
+    "PHYS_ADDR": "HARTWELL VILLAS   19A HARTWELL VILLAS      ",
+    "SALE_PRICE": 120000,
+    "PREV_OWNER": "COULIS JOHN L + CLARE R               ",
+    "MRKT_VALUE": 200000,
+    "SALE_YEAR": 2014,
+    "IMPRV": "1",
+    "RATIO": "RC"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 24,
+    "TMS": "401001005",
+    "OWNER": "RHODES JEROME M + KATHY A               ",
+    "OWNER_ADDR": "PO BOX 467                     ",
+    "CITY": "SANDY SPRINGS  SC",
+    "ZIPCODE": "29677",
+    "DBOOK": "13315 ",
+    "DPAGE": "55",
+    "PHYS_ADDR": "122 + 124 E MAIN ST      ",
+    "SALE_PRICE": 200000,
+    "PREV_OWNER": "EVANS HARRY E + CATRIN P              ",
+    "MRKT_VALUE": 207600,
+    "SALE_YEAR": 2018,
+    "IMPRV": "1",
+    "RATIO": "C"
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 25,
+    "TMS": "401001007",
+    "OWNER": "WARD A SCOTT                            ",
+    "OWNER_ADDR": "135 MICASA DR                  ",
+    "CITY": "PENDLETON  SC",
+    "ZIPCODE": "29670",
+    "DBOOK": "6477  ",
+    "DPAGE": "34",
+    "PHYS_ADDR": "134 E MAIN ST            ",
+    "SALE_PRICE": 132000,
+    "PREV_OWNER": "QUATTLEBAUM RICHARD S + SHELBY B      ",
+    "MRKT_VALUE": 197100,
+    "SALE_YEAR": 2004,
+    "IMPRV": "1",
+    "RATIO": "C"
+   }
+  }
+ ],
+ "exceededTransferLimit": true
+}

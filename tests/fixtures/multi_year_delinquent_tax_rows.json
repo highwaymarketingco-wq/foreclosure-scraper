@@ -1,0 +1,180 @@
+{
+  "_note": "Field-for-field captures of the live ArcGIS attribute payloads, taken 2026-08-03. Buncombe rows come from the 'Unpaid Property Bills from <YYYY>' tables (levy_year is the authoritative year; the service TITLE lies). Oconee rows from DT2023 (Total_Tax_ is TEXT ' $1,979.70') and DT2025 (Total_Tax_ is a float). Pickens rows from dqnt_2023/dqnt_2024/DelParces_October2025NewsAd. Owner/address values are real public tax-roll data.",
+
+  "buncombe_2024_real_property": {
+    "bill": "0000697134-2024-2024-0000-00",
+    "owner1_last_name": "CONNER", "owner1_first_name": "RICKEY",
+    "owner1_third_name": "DEWAYNE", "owner1_suffix_name": "",
+    "owner2_last_name": "CONNER", "owner2_first_name": "AMANDA",
+    "owner2_third_name": "LAUREL", "owner2_suffix_name": "",
+    "address_line1": "1068 MONTE VISTA RD", "address_line2": "",
+    "city": "CANDLER", "state": "NC", "postal_code": "28715",
+    "pin": "9608-10-8745-00000",
+    "house_num": "1068", "street_direction": "", "street_name": "MONTE VISTA",
+    "street_type": "RD",
+    "subdivision": "AMANDA CONNER                      ",
+    "sub_lot": "                              ",
+    "deed_book": "4774", "deed_page": "944", "deed_date": "2010-04-09",
+    "deed_instrument": "WDT",
+    "acres": "1", "mortgage_co": "", "real_value": "130600",
+    "total_value": "130600", "levy_year": "2024",
+    "original_bill_amount": "880.10", "tax_due": "880.10", "late_due": "0",
+    "ad_cost_due": "0", "interest_due": "44.00", "cost_due": "0",
+    "fees_due": "0", "total_due": "924.10"
+  },
+
+  "buncombe_2025_real_property": {
+    "bill": "0000697134-2025-2025-0000-00",
+    "owner1_last_name": "CONNER", "owner1_first_name": "RICKEY",
+    "owner1_third_name": "DEWAYNE", "owner1_suffix_name": "",
+    "owner2_last_name": "CONNER", "owner2_first_name": "AMANDA",
+    "owner2_third_name": "LAUREL", "owner2_suffix_name": "",
+    "address_line1": "1068 MONTE VISTA RD", "address_line2": "",
+    "city": "CANDLER", "state": "NC", "postal_code": "28715",
+    "pin": "9608-10-8745-00000",
+    "house_num": "1068", "street_direction": "", "street_name": "MONTE VISTA",
+    "street_type": "RD",
+    "subdivision": "AMANDA CONNER                      ",
+    "sub_lot": "                              ",
+    "deed_book": "4774", "deed_page": "944", "deed_date": "2010-04-09",
+    "deed_instrument": "WDT",
+    "acres": "1", "mortgage_co": "", "real_value": "130600",
+    "total_value": "130600", "levy_year": "2025",
+    "original_bill_amount": "890.17", "tax_due": "890.17", "late_due": "0",
+    "ad_cost_due": "0", "interest_due": "0", "cost_due": "0", "fees_due": "0",
+    "total_due": "890.17"
+  },
+
+  "buncombe_2025_absentee_situs_differs": {
+    "bill": "0000754996-2025-2025-0000-00",
+    "owner1_last_name": "NORTON", "owner1_first_name": "MICHAEL",
+    "owner1_third_name": "D", "owner1_suffix_name": "",
+    "owner2_last_name": "NORTON", "owner2_first_name": "SHEREE",
+    "owner2_third_name": "H", "owner2_suffix_name": "",
+    "address_line1": "23 BULLMAN DR", "address_line2": "",
+    "city": "ALEXANDER", "state": "NC", "postal_code": "28701",
+    "pin": "9712-48-0228-00000",
+    "house_num": "0", "street_direction": "", "street_name": "TIPTON HILL",
+    "street_type": "RD",
+    "subdivision": "ESTATE OF POLLIE C BULLMAN         ",
+    "sub_lot": "1                             ",
+    "deed_book": "4120", "deed_page": "293", "deed_date": "2005-10-13",
+    "deed_instrument": "WDT",
+    "acres": "8", "mortgage_co": "", "real_value": "82600",
+    "total_value": "82600", "levy_year": "2025",
+    "original_bill_amount": "638.99", "tax_due": "638.99", "late_due": "0",
+    "ad_cost_due": "0", "interest_due": "0", "cost_due": "0", "fees_due": "0",
+    "total_due": "638.99"
+  },
+
+  "buncombe_2025_personal_property_no_pin": {
+    "bill": "0003119104-2025-2024-0000-00",
+    "owner1_last_name": "RILEY", "owner1_first_name": "JOSHUA",
+    "owner1_third_name": "BEAU", "owner1_suffix_name": "",
+    "owner2_last_name": "", "owner2_first_name": "", "owner2_third_name": "",
+    "owner2_suffix_name": "",
+    "address_line1": "4 N DELANO RD", "address_line2": "",
+    "city": "ASHEVILLE", "state": "NC", "postal_code": "28805",
+    "pin": "",
+    "house_num": "0", "street_direction": "", "street_name": "",
+    "street_type": "",
+    "subdivision": "", "sub_lot": "",
+    "deed_book": "", "deed_page": "", "deed_date": null, "deed_instrument": "",
+    "acres": null, "mortgage_co": "", "real_value": "0",
+    "total_value": "300", "levy_year": "2025",
+    "original_bill_amount": "34.4", "tax_due": "4.4", "late_due": "0",
+    "ad_cost_due": "0", "interest_due": "0", "cost_due": "0", "fees_due": "0",
+    "total_due": "30.00"
+  },
+
+  "oconee_dt2023_text_money": {
+    "TMS_NUMBER": "520-42-04-011", "Map_Number": "520-42-04-011",
+    "Owners_Nam": "ROBINSON BELINDA A & ROBINSON ANTHONY T & SKELTON DAMIAN",
+    "Descriptio": "0.48 +/- ACRES", "Total_Tax_": " $1,979.70",
+    "Item_Numbe": 33013, "SUBDIVSION": " ", "DEEDREF": " ",
+    "GIS_ACRES": 0.4812, "TMS_ACRES": 0.48,
+    "X": -82.93542741, "Y": 34.67623193
+  },
+
+  "oconee_dt2025_float_money": {
+    "TMS_NUMBER": "035-00-01-005", "Map_Number": "035-00-01-005",
+    "Owner_Name": "HILL ASHLEY P",
+    "Descriptio": "14.72 +/- ACRES", "Total_Tax_": 201.58,
+    "Item_Numbe": 52227, "SUBDIVSION": " ", "DEEDREF": " ",
+    "GIS_ACRES": 15.9920909, "TMS_ACRES": 14.72,
+    "X": -83.03877545, "Y": 34.94231264
+  },
+
+  "oconee_delqtaxsale_2015": {
+    "TMS_NUMBER": "075-00-02-007", "Owner": "WILSON THOMAS DEAN",
+    "Description": "4.68 +/- ACRES", "TaxDue": 1247.1
+  },
+
+  "pickens_dqnt_2023_out_of_state": {
+    "PIN": "4046-04-83-6249", "PINEXT": 0,
+    "NAME1": "DAVIS JOHN THOMAS", "NAME2": " ",
+    "ADD1": "30343 TAKARA TERRACE", "CITY": "MOUNT DORA", "STATE": "FL",
+    "ZIP": 32757,
+    "LOCADD": " ", "LOCCITY": " ", "LOCZIP": 0,
+    "ACRES": 0.5, "ACTUALVAL": 0, "TAXYEAR": 2024,
+    "MAP_PARCEL": "4046-04-83-6249", "OWNER__NOW": "DAVIS, JOHN THOMAS",
+    "AMOUNT_DUE": 295.22, "STATUS": "A", "IMPVAC": " ",
+    "SubDivisio": " ", "ACCTNO": "R0113344",
+    "__lat": 34.9012, "__lng": -82.7311
+  },
+
+  "pickens_dqnt_2023_local": {
+    "PIN": "4037-00-83-2164", "PINEXT": 0,
+    "NAME1": "LADD PEGGY S", "NAME2": " ",
+    "ADD1": "126 SHEMAIAH RD", "CITY": "CENTRAL", "STATE": "SC", "ZIP": 29630,
+    "LOCADD": "126  SHEMAIAH RD", "LOCCITY": "CENTRAL", "LOCZIP": 29630,
+    "ACRES": 0.73, "ACTUALVAL": 0, "TAXYEAR": 2024,
+    "MAP_PARCEL": "4037-00-83-2164", "OWNER__NOW": "LADD, PEGGY S.",
+    "AMOUNT_DUE": 231.39, "STATUS": "A", "IMPVAC": "Vacant",
+    "SubDivisio": " ", "ACCTNO": "R0088556",
+    "__lat": 34.7255, "__lng": -82.7801
+  },
+
+  "pickens_dqnt_2024_zip_plus_four_int": {
+    "PIN": "5110-20-70-8427", "PINEXT": " ",
+    "NAME1": "VINSON JEREMY J", "NAME2": " ",
+    "ADD1": "121 CADES DR", "CITY": "PIEDMONT", "STATE": "SC",
+    "ZIP": 296730000,
+    "LOCADD": "153  ROBERT P JEANES  RD", "LOCCITY": "EASLEY", "LOCZIP": 29640,
+    "ACRES": 0, "TAXYEAR": 2024,
+    "PARCEL_NUM": "5110-20-70-8427", "Max_AMT_DU": 212.24, "Cnt_PARCEL": 1,
+    "STATUS": "A", "IMPVAC": " ", "ACCTNO": "R0071122",
+    "__lat": 34.84749839, "__lng": -82.60700701
+  },
+
+  "pickens_2025_newsad": {
+    "PIN": "4047-00-69-7682", "CALCACRE": 1.80111005,
+    "OWNER__NOW": "MAULDIN, WALLACE DALE", "AMOUNT_DUE": 478.24,
+    "__lat": 34.8901, "__lng": -82.7455
+  },
+
+  "pickens_del_2021_thin_no_owner": {
+    "PIN": "4037-00-83-2164", "ACCTNO": "R0088556",
+    "LOCADD": "126  SHEMAIAH RD", "LOCCITY": "CENTRAL", "LOCZIP": 29630,
+    "ACRES": 0.73,
+    "__lat": 34.7255, "__lng": -82.7801
+  },
+
+  "oconee_demo_layer_row": {
+    "PROPERTYOWNER1": "John Doe", "PROPERTYOWNER2": "Jane Doe",
+    "OWNERADDRESS": "201 Street Name Rd Your Town, State Zip",
+    "PROPERTYADDRESS": "101 Street Name Rd Your Town, State Zip",
+    "PARCELID": "123456", "TAXYEARS": "2013", "TAX": 1.5, "POSTED": "Yes"
+  },
+
+  "_buncombe_services_sample": [
+    {"name": "Unpaid Property Bills from 2021", "type": "FeatureServer",
+     "url": "https://services6.arcgis.com/VLA0ImJ33zhtGEaP/ArcGIS/rest/services/Unpaid Property Bills from 2021/FeatureServer",
+     "_actual_table": "Buncombe_County_All_Property_Bills_Unpaid_from_2022",
+     "_actual_levy_year": "2022"},
+    {"name": "Unpaid_Property_Bills_from_2021", "type": "FeatureServer",
+     "url": "https://services6.arcgis.com/VLA0ImJ33zhtGEaP/ArcGIS/rest/services/Unpaid_Property_Bills_from_2021/FeatureServer",
+     "_actual_table": "Buncombe_County_All_Property_Bills_Unpaid_from_2021",
+     "_actual_levy_year": "2021"}
+  ]
+}

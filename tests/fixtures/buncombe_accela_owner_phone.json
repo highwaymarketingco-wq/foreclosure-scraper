@@ -1,0 +1,55 @@
+{
+  "displayFieldName": "OwnerFullName",
+  "fields": [
+    {"name": "ID", "type": "esriFieldTypeInteger"},
+    {"name": "ParcelNumber", "type": "esriFieldTypeString"},
+    {"name": "OwnerStatus", "type": "esriFieldTypeString"},
+    {"name": "OwnerFullName", "type": "esriFieldTypeString"},
+    {"name": "Phone", "type": "esriFieldTypeString"},
+    {"name": "Phone2", "type": "esriFieldTypeString"},
+    {"name": "MailAddress1", "type": "esriFieldTypeString"},
+    {"name": "MailAddress2", "type": "esriFieldTypeString"},
+    {"name": "MailCity", "type": "esriFieldTypeString"},
+    {"name": "MailState", "type": "esriFieldTypeString"},
+    {"name": "MailZip", "type": "esriFieldTypeString"},
+    {"name": "LastUpdateDate", "type": "esriFieldTypeDate"}
+  ],
+  "features": [
+    {"attributes": {
+      "ID": 1, "ParcelNumber": "060502683700000", "OwnerStatus": "A",
+      "OwnerFullName": "DAVID T MANLY; MARGARET DILLON",
+      "Phone": "8286289884", "Phone2": null,
+      "MailAddress1": "5 SHARON DR", "MailAddress2": null, "MailCity": "FAIRVIEW",
+      "MailState": "NC", "MailZip": "28730", "LastUpdateDate": 1785369600000}},
+    {"attributes": {
+      "ID": 2, "ParcelNumber": "971370653100000", "OwnerStatus": "A",
+      "OwnerFullName": "WILLIAM T GALYEAN",
+      "Phone": "8282755283", "Phone2": "7042749014",
+      "MailAddress1": "389 SUGAR HOLLOW RD", "MailAddress2": null, "MailCity": "FAIRVIEW",
+      "MailState": "NC", "MailZip": "28730", "LastUpdateDate": 1785369600000}},
+    {"attributes": {
+      "ID": 3, "ParcelNumber": "964809813900000", "OwnerStatus": "A",
+      "OwnerFullName": "PLACEHOLDER NUMBER LLC",
+      "Phone": "9999999999", "Phone2": "0000000000",
+      "MailAddress1": "1 NOWHERE RD", "MailAddress2": null, "MailCity": "ASHEVILLE",
+      "MailState": "NC", "MailZip": "28801", "LastUpdateDate": 1785369600000}},
+    {"attributes": {
+      "ID": 4, "ParcelNumber": "868587595400001", "OwnerStatus": "A",
+      "OwnerFullName": "FRANKLIN L COURSON",
+      "Phone": "8283011158", "Phone2": null,
+      "MailAddress1": "12 SPLIT CARD LN", "MailAddress2": null, "MailCity": "ASHEVILLE",
+      "MailState": "NC", "MailZip": "28806", "LastUpdateDate": 1785369600000}},
+    {"attributes": {
+      "ID": 5, "ParcelNumber": "868587595400002", "OwnerStatus": "A",
+      "OwnerFullName": "WALTER ADAMS",
+      "Phone": "8287124040", "Phone2": null,
+      "MailAddress1": "14 SPLIT CARD LN", "MailAddress2": null, "MailCity": "ASHEVILLE",
+      "MailState": "NC", "MailZip": "28806", "LastUpdateDate": 1785369600000}},
+    {"attributes": {
+      "ID": 6, "ParcelNumber": "060505914100000", "OwnerStatus": "X",
+      "OwnerFullName": "PETER LOOMIS HELLEBUSH (PRIOR OWNER)",
+      "Phone": "3364622897", "Phone2": null,
+      "MailAddress1": "820 ARBOR RD", "MailAddress2": null, "MailCity": "WINSTON SALEM",
+      "MailState": "NC", "MailZip": "27104", "LastUpdateDate": 1785369600000}}
+  ]
+}

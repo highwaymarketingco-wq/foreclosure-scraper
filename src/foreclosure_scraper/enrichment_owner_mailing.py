@@ -50,13 +50,30 @@ COUNTY_GIS: dict[str, dict] = {
         "owner": ["Property_Owner"],
         "mail": ["Owner_Mailing_Address_1", "Owner_Mailing_Address_2", "Owner_Mailing_Address_City", "Owner_Mailing_Address_State", "Owner_Mailing_Address_Zip"],
         "mail_state": "Owner_Mailing_Address_State", "situs": ["Physical_Address"], "parcel": "PIN"},
-    "NC:Gaston": {"url": "https://cogserver.gastonianc.gov/serverweb/rest/services/Parcels/GastonCountyParcels/MapServer/0",
+    # 2026-08-03 REPOINT: was cogserver.gastonianc.gov (the CITY of Gastonia
+    # server), a 115,066-row copy. The COUNTY's own service is the authority:
+    # 117,565 rows, situs 99.97%, mailing state 99.96%. Same column names, so
+    # only the URL moves. Layer id is 11 — /FeatureServer/0 is HTTP 500.
+    "NC:Gaston": {"url": "https://gis.gastoncountync.gov/publicgis/rest/services/PublicGIS/Parcels/FeatureServer/11",
         "owner": ["CURR_NAME1", "CURR_NAME2"],
         "mail": ["CURR_ADDR1", "CURR_ADDR2", "CURR_CITY", "CURR_STATE", "CURR_ZIPCODE"],
         "mail_state": "CURR_STATE", "situs": ["PHYSSTRADD"], "parcel": "PIN"},
+    # 2026-08-03 FIELD FIX (URL unchanged). Verified live on real rows:
+    #   ADDRESS_1 holds the SECOND OWNER'S NAME ("Rein Lindsay", "Quinn Starr L"),
+    #             not an address — it was being concatenated into the mail string.
+    #   ADDRESS_2 is the care-of / first mailing line ("%Karen Mcleod President").
+    #   ADDRESS_3 is the mailing street ("PO Box 2845", "840 Springdale Rd NE").
+    #   CITY/STATE/ZIP_CODE are the MAILING city/state/zip and were omitted
+    #             entirely, so `mail_state` was absent and absentee/out_of_state
+    #             could never fire — in a resort county with 7,464 out-of-state
+    #             owners on the layer.
+    #   LEGAL_ADDR is a legal description ("LOT 1 Whitewater Cove 2.00"), not a
+    #             situs, so it can't be address-matched; this layer has no situs
+    #             column at all → parcel-match only (same as SC:Oconee/SC:Union).
     "NC:Transylvania": {"url": "https://gis.transylvaniacounty.org/server/rest/services/Parcels/MapServer/2",
-        "owner": ["OWNER_NAME"], "mail": ["ADDRESS_1", "ADDRESS_2", "ADDRESS_3"],
-        "situs": ["LEGAL_ADDR"], "parcel": "PIN"},
+        "owner": ["OWNER_NAME", "ADDRESS_1"],
+        "mail": ["ADDRESS_2", "ADDRESS_3", "CITY", "STATE", "ZIP_CODE"],
+        "mail_state": "STATE", "situs": [], "parcel": "PIN"},
     "NC:Polk": {"url": "https://services1.arcgis.com/23uf7jKvz6SRPFWJ/arcgis/rest/services/Parcels/FeatureServer/0",
         "owner": ["OWNAM1", "OWNAM2", "OWNAM3"], "mail": ["OWADR1", "OWCITY", "OWSTA", "OWZIPA"],
         "mail_state": "OWSTA", "situs": ["PHYSICAL_STREET_ADDRESS"], "parcel": "TMS"},
@@ -77,9 +94,16 @@ COUNTY_GIS: dict[str, dict] = {
         "owner": ["ownname", "ownname2"], "mail": ["mailadd", "munit", "mcity", "mstate", "mzip"],
         "mail_state": "mstate", "situs": ["siteadd"], "parcel": "parno", "county_field": "cntyname"},
     # --- SC ---
-    "SC:Spartanburg": {"url": "https://services9.arcgis.com/HoRra3ATPLGmyjn6/arcgis/rest/services/Parcel_and_CAMA_Feb_1_2021/FeatureServer/0",
-        "owner": ["OwnerName", "TaxpayerNa"], "mail": ["StreetAddr", "City", "State", "Zip"],
-        "mail_state": "State", "situs": ["PropertyLo"], "parcel": "TAXPIN"},
+    # 2026-08-03 REPOINT: the old AGOL layer (services9…/Parcel_and_CAMA_Feb_1_2021)
+    # is a 29,402-row MUNICIPAL extract — it can only answer ~16% of the 8,919
+    # Spartanburg board leads. The county's own CAMA FeatureServer carries the
+    # FULL roll: 181,369 card-level rows, 163,059 primary cards (CardNumber=1).
+    # Parcel key is MAPNUMBER (unique per parcel); GISParcelNumber is NOT unique
+    # (condos share a polygon), so it is not used as the join field here.
+    "SC:Spartanburg": {"url": "https://maps.spartanburgcounty.org/server/rest/services/GIS/CAMA_Parcels/FeatureServer/0",
+        "owner": ["OwnerName", "TaxpayerName"], "mail": ["StreetAddress", "City", "State", "Zip"],
+        "mail_state": "State", "situs": ["PropertyLocation"], "situs_match": "StreetName",
+        "parcel": "MAPNUMBER", "where_suffix": "CardNumber=1"},
     "SC:Pickens": {"url": "https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services/Pickens_Open_data/FeatureServer/6",
         "owner": ["NAME1", "NAME2"], "mail": ["ADD1", "CITY", "STATE", "ZIP"],
         "mail_state": "STATE", "situs": ["LOCADD"], "parcel": "PIN"},
@@ -141,9 +165,25 @@ def _is_absentee(prop_addr: Optional[str], mailing: Optional[str]) -> bool:
     return bool(prop_addr and mailing and _norm(prop_addr) not in _norm(mailing))
 
 
-def _join(attrs: dict, fields: list[str]) -> str:
+def _join(attrs: dict, fields: list[str], *, dedupe: bool = False) -> str:
+    """Concatenate the listed attributes into one string.
+
+    `dedupe` drops a repeated part (case-insensitively) — used for the OWNER
+    join, where most rolls set the taxpayer/second-owner column to the SAME
+    string as the owner column and a blind join produced doubled names like
+    'YOUNG WILLIE YOUNG WILLIE'."""
     parts = [str(attrs.get(f)).strip() for f in fields if attrs.get(f) not in (None, "", " ")]
-    return " ".join(p for p in parts if p and p.lower() != "none").strip()
+    parts = [p for p in parts if p and p.lower() != "none"]
+    if dedupe:
+        seen: set[str] = set()
+        kept: list[str] = []
+        for p in parts:
+            k = re.sub(r"\s+", " ", p).strip().lower()
+            if k not in seen:
+                seen.add(k)
+                kept.append(p)
+        parts = kept
+    return " ".join(parts).strip()
 
 
 async def _query(http: httpx.AsyncClient, base: str, where: str, out_fields: str = "*",
@@ -355,10 +395,15 @@ _STREET_STOPWORDS = ("rd", "dr", "st", "ln", "ave", "ct", "way", "cir",
 
 
 def _county_clause(spec: dict, li: Listing) -> str:
-    """Extra WHERE clause pinning a statewide layer to the listing's county."""
+    """Extra WHERE clauses: pin a statewide layer to the listing's county, and
+    apply any per-layer row filter (`where_suffix`, e.g. Spartanburg's
+    CardNumber=1, which keeps card-level layers from returning duplicate cards)."""
     cf = spec.get("county_field")
     cty = (li.county or "").strip()
-    return f" AND UPPER({cf})='{cty.upper()}'" if cf and cty else ""
+    out = f" AND UPPER({cf})='{cty.upper()}'" if cf and cty else ""
+    if spec.get("where_suffix"):
+        out += f" AND {spec['where_suffix']}"
+    return out
 
 
 async def _match_attrs(http: httpx.AsyncClient, li: Listing, spec: dict) -> Optional[dict]:
@@ -399,7 +444,7 @@ async def _match_attrs(http: httpx.AsyncClient, li: Listing, spec: dict) -> Opti
 
 
 def _build_result(li: Listing, spec: dict, attrs: dict) -> Optional[dict]:
-    owner = _join(attrs, spec["owner"])
+    owner = _join(attrs, spec["owner"], dedupe=True)
     if spec.get("care_of") and attrs.get(spec["care_of"]):
         mailing = f"C/O {attrs[spec['care_of']]}, " + _join(attrs, spec["mail"])
     else:
@@ -438,7 +483,66 @@ def _county_key(li: Listing) -> str:
     return f"{li.state}:{cty}"
 
 
+# --- local bulk assessor rolls (Spartanburg + Anderson) --------------------------
+# The two biggest SC mailing gaps publish their FULL county roll for free
+# (sc_parcel_mailing). Reading the cached table first is exact-key, offline and
+# ~1000x cheaper than a per-lead ArcGIS LIKE, and it is the ONLY path that covers
+# Anderson county-wide (SCDOT statewide is now token-walled).
+_BULK_COUNTIES: Optional[set[tuple[str, str]]] = None
+
+
+def _bulk_counties() -> set[tuple[str, str]]:
+    global _BULK_COUNTIES
+    if _BULK_COUNTIES is None:
+        try:
+            from . import sc_parcel_mailing as _pm
+            _BULK_COUNTIES = _pm.covered_counties()
+        except Exception:  # noqa: BLE001 — table absent/unreadable: fall through to live GIS
+            _BULK_COUNTIES = set()
+    return _BULK_COUNTIES
+
+
+def _from_bulk_roll(li: Listing) -> Optional[dict]:
+    key = (li.state or "", (li.county or "").strip().title())
+    if key not in _bulk_counties():
+        return None
+    from . import sc_parcel_mailing as _pm
+    rec = _pm.lookup(key[0], key[1], parcel_id=li.parcel_id,
+                     street_address=li.street_address, zip_code=li.zip_code)
+    if not rec:
+        return None
+    mailing = rec.get("mailing") or None
+    owner = rec.get("owner") or rec.get("taxpayer") or None
+    if not owner and not mailing:
+        return None
+    situs = rec.get("situs_street") or rec.get("situs") or None
+    mail_state = (rec.get("mail_state") or "").strip().upper() or None
+    prop_addr = situs or (li.street_address or None)
+    specs = {k: v for k, v in (("living_sqft", rec.get("living_sqft")),
+                               ("year_built", rec.get("year_built")),
+                               ("bedrooms", rec.get("beds")),
+                               ("bathrooms", rec.get("baths"))) if v}
+    distress = {k: v for k, v in (("condition_code", rec.get("condition_code")),
+                                  ("last_sale_date", rec.get("sale_date")),
+                                  ("last_sale_amount", rec.get("sale_amount")),
+                                  ("deed_ref", rec.get("deed_ref")),
+                                  ("previous_owner", rec.get("prev_owner"))) if v}
+    if rec.get("condition_distressed"):
+        distress["condition_distressed"] = True
+    return {"owner": owner, "mailing": mailing, "situs": situs,
+            "parcel_id": rec.get("parcel_raw") or rec.get("parcel_key") or None,
+            "mail_state": mail_state,
+            "absentee": _is_absentee(prop_addr, mailing),
+            "out_of_state": bool(mail_state and li.state and mail_state != li.state),
+            "source": "sc_assessor_roll",
+            "_specs": specs, "_value": rec.get("market_value"), "_distress": distress}
+
+
 async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
+    # 0) local bulk assessor roll — offline exact-key hit, no request at all.
+    res = _from_bulk_roll(li)
+    if res:
+        return res
     # 1) county-specific layer (richer — has building specs/CAMA where available)
     res = None
     spec = COUNTY_GIS.get(_county_key(li))

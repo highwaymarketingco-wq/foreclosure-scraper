@@ -44,7 +44,28 @@ CONFIRMED WALLS / NO-PHOTO (do not re-chase):
                   embedded images.
   NC Cleveland    webgis.net/nc/cleveland/PropertyCard.php is a plain-text card
                   (no <img>); the Tax MapServer has no image layer.
-  NC Transylvania Parcels layer HAS `CARD` + `Report_URL` columns — both 100% NULL.
+  NC Transylvania RE-CHECKED 2026-08-03, and the earlier "both 100% NULL" note was
+                  half wrong: `Report_URL` IS 100% NULL (0 of 31,751), but `CARD`
+                  is populated on 31,633 rows (99.6%), and the report PDF really
+                  does resolve without it:
+                    gis.transylvaniacounty.org/GISReports/propertyreports/
+                    Parcel_{PIN}-{CARD}.pdf            42/42 sampled -> HTTP 200
+                  It is still NOT a photo lane. Every card carries exactly three
+                  rasters and the shape signature is identical on all 42 sampled
+                  parcels (in-town, rural, improved and vacant alike):
+                    532x256  AERIAL (orthophoto)
+                    532x252  AERIAL (second vintage/zoom)
+                    300x197  the county LOGO (byte-identical across every PDF)
+                  There is no drive-by photo slot on the card at all. Wiring this
+                  in would publish an AERIAL as raw['images']['real'], which is
+                  exactly what this module's contract forbids (see _has_real_photo:
+                  "Aerial/street fallbacks do NOT count"), and enrichment_images
+                  already supplies aerials for free. So: WALL for photos, and do
+                  not re-chase it as one.
+                  The PDF is, separately, a rich free CAMA-attribute source (year
+                  built, heated sqft, beds, baths, half-baths, fireplaces, land /
+                  building / assessed value, sale price + date, deed book/page) —
+                  that belongs in an attribute lane, not here.
   NC Mitchell     43 layers, none carry building photos.
   SC Anderson     NewPropertyViewer/MapServer/5 has no image field.
   SC Laurens      Pebble/PropertyParcel has no image field on any layer.
