@@ -1,11 +1,11 @@
 {
-  "run_time": "2026-08-02T18:04:34.461966Z",
-  "total": 25576,
+  "run_time": "2026-08-03T13:37:19.867362Z",
+  "total": 25552,
   "by_source": {},
   "by_state": {},
   "by_county_top": [],
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "scheduled NC SOS registered-agent refresh"
+  "notes": ""
 }
