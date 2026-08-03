@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-08-03T13:37:19.867362Z",
+  "run_time": "2026-08-03T17:14:42.171793Z",
   "total": 25552,
   "by_source": {},
   "by_state": {},
@@ -7,5 +7,5 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": ""
+  "notes": "scheduled land-records refresh"
 }
