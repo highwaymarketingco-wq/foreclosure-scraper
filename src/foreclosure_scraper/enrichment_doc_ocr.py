@@ -202,11 +202,23 @@ async def _gemini_call(key: str, parts_or_text, is_text: bool) -> Optional[dict]
     return parsed
 
 
+#: Backends that answered "permanently gone" this process. A retiring provider
+#: (GitHub Models returns HTTP 410 github_models_retirement_brownout) will keep
+#: returning 410 for every subsequent call, so retrying it is pure wall-clock.
+#: The 2026-07-31 run ate 96 such round-trips and finished that pass with
+#: ocr_ok=0, backfilled=0 — time spent to accomplish nothing. One 410 now
+#: disables the backend for the rest of the run; the next run re-tries it once,
+#: so a provider that comes back heals itself without a code change.
+_RETIRED_BACKENDS: set[str] = set()
+
+
 async def _openai_compat_call(http: httpx.AsyncClient, name: str, url: str,
                               key: str, model: str, blocks=None,
                               text: Optional[str] = None) -> Optional[dict]:
     """GitHub Models / Groq — OpenAI chat API. `text` = parse lifted PDF text;
     `blocks` = base64 data-URL images (these endpoints don't take PDF bytes)."""
+    if name in _RETIRED_BACKENDS:
+        return None
     if text is not None:
         content = [{"type": "text", "text": f"{OCR_PROMPT}\n\nDOCUMENT TEXT:\n{text}"}]
     else:
@@ -225,6 +237,14 @@ async def _openai_compat_call(http: httpx.AsyncClient, name: str, url: str,
         return None
     if r.status_code == 429:
         raise _QuotaOut(name)
+    # 410 Gone / 404 on the endpoint itself = the provider is retired, not busy.
+    # Trip the breaker so the remaining leads skip it instead of re-proving it.
+    if r.status_code in (404, 410):
+        _RETIRED_BACKENDS.add(name)
+        log.warning("doc_ocr.backend_retired", backend=name, status=r.status_code,
+                    error=r.text[:160],
+                    note="disabled for this run; will be retried once next run")
+        return None
     if r.status_code >= 400:
         log.warning("doc_ocr.compat_error", backend=name, status=r.status_code, error=r.text[:120])
         return None
