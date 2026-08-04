@@ -20,7 +20,6 @@ via the qPublic stealth path elsewhere.
 from __future__ import annotations
 
 import asyncio
-import os
 import re
 from typing import Optional
 
@@ -312,12 +311,55 @@ _SITUS_PAGE = 500       # <= every configured layer's maxRecordCount (1000/2000)
 _SITUS_SCAN_CAP = 1500  # hard ceiling: one lead never costs more than 3 requests
 
 
+#: Field-name shapes we must never request, whatever a spec or a county layer offers.
+#: Belt-and-braces with _spec_out_fields(): even a hand-written out_fields is filtered.
+_FORBIDDEN_FIELD = re.compile(
+    r"ssn|social_?sec|drivers?_?lic|dl_?num|tcdlc|date_?of_?birth|\bdob\b|birth_?date"
+    r"|poc_?phone|poc_?email|account_?(no|num)|acct_?(no|num)",
+    re.I,
+)
+
+
+def _spec_out_fields(spec: dict) -> str:
+    """Derive the exact field list a spec needs, so we never send outFields=*.
+
+    Every spec already declares the columns it reads (owner / care_of / mail /
+    mail_state / situs / situs_match / parcel / order_by), so the list is
+    derivable and no county needs a hand-maintained string. This matters for
+    privacy, not tidiness: 14 of 17 counties previously fell through to "*", so
+    the day any county layer gains an SSN, DOB or customer-contact column we
+    would have started pulling it silently. An explicit spec `out_fields` still
+    wins, but is filtered through _FORBIDDEN_FIELD the same way.
+    """
+    explicit = spec.get("out_fields")
+    if explicit and explicit != "*":
+        names = [f.strip() for f in str(explicit).split(",") if f.strip()]
+    else:
+        names = []
+        for key in ("owner", "mail", "situs"):
+            names += list(spec.get(key) or [])
+        for key in ("care_of", "mail_state", "situs_match", "parcel", "order_by", "county_field"):
+            v = spec.get(key)
+            if v:
+                names.append(v)
+    seen: set[str] = set()
+    safe: list[str] = []
+    for n in names:
+        if n in seen or n == "*" or _FORBIDDEN_FIELD.search(n):
+            continue
+        seen.add(n)
+        safe.append(n)
+    # A spec with nothing declared would otherwise become an empty outFields,
+    # which ArcGIS treats as "*". Fall back to the parcel key alone.
+    return ",".join(safe) or (spec.get("parcel") or "OBJECTID")
+
+
 async def _scan(http: httpx.AsyncClient, spec: dict, where: str) -> list[dict]:
     """Page a candidate set up to _SITUS_SCAN_CAP rows.
 
     Stops on the server's exceededTransferLimit=False (or a short/empty page) so
     a full-but-final page doesn't cost an extra round trip per lead."""
-    out_fields = spec.get("out_fields", "*")
+    out_fields = _spec_out_fields(spec)
     order_by = spec.get("order_by") or spec.get("parcel", "")
     rows: list[dict] = []
     while len(rows) < _SITUS_SCAN_CAP:
@@ -549,7 +591,7 @@ async def _match_attrs(http: httpx.AsyncClient, li: Listing, spec: dict) -> Opti
         for cand in _pid_variants(li.parcel_id):
             safe = cand.replace("'", "''")
             rows = await _query(http, spec["url"], f"{spec['parcel']} LIKE '%{safe}%'{cc}",
-                                spec.get("out_fields", "*"))
+                                _spec_out_fields(spec))
             if rows:
                 return rows[0]
     # 2) else match on situs street address. Query the street-NAME field broadly
