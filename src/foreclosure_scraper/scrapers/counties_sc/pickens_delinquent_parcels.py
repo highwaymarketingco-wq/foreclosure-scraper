@@ -73,6 +73,7 @@ import structlog
 from ... import arcgis_webmap as agw
 from ...base_scraper import BaseScraper
 from ...http_client import client
+from ...layer_guard import LayerHarvest
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -455,17 +456,20 @@ def build_listing(pin: str, rows: list[Row], now: datetime | None = None) -> Lis
 
 
 async def fetch_layer(http, layer: Layer) -> list[tuple[str, Row]]:
-    """One layer -> normalized (pin, Row) pairs. A dead layer costs that layer,
-    never the run: the county retires/renames these services between cycles."""
-    try:
-        feats = await agw.query_features(
-            http, layer.url, where="1=1", out_fields=layer.out_fields,
-            return_geometry=True, out_sr=4326, order_by="FID ASC",
-            page=_PAGE, max_records=20000)
-    except Exception as exc:  # noqa: BLE001
-        log.warning("pickens_delinquent.layer_fail",
-                    service=layer.service, error=str(exc)[:200])
-        return []
+    """One layer -> normalized (pin, Row) pairs.
+
+    RAISES on a dead layer. It used to swallow the failure and return [], which
+    is how a 404 on one of the eight services quietly shipped 1,977 leads
+    instead of 2,161 — a short return is indistinguishable from a roll that
+    genuinely shrank. ``LayerHarvest`` in :meth:`fetch` banks the exception and
+    turns the run into a reported ERROR. The county DOES retire and rename
+    these services between cycles; when that happens the layer comes out of
+    ``LAYERS`` (or into ``tolerate=``) in a reviewed commit.
+    """
+    feats = await agw.query_features(
+        http, layer.url, where="1=1", out_fields=layer.out_fields,
+        return_geometry=True, out_sr=4326, order_by="FID ASC",
+        page=_PAGE, max_records=20000)
     out = [p for p in (parse_feature(f, layer) for f in feats) if p]
     log.info("pickens_delinquent.layer", service=layer.service, cycle=layer.cycle,
              features=len(feats), parsed=len(out))
@@ -487,14 +491,17 @@ class PickensDelinquentParcels(BaseScraper):
             return []
 
         by_pin: dict[str, list[Row]] = {}
-        live_layers = 0
-        async with client(timeout=60.0) as http:
-            for layer in LAYERS:
-                pairs = await fetch_layer(http, layer)
-                if pairs:
-                    live_layers += 1
-                for pin, row in pairs:
-                    by_pin.setdefault(pin, []).append(row)
+        # All eight services are declared up front. Losing any one of them is a
+        # hard failure, not a smaller harvest — see layer_guard for why.
+        guard = LayerHarvest(self.slug, [ly.service for ly in LAYERS])
+        with guard:
+            async with client(timeout=60.0) as http:
+                for layer in LAYERS:
+                    pairs = await guard.harvest(
+                        layer.service, lambda ly=layer: fetch_layer(http, ly))
+                    for pin, row in pairs:
+                        by_pin.setdefault(pin, []).append(row)
+        live_layers = guard.live
 
         if not by_pin:
             return []

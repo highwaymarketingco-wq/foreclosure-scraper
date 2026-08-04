@@ -86,7 +86,11 @@ _TAG_RE = re.compile(r"<[^>]*>")
 # and match either storage form; collapsing them would break the spaced variant.
 _APOSTROPHE_RE = re.compile(r"['’ʼ`]")
 _NONWORD_RE = re.compile(r"[^A-Z0-9]+")
-_JOINT_SPLIT_RE = re.compile(r"\s*(?:&|\bAND\b)\s*")
+# ';' joins co-owners on NC OneMap ('MANLY DAVID T;DILLON MARGARET') exactly the
+# way '&' does on the county layers. Without it normalize_name turns the
+# semicolon into a space and primary_party fuses two people into one four-token
+# name, so neither owner can ever match. Strings without a ';' are unaffected.
+_JOINT_SPLIT_RE = re.compile(r"\s*(?:&|;|\bAND\b)\s*")
 
 
 class PersonName(NamedTuple):

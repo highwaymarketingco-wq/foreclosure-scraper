@@ -1,0 +1,184 @@
+{
+ "features": [
+  {
+   "attributes": {
+    "OBJECTID": 485066,
+    "PIN": "0032000200610",
+    "OWNAM1": "MASS MEDIA INC",
+    "OWNAM2": "",
+    "STREET": "200 N MAIN ST",
+    "CITY": "GREENVILLE",
+    "STATE": "SC",
+    "ZIP5": "29601",
+    "STRNUM": "200",
+    "LOCATE": "MAIN",
+    "TOTTAX": 5567.69,
+    "PAIDDATE": null,
+    "SLPRICE": 195000,
+    "DEEDDATE": 1525824000000,
+    "FAIRMKTVAL": 370950,
+    "TAXMKTVAL": 230000,
+    "TACRES": 0.03,
+    "SQFEET": 0,
+    "BEDROOMS": 0,
+    "BATHRMS": 0,
+    "PROPTYPE": "COMMERCIAL",
+    "IMPROVED": "YES",
+    "LANDUSE": "421",
+    "DESCR": "SUITE 204",
+    "SUBDIV": "IVEY SQUARE HORIZONTAL"
+   },
+   "geometry": {
+    "rings": [
+     [
+      [
+       -82.3976717669814,
+       34.86627966959683
+      ],
+      [
+       -82.39766888514653,
+       34.866427273454235
+      ],
+      [
+       -82.39766858520275,
+       34.86644265702278
+      ],
+      [
+       -82.39757505046208,
+       34.8664421931765
+      ],
+      [
+       -82.39732249593989,
+       34.86643391912057
+      ],
+      [
+       -82.39732298152788,
+       34.86642224691622
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "attributes": {
+    "OBJECTID": 485190,
+    "PIN": "0001000100208",
+    "OWNAM1": "DU PROPERTIES LLC",
+    "OWNAM2": "",
+    "STREET": "961 CHESTNUT ST STE 101",
+    "CITY": "GAINESVILLE",
+    "STATE": "GA",
+    "ZIP5": "30501",
+    "STRNUM": "",
+    "LOCATE": "LAURENS",
+    "TOTTAX": 329.66,
+    "PAIDDATE": null,
+    "SLPRICE": 0,
+    "DEEDDATE": 1659916800000,
+    "FAIRMKTVAL": 1000,
+    "TAXMKTVAL": 1000,
+    "TACRES": 0.0,
+    "SQFEET": 0,
+    "BEDROOMS": 0,
+    "BATHRMS": 0,
+    "PROPTYPE": "COMMERCIAL",
+    "IMPROVED": "NO",
+    "LANDUSE": "6800",
+    "DESCR": "UNIT G-7",
+    "SUBDIV": "NORTH LAURENS STREET CO"
+   },
+   "geometry": null
+  },
+  {
+   "attributes": {
+    "OBJECTID": 486797,
+    "PIN": "0053000501500",
+    "OWNAM1": "KRAMDELLA LLC",
+    "OWNAM2": "",
+    "STREET": "135 CENTRAL BLVD",
+    "CITY": "ORLANDO",
+    "STATE": "FL",
+    "ZIP5": "32801",
+    "STRNUM": "917",
+    "LOCATE": "WASHINGTON",
+    "TOTTAX": 2665.66,
+    "PAIDDATE": null,
+    "SLPRICE": 360000,
+    "DEEDDATE": 1746748800000,
+    "FAIRMKTVAL": 171500,
+    "TAXMKTVAL": 171500,
+    "TACRES": 0.19,
+    "SQFEET": 0,
+    "BEDROOMS": 0,
+    "BATHRMS": 0,
+    "PROPTYPE": "RESIDENTIAL",
+    "IMPROVED": "NO",
+    "LANDUSE": "1180",
+    "DESCR": "1",
+    "SUBDIV": ""
+   },
+   "geometry": null
+  },
+  {
+   "attributes": {
+    "OBJECTID": 488905,
+    "PIN": "0091010802300",
+    "OWNAM1": "CITY OF GREENVILLE SOUTH CAROL",
+    "OWNAM2": "",
+    "STREET": "206 S MAIN ST",
+    "CITY": "GREENVILLE",
+    "STATE": "SC",
+    "ZIP5": "29601",
+    "STRNUM": "717",
+    "LOCATE": "FRED GARRETT",
+    "TOTTAX": 1140.76,
+    "PAIDDATE": null,
+    "SLPRICE": 0,
+    "DEEDDATE": 1758758400000,
+    "FAIRMKTVAL": 291020,
+    "TAXMKTVAL": 291020,
+    "TACRES": 0.18,
+    "SQFEET": 1208,
+    "BEDROOMS": 2,
+    "BATHRMS": 2,
+    "PROPTYPE": "RESIDENTIAL",
+    "IMPROVED": "YES",
+    "LANDUSE": "1100",
+    "DESCR": "7",
+    "SUBDIV": ""
+   },
+   "geometry": null
+  },
+  {
+   "attributes": {
+    "OBJECTID": 497638,
+    "PIN": "0135000601300",
+    "OWNAM1": "HARVLEY JULIE MARIE",
+    "OWNAM2": "",
+    "STREET": "1 CATAWBA AVE",
+    "CITY": "GREENVILLE",
+    "STATE": "SC",
+    "ZIP5": "29611",
+    "STRNUM": "1",
+    "LOCATE": "CATAWBA",
+    "TOTTAX": 884.29,
+    "PAIDDATE": null,
+    "SLPRICE": 1,
+    "DEEDDATE": 1526601600000,
+    "FAIRMKTVAL": 52560,
+    "TAXMKTVAL": 21980,
+    "TACRES": 0.26,
+    "SQFEET": 960,
+    "BEDROOMS": 3,
+    "BATHRMS": 2,
+    "PROPTYPE": "MOBILE HOME",
+    "IMPROVED": "YES",
+    "LANDUSE": "1170",
+    "DESCR": "1 PT2,BLK E",
+    "SUBDIV": "SUNNY SLOPE"
+   },
+   "geometry": null
+  }
+ ],
+ "exceededTransferLimit": false
+}

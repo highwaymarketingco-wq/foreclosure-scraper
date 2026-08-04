@@ -26,8 +26,20 @@ POST-SALE FILTER (2026-06-25):
   A genuinely current/pre-sale delinquent PDF (no results/bidder markers,
   no "now or formerly") still flows through normally.
 
+LAURENS NOTICE LIVES OFF-SITE (2026-08-04):
+  Laurens does not attach its delinquent-tax list to the county site. The
+  treasurer page links a third-party newspaper edition viewer instead:
+    https://1543.newstogo.us/editionviewer/default.aspx?Edition=<guid>
+  (current edition title: "Delinquent Tax Notices - November 12, 2025", 4 pages,
+  page images from media.iadsnetwork.com plus a "&View=PDFList" variant).
+  That host's robots.txt permits `User-agent: *` on this path but publishes
+  explicit `Disallow: /` groups for AI-agent user agents (anthropic-ai,
+  Claude-Web, GPTBot, CCBot, Google-Extended, ...). Because this pipeline is
+  AI-operated, the viewer is NOT harvested here — treat it as an operator
+  decision, not a bug to fix. See docs note in the batch report.
+
 KNOWN ISSUES (2026-05-14):
-  - Spartanburg, Laurens URLs return 404 (CivicEngage CMS migration)
+  - Spartanburg URLs return 404 (CivicEngage CMS migration)
   - Cherokee returns 403 (Cloudflare)
   - Union DNS-fails
   - Pickens currently links only post-sale / historical RESULT PDFs, which
@@ -83,9 +95,17 @@ COUNTY_URLS: dict[str, list[str]] = {
         "https://www.countyofunion.com/treasurer",
         "https://www.unioncountysc.gov/treasurer",
     ],
+    # 2026-08-04: the two previous Laurens entries were dead — bare "/" is the
+    # county homepage (200 but carries nothing) and "/treasurer" 404s. The
+    # Revize site keeps the delinquent-tax content under /departments/.
+    # Both replacements verified live at HTTP 200. NOTE: the county's actual
+    # §12-51-40 notice is NOT posted here as a PDF — delinquent_taxes.php only
+    # links an off-site newspaper edition viewer (see LAURENS NOTICE below), so
+    # these URLs yield 0 rows until the county attaches a real list. They are
+    # still the correct pages to watch: _scrape_html follows any linked PDF.
     "Laurens": [
-        "https://www.laurenscountysc.gov/",
-        "https://www.laurenscountysc.gov/treasurer",
+        "https://www.laurenscountysc.gov/departments/treasurer/delinquent_taxes.php",
+        "https://www.laurenscountysc.gov/departments/treasurer/index.php",
     ],
 }
 

@@ -64,12 +64,19 @@ from typing import Any, Optional
 import httpx
 import structlog
 
+from . import arcgis_webmap as agw
 from .http_client import client
+from .layer_guard import LayerHarvest
 from .models import Listing, _normalize_addr, _normalize_parcel
 
 log = structlog.get_logger()
 
 ENV_OFF = "FORECLOSURE_HELENE_DAMAGE_OFF"
+
+#: Per-layer row ceiling. The biggest live layer (Henderson) is ~19.6k, so this
+#: is headroom, not a filter — hitting it means the layer grew past what we
+#: believe it is and the join index would be silently short.
+_MAX_ROWS_PER_LAYER = 60000
 
 # ---- Source registry -------------------------------------------------------
 #
@@ -298,8 +305,20 @@ def _derive_buncombe_level(attrs: dict[str, Any]) -> Optional[str]:
 
 
 async def _fetch_layer(c: httpx.AsyncClient, src: dict[str, Any]) -> list[dict[str, Any]]:
-    """Page an ArcGIS FeatureServer layer fully into memory (attributes only)."""
-    out: list[dict[str, Any]] = []
+    """Page an ArcGIS FeatureServer layer fully into memory (attributes only).
+
+    RAISES on any failure. This function used to ``break`` out of the paging
+    loop on a non-200, on an HTTP-200-with-error-body, and on any HTTPError —
+    returning whatever partial page set it had already accumulated. That is how
+    the enricher stamped 476 leads on one run and 521 on two others: one of the
+    five layers flaked, and a short index is indistinguishable from a layer the
+    county trimmed. ``LayerHarvest`` in :func:`enrich_with_helene_damage` banks
+    the failure and re-raises it.
+
+    ``arcgis_webmap.query_features`` owns the paging + the error-body check +
+    the repeated-OBJECTID guard, so the 200-with-error-body case is handled in
+    one place rather than re-implemented here.
+    """
     out_fields = [f for f in (
         src.get("parcel_field"), src.get("addr_field"), src.get("damage_field"),
         src.get("loss_field"), src.get("occupancy_field"), src.get("structure_field"),
@@ -311,45 +330,30 @@ async def _fetch_layer(c: httpx.AsyncClient, src: dict[str, Any]) -> list[dict[s
     # enumerated fields is a config bug, not a reason to widen the request.
     fields_param = ",".join(dict.fromkeys(out_fields))
     if not fields_param:
-        log.warning("helene.no_out_fields", key=src["key"])
-        return out
-    where = src.get("where", "1=1")
-    offset = 0
-    page = int(src.get("page_size", 2000))
-    while True:
-        params = {
-            "where": where,
-            "outFields": fields_param,
-            "returnGeometry": "false",
-            "resultOffset": offset,
-            "resultRecordCount": page,
-            "f": "json",
-        }
+        # A config bug, not a network condition — surface it as a failure so it
+        # can never present as "this layer has no damaged parcels".
+        raise ValueError(f"helene source {src['key']}: no enumerated outFields")
+
+    attrs = await agw.query_attributes(
+        c, src["url"],
+        out_fields=fields_param,
+        where=src.get("where", "1=1"),
+        return_geometry=False,
         # Layers whose objectIdField is null reject any paged request unless an
         # explicit sort is supplied.
-        if src.get("order_by"):
-            params["orderByFields"] = src["order_by"]
-        try:
-            r = await c.get(src["url"], params=params, timeout=40.0)
-            if r.status_code != 200:
-                log.warning("helene.fetch_status", key=src["key"], code=r.status_code)
-                break
-            data = r.json()
-            if "error" in data:
-                log.warning("helene.fetch_error", key=src["key"],
-                            error=str(data.get("error"))[:200])
-                break
-            feats = data.get("features", [])
-            out.extend(f.get("attributes", {}) or {} for f in feats)
-            if len(feats) < page or not data.get("exceededTransferLimit"):
-                break
-            offset += page
-            if offset >= 60000:  # safety cap
-                break
-        except (httpx.HTTPError, ValueError) as exc:
-            log.warning("helene.fetch_fail", key=src["key"], error=str(exc)[:200])
-            break
-    return out
+        order_by=src.get("order_by"),
+        page=int(src.get("page_size", 2000)),
+        max_records=_MAX_ROWS_PER_LAYER,
+        timeout=40.0,
+    )
+    if len(attrs) >= _MAX_ROWS_PER_LAYER:
+        # Hitting the cap means the layer is bigger than we believe it is, so
+        # the index is silently truncated. Fail loudly and raise the cap on
+        # purpose rather than ship a partial join table.
+        raise RuntimeError(
+            f"helene source {src['key']}: hit the {_MAX_ROWS_PER_LAYER}-row cap; "
+            "the index would be truncated")
+    return attrs
 
 
 def _index_source(src: dict[str, Any], rows: list[dict[str, Any]]
@@ -475,17 +479,25 @@ async def enrich_with_helene_damage(listings: list[Listing]) -> dict[str, int]:
         return stats
 
     # Load every active source once, build indexes.
+    #
+    # Every source selected for this batch is declared to the guard: losing one
+    # mid-run has to fail the enricher, because a join index built from four of
+    # five layers stamps fewer leads and looks exactly like a quiet week. main.py
+    # already wraps this call and logs helene_damage.failed at ERROR.
     parcel_idx: dict[str, list[tuple[dict, dict]]] = {}  # key -> [(src, rec)]
     addr_idx: dict[str, list[tuple[dict, dict]]] = {}
-    async with client(timeout=40.0) as c:
-        for src in active:
-            rows = await _fetch_layer(c, src)
-            log.info("helene.source_loaded", key=src["key"], rows=len(rows))
-            by_parcel, by_addr = _index_source(src, rows)
-            for k, rec in by_parcel.items():
-                parcel_idx.setdefault(k, []).append((src, rec))
-            for k, rec in by_addr.items():
-                addr_idx.setdefault(k, []).append((src, rec))
+    guard = LayerHarvest("enrichment_helene_damage", [s["key"] for s in active])
+    with guard:
+        async with client(timeout=40.0) as c:
+            for src in active:
+                rows = await guard.harvest(
+                    src["key"], lambda s=src: _fetch_layer(c, s))
+                log.info("helene.source_loaded", key=src["key"], rows=len(rows))
+                by_parcel, by_addr = _index_source(src, rows)
+                for k, rec in by_parcel.items():
+                    parcel_idx.setdefault(k, []).append((src, rec))
+                for k, rec in by_addr.items():
+                    addr_idx.setdefault(k, []).append((src, rec))
 
     if not parcel_idx and not addr_idx:
         log.info("helene.no_index")

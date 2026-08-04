@@ -28,7 +28,7 @@ import structlog
 from datetime import date
 
 from .models import Listing
-from .valuation.amortize import _as_date, amortized_balance
+from .valuation.amortize import _as_date, estimate_current_balance
 
 log = structlog.get_logger()
 
@@ -72,11 +72,18 @@ def _is_deed_of_trust(doc_type: object) -> bool:
     TRUST', 'Deed of Trust', 'DT', 'MTG', 'MORTGAGE'. The old check only
     matched the space-separated phrase or the exact short codes, so the
     underscore form 'deed_of_trust' (the form the equity engine's own
-    payoff contract emits) silently fell through and produced 0 equity."""
+    payoff contract emits) silently fell through and produced 0 equity.
+
+    'D/T' is the SLASHED short code both Logan and CCHS emit natively, and it
+    normalizes to 'D T' — which was not in the accepted set, so a recorded
+    principal harvested straight off an NC county index was silently ignored
+    and the lead fell through to the far weaker opening-bid proxy. Caught on a
+    live Burke run 2026-08-04 (10 recorded principals, 0 of them used).
+    'TR/D' -> 'TR D' stays out on purpose: that is the TRUSTEE'S deed."""
     s = re.sub(r"[\s_\-/]+", " ", str(doc_type or "").upper()).strip()
     if "DEED OF TRUST" in s:
         return True
-    return s in ("DT", "MTG", "MORT", "MORTGAGE")
+    return s in ("DT", "D T", "MTG", "M T G", "MORT", "MORTGAGE")
 
 
 def _recorded_dt(raw: dict) -> tuple[Optional[float], object]:
@@ -111,14 +118,23 @@ def _senior_liens(raw: dict) -> float:
 
 def _payoff(li: Listing, arv: float) -> tuple[Optional[float], str, str]:
     """(estimated_payoff, source, confidence). arv is the value reference used to
-    arms-length-gate the last-sale proxy."""
+    arms-length-gate the last-sale proxy.
+
+    NOTE: every value this returns is an ESTIMATE. Path 1 amortizes a recorded
+    original principal, paths 2/2b read a court/auction debt figure, path 3
+    models a note off the last sale price. A true payoff is borrower-only under
+    TILA/RESPA. `enrich_equity` therefore stamps `payoff_is_estimate` and an
+    `amortization` detail block so nothing downstream can mistake it for one.
+    """
     raw = li.raw if isinstance(li.raw, dict) else {}
-    # 1) recorded Deed of Trust -> amortized current balance
+    # 1) recorded Deed of Trust -> amortized ESTIMATED current balance
     amt, dt = _recorded_dt(raw)
     if amt and dt:
-        bal = amortized_balance(amt, dt)
-        if bal is not None:
-            return bal, "recorded_deed_of_trust", "high"
+        est = estimate_current_balance(amt, dt, basis="recorded_principal")
+        if est is not None:
+            # Stash the labelled detail for enrich_equity to publish verbatim.
+            raw["_equity_amortization"] = est
+            return est["estimated_balance"], "recorded_deed_of_trust", "high"
     # 2) amount_owed when it's an actual debt (judgment / indebtedness).
     #    A foreclosure judgment OR the auction opening bid both represent the
     #    debt being foreclosed (the lender opens at ~the payoff), so treat them
@@ -194,8 +210,11 @@ def _payoff(li: Listing, arv: float) -> tuple[Optional[float], str, str]:
             # rather than trust it. (arv is always > 0 here — _payoff's callers gate
             # on it — so a pure ARV-relative ceiling is safe, no absolute floor.)
             if floor <= sale_amt <= 3.0 * arv:
-                bal = amortized_balance(sale_amt * _LTV_PROXY, sale_date)
+                est = estimate_current_balance(sale_amt * _LTV_PROXY, sale_date,
+                                               basis="last_sale_ltv_proxy")
+                bal = est["estimated_balance"] if est else None
                 if bal is not None and bal <= 2.0 * arv:
+                    raw["_equity_amortization"] = est
                     return bal, src, conf
     return None, "unknown", "none"
 
@@ -203,8 +222,10 @@ def _payoff(li: Listing, arv: float) -> tuple[Optional[float], str, str]:
 def enrich_equity(listings: list[Listing]) -> dict:
     """Attach raw['equity'] = {value, pct, arv_used, payoff, payoff_source, ...}."""
     n = 0
+    amortized = 0
     for li in listings:
         raw0 = li.raw if isinstance(li.raw, dict) else {}
+        raw0.pop("_equity_amortization", None)  # never carry a stale detail block
         arv = _arv(li)
         if not arv or arv <= 0:
             raw0.pop("equity", None)  # never leave a stale equity we can't recompute
@@ -214,10 +235,12 @@ def enrich_equity(listings: list[Listing]) -> dict:
             # e.g. a corrupt last-sale amount the upper-bound gate now rejects —
             # clear any prior (possibly billion-dollar) value rather than keep it.
             raw0.pop("equity", None)
+            raw0.pop("_equity_amortization", None)
             continue
         seniors = _senior_liens(li.raw if isinstance(li.raw, dict) else {})
         equity = round(arv - payoff - seniors, -2)
         raw = li.raw if isinstance(li.raw, dict) else {}
+        amort = raw.pop("_equity_amortization", None)
         raw["equity"] = {
             "value": equity,
             "pct": round(equity / arv, 3),
@@ -227,8 +250,18 @@ def enrich_equity(listings: list[Listing]) -> dict:
             "senior_liens": round(seniors, -2),
             "confidence": conf,
             "is_underwater": equity < 0,
+            # --- explicit estimate labelling (never present this as a payoff) --
+            "payoff_is_estimate": True,
+            "payoff_label": "estimated balance",
+            "payoff_method": (amort or {}).get("method") or f"reported_debt:{src}",
+            "payoff_disclaimer": (
+                "ESTIMATE ONLY — a true payoff is borrower-only under TILA/RESPA "
+                "and includes escrow, arrears and fees we cannot see"),
+            "amortization": amort,
         }
+        if amort:
+            amortized += 1
         li.raw = raw
         n += 1
-    log.info("equity.done", computed=n, total=len(listings))
-    return {"computed": n}
+    log.info("equity.done", computed=n, amortized=amortized, total=len(listings))
+    return {"computed": n, "amortized": amortized}

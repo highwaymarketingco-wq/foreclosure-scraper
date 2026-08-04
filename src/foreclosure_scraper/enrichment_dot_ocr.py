@@ -1,42 +1,54 @@
-"""Deed-of-Trust loan-amount OCR for Spartanburg SC leads — the missing $ that
-turns raw['rod'] lien EXISTENCE into an equity number (the #1 flipper metric).
+"""Recorded Deed-of-Trust ORIGINAL PRINCIPAL via free document-image OCR — the
+one input that turns raw['rod'] lien EXISTENCE into an equity number.
 
-The Spartanburg Logan ROD index (enrichment_spartanburg_rod) tells us a lead HAS
-a mortgage but carries NO dollar figure — the loan amount lives only inside the
-recorded document image. Spartanburg's Logan "The Lookup" exposes each recorded
-instrument's scanned page for FREE at `view_image.php?key=<hash>`
-(content-type application/pdf, NO cart, NO login, NO payment) — the key is
-embedded in the records grid right next to each row. So per HOT/WARM Spartanburg
-lead we:
+The problem
+-----------
+Every Register-of-Deeds INDEX in this repo tells us a lead HAS a mortgage but
+carries NO dollar figure: the principal is printed only inside the recorded
+instrument image. Without it the equity engine has no payoff basis, so every
+downstream max-bid is soft.
 
-  1. render the owner's ROD (reuses rod/logan_render's exact search flow —
-     Accept -> name search -> pick-list -> records frame), keeping the browser
-     OPEN so the guest-session PHPSESSID cookie is still live;
-  2. parse the records grid for the DEED-OF-TRUST / MORTGAGE row belonging to the
-     owner and grab its view_image.php key (from the row's copyToClipboard call);
-  3. download that ONE instrument's free PDF via the render session's own cookies
-     (a bare httpx GET returns 200 application/pdf with 0 bytes — the image is
-     tied to the guest session, so we must fetch it inside the browser context);
-  4. OCR page 1 for the "principal sum of $X" via enrichment_doc_ocr's FREE
-     Gemini path (scanned pages have no text layer);
-  5. write raw['loan_amount'] + raw['dot_ocr'] AND append a rod_docs entry
-     (doc_type='DEED OF TRUST', amount=loan, recorded_date) so
-     enrichment_equity._recorded_dt picks it up as the amortized-payoff basis.
+What this does
+--------------
+Per eligible lead, in a county whose recorder serves the document image FREE and
+ROBOTS-CLEAN (`rod/doc_images.DOC_IMAGE_COUNTIES`):
 
-Compliant: free public image, guest session, no CAPTCHA/WAF/login defeated —
-just the JS the page itself runs plus a cookie-scoped download. Best-effort and
-graceful: any render/download/OCR failure leaves the lead untouched so it retries
-next run. Bounded: HOT/WARM Spartanburg only, capped N leads/run (render is
-~25-40s/owner and flaky), idempotent (skips leads already carrying
-raw['dot_ocr'] unless FORECLOSURE_DOT_OCR_FORCE=1), wall-clock budget-bailed.
+  1. resolve the owner's Deed-of-Trust recordings (per-vendor, see rod/doc_images);
+  2. download the free image (PDF, or a TIFF normalized to a PNG of page 1);
+  3. OCR it for the "principal sum of $X" via enrichment_doc_ocr's FREE
+     Gemini-first path (recorded pages are scans with no text layer);
+  4. write raw['loan_amount'] + raw['dot_ocr'] AND append a rod_docs entry
+     (doc_type='DEED OF TRUST', amount, recorded_date) so
+     enrichment_equity._recorded_dt picks it up as the amortization basis;
+  5. stamp the labelled ESTIMATED current balance (valuation.amortize
+     .estimate_current_balance) onto raw['dot_ocr']['estimated_balance'].
 
-Live-verified 2026-07-01 (GARRETT, JAMES): records grid 56 DEED / 39 MORTGAGE /
-4 LIEN / 1 UCC; picked a MORTGAGE row; view_image.php -> 200 application/pdf
-374,906 bytes (4pp scanned, 0 text layer); Gemini OCR -> amount 56097.80,
-owner 'James V. Garrett', property '120 Kenmatt Drive, Chesnee SC 29323'.
+The recorded principal is a FACT. The current balance is an ESTIMATE — a true
+payoff is borrower-only under TILA/RESPA — and is labelled as such everywhere.
 
-Disable with FORECLOSURE_DOT_OCR=0. Env: FORECLOSURE_DOT_OCR_MAX (default 25),
-FORECLOSURE_DOT_OCR_BUDGET_S (default 1800), FORECLOSURE_DOT_OCR_REFRESH_DAYS.
+Compliance
+----------
+County access is gated in ONE place: `rod/doc_images.ensure_allowed`, a live
+robots.txt evaluation run before every request, with NO env bypass. The four
+i3 Verticals / Logan tenants this module used to target (Spartanburg, Laurens,
+McDowell, Mitchell) all publish `Allow: /$` + `Disallow: /` — the same
+machine-readable no-automation directive rod/kofile.py already treats as a wall
+— so the legacy Spartanburg render path below is retained but can no longer
+fire. It reactivates by itself the day the county relaxes robots.
+
+Bounding (this pipeline has hung on unbounded per-lead loops before)
+--------------------------------------------------------------------
+Four independent limits, all env-tunable:
+  FORECLOSURE_DOT_OCR_MAX          total leads per run       (default 400)
+  FORECLOSURE_DOT_OCR_COUNTY_MAX   leads per county per run  (default 200)
+  FORECLOSURE_DOT_OCR_BUDGET_S     wall clock for the whole enricher (1800)
+  FORECLOSURE_DOT_OCR_SWEEP_BUDGET_S  wall clock per county index sweep (300)
+
+Gating: the old HOT/WARM-only grade gate is GONE (a cold lead's equity is
+exactly what tells you it is not cold). Set FORECLOSURE_DOT_OCR_TIERS to a
+comma list, e.g. "HOT,WARM", to re-narrow. Disable with FORECLOSURE_DOT_OCR=0.
+Idempotent: skips leads already carrying raw['dot_ocr'] younger than
+FORECLOSURE_DOT_OCR_REFRESH_DAYS unless FORECLOSURE_DOT_OCR_FORCE=1.
 """
 from __future__ import annotations
 
@@ -48,39 +60,33 @@ from typing import Optional
 
 import structlog
 
+from .http_client import client as http_client
+from .rod import doc_images as di
+from .rod.doc_images import DOC_IMAGE_COUNTIES, LoganImageSession
 from .rod.logan_render import LOGAN_RENDER_COUNTIES, _SUMMARY_RE
 
 log = structlog.get_logger(__name__)
 
-# Only Spartanburg is a render-based Logan county with free view_image PDFs today.
+# Legacy render target. Kept so it flips back on for free if the county relaxes
+# robots; `ensure_allowed` currently short-circuits it (Disallow: /).
 _TARGET = ("SC", "Spartanburg")
 
-# A records-grid row is a Deed of Trust / mortgage-equivalent (the note that
-# secures the debt whose balance we amortize for the payoff).
-_DOT_RE = re.compile(
-    r"MORT|DEED OF TRUST|\bD/?T\b|\bMTG\b|SECURITY (?:DEED|AGREEMENT)|TR/?D", re.I)
-# Satisfactions / releases / cancellations / assignments carry NO loan amount —
-# they're the PAYOFF or transfer record, not the original note. "MORTGAGE
-# SATISFACTION" matches _DOT_RE (contains "MORT") but OCRs to a null amount, so
-# exclude these and keep only the note that actually secures a dollar figure.
-_NOT_A_NOTE_RE = re.compile(
-    r"SATISF|RELEASE|CANCEL|\bSAT\b|\bREL\b|ASSIGN|SUBORDINAT|MODIFICATION", re.I)
+# Re-exported so existing importers/tests keep working; the canonical
+# definitions now live in rod/doc_images so every vendor shares one rule.
+_DOT_RE = di.DOT_RE
+_NOT_A_NOTE_RE = di.NOT_A_NOTE_RE
+
 # A real recorded mortgage note is well above this; nominal deed/satisfaction
-# consideration ("$1", "$10 and other valuable consideration") and stray page/tax
-# figures fall below it and must NOT be accepted as a loan amount.
+# consideration ("$1", "$10 and other valuable consideration") and stray page or
+# tax figures fall below it and must NOT be accepted as a loan amount.
 _MIN_LOAN = float(os.environ.get("FORECLOSURE_DOT_OCR_MIN_LOAN", "1000"))
+# Ceiling guard: an OCR misread of a parcel id / book+page concatenation would
+# otherwise become a billion-dollar "principal" and drive equity to nonsense.
+_MAX_LOAN = float(os.environ.get("FORECLOSURE_DOT_OCR_MAX_LOAN", "20000000"))
 
 
 def _name_parts(owner: str) -> tuple[str, str]:
-    o = re.sub(r"[^A-Za-z, ]", " ", owner or "").upper()
-    o = re.sub(r"\s+", " ", o).strip()
-    if not o:
-        return "", ""
-    if "," in o:
-        a, b = o.split(",", 1)
-        return a.strip(), (b.strip().split(" ")[0] if b.strip() else "")
-    toks = o.split(" ")
-    return toks[0], (toks[1] if len(toks) > 1 else "")
+    return di.name_parts(owner)
 
 
 def _parse_image_rows(html: str) -> list[dict]:
@@ -89,9 +95,8 @@ def _parse_image_rows(html: str) -> list[dict]:
 
     Each row emits a `copyToClipboard('<inst>','<date>','<book_info>','<DOC_TYPE>',
     '<legal>','<party_type>','<searched>','<reverse>',...,'...view_image.php?key=
-    <hash>...')` call — the DOC TYPE and the image key are both right there, so we
-    read the row straight from that call (more robust than re-associating the
-    summary <td> cells with the separate anchor)."""
+    <hash>...')` call — the DOC TYPE and the image key are both right there.
+    Retained for the legacy (currently robots-walled) render path."""
     rows: list[dict] = []
     for call in re.findall(r"copyToClipboard\((.*?)\);", html, re.S):
         args = re.findall(r"'((?:[^'\\]|\\.)*)'", call)
@@ -128,30 +133,24 @@ def _parse_date(s: str):
 
 def _rank_dot_rows(rows: list[dict], last: str, first: str) -> list[dict]:
     """Ranked Deed-of-Trust candidate rows, newest note first (most recent note =
-    best payoff basis). Owner-matched rows preferred; falls back to all DOT rows
-    when party columns are blank/ambiguous.
+    best amortization basis). Owner-matched rows preferred; falls back to all DOT
+    rows when party columns are blank/ambiguous.
 
-    Returns a LIST (not one row) because Spartanburg's index mislabels some
-    satisfactions as plain 'MORTGAGE' — the doc_type filter can't catch those, so
-    the caller OCRs candidates in order and keeps the first that yields a real
-    dollar amount (a satisfaction OCRs to a null amount)."""
-    dots = [r for r in rows
-            if _DOT_RE.search(r.get("doc_type", ""))
-            and not _NOT_A_NOTE_RE.search(r.get("doc_type", ""))
-            and r.get("key")]
+    Returns a LIST because county indexes mislabel some satisfactions as plain
+    'MORTGAGE' — the doc_type filter can't catch those, so the caller OCRs
+    candidates in order and keeps the first that yields a real dollar amount."""
+    dots = [r for r in rows if di.is_dot_type(r.get("doc_type", "")) and r.get("key")]
     if not dots:
         return []
     mine = [r for r in dots if _owner_row(r, last, first)] or dots
 
     def _key(r):
-        d = _parse_date(r.get("date", ""))
-        return d or datetime.min
+        return _parse_date(r.get("date", "")) or datetime.min
     return sorted(mine, key=_key, reverse=True)
 
 
 def _pick_dot_row(rows: list[dict], last: str, first: str) -> Optional[dict]:
-    """Best single DOT candidate (newest note). Thin wrapper over _rank_dot_rows
-    for callers/tests that want just the top pick."""
+    """Best single DOT candidate (newest note)."""
     ranked = _rank_dot_rows(rows, last, first)
     return ranked[0] if ranked else None
 
@@ -159,19 +158,16 @@ def _pick_dot_row(rows: list[dict], last: str, first: str) -> Optional[dict]:
 async def _render_owner_dot_pdfs(owner: str, max_candidates: int = 3,
                                  timeout_ms: int = 90000
                                  ) -> list[tuple[bytes, dict]]:
-    """Render the owner's Spartanburg ROD and download the free view_image.php PDF
-    for up to `max_candidates` ranked Deed-of-Trust rows (newest note first),
-    using the render session's cookies.
+    """LEGACY Spartanburg render path — robots-GATED and currently a no-op.
 
-    Returns a list of (pdf_bytes, row_dict), newest note first, or []. Mirrors
-    rod/logan_render's proven Accept -> name-search -> pick-list -> records-frame
-    flow, but keeps the browser OPEN to do the cookie-scoped image download
-    (view_image.php returns 200 + 0 bytes to a session-less request). Multiple
-    candidates are downloaded because Spartanburg's index mislabels some
-    satisfactions as plain 'MORTGAGE'; the caller OCRs them in order and keeps the
-    first with a real amount."""
+    search.spartanburgdeeds.com publishes `Allow: /$` + `Disallow: /`, so the
+    guard below returns [] before any request is made. The flow is kept intact
+    (it was live-verified before the robots file was read) so the county
+    relaxing its robots.txt re-enables it with no code change."""
     base = LOGAN_RENDER_COUNTIES.get(_TARGET)
     if not base or not owner:
+        return []
+    if not await di.ensure_allowed(f"{base}/view_image.php"):
         return []
     last, first = _name_parts(owner)
     if not last:
@@ -265,9 +261,7 @@ async def _render_owner_dot_pdfs(owner: str, max_candidates: int = 3,
                 await br.close()
                 return []
             # Cookie-scoped download inside the render session (page.request shares
-            # the guest PHPSESSID; a session-less GET gets 200 + 0 bytes). Grab up
-            # to max_candidates ranked notes so the caller can skip an index-
-            # mislabeled satisfaction and fall through to the real note.
+            # the guest PHPSESSID; a session-less GET gets 200 + 0 bytes).
             out: list[tuple[bytes, dict]] = []
             for row in ranked[:max(1, max_candidates)]:
                 try:
@@ -284,24 +278,47 @@ async def _render_owner_dot_pdfs(owner: str, max_candidates: int = 3,
     return []
 
 
+# --------------------------------------------------------------------------- #
+# Write-back                                                                    #
+# --------------------------------------------------------------------------- #
 def _apply(li, loan: float, row: dict, ocr: dict) -> None:
     """Write raw['loan_amount'] + raw['dot_ocr'] and append a rod_docs entry so
-    the equity engine (_recorded_dt) reads the amortized-payoff basis."""
+    the equity engine (_recorded_dt) reads the amortization basis.
+
+    `row` keys: doc_type, date (MM/DD/YYYY) or recorded_date (datetime),
+    book_info/book/page, instrument_no, key, grantor, grantee, county, state,
+    source.
+    """
+    from .valuation.amortize import estimate_current_balance
+
     if not isinstance(li.raw, dict):
         li.raw = {}
-    rec = _parse_date(row.get("date", ""))
+    rec = row.get("recorded_date")
+    if not isinstance(rec, datetime):
+        rec = _parse_date(row.get("date", "") or "")
+    county = row.get("county") or (li.county or "")
+    state = row.get("state") or (li.state or "")
+    est = estimate_current_balance(loan, rec, basis="recorded_principal") if rec else None
     li.raw["loan_amount"] = loan
     li.raw["dot_ocr"] = {
-        "loan_amount": loan,
+        "loan_amount": loan,                 # recorded ORIGINAL principal (a fact)
+        "is_original_principal": True,
+        "estimated_balance": (est or {}).get("estimated_balance"),
+        "estimated_balance_confidence": (est or {}).get("confidence"),
+        "estimated_balance_detail": est,
+        "not_a_payoff": ("recorded original principal + modeled amortization; a "
+                         "true payoff is borrower-only under TILA/RESPA"),
         "doc_type": row.get("doc_type"),
         "recorded_date": rec.date().isoformat() if rec else None,
+        "book": row.get("book"), "page": row.get("page"),
         "book_info": row.get("book_info"),
         "instrument_no": row.get("instrument_no"),
         "image_key": row.get("key"),
         "ocr_owner": ocr.get("owner_name"),
         "ocr_property_address": ocr.get("property_address"),
         "provider": ocr.get("_provider"),
-        "source": "spartanburg_dot_ocr",
+        "county": county, "state": state,
+        "source": row.get("source") or "rod_dot_ocr",
         "fetched_at": datetime.now(timezone.utc).isoformat(),
     }
     # Feed the equity engine via the ALREADY-allowlisted rod_docs list (append,
@@ -310,18 +327,36 @@ def _apply(li, loan: float, row: dict, ocr: dict) -> None:
     docs = li.raw.get("rod_docs")
     if not isinstance(docs, list):
         docs = []
-    docs.append({
-        "doc_type": row.get("doc_type") or "DEED OF TRUST",
-        "amount": loan,
-        "recorded_date": rec.isoformat() if rec else None,
-        "book": None, "page": None,
-        "grantor": row.get("grantor") or None,
-        "grantee": row.get("grantee") or None,
-        "county": "Spartanburg", "state": "SC",
-        "instrument_no": row.get("instrument_no"),
-        "source": "spartanburg_dot_ocr",
-    })
+    inst = row.get("instrument_no")
+    if not any(isinstance(d, dict) and d.get("instrument_no") == inst
+               and d.get("source", "").endswith("dot_ocr") for d in docs):
+        docs.append({
+            "doc_type": row.get("doc_type") or "DEED OF TRUST",
+            "amount": loan,
+            "recorded_date": rec.isoformat() if rec else None,
+            "book": row.get("book"), "page": row.get("page"),
+            "grantor": row.get("grantor") or None,
+            "grantee": row.get("grantee") or None,
+            "county": county, "state": state,
+            "instrument_no": inst,
+            "source": row.get("source") or "rod_dot_ocr",
+        })
     li.raw["rod_docs"] = docs
+
+
+def _row_from_doc(doc) -> dict:
+    """RodDoc -> the flat row dict `_apply` writes from."""
+    return {
+        "doc_type": doc.doc_type,
+        "recorded_date": doc.recorded_date,
+        "book": doc.book, "page": doc.page,
+        "book_info": f"{doc.book or ''} {doc.page or ''}".strip() or None,
+        "instrument_no": doc.instrument_no,
+        "key": (doc.raw or {}).get("image_key"),
+        "grantor": doc.grantor, "grantee": doc.grantee,
+        "county": doc.county, "state": doc.state,
+        "source": f"{(doc.raw or {}).get('vendor') or 'rod'}_dot_ocr",
+    }
 
 
 def _dot_age_days(li, now: datetime) -> Optional[float]:
@@ -338,24 +373,24 @@ def _dot_age_days(li, now: datetime) -> Optional[float]:
         return None
 
 
-def _is_hot_warm(li) -> bool:
-    tier = ((li.raw or {}).get("distress_stack") or {}).get("tier")
-    return tier in ("HOT", "WARM")
+def _tier(li) -> Optional[str]:
+    return ((li.raw or {}).get("distress_stack") or {}).get("tier")
 
 
 def _has_mortgage_signal(li) -> bool:
-    """Prefer leads the ROD index already flagged as carrying a mortgage — no
-    point rendering a DOT search for a lead with no mortgage on file. When the
-    ROD hasn't run yet we don't know, so treat unknown as eligible (best-effort).
-    """
+    """Prefer leads the ROD index already flagged as carrying a mortgage. When
+    the ROD hasn't run yet we don't know, so treat unknown as eligible."""
     rod = (li.raw or {}).get("rod") if isinstance(li.raw, dict) else None
     if isinstance(rod, dict) and "has_mortgage" in rod:
         return bool(rod.get("has_mortgage"))
-    return True  # ROD not yet fetched -> allow, the render itself confirms
+    return True  # ROD not yet fetched -> allow, the lookup itself confirms
 
 
+# --------------------------------------------------------------------------- #
+# Entry point                                                                   #
+# --------------------------------------------------------------------------- #
 async def enrich_dot_ocr(listings, max_lookups: Optional[int] = None) -> dict:
-    """Best-effort DOT loan-amount OCR for HOT/WARM Spartanburg leads."""
+    """Best-effort recorded-principal OCR across every free + robots-clean county."""
     if os.environ.get("FORECLOSURE_DOT_OCR", "1") == "0":
         return {"skipped": "disabled (FORECLOSURE_DOT_OCR=0)"}
 
@@ -367,16 +402,28 @@ async def enrich_dot_ocr(listings, max_lookups: Optional[int] = None) -> dict:
 
     force = os.environ.get("FORECLOSURE_DOT_OCR_FORCE", "0") == "1"
     cap = max_lookups if max_lookups is not None else int(
-        os.environ.get("FORECLOSURE_DOT_OCR_MAX", "25"))
+        os.environ.get("FORECLOSURE_DOT_OCR_MAX", "400"))
+    county_cap = int(os.environ.get("FORECLOSURE_DOT_OCR_COUNTY_MAX", "200"))
     refresh_days = float(os.environ.get("FORECLOSURE_DOT_OCR_REFRESH_DAYS", "30"))
-    budget_s = float(os.environ.get("FORECLOSURE_DOT_OCR_BUDGET_S", "1800"))  # 30m safety
+    budget_s = float(os.environ.get("FORECLOSURE_DOT_OCR_BUDGET_S", "1800"))
+    sweep_budget_s = float(os.environ.get("FORECLOSURE_DOT_OCR_SWEEP_BUDGET_S", "300"))
+    sweep_years = float(os.environ.get("FORECLOSURE_DOT_OCR_SWEEP_YEARS", "6"))
+    sweep_window = int(os.environ.get("FORECLOSURE_DOT_OCR_SWEEP_WINDOW_DAYS", "60"))
+    max_candidates = int(os.environ.get("FORECLOSURE_DOT_OCR_CANDIDATES", "3"))
+    # Empty (the default) = NO grade gate. The old HOT/WARM-only rule hid equity
+    # from exactly the leads whose grade was low BECAUSE equity was unknown.
+    tiers = {t.strip().upper() for t in
+             os.environ.get("FORECLOSURE_DOT_OCR_TIERS", "").split(",") if t.strip()}
     now = datetime.now(timezone.utc)
     t0 = time.monotonic()
 
     def _eligible(li) -> bool:
-        if li.state != "SC" or (li.county or "").strip() != "Spartanburg":
+        key = ((li.state or "").strip(), (li.county or "").strip())
+        if key not in DOC_IMAGE_COUNTIES:
             return False
-        if not li.owner_name or not _is_hot_warm(li):
+        if not (li.owner_name or "").strip():
+            return False
+        if tiers and _tier(li) not in tiers:
             return False
         if not _has_mortgage_signal(li):
             return False
@@ -390,59 +437,147 @@ async def enrich_dot_ocr(listings, max_lookups: Optional[int] = None) -> dict:
     targets.sort(key=lambda li: (_dot_age_days(li, now) is not None,
                                  -(_dot_age_days(li, now) or 1e9)))
     total_pending = len(targets)
-    targets = targets[:cap]
 
-    stats = {"pending": total_pending, "targets": len(targets), "searched": 0,
-             "pdf_ok": 0, "loan_found": 0, "budget_exhausted": False}
+    stats = {"pending": total_pending, "targets": 0, "searched": 0, "image_ok": 0,
+             "loan_found": 0, "rejected_not_note": 0, "budget_exhausted": False,
+             "gemini_quota_exhausted": False, "fallback_ocr": 0,
+             "counties": {}, "walled_counties": sorted(
+                 f"{s}:{c}" for (s, c), (v, _) in di.COUNTY_IMAGE_STATUS.items()
+                 if v != "free")}
     if not targets:
+        log.info("dot_ocr.done", **stats)
         return stats
 
-    from . import enrichment_doc_ocr as ocr
-    max_candidates = int(os.environ.get("FORECLOSURE_DOT_OCR_CANDIDATES", "3"))
+    # Group by county so a per-county index sweep is paid ONCE, not per lead.
+    by_county: dict[tuple[str, str], list] = {}
+    for li in targets:
+        by_county.setdefault(((li.state or "").strip(), (li.county or "").strip()), []).append(li)
 
-    async def _ocr_amount(pdf: bytes):
-        """OCR one scanned DOT PDF via the shared FREE Gemini path; return
-        (loan, parsed) with loan=None when no dollar amount (e.g. a satisfaction)."""
+    from . import enrichment_doc_ocr as ocr
+
+    gh_token = os.environ.get("GITHUB_MODELS_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    groq_token = os.environ.get("GROQ_API_KEY")
+
+    async def _ocr_amount(data: bytes, mime: str):
+        """OCR one document across the FREE provider chain; return (loan, parsed).
+
+        Gemini first (the only free backend that takes `application/pdf`), then
+        GitHub Models and Groq. A live Burke/Cleveland/Transylvania run on
+        2026-08-04 OCR'd 10 notes and then produced ZERO from the next 108
+        downloaded documents — all nine Gemini keys were quota-exhausted, and
+        with no fallback the rest of the run was wasted network. So when Gemini
+        is out we rasterize page 1 to PNG (the compat backends take images, not
+        PDFs) and keep going.
+
+        loan is None when the page carries no plausible principal (a
+        satisfaction) or when the document reads as a conveyance, not a note.
+        """
         parsed = None
+        quota_out = 0
         for k in gemini_keys:
             try:
-                parsed = await ocr._gemini_call(k, [(pdf, "application/pdf")], is_text=False)
+                parsed = await ocr._gemini_call(k, [(data, mime)], is_text=False)
             except ocr._QuotaOut:
+                quota_out += 1
                 continue
             except Exception:  # noqa: BLE001
                 parsed = None
             if parsed:
                 break
+        if not parsed and quota_out == len(gemini_keys) and (gh_token or groq_token):
+            stats["gemini_quota_exhausted"] = True
+            blocks = None
+            if mime == "application/pdf":
+                png = di.rasterize_pdf_page1(data)
+                if png:
+                    blocks = [png]
+            else:
+                blocks = [(data, mime)]
+            for name, url, key, model in (
+                    ("github", ocr.GITHUB_MODELS_URL, gh_token, ocr.GITHUB_MODELS_MODEL),
+                    ("groq", ocr.GROQ_URL, groq_token, ocr.GROQ_MODEL)):
+                if not key or not blocks:
+                    continue
+                try:
+                    async with http_client(timeout=90.0) as hc:
+                        parsed = await ocr._openai_compat_call(hc, name, url, key,
+                                                               model, blocks)
+                except ocr._QuotaOut:
+                    continue
+                except Exception:  # noqa: BLE001
+                    parsed = None
+                if parsed:
+                    stats["fallback_ocr"] = stats.get("fallback_ocr", 0) + 1
+                    break
         if not parsed:
             return None, None
+        if not di.ocr_is_note(parsed):
+            # e.g. an index row mislabeled a trustee's deed as a note; its dollar
+            # figure is the AUCTION price, the opposite of a payoff basis.
+            return None, parsed
         loan = ocr._clean_amount(parsed.get("amount"))
-        # Reject implausibly small figures. A satisfaction/release carries no loan
-        # amount, but its document body often contains nominal boilerplate
-        # ("$1.00", "$10.00 and other valuable consideration") or a stray page/tax
-        # figure — treat anything below the floor as "no real loan" so the loop
-        # falls through to the next candidate (the actual note).
-        return (loan if loan and loan >= _MIN_LOAN else None), parsed
+        if loan and _MIN_LOAN <= loan <= _MAX_LOAN:
+            return loan, parsed
+        return None, parsed
 
-    for li in targets:
-        if time.monotonic() - t0 > budget_s:
+    async def _run_county(state: str, county: str, leads: list) -> None:
+        leads = leads[:county_cap]
+        stats["targets"] += len(leads)
+        vendor = DOC_IMAGE_COUNTIES.get((state, county))
+        cstat = {"leads": len(leads), "image_ok": 0, "loan_found": 0}
+        stats["counties"][f"{state}:{county}"] = cstat
+
+        logan_index = None
+        sess = None
+        try:
+            if vendor == "logan":
+                sess = LoganImageSession(state, county)
+                await sess.__aenter__()
+                if not sess.live:
+                    return
+                remaining = max(30.0, min(sweep_budget_s, budget_s - (time.monotonic() - t0)))
+                swept = await sess.sweep_dots(years_back=sweep_years,
+                                              window_days=sweep_window,
+                                              budget_s=remaining)
+                logan_index = di.index_by_surname(swept)
+                cstat["swept_docs"] = len(swept)
+
+            for li in leads:
+                if time.monotonic() - t0 > budget_s or stats["searched"] >= cap:
+                    stats["budget_exhausted"] = True
+                    return
+                stats["searched"] += 1
+                try:
+                    cands = await di.owner_dot_documents(
+                        state, county, li.owner_name, max_candidates=max_candidates,
+                        logan_index=logan_index, logan_session=sess)
+                except Exception:  # noqa: BLE001
+                    cands = []
+                if not cands:
+                    continue
+                stats["image_ok"] += 1
+                cstat["image_ok"] += 1
+                for data, mime, doc in cands:
+                    loan, parsed = await _ocr_amount(data, mime)
+                    if loan:
+                        _apply(li, loan, _row_from_doc(doc), parsed or {})
+                        stats["loan_found"] += 1
+                        cstat["loan_found"] += 1
+                        break
+                    if parsed and not di.ocr_is_note(parsed):
+                        stats["rejected_not_note"] += 1
+        finally:
+            if sess is not None:
+                await sess.__aexit__(None, None, None)
+
+    for (state, county), leads in by_county.items():
+        if time.monotonic() - t0 > budget_s or stats["searched"] >= cap:
             stats["budget_exhausted"] = True
             break
-        stats["searched"] += 1
         try:
-            candidates = await _render_owner_dot_pdfs(li.owner_name, max_candidates)
-        except Exception:  # noqa: BLE001
-            candidates = []
-        if not candidates:
-            continue  # render/download failed -> leave unstamped, retry next run
-        stats["pdf_ok"] += 1
-        # OCR candidates newest-first; keep the first with a real dollar amount
-        # (skips an index-mislabeled satisfaction, which OCRs to a null amount).
-        for pdf, row in candidates:
-            loan, parsed = await _ocr_amount(pdf)
-            if loan:
-                _apply(li, loan, row, parsed)
-                stats["loan_found"] += 1
-                break
+            await _run_county(state, county, leads)
+        except Exception:  # noqa: BLE001 - one county must never kill the run
+            log.warning("dot_ocr.county_failed", state=state, county=county)
 
     log.info("dot_ocr.done", **stats)
     return stats

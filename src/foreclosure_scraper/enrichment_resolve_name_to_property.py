@@ -65,6 +65,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import time
 from typing import Any, Optional
 
@@ -84,7 +85,13 @@ from .enrichment_address_owner_v2 import (
 from .enrichment_gis_attrs import apply_gis_attrs
 from .http_client import client
 from .models import Listing
-from .name_normalize import like_patterns, match_owner, middle_conflict
+from .name_normalize import (
+    is_entity,
+    like_patterns,
+    match_owner,
+    middle_conflict,
+    person_orderings,
+)
 
 log = structlog.get_logger()
 
@@ -156,6 +163,73 @@ SC_OWNER_LAYERS: dict[str, dict[str, Any]] = {
 #   Cherokee  — qPublic/Schneider only: parcel-keyed ASP.NET viewstate postback,
 #               no address/owner GET surface.
 SC_NO_FREE_OWNER_SEARCH = {"Anderson", "Cherokee"}
+
+
+# ---------------------------------------------------------------------------
+# NC OneMap — statewide owner-name index (verified live 2026-08-03)
+# ---------------------------------------------------------------------------
+# 5,938,639 parcels across all 100 NC counties, free, public, no auth, no robots
+# Disallow (the host serves no robots.txt at all). It is the ONLY NC owner-name
+# surface that covers counties enrichment_arcgis.NC_GIS never wired (NC_GIS has
+# 18 of 100), and a second chance for the 18 it did.
+#
+# GOTCHA 1 — cntyname is stored Title Case with INTERNAL capitals. `cntyname =
+#   'BUNCOMBE'` returns 0, and Python's `.title()` (which _county_clean applies)
+#   turns "McDowell" into "Mcdowell", which ALSO returns 0. That is exactly why a
+#   prior pass measured McDowell as absent; it is present with 33,449 parcels.
+#   Always compare with `UPPER(cntyname) = 'MCDOWELL'`, never a literal.
+# GOTCHA 2 — the county predicate is MANDATORY. Without it an owner LIKE runs
+#   against 5.9M statewide rows and returns same-named strangers from the far
+#   side of the state, which the strict matcher would happily accept.
+# GOTCHA 3 — ownname joins co-owners with ';' ('MANLY DAVID T;DILLON MARGARET'),
+#   handled by the ';' branch in name_normalize._JOINT_SPLIT_RE plus
+#   _owner_segments below, so a lead who is the SECOND owner still matches.
+# GOTCHA 4 — ownlast/ownfrst exist in the schema but are EMPTY statewide
+#   (measured 0 populated rows in Buncombe/Henderson/McDowell/Brunswick/Pender/
+#   Transylvania/Cleveland). Do not build a structured search on them.
+NC_ONEMAP_URL = (
+    "https://services.nconemap.gov/secure/rest/services/"
+    "NC1Map_Parcels/FeatureServer/1/query"
+)
+# Enumerated, never '*'. Deliberately EXCLUDES every owner-mailing column
+# (mailadd/munit/mcity/mstate/mzip/maddr*) — the resolver's job is name -> parcel,
+# and not requesting them is a stronger guarantee than stripping them after.
+NC_ONEMAP_FIELDS = (
+    "parno,ownname,ownname2,siteadd,scity,szip,parval,landval,improvval,"
+    "gisacres,structyear,cntyname,saledatetx,parusedesc"
+)
+
+# ---------------------------------------------------------------------------
+# Buncombe owner index — structured LastName/FirstName spine (live 2026-08-03)
+# ---------------------------------------------------------------------------
+# Buncombe publishes its appraisal roll as two normalized tables, which together
+# beat a LIKE against a single concatenated owner string:
+#   Owner Lookup 2025   544,665 rows  ID, LastName, FirstName, ThirdName, SuffixName
+#   Parcel Owners 2025  196,836 rows  Pin, OwnerId, Primary_
+# Chain: (LastName=, FirstName LIKE) -> ID -> OwnerId -> Pin -> NC OneMap parno.
+#
+# WHY IT BEATS THE LIKE PATH: every co-owner is her OWN row. 'MARGARET DILLON'
+# on parcel 060502683700000 is invisible to an ownname search (primary_party
+# reads only 'MANLY DAVID T') but is a first-class row here. And surname/given
+# are separate columns, so 'SMITH JOHN' cannot collide with 'SMITHIES JOHN W'
+# the way '%SMITH%JOHN%' does.
+#
+# PRIVACY: only ID + name columns are requested. The lookup also carries owner
+# mailing Address1/Address2/City/State/Zip; those are NEVER in outFields.
+_BUNCOMBE_BASE = "https://services6.arcgis.com/VLA0ImJ33zhtGEaP/ArcGIS/rest/services"
+BUNCOMBE_OWNER_LOOKUP_URL = (
+    f"{_BUNCOMBE_BASE}/Real%20Estate%20Appraisal%20Owner%20Lookup%202025/FeatureServer/0/query"
+)
+BUNCOMBE_PARCEL_OWNERS_URL = (
+    f"{_BUNCOMBE_BASE}/Real%20Estate%20Appraisal%20Parcel%20Owners%202025/FeatureServer/0/query"
+)
+BUNCOMBE_OWNER_FIELDS = "ID,LastName,FirstName,ThirdName,SuffixName"
+# Owner rows to consider per surname/given probe, and parcels per matched owner.
+# 544,665 owner rows means a common surname alone would page forever; the strict
+# matcher only ever commits a unique parcel, so a bounded window is sufficient.
+_BUNCOMBE_OWNER_ROWS = 200
+_BUNCOMBE_PARCEL_ROWS = 60
+
 
 # Name-indexed lead surfaces we most want to resolve. A lead from one of these
 # sources / listing_types is PRIORITIZED; others still qualify if name-only.
@@ -232,6 +306,13 @@ _STREET_WORDS = {
 # US state-abbrev tail that marks a value as a city/state line, not a street.
 _STATE_TAILS = {"NC", "SC", "GA", "TN", "VA", "FL"}
 
+# House numbers that are a county's "this parcel has no address" sentinel, not a
+# real number. Buncombe writes '99999 PEARSON  LN' on 17,788 of its 134,741 NC
+# OneMap rows (13%, and every such row statewide is Buncombe's) — raw land, ROW,
+# easements. Committing one would put a nonexistent street number in front of
+# outreach, so the situs is rejected and the lead keeps its parcel id only.
+_PLACEHOLDER_HOUSE_NOS = {"99999", "9999", "00000", "0"}
+
 
 def _valid_situs(s: Optional[str]) -> bool:
     """A resolved street_address is trustworthy only if it carries a house number
@@ -243,6 +324,8 @@ def _valid_situs(s: Optional[str]) -> bool:
         return False
     toks = t.replace(",", " ").split()
     if not toks:
+        return False
+    if toks[0] in _PLACEHOLDER_HOUSE_NOS:
         return False
     if toks[0].isdigit() and len(toks) >= 2:
         return True
@@ -266,7 +349,31 @@ def _valid_parcel(p: Optional[str]) -> bool:
     return len(digits) >= 5
 
 
+#: Column names never worth sampling, whatever a layer offers. This probe is the
+#: ONE wildcard query left in the codebase, so it is also the one place a county
+#: could hand us an SSN/DOB/contact column we never asked for. Two counties in
+#: this footprint already publish such columns.
+_SAMPLE_FORBIDDEN = re.compile(
+    r"ssn|social_?sec|drivers?_?lic|dl_?num|tcdlc|date_?of_?birth|\bdob\b|birth"
+    r"|poc_?phone|poc_?email|e_?mail|phone|account_?(no|num)|acct_?(no|num)",
+    re.I,
+)
+
+
 async def _sample_row(c: httpx.AsyncClient, base: str) -> Optional[dict[str, Any]]:
+    """One-row schema probe for layers whose metadata exposes no field list.
+
+    outFields="*" is unavoidable HERE and only here: the whole reason this
+    fallback exists is that the layer's own metadata returns an empty ``fields``
+    array (SCDOT-class layers), so there is no way to name the columns in
+    advance. _detect_from_sample needs the VALUES too, not just the keys, because
+    it picks the owner/situs columns by value shape as well as name.
+
+    It is bounded instead: ONE row, ONE layer, cached per base URL, and every
+    column whose name looks like an identifier or personal contact detail is
+    dropped before any caller sees it. Nothing from this probe is written to a
+    Listing - it is used solely to learn which two column names to query later.
+    """
     try:
         r = await c.get(base, params={
             "where": "1=1", "outFields": "*", "returnGeometry": "false",
@@ -276,7 +383,8 @@ async def _sample_row(c: httpx.AsyncClient, base: str) -> Optional[dict[str, Any
             return None
         feats = r.json().get("features") or []
         if feats and feats[0].get("attributes"):
-            return dict(feats[0]["attributes"])
+            return {k: v for k, v in feats[0]["attributes"].items()
+                    if not _SAMPLE_FORBIDDEN.search(str(k))}
     except (httpx.HTTPError, ValueError):
         return None
     return None
@@ -341,6 +449,38 @@ def _county_clean(li: Listing) -> str:
     return c.split(",")[0].strip().title()
 
 
+def _county_upper(li: Listing) -> str:
+    """County for a SQL literal, WITHOUT .title().
+
+    _county_clean applies .title(), which maps 'McDowell' -> 'Mcdowell'. NC OneMap
+    stores 'McDowell', so a Title-Cased literal silently returns 0 rows — the
+    documented reason a prior pass concluded McDowell was missing. Everything
+    downstream compares with UPPER(cntyname), so casing never matters again.
+    """
+    c = (li.county or "").replace(" County", "").strip()
+    for sfx in (", NC", ", SC", ",NC", ",SC"):
+        if c.upper().endswith(sfx):
+            c = c[: -len(sfx)].strip()
+    return " ".join(c.split(",")[0].split()).upper()
+
+
+def _nc_onemap_cfg(li: Listing) -> dict[str, Any]:
+    """Statewide NC OneMap cfg, county-scoped. Always safe to append to a plan."""
+    return {
+        "kind": "gis_like",
+        "base": NC_ONEMAP_URL,
+        "owner_field": "ownname",
+        "situs_field": "siteadd",
+        "parcel_field": "parno",
+        "mail_fields": (),          # mailing columns are never requested at all
+        "out_fields": NC_ONEMAP_FIELDS,
+        "where_prefix": f"UPPER(cntyname) = '{_county_upper(li).replace(chr(39), chr(39) * 2)}'",
+        "pinned": True,
+        "county": _county_clean(li),
+        "label": "nc_onemap",
+    }
+
+
 def _endpoint_cfg(li: Listing) -> Optional[dict[str, Any]]:
     """Endpoint + field plan for a lead's county, or None when nothing is wired.
 
@@ -356,26 +496,71 @@ def _endpoint_cfg(li: Listing) -> Optional[dict[str, Any]]:
         pinned = SC_OWNER_LAYERS.get(county)
         if pinned:
             return {
+                "kind": "gis_like",
                 "base": pinned["url"], "owner_field": pinned["owner"],
                 "situs_field": pinned["situs"], "parcel_field": pinned["parcel"],
                 "mail_fields": pinned["mail"], "pinned": True, "county": county,
+                "label": f"sc_pinned_{county.lower()}",
             }
     base = _endpoint_for(li)
     if not base:
         return None
     return {
+        "kind": "gis_like",
         "base": base, "owner_field": None, "situs_field": None,
         "parcel_field": None, "mail_fields": (), "pinned": False,
-        "county": county,
+        "county": county, "label": "county_layer",
     }
 
 
+def _endpoint_plan(li: Listing) -> list[dict[str, Any]]:
+    """Ordered chain of owner-search backends to try for one lead, best first.
+
+    A single endpoint was the real shape of the ~28.7% ceiling: when the county
+    layer had no row for a name, the lead was done. The chain gives every NC lead
+    a statewide second look, and Buncombe a structured index that finds owners the
+    concatenated-string search cannot see at all.
+
+    Ordering is deliberate — most authoritative and most specific first, so the
+    cheap local answer wins and the statewide scan is only paid for on a miss:
+      Buncombe NC : structured owner index -> county layer -> NC OneMap
+      other NC    : county layer (if wired) -> NC OneMap
+      SC          : unchanged (pinned county layer, or nothing)
+    """
+    plan: list[dict[str, Any]] = []
+    county = _county_clean(li)
+
+    if li.state == "NC" and county == "Buncombe":
+        plan.append({
+            "kind": "owner_index",
+            "base": BUNCOMBE_OWNER_LOOKUP_URL,
+            "owner_field": "ownname",     # adjudicated on the OneMap parcel row
+            "situs_field": "siteadd",
+            "parcel_field": "parno",
+            "mail_fields": (),
+            "pinned": True,
+            "county": county,
+            "label": "buncombe_owner_index",
+        })
+
+    first = _endpoint_cfg(li)
+    if first:
+        plan.append(first)
+
+    if li.state == "NC" and _county_upper(li):
+        onemap = _nc_onemap_cfg(li)
+        if not any(p["base"] == onemap["base"] for p in plan):
+            plan.append(onemap)
+
+    return plan
+
+
 def _in_core(li: Listing) -> bool:
-    # Resolvable = the county has a wired GIS owner-search endpoint. This now
-    # covers coastal NC/SC (Charleston, Georgetown, Horry, Beaufort, Brunswick,
-    # New Hanover, Pender, Onslow, Carteret, ...) which are real targets, not the
-    # old inland-only _CORE_* sets. Unwired counties fall out via _endpoint_cfg.
-    return _endpoint_cfg(li) is not None
+    # Resolvable = SOME wired owner-search backend covers the lead's county. For
+    # SC that is still the pinned county layer (or nothing). For NC it is now
+    # every county, because NC OneMap carries all 100 — the 82 counties
+    # enrichment_arcgis.NC_GIS never wired stop falling out as no_endpoint.
+    return bool(_endpoint_plan(li))
 
 
 # Government/agency parties that show up as the plaintiff on tax-foreclosure
@@ -490,6 +675,22 @@ def _mark(li: Listing, confidence: str, *, queried: bool, **extra: Any) -> None:
     }
 
 
+def _owner_segments(owner: str) -> list[str]:
+    """Co-owner strings inside one GIS owner cell, first party first.
+
+    NC OneMap packs every owner of a parcel into `ownname` separated by ';'
+    ('MANLY DAVID T;DILLON MARGARET'). match_owner only ever reads the FIRST
+    party, so without this a lead who is the second-listed owner — routinely a
+    spouse, and exactly the person a divorce or probate lead names — can never
+    match her own parcel. Cells with no ';' yield a single segment, so every
+    existing county layer behaves identically.
+    """
+    raw = str(owner or "")
+    if ";" not in raw:
+        return [raw] if raw.strip() else []
+    return [seg.strip() for seg in raw.split(";") if seg.strip()]
+
+
 def _strict_matches(
     rows: list[dict[str, Any]], owner_field: str, name: str,
 ) -> list[tuple[str, dict[str, Any]]]:
@@ -499,12 +700,18 @@ def _strict_matches(
     equality, or surname-in-surname-position + first-name-in-first-name-position.
     A bag-of-tokens rule accepted roughly one wrong person per three "unique"
     matches on this cohort; positional matching removes them.
+
+    Each ';'-delimited co-owner in the cell is adjudicated separately, at full
+    strictness. Widening WHICH strings are compared is not the same as loosening
+    the comparison — every segment still has to clear match_owner outright.
     """
     out: list[tuple[str, dict[str, Any]]] = []
     for row in rows:
-        kind = match_owner(name, str(row.get(owner_field) or ""))
-        if kind:
-            out.append((kind, row))
+        for segment in _owner_segments(str(row.get(owner_field) or "")):
+            kind = match_owner(name, segment)
+            if kind:
+                out.append((kind, row))
+                break
     return out
 
 
@@ -570,6 +777,224 @@ async def _layer_health(c: httpx.AsyncClient, base: str) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
+# Query providers
+# ---------------------------------------------------------------------------
+
+def _sql_quote(s: str) -> str:
+    return str(s or "").replace("'", "''")
+
+
+async def _arcgis_rows(
+    c: httpx.AsyncClient,
+    base: str,
+    where: str,
+    out_fields: str,
+    *,
+    page: int,
+    max_rows: int,
+    order_by: str,
+) -> list[dict[str, Any]]:
+    """Paged ArcGIS attribute fetch. Enumerated outFields — never '*'.
+
+    Pages with resultOffset + resultRecordCount and an explicit orderByFields, so
+    the window is stable across pages instead of silently re-serving page 1.
+    """
+    rows: list[dict[str, Any]] = []
+    offset = 0
+    while offset < max_rows:
+        params = {
+            "where": where,
+            "outFields": out_fields,
+            "returnGeometry": "false",
+            "orderByFields": order_by,
+            "resultOffset": str(offset),
+            "resultRecordCount": str(min(page, max_rows - offset)),
+            "f": "json",
+        }
+        try:
+            r = await c.get(base, params=params, timeout=30.0)
+            if r.status_code != 200:
+                break
+            data = r.json()
+        except (httpx.HTTPError, ValueError):
+            break
+        if not isinstance(data, dict) or "error" in data:
+            break
+        feats = data.get("features") or []
+        if not feats:
+            break
+        rows.extend(dict(f.get("attributes") or {}) for f in feats)
+        if len(feats) < int(params["resultRecordCount"]) and not data.get("exceededTransferLimit"):
+            break
+        offset += len(feats)
+    return rows
+
+
+async def _query_owner_scoped(
+    c: httpx.AsyncClient, cfg: dict[str, Any], patterns: list[str],
+) -> list[dict[str, Any]]:
+    """Owner LIKE search that can carry a mandatory extra predicate.
+
+    The shared _query_owner in enrichment_address_owner_v2 builds a bare
+    `UPPER(owner) LIKE '...'` and asks for outFields=*. Neither is usable against
+    NC OneMap: the county predicate is REQUIRED there (without it '%SMITH%JOHN%'
+    scans 5.9M statewide rows and hands the strict matcher a same-named stranger
+    from three hundred miles away), and '*' is barred. Layers with no
+    `where_prefix` fall through to the original helper, unchanged.
+    """
+    prefix = cfg.get("where_prefix")
+    if not prefix:
+        return await _query_owner(c, cfg["base"], cfg["owner_field"], patterns)
+
+    owner_field = cfg["owner_field"]
+    out_fields = cfg.get("out_fields") or owner_field
+    seen: set[Any] = set()
+    out: list[dict[str, Any]] = []
+    for pat in patterns:
+        where = f"{prefix} AND UPPER({owner_field}) LIKE '{pat}'"
+        rows = await _arcgis_rows(
+            c, cfg["base"], where, out_fields,
+            page=25, max_rows=25, order_by=cfg.get("parcel_field") or owner_field,
+        )
+        for attrs in rows:
+            key = attrs.get(cfg.get("parcel_field") or "") or str(sorted(attrs.items()))
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(attrs)
+        if out:
+            break   # most-specific pattern that returns rows wins
+    return out
+
+
+def _drop_middle_name_conflicts(
+    rows: list[dict[str, Any]], person: Any,
+) -> list[dict[str, Any]]:
+    """Remove owner rows whose spelled-out middle name contradicts the lead's.
+
+    WHY THIS BACKEND NEEDS IT AND THE LIKE PATH DOES NOT: the structured probe
+    asks for EVERY 'MCCURRY, JAMES%' in the county on purpose. If only one of
+    those men happens to own a parcel today, the chain hands the matcher exactly
+    one candidate and it commits as a unique 'strong' hit — but the uniqueness
+    came from who owns property, not from the name being distinctive. Measured on
+    the live board, 2 of the first 6 Buncombe resolutions were this shape
+    ('James Rodney Mccurry' -> 'MCCURRY JAMES BRUCE').
+
+    ThirdName is the structured middle name the concatenated ownname string does
+    not reliably expose, so the contradiction can be caught BEFORE a candidate is
+    generated — and a different, genuinely-matching James McCurry can still win.
+
+    Same evidentiary bar as name_normalize.middle_conflict: only a spelled-out
+    middle on BOTH sides can contradict. A blank ThirdName or a bare initial
+    ('R') cannot disagree with anything and is always kept.
+    """
+    lead_middles = {t for t in getattr(person, "given", ())[1:] if len(t) > 1}
+    if not lead_middles:
+        return rows
+    kept: list[dict[str, Any]] = []
+    for r in rows:
+        third = str(r.get("ThirdName") or "").strip().upper()
+        if len(third) > 1 and third.isalpha() and third not in lead_middles:
+            continue
+        kept.append(r)
+    return kept
+
+
+async def _query_buncombe_owner_index(
+    c: httpx.AsyncClient, cfg: dict[str, Any], party: str,
+) -> list[dict[str, Any]]:
+    """Buncombe structured spine: (LastName, FirstName) -> ID -> Pin -> parcel row.
+
+    Returns NC OneMap parcel rows so the SAME strict matcher and the SAME
+    ambiguity rule adjudicate the result — this is a candidate GENERATOR, not a
+    second matching policy. It never decides anything on its own.
+
+    Both name orderings from person_orderings are probed, because a court
+    defendant string is genuinely ambiguous ('CASEY WILLIAM' is either).
+    Companies are skipped: the lookup is a person table (LastName/FirstName), and
+    an entity's name does not decompose into surname + given.
+    """
+    if is_entity(party):
+        return []
+    ids: list[int] = []
+    for person in person_orderings(party)[:2]:
+        if not person.given:
+            continue
+        where = (
+            f"UPPER(LastName) = '{_sql_quote(person.surname)}' "
+            f"AND UPPER(FirstName) LIKE '{_sql_quote(person.given[0])}%'"
+        )
+        rows = await _arcgis_rows(
+            c, BUNCOMBE_OWNER_LOOKUP_URL, where, BUNCOMBE_OWNER_FIELDS,
+            page=200, max_rows=_BUNCOMBE_OWNER_ROWS, order_by="ID",
+        )
+        rows = _drop_middle_name_conflicts(rows, person)
+        for r in rows:
+            oid = r.get("ID")
+            if isinstance(oid, (int, float)) and int(oid) not in ids:
+                ids.append(int(oid))
+        if ids:
+            break
+    if not ids:
+        return []
+
+    # ID -> Pin. Most of the 544,665 owner rows are historical and own nothing
+    # today, so an empty result here is a real answer ("this person holds no
+    # Buncombe parcel"), not a failure.
+    pins: list[str] = []
+    for chunk in (ids[i:i + 100] for i in range(0, len(ids), 100)):
+        rows = await _arcgis_rows(
+            c, BUNCOMBE_PARCEL_OWNERS_URL,
+            f"OwnerId IN ({','.join(str(i) for i in chunk)})",
+            "Pin,OwnerId,Primary_",
+            page=200, max_rows=_BUNCOMBE_PARCEL_ROWS, order_by="Pin",
+        )
+        for r in rows:
+            pin = str(r.get("Pin") or "").strip()
+            if pin and pin not in pins:
+                pins.append(pin)
+        if len(pins) >= _BUNCOMBE_PARCEL_ROWS:
+            break
+    if not pins:
+        return []
+
+    # Pin -> the parcel row that actually carries situs/value. County-scoped so a
+    # Pin collision with another county's parno cannot resolve to the wrong state.
+    quoted = ",".join(f"'{_sql_quote(p)}'" for p in pins[:_BUNCOMBE_PARCEL_ROWS])
+    return await _arcgis_rows(
+        c, NC_ONEMAP_URL,
+        f"UPPER(cntyname) = 'BUNCOMBE' AND parno IN ({quoted})",
+        NC_ONEMAP_FIELDS,
+        page=100, max_rows=_BUNCOMBE_PARCEL_ROWS, order_by="parno",
+    )
+
+
+# cfg label -> the stats key that counts a resolution from that backend.
+_BACKEND_STAT = {
+    "buncombe_owner_index": "resolved_buncombe_index",
+    "nc_onemap": "resolved_nc_onemap",
+    "county_layer": "resolved_county_layer",
+}
+
+
+def _backend_stat_key(label: str) -> str:
+    if label in _BACKEND_STAT:
+        return _BACKEND_STAT[label]
+    if label.startswith("sc_pinned_"):
+        return "resolved_sc_pinned"
+    return "resolved_other"
+
+
+async def _candidate_rows(
+    c: httpx.AsyncClient, cfg: dict[str, Any], party: str, patterns: list[str],
+) -> list[dict[str, Any]]:
+    """Dispatch one backend in the plan to its rows."""
+    if cfg.get("kind") == "owner_index":
+        return await _query_buncombe_owner_index(c, cfg, party)
+    return await _query_owner_scoped(c, cfg, patterns)
+
+
+# ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
@@ -585,6 +1010,10 @@ async def enrich_resolve_name_to_property(
         "ambiguous": 0, "resolved": 0, "middle_conflict": 0, "address_filled": 0,
         "parcel_filled": 0, "value_filled": 0, "sqft_filled": 0,
         "budget_hit": 0, "cap_hit": 0,
+        # Which backend in the chain actually produced each resolution, so the
+        # next measurement can tell a real gain from a reshuffle.
+        "resolved_buncombe_index": 0, "resolved_nc_onemap": 0,
+        "resolved_county_layer": 0, "resolved_sc_pinned": 0, "resolved_other": 0,
     }
     if not _ENABLED:
         log.info("name_resolve.disabled")
@@ -630,142 +1059,171 @@ async def enrich_resolve_name_to_property(
             _mark(li, "budget_bail", queried=False)
             return
 
-        cfg = _endpoint_cfg(li)
-        if not cfg:
+        plan = _endpoint_plan(li)
+        if not plan:
             stats["no_endpoint"] += 1
             _mark(li, "no_endpoint", queried=False)
-            return
-        base = cfg["base"]
-
-        dead = await _health(c, base)
-        if dead:
-            stats["endpoint_dead"] += 1
-            _mark(li, "endpoint_dead", queried=False, endpoint=base, reason=dead)
-            return
-
-        owner_field = cfg["owner_field"]
-        situs_field = cfg["situs_field"]
-        if not cfg["pinned"]:
-            if base not in field_cache:
-                field_cache[base] = await _resolve_fields(c, base)
-            owner_field, situs_field = field_cache[base]
-        if not owner_field:
-            stats["no_owner_field"] += 1
-            _mark(li, "no_owner_field", queried=False, endpoint=base)
             return
 
         name = _lead_name(li)
         if not isinstance(li.raw, dict):
             li.raw = {}
 
-        for party in _split_joint(name):
-            patterns = like_patterns(party)
-            if not patterns:
+        # A lead is only "queried" (and so skipped on re-runs) if at least ONE
+        # backend actually answered. If every backend in the chain bailed for an
+        # environmental reason, the lead must stay retryable.
+        queried_any = False
+        last_env: Optional[tuple[str, dict[str, Any]]] = None
+
+        for cfg in plan:
+            base = cfg["base"]
+
+            dead = await _health(c, base)
+            if dead:
+                stats["endpoint_dead"] += 1
+                last_env = ("endpoint_dead", {"endpoint": base, "reason": dead})
                 continue
 
-            # Re-check the budget HERE, not just at task entry: gather() dispatches
-            # every target at once, so without this a long queue of leads
-            # serialized behind a slow host would all sail past the entry check
-            # and run for far longer than _BUDGET_S.
-            if time.monotonic() - t0 > _BUDGET_S:
-                stop.set()
-                stats["budget_hit"] = 1
-                _mark(li, "budget_bail", queried=False)
-                return
-
-            async with sem:
-                stats["attempted"] += 1
-                rows = await _query_owner(c, base, owner_field, patterns)
-            if not rows:
-                continue
-
-            hits = _strict_matches(rows, owner_field, party)
-            if not hits:
-                continue
-
-            # Several parcels for one owner: real and common (a landlord holding
-            # multiple lots). Keep every candidate on the lead and FLAG it —
-            # never pick one at random and present it as the address.
-            parcels = {
-                _row_parcel(r, cfg.get("parcel_field")) or str(r.get("OBJECTID") or i)
-                for i, (_k, r) in enumerate(hits)
-            }
-            if len(hits) > 1 and len(parcels) > 1:
-                stats["ambiguous"] += 1
-                _mark(
-                    li, "ambiguous_multi_parcel", queried=True,
-                    query_name=party, match_count=len(hits),
-                    matched_owner=str(hits[0][1].get(owner_field) or "").strip(),
-                    candidates=[
-                        {
-                            "parcel_id": _row_parcel(r, cfg.get("parcel_field")),
-                            "owner": str(r.get(owner_field) or "").strip(),
-                            "match": k,
-                        }
-                        for k, r in hits[:10]
-                    ],
-                )
-                return
-
-            kind, best = hits[0]
-            matched_owner = str(best.get(owner_field) or "").strip()
-            attrs = _safe_attrs(best, cfg)
+            owner_field = cfg["owner_field"]
+            situs_field = cfg["situs_field"]
             if not cfg["pinned"]:
-                _inject_site_alias(attrs, situs_field)
+                if base not in field_cache:
+                    field_cache[base] = await _resolve_fields(c, base)
+                owner_field, situs_field = field_cache[base]
+            if not owner_field:
+                stats["no_owner_field"] += 1
+                last_env = ("no_owner_field", {"endpoint": base})
+                continue
 
-            had_addr = bool((li.street_address or "").strip())
-            had_parcel = bool((li.parcel_id or "").strip())
-            had_value = bool(li.market_value)
-            had_sqft = bool(li.living_sqft)
+            for party in _split_joint(name):
+                patterns = like_patterns(party)
+                if not patterns:
+                    continue
 
-            _populate_from_attrs(li, attrs)
-            # Sanity-reject artifacts a GIS layer can still emit:
-            #   * a mailing / PO-box line as situs,
-            #   * a bare 'CITY ST' line (no house number / street word) as situs,
-            #   * a decimal acreage/value (e.g. '38.06') as parcel_id.
-            if not had_addr and li.street_address and (
-                _looks_like_mailing(li.street_address)
-                or not _valid_situs(li.street_address)
-            ):
-                li.street_address = None
-            if not had_parcel and li.parcel_id and not _valid_parcel(li.parcel_id):
-                li.parcel_id = None
-            # Value + sqft + owner from the matched parcel attribute bag.
-            apply_gis_attrs(li, attrs)
+                # Re-check the budget HERE, not just at task entry: gather()
+                # dispatches every target at once, so without this a long queue of
+                # leads serialized behind a slow host would all sail past the entry
+                # check and run for far longer than _BUDGET_S.
+                if time.monotonic() - t0 > _BUDGET_S:
+                    stop.set()
+                    stats["budget_hit"] = 1
+                    if not queried_any:
+                        _mark(li, "budget_bail", queried=False)
+                    return
 
-            now_addr = bool((li.street_address or "").strip())
-            now_parcel = bool((li.parcel_id or "").strip())
-            if (now_addr and not had_addr) or (now_parcel and not had_parcel):
-                stats["resolved"] += 1
-                if now_addr and not had_addr:
-                    stats["address_filled"] += 1
-                if now_parcel and not had_parcel:
-                    stats["parcel_filled"] += 1
-                if li.market_value and not had_value:
-                    stats["value_filled"] += 1
-                if li.living_sqft and not had_sqft:
-                    stats["sqft_filled"] += 1
-                # Same surname + first name but a provably different spelled-out
-                # middle name. Still committed (a surname+firstname hit in the
-                # right county is real signal) but flagged and counted so review
-                # can see the doubt before outreach.
-                conflict = middle_conflict(party, matched_owner)
-                if conflict:
-                    stats["middle_conflict"] += 1
-                _mark(
-                    li, kind, queried=True, matched_owner=matched_owner,
-                    from_field="owner_name" if li.owner_name == name else "defendant",
-                    query_name=party, endpoint=base, middle_conflict=conflict,
-                )
-                return
-            # Matched the owner but the layer carried no usable situs/parcel.
-            stats["no_rows"] += 1
-            _mark(li, f"{kind}_no_parcel_data", queried=True,
-                  matched_owner=matched_owner, query_name=party)
+                async with sem:
+                    stats["attempted"] += 1
+                    rows = await _candidate_rows(c, cfg, party, patterns)
+                queried_any = True
+                if not rows:
+                    continue
+
+                hits = _strict_matches(rows, owner_field, party)
+                if not hits:
+                    continue
+
+                # Several parcels for one owner: real and common (a landlord
+                # holding multiple lots). Keep every candidate on the lead and
+                # FLAG it — never pick one at random and present it as the
+                # address. Mailing the wrong person is the failure that matters,
+                # so an ambiguous hit STOPS the chain: a later backend finding one
+                # parcel would not make the several this one found go away.
+                parcels = {
+                    _row_parcel(r, cfg.get("parcel_field")) or str(r.get("OBJECTID") or i)
+                    for i, (_k, r) in enumerate(hits)
+                }
+                if len(hits) > 1 and len(parcels) > 1:
+                    stats["ambiguous"] += 1
+                    _mark(
+                        li, "ambiguous_multi_parcel", queried=True,
+                        query_name=party, match_count=len(hits),
+                        backend=cfg.get("label"),
+                        matched_owner=str(hits[0][1].get(owner_field) or "").strip(),
+                        candidates=[
+                            {
+                                "parcel_id": _row_parcel(r, cfg.get("parcel_field")),
+                                "owner": str(r.get(owner_field) or "").strip(),
+                                "match": k,
+                            }
+                            for k, r in hits[:10]
+                        ],
+                    )
+                    return
+
+                kind, best = hits[0]
+                matched_owner = str(best.get(owner_field) or "").strip()
+                attrs = _safe_attrs(best, cfg)
+                if not cfg["pinned"]:
+                    _inject_site_alias(attrs, situs_field)
+
+                had_addr = bool((li.street_address or "").strip())
+                had_parcel = bool((li.parcel_id or "").strip())
+                had_value = bool(li.market_value)
+                had_sqft = bool(li.living_sqft)
+
+                _populate_from_attrs(li, attrs)
+                # Sanity-reject artifacts a GIS layer can still emit:
+                #   * a mailing / PO-box line as situs,
+                #   * a bare 'CITY ST' line (no house number / street word), or a
+                #     '99999 ...' no-address sentinel, as situs,
+                #   * a decimal acreage/value (e.g. '38.06') as parcel_id.
+                if not had_addr and li.street_address and (
+                    _looks_like_mailing(li.street_address)
+                    or not _valid_situs(li.street_address)
+                ):
+                    li.street_address = None
+                if not had_parcel and li.parcel_id and not _valid_parcel(li.parcel_id):
+                    li.parcel_id = None
+                # Value + sqft + owner from the matched parcel attribute bag.
+                apply_gis_attrs(li, attrs)
+
+                now_addr = bool((li.street_address or "").strip())
+                now_parcel = bool((li.parcel_id or "").strip())
+                if (now_addr and not had_addr) or (now_parcel and not had_parcel):
+                    stats["resolved"] += 1
+                    stats[_backend_stat_key(cfg.get("label") or "")] += 1
+                    if now_addr and not had_addr:
+                        stats["address_filled"] += 1
+                    if now_parcel and not had_parcel:
+                        stats["parcel_filled"] += 1
+                    if li.market_value and not had_value:
+                        stats["value_filled"] += 1
+                    if li.living_sqft and not had_sqft:
+                        stats["sqft_filled"] += 1
+                    # Same surname + first name but a provably different
+                    # spelled-out middle name. Still committed (a surname+firstname
+                    # hit in the right county is real signal) but flagged and
+                    # counted so review can see the doubt before outreach.
+                    conflict = middle_conflict(party, matched_owner)
+                    if conflict:
+                        stats["middle_conflict"] += 1
+                    _mark(
+                        li, kind, queried=True, matched_owner=matched_owner,
+                        from_field="owner_name" if li.owner_name == name else "defendant",
+                        query_name=party, endpoint=base, backend=cfg.get("label"),
+                        middle_conflict=conflict,
+                    )
+                    return
+                # Matched the owner but this backend carried no usable situs or
+                # parcel. Fall through to the next backend rather than giving up —
+                # that is the whole point of the chain.
+                stats["no_rows"] += 1
+                last_env = ("%s_no_parcel_data" % kind,
+                            {"matched_owner": matched_owner, "query_name": party,
+                             "backend": cfg.get("label")})
+
+        if queried_any:
+            # Reached at least one backend, no strict match anywhere in the chain
+            # -> mark queried so re-runs skip it.
+            if last_env and last_env[0].endswith("_no_parcel_data"):
+                _mark(li, last_env[0], queried=True, **last_env[1])
+            else:
+                _mark(li, "no_match", queried=True, query_name=name,
+                      backends=[c_.get("label") for c_ in plan])
             return
-
-        # Reached GIS, no strict match -> mark queried so re-runs skip it.
-        _mark(li, "no_match", queried=True, query_name=name)
+        # Every backend bailed environmentally — stay retryable.
+        conf, extra = last_env or ("no_endpoint", {})
+        _mark(li, conf, queried=False, **extra)
 
     async with client(timeout=25.0) as c:
         # Hard wall-clock backstop around the whole fan-out. The per-call budget

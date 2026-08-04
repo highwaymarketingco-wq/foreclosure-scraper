@@ -110,6 +110,9 @@ RAW_KEEP = {
     "condition_source": "*",          # "vision-HIGH" / "vision-MEDIUM" / regex/age default
     "vision": "*",                    # full Claude Vision condition report
     "doc_ocr": "*",                   # OCR of scanned legal-notice/deed docs: owner+address+debt$
+    "dot_ocr": "*",                   # recorded Deed-of-Trust ORIGINAL principal + labelled
+                                      # ESTIMATED current balance (never a payoff) + provenance
+    "loan_amount": "*",               # scalar mirror of dot_ocr.loan_amount (recorded principal)
     "nc_ptscloud_delinquent_tax": "*",
     "lrcpwa": "*",                       # land-records parcel resolve: assessed/mailing/absentee   # PTS delinquent roll: parcel/assessed/mailing/tax_year (skip-trace)
     "nc_county_pdf_delinquent_tax": "*", # county PDF delinquent roll: county_id/owner provenance

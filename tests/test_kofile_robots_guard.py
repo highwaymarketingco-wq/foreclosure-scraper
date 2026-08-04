@@ -15,6 +15,8 @@ These tests pin the robots evaluator against the REAL Kofile robots body and con
 both public entry points short-circuit to a clean [] no-op (no httpx probe, no stealth
 render) when the search path is robots-disallowed. CI never hits the network.
 """
+from pathlib import Path
+
 import pytest
 
 from foreclosure_scraper.rod import kofile
@@ -87,11 +89,23 @@ def test_robots_blocks_search_false_on_clean_body(monkeypatch):
     assert _robots_blocks_search("oconee.sc.publicsearch.us") is False
 
 
-def test_ignore_robots_env_escape_hatch(monkeypatch):
-    """KOFILE_IGNORE_ROBOTS=1 disables the guard (operator override only)."""
-    monkeypatch.setattr(kofile, "_IGNORE_ROBOTS", True)
-    # Even with an unreadable robots.txt, the override skips the check.
-    assert _robots_blocks_search("oconee.sc.publicsearch.us") is False
+def test_no_robots_escape_hatch_exists():
+    """There must be NO env switch that skips the robots guard.
+
+    This test previously asserted the opposite: that KOFILE_IGNORE_ROBOTS=1
+    disabled the check. That switch was removed, because a flag that ignores a
+    machine-readable no-automation directive is a bypass with a config file in
+    front of it — the same reason the equivalent switch was removed from the
+    Rutherford Sturgis module. If a Kofile host goes robots-clean, the guard
+    notices on its own on the next run.
+    """
+    assert not hasattr(kofile, "_IGNORE_ROBOTS"), (
+        "a robots escape hatch was reintroduced into rod/kofile.py"
+    )
+    src = Path(kofile.__file__).read_text()
+    assert "IGNORE_ROBOTS" not in src, (
+        "rod/kofile.py references an IGNORE_ROBOTS switch again"
+    )
 
 
 @pytest.mark.asyncio

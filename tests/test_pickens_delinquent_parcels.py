@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 
 from foreclosure_scraper import arcgis_webmap as agw
+from foreclosure_scraper.layer_guard import LayerHarvest, PartialHarvest
 from foreclosure_scraper.models import ListingType, PropertyKind
 from foreclosure_scraper.scrapers.counties_sc import pickens_delinquent_parcels as mod
 
@@ -47,6 +48,25 @@ class _ctx:
 
     async def __aexit__(self, *a):
         return False
+
+
+#: A layer that is alive and simply has nothing for this fixture's parcels.
+_EMPTY = {"objectIdFieldName": "FID", "features": []}
+
+
+def _only(payload: dict) -> FakeHttp:
+    """FakeHttp where the named layers carry rows and every OTHER declared layer
+    answers cleanly EMPTY.
+
+    Unrouted layers must answer empty rather than error, because since the
+    LayerHarvest guard an erroring layer deliberately fails the whole run. These
+    tests exercise the cross-cycle fold, not layer death — "this roll year holds
+    nothing for this parcel" is the honest stand-in. Layer death has its own
+    tests below.
+    """
+    routes = {f"/services/{L.service}/FeatureServer": _EMPTY for L in mod.LAYERS}
+    routes.update(payload)
+    return FakeHttp(routes)
 
 
 def _run(http=None) -> list:
@@ -184,7 +204,7 @@ def test_amount_comes_from_the_newest_publication_not_the_oldest():
             {"attributes": {"FID": 1, "PIN": "4065-16-73-6947", "AMOUNT_DUE": 999.0,
                             "OWNER__NOW": "NEW OWNER"}}]},
     }
-    rows = _run(FakeHttp(payload))
+    rows = _run(_only(payload))
     li = rows[0]
     assert li.raw["pickens_delinquent"]["amount_owed"] == 999.0
     assert li.owner_name == "NEW OWNER"
@@ -200,7 +220,7 @@ def test_owner_now_long_form_beats_the_terse_name1_index_form():
                             "NAME1": "KIRKLAND DELIA F",
                             "OWNER__NOW": "KIRKLAND, DELIA F., HEIRS OF,",
                             "AMOUNT_DUE": 2802.17}}]}}
-    li = _run(FakeHttp(payload))[0]
+    li = _run(_only(payload))[0]
     assert li.owner_name == "KIRKLAND, DELIA F., HEIRS OF,"
 
 
@@ -274,7 +294,7 @@ def test_absentee_owner_flagged_from_the_mailing_address():
             {"attributes": {"FID": 1, "PIN": "4046-04-83-6249", "NAME1": "DAVIS JOHN THOMAS",
                             "ADD1": "30343 TAKARA TERRACE", "CITY": "MOUNT DORA",
                             "STATE": "FL", "ZIP": 32757, "AMOUNT_DUE": 295.22}}]}}
-    li = _run(FakeHttp(payload))[0]
+    li = _run(_only(payload))[0]
     assert li.raw["absentee_owner"] is True
     assert li.raw["owner_mailing"]["state"] == "FL"
 
@@ -286,7 +306,7 @@ def test_owner_occupied_parcel_is_not_flagged_absentee():
                             "ADD1": "126 SHEMAIAH RD", "CITY": "CENTRAL", "STATE": "SC",
                             "ZIP": 29630, "LOCADD": "126  SHEMAIAH RD",
                             "LOCCITY": "CENTRAL", "LOCZIP": 29630, "AMOUNT_DUE": 231.39}}]}}
-    li = _run(FakeHttp(payload))[0]
+    li = _run(_only(payload))[0]
     assert "absentee_owner" not in li.raw
 
 
@@ -311,7 +331,7 @@ def test_government_owners_are_dropped():
                             "OWNER__NOW": "CITY OF EASLEY", "AMOUNT_DUE": 100.0}},
             {"attributes": {"FID": 2, "PIN": "4054-11-55-7793",
                             "OWNER__NOW": "WILLIAMS, ALVIN M., JR.", "AMOUNT_DUE": 638.8}}]}}
-    rows = _run(FakeHttp(payload))
+    rows = _run(_only(payload))
     assert [li.owner_name for li in rows] == ["WILLIAMS, ALVIN M., JR."]
 
 
@@ -319,25 +339,69 @@ def test_row_without_a_parseable_pin_is_dropped():
     payload = {"/services/Posting3/FeatureServer": {
         "objectIdFieldName": "FID", "features": [
             {"attributes": {"FID": 1, "PIN": " ", "OWNER__NOW": "X", "AMOUNT_DUE": 5.0}}]}}
-    assert _run(FakeHttp(payload)) == []
+    assert _run(_only(payload)) == []
 
 
 # --------------------------------------------------------------------------- #
 # resilience
 # --------------------------------------------------------------------------- #
 
-def test_one_dead_layer_costs_that_layer_not_the_run():
-    """The county retires and renames these services between cycles."""
+def test_one_dead_layer_fails_the_run_instead_of_shrinking_it():
+    """THE REGRESSION THIS GUARD EXISTS FOR.
+
+    This used to assert the opposite ("costs that layer, not the run"), and
+    that contract is exactly how the source shipped 1,977 leads instead of
+    2,161 when one of the eight services was retired: seven layers' worth of
+    parcels is a plausible number, and expected_min_count=1500 waved it
+    through. A short harvest is indistinguishable from a roll that genuinely
+    shrank, so it must be an ERROR, not a smaller OK.
+
+    Note the retired service answers HTTP **200** with an error body, so there
+    is no status code anywhere for anything else to notice.
+    """
     p = _payloads()
     p["dqnt_2024"] = {"error": {"code": 400, "message": "Invalid URL"}}
-    rows = _run(FakeHttp(_routes(p)))
-    assert rows, "the other seven layers must still produce leads"
-    assert any(li.raw["pickens_delinquent"]["pre_sale"] for li in rows)
+    with pytest.raises(PartialHarvest) as ei:
+        _run(FakeHttp(_routes(p)))
+    assert "dqnt_2024" in str(ei.value)
+    assert "7/8 declared layers alive" in str(ei.value)
 
 
-def test_all_layers_dead_returns_empty_rather_than_raising():
-    rows = _run(FakeHttp({}))          # every route 400s
-    assert rows == []
+def test_safe_run_reports_a_partial_harvest_as_an_error_not_a_zero():
+    """The orchestrator must be able to tell "a layer died" from "no parcels
+    are delinquent" — which is the distinction that hid the upset-bid outage."""
+    p = _payloads()
+    p["dqnt_2024"] = {"error": {"code": 400, "message": "Invalid URL"}}
+    http = FakeHttp(_routes(p))
+    original = mod.client
+    mod.client = lambda *a, **kw: _ctx(http)      # noqa: E731
+    try:
+        s = mod.PickensDelinquentParcels()
+        rows = asyncio.run(s.safe_run())
+    finally:
+        mod.client = original
+    assert rows == []                      # partial rows are discarded, not shipped
+    assert s.last_outcome == "ERROR"
+    assert "partial harvest" in s.last_reason
+    assert "dqnt_2024" in s.last_reason    # survives the 160-char truncation
+
+
+def test_all_layers_dead_raises_rather_than_looking_like_an_empty_county():
+    with pytest.raises(PartialHarvest):
+        _run(FakeHttp({}))                 # every route 400s
+
+
+def test_a_retired_layer_can_be_retired_deliberately_via_tolerate():
+    """Retiring a layer stays possible — it just has to be a code change
+    somebody reviewed, rather than a warning in the log."""
+    guard = LayerHarvest("counties_sc.pickens_delinquent_parcels",
+                         [L.service for L in mod.LAYERS], tolerate=["dqnt_2024"])
+    for L in mod.LAYERS:
+        if L.service == "dqnt_2024":
+            guard.failed(L.service, "Invalid URL")
+        else:
+            guard.ok(L.service, 400)
+    guard.verify()                         # does not raise
 
 
 def test_env_gate_skips_without_fetching(monkeypatch):

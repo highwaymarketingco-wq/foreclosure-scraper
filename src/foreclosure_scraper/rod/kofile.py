@@ -46,9 +46,10 @@ KOFILE_COUNTIES = {
 # The search paths we would need. `Disallow: /` covers all of them.
 _ROBOTS_SEARCH_PATHS = ("/search", "/results", "/api/search")
 
-# Env escape hatch for the day a host goes robots-clean: KOFILE_IGNORE_ROBOTS=1
-# skips the guard. Off by default — compliant-by-default.
-_IGNORE_ROBOTS = os.environ.get("KOFILE_IGNORE_ROBOTS", "0") == "1"
+# There is deliberately NO env override here. A flag that skips a robots check is
+# a bypass with a config file in front of it, and this project does not ship one
+# (the same switch was removed from the Rutherford Sturgis module). If a Kofile
+# host goes robots-clean, this guard notices on the next run by itself.
 
 
 def _path_disallowed(robots_body: str, path: str) -> bool:
@@ -95,8 +96,6 @@ def _robots_blocks_search(host: str) -> bool:
     Fails CLOSED (treats as blocked) if robots.txt is unreadable — we never
     query a search endpoint we can't confirm is robots-allowed. Compliance guard,
     not a bug: honoring robots is the whole point."""
-    if _IGNORE_ROBOTS:
-        return False
     try:
         r = httpx.get(f"https://{host}/robots.txt", timeout=15,
                       follow_redirects=True)

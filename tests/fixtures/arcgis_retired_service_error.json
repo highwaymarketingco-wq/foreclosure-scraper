@@ -1,0 +1,8 @@
+{
+  "_comment": "VERBATIM body captured 2026-08-03 from a retired service on the live Pickens County GIS org (services1.arcgis.com/59960rq18IxUcAVI/.../dqnt_2026/FeatureServer/0/query). Note the HTTP status was 200. This is the exact silent-death shape the guard exists for: a dead layer answers 200 with an error object and NO 'features' key, so any caller doing data.get('features') or [] reads a retired service as a service with zero delinquent parcels.",
+  "error": {
+    "code": 400,
+    "message": "Invalid URL",
+    "details": ["Invalid URL"]
+  }
+}

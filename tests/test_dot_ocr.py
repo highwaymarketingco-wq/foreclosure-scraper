@@ -147,7 +147,7 @@ def test_apply_appends_to_existing_rod_docs():
 
 def test_apply_feeds_equity_engine_recorded_dt():
     """End-to-end: the appended rod_docs entry is the one enrichment_equity
-    picks up as the amortized-payoff basis."""
+    picks up as the amortization basis."""
     from foreclosure_scraper.enrichment_equity import _recorded_dt
     li = _hot(owner_name="GARRETT, JAMES")
     row = dm._parse_image_rows(_MORTGAGE_ROW)[0]
@@ -157,23 +157,117 @@ def test_apply_feeds_equity_engine_recorded_dt():
     assert dt is not None
 
 
+def test_apply_round_trips_all_the_way_to_an_equity_payoff():
+    """The regression the live Burke run exposed: `_apply` writes rod_docs with
+    the county-native doc code ('D/T') and an ISO DATETIME recorded_date, and
+    BOTH of those used to be silently unreadable by the equity engine — 10
+    harvested principals produced 0 recorded_deed_of_trust payoffs. Assert the
+    whole chain, not just that rod_docs was written."""
+    from foreclosure_scraper.enrichment_equity import enrich_equity
+    from foreclosure_scraper.rod.models import RodDoc
+    from datetime import datetime as _dt
+    li = _burke(owner_name="WYKLE, JASON CHAD")
+    li.raw["calc"] = {"arv_expected": 250000.0}
+    li.opening_bid = 180000.0     # the weaker proxy the bug used to fall back to
+    doc = RodDoc(county="Burke", state="NC", doc_type="D/T",
+                 recorded_date=_dt(2020, 6, 23), book="2612", page="1203",
+                 instrument_no="2020007777", raw={"vendor": "cchs"})
+    dm._apply(li, 109000.0, dm._row_from_doc(doc), {})
+    assert li.raw["rod_docs"][0]["recorded_date"] == "2020-06-23T00:00:00"
+    assert li.raw["rod_docs"][0]["doc_type"] == "D/T"
+    enrich_equity([li])
+    eq = li.raw["equity"]
+    assert eq["payoff_source"] == "recorded_deed_of_trust"
+    assert eq["amortization"]["original_principal"] == 109000.0
+    assert eq["payoff_is_estimate"] is True
+
+
 # --- eligibility gating ------------------------------------------------------
-def test_eligible_requires_spartanburg_hot_warm():
+# NOTE: Spartanburg is no longer an eligible county — search.spartanburgdeeds.com
+# publishes `Allow: /$` + `Disallow: /`, so rod/doc_images gates it out. The
+# leads below therefore use NC Burke, a verified free + robots-clean county.
+from foreclosure_scraper.rod import doc_images as di  # noqa: E402
+from foreclosure_scraper.rod.models import RodDoc      # noqa: E402
+from datetime import datetime                          # noqa: E402
+
+
+def _burke(**kw):
+    """A Burke NC lead — free CCHS image, robots-clean, so it IS eligible."""
+    base = dict(source="test", source_url="https://x/y", state="NC", county="Burke")
+    base.update(kw)
+    li = Listing(**base)
+    li.raw = dict(li.raw or {})
+    return li
+
+
+def _dot_doc(inst: str, amount_hint: str, when="2019-04-12") -> RodDoc:
+    return RodDoc(county="Burke", state="NC", doc_type="D/T",
+                  recorded_date=datetime.fromisoformat(when),
+                  book="2749", page="358", instrument_no=inst,
+                  grantor="GARRETT JAMES V", grantee="FIRST FEDERAL",
+                  raw={"image_key": amount_hint, "vendor": "cchs"})
+
+
+def test_eligible_requires_registered_county():
     disabled = asyncio.run(dm.enrich_dot_ocr([]))  # empty -> no targets
     assert disabled.get("targets", 0) == 0
 
 
-def test_non_spartanburg_lead_never_targeted(monkeypatch):
+def test_walled_and_unregistered_counties_are_never_targeted(monkeypatch):
+    """Spartanburg (robots Disallow) and Buncombe (vendor cart) must both be
+    skipped even at HOT tier — the compliance gate is not a grade gate."""
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key-for-gate")
-    other = _hot(county="Buncombe", state="NC", owner_name="SMITH, JOHN")
-    spart_cold = _li(owner_name="SMITH, JOHN")  # Spartanburg but no HOT/WARM tier
-    stats = asyncio.run(dm.enrich_dot_ocr([other, spart_cold]))
-    assert stats["targets"] == 0  # neither qualifies
+    spartanburg = _hot(owner_name="GARRETT, JAMES")           # robots-disallowed
+    buncombe = _hot(county="Buncombe", state="NC", owner_name="SMITH, JOHN")  # paywalled
+    stats = asyncio.run(dm.enrich_dot_ocr([spartanburg, buncombe]))
+    assert stats["targets"] == 0
+    assert "SC:Spartanburg" in stats["walled_counties"]
+    assert "NC:Buncombe" in stats["walled_counties"]
+
+
+def test_cold_lead_is_targeted_grade_gate_is_gone(monkeypatch):
+    """The old HOT/WARM-only gate hid equity from exactly the leads whose grade
+    was low BECAUSE equity was unknown. A COLD lead must now be a target."""
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key-for-gate")
+
+    async def _noop(state, county, owner, **kw):
+        return []
+
+    monkeypatch.setattr(di, "owner_dot_documents", _noop)
+    li = _burke(owner_name="GARRETT, JAMES")   # no distress_stack at all
+    stats = asyncio.run(dm.enrich_dot_ocr([li]))
+    assert stats["targets"] == 1
+    assert stats["searched"] == 1
+    assert stats["loan_found"] == 0
+
+
+def test_tier_env_can_re_narrow(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key-for-gate")
+    monkeypatch.setenv("FORECLOSURE_DOT_OCR_TIERS", "HOT,WARM")
+    cold = _burke(owner_name="GARRETT, JAMES")
+    stats = asyncio.run(dm.enrich_dot_ocr([cold]))
+    assert stats["targets"] == 0
+
+
+def test_cap_is_env_tunable_and_bounds_the_run(monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key-for-gate")
+    monkeypatch.setenv("FORECLOSURE_DOT_OCR_MAX", "2")
+    seen = []
+
+    async def _count(state, county, owner, **kw):
+        seen.append(owner)
+        return []
+
+    monkeypatch.setattr(di, "owner_dot_documents", _count)
+    leads = [_burke(owner_name=f"OWNER{i}, X") for i in range(6)]
+    stats = asyncio.run(dm.enrich_dot_ocr(leads))
+    assert len(seen) == 2 and stats["searched"] == 2
+    assert stats["budget_exhausted"] is True
 
 
 def test_disabled_env(monkeypatch):
     monkeypatch.setenv("FORECLOSURE_DOT_OCR", "0")
-    out = asyncio.run(dm.enrich_dot_ocr([_hot(owner_name="X, Y")]))
+    out = asyncio.run(dm.enrich_dot_ocr([_burke(owner_name="X, Y")]))
     assert "skipped" in out
 
 
@@ -182,31 +276,13 @@ def test_no_gemini_key_skips(monkeypatch):
     for i in range(1, 61):
         monkeypatch.delenv(f"GEMINI_API_KEY_{i}", raising=False)
     monkeypatch.setenv("FORECLOSURE_DOT_OCR", "1")
-    out = asyncio.run(dm.enrich_dot_ocr([_hot(owner_name="X, Y")]))
+    out = asyncio.run(dm.enrich_dot_ocr([_burke(owner_name="X, Y")]))
     assert "skipped" in out and "Gemini" in out["skipped"]
-
-
-def test_hot_warm_lead_is_targeted(monkeypatch):
-    """A Spartanburg HOT lead with a mortgage on file is a target (render is
-    monkeypatched to a no-op so no network happens)."""
-    monkeypatch.setenv("GEMINI_API_KEY", "fake-key-for-gate")
-    monkeypatch.setenv("FORECLOSURE_DOT_OCR_MAX", "5")
-
-    async def _noop(owner, max_candidates=3, timeout_ms=90000):
-        return []  # render "fails" -> lead left unstamped, but was TARGETED
-
-    monkeypatch.setattr(dm, "_render_owner_dot_pdfs", _noop)
-    li = _hot(owner_name="GARRETT, JAMES")
-    li.raw["rod"] = {"has_mortgage": True}
-    stats = asyncio.run(dm.enrich_dot_ocr([li]))
-    assert stats["targets"] == 1
-    assert stats["searched"] == 1
-    assert stats["loan_found"] == 0  # render returned None
 
 
 def test_mortgage_signal_gate_skips_no_mortgage_leads(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key-for-gate")
-    li = _hot(owner_name="GARRETT, JAMES")
+    li = _burke(owner_name="GARRETT, JAMES")
     li.raw["rod"] = {"has_mortgage": False}  # ROD says no mortgage -> skip
     stats = asyncio.run(dm.enrich_dot_ocr([li]))
     assert stats["targets"] == 0
@@ -219,29 +295,67 @@ def test_multi_candidate_skips_satisfaction_falls_through_to_note(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key-for-gate")
     from foreclosure_scraper import enrichment_doc_ocr as ocr
 
-    sat_row = dm._parse_image_rows(_SATISFACTION_ROW)[0]
-    note_row = dm._parse_image_rows(_MORTGAGE_ROW)[0]
-
-    async def _two_candidates(owner, max_candidates=3, timeout_ms=90000):
-        return [(b"%PDF-sat", sat_row), (b"%PDF-note", note_row)]
+    async def _two_candidates(state, county, owner, **kw):
+        return [(b"%PDF-sat", "application/pdf", _dot_doc("SAT1", "k1")),
+                (b"%PDF-note", "application/pdf", _dot_doc("NOTE1", "k2"))]
 
     async def _fake_gemini(key, parts, is_text):
-        pdf = parts[0][0]
-        if pdf == b"%PDF-sat":
+        if parts[0][0] == b"%PDF-sat":
             # nominal $10 consideration on the satisfaction -> below the loan floor
             return {"amount": 10.0, "doc_type": "mortgage_satisfaction", "_provider": "gemini"}
-        return {"amount": 56097.80, "doc_type": "mortgage", "_provider": "gemini"}
+        return {"amount": 56097.80, "doc_type": "deed_of_trust", "_provider": "gemini"}
 
-    monkeypatch.setattr(dm, "_render_owner_dot_pdfs", _two_candidates)
+    monkeypatch.setattr(di, "owner_dot_documents", _two_candidates)
     monkeypatch.setattr(ocr, "_gemini_call", _fake_gemini)
 
-    li = _hot(owner_name="GARRETT, JAMES")
+    li = _burke(owner_name="GARRETT, JAMES")
     li.raw["rod"] = {"has_mortgage": True}
     stats = asyncio.run(dm.enrich_dot_ocr([li]))
     assert stats["loan_found"] == 1
     assert li.raw["loan_amount"] == 56097.80
-    # stamped the NOTE row, not the satisfaction
-    assert li.raw["dot_ocr"]["instrument_no"] == "1992038402"
+    assert li.raw["dot_ocr"]["instrument_no"] == "NOTE1"
+
+
+def test_trustees_deed_is_rejected_even_when_the_index_mislabels_it(monkeypatch):
+    """A trustee's deed's dollar figure is the AUCTION SALE PRICE, the opposite
+    of a loan principal. Live-caught on Burke bk2847/pg826. The OCR-side
+    backstop must refuse it rather than feed equity an inverted number."""
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key-for-gate")
+    from foreclosure_scraper import enrichment_doc_ocr as ocr
+
+    async def _one(state, county, owner, **kw):
+        return [(b"%PDF-trd", "application/pdf", _dot_doc("TRD1", "k"))]
+
+    async def _gemini(key, parts, is_text):
+        return {"amount": 170640.0, "doc_type": "trustees_deed", "_provider": "gemini"}
+
+    monkeypatch.setattr(di, "owner_dot_documents", _one)
+    monkeypatch.setattr(ocr, "_gemini_call", _gemini)
+    li = _burke(owner_name="GARRETT, JAMES")
+    stats = asyncio.run(dm.enrich_dot_ocr([li]))
+    assert stats["loan_found"] == 0
+    assert stats["rejected_not_note"] == 1
+    assert li.raw.get("loan_amount") is None
+
+
+def test_absurd_amount_is_rejected(monkeypatch):
+    """An OCR misread of a parcel id / book+page concatenation must not become a
+    billion-dollar principal."""
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key-for-gate")
+    from foreclosure_scraper import enrichment_doc_ocr as ocr
+
+    async def _one(state, county, owner, **kw):
+        return [(b"%PDF-x", "application/pdf", _dot_doc("X1", "k"))]
+
+    async def _gemini(key, parts, is_text):
+        return {"amount": 934000000.0, "doc_type": "deed_of_trust", "_provider": "gemini"}
+
+    monkeypatch.setattr(di, "owner_dot_documents", _one)
+    monkeypatch.setattr(ocr, "_gemini_call", _gemini)
+    li = _burke(owner_name="GARRETT, JAMES")
+    stats = asyncio.run(dm.enrich_dot_ocr([li]))
+    assert stats["loan_found"] == 0
+    assert li.raw.get("loan_amount") is None
 
 
 def test_all_candidates_null_leaves_lead_unstamped(monkeypatch):
@@ -249,20 +363,32 @@ def test_all_candidates_null_leaves_lead_unstamped(monkeypatch):
     left untouched so it retries next run — no bogus zero written."""
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key-for-gate")
     from foreclosure_scraper import enrichment_doc_ocr as ocr
-    sat_row = dm._parse_image_rows(_SATISFACTION_ROW)[0]
 
-    async def _one_candidate(owner, max_candidates=3, timeout_ms=90000):
-        return [(b"%PDF-sat", sat_row)]
+    async def _one_candidate(state, county, owner, **kw):
+        return [(b"%PDF-sat", "application/pdf", _dot_doc("SAT1", "k"))]
 
     async def _null_gemini(key, parts, is_text):
         # $10 nominal consideration on a satisfaction -> below floor -> rejected
-        return {"amount": 10.0, "_provider": "gemini"}
+        return {"amount": 10.0, "doc_type": "deed_of_trust", "_provider": "gemini"}
 
-    monkeypatch.setattr(dm, "_render_owner_dot_pdfs", _one_candidate)
+    monkeypatch.setattr(di, "owner_dot_documents", _one_candidate)
     monkeypatch.setattr(ocr, "_gemini_call", _null_gemini)
-    li = _hot(owner_name="GARRETT, JAMES")
+    li = _burke(owner_name="GARRETT, JAMES")
     li.raw["rod"] = {"has_mortgage": True}
     stats = asyncio.run(dm.enrich_dot_ocr([li]))
-    assert stats["pdf_ok"] == 1
+    assert stats["image_ok"] == 1
     assert stats["loan_found"] == 0
     assert li.raw.get("loan_amount") is None
+
+
+def test_apply_stamps_labelled_estimated_balance():
+    """The recorded principal is a FACT; the current balance is an ESTIMATE and
+    must be labelled as such — never presented as a payoff."""
+    li = _burke(owner_name="GARRETT, JAMES")
+    dm._apply(li, 165000.0, dm._row_from_doc(_dot_doc("N1", "k", "2019-04-12")), {})
+    d = li.raw["dot_ocr"]
+    assert d["loan_amount"] == 165000.0 and d["is_original_principal"] is True
+    assert 0 < d["estimated_balance"] < 165000.0     # amortized down, not a payoff
+    assert d["estimated_balance_confidence"] in ("medium", "low")
+    assert d["estimated_balance_detail"]["is_estimate"] is True
+    assert "TILA" in d["not_a_payoff"]

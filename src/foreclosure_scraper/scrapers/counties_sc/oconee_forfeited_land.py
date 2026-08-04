@@ -18,9 +18,11 @@ both render the SAME hosted FeatureServer, ``Assignment_Availability`` under org
 Both layers are plain ArcGIS REST FeatureServer query endpoints (free, no key,
 no CAPTCHA/WAF) returning polygon features in WGS84 with rich attributes:
 TMS, Owner, Description, acreage, FLC bid/price, status, sale date. We query
-?where=1=1&outFields=*&f=json, page through with resultOffset (layer 0 holds
-~948 features, over the 1000-but-actually-low transfer cap), compute each
-parcel's polygon centroid for lat/lng, and emit one Listing per parcel.
+?where=1=1 with an ENUMERATED outFields list per layer (never "*" — see
+_LAYERS), page through with resultOffset (layer 0 holds ~948 features, over the
+1000-but-actually-low transfer cap), compute each parcel's polygon centroid for
+lat/lng, and emit one Listing per parcel. Losing either layer fails the run
+rather than halving the inventory (see layer_guard).
 
 Dateless: this is a standing inventory, not a seasonal sale list, so there is
 no active_months window — the layers carry parcels year-round.
@@ -35,8 +37,10 @@ from typing import Any, Iterable
 import httpx
 import structlog
 
+from ... import arcgis_webmap as agw
 from ...base_scraper import BaseScraper
 from ...http_client import client
+from ...layer_guard import LayerHarvest
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -46,10 +50,23 @@ FS_BASE = ("https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services/"
            "Assignment_Availability/FeatureServer")
 PAGE_URL = "https://oconeesc.com/auditor-home/forfeited-land"
 
-# (layer id, label) — layer 1 = FLC inventory, layer 0 = available-for-assignment.
-_LAYERS: tuple[tuple[int, str], ...] = (
-    (1, "FLC"),
-    (0, "Assignment"),
+#: (layer id, label, enumerated outFields).
+#:
+#: The two layers do NOT share a schema — layer 1 carries FLC_Price/Bid/Status/
+#: Sale_Date/Year, layer 0 carries Acres/FLC_Bid/Redeem_Assign — so the field
+#: list is per layer. Asking either for the other's columns 400s the query.
+#:
+#: PRIVACY: enumerated, never "*". This used to request "*", which additionally
+#: pulled Comment, GlobalID and the whole tax-arithmetic block (DT_Cost,
+#: PriorYr_Tax, Current_Tax, Total_Tax, Abated_Tax, Proc_Fee) that nothing here
+#: reads. Verified against both layers' ?f=json schemas on 2026-08-04.
+_LAYERS: tuple[tuple[int, str, str], ...] = (
+    (1, "FLC",
+     "OBJECTID,TMS,TMS_NUMBER,Owner,Description,SUBDIVSION,GIS_ACRES,TMS_ACRES,"
+     "FLC_Price,Bid,Sale_Date,Status,Year"),
+    (0, "Assignment",
+     "OBJECTID,TMS,TMS_NUMBER,Owner,Description,SUBDIVSION,GIS_ACRES,TMS_ACRES,"
+     "Acres,FLC_Bid,Redeem_Assign"),
 )
 
 _PAGE_SIZE = 1000  # ArcGIS hard cap per request; we page with resultOffset.
@@ -173,41 +190,28 @@ def _feature_to_listing(attrs: dict[str, Any], geom: dict[str, Any], label: str)
     )
 
 
-async def _fetch_layer(c: httpx.AsyncClient, layer: int, label: str) -> list[Listing]:
+async def _fetch_layer(c: httpx.AsyncClient, layer: int, label: str,
+                       out_fields: str) -> list[Listing]:
+    """One layer -> Listings. RAISES on failure.
+
+    The hand-rolled paginator this replaces logged
+    ``oconee_forfeited_land.arcgis_error`` and ``break``-ed on an
+    HTTP-200-with-error-body, returning whatever it had already collected — so
+    a dead or renamed layer looked like a layer with no parcels in it.
+    ``query_features`` owns the paging, the error-body check, the
+    repeated-OBJECTID guard and the ban on ``outFields='*'``; ``LayerHarvest``
+    in :meth:`OconeeForfeitedLand.fetch` turns a lost layer into a run ERROR.
+    """
+    feats = await agw.query_features(
+        c, f"{FS_BASE}/{layer}", where="1=1", out_fields=out_fields,
+        return_geometry=True, out_sr=4326, page=_PAGE_SIZE, max_records=20000)
     out: list[Listing] = []
-    offset = 0
-    while True:
-        params = {
-            "where": "1=1",
-            "outFields": "*",
-            "returnGeometry": "true",
-            "outSR": "4326",
-            "resultOffset": str(offset),
-            "resultRecordCount": str(_PAGE_SIZE),
-            "f": "json",
-        }
-        r = await c.get(f"{FS_BASE}/{layer}/query", params=params)
-        r.raise_for_status()
-        data = r.json()
-        if isinstance(data, dict) and data.get("error"):
-            log.warning("oconee_forfeited_land.arcgis_error", layer=label,
-                        error=data.get("error"))
-            break
-        feats = data.get("features") or []
-        for f in feats:
-            li = _feature_to_listing(
-                dict(f.get("attributes") or {}), f.get("geometry") or {}, label
-            )
-            if li is not None:
-                out.append(li)
-        # Page until the server stops returning a full page / flagging more.
-        if len(feats) < _PAGE_SIZE and not data.get("exceededTransferLimit"):
-            break
-        if not feats:
-            break
-        offset += len(feats)
-        if offset > 20000:  # safety stop; these layers are ~1k parcels
-            break
+    for f in feats:
+        li = _feature_to_listing(
+            dict(f.get("attributes") or {}), f.get("geometry") or {}, label
+        )
+        if li is not None:
+            out.append(li)
     return out
 
 
@@ -221,21 +225,22 @@ class OconeeForfeitedLand(BaseScraper):
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         seen: set[str] = set()
-        async with client(timeout=45.0) as c:
-            for layer, label in _LAYERS:
-                try:
-                    rows = await _fetch_layer(c, layer, label)
-                except (httpx.HTTPError, ValueError):
-                    log.warning("oconee_forfeited_land.layer_failed", layer=label,
-                                exc_info=True)
-                    continue
-                for li in rows:
-                    # Dedupe across the two layers (a parcel can sit in both the
-                    # FLC inventory and the assignment list) on parcel id.
-                    key = (li.parcel_id or "").upper().replace(" ", "")
-                    if key and key in seen:
-                        continue
-                    if key:
-                        seen.add(key)
-                    out.append(li)
+        # Both layers are declared: losing one has to fail the run rather than
+        # halve the inventory, because half the FLC roll is a believable number.
+        guard = LayerHarvest(self.slug, [label for _id, label, _f in _LAYERS])
+        with guard:
+            async with client(timeout=45.0) as c:
+                for layer, label, fields in _LAYERS:
+                    rows = await guard.harvest(
+                        label,
+                        lambda ly=layer, lb=label, fl=fields: _fetch_layer(c, ly, lb, fl))
+                    for li in rows:
+                        # Dedupe across the two layers (a parcel can sit in both
+                        # the FLC inventory and the assignment list) on parcel id.
+                        key = (li.parcel_id or "").upper().replace(" ", "")
+                        if key and key in seen:
+                            continue
+                        if key:
+                            seen.add(key)
+                        out.append(li)
         return out
