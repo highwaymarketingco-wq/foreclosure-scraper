@@ -37,6 +37,7 @@ from typing import Iterable
 import structlog
 
 from ...base_scraper import BaseScraper
+from ...layer_guard import LayerHarvest
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
@@ -102,38 +103,65 @@ def _money(v) -> float | None:
         return None
 
 
+class TenantExportBroken(RuntimeError):
+    """The tenant's export pipeline failed. Distinct from 'published nothing'."""
+
+
+#: Returned when a tenant answered correctly but publishes no delinquent export
+#: right now. Burke, Rutherford and Mecklenburg were all verified live in this
+#: state: HTTP 200 with an empty blob list. That is a real answer, not a break.
+NO_EXPORT = "no_export"
+
+
 async def _download_delinquent_csv(c, tenant: str) -> str | None:
-    """Run the 3-step BillPWA flow for one tenant. Returns CSV text or None."""
+    """Run the 3-step BillPWA flow for one tenant.
+
+    Returns CSV text, or None when the tenant simply has no delinquent export
+    published today. Raises TenantExportBroken when a step actually fails.
+
+    This used to have five bare ``return None`` exits, so "this county has no
+    export this week" and "this county's endpoint is broken" were the same
+    value, on the largest source in the board (21,463 rows). Nine of the
+    seventeen declared tenants produced no log line at all and there was no way
+    to tell which kind of nine they were.
+    """
     hdr = {"X-Tenant": tenant, "Accept": "application/json"}
     try:
         r = await c.get(f"{BASE}/api/GetTaxpayerDownloadList", headers=hdr)
-        if r.status_code != 200:
-            return None
+    except Exception as exc:  # noqa: BLE001
+        raise TenantExportBroken(f"list request failed: {type(exc).__name__}") from exc
+    if r.status_code != 200:
+        raise TenantExportBroken(f"list HTTP {r.status_code}")
+    try:
         blobs = r.json()
-    except Exception:
-        return None
+    except Exception as exc:  # noqa: BLE001
+        raise TenantExportBroken("list response is not JSON") from exc
+
     blob = next((b.get("blobName") for b in blobs
                  if "delinquent" in (b.get("blobName") or "").lower()), None)
     if not blob:
+        # Answered cleanly, nothing delinquent published. Legitimate zero.
         return None
+
     try:
         r2 = await c.get(f"{BASE}/api/DownloadTaxpayerDownloadBlob",
                          params={"fileName": blob}, headers=hdr)
         url = r2.json().get("downloadUrl")
-    except Exception:
-        return None
+    except Exception as exc:  # noqa: BLE001
+        raise TenantExportBroken(f"blob request failed: {type(exc).__name__}") from exc
     if not url:
-        return None
+        raise TenantExportBroken(f"blob {blob!r} returned no downloadUrl")
+
     # Encode literal spaces in the blob PATH; keep the signed query string intact.
     p = urllib.parse.urlsplit(url)
     dl = urllib.parse.urlunsplit((p.scheme, p.netloc, urllib.parse.quote(p.path), p.query, p.fragment))
     try:
         r3 = await c.get(dl)
-        if r3.status_code != 200:
-            return None
-        return r3.content.decode("utf-8-sig", errors="replace")
-    except Exception:
-        return None
+    except Exception as exc:  # noqa: BLE001
+        raise TenantExportBroken(f"download failed: {type(exc).__name__}") from exc
+    if r3.status_code != 200:
+        raise TenantExportBroken(f"download HTTP {r3.status_code}")
+    return r3.content.decode("utf-8-sig", errors="replace")
 
 
 def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]:
@@ -219,17 +247,24 @@ class NCPtsCloudDelinquentTax(BaseScraper):
         if os.environ.get("FORECLOSURE_NC_PTSCLOUD") == "0":
             return []
         out: list[Listing] = []
+        # Every declared tenant must account for itself. A tenant that breaks is
+        # now a hard failure the run report shows, instead of 21,463 rows that
+        # look fine because nobody has last week's per-county number to compare.
+        guard = LayerHarvest(self.slug, list(TENANTS))
         # Sequential per tenant — one shared throttled client, gentle on the host.
-        async with client(timeout=30.0) as c:
+        async with client(timeout=30.0) as c, guard:
             for tenant, (county, state) in TENANTS.items():
-                try:
+
+                async def _one(tenant=tenant, county=county, state=state):
                     text = await _download_delinquent_csv(c, tenant)
-                except Exception as exc:  # noqa: BLE001
-                    log.warning("nc_ptscloud.tenant_fail", tenant=tenant, error=str(exc)[:120])
-                    continue
-                if not text:
-                    continue
-                leads = _parse_csv(text, county, state, tenant)
-                log.info("nc_ptscloud.tenant_done", tenant=tenant, county=county, leads=len(leads))
-                out.extend(leads)
+                    if text is None:
+                        log.info("nc_ptscloud.tenant_empty", tenant=tenant,
+                                 county=county, reason=NO_EXPORT)
+                        return []
+                    leads = _parse_csv(text, county, state, tenant)
+                    log.info("nc_ptscloud.tenant_done", tenant=tenant,
+                             county=county, leads=len(leads))
+                    return leads
+
+                out.extend(await guard.harvest(tenant, _one))
         return out
