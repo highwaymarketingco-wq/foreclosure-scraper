@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime
 import os
+from urllib.parse import urlparse
 
 import httpx
 import structlog
@@ -93,6 +94,11 @@ async def _check_one(c: httpx.AsyncClient, url: str) -> tuple[str, int | None]:
 #: most expensive avoidable step in the run.
 LINK_RECHECK_DAYS = float(os.environ.get("LINK_RECHECK_DAYS", "7"))
 
+#: Concurrent requests allowed against any ONE hostname. The global worker pool
+#: can stay wide because the board spans hundreds of hosts; what hurt was
+#: pointing all 24 workers at whichever host happened to dominate the queue.
+PER_HOST_WORKERS = int(os.environ.get("LINK_PER_HOST_WORKERS", "4"))
+
 
 def _needs_recheck(li: Listing, now: datetime) -> bool:
     """True when this listing's link must actually be fetched this run.
@@ -141,6 +147,13 @@ async def validate(listings: list[Listing], *, workers: int = 24) -> list[Listin
     same request repeated. That is slow, and it points a few thousand identical
     HEADs at one county server, which is exactly how a polite scraper gets its
     IP blocked.
+
+    Throttled per host: `workers` is the global ceiling, PER_HOST_WORKERS the
+    per-hostname one. 24-way concurrency against a single host drew 1,043 of
+    3,349 courtlistener.com responses as 429 — a third of them — and every one
+    of those leads got tagged link_check.status="auth". That is a quality
+    signal we manufactured ourselves: the URLs were fine, we simply asked too
+    fast, and the operator would have read it as a wall.
     """
     if not listings:
         return []
@@ -154,13 +167,23 @@ async def validate(listings: list[Listing], *, workers: int = 24) -> list[Listin
         by_url.setdefault(li.source_url, []).append(li)
 
     sem = asyncio.Semaphore(workers)
+    host_sems: dict[str, asyncio.Semaphore] = {}
     counts = {"skipped": 0, "ok": 0, "auth": 0, "anti-bot": 0,
               "dead": 0, "server": 0, "other": 0, "unreachable": 0}
+
+    def _host_sem(url: str) -> asyncio.Semaphore:
+        try:
+            host = urlparse(url).hostname or ""
+        except ValueError:
+            host = ""
+        if host not in host_sems:
+            host_sems[host] = asyncio.Semaphore(PER_HOST_WORKERS)
+        return host_sems[host]
 
     async with client(timeout=20.0) as c:
 
         async def task(url: str, sharing: list[Listing]) -> None:
-            async with sem:
+            async with sem, _host_sem(url):
                 label, status = await _check_one(c, url)
             counts[label] += len(sharing)
             for listing in sharing:

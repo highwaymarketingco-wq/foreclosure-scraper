@@ -328,3 +328,61 @@ def test_shared_broken_url_tags_all_of_its_listings():
     c.head.assert_called_once()
     assert all(li.raw["link_check"]["status"] == "dead" for li in out)
     assert all(li.raw["link_check"]["http"] == 404 for li in out)
+
+
+def test_per_host_concurrency_is_capped():
+    """24-way concurrency against one host drew 1,043 of 3,349 courtlistener
+    responses as 429, and every one of those leads got tagged "auth" — a wall
+    we manufactured ourselves. Cap in-flight requests per hostname."""
+    import foreclosure_scraper.link_validator as LV
+    listings = [_li(url=f"https://one-host.example.com/docket/{i}/")
+                for i in range(60)]
+
+    inflight = 0
+    peak = 0
+
+    async def head(url, **kw):
+        nonlocal inflight, peak
+        inflight += 1
+        peak = max(peak, inflight)
+        await asyncio.sleep(0)          # yield so overlap is observable
+        inflight -= 1
+        return _resp(200)
+
+    c = AsyncMock()
+    c.head = head
+    with patch("foreclosure_scraper.link_validator.client") as mock_client:
+        mock_client.return_value.__aenter__ = AsyncMock(return_value=c)
+        mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
+        asyncio.run(validate(listings, workers=24))
+
+    assert peak <= LV.PER_HOST_WORKERS, (
+        f"{peak} concurrent requests hit one host, cap is {LV.PER_HOST_WORKERS}")
+
+
+def test_many_hosts_still_run_wide():
+    """The per-host cap must not collapse global throughput — the board spans
+    hundreds of hosts and each one only gets a few workers."""
+    import foreclosure_scraper.link_validator as LV
+    listings = [_li(url=f"https://host{i}.example.com/x") for i in range(60)]
+
+    inflight = 0
+    peak = 0
+
+    async def head(url, **kw):
+        nonlocal inflight, peak
+        inflight += 1
+        peak = max(peak, inflight)
+        await asyncio.sleep(0)
+        inflight -= 1
+        return _resp(200)
+
+    c = AsyncMock()
+    c.head = head
+    with patch("foreclosure_scraper.link_validator.client") as mock_client:
+        mock_client.return_value.__aenter__ = AsyncMock(return_value=c)
+        mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
+        asyncio.run(validate(listings, workers=24))
+
+    assert peak > LV.PER_HOST_WORKERS, (
+        f"distinct hosts throttled to {peak}; the per-host cap leaked global")
