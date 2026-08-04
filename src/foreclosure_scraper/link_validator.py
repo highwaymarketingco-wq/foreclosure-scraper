@@ -16,6 +16,8 @@ This module no longer drops on any HTTP code.
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
+import os
 
 import httpx
 import structlog
@@ -86,15 +88,58 @@ async def _check_one(c: httpx.AsyncClient, url: str) -> tuple[str, int | None]:
         return "unreachable", None
 
 
+#: How long an "ok" verdict stays trusted. A source_url that resolved cleanly a
+#: few days ago is overwhelmingly still fine, and re-proving it is the single
+#: most expensive avoidable step in the run.
+LINK_RECHECK_DAYS = float(os.environ.get("LINK_RECHECK_DAYS", "7"))
+
+
+def _needs_recheck(li: Listing, now: datetime) -> bool:
+    """True when this listing's link must actually be fetched this run.
+
+    Every other slow enricher already skips work it has done (gis_attrs targets
+    ~18% of the board, geocode ~28%). Link validation did not: it re-fetched all
+    32,143 source_urls every run, which the 2026-07-31 profile put at 7.7 hours,
+    the second-largest block in a 42.8-hour run. The stored verdict carried no
+    timestamp, so there was no way to tell a link checked an hour ago from one
+    never seen.
+
+    Policy: only a fresh "ok" is trusted. Anything broken, auth-walled or
+    unreachable is re-checked every run, because those are exactly the states
+    that change and that the operator acts on. A missing timestamp means the
+    verdict predates this change, so it is re-checked once and stamped.
+    """
+    lc = li.raw.get("link_check") if isinstance(li.raw, dict) else None
+    if not isinstance(lc, dict) or lc.get("status") != "ok":
+        return True
+    ts = lc.get("checked")
+    if not ts:
+        return True
+    try:
+        when = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if when.tzinfo is not None:
+        when = when.replace(tzinfo=None)
+    return (now - when).total_seconds() > LINK_RECHECK_DAYS * 86400
+
+
 async def validate(listings: list[Listing], *, workers: int = 24) -> list[Listing]:
     """Tag every listing with its link health status. No listings are dropped.
 
-    Each listing receives ``raw["link_check"] = {"status": <label>, "http": int|None}``
-    so dashboard / sheets / email consumers can warn when links are broken
-    without losing the underlying foreclosure data.
+    Each listing receives ``raw["link_check"] = {"status": <label>, "http": int|None,
+    "checked": <iso8601>}`` so dashboard / sheets / email consumers can warn when
+    links are broken without losing the underlying foreclosure data.
+
+    Incremental: a lead whose link was "ok" within LINK_RECHECK_DAYS keeps its
+    verdict untouched. Set LINK_RECHECK_DAYS=0 to force a full re-validation.
     """
     if not listings:
         return []
+    now = datetime.utcnow()
+    todo = [li for li in listings if _needs_recheck(li, now)]
+    reused = len(listings) - len(todo)
+
     sem = asyncio.Semaphore(workers)
     counts = {"skipped": 0, "ok": 0, "auth": 0, "anti-bot": 0,
               "dead": 0, "server": 0, "other": 0, "unreachable": 0}
@@ -107,9 +152,13 @@ async def validate(listings: list[Listing], *, workers: int = 24) -> list[Listin
                 counts[label] += 1
                 if not isinstance(listing.raw, dict):
                     listing.raw = {}
-                listing.raw["link_check"] = {"status": label, "http": status}
+                listing.raw["link_check"] = {
+                    "status": label, "http": status,
+                    "checked": now.isoformat(timespec="seconds") + "Z",
+                }
 
-        await asyncio.gather(*(task(li) for li in listings))
+        await asyncio.gather(*(task(li) for li in todo))
 
-    log.info("link.validate.done", total=len(listings), **counts)
+    log.info("link.validate.done", total=len(listings), checked=len(todo),
+             reused_fresh=reused, recheck_days=LINK_RECHECK_DAYS, **counts)
     return listings  # KEEP ALL — tagging only, no drops

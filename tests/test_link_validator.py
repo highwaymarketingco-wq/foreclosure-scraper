@@ -9,13 +9,14 @@ underlying scraped data.
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 
 from foreclosure_scraper.link_validator import (
     KNOWN_ANTI_BOT_HOSTS,
+    LINK_RECHECK_DAYS,
     _check_one,
     validate,
 )
@@ -174,3 +175,112 @@ def test_known_anti_bot_hosts_set_includes_critical_sources():
     }
     for host in must_be_present:
         assert host in KNOWN_ANTI_BOT_HOSTS, f"{host} missing from bypass list"
+
+
+# ---------------------------------------------------------------------------
+# Incremental re-check. Link validation used to re-fetch every source_url on
+# every run: 7.7 hours of the 42.8-hour 2026-07-31 run, and the second-largest
+# block in it. The verdict it stored carried no timestamp, so there was no way
+# to tell a link checked an hour ago from one never seen.
+# ---------------------------------------------------------------------------
+
+def _ago(days: float) -> str:
+    return (datetime.utcnow() - timedelta(days=days)).isoformat(
+        timespec="seconds") + "Z"
+
+
+def test_fresh_ok_link_is_not_refetched():
+    """A link that answered 200 yesterday is not asked again."""
+    li = _li(url="https://example.com/still-fine")
+    li.raw = {"link_check": {"status": "ok", "http": 200, "checked": _ago(1)}}
+    c = AsyncMock()
+    c.head = AsyncMock(side_effect=AssertionError("must NOT re-fetch a fresh ok"))
+    with patch("foreclosure_scraper.link_validator.client") as mock_client:
+        mock_client.return_value.__aenter__ = AsyncMock(return_value=c)
+        mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
+        out = asyncio.run(validate([li]))
+    assert len(out) == 1
+    c.head.assert_not_called()
+    assert out[0].raw["link_check"]["checked"], "existing verdict must survive"
+
+
+def test_stale_ok_link_IS_refetched():
+    """Past LINK_RECHECK_DAYS the verdict expires and we ask again."""
+    li = _li(url="https://example.com/old-news")
+    li.raw = {"link_check": {"status": "ok", "http": 200,
+                             "checked": _ago(LINK_RECHECK_DAYS + 1)}}
+    c = _mock_client(head_status=404)
+    with patch("foreclosure_scraper.link_validator.client") as mock_client:
+        mock_client.return_value.__aenter__ = AsyncMock(return_value=c)
+        mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
+        out = asyncio.run(validate([li]))
+    assert out[0].raw["link_check"]["status"] == "dead", "stale ok not re-checked"
+
+
+def test_broken_link_is_refetched_even_when_fresh():
+    """Broken/auth/unreachable states are exactly what the operator acts on,
+    so they are never cached — a 404 that came back today gets asked again."""
+    for stale_status, http in (("dead", 404), ("auth", 403),
+                               ("unreachable", None), ("anti-bot", 406)):
+        li = _li(url="https://example.com/recheck-me")
+        li.raw = {"link_check": {"status": stale_status, "http": http,
+                                 "checked": _ago(0)}}
+        c = _mock_client(head_status=200)
+        with patch("foreclosure_scraper.link_validator.client") as mock_client:
+            mock_client.return_value.__aenter__ = AsyncMock(return_value=c)
+            mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
+            out = asyncio.run(validate([li]))
+        assert out[0].raw["link_check"]["status"] == "ok", (
+            f"{stale_status} link was cached instead of re-checked")
+
+
+def test_undated_verdict_is_refetched_once_then_stamped():
+    """Every verdict written before this change has no 'checked' key. Those
+    must be re-checked once and stamped, not trusted forever."""
+    li = _li(url="https://example.com/legacy")
+    li.raw = {"link_check": {"status": "ok", "http": 200}}   # no timestamp
+    c = _mock_client(head_status=200)
+    with patch("foreclosure_scraper.link_validator.client") as mock_client:
+        mock_client.return_value.__aenter__ = AsyncMock(return_value=c)
+        mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
+        out = asyncio.run(validate([li]))
+    c.head.assert_called_once()
+    assert out[0].raw["link_check"]["checked"], "re-check must stamp a timestamp"
+
+
+def test_never_checked_listing_is_fetched():
+    li = _li(url="https://example.com/brand-new")
+    c = _mock_client(head_status=200)
+    with patch("foreclosure_scraper.link_validator.client") as mock_client:
+        mock_client.return_value.__aenter__ = AsyncMock(return_value=c)
+        mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
+        out = asyncio.run(validate([li]))
+    c.head.assert_called_once()
+    assert out[0].raw["link_check"]["status"] == "ok"
+
+
+def test_mixed_board_only_fetches_the_stale_ones():
+    """The whole point: on a board that is mostly fresh, only the tail moves."""
+    fresh = []
+    for i in range(20):
+        li = _li(url=f"https://example.com/fresh/{i}")
+        li.raw = {"link_check": {"status": "ok", "http": 200, "checked": _ago(2)}}
+        fresh.append(li)
+    stale = [_li(url=f"https://example.com/new/{i}") for i in range(3)]
+
+    calls: list[str] = []
+
+    async def head(url, **kw):
+        calls.append(url)
+        return _resp(200)
+
+    c = AsyncMock()
+    c.head = head
+    with patch("foreclosure_scraper.link_validator.client") as mock_client:
+        mock_client.return_value.__aenter__ = AsyncMock(return_value=c)
+        mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
+        out = asyncio.run(validate(fresh + stale))
+
+    assert len(out) == 23, "validate() must still return every listing"
+    assert len(calls) == 3, f"expected 3 network calls, made {len(calls)}"
+    assert all("/new/" in u for u in calls)
