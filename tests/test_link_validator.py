@@ -284,3 +284,47 @@ def test_mixed_board_only_fetches_the_stale_ones():
     assert len(out) == 23, "validate() must still return every listing"
     assert len(calls) == 3, f"expected 3 network calls, made {len(calls)}"
     assert all("/new/" in u for u in calls)
+
+
+def test_shared_url_is_fetched_once_and_tagged_on_every_listing():
+    """Whole sources hang off one document: 2,095 Spartanburg leads share a
+    single tax-sale PDF. Fetching it per-listing is 2,094 wasted requests
+    pointed at one county server."""
+    shared = "https://county.example.gov/DocumentCenter/View/11161/tax-sale.pdf"
+    listings = [_li(url=shared) for _ in range(50)]
+    listings += [_li(url=f"https://example.com/unique/{i}") for i in range(4)]
+
+    calls: list[str] = []
+
+    async def head(url, **kw):
+        calls.append(url)
+        return _resp(200)
+
+    c = AsyncMock()
+    c.head = head
+    with patch("foreclosure_scraper.link_validator.client") as mock_client:
+        mock_client.return_value.__aenter__ = AsyncMock(return_value=c)
+        mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
+        out = asyncio.run(validate(listings))
+
+    assert len(out) == 54, "validate() must still return every listing"
+    assert calls.count(shared) == 1, (
+        f"shared URL fetched {calls.count(shared)}x, expected once")
+    assert len(calls) == 5, f"expected 5 distinct fetches, made {len(calls)}"
+    assert all(li.raw["link_check"]["status"] == "ok" for li in out), (
+        "every listing sharing the URL must still get the verdict")
+
+
+def test_shared_broken_url_tags_all_of_its_listings():
+    """The verdict, not just the request, is shared — a dead document must
+    mark all 50 of its leads dead, not only the one that happened to fetch."""
+    shared = "https://county.example.gov/gone.pdf"
+    listings = [_li(url=shared) for _ in range(50)]
+    c = _mock_client(head_status=404)
+    with patch("foreclosure_scraper.link_validator.client") as mock_client:
+        mock_client.return_value.__aenter__ = AsyncMock(return_value=c)
+        mock_client.return_value.__aexit__ = AsyncMock(return_value=None)
+        out = asyncio.run(validate(listings))
+    c.head.assert_called_once()
+    assert all(li.raw["link_check"]["status"] == "dead" for li in out)
+    assert all(li.raw["link_check"]["http"] == 404 for li in out)

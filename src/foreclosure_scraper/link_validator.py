@@ -133,12 +133,25 @@ async def validate(listings: list[Listing], *, workers: int = 24) -> list[Listin
 
     Incremental: a lead whose link was "ok" within LINK_RECHECK_DAYS keeps its
     verdict untouched. Set LINK_RECHECK_DAYS=0 to force a full re-validation.
+
+    Deduplicated: each distinct URL is fetched once per run and the verdict is
+    applied to every listing that shares it. Whole sources hang off a single
+    document — 2,095 Spartanburg leads share one tax-sale PDF, 3,307 Asheville
+    leads share one ArcGIS layer — so 57.5% of an undeduplicated pass was the
+    same request repeated. That is slow, and it points a few thousand identical
+    HEADs at one county server, which is exactly how a polite scraper gets its
+    IP blocked.
     """
     if not listings:
         return []
     now = datetime.utcnow()
+    stamp = now.isoformat(timespec="seconds") + "Z"
     todo = [li for li in listings if _needs_recheck(li, now)]
     reused = len(listings) - len(todo)
+
+    by_url: dict[str, list[Listing]] = {}
+    for li in todo:
+        by_url.setdefault(li.source_url, []).append(li)
 
     sem = asyncio.Semaphore(workers)
     counts = {"skipped": 0, "ok": 0, "auth": 0, "anti-bot": 0,
@@ -146,19 +159,20 @@ async def validate(listings: list[Listing], *, workers: int = 24) -> list[Listin
 
     async with client(timeout=20.0) as c:
 
-        async def task(listing: Listing) -> None:
+        async def task(url: str, sharing: list[Listing]) -> None:
             async with sem:
-                label, status = await _check_one(c, listing.source_url)
-                counts[label] += 1
+                label, status = await _check_one(c, url)
+            counts[label] += len(sharing)
+            for listing in sharing:
                 if not isinstance(listing.raw, dict):
                     listing.raw = {}
                 listing.raw["link_check"] = {
-                    "status": label, "http": status,
-                    "checked": now.isoformat(timespec="seconds") + "Z",
+                    "status": label, "http": status, "checked": stamp,
                 }
 
-        await asyncio.gather(*(task(li) for li in todo))
+        await asyncio.gather(*(task(u, ls) for u, ls in by_url.items()))
 
     log.info("link.validate.done", total=len(listings), checked=len(todo),
-             reused_fresh=reused, recheck_days=LINK_RECHECK_DAYS, **counts)
+             fetched=len(by_url), reused_fresh=reused,
+             recheck_days=LINK_RECHECK_DAYS, **counts)
     return listings  # KEEP ALL — tagging only, no drops
