@@ -392,3 +392,47 @@ def test_apply_stamps_labelled_estimated_balance():
     assert d["estimated_balance_confidence"] in ("medium", "low")
     assert d["estimated_balance_detail"]["is_estimate"] is True
     assert "TILA" in d["not_a_payoff"]
+
+
+# ---------------------------------------------------------------------------
+# Hard wall-clock backstop.
+#
+# The budget checks inside this enricher sit BETWEEN counties and BETWEEN leads,
+# so they cannot interrupt the expensive work itself. On the 2026-07-31 run that
+# let it spend 13h36m and 8,084 HTTP requests to enrich 25 leads — 32% of a
+# 42.8-hour run — while still reporting budget_exhausted=False, because neither
+# check ever got a turn.
+# ---------------------------------------------------------------------------
+
+def test_hard_timeout_returns_instead_of_running_forever(monkeypatch):
+    """A county whose work never yields control back must not hold the run."""
+    import asyncio as _aio
+    import foreclosure_scraper.enrichment_dot_ocr as M
+    from foreclosure_scraper.models import Listing, ListingType, PropertyKind
+
+    monkeypatch.setenv("FORECLOSURE_DOT_OCR_BUDGET_S", "0.2")
+    monkeypatch.setenv("FORECLOSURE_DOT_OCR_GRACE_S", "1")
+    monkeypatch.setattr(M, "_parse_gemini_keys", lambda: ["k"], raising=False)
+    monkeypatch.setattr("foreclosure_scraper.enrichment_vision._parse_gemini_keys",
+                        lambda: ["k"])
+    # One eligible county, and work inside it that outlives the budget many times.
+    # A non-logan vendor, so the run goes straight to the per-lead loop and the
+    # slow work is the per-owner lookup rather than an index sweep.
+    state, county = "NC", "Testland"
+    monkeypatch.setattr(M, "DOC_IMAGE_COUNTIES", {(state, county): "other"})
+
+    async def _forever(*a, **kw):
+        await _aio.sleep(30)
+        return []
+    monkeypatch.setattr(M.di, "owner_dot_documents", _forever)
+
+    li = Listing(source="x", source_url="https://e.com/1",
+                 listing_type=ListingType.UNKNOWN, property_kind=PropertyKind.UNKNOWN,
+                 state=state, county=county, owner_name="SMITH JOHN", raw={})
+
+    async def run():
+        return await _aio.wait_for(M.enrich_dot_ocr([li]), timeout=20)
+
+    stats = _aio.run(run())          # must return, not hang
+    assert stats.get("hard_timeout") or stats.get("budget_exhausted") \
+        or stats.get("skipped") is not None, stats

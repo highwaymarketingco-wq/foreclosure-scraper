@@ -54,6 +54,7 @@ from __future__ import annotations
 
 import os
 import re
+import asyncio
 import time
 from datetime import datetime, timezone
 from typing import Optional
@@ -570,14 +571,37 @@ async def enrich_dot_ocr(listings, max_lookups: Optional[int] = None) -> dict:
             if sess is not None:
                 await sess.__aexit__(None, None, None)
 
-    for (state, county), leads in by_county.items():
-        if time.monotonic() - t0 > budget_s or stats["searched"] >= cap:
-            stats["budget_exhausted"] = True
-            break
-        try:
-            await _run_county(state, county, leads)
-        except Exception:  # noqa: BLE001 - one county must never kill the run
-            log.warning("dot_ocr.county_failed", state=state, county=county)
+    async def _all_counties() -> None:
+        for (state, county), leads in by_county.items():
+            if time.monotonic() - t0 > budget_s or stats["searched"] >= cap:
+                stats["budget_exhausted"] = True
+                break
+            try:
+                await _run_county(state, county, leads)
+            except Exception:  # noqa: BLE001 - one county must never kill the run
+                log.warning("dot_ocr.county_failed", state=state, county=county)
+
+    # HARD wall-clock backstop around the whole enricher.
+    #
+    # The budget checks above are BETWEEN counties and BETWEEN leads, so they
+    # cannot interrupt the expensive work itself — a slow index sweep or a
+    # crawling per-owner lookup runs to completion no matter how long it takes.
+    # On the 2026-07-31 run that let this enricher spend 13h36m and 8,084 HTTP
+    # requests to enrich 25 leads, 32% of a 42.8-hour run, and it still reported
+    # budget_exhausted=False because neither check ever got a turn.
+    #
+    # Same pattern the name resolver already uses: the inner checks stop NEW
+    # work, this guarantees the pass returns so the run can finish.
+    # Grace lets requests already in flight finish rather than orphaning their
+    # work; past it the pass is cut off regardless.
+    grace_s = float(os.environ.get("FORECLOSURE_DOT_OCR_GRACE_S", "120"))
+    try:
+        await asyncio.wait_for(_all_counties(), timeout=budget_s + grace_s)
+    except asyncio.TimeoutError:
+        stats["budget_exhausted"] = True
+        stats["hard_timeout"] = True
+        log.warning("dot_ocr.hard_timeout", elapsed_s=round(time.monotonic() - t0),
+                    budget_s=budget_s, searched=stats["searched"])
 
     log.info("dot_ocr.done", **stats)
     return stats
