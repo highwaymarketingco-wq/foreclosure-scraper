@@ -1043,7 +1043,7 @@ async def enrich_resolve_name_to_property(
         "no_endpoint": 0, "no_owner_field": 0, "endpoint_dead": 0, "no_rows": 0,
         "ambiguous": 0, "resolved": 0, "middle_conflict": 0, "address_filled": 0,
         "parcel_filled": 0, "value_filled": 0, "sqft_filled": 0,
-        "budget_hit": 0, "cap_hit": 0,
+        "budget_hit": 0, "cap_hit": 0, "no_backend_county": 0,
         # Which backend in the chain actually produced each resolution, so the
         # next measurement can tell a real gain from a reshuffle.
         "resolved_buncombe_index": 0, "resolved_nc_onemap": 0,
@@ -1055,6 +1055,41 @@ async def enrich_resolve_name_to_property(
 
     targets = [li for li in listings if _is_target(li)]
     stats["targets"] = len(targets)
+
+    # Leads that are name-indexed and address-less but whose county has NO wired
+    # owner-search backend get dropped by _is_target without a trace, so on the
+    # board they are indistinguishable from leads nothing has looked at yet.
+    # That is the same defect _mark() was written to kill, one filter earlier:
+    # 1,236 of them (Anderson SC 748, Cherokee SC 488) have sat silent, and
+    # re-investigating that silence has cost real time more than once.
+    #
+    # It is a wall, not a bug. Anderson's free parcel viewer carries no owner
+    # name (TAXOWNSTR is a district code), its ACPASS owner search is
+    # robots-disallowed, Cherokee is qPublic-only, and ArcGIS Online publishes
+    # no owner-searchable layer for either. Say so on the lead.
+    blocked = 0
+    target_ids = {id(li) for li in targets}
+    for li in listings:
+        if id(li) in target_ids:
+            continue
+        if li.state not in ("NC", "SC"):
+            continue
+        if (li.street_address or "").strip() or (li.parcel_id or "").strip():
+            continue
+        if not _lead_name(li):
+            continue
+        if isinstance(li.raw, dict) and li.raw.get("resolved_from_name"):
+            continue
+        if _endpoint_plan(li):
+            continue
+        _mark(li, "no_owner_search_backend", queried=False,
+              county=li.county, note="no free owner-name-searchable layer wired "
+                                     "for this county")
+        blocked += 1
+    stats["no_backend_county"] = blocked
+    if blocked:
+        log.info("name_resolve.county_without_backend", leads=blocked)
+
     if not targets:
         log.info("name_resolve.no_targets")
         return stats

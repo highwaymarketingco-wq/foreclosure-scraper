@@ -79,3 +79,49 @@ def test_cap_no_longer_binds_before_the_budget(monkeypatch):
     assert m._CAP >= reachable, (
         f"cap {m._CAP} is below the {reachable:.0f} leads the budget allows")
     assert m._CAP > 3688, "cap still binds before the real backlog is drained"
+
+
+# ---------------------------------------------------------------------------
+# Counties with no wired owner-search backend must say so on the lead.
+# ---------------------------------------------------------------------------
+
+def _named_leadless(county: str, state: str = "SC"):
+    from foreclosure_scraper.models import Listing, ListingType, PropertyKind
+    return Listing(
+        source="counties_sc.sc_public_index",
+        source_url="https://publicindex.sccourts.org/x/CaseDetails.aspx?id=1",
+        listing_type=ListingType.LIS_PENDENS, property_kind=PropertyKind.UNKNOWN,
+        state=state, county=county, defendant="SMITH, JOHN A", raw={},
+    )
+
+
+def test_county_without_a_backend_is_marked_not_silently_dropped(monkeypatch):
+    """Anderson SC and Cherokee SC have no free owner-name-searchable layer, so
+    _is_target drops them. Dropped without provenance they look identical to
+    leads nothing has looked at yet, which is what made 1,187 of them read as
+    'never attempted' and cost real time to re-diagnose more than once."""
+    import asyncio
+    m = _reload(monkeypatch, FORECLOSURE_NAME_RESOLVE_BUDGET_S="0.01")
+    leads = [_named_leadless("Anderson"), _named_leadless("Cherokee")]
+    stats = asyncio.run(m.enrich_resolve_name_to_property(leads))
+    assert stats["no_backend_county"] == 2, stats
+    for li in leads:
+        prov = li.raw.get("resolved_from_name")
+        assert isinstance(prov, dict), f"{li.county} dropped with no provenance"
+        assert prov["confidence"] == "no_owner_search_backend"
+        assert prov["queried"] is False, "a wall is not a query; must stay retryable"
+        assert prov["county"] == li.county
+    _reload(monkeypatch)
+
+
+def test_marking_walls_never_overwrites_an_existing_verdict(monkeypatch):
+    """A lead the resolver already matched must keep its match."""
+    import asyncio
+    m = _reload(monkeypatch, FORECLOSURE_NAME_RESOLVE_BUDGET_S="0.01")
+    li = _named_leadless("Anderson")
+    li.raw = {"resolved_from_name": {"queried": True, "confidence": "exact",
+                                     "matched_owner": "SMITH JOHN A"}}
+    asyncio.run(m.enrich_resolve_name_to_property([li]))
+    assert li.raw["resolved_from_name"]["confidence"] == "exact", \
+        "existing resolver verdict was clobbered by the wall marker"
+    _reload(monkeypatch)
