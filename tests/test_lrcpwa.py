@@ -59,3 +59,19 @@ def test_never_clobbers_existing_address():
     li = _li(street_address="999 REAL ST")
     m._apply(li, _REC)
     assert li.street_address == "999 REAL ST"
+
+
+def test_search_key_prefers_the_burke_spine_reid():
+    """Burke leads reach the board as 10-digit map PINs, which this API answers
+    with HTTP 500 (measured 2026-08-03: 0/26 by PIN, 25/26 by REID). Once
+    nc_burke_spine has stamped the REID on, that is the key to search."""
+    li = _li(county="Burke", parcel_id="2703905385",
+             raw={"burke_spine": {"pin": "2703905385", "reid": "2796"}})
+    assert m._search_key(li) == "2796"
+
+
+def test_search_key_falls_back_to_the_parcel_id():
+    assert m._search_key(_li()) == "10007200"
+    # spine ran but could not resolve this PIN (ambiguous) — no REID to prefer
+    assert m._search_key(_li(raw={"burke_spine": {"pin": "2713194819"}})) == "10007200"
+    assert m._search_key(_li(raw={"burke_spine": "not-a-dict"})) == "10007200"

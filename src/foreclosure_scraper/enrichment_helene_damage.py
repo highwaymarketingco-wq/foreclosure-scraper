@@ -20,6 +20,27 @@ CAPTCHA / no ToS-scrape wall). Live-verified 2026-07-02:
   * Buncombe NC — NC_BuncombeCnty_PPDR_Dashboard_Helene_RT2024/0 (1461). A
     Private-Property-Debris-Removal parcel join: pin + Address + the
     residential/commercial flag + service requested + ROE status.
+  * Buncombe NC — HeleneCombinedDamageAssessmentResults_Clipped/0 (10,973;
+    10,532 pin-keyed). THE AUTHORITATIVE PLACARD SOURCE: the countywide
+    combined ATC-45 posting roll — red 1,542 / yellow 5,728 / green 3,693,
+    plus a substantial_damage_determination (734 "yes") that is the FEMA
+    50%-rule trigger, use/entry restrictions, and detailed-eval flags. Keyed
+    on pinnum + structure_address. Live-verified 2026-08-03.
+  * Buncombe NC — Accela/MapServer/7 (10,723 rows; 7,643 with a pin). The
+    permit-system view of the same event: DamageType = DESTROYED (758 w/ pin)
+    / MAJOR DAMAGE / INUNDATED / LANDSLIDE / MINOR DAMAGE-AFFECTED. Parcel
+    join only (no address column). objectIdField is null on this layer, so
+    pagination REQUIRES orderByFields (see ``order_by`` below) — without it
+    the service 400s on any resultOffset request.
+
+The two Buncombe layers ADD to (never replace) the PPDR layer: measured
+against the live board, repointing off PPDR onto the placards would have
+dropped 76 already-matched leads while gaining 306, so all three run and the
+worst-damage-wins collision rule picks the strongest signal per parcel.
+
+PRIVACY: the placard layer also carries ``building_contact_info`` (owner /
+occupant phone + email). That column is deliberately NOT requested — the
+outFields list is enumerated explicitly and never ``*``.
 
 Each source is a single ArcGIS FeatureServer layer we page through ONCE into
 memory (a few thousand rows), build parcel + address indexes, then match each
@@ -140,6 +161,53 @@ SOURCES: list[dict[str, Any]] = [
         "extra_fields": ("What_Service_are_you_Requesting", "Status",
                          "Was_this_Property_Residential_o"),
     },
+    {
+        "key": "buncombe_placards",
+        "label": "Buncombe County Combined Helene Damage Assessment (ATC-45 placards)",
+        "url": (
+            "https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services/"
+            "HeleneCombinedDamageAssessmentResults_Clipped/FeatureServer/0/query"
+        ),
+        "parcel_field": "pinnum",
+        "addr_field": "structure_address",
+        # red / yellow / green ATC-45 posting, ranked in _DAMAGE_RANK below.
+        "damage_field": "posting",
+        "loss_field": None,               # no dollar loss on this layer
+        "occupancy_field": "primary_occupancy_type",
+        "structure_field": "structure_type",
+        "zip_field": None,
+        "join": ("parcel", "address"),
+        "county": "Buncombe",
+        "state": "NC",
+        # NOTE: building_contact_info (owner/occupant phone+email) is
+        # intentionally omitted — we never pull personal contact data off a
+        # damage-assessment layer.
+        "extra_fields": ("use_and_entry_restrictions_as_w",
+                         "detailed_evals_recommended_for",
+                         "substantial_damage_determinatio",
+                         "Source"),
+    },
+    {
+        "key": "buncombe_accela_damage",
+        "label": "Buncombe County Accela Helene Damage Parcels (permit system)",
+        "url": "https://gis.buncombenc.gov/arcgis/rest/services/Accela/MapServer/7/query",
+        "parcel_field": "pin",
+        "addr_field": None,               # layer carries pin + DamageType only
+        "damage_field": "DamageType",
+        "loss_field": None,
+        "occupancy_field": None,
+        "structure_field": None,
+        "zip_field": None,
+        "join": ("parcel",),
+        "county": "Buncombe",
+        "state": "NC",
+        "where": "pin IS NOT NULL AND pin<>''",
+        # objectIdField is null on this MapServer layer: any resultOffset
+        # request 400s ("Pagination request requires either orderBy field or
+        # the layer/table needs to have OID Field") unless orderByFields is set.
+        "order_by": "pin",
+        "page_size": 1000,
+    },
 ]
 
 # Normalize the many damage-severity spellings across layers onto one ladder so
@@ -153,13 +221,46 @@ _DAMAGE_RANK = {
     "affected": 1,
     "inaccessible": 1,
     "unaffected": 0,
+    # Buncombe Accela DamageType spellings.
+    "natural disaster - destroyed": 5,
+    "natural disaster - major damage": 4,
+    "natural disaster - inundated": 3,
+    "natural disaster - landslide": 3,
+    "natural disaster - minor damage/affected": 2,
+    # Buncombe ATC-45 placard postings. Red = unsafe (do not enter), yellow =
+    # restricted use, green = inspected & usable. Slotted between the county
+    # damage words so a red placard outranks a "minor damage" row but not an
+    # outright "destroyed" determination.
+    "red": 4,
+    "yellow": 3,
+    "green": 1,
 }
+
+# ATC-45 placard postings we treat as a real structure posting. The layer also
+# holds a handful of road/access rows ("access point - open" / "- cloes") that
+# are not building assessments and carry no seller signal.
+_PLACARD_POSTINGS = {"red", "yellow", "green"}
 
 
 def _rank(level: Optional[str]) -> int:
     if not level:
         return -1
     return _DAMAGE_RANK.get(str(level).strip().lower(), 0)
+
+
+def _rec_rank(rec: Optional[dict[str, Any]]) -> int:
+    """Severity of a built record, used to pick a winner on key collisions.
+
+    A FEMA substantial-damage determination outranks every plain severity
+    word, so a yellow-placard structure that was nonetheless found >=50%
+    damaged beats a bare red placard from another layer.
+    """
+    if not rec:
+        return -1
+    r = _rank(rec.get("damage_level"))
+    if rec.get("substantial_damage") is True:
+        r += 10
+    return r
 
 
 def _clean(v: Any) -> Optional[str]:
@@ -205,10 +306,16 @@ async def _fetch_layer(c: httpx.AsyncClient, src: dict[str, Any]) -> list[dict[s
         src.get("zip_field"),
     ) if f]
     out_fields.extend(src.get("extra_fields", ()))
-    fields_param = ",".join(dict.fromkeys(out_fields)) or "*"
+    # NEVER "*": some of these layers carry personal contact columns
+    # (the placard layer's building_contact_info), so a source with no
+    # enumerated fields is a config bug, not a reason to widen the request.
+    fields_param = ",".join(dict.fromkeys(out_fields))
+    if not fields_param:
+        log.warning("helene.no_out_fields", key=src["key"])
+        return out
     where = src.get("where", "1=1")
     offset = 0
-    page = 2000
+    page = int(src.get("page_size", 2000))
     while True:
         params = {
             "where": where,
@@ -218,6 +325,10 @@ async def _fetch_layer(c: httpx.AsyncClient, src: dict[str, Any]) -> list[dict[s
             "resultRecordCount": page,
             "f": "json",
         }
+        # Layers whose objectIdField is null reject any paged request unless an
+        # explicit sort is supplied.
+        if src.get("order_by"):
+            params["orderByFields"] = src["order_by"]
         try:
             r = await c.get(src["url"], params=params, timeout=40.0)
             if r.status_code != 200:
@@ -257,18 +368,18 @@ def _index_source(src: dict[str, Any], rows: list[dict[str, Any]]
         rec = _build_record(src, attrs)
         if rec is None:
             continue
-        rank = _rank(rec["damage_level"])
+        rank = _rec_rank(rec)
         if can_parcel:
             pk = _normalize_parcel(attrs.get(src["parcel_field"]))
             if pk:
                 cur = by_parcel.get(pk)
-                if cur is None or rank > _rank(cur["damage_level"]):
+                if cur is None or rank > _rec_rank(cur):
                     by_parcel[pk] = rec
         if can_addr:
             ak = _normalize_addr(_clean(attrs.get(src["addr_field"])))
             if ak:
                 cur = by_addr.get(ak)
-                if cur is None or rank > _rank(cur["damage_level"]):
+                if cur is None or rank > _rec_rank(cur):
                     by_addr[ak] = rec
     return by_parcel, by_addr
 
@@ -279,6 +390,11 @@ def _build_record(src: dict[str, Any], attrs: dict[str, Any]) -> Optional[dict[s
         level = _derive_buncombe_level(attrs)
     else:
         level = _clean(attrs.get(src["damage_field"])) if src.get("damage_field") else None
+
+    if src["key"] == "buncombe_placards":
+        # Drop the road/access-point rows — not a structure posting.
+        if (level or "").lower() not in _PLACARD_POSTINGS:
+            return None
 
     loss = _to_float(attrs.get(src["loss_field"])) if src.get("loss_field") else None
     occ = _clean(attrs.get(src["occupancy_field"])) if src.get("occupancy_field") else None
@@ -300,6 +416,20 @@ def _build_record(src: dict[str, Any], attrs: dict[str, Any]) -> Optional[dict[s
     }
     if src.get("addr_field"):
         rec["matched_address"] = _clean(attrs.get(src["addr_field"]))
+
+    if src["key"] == "buncombe_placards":
+        rec["placard"] = (level or "").lower()
+        # substantial_damage_determination == yes is the FEMA/NFIP 50%-rule
+        # finding: repair cost >= 50% of market value, which forces the owner
+        # to bring the whole structure to current code (or demolish) before it
+        # can be reoccupied. That is the single hardest sell-instead-of-repair
+        # trigger this layer carries.
+        sub = (_clean(attrs.get("substantial_damage_determinatio")) or "").lower()
+        if sub in ("yes", "no"):
+            rec["substantial_damage"] = sub == "yes"
+        rec["entry_restrictions"] = _clean(attrs.get("use_and_entry_restrictions_as_w"))
+        rec["detailed_eval_recommended"] = _clean(attrs.get("detailed_evals_recommended_for"))
+        rec["assessment_program"] = _clean(attrs.get("Source"))
     return rec
 
 
@@ -377,7 +507,7 @@ async def enrich_with_helene_damage(listings: list[Listing]) -> dict[str, int]:
         if pk:
             for src, rec in parcel_idx.get(pk, ()):
                 if src["key"] in allowed_keys and (
-                    best is None or _rank(rec["damage_level"]) > _rank(best["damage_level"])
+                    best is None or _rec_rank(rec) > _rec_rank(best)
                 ):
                     best, best_via = rec, "parcel"
 
@@ -387,7 +517,7 @@ async def enrich_with_helene_damage(listings: list[Listing]) -> dict[str, int]:
             if ak:
                 for src, rec in addr_idx.get(ak, ()):
                     if src["key"] in allowed_keys and (
-                        best is None or _rank(rec["damage_level"]) > _rank(best["damage_level"])
+                        best is None or _rec_rank(rec) > _rec_rank(best)
                     ):
                         best, best_via = rec, "address"
 

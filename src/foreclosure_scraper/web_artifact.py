@@ -103,6 +103,9 @@ RAW_KEEP = {
     "market_velocity": "*",           # months-of-inventory + holding-period estimate
     "recorded_comps": "*",            # county-GIS recorded arms-length sales (median $/sqft, Tier-0 ARV)
     "comp_median_ppsf_recorded": "*",
+    "recorded_sales": "*",            # county sales-roll transactions: price/date/deed/parties (audit trail)
+    "recorded_ratio_comps": "*",      # median sale-to-assessed ratio from nearby recorded sales
+    "comp_median_ppa_recorded": "*",  # median $/acre from recorded vacant-lot sales
     "condition_tier": "*",            # move_in_ready / cosmetic / major / gut
     "condition_source": "*",          # "vision-HIGH" / "vision-MEDIUM" / regex/age default
     "vision": "*",                    # full Claude Vision condition report
@@ -198,6 +201,7 @@ RAW_KEEP = {
     "intent_band": "*",               # hot/warm/cool/cold band
     "condition_cama": "*",            # CAMA per-parcel condition/grade/year_built
     "storm_damage": "*",              # Hurricane Helene damage-assessment match {damage_level, estimated_loss, ...}
+    "rollback_exposure": "*",         # present-use/elderly deferral: rollback tax that comes due ON SALE
     "condemned": "*",                 # condemned/dilapidated flag from county condemned inventory
     "owner_mismatch": "*",            # court lead whose geo-snapped property was stripped (name-only, unverified)
     "resolved_from_name": "*",        # name->property resolver provenance {county, strategy, confidence}

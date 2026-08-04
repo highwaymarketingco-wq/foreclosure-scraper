@@ -58,6 +58,23 @@ def _money(v) -> Optional[float]:
         return None
 
 
+def _search_key(li: Listing) -> str:
+    """The value this API's `ParcelId` search actually wants.
+
+    Henderson/Madison/Rutherford leads reach the board already carrying the
+    county ACCOUNT number, so parcel_id is the right key. Burke leads carry the
+    10-digit map PIN instead, and lrcpwa answers a PIN with HTTP 500 — measured
+    2026-08-03 over 26 Burke board leads, 0/26 resolved by PIN against 25/26 for
+    the same parcels' REIDs, which is why this tenant has sat at 0.6% coverage
+    while Henderson runs at 78%. nc_burke_spine stamps the REID onto
+    raw['burke_spine'], so prefer it whenever the spine has run.
+    """
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    spine = raw.get("burke_spine")
+    reid = spine.get("reid") if isinstance(spine, dict) else None
+    return str(reid).strip() if reid else (li.parcel_id or "").strip()
+
+
 async def _lookup(http: httpx.AsyncClient, tenant: str, parcel: str) -> Optional[dict]:
     try:
         r = await http.post(
@@ -146,7 +163,7 @@ async def enrich_lrcpwa_parcel(listings: Iterable[Listing]) -> dict:
                 stats["skipped_budget"] += 1
                 return
             async with sem:
-                rec = await _lookup(http, _county(li), (li.parcel_id or "").strip())
+                rec = await _lookup(http, _county(li), _search_key(li))
             if not rec:
                 return
             had_addr = bool((li.street_address or "").strip())

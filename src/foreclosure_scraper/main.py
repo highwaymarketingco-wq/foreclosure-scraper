@@ -371,6 +371,15 @@ DATELESS_OK_SOURCES = {
     # Kania tax-foreclosure filings — filed, then await a scheduled sale date
     # (37 of 56 rows dateless on 2026-07-31).
     "law_firms.kania",
+    # Pickens pre-sale delinquent-tax rolls (2020-2025 GIS layers). A delinquent balance is
+    # a standing debt, not a dated sale. Without this the active filter drops all of them.
+    "counties_sc.pickens_delinquent_parcels",
+    # Spartanburg City Master Condemnation List — a condemnation is a standing condition.
+    "counties_sc.spartanburg_city_condemned",
+    # Hendersonville vacant/condemned structures register — same, standing condition.
+    # NOTE: this scraper takes owner + mailing only; the PHONE__/EMAIL columns on that
+    # layer are deliberately excluded (see FORBIDDEN_FIELDS in the module).
+    "counties_nc.hendersonville_vacant_structures",
     # Henderson foreclosure parcels — the list is a definitionExpression of REIDs
     # inside an ArcGIS Web Experience, not a page. Parcels in foreclosure carry no
     # published sale date; the sale posture lives in the county's court file.
@@ -910,6 +919,27 @@ async def run() -> int:
     except Exception:
         log.error("hud_reac_address.failed", traceback=traceback.format_exc())
 
+    # Lincoln bulk assessor dumps (sqft/beds/baths/year) + Burke WPCOG parcel spine
+    # (PIN -> REID + owner/mailing/situs/value). Order is load-bearing: Burke must precede
+    # the lrcpwa resolver below, because Burke leads carry the 10-digit map PIN while lrcpwa
+    # searches on REID — which is exactly why that tenant sat at 0.6% coverage. Both
+    # enrich() are SYNC; do not await them.
+    try:
+        from .nc_lincoln_bulk import enrich as enrich_lincoln_bulk
+        s = enrich_lincoln_bulk(enriched)
+        if s:
+            enrichment_stats["lincoln_bulk"] = s
+    except Exception:
+        log.error("lincoln_bulk.failed", traceback=traceback.format_exc())
+
+    try:
+        from .nc_burke_spine import enrich as enrich_burke_spine
+        s = enrich_burke_spine(enriched)
+        if s:
+            enrichment_stats["burke_spine"] = s
+    except Exception:
+        log.error("burke_spine.failed", traceback=traceback.format_exc())
+
     # NC PTS Cloud land-records resolver — parcel# -> situs address + assessed
     # value + owner + mailing for Henderson/Madison/Rutherford/Burke (the
     # delinquent-tax leads land with a parcel but no address). Runs BEFORE geocode
@@ -1407,6 +1437,17 @@ async def run() -> int:
         await enrich_with_comps(enriched)
     except Exception:
         log.error("comps.failed", traceback=traceback.format_exc())
+
+    # FREE COMP SPINE from county sales rolls (Buncombe 388k, Cleveland). These publish a
+    # recorded price but no sqft, so they gap-fill only: land $/acre into raw['comps'], and
+    # sale-to-assessed ratio into raw['recorded_ratio_comps'] (Tier 1b in valuation/calc.py).
+    # MUST run after enrich_with_comps so HomeHarvest's sqft-matched comps win. Anderson SC
+    # contributes 0 — its Parcel_Sales layer returns "Unable to complete operation".
+    try:
+        from .enrichment_recorded_sales import enrich as enrich_recorded_sales
+        await enrich_recorded_sales(enriched)
+    except Exception:
+        log.error("recorded_sales.failed", traceback=traceback.format_exc())
 
     # Per-address photo gallery enrichment — for listings that came from
     # courthouse / law-firm / sitemap sources WITHOUT photos, look up the
@@ -2072,6 +2113,18 @@ async def run() -> int:
             enrichment_stats["tax_relief"] = s
     except Exception:
         log.error("tax_relief.failed", traceback=traceback.format_exc())
+
+    # Present-use / elderly DEFERRAL rollback: deferred tax comes due ON SALE, so it is a
+    # hard constraint on what a seller actually nets. Kill switch FORECLOSURE_ROLLBACK_OFF=1.
+    # Anderson's PDF books are opt-in via ROLLBACK_ANDERSON=1; the default path yields 42
+    # leads (all Buncombe), not the 47 the build reported with Anderson enabled.
+    try:
+        from .enrichment_rollback_deferral import enrich_with_rollback_exposure
+        s = await enrich_with_rollback_exposure(enriched)
+        if s and s.get("matched"):
+            enrichment_stats["rollback_exposure"] = s
+    except Exception:
+        log.error("rollback_exposure.failed", traceback=traceback.format_exc())
 
     # Elderly/probate life-event tagging on owner_name (after promotion).
     try:

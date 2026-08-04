@@ -10,7 +10,9 @@ Spartanburg layer to confirm the endpoint + field names haven't drifted.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
+import pathlib
 from datetime import datetime
 
 import pytest
@@ -148,7 +150,137 @@ def test_source_skipped_when_county_absent(monkeypatch):
     monkeypatch.setattr(mod, "_fetch_layer", fake_fetch)
     li = _lead(county="Buncombe", state="NC", parcel_id="0605073289")
     asyncio.run(mod.enrich_with_helene_damage([li]))
-    assert fetched == ["buncombe_ppdr"]
+    assert fetched == ["buncombe_ppdr", "buncombe_placards", "buncombe_accela_damage"]
+
+
+# --------------------------------------------------------------------------
+# Buncombe ATC-45 placards + Accela damage parcels (added 2026-08-03)
+# --------------------------------------------------------------------------
+
+_PLACARD_ROWS = json.loads(
+    (pathlib.Path(__file__).parent / "fixtures"
+     / "buncombe_helene_placards.json").read_text())
+_ACCELA_ROWS = json.loads(
+    (pathlib.Path(__file__).parent / "fixtures"
+     / "buncombe_accela_helene_damage.json").read_text())
+
+
+def _first(rows, **match):
+    for r in rows:
+        if all(r.get(k) == v for k, v in match.items()):
+            return r
+    raise AssertionError(f"fixture has no row matching {match}")
+
+
+def test_placard_stamps_posting_and_substantial_damage(monkeypatch):
+    row = _first(_PLACARD_ROWS, substantial_damage_determinatio="yes")
+    _patch(monkeypatch, {"buncombe_placards": [row]})
+    li = _lead(county="Buncombe", state="NC", parcel_id=row["pinnum"])
+    stats = asyncio.run(mod.enrich_with_helene_damage([li]))
+    assert stats["matched"] == 1
+    sd = li.raw["storm_damage"]
+    assert sd["source_key"] == "buncombe_placards"
+    assert sd["placard"] in ("red", "yellow", "green")
+    # The FEMA 50%-rule finding is the whole point of this layer.
+    assert sd["substantial_damage"] is True
+    assert sd["match_method"] == "parcel"
+
+
+def test_placard_substantial_damage_outranks_a_bare_red(monkeypatch):
+    """A yellow-placard structure found >=50% damaged must beat a plain red
+    placard from another layer on the same parcel."""
+    pin = "9611111111"
+    yellow_sub = {"pinnum": pin, "structure_address": "1 TEST RD", "posting": "yellow",
+                  "structure_type": "residence", "primary_occupancy_type": "Single family",
+                  "substantial_damage_determinatio": "yes"}
+    red_plain = {"pinnum": pin, "structure_address": "1 TEST RD", "posting": "red",
+                 "structure_type": "residence", "primary_occupancy_type": "Single family",
+                 "substantial_damage_determinatio": "no"}
+    _patch(monkeypatch, {"buncombe_placards": [red_plain, yellow_sub]})
+    li = _lead(county="Buncombe", state="NC", parcel_id=pin)
+    asyncio.run(mod.enrich_with_helene_damage([li]))
+    assert li.raw["storm_damage"]["placard"] == "yellow"
+    assert li.raw["storm_damage"]["substantial_damage"] is True
+
+
+def test_placard_access_point_rows_are_not_structures(monkeypatch):
+    """The layer holds a few road/access rows whose 'posting' is not an
+    ATC-45 placard; they carry no seller signal and must be dropped."""
+    row = {"pinnum": "9612222222", "structure_address": "2 TEST RD",
+           "posting": "access point - open", "structure_type": None,
+           "primary_occupancy_type": None}
+    _patch(monkeypatch, {"buncombe_placards": [row]})
+    li = _lead(county="Buncombe", state="NC", parcel_id="9612222222")
+    stats = asyncio.run(mod.enrich_with_helene_damage([li]))
+    assert stats["matched"] == 0
+    assert "storm_damage" not in li.raw
+
+
+def test_placard_padded_pin_joins_the_board_form(monkeypatch):
+    """Placard pinnum is the 15-digit padded PIN; board leads carry both the
+    padded and the bare 10-digit form."""
+    row = {"pinnum": "968914245000000", "structure_address": "875 Warren Wilson Road",
+           "posting": "red", "structure_type": "commercial",
+           "primary_occupancy_type": "B", "substantial_damage_determinatio": "no"}
+    _patch(monkeypatch, {"buncombe_placards": [row]})
+    bare = _lead(county="Buncombe", state="NC", parcel_id="9689142450")
+    padded = _lead(county="Buncombe", state="NC", parcel_id="968914245000000")
+    stats = asyncio.run(mod.enrich_with_helene_damage([bare, padded]))
+    assert stats["matched"] == 2
+
+
+def test_accela_destroyed_outranks_a_green_placard(monkeypatch):
+    destroyed = _first(_ACCELA_ROWS, DamageType="NATURAL DISASTER - DESTROYED")
+    pin = destroyed["pin"]
+    green = {"pinnum": pin, "structure_address": "3 TEST RD", "posting": "green",
+             "structure_type": "residence", "primary_occupancy_type": "Single family",
+             "substantial_damage_determinatio": "no"}
+    _patch(monkeypatch, {"buncombe_accela_damage": [destroyed],
+                         "buncombe_placards": [green]})
+    li = _lead(county="Buncombe", state="NC", parcel_id=pin)
+    asyncio.run(mod.enrich_with_helene_damage([li]))
+    sd = li.raw["storm_damage"]
+    assert sd["source_key"] == "buncombe_accela_damage"
+    assert sd["damage_level"] == "NATURAL DISASTER - DESTROYED"
+
+
+def test_accela_damage_types_are_all_ranked():
+    """An unranked DamageType silently scores 0 and loses every collision."""
+    for row in _ACCELA_ROWS:
+        assert mod._rank(row["DamageType"]) > 0, row["DamageType"]
+
+
+def test_accela_layer_paginates_with_an_explicit_sort():
+    """Accela/MapServer/7 has objectIdField=null: any resultOffset request 400s
+    unless orderByFields is supplied."""
+    src = next(s for s in mod.SOURCES if s["key"] == "buncombe_accela_damage")
+    assert src.get("order_by")
+
+
+def test_no_source_requests_a_wildcard_field_list(monkeypatch):
+    """The placard layer carries building_contact_info (owner/occupant phone +
+    email). outFields must stay enumerated for every source, forever."""
+    seen = []
+
+    class FakeResp:
+        status_code = 200
+
+        @staticmethod
+        def json():
+            return {"features": []}
+
+    class FakeClient:
+        async def get(self, url, params=None, timeout=None):
+            seen.append(params)
+            return FakeResp()
+
+    for src in mod.SOURCES:
+        asyncio.run(mod._fetch_layer(FakeClient(), src))
+    assert seen, "no source issued a request"
+    for params in seen:
+        fields = params["outFields"]
+        assert fields and fields != "*"
+        assert "building_contact_info" not in fields
 
 
 @pytest.mark.skipif(not os.environ.get("RUN_LIVE"), reason="live smoke; set RUN_LIVE=1")

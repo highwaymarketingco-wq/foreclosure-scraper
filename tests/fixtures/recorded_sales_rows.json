@@ -1,0 +1,783 @@
+{
+ "buncombe_saledata": {
+  "objectIdFieldName": "ObjectId",
+  "uniqueIdField": {
+   "name": "ObjectId",
+   "isSystemMaintained": true
+  },
+  "globalIdFieldName": "",
+  "fields": [
+   {
+    "name": "PINN",
+    "type": "esriFieldTypeString",
+    "alias": "PINN",
+    "sqlType": "sqlTypeNVarchar",
+    "length": 4000,
+    "domain": null,
+    "defaultValue": null
+   },
+   {
+    "name": "Grantor1",
+    "type": "esriFieldTypeString",
+    "alias": "Grantor1",
+    "sqlType": "sqlTypeNVarchar",
+    "length": 4000,
+    "domain": null,
+    "defaultValue": null
+   },
+   {
+    "name": "Grantee1",
+    "type": "esriFieldTypeString",
+    "alias": "Grantee1",
+    "sqlType": "sqlTypeNVarchar",
+    "length": 4000,
+    "domain": null,
+    "defaultValue": null
+   },
+   {
+    "name": "SellingPrice",
+    "type": "esriFieldTypeInteger",
+    "alias": "SellingPrice",
+    "sqlType": "sqlTypeInteger",
+    "domain": null,
+    "defaultValue": null
+   },
+   {
+    "name": "AdjustedSalePrice",
+    "type": "esriFieldTypeInteger",
+    "alias": "AdjustedSalePrice",
+    "sqlType": "sqlTypeInteger",
+    "domain": null,
+    "defaultValue": null
+   },
+   {
+    "name": "DeedBook",
+    "type": "esriFieldTypeString",
+    "alias": "DeedBook",
+    "sqlType": "sqlTypeNVarchar",
+    "length": 256,
+    "domain": null,
+    "defaultValue": null
+   },
+   {
+    "name": "DeedPage",
+    "type": "esriFieldTypeString",
+    "alias": "DeedPage",
+    "sqlType": "sqlTypeNVarchar",
+    "length": 256,
+    "domain": null,
+    "defaultValue": null
+   },
+   {
+    "name": "SellDate",
+    "type": "esriFieldTypeDate",
+    "alias": "SellDate",
+    "sqlType": "sqlTypeTimestamp2",
+    "length": 8,
+    "domain": null,
+    "defaultValue": null
+   },
+   {
+    "name": "QualifiedSale",
+    "type": "esriFieldTypeString",
+    "alias": "QualifiedSale",
+    "sqlType": "sqlTypeNVarchar",
+    "length": 4000,
+    "domain": null,
+    "defaultValue": null
+   },
+   {
+    "name": "VacantLot",
+    "type": "esriFieldTypeString",
+    "alias": "VacantLot",
+    "sqlType": "sqlTypeNVarchar",
+    "length": 4000,
+    "domain": null,
+    "defaultValue": null
+   },
+   {
+    "name": "Acres",
+    "type": "esriFieldTypeDouble",
+    "alias": "Acres",
+    "sqlType": "sqlTypeFloat",
+    "domain": null,
+    "defaultValue": null
+   },
+   {
+    "name": "Class",
+    "type": "esriFieldTypeString",
+    "alias": "Class",
+    "sqlType": "sqlTypeNVarchar",
+    "length": 4000,
+    "domain": null,
+    "defaultValue": null
+   },
+   {
+    "name": "Address",
+    "type": "esriFieldTypeString",
+    "alias": "Address",
+    "sqlType": "sqlTypeNVarchar",
+    "length": 4000,
+    "domain": null,
+    "defaultValue": null
+   }
+  ],
+  "exceededTransferLimit": true,
+  "features": [
+   {
+    "attributes": {
+     "PINN": "8685-71-3969-00000",
+     "Grantor1": "PROPMASTERS HOLDING COMPANY INC",
+     "Grantee1": "BSR 5 LLC",
+     "SellingPrice": 570000,
+     "AdjustedSalePrice": 570000,
+     "DeedBook": "6509",
+     "DeedPage": "0767",
+     "SellDate": 1752883200000,
+     "QualifiedSale": "N",
+     "VacantLot": "False",
+     "Acres": 2,
+     "Class": "RES 0-3 AC",
+     "Address": "1779 PISGAH HWY"
+    }
+   },
+   {
+    "attributes": {
+     "PINN": "9770-20-2380-00000",
+     "Grantor1": "AMBER R HARRIS",
+     "Grantee1": "DAWN HALE",
+     "SellingPrice": 341000,
+     "AdjustedSalePrice": 341000,
+     "DeedBook": "6578",
+     "DeedPage": "0593",
+     "SellDate": 1774656000000,
+     "QualifiedSale": "P",
+     "VacantLot": "False",
+     "Acres": 0.25,
+     "Class": "RES 0-3 AC",
+     "Address": "109 CHAPMAN DR"
+    }
+   },
+   {
+    "attributes": {
+     "PINN": "9618-96-9367-CU031",
+     "Grantor1": "ROBERT B LEASE",
+     "Grantee1": "READE WALKER",
+     "SellingPrice": 150000,
+     "AdjustedSalePrice": 150000,
+     "DeedBook": "6480",
+     "DeedPage": "1864",
+     "SellDate": 1743552000000,
+     "QualifiedSale": "N",
+     "VacantLot": "False",
+     "Acres": 0,
+     "Class": "CONDO",
+     "Address": "31 BERI DR Unit U"
+    }
+   },
+   {
+    "attributes": {
+     "PINN": "9649-40-2414-C1803",
+     "Grantor1": "ASHEVILLE ARRAS RESIDENCES LLC",
+     "Grantee1": "TAMMY KOPELMAN",
+     "SellingPrice": 1100000,
+     "AdjustedSalePrice": 1100000,
+     "DeedBook": "6597",
+     "DeedPage": "1675",
+     "SellDate": 1780099200000,
+     "QualifiedSale": "Y",
+     "VacantLot": "False",
+     "Acres": 0,
+     "Class": "CONDO",
+     "Address": "7 PATTON AVE"
+    }
+   },
+   {
+    "attributes": {
+     "PINN": "9628-03-0555-00000",
+     "Grantor1": "ASHEVILLE AREA HABITAT FOR HUMANITY INC",
+     "Grantee1": "ALLEN JOSEPH HAAG",
+     "SellingPrice": 360000,
+     "AdjustedSalePrice": 360000,
+     "DeedBook": "6603",
+     "DeedPage": "1517",
+     "SellDate": 1781827200000,
+     "QualifiedSale": "P",
+     "VacantLot": "False",
+     "Acres": 0.14,
+     "Class": "LOW I/C HO",
+     "Address": "138 PARTNERSHIP PL"
+    }
+   },
+   {
+    "attributes": {
+     "PINN": "0619-46-1200-00000",
+     "Grantor1": "CAROLE ALLISON",
+     "Grantee1": "BLACK MOUNTAIN COUNSELING CENTER INC",
+     "SellingPrice": 425000,
+     "AdjustedSalePrice": 425000,
+     "DeedBook": "6513",
+     "DeedPage": "0688",
+     "SellDate": 1754092800000,
+     "QualifiedSale": "N",
+     "VacantLot": "False",
+     "Acres": 0.31,
+     "Class": "CONVERTED ",
+     "Address": "136 S RIDGEWAY AVE"
+    }
+   },
+   {
+    "attributes": {
+     "PINN": "9648-73-4787-00000",
+     "Grantor1": "24 WARWICK LLC",
+     "Grantee1": "CYNTHIA M WOOTEN",
+     "SellingPrice": 940000,
+     "AdjustedSalePrice": 940000,
+     "DeedBook": "6541",
+     "DeedPage": "1245",
+     "SellDate": 1762819200000,
+     "QualifiedSale": "Y",
+     "VacantLot": "False",
+     "Acres": 0.18,
+     "Class": "RES 0-3 AC",
+     "Address": "24 WARWICK RD"
+    }
+   },
+   {
+    "attributes": {
+     "PINN": "9634-80-2811-00000",
+     "Grantor1": "AMY ABBOTT QUINN REVOCABLE LIVING TRUST",
+     "Grantee1": "SUSAN G RAY",
+     "SellingPrice": 630000,
+     "AdjustedSalePrice": 630000,
+     "DeedBook": "6576",
+     "DeedPage": "1852",
+     "SellDate": 1774396800000,
+     "QualifiedSale": "P",
+     "VacantLot": "False",
+     "Acres": 0.19,
+     "Class": "RES 0-3 AC",
+     "Address": "12 ASHER LN"
+    }
+   },
+   {
+    "attributes": {
+     "PINN": "8792-70-0024-00000",
+     "Grantor1": "LAUREN AUSTIN",
+     "Grantee1": "HALEY DAWN MOORE",
+     "SellingPrice": 465000,
+     "AdjustedSalePrice": 465000,
+     "DeedBook": "6547",
+     "DeedPage": "1437",
+     "SellDate": 1764720000000,
+     "QualifiedSale": "Y",
+     "VacantLot": "False",
+     "Acres": 1.55,
+     "Class": "RES 0-3 AC",
+     "Address": "28 HIGHCREST DR"
+    }
+   },
+   {
+    "attributes": {
+     "PINN": "9606-76-7132-00000",
+     "Grantor1": "BRANDI WOLFE HENSON",
+     "Grantee1": "ERIN KATHLEEN OPRY",
+     "SellingPrice": 800000,
+     "AdjustedSalePrice": 800000,
+     "DeedBook": "6599",
+     "DeedPage": "1833",
+     "SellDate": 1780704000000,
+     "QualifiedSale": "Y",
+     "VacantLot": "False",
+     "Acres": 0.92,
+     "Class": "RES 0-3 AC",
+     "Address": "52 OLD SPRING DR"
+    }
+   },
+   {
+    "attributes": {
+     "PINN": "9638-01-3584-00000",
+     "Grantor1": "TED H MEADOWS",
+     "Grantee1": "MARY CADE MAINWARING",
+     "SellingPrice": 345000,
+     "AdjustedSalePrice": 345000,
+     "DeedBook": "6510",
+     "DeedPage": "1550",
+     "SellDate": 1753315200000,
+     "QualifiedSale": "N",
+     "VacantLot": "False",
+     "Acres": 0.22,
+     "Class": "RES 0-3 AC",
+     "Address": "18 TALMADGE CT"
+    }
+   },
+   {
+    "attributes": {
+     "PINN": "9761-70-0549-00000",
+     "Grantor1": "THOMAS JOSEPHS",
+     "Grantee1": "JENNA TAYLOR",
+     "SellingPrice": 900000,
+     "AdjustedSalePrice": 900000,
+     "DeedBook": "6521",
+     "DeedPage": "0280",
+     "SellDate": 1756512000000,
+     "QualifiedSale": "Y",
+     "VacantLot": "False",
+     "Acres": 1.28,
+     "Class": "RES 0-3 AC",
+     "Address": "12 APPLE TREE WAY"
+    }
+   }
+  ]
+ },
+ "buncombe_parcels": {
+  "displayFieldName": "pinnum",
+  "fieldAliases": {
+   "pin": "pin",
+   "pinnum": "pinnum",
+   "Acreage": "Acreage",
+   "Class": "Class",
+   "Improved": "Improved",
+   "TaxValue": "TaxValue",
+   "Address": "Address"
+  },
+  "fields": [
+   {
+    "name": "pin",
+    "type": "esriFieldTypeString",
+    "alias": "pin",
+    "length": 10
+   },
+   {
+    "name": "pinnum",
+    "type": "esriFieldTypeString",
+    "alias": "pinnum",
+    "length": 15
+   },
+   {
+    "name": "Acreage",
+    "type": "esriFieldTypeDouble",
+    "alias": "Acreage"
+   },
+   {
+    "name": "Class",
+    "type": "esriFieldTypeString",
+    "alias": "Class",
+    "length": 10
+   },
+   {
+    "name": "Improved",
+    "type": "esriFieldTypeString",
+    "alias": "Improved",
+    "length": 1
+   },
+   {
+    "name": "TaxValue",
+    "type": "esriFieldTypeString",
+    "alias": "TaxValue",
+    "length": 9
+   },
+   {
+    "name": "Address",
+    "type": "esriFieldTypeString",
+    "alias": "Address",
+    "length": 100
+   }
+  ],
+  "features": [
+   {
+    "attributes": {
+     "pin": "9628334112",
+     "pinnum": "962833411200000",
+     "Acreage": 0.34999999,
+     "Class": "312",
+     "Improved": "N",
+     "TaxValue": "57000",
+     "Address": "1 SPRING DR"
+    }
+   },
+   {
+    "attributes": {
+     "pin": "9628325965",
+     "pinnum": "962832596500000",
+     "Acreage": 0.12,
+     "Class": "100",
+     "Improved": "Y",
+     "TaxValue": "232900",
+     "Address": "1 VERONA DR"
+    }
+   },
+   {
+    "attributes": {
+     "pin": "9628326885",
+     "pinnum": "962832688500000",
+     "Acreage": 0.15000001,
+     "Class": "100",
+     "Improved": "Y",
+     "TaxValue": "267200",
+     "Address": "7 VERONA DR"
+    }
+   },
+   {
+    "attributes": {
+     "pin": "9628322983",
+     "pinnum": "962832298300000",
+     "Acreage": 0.13,
+     "Class": "100",
+     "Improved": "Y",
+     "TaxValue": "270200",
+     "Address": "3 HI ALTA AVE"
+    }
+   },
+   {
+    "attributes": {
+     "pin": "9628334479",
+     "pinnum": "962833447900000",
+     "Acreage": 0.36000001,
+     "Class": "100",
+     "Improved": "Y",
+     "TaxValue": "218100",
+     "Address": "15 SPRING DR"
+    }
+   },
+   {
+    "attributes": {
+     "pin": "9628337039",
+     "pinnum": "962833703900000",
+     "Acreage": 0.12,
+     "Class": "100",
+     "Improved": "Y",
+     "TaxValue": "198700",
+     "Address": "6 SPRINGMILL DR"
+    }
+   },
+   {
+    "attributes": {
+     "pin": "9628325843",
+     "pinnum": "962832584300000",
+     "Acreage": 0.5,
+     "Class": "180",
+     "Improved": "Y",
+     "TaxValue": "326000",
+     "Address": "27 WOODLAND DR"
+    }
+   },
+   {
+    "attributes": {
+     "pin": "9628337172",
+     "pinnum": "962833717200000",
+     "Acreage": 0.13,
+     "Class": "100",
+     "Improved": "Y",
+     "TaxValue": "269800",
+     "Address": "8 SPRINGMILL DR"
+    }
+   },
+   {
+    "attributes": {
+     "pin": "9628339330",
+     "pinnum": "962833933000000",
+     "Acreage": 0.13,
+     "Class": "100",
+     "Improved": "Y",
+     "TaxValue": "205100",
+     "Address": "1162 BEAR CREEK RD"
+    }
+   },
+   {
+    "attributes": {
+     "pin": "9628321739",
+     "pinnum": "962832173900000",
+     "Acreage": 0.63,
+     "Class": "411",
+     "Improved": "Y",
+     "TaxValue": "0",
+     "Address": "PO BOX 8905"
+    }
+   }
+  ],
+  "exceededTransferLimit": true
+ },
+ "cleveland_improved": {
+  "displayFieldName": "Parcel_Number",
+  "fieldAliases": {
+   "Parcel_Number": "Parcel Number",
+   "Deed_Book": "Deed Book",
+   "Deed_Page": "Deed Page",
+   "DateSold_YYYYMMDD": "Date Sold YYYYMMDD",
+   "Deed_Stamp_Amount": "Deed Stamp Amount",
+   "Sales_Amount": "Sales Amount",
+   "Sum_LND_Acres": "Sum LND Acres",
+   "Tax_Year": "Tax Year"
+  },
+  "fields": [
+   {
+    "name": "Parcel_Number",
+    "type": "esriFieldTypeString",
+    "alias": "Parcel Number",
+    "length": 255
+   },
+   {
+    "name": "Deed_Book",
+    "type": "esriFieldTypeString",
+    "alias": "Deed Book",
+    "length": 255
+   },
+   {
+    "name": "Deed_Page",
+    "type": "esriFieldTypeString",
+    "alias": "Deed Page",
+    "length": 255
+   },
+   {
+    "name": "DateSold_YYYYMMDD",
+    "type": "esriFieldTypeInteger",
+    "alias": "Date Sold YYYYMMDD"
+   },
+   {
+    "name": "Deed_Stamp_Amount",
+    "type": "esriFieldTypeDouble",
+    "alias": "Deed Stamp Amount"
+   },
+   {
+    "name": "Sales_Amount",
+    "type": "esriFieldTypeInteger",
+    "alias": "Sales Amount"
+   },
+   {
+    "name": "Sum_LND_Acres",
+    "type": "esriFieldTypeDouble",
+    "alias": "Sum LND Acres"
+   },
+   {
+    "name": "Tax_Year",
+    "type": "esriFieldTypeString",
+    "alias": "Tax Year",
+    "length": 255
+   }
+  ],
+  "features": [
+   {
+    "attributes": {
+     "Parcel_Number": "17440",
+     "Deed_Book": "1893",
+     "Deed_Page": "1592",
+     "DateSold_YYYYMMDD": 20230303,
+     "Deed_Stamp_Amount": 230.0,
+     "Sales_Amount": 115000,
+     "Sum_LND_Acres": null,
+     "Tax_Year": "2024"
+    }
+   },
+   {
+    "attributes": {
+     "Parcel_Number": "17439",
+     "Deed_Book": "1893",
+     "Deed_Page": "1592",
+     "DateSold_YYYYMMDD": 20230303,
+     "Deed_Stamp_Amount": 230.0,
+     "Sales_Amount": 115000,
+     "Sum_LND_Acres": null,
+     "Tax_Year": "2024"
+    }
+   },
+   {
+    "attributes": {
+     "Parcel_Number": "17381",
+     "Deed_Book": "1890",
+     "Deed_Page": "1525",
+     "DateSold_YYYYMMDD": 20230112,
+     "Deed_Stamp_Amount": 294.0,
+     "Sales_Amount": 147000,
+     "Sum_LND_Acres": null,
+     "Tax_Year": "2024"
+    }
+   },
+   {
+    "attributes": {
+     "Parcel_Number": "17431",
+     "Deed_Book": "1891",
+     "Deed_Page": "0010",
+     "DateSold_YYYYMMDD": 20230120,
+     "Deed_Stamp_Amount": 44.0,
+     "Sales_Amount": 22000,
+     "Sum_LND_Acres": null,
+     "Tax_Year": "2024"
+    }
+   },
+   {
+    "attributes": {
+     "Parcel_Number": "17432",
+     "Deed_Book": "1893",
+     "Deed_Page": "1592",
+     "DateSold_YYYYMMDD": 20230303,
+     "Deed_Stamp_Amount": 230.0,
+     "Sales_Amount": 115000,
+     "Sum_LND_Acres": null,
+     "Tax_Year": "2024"
+    }
+   },
+   {
+    "attributes": {
+     "Parcel_Number": "17434",
+     "Deed_Book": "1893",
+     "Deed_Page": "1592",
+     "DateSold_YYYYMMDD": 20230303,
+     "Deed_Stamp_Amount": 230.0,
+     "Sales_Amount": 115000,
+     "Sum_LND_Acres": null,
+     "Tax_Year": "2024"
+    }
+   },
+   {
+    "attributes": {
+     "Parcel_Number": "18004",
+     "Deed_Book": "1871",
+     "Deed_Page": "1242",
+     "DateSold_YYYYMMDD": 20220428,
+     "Deed_Stamp_Amount": 329.0,
+     "Sales_Amount": 164500,
+     "Sum_LND_Acres": null,
+     "Tax_Year": "2023"
+    }
+   }
+  ],
+  "exceededTransferLimit": true
+ },
+ "cleveland_vacant": {
+  "displayFieldName": "Parcel_Number",
+  "fieldAliases": {
+   "Parcel_Number": "Parcel Number",
+   "Deed_Book": "Deed Book",
+   "Deed_Page": "Deed Page",
+   "DateSold_YYYYMMDD": "Date Sold YYYYMMDD",
+   "Deed_Stamp_Amount": "Deed Stamp Amount",
+   "Sales_Amount": "Sales Amount",
+   "Acres": "Acres",
+   "Tax_Year": "Tax Year"
+  },
+  "fields": [
+   {
+    "name": "Parcel_Number",
+    "type": "esriFieldTypeString",
+    "alias": "Parcel Number",
+    "length": 255
+   },
+   {
+    "name": "Deed_Book",
+    "type": "esriFieldTypeString",
+    "alias": "Deed Book",
+    "length": 255
+   },
+   {
+    "name": "Deed_Page",
+    "type": "esriFieldTypeString",
+    "alias": "Deed Page",
+    "length": 255
+   },
+   {
+    "name": "DateSold_YYYYMMDD",
+    "type": "esriFieldTypeString",
+    "alias": "Date Sold YYYYMMDD",
+    "length": 255
+   },
+   {
+    "name": "Deed_Stamp_Amount",
+    "type": "esriFieldTypeString",
+    "alias": "Deed Stamp Amount",
+    "length": 255
+   },
+   {
+    "name": "Sales_Amount",
+    "type": "esriFieldTypeInteger",
+    "alias": "Sales Amount"
+   },
+   {
+    "name": "Acres",
+    "type": "esriFieldTypeDouble",
+    "alias": "Acres"
+   },
+   {
+    "name": "Tax_Year",
+    "type": "esriFieldTypeString",
+    "alias": "Tax Year",
+    "length": 255
+   }
+  ],
+  "features": [
+   {
+    "attributes": {
+     "Parcel_Number": "55846",
+     "Deed_Book": "1879",
+     "Deed_Page": "2818",
+     "DateSold_YYYYMMDD": "20220810",
+     "Deed_Stamp_Amount": "190.00",
+     "Sales_Amount": 95000,
+     "Acres": 9.559,
+     "Tax_Year": "2023"
+    }
+   },
+   {
+    "attributes": {
+     "Parcel_Number": "50964",
+     "Deed_Book": "1877",
+     "Deed_Page": "0192",
+     "DateSold_YYYYMMDD": "20220701",
+     "Deed_Stamp_Amount": "32.00",
+     "Sales_Amount": 16000,
+     "Acres": 0.796,
+     "Tax_Year": "2023"
+    }
+   },
+   {
+    "attributes": {
+     "Parcel_Number": "50961",
+     "Deed_Book": "1873",
+     "Deed_Page": "0946",
+     "DateSold_YYYYMMDD": "20220518",
+     "Deed_Stamp_Amount": "50.00",
+     "Sales_Amount": 25000,
+     "Acres": 0.605,
+     "Tax_Year": "2023"
+    }
+   },
+   {
+    "attributes": {
+     "Parcel_Number": "56498",
+     "Deed_Book": "1874",
+     "Deed_Page": "0158",
+     "DateSold_YYYYMMDD": "20220527",
+     "Deed_Stamp_Amount": "32.00",
+     "Sales_Amount": 16000,
+     "Acres": 1.058,
+     "Tax_Year": "2023"
+    }
+   },
+   {
+    "attributes": {
+     "Parcel_Number": "56497",
+     "Deed_Book": "1898",
+     "Deed_Page": "0721",
+     "DateSold_YYYYMMDD": "20230512",
+     "Deed_Stamp_Amount": "80.00",
+     "Sales_Amount": 40000,
+     "Acres": 1.068,
+     "Tax_Year": "2024"
+    }
+   },
+   {
+    "attributes": {
+     "Parcel_Number": "50955",
+     "Deed_Book": "1871",
+     "Deed_Page": "1412",
+     "DateSold_YYYYMMDD": "20220428",
+     "Deed_Stamp_Amount": "30.00",
+     "Sales_Amount": 15000,
+     "Acres": 0.791,
+     "Tax_Year": "2023"
+    }
+   }
+  ],
+  "exceededTransferLimit": true
+ }
+}

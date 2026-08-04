@@ -1,0 +1,1357 @@
+{
+ "objectIdFieldName": "FID",
+ "features": [
+  {
+   "attributes": {
+    "FID": 1,
+    "DATE": null,
+    "ADDRESS": "1001 TEMON ST",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "NEIGHBOR NEXT DOOR BROUGHT THIS TO MY ATTENTION",
+    "OWNER": "BILLY HOLDEN JR & KEISHA",
+    "MAILING_ADDRESS": "162 PINEY KNOB RD",
+    "MAIL_CITY": "RUTHERFORDTON",
+    "ST": "NC",
+    "ZIP": "28139"
+   },
+   "geometry": {
+    "x": -82.46463296124503,
+    "y": 35.302471436895225
+   }
+  },
+  {
+   "attributes": {
+    "FID": 2,
+    "DATE": null,
+    "ADDRESS": "1003 3RD AVE W",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": "BILLED BASE FOR WATER, GARBAGE & SEWER ",
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "MESH OVER WINDOWS - HOLES IN FOUNDATION",
+    "OWNER": "DANNY & SHIRLEY HYDER",
+    "MAILING_ADDRESS": "PO BOX 89",
+    "MAIL_CITY": "ETOWAH",
+    "ST": "NC",
+    "ZIP": "28792"
+   },
+   "geometry": {
+    "x": -82.47293305670375,
+    "y": 35.313852385357535
+   }
+  },
+  {
+   "attributes": {
+    "FID": 3,
+    "DATE": "2023-07-25",
+    "ADDRESS": "1030 N JUSTICE ST",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "DEMOED 7/25/2023",
+    "OWNER": "HUNTING CREEK ASSOCIATES LLC",
+    "MAILING_ADDRESS": "PO BOX 583",
+    "MAIL_CITY": "MORGANTON",
+    "ST": "NC",
+    "ZIP": "28680"
+   },
+   "geometry": {
+    "x": -82.46758624101354,
+    "y": 35.32424548423401
+   }
+  },
+  {
+   "attributes": {
+    "FID": 4,
+    "DATE": null,
+    "ADDRESS": "112 N BLUE RIDGE AVE",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "SCOTT HARMAN; ",
+    "OWNER": "BRIGHTHEART FOUNDATION INC",
+    "MAILING_ADDRESS": "17508 LOS ALIMOS ST",
+    "MAIL_CITY": "GRANADA HILLS",
+    "ST": "CA",
+    "ZIP": "91344"
+   },
+   "geometry": {
+    "x": -82.44701646402585,
+    "y": 35.33259193186678
+   }
+  },
+  {
+   "attributes": {
+    "FID": 5,
+    "DATE": "2024-02-01",
+    "ADDRESS": "1136 GARDEN LN",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": "RED",
+    "NOTES": "2/1/2024 SITE VISIT",
+    "OWNER": "KAY PINKERTON PEREZ",
+    "MAILING_ADDRESS": "PO BOX 5853",
+    "MAIL_CITY": "SARASOTA",
+    "ST": "FL",
+    "ZIP": "34277"
+   },
+   "geometry": {
+    "x": -82.4519134231847,
+    "y": 35.301024636976386
+   }
+  },
+  {
+   "attributes": {
+    "FID": 6,
+    "DATE": "2022-11-28",
+    "ADDRESS": "115 RHODES ST",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": "POSSIBLY IN 2022",
+    "DELINQUENT_TAX": "2022 - DUE $659.41",
+    "UTILITIES": "ACTIVE NO USE FOR YRS",
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "BUILDING IS VACANT -  owner1965@example.net",
+    "OWNER": "JAMES MESSER C/O PATSY MESSER",
+    "MAILING_ADDRESS": "3444 CHIMNEY ROCK RD",
+    "MAIL_CITY": "HENDERSONVILLE",
+    "ST": "NC",
+    "ZIP": "28792"
+   },
+   "geometry": {
+    "x": -82.46413935047113,
+    "y": 35.31424520355224
+   }
+  },
+  {
+   "attributes": {
+    "FID": 7,
+    "DATE": "2023-02-13",
+    "ADDRESS": "120 N BLUE RIDGE AVE",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": "BLACK & BLUE",
+    "NOTES": "JIM MAYBIN - 2/13/2023 PULLING DEMO PERMIT TO TEAR THIS DOWN",
+    "OWNER": "JIMDA OF WNC LLC",
+    "MAILING_ADDRESS": "197 MOUNTAIN VALLEY CEMETARY RD",
+    "MAIL_CITY": "ZIRCONIA",
+    "ST": "NC",
+    "ZIP": "28790"
+   },
+   "geometry": {
+    "x": -82.44638614493707,
+    "y": 35.33213826131695
+   }
+  },
+  {
+   "attributes": {
+    "FID": 8,
+    "DATE": "2022-10-24",
+    "ADDRESS": "122 OVERLOOK VIEW DR",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "VACANT - TALL GRASS",
+    "OWNER": "STEPHEN RHOSE",
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.48046436495918,
+    "y": 35.31179479563576
+   }
+  },
+  {
+   "attributes": {
+    "FID": 9,
+    "DATE": null,
+    "ADDRESS": "122 SOUTH CAROLINA AVE",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": null,
+    "OWNER": "DAVID NEAL CANADAY",
+    "MAILING_ADDRESS": "320 44TH AVE N",
+    "MAIL_CITY": "ST PETERSBURG ",
+    "ST": "FL",
+    "ZIP": "33703"
+   },
+   "geometry": {
+    "x": -82.47952064612564,
+    "y": 35.299064612938345
+   }
+  },
+  {
+   "attributes": {
+    "FID": 10,
+    "DATE": null,
+    "ADDRESS": "1312 PINECREST DR",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": null,
+    "OWNER": "ALAN JOSEPH MCADAMS",
+    "MAILING_ADDRESS": "3641 CRAZY HORSE TRAIL",
+    "MAIL_CITY": "SAINT AUGUSTINE",
+    "ST": "FL",
+    "ZIP": "32086"
+   },
+   "geometry": {
+    "x": -82.47928612025946,
+    "y": 35.3181069139516
+   }
+  },
+  {
+   "attributes": {
+    "FID": 11,
+    "DATE": null,
+    "ADDRESS": "1314 PINECREST DR",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": null,
+    "OWNER": "ALAN JOSEPH MCADAMS",
+    "MAILING_ADDRESS": "3641 CRAZY HORSE TRAIL",
+    "MAIL_CITY": "SAINT AUGUSTINE",
+    "ST": "FL",
+    "ZIP": "32086"
+   },
+   "geometry": {
+    "x": -82.47957739180382,
+    "y": 35.3180536046835
+   }
+  },
+  {
+   "attributes": {
+    "FID": 12,
+    "DATE": "2022-12-30",
+    "ADDRESS": "1413 PINECREST DR",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "RECENT TRANSFER ON 12/8/2022",
+    "OWNER": "ALAN JOSEPH MCADAMS",
+    "MAILING_ADDRESS": "3641 CRAZY HORSE TRAIL",
+    "MAIL_CITY": "SAINT AUGUSTINE",
+    "ST": "FL",
+    "ZIP": "32086"
+   },
+   "geometry": {
+    "x": -82.47968023722575,
+    "y": 35.31882981110211
+   }
+  },
+  {
+   "attributes": {
+    "FID": 13,
+    "DATE": null,
+    "ADDRESS": "1415 PINECREST DR",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": null,
+    "OWNER": "ALAN JOSEPH MCADAMS",
+    "MAILING_ADDRESS": "3641 CRAZY HORSE TRAIL",
+    "MAIL_CITY": "SAINT AUGUSTINE",
+    "ST": "FL",
+    "ZIP": "32086"
+   },
+   "geometry": {
+    "x": -82.47976590057124,
+    "y": 35.31904002898635
+   }
+  },
+  {
+   "attributes": {
+    "FID": 14,
+    "DATE": "2023-01-24",
+    "ADDRESS": "1605 GEORGIA AVE",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": "2022- $612.87  2021 - $726.94",
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "MOBILE HOME - LOCATED IN THE ETJ - R-15",
+    "OWNER": "ANGELISA JANSSEN",
+    "MAILING_ADDRESS": "25265 STEWART DR",
+    "MAIL_CITY": "CARTHAGE",
+    "ST": "NY",
+    "ZIP": "13619"
+   },
+   "geometry": {
+    "x": -82.47849495242917,
+    "y": 35.29674253174404
+   }
+  },
+  {
+   "attributes": {
+    "FID": 15,
+    "DATE": "2023-01-24",
+    "ADDRESS": "1612 DIXIE LN",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": "0",
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "2 JUNK VEHICLES IN DRIVEWY BOTH WHITE; STATION WAGON AND CHRYSLER 5TH AVE; 2 OTHERS ON SIDE - WHITE VAN & BROWN PLYMOUTH (ON GIS MAP SINCE 2010)",
+    "OWNER": "DIXIE & ROBERT WHITAKER",
+    "MAILING_ADDRESS": "2395 ROSEMONT CT",
+    "MAIL_CITY": "HENDERSONVILLE",
+    "ST": "NC",
+    "ZIP": "28791"
+   },
+   "geometry": {
+    "x": -82.48359165288977,
+    "y": 35.31871476935348
+   }
+  },
+  {
+   "attributes": {
+    "FID": 16,
+    "DATE": "2022-10-19",
+    "ADDRESS": "1730 ASHEVILLE HWY",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "YES",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "VACANT; GRAFFITI",
+    "OWNER": "BLUE RIDGE COMMUNITY HEALTH SERVICES, INC",
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.4693395673952,
+    "y": 35.3329745654836
+   }
+  },
+  {
+   "attributes": {
+    "FID": 17,
+    "DATE": "2022-09-14",
+    "ADDRESS": "1733 HAYWOOD RD",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "NO",
+    "CONDEMNED": "NO",
+    "DELINQUENT_TAX": null,
+    "UTILITIES": "ACTIVE BUT NO USEAGE",
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "COMPLAINT OF TALL GRASS IN SEPT 2022",
+    "OWNER": "SAM RAY/REGINA RUTH",
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.47417852413278,
+    "y": 35.329242104297045
+   }
+  },
+  {
+   "attributes": {
+    "FID": 18,
+    "DATE": "2022-11-08",
+    "ADDRESS": "1744 MEADOWBROOK TER",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": null,
+    "OWNER": null,
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.4714978237642,
+    "y": 35.333209426712095
+   }
+  },
+  {
+   "attributes": {
+    "FID": 19,
+    "DATE": "2022-11-29",
+    "ADDRESS": "200 EWBANK",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "NO",
+    "CONDEMNED": "NO",
+    "DELINQUENT_TAX": "PAID",
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": "GREEN",
+    "NOTES": "WELL MAINTAINED; VACANT",
+    "OWNER": "STEPHANIE & ROBERT RENNER",
+    "MAILING_ADDRESS": "21403 CATAWBA AVE",
+    "MAIL_CITY": "CORNELIUS",
+    "ST": "NC",
+    "ZIP": "28031"
+   },
+   "geometry": {
+    "x": -82.47773354039434,
+    "y": 35.33266896132549
+   }
+  },
+  {
+   "attributes": {
+    "FID": 20,
+    "DATE": "2022-10-25",
+    "ADDRESS": "201 BLUE RIDGE ST",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "YES",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": "DEMOED",
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "FIRE DAMAGE ; ENUMERATION",
+    "OWNER": "PATRICK ROBINSON",
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.44221966791947,
+    "y": 35.31061412099312
+   }
+  },
+  {
+   "attributes": {
+    "FID": 21,
+    "DATE": "2023-12-29",
+    "ADDRESS": "2025 S STONEY VIEW CT",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": "YELLOW",
+    "NOTES": "GRASS DOES NOT EXCEED 24\" - HOME APPEARS TO BE VACANT",
+    "OWNER": "CARROLL JUSTUS BRIAN HEIRS",
+    "MAILING_ADDRESS": "205 WARD DR",
+    "MAIL_CITY": "EAST FLAT ROCK",
+    "ST": "NC",
+    "ZIP": "28726"
+   },
+   "geometry": {
+    "x": -82.47331753474703,
+    "y": 35.338502808467204
+   }
+  },
+  {
+   "attributes": {
+    "FID": 22,
+    "DATE": "2024-04-25",
+    "ADDRESS": "203 LYNDHURST DR",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": "BLUE",
+    "NOTES": "COMPLAINT E/M 4/2/2024 FROM STEVE P.",
+    "OWNER": "JIMMY BLACKWELL",
+    "MAILING_ADDRESS": "147 CENTER RD",
+    "MAIL_CITY": "LANDRUM",
+    "ST": "SC",
+    "ZIP": "29356"
+   },
+   "geometry": {
+    "x": -82.48049688666738,
+    "y": 35.34411394730511
+   }
+  },
+  {
+   "attributes": {
+    "FID": 23,
+    "DATE": "2022-10-20",
+    "ADDRESS": "223 ASHWOOD",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "VACANT",
+    "OWNER": "CAROLYN H. SMATHERS TRUST",
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.47117981386542,
+    "y": 35.32899408356507
+   }
+  },
+  {
+   "attributes": {
+    "FID": 24,
+    "DATE": "2022-10-19",
+    "ADDRESS": "230 1ST AVE W",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": "DEACTIVATED MARCH 2022",
+    "NOV___CONTACT_LETTER_SENT": "11/9/2022 12:00:00 AM",
+    "CODE_COLOR": null,
+    "NOTES": null,
+    "OWNER": "THOMAS R SHEPHERD ESTATE",
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.46160189725438,
+    "y": 35.313912022649085
+   }
+  },
+  {
+   "attributes": {
+    "FID": 25,
+    "DATE": "2022-10-25",
+    "ADDRESS": "401 GLOVER",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "VACANT - TALL GRASS",
+    "OWNER": "HOWARD SMITH",
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.44396670878909,
+    "y": 35.31013165872409
+   }
+  },
+  {
+   "attributes": {
+    "FID": 26,
+    "DATE": "2022-12-07",
+    "ADDRESS": "407 7TH AVE E",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "PRTL",
+    "CONDEMNED": "NO",
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": "N/A",
+    "CODE_COLOR": null,
+    "NOTES": null,
+    "OWNER": "FLASHBACK FURNITURE LLC (BOB & MAXINE QUATTLEBAUM)",
+    "MAILING_ADDRESS": "404 S GROVE ST - PO BOX 5007 ",
+    "MAIL_CITY": "HENDERSONVILLE",
+    "ST": "NC",
+    "ZIP": "28793"
+   },
+   "geometry": {
+    "x": -82.45764010676417,
+    "y": 35.321135714554266
+   }
+  },
+  {
+   "attributes": {
+    "FID": 27,
+    "DATE": "2023-03-14",
+    "ADDRESS": "410 MIDWAY ST",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": "NO",
+    "DELINQUENT_TAX": null,
+    "UTILITIES": "METER PULLED FEB 2020",
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": "YELLOW",
+    "NOTES": "VACANT HOUSE REPORTED TO COMMUNITY DEVELOPMENT",
+    "OWNER": "WILLIAM & BARBARA DRAKE",
+    "MAILING_ADDRESS": "2614 KANUGA PINES DR",
+    "MAIL_CITY": "HENDERSONVILLE",
+    "ST": "NC",
+    "ZIP": "28739"
+   },
+   "geometry": {
+    "x": -82.47935376250206,
+    "y": 35.314134017568435
+   }
+  },
+  {
+   "attributes": {
+    "FID": 28,
+    "DATE": "2023-10-09",
+    "ADDRESS": "410 MIDWAY ST",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": "METER WAS PULLED 2020",
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "COMPLAINT FROM VIRGINIA TEGEL OF 418 MIDWAY - LARGE TREE LIMBS FALLING ON LINES",
+    "OWNER": "THEAWELL & BARBARA DRAKE",
+    "MAILING_ADDRESS": "2614 KANUGA PINES DR",
+    "MAIL_CITY": "HENDERSONVILLE",
+    "ST": "NC",
+    "ZIP": "28739"
+   },
+   "geometry": {
+    "x": -82.47935376250206,
+    "y": 35.314134017568435
+   }
+  },
+  {
+   "attributes": {
+    "FID": 29,
+    "DATE": "2022-12-12",
+    "ADDRESS": "421 HIGATE RD",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": null,
+    "OWNER": "JOEL KIMBALL",
+    "MAILING_ADDRESS": "122 CHANTICLEER CT",
+    "MAIL_CITY": "CHARLOTTE",
+    "ST": "NC",
+    "ZIP": "28214"
+   },
+   "geometry": {
+    "x": -82.47340529296376,
+    "y": 35.332566367002244
+   }
+  },
+  {
+   "attributes": {
+    "FID": 30,
+    "DATE": "2022-11-09",
+    "ADDRESS": "522 1ST AVE W",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": "11/9/2022 POSTED",
+    "CODE_COLOR": null,
+    "NOTES": "MAIL RETURNED; MORE TRASH ON FRONT PORCH AND YARD- THIS PARCEL INCLUDES BOTH 522 AND 520 1ST AVE W",
+    "OWNER": "MARIE WATSON (son is Timothy Watson)",
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.465468972076,
+    "y": 35.31324092575681
+   }
+  },
+  {
+   "attributes": {
+    "FID": 31,
+    "DATE": "2022-11-29",
+    "ADDRESS": "601 E PACE ST",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "YES",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": "PAID",
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": "YELLLOW",
+    "NOTES": null,
+    "OWNER": "E A HENDERSON LAND COMPANY LLC",
+    "MAILING_ADDRESS": "4680 HOWARD GAP RD",
+    "MAIL_CITY": "HENDERSONVILLE",
+    "ST": "NC",
+    "ZIP": "28792"
+   },
+   "geometry": {
+    "x": -82.45540247435834,
+    "y": 35.321795244462955
+   }
+  },
+  {
+   "attributes": {
+    "FID": 32,
+    "DATE": "2022-12-12",
+    "ADDRESS": "602 FERNCLIFF",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": "NO",
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": "YELLOW",
+    "NOTES": "EXTERIOR IS MAINTAINED",
+    "OWNER": "KENNTHER DOUGHER",
+    "MAILING_ADDRESS": "69 GUFFEY MOUNTAIN RD",
+    "MAIL_CITY": "FAIRVIEW",
+    "ST": "NC",
+    "ZIP": "28730"
+   },
+   "geometry": {
+    "x": -82.4748966014383,
+    "y": 35.333282474756395
+   }
+  },
+  {
+   "attributes": {
+    "FID": 33,
+    "DATE": "2023-10-24",
+    "ADDRESS": "611 BROOKLYN",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "MOBILE HOME ON .79 ACRE PARCEL",
+    "OWNER": "CALVIN GOSNELL & CONNIE WATTS",
+    "MAILING_ADDRESS": "611 BROOKLYN",
+    "MAIL_CITY": "HENDERSONVILLE",
+    "ST": "NC",
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.44258134761918,
+    "y": 35.29901260273955
+   }
+  },
+  {
+   "attributes": {
+    "FID": 34,
+    "DATE": "2022-10-17",
+    "ADDRESS": "618 FERNCLIFF",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "YES",
+    "CONDEMNED": "6/30/2022 12:00:00 AM",
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "FIRE DAMAGE; HOUSE BOARDED UP NO IMMEDIATE PLANS TO DEMO AND REBUILD",
+    "OWNER": "KIM OSBORNE",
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.47605087369632,
+    "y": 35.33354017640236
+   }
+  },
+  {
+   "attributes": {
+    "FID": 35,
+    "DATE": "2022-10-26",
+    "ADDRESS": "700 N WHITTED",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "UNKNOWN",
+    "OWNER": null,
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.47203833827403,
+    "y": 35.32020561346986
+   }
+  },
+  {
+   "attributes": {
+    "FID": 36,
+    "DATE": null,
+    "ADDRESS": "701 N WHITTED",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": null,
+    "OWNER": null,
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.47230257052833,
+    "y": 35.320267809988756
+   }
+  },
+  {
+   "attributes": {
+    "FID": 37,
+    "DATE": "2022-10-17",
+    "ADDRESS": "704 E PACE ST",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "YES",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": "NO",
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "VACANT/ BOARDED UP/ TALL GRASS AND DEBRIS",
+    "OWNER": "KATTERMANN4 HOLDINGS LLC",
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.45432573479418,
+    "y": 35.322269659760934
+   }
+  },
+  {
+   "attributes": {
+    "FID": 38,
+    "DATE": "2022-11-29",
+    "ADDRESS": "706 WHITE SPARROW DR",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": "2022 - DUE $749.13",
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": "YELLOW/RED",
+    "NOTES": null,
+    "OWNER": "ROSE MARY UNDERWOOD",
+    "MAILING_ADDRESS": "743 LITTLE HUNGY RD",
+    "MAIL_CITY": "HENDERSONVILLE",
+    "ST": "NC",
+    "ZIP": "28792"
+   },
+   "geometry": {
+    "x": -82.45831728107986,
+    "y": 35.327142144213
+   }
+  },
+  {
+   "attributes": {
+    "FID": 39,
+    "DATE": "2022-10-19",
+    "ADDRESS": "710 JONAS ST",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "VACANT/ENUMERATION",
+    "OWNER": "THOMPSON FAMILY LMT PARTNERSHIP",
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.45332284033961,
+    "y": 35.32181527748691
+   }
+  },
+  {
+   "attributes": {
+    "FID": 40,
+    "DATE": "2023-10-04",
+    "ADDRESS": "715 SHADYWOOD LN",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": "ACTIVE - NO USEAGE SINCE 2017",
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "VACANT SINCE 2017 - UTILITY ACCT - BASE BUT NO USEAGE",
+    "OWNER": "TURNER & DEBORAH ROUSE",
+    "MAILING_ADDRESS": "108 SUNNINGDALE DR",
+    "MAIL_CITY": "FLAT ROCK",
+    "ST": "NC",
+    "ZIP": "28731"
+   },
+   "geometry": {
+    "x": -82.44772037579764,
+    "y": 35.30046372019765
+   }
+  },
+  {
+   "attributes": {
+    "FID": 41,
+    "DATE": null,
+    "ADDRESS": "721 WOODCOCK ST",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": "YES",
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": "BLACK & BLUE",
+    "NOTES": "FIRE/VACANT/ENUMERATION - 2/17/2022 - TONY SMITH CAME IN TO GET A BUILDING PERMIT FOR REMODEL AND REPAIR",
+    "OWNER": "TONY & BARBARA SMITH",
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.4558266821917,
+    "y": 35.32429594345803
+   }
+  },
+  {
+   "attributes": {
+    "FID": 42,
+    "DATE": "2022-11-02",
+    "ADDRESS": "722 E PACE ST",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": "WATER IS ON ",
+    "NOV___CONTACT_LETTER_SENT": "11/7/2022 12:00:00 AM",
+    "CODE_COLOR": null,
+    "NOTES": "VACANT/BROKEN WINDOWS/GUTTERS HANGING OFF/ ENUMERATION",
+    "OWNER": "CHRISTOPHER & KENYATTA WATERS",
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.45384260196974,
+    "y": 35.32270560303281
+   }
+  },
+  {
+   "attributes": {
+    "FID": 43,
+    "DATE": "2022-11-29",
+    "ADDRESS": "722 PARKVIEW DR",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": "2022 - DUE $710.22",
+    "UTILITIES": "W - S - T INACTIVE SINCE MAY 2021",
+    "NOV___CONTACT_LETTER_SENT": "12/7/2022 12:00:00 AM",
+    "CODE_COLOR": "YELLOW/RED",
+    "NOTES": "12/12/2022 - RANDY CALLED - IN PROCESS OF RENOVATING FROM LAST TENANT DAMAGE SHOULD BE COMPLETE BY 1/31/2023",
+    "OWNER": "RANDY & ELLEN CAUDLE",
+    "MAILING_ADDRESS": "931 MID ALLEN RD",
+    "MAIL_CITY": "HENDERSONVILLE",
+    "ST": "NC",
+    "ZIP": "28792"
+   },
+   "geometry": {
+    "x": -82.45698774391664,
+    "y": 35.325896341898165
+   }
+  },
+  {
+   "attributes": {
+    "FID": 44,
+    "DATE": "2023-01-10",
+    "ADDRESS": "746 GENEVA ST",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": "NO WATER USAGE IN 3 YRS - WATER CUT FOR NON PAYMENT 11/8/2022",
+    "NOV___CONTACT_LETTER_SENT": "1/10/2023 12:00:00 AM",
+    "CODE_COLOR": "YELLOW",
+    "NOTES": "NO WATER USAGE IN 3 YRS - UTILITIES CUT 11/8/2022 FOR NON PAYMENT",
+    "OWNER": "LEM JONES",
+    "MAILING_ADDRESS": "204 N WHITTED ST",
+    "MAIL_CITY": "HENDERSONVILLE",
+    "ST": "NC",
+    "ZIP": "28739"
+   },
+   "geometry": {
+    "x": -82.46948423927505,
+    "y": 35.3131703079219
+   }
+  },
+  {
+   "attributes": {
+    "FID": 45,
+    "DATE": "2024-05-02",
+    "ADDRESS": "8 CLEAR CREEK RD",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": "BLACK   ",
+    "NOTES": "GRAFFITI",
+    "OWNER": "RC GRAY ENTERPRISE INC",
+    "MAILING_ADDRESS": "236 HYDER VIEW DR",
+    "MAIL_CITY": "HENDERSONVILLE",
+    "ST": "NC",
+    "ZIP": "28791"
+   },
+   "geometry": {
+    "x": -82.45827696379159,
+    "y": 35.339336472474585
+   }
+  },
+  {
+   "attributes": {
+    "FID": 46,
+    "DATE": "2022-10-26",
+    "ADDRESS": "822 7TH AVE W",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": null,
+    "BOARDED_UP": "YES",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "UNKNOWN",
+    "OWNER": null,
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.47173442833193,
+    "y": 35.320068814823
+   }
+  },
+  {
+   "attributes": {
+    "FID": 47,
+    "DATE": null,
+    "ADDRESS": "826 7TH AVE W",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "YES",
+    "CONDEMNED": "NO",
+    "DELINQUENT_TAX": "CURRENT",
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "2 PARCELS 9568-49-4492 & 9568-49-4463",
+    "OWNER": "BARNETT & GRETTA BAILEY",
+    "MAILING_ADDRESS": "2279 SAINT KENNEDY LN",
+    "MAIL_CITY": "BUFORD",
+    "ST": "NC",
+    "ZIP": "30518"
+   },
+   "geometry": {
+    "x": -82.47192588716676,
+    "y": 35.31998458587593
+   }
+  },
+  {
+   "attributes": {
+    "FID": 48,
+    "DATE": "2024-04-25",
+    "ADDRESS": "902 SYLVAN BLVD",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "YES",
+    "BOARDED_UP": null,
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": "YES ACTIVE ",
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "TENANT IS ELIZAETH PASTORIUS 828-555-0142",
+    "OWNER": "STARR, ANTHONY WAYNE & ELIZABETH CLINE",
+    "MAILING_ADDRESS": "4019 PINECREST DR NE",
+    "MAIL_CITY": "HICKORY ",
+    "ST": "NC",
+    "ZIP": "28601"
+   },
+   "geometry": {
+    "x": -82.47081453102311,
+    "y": 35.32671525427471
+   }
+  },
+  {
+   "attributes": {
+    "FID": 49,
+    "DATE": "2024-05-09",
+    "ADDRESS": "906 HOLMES ST",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": "BLACK",
+    "NOTES": "PENDING FEDERAL SEIZURE",
+    "OWNER": "MITCHUM, JAMES EST SR",
+    "MAILING_ADDRESS": "906 HOLMES ST",
+    "MAIL_CITY": "HENDERSONVILLE",
+    "ST": "NC",
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.47249317506532,
+    "y": 35.31804451053477
+   }
+  },
+  {
+   "attributes": {
+    "FID": 50,
+    "DATE": "2022-10-26",
+    "ADDRESS": "917 9TH AVE W",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "UNKNOWN",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": "NO",
+    "DELINQUENT_TAX": "NO",
+    "UTILITIES": "ACTIVE",
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": "YELLOW",
+    "NOTES": " TALL GRASS - 1/3/2023 - HE IS GETTING IT CUT AND WORKING ON GETTING HOUSE ON THE MARKET - HAS NOT LIVED THERE IN 2 YEARS",
+    "OWNER": "PATRICK JONES",
+    "MAILING_ADDRESS": "827 N JUSTICE ST",
+    "MAIL_CITY": "HENDERSONVILLE",
+    "ST": "NC",
+    "ZIP": "28791"
+   },
+   "geometry": {
+    "x": -82.47274245216676,
+    "y": 35.32293468040992
+   }
+  },
+  {
+   "attributes": {
+    "FID": 51,
+    "DATE": "2024-05-21",
+    "ADDRESS": "1302 N MAIN ST",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": "NO",
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": null,
+    "NOTES": "BROKEN WINDOWS",
+    "OWNER": "TCB PROPERTY DEVELOPMENT LLC",
+    "MAILING_ADDRESS": "1310 N MAIN ST",
+    "MAIL_CITY": "HENDERSONVILLE",
+    "ST": "NC",
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.46319328523808,
+    "y": 35.32953509387015
+   }
+  },
+  {
+   "attributes": {
+    "FID": 52,
+    "DATE": "2024-06-18",
+    "ADDRESS": "1900 WILLOW RD",
+    "City": "Hendersonville",
+    "State": "NC",
+    "OCCUPIED": "NO",
+    "BOARDED_UP": "NO",
+    "CONDEMNED": null,
+    "DELINQUENT_TAX": null,
+    "UTILITIES": null,
+    "NOV___CONTACT_LETTER_SENT": null,
+    "CODE_COLOR": "BLACK   ",
+    "NOTES": "COUNTY REPORTED A COMPLAINT THEY RECEIVED",
+    "OWNER": "TURNER & DEBORAH ROUSE",
+    "MAILING_ADDRESS": null,
+    "MAIL_CITY": null,
+    "ST": null,
+    "ZIP": null
+   },
+   "geometry": {
+    "x": -82.4829992193498,
+    "y": 35.29838961781575
+   }
+  }
+ ]
+}

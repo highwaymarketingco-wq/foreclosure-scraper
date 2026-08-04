@@ -275,6 +275,25 @@ def _land_arv(li: Listing) -> tuple[float | None, float | None, float | None, st
             conf = "LOW" if (low and high and low > 0 and high / low >= 3) else "HIGH"
             return expected, low, high, conf, notes
 
+    # Tier 1b: RECORDED sale-to-assessment ratio from nearby vacant-lot sales
+    # (enrichment_recorded_sales). Beats the flat ×1.10 below because the
+    # multiplier is measured from this submarket's actual recorded sales instead
+    # of assumed. Never HIGH — it is a ratio proxy, not a like-for-like comp.
+    ratio_c = raw.get("recorded_ratio_comps") or {}
+    ratio = ratio_c.get("median_ratio")
+    basis = ratio_c.get("assessed_basis")
+    if (ratio and basis and float(basis) > 0 and int(ratio_c.get("count") or 0) >= 3
+            and float(ratio) * float(basis) <= MAX_PROXY_ARV):
+        ratio, basis = float(ratio), float(basis)
+        low = round((ratio_c.get("p25_ratio") or ratio * 0.9) * basis, -2)
+        high = round((ratio_c.get("p75_ratio") or ratio * 1.1) * basis, -2)
+        expected = min(max(round(ratio * basis, -2), low), high)
+        notes.append(
+            f"Land ARV from {ratio_c['count']} RECORDED nearby sales priced against county "
+            f"assessed value ({ratio:.2f}× median sale-to-assessed × ${basis:,.0f})"
+        )
+        return expected, low, high, ("MEDIUM" if ratio_c.get("confidence") == "MEDIUM" else "LOW"), notes
+
     # Tier 2: tax-assessed × 1.10 (land is assessed closer to market than improved)
     if li.tax_value and li.tax_value > 0:
         expected = round(float(li.tax_value) * 1.10, -2)
@@ -395,6 +414,45 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
             notes.append(f"ARV confidence lowered to {conf}: " + "; ".join(reasons))
         return round(expected, -2), low, high, conf, notes
 
+    # Tier 1b: RECORDED sale-to-assessment RATIO comps (enrichment_recorded_sales).
+    # Buncombe/Anderson publish a full sales roll but NO heated sqft anywhere in
+    # their public GIS, so no $/sqft tier can ever fire there. What they do give
+    # is the ratio real nearby recorded sales fetched against the county's own
+    # assessed value — the standard assessment-sales ratio. Applied to the
+    # subject's assessed value on the SAME basis (the enricher supplies it; the
+    # board's li.tax_value is a different, often land-only figure) it is a real
+    # market-grounded ARV. It is a proxy, not a like-for-like comp, so it sits
+    # BELOW both $/sqft tiers and is never graded HIGH.
+    ratio_c = raw.get("recorded_ratio_comps") or {}
+    ratio = ratio_c.get("median_ratio")
+    basis = ratio_c.get("assessed_basis")
+    if ratio and basis and float(basis) > 0 and int(ratio_c.get("count") or 0) >= 3:
+        ratio, basis = float(ratio), float(basis)
+        expected = ratio * basis
+        # Same plausibility ceiling the other proxy tiers use: an "assessed
+        # value" north of $2M on a distressed residential lead is nearly always a
+        # judgment/portfolio figure that leaked into the field, and multiplying
+        # it by a ratio would launder that into a confident phantom ARV.
+        if expected > MAX_PROXY_ARV:
+            notes.append(
+                f"Sale-to-assessed ARV (${expected:,.0f}) exceeds the "
+                f"${MAX_PROXY_ARV:,.0f} plausibility ceiling — assessed basis "
+                f"(${basis:,.0f}) is likely a judgment/aggregate figure; skipped."
+            )
+        else:
+            low = round((ratio_c.get("p25_ratio") or ratio * 0.9) * basis, -2)
+            high = round((ratio_c.get("p75_ratio") or ratio * 1.1) * basis, -2)
+            expected = min(max(round(expected, -2), low), high)
+            notes.append(
+                f"ARV from {ratio_c['count']} RECORDED nearby sales priced against county "
+                f"assessed value within {ratio_c.get('radius_mi', '?')}mi "
+                f"({ratio:.2f}× median sale-to-assessed × ${basis:,.0f} county value)"
+            )
+            conf = "MEDIUM" if ratio_c.get("confidence") == "MEDIUM" else "LOW"
+            if conf == "LOW":
+                notes.append("ARV confidence LOW: thin or widely-spread sale-to-assessed ratio")
+            return expected, low, high, conf, notes
+
     # Tier 2: Zillow zestimate
     z = raw.get("zillow", {}) if isinstance(raw, dict) else {}
     zest = z.get("zestimate") or li.market_value
@@ -435,7 +493,7 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
         notes.append(f"ARV proxy from opening bid × 2.4 ({li.opening_bid:,.0f} × 2.4) — rough")
         confidence = "LOW"
     else:
-        return None, None, None, "LOW", ["Insufficient data for ARV"]
+        return None, None, None, "LOW", notes + ["Insufficient data for ARV"]
 
     # Final backstop: the tax×1.25 path can also overshoot on a stale/wrong
     # assessment. Any proxy ARV above the ceiling is not trustworthy.

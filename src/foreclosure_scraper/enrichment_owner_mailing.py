@@ -104,12 +104,47 @@ COUNTY_GIS: dict[str, dict] = {
         "owner": ["OwnerName", "TaxpayerName"], "mail": ["StreetAddress", "City", "State", "Zip"],
         "mail_state": "State", "situs": ["PropertyLocation"], "situs_match": "StreetName",
         "parcel": "MAPNUMBER", "where_suffix": "CardNumber=1"},
+    # Verified live 2026-08-03: 66,417 rows, NAME1 populated on 66,365, ADD1 on
+    # 66,353, LOCADD (situs) on 57,009, STATE on 66,346. URL/fields unchanged —
+    # what was actually capping this county was the 25-row situs scan (see
+    # `_scan`): the street-word LIKE this matcher fires returns 142-324 rows here.
+    # outFields is enumerated (no `*`); the layer carries no contact/ID column.
     "SC:Pickens": {"url": "https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services/Pickens_Open_data/FeatureServer/6",
         "owner": ["NAME1", "NAME2"], "mail": ["ADD1", "CITY", "STATE", "ZIP"],
-        "mail_state": "STATE", "situs": ["LOCADD"], "parcel": "PIN"},
-    "SC:Oconee": {"url": "https://arcserver2.oconeesc.com/arcgis/rest/services/PARCELDATA_owner_Assr/MapServer/1",
+        "mail_state": "STATE", "situs": ["LOCADD"], "parcel": "PIN",
+        "out_fields": "PIN,NAME1,NAME2,ADD1,CITY,STATE,ZIP,LOCADD,ACRES,TAXYEAR"},
+    # 2026-08-03 REPOINT: was PARCELDATA_owner_Assr/MapServer/1, the JOINED
+    # polygon view — 63,384 rows, current_owner populated on 62,406. Oconee's
+    # parcel layers proper (CitizenServe/1 'Parcels', Parcels_OpenData/0) carry NO
+    # owner and NO mailing at all, so the assessor TABLE is the county's only
+    # machine-readable mail spine: 68,145 rows with current_owner AND owner_street
+    # populated on ALL of them (+4,761 rows, +5,739 owners over the joined view).
+    # Field names verified live off the layer's own metadata; parcel key is `pin`
+    # (dashed TMS, space-padded — '002-00-01-001'), matching board parcel_ids.
+    # objectIdField is null on this table, hence the explicit `order_by` for paging.
+    # Still situs-less (no address column exists on ANY Oconee owner layer), so
+    # this county stays parcel-match only — street-only leads cannot resolve here.
+    "SC:Oconee": {"url": "https://arcserver2.oconeesc.com/arcgis/rest/services/CitizenServe/MapServer/5",
         "owner": ["current_owner"], "mail": ["owner_street", "owner_citystate", "owner_zip"],
-        "situs": [], "parcel": "TMS_NUMBER"},  # no situs field → parcel-match only
+        "situs": [], "parcel": "pin", "order_by": "pin",
+        "out_fields": "pin,current_owner,owner_street,owner_citystate,owner_zip,deed_book,deed_page,proval_acres"},
+    # 2026-08-03 NEW. Anderson had no COUNTY_GIS entry at all: it fell through to
+    # the statewide SCDOT layer, which is now token-walled, leaving the local bulk
+    # roll (sc_parcel_mailing) as the ONLY path — and that path is dark on any host
+    # whose SQLite cache is missing or stale. This is the live spine behind it.
+    # The service lives on the CITY of Anderson server under a folder named
+    # "WaterUtilities", but the layer is LocalGovernment.DBO.Parcels_County and is
+    # verified parcel/assessment data, NOT utility customers: TMS, OWNER (owner of
+    # record), OWNER_ADDR (taxpayer mailing), PHYS_ADDR (situs), MRKT_VALUE,
+    # SALE_PRICE/SALE_YEAR, PREV_OWNER, DBOOK/DPAGE. There is no phone, e-mail,
+    # account, meter or customer column on it. 114,516 rows; OWNER + OWNER_ADDR on
+    # 113,699; PHYS_ADDR on 100,985; MRKT_VALUE>0 on 112,641.
+    # CITY is "CITY  STATE" ("ANDERSON  SC"), same as SCDOT, so mail_state is
+    # recovered from the mailing tail rather than a discrete column.
+    "SC:Anderson": {"url": "https://gis.cityofandersonsc.com/arcgis/rest/services/WaterUtilities/County_Parcels/FeatureServer/0",
+        "owner": ["OWNER"], "mail": ["OWNER_ADDR", "CITY", "ZIPCODE"],
+        "situs": ["PHYS_ADDR"], "parcel": "TMS",
+        "out_fields": "TMS,OWNER,OWNER_ADDR,CITY,ZIPCODE,PHYS_ADDR,MRKT_VALUE,SALE_PRICE,SALE_YEAR,PREV_OWNER,DBOOK,DPAGE"},
     "SC:Laurens": {"url": "https://laurenscountygis.org/arcgis/rest/services/Pebble/TaxParcel/MapServer/5",
         "owner": ["Owner"], "mail": ["Mailing_Address", "Mailing_City_State_ZIP"],
         "situs": ["Property_Address"], "parcel": "TMS"},
@@ -117,13 +152,43 @@ COUNTY_GIS: dict[str, dict] = {
         "owner": ["Name"], "mail": ["Address_1", "Address_2", "Address_3"],
         "situs": [], "parcel": "ParcelID"},  # situs on a different layer → parcel-match only
 }
-# Anderson SC + Cherokee SC: no ArcGIS owner/mailing layer (qPublic-only) → not here.
+# Cherokee SC: no ArcGIS owner/mailing layer (qPublic-only) → not here.
 
 _NUM_STREET = re.compile(r"^\s*(\d+)\s+(.+?)\s*$")
 
 
 def _norm(s: str) -> str:
-    return re.sub(r"[^a-z0-9 ]", "", (s or "").lower()).strip()
+    # Collapse runs of whitespace too: several rolls pad columns into fixed-width
+    # slots (Anderson PHYS_ADDR = 'SPRINGSIDE        300 SPRINGSIDE CIR'), and a
+    # raw double space made every substring comparison against it fail.
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", "", (s or "").lower())).strip()
+
+
+def _has_house_number(num: str, norm_situs: str) -> bool:
+    """House number present as a WHOLE token in a normalized situs string.
+
+    Was a bare `num in situs` substring test, which matches '144' inside '1440'.
+    That was survivable while the candidate scan was capped at 25 rows; now that
+    we page up to 1500 candidates, a substring test would hand back the wrong
+    parcel — and a wrong parcel means a letter mailed to a stranger. Every
+    configured layer's situs (Pickens 'LOCADD'='144 PORTER RD', Anderson
+    'PHYS_ADDR'='SPRINGSIDE  300 SPRINGSIDE CIR', Buncombe's split
+    HouseNumber+streetname join) carries the number as its own token."""
+    return num in norm_situs.split()
+
+
+# Several rolls store the mailing ZIP as an integer or as a run-together ZIP+4
+# ('296300000', '296708823'), and a missing ZIP arrives as literal 0. Left alone
+# those land in the mailing string as '296300000' / '0', which is not a mailable
+# address. Normalize the trailing ZIP token only — never the street or city.
+def _clean_mailing(mailing: str) -> str:
+    if not mailing:
+        return mailing
+    out = re.sub(r"\s+", " ", mailing).strip()
+    out = re.sub(r"\s+0$", "", out)                       # ZIP absent -> integer 0
+    out = re.sub(r"\b(\d{5})0000$", r"\1", out)           # ZIP+4 padded with zeros
+    out = re.sub(r"\b(\d{5})(\d{4})$", r"\1-\2", out)     # real ZIP+4 -> ZIP5-ZIP4
+    return out.strip()
 
 
 def _pid_variants(parcel_id: str) -> list[str]:
@@ -160,9 +225,28 @@ def _is_absentee(prop_addr: Optional[str], mailing: Optional[str]) -> bool:
 
     prop_addr is the GIS situs when available, else the listing's own street
     address (so counties whose parcel layer has no situs field still resolve an
-    absentee flag). Substring test tolerates the mailing carrying extra
-    city/state/zip the situs string doesn't."""
-    return bool(prop_addr and mailing and _norm(prop_addr) not in _norm(mailing))
+    absentee flag). The substring test tolerates the mailing carrying extra
+    city/state/zip the situs string doesn't.
+
+    The substring test alone is not enough once a layer's situs carries a
+    SUBDIVISION prefix: Anderson's PHYS_ADDR is 'SPRINGSIDE  300 SPRINGSIDE CIR'
+    against a mailing of '300 SPRINGSIDE CIR ANDERSON SC 29625' — the same house,
+    but the situs is not a substring, so every Anderson owner-occupant was
+    flagged absentee (+8 distress, and absentee gates HOT). So we also accept a
+    token-subset match: if every word of the situs appears somewhere in the
+    mailing, the owner mails to the property. Subset is strictly weaker than
+    substring, so this can only REMOVE false absentee flags, never add one."""
+    if not (prop_addr and mailing):
+        return False
+    p, m = _norm(prop_addr), _norm(mailing)
+    if not p or p in m:
+        return False
+    toks = p.split()
+    # Need a real address (a house number + at least one street word) before a
+    # subset match is trustworthy — 'RD' alone must not clear the flag.
+    if len(toks) >= 2 and any(t.isdigit() for t in toks) and set(toks) <= set(m.split()):
+        return False
+    return True
 
 
 def _join(attrs: dict, fields: list[str], *, dedupe: bool = False) -> str:
@@ -186,18 +270,66 @@ def _join(attrs: dict, fields: list[str], *, dedupe: bool = False) -> str:
     return " ".join(parts).strip()
 
 
-async def _query(http: httpx.AsyncClient, base: str, where: str, out_fields: str = "*",
-                 count: int = 25) -> list[dict]:
+async def _query_page(http: httpx.AsyncClient, base: str, where: str, out_fields: str = "*",
+                      count: int = 25, offset: int = 0,
+                      order_by: str = "") -> tuple[list[dict], bool]:
+    """One /query call -> (attribute rows, server's exceededTransferLimit)."""
     url = base.rstrip("/") + "/query"
     params = {"where": where, "outFields": out_fields, "returnGeometry": "false",
               "resultRecordCount": str(count), "f": "json"}
+    if offset:
+        params["resultOffset"] = str(offset)
+    # Several of these layers are TABLES with objectIdField=null (Oconee
+    # CitizenServe/5, Pickens, Anderson). ArcGIS will not page deterministically
+    # without an explicit sort, so pass one whenever we page.
+    if order_by:
+        params["orderByFields"] = order_by
     try:
         r = await http.get(url, params=params, timeout=20.0)
         if r.status_code != 200:
-            return []
-        return [f.get("attributes", {}) for f in (r.json().get("features") or [])]
+            return [], False
+        data = r.json()
+        rows = [f.get("attributes", {}) for f in (data.get("features") or [])]
+        return rows, bool(data.get("exceededTransferLimit"))
     except Exception:
-        return []
+        return [], False
+
+
+async def _query(http: httpx.AsyncClient, base: str, where: str, out_fields: str = "*",
+                 count: int = 25) -> list[dict]:
+    rows, _ = await _query_page(http, base, where, out_fields, count)
+    return rows
+
+
+# 2026-08-03: the situs street-name query was capped at ONE page of 25 rows, which
+# silently truncated every match in a real county. Measured live: the broad
+# street-word LIKE this matcher fires returns 44-900 rows on these layers
+# (Pickens LOCADD '%MOOREFIELD%'=324, '%MEADOW%'=261; Anderson PHYS_ADDR
+# '%SHORE%'=900, '%SHIRLEY%'=252), so the correct parcel was usually past row 25
+# and the lead resolved to nothing. We now page through the candidates
+# (resultOffset + resultRecordCount, sorted so paging is stable) up to a cap.
+_SITUS_PAGE = 500       # <= every configured layer's maxRecordCount (1000/2000)
+_SITUS_SCAN_CAP = 1500  # hard ceiling: one lead never costs more than 3 requests
+
+
+async def _scan(http: httpx.AsyncClient, spec: dict, where: str) -> list[dict]:
+    """Page a candidate set up to _SITUS_SCAN_CAP rows.
+
+    Stops on the server's exceededTransferLimit=False (or a short/empty page) so
+    a full-but-final page doesn't cost an extra round trip per lead."""
+    out_fields = spec.get("out_fields", "*")
+    order_by = spec.get("order_by") or spec.get("parcel", "")
+    rows: list[dict] = []
+    while len(rows) < _SITUS_SCAN_CAP:
+        page, more = await _query_page(http, spec["url"], where, out_fields,
+                                       count=_SITUS_PAGE, offset=len(rows),
+                                       order_by=order_by)
+        if not page:
+            break
+        rows.extend(page)
+        if not more or len(page) < _SITUS_PAGE:
+            break
+    return rows
 
 
 # 2026-06-19: generic building-spec extractor. County CAMA/parcel layers that
@@ -240,7 +372,7 @@ def _extract_specs(attrs: dict) -> dict:
 # summing land + improvement. Land-only fields and SC's "Assessment" class
 # string ("4% OO RES IM") are deliberately NOT used as the value.
 _VALUE_PRIORITY = [
-    re.compile(r"^(total_?market_?value|market_?value)$", re.I),                       # Buncombe TotalMarketValue
+    re.compile(r"^(total_?market_?value|market_?value|mrkt_?value)$", re.I),           # Buncombe TotalMarketValue; Anderson/SCDOT MRKT_VALUE
     re.compile(r"^(appraised_?value|apprval|appr_?val)$", re.I),                       # Buncombe AppraisedValue
     re.compile(r"^(total_?tax_?value|cost_?total_?value|total_?value|totval|totalvalue|parval|present_?val|presentval)$", re.I),  # Polk/Henderson/Lincoln/Gaston + NC OneMap parval/presentval
     re.compile(r"^(assessed_?value|assessed_?v|taxvalue|tax_?value)$", re.I),          # Transylvania ASSESSED_V, Buncombe TaxValue
@@ -416,7 +548,8 @@ async def _match_attrs(http: httpx.AsyncClient, li: Listing, spec: dict) -> Opti
     if li.parcel_id:
         for cand in _pid_variants(li.parcel_id):
             safe = cand.replace("'", "''")
-            rows = await _query(http, spec["url"], f"{spec['parcel']} LIKE '%{safe}%'{cc}")
+            rows = await _query(http, spec["url"], f"{spec['parcel']} LIKE '%{safe}%'{cc}",
+                                spec.get("out_fields", "*"))
             if rows:
                 return rows[0]
     # 2) else match on situs street address. Query the street-NAME field broadly
@@ -430,15 +563,15 @@ async def _match_attrs(http: httpx.AsyncClient, li: Listing, spec: dict) -> Opti
             if words:
                 mfield = spec.get("situs_match", spec["situs"][0])
                 key = max(words, key=len)  # most distinctive street word
-                rows = await _query(http, spec["url"],
-                                    f"UPPER({mfield}) LIKE '%{key.upper()}%'{cc}")
+                rows = await _scan(http, spec,
+                                   f"UPPER({mfield}) LIKE '%{key.upper()}%'{cc}")
                 for row in rows:
                     rs = _norm(_join(row, spec["situs"]))
-                    if num in rs and all(w in rs for w in words):
+                    if _has_house_number(num, rs) and all(w in rs for w in words):
                         return row
                 for row in rows:  # looser: number + the key word
                     rs = _norm(_join(row, spec["situs"]))
-                    if num in rs and key in rs:
+                    if _has_house_number(num, rs) and key in rs:
                         return row
     return None
 
@@ -449,6 +582,7 @@ def _build_result(li: Listing, spec: dict, attrs: dict) -> Optional[dict]:
         mailing = f"C/O {attrs[spec['care_of']]}, " + _join(attrs, spec["mail"])
     else:
         mailing = _join(attrs, spec["mail"])
+    mailing = _clean_mailing(mailing)
     situs = _join(attrs, spec["situs"]) if spec.get("situs") else None
     parcel = str(attrs.get(spec["parcel"]) or "").strip() or None
     mail_state = (attrs.get(spec.get("mail_state", "")) or "").strip().upper() if spec.get("mail_state") else None
