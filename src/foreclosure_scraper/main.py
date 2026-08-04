@@ -371,6 +371,12 @@ DATELESS_OK_SOURCES = {
     # Kania tax-foreclosure filings — filed, then await a scheduled sale date
     # (37 of 56 rows dateless on 2026-07-31).
     "law_firms.kania",
+    # Oconee Forfeited Land Commission assignment list. FLC parcels are county-OWNED after
+    # an unsold tax sale and assignable over the counter at the back-taxes figure — the
+    # buy-direct lane. All 585 rows are dateless by nature (there is no scheduled sale; the
+    # county already owns them), so without this entry _active_only drops the entire source.
+    # Observed exactly that on the 2026-08-04 run: "OK with rows but 0 reached the dashboard".
+    "counties_sc.oconee_flc_assignment",
     # Pickens pre-sale delinquent-tax rolls (2020-2025 GIS layers). A delinquent balance is
     # a standing debt, not a dated sale. Without this the active filter drops all of them.
     "counties_sc.pickens_delinquent_parcels",
