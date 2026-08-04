@@ -510,6 +510,31 @@ def write_artifact(
         "errors": summary.get("errors", []),
         "notes": summary.get("notes", ""),
     }
+
+    # PRESERVE per-source health across partial writers.
+    # Fourteen maintenance scripts (sos_agent_refresh, lrcpwa_refresh,
+    # owner_mailing_refresh, the ingest_* family, ...) call write_artifact with a
+    # one-key summary like {"notes": "scheduled NC SOS refresh"}. Each one then
+    # blanked by_source / source_status / by_state, so run_meta.json - the ONLY
+    # per-source health report there is - showed "by_source": {} for days after a
+    # full run, and neither the operator nor a dashboard could answer "which
+    # sources are actually contributing". Carry the prior run's values forward
+    # when this writer did not compute its own, and mark the file so the staleness
+    # is visible rather than implied.
+    _carried: list[str] = []
+    if meta_path.exists():
+        try:
+            prior_meta = json.loads(meta_path.read_text())
+        except Exception:  # noqa: BLE001 - a corrupt prior file must not block the write
+            prior_meta = {}
+        for key in ("by_source", "by_state", "by_county_top", "source_status",
+                    "regressions", "errors"):
+            if not meta.get(key) and prior_meta.get(key):
+                meta[key] = prior_meta[key]
+                _carried.append(key)
+        if _carried:
+            meta["health_carried_from"] = prior_meta.get("run_time")
+            meta["health_carried_keys"] = _carried
     _atomic_write_bytes(meta_path, json.dumps(meta, ensure_ascii=False, default=str, indent=2).encode("utf-8"))
 
     log.info("web_artifact.written", listings=len(listings), bytes=listings_path.stat().st_size)
