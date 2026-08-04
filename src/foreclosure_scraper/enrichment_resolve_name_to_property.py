@@ -52,7 +52,10 @@ MATCHING POLICY (tightened over v2 — this data drives outreach):
 GATING / COST (it hits county GIS per lead):
   * FORECLOSURE_NAME_RESOLVE (default "1"; set "0" to disable).
   * FORECLOSURE_NAME_RESOLVE_MAX  per-run cap on leads attempted (default 400).
-  * FORECLOSURE_NAME_RESOLVE_BUDGET_S wall-clock budget seconds (default 900).
+  * FORECLOSURE_NAME_RESOLVE_BUDGET_S pins the wall-clock budget to a fixed
+    number of seconds. Unset, the budget scales with the queue (see
+    _budget_for): a big one-time backlog gets a long pass, steady state a short
+    one.
   * Scoped to Western-NC + Upstate-SC core counties only.
   * Idempotent: a lead already attempted (raw['resolved_from_name']['queried'])
     is skipped on re-runs unless FORECLOSURE_NAME_RESOLVE_FORCE=1.
@@ -250,9 +253,40 @@ _FORCE = bool(os.environ.get("FORECLOSURE_NAME_RESOLVE_FORCE"))
 # cap is now a fair round-robin share (see _fair_order) and the wall-clock
 # budget below is the real ceiling, so a larger cap costs nothing when the
 # queue is short and unblocks starved cohorts when it is long.
-_CAP = int(os.environ.get("FORECLOSURE_NAME_RESOLVE_MAX", "1200"))
-_BUDGET_S = float(os.environ.get("FORECLOSURE_NAME_RESOLVE_BUDGET_S", "900"))
+# 1200 still sat below the 3,688-lead backlog, so the cap kept binding before
+# the budget could. It is a runaway backstop, not the throttle: at the measured
+# ~1.6s/lead the budget ceiling below can only ever reach ~4,500 leads anyway.
+_CAP = int(os.environ.get("FORECLOSURE_NAME_RESOLVE_MAX", "6000"))
 _CONCURRENCY = int(os.environ.get("FORECLOSURE_NAME_RESOLVE_CONCURRENCY", "6"))
+
+# A flat 900s budget was the real ceiling, not the cap. Every measured run hit
+# name_resolve.hard_timeout: 568 of 1,060 targets on 2026-08-02, 241 of 400 on
+# 2026-07-26. With 3,688 leads still eligible and twice-weekly runs, the backlog
+# needed about three weeks to drain — and every run paid the full 900s to make
+# that sliver of progress.
+#
+# The queue is self-limiting, which is what makes a flat budget the wrong shape:
+# a queried lead is marked and skipped forever after, so the big number is a
+# one-time backlog and the steady state is only the leads that arrived this
+# week. Sizing the budget to the work drains the backlog in one long pass and
+# then costs a couple of minutes a run.
+_SECONDS_PER_LEAD = float(os.environ.get("FORECLOSURE_NAME_RESOLVE_SEC_PER_LEAD", "2.0"))
+_BUDGET_MIN_S = float(os.environ.get("FORECLOSURE_NAME_RESOLVE_BUDGET_MIN_S", "300"))
+_BUDGET_MAX_S = float(os.environ.get("FORECLOSURE_NAME_RESOLVE_BUDGET_MAX_S", "7200"))
+_BUDGET_OVERRIDE = os.environ.get("FORECLOSURE_NAME_RESOLVE_BUDGET_S")
+
+
+def _budget_for(target_count: int) -> float:
+    """Wall-clock seconds to allow for `target_count` leads.
+
+    Measured throughput is ~1.6s/lead at concurrency 6, so 2.0s/lead leaves
+    headroom without letting a stalled county server run the pass forever.
+    FORECLOSURE_NAME_RESOLVE_BUDGET_S still pins it to a fixed value.
+    """
+    if _BUDGET_OVERRIDE:
+        return float(_BUDGET_OVERRIDE)
+    return max(_BUDGET_MIN_S,
+               min(_BUDGET_MAX_S, target_count * _SECONDS_PER_LEAD))
 
 
 # ---------------------------------------------------------------------------
@@ -1031,8 +1065,9 @@ async def enrich_resolve_name_to_property(
         stats["cap_hit"] = 1
         targets = targets[:_CAP]
 
+    budget_s = _budget_for(len(targets))
     log.info("name_resolve.start", target_count=len(targets), of_total=len(listings),
-             cap=_CAP, budget_s=_BUDGET_S)
+             cap=_CAP, budget_s=budget_s)
 
     sem = asyncio.Semaphore(concurrency)
     field_cache: dict[str, tuple[Optional[str], Optional[str]]] = {}
@@ -1053,7 +1088,7 @@ async def enrich_resolve_name_to_property(
     async def one(c: httpx.AsyncClient, li: Listing) -> None:
         if stop.is_set():
             return
-        if time.monotonic() - t0 > _BUDGET_S:
+        if time.monotonic() - t0 > budget_s:
             stop.set()
             stats["budget_hit"] = 1
             _mark(li, "budget_bail", queried=False)
@@ -1103,8 +1138,8 @@ async def enrich_resolve_name_to_property(
                 # Re-check the budget HERE, not just at task entry: gather()
                 # dispatches every target at once, so without this a long queue of
                 # leads serialized behind a slow host would all sail past the entry
-                # check and run for far longer than _BUDGET_S.
-                if time.monotonic() - t0 > _BUDGET_S:
+                # check and run for far longer than the budget.
+                if time.monotonic() - t0 > budget_s:
                     stop.set()
                     stats["budget_hit"] = 1
                     if not queried_any:
@@ -1232,7 +1267,7 @@ async def enrich_resolve_name_to_property(
         try:
             await asyncio.wait_for(
                 asyncio.gather(*(one(c, li) for li in targets)),
-                timeout=_BUDGET_S + 30.0,
+                timeout=budget_s + 30.0,
             )
         except asyncio.TimeoutError:
             stats["budget_hit"] = 1
