@@ -250,21 +250,30 @@ class NCPtsCloudDelinquentTax(BaseScraper):
         # Every declared tenant must account for itself. A tenant that breaks is
         # now a hard failure the run report shows, instead of 21,463 rows that
         # look fine because nobody has last week's per-county number to compare.
+        # LayerHarvest is a SYNC context manager; putting it in the `async with`
+        # header raises TypeError at runtime, which is exactly the kind of break
+        # a test that only exercises the helpers will not catch.
         guard = LayerHarvest(self.slug, list(TENANTS))
         # Sequential per tenant — one shared throttled client, gentle on the host.
-        async with client(timeout=30.0) as c, guard:
-            for tenant, (county, state) in TENANTS.items():
-
-                async def _one(tenant=tenant, county=county, state=state):
-                    text = await _download_delinquent_csv(c, tenant)
-                    if text is None:
-                        log.info("nc_ptscloud.tenant_empty", tenant=tenant,
-                                 county=county, reason=NO_EXPORT)
-                        return []
-                    leads = _parse_csv(text, county, state, tenant)
-                    log.info("nc_ptscloud.tenant_done", tenant=tenant,
-                             county=county, leads=len(leads))
-                    return leads
-
-                out.extend(await guard.harvest(tenant, _one))
+        async with client(timeout=30.0) as c:
+            with guard:
+                for tenant, (county, state) in TENANTS.items():
+                    out.extend(await guard.harvest(
+                        tenant, self._tenant_fetcher(c, tenant, county, state)))
         return out
+
+    @staticmethod
+    def _tenant_fetcher(c, tenant: str, county: str, state: str):
+        """Zero-arg callable for one tenant, so LayerHarvest can retry it."""
+        async def _one() -> list[Listing]:
+            text = await _download_delinquent_csv(c, tenant)
+            if text is None:
+                log.info("nc_ptscloud.tenant_empty", tenant=tenant,
+                         county=county, reason=NO_EXPORT)
+                return []
+            leads = _parse_csv(text, county, state, tenant)
+            log.info("nc_ptscloud.tenant_done", tenant=tenant,
+                     county=county, leads=len(leads))
+            return leads
+
+        return _one

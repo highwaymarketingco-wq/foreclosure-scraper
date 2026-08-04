@@ -123,3 +123,53 @@ def test_every_declared_tenant_is_guarded():
     silently stops being harvested is the failure this closes."""
     assert len(TENANTS) == 17
     assert len(set(TENANTS)) == len(TENANTS), "duplicate tenant keys"
+
+
+# ---------------------------------------------------------------------------
+# fetch() itself. The helper tests above all passed while fetch() raised
+# TypeError on its first line: LayerHarvest is a SYNC context manager and it had
+# been put in the `async with` header. Testing only the helpers of a scraper is
+# how you ship a source that cannot run at all.
+# ---------------------------------------------------------------------------
+
+def _fake_client(handler):
+    """Patch http_client.client with an async CM yielding a stub with .get."""
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def _cm(*a, **kw):
+        stub = MagicMock()
+        stub.get = handler
+        yield stub
+    return _cm
+
+
+def test_fetch_runs_and_harvests_every_tenant(monkeypatch):
+    import foreclosure_scraper.scrapers.counties_nc.nc_ptscloud_delinquent_tax as M
+
+    async def get(url, **kw):
+        if "GetTaxpayerDownloadList" in url:
+            return _resp(200, json_body=[{"blobName": "Bills.csv"}])   # empty everywhere
+        raise AssertionError("should not reach download for an empty tenant")
+
+    monkeypatch.setattr(M, "client", _fake_client(get))
+    rows = asyncio.run(M.NCPtsCloudDelinquentTax().fetch())
+    assert list(rows) == [], "no tenant publishes a delinquent blob in this fixture"
+
+
+def test_fetch_hard_fails_when_a_declared_tenant_breaks(monkeypatch):
+    """The whole point of the guard: one broken tenant must raise, not shrink
+    the number quietly."""
+    import foreclosure_scraper.scrapers.counties_nc.nc_ptscloud_delinquent_tax as M
+    from foreclosure_scraper.layer_guard import PartialHarvest
+
+    async def get(url, **kw):
+        if "GetTaxpayerDownloadList" in url:
+            if kw.get("headers", {}).get("X-Tenant") == "Guilford":
+                return _resp(503, json_body=[])
+            return _resp(200, json_body=[{"blobName": "Bills.csv"}])
+        raise AssertionError("unexpected download")
+
+    monkeypatch.setattr(M, "client", _fake_client(get))
+    with pytest.raises(PartialHarvest):
+        asyncio.run(M.NCPtsCloudDelinquentTax().fetch())

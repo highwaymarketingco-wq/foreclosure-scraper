@@ -28,6 +28,7 @@ from typing import Iterable
 import structlog
 
 from ...base_scraper import BaseScraper
+from ...layer_guard import LayerHarvest
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
@@ -141,31 +142,48 @@ class NCCountyPdfDelinquentTax(BaseScraper):
         if os.environ.get("FORECLOSURE_NC_PDF_TAX") == "0":
             return []
         out: list[Listing] = []
+        # Each county is a four-figure block of leads behind ONE annual PDF, so a
+        # county that 404s or quietly stops parsing leaves a hole big enough to
+        # pass for normal week-to-week shrinkage. Declare the set and fail loud:
+        # a moved document becomes a reported error, not a smaller number.
+        # LayerHarvest is a SYNC context manager; putting it in the `async with`
+        # header raises TypeError at runtime, which is exactly the kind of break
+        # a test that only exercises the helpers will not catch.
+        guard = LayerHarvest(self.slug, list(COUNTIES))
         async with client(timeout=40.0) as c:
-            for county, cfg in COUNTIES.items():
-                try:
-                    r = await c.get(cfg["url"], headers={"User-Agent": "Mozilla/5.0"})
-                    if r.status_code != 200 or r.content[:4] != b"%PDF":
-                        log.warning("nc_pdf_tax.bad_pdf", county=county, status=r.status_code)
-                        continue
-                    from pypdf import PdfReader
-                    text = "\n".join((p.extract_text() or "")
-                                     for p in PdfReader(io.BytesIO(r.content)).pages)
-                except Exception as exc:  # noqa: BLE001
-                    log.warning("nc_pdf_tax.fetch_fail", county=county, error=str(exc)[:120])
-                    continue
-                if cfg["layout"] == "name_id_amt":
-                    rows = _parse_name_id_amt(text, cfg["id_digits"])
-                else:
-                    rows = _parse_parcel_amt_owner(text)
-                # dedupe by id within county (Catawba repeats a parcel per bill)
-                seen: set[str] = set()
-                n = 0
-                for owner, ident, amt in rows:
-                    if ident in seen:
-                        continue
-                    seen.add(ident)
-                    out.append(_to_listing(owner, ident, amt, county, cfg))
-                    n += 1
-                log.info("nc_pdf_tax.county_done", county=county, leads=n)
+            with guard:
+                for county, cfg in COUNTIES.items():
+                    out.extend(await guard.harvest(
+                        county, self._county_fetcher(c, county, cfg)))
         return out
+
+    @staticmethod
+    def _county_fetcher(c, county: str, cfg: dict):
+        """Zero-arg callable for one county, so LayerHarvest can retry it."""
+        async def _one() -> list[Listing]:
+            r = await c.get(cfg["url"], headers={"User-Agent": "Mozilla/5.0"})
+            if r.status_code != 200:
+                raise RuntimeError(f"{county}: HTTP {r.status_code}")
+            if r.content[:4] != b"%PDF":
+                raise RuntimeError(
+                    f"{county}: response is not a PDF (starts {r.content[:16]!r}) "
+                    "— the county most likely moved the document")
+            from pypdf import PdfReader
+            text = "\n".join((p.extract_text() or "")
+                             for p in PdfReader(io.BytesIO(r.content)).pages)
+            if cfg["layout"] == "name_id_amt":
+                rows = _parse_name_id_amt(text, cfg["id_digits"])
+            else:
+                rows = _parse_parcel_amt_owner(text)
+            # dedupe by id within county (Catawba repeats a parcel per bill)
+            seen: set[str] = set()
+            leads: list[Listing] = []
+            for owner, ident, amt in rows:
+                if ident in seen:
+                    continue
+                seen.add(ident)
+                leads.append(_to_listing(owner, ident, amt, county, cfg))
+            log.info("nc_pdf_tax.county_done", county=county, leads=len(leads))
+            return leads
+
+        return _one
