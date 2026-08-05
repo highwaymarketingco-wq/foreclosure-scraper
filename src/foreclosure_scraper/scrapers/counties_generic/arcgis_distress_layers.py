@@ -167,6 +167,36 @@ LAYERS: tuple[Layer, ...] = (
         value="total_value", detail="bill", process="tax",
         source_page="https://www.buncombecounty.org/governing/depts/tax/",
     ),
+    # Field-assessed FLOOD damage joined to CAMA, so the owner name is the
+    # record owner rather than a self-submitted form. Carries per-element
+    # condition (foundation, roof, HVAC) and a depreciation figure.
+    Layer(
+        slug="pickens_flood_damage",
+        state="SC", county="Pickens",
+        url=("https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services/"
+             "FloodStructureFieldAssessmentCAMA/FeatureServer/0"),
+        listing_type=ListingType.DISTRESSED,
+        fields=("PIN", "NAME1", "WHOLE_ADDR", "ZIP", "Foundation", "RoofCover",
+                "Superstruc", "HVAC", "Depreciati", "ResidenceT", "Stories"),
+        parcel="PIN", owner_last="NAME1", situs="WHOLE_ADDR", zip_="ZIP",
+        detail="Depreciati", process="flood_damage",
+        source_page="https://www.co.pickens.sc.us/",
+    ),
+    # Structures inside the floodway / Zone AE — the pool NCDPS draws buyout
+    # candidates from. Owner names here come from the tax roll.
+    Layer(
+        slug="hendersonville_flood_zone_structures",
+        state="NC", county="Henderson",
+        url=("https://services1.arcgis.com/UTZTmZoX2rsa9yFA/arcgis/rest/services/"
+             "Structures_ZONE_AE/FeatureServer/0"),
+        listing_type=ListingType.DISTRESSED,
+        fields=("PIN_1", "OWNER_LAST_NAME", "OWNER_FIRST_NAME", "STRUCTURE_TYPE",
+                "YR_BUILT", "TOTSQFT", "TAXVAL_BUILDING", "TAXVAL_LAND",
+                "FLOOD_ZONE", "OWNER_RENTER_OCCUPIED"),
+        parcel="PIN_1", owner_last="OWNER_LAST_NAME", owner_first="OWNER_FIRST_NAME",
+        value="TAXVAL_BUILDING", detail="FLOOD_ZONE", process="flood_zone",
+        source_page="https://www.hendersonvillenc.gov/",
+    ),
     # Structures with recorded landslide damage. Physical distress with an
     # address, and the county publishes it because the damage is material.
     Layer(
