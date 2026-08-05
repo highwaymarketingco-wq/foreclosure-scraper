@@ -13,10 +13,14 @@ those consume the promoted names.
 """
 from __future__ import annotations
 
+from .enrichment_owner_mailing import mailing_dict
+
 
 def _cand(li) -> str | None:
     r = li.raw if isinstance(li.raw, dict) else {}
-    for src in ((r.get("owner_mailing") or {}).get("owner"), (r.get("gis") or {}).get("owner")):
+    gis = r.get("gis")
+    gis = gis if isinstance(gis, dict) else {}
+    for src in (mailing_dict(r).get("owner"), gis.get("owner")):
         if isinstance(src, str) and len(src.strip()) > 2:
             return src.strip()
     return None

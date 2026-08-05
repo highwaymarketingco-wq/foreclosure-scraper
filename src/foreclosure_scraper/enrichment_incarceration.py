@@ -32,6 +32,7 @@ import httpx
 import structlog
 
 from .models import Listing
+from .enrichment_owner_mailing import mailing_dict
 
 log = structlog.get_logger()
 
@@ -150,7 +151,7 @@ async def _scdc_match(http: httpx.AsyncClient, last: str, first: str) -> Optiona
 
 
 def _owner_of(li: Listing) -> Optional[str]:
-    om = (li.raw or {}).get("owner_mailing") or {}
+    om = mailing_dict(li)
     return om.get("owner") or li.defendant or None
 
 

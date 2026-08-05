@@ -37,6 +37,7 @@ from typing import Iterable
 import structlog
 
 from .models import Listing
+from .enrichment_owner_mailing import mailing_dict
 
 log = structlog.get_logger()
 
@@ -113,7 +114,7 @@ def _facet_signals(li: Listing) -> set[str]:
         out.add("storm_damage")
 
     # --- OWNERSHIP context (a distinct list a desk would stack on) ---
-    om = raw.get("owner_mailing") or {}
+    om = mailing_dict(raw)
     if _truthy(om.get("absentee")):
         out.add("absentee_owner")
     if _truthy(om.get("out_of_state")):

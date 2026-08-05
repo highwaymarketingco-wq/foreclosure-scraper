@@ -53,6 +53,7 @@ from ...base_scraper import BaseScraper
 from ...enrichment_owner_mailing import _is_absentee
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
+from ...enrichment_owner_mailing import mailing_dict
 
 log = structlog.get_logger()
 
@@ -353,8 +354,8 @@ if __name__ == "__main__":
         s = HendersonForeclosureParcels()
         rows = await s.safe_run()
         est = sum(1 for li in rows if "heir_estate" in (li.raw or {}))
-        abs_ = sum(1 for li in rows if ((li.raw or {}).get("owner_mailing") or {}).get("absentee"))
-        oos = sum(1 for li in rows if ((li.raw or {}).get("owner_mailing") or {}).get("out_of_state"))
+        abs_ = sum(1 for li in rows if mailing_dict(li).get("absentee"))
+        oos = sum(1 for li in rows if mailing_dict(li).get("out_of_state"))
         print(f"outcome={s.last_outcome} count={len(rows)} estate={est} absentee={abs_} out_of_state={oos}")
         for li in rows:
             print(f"  {(li.defendant or '')[:36]:36} pin={li.parcel_id:12} "

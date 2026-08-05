@@ -46,6 +46,7 @@ import httpx
 import structlog
 
 from .models import Listing
+from .enrichment_owner_mailing import mailing_dict
 
 log = structlog.get_logger()
 
@@ -92,7 +93,7 @@ class TaxRecordsOnlyProvider:
         # which the contactability spine never populates with mailing — that
         # storage-key mismatch is why this free path produced almost nothing.
         # We now read owner_mailing first and fall back to the older gis shape.
-        om = raw.get("owner_mailing") or {}
+        om = mailing_dict(raw)
         gis = raw.get("gis") or {}
         mailing = (
             om.get("mailing")
