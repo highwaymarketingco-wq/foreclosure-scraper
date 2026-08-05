@@ -305,6 +305,41 @@ const STAGE_REO = /hud_homestore|fannie|freddie|homepath|homesteps|hubzu|xome|au
 const STAGE_PREFORE = /substitute_trustee|nod_discovery|lis_pendens|rod_acclaim|rod_cott|rod_logan|nc_rod|sc_rod/;
 let STAGE = "";
 
+// ---------------------------------------------------------------------------
+// DEADLINES.
+//
+// A lead with a legal clock on it is worth more than a hundred without one: a
+// tax sale you find the day after is worth nothing. These dates were already on
+// every listing, but they sat as one column among seventeen, so the 141 leads
+// with a deadline inside 45 days were invisible among 25,552 rows.
+// ---------------------------------------------------------------------------
+const DEADLINE_WINDOW_DAYS = 45;
+const DEADLINE_FIELDS = [
+  ["upset_bid_deadline", "upset bid closes"],
+  ["sale_date", "sale"],
+  ["redemption_deadline", "redemption ends"],
+];
+
+/** Soonest un-expired deadline on a listing, or null. */
+function deadlineInfo(l) {
+  let best = null;
+  for (const [f, label] of DEADLINE_FIELDS) {
+    const v = l[f];
+    if (!v) continue;
+    const t = Date.parse(v);
+    if (isNaN(t)) continue;
+    const days = Math.floor((t - Date.now()) / 86400000);
+    if (days < 0) continue;                     // already gone
+    if (!best || days < best.days) best = { days, label, field: f, ts: t };
+  }
+  return best;
+}
+
+/** True when the lead cannot be acted on yet — no way to reach the owner. */
+function deadlineBlocked(l) {
+  return !(l.street_address || "").trim() || !(l.owner_name || "").trim();
+}
+
 function stageOf(l) {
   const t = (l.listing_type || "").toLowerCase();
   const src = (l.source || "").toLowerCase();
@@ -317,11 +352,13 @@ function stageOf(l) {
 }
 
 function updateStageCounts() {
-  const c = { "": 0, foreclosure: 0, prefore: 0, outbound: 0, reo: 0 };
+  const c = { "": 0, foreclosure: 0, prefore: 0, outbound: 0, reo: 0, deadline: 0 };
   LISTINGS.forEach((l) => {
     if (l.raw && l.raw.sold_confirmed) return;
     c[""]++;
     c[stageOf(l)]++;
+    const d = deadlineInfo(l);
+    if (d && d.days <= DEADLINE_WINDOW_DAYS) c.deadline++;
   });
   document.querySelectorAll(".stage-count").forEach((el) => {
     el.textContent = (c[el.dataset.c] || 0).toLocaleString();
@@ -351,7 +388,10 @@ function applyFilters() {
   filtered = LISTINGS.filter((l) => {
     // Court-confirmed sales already sold at auction — not opportunities. Hide.
     if (l.raw && l.raw.sold_confirmed) return false;
-    if (STAGE && stageOf(l) !== STAGE) return false;
+    if (STAGE === "deadline") {
+      const d = deadlineInfo(l);
+      if (!d || d.days > DEADLINE_WINDOW_DAYS) return false;
+    } else if (STAGE && stageOf(l) !== STAGE) return false;
     if (st && l.state !== st) return false;
     if (co && `${l.county || ""}, ${l.state || "?"}` !== co) return false;
     if (ty && l.listing_type !== ty) return false;
@@ -437,6 +477,25 @@ function applyFilters() {
   const rankByIntent = minIntent || minSignals;
   const effKey = rankByIntent ? "_intent" : distress ? "_distress" : sortKey;
   const effDir = (rankByIntent || distress) ? "desc" : sortDir;
+  if (STAGE === "deadline") {
+    // Soonest clock first; a lead you cannot act on yet sinks below one you can.
+    filtered.sort((a, b) => {
+      const da = deadlineInfo(a), db = deadlineInfo(b);
+      const ba = deadlineBlocked(a) ? 1 : 0, bb = deadlineBlocked(b) ? 1 : 0;
+      if (ba !== bb) return ba - bb;
+      return (da ? da.ts : Infinity) - (db ? db.ts : Infinity);
+    });
+    renderTable();
+    renderCards();
+    const blocked = filtered.filter(deadlineBlocked).length;
+    const today = filtered.filter((l) => { const d = deadlineInfo(l); return d && d.days === 0; }).length;
+    $("result-count").textContent =
+      `${filtered.length} with a deadline in ${DEADLINE_WINDOW_DAYS} days` +
+      (today ? `  ·  ⏰ ${today} TODAY` : "") +
+      (blocked ? `  ·  ${blocked} not actionable yet (no owner or address)` : "");
+    return;
+  }
+
   filtered.sort((a, b) => {
     let av = getSortValue(a, effKey);
     let bv = getSortValue(b, effKey);
@@ -574,7 +633,18 @@ function renderTable() {
       const addrCell = isBkSource
         ? `🏛 ${cl.chapter && cl.chapter !== "?" ? `Ch.${cl.chapter} ` : ""}${(l.defendant || "Bankruptcy filing").slice(0, 60)}`
         : `${bkXref ? "🏛 " : ""}${l.street_address || ""}`;
-      const dateCell = isBkSource && cl && cl.date_filed ? cl.date_filed : fmtDate(l.sale_date);
+      let dateCell = isBkSource && cl && cl.date_filed ? cl.date_filed : fmtDate(l.sale_date);
+      // In the deadline track the clock IS the point, so it replaces the date.
+      if (STAGE === "deadline") {
+        const d = deadlineInfo(l);
+        if (d) {
+          const cls = d.days === 0 ? "dl-today" : d.days <= 7 ? "dl-week" : "dl-soon";
+          const txt = d.days === 0 ? "TODAY" : `${d.days}d`;
+          dateCell = `<span class="dl-pill ${cls}" title="${d.label} — ${fmtDate(l[d.field])}">${txt}</span>` +
+                     `<span class="dl-kind">${d.label}</span>` +
+                     (deadlineBlocked(l) ? `<span class="dl-blocked" title="No owner name or street address — cannot act on this yet">⚠</span>` : "");
+        }
+      }
       return `
     <tr class="${rowClass}" data-id="${i}">
       <td>${(() => { const ds = getDistress(l); return ds && distressLabel[ds.tier] ? `<span class="tier-dot ${distressLabel[ds.tier].cls}" title="${ds.tier} · ${(ds.signals || []).join(', ')}"></span>` : ""; })()}${gradeBadge(g)}${intentBadge(l)}</td>

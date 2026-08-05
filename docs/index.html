@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
   <meta name="theme-color" content="#080b14">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20260805a">
   <link rel="stylesheet" href="premium.css?v=1">
   <script>
     // Set theme before paint — avoids flash of wrong theme.
@@ -46,6 +46,7 @@
     <button class="ds-btn stage-btn" data-stage="prefore">⏳ Pre-Foreclosure <span class="ds-count stage-count" data-c="prefore">—</span></button>
     <button class="ds-btn stage-btn" data-stage="outbound">📬 Outbound <span class="ds-count stage-count" data-c="outbound">—</span></button>
     <button class="ds-btn stage-btn" data-stage="reo">🏦 REO/Auction <span class="ds-count stage-count" data-c="reo">—</span></button>
+    <button class="ds-btn stage-btn stage-deadline" data-stage="deadline" title="Leads with a legal clock: sale date, upset-bid close, or redemption expiry inside 45 days. Soonest first; the ones you cannot act on yet sink to the bottom.">⏰ Closing Soon <span class="ds-count stage-count" data-c="deadline">—</span></button>
   </div>
   <div class="brand-meta">
     <span class="badge" id="total-badge">— total</span>
@@ -418,7 +419,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="dashboard.js?v=20260803a"></script>
+<script src="dashboard.js?v=20260805a"></script>
 <script>
   // Theme toggle wiring (kept separate from dashboard.js so data/render logic stays untouched)
   (function () {

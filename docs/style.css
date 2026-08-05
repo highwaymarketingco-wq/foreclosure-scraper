@@ -1238,3 +1238,18 @@ footer strong { color: var(--text-2); font-weight: 600; }
 .ev-details>summary:hover{color:inherit}
 .ev-details[open]>summary{margin-bottom:4px}
 @media (max-width:700px){.ev-row{grid-template-columns:1fr;gap:2px}}
+
+/* ---- Deadline track -------------------------------------------------------
+   A lead with a legal clock is worth more than a hundred without one, so the
+   clock gets the colour budget: red today, amber this week, neutral beyond. */
+.stage-btn.stage-deadline.active { background: #b3261e; border-color: #b3261e; color: #fff; }
+.dl-pill {
+  display: inline-block; min-width: 3.1em; text-align: center;
+  padding: 1px 6px; border-radius: 3px; font-weight: 700; font-size: 11px;
+  font-variant-numeric: tabular-nums; letter-spacing: .02em;
+}
+.dl-pill.dl-today { background: #b3261e; color: #fff; }
+.dl-pill.dl-week  { background: #9a6700; color: #fff; }
+.dl-pill.dl-soon  { background: rgba(128,128,128,.18); color: inherit; }
+.dl-kind { font-size: 10.5px; opacity: .62; margin-left: 6px; white-space: nowrap; }
+.dl-blocked { margin-left: 5px; opacity: .75; cursor: help; }
