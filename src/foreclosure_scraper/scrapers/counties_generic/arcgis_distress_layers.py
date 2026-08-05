@@ -18,12 +18,27 @@ WHAT BELONGS HERE (and what does not)
     property. Those belong in the enrichment modules that already read them.
 
     Every candidate is checked for NET-NEW value against the published board
-    before it is added. Two layers with large headline counts were rejected on
-    exactly that basis:
-      * Buncombe "Unpaid Property Bills" is 7,900 rows, but 6,873 are PERSONAL
-        property (vehicle tax). Only the real-property subset is admitted.
-      * Pickens dqnt_* and Oconee DT2025 were already covered by
-        `pickens_delinquent_parcels` / `multi_year_delinquent_tax`. Not added.
+    before it is added, because the headline row count has been misleading far
+    more often than not. REJECTED so far, all of which the enumeration counted
+    as finds — do not re-chase these:
+
+      Buncombe "Unpaid Bills 2026"  103,191 real-property rows, but that is the
+                                    whole current-year unpaid levy: everyone who
+                                    has not paid yet, not delinquency.
+      Buncombe "Unpaid Bills 2025"  7,900 rows, 6,873 of them PERSONAL property
+                                    (vehicle tax). Admitted at real_value>0 only.
+      Burke "Tax_Sales_FS"          sounds like tax foreclosure; the schema has
+                                    GRANTOR/GRANTEE/Qualified/Appraiser/Week. It
+                                    is the assessor's qualified-sales review
+                                    roll — comps data, not distress.
+      Anderson city code violations live, 9 open, and every address, owner and
+                                    TMS is null with CaseNumber '123'. A stub.
+      Anderson "Property Type"      13,374 rows, a parcel/zoning join.
+      Pickens Citizen_Problems      complainant phone/email, no property locator.
+      Buncombe towed property       "titled property" here means vehicles.
+      Gaston Blight Problems        live, 0 rows.
+      Pickens dqnt_*, Oconee DT2025 already covered by pickens_delinquent_parcels
+                                    and multi_year_delinquent_tax.
 
 PRIVACY
     Several of these layers carry the CONTACT DETAILS OF THE PERSON WHO FILED
@@ -130,6 +145,93 @@ LAYERS: tuple[Layer, ...] = (
         parcel="Tax_Sale_1", owner_last="Tax_Sale_2", situs="Tax_Sale_4",
         detail="L20CAMA_18", process="tax",
         source_page="https://www.spartanburgcounty.org/158/Delinquent-Tax",
+    ),
+    # Buncombe's 2024 bills that are STILL unpaid — two levies behind, so a
+    # harder signal than the 2025 file. 6,252 rows, 372 of them real property.
+    #
+    # The 2026 file on the same org was REJECTED: 103,191 real-property rows is
+    # the entire current-year unpaid levy, i.e. everyone who has not paid yet,
+    # not delinquency. Do not add it.
+    Layer(
+        slug="buncombe_unpaid_bills_2024",
+        state="NC", county="Buncombe",
+        url=("https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services/"
+             "Buncombe_County_All_Property_Bills_Unpaid_from_2024/FeatureServer/0"),
+        listing_type=ListingType.TAX_LIEN,
+        where="real_value>0",
+        fields=("bill", "pin", "owner1_last_name", "owner1_first_name",
+                "address_line1", "city", "postal_code", "real_value",
+                "total_value", "levy_year"),
+        parcel="pin", owner_last="owner1_last_name", owner_first="owner1_first_name",
+        situs="address_line1", city="city", zip_="postal_code",
+        value="total_value", detail="bill", process="tax",
+        source_page="https://www.buncombecounty.org/governing/depts/tax/",
+    ),
+    # Structures with recorded landslide damage. Physical distress with an
+    # address, and the county publishes it because the damage is material.
+    Layer(
+        slug="buncombe_landslide_damage",
+        state="NC", county="Buncombe",
+        url=("https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services/"
+             "Landslides_With_Damage/FeatureServer/0"),
+        listing_type=ListingType.DISTRESSED,
+        fields=("location_id", "full_civic_address", "postal_code",
+                "DamageType", "ClosestAddress"),
+        situs="full_civic_address", zip_="postal_code",
+        detail="DamageType", process="storm_damage",
+        source_page="https://www.buncombecounty.org/",
+    ),
+    # Transylvania and Burke both read ZERO on the storm-damage signal today,
+    # not because they were undamaged but because only Buncombe's roll was
+    # wired. These are the county assessments.
+    Layer(
+        slug="transylvania_damage_assessment",
+        state="NC", county="Transylvania",
+        url=("https://services1.arcgis.com/ProOLvsmwpY1RmFG/arcgis/rest/services/"
+             "Damage_Assessment_Viewer/FeatureServer/0"),
+        listing_type=ListingType.DISTRESSED,
+        fields=("reportdate", "structure_type", "severity_level", "needs",
+                "house_number", "road_name", "pin", "cost"),
+        parcel="pin", situs_parts=("house_number", "road_name"),
+        detail="severity_level", process="storm_damage",
+        source_page="https://www.transylvaniacounty.org/",
+    ),
+    Layer(
+        slug="burke_storm_damage",
+        state="NC", county="Burke",
+        url=("https://services3.arcgis.com/axQ4OCSpcxALIQsV/arcgis/rest/services/"
+             "NCEM_Damage_Assessment_BC/FeatureServer/119"),
+        listing_type=ListingType.DISTRESSED,
+        fields=("REID", "dmg_loc", "damage_cat_cal", "program_type", "county"),
+        parcel="REID", situs="dmg_loc",
+        detail="damage_cat_cal", process="storm_damage",
+        source_page="https://www.burkenc.org/",
+    ),
+    # A curated redevelopment-eligibility list carrying a "Problem" column —
+    # the city has already judged these parcels problematic.
+    Layer(
+        slug="spartanburg_infill_eligible",
+        state="SC", county="Spartanburg",
+        url=("https://services9.arcgis.com/HoRra3ATPLGmyjn6/arcgis/rest/services/"
+             "Infill_Eligible_Properties/FeatureServer/0"),
+        listing_type=ListingType.DISTRESSED,
+        fields=("TAXPIN", "SHORTPIN", "PARCELNUMB", "LOTNUMBER", "Problem",
+                "DEEDACREAG"),
+        parcel="TAXPIN", detail="Problem", process="redevelopment",
+        source_page="https://www.cityofspartanburg.org/",
+    ),
+    # HMGP buyout applicants: a homeowner who has APPLIED to have the
+    # government buy their damaged property has already decided to sell. The
+    # layer also carries a Phone column, which is deliberately not requested.
+    Layer(
+        slug="buncombe_hmgp_buyout",
+        state="NC", county="Buncombe",
+        url=("https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services/"
+             "HMGP_Update_06122026/FeatureServer/0"),
+        listing_type=ListingType.DISTRESSED,
+        fields=("Match_addr", "Place_addr", "Status", "Type", "PlaceName"),
+        situs="Match_addr", detail="Status", process="buyout_applicant",
+        source_page="https://www.buncombecounty.org/",
     ),
 ) + tuple(
     # ---------------------------------------------------------------------

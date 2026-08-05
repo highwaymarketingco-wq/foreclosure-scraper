@@ -190,3 +190,28 @@ def test_every_layer_declares_a_way_to_locate_the_property():
     rows that are dropped on the floor — declare it and you get silence."""
     for lay in M.LAYERS:
         assert lay.parcel or lay.situs or lay.situs_parts, lay.slug
+
+
+def test_no_layer_carries_an_owner_or_complainant_phone():
+    """Buncombe's HMGP layer has a Phone column and Lincoln's has PHONE/EMAIL.
+    Contact data belongs to the skip-trace path under its own DNC rules, not to
+    a source reader that has no consent context."""
+    banned = {"phone", "phone_number", "email", "homeowner_phone_number",
+              "pocphone", "pocemail"}
+    for lay in M.LAYERS:
+        leak = {f for f in lay.fields if f.lower() in banned}
+        assert not leak, f"{lay.slug} requests {leak}"
+
+
+def test_storm_damage_counties_are_actually_covered():
+    """Transylvania and Burke read ZERO on storm damage not because they were
+    undamaged but because only Buncombe's roll was wired."""
+    storm = {x.county for x in M.LAYERS if x.process == "storm_damage"}
+    assert {"Burke", "Transylvania", "Buncombe"} <= storm, storm
+
+
+def test_every_layer_has_a_distinct_process_tag():
+    """process drives how a lead may be used. A buyout applicant, a county
+    surplus parcel and a delinquent owner are three different workflows."""
+    for lay in M.LAYERS:
+        assert lay.process, f"{lay.slug} has no process tag"
