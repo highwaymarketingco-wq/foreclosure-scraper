@@ -128,3 +128,65 @@ def test_lincoln_filter_excludes_closed_violations():
 def test_every_layer_slug_is_unique():
     slugs = [x.slug for x in M.LAYERS]
     assert len(slugs) == len(set(slugs))
+
+
+# ---------------------------------------------------------------------------
+# Batch 2: tax-sale + county-owned surplus.
+# ---------------------------------------------------------------------------
+
+def test_county_surplus_is_tagged_so_it_cannot_reach_an_outreach_list():
+    """The owner on these rows is the county itself. Buying at a surplus sale
+    and cold-calling an owner in default are different workflows; if surplus
+    leaks into a mail merge we are writing to the county tax office."""
+    surplus = [x for x in M.LAYERS if x.slug.endswith("_county_owned")]
+    assert surplus, "no surplus layers declared"
+    for lay in surplus:
+        assert lay.process == "county_surplus", lay.slug
+
+
+def test_no_surplus_layer_is_typed_as_a_foreclosure_or_tax_lien():
+    """Typing county inventory as TAX_LIEN would make it score as distress."""
+    from foreclosure_scraper.models import ListingType
+    for lay in M.LAYERS:
+        if lay.process == "county_surplus":
+            assert lay.listing_type not in (
+                ListingType.TAX_LIEN, ListingType.TAX_SALE,
+                ListingType.FORECLOSURE_SALE), lay.slug
+
+
+def test_split_situs_columns_are_composed_into_an_address():
+    """Buncombe's surplus layer has no single address column; without this all
+    98 rows land with street_address=None and cannot be driven to."""
+    lay = next(x for x in M.LAYERS if x.slug == "buncombe_county_owned")
+    assert lay.situs_parts, "buncombe surplus declares no situs_parts"
+    li = M._to_listing({"pin": "9699215869", "owner": "COUNTY OF BUNCOMBE",
+                        "HouseNumber": "550", "streetname": "OLD US 70",
+                        "StreetType": "HWY"}, lay)
+    assert li.street_address == "550 OLD US 70 HWY"
+
+
+def test_spartanburg_maps_only_self_describing_columns():
+    """The CAMA join renamed every column to a positional alias. Those shift if
+    the county rebuilds the join, so only the Tax_Sale_* columns may drive the
+    mapping — a wrong owner is worse than no owner."""
+    lay = next(x for x in M.LAYERS if x.slug == "spartanburg_city_tax_sale")
+    for role in (lay.parcel, lay.owner_last, lay.situs):
+        assert role.startswith("Tax_Sale_"), f"{role} is a positional alias"
+
+
+def test_spartanburg_row_maps():
+    lay = next(x for x in M.LAYERS if x.slug == "spartanburg_city_tax_sale")
+    li = M._to_listing({"Tax_Sale_1": "7-17-10-041.00", "Tax_Sale_2": "RT & C LLC",
+                        "Tax_Sale_4": "2117 OAKHURST CIR",
+                        "L20CAMA_18": "LOT 8 BLK A OAKHURST DEV CO"}, lay)
+    assert li.parcel_id == "7-17-10-041.00"
+    assert li.owner_name == "RT & C LLC"
+    assert li.street_address == "2117 OAKHURST CIR"
+    assert li.county == "Spartanburg" and li.state == "SC"
+
+
+def test_every_layer_declares_a_way_to_locate_the_property():
+    """A layer with neither a parcel column nor any address column produces
+    rows that are dropped on the floor — declare it and you get silence."""
+    for lay in M.LAYERS:
+        assert lay.parcel or lay.situs or lay.situs_parts, lay.slug

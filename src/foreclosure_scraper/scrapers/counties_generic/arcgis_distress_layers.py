@@ -64,6 +64,9 @@ class Layer(NamedTuple):
     owner_last: Optional[str] = None
     owner_first: Optional[str] = None
     situs: Optional[str] = None
+    #: Some layers split the situs across columns (house number / street /
+    #: type). Joined in order, blanks dropped.
+    situs_parts: tuple[str, ...] = ()
     city: Optional[str] = None
     zip_: Optional[str] = None
     value: Optional[str] = None
@@ -108,6 +111,77 @@ LAYERS: tuple[Layer, ...] = (
         situs="FULLADDR", detail="VIOLATEDESC", process="code_enforcement",
         source_page="https://www.lincolncountync.gov/246/Code-Enforcement",
     ),
+    # The city's tax-sale parcel set, joined to CAMA. The join renamed every
+    # CAMA column to a positional alias (L20CAMA_11 = owner, L20CAMA_13..16 =
+    # mailing, L20CAMA_64 = condition), which is why only the self-describing
+    # Tax_Sale_* columns drive the mapping and the CAMA block is kept in raw
+    # rather than asserted — a positional alias silently shifts if the county
+    # rebuilds the join, and a wrong value is worse than no value.
+    Layer(
+        slug="spartanburg_city_tax_sale",
+        state="SC", county="Spartanburg",
+        url=("https://services9.arcgis.com/HoRra3ATPLGmyjn6/arcgis/rest/services/"
+             "Tax_Sale_Parcels/FeatureServer/0"),
+        listing_type=ListingType.TAX_SALE,
+        fields=("Tax_Sale_1", "Tax_Sale_2", "Tax_Sale_4", "Tax_Sale_5",
+                "L20CAMA_Pa", "L20CAMA_13", "L20CAMA_14", "L20CAMA_15",
+                "L20CAMA_16", "L20CAMA_18", "L20CAMA_21", "L20CAMA_35",
+                "L20CAMA_64"),
+        parcel="Tax_Sale_1", owner_last="Tax_Sale_2", situs="Tax_Sale_4",
+        detail="L20CAMA_18", process="tax",
+        source_page="https://www.spartanburgcounty.org/158/Delinquent-Tax",
+    ),
+) + tuple(
+    # ---------------------------------------------------------------------
+    # COUNTY-OWNED / SURPLUS inventory.
+    #
+    # These are NOT distressed owners — the owner is literally the county
+    # ("BURKE COUNTY", "COUNTY OF BUNCOMBE"). They are properties the county
+    # is disposing of, much of it acquired through tax foreclosure, so they
+    # are acquirable inventory rather than an outreach target.
+    #
+    # Tagged process="county_surplus" specifically so they can never be
+    # filtered into a mail or call list by accident. Buying at a surplus sale
+    # and cold-calling an owner in default are different workflows and the
+    # board has to keep them apart.
+    # ---------------------------------------------------------------------
+    Layer(
+        slug=f"{co.lower()}_county_owned",
+        state=st, county=co, url=url,
+        listing_type=ListingType.DISTRESSED,
+        fields=flds, parcel=pf, owner_last=of, situs=af,
+        situs_parts=(("HouseNumber", "streetname", "StreetType")
+                     if af is None else ()),
+        process="county_surplus", source_page=page,
+    )
+    for co, st, url, flds, pf, of, af, page in (
+        ("Lincoln", "NC",
+         "https://services8.arcgis.com/TaX0xkzgvxdv4n56/arcgis/rest/services/"
+         "County_Owned_Property/FeatureServer/1",
+         ("PID", "PHYSICALADDR", "NAME1_1", "Class", "USE_", "ZONING_1"),
+         "PID", "NAME1_1", "PHYSICALADDR",
+         "https://www.lincolncountync.gov/"),
+        ("Buncombe", "NC",
+         "https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services/"
+         "County_Owned_Over_Half_Acre/FeatureServer/0",
+         ("pin", "owner", "HouseNumber", "streetname", "StreetType",
+          "TaxYear", "DeedBook", "DeedPage"),
+         "pin", "owner", None,
+         "https://www.buncombecounty.org/governing/depts/tax/"),
+        ("Burke", "NC",
+         "https://services3.arcgis.com/axQ4OCSpcxALIQsV/arcgis/rest/services/"
+         "Disposable_BC_Owned_Parcels_FS/FeatureServer/194",
+         ("PIN", "LOCATION_ADDR", "PROPERTY_OWNER", "Acq_Type", "Acq_Year",
+          "Acq_Cost", "TOTAL_PROP_VALUE", "ACREAGE", "PROPERTY_DESCR"),
+         "PIN", "PROPERTY_OWNER", "LOCATION_ADDR",
+         "https://www.burkenc.org/"),
+        ("Pickens", "SC",
+         "https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services/"
+         "vacant_co_prop/FeatureServer/0",
+         ("PIN", "NAME1", "LOCADD", "LOCCITY", "LOCZIP", "ACRES"),
+         "PIN", "NAME1", "LOCADD",
+         "https://www.co.pickens.sc.us/"),
+    )
 )
 
 
@@ -134,6 +208,9 @@ def _owner(a: dict, lay: Layer) -> Optional[str]:
 
 def _to_listing(a: dict, lay: Layer) -> Optional[Listing]:
     situs = _clean(a.get(lay.situs)) if lay.situs else None
+    if not situs and lay.situs_parts:
+        bits = [_clean(a.get(p)) for p in lay.situs_parts]
+        situs = " ".join(b for b in bits if b) or None
     parcel = _clean(a.get(lay.parcel)) if lay.parcel else None
     if not (situs or parcel):
         return None                     # nothing to locate the property by
