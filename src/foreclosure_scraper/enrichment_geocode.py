@@ -100,6 +100,95 @@ async def _nominatim_geocode(c, query: str) -> Optional[tuple[float, float]]:
     return None
 
 
+
+# ---------------------------------------------------------------------------
+# Census BATCH pre-pass.
+#
+# Census was already tier 1 of the per-lead cascade, but it was being called one
+# address at a time — 17,161 separate HTTP round-trips on the 2026-08-04 run,
+# which is what burned the 600s budget and left 6,266 leads with no coordinates.
+#
+# The same free service accepts 10,000 addresses in ONE request. Running it as a
+# pre-pass resolves the bulk in a handful of calls, so the rate-limited
+# per-lead tier (Nominatim, 1 req/sec by their policy) only ever sees the tail.
+# Nominatim's usage policy forbids bulk geocoding on the shared instance, so
+# this is also the compliant way round: bulk goes to the service designed for it.
+# ---------------------------------------------------------------------------
+CENSUS_BATCH_URL = "https://geocoding.geo.census.gov/geocoder/locations/addressbatch"
+# The service DOCUMENTS 10,000 rows per file. In practice it 502s
+# non-deterministically and size is not the variable: measured 2026-08-05,
+# n=250 succeeded while n=100, n=500 and n=1000 all 502'd on the same data.
+# So: modest chunks plus retry, which measured 832/1000 matched in 25s.
+CENSUS_BATCH_MAX = int(os.environ.get("GEOCODE_CENSUS_BATCH_MAX", "250"))
+CENSUS_BATCH_TRIES = int(os.environ.get("GEOCODE_CENSUS_BATCH_TRIES", "4"))
+CENSUS_BATCH_TIMEOUT_S = float(os.environ.get("GEOCODE_CENSUS_BATCH_TIMEOUT_S", "180"))
+
+
+def _batchable(li: Listing) -> bool:
+    """Census batch needs a street plus enough locality to disambiguate."""
+    return bool((li.street_address or "").strip()
+                and ((li.city or "").strip() or (li.zip_code or "").strip())
+                and (li.state or "").strip())
+
+
+async def _census_batch(c, targets: list[Listing]) -> int:
+    """Resolve as many targets as possible in bulk. Returns how many were filled."""
+    import csv as _csv
+    import io as _io
+
+    rows = [li for li in targets if _batchable(li)]
+    if not rows:
+        return 0
+    filled = 0
+    for start in range(0, len(rows), CENSUS_BATCH_MAX):
+        chunk = rows[start:start + CENSUS_BATCH_MAX]
+        buf = _io.StringIO()
+        w = _csv.writer(buf)
+        for i, li in enumerate(chunk):
+            w.writerow([i, (li.street_address or "").strip(), (li.city or "").strip(),
+                        (li.state or "").strip(), (li.zip_code or "").strip()])
+        r = None
+        for attempt in range(CENSUS_BATCH_TRIES):
+            try:
+                r = await c.post(
+                    CENSUS_BATCH_URL,
+                    files={"addressFile": ("addresses.csv", buf.getvalue(), "text/csv")},
+                    data={"benchmark": "Public_AR_Current", "vintage": "Current_Current"},
+                    timeout=CENSUS_BATCH_TIMEOUT_S)
+                if r.status_code == 200:
+                    break
+            except Exception as exc:  # noqa: BLE001
+                log.warning("geocode.census_batch_error", chunk=start,
+                            attempt=attempt + 1,
+                            error=f"{type(exc).__name__}: {str(exc)[:80]}")
+                r = None
+            await asyncio.sleep(2 * (attempt + 1))
+        if r is None or r.status_code != 200:
+            log.warning("geocode.census_batch_giveup", chunk=start,
+                        status=(r.status_code if r is not None else None),
+                        tries=CENSUS_BATCH_TRIES)
+            continue
+        got = 0
+        for line in _csv.reader(_io.StringIO(r.text)):
+            # id, input, Match/No_Match, exactness, matched_addr, "lon,lat", ...
+            if len(line) < 6 or line[2] != "Match":
+                continue
+            try:
+                idx = int(line[0])
+                lon, lat = (float(x) for x in line[5].split(","))
+            except (ValueError, IndexError):
+                continue
+            if not (0 <= idx < len(chunk)):
+                continue
+            li = chunk[idx]
+            if li.latitude is None or li.longitude is None:
+                li.latitude, li.longitude = lat, lon
+                filled += 1
+                got += 1
+        log.info("geocode.census_batch", chunk=start, sent=len(chunk), matched=got)
+    return filled
+
+
 async def _resolve(c, li: Listing, nominatim_delay: float,
                    fast_only: bool = False) -> Optional[tuple[float, float]]:
     """Cascade: Census -> Nominatim -> city centroid -> county centroid.
@@ -180,8 +269,13 @@ async def enrich(listings: list[Listing], rate_per_sec: float = 1.0) -> list[Lis
     budget_hit = False
 
     async with client(timeout=20.0) as c:
+        # Bulk first, so the rate-limited per-lead tier only sees what is left.
+        batch_filled = await _census_batch(c, targets)
+        targets = [li for li in targets
+                   if li.latitude is None or li.longitude is None]
+
         delay = max(1.0 / rate_per_sec, 1.0)
-        matched = 0
+        matched = batch_filled
         for li in targets:
             if not budget_hit and time.monotonic() - t0 > budget_s:
                 budget_hit = True
@@ -194,6 +288,7 @@ async def enrich(listings: list[Listing], rate_per_sec: float = 1.0) -> list[Lis
 
     final_missing = sum(1 for li in listings if li.latitude is None or li.longitude is None)
     log.info("geocode.done",
-             queried=len(targets), matched=matched, budget_hit=budget_hit,
+             queried=len(targets), matched=matched, batch_filled=batch_filled,
+             budget_hit=budget_hit,
              total=len(listings), still_missing=final_missing)
     return listings

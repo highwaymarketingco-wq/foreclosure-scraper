@@ -177,7 +177,11 @@ async def enrich_with_court_records(listings: list[Listing]) -> list[Listing]:
         legal clearance, kept available per direction, breaker-protected.
     """
     token = None
-    counts = {"nc_targets": 0, "nc_matched": 0, "fields_filled": 0,
+    # fields_filled counts ONLY name backfill into an EMPTY plaintiff/defendant,
+    # so it reads near-zero on a healthy run (most leads already carry a parsed
+    # name and must not be clobbered). court_records is the honest measure of
+    # what the NC pass actually produced.
+    counts = {"nc_targets": 0, "nc_matched": 0, "fields_filled": 0, "court_records": 0,
               "sc_queried": 0, "sc_matched": 0, "sc_failed": 0}
 
     # ---- NC: fast batch index ----
@@ -190,6 +194,8 @@ async def enrich_with_court_records(listings: list[Listing]) -> list[Listing]:
             if hit:
                 counts["nc_matched"] += 1
                 counts["fields_filled"] += _apply_nc_hit(li, hit)
+                if isinstance(li.raw, dict) and li.raw.get("court_record"):
+                    counts["court_records"] += 1
 
     # ---- SC: per-case render (legal-gated; breaker-protected) ----
     sem = asyncio.Semaphore(4)

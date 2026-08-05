@@ -154,6 +154,11 @@ RAW_KEEP = {
     "court_balance_due": "*",         # live court-derived debt (judgment + accrued interest)
     "court_balance_due_as_of": "*",
     "court_record_url": "*",          # deep link to the Tyler case page
+    # The court-record BLOCK itself (cause of action, court location, ordered
+    # date) was written by enrichment_courts._apply_nc_hit for every NC case
+    # match and then stripped here because it was never whitelisted: 621
+    # matches on the 2026-08-04 run, ZERO of them on the published board.
+    "court_record": "*",
     "court_sale_status": "*",         # confirmed / sold_unconfirmed / sale_noticed / judgment
     "sold_confirmed": "*",            # court-confirmed sale → already sold, filter off active board
     "owner_mailing": "*",             # #0 contactability: owner name + mailing addr + absentee/out-of-state flags
