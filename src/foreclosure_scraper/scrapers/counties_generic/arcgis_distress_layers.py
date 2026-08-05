@@ -283,6 +283,15 @@ LAYERS: tuple[Layer, ...] = (
          ("PIN", "NAME1", "LOCADD", "LOCCITY", "LOCZIP", "ACRES"),
          "PIN", "NAME1", "LOCADD",
          "https://www.co.pickens.sc.us/"),
+        # City of Clinton, which sits in Laurens County — the only municipal
+        # layer in the whole 63-endpoint city sweep that turned out to be
+        # both distress-shaped and free of complainant PII.
+        ("Laurens", "SC",
+         "https://gis.cityofclintonsc.com/arcgis/rest/services/"
+         "EconomicDevelopment/CityOwnedParcels/MapServer/0",
+         ("TMS", "Owner", "Descriptio", "ZoningCode"),
+         "TMS", "Owner", None,
+         "https://www.cityofclintonsc.com/"),
     )
 )
 
