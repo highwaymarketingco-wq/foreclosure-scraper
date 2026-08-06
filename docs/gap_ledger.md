@@ -359,3 +359,56 @@ Ranked by value:
 ---
 
 Board numbers verified live 2026-07-03 against `/Users/cashhigh/foreclosure-scraper/docs/listings.json` (n=17,003): address 60.9%, owner_name 89.9%, parcel_id 88.0%, equity 6.9% (1,166), tax_owed 39.2% (6,672), recorded loan$ 0.0%, judgment$ 187 (1.1%), opening_bid 723 (4.3%). Per-county fills confirmed exactly: Buncombe owner 97% / 258 geo-only, Cherokee owner 7% (5/69), elderly_disabled 3,505 all Buncombe, REO 110 (zillow_bulk 76, VRM 16, Fannie 6, HUD 6, Freddie 1), and all 33 counties-with-leads including the 5 coastal 0%-address counties. Primary fix targets: `enrichment_gis_attrs.py` (resolver, 4,054 leads), `enrichment_dot_ocr.py` (loan$), `nc_ecourts_lis_pendens.py` (divorce), `national/courtlistener_bankruptcy.py` (bankruptcy), `national/fannie_homepath` ingest (REO), `enrichment_address_owner_v2.py` (Charleston + board-wide probate owner-fill).
+
+---
+
+## 6. Verified 2026-08-06 — built, and deliberately discarded
+
+### BUILT this pass
+
+- **SC Notice to Creditors probate** (`counties_sc/sc_probate_notices.py`) — 886 estates live:
+  Pickens 516, Cherokee 245, Laurens 125. 885 are net-new against the board even
+  when compared on decedent NAME, not just case number; the single overlap
+  (Donald Ray Davis) is already a `sc_public_index_lis_pendens` lead, so it is a
+  probate + lis-pendens cross-signal rather than a duplicate. 884/886 carry a
+  personal-representative MAILING address, which is the thinnest field in the
+  engine. This is the compliant answer to the ToS-walled SC PublicIndex probate
+  docket: SCPC 62-3-801 forces the same facts into a public newspaper notice.
+  County is derived from the two-digit county code inside the ES case number,
+  never from which paper ran the notice.
+- **EPA brownfield + Superfund** (`counties_generic/epa_frs_sites.py`) — 269 in
+  footprint. Read via FRS because `sems.envirofacts_site` returns HTTP 500.
+- **Lincoln NC jail roster** — same CentralSquare jqGrid build as Cleveland, so
+  no new code. 173 in custody. Jail rosters now 10 of 18 counties.
+
+### DISCARDED — checked, and NOT a distress signal (do not re-chase)
+
+- **Burke County `BurkeNC_2026_Billing.zip`** (burkenc.org Data Sets, 19 MB
+  zipped / 615 MB raw, one fixed-width record per bill, 8,925 chars wide).
+  It is a print-image feed for the bill-printing vendor covering EVERY 2026
+  tax bill: 56,536 REI + 9,095 IND + 3,330 BUS in the sampled 68,961, ALL tax
+  year 2026, billed 07/01/2026 with a delinquency date of 01/06/2027 that has
+  not yet arrived. There is no paid/unpaid flag and no prior-year balance
+  anywhere in the record. An apparent "PAID" match is the phrase "if paid" in
+  the early-payment discount line. Being sent a tax bill is not distress.
+  NOTE it is still a legitimate ENRICHMENT candidate and not worthless: it
+  carries owner name, owner MAILING address, situs, parcel/account, assessed
+  value and acreage for every Burke real-estate parcel.
+- **Gaston `DocumentCenter/View/8855`**, the only document linked from
+  gastongov.com/1043/Delinquent-Taxes, is not a delinquent list. It is
+  "Tales for Tales Flyer February", a library storytime flyer.
+- **Transylvania `tax.transylvaniacounty.org/TaxBillSearch`** has a real
+  "UnpaidBillsOnly" control, but `GetSearchTablePartial` returns HTTP 200 with
+  a ZERO-length body for every model shape tried, including bounded
+  single-surname searches, and `GetSearchTableData` 500s. So this is not a
+  blocked bulk export, it is an endpoint that does not answer. The page's
+  sha256 dependency is only the Forte payment gateway signature, not a request
+  signature, so there is nothing to reproduce and nothing that should be.
+  Transylvania delinquent tax remains a genuine wall.
+- **Mitchell News-Journal legals** — redundant. Mitchell NC probate is already
+  carried by `nc_notices_counties`, `ncpublicnotices` and `column_legal_notices`,
+  and the page held exactly one notice.
+- **Burke NCPTS delinquent tenant** is still a valid tenant but now returns
+  ZERO blobs, so the county currently publishes no delinquent extract there.
+  Transylvania, Polk, Mitchell, McDowell, Cleveland, Gaston, Lincoln and
+  Buncombe all return HTTP 500 on that cluster, i.e. they are not tenants.
