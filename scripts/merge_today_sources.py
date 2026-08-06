@@ -68,7 +68,7 @@ NEW_SOURCES = {
     "counties_sc.spartanburg_master_in_equity", "counties_sc.sc_public_notices",
     "counties_sc.sc_county_rosters",
     "counties_nc.nc_rod_substitute_trustee", "counties_nc.nc_rod_logan",
-    "public_notices.ncpublicnotices",
+    "public_notices.ncnotices",
     # net-new multifamily + coastal sources (2026-06-25)
     "national.crexi_multifamily", "counties_sc.sc_coastal_rosters",
     # net-new + recovered sources (2026-06-25 pm): fixed CourtListener lift-stay,
@@ -109,6 +109,15 @@ NEW_SOURCES = {
     # API (Madison/Henderson ~3k) + county .gov PDFs (Lincoln/Catawba/McDowell ~9k).
     "counties_nc.nc_ptscloud_delinquent_tax",
     "counties_nc.nc_county_pdf_delinquent_tax",
+    # net-new (2026-08-06): contamination spine + the SC probate answer.
+    # sc_probate_notices is the important one — 886 estates, 885 net-new even
+    # compared on decedent NAME, and 884 of them carry a personal-representative
+    # mailing address, which is the field the board is thinnest on.
+    "counties_sc.sc_probate_notices",
+    "counties_sc.sc_ust_registry",
+    "counties_generic.state_contamination",
+    "counties_generic.epa_frs_sites",
+    "counties_generic.arcgis_distress_layers",
 }
 
 
@@ -121,6 +130,15 @@ async def _scrape_new() -> list[Listing]:
     only = os.environ.get("MERGE_ONLY_SOURCES")
     active = set(only.split(",")) if only else NEW_SOURCES
     scrapers = [s for s in all_scrapers() if s.slug in active]
+    # A slug that matches nothing contributes zero leads and says nothing about
+    # it, so the merge looks like it ran when a source was never touched. That
+    # is how "public_notices.ncpublicnotices" (real slug: ...ncnotices) sat in
+    # this list contributing nothing. Unknown slugs are now loud.
+    unknown = sorted(active - {s.slug for s in scrapers})
+    if unknown:
+        raise SystemExit(
+            f"merge_today_sources: {len(unknown)} slug(s) match no scraper and "
+            f"would silently contribute nothing: {unknown}")
     print("running new/fixed scrapers:", sorted(s.slug for s in scrapers))
     out: list[Listing] = []
     for s in scrapers:
