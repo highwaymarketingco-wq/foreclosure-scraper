@@ -28,6 +28,7 @@ from .enrichment_owner_mailing import enrich_owner_mailing
 from .enrichment_courts import discover_lis_pendens, enrich_with_court_records
 from .enrichment_geocode import enrich as enrich_geocode
 from .flags import compute_flags
+from . import checkpoint
 from .link_validator import validate
 from .models import Listing, PropertyKind
 from .scrapers._registry import all_scrapers
@@ -859,6 +860,7 @@ async def run() -> int:
     # Link reachability — drop any listing whose URL is dead
     valid = await validate(deduped, workers=cfg.link_check_workers)
     log.info("orchestrator.valid_links", count=len(valid))
+    checkpoint.save(valid, "link_validation")
 
     # County GIS enrichment (free, pure HTTP) — fills parcel ID, owner, zoning,
     # year built, beds/baths, sqft, tax value, last-sale book/page from county
@@ -870,6 +872,7 @@ async def run() -> int:
     try:
         enriched = await enrich_gis(valid)
         log.info("orchestrator.gis_enriched", count=len(enriched))
+        checkpoint.save(enriched, "gis")
     except Exception:
         log.error("gis_enrich.failed", traceback=traceback.format_exc())
         enriched = valid
@@ -1183,6 +1186,7 @@ async def run() -> int:
                       traceback=traceback.format_exc())
     if _county_fixed:
         log.info("orchestrator.county_normalized", fixed=_county_fixed)
+        checkpoint.save(enriched, "county_normalized")
 
     # H1 FIX (post-enrich dedupe): the initial dedupe() at line 369 ran
     # before parcel_id / zip_code / street_address / county were filled
@@ -1325,6 +1329,7 @@ async def run() -> int:
         try:
             om = await enrich_owner_mailing(enriched)
             enrichment_stats["owner_mailing"] = om
+            checkpoint.save(enriched, "owner_mailing")
         except Exception:
             log.error("owner_mailing.failed", traceback=traceback.format_exc())
 
@@ -1559,6 +1564,7 @@ async def run() -> int:
         s = await enrich_doc_ocr(enriched)
         if s:
             enrichment_stats["doc_ocr"] = s
+            checkpoint.save(enriched, "doc_ocr")
     except Exception:
         log.error("doc_ocr.failed", traceback=traceback.format_exc())
 
@@ -1984,6 +1990,7 @@ async def run() -> int:
         from .enrichment_dot_ocr import enrich_dot_ocr
         s = await enrich_dot_ocr(enriched)
         if s and "skipped" not in s: enrichment_stats["dot_ocr"] = s
+        checkpoint.save(enriched, "dot_ocr")
     except Exception:
         log.error("dot_ocr.failed", traceback=traceback.format_exc())
 
@@ -2658,6 +2665,9 @@ async def run() -> int:
     # GitHub Actions then commits docs/ back to the repo, GitHub Pages serves it.
     try:
         write_artifact(enriched, summary)
+        # Published successfully — drop the checkpoint so the next run
+        # starts clean instead of resuming onto a board that shipped.
+        checkpoint.clear()
     except Exception:
         log.error("web_artifact.failed", traceback=traceback.format_exc())
 
