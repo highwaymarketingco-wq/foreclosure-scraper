@@ -177,18 +177,31 @@ def _in_scope(li: Listing) -> bool:
               li.state.upper())
         if cs in OCEANFRONT_COASTAL_COUNTIES and _check_oceanfront(li):
             return True
+    # Source-scoped coastal-county admission — coastal foreclosure sources whose
+    # lead value IS the coastal county, even without near-beach coords. Runs before
+    # the deny check so deny-listed coastal counties (Brunswick/Onslow/Pender/New
+    # Hanover) can re-enter for these sources only.
+    #
+    # ORDER MATTERS, and it was wrong until 2026-08-06. This ran AFTER the
+    # provisional oceanfront check below, which matches any coastal row carrying
+    # an address or a parcel_id. Every bypass-source row with either field
+    # therefore took the provisional path instead, got tagged
+    # raw.oceanfront_pending, and was deleted by the publish-time re-pass for
+    # failing a beach-distance test these sources are explicitly exempt from.
+    # It silently cost 450 leads on the 2026-08-06 board: 408 of Georgetown's
+    # 444 (leaving 1), all 23 Horry FLC, 14 Charleston MIE. Georgetown's tax
+    # sale is the ENTIRE point of georgetown_civicengage, so the county looked
+    # dead while the data was being fetched correctly and thrown away.
+    if _coastal_county_source(li):
+        return True
     # Provisional oceanfront admission — keep coastal-county rows that have an
     # address/parcel but no coordinates yet, so the geocode + parcel-lookup
     # enrichers can fill lat/lng. The post-geocode re-pass re-tests them and
     # drops the inland ones. (Without this, address-only coastal rows from the
     # NC law firms / eCourts / SC rosters die before they can be geocoded.)
+    # Rows from a declared bypass source never reach here — they are admitted
+    # unconditionally above, which is the whole meaning of that list.
     if _oceanfront_pending(li):
-        return True
-    # Source-scoped coastal-county admission — coastal foreclosure sources whose
-    # lead value IS the coastal county, even without near-beach coords. Runs before
-    # the deny check so deny-listed coastal counties (Brunswick/Onslow/Pender/New
-    # Hanover) can re-enter for these sources only.
-    if _coastal_county_source(li):
         return True
     # True downtown Charleston peninsula — harbor-side, so it won't pass the
     # oceanfront distance gate, but the owner wants it kept (not N. Charleston /
