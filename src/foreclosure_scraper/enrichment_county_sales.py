@@ -75,6 +75,10 @@ class SalesRoll(NamedTuple):
     sale_type: Optional[str] = None
     #: Values of sale_type that indicate an arms-length improved sale.
     arms_length: tuple[str, ...] = ()
+    #: Some layers store the parcel key space-padded to a fixed width (Mitchell
+    #: pads PIN to 26 chars). An exact IN() match then returns nothing, so for
+    #: small layers we pull everything and match on the trimmed value instead.
+    padded_key: bool = False
 
 
 ROLLS: tuple[SalesRoll, ...] = (
@@ -116,6 +120,70 @@ ROLLS: tuple[SalesRoll, ...] = (
         key="TMS", price="Sale_Price", sale_date="Sale_Date",
         situs="Property_Address",
     ),
+    # ---------------------------------------------------------------------
+    # Added 2026-08-06 from the per-signal parity sweep, which required every
+    # one of the 18 counties to be accounted for rather than letting agents
+    # chase whichever counties were easiest. comps was 0.0% of the board.
+    # Field names were read off each layer's own /?f=json rather than guessed.
+    # ---------------------------------------------------------------------
+    SalesRoll(county="Buncombe", state="NC",
+              url="https://gis.buncombecounty.org/arcgis/rest/services/opendata/MapServer/1/query",
+              fields=("PIN", "Address", "SalePrice", "DeedDate", "Stamps",
+                      "TotalMarketValue", "DeedBook", "DeedPage"),
+              key="PIN", price="SalePrice", sale_date="DeedDate", situs="Address"),
+    SalesRoll(county="Rutherford", state="NC",
+              url="https://gis.rutherfordcountync.gov/arcgis/rest/services/TaxParcels/MapServer/0/query",
+              fields=("Parcel_Number", "PIN", "Sale_Price", "Deed_Date",
+                      "Heated_Area", "Physical_Address"),
+              key="Parcel_Number", price="Sale_Price", sale_date="Deed_Date",
+              sqft="Heated_Area", situs="Physical_Address"),
+    SalesRoll(county="Transylvania", state="NC",
+              url="https://gis.transylvaniacounty.org/server/rest/services/Parcels/MapServer/2/query",
+              fields=("PIN", "SALE_PRICE", "SALE_DATE", "HEATED_SQ_", "AYB",
+                      "LEGAL_ADDR", "ACRES"),
+              key="PIN", price="SALE_PRICE", sale_date="SALE_DATE",
+              sqft="HEATED_SQ_", year_built="AYB", situs="LEGAL_ADDR", acreage="ACRES"),
+    SalesRoll(county="Cleveland", state="NC",
+              url=("https://gis.clevelandcounty.com/arcgis/rest/services/Tax/"
+                   "Vacant_ImprovedLot_Sales/MapServer/1/query"),
+              fields=("Parcel_Number", "Sales_Amount", "DateSold_YYYYMMDD",
+                      "Deed_Book", "Deed_Page", "Acres"),
+              key="Parcel_Number", price="Sales_Amount",
+              sale_date="DateSold_YYYYMMDD", acreage="Acres"),
+    SalesRoll(county="Gaston", state="NC",
+              url=("https://cogserver.gastonianc.gov/serverweb/rest/services/Parcels/"
+                   "GastonCountyParcels/MapServer/0/query"),
+              fields=("PIN", "SALESAMT", "SALEDATE", "SQFT"),
+              key="PIN", price="SALESAMT", sale_date="SALEDATE", sqft="SQFT"),
+    # LINCOLN NOT WIRED. Server_Tables/4 has 98,319 priced sale rows, but it
+    # keys on AMPAR — a 5-digit internal account number (' 59277'), not the
+    # 10-digit PIN our leads carry, and it is blank on many rows. It needs a
+    # bridge through MainInfoLive before it is usable; wiring it on the wrong
+    # key would silently attach another parcel's sale history.
+    SalesRoll(county="Burke", state="NC",
+              url="https://gis.burkenc.org/arcgis/rest/services/ProdParcelViewFC/MapServer/0/query",
+              fields=("PIN", "REID", "PKG_SALE_PRICE", "PKG_SALE_DATE",
+                      "HEATED_AREA", "LOCATION_ADDR", "ACREAGE"),
+              key="PIN", price="PKG_SALE_PRICE", sale_date="PKG_SALE_DATE",
+              sqft="HEATED_AREA", situs="LOCATION_ADDR", acreage="ACREAGE"),
+    # Mitchell's PIN is space-padded to 26 chars in this layer; _fetch_all
+    # compares against our trimmed ids, so the roll is matched on the trimmed
+    # value the county also stores. Smallest roll in the sweep at 397 rows, but
+    # Mitchell had no comps source at all.
+    SalesRoll(county="Mitchell", state="NC",
+              url="https://mapping.mitchellcountync.gov/arcgis/rest/services/WebMap/MapServer/18/query",
+              fields=("PIN", "sale_price", "sale_date"),
+              key="PIN", price="sale_price", sale_date="sale_date",
+              padded_key=True),
+    SalesRoll(county="Spartanburg", state="SC",
+              url=("https://maps.spartanburgcounty.org/server/rest/services/GIS/"
+                   "Assessed_Land_Use/MapServer/0/query"),
+              # Key on TAXPIN, NOT PARCELNUMBER. Despite the name,
+              # PARCELNUMBER holds a suffix fragment ('.01', '.126'); TAXPIN is
+              # the 12-digit id our Spartanburg leads actually carry.
+              fields=("TAXPIN", "PARCELNUMBER", "SaleAmount", "SaleDate", "YearBuilt"),
+              key="TAXPIN", price="SaleAmount", sale_date="SaleDate",
+              year_built="YearBuilt"),
     # ANDERSON IS DELIBERATELY ABSENT. propertyviewer.andersoncountysc.org has a
     # valid DigiCert certificate but its server omits the intermediate, so curl
     # and openssl recover the chain by AIA fetching while Python's OpenSSL does
@@ -179,7 +247,8 @@ def _sale_date(v) -> Optional[str]:
         return None
 
 
-async def _fetch_all(c, url: str, fields: tuple[str, ...], where: str) -> list[dict]:
+async def _fetch_all(c, url: str, fields: tuple[str, ...], where: str,
+                     order_by: str | None = None) -> list[dict]:
     out: list[dict] = []
     offset = 0
     while True:
@@ -187,11 +256,17 @@ async def _fetch_all(c, url: str, fields: tuple[str, ...], where: str) -> list[d
         # query string long enough that the server answers 404 — which reads as
         # "layer gone" and is really "URL too long". ArcGIS accepts the same
         # parameters as a form POST with no length limit.
-        r = await c.post(url, data={
+        params = {
             "where": where, "outFields": ",".join(fields),
             "returnGeometry": "false", "resultOffset": offset,
             "resultRecordCount": _PAGE, "f": "json",
-        }, timeout=90.0)
+        }
+        if order_by:
+            # "Pagination request requires either orderBy field or the
+            # layer/table must have objectIdField" — none of these layers
+            # declare an objectIdField, so paging without this 400s.
+            params["orderByFields"] = order_by
+        r = await c.post(url, data=params, timeout=90.0)
         if r.status_code != 200:
             raise RuntimeError(f"HTTP {r.status_code}")
         d = r.json()
@@ -227,7 +302,7 @@ async def _one_county(c, roll: SalesRoll, leads: list[Listing]) -> dict:
             try:
                 rows = await _fetch_all(
                     c, roll.bridge_url, (roll.bridge_from, roll.bridge_to),
-                    f"{roll.bridge_from} IN ({q})")
+                    f"{roll.bridge_from} IN ({q})", order_by=roll.bridge_from)
             except Exception as exc:  # noqa: BLE001
                 log.warning("county_sales.bridge_failed", county=roll.county,
                             error=f"{type(exc).__name__}: {str(exc)[:90]}")
@@ -250,13 +325,30 @@ async def _one_county(c, roll: SalesRoll, leads: list[Listing]) -> dict:
 
     # Pull only the sales for parcels we actually hold.
     by_key: dict[str, list[dict]] = {}
+    if roll.padded_key:
+        # An exact IN() match cannot work against a space-padded column, so pull
+        # the whole layer (these are small) and key on the trimmed value.
+        try:
+            rows = await _fetch_all(c, roll.url, roll.fields, "1=1",
+                                    order_by=roll.key)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("county_sales.roll_failed", county=roll.county,
+                        error=f"{type(exc).__name__}: {str(exc)[:90]}")
+            rows = []
+        for a in rows:
+            k = str(a.get(roll.key) or "").strip()
+            if k:
+                by_key.setdefault(k, []).append(a)
+        stat["sales_rows"] = sum(len(v) for v in by_key.values())
+        return _attach(roll, leads, to_roll, by_key, stat)
+
     vals = sorted(wanted)
     for i in range(0, len(vals), 400):
         chunk = vals[i:i + 400]
         q = ",".join("'" + v.replace("'", "''") + "'" for v in chunk)
         try:
             rows = await _fetch_all(c, roll.url, roll.fields,
-                                    f"{roll.key} IN ({q})")
+                                    f"{roll.key} IN ({q})", order_by=roll.key)
         except Exception as exc:  # noqa: BLE001
             log.warning("county_sales.roll_failed", county=roll.county,
                         error=f"{type(exc).__name__}: {str(exc)[:90]}")
@@ -267,6 +359,15 @@ async def _one_county(c, roll: SalesRoll, leads: list[Listing]) -> dict:
                 by_key.setdefault(k, []).append(a)
     stat["sales_rows"] = sum(len(v) for v in by_key.values())
 
+    return _attach(roll, leads, to_roll, by_key, stat)
+
+
+
+
+
+def _attach(roll: SalesRoll, leads: list[Listing], to_roll: dict,
+            by_key: dict, stat: dict) -> dict:
+    """Write the matched sale history and backfill sqft/year/acreage."""
     cutoff = datetime.now(timezone.utc).year - MAX_SALE_AGE_Y
     for li in leads:
         pid = (li.parcel_id or "").strip()
