@@ -37,7 +37,7 @@ from typing import Iterable
 import structlog
 
 from .models import Listing
-from .enrichment_owner_mailing import mailing_dict
+from .mailing_shape import mailing_dict
 
 log = structlog.get_logger()
 

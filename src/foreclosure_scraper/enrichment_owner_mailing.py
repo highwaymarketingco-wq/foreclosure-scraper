@@ -27,32 +27,14 @@ import httpx
 import structlog
 
 from .models import Listing
+# Re-export so existing importers keep working; the definition lives in a
+# leaf module so a mid-run edit can never leave it half-loaded.
+from .mailing_shape import mailing_dict  # noqa: F401  (re-export)
 
 log = structlog.get_logger()
 
 
-def mailing_dict(obj) -> dict:
-    """`raw['owner_mailing']` as a dict, whatever the source actually wrote.
 
-    Most sources write a dict. Several Spartanburg ones (spartanburg_vacant,
-    spartanburg_condemned, spartanburg_delinquent_tax) write a bare STRING that
-    IS the mailing address — 5,098 leads on the 2026-08-03 board. `or {}` cannot
-    rescue a truthy str, so every unguarded `(raw.get("owner_mailing") or {}).get(...)`
-    raises AttributeError and takes its whole pass down with it. That killed the
-    mail spine for all 30k leads on the 2026-07-31 run.
-
-    Accepts a Listing, a raw dict, or the owner_mailing value itself.
-    """
-    raw = getattr(obj, "raw", obj)
-    if isinstance(raw, dict) and "owner_mailing" in raw:
-        om = raw.get("owner_mailing")
-    else:
-        om = raw
-    if isinstance(om, dict):
-        return om
-    if isinstance(om, str) and om.strip():
-        return {"mailing": om.strip()}
-    return {}
 
 
 # Per-county verified ArcGIS REST parcel layers. `mail`/`situs` list the

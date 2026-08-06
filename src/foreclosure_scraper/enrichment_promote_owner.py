@@ -13,7 +13,7 @@ those consume the promoted names.
 """
 from __future__ import annotations
 
-from .enrichment_owner_mailing import mailing_dict
+from .mailing_shape import mailing_dict
 
 
 def _cand(li) -> str | None:

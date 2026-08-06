@@ -53,7 +53,7 @@ from ...base_scraper import BaseScraper
 from ...enrichment_owner_mailing import _is_absentee
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
-from ...enrichment_owner_mailing import mailing_dict
+from ...mailing_shape import mailing_dict
 
 log = structlog.get_logger()
 
