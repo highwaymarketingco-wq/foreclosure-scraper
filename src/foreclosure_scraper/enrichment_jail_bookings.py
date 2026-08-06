@@ -95,6 +95,16 @@ ROSTERS = [
     ("NC", "Henderson", "citizen_connect", "HendersonCoNC|NC0450000"),
     ("NC", "Gaston", "tyler_inmate_inquiry",
      "https://tepsweb.cityofgastonia.com/NewWorld.InmateInquiry/GastonCounty"),
+    # Added 2026-08-06. All three ride adapters that already existed — Polk and
+    # Transylvania are the same Southern Software tenant as Henderson (only the
+    # JMSAgencyID differs), Burke is the same CentralSquare P2C as Buncombe.
+    # Verified live through the real adapters that day: Burke 175 in custody,
+    # Transylvania 83, Polk 44. The incarceration signal covered 15 leads across
+    # all 18 counties before this.
+    ("NC", "Polk", "citizen_connect", "PolkCoNC|NC0750000"),
+    ("NC", "Transylvania", "citizen_connect", "TransylvaniaCoNC|NC0880000"),
+    ("NC", "Burke", "p2c_centralsquare",
+     "https://morgantonpdnc.policetocitizen.com|342"),
 ]
 
 # (state, county, vendor, target) for the PER-NAME search vendors — no bulk

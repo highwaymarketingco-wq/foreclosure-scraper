@@ -95,6 +95,33 @@ ROLLS: tuple[SalesRoll, ...] = (
                     "Parcels/FeatureServer/0/query"),
         bridge_from="PIN", bridge_to="REID",
     ),
+    # Pickens publishes the whole parcel file with sale price/date, a VACANT
+    # flag and the owner mailing state (an absentee proxy). No bridge needed —
+    # our Pickens leads already carry the dashed PIN this layer keys on.
+    SalesRoll(
+        county="Pickens", state="SC",
+        url=("https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services/"
+             "Pickens_Open_data/FeatureServer/6/query"),
+        fields=("PIN", "LOCADD", "SALEDT", "SALEP", "ACRES", "BLDGS", "IMPVAC"),
+        key="PIN", price="SALEP", sale_date="SALEDT",
+        situs="LOCADD", acreage="ACRES",
+    ),
+    # Laurens: 44,880 rows. Verified our TMS format matches theirs 3/3 on real
+    # board leads, so no bridge is needed here either.
+    SalesRoll(
+        county="Laurens", state="SC",
+        url=("https://www.laurenscountygis.org/arcgis/rest/services/"
+             "Pebble/LaurensCountyData/MapServer/4/query"),
+        fields=("TMS", "Property_Address", "Sale_Price", "Sale_Date"),
+        key="TMS", price="Sale_Price", sale_date="Sale_Date",
+        situs="Property_Address",
+    ),
+    # ANDERSON IS DELIBERATELY ABSENT. propertyviewer.andersoncountysc.org has a
+    # valid DigiCert certificate but its server omits the intermediate, so curl
+    # and openssl recover the chain by AIA fetching while Python's OpenSSL does
+    # not and raises CERTIFICATE_VERIFY_FAILED. That is their misconfiguration,
+    # and the fix is to supply the missing intermediate — NOT verify=False,
+    # which would disable verification for a real host we cannot then trust.
 )
 
 
@@ -116,11 +143,29 @@ def _sale_date(v) -> Optional[str]:
     if v in (None, "", 0):
         return None
     s = str(v).strip()
+    # Counties disagree on this in every way they can. Observed live:
+    #   Henderson  epoch millis (int)      1590695820000
+    #   Transylvania  yyyymm (str)         "199607"
+    #   Laurens    yyyymmdd (str)          "20260113"
+    # so each shape is handled explicitly rather than guessed at.
+    if s.isdigit() and len(s) == 8:                 # yyyymmdd
+        y, m, d = s[:4], s[4:6], s[6:8]
+        if "1700" <= y <= "2100" and "01" <= m <= "12" and "01" <= d <= "31":
+            return f"{y}-{m}-{d}"
+        return None
     if s.isdigit() and len(s) == 6:                 # yyyymm
-        try:
-            return f"{s[:4]}-{s[4:6]}-01"
-        except Exception:  # noqa: BLE001
-            return None
+        y, m = s[:4], s[4:6]
+        if "1700" <= y <= "2100" and "01" <= m <= "12":
+            return f"{y}-{m}-01"
+        return None
+    # MM/DD/YYYY, seen on several county portals
+    if "/" in s:
+        parts = s.split("/")
+        if len(parts) == 3 and all(x.isdigit() for x in parts):
+            m, d, y = parts
+            if len(y) == 4:
+                return f"{y}-{int(m):02d}-{int(d):02d}"
+        return None
     try:
         ms = float(s)
     except ValueError:
@@ -138,7 +183,11 @@ async def _fetch_all(c, url: str, fields: tuple[str, ...], where: str) -> list[d
     out: list[dict] = []
     offset = 0
     while True:
-        r = await c.get(url, params={
+        # POST, not GET. A WHERE clause listing a few hundred parcel ids makes a
+        # query string long enough that the server answers 404 — which reads as
+        # "layer gone" and is really "URL too long". ArcGIS accepts the same
+        # parameters as a form POST with no length limit.
+        r = await c.post(url, data={
             "where": where, "outFields": ",".join(fields),
             "returnGeometry": "false", "resultOffset": offset,
             "resultRecordCount": _PAGE, "f": "json",

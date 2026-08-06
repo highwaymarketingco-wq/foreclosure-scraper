@@ -88,7 +88,7 @@ def test_arcgis_200_with_an_error_body_raises():
     c = MagicMock()
     r = MagicMock(); r.status_code = 200
     r.json = MagicMock(return_value={"error": {"code": 499, "message": "Token Required"}})
-    c.get = AsyncMock(return_value=r)
+    c.post = AsyncMock(return_value=r)
     try:
         asyncio.run(S._fetch_all(c, "https://x/query", ("A",), "1=1"))
     except RuntimeError as e:
@@ -114,3 +114,55 @@ def test_county_sales_is_whitelisted_for_publication():
     from foreclosure_scraper import web_artifact
     src = open(web_artifact.__file__).read()
     assert '"county_sales"' in src, "county_sales would be stripped at publish"
+
+
+# ---------------------------------------------------------------------------
+# Per-county format drift. Every one of these was found by a live run
+# returning zero, not by reading a spec.
+# ---------------------------------------------------------------------------
+
+def test_yyyymmdd_string_dates_parse():
+    """Laurens stores Sale_Date as '20260113'. Unhandled, it parsed to None and
+    the county produced 0 comps from 211 matched parcels."""
+    assert S._sale_date("20260113") == "2026-01-13"
+    assert S._sale_date("20180827") == "2018-08-27"
+
+
+def test_slash_dates_parse():
+    assert S._sale_date("05/28/2020") == "2020-05-28"
+
+
+def test_impossible_dates_are_rejected_not_coerced():
+    assert S._sale_date("20261399") is None      # month 13, day 99
+    assert S._sale_date("999901") is None        # year 9999
+
+
+def test_price_strings_with_commas_parse():
+    """Laurens returns Sale_Price as the STRING '250,000'."""
+    assert S._num("250,000") == 250000.0
+    assert S._num("$1,234.50") == 1234.5
+    assert S._num("0") is None
+    assert S._num(None) is None
+
+
+def test_the_query_is_a_POST():
+    """A WHERE clause listing a few hundred parcel ids makes a query string long
+    enough that the server answers 404 — which reads as 'layer gone' and is
+    really 'URL too long'. Pickens and Laurens both 404'd on GET with 262 and
+    211 ids; POST fixed both."""
+    import inspect
+    src = inspect.getsource(S._fetch_all)
+    assert "c.post(" in src, "long IN() clauses will 404 on GET"
+    assert "c.get(" not in src
+
+
+def test_every_roll_declares_explicit_fields():
+    for r in S.ROLLS:
+        assert r.fields and "*" not in r.fields, r.county
+
+
+def test_rolls_cover_the_counties_we_verified():
+    got = {(r.county, r.state) for r in S.ROLLS}
+    assert ("Henderson", "NC") in got
+    assert ("Pickens", "SC") in got
+    assert ("Laurens", "SC") in got
