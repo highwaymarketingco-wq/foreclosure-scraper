@@ -420,7 +420,22 @@ class ArcgisDistressLayers(BaseScraper):
         if os.environ.get("FORECLOSURE_ARCGIS_DISTRESS") == "0":
             return []
         out: list[Listing] = []
-        guard = LayerHarvest(self.slug, [lay.slug for lay in LAYERS])
+        # Small municipal layers ride on single-city servers that flake. On the
+        # 2026-08-06 run Clinton (69 rows) returned a 500 then timed out, and the
+        # guard did what it is built to do: hard-failed the source and discarded
+        # 4,780 GOOD rows from 15 healthy county layers rather than ship a quiet
+        # shortfall. Correct instinct, wrong trade at this ratio.
+        #
+        # These three are tolerated: each is under 100 rows, each sits on a
+        # single-city host, and losing one is not worth losing the other fifteen.
+        # LayerHarvest still logs tolerated=True, so the loss stays VISIBLE — it
+        # is an accepted loss, not a silent one. Every county-scale layer stays
+        # hard-fail.
+        guard = LayerHarvest(
+            self.slug, [lay.slug for lay in LAYERS],
+            tolerate=("laurens_county_owned", "pickens_county_owned",
+                      "burke_county_owned"),
+            attempts=3)
         async with client(timeout=45.0) as c:
             with guard:
                 for lay in LAYERS:
