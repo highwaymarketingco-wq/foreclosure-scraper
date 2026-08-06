@@ -105,6 +105,11 @@ ROSTERS = [
     ("NC", "Transylvania", "citizen_connect", "TransylvaniaCoNC|NC0880000"),
     ("NC", "Burke", "p2c_centralsquare",
      "https://morgantonpdnc.policetocitizen.com|342"),
+    # Lincoln runs the SAME CentralSquare jqGrid build as Cleveland — only the
+    # host differs. Verified live through the existing adapter: 173 in custody.
+    # NB the vendor typos its own agency as 'Lncoln County'; there is also a
+    # Lincoln County NEBRASKA P2C, so match on the host, never the agency string.
+    ("NC", "Lincoln", "p2c_jqgrid", "http://p2c.lincolnsheriff.org"),
 ]
 
 # (state, county, vendor, target) for the PER-NAME search vendors — no bulk
