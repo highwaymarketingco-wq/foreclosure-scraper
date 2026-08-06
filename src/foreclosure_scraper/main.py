@@ -1333,6 +1333,15 @@ async def run() -> int:
         except Exception:
             log.error("owner_mailing.failed", traceback=traceback.format_exc())
 
+    # County sales rolls: the comps spine plus sqft/year/acreage. Runs after
+    # owner_mailing so parcel_id is as populated as it will get — the join is
+    # by parcel and a lead without one cannot be reached.
+    try:
+        from .enrichment_county_sales import enrich_county_sales
+        enrichment_stats["county_sales"] = await enrich_county_sales(enriched)
+    except Exception:  # noqa: BLE001
+        log.error("county_sales.failed", traceback=traceback.format_exc())
+
     # Incarceration distress (NC DAC name-match against owners from #0). Low-
     # confidence name-only stack signal; runs after owner_mailing fills names.
     if not os.environ.get("INCARCERATION_OFF"):

@@ -159,6 +159,11 @@ RAW_KEEP = {
     # match and then stripped here because it was never whitelisted: 621
     # matches on the 2026-08-04 run, ZERO of them on the published board.
     "court_record": "*",
+    # County sales roll: the parcel's own sale history (date/price/sqft/
+    # arms-length flag) plus the fields it backfills. comps sat at 0% on the
+    # 2026-08-03 board; forgetting to whitelist this would gather them and
+    # throw them away at publish, exactly as happened to court_record.
+    "county_sales": "*",
     "court_sale_status": "*",         # confirmed / sold_unconfirmed / sale_noticed / judgment
     "sold_confirmed": "*",            # court-confirmed sale → already sold, filter off active board
     "owner_mailing": "*",             # #0 contactability: owner name + mailing addr + absentee/out-of-state flags
