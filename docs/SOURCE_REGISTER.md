@@ -1,10 +1,10 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-08-07 00:50 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-08-07 03:17 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
-- Scrapers in the registry: **137**
+- Scrapers in the registry: **138**
 - Producing rows on the board: **86**
-- Registered but contributing ZERO rows: **51**
+- Registered but contributing ZERO rows: **52**
 - Confirmed real and not yet built: **9**
 - Board read: `data/checkpoint/board.json.gz` (47,125 rows)
 
@@ -145,6 +145,7 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `law_firms.korn` | `https://www.kornlawfirm.com/foreclosure-sales/`<br>`https://www.kornlawfirm.com/sales/` |
 | `law_firms.mewborn_deselms` | `https://www.mewbornlaw.biz` |
 | `law_firms.zacchaeus` | `https://www.zls-nc.com/listings` |
+| `national.auction_bank_reo` | `https://apiweb.realtybid.com/rest/RBIAPI/`<br>`https://bid.auctionnetwork.com/Auctions`<br>_+2 more_ |
 | `national.bid4assets` | `https://www.bid4assets.com/storefront/index.cfm?searchstate=NC&searchprop=Real+Estate`<br>`https://www.bid4assets.com/storefront/index.cfm?searchstate=SC&searchprop=Real+Estate`<br>_+1 more_ |
 | `national.craigslist_fsbo` | `https://{subdomain`<br>`https://{host` |
 | `national.first_citizens_reo` | `https://www.firstcitizens.com/real-estate` |

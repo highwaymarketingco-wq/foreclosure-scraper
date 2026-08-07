@@ -118,6 +118,7 @@ NEW_SOURCES = {
     "counties_generic.state_contamination",
     "counties_generic.epa_frs_sites",
     "counties_generic.arcgis_distress_layers",
+    "national.auction_bank_reo",
 }
 
 
