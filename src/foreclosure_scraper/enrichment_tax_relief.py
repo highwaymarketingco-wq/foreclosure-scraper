@@ -18,8 +18,32 @@ county, by querying that county's parcel layer for the relief field. Reuses the
 COUNTY-layer _query + PID-variant helpers. Free, no auth. Adds raw['tax_relief']
 and a modest distress-score signal. Gate off with FORECLOSURE_TAX_RELIEF=0.
 
-Extensible: Gaston (LUV_YES_NO / EXEMPT_CODE) and Anderson SC (RATIO=R legal
-residence) drop straight into _RELIEF_LAYERS once needed.
+MEASURED YIELD, 2026-08-06 — read this before investing more here
+    Gaston and Rutherford were added on this date. The parcel joins work
+    (Gaston 19/40, Rutherford 39/40 against real board rows), but over a
+    600-lead sample of Gaston + Rutherford leads only ONE tagged.
+
+    That is a true base rate, not a bug. Present-use value deferral is a
+    FARM/FOREST programme, and this board is residential distress, so the two
+    populations barely intersect. The tag is still worth having when it lands
+    (the one hit carries a $73,300 rollback lien that comes due on sale), but
+    do not expect volume from adding more counties here.
+
+THE ELDERLY EXEMPTION DOES NOT EXTEND BEYOND BUNCOMBE — checked 2026-08-06
+    All 17 county parcel layers were probed for an exemption/relief field.
+    Seven have one, and on inspection the VALUES are institutional, not
+    personal: Rutherford is Religious/Public Service/Charitable/Lodges, Gaston
+    is GOV/REL/UTL/CEM, Henderson is Government/Religious/Conservation/Burial.
+    Searching every distinct value for elderly/disabled/veteran terms returned
+    2 rows in Rutherford, 13 in Gaston ("CAGE" = a charity for the aged, an
+    institution rather than a homeowner) and 3 in Henderson.
+
+    Anderson SC RATIO is the 4%/6% assessment class, not a relief flag, and
+    Spartanburg HomesteadNumber has 32 non-empty values that look like book
+    codes. So the note that once stood here, that Gaston and Anderson SC "drop
+    straight in" for senior exemption, was WRONG and is retracted. Buncombe is
+    unusual in publishing the elderly-or-disabled exclusion per parcel; do not
+    go looking for it elsewhere again.
 """
 from __future__ import annotations
 
@@ -50,6 +74,38 @@ _RELIEF_LAYERS: dict[tuple[str, str], dict] = {
         "fields": "PIN,PROPERTY_OWNER,TOTAL_DEFERRED_VALUE",
         "classify": "use_value_deferral",
     },
+    # 1,576 parcels carry the land-use-value deferral flag, measured 2026-08-06.
+    # Gaston stores it as a Y/N string rather than a deferred dollar amount, so
+    # there is no value to read, only the flag.
+    ("NC", "Gaston"): {
+        "url": ("https://gis.gastoncountync.gov/publicgis/rest/services/"
+                "PublicGIS/Parcels/FeatureServer/11"),
+        # oldPIN, NOT PIN: the board carries undashed 10-digit ids
+        # ("3524910792") and this layer's PIN is dashed ("3546-95-5421").
+        # oldPIN holds the undashed form and joins 19/40 on real board rows;
+        # PIN joins none of them.
+        "pin_field": "oldPIN",
+        "where_extra": "LUV_YES_NO='Y'",
+        "fields": "oldPIN,CURR_NAME1,LUV_YES_NO",
+        "classify": "use_value_flag",
+    },
+    # 2,181 parcels, measured 2026-08-06. THE TRAP: Rutherford types its deferral
+    # columns as esriFieldTypeString, so the numeric predicate other counties use
+    # ("Use_Value_Deferred > 0") returns ArcGIS error 400 "Unable to complete
+    # operation" rather than zero rows. It must be tested as a non-empty STRING.
+    # Do not "fix" this to a numeric comparison.
+    #
+    # Use Use_Value_Deferred, NOT Total_Value_Deferred: the latter is populated
+    # on 57,292 rows, i.e. essentially every parcel in the county, because it
+    # holds the string "0" for the ones with no deferral.
+    ("NC", "Rutherford"): {
+        "url": ("https://gis.rutherfordcountync.gov/server/rest/services/"
+                "MapMetricsServiceRutherford/MapServer/7"),
+        "pin_field": "Parcel_Number",
+        "where_extra": "Use_Value_Deferred IS NOT NULL AND Use_Value_Deferred<>''",
+        "fields": "Parcel_Number,Property_Owner,Use_Value_Deferred",
+        "classify": "use_value_deferral_str",
+    },
 }
 
 _EXEMPT_KIND = {"ELD": "elderly", "DIS": "disabled", "BLD": "blind"}
@@ -72,6 +128,24 @@ def _classify(cfg: dict, attrs: dict) -> Optional[dict]:
             return None
         return {"kind": "use_value_deferral", "basis": "present_use_rollback_lien",
                 "deferred_value": fv}
+    if cfg["classify"] == "use_value_deferral_str":
+        # Rutherford types the amount as a string, so parse rather than compare.
+        raw = str(attrs.get("Use_Value_Deferred") or "").replace(",", "").strip()
+        try:
+            fv = float(raw)
+        except (TypeError, ValueError):
+            fv = 0.0
+        if fv <= 0:
+            return None
+        return {"kind": "use_value_deferral", "basis": "present_use_rollback_lien",
+                "deferred_value": fv}
+    if cfg["classify"] == "use_value_flag":
+        # Gaston publishes only a Y/N flag, so the rollback lien is known to
+        # exist but its size is not published. Report the flag, invent no number.
+        if str(attrs.get("LUV_YES_NO") or "").strip().upper() != "Y":
+            return None
+        return {"kind": "use_value_deferral", "basis": "present_use_rollback_lien",
+                "deferred_value": None}
     return None
 
 
