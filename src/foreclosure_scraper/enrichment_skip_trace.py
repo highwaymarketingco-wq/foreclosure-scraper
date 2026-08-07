@@ -211,7 +211,13 @@ class FreeProvider:
         self.people = FreePeopleSearchProvider()
         # People-search is slow (real browser); only attempt it for the
         # top N closest-to-sale listings to keep run time sane.
-        self.phone_budget = int(os.environ.get("FREE_SKIPTRACE_PHONE_MAX", "40"))
+        #
+        # 2026-08-07: raised from 40. The request RATE against the target site
+        # is unchanged by this — every render, from any caller in the process,
+        # queues behind the shared RENDER_CONCURRENCY semaphore (2 concurrent),
+        # so this cap only grows total volume over a longer run, not burst
+        # rate. 250 is a ~6x increase in coverage, not in politeness posture.
+        self.phone_budget = int(os.environ.get("FREE_SKIPTRACE_PHONE_MAX", "250"))
         self._phone_used = 0
 
     async def lookup(self, li: Listing) -> Optional[dict]:
@@ -365,7 +371,28 @@ async def enrich_with_skip_trace(
         return stats
 
     if max_per_run is None:
-        max_per_run = int(os.environ.get("SKIP_TRACE_MAX_PER_RUN", "100"))
+        # 2026-08-07: raised from 100. The "free" combined provider is really
+        # two halves with very different costs, and this one cap was
+        # throttling both together:
+        #   TaxRecordsOnlyProvider  owner + MAILING address + absentee flag.
+        #                           Zero HTTP calls — pure read of GIS data
+        #                           already fetched. $0, no external request.
+        #   FreePeopleSearchProvider  phone numbers, browser-rendered against
+        #                           a real site. Has its OWN separate cap
+        #                           (FREE_SKIPTRACE_PHONE_MAX) and is further
+        #                           throttled by RENDER_CONCURRENCY (2
+        #                           concurrent renders, process-wide) — so
+        #                           raising THIS cap does not raise the rate
+        #                           of hits to that site, only how many
+        #                           mailing addresses get filled per run.
+        # Measured 2026-08-06: 34,614 eligible, capped at 100/run — the free
+        # half was covering 0.3% of the mailable board per run. 30000 clears
+        # the whole eligible pool in one pass (idempotent — a lead with
+        # raw["skip_trace"] already set is excluded from future targets, so
+        # this never re-spends work), leaving quota/eligibility as the real
+        # limiter rather than an arbitrary count, same reasoning as the vision
+        # backlog cap in run_daily_vision.sh.
+        max_per_run = int(os.environ.get("SKIP_TRACE_MAX_PER_RUN", "30000"))
 
     # Filter eligible: must have street_address; prioritize ones with
     # a defendant name (paid lookups need both).

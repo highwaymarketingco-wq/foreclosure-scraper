@@ -71,11 +71,12 @@ export VISION_PROVIDER=gemini
 # arbitrary count. 1500 was NOT letting quota be the limiter: every recent pass
 # drained its 1500 and exited with unscored_remaining=0 in 5-17 minutes out of a
 # 4-hour budget (logs/daily-vision-*.log: 972 scored in 999s, 976 in 1006s, 956
-# in 991s). The board only holds ~5.9k photo-bearing leads, so 6000 covers the
-# entire eligible universe in one pass and hands the stop back to quota/time.
-# TRADEOFF: the daily pass now runs ~60-110 min instead of ~17 — still well
-# inside the 4h budget and finished long before the next scheduled job.
-export VISION_MAX_LISTINGS="${VISION_MAX_LISTINGS:-6000}"
+# in 991s). 6000 was raised for the same reason on 2026-07: measured 2026-08-07,
+# the eligible-and-unscored backlog is 9,326 (board has grown since 6000 was
+# set), so 6000 was ITSELF now the arbitrary limiter it was raised to eliminate.
+# 15000 comfortably clears today's backlog with room for board growth; quota/
+# time remain the real stop, same as the 6000->1500 change.
+export VISION_MAX_LISTINGS="${VISION_MAX_LISTINGS:-15000}"
 export VISION_INTER_CALL_DELAY="${VISION_INTER_CALL_DELAY:-4}"
 # Free-tier 429s are usually PER-MINUTE rate limits, not daily exhaustion. Keep a
 # rate-limited backend cooling-down-and-retrying instead of retiring it after 2

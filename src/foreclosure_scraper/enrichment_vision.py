@@ -41,9 +41,61 @@ log = structlog.get_logger()
 VISION_PROVIDER = os.environ.get("VISION_PROVIDER", "anthropic").lower().strip()
 
 # Anthropic settings
-ANTHROPIC_VISION_MODEL = "claude-sonnet-4-5-20250929"
+#
+# 2026-08-07: switched the default from claude-sonnet-4-5-20250929 to Haiku
+# 4.5. This is a grading task ("roof condition, boarded windows, overgrown
+# lot, score 1-5"), and a small model does it as accurately as a large one at
+# a fraction of the price. Measured on the live board: 9,326 eligible leads at
+# ~1,600 input / ~400 output tokens each is ~$34 on Haiku 4.5 ($1/$5 per
+# Mtok) versus ~$67-84 on Sonnet/Opus for the identical grades. Override with
+# ANTHROPIC_VISION_MODEL if a specific run wants a different model.
+ANTHROPIC_VISION_MODEL = os.environ.get("ANTHROPIC_VISION_MODEL", "claude-haiku-4-5")
 # Legacy alias kept for any external imports
 VISION_MODEL = ANTHROPIC_VISION_MODEL
+
+# $/million tokens, input/output. Used only to enforce VISION_MAX_SPEND_USD
+# below — not billed by this code, Anthropic bills the real usage. Keep in
+# sync with the model actually in use; a stale price under-enforces the cap
+# (spends more than intended) rather than over-enforcing it, so err toward
+# looking the current price up if this drifts.
+_ANTHROPIC_PRICE_PER_MTOK = {
+    "claude-haiku-4-5": (1.00, 5.00),
+    "claude-sonnet-5": (3.00, 15.00),
+    "claude-sonnet-4-5-20250929": (3.00, 15.00),
+    "claude-opus-5": (5.00, 25.00),
+}
+
+
+class _SpendGuard:
+    """Running-total $ stop for the Anthropic vision path ONLY.
+
+    The free providers (Gemini/Groq/GitHub/OpenRouter/Mistral/Cloudflare/NVIDIA/
+    Ollama) have no $ cost, so this guard is scoped to the one backend that
+    does. It sits at the entry of _assess_one_anthropic rather than inside the
+    worker-pool scheduler in enrich_with_vision: the pool already treats "this
+    backend returned None" as a normal decline and re-queues the listing to a
+    free backend, so refusing the call here needs no change to that pool logic
+    at all — it is just one more reason a backend can say no.
+
+    VISION_MAX_SPEND_USD unset or 0 = no limit (existing behavior).
+    """
+
+    def __init__(self) -> None:
+        self.limit = float(os.environ.get("VISION_MAX_SPEND_USD", "0") or 0)
+        self.spent = 0.0
+        self._warned = False
+
+    def over_budget(self) -> bool:
+        return self.limit > 0 and self.spent >= self.limit
+
+    def record(self, model: str, input_tokens: int, output_tokens: int) -> None:
+        in_price, out_price = _ANTHROPIC_PRICE_PER_MTOK.get(
+            model, _ANTHROPIC_PRICE_PER_MTOK["claude-haiku-4-5"])
+        self.spent += (input_tokens / 1_000_000) * in_price
+        self.spent += (output_tokens / 1_000_000) * out_price
+
+
+_spend_guard = _SpendGuard()
 
 # Gemini settings — Google zeroed out gemini-2.0-flash's free tier on
 # 2026-05-12 (quota metric returns limit: 0 for new and existing keys),
@@ -235,6 +287,17 @@ async def _assess_one_anthropic(
     client, li: Listing, http: httpx.AsyncClient
 ) -> Optional[dict]:
     """Run Claude Vision on one listing. Returns the parsed JSON or None."""
+    if _spend_guard.over_budget():
+        # Declines exactly like any other exhausted backend: the pool re-queues
+        # this listing to a free backend rather than dropping it, so hitting
+        # the $ cap degrades to "finish the rest for free" instead of stopping
+        # the run.
+        if not _spend_guard._warned:
+            log.info("vision.anthropic_budget_reached",
+                     spent_usd=round(_spend_guard.spent, 2),
+                     limit_usd=_spend_guard.limit)
+            _spend_guard._warned = True
+        return None
     payloads, urls = await _fetch_image_blocks(li, http)
     if not payloads:
         return None
@@ -274,10 +337,10 @@ async def _assess_one_anthropic(
 
     usage = getattr(resp, "usage", None)
     if usage:
-        parsed["_usage"] = {
-            "input_tokens": getattr(usage, "input_tokens", None),
-            "output_tokens": getattr(usage, "output_tokens", None),
-        }
+        in_tok = getattr(usage, "input_tokens", None) or 0
+        out_tok = getattr(usage, "output_tokens", None) or 0
+        parsed["_usage"] = {"input_tokens": in_tok, "output_tokens": out_tok}
+        _spend_guard.record(ANTHROPIC_VISION_MODEL, in_tok, out_tok)
     parsed["_provider"] = "anthropic"
     parsed["_model"] = ANTHROPIC_VISION_MODEL
     parsed["_n_photos"] = len(image_blocks)
@@ -926,6 +989,17 @@ class _AnthropicBackend:
         self.cap = MAX_PHOTOS_PER_LISTING
 
     async def assess(self, li: Listing, payloads, urls) -> Optional[dict]:
+        if _spend_guard.over_budget():
+            # A QuotaExhausted raise is the pool's existing signal for "this
+            # backend is done" — it retires the backend and re-queues whatever
+            # it was holding to a live lane, exactly like a real 429. Reusing
+            # it means the $ cap needs no new pool-level handling.
+            if not _spend_guard._warned:
+                log.info("vision.anthropic_budget_reached",
+                         spent_usd=round(_spend_guard.spent, 2),
+                         limit_usd=_spend_guard.limit)
+                _spend_guard._warned = True
+            raise QuotaExhausted(self.name)
         blocks = [{"type": "image", "source": {"type": "base64", "media_type": m,
                    "data": base64.b64encode(d).decode("ascii")}}
                   for d, m in payloads[:self.cap]]
@@ -942,8 +1016,10 @@ class _AnthropicBackend:
         usage = None
         u = getattr(resp, "usage", None)
         if u:
-            usage = {"input_tokens": getattr(u, "input_tokens", None),
-                     "output_tokens": getattr(u, "output_tokens", None)}
+            in_tok = getattr(u, "input_tokens", None) or 0
+            out_tok = getattr(u, "output_tokens", None) or 0
+            usage = {"input_tokens": in_tok, "output_tokens": out_tok}
+            _spend_guard.record(self.model, in_tok, out_tok)
         return _finalize(_parse_json_response(text), "anthropic", self.model,
                          len(blocks), urls, usage)
 
@@ -1045,8 +1121,16 @@ async def _build_backends(http: httpx.AsyncClient) -> list:
         except Exception:
             pass  # ollama not running — fine, it's optional
 
-    # Anthropic — paid; only as a fallback when nothing free is configured.
-    if not backends and os.environ.get("ANTHROPIC_API_KEY"):
+    # Anthropic — paid. Default stays "fallback of last resort" (only added
+    # when the free pool is empty) so a normal run never spends money by
+    # accident. Set VISION_INCLUDE_ANTHROPIC=1 to add it to the pool alongside
+    # whatever free backends are present — e.g. to deliberately spend down a
+    # pre-funded budget (VISION_MAX_SPEND_USD) faster than the free pool alone
+    # would clear the backlog. It draws from the SAME shared queue as every
+    # other backend, so it only picks up listings the free lanes haven't
+    # already claimed — it competes for the tail, it doesn't duplicate work.
+    want_anthropic = not backends or os.environ.get("VISION_INCLUDE_ANTHROPIC") == "1"
+    if want_anthropic and os.environ.get("ANTHROPIC_API_KEY"):
         try:
             from anthropic import AsyncAnthropic
             backends.append(_AnthropicBackend(AsyncAnthropic(
@@ -1215,8 +1299,18 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
         # consecutive 429s with no success in between. A success resets strikes,
         # so a per-minute-limited backend keeps contributing all run; a truly
         # daily-exhausted one (e.g. a spent Gemini key) retires after STRIKES.
-        cooldown = float(os.environ.get("VISION_BACKEND_COOLDOWN", "60"))
-        max_strikes = int(os.environ.get("VISION_BACKEND_STRIKES", "2"))
+        #
+        # 2026-08-07: raised the CODE defaults to match what run_daily_vision.sh
+        # already overrides, because the fragile old defaults (2 strikes / 60s)
+        # were only ever fixed for callers that remembered to set the env vars.
+        # scripts/main.py's own internal vision pass — the single biggest vision
+        # workload, a fresh weekly board full of unscored leads — sets neither
+        # and was inheriting the defaults that this file's own history records
+        # as having "killed the whole 9-key Gemini fleet in ~2 min." A caller
+        # that genuinely wants the old fast-fail behavior can still set these
+        # env vars explicitly; nothing here overrides an explicit override.
+        cooldown = float(os.environ.get("VISION_BACKEND_COOLDOWN", "70"))
+        max_strikes = int(os.environ.get("VISION_BACKEND_STRIKES", "10"))
         # Per-listing hard timeout — a single stuck network await (hung image
         # fetch or provider call whose own timeout doesn't fire) must never
         # freeze a worker. On timeout we drop that listing (re-scored next run)
