@@ -263,6 +263,31 @@ LAYERS: tuple[Layer, ...] = (
         situs="Match_addr", detail="Status", process="buyout_applicant",
         source_page="https://www.buncombecounty.org/",
     ),
+    # Private-property storm cleanup sites. Spartanburg read ZERO on the
+    # storm-damage signal while Buncombe, Transylvania, Burke and Pickens all
+    # had a leg, so this is the county's first. 2,359 rows, verified live
+    # 2026-08-06.
+    #
+    # ADDRESS ONLY, and that is the whole record. USER_Name, USER_Issue and
+    # USER_Status are empty on 1,997 of the 2,000 rows sampled, so there is no
+    # owner name to be had here; the parcel resolver supplies it from the situs.
+    # The layer also carries USER_Phone and USER_Secondary_Phone, which are NOT
+    # requested, on the same reasoning as buncombe_hmgp_buyout above: these are
+    # residents who called in for help, not a contact list. The one populated
+    # USER_Issue in the sample is a free-text narrative describing an elderly
+    # resident living in a damaged house without power. That is exactly the
+    # content this engine reports and does not harvest.
+    Layer(
+        slug="spartanburg_property_cleanup",
+        state="SC", county="Spartanburg",
+        url=("https://services6.arcgis.com/YJV3IFNXuNHJDIvn/arcgis/rest/services/"
+             "Private_Property_Cleanup_Locations/FeatureServer/13"),
+        listing_type=ListingType.DISTRESSED,
+        fields=("Match_addr", "IN_City", "IN_Postal"),
+        situs="Match_addr", city="IN_City", zip_="IN_Postal",
+        process="storm_damage",
+        source_page="https://www.spartanburgcounty.org/",
+    ),
 ) + tuple(
     # ---------------------------------------------------------------------
     # COUNTY-OWNED / SURPLUS inventory.
