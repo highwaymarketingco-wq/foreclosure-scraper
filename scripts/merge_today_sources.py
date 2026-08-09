@@ -14,12 +14,22 @@ Usage: ASSESSOR_CARD_ON=1 ASSESSOR_CARD_SKIP_RENDER=1 python scripts/merge_today
 import asyncio
 import collections
 import json
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+# Own checkpoint directory, separate from the main engine's data/checkpoint/.
+# They never run concurrently — this script's caller waits for the main run
+# to release the board first — but a distinct directory means a checkpoint
+# here is never ambiguous about which process it belongs to. Must be set
+# BEFORE importing foreclosure_scraper.checkpoint: CHECKPOINT_DIR is a
+# module-level constant read from the env once, at import time.
+os.environ.setdefault("FORECLOSURE_CHECKPOINT_DIR", "data/checkpoint_merge")
+
 from foreclosure_scraper.models import Listing  # noqa: E402
+from foreclosure_scraper import checkpoint  # noqa: E402
 from foreclosure_scraper.config import RuntimeConfig  # noqa: E402
 from foreclosure_scraper.scrapers._registry import all_scrapers  # noqa: E402
 from foreclosure_scraper.dedupe import dedupe  # noqa: E402
@@ -254,6 +264,14 @@ async def _resolve(existing: list[Listing], cfg) -> list[Listing]:
         # scanned notice/deed docs. Per-lead network, so FAST landing skips it too.
         from foreclosure_scraper.enrichment_doc_ocr import enrich_doc_ocr
         await _step("doc_ocr", enrich_doc_ocr(merged))
+
+    # This is the expensive part — the async chain above measured 16+ hours on
+    # 2026-08-08, and a laptop power loss killed it with zero disk writes:
+    # the exact "44.6h run, nothing saved" failure checkpoint.py exists to
+    # prevent, just never wired into THIS script. Checkpoint the instant the
+    # chain finishes so a crash in the sync valuation/scoring phase below
+    # only costs that phase, never a re-run of this one.
+    checkpoint.save(merged, "resolved")
     return merged
 
 
@@ -266,16 +284,31 @@ def main() -> int:
     # come on the stable weekly full run.
     import os as _osm
     _FAST = _osm.environ.get("MERGE_FAST") == "1"
-    # Load via load_board() so the lazy-detail sidecar (listings_detail.json:
-    # vision/comps/cama/foreclosure_sold_comps/rent_comps) is merged back into
-    # each lead's .raw. A plain json.loads of listings.json alone would strip
-    # those keys, and write_artifact would then re-emit an EMPTY sidecar,
-    # wiping the detail. load_board returns Listing objects with the sidecar
-    # already folded in (it silently skips unparseable records).
-    existing = load_board(DOCS)
-    print(f"existing dashboard: {len(existing)}")
-
-    merged = asyncio.run(_resolve(existing, cfg))
+    # Resume onto a checkpoint from a killed prior attempt, if one is fresh
+    # enough. The enrichers this script runs are all idempotent (they only
+    # target leads still missing the field they fill), so it is always safe
+    # to skip straight to the sync valuation/scoring phase on a checkpointed
+    # board rather than re-running the ~16h address-resolution chain that
+    # already completed once. checkpoint.load() returns None on no checkpoint,
+    # a checkpoint older than FORECLOSURE_CHECKPOINT_MAX_AGE_H (default 48h),
+    # or a corrupt file — any of which falls through to the normal cold start.
+    resumed = checkpoint.load()
+    if resumed:
+        age = checkpoint.age_hours()
+        print(f"RESUMING from checkpoint: {len(resumed)} leads, "
+              f"{f'{age:.1f}h old' if age is not None else 'age unknown'} — "
+              f"skipping the address-resolution chain")
+        merged = resumed
+    else:
+        # Load via load_board() so the lazy-detail sidecar (listings_detail.json:
+        # vision/comps/cama/foreclosure_sold_comps/rent_comps) is merged back into
+        # each lead's .raw. A plain json.loads of listings.json alone would strip
+        # those keys, and write_artifact would then re-emit an EMPTY sidecar,
+        # wiping the detail. load_board returns Listing objects with the sidecar
+        # already folded in (it silently skips unparseable records).
+        existing = load_board(DOCS)
+        print(f"existing dashboard: {len(existing)}")
+        merged = asyncio.run(_resolve(existing, cfg))
 
     # Value + score chain (sync; enrich_assessor_card runs its own loop, so it must
     # be OUTSIDE the async phase above).
@@ -353,6 +386,11 @@ def main() -> int:
     print(f"post-enrich dedupe: {_pre_dedupe2} -> {len(merged)} "
           f"(collapsed {_pre_dedupe2 - len(merged)})")
 
+    # Second checkpoint — the sync valuation/scoring phase above is shorter
+    # than the address-resolution chain but not instant (assessor_card runs
+    # its own per-lead loop), so this covers a crash there too.
+    checkpoint.save(merged, "scored")
+
     summary = {
         "by_source": dict(collections.Counter(li.source for li in merged if li.source)),
         "notes": "partial merge: today's new/fixed sources + full enrichment (no full re-scrape)",
@@ -364,6 +402,10 @@ def main() -> int:
         print("generate_outreach: ERROR", str(e)[:80])
     lp, mp = write_artifact(merged, summary, docs_dir=DOCS)
     print(f"wrote {lp} ({lp.stat().st_size:,} bytes) + {mp.name}")
+    # Published successfully — drop the checkpoint so the NEXT invocation of
+    # this script starts clean instead of resuming onto a board that already
+    # shipped (which would silently republish stale data as if fresh).
+    checkpoint.clear()
     return 0
 
 
