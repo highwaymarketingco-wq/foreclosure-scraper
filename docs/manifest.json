@@ -1,0 +1,21 @@
+{
+  "id": "/foreclosure-scraper/",
+  "name": "Foreclosure Board: Upstate SC and Western NC",
+  "short_name": "Foreclosures",
+  "description": "Distressed-property lead board for Upstate South Carolina and Western North Carolina, built from public records.",
+  "start_url": "/foreclosure-scraper/",
+  "scope": "/foreclosure-scraper/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#080b14",
+  "theme_color": "#080b14",
+  "lang": "en-US",
+  "dir": "ltr",
+  "categories": ["business", "finance", "utilities"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

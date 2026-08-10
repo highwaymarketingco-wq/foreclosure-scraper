@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Foreclosure Board">
+  <!-- Source artwork for icon-192.png, icon-512.png and apple-touch-icon-180.png.
+       Reproduces the rendered .brand-logo tile (premium.css:147-153): a 135deg
+       accent-to-accent-2 gradient with the white house glyph from index.html:32.
+       Colours come from premium.css, NOT style.css — premium.css re-declares
+       :root and :root[data-theme="dark"] and loads second, so its
+       --accent #3b82f6 / --accent-2 #22d3ee are what the page actually paints.
+       premium.css:149 rounds that tile 9px; this omits the rounding on purpose,
+       because iOS and Android apply their own mask and would double-round it.
+       The shipped PNGs are rasterised from these coordinates, not from this file. -->
+  <defs>
+    <!-- CSS 135deg = start colour at top-left, end colour at bottom-right -->
+    <linearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#brand)"/>
+  <g transform="translate(256 256) scale(14.2) translate(-12 -12)"
+     fill="none" stroke="#ffffff" stroke-width="2"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 10.5 12 4l9 6.5"/>
+    <path d="M5 9.5V20h14V9.5"/>
+    <path d="M9.5 20v-5h5v5"/>
+  </g>
+</svg>

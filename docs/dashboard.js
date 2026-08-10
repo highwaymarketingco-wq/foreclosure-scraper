@@ -21,11 +21,56 @@ const getGrade = (l) => (l.raw && l.raw.grade) || null;
 const getCalc = (l) => (l.raw && l.raw.calc) || null;
 const gradeOrder = { A: 5, B: 4, C: 3, D: 2, F: 1 };
 
+// ---------------------------------------------------------------------------
+// LEAN — the one switch every mobile-only behaviour in this file hangs off.
+//
+// 2026-08-10: the board was killing the WebContent process on two iPhones on
+// every single launch ("a problem repeatedly occurred"). Measured live: one
+// page load cost 521 MB of JS heap (23 MB gz -> a 258.9 MB UTF-16 string -> a
+// further ~241 MB object graph, all three alive at once). Desktop Chrome's
+// ceiling here is 2,144 MB so it survives; an iPhone tab gets a few hundred MB.
+//
+// Everything guarded by LEAN is therefore a *memory* decision, not a styling
+// one. Desktop keeps every marker, every tooltip, all 800 rows and the full
+// record — if a change is visible at 1440px, it is a bug.
+//
+// Latched ONCE at boot, deliberately: re-evaluating a media query would flip
+// the profile on a rotation, halfway through a session, with a half-projected
+// board already in memory. `?lean=1` / `?lean=0` force it for debugging.
+//
+// The second clause exists because iOS Safari's per-site "Request Desktop
+// Website" reports a ~980px viewport and persists into a home-screen webclip —
+// the width test alone would hand the FULL path back to the exact phone this
+// is meant to save. It requires a coarse pointer AND a physically small screen,
+// so a touchscreen laptop (min screen dimension >= 1024) can never trip it.
+const _QS = (() => { try { return new URLSearchParams(location.search); } catch (e) { return new URLSearchParams(""); } })();
+const LEAN = (() => {
+  const forced = _QS.get("lean");
+  if (forced === "1") return true;
+  if (forced === "0") return false;
+  // 720px, matching the CSS breakpoint exactly. It was 820, which opened a
+  // 721-820px band where a half-width desktop window got DESKTOP css with the
+  // MOBILE data profile: a full 17-column table capped at 50 rows, no mobile
+  // sort control (it is display:none above 720), and a detail panel telling a
+  // desktop user to open it on a desktop. The two thresholds must not diverge.
+  const narrow = typeof matchMedia === "function" && matchMedia("(max-width:720px)").matches;
+  const handheld = (navigator.maxTouchPoints || 0) > 0 && typeof screen === "object" && screen
+    && Math.min(screen.width || 9999, screen.height || 9999) < 820;
+  return narrow || handheld;
+})();
+// Escape hatch: a broken streaming deploy is recoverable from Safari's URL bar
+// without waiting on a Pages rebuild + the 10-minute cache TTL.
+const NOSTREAM = _QS.get("nostream") === "1";
+
 // ------------- Load data -----------------------------------------------------
 // Fetch JSON, preferring a gzipped copy (~16x smaller). Robust to both GitHub
 // Pages behaviours: if the .gz is served as raw gzip we inflate it via
 // DecompressionStream; if the server already inflated it (Content-Encoding: gzip)
 // we parse the bytes directly. Any failure falls back to the plain .json.
+//
+// The BOARD no longer comes through here — see loadBoardStreaming(). This is
+// still the path for listings_detail.json (desktop only) and it stays exactly
+// as it was, because it works and desktop is not what is broken.
 async function fetchJsonMaybeGz(base, bust) {
   const q = bust ? `?t=${bust}` : "";
   try {
@@ -44,6 +89,388 @@ async function fetchJsonMaybeGz(base, bust) {
   const r2 = await fetch(`${base}${q}`);
   if (!r2.ok) throw new Error(`${base} missing`);
   return await r2.json();
+}
+
+// ===========================================================================
+// STREAMING BOARD LOADER — the fix for the iPhone crash loop.
+//
+// The old path was one `JSON.parse(await new Response(stream).text())` over
+// listings.json.gz. That materialises the ENTIRE document three times over:
+// the 23 MB gz buffer, a 258.9 MB inflated UTF-16 string, and a ~241 MB parsed
+// object graph, all alive simultaneously. 521 MB for one page load, 9.1 s on a
+// fast wired desktop. iOS jetsams the WebContent process well below that, which
+// is why both phones showed "a problem repeatedly occurred" on every launch.
+//
+// So we never hold the whole document. We stream the response, scan for
+// top-level array-element boundaries, JSON.parse ONE record at a time, project
+// it down to the fields this file actually reads, push the projection, and drop
+// the consumed prefix off the buffer. Peak resident becomes one chunk + one
+// ~7 KB record + the projected graph.
+//
+// The same code path reads the future slim payload: the projector is
+// idempotent (an allowlist applied to an already-allowlisted record is a no-op)
+// so listings_slim.json.gz is a pure speedup, never a dependency.
+// ===========================================================================
+
+// ---- BEGIN PORTABLE -------------------------------------------------------
+// Pure data logic between these markers: no DOM, no fetch, no module globals
+// beyond what is defined here. The Node harness at
+// scratchpad/b/harness.mjs slices this exact region out of this file and runs
+// it against the real docs/listings.json.gz, so the code under test IS the code
+// that ships. Do not reference document / window / LEAN inside it.
+
+/** Fresh state for the top-level-array boundary scanner. */
+function boardScanState() {
+  return { buf: "", pos: 0, started: false, ended: false, elemStart: -1, depth: 0, inStr: false, esc: false };
+}
+
+/**
+ * Feed one text chunk to the scanner; `onElement(text)` fires once per complete
+ * top-level array element.
+ *
+ * Hand-written because JSON.parse has no incremental mode — asking it for the
+ * whole array is precisely what allocated the 258.9 MB string. It tracks three
+ * things, and getting any one of them wrong silently corrupts a single record
+ * somewhere in 38,500 with no error anywhere:
+ *   - in-string state, because `}` and `]` are ordinary characters inside a
+ *     JSON string and this board is full of legal descriptions like "LOT 3 [PH 2]";
+ *   - backslash escapes, so `\"` does not close the string;
+ *   - escaped backslashes, so a value ending in `\\` DOES close it.
+ * \uXXXX needs no special case: the escape flag eats the `u` and the four hex
+ * digits are ordinary characters. Astral-plane characters (U+1F4CA appears
+ * 1,712 times in the real board) arrive as surrogate pairs, both code units
+ * >= 0xD800, so they can never collide with an ASCII structural character.
+ * Covered by scratchpad/b/test_scanner.mjs, including a fixture re-split at
+ * every byte position.
+ */
+function boardScanChunk(st, chunk, onElement) {
+  if (st.ended) return;
+  if (chunk) st.buf += chunk;
+  const s = st.buf;
+  const n = s.length;
+  let i = st.pos;
+  while (i < n) {
+    const c = s.charCodeAt(i);
+    if (st.elemStart < 0) {
+      // Between elements: whitespace, the opening `[`, `,` separators, `]` end.
+      if (c === 32 || c === 9 || c === 10 || c === 13) { i++; continue; }
+      if (!st.started) {
+        if (c !== 91 /* [ */) throw new Error("board payload is not a JSON array");
+        st.started = true; i++; continue;
+      }
+      if (c === 44 /* , */) { i++; continue; }
+      if (c === 93 /* ] */) { st.ended = true; i++; break; }
+      st.elemStart = i; st.depth = 0; st.inStr = false; st.esc = false;
+      continue;                                   // re-read this char as content
+    }
+    if (st.esc) { st.esc = false; i++; continue; }
+    if (st.inStr) {
+      if (c === 92 /* \ */) st.esc = true;
+      else if (c === 34 /* " */) st.inStr = false;
+      i++; continue;
+    }
+    if (c === 34 /* " */) { st.inStr = true; i++; continue; }
+    // A bare scalar element (number / true / null) ends at the separator, which
+    // we must NOT consume — the between-elements branch above owns `,` and `]`.
+    // This test has to come before the bracket handling or `[1]` would take the
+    // depth-- path and never emit.
+    if (st.depth === 0 && (c === 44 || c === 93)) {
+      onElement(s.slice(st.elemStart, i)); st.elemStart = -1; continue;
+    }
+    if (c === 123 /* { */ || c === 91 /* [ */) { st.depth++; i++; continue; }
+    if (c === 125 /* } */ || c === 93 /* ] */) {
+      st.depth--; i++;
+      if (st.depth === 0) { onElement(s.slice(st.elemStart, i)); st.elemStart = -1; }
+      continue;
+    }
+    i++;
+  }
+  // Compact. This is the line that keeps peak memory flat: the buffer never
+  // holds more than one partial record plus the tail of the current chunk.
+  if (st.ended) { st.buf = ""; st.pos = 0; st.elemStart = -1; return; }
+  if (st.elemStart > 0) {
+    st.buf = s.slice(st.elemStart);
+    st.pos = i - st.elemStart;
+    st.elemStart = 0;
+  } else if (st.elemStart === 0) {
+    st.pos = i;
+  } else {
+    st.buf = i > 0 ? s.slice(i) : s;
+    st.pos = 0;
+  }
+}
+
+// --- The LEAN field allowlist ----------------------------------------------
+// Top-level scalars: derived mechanically from every `l.<field>` read in this
+// file plus the `l[k]` sort fallback (th[data-sort]) and the `l[f]` deadline
+// fields — NOT hand-picked. The board carries 43 top-level keys. The 9 with no
+// reader anywhere (legal_description, lot_size_sqft, land_use, assessed_value,
+// market_value, living_sqft_estimated, first_seen, last_seen) plus
+// `description` (replaced by the two precomputed values below) do not ship.
+const _LEAN_TOP = [
+  "source", "source_url", "listing_type", "property_kind",
+  "street_address", "city", "state", "zip_code", "county", "parcel_id",
+  "latitude", "longitude",
+  "sale_date", "sale_time", "sale_location", "upset_bid_deadline", "redemption_deadline",
+  "opening_bid", "judgment_amount", "tax_value", "auction_status", "foreclosure_process",
+  "bedrooms", "bathrooms", "living_sqft", "year_built", "acreage", "zoning",
+  "case_number", "plaintiff", "defendant", "trustee", "owner_name",
+];
+// Per-block sub-key allowlist. A block that exists in the source is ALWAYS
+// emitted, even when none of its sub-keys survive, because several call sites
+// test the block for existence rather than reading it (raw.upset_bid at :349,
+// raw.bankruptcy at :632).
+const _LEAN_RAW = {
+  // grade and calc are kept WHOLE ("*"), not sub-allowlisted.
+  //
+  // They were sub-allowlisted, and both drifted immediately. The grade badge row
+  // (:1781-1784) reads financial/property/location/risk unguarded and rendered a
+  // literal "undefined undefined undefined undefined" on every phone. The
+  // confidence pill (:1857) reads `confidence` — the list carried only
+  // `arv_confidence` — so it defaulted, and every listing on every phone claimed
+  // "CONFIDENCE: LOW". Both caught in verification 2026-08-10.
+  //
+  // A fabricated number on a board people bid money off is worse than a missing
+  // one, and a hand-maintained sub-list of a block that gains keys every time
+  // the valuation code changes will drift again. Measured cost of keeping both
+  // blocks whole: ~6 MB against a 185 MB heap. Not a trade worth making.
+  grade: "*",
+  calc: "*",
+  // data_quality.summary is 5.7 MB of prose and reads like an obvious LEAN cut.
+  // It stays: it is the CSV's `data_quality_note` column, and the export must be
+  // byte-identical on every device.
+  data_quality: ["flags", "summary"],
+  distress_stack: ["tier", "score", "stack", "signals", "categories", "absentee",
+                   "out_of_state", "contactable", "equity_band", "surviving_senior_debt_risk"],
+  signal_stack: ["count"],
+  strategy_fit: ["tags"],
+  owner_mailing: ["mailing", "mail_state", "absentee", "out_of_state"],
+  owner_phone: ["phone", "source", "needs_dnc_scrub"],
+  sos_agent: ["sosid", "best_contact_name", "best_contact_address"],
+  rod: ["has_mortgage", "has_adverse_lien"],
+  equity: ["value", "pct", "is_underwater"],
+  title_risk: ["surviving_senior_debt_risk"],
+  corroboration: ["court_confirmed", "label", "tier", "multi_source"],
+  helene: ["worst_placard", "worst_damage_pct", "damaged_buildings"],
+  bankruptcy: ["chapter", "date_filed", "case_name", "docket_number", "court"],
+  courtlistener: ["chapter", "date_filed", "court"],
+  last_sale: ["date", "amount", "basis"],
+  zillow: ["photo"],
+  gis: ["owner"],
+  lrcpwa: ["absentee", "mail_state"],
+  tax_owed: ["balance"],
+  upset_bid: ["in_window", "days_remaining"],
+};
+const _LEAN_RAW_KEYS = Object.keys(_LEAN_RAW);
+const _LEAN_RAW_SCALARS = [
+  "intent_score", "intent_band", "multifamily_class",
+  "stale_case", "geo_imprecise", "sold_confirmed", "kw_vacant", "acres",
+];
+const _ACRE_KEYS = ["acreage", "acres", "calculatedAcres", "deededAcres"];
+
+/** Single implementation of the 12-way acreage probe (also used by _acresOf). */
+function _acresProbe(raw) {
+  const r = raw || {};
+  for (const s of [r.lrcpwa, r.gis, r]) {
+    if (s) for (const k of _ACRE_KEYS) { const v = parseFloat(s[k]); if (!isNaN(v)) return v; }
+  }
+  return null;
+}
+
+/** `raw.life_events` is an array in the fat board and an int in the slim one. */
+function _lifeEventCount(le) {
+  if (le == null) return 0;
+  if (typeof le === "number") return le;
+  return le.length || 0;
+}
+
+/**
+ * Project one record onto what this file actually reads.
+ *
+ * FULL (lean=false) is the IDENTITY — no projection at all. That is deliberate
+ * and it is not laziness: renderEverything() (:814) is a reflective sweep over
+ * Object.keys(raw), and the real board carries 107 distinct raw keys against an
+ * allowlist of ~25. Any named allowlist applied to desktop would silently gut
+ * the "Everything We Found" panel, which exists precisely so that adding a
+ * source can never again mean adding data nobody can see. Desktop therefore
+ * gets byte-for-byte what it got before this change.
+ *
+ * LEAN drops what a phone cannot afford, and precomputes the two things that
+ * were derived from `description` BEFORE discarding it, so mobile classifies
+ * leads identically to desktop rather than merely looking similar.
+ */
+function projectRecord(rec, lean) {
+  if (!lean || !rec || typeof rec !== "object" || Array.isArray(rec)) return rec;
+  const out = {};
+  for (let i = 0; i < _LEAN_TOP.length; i++) {
+    const k = _LEAN_TOP[i];
+    if (k in rec) out[k] = rec[k];
+  }
+
+  const desc = typeof rec.description === "string" ? rec.description : "";
+  // kw_vacant replaces the description probe in _catOf() (:737), which decides
+  // land vs residential and therefore which buyers match. Without this, mobile
+  // would produce different buyer matches than desktop for the same lead.
+  if (rec.kw_vacant != null) {
+    out.kw_vacant = !!rec.kw_vacant;
+  } else {
+    const d = desc.toLowerCase();
+    out.kw_vacant = d.includes("vacant lot") || d.includes("vacant land") || d.includes("vacant parcel");
+  }
+
+  const raw = rec.raw;
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) {
+    if ("raw" in rec) out.raw = raw;
+    return out;
+  }
+  const r = {};
+  for (let i = 0; i < _LEAN_RAW_KEYS.length; i++) {
+    const k = _LEAN_RAW_KEYS[i];
+    const src = raw[k];
+    if (src == null) continue;
+    if (typeof src !== "object" || Array.isArray(src)) { r[k] = src; continue; } // shape drift: keep verbatim
+    const subs = _LEAN_RAW[k];
+    // "*" keeps the block whole. Used for blocks whose sub-keys are read in too
+    // many places to track by hand — see the drift incident noted at _LEAN_RAW.
+    if (subs === "*") { r[k] = src; continue; }
+    const o = {};
+    for (let j = 0; j < subs.length; j++) { const sk = subs[j]; if (sk in src) o[sk] = src[sk]; }
+    r[k] = o;
+  }
+  for (let i = 0; i < _LEAN_RAW_SCALARS.length; i++) {
+    const k = _LEAN_RAW_SCALARS[i];
+    if (k in raw) r[k] = raw[k];
+  }
+  if (Array.isArray(raw.also_seen_in)) {
+    r.also_seen_in = raw.also_seen_in.map((s) =>
+      (s && typeof s === "object" && !Array.isArray(s)) ? { url: s.url, source: s.source } : s);
+  }
+  if ("life_events" in raw) r.life_events = _lifeEventCount(raw.life_events);
+  // lrcpwa.mail_state is the flattened form of lrcpwa.mailing.state, which the
+  // out-of-state chip (:992) reads. Flatten it here: today's board carries only
+  // the nested key, so without this the chip silently vanished on mobile for
+  // 270 of the 3,062 leads that carry an lrcpwa block. Caught by the harness.
+  if (r.lrcpwa && r.lrcpwa.mail_state === undefined) {
+    const lm = raw.lrcpwa && raw.lrcpwa.mailing;
+    if (lm && typeof lm === "object" && lm.state != null) r.lrcpwa.mail_state = lm.state;
+  }
+  if (r.acres === undefined) {
+    const a = _acresProbe(raw);
+    if (a !== null) r.acres = a;
+  }
+  // heleneInfo() (:576) falls back to a regex over `description` when the dedup
+  // meta has no placard. LEAN drops description, so run that fallback here,
+  // while it is still in hand. Mirrors :581-586 exactly, including the fact
+  // that the description's damage pct wins whenever the placard was missing.
+  if (rec.source === "counties_nc.asheville_helene" && desc) {
+    const h = r.helene || {};
+    if (!h.worst_placard) {
+      const m = /Helene damage:\s*([A-Za-z]+)\s+placard/.exec(desc);
+      const p = /placard\s*-\s*([0-9]+)%/.exec(desc);
+      if (m) h.worst_placard = m[1];
+      if (p) h.worst_damage_pct = parseInt(p[1], 10);
+      if (m || p) r.helene = h;
+    }
+  }
+  out.raw = r;
+  return out;
+}
+// ---- END PORTABLE ---------------------------------------------------------
+
+// Slim first, fat second. The slim file does not exist yet; the 404 fallback is
+// the path that runs today, and one 404 is a fair price for making the future
+// payload a drop-in with zero client change.
+const BOARD_FILES = ["listings_slim.json.gz", "listings.json.gz"];
+// A stream that has produced nothing for this long is not slow, it is stuck.
+// Rural Upstate SC / Western NC cellular is the target environment, and on a
+// webclip a stalled stream looks exactly like the crash we are fixing.
+const BOARD_STALL_MS = 60000;
+
+/** One-line status bar, injected the way the error banner at :88 is. */
+function boardProgress(msg) {
+  let el = $("board-progress");
+  if (msg === null) { if (el) el.remove(); return; }
+  if (!el) {
+    document.body.insertAdjacentHTML("afterbegin",
+      '<div id="board-progress" role="status" style="position:fixed;left:0;right:0;top:0;z-index:9999;' +
+      'background:#1f6feb;color:#fff;padding:9px 14px;text-align:center;font:600 13px/1.35 ' +
+      "system-ui,-apple-system,'Segoe UI',sans-serif\">&nbsp;</div>");
+    el = $("board-progress");
+  }
+  if (el) el.textContent = msg;
+}
+
+/**
+ * Stream the board, one record at a time. Returns the projected array.
+ * `onProgress(count)` is called per chunk; throttle in the callback.
+ */
+async function loadBoardStreaming(bust, onProgress) {
+  const ac = new AbortController();
+  const q = `?t=${encodeURIComponent(bust)}`;
+  let res = null;
+  for (const name of BOARD_FILES) {
+    let r = null;
+    try { r = await fetch(name + q, { signal: ac.signal }); } catch (e) { r = null; }
+    if (r && r.ok && r.body) { res = r; break; }
+  }
+  if (!res) throw new Error("board payload missing");
+
+  // Peek the first two bytes before deciding to inflate. The code this replaces
+  // sniffed the gzip magic (:35) for a reason: this file has been served
+  // already-inflated (Content-Encoding: gzip) before, and an unconditional
+  // DecompressionStream would then throw on every device, everywhere, at once.
+  // Do not delete a defence whose comment names the incident that produced it.
+  const reader = res.body.getReader();
+  let head = new Uint8Array(0);
+  let exhausted = false;
+  while (head.length < 2) {
+    const r = await reader.read();
+    if (r.done) { exhausted = true; break; }
+    if (!r.value || !r.value.length) continue;
+    const merged = new Uint8Array(head.length + r.value.length);
+    merged.set(head); merged.set(r.value, head.length);
+    head = merged;
+  }
+  const isGzip = head.length > 1 && head[0] === 0x1f && head[1] === 0x8b;
+  if (isGzip && typeof DecompressionStream === "undefined") throw new Error("NO_DECOMPRESSION");
+
+  let lastByteAt = Date.now();
+  const watchdog = setInterval(() => {
+    if (Date.now() - lastByteAt > BOARD_STALL_MS) { try { ac.abort(); } catch (e) { /* noop */ } }
+  }, 5000);
+
+  try {
+    const src = new ReadableStream({
+      start(c) { if (head.length) c.enqueue(head); if (exhausted) c.close(); },
+      async pull(c) {
+        const r = await reader.read();
+        lastByteAt = Date.now();
+        if (r.done) c.close(); else c.enqueue(r.value);
+      },
+      cancel(reason) { try { reader.cancel(reason); } catch (e) { /* noop */ } },
+    });
+    let bytes = src;
+    if (isGzip) bytes = bytes.pipeThrough(new DecompressionStream("gzip"));
+    const text = bytes.pipeThrough(new TextDecoderStream()).getReader();
+
+    const out = [];
+    const st = boardScanState();
+    const onElement = (s) => { out.push(projectRecord(JSON.parse(s), LEAN)); };
+    for (;;) {
+      const r = await text.read();
+      if (r.done) break;
+      lastByteAt = Date.now();
+      boardScanChunk(st, r.value, onElement);
+      if (onProgress) onProgress(out.length);
+    }
+    boardScanChunk(st, "", onElement);   // flush a trailing bare scalar, if any
+    // A truncated download would otherwise render a silently partial board —
+    // and this board carries sale dates and bid deadlines. Fail loudly instead.
+    if (!st.ended) throw new Error("board payload truncated");
+    return out;
+  } finally {
+    clearInterval(watchdog);
+  }
 }
 
 async function loadDataset(name) {
@@ -73,22 +500,53 @@ async function loadDataset(name) {
         by_county_top: data.by_county_top,
       };
     } else {
-      const [listings, metaRes] = await Promise.all([
-        fetchJsonMaybeGz("listings.json", Date.now()),
-        fetch(`run_meta.json?t=${Date.now()}`),
-      ]);
-      LISTINGS = listings;
+      // run_meta.json first, and its run_time becomes the board's cache key.
+      // The old `?t=${Date.now()}` guaranteed a fresh 23 MB download on EVERY
+      // launch, even when the board was byte-identical to the copy the phone
+      // had five minutes ago. run_time busts the cache exactly when the board
+      // actually changes — the convention ensureDetails() already uses for
+      // listings_detail.json. run_meta.json itself is 13 KB and stays uncached.
+      const metaRes = await fetch(`run_meta.json?t=${Date.now()}`);
       META = metaRes.ok ? await metaRes.json() : {};
+      const bust = META.run_time || Date.now();
+      const total = Number(META.total) || 0;
+      let painted = 0;
+      boardProgress("Loading listings…");
+      const onProgress = (n) => {
+        if (n - painted < 2000) return;          // ~19 repaints, not 38,500
+        painted = n;
+        boardProgress(total ? `Loading ${n.toLocaleString()} of ${total.toLocaleString()}…`
+                            : `Loading ${n.toLocaleString()} listings…`);
+      };
+      try {
+        if (NOSTREAM) throw new Error("NOSTREAM");
+        LISTINGS = await loadBoardStreaming(bust, onProgress);
+      } catch (streamErr) {
+        // A machine with the headroom for the old path should show a board
+        // rather than an error if the new one fails. LEAN deliberately does
+        // NOT fall back: the old path on a phone IS the crash we are fixing.
+        if (LEAN || String(streamErr.message) === "NO_DECOMPRESSION") throw streamErr;
+        boardProgress("Loading listings (fallback)…");
+        LISTINGS = await fetchJsonMaybeGz("listings.json", bust);
+      }
+      boardProgress(null);
     }
     DS_CACHE[name] = { listings: LISTINGS, meta: META };
   } catch (e) {
     LISTINGS = [];
     META = {};
+    boardProgress(null);
     if (name === "foreclosure") {
+      // DecompressionStream is Safari 16.4+. The old fallback here fetched the
+      // plain listings.json, which 404s on Pages (it is excluded in
+      // docs/_config.yml) — so an old iPhone got a silent empty board. Say the
+      // true thing instead.
+      const msg = String(e && e.message) === "NO_DECOMPRESSION"
+        ? "This board needs iOS 16.4 or newer (or a current desktop browser) to open."
+        : "Could not load listings — first run hasn't finished yet, or network error. Reload in a few minutes.";
       document.body.insertAdjacentHTML(
         "afterbegin",
-        `<div style="background:#ffd2dc;color:#b22a2a;padding:14px 28px;text-align:center;">
-         Could not load listings — first run hasn't finished yet, or network error. Reload in a few minutes.</div>`,
+        `<div style="background:#ffd2dc;color:#b22a2a;padding:14px 28px;text-align:center;">${msg}</div>`,
       );
     }
   }
@@ -103,7 +561,12 @@ function refreshDatasetUI() {
   const isMF = DATASET === "multifamily";
   const title = $("dataset-title");
   if (title) title.textContent = isMF ? "Multifamily Listings" : "Foreclosure Listings";
-  document.querySelectorAll(".ds-btn").forEach(btn => {
+  // `.ds-btn[data-ds]`, not `.ds-btn`. index.html gives the six stage buttons
+  // BOTH classes, so the bare selector (a) stripped `active` off whichever
+  // stage was selected, and (b) made one stage click run both the dataset
+  // handler and the stage handler. Scoping to [data-ds] separates them without
+  // touching index.html.
+  document.querySelectorAll(".ds-btn[data-ds]").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.ds === DATASET);
   });
 }
@@ -130,11 +593,11 @@ async function preloadDatasetCounts() {
 
 async function loadData() {
   await Promise.all([loadDataset("foreclosure"), preloadDatasetCounts(), loadBuyerRegistry()]);
-  // Wire toggle buttons
-  document.querySelectorAll(".ds-btn").forEach(btn => {
+  // Wire toggle buttons (dataset pills only — see refreshDatasetUI)
+  document.querySelectorAll(".ds-btn[data-ds]").forEach(btn => {
     btn.addEventListener("click", () => {
       const target = btn.dataset.ds;
-      document.querySelectorAll(".ds-btn").forEach((b) => b.classList.toggle("active", b === btn));
+      document.querySelectorAll(".ds-btn[data-ds]").forEach((b) => b.classList.toggle("active", b === btn));
       if (target === "_buyers") { enterBuyersMode(); return; }
       if (BUYERS_MODE) exitBuyersMode();
       if (target && target !== DATASET) loadDataset(target);
@@ -157,19 +620,22 @@ function fillStats() {
   $("stat-total").textContent = LISTINGS.length;
   const byGrade = { A: 0, B: 0, C: 0, D: 0, F: 0 };
   let posRoi = 0, withBid = 0;
+  // One pass. The source Set used to be a separate `.map().filter()` here,
+  // which allocated two throwaway 38,500-element arrays on every dataset load.
+  const sources = new Set();
   LISTINGS.forEach((l) => {
     const g = getGrade(l);
     if (g && g.overall) byGrade[g.overall] = (byGrade[g.overall] || 0) + 1;
     const c = getCalc(l);
     if (c && c.roi_pct != null && c.roi_pct > 0) posRoi += 1;
     if (l.opening_bid) withBid += 1;
+    if (l.source) sources.add(l.source);
   });
   $("stat-a").textContent = byGrade.A;
   $("stat-b").textContent = byGrade.B;
   $("stat-c").textContent = byGrade.C;
   $("stat-positive-roi").textContent = posRoi;
   $("stat-with-bid").textContent = withBid;
-  const sources = new Set(LISTINGS.map((l) => l.source).filter(Boolean));
   $("stat-sources").textContent = sources.size;
 
   $("total-badge").textContent = `${LISTINGS.length} total`;
@@ -186,6 +652,21 @@ function fillStats() {
 }
 
 // ------------- Filter init ---------------------------------------------------
+// Every control except #search. #search is bound separately, debounced.
+const FILTER_IDS = ["filter-state", "filter-county", "filter-type", "filter-contact",
+  "filter-land", "filter-strategy", "filter-arv", "filter-source", "filter-distress",
+  "filter-signals", "filter-intent", "filter-grade", "filter-window", "filter-roi"];
+// The listener half of initFilters() must run EXACTLY once. It used to run on
+// every call, and initFilters() is called from both loadDataset() branches, so
+// after k dataset-pill clicks every keystroke ran applyFilters k+1 times and
+// one click on Export CSV built and downloaded the ~19 MB file k+1 times. The
+// author caught the same class of bug for the <option> lists (resetSelect,
+// below) and missed it for the listeners.
+let _WIRED = false;
+// Captured at wiring time so #filter-active-count can say how many controls are
+// off their default, whatever the markup's defaults happen to be.
+const _FILTER_DEFAULTS = {};
+
 function initFilters() {
   // Idempotent: loadDataset() calls this on every (re)load + dataset switch, so
   // strip any previously-appended options (keep the first "All …" default)
@@ -194,35 +675,59 @@ function initFilters() {
     while (el.options.length > 1) el.remove(1);
   };
 
+  // One pass for both sets; this used to walk LISTINGS twice.
   const counties = new Set();
-  LISTINGS.forEach((l) => l.county && counties.add(`${l.county}, ${l.state || "?"}`));
-  const sel = $("filter-county");
-  resetSelect(sel);
-  Array.from(counties)
-    .sort()
-    .forEach((c) => {
-      const opt = document.createElement("option");
-      opt.value = c;
-      opt.textContent = c;
-      sel.appendChild(opt);
-    });
-
   const sources = new Set();
-  LISTINGS.forEach((l) => l.source && sources.add(l.source));
-  const ssel = $("filter-source");
-  resetSelect(ssel);
-  Array.from(sources)
-    .sort()
-    .forEach((s) => {
+  LISTINGS.forEach((l) => {
+    if (l.county) counties.add(`${l.county}, ${l.state || "?"}`);
+    if (l.source) sources.add(l.source);
+  });
+  const fill = (el, values) => {
+    resetSelect(el);
+    Array.from(values).sort().forEach((v) => {
       const opt = document.createElement("option");
-      opt.value = s;
-      opt.textContent = s;
-      ssel.appendChild(opt);
+      opt.value = v;
+      opt.textContent = v;
+      el.appendChild(opt);
     });
+  };
+  fill($("filter-county"), counties);
+  fill($("filter-source"), sources);
 
-  ["search", "filter-state", "filter-county", "filter-type", "filter-contact", "filter-land", "filter-strategy", "filter-arv", "filter-source", "filter-distress", "filter-signals", "filter-intent", "filter-grade", "filter-window", "filter-roi"].forEach((id) =>
-    $(id).addEventListener("input", applyFilters),
-  );
+  // updateStageCounts() stays OUTSIDE the wiring guard: the counts are derived
+  // from LISTINGS, so they must refresh on every dataset switch.
+  updateStageCounts();
+  if (_WIRED) { updateFilterCount(); return; }
+  _WIRED = true;
+
+  FILTER_IDS.forEach((id) => {
+    const el = $(id);
+    if (!el) return;
+    _FILTER_DEFAULTS[id] = el.value;
+    el.addEventListener("input", applyFilters);
+  });
+  // #search is NOT in that list. It fires an `input` event per character, and
+  // applyFilters rebuilds a 12-element array + join + toLowerCase for all
+  // 38,497 records — ~115,000 allocations per keystroke, on the main thread,
+  // while the user is typing. 250 ms of debounce removes the GC storm without
+  // changing a single result.
+  //
+  // Phones only. Desktop already absorbed this fine (the memoised _blob does the
+  // real work) and debouncing it there cost instant type-ahead for everyone —
+  // measured 100 ms after an input event: 57 results before, 1,199 after.
+  // Desktop is the thing that currently works; it does not pay for a mobile fix.
+  const search = $("search");
+  if (search) {
+    if (LEAN) {
+      let t = null;
+      search.addEventListener("input", () => {
+        clearTimeout(t);
+        t = setTimeout(applyFilters, 250);
+      });
+    } else {
+      search.addEventListener("input", applyFilters);
+    }
+  }
   // Live-sync the intent slider's numeric readout as it drags.
   const intentSlider = $("filter-intent");
   if (intentSlider) intentSlider.addEventListener("input", () => { $("filter-intent-val").textContent = intentSlider.value; });
@@ -234,6 +739,8 @@ function initFilters() {
       btn.classList.add("active");
       $(`view-${btn.dataset.view}`).classList.add("active");
       if (btn.dataset.view === "map") setTimeout(initMap, 60);
+      // Cards are rendered on demand now, the same way the map already was.
+      if (btn.dataset.view === "cards") renderCards();
     }),
   );
 
@@ -247,6 +754,8 @@ function initFilters() {
       }
       document.querySelectorAll("th[data-sort]").forEach((t) => t.classList.remove("sort-asc", "sort-desc"));
       th.classList.add(sortDir === "asc" ? "sort-asc" : "sort-desc");
+      const sm = $("sort-mobile");
+      if (sm && sm.value !== k) sm.value = k;
       applyFilters();
     }),
   );
@@ -262,19 +771,106 @@ function initFilters() {
       applyFilters();
     }),
   );
-  updateStageCounts();
+
+  initMobileShell();
 
   $("export-csv").addEventListener("click", exportCsv);
   $("close-detail").addEventListener("click", () => $("detail-panel").classList.add("hidden"));
+  updateFilterCount();
+}
+
+// ---- Mobile shell controls (#filter-sheet-toggle, #sort-mobile) -------------
+// Both live in index.html and are display:none above 720px. Every lookup is
+// guarded: this file must not throw if the markup has not landed yet.
+function initMobileShell() {
+  const toggle = $("filter-sheet-toggle");
+  const filters = document.querySelector(".filters");
+  if (toggle && filters) {
+    // Start collapsed only where the toggle is actually shown, so the button's
+    // aria-expanded="false" and the panel agree. Keyed off C's 720px
+    // breakpoint, not LEAN's 820 — between the two the sheet stays open and the
+    // toggle stays hidden, which is the deliberate 100px gap.
+    if (typeof matchMedia === "function" && matchMedia("(max-width:720px)").matches) {
+      filters.classList.add("is-collapsed");
+    }
+    toggle.addEventListener("click", () => {
+      const collapsed = filters.classList.toggle("is-collapsed");
+      toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    });
+  }
+  // The mobile layout hides <thead>, which takes the th[data-sort] click
+  // targets with it. Dispatch a click on the matching th so the sort path,
+  // including the asc/desc toggle, is reused completely unchanged.
+  // Mobile sort was one-way. <thead> is display:none below 720px, so the th
+  // click handler that normally toggles direction is unreachable, and re-picking
+  // the already-selected option in a native select fires no `change` event. The
+  // result: picking ROI gave -99.8% first, and going back to Grade put the
+  // UNGRADED records on top with no way to reverse it short of a reload.
+  //
+  // Two fixes: an explicit direction button, and a sensible default direction
+  // per key. The th handler defaults every new key to "asc" (:753), which is
+  // right for an address and wrong for every quality/money column.
+  const SORT_DESC_FIRST = {
+    _grade: 1, _roi: 1, _arv: 1, _max_bid: 1, _rehab: 1,
+    opening_bid: 1, living_sqft: 1, year_built: 1, bedrooms: 1, bathrooms: 1,
+  };
+  const sortSel = $("sort-mobile");
+  const sortDirBtn = $("sort-dir");
+  const paintDir = () => { if (sortDirBtn) sortDirBtn.textContent = sortDir === "asc" ? "↑" : "↓"; };
+  if (sortSel) {
+    sortSel.value = sortKey;
+    sortSel.addEventListener("change", () => {
+      const k = sortSel.value.replace(/"/g, "");
+      const th = document.querySelector(`th[data-sort="${k}"]`);
+      if (th) th.click();
+      // th.click() has just set sortDir="asc" for the newly-picked key. Override
+      // it for the columns where "best first" is the only sane opening state.
+      if (SORT_DESC_FIRST[k] && sortDir === "asc") { sortDir = "desc"; applyFilters(); }
+      paintDir();
+    });
+  }
+  if (sortDirBtn) {
+    sortDirBtn.addEventListener("click", () => {
+      sortDir = sortDir === "asc" ? "desc" : "asc";
+      applyFilters();
+      paintDir();
+    });
+  }
+  paintDir();
+}
+
+/** "Filters (3)" — how many controls are off their captured default. */
+function updateFilterCount() {
+  const badge = $("filter-active-count");
+  if (!badge) return;
+  let n = 0;
+  FILTER_IDS.forEach((id) => {
+    const el = $(id);
+    if (el && id in _FILTER_DEFAULTS && el.value !== _FILTER_DEFAULTS[id]) n += 1;
+  });
+  badge.textContent = n ? `(${n})` : "";
 }
 
 // ------------- Filtering + sorting ------------------------------------------
+// Memoised derived values live on the listing itself, but ALWAYS as
+// non-enumerable properties. exportCsv used to spread `{...l}` and any future
+// serialization would do the same, so an ordinary `l._blob = …` would leak a
+// 150-character lowercased blob into the CSV. Non-enumerable makes that
+// impossible rather than merely unlikely.
+function _memo(l, key, value) {
+  Object.defineProperty(l, key, { value, writable: true, enumerable: false, configurable: true });
+  return value;
+}
+
 function getSortValue(l, k) {
   if (k === "_grade") {
     const g = getGrade(l);
     return g ? g.overall_score || gradeOrder[g.overall] || 0 : -1;
   }
   if (k === "_arv") {
+    // Pure function of immutable data, and the sort calls it ~1.17 M times —
+    // each call was doing two .includes() scans over data_quality.flags.
+    if (l._sv_arv !== undefined) return l._sv_arv;
     const c = getCalc(l) || {};
     const arv = c.arv_expected || 0;
     // Fabricated/unrated ARVs (proxy values >$2M, LOW confidence, or an
@@ -287,7 +883,7 @@ function getSortValue(l, k) {
     const unrated = !arv || arv > 2000000 || c.arv_confidence === "LOW"
       || dqf.includes("low_arv_confidence") || dqf.includes("no_sqft")
       || !(g && g.overall);
-    return unrated ? -1 : arv;
+    return _memo(l, "_sv_arv", unrated ? -1 : arv);
   }
   if (k === "_rehab") return (getCalc(l) || {}).rehab_expected || 0;
   if (k === "_max_bid") return (getCalc(l) || {}).max_bid_70 || 0;
@@ -320,18 +916,31 @@ const DEADLINE_FIELDS = [
   ["redemption_deadline", "redemption ends"],
 ];
 
+// Short-lived memo. The deadline comparator calls this twice per comparison and
+// each call does up to three Date.parse, so a 38 K sort was ~460 K date parses;
+// updateStageCounts adds another 115 K on every dataset switch. The result is
+// NOT cached for the session — `days` is relative to now, and this board is the
+// reason someone drives to a courthouse — so it expires after a minute, which
+// is orders of magnitude longer than a sort and orders of magnitude shorter
+// than the value changing.
+const _DL_TTL_MS = 60000;
+
 /** Soonest un-expired deadline on a listing, or null. */
 function deadlineInfo(l) {
+  const now = Date.now();
+  const m = l._dl;
+  if (m && now - m.at < _DL_TTL_MS) return m.v;
   let best = null;
   for (const [f, label] of DEADLINE_FIELDS) {
     const v = l[f];
     if (!v) continue;
     const t = Date.parse(v);
     if (isNaN(t)) continue;
-    const days = Math.floor((t - Date.now()) / 86400000);
+    const days = Math.floor((t - now) / 86400000);
     if (days < 0) continue;                     // already gone
     if (!best || days < best.days) best = { days, label, field: f, ts: t };
   }
+  _memo(l, "_dl", { at: now, v: best });
   return best;
 }
 
@@ -365,6 +974,29 @@ function updateStageCounts() {
   });
 }
 
+// The search blob: 12 fields joined + lowercased, for every record, on every
+// keystroke. Memoised on FULL. NOT memoised on LEAN — ~150 UTF-16 characters
+// × 38,500 is ~12 MB held permanently, and RAM is the exact resource the phone
+// runs out of; the 250 ms debounce already removes the per-keystroke cost.
+const MEMO_BLOB = !LEAN;
+function searchBlob(l) {
+  if (l._blob !== undefined) return l._blob;
+  const b = [
+    l.street_address, l.city, l.county, l.state, l.zip_code, l.case_number,
+    l.plaintiff, l.defendant, l.trustee, l.source, l.parcel_id,
+    (l.raw && l.raw.gis && l.raw.gis.owner) || "",
+  ].join(" ").toLowerCase();
+  return MEMO_BLOB ? _memo(l, "_blob", b) : b;
+}
+
+// #view-cards has no `active` class at boot and style.css hides it, but
+// renderCards() was called unconditionally — so every keystroke built ~5,000
+// invisible elements and 200 closures. Gate it the way initMap already was.
+function maybeRenderCards() {
+  const v = $("view-cards");
+  if (v && v.classList.contains("active")) renderCards();
+}
+
 function applyFilters() {
   const q = $("search").value.toLowerCase();
   const st = $("filter-state").value;
@@ -385,6 +1017,9 @@ function applyFilters() {
   const now = Date.now();
   const wmax = win ? now + win * 86400000 : 0;
 
+  // Tier tally, folded into the filter pass. It used to be a second full pass
+  // over `filtered` on every keystroke.
+  let hot = 0, warm = 0;
   filtered = LISTINGS.filter((l) => {
     // Court-confirmed sales already sold at auction — not opportunities. Hide.
     if (l.raw && l.raw.sold_confirmed) return false;
@@ -443,7 +1078,10 @@ function applyFilters() {
       if (contact === "absentee" && !om.absentee) return false;
       if (contact === "out_of_state" && !om.out_of_state) return false;
       if (contact === "mortgage" && !(r.rod && r.rod.has_mortgage)) return false;
-      if (contact === "estate_elderly" && !(r.life_events && r.life_events.length)) return false;
+      // life_events is an array in the fat board and an int count in the slim
+      // one / the LEAN projection — `.length` alone would silently empty this
+      // filter on mobile.
+      if (contact === "estate_elderly" && !_lifeEventCount(r.life_events)) return false;
       if (contact === "hide_stale" && r.stale_case) return false;
     }
     if (win && l.sale_date) {
@@ -460,14 +1098,9 @@ function applyFilters() {
       const r = c ? c.roi_pct : null;
       if (r == null || r < minRoi) return false;
     }
-    if (q) {
-      const blob = [
-        l.street_address, l.city, l.county, l.state, l.zip_code, l.case_number,
-        l.plaintiff, l.defendant, l.trustee, l.source, l.parcel_id,
-        (l.raw && l.raw.gis && l.raw.gis.owner) || "",
-      ].join(" ").toLowerCase();
-      if (!blob.includes(q)) return false;
-    }
+    if (q && !searchBlob(l).includes(q)) return false;
+    const _tier = (getDistress(l) || {}).tier;
+    if (_tier === "HOT") hot++; else if (_tier === "WARM") warm++;
     return true;
   });
 
@@ -486,7 +1119,8 @@ function applyFilters() {
       return (da ? da.ts : Infinity) - (db ? db.ts : Infinity);
     });
     renderTable();
-    renderCards();
+    maybeRenderCards();
+    updateFilterCount();
     const blocked = filtered.filter(deadlineBlocked).length;
     const today = filtered.filter((l) => { const d = deadlineInfo(l); return d && d.days === 0; }).length;
     $("result-count").textContent =
@@ -509,13 +1143,10 @@ function applyFilters() {
   });
 
   renderTable();
-  renderCards();
-  // Tier tally over the current filtered set (the operator-board headline).
-  let hot = 0, warm = 0;
-  filtered.forEach((l) => {
-    const t = (getDistress(l) || {}).tier;
-    if (t === "HOT") hot++; else if (t === "WARM") warm++;
-  });
+  maybeRenderCards();
+  updateFilterCount();
+  // Tier tally over the current filtered set (the operator-board headline),
+  // counted during the filter pass above.
   const tally = hot || warm ? `  ·  🔥 ${hot} HOT · ${warm} WARM` : "";
   $("result-count").textContent = `${filtered.length} of ${LISTINGS.length} listings${tally}`;
 }
@@ -617,10 +1248,24 @@ function roiCell(roi) {
 }
 
 // ------------- Table render --------------------------------------------------
+// Desktop keeps 800 rows — 800 × 17 columns ≈ 18,400 elements per render, which
+// is fine on a desktop and is not fine on a phone that is already at its heap
+// ceiling. There is no virtualisation here, just the cap.
+const ROW_CAP = LEAN ? 50 : 800;
+let _TBODY_WIRED = false;
+
 function renderTable() {
   const tb = $("listings-tbody");
+  // One delegated listener instead of 800 fresh closures on every keystroke.
+  if (!_TBODY_WIRED) {
+    _TBODY_WIRED = true;
+    tb.addEventListener("click", (e) => {
+      const tr = e.target && e.target.closest ? e.target.closest("tr") : null;
+      if (tr && tr.dataset.id !== undefined) openDetail(filtered[parseInt(tr.dataset.id)]);
+    });
+  }
   tb.innerHTML = filtered
-    .slice(0, 800)
+    .slice(0, ROW_CAP)
     .map((l, i) => {
       const g = getGrade(l) || {};
       const c = getCalc(l) || {};
@@ -667,9 +1312,6 @@ function renderTable() {
     </tr>`;
     })
     .join("");
-  tb.querySelectorAll("tr").forEach((tr) =>
-    tr.addEventListener("click", () => openDetail(filtered[parseInt(tr.dataset.id)])),
-  );
 }
 
 // ------------- Cards render --------------------------------------------------
@@ -730,11 +1372,22 @@ const _EXTRA_BUYERS = [
   {name:"HomeVestors / We Buy Ugly Houses", type:"house_buyers", contact:"https://www.webuyuglyhouses.com/", buys:"cash for houses, blanket coverage", regions:["wnc","upstate_sc"], geo:"Footprint-wide"},
   {name:"Greenville Home Solutions", type:"house_buyers", contact:"https://www.greenvillehomesolutions.com/", buys:"houses + land, Upstate SC", regions:["upstate_sc"], geo:"Greenville/Anderson/Pickens/Oconee/Spartanburg/Laurens"},
 ];
-function _acresOf(l) { const r=l.raw||{}; for (const s of [r.lrcpwa, r.gis, r]) { if (s) for (const k of ["acreage","acres","calculatedAcres","deededAcres"]) { const v=parseFloat(s[k]); if (!isNaN(v)) return v; } } return null; }
+// Single implementation, shared with the projector (_acresProbe). On the LEAN
+// projection raw.lrcpwa/raw.gis carry no acreage keys and the precomputed
+// raw.acres is found on the third probe, so the answer is identical.
+function _acresOf(l) { return _acresProbe(l.raw); }
 function _regionOf(l) { const c = (l.county||"").replace(" County","").trim(); return _WNC.has(c) ? "wnc" : _UPSTATE.has(c) ? "upstate_sc" : null; }
 function _catOf(l) {
   const pk = (l.property_kind||"").toLowerCase(), d = (l.description||"").toLowerCase();
-  if (["land","lot","vacant","acreage"].some(k=>pk.includes(k)) || d.includes("vacant lot") || d.includes("vacant land") || d.includes("vacant parcel")) return "land";
+  // kw_vacant is the precomputed form of the three description probes below.
+  // This is a classification input, not a tooltip: it decides land vs
+  // residential, which decides which buyers match. LEAN drops `description`,
+  // so without this the phone would silently produce different buyer matches
+  // than the desktop for the same lead.
+  const kwv = (l.kw_vacant != null || (l.raw && l.raw.kw_vacant != null))
+    ? !!(l.kw_vacant != null ? l.kw_vacant : l.raw.kw_vacant)
+    : (d.includes("vacant lot") || d.includes("vacant land") || d.includes("vacant parcel"));
+  if (["land","lot","vacant","acreage"].some(k=>pk.includes(k)) || kwv) return "land";
   if (pk.includes("multi") || pk.includes("apartment") || (l.raw && l.raw.multifamily_class)) return "multifamily";
   if (["commercial","retail","office","industrial"].some(k=>pk.includes(k))) return "commercial";
   return "residential";
@@ -919,10 +1572,18 @@ function openBuyer(name) {
   bv.querySelectorAll(".bm-card").forEach((c)=>c.addEventListener("click",()=>openDetail(LISTINGS[parseInt(c.dataset.li)])));
 }
 
+let _CARDS_WIRED = false;
 function renderCards() {
   const grid = $("cards-grid");
+  if (!_CARDS_WIRED) {
+    _CARDS_WIRED = true;
+    grid.addEventListener("click", (e) => {
+      const card = e.target && e.target.closest ? e.target.closest(".card") : null;
+      if (card && card.dataset.id !== undefined) openDetail(filtered[parseInt(card.dataset.id)]);
+    });
+  }
   grid.innerHTML = filtered
-    .slice(0, 200)
+    .slice(0, LEAN ? 40 : 200)
     .map((l, i) => {
       const g = getGrade(l);
       const c = getCalc(l) || {};
@@ -988,8 +1649,13 @@ function renderCards() {
       //     the owner_mailing flags (the authoritative absentee source).
       const om = (l.raw && l.raw.owner_mailing) || {};
       const lrc = (l.raw && l.raw.lrcpwa) || {};
+      // lrcpwa.mail_state is the flattened form of lrcpwa.mailing.state. Today's
+      // board carries only the nested one (verified: 0 of 3,062 lrcpwa blocks
+      // have mail_state), so reading the flat key first is a no-op on desktop
+      // and is what the LEAN projection and the future slim payload emit.
+      const lrcState = lrc.mail_state || (lrc.mailing && lrc.mailing.state) || "";
       if (om.absentee || lrc.absentee) signalChips.push(`<span class="distress-chip absentee">absentee</span>`);
-      if (om.out_of_state || (lrc.mailing && lrc.mailing.state && lrc.mailing.state !== "NC")) signalChips.push(`<span class="distress-chip absentee">out-of-state</span>`);
+      if (om.out_of_state || (lrcState && lrcState !== "NC")) signalChips.push(`<span class="distress-chip absentee">out-of-state</span>`);
       // (3b) Entity-owned lead with a free NC SOS contact (registered agent /
       //      officer) — no paid skip-trace needed to reach the owner.
       const sa = (l.raw && l.raw.sos_agent) || {};
@@ -1045,15 +1711,28 @@ function renderCards() {
       </div>`;
     })
     .join("");
-  grid.querySelectorAll(".card").forEach((c) =>
-    c.addEventListener("click", () => openDetail(filtered[parseInt(c.dataset.id)])),
-  );
 }
 
 // ------------- Map ------------------------------------------------------------
+// Desktop keeps every marker. LEAN caps them: at zoom 7 you cannot visually
+// distinguish 1,500 dots from 36,364, and 36,364 of anything is a jetsam.
+const MAP_CAP = LEAN ? 1500 : Infinity;
+
+/** Marker tooltip HTML — identical text to what bindTooltip used to be given. */
+function markerTip(l) {
+  const g = getGrade(l) || {};
+  const c = getCalc(l) || {};
+  return `<strong>${g.overall || "—"}</strong> · ${l.street_address || ""}<br>` +
+    `Bid: ${fmtMoney(l.opening_bid) || "(no bid)"}<br>` +
+    `${c.roi_pct != null ? `ROI: ${c.roi_pct.toFixed(1)}%` : ""}`;
+}
+
 function initMap() {
   if (!map) {
-    map = L.map("map").setView([35.0, -82.0], 7);
+    // preferCanvas: the default SVG renderer built one <path> element per
+    // marker — 36,364 DOM nodes in a single synchronous loop. Canvas is
+    // visually identical for circleMarkers and costs no DOM at all.
+    map = L.map("map", { preferCanvas: true }).setView([35.0, -82.0], 7);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "© OpenStreetMap",
       maxZoom: 19,
@@ -1062,11 +1741,18 @@ function initMap() {
     map.invalidateSize();
   }
   if (mapMarkers) map.removeLayer(mapMarkers);
-  mapMarkers = L.layerGroup();
+  // featureGroup, NOT layerGroup: only FeatureGroup calls addEventParent on its
+  // children, and event propagation to the group is the whole point here. With
+  // a plain layerGroup the delegated handlers below would never fire and
+  // click-to-open would silently die on desktop too.
+  mapMarkers = L.featureGroup();
+  let plotted = 0, eligible = 0;
   filtered.forEach((l) => {
     if (!l.latitude || !l.longitude) return;
+    eligible++;
+    if (plotted >= MAP_CAP) return;
+    plotted++;
     const g = getGrade(l) || {};
-    const c = getCalc(l) || {};
     const color = g.overall === "A" ? "#1a7f37" : g.overall === "B" ? "#5b8d3a" : g.overall === "C" ? "#b8860b" : g.overall === "D" ? "#b8540c" : "#b22a2a";
     const m = L.circleMarker([l.latitude, l.longitude], {
       radius: 8,
@@ -1075,15 +1761,37 @@ function initMap() {
       fillOpacity: 0.7,
       weight: 2,
     });
-    m.bindTooltip(
-      `<strong>${g.overall || "—"}</strong> · ${l.street_address || ""}<br>` +
-      `Bid: ${fmtMoney(l.opening_bid) || "(no bid)"}<br>` +
-      `${c.roi_pct != null ? `ROI: ${c.roi_pct.toFixed(1)}%` : ""}`,
-    );
-    m.on("click", () => openDetail(l));
+    // The listing rides on the marker instead of in a closure. bindTooltip is
+    // gone from this loop: it used to construct 36,364 L.Tooltip instances up
+    // front, for the one the pointer is actually over.
+    m._fcListing = l;
     mapMarkers.addLayer(m);
   });
+  mapMarkers.on("mouseover", (e) => {
+    const layer = e.propagatedFrom || e.layer;
+    if (!layer || !layer._fcListing || layer.getTooltip()) return;
+    layer.bindTooltip(markerTip(layer._fcListing));
+    layer.openTooltip();
+  });
+  mapMarkers.on("click", (e) => {
+    const layer = e.propagatedFrom || e.layer;
+    if (layer && layer._fcListing) openDetail(layer._fcListing);
+  });
   mapMarkers.addTo(map);
+
+  const note = $("map-cap-note");
+  if (plotted < eligible) {
+    const html = `Showing the first ${plotted.toLocaleString()} of ${eligible.toLocaleString()} mapped listings — filter down, or open on desktop for all of them.`;
+    if (note) note.innerHTML = html;
+    else {
+      const host = $("view-map");
+      if (host) host.insertAdjacentHTML("afterbegin",
+        `<div id="map-cap-note" style="padding:7px 10px;font:500 12px/1.35 system-ui,-apple-system,sans-serif;` +
+        `background:var(--surface-2,#f2efe9);color:var(--muted,#6b6257)">${html}</div>`);
+    }
+  } else if (note) {
+    note.remove();
+  }
 }
 
 // ------------- Detail panel ---------------------------------------------------
@@ -1092,8 +1800,15 @@ function initMap() {
 // Fetched once on the first card open, merged into LISTINGS in place (same
 // object refs as `filtered`, so re-opens are instant). Foreclosure board only;
 // degrades gracefully (empty panels) if the file is missing or length-mismatched.
+//
+// LEAN skips this entirely. listings_detail.json inflates to 70.8 MB and then
+// Object.assigns every sub-object permanently into LISTINGS[i].raw, so the heap
+// never comes back down: on a phone that survived boot, the first tap on a row
+// was what finished it. Until the detail shards land, mobile shows an
+// "open on desktop" note in place of comps / vision / CAMA (see openDetail).
 const _DETAILS_MERGED = {};
 async function ensureDetails() {
+  if (LEAN) return;
   if (DATASET !== "foreclosure" || _DETAILS_MERGED[DATASET]) return;
   _DETAILS_MERGED[DATASET] = true; // set first so concurrent opens don't double-fetch
   try {
@@ -1293,7 +2008,18 @@ async function openDetail(l) {
   if (l.latitude && l.longitude) {
     setTimeout(() => {
       if (detailMap) detailMap.remove();
-      detailMap = L.map("d-map").setView([l.latitude, l.longitude], 15);
+      // On a phone this is a locator, not a map you work in: it is a 240 px band
+      // mid-scroll inside the detail panel and every one of its gestures was
+      // swallowing the thumb-swipe that should scroll the panel.
+      //
+      // On a desktop there is no thumb-swipe to protect, and panning around a
+      // parcel to see what is next to it is real work. Locking it there was an
+      // unintended regression (caught in verification 2026-08-10: the +/- zoom
+      // controls disappeared for desktop users too). Gate it.
+      detailMap = L.map("d-map", LEAN ? {
+        dragging: false, touchZoom: false, scrollWheelZoom: false,
+        doubleClickZoom: false, boxZoom: false, zoomControl: false, keyboard: false,
+      } : {}).setView([l.latitude, l.longitude], 15);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(detailMap);
       L.marker([l.latitude, l.longitude]).addTo(detailMap);
     }, 50);
@@ -1347,6 +2073,13 @@ async function openDetail(l) {
         `).join("")}
         </tbody>
       </table>`;
+  } else if (LEAN) {
+    // Be honest about WHY it is empty rather than hiding the section and
+    // letting it read as "no comps exist for this property".
+    $("d-comps-section").style.display = "block";
+    $("d-comps").innerHTML =
+      `<div class="muted" style="font-size:.9em">Open this lead on a desktop for comps, photo analysis and CAMA. ` +
+      `They are held in a separate 70 MB file that will not fit in a phone browser.</div>`;
   } else {
     $("d-comps-section").style.display = "none";
   }
@@ -1848,15 +2581,21 @@ function exportCsv() {
     const tps = l.owner_name
       ? `https://www.truepeoplesearch.com/results?name=${encodeURIComponent(l.owner_name)}&citystatezip=${encodeURIComponent(((l.city || "") + " " + (l.state || "")).trim())}`
       : "";
+    // This used to end with `...l`, spreading all 43 top-level keys of every
+    // listing into a throwaway object 38,497 times to read 21 of them. The
+    // spread came LAST, so wherever a column name collided with a listing key
+    // the listing value won — reading those 21 fields explicitly here preserves
+    // that precedence exactly. Removing the spread without preserving it would
+    // have quietly changed 21 columns. Verified byte-for-byte by
+    // scratchpad/b/harness.mjs over the real board.
     const row = {
-      grade_overall: g.overall, grade_financial: g.financial, grade_property: g.property,
-      grade_location: g.location, grade_risk: g.risk,
+      grade_overall: g.overall,
       arv_expected: c.arv_expected, rehab_expected: c.rehab_expected,
       max_bid_70: c.max_bid_70, roi_pct: c.roi_pct, cash_on_cash_pct: c.cash_on_cash_pct,
       // contact + signal block
       distress_tier: ds.tier || "", distress_score: ds.score != null ? ds.score : "",
       contactable: ds.contactable ? "yes" : "",
-      owner_name: l.owner_name || "", owner_mailing: om.mailing || "", mail_state: om.mail_state || "",
+      owner_mailing: om.mailing || "", mail_state: om.mail_state || "",
       absentee: om.absentee ? "yes" : "", out_of_state: om.out_of_state ? "yes" : "",
       owner_phone: op.phone || "", phone_source: op.source || "",
       phone_needs_dnc: op.needs_dnc_scrub ? "yes" : "",
@@ -1869,20 +2608,34 @@ function exportCsv() {
                        : dqf.includes("approximate_address") ? "approximate" : "verified",
       arv_confidence: c.arv_confidence || "",
       data_quality_note: dq.summary || "",
-      ...l,
+      // the 21 columns the `...l` spread used to supply, in its precedence
+      owner_name: l.owner_name, sale_date: l.sale_date, state: l.state, county: l.county,
+      street_address: l.street_address, city: l.city, zip_code: l.zip_code,
+      listing_type: l.listing_type, opening_bid: l.opening_bid,
+      bedrooms: l.bedrooms, bathrooms: l.bathrooms, living_sqft: l.living_sqft,
+      year_built: l.year_built, acreage: l.acreage, zoning: l.zoning,
+      case_number: l.case_number, plaintiff: l.plaintiff, defendant: l.defendant,
+      trustee: l.trustee, source: l.source, source_url: l.source_url,
     };
-    rows.push(cols.map((k) => {
+    // Leading "\n" rather than a trailing one so the concatenation of `rows` is
+    // byte-for-byte what rows.join("\n") produced — the join materialised a
+    // second ~19 MB string next to the first, and the Blob copied a third.
+    rows.push("\n" + cols.map((k) => {
       let v = row[k];
       if (v == null) v = "";
       v = String(v).replace(/"/g, '""');
       return /[",\n]/.test(v) ? `"${v}"` : v;
     }).join(","));
   });
-  const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+  const blob = new Blob(rows, { type: "text/csv" });
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(blob);
+  a.href = url;
   a.download = `foreclosure-listings-${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
+  // Never revoked before, so every export pinned its ~19 MB blob for the life
+  // of the document.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 // ------------- Boot ----------------------------------------------------------

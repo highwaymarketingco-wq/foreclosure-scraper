@@ -339,3 +339,406 @@ select:focus-visible, [tabindex]:focus-visible {
 *::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
 *::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ============================================================================
+   MOBILE  ·  <= 720px  ·  MUST STAY THE LAST BLOCK IN THIS FILE
+   ============================================================================
+   Why every mobile rule lives here and not in style.css:
+
+   index.html loads style.css and then premium.css. Media queries add ZERO
+   specificity, so premium.css's later declarations already beat the
+   identical-specificity rules inside style.css's own @media (max-width:720px)
+   block (style.css:1036-1053). 12 of its 14 declarations were measured dead.
+   The worst case: style.css:1043 raises form controls to 16px to stop iOS
+   Safari's focus auto-zoom, and premium.css:225-228 silently pushed them back
+   to 13px. That bug was already fixed once and this file undid it.
+
+   So: append here, never re-edit style.css:1036-1053 — it cannot win.
+
+   Nothing below this comment may escape the media query. Desktop works today;
+   a rule outside the query is a desktop regression, which is a net loss even
+   if it improves the phone.
+   ============================================================================ */
+@media (max-width: 720px) {
+
+  /* --- C1.1 · kill the 673px of horizontal page scroll --------------------
+     Measured cause: .stage-toggle is 1027px and .dataset-toggle 479px. Both
+     are inline-flex with nowrap children, so as flex items of .app-header
+     their min-width:auto floors them at min-content and the header's
+     flex-wrap can never rescue them. Regrid the header and turn both pill
+     strips into snap-scrolling rails.
+
+     min-width:0 is the LOAD-BEARING declaration. Without it the item still
+     floors at min-content and overflow-x never engages. */
+  .app-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "brand meta"
+      "ds    meta"
+      "stage stage";
+    align-items: center;
+    gap: 5px 8px;
+    padding: 4px 12px;
+    padding-top: calc(4px + env(safe-area-inset-top));
+    padding-left: calc(12px + env(safe-area-inset-left));
+    padding-right: calc(12px + env(safe-area-inset-right));
+  }
+  .brand      { grid-area: brand; gap: 10px; min-width: 0; }
+  .brand > div{ min-width: 0; }
+  .brand-meta { grid-area: meta;  flex-wrap: nowrap; gap: 6px; }
+  .dataset-toggle { grid-area: ds; }
+  .stage-toggle   { grid-area: stage; }
+
+  .brand-logo { width: 28px; height: 28px; border-radius: 8px; }
+  .brand-logo svg { width: 16px; height: 16px; }
+  .brand h1 {
+    font-size: 14.5px; line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  /* "Upstate SC · Western NC · updated…" — 11.5px and non-actionable. */
+  .subtitle { display: none; }
+  /* Every px the badges take is stolen from the dataset rail beside them, and
+     all three numbers are already on screen: the total is in the "Foreclosures
+     38,500" pill and in the TOTAL LISTINGS stat card, the A-grade count is the
+     A GRADE stat card, and "priced" is WITH OPENING BID. Dropping them takes
+     the dataset rail from 212px to 299px at a 375px viewport. */
+  .brand-meta .badge { display: none; }
+  /* dashboard.js:179 writes an inline display on this one, so only !important
+     can beat it. It is the single !important in this block. */
+  #a-grade-badge { display: none !important; }
+
+  /* the two pill strips become horizontal rails */
+  .dataset-toggle, .stage-toggle {
+    display: flex;
+    width: 100%;
+    min-width: 0;                 /* <- without this, overflow-x is inert */
+    padding: 0;                   /* pill height alone sets the rail height */
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .dataset-toggle::-webkit-scrollbar,
+  .stage-toggle::-webkit-scrollbar { display: none; }
+  .ds-btn, .stage-btn {
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    padding: 0 14px;
+    min-height: 44px;             /* C1.6 — min-height, never padding */
+  }
+  /* Closing Soon is the only stage with a legal clock, and the reason someone
+     opens this on a phone. Put it first in the rail. */
+  .stage-btn.stage-deadline { order: -1; }
+
+  /* --- C1.2 · iOS focus auto-zoom -----------------------------------------
+     Safari zooms the viewport whenever a focused control is under 16px and
+     never zooms back out, which stacks on top of C1.1. */
+  .filters input[type="text"],
+  .filters select,
+  .filters input[type="date"],
+  #search, #sort-mobile,
+  .crm-date, .crm-notes { font-size: 16px; }
+
+  /* --- C1.3 · 1447px of chrome before the first data row ------------------ */
+
+  /* stats: 3 of 7 cards (total / A grade / positive ROI). */
+  .stats { padding: 8px 12px 0; gap: 8px; grid-template-columns: repeat(3, 1fr); }
+  .stat  { padding: 8px; border-radius: 12px; }
+  .stat:nth-child(3), .stat:nth-child(4),
+  .stat:nth-child(6), .stat:nth-child(7) { display: none; }
+  /* .stat-num measured clientWidth 63 / scrollWidth 87 inside
+     .stat{overflow:hidden} — "38,500" was rendering as "38,50" on both
+     phones. Smaller type + smaller padding is the fix. */
+  .stat-num { font-size: 17px; letter-spacing: -.03em; }
+  .stat-lbl { font-size: 9.5px; margin-top: 3px; letter-spacing: .04em; }
+
+  /* filter bar: Search on row 1, View + the sheet trigger on row 2, the other
+     14 groups collapsed behind #filter-sheet-toggle (owner D's button, wired
+     by owner B). .filter-group is the only element type in .filters besides
+     that button, so :first-of-type is Search and :last-of-type is View. */
+  .filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: 8px;
+    margin: 8px 12px 0;
+    padding: 10px;
+    border-radius: 12px;
+  }
+  .filters .filter-group { grid-column: 1 / -1; width: 100%; min-width: 0; }
+  /* style.css:1044 sets min-width:100% on the search input, which is a no-op:
+     a percentage min-width against a shrink-to-fit flex item resolves to 0,
+     so #search rendered at 167px instead of full width. */
+  .filters .filter-group input,
+  .filters .filter-group select { width: 100%; min-width: 0; min-height: 44px; }
+  .filters input[type="text"] { padding: 0 14px; }
+  /* premium.css:226 sets `background:` as a SHORTHAND, which resets
+     background-image and so deletes the chevron style.css:346 draws on every
+     select. The controls stop reading as dropdowns. That is true on desktop
+     too, but desktop is frozen, so the restore is scoped to mobile — where
+     the selects are now full-width and the missing affordance is obvious. */
+  .filters select {
+    appearance: none; -webkit-appearance: none;
+    padding: 0 34px 0 14px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5l3 3 3-3' stroke='%238a7f71' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+  }
+  .filters .filter-group:first-of-type { order: -3; }
+  .filters .filter-group:last-of-type  { order: -2; grid-column: 1; }
+  /* the two always-visible controls label themselves (placeholder / button
+     text), so their labels are pure vertical cost on a phone */
+  .filters .filter-group:first-of-type > label,
+  .filters .filter-group:last-of-type  > label { display: none; }
+  .filters.is-collapsed .filter-group:not(:first-of-type):not(:last-of-type) { display: none; }
+
+  .view-toggle { display: flex; width: 100%; padding: 0; }
+  .view-btn { flex: 1; min-height: 44px; padding: 0 8px; }
+
+  #filter-sheet-toggle {
+    order: -1;
+    grid-column: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 46px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text-2);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  /* state is read off .filters.is-collapsed, not aria-expanded, so the chevron
+     stays correct however owner B chooses to maintain the attribute */
+  .filters.is-collapsed #filter-sheet-toggle::after { content: "▾"; opacity: .6; font-size: 11px; }
+  .filters:not(.is-collapsed) #filter-sheet-toggle::after { content: "▴"; opacity: .6; font-size: 11px; }
+  .filters:not(.is-collapsed) #filter-sheet-toggle {
+    background: var(--accent-soft); color: var(--accent); border-color: var(--accent);
+  }
+  #filter-active-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 19px; height: 19px; padding: 0 5px;
+    border-radius: 999px;
+    background: var(--accent); color: var(--on-accent);
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  #filter-active-count:empty { display: none; }
+
+  /* main + result bar */
+  main {
+    padding: 0 12px 24px;
+    padding-left: calc(12px + env(safe-area-inset-left));
+    padding-right: calc(12px + env(safe-area-inset-right));
+  }
+  .result-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px auto;
+    align-items: center;
+    gap: 6px 8px;
+    margin: 0;
+    padding: 8px 0 6px;
+  }
+  /* 11px, not 12: the live count string ("38647 of 38650 listings · 🔥 539 HOT
+     · 20149 WARM") wrapped to a second line at 375px, pushing the first data
+     row to y=432 past the 420 budget. It fits on one line here. */
+  /* Explicit rows on all four children. Grid auto-placement only ever moves
+     FORWARD, so with column-only assignments the child that appears first in
+     the markup claims its column and pushes every later, lower-numbered column
+     onto a new row — which is exactly what happened here. */
+  #result-count { order: -1; grid-column: 1 / -1; grid-row: 1; font-size: 11px; }
+  /* Direction toggle. <thead> is hidden on mobile, so this is the ONLY way to
+     reverse a sort on a phone. */
+  #sort-dir {
+    order: 0;
+    grid-column: 2;
+    grid-row: 2;
+    width: 44px;
+    min-height: 44px;
+    padding: 0;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text);
+    font-size: 16px;
+    line-height: 1;
+  }
+  #sort-mobile {
+    order: 0;
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+    min-height: 44px;
+    padding: 0 34px 0 12px;
+    appearance: none; -webkit-appearance: none;
+    background-color: var(--surface-2);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5l3 3 3-3' stroke='%238a7f71' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--text);
+    font-family: inherit;
+    font-weight: 600;
+  }
+  #export-csv { order: 1; grid-column: 3; grid-row: 2; min-height: 44px; padding: 0 14px; }
+
+  /* --- C1.4 · the 17-column table becomes stacked cards -------------------
+     Measured: table 1316px inside a 301px window = 4.4 sideways swipes per
+     record. CSS only — renderTable() and the sort path in dashboard.js are
+     untouched. The eleven hidden columns all remain in the detail panel and
+     in the CSV export, so nothing is lost.
+
+     Hiding <thead> takes the th[data-sort] click targets with it; that is
+     what #sort-mobile replaces (owner D's select, dispatched at the matching
+     th by owner B, so the sort logic itself never changes). */
+  .table-wrap {
+    max-height: none;
+    overflow: visible;
+    margin: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  #listings-table, #listings-table tbody { display: block; width: 100%; }
+  #listings-table thead { display: none; }
+  /* moot on mobile since thead is hidden, but the token is the accessible one:
+     thead th on --surface-2 measures 4.24:1 in light theme with --muted */
+  #listings-table thead th { color: var(--text-2); }
+
+  #listings-table tbody tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "grade addr roi"
+      "grade city bid"
+      "grade date date";
+    align-items: center;
+    gap: 1px 10px;
+    padding: 11px 13px;
+    margin-bottom: 8px;
+    min-height: 64px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  /* The grade stripe is an inset box-shadow on the row (style.css:486-490) and
+     the card elevation is also a box-shadow, so they have to be one
+     declaration or the second silently deletes the first. */
+  #listings-table tbody tr        { box-shadow: var(--shadow-sm); }
+  #listings-table tbody tr.row-A  { box-shadow: inset 4px 0 0 0 var(--grade-A), var(--shadow-sm); }
+  #listings-table tbody tr.row-B  { box-shadow: inset 4px 0 0 0 var(--grade-B), var(--shadow-sm); }
+  #listings-table tbody tr.row-C  { box-shadow: inset 4px 0 0 0 var(--grade-C), var(--shadow-sm); }
+  #listings-table tbody tr.row-D  { box-shadow: inset 4px 0 0 0 var(--grade-D), var(--shadow-sm); }
+  #listings-table tbody tr.row-F  { box-shadow: inset 4px 0 0 0 var(--grade-F), var(--shadow-sm); }
+  /* premium.css:278-282 also paints the stripe on td:first-child, which would
+     double it inside the card */
+  #listings-table tbody tr.row-A td:first-child,
+  #listings-table tbody tr.row-B td:first-child,
+  #listings-table tbody tr.row-C td:first-child,
+  #listings-table tbody tr.row-D td:first-child,
+  #listings-table tbody tr.row-F td:first-child { box-shadow: none; }
+
+  #listings-table tbody td {
+    display: block;
+    border: 0;
+    padding: 0;
+    line-height: 1.3;
+    font-size: 13px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  /* 1 Grade — tier dot, grade badge and intent score stack instead of running
+     79px wide across the top of every card */
+  #listings-table tbody td:nth-child(1) {
+    grid-area: grade;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    margin-left: 2px;
+  }
+  #listings-table tbody td:nth-child(1) .intent-badge { margin-left: 0; }
+  #listings-table tbody td:nth-child(2)  { grid-area: date; font-size: 12px; color: var(--muted); }
+  #listings-table tbody td:nth-child(5)  { grid-area: addr; font-size: 15px; font-weight: 600; color: var(--text); }
+  #listings-table tbody td:nth-child(6)  { grid-area: city; color: var(--muted); }
+  #listings-table tbody td:nth-child(8)  { grid-area: bid;  text-align: right; color: var(--text-2); white-space: nowrap; }
+  #listings-table tbody td:nth-child(12) { grid-area: roi;  text-align: right; font-size: 15px; font-weight: 700; white-space: nowrap; }
+  /* St, County, Type, Est. ARV, Est. Rehab, Max Bid, Bd, Ba, SqFt, Year,
+     Case # — all still in the detail panel and the CSV */
+  #listings-table tbody td:nth-child(3),
+  #listings-table tbody td:nth-child(4),
+  #listings-table tbody td:nth-child(7),
+  #listings-table tbody td:nth-child(9),
+  #listings-table tbody td:nth-child(10),
+  #listings-table tbody td:nth-child(11),
+  #listings-table tbody td:nth-child(13),
+  #listings-table tbody td:nth-child(14),
+  #listings-table tbody td:nth-child(15),
+  #listings-table tbody td:nth-child(16),
+  #listings-table tbody td:nth-child(17) { display: none; }
+
+  /* --- map ---------------------------------------------------------------- */
+  /* premium.css:325 gives #view-map a 22px side margin inside main's own
+     padding, which wastes 72px of a 375px screen. And 100vh is the wrong unit
+     for a home-screen app: it is the LARGEST viewport, so the map is taller
+     than the visible area whenever Safari's bars are showing. 150px is the
+     139px sticky header plus a hairline, so the map fills the screen exactly
+     once the stats and filter bar have scrolled away. */
+  #view-map { margin: 0; }
+  #map { height: calc(100vh - 150px); height: calc(100dvh - 150px); }
+  /* leaflet.css:288 is `.leaflet-bar a{26px}` and :324 is
+     `.leaflet-touch .leaflet-bar a{30px}` — Leaflet adds .leaflet-touch to
+     the container on every touch device, so the 2-class selector is the one
+     that has to be matched. leaflet.css loads before this file (index.html
+     :38 vs :52), so an equal-specificity rule here wins on order; no
+     !important needed. */
+  .leaflet-touch .leaflet-bar a,
+  .leaflet-bar a { width: 44px; height: 44px; line-height: 44px; }
+
+  /* --- C1.5 · 106px of sideways scroll inside the detail panel -------------
+     The 6- and 7-column comps tables (dashboard.js:1335, :1379, :1412) are
+     injected raw with no overflow wrapper, and #detail-panel{overflow-y:auto}
+     forces its overflow-x to compute to auto, so the whole panel slides. Give
+     each table its own scroller and stop the panel from absorbing it. */
+  #detail-panel { overflow-x: hidden; }
+  .comps-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .comps-table thead, .comps-table tbody { display: table; width: max-content; min-width: 100%; }
+
+  /* detail panel chrome + notch */
+  .detail-header { padding: calc(16px + env(safe-area-inset-top)) 20px 14px; }
+  .close-btn { width: 44px; height: 44px; top: calc(10px + env(safe-area-inset-top)); right: 12px; }
+  .detail-body { padding: 18px 20px calc(28px + env(safe-area-inset-bottom)); line-height: 1.55; }
+  .mini-map { height: 200px; }
+
+  /* --- C1.6 · remaining sub-44px touch targets ----------------------------
+     min-height rather than padding: every one of these computes
+     line-height:normal, because the UA button/input font shorthand beats the
+     inherited line-height:1.45 at style.css:130, so padding maths on these is
+     unreliable. */
+  .theme-toggle { width: 44px; height: 44px; margin-left: 0; }
+  .filter-slider { height: 44px; }
+  .crm-status-btn { min-height: 44px; padding: 0 14px; display: inline-flex; align-items: center; }
+  .crm-date { min-height: 44px; }
+  .btype-pill, .buyer-back { min-height: 44px; padding: 0 14px; display: inline-flex; align-items: center; }
+  .buyer-chip { min-height: 44px; padding: 0 12px; display: inline-flex; align-items: center; }
+  .ev-details > summary { min-height: 44px; padding: 12px 0; }
+
+  /* --- readability + theme correctness on the panel that is now the primary
+     mobile surface. .ev-key/.ev-hot .ev-key were hard-coded hex that ignore
+     data-theme entirely (#c2410c measures ~3.3:1 on the dark navy surface). */
+  .ev-key { color: var(--muted); }
+  .ev-hot .ev-key { color: var(--warn); }
+  .ev-val, .rationale-row { line-height: 1.55; }
+  footer {
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+    line-height: 1.55;
+  }
+  body { min-height: 100dvh; }
+}
