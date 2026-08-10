@@ -76,3 +76,6 @@ backups/
 # load_board falls back to the committed .gz on a fresh clone. See web_artifact.read_board_json.
 docs/listings.json
 docs/listings_detail.json
+# Same rule for the mobile slim payload: the .gz twin (docs/listings_slim.json.gz)
+# is committed and served; the uncompressed twin stays local only.
+docs/listings_slim.json

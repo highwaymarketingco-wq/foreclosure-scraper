@@ -202,6 +202,20 @@ if [[ "$RC" -eq 0 && -f "$ROOT/docs/listings.json" ]]; then
   PUB_FILES=(docs/listings.json.gz docs/listings_detail.json.gz
              docs/run_meta.json docs/run_health.json
              docs/foreclosure_sold_pool.json docs/multifamily.json)
+  # docs/listings_slim.json.gz is the mobile payload write_artifact() emits
+  # alongside the board. Added ONLY IF PRESENT: a pathspec matching no file makes
+  # `git add` exit 128 and stage NOTHING AT ALL (unlike a gitignored path, which
+  # only skips itself), so hardcoding it would silently stop publishing the whole
+  # dashboard on any checkout where the slim emitter hasn't run yet.
+  # "exists OR already tracked", not just "exists". The 128-exit only happens
+  # when the path is absent AND untracked; once it is tracked we must still be
+  # able to stage its DELETION, which is how the emitter's delete-on-failure
+  # path (and FORECLOSURE_SLIM=0) actually reaches the live site. Gating on
+  # existence alone leaves the last-published slim serving phones forever.
+  if [ -f "$ROOT/docs/listings_slim.json.gz" ] \
+     || git -C "$ROOT" ls-files --error-unmatch docs/listings_slim.json.gz >/dev/null 2>&1; then
+    PUB_FILES+=(docs/listings_slim.json.gz)
+  fi
   if command -v git >/dev/null 2>&1; then
     cd "$ROOT"
     git add "${PUB_FILES[@]}" 2>/dev/null || true

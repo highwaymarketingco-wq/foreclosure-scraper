@@ -54,6 +54,27 @@ def main() -> int:
     _p = Path("docs/listings.json")
     (_p.parent / "listings.json.gz").write_bytes(_gz.compress(_p.read_bytes(), compresslevel=9, mtime=0))
 
+    # This script is a board writer that BYPASSES write_artifact(): it mutates
+    # docs/listings.json in place and regenerates only listings.json.gz. It
+    # therefore cannot regenerate docs/listings_slim.json.gz, the index-aligned
+    # mobile payload write_artifact() emits. Publishing here would ship a fresh
+    # board next to a slim file describing the PREVIOUS board — the dashboard
+    # would render stale tiers on phones and correct ones on desktop, silently.
+    # So once the slim payload exists, refuse to publish. Nothing is lost: the
+    # mutation is already persisted to docs/listings.json, and the next
+    # write_artifact() caller re-emits board + slim together from one payload.
+    if (_p.parent / "listings_slim.json.gz").exists():
+        print(f"[{time.strftime('%H:%M:%S')}] NOT PUBLISHING: docs/listings.json was "
+              "updated in place, but this script cannot regenerate "
+              "docs/listings_slim.json.gz (the mobile payload), which would go "
+              "stale against the board.\n"
+              "  Next step:  python scripts/regenerate_dashboard.py\n"
+              "  That calls write_artifact(), which re-emits listings.json.gz, "
+              "listings_detail.json.gz and listings_slim.json.gz from one payload.\n"
+              "  Then publish (or just let the next daily job publish it).",
+              flush=True)
+        return 0
+
     if os.environ.get("STACK_PUBLISH", "1") == "1":
         import subprocess
         root = str(Path(__file__).parent.parent)

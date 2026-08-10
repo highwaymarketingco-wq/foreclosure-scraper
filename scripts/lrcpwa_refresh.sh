@@ -19,8 +19,23 @@ fi
 # .gz twins only — the uncompressed listings.json/.detail.json are gitignored
 # (over GitHub's 100MB limit; load_board rebuilds from the .gz). Naming an
 # ignored path in git add fails the whole command.
-git add docs/listings.json.gz docs/listings_detail.json.gz \
-        docs/run_meta.json docs/parcel_photos 2>/dev/null
+# docs/listings_slim.json.gz is the payload PHONES fetch. This script calls
+# write_artifact(), so it regenerates the slim file — but it used to commit the
+# fat board and run_meta while leaving the fresh slim uncommitted, which puts
+# phones on a stale board (or a blank one, when the record count moves) until
+# the next publisher that stages it. Desktop looked perfect the whole time.
+#
+# Gate on "exists OR is already tracked", not just "exists": a pathspec matching
+# no file AND not in the index makes `git add` exit 128 and stage NOTHING AT ALL,
+# but once the file is tracked we must still be able to stage its DELETION —
+# that is how the emitter's delete-on-failure path reaches the live site.
+PUB=(docs/listings.json.gz docs/listings_detail.json.gz
+     docs/run_meta.json docs/parcel_photos)
+if [ -f docs/listings_slim.json.gz ] \
+   || git ls-files --error-unmatch docs/listings_slim.json.gz >/dev/null 2>&1; then
+  PUB+=(docs/listings_slim.json.gz)
+fi
+git add "${PUB[@]}" 2>/dev/null
 if ! git diff --cached --quiet; then
   git commit -q -m "Scheduled land-records refresh: lrcpwa addresses/values/photos + tags
 

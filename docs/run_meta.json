@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-08-10T18:02:11.554293Z",
+  "run_time": "2026-08-10T20:38:43.100252Z",
   "total": 38500,
   "by_source": {
     "national.auction_dot_com": 12,
@@ -321,8 +321,12 @@
     "newspapers.tryon_bulletin",
     "national.gsa_realproperty"
   ],
-  "notes": "scheduled NC SOS registered-agent refresh",
-  "health_carried_from": "2026-08-10T17:35:40.948426Z",
+  "notes": "catchup_geocode: filled 43 of 2,136 leads missing lat/lng",
+  "board": {
+    "schema": "slim-v1",
+    "count": 38500
+  },
+  "health_carried_from": "2026-08-10T18:02:11.554293Z",
   "health_carried_keys": [
     "by_source",
     "by_state",

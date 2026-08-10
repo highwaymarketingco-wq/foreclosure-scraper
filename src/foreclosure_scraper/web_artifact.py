@@ -41,6 +41,16 @@ def read_board_json(path: Path | str):
     raise FileNotFoundError(f"{p} (and {p.name}.gz) not found")
 
 
+def _board_file_present(path: Path) -> bool:
+    """True when a board file exists as either the plain .json or its .gz twin.
+
+    The presence test that pairs with read_board_json. `path.exists()` alone is
+    the wrong question anywhere the uncompressed twin is gitignored.
+    """
+    p = Path(path)
+    return p.exists() or p.with_name(p.name + ".gz").exists()
+
+
 def load_board(docs_dir: Path | str = "docs") -> list[Listing]:
     """Load the published board as Listing objects WITH the lazy-detail sidecar
     merged back into each lead's raw.
@@ -320,6 +330,337 @@ def _is_valid_street_address(addr: str | None) -> bool:
 LAZY_DETAIL_KEYS = ("vision", "foreclosure_sold_comps", "comps", "cama", "rent_comps")
 
 
+# ===========================================================================
+# SLIM-V1 — docs/listings_slim.json(.gz), the mobile payload
+#
+# 2026-08-10: the board was killing the WebContent process on two iPhones on
+# every launch. docs/dashboard.js now streams listings.json.gz and projects each
+# record down to a field allowlist as it parses (521 MB heap -> 167 MB), which
+# fixed the crash but still makes a phone download and inflate 272 MB to throw
+# ~85% of it away. This emits that projection build-side instead: ~52 MB of JSON
+# and ~4 MB on the wire.
+#
+# THE THREE RULES THIS FILE IS UNDER:
+#
+# 1. ADDITIVE, NEVER AUTHORITATIVE. listings.json + listings_detail.json are
+#    TOGETHER the only full-fidelity board on disk — both are gitignored, only
+#    the .gz twins are committed. Drop a key from either and the next
+#    load_board() returns Listings without it, the next write_artifact()
+#    re-serializes from that lobotomized raw, and the enrichment is gone
+#    permanently, with three unattended launchd jobs (dailyvision 09:30, lrcpwa
+#    12:00, sosagent 14:00) doing it within hours. So the slim file is derived
+#    from the same `payload` list AFTER both authoritative files are already on
+#    disk, it never mutates `payload`, and load_board() must NEVER read it.
+#
+# 2. IT IS THE BUILD-SIDE COPY OF THE CLIENT'S PROJECTOR, and the two can drift.
+#    _SLIM_TOP / _SLIM_RAW / _SLIM_RAW_SCALARS mirror _LEAN_TOP / _LEAN_RAW /
+#    _LEAN_RAW_SCALARS in docs/dashboard.js, and _project_slim_record mirrors
+#    projectRecord(rec, true) — including the four fields the client derives
+#    from `description` (kw_vacant, the flattened acres probe,
+#    lrcpwa.mail_state, life_events as an int) and the Helene placard regex, all
+#    of which are precomputed here so the slim file does not have to ship
+#    `description` at all. The projector is idempotent, so a LEAN client running
+#    it over an already-slim record is a no-op and one code path reads both
+#    files. tests/test_board_slim.py parses the JS and asserts the two lists are
+#    equal — if that test fails, the client changed and this must follow.
+#
+# 3. NOTE _SLIM_RAW's "*" SENTINEL. grade and calc are kept WHOLE. They were
+#    sub-allowlisted client-side and both drifted within hours: the grade badge
+#    row rendered "undefined undefined undefined undefined" and every listing on
+#    every phone claimed "CONFIDENCE: LOW". A fabricated number on a board people
+#    bid money off is worse than a missing one. Do not sub-allowlist them here.
+# ===========================================================================
+
+# Top-level scalars. Mirrors _LEAN_TOP. `description` is deliberately absent —
+# everything the client derived from it is precomputed below.
+_SLIM_TOP = (
+    "source", "source_url", "listing_type", "property_kind",
+    "street_address", "city", "state", "zip_code", "county", "parcel_id",
+    "latitude", "longitude",
+    "sale_date", "sale_time", "sale_location", "upset_bid_deadline", "redemption_deadline",
+    "opening_bid", "judgment_amount", "tax_value", "auction_status", "foreclosure_process",
+    "bedrooms", "bathrooms", "living_sqft", "year_built", "acreage", "zoning",
+    "case_number", "plaintiff", "defendant", "trustee", "owner_name",
+)
+
+# Per-block sub-key allowlist. Mirrors _LEAN_RAW. A block present in the source
+# is ALWAYS emitted even when none of its sub-keys survive, because several
+# client call sites test the block for existence rather than reading it
+# (raw.upset_bid, raw.bankruptcy). "*" keeps the block whole — see rule 3.
+_SLIM_RAW: dict[str, str | tuple[str, ...]] = {
+    "grade": "*",
+    "calc": "*",
+    # data_quality.summary is 5.7 MB of prose and reads like an obvious cut. It
+    # stays: it is the CSV's data_quality_note column, and the export must be
+    # byte-identical on every device.
+    "data_quality": ("flags", "summary"),
+    "distress_stack": ("tier", "score", "stack", "signals", "categories", "absentee",
+                       "out_of_state", "contactable", "equity_band",
+                       "surviving_senior_debt_risk"),
+    "signal_stack": ("count",),
+    "strategy_fit": ("tags",),
+    "owner_mailing": ("mailing", "mail_state", "absentee", "out_of_state"),
+    "owner_phone": ("phone", "source", "needs_dnc_scrub"),
+    "sos_agent": ("sosid", "best_contact_name", "best_contact_address"),
+    "rod": ("has_mortgage", "has_adverse_lien"),
+    "equity": ("value", "pct", "is_underwater"),
+    "title_risk": ("surviving_senior_debt_risk",),
+    "corroboration": ("court_confirmed", "label", "tier", "multi_source"),
+    "helene": ("worst_placard", "worst_damage_pct", "damaged_buildings"),
+    "bankruptcy": ("chapter", "date_filed", "case_name", "docket_number", "court"),
+    "courtlistener": ("chapter", "date_filed", "court"),
+    "last_sale": ("date", "amount", "basis"),
+    "zillow": ("photo",),
+    "gis": ("owner",),
+    "lrcpwa": ("absentee", "mail_state"),
+    "tax_owed": ("balance",),
+    "upset_bid": ("in_window", "days_remaining"),
+}
+
+# Mirrors _LEAN_RAW_SCALARS.
+_SLIM_RAW_SCALARS = (
+    "intent_score", "intent_band", "multifamily_class",
+    "stale_case", "geo_imprecise", "sold_confirmed", "kw_vacant", "acres",
+)
+
+# Mirrors _ACRE_KEYS. The client probes three containers x four names = the
+# 12-way acreage probe; the result is flattened to raw.acres here so the slim
+# file carries one number instead of three blocks kept alive to hold it.
+_SLIM_ACRE_KEYS = ("acreage", "acres", "calculatedAcres", "deededAcres")
+
+# Mirrors the two regexes in heleneInfo()'s description fallback. Only Asheville
+# Helene leads carry a placard in prose rather than in the dedup meta.
+_HELENE_PLACARD_RE = re.compile(r"Helene damage:\s*([A-Za-z]+)\s+placard")
+_HELENE_PCT_RE = re.compile(r"placard\s*-\s*([0-9]+)%")
+_HELENE_SOURCE = "counties_nc.asheville_helene"
+
+_VACANT_MARKERS = ("vacant lot", "vacant land", "vacant parcel")
+
+# JS parseFloat: optional sign, leading numeric prefix, trailing garbage ignored
+# ("12.5 acres" -> 12.5). Anchored at the start after stripping leading space.
+_JS_FLOAT_RE = re.compile(r"[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?")
+
+
+def _js_parse_float(v):
+    """Python stand-in for JS ``parseFloat``, which is what the client's acreage
+    probe uses. Non-numeric -> None (JS NaN). Booleans are NOT numbers in JS, and
+    Python's bool-is-int would otherwise turn ``acreage: true`` into 1 acre.
+
+    Integral results come back as ``int`` so json.dumps emits ``12`` and not
+    ``12.0`` — matching JSON.stringify, which has no float/int distinction.
+    """
+    if isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        f = float(v)
+    elif isinstance(v, str):
+        m = _JS_FLOAT_RE.match(v.strip())
+        if not m:
+            return None
+        try:
+            f = float(m.group(0))
+        except ValueError:
+            return None
+    else:
+        return None
+    if f != f or f in (float("inf"), float("-inf")):  # NaN / Infinity
+        return None
+    return int(f) if f.is_integer() and abs(f) < 2 ** 53 else f
+
+
+def _slim_acres_probe(raw: dict):
+    """Mirrors _acresProbe: first hit across (raw.lrcpwa, raw.gis, raw) x the
+    four acreage spellings. Returns None when nothing parses."""
+    r = raw if isinstance(raw, dict) else {}
+    for src in (r.get("lrcpwa"), r.get("gis"), r):
+        if not isinstance(src, dict):
+            continue
+        for k in _SLIM_ACRE_KEYS:
+            v = _js_parse_float(src.get(k))
+            if v is not None:
+                return v
+    return None
+
+
+def _slim_life_event_count(le) -> int | float:
+    """Mirrors _lifeEventCount. raw.life_events is a list of probate/elderly
+    signals but the client only ever reads ``.length``, so the slim file ships
+    the count. Matches the JS exactly, including that a bool has no .length."""
+    if le is None or isinstance(le, bool):
+        return 0
+    if isinstance(le, (int, float)):
+        return le
+    try:
+        return len(le) or 0
+    except TypeError:
+        return 0
+
+
+def _project_slim_record(rec: dict) -> dict:
+    """Build-side ``projectRecord(rec, lean=true)``.
+
+    Pure: never mutates `rec` or anything reachable from it. The "*" blocks are
+    passed through by REFERENCE (they are large and this runs 38,500 times), so
+    every derived value below is written into a dict this function created.
+    """
+    if not isinstance(rec, dict):
+        return rec
+
+    out: dict = {}
+    for k in _SLIM_TOP:
+        if k in rec:
+            out[k] = rec[k]
+
+    desc = rec.get("description")
+    if not isinstance(desc, str):
+        desc = ""
+    # kw_vacant replaces the three description probes in _catOf(), which decide
+    # land vs residential and therefore which buyers match a lead. Precomputing
+    # it is what lets `description` (6.1 MB) leave the payload without mobile
+    # silently classifying leads differently from desktop.
+    #
+    # The `elif desc` (rather than a plain else) is what makes the CLIENT's
+    # projector a strict fixed point on this file's output: with no description
+    # in hand it emits no kw_vacant, so writing `kw_vacant: false` here for the
+    # 65-odd records that carry an empty description would make
+    # projectRecord(slim) stop deep-equalling slim. _catOf reads an absent
+    # kw_vacant and a false one identically once description is also gone, so
+    # this is byte-saving, not behaviour.
+    kwv = rec.get("kw_vacant")
+    if kwv is not None:
+        out["kw_vacant"] = bool(kwv)
+    elif desc:
+        low = desc.lower()
+        out["kw_vacant"] = any(m in low for m in _VACANT_MARKERS)
+
+    raw = rec.get("raw")
+    if not isinstance(raw, dict):
+        if "raw" in rec:
+            out["raw"] = raw
+        return out
+
+    r: dict = {}
+    for k, subs in _SLIM_RAW.items():
+        src = raw.get(k)
+        if src is None:
+            continue
+        if not isinstance(src, dict):
+            r[k] = src            # shape drift: keep verbatim, same as the client
+            continue
+        if subs == "*":
+            r[k] = src            # by reference — never mutated
+            continue
+        r[k] = {sk: src[sk] for sk in subs if sk in src}
+
+    for k in _SLIM_RAW_SCALARS:
+        if k in raw:
+            r[k] = raw[k]
+
+    asi = raw.get("also_seen_in")
+    if isinstance(asi, list):
+        # Mirrors the client's {url, source} map. Absent sub-keys stay absent
+        # rather than becoming nulls — JSON.stringify drops undefined.
+        r["also_seen_in"] = [
+            ({sk: s[sk] for sk in ("url", "source") if sk in s} if isinstance(s, dict) else s)
+            for s in asi
+        ]
+
+    if "life_events" in raw:
+        r["life_events"] = _slim_life_event_count(raw["life_events"])
+
+    # lrcpwa.mail_state is the flattened form of lrcpwa.mailing.state, which the
+    # out-of-state chip reads. Today's board carries only the nested key, so
+    # without this the chip vanishes for 270 of the 3,062 leads with an lrcpwa
+    # block. (r["lrcpwa"] is our own dict, so this mutation cannot reach payload.)
+    lr = r.get("lrcpwa")
+    if isinstance(lr, dict) and "mail_state" not in lr:
+        src_lr = raw.get("lrcpwa")
+        mailing = src_lr.get("mailing") if isinstance(src_lr, dict) else None
+        if isinstance(mailing, dict) and mailing.get("state") is not None:
+            lr["mail_state"] = mailing["state"]
+
+    if "acres" not in r:
+        a = _slim_acres_probe(raw)
+        if a is not None:
+            r["acres"] = a
+
+    # heleneInfo() falls back to a regex over `description` when the dedup meta
+    # carries no placard. Run that fallback here, while description is still in
+    # hand, so worst_placard is always populated in the slim file.
+    if desc and rec.get("source") == _HELENE_SOURCE:
+        h = r.get("helene")
+        if h is None:
+            h = {}
+        if isinstance(h, dict) and not h.get("worst_placard"):
+            m = _HELENE_PLACARD_RE.search(desc)
+            p = _HELENE_PCT_RE.search(desc)
+            if m:
+                h["worst_placard"] = m.group(1)
+            if p:
+                h["worst_damage_pct"] = int(p.group(1))
+            if m or p:
+                r["helene"] = h
+
+    out["raw"] = r
+    return out
+
+
+def _slim_payload_bytes(payload: list) -> bytes:
+    """Serialize the slim projection of `payload`.
+
+    Record-at-a-time and joined, rather than json.dumps over a projected list,
+    so the whole projected object graph is never resident — this runs right
+    after two multi-hundred-MB serializations on an 8 GB machine.
+
+    COMPACT SEPARATORS, and only here: default separators cost 17.1 MB of pure
+    whitespace at this record count. listings.json keeps its default separators
+    because its bytes must not change.
+    """
+    parts = [
+        json.dumps(_project_slim_record(rec), ensure_ascii=False, default=str,
+                   separators=(",", ":")).encode("utf-8")
+        for rec in payload
+    ]
+    return b"[" + b",".join(parts) + b"]"
+
+
+def _emit_slim(docs: Path, payload: list) -> int | None:
+    """Write listings_slim.json + .gz. Returns the record count, or None if the
+    slim payload could not be produced.
+
+    Never raises. This runs inside three unattended daily jobs, after the
+    authoritative board is already safely on disk, and a derivative file is not
+    worth failing a run over.
+
+    On failure the slim files are REMOVED rather than left behind. Index i is
+    the join across listings.json / listings_detail.json / listings_slim.json,
+    and that alignment only holds within one write_artifact call — a stale slim
+    file beside a fresh board is a silently mis-joined board on a phone, which is
+    strictly worse than no slim file at all (the client 404s and streams the fat
+    one, which is exactly what it does today).
+    """
+    slim_path = docs / "listings_slim.json"
+    gz_path = docs / "listings_slim.json.gz"
+    if os.getenv("FORECLOSURE_SLIM") == "0":   # emergency stop for the launchd jobs
+        return None
+    try:
+        import gzip as _gzip
+        slim_bytes = _slim_payload_bytes(payload)
+        _atomic_write_bytes(slim_path, slim_bytes)
+        _atomic_write_bytes(gz_path, _gzip.compress(slim_bytes, compresslevel=9, mtime=0))
+        return len(payload)
+    except Exception as exc:  # noqa: BLE001
+        for p in (slim_path, gz_path,
+                  slim_path.with_name(slim_path.name + ".tmp"),
+                  gz_path.with_name(gz_path.name + ".tmp")):
+            try:
+                p.unlink(missing_ok=True)
+            except OSError:
+                pass
+        log.warning("web_artifact.slim_failed", error=str(exc))
+        return None
+
+
 def _identity_keys(rec: dict):
     """Candidate cross-run identity keys for a published record.
 
@@ -360,14 +701,26 @@ def _load_prior_details_by_key(docs: Path) -> dict:
     the ~29k leads it didn't touch. Keyed by identity (not index) so it survives
     the reordering a full re-scrape produces. Returns {} if the board is absent
     or unreadable (fresh publish, or first run) — never raises.
+
+    Reads through read_board_json, exactly like load_board at :59. It used to use
+    plain .exists() + plain json.loads on the uncompressed twins ONLY, and both
+    of those are gitignored (.gitignore:77-78) — only listings.json.gz and
+    listings_detail.json.gz are committed. So on a fresh clone, a cloud/CI run or
+    a disaster-recovery restore — the exact machines read_board_json's docstring
+    was written for — this returned {} and the safety net silently disappeared.
+    The next write_artifact would then publish details[i]={} for every lead it
+    hadn't re-enriched, and since listings.json + listings_detail.json are
+    TOGETHER the only full-fidelity board on disk, the next load_board would bake
+    that loss in permanently. Silent, unattended, unrecoverable. Never narrow
+    this back to the plain files.
     """
     lp = docs / "listings.json"
     dp = docs / "listings_detail.json"
-    if not lp.exists() or not dp.exists():
+    if not _board_file_present(lp) or not _board_file_present(dp):
         return {}
     try:
-        recs = json.loads(lp.read_text())
-        dets = json.loads(dp.read_text())
+        recs = read_board_json(lp)
+        dets = read_board_json(dp)
     except Exception:  # noqa: BLE001
         return {}
     unique = _unique_key_map(recs)
@@ -509,6 +862,13 @@ def write_artifact(
     _atomic_write_bytes(docs / "listings.json.gz", gzip.compress(listings_bytes, compresslevel=9, mtime=0))
     _atomic_write_bytes(docs / "listings_detail.json.gz", gzip.compress(detail_bytes, compresslevel=9, mtime=0))
 
+    # SLIM-V1, the mobile payload. Derived from the SAME `payload` list, and
+    # deliberately emitted only after the two authoritative files are already on
+    # disk: nothing below this line can change listings.json's bytes, and a bug
+    # in the derivative cannot cost a run its board. See the SLIM-V1 block above.
+    del listings_bytes, detail_bytes    # free ~350 MB before projecting (8 GB box)
+    slim_count = _emit_slim(docs, payload)
+
     meta = {
         "run_time": datetime.utcnow().isoformat() + "Z",
         "total": len(listings),
@@ -520,6 +880,14 @@ def write_artifact(
         "errors": summary.get("errors", []),
         "notes": summary.get("notes", ""),
     }
+    # Board block: how the dashboard learns the slim payload exists and how many
+    # records it must contain. run_meta.json is already in every publish list, so
+    # this adds zero new entries to the five hardcoded ones. Absent whenever the
+    # slim emit was skipped or failed — and it is NOT carried forward from the
+    # prior meta by the health-preservation block below, which is the point: a
+    # board block always describes the slim file written by THIS call.
+    if slim_count is not None:
+        meta["board"] = {"schema": "slim-v1", "count": slim_count}
 
     # PRESERVE per-source health across partial writers.
     # Fourteen maintenance scripts (sos_agent_refresh, lrcpwa_refresh,

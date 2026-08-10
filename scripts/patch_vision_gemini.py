@@ -210,9 +210,23 @@ async def main() -> int:
             # 100MB/file limit and Pages excludes them); load_board rebuilds from
             # the .gz. Naming a gitignored path in `git add` fails the whole add,
             # so it must NOT appear here.
-            subprocess.run(["git", "add", "docs/listings.json.gz",
-                            "docs/listings_detail.json.gz",
-                            "docs/run_meta.json"], cwd=root, check=False)
+            # listings_slim.json.gz is the mobile payload write_artifact() emits.
+            # It is appended ONLY IF IT EXISTS: a pathspec matching no file makes
+            # `git add` exit 128 and stage NOTHING AT ALL, which would silently
+            # stop publishing the dashboard entirely on a checkout where the slim
+            # emitter has not run yet.
+            pub = ["docs/listings.json.gz", "docs/listings_detail.json.gz",
+                   "docs/run_meta.json"]
+            # ...but "exists" alone is the wrong gate once it IS tracked: the
+            # emitter deletes both slim files if projection fails, and that
+            # DELETION has to be staged or phones keep being served the last
+            # published slim beside a board that has moved on. The 128-exit only
+            # fires when the path is absent AND untracked, so test for both.
+            if (DOCS / "listings_slim.json.gz").exists() or subprocess.run(
+                    ["git", "ls-files", "--error-unmatch", "docs/listings_slim.json.gz"],
+                    cwd=root, capture_output=True).returncode == 0:
+                pub.append("docs/listings_slim.json.gz")
+            subprocess.run(["git", "add", *pub], cwd=root, check=False)
             r = subprocess.run(["git", "diff", "--staged", "--quiet"], cwd=root)
             if r.returncode != 0:  # there are changes
                 subprocess.run(["git", "commit", "-q", "-m",

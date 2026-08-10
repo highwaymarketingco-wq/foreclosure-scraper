@@ -28,7 +28,16 @@ export SOS_AGENT_BREAKER_FAILS="${SOS_AGENT_BREAKER_FAILS:-6}"
 # .gz twins only — the uncompressed listings.json/.detail.json are gitignored
 # (over GitHub's 100MB limit; load_board rebuilds from the .gz). The board-change
 # gate now checks the .gz (deterministic gzip: identical data -> identical bytes).
-git add docs/listings.json.gz docs/listings_detail.json.gz
+# docs/listings_slim.json.gz is the payload PHONES fetch. See the note in
+# lrcpwa_refresh.sh: publishing the fat board without it strands phones on a
+# stale slim while desktop shows current data. Gate on "exists OR tracked" so a
+# deletion (the emitter's failure path) can still be staged.
+SLIM=()
+if [ -f docs/listings_slim.json.gz ] \
+   || git ls-files --error-unmatch docs/listings_slim.json.gz >/dev/null 2>&1; then
+  SLIM=(docs/listings_slim.json.gz)
+fi
+git add docs/listings.json.gz docs/listings_detail.json.gz "${SLIM[@]}"
 if ! git diff --cached --quiet -- docs/listings.json.gz docs/listings_detail.json.gz; then
   git add docs/run_meta.json
   git commit -q -m "Scheduled SOS pass: +NC entity registered-agent contacts

@@ -311,9 +311,20 @@ function projectRecord(rec, lean) {
   // kw_vacant replaces the description probe in _catOf() (:737), which decides
   // land vs residential and therefore which buyers match. Without this, mobile
   // would produce different buyer matches than desktop for the same lead.
+  //
+  // The `else if (desc)` is what makes this projector a strict fixed point on
+  // an already-slim record. A build side that omits kw_vacant when it is false
+  // — a reasonable byte-saving choice, and not one we can see from here — would
+  // otherwise get `kw_vacant:false` written back onto every such record, so
+  // projectRecord(slim) would stop deep-equalling slim. The two are
+  // behaviourally identical: _catOf (:1561) treats an absent kw_vacant and a
+  // false one the same once `description` is also absent, which on a slim
+  // record it always is. On the fat board this changes only the 65 records of
+  // 38,500 that carry an empty description, and changes them from false to
+  // absent, which _catOf reads identically.
   if (rec.kw_vacant != null) {
     out.kw_vacant = !!rec.kw_vacant;
-  } else {
+  } else if (desc) {
     const d = desc.toLowerCase();
     out.kw_vacant = d.includes("vacant lot") || d.includes("vacant land") || d.includes("vacant parcel");
   }
@@ -342,8 +353,20 @@ function projectRecord(rec, lean) {
     if (k in raw) r[k] = raw[k];
   }
   if (Array.isArray(raw.also_seen_in)) {
-    r.also_seen_in = raw.also_seen_in.map((s) =>
-      (s && typeof s === "object" && !Array.isArray(s)) ? { url: s.url, source: s.source } : s);
+    // Copy the two keys ONLY where they are actually present. The obvious
+    // `{ url: s.url, source: s.source }` invents `source: undefined` on an entry
+    // that never carried one — JSON.stringify hides that, a structural
+    // comparison does not, and it is the difference between this projector
+    // being a fixed point on a slim record and merely looking like one.
+    // Board-wide today every entry carries both keys, so this is hardening
+    // against a future source, not a fix for a live bug.
+    r.also_seen_in = raw.also_seen_in.map((s) => {
+      if (!s || typeof s !== "object" || Array.isArray(s)) return s;
+      const o = {};
+      if ("url" in s) o.url = s.url;
+      if ("source" in s) o.source = s.source;
+      return o;
+    });
   }
   if ("life_events" in raw) r.life_events = _lifeEventCount(raw.life_events);
   // lrcpwa.mail_state is the flattened form of lrcpwa.mailing.state, which the
@@ -377,10 +400,79 @@ function projectRecord(rec, lean) {
 }
 // ---- END PORTABLE ---------------------------------------------------------
 
-// Slim first, fat second. The slim file does not exist yet; the 404 fallback is
-// the path that runs today, and one 404 is a fair price for making the future
-// payload a drop-in with zero client change.
-const BOARD_FILES = ["listings_slim.json.gz", "listings.json.gz"];
+// ---------------------------------------------------------------------------
+// WHICH BOARD FILE EACH CLIENT FETCHES — and why desktop does not get the slim
+// one.
+//
+// Phase 0 shipped `["listings_slim.json.gz", "listings.json.gz"]` for every
+// client. That was harmless only because the slim file did not exist. The
+// moment it does, that list hands DESKTOP a payload built to a ~25-key
+// allowlist — and renderEverything() (:1641) is not a named read, it is a
+// reflective sweep over Object.keys(raw). A name-based allowlist cannot
+// preserve a reflective reader by construction.
+//
+// Measured, not assumed. scratchpad/p3/census.mjs streams the real 38,500-record
+// docs/listings.json.gz through THIS FILE's own scanner and projector:
+//
+//   distinct raw.* keys the board carries .............. 107
+//   distinct raw.* keys the LEAN allowlist keeps .......  29   (78 dropped)
+//   distinct blocks "Everything We Found" renders, fat ..  47
+//   ...................................... on the slim ..   2
+//   rows it renders board-wide, fat ................ 172,192
+//   ................................. on the slim ....  6,167   (-96.4%)
+//   records whose section is non-empty, fat ......... 37,791   (98.2%)
+//   ................................. on the slim ....  6,146   (16.0%)
+//
+// 46 blocks vanish outright, and they are not obscure: eviction_market on 80.9%
+// of records, amount_owed 59.9%, tenure 43.7%, recorded_comps 18.6%,
+// recorded_sales 15.3%, rent_comps_extra 12.1%, condemned, divorce, nc_ecourts,
+// assessor_card. That is the completeness backstop the panel exists to be
+// (:1595 "adding a source can never again mean adding data nobody can see")
+// going quietly blank on the machine that currently works.
+//
+// So the URL is gated on LEAN. The phone fetches slim; the desktop keeps
+// fetching the board it has always fetched. Desktop survives the fat payload
+// today at 521 MB and the rule for this whole change is that desktop must not
+// move.
+//
+// Mobile keeps the 404 fallback, so a missing or not-yet-published slim file
+// degrades to exactly today's behaviour instead of to an empty board. Desktop
+// deliberately has NO slim fallback: falling back onto the lobotomised file is
+// the single failure this gate exists to prevent, and a fallback that fires
+// only when listings.json.gz is missing would fire precisely when nobody is
+// watching.
+const BOARD_SLIM_FILE = "listings_slim.json.gz";
+const BOARD_FAT_FILE = "listings.json.gz";
+const BOARD_FILES = LEAN ? [BOARD_SLIM_FILE, BOARD_FAT_FILE] : [BOARD_FAT_FILE];
+
+// run_meta.json carries a "board" block — {"schema":"slim-v1","count":N} —
+// written by the same write_artifact() call that writes the payload, so its
+// count is the length of the array that call emitted. It may be absent: it is
+// not there today, and two board-writing scripts republish listings.json.gz
+// without going through write_artifact at all.
+const BOARD_SCHEMA = "slim-v1";
+
+/**
+ * The record count the build side declares, or null when it declares nothing
+ * we can act on.
+ *
+ * Deliberately NOT derived from META.total. `total` is a summary statistic
+ * assembled from a caller-supplied dict; nothing in the contract says it equals
+ * the array length. `board.count` is *defined* as that length. Gating the whole
+ * board on `total` would black out the dashboard the first time some run
+ * reported a differently-scoped total, which is a worse failure than the one
+ * being defended against.
+ *
+ * An unrecognised schema returns null rather than throwing: a future slim-v2
+ * must be able to ship without this file refusing to render.
+ */
+function boardExpectedCount(board) {
+  if (!board || typeof board !== "object" || Array.isArray(board)) return null;
+  if (board.schema !== BOARD_SCHEMA) return null;
+  const n = board.count;
+  if (typeof n !== "number" || !isFinite(n) || n <= 0 || Math.floor(n) !== n) return null;
+  return n;
+}
 // A stream that has produced nothing for this long is not slow, it is stuck.
 // Rural Upstate SC / Western NC cellular is the target environment, and on a
 // webclip a stalled stream looks exactly like the crash we are fixing.
@@ -403,15 +495,17 @@ function boardProgress(msg) {
 /**
  * Stream the board, one record at a time. Returns the projected array.
  * `onProgress(count)` is called per chunk; throttle in the callback.
+ * `board` is run_meta.json's "board" block, or null when it has none.
  */
-async function loadBoardStreaming(bust, onProgress) {
+async function loadBoardStreaming(bust, onProgress, board) {
   const ac = new AbortController();
   const q = `?t=${encodeURIComponent(bust)}`;
   let res = null;
+  let usedName = "";
   for (const name of BOARD_FILES) {
     let r = null;
     try { r = await fetch(name + q, { signal: ac.signal }); } catch (e) { r = null; }
-    if (r && r.ok && r.body) { res = r; break; }
+    if (r && r.ok && r.body) { res = r; usedName = name; break; }
   }
   if (!res) throw new Error("board payload missing");
 
@@ -455,7 +549,52 @@ async function loadBoardStreaming(bust, onProgress) {
 
     const out = [];
     const st = boardScanState();
-    const onElement = (s) => { out.push(projectRecord(JSON.parse(s), LEAN)); };
+
+    // Do not re-derive what the build side already derived.
+    //
+    // The projector is a proven fixed point on a SLIM-V1 record — 945 real
+    // stratified board records rebuilt as slim by an independent Python
+    // implementation of the contract, across six plausible build-side
+    // serialisation choices, every one an exact structural fixed point
+    // (scratchpad/p3/test_idempotent.mjs). So running it over the slim file
+    // cannot change a single value; it can only rebuild 38,500 objects for
+    // nothing, on the device with the least memory to spare.
+    //
+    // But skip it only on a POSITIVE handshake: we fetched the slim file AND
+    // run_meta declares schema "slim-v1". Absent block, unknown schema, or a
+    // fallback to the fat file all mean project — the projector is also what
+    // re-derives kw_vacant / acres / lrcpwa.mail_state / life_events when the
+    // payload drifts from the contract, and that self-healing is worth more
+    // than the CPU whenever we are not certain what we are holding.
+    let project = LEAN;
+    if (project && usedName === BOARD_SLIM_FILE && boardExpectedCount(board) !== null) {
+      project = false;
+    }
+    let onElement;
+    if (project) {
+      onElement = (s) => { out.push(projectRecord(JSON.parse(s), true)); };
+    } else if (!LEAN) {
+      onElement = (s) => { out.push(JSON.parse(s)); };   // FULL: identity, as before
+    } else {
+      // One conformance check, on record 0 only. A payload still carrying
+      // `description` or `raw.images` is not SLIM-V1 whatever run_meta says —
+      // the realistic cause is run_meta.json publishing ahead of the payload —
+      // and handing a phone unprojected fat records is the exact crash this
+      // whole change exists to prevent. Cost: two `in` tests, once.
+      let verified = false;
+      onElement = (s) => {
+        const rec = JSON.parse(s);
+        if (!verified) {
+          verified = true;
+          if (rec && typeof rec === "object" && !Array.isArray(rec)
+              && ("description" in rec || (rec.raw && typeof rec.raw === "object" && "images" in rec.raw))) {
+            project = true;
+          }
+        }
+        out.push(project ? projectRecord(rec, true) : rec);
+      };
+    }
+
     for (;;) {
       const r = await text.read();
       if (r.done) break;
@@ -467,6 +606,15 @@ async function loadBoardStreaming(bust, onProgress) {
     // A truncated download would otherwise render a silently partial board —
     // and this board carries sale dates and bid deadlines. Fail loudly instead.
     if (!st.ended) throw new Error("board payload truncated");
+    // Same reasoning, one level up. The document can be perfectly well-formed
+    // and still be SHORT — Pages serving a payload from one publish alongside a
+    // run_meta.json from another is the ordinary way that happens. A short board
+    // is the dangerous shape precisely because it renders beautifully: it just
+    // quietly omits leads, and the omitted lead is the one with the sale on
+    // Thursday. Enforced only when the build side declares a count under a
+    // schema we recognise; see boardExpectedCount.
+    const want = boardExpectedCount(board);
+    if (want !== null && out.length !== want) throw new Error(`BOARD_COUNT:${out.length}:${want}`);
     return out;
   } finally {
     clearInterval(watchdog);
@@ -509,7 +657,14 @@ async function loadDataset(name) {
       const metaRes = await fetch(`run_meta.json?t=${Date.now()}`);
       META = metaRes.ok ? await metaRes.json() : {};
       const bust = META.run_time || Date.now();
-      const total = Number(META.total) || 0;
+      // The board block is the build side's own statement about the payload it
+      // just wrote. Absent on every publish before phase 3, and absent again
+      // after any run of patch_distress_score.py / patch_owner_mailing.py, both
+      // of which rewrite listings.json.gz without going through write_artifact.
+      // Everything downstream treats it as optional.
+      const board = (META && META.board) || null;
+      const declared = boardExpectedCount(board);
+      const total = declared || Number(META.total) || 0;
       let painted = 0;
       boardProgress("Loading listings…");
       const onProgress = (n) => {
@@ -520,12 +675,19 @@ async function loadDataset(name) {
       };
       try {
         if (NOSTREAM) throw new Error("NOSTREAM");
-        LISTINGS = await loadBoardStreaming(bust, onProgress);
+        LISTINGS = await loadBoardStreaming(bust, onProgress, board);
       } catch (streamErr) {
+        const em = String(streamErr && streamErr.message);
         // A machine with the headroom for the old path should show a board
         // rather than an error if the new one fails. LEAN deliberately does
         // NOT fall back: the old path on a phone IS the crash we are fixing.
-        if (LEAN || String(streamErr.message) === "NO_DECOMPRESSION") throw streamErr;
+        //
+        // A count mismatch is NOT eligible for that fallback. This fallback
+        // exists to protect desktop from a bug in THIS loader; it must not be
+        // used to launder a bad payload. The old path would happily JSON.parse
+        // the same well-formed, short array and render it without a word, which
+        // is the exact outcome the count gate was added to make impossible.
+        if (LEAN || em === "NO_DECOMPRESSION" || em.indexOf("BOARD_COUNT:") === 0) throw streamErr;
         boardProgress("Loading listings (fallback)…");
         LISTINGS = await fetchJsonMaybeGz("listings.json", bust);
       }
@@ -541,9 +703,21 @@ async function loadDataset(name) {
       // plain listings.json, which 404s on Pages (it is excluded in
       // docs/_config.yml) — so an old iPhone got a silent empty board. Say the
       // true thing instead.
-      const msg = String(e && e.message) === "NO_DECOMPRESSION"
-        ? "This board needs iOS 16.4 or newer (or a current desktop browser) to open."
-        : "Could not load listings — first run hasn't finished yet, or network error. Reload in a few minutes.";
+      const em = String((e && e.message) || "");
+      let msg;
+      if (em === "NO_DECOMPRESSION") {
+        msg = "This board needs iOS 16.4 or newer (or a current desktop browser) to open.";
+      } else if (em.indexOf("BOARD_COUNT:") === 0) {
+        // Deliberately refusing to render. A short board looks completely
+        // normal and the lead it drops is the one with a sale date on it, so
+        // "show what we got" is the wrong default here. Publishes are not
+        // atomic on Pages, so a reload a few minutes later is the actual fix.
+        const p = em.split(":");
+        msg = `Board is mid-publish — got ${Number(p[1]).toLocaleString()} listings, expected ${Number(p[2]).toLocaleString()}. `
+          + "Showing nothing rather than a partial board with missing sale dates. Reload in a few minutes.";
+      } else {
+        msg = "Could not load listings — first run hasn't finished yet, or network error. Reload in a few minutes.";
+      }
       document.body.insertAdjacentHTML(
         "afterbegin",
         `<div style="background:#ffd2dc;color:#b22a2a;padding:14px 28px;text-align:center;">${msg}</div>`,

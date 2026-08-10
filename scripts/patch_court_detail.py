@@ -99,6 +99,25 @@ async def main() -> int:
     _p = Path("docs/listings.json")
     (_p.parent / "listings.json.gz").write_bytes(_gz.compress(_p.read_bytes(), compresslevel=9, mtime=0))
 
+    # Same shape as patch_owner_mailing.py / patch_distress_score.py: this is a
+    # board writer that BYPASSES write_artifact(), mutating docs/listings.json in
+    # place and regenerating only listings.json.gz. It cannot regenerate
+    # docs/listings_slim.json.gz, the index-aligned payload phones fetch, so
+    # publishing here would ship a fresh board beside a slim file describing the
+    # PREVIOUS one — phones silently stale on sale dates and case detail while
+    # desktop shows current. Nothing is lost by refusing: the mutation is already
+    # on disk, and the next write_artifact() caller re-emits all three together.
+    if (_p.parent / "listings_slim.json.gz").exists():
+        print(f"[{time.strftime('%H:%M:%S')}] NOT PUBLISHING: docs/listings.json was "
+              "updated in place, but this script cannot regenerate "
+              "docs/listings_slim.json.gz (the mobile payload), which would go "
+              "stale against the board.\n"
+              "  Next step:  python scripts/regenerate_dashboard.py\n"
+              "  That calls write_artifact(), which re-emits listings.json.gz, "
+              "listings_detail.json.gz and listings_slim.json.gz from one payload.",
+              flush=True)
+        return 0
+
     if os.environ.get("COURT_PUBLISH", "1") == "1":
         import subprocess
         root = str(Path(__file__).parent.parent)
