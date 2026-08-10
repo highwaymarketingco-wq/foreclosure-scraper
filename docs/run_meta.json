@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-08-10T17:02:32.863928Z",
-  "total": 38650,
+  "run_time": "2026-08-10T17:35:40.948426Z",
+  "total": 38500,
   "by_source": {
     "national.auction_dot_com": 12,
     "national.cash_buyer_deeds": 24,
@@ -321,5 +321,5 @@
     "newspapers.tryon_bulletin",
     "national.gsa_realproperty"
   ],
-  "notes": "daily vision pass: 12341 of 38650 listings have a vision report"
+  "notes": "daily vision pass: 10317 of 38500 listings have a vision report"
 }
