@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-08-10T13:33:24.566257Z",
+  "run_time": "2026-08-10T16:31:40.541159Z",
   "total": 38500,
   "by_source": {
     "national.auction_dot_com": 12,
@@ -321,8 +321,8 @@
     "newspapers.tryon_bulletin",
     "national.gsa_realproperty"
   ],
-  "notes": "",
-  "health_carried_from": "2026-08-10T09:01:44.870116Z",
+  "notes": "scheduled land-records refresh",
+  "health_carried_from": "2026-08-10T13:33:24.566257Z",
   "health_carried_keys": [
     "by_source",
     "by_state",
