@@ -132,7 +132,16 @@ async def main() -> int:
         return 0
     # load_board/write_artifact keep the vision/comps/cama sidecar intact; a
     # bare write_artifact on a freshly-built list wipes it.
-    write_artifact(listings)
+    #
+    # write_artifact() takes summary as a REQUIRED positional arg — omitting it
+    # is a TypeError, and since it's the last statement in main(), that meant
+    # this script did all its geocoding in memory and then crashed trying to
+    # save it, discarding the whole pass. Caught 2026-08-10 when a live
+    # catchup-chain run hit exactly this and exited 1 after filling coordinates
+    # it then never persisted.
+    summary = {"notes": f"catchup_geocode: filled {filled:,} of {len(missing):,} "
+                        f"leads missing lat/lng"}
+    write_artifact(listings, summary)
     total_missing = len(_missing(listings))
     print(f"board rewritten. leads without lat/lng now: {total_missing:,}")
     return 0
