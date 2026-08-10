@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-08-10T16:31:40.541159Z",
-  "total": 38500,
+  "run_time": "2026-08-10T17:02:32.863928Z",
+  "total": 38650,
   "by_source": {
     "national.auction_dot_com": 12,
     "national.cash_buyer_deeds": 24,
@@ -321,13 +321,5 @@
     "newspapers.tryon_bulletin",
     "national.gsa_realproperty"
   ],
-  "notes": "scheduled land-records refresh",
-  "health_carried_from": "2026-08-10T13:33:24.566257Z",
-  "health_carried_keys": [
-    "by_source",
-    "by_state",
-    "by_county_top",
-    "source_status",
-    "errors"
-  ]
+  "notes": "daily vision pass: 12341 of 38650 listings have a vision report"
 }
