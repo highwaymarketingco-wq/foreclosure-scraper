@@ -302,3 +302,111 @@ Investigated, found real and reachable, and deliberately NOT turned into leads. 
 - `docs/manual_playbook_and_limits.md` — what stays manual and the exact operator steps for each manual lane.
 - `docs/net_new_source_register.md` — deep per-county URL register. **WARNING: physically truncated** — it begins mid-table-row and its sections 1.1 through 1.14 (all 11 NC counties) do not exist anywhere.
 
+---
+
+# MEASURED PUBLICATION CADENCE — 2026-08-11
+
+Added because "should we poll these daily?" kept being answered by assumption.
+This is measured from the DATES ON THE RECORDS THEMSELVES (sale_date, filed_date,
+and the date fields inside nc_ecourts / court_record / upset_bid / rod /
+county_sales blocks), counting how many DISTINCT days in the last 180 a source
+actually published on. Sources with fewer than 25 leads are omitted.
+
+## Why not measure it from when leads arrive
+
+The obvious metric — new leads per source per day — is censored by our own
+schedule. Full runs fire Tue/Fri only, so no source can show daily inflow no
+matter how often it publishes. Measured 2026-08-11: 0 of 66 sources had a lead
+whose first_seen was inside 24h, purely because that day's run was skipped. The
+record dates are independent of when we happen to look.
+
+## The finding, which reverses the obvious plan
+
+ONLY TWO SOURCES PUBLISH DAILY, AND THEY ARE THE TWO WE CANNOT SCRAPE.
+
+  counties_nc.nc_ecourts_lis_pendens   55 distinct filing days out of 180
+  counties_nc.nc_ecourts_divorce       46
+
+~45% of calendar days is essentially every business day. Both are NC eCourts,
+which is WAF-walled — which is exactly why the manual court-page lane
+(scripts/ingest_saved.sh + the "Ingest Saved Court Pages" app) exists.
+
+Everything else is PERIODIC or a SNAPSHOT. Delinquent tax rolls, condemned
+lists, forfeited-land lists and code-violation exports publish on 1 day in 180.
+Polling them daily would re-fetch an identical file 7x a week, add WAF exposure
+on sources we depend on, and surface nothing. The weekly cadence already matches
+their publication cadence.
+
+The 10 REO/API sources on the daily job (scripts/daily_api_refresh.py
+DEFAULT_SLUGS: fannie_homepath, foreclosure_dot_com, hud_homestore,
+freddie_homesteps, realtor_foreclosures, homeharvest, distressed, vrm_va_reo,
+usda_rd, treasury_seized) are correctly daily for a different reason: their
+inventory CHURNS. A house sells and the listing 404s, so absence is the signal
+and it has to be checked often. That is not the same property as publishing.
+
+## What this means for freshness
+
+A delinquent-tax lead that gets paid off does NOT disappear from the county's
+list the next day, because the county does not republish the list the next day.
+Scraping daily cannot make the board fresher than the source is. The residual
+staleness is the source's, not ours.
+
+Where we ARE behind: the two genuinely-daily sources are wall-blocked and depend
+on a human saving pages. That lane currently runs on the Tue/Fri prompt. Running
+it more often is the only change here that would buy real freshness.
+
+## SNAPSHOT/UNKNOWN is not a verdict
+
+27 sources carry no usable per-record date, so their cadence cannot be
+determined offline at all. They are not proven static — they are unmeasured.
+Deciding their cadence requires polling and diffing, which is the scrape itself.
+
+## The table
+
+```
+cadence            source                                           leads  distinct filing days /180
+DAILY              counties_nc.nc_ecourts_lis_pendens                 214                         55
+DAILY              counties_nc.nc_ecourts_divorce                      78                         46
+PERIODIC           counties_nc.nc_county_pdf_delinquent_tax         2,162                         10
+PERIODIC           counties_nc.buncombe_elderly                     3,482                          9
+PERIODIC           public_notices.nc_notices_counties                 108                          8
+PERIODIC           national.nc_upset_bids                              27                          7
+PERIODIC           national.courtlistener_bankruptcy                  370                          5
+PERIODIC           national.landandfarm                               287                          4
+PERIODIC           law_firms.kania                                     29                          2
+SNAPSHOT/UNKNOWN   counties_sc.spartanburg_delinquent_tax           2,080                          1
+SNAPSHOT/UNKNOWN   counties_sc.pickens_delinquent_parcels           1,928                          1
+SNAPSHOT/UNKNOWN   counties_nc.buncombe_delinquent_tax              1,151                          1
+SNAPSHOT/UNKNOWN   counties_nc.asheville_str_permits                  587                          1
+SNAPSHOT/UNKNOWN   national.hud_reac_inspection                       191                          1
+SNAPSHOT/UNKNOWN   counties_nc.henderson_code_violations              156                          1
+SNAPSHOT/UNKNOWN   counties_sc.sc_public_notices                      124                          1
+SNAPSHOT/UNKNOWN   counties_sc.spartanburg_city_condemned              90                          1
+SNAPSHOT/UNKNOWN   law_firms.shapiro_ingle_powerbi                     47                          1
+SNAPSHOT/UNKNOWN   counties_sc.spartanburg_vacant                   3,307                          0
+SNAPSHOT/UNKNOWN   counties_sc.sc_public_index                      1,670                          0
+SNAPSHOT/UNKNOWN   counties_sc.spartanburg_condemned                1,658                          0
+SNAPSHOT/UNKNOWN   counties_sc.oconee_flc_assignment                  585                          0
+SNAPSHOT/UNKNOWN   counties_sc.oconee_forfeited_land                  453                          0
+SNAPSHOT/UNKNOWN   counties_nc.nc_heir_estate_parcels                 295                          0
+SNAPSHOT/UNKNOWN   national.distressed                                283                          0
+SNAPSHOT/UNKNOWN   counties_sc.sc_probate_net                         236                          0
+SNAPSHOT/UNKNOWN   counties_nc.asheville_helene                       179                          0
+SNAPSHOT/UNKNOWN   counties_sc.spartan_weekly_legals                   94                          0
+SNAPSHOT/UNKNOWN   national.landwatch                                  90                          0
+SNAPSHOT/UNKNOWN   counties_sc.sc_rod_acclaim                          90                          0
+SNAPSHOT/UNKNOWN   counties_sc.sc_public_index_lis_pendens             70                          0
+SNAPSHOT/UNKNOWN   public_notices.gannett_obituaries                   60                          0
+SNAPSHOT/UNKNOWN   counties_nc.hendersonville_vacant_structures        50                          0
+SNAPSHOT/UNKNOWN   national.hud_section8_contracts                     45                          0
+SNAPSHOT/UNKNOWN   law_firms.brock_scott                               45                          0
+SNAPSHOT/UNKNOWN   law_firms.hutchens                                  33                          0
+
+DAILY              2 sources
+WEEKLY             0 sources
+PERIODIC           7 sources
+SNAPSHOT/UNKNOWN   27 sources
+```
+
+Regenerate: the measurement script is inline in the session that produced this;
+the durable version belongs in scripts/ if this needs to be repeated.

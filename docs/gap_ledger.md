@@ -412,3 +412,84 @@ Board numbers verified live 2026-07-03 against `/Users/cashhigh/foreclosure-scra
   ZERO blobs, so the county currently publishes no delinquent extract there.
   Transylvania, Polk, Mitchell, McDowell, Cleveland, Gaston, Lincoln and
   Buncombe all return HTTP 500 on that cluster, i.e. they are not tenants.
+
+---
+
+# 2026-08-11 — WHAT CHANGED, AND WHAT IS STILL BLOCKED
+
+## Closed today
+
+MOBILE WAS UNUSABLE, NOW ISN'T. One page load cost 521 MB of JS heap (23 MB gz ->
+259 MB inflated string -> +241 MB parsed graph, all alive at once) for 38,500
+records, so iOS killed the tab on every launch. The client now streams the board
+and projects each record as it arrives: 521 MB -> ~150 MB. The published payload
+for phones went 24 MB -> ~7 MB via listings_slim.json.gz, and per-lead detail
+arrives from docs/detail_shards/ instead of a 70.8 MB sidecar.
+
+VALUATIONS COMPUTED FROM ANOTHER PROPERTY'S RECORD. The reported case: a 1,400
+sqft manufactured home on 0.51 acres published an ARV of $780,300. The comps were
+right ($121,100); an ARV floor overrode them with a county market value that came
+from a CAMA record whose building_type is "GEN WHSE 50" — a warehouse joined onto
+a mobile-home lot. Root causes fixed: no $/sqft ceiling, comps not property-type
+aware, SC statutory 4%/6% ratio values compared against 100%-basis NC figures,
+and one Lincoln County appraisal stamped on 1,433 leads driving $320,145,300 of
+max bids. Board effect: max bids 21,843 -> 20,434, ARVs 24,974 -> 25,338.
+Invariant now holding on the published payload: of 3,809 leads carrying a
+contradicted ARV flag, 0 publish a bid, 0 a verdict, 0 equity.
+
+TWO WRITERS COULD SILENTLY REVERT EACH OTHER. On 2026-08-10 the noon lrcpwa pass
+resolved 1,064 parcels, wrote 38,500 listings and pushed — and the 09:30 vision
+job, holding a board loaded at 09:33, wrote it back at 13:36 and reverted all of
+it. Both jobs reported success. A real lock now spans load_board -> mutate ->
+write_artifact in every publisher. PROVEN on 2026-08-11: the noon job held the
+lock, a republish refused to write rather than clobbering it, and the +1,064
+addresses survived to production.
+
+SOURCE VERIFICATION WITHOUT A SCRAPE. Board index 0 is wrong on six of nine
+fields against its own listing, and the city error needs no network at all — the
+stored source_url is ".../510-kings-rd-shelby-nc-2141050" while the city field
+says CLEVELAND, the county. enrichment_source_consistency.py now convicts on
+per-record contradictions: 1,306 leads flagged, measured false-positive rates
+0.0% / 0.0% / 0.0% / 1.8% across the four checks.
+
+## Still blocked, and why
+
+THE CENTROID ROOT CAUSE. 15,608 leads sit on 71 shared coordinates; 3,279 of
+3,309 counties_sc.spartanburg_vacant leads share ONE point — the ASL sculpture on
+West Main Street. Forward-geocoding five of those addresses puts the real
+properties 1.07-2.08 miles away, five for five. The SYMPTOMS are handled (flagged,
+map pin suppressed, comps distances struck through, valuation gated). WHY the
+scraper emits one coordinate for a whole county is still not diagnosed. Until it
+is, every new source risks importing the same defect.
+
+RE-READING SOURCE PAGES. The offline half of source verification catches
+contradictions. Catching DRIFT — beds, baths, sqft, year built, opening bid — needs
+re-fetching the listing, and 6 of 10 spot-checks were WAF-blocked. Not a code
+problem; a wall.
+
+THE TWO GENUINELY-DAILY SOURCES ARE THE WALLED ONES. See the measured cadence
+section in SOURCE_REGISTER.md. NC eCourts publishes on ~45% of calendar days and
+cannot be scraped; SC PublicIndex is ToS-walled. The manual save-and-ingest lane
+is the answer and it runs on the Tue/Fri prompt. Everything else publishes
+periodically, so polling it daily would buy nothing.
+
+CONTACTABILITY, NOT COVERAGE, IS THE REAL CEILING. ~22,000 leads have a complete
+mailing address on the owner spine, but only 11,353 (29.5%) have a mailable situs
+address, and 4,347 carry a county name in the city field. A lead you cannot reach
+is not a lead. This is the highest-value work remaining and it needs no new
+sources.
+
+REPO GROWTH. .git is ~962 MB local, ~791 MB on GitHub, against a ~5 GB soft
+limit. The shard-churn fix took a valuation-only republish from 39 changed files
+/ 29 MB to 1 / 275 KB, but 25,412 of 38,500 records have no vision and every
+shard contains at least one unscored record, so a daily vision pass still
+rewrites the whole shard set.
+
+## The honest structural gap
+
+This system has no way to know it is wrong except a human noticing. Every real
+defect found today came from the operator spotting something — a trailer valued at
+$700k, an app that would not open — or from an audit that only ran because it was
+asked for. The board does not grade itself between runs and does not report when
+a number moved for no reason. That, not more sources, is what separates this from
+trustworthy.
