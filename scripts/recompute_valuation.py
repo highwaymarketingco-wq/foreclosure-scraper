@@ -16,7 +16,8 @@ ORDER MATTERS AND IS NOT ARBITRARY
     Mirrors scripts/regenerate_dashboard.py's post-network section and main.py:
 
       calc/grade -> gis_derived -> equity -> distress -> derived_signals
-                 -> data_quality -> board_qa -> write
+                 -> data_quality -> board_quality -> board_qa
+                 -> source_consistency -> write
 
     data_quality LAST of the ARV-aware passes, because every caveat it writes is
     read out of raw['calc']. Run it earlier and it captions the board off the
@@ -26,6 +27,13 @@ ORDER MATTERS AND IS NOT ARBITRARY
 
     equity runs after calc because it is ARV - payoff - senior liens, and its
     own trust gate has to see the fresh calc to know whether to withhold.
+
+    source_consistency runs LAST, and specifically after board_qa, because
+    board_qa ASSIGNS raw['qa_flags'] (`li.raw["qa_flags"] = flags`) while
+    source_consistency only EXTENDS it. In this order the two compose; in the
+    other, every source-consistency flag is deleted a moment after it is
+    written, by an assignment that looks completely innocent. It reads nothing
+    board_qa writes, so nothing else about the order matters.
 
 USAGE
     uv run python scripts/recompute_valuation.py [--dry-run]
@@ -109,6 +117,9 @@ def _run(args) -> int:
     from foreclosure_scraper.enrichment_data_quality import enrich_data_quality
     from foreclosure_scraper.enrichment_board_quality import enrich_board_quality
     from foreclosure_scraper.enrichment_board_qa import enrich_board_qa
+    from foreclosure_scraper.enrichment_source_consistency import (
+        enrich_source_consistency,
+    )
 
     print("gis_derived:", enrich_gis_derived(listings), flush=True)
     print("equity:", enrich_equity(listings), flush=True)
@@ -135,6 +146,15 @@ def _run(args) -> int:
         print("board_qa:", enrich_board_qa(listings), flush=True)
     except Exception as exc:  # noqa: BLE001
         print(f"board_qa: ERROR {str(exc)[:100]}", flush=True)
+    # STRICTLY AFTER board_qa — it extends raw['qa_flags'], board_qa assigns it.
+    # Offline verification of each lead against its own record: the URL's city
+    # vs the city field, the address's trailing town vs the city field, the ZIP
+    # vs the state, the assessor's land use vs the property kind. Flags only;
+    # nothing here withholds a dollar (see that module's docstring).
+    try:
+        print("source_consistency:", enrich_source_consistency(listings), flush=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"source_consistency: ERROR {str(exc)[:100]}", flush=True)
 
     after = [((li.raw or {}).get("calc") or {}) for li in listings]
     a_arv = [c.get("arv_expected") for c in after]

@@ -2182,6 +2182,84 @@ function arvFlagClass(name, inArvFlags, c) {
   };
 }
 
+// ===========================================================================
+// THE STAMPED-VALUE CLUSTER, on the leads that KEEP their money.
+//
+// THE FLAG STRING, exactly, and who writes it:
+//   "anchor_shared_across_parcels"
+//     written by src/foreclosure_scraper/enrichment_board_qa.py
+//     (SHARED_ANCHOR_FLAG) onto raw['qa_flags'] for EVERY lead in a detected
+//     cluster, and additionally onto raw['calc']['arv_flags'] by that file's
+//     _retract_shared_anchor() for the subset whose ARV was built on the
+//     stamped county figure. valuation/grading.py lists it in
+//     ARV_FLAGS_CONTRADICTED, which is what strips max_bid_70 / roi_pct /
+//     profit / deal_status and withholds equity on that subset, server-side.
+//
+// Nothing new is written by this file and no new flag string is invented. Both
+// channels already ship: web_artifact._SLIM_RAW carries "qa_flags": "*" and
+// "calc": "*", so this reads identically on desktop and on a phone.
+//
+// MEASURED on the live board, 38,500 records:
+//   1,706  carry the flag in raw.qa_flags        (in a cluster)
+//   1,451  also carry it in calc.arv_flags       (ARV built on the stamp —
+//          money already gone, and calc.notes carries the full prose saying so)
+//     255  carry it ONLY in qa_flags             (comp-grounded ARV; of these
+//          11 publish a max bid, 2 an ROI, 6 an equity figure, 0 a verdict)
+//       0  of the 255 said anything about it anywhere on the panel
+//
+// The 255 are the ones this exists for. Their bid is defensible — the ARV came
+// from recorded arms-length comps, not from the stamp — but "the county figure
+// for this parcel is one number stamped across many parcels" is a fact about
+// the parcel record an operator is about to bid against, and it survived the
+// valuation being fine. It gets said.
+//
+// WHAT IS NOT SAID: how many parcels. enrichment_board_qa computes that count
+// (`info['parcels']`) and writes it into the withheld leads' calc.notes prose,
+// but it is not persisted on the comp-grounded ones, and the anchor field it
+// grouped on (market_value / cama.appraised_value / tax_value) is not fully
+// present in the slim payload — market_value and cama are both absent, so a
+// client-side recount would give a phone a different N than a desktop. A number
+// that changes with the device is worse than no number, so this states the
+// fact and sends the reader to the parcel record.
+// ===========================================================================
+const STAMP_CLUSTER_FLAG = "anchor_shared_across_parcels";
+
+/**
+ * `{inCluster, arvDerivedFromStamp}` — is this lead in a stamped-value cluster,
+ * and did its ARV come from the stamp?
+ *
+ * `arvDerivedFromStamp` true  -> the money is already withheld and calc.notes
+ *                                explains it; arvTrust() paints it bad.
+ * `arvDerivedFromStamp` false -> the 255. The money stands. Disclose the
+ *                                cluster; do NOT contradict the valuation.
+ */
+function stampCluster(l) {
+  const raw = (l && l.raw) || {};
+  const qf = Array.isArray(raw.qa_flags) ? raw.qa_flags : null;
+  if (!qf) return _STAMP_NONE;
+  let inCluster = false;
+  for (let i = 0; i < qf.length; i++) {
+    if (String(qf[i] || "").toLowerCase() === STAMP_CLUSTER_FLAG) { inCluster = true; break; }
+  }
+  if (!inCluster) return _STAMP_NONE;
+  const af = (raw.calc && Array.isArray(raw.calc.arv_flags)) ? raw.calc.arv_flags : [];
+  let derived = false;
+  for (let i = 0; i < af.length; i++) {
+    if (String(af[i] || "").toLowerCase() === STAMP_CLUSTER_FLAG) { derived = true; break; }
+  }
+  return { inCluster: true, arvDerivedFromStamp: derived };
+}
+const _STAMP_NONE = { inCluster: false, arvDerivedFromStamp: false };
+
+/** The sentence shown on a comp-grounded lead inside a cluster. */
+const STAMP_CLUSTER_NOTE =
+  "The county's own valuation of this parcel is one figure stamped across many "
+  + "different parcels in this county, so the assessor record does not describe "
+  + "this property. The ARV above did NOT come from it — it was built from "
+  + "recorded comparable sales — which is why max bid, ROI and equity are still "
+  + "published here rather than withheld. Read them as sound, and the county "
+  + "record beneath them as unverified: check the parcel record before you bid.";
+
 /** calc's own note explaining `flag`, or "" when it wrote none. */
 function arvFlagNote(c, flag) {
   const re = _ARV_FLAG_NOTE[flag];
@@ -2256,7 +2334,45 @@ function arvTrust(l) {
   // ...) were simply missing on mobile. It is in _LEAN_RAW now. Still read
   // defensively — a board published before that change carries no qa_flags in
   // its slim payload, and nothing above depends on this.
-  if (Array.isArray(raw.qa_flags)) raw.qa_flags.forEach((f) => consider(f, false));
+  //
+  // ONE NAME IS SCOPED, and the scope is the writer's, not this file's.
+  // enrichment_board_qa.py writes "anchor_shared_across_parcels" onto TWO
+  // channels and means two different things by it (its own comment, at
+  // enrichment_board_qa.py:616):
+  //
+  //   raw['qa_flags']        every lead in a stamped cluster, "because sitting
+  //                          in one is a fact about the lead"   — 1,706 leads
+  //   calc['arv_flags']      only the leads whose ARV DESCENDS from the stamp,
+  //                          "because that list is the trust gate's vocabulary
+  //                          and there it would be a claim about the
+  //                          valuation"                          — 1,451 leads
+  //
+  // The 255-lead difference is comp-grounded ARVs, and the pipeline keeps every
+  // dollar on them on purpose. Reading the qa_flags copy as a verdict painted
+  // all 255 "Do not bid off this number" beside a max bid the same panel still
+  // prints — 7658 Hickory Creek Dr, Denver NC: ARV from 184 recorded
+  // arms-length sales, $588,100 max bid, and a red do-not-bid over the top of
+  // it. That is the reader/writer mismatch, in the direction that teaches an
+  // operator to ignore the red.
+  //
+  // So: the flag stays in _ARV_BAD_FLAGS and is UNCHANGED there — it does all
+  // of its work when it arrives in calc.arv_flags (the `consider(f, true)` pass
+  // above, 1,451 leads, still bad, still every dollar withheld server-side).
+  // From qa_flags it is skipped HERE and disclosed instead by stampCluster()
+  // below, which says the true thing at full volume. No other qa_flags name is
+  // scoped: arv_above_asis / arv_below_asis / verdict_on_flagged_arv /
+  // bid_on_contradicted_arv / derived_without_arv are all claims about the
+  // valuation on whichever channel they arrive.
+  if (Array.isArray(raw.qa_flags)) {
+    const _inCalcFlags = Array.isArray(c.arv_flags)
+      ? c.arv_flags.map((f) => String(f || "").toLowerCase())
+      : [];
+    raw.qa_flags.forEach((f) => {
+      const n = String(f || "").toLowerCase();
+      if (n === STAMP_CLUSTER_FLAG && _inCalcFlags.indexOf(STAMP_CLUSTER_FLAG) === -1) return;
+      consider(f, false);
+    });
+  }
   // Boolean verdicts written straight onto calc — arv_geo_suspect already is one.
   for (const k in c) { if (c[k] === true && k.indexOf("arv") === 0) consider(k, false); }
 
@@ -3095,6 +3211,88 @@ function openBuyer(name) {
   bv.querySelectorAll(".bm-card").forEach((c)=>c.addEventListener("click",()=>openDetail(LISTINGS[parseInt(c.dataset.li)])));
 }
 
+// ===========================================================================
+// THE CARD PHOTO SLOT — what is allowed to sit in it.
+//
+// The slot's own contract is written on the geo-unknown branch below: "whatever
+// is in it reads as THIS IS THE PROPERTY". That branch already refuses to draw
+// a pushpin map on a coordinate this file does not trust. The branch ABOVE it
+// did not, and `raw.zillow.photo` is not always a photograph.
+//
+// MEASURED on docs/listings.json, 38,500 records, 2026-08-11:
+//   27,710 leads fill this slot from raw.zillow.photo
+//    4,069 of those are a real photograph      (ap./p./nh.rdcpix.com)
+//   23,641 of those are a SATELLITE MAP TILE   (server.arcgisonline.com,
+//          .../World_Imagery/MapServer/tile/{z}/{y}/{x}, all of them zoom 19)
+//   16,728 of the tiles sit on a coordinate geoTrust() already accepts — those
+//          are unchanged by this function and keep the tile
+//    6,426 of the tiles sit on a coordinate geoTrust() calls IMPRECISE: a city
+//          or county centroid, typically 1-2 miles from the property and
+//          frequently a courthouse lawn or a town square
+//
+// Those 6,426 are the defect. A zoom-19 aerial computed from the lead's own
+// lat/lng is the SAME claim the pushpin makes — "the property is here" — and it
+// is a worse version of it, because it is photographic and therefore reads as
+// evidence rather than as a diagram. It arrives uncaptioned in the one slot on
+// the card that means "this is the house".
+//
+// So the gate is the same gate, applied one branch higher.
+//
+// WHAT REPLACES IT. raw.images.real is the assessor/listing photo channel
+// (enrichment_assessor_photo.py writes `["parcel_photos/<county>_<parcel>.jpg"]`,
+// the listing scrapers write rdcpix / landwatch URLs). It is NOT a trustworthy
+// name on its own: of the 5,808 leads in this cohort that HAVE an images.real,
+// 5,665 of the values are themselves arcgisonline tiles — the same lie under a
+// different key. So every candidate is classified, not trusted by field name.
+// After classification 143 of the 6,426 yield a genuine photograph and 6,283
+// fall through to the honest empty state.
+//
+// raw.images is NOT in web_artifact._SLIM_RAW, so a phone has no images block
+// at grid-render time (the shard that carries it is fetched when a lead is
+// OPENED, long after these cards paint). That is read defensively here rather
+// than worked around: on LEAN the cohort simply takes the empty state, which is
+// the honest answer, never a wrong one.
+// ===========================================================================
+
+// A URL that was COMPUTED FROM A COORDINATE — a tile or static map, not a
+// photograph of a building. Hosts measured on the live board; the openstreetmap
+// and googleapis arms cover the static-map URL this same function's callers
+// build, so a future writer that stores one into raw.zillow.photo is caught.
+const _DERIVED_IMG_RE = /(server\.arcgisonline\.com|staticmap\.openstreetmap|tile\.openstreetmap\.org|maps\.googleapis\.com\/maps\/api\/staticmap|api\.mapbox\.com\/styles)/i;
+
+/** True when `u` is a real photograph rather than a map/satellite tile. */
+function isPhotograph(u) {
+  return typeof u === "string" && !!u && !_DERIVED_IMG_RE.test(u);
+}
+
+/**
+ * First photographic URL in a raw.images value. The channel is written as a
+ * LIST by enrichment_assessor_photo (`images["real"] = [rel]`) and as a bare
+ * string by other writers, so both shapes are read.
+ */
+function _firstPhoto(v) {
+  if (Array.isArray(v)) {
+    for (let i = 0; i < v.length; i++) if (isPhotograph(v[i])) return v[i];
+    return "";
+  }
+  return isPhotograph(v) ? v : "";
+}
+
+/**
+ * A genuine photograph for this lead from raw.images, or "".
+ *
+ * Order is provenance order, best first: `real` is the assessor/listing photo
+ * the enricher went and fetched, `primary` is whatever that enricher chose to
+ * lead with, `streetview`/`street` is a Street View frame — a photograph, but
+ * of a location, so it is last.
+ */
+function realPropertyPhoto(l) {
+  const im = l && l.raw && l.raw.images;
+  if (!im || typeof im !== "object" || Array.isArray(im)) return "";
+  return _firstPhoto(im.real) || _firstPhoto(im.primary)
+      || _firstPhoto(im.streetview) || _firstPhoto(im.street);
+}
+
 let _CARDS_WIRED = false;
 function renderCards() {
   const grid = $("cards-grid");
@@ -3118,8 +3316,34 @@ function renderCards() {
       if (isBkSource) {
         // Bankruptcy listings have no property — use a court-themed placeholder
         photo = `<div class="card-img no-photo" style="background:linear-gradient(135deg,#1a365d,#2c5282);color:#fff;font-size:48px">🏛</div>`;
-      } else if (l.raw && l.raw.zillow && l.raw.zillow.photo) {
+      } else if (l.raw && l.raw.zillow && l.raw.zillow.photo
+                 && (isPhotograph(l.raw.zillow.photo) || !geoTrust(l).imprecise)) {
+        // UNCHANGED PATH, now with the gate spelled out. Two populations reach
+        // here and both are legitimate: a real photograph (4,069 leads — a
+        // photograph makes no claim about coordinates, so geo trust is
+        // irrelevant to it), and a satellite tile on a coordinate geoTrust()
+        // accepts (16,728). Neither is touched.
         photo = `<div class="card-img" style="background-image:url('${l.raw.zillow.photo}')"></div>`;
+      } else if (l.raw && l.raw.zillow && l.raw.zillow.photo && realPropertyPhoto(l)) {
+        // GATED, and REPLACED. The stored image is a tile computed from a
+        // coordinate this file does not trust — but a genuine photograph of the
+        // property exists in raw.images. 143 of the 6,426 land here. The photo
+        // is honest (it depicts a building, it does not assert a location); the
+        // title says where it came from so it is never mistaken for a fresh
+        // capture.
+        const _rp = realPropertyPhoto(l);
+        photo = `<div class="card-img" style="background-image:url('${_rp}')" `
+          + `title="${_attr("County assessor / listing photo. The satellite tile this record stored was discarded: " + geoTrust(l).why + ", so an aerial computed from it would picture the wrong place.")}"></div>`;
+      } else if (l.raw && l.raw.zillow && l.raw.zillow.photo) {
+        // GATED, and EMPTY. A satellite tile of an untrusted point, and no
+        // photograph to put in its place. 6,283 of the 6,426 land here (every
+        // one of them on a phone, where raw.images has not arrived yet).
+        // The empty state is the same one the map branch already uses, because
+        // it is the same fact: this file does not know where this property is.
+        const _gtp = geoTrust(l);
+        photo = `<div class="card-img no-photo geo-unknown photo-unverified" title="${_attr("No photo of this property. The image on this record is a satellite tile computed from its coordinates, and " + _gtp.why + " — so the tile pictures somewhere this property is not. It is not shown.")}">`
+          + `<span class="geo-unknown-glyph">🛰</span>`
+          + `<span class="geo-unknown-txt">no verified photo</span></div>`;
       } else if (l.latitude && l.longitude && !geoTrust(l).imprecise) {
         const staticUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${l.latitude},${l.longitude}&zoom=17&size=400x250&markers=${l.latitude},${l.longitude},red-pushpin`;
         photo = `<div class="card-img" style="background-image:url('${staticUrl}')"></div>`;
@@ -3186,6 +3410,15 @@ function renderCards() {
         // and calc's own note says "none within 5x the subject's 2.60 ac". The
         // chip names it; the tooltip quotes the note verbatim.
         signalChips.push(`<span class="arv-weak-chip" title="${_attr(arvTrustTitle(at))}">${arvWeakLabel(at, "chip")}${arvShortWhy(at) ? " · " + arvShortWhy(at) : ""}</span>`);
+      }
+      // (0c) Stamped-value cluster on a comp-grounded ARV — the 255 leads that
+      //      keep every dollar. The panel says it in full; the card says it too,
+      //      because the card is where a bid list gets built and 11 of these
+      //      carry a live max bid. Amber, like the weak chip beside it: the
+      //      unverified record is the COUNTY's, not this valuation.
+      const _csc = stampCluster(l);
+      if (_csc.inCluster && !_csc.arvDerivedFromStamp) {
+        signalChips.push(`<span class="arv-weak-chip" title="${_attr(STAMP_CLUSTER_NOTE)}">🧬 county value stamped across parcels</span>`);
       }
       // (1) Equity — mirror the detail panel's value/pct + underwater colouring.
       const eq = (l.raw && l.raw.equity) || null;
@@ -3897,6 +4130,22 @@ function renderDetail(l, detailState) {
           </div>
         </div>`);
     }
+    // THE STAMPED-VALUE CLUSTER, on the leads that KEEP their money.
+    //
+    // On the 1,451 leads whose ARV was built on the stamp, calc.notes already
+    // carries the full prose and _quote above prints it verbatim — nothing is
+    // added here, because saying it twice is how a warning becomes wallpaper.
+    // The 255 comp-grounded ones had NO note, no flag the panel rendered and no
+    // sentence anywhere: measured on the rendered board, 0 of 255 matched
+    // /stamped across many properties/ or /shared across parcels/. They get the
+    // fact, in the same visual register as the other caveats and next to the
+    // numbers it qualifies. See stampCluster() for the flag strings and counts.
+    const _sc = stampCluster(l);
+    if (_sc.inCluster && !_sc.arvDerivedFromStamp) {
+      rows.push(`<div class="calc-row stamp-cluster-row"><div class="lbl">County record</div>`
+        + `<div><div class="arv-weak-note"><strong>This parcel sits in a stamped-value cluster.</strong> `
+        + `${_attr(STAMP_CLUSTER_NOTE)}</div></div></div>`);
+    }
     if (c.rehab_expected != null) {
       rows.push(`
         <div class="calc-row">
@@ -4475,6 +4724,15 @@ function renderDetail(l, detailState) {
     // real warning turns into wallpaper.
     badges.push(`<span class="qbadge warn-light dq-weak" title="${_batTtl}">${arvWeakLabel(_bat, "badge")}${_batWhy ? " · " + _batWhy : ""}</span>`);
   }
+  // Stamped-value cluster, comp-grounded. Amber, not red: the valuation is
+  // sound and the money below it stands — what is unverified is the COUNTY
+  // record, which is a different subject and gets different words. On the 1,451
+  // leads whose ARV came from the stamp the badge above already says "ARV
+  // flagged — do not bid off it", so this stays quiet there.
+  const _scb = stampCluster(l);
+  if (_scb.inCluster && !_scb.arvDerivedFromStamp) {
+    badges.push(`<span class="qbadge warn-light dq-weak" title="${_attr(STAMP_CLUSTER_NOTE)}">🧬 County value stamped across parcels · ARV is comp-based, money stands</span>`);
+  }
   // `dq-weak` repaints warn-light into the weak vocabulary — see injectDashStyles.
   // It is added only where warn-light MEANS "caveated", never where it is just
   // the palette for a middling ROI, so the two can be told apart.
@@ -4569,6 +4827,11 @@ function renderDetail(l, detailState) {
     badges.push(`<span class="qbadge ${cls}">${f.replace(/_/g, " ")}</span>`);
   });
 
+  // These badges WRAP now rather than being painted off the right edge of the
+  // page — see the .qbadge block in style.css for the measurement that forced
+  // it. Nothing is needed here: whether a given badge is one line or three is a
+  // pure layout question, it changes when the phone is rotated, and CSS is the
+  // only layer that stays right across that.
   $("d-quick-badges").innerHTML = badges.join("");
 
   // Keep the bottom flags section in sync (legacy — for users who scroll)

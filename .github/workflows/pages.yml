@@ -45,6 +45,96 @@ jobs:
       # It runs on bare python3 (no deps, no uv sync) by design.
       - name: Prove every dashboard payload survives the Jekyll build
         run: python3 scripts/check_pages_publish.py
+
+      # HOW BIG IS THE THING WE ARE ABOUT TO PUBLISH.
+      #
+      # docs/_config.yml's header carried a hand-written "~127 MB deploy -> ~8 MB"
+      # for months. Measured 2026-08-11 the real deployed set was 71.5 MB, and
+      # after parcel_photos stopped being excluded it is ~398 MB. A number a
+      # human retypes is a number that goes stale; this step measures it every
+      # build and writes it into the run summary, so the next person reads a
+      # fact instead of a claim.
+      #
+      # WHY IT IMPORTS check_pages_publish.py INSTEAD OF RE-DERIVING THE RULE.
+      # Jekyll's prefix rule is already implemented, once, in that script, and it
+      # is the thing three separate outages turned on. A second copy here would
+      # drift from it silently — the failure mode would be this step reporting a
+      # deploy that is not the deploy. So it imports decide() and reuses it. Same
+      # reason it stays on bare python3 with no `uv sync`: this is the critical
+      # publish path, and a PyPI hiccup must not be able to stop a deploy.
+      #
+      # THRESHOLDS, and why only one of them fails the build:
+      #   WARN at 600 MB — advisory. A big deploy is not a wrong deploy, and
+      #     failing here would turn "the site got heavy" into "the site stopped
+      #     updating", which is strictly worse. It just gets loud.
+      #   FAIL at 950 MB — GitHub Pages refuses to publish a site larger than
+      #     1 GB. Past that ceiling the deploy does not happen either way; failing
+      #     here fails it with a sentence that says why, and (per this file's own
+      #     rule) leaves the last good deploy live instead of a confusing
+      #     half-state.
+      # Neither threshold is the 10-minute Pages timeout — that is wall-clock,
+      # not bytes, and the run duration is already visible on the run page. The
+      # packaging cost of the photos is small: tar + gzip -1 over the whole
+      # 326.6 MB directory measured 5.8s locally, because JPEG does not compress
+      # (326.6 MB -> 325.9 MB, 0.2%).
+      - name: Measure the deployed site
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import importlib.util, pathlib, collections, os, sys
+
+          spec = importlib.util.spec_from_file_location(
+              "cpp", "scripts/check_pages_publish.py")
+          cpp = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(cpp)
+
+          docs = pathlib.Path("docs")
+          exclude, include = cpp.parse_config((docs / "_config.yml").read_text())
+
+          by_top = collections.Counter()
+          files = total = 0
+          for p in docs.rglob("*"):
+              if not p.is_file():
+                  continue
+              rel = p.relative_to(docs).as_posix()
+              published, _ = cpp.decide(rel, exclude, include)
+              if not published:
+                  continue
+              size = p.stat().st_size
+              top = rel.split("/")[0] + "/" if "/" in rel else rel
+              by_top[top] += size
+              total += size
+              files += 1
+
+          mb = total / 1e6
+          print("## Deployed site\n")
+          print(f"**{mb:.1f} MB** across **{files}** files "
+                f"(GitHub Pages limit: 1000 MB)\n")
+          print("| entry | MB |")
+          print("| --- | ---: |")
+          for name, size in by_top.most_common(12):
+              print(f"| `{name}` | {size/1e6:.1f} |")
+          other = len(by_top) - 12
+          if other > 0:
+              print(f"| _…{other} more_ | "
+                    f"{sum(v for _, v in by_top.most_common()[12:])/1e6:.1f} |")
+
+          WARN, FAIL = 600.0, 950.0
+          if mb >= FAIL:
+              print(f"\n**FAIL** — {mb:.0f} MB is past the {FAIL:.0f} MB stop. "
+                    "GitHub Pages will not publish a site over 1 GB.")
+              print(f"::error::Deployed site is {mb:.0f} MB, over the "
+                    f"{FAIL:.0f} MB limit — Pages caps published sites at 1 GB. "
+                    "Last good deploy stays live.", file=sys.stderr)
+              raise SystemExit(1)
+          if mb >= WARN:
+              print(f"\n**Warning** — {mb:.0f} MB is past the {WARN:.0f} MB "
+                    "advisory line; headroom to the 1 GB Pages ceiling is "
+                    f"{1000 - mb:.0f} MB.")
+              print(f"::warning::Deployed site is {mb:.0f} MB "
+                    f"({1000 - mb:.0f} MB of headroom before Pages refuses it).",
+                    file=sys.stderr)
+          PY
+
       - uses: actions/configure-pages@v5
       - uses: actions/jekyll-build-pages@v1
         with:

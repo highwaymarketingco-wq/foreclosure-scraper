@@ -900,6 +900,26 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
   padding-top: 14px;
   border-top: 1px solid var(--border-subtle);
 }
+/* THIS BADGE CARRIES THE CAVEAT, SO IT HAS TO BE READABLE.
+ *
+ * `white-space: nowrap` was here, and .quick-badges is a flex row inside a
+ * panel whose parents are all overflow-x: visible. A flex item wider than the
+ * row therefore did not scroll and did not truncate with an ellipsis — it was
+ * simply painted past the right edge of a 390px page whose scrollWidth is also
+ * 390, so there was no swipe that could reveal it.
+ *
+ * MEASURED in Chromium before this change, lead 1 at 390x844: the
+ * "Max bid (70%)" badge rendered 530.5px wide inside a 349px row whose right
+ * edge is x=370, and the phrase "no rehab deducted" sat at x 437.5-539.5 —
+ * ending 149.5px past the 390px viewport. On screen the reader got
+ * "Max bid (70%) ≈$75,100 — band, not a numbe" and both reasons (the ARV is a
+ * band, and NO REHAB WAS SUBTRACTED from the bid) were gone. Those two clauses
+ * are the entire point of the badge; the number without them is the lie.
+ *
+ * So the badge wraps. `max-width` + `min-width: 0` are what let a flex item
+ * shrink at all (flex items default to min-width: auto, i.e. min-content, which
+ * is what let this one grow to 530px in a 349px box), and `overflow-wrap`
+ * is the backstop for a single token longer than the line. */
 .qbadge {
   display: inline-block;
   font-size: 11.5px;
@@ -908,9 +928,27 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
   border-radius: var(--r-pill);
   background: var(--surface-2);
   color: var(--text-2);
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: break-word;
+  max-width: 100%;
+  min-width: 0;
+  line-height: 1.4;
+  text-align: left;
   border: 1px solid var(--border-subtle);
 }
+/* A pill radius is right for one line and wrong for three: at 999px
+ * (premium.css:285, which wins on source order at equal specificity) a wrapped
+ * badge becomes a lozenge whose curve eats its own first and last words.
+ *
+ * 14px, unconditionally, and NOT a class toggled by measuring the rendered
+ * height — because a badge that wraps at 390 does not wrap at 1440, and a class
+ * written once at open time is stale the moment the phone is rotated. CSS
+ * already knows: when the two radii down one side exceed the box height the
+ * browser scales them to fit, so on a 27.4px single-line badge 14px+14px=28px
+ * is clamped back to 13.7px each — the pill it already was, to within a third
+ * of a pixel. Only a badge tall enough to have wrapped keeps the 14px corner.
+ * Two selectors deep so it beats premium.css without editing that rule. */
+.quick-badges .qbadge { border-radius: 14px; }
 .qbadge.pos        { background: var(--grade-A-bg); color: var(--grade-A); border-color: transparent; }
 .qbadge.neg        { background: var(--grade-F-bg); color: var(--grade-F); border-color: transparent; }
 .qbadge.warn       { background: var(--grade-D-bg); color: var(--grade-D); border-color: transparent; }
