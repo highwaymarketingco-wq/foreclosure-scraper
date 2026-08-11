@@ -103,6 +103,7 @@ def main() -> int:
     from foreclosure_scraper.distress_score import score_board
     from foreclosure_scraper.enrichment_derived_signals import enrich_derived_signals
     from foreclosure_scraper.enrichment_data_quality import enrich_data_quality
+    from foreclosure_scraper.enrichment_board_quality import enrich_board_quality
     from foreclosure_scraper.enrichment_board_qa import enrich_board_qa
 
     print("gis_derived:", enrich_gis_derived(listings), flush=True)
@@ -111,6 +112,21 @@ def main() -> int:
     print("derived_signals:", enrich_derived_signals(listings), flush=True)
     # LAST of the ARV-aware passes — see the ORDER note in the docstring.
     print("data_quality:", enrich_data_quality(listings), flush=True)
+    # enrich_board_quality sets raw['geo_imprecise'] (the shared-centroid tag).
+    # Omitting it here — which this script did on its first outing — does not
+    # clear the flag, it FREEZES it: qa_flags gets refreshed while geo_imprecise
+    # keeps whatever the last full run left, so any coordinate collision that
+    # arrived since is permanently invisible on every fast republish. Measured
+    # after the first run of this script: 71 clusters hold 15,048 leads, 1,999
+    # of them carried no geo_imprecise at all, and 1,560 of those published a
+    # max bid with no warning — including all 1,028 leads pinned to South
+    # Academy Street, Lincolnton. Its only other call sites are main.py and
+    # regenerate_dashboard.py, i.e. the 13-hour path nobody runs for a
+    # valuation change.
+    try:
+        print("board_quality:", enrich_board_quality(listings), flush=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"board_quality: ERROR {str(exc)[:100]}", flush=True)
     try:
         print("board_qa:", enrich_board_qa(listings), flush=True)
     except Exception as exc:  # noqa: BLE001
