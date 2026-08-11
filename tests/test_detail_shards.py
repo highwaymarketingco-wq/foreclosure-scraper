@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import gzip
 import json
+from pathlib import Path
 
 import pytest
 
@@ -52,14 +53,27 @@ def _lead(i: int) -> Listing:
         "calc": {"arv_expected": 100000 + i},
         "intent_score": 55 + i,
         "stale_case": False,
+        # The four VALUATION-DERIVED blocks. Also "*", for the churn reason
+        # rather than the drift reason — they change on every publish that
+        # re-runs the valuation, so carrying them in the shard rewrote all 39
+        # committed .gz files each time. Each one below carries a sub-key the
+        # old sub-tuple allowlist was DROPPING, which is what proves the move to
+        # "*" actually widened slim rather than only relocating bytes.
+        "data_quality": {"flags": ["no_sqft"], "summary": "no heated sqft on file",
+                         "arv_confidence": "LOW"},
+        "distress_stack": {"tier": "WARM", "score": 41, "stack": ["absentee"],
+                           "signals": ["absentee"], "categories": ["owner"]},
+        "equity": {"value": 50000, "pct": 0.5, "is_underwater": False,
+                   "payoff_source": "dot_ocr", "withheld_reason": "ARV contradicted"},
+        # a LIST, so it takes the shape-drift branch of both projectors rather
+        # than the "*" branch, and must still be skipped by the shard
+        "qa_flags": ["arv_above_asis", "gis_row_shared"],
         # slim keeps only a SUB-TUPLE -> shard must carry the FULL block
         "zillow": {"photo": f"p{i}.jpg", "description": f"desc {i}",
                    "zestimate": 200000 + i, "taxAssessedValue": 90000 + i},
         "gis": {"owner": f"OWNER {i}", "mailing": f"{i} Elsewhere Rd",
                 "last_sale": {"amount": 1000 * i}},
         "signal_stack": {"count": 3, "signals": ["a", "b", "c"]},
-        "equity": {"value": 50000, "pct": 0.5, "is_underwater": False,
-                   "payoff_source": "dot_ocr"},
         # slim drops these outright -> shard must carry them
         "amount_owed": {"value": 42000 + i},
         "tenure": {"years_held": 12},
@@ -187,9 +201,6 @@ def test_shard_restores_blocks_slim_only_partially_keeps(tmp_path):
     assert set(slim_raw["signal_stack"]) == {"count"}
     assert shard["signal_stack"]["signals"] == ["a", "b", "c"]
 
-    assert "payoff_source" not in slim_raw["equity"]
-    assert shard["equity"]["payoff_source"] == "dot_ocr"
-
     # life_events is an int in slim (the client only reads .length) and the list
     # itself is what the panel renders.
     assert slim_raw["life_events"] == 2
@@ -204,6 +215,48 @@ def test_shard_omits_what_slim_already_carries_whole(tmp_path):
     for k in ("grade", "calc", "intent_score", "stale_case"):
         assert k in _SHARD_SKIP_RAW
         assert k not in shard, f"{k} duplicated into the shard"
+
+
+# The four valuation-derived blocks. These get their own test rather than a
+# line in the one above because they are here for a different reason and can
+# regress in a way grade/calc cannot: someone re-tightening one of them to a
+# sub-tuple would look like a byte saving on the slim payload and would silently
+# put ~29 MB of shard rewrite back into every publish.
+_VALUATION_DERIVED = ("data_quality", "distress_stack", "equity", "qa_flags")
+
+
+def test_valuation_derived_blocks_leave_the_shard_entirely(tmp_path):
+    """The churn contract, as a fact rather than a comment.
+
+    data_quality / distress_stack / equity / qa_flags are recomputed by every
+    publisher that touches the valuation, while vision / comps / cama — what a
+    shard exists to carry — sit still for weeks. Measured on the real board
+    across the ARV-fix publish (3b60fa0 -> a767377): all 39 shard files changed
+    and 24,253 of 38,500 records differed, and these four keys were the only
+    thing that had moved board-wide, apart from `gis` on a single record. A gzip
+    blob does not delta-compress, so that was ~29 MB of new objects in a .git
+    that is already 962 MB, four unattended launchd jobs a day.
+
+    They must therefore be absent from the shard AND whole in slim — absent
+    alone would just delete them from mobile.
+    """
+    write_artifact([_lead(0)], {"notes": "t"}, docs_dir=tmp_path)
+    shard = _read_shard(tmp_path, 0)[0]
+    slim_raw = json.loads((tmp_path / "listings_slim.json").read_text())[0]["raw"]
+    src = _lead(0).raw
+
+    for k in _VALUATION_DERIVED:
+        assert k in _SHARD_SKIP_RAW, f"{k} must be '*' in _SLIM_RAW"
+        assert k not in shard, f"{k} still churning in the shard"
+        assert slim_raw[k] == src[k], f"{k} must reach the phone WHOLE through slim"
+
+    # The sub-keys the old sub-tuple allowlist dropped. Each was reaching mobile
+    # only via the shard, and each is read on the phone: arv_confidence sets the
+    # "(proxy)" caveat, withheld_reason is the sentence that says why there is no
+    # equity figure, and qa_flags feeds arvTrust().
+    assert slim_raw["data_quality"]["arv_confidence"] == "LOW"
+    assert slim_raw["equity"]["withheld_reason"] == "ARV contradicted"
+    assert slim_raw["qa_flags"] == ["arv_above_asis", "gis_row_shared"]
 
 
 def test_skip_set_is_derived_from_the_slim_projector(tmp_path):
@@ -391,3 +444,65 @@ def test_the_directory_name_avoids_jekylls_special_rule(bad):
     cpp, _, _ = _pages_model()
     assert cpp.is_special(f"{bad}/00000.json.gz")
     assert not cpp.is_special(f"{DETAIL_SHARD_DIR}/00000.json.gz")
+
+
+# ---------------------------------------------------------------------------
+# The shard/slim sub-key contract.
+#
+# web_artifact's shard emitter deliberately duplicates the FULL body of every
+# block that slim keeps only a sub-tuple of (zillow -> photo, gis -> owner,
+# signal_stack -> count, ...), because the detail panel reads exactly the
+# sub-keys slim drops. That duplication is only worth its bytes if the client
+# merge DEEPENS an existing block rather than skipping it.
+#
+# For one release it did not. `_shardMerge` skipped any key already present, and
+# the slim projector emits an allowlisted block whenever the source carries it
+# even when no sub-key survives — so the key was ALWAYS already present and the
+# full copy was never applied. Measured on the live 38,500-lead board at
+# 375x812: zillow.description 0/10 leads, gis.mailing 0/10,
+# signal_stack.signals 0/10, corroboration.sources 0/10, and 50,459,084 of
+# 216,924,819 shard bytes (23.3%) were unreachable duplicates being shipped to
+# phones that could not read them.
+#
+# Nothing failed. The panel simply rendered less, which is exactly why this
+# needs a guard rather than a comment.
+# ---------------------------------------------------------------------------
+DASHBOARD_JS = Path(__file__).resolve().parents[1] / "docs" / "dashboard.js"
+
+
+@pytest.mark.skipif(not DASHBOARD_JS.exists(), reason="docs/dashboard.js not present")
+def test_shard_merge_deepens_a_block_slim_only_partly_carries():
+    """_shardMerge must not go back to a bare top-level assign."""
+    js = DASHBOARD_JS.read_text()
+    start = js.index("function _shardMerge(")
+    body = js[start:js.index("\nfunction ", start + 1)]
+
+    # It must still refuse to OVERWRITE what the board already holds...
+    assert "hasOwnProperty.call(raw, k)" in body, (
+        "_shardMerge no longer checks whether the board already carries the key. "
+        "The shard is a derivative and must never overwrite the authoritative payload."
+    )
+    # ...but a present PLAIN-OBJECT block must be deepened, not skipped.
+    assert "_isPlainObj" in body, (
+        "_shardMerge does not distinguish a plain-object block from a scalar/array, "
+        "so it cannot deepen. Every sub-tupled block in the shard is dead weight again "
+        "and the panel silently renders less."
+    )
+    assert "subs" in body, (
+        "_shardMerge no longer records deepened sub-keys. LRU eviction then either "
+        "cannot undo them, or undoes them by deleting the whole block — which would "
+        "take slim's own sub-tuple with it and leave the record WORSE than before the "
+        "shard loaded."
+    )
+
+
+@pytest.mark.skipif(not DASHBOARD_JS.exists(), reason="docs/dashboard.js not present")
+def test_shard_eviction_undoes_sub_keys_at_sub_key_granularity():
+    """Eviction has to mirror _shardMerge's two granularities."""
+    js = DASHBOARD_JS.read_text()
+    start = js.index("function _shardTouch(")
+    body = js[start:js.index("\nfunction ", start + 1)]
+    assert "rec.keys" in body and "rec.subs" in body, (
+        "_shardTouch's eviction path does not undo whole keys AND deepened sub-keys "
+        "separately. Deleting the whole key here removes the sub-tuple slim owns."
+    )

@@ -236,19 +236,28 @@ const _LEAN_RAW = {
   // blocks whole: ~6 MB against a 185 MB heap. Not a trade worth making.
   grade: "*",
   calc: "*",
+  //
+  // data_quality, distress_stack, equity and qa_flags are "*" for a DIFFERENT
+  // reason than grade/calc: churn, not drift. The build side derives its shard
+  // skip-set from this table — only "*" blocks and scalars are left out of
+  // docs/detail_shards — so a block held here as a sub-list ships partly in the
+  // slim payload and WHOLE in the shard, where these four rewrite ~29 MB of
+  // committed .gz on every publish that re-runs the valuation. Measured across
+  // the ARV fix: all 39 shards changed and these four were the only keys that
+  // moved board-wide. See web_artifact.py's rule 3.
+  //
   // data_quality.summary is 5.7 MB of prose and reads like an obvious LEAN cut.
   // It stays: it is the CSV's `data_quality_note` column, and the export must be
   // byte-identical on every device.
-  data_quality: ["flags", "summary"],
-  distress_stack: ["tier", "score", "stack", "signals", "categories", "absentee",
-                   "out_of_state", "contactable", "equity_band", "surviving_senior_debt_risk"],
+  data_quality: "*",
+  distress_stack: "*",
   signal_stack: ["count"],
   strategy_fit: ["tags"],
   owner_mailing: ["mailing", "mail_state", "absentee", "out_of_state"],
   owner_phone: ["phone", "source", "needs_dnc_scrub"],
   sos_agent: ["sosid", "best_contact_name", "best_contact_address"],
   rod: ["has_mortgage", "has_adverse_lien"],
-  equity: ["value", "pct", "is_underwater"],
+  equity: "*",
   title_risk: ["surviving_senior_debt_risk"],
   corroboration: ["court_confirmed", "label", "tier", "multi_source"],
   helene: ["worst_placard", "worst_damage_pct", "damaged_buildings"],
@@ -260,6 +269,21 @@ const _LEAN_RAW = {
   lrcpwa: ["absentee", "mail_state"],
   tax_owed: ["balance"],
   upset_bid: ["in_window", "days_remaining"],
+  // APPENDED LAST, on purpose: this is a NEW entry, and the key order of this
+  // object is the key order of every record in the slim file, so a new key goes
+  // where it moves nothing else.
+  //
+  // qa_flags is an ARRAY. It never reaches the `subs === "*"` branch — the
+  // Array.isArray shape-drift branch above copies it verbatim first, which is
+  // the same outcome. It is still declared "*" because the build side reads that
+  // literal to decide docs/detail_shards skips the key.
+  //
+  // Listing it here is also what finally gives MOBILE the board-QA backstop.
+  // arvTrust() reads raw.qa_flags for arv_above_asis / arv_below_asis /
+  // verdict_on_flagged_arv / bid_on_contradicted_arv / derived_without_arv /
+  // gis_row_shared, and until now the key was in no allowlist, so a phone
+  // silently saw none of them — 21,678 records on today's board carry one.
+  qa_flags: "*",
 };
 const _LEAN_RAW_KEYS = Object.keys(_LEAN_RAW);
 const _LEAN_RAW_SCALARS = [
@@ -1485,8 +1509,7 @@ function roiCell(roi) {
 // over what the pipeline emits today (measured, not guessed):
 //   valuation/calc.py -> calc.arv_flags          13 strings
 //   enrichment_data_quality.py -> data_quality.flags  12 strings
-//   enrichment_board_qa.py -> raw.qa_flags        14 strings (desktop only —
-//        qa_flags is NOT in web_artifact._SLIM_RAW, so a phone never sees it)
+//   enrichment_board_qa.py -> raw.qa_flags        14 strings
 // Anything not in a table is handled by arvFlagClass()'s documented default.
 //
 // AN UNRECOGNISED FLAG IS A CAVEAT, NOT A PASS. calc.arv_flags exists only to
@@ -1530,7 +1553,7 @@ const _ARV_BAD_FLAGS = {
   arv_unreliable: "the pipeline classified this valuation as contradicted",
   arv_bid_and_roi_withheld: "max bid, ROI, profit and the deal verdict were withheld on purpose",
   arv_outlier: "implausible magnitude for this property",
-  // --- enrichment_board_qa.py :: raw.qa_flags (desktop only) ---------------
+  // --- enrichment_board_qa.py :: raw.qa_flags ------------------------------
   arv_above_asis: "the ARV sits above the as-is value by more than the board tolerates",
   arv_below_asis: "the after-repair value came out BELOW the as-is value, which cannot be true",
   verdict_on_flagged_arv: "board QA caught a deal verdict published on a flagged ARV",
@@ -1577,7 +1600,7 @@ const _ARV_WEAK_FLAGS = {
   // is never silent when they are missing (a stale board, or the LEAN payload
   // arriving before the shard).
   arv_sanity_flag: "the valuation carries a sanity flag",
-  // --- enrichment_board_qa.py :: raw.qa_flags (desktop only) ---------------
+  // --- enrichment_board_qa.py :: raw.qa_flags ------------------------------
   gis_row_shared: "several leads resolved to the same GIS row, so the sqft/value behind this ARV may be another parcel's",
   // --- not currently emitted, kept while absent ---------------------------
   geo_imprecise: "the coordinates used to find comps are imprecise",
@@ -1764,8 +1787,18 @@ function arvFlagNote(c, flag) {
  *
  * Memoised non-enumerably (the exportCsv `{...l}` spread must never pick this
  * up) and safe to memoise: every input lives in raw.calc / raw.data_quality /
- * raw.grade, none of which is a lazy-detail key, so a shard merge cannot change
- * the answer.
+ * raw.grade / raw.qa_flags, all of which are in the slim allowlist and none of
+ * which is a lazy-detail key, so a shard merge cannot change the answer.
+ *
+ * raw.qa_flags is why that sentence had to be earned rather than assumed. Until
+ * qa_flags was added to _LEAN_RAW it reached a phone ONLY through the shard,
+ * and the shard always lost the race: this function is called from renderCards
+ * and from the filter, both of which run before any lead is opened, so the memo
+ * was already set — from a record with no qa_flags — by the time ensureShardFor
+ * merged them in. The detail panel then re-read the memo. So on mobile every
+ * qa_flags byte in the shard was dead weight: paid for on the wire, never able
+ * to change a single warning on screen. In the allowlist it arrives with the
+ * board, before the first render, and the memo is computed from it.
  */
 function arvTrust(l) {
   if (!l || typeof l !== "object") return _ARV_TRUST_OK;
@@ -1796,9 +1829,13 @@ function arvTrust(l) {
   if (Array.isArray(c.flags)) c.flags.forEach((f) => consider(f, true));
   const dq = raw.data_quality;
   if (dq && Array.isArray(dq.flags)) dq.flags.forEach((f) => consider(f, false));
-  // qa_flags is written by enrichment_board_qa and is NOT in web_artifact's
-  // _SLIM_RAW allowlist, so it is a desktop-only signal. Read it where it
-  // exists rather than requiring it — nothing above depends on it.
+  // qa_flags is written by enrichment_board_qa. It used to be in NO slim
+  // allowlist, which made it a desktop-only signal: 21,678 of 38,500 records
+  // carry one and a phone saw none of them, so the board-QA reasons for
+  // distrusting an ARV (arv_above_asis, verdict_on_flagged_arv, gis_row_shared,
+  // ...) were simply missing on mobile. It is in _LEAN_RAW now. Still read
+  // defensively — a board published before that change carries no qa_flags in
+  // its slim payload, and nothing above depends on this.
   if (Array.isArray(raw.qa_flags)) raw.qa_flags.forEach((f) => consider(f, false));
   // Boolean verdicts written straight onto calc — arv_geo_suspect already is one.
   for (const k in c) { if (c[k] === true && k.indexOf("arv") === 0) consider(k, false); }
@@ -2865,7 +2902,10 @@ const _SHARD = {
   // spelled identically under either, so the naming is learned from the first
   // shard that actually distinguishes them and latched from then on.
   naming: null,
-  lru: [],                 // [{key, start, data:null, applied: Map<listing, string[]>}]
+  // applied: Map<listing, {keys: string[], subs: {[key]: string[]}}> — whole keys
+  // the shard added, and sub-keys it deepened INTO a block slim already owns.
+  // Eviction must undo each at its own granularity; see _shardMerge.
+  lru: [],
   inflight: Object.create(null),
   // Set once a shard fetch fails in a way that says the directory is not there
   // (as opposed to one bad block). Stops a 404 per tap for the rest of the
@@ -2953,10 +2993,22 @@ function _shardTouch(entry) {
   _SHARD.lru.push(entry);
   while (_SHARD.lru.length > DETAIL_SHARD_LRU) {
     const gone = _SHARD.lru.shift();
-    gone.applied.forEach((keys, li) => {
+    // Undo at the SAME granularity it was applied — see _shardMerge. Deleting
+    // the whole key here would take slim's own sub-tuple with it, leaving the
+    // record worse than before the shard ever loaded.
+    gone.applied.forEach((rec, li) => {
       const raw = li && li.raw;
-      if (!raw) return;
+      if (!raw || !rec) return;
+      const keys = rec.keys || [];
       for (let i = 0; i < keys.length; i++) delete raw[keys[i]];
+      const subs = rec.subs || {};
+      for (const k in subs) {
+        if (!Object.prototype.hasOwnProperty.call(subs, k)) continue;
+        const blk = raw[k];
+        if (!_isPlainObj(blk)) continue;
+        const sk = subs[k];
+        for (let i = 0; i < sk.length; i++) delete blk[sk[i]];
+      }
     });
     gone.applied = new Map();
     gone.data = null;
@@ -2968,24 +3020,60 @@ function _shardEntry(key) {
   return null;
 }
 
+function _isPlainObj(v) {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
 /**
- * Merge one detail record into one listing, recording exactly which keys were
- * added so eviction can take them back out again.
+ * Merge one detail record into one listing, recording exactly what was added so
+ * eviction can take it back out again.
  *
- * A key the board already carried is left alone: the shard is a derivative and
- * must never be able to overwrite the authoritative payload, and more
- * practically, "put it back how you found it" is only possible for keys we own.
+ * The shard NEVER overwrites a value the board already carries: it is a
+ * derivative, the board is authoritative, and "put it back how you found it" is
+ * only possible for what we ourselves put there.
+ *
+ * But "already carries the KEY" is not the same as "already carries the BLOCK",
+ * and conflating the two silently cost mobile every sub-key slim drops. The slim
+ * projector emits an allowlisted block whenever the source has it, even when no
+ * sub-key survives, and several blocks are allowlisted down to a sub-tuple
+ * (zillow -> photo, gis -> owner, signal_stack -> count, ...). So the key was
+ * ALWAYS already present, this function skipped it, and the shard's full copy
+ * was never applied. Measured on the live board at 375x812: zillow.description
+ * 0/10 leads, gis.mailing 0/10, signal_stack.signals 0/10, corroboration.sources
+ * 0/10 — 50,459,084 of 216,924,819 shard bytes (23.3%) were unreachable
+ * duplicates being shipped to phones that could never read them.
+ *
+ * So: an absent key is assigned whole; a present PLAIN-OBJECT block is DEEPENED
+ * with only the sub-keys the record lacks. Anything else (arrays, scalars, a
+ * type mismatch between the two sides) is left strictly alone.
+ *
+ * `applied` therefore records at two granularities — {keys, subs} — because
+ * eviction has to undo a deepening without deleting the block slim owns.
  */
 function _shardMerge(li, d, entry) {
   const raw = li.raw || (li.raw = {});
-  const added = [];
+  const added = [];                       // whole keys this shard put on the record
+  const deepened = Object.create(null);   // key -> sub-keys put INTO a block slim owns
   for (const k in d) {
     if (!Object.prototype.hasOwnProperty.call(d, k)) continue;
-    if (Object.prototype.hasOwnProperty.call(raw, k)) continue;
-    raw[k] = d[k];
-    added.push(k);
+    const val = d[k];
+    if (!Object.prototype.hasOwnProperty.call(raw, k)) {
+      raw[k] = val;
+      added.push(k);
+      continue;
+    }
+    const cur = raw[k];
+    if (!_isPlainObj(val) || !_isPlainObj(cur)) continue;
+    const subs = [];
+    for (const sk in val) {
+      if (!Object.prototype.hasOwnProperty.call(val, sk)) continue;
+      if (Object.prototype.hasOwnProperty.call(cur, sk)) continue;
+      cur[sk] = val[sk];
+      subs.push(sk);
+    }
+    if (subs.length) deepened[k] = subs;
   }
-  entry.applied.set(li, added);
+  entry.applied.set(li, { keys: added, subs: deepened });
 }
 
 /**

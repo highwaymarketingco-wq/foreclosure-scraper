@@ -368,11 +368,27 @@ LAZY_DETAIL_KEYS = ("vision", "foreclosure_sold_comps", "comps", "cama", "rent_c
 #    files. tests/test_board_slim.py parses the JS and asserts the two lists are
 #    equal — if that test fails, the client changed and this must follow.
 #
-# 3. NOTE _SLIM_RAW's "*" SENTINEL. grade and calc are kept WHOLE. They were
-#    sub-allowlisted client-side and both drifted within hours: the grade badge
-#    row rendered "undefined undefined undefined undefined" and every listing on
-#    every phone claimed "CONFIDENCE: LOW". A fabricated number on a board people
-#    bid money off is worse than a missing one. Do not sub-allowlist them here.
+# 3. NOTE _SLIM_RAW's "*" SENTINEL. Six blocks are kept WHOLE, for two separate
+#    reasons.
+#
+#    grade and calc: they were sub-allowlisted client-side and both drifted
+#    within hours — the grade badge row rendered "undefined undefined undefined
+#    undefined" and every listing on every phone claimed "CONFIDENCE: LOW". A
+#    fabricated number on a board people bid money off is worse than a missing
+#    one. Do not sub-allowlist them here.
+#
+#    data_quality, qa_flags, equity and distress_stack: these are FAST-CHANGING
+#    DERIVED values, and whole-block here is what keeps them out of the SHARDS.
+#    _SHARD_SKIP_RAW (below) skips only "*" blocks and scalars, so a block held
+#    as a sub-tuple ships partly in slim and WHOLE in the shard — where it
+#    churns 29 MB of committed .gz on every publish that so much as re-runs the
+#    valuation. Measured on the real board: across the ARV fix (3b60fa0 ->
+#    a767377) all 39 shard files changed, 24,253 of 38,500 records differed, and
+#    the ONLY keys that moved board-wide were these four (data_quality 22,374,
+#    qa_flags 21,678, equity 8,892, distress_stack 2,387) plus `gis` on exactly
+#    one record. Whole-block here, absent from the shard, 39 changed files
+#    becomes 1. Slim is rewritten every publish anyway, so it is the right file
+#    to carry them. Do not sub-allowlist these back.
 # ===========================================================================
 
 # Top-level scalars. Mirrors _LEAN_TOP. `description` is deliberately absent —
@@ -396,18 +412,27 @@ _SLIM_RAW: dict[str, str | tuple[str, ...]] = {
     "calc": "*",
     # data_quality.summary is 5.7 MB of prose and reads like an obvious cut. It
     # stays: it is the CSV's data_quality_note column, and the export must be
-    # byte-identical on every device.
-    "data_quality": ("flags", "summary"),
-    "distress_stack": ("tier", "score", "stack", "signals", "categories", "absentee",
-                       "out_of_state", "contactable", "equity_band",
-                       "surviving_senior_debt_risk"),
+    # byte-identical on every device. Whole-block ("*") rather than
+    # ("flags", "summary") for the churn reason in rule 3 — the only sub-key the
+    # tuple was dropping is arv_confidence, 26 KB per 1,000 records, against
+    # 354 KB per 1,000 of shard rewrite.
+    "data_quality": "*",
+    # The sub-tuple already listed every sub-key this block carries on the live
+    # board, so "*" adds ZERO bytes to slim and takes 242 KB per 1,000 records
+    # out of the shard. Pure win.
+    "distress_stack": "*",
     "signal_stack": ("count",),
     "strategy_fit": ("tags",),
     "owner_mailing": ("mailing", "mail_state", "absentee", "out_of_state"),
     "owner_phone": ("phone", "source", "needs_dnc_scrub"),
     "sos_agent": ("sosid", "best_contact_name", "best_contact_address"),
     "rod": ("has_mortgage", "has_adverse_lien"),
-    "equity": ("value", "pct", "is_underwater"),
+    # Whole-block: withheld_reason / withheld / arv_trust / arv_flags are the
+    # sentences that say WHY a figure is missing, the detail panel reads them,
+    # and they change with the valuation. This is the largest of the four moves
+    # — ~169 KB per 1,000 records into slim — and still cheaper than the shard
+    # rewrite it stops.
+    "equity": "*",
     "title_risk": ("surviving_senior_debt_risk",),
     "corroboration": ("court_confirmed", "label", "tier", "multi_source"),
     "helene": ("worst_placard", "worst_damage_pct", "damaged_buildings"),
@@ -419,6 +444,25 @@ _SLIM_RAW: dict[str, str | tuple[str, ...]] = {
     "lrcpwa": ("absentee", "mail_state"),
     "tax_owed": ("balance",),
     "upset_bid": ("in_window", "days_remaining"),
+    # APPENDED, deliberately last. Two things about this entry:
+    #
+    # It is a LIST, not a dict, so neither projector's "*" branch is what
+    # carries it — both fall through their shape-drift branch ("not a dict" here,
+    # `Array.isArray` in the client) and copy it verbatim. Same result, and it is
+    # still declared "*" because _SHARD_SKIP_RAW reads that literal to decide the
+    # shard skips it. Do not "fix" it to a tuple.
+    #
+    # It is NEW to the allowlist, not a re-shaping of an existing entry, and it
+    # goes at the END so no other key's position in the record moves — key order
+    # here is the key order of every record in the slim file.
+    #
+    # It also closes a real gap. qa_flags is enrichment_board_qa's output and
+    # arvTrust() (dashboard.js) reads it as a reason to distrust a published ARV
+    # — arv_above_asis, arv_below_asis, verdict_on_flagged_arv,
+    # bid_on_contradicted_arv, derived_without_arv, gis_row_shared. Until now it
+    # was in no slim allowlist at all, so a phone had no board-QA backstop: on
+    # today's board 21,678 records carry it and mobile saw none of them.
+    "qa_flags": "*",
 }
 
 # Mirrors _LEAN_RAW_SCALARS.
@@ -654,9 +698,10 @@ def _emit_slim(docs: Path, payload: list) -> int | None:
         _atomic_write_bytes(gz_path, _gzip.compress(slim_bytes, compresslevel=9, mtime=0))
         return len(payload)
     except Exception as exc:  # noqa: BLE001
-        for p in (slim_path, gz_path,
-                  slim_path.with_name(slim_path.name + ".tmp"),
-                  gz_path.with_name(gz_path.name + ".tmp")):
+        # Only the finished files: _atomic_write_bytes now names its temp with
+        # the PID and unlinks it itself on failure, so there is no fixed ".tmp"
+        # left here to sweep. Naming one would sweep another process's.
+        for p in (slim_path, gz_path):
             try:
                 p.unlink(missing_ok=True)
             except OSError:
@@ -693,15 +738,41 @@ def _emit_slim(docs: Path, payload: list) -> int | None:
 # _SHARD_SKIP_RAW is derived from _SLIM_RAW / _SLIM_RAW_SCALARS rather than
 # written out, so it cannot drift from the projector the way a hand-kept second
 # list would. Only two classes of key are skipped:
-#   * _SLIM_RAW entries marked "*" (grade, calc) — slim ships them WHOLE.
+#   * _SLIM_RAW entries marked "*" (grade, calc, data_quality, distress_stack,
+#     equity, qa_flags) — slim ships them WHOLE.
 #   * _SLIM_RAW_SCALARS — slim ships the scalar verbatim.
 # A block slim keeps only a SUB-TUPLE of (zillow -> photo, gis -> owner,
-# signal_stack -> count, equity -> value/pct/is_underwater, ...) is emitted here
-# in FULL, on purpose. The client merge is a top-level assign, so a partial
-# block in the shard would REPLACE, not deepen, the partial block already on the
-# record — and the panel reads exactly the sub-keys slim drops (zillow
-# .description, gis.mailing, signal_stack.signals, equity.payoff_source). The
-# duplicated sub-keys cost bytes; a half-populated block costs facts.
+# signal_stack -> count, ...) is emitted here in FULL, on purpose: the panel
+# reads exactly the sub-keys slim drops (zillow.description, gis.mailing,
+# signal_stack.signals). The duplicated sub-keys cost bytes; a half-populated
+# block costs facts.
+#
+# THIS ONLY WORKS BECAUSE THE CLIENT MERGE DEEPENS. It did not until 2026-08-11.
+# docs/dashboard.js _shardMerge skipped any key already present on the record,
+# and the slim projector emits an allowlisted block whenever the source has it
+# EVEN WHEN NO SUB-KEY SURVIVES — so for every sub-tupled block the key was
+# always already there, the skip always fired, and the full copy below was never
+# applied. Measured at 375x812 on the live board: zillow.description 0/10 leads,
+# gis.mailing 0/10, signal_stack.signals 0/10, corroboration.sources 0/10;
+# 50,459,084 of 216,924,819 shard bytes (23.3%) were unreachable duplicates
+# shipped to phones that could not read them. The merge now copies in only the
+# sub-keys the record lacks and records them at sub-key granularity so LRU
+# eviction can take back exactly what it added.
+#
+# If that merge ever reverts to a top-level assign, every sub-tuple below turns
+# back into dead weight — silently, because the panel simply renders less.
+#
+# WHICH SIDE OF THAT LINE A BLOCK BELONGS ON IS A CHURN DECISION, NOT ONLY A
+# SIZE ONE. Duplicating a block here costs its bytes once per publish; carrying
+# it here at all costs a full rewrite of every shard file that holds a record
+# whose copy changed, and a gzip blob does not delta-compress. Four blocks —
+# data_quality, qa_flags, equity, distress_stack — are derived from the
+# valuation and change on essentially every publish while vision/comps/cama sit
+# still, which is the exact inverse of what a shard is for. They were moved to
+# "*" in _SLIM_RAW so they leave here entirely. Measured on the real board: the
+# ARV-fix publish (3b60fa0 -> a767377) changed all 39 shard files and 24,253 of
+# 38,500 records, and those four keys plus `gis` on ONE record were the only
+# things that had moved. Under this rule that publish rewrites 1 shard, not 39.
 #
 # THE INVARIANT THIS CODE IS UNDER, same as SLIM-V1's rule 1: ADDITIVE, NEVER
 # AUTHORITATIVE. listings.json + listings_detail.json are TOGETHER the only
@@ -938,10 +1009,33 @@ def _unique_key_map(recs: list) -> dict:
 def _atomic_write_bytes(path: Path, data: bytes) -> None:
     """Write bytes atomically: a temp file in the same dir + os.replace, so a
     kill mid-write leaves the PRIOR file intact instead of a truncated,
-    corrupt one. os.replace is atomic within a filesystem."""
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_bytes(data)
-    os.replace(tmp, path)
+    corrupt one. os.replace is atomic within a filesystem.
+
+    The temp name carries the PID. It did not until 2026-08-11, and a shared
+    "<name>.tmp" is not a private scratch file — it is a rendezvous point. Two
+    concurrent writers were reproduced three times out of three: writer B
+    reports success, writer A raises FileNotFoundError on os.replace, and A's
+    bytes are what land on disk. The damage is not the crash; it is that the
+    payload set ends up MIXED. Measured on a 25,000-record board, listings.json
+    belonged to the crashed writer while the gz twin, the detail sidecar, slim
+    and every shard belonged to the survivor. read_board_json prefers the .json
+    over the .gz, so the next load_board() merged the survivor's sidecar into
+    the loser's board BY INDEX — 25,000 of 25,000 leads carrying the neighbour's
+    vision and comps, no exception raised, run_meta looking perfect.
+
+    A per-process name does not prevent the race (see the flock in the job
+    wrappers for that); it prevents two writers from silently swapping halves of
+    the same publish."""
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_bytes(data)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
 
 
 def _slim_raw(raw: dict | None) -> dict:
