@@ -17,6 +17,10 @@ estimate the CURRENT payoff:
 equity = ARV − payoff − senior_liens ; equity_pct = equity / ARV.
 Runs AFTER calc (needs arv_expected) and amount_owed, BEFORE distress scoring
 (which now gates HOT on real equity). Pure-Python, no I/O, no cost.
+
+Because the first term IS the ARV, this module is also the third call site of
+the ARV trust gate: a valuation the board refuses to bid off is a valuation it
+refuses to publish equity off. See the block above `_EQUITY_TRUST_BLOCKED`.
 """
 from __future__ import annotations
 
@@ -29,10 +33,77 @@ from datetime import date
 
 from .models import Listing
 from .valuation.amortize import _as_date, estimate_current_balance
+from .valuation.grading import ARV_TRUST_BLOCKS_DERIVED, arv_trust
 
 log = structlog.get_logger()
 
 _LTV_PROXY = 0.90   # if we only know the sale price, assume ~90% was financed
+
+# ===========================================================================
+# THE ARV TRUST GATE, AT THE WRITER
+#
+# THE DEFECT. `equity = ARV - payoff - senior_liens` (`enrich_equity` below), so
+# equity is an ARV-derived money figure in exactly the sense
+# grading.ARV_DERIVED_MONEY_FIELDS means. It was the only one that was never
+# gated. Measured by replaying the shipping code over the live board (38,500
+# leads, 9,146 equity rows): 1,252 published an equity figure on a CONTRADICTED
+# ARV and 113 more on a WITHHELD one — leads whose max bid, ROI, profit, deal
+# verdict AND letter grade were all withheld by the gate, still rendering
+# "Equity $1,920,000 (97%)" in green on the same card, because
+# docs/dashboard.js:2454 tests `eq.value != null` and nothing else.
+#
+# WHY IT COULD NOT BE FIXED IN grading.py. valuation runs at main.py:2287 and
+# writes raw['calc']; enrich_equity runs at main.py:2329 and writes
+# raw['equity'] itself. At grade() time raw['equity'] does not exist yet, so
+# there is nothing there to blank — the gate has to live at the writer. The same
+# is true of distress_score._equity_band (main.py:2369), which reads the equity
+# it must not rank on. Same rule, same function (grading.arv_trust), three call
+# sites; see the "GATED ELSEWHERE" block in grading.py.
+#
+# THE RULE. Identical to the one the money fields already follow, deliberately,
+# so there is one definition and not two:
+#
+#   CONTRADICTED or WITHHELD -> no equity figure. WEAK -> publish.
+#
+# Why WEAK still publishes. The weak tier is ~16,300 leads, most of them ARVs
+# that simply ARE the county's own appraisal times a constant
+# (anchor_not_independent). max_bid_70 and roi_pct are published there for that
+# reason and equity is no different: unverified is not the same as contradicted,
+# and blanking the equity on two thirds of the board would delete the signal the
+# HOT/WARM tier is built on. (Weak equity inherits the same caption gap the weak
+# max bid has — the card marks the ARV "unverified" but not each figure derived
+# from it. That is the dashboard's E6, not this file's.)
+#
+# Why WITHHELD is blocked even though calc published no ARV at all. `_arv()`
+# falls back to `market_value`, then `tax_value x 1.25`, so a withheld lead
+# still produced an equity number — off a value reference that appears NOWHERE
+# on the card, because calc refused to print an ARV. That is the worst shape a
+# number can have here: a large green figure whose denominator the reader cannot
+# see, on a card whose headline claim is "this property could not be valued".
+# 113 leads; blocking them is not a normal-case cost.
+#
+# WHAT IS PUBLISHED INSTEAD. Not nothing — a marker. `raw['equity']` keeps its
+# block with NO `value` and NO `pct`, plus `withheld` / `withheld_reason` /
+# `arv_trust` / `arv_flags`. Every existing reader is already written
+# `if eq.value != null` (dashboard card :2454, detail panel :3112) or
+# `eq.get("pct")` (grading._risk_score, distress_score._equity_band,
+# enrichment_strategy_fit._equity_pct), so all of them fall through to their
+# no-equity branch with no change. The reason survives into the detail shard
+# (web_artifact keeps raw['equity'] whole there); the slim board projects only
+# ("value", "pct", "is_underwater") and so ships `"equity": {}` — renders
+# nothing, which is the correct board behaviour.
+#
+# FLAG STRINGS INTRODUCED BY THIS BLOCK (interface — a reader/writer mismatch
+# has caused three silent failures in this project already):
+#   raw['equity']['withheld']         bool, always True when present
+#   raw['equity']['withheld_reason']  prose, safe to render verbatim
+#   raw['equity']['arv_trust']        "contradicted" | "withheld"
+#   raw['equity']['arv_flags']        sorted list of the calc flags responsible
+# ===========================================================================
+# Imported, not re-spelled — grading.ARV_TRUST_BLOCKS_DERIVED is the one
+# definition of "which trust levels forbid an ARV-derived figure", shared with
+# the in-Calc gate and with distress_score.
+_EQUITY_TRUST_BLOCKED = ARV_TRUST_BLOCKS_DERIVED
 
 # NC counties whose parcel layer publishes a sale AMOUNT but no sale DATE.
 # For these we attach a conservative assumed note date so the last-sale path
@@ -62,6 +133,64 @@ def _arv(li: Listing) -> Optional[float]:
     if li.tax_value:
         return float(li.tax_value) * 1.25
     return None
+
+
+def equity_arv_trust(li: Listing) -> tuple[str, list[str]]:
+    """(trust level, responsible flags) for this lead's published valuation.
+
+    Reads the SERIALIZED raw['calc'] rather than re-running compute(), because
+    that is what exists by the time this enricher runs and it is the same block
+    the dashboard reads — so the gate here and the warning on the card can never
+    be computed off different data. `grading.arv_trust` is a pure function over
+    those three fields precisely so this call site exists.
+
+    A lead with no raw['calc'] at all (a source that never reached valuation)
+    classifies "ok" and is left exactly as it was: this gate withholds equity
+    that a BAD valuation produced, it does not require a valuation.
+    """
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    calc = raw.get("calc") or {}
+    if not isinstance(calc, dict):
+        return "ok", []
+    flags = sorted(calc.get("arv_flags") or [])
+    return arv_trust(flags, calc.get("arv_expected"),
+                     calc.get("arv_withheld")), flags
+
+
+def _withheld_block(level: str, flags: list[str]) -> dict:
+    """The marker that replaces a figure we will not stand behind.
+
+    Deliberately carries no `value` and no `pct` — every reader in the repo
+    branches on one of those two — and states WHY in prose that is safe to
+    render verbatim next to the empty cell.
+    """
+    named = ", ".join(flags) or "an unnamed sanity flag"
+    if level == "withheld":
+        why = (
+            "No owner-equity figure published: the valuation engine refused to "
+            "publish an ARV for this property at all, so equity (ARV minus "
+            "payoff minus senior liens) has no first term. The county or market "
+            "value this engine would otherwise fall back on is not shown "
+            "anywhere on this card, so an equity percentage computed from it "
+            "could not be checked against anything you can see."
+        )
+    else:
+        why = (
+            f"No owner-equity figure published: this ARV is flagged {named}, "
+            f"which means another record (or the arithmetic itself) contradicts "
+            f"it. Equity is the ARV minus the estimated payoff, so it is the "
+            f"same disputed number with a subtraction on it — and it is the "
+            f"largest figure on the card. The max bid, ROI, profit and deal "
+            f"verdict are withheld here for exactly this reason; equity is not "
+            f"an exception to that. Verify the parcel, then subtract the payoff "
+            f"yourself."
+        )
+    return {
+        "withheld": True,
+        "withheld_reason": why,
+        "arv_trust": level,
+        "arv_flags": flags,
+    }
 
 
 def _is_deed_of_trust(doc_type: object) -> bool:
@@ -223,9 +352,23 @@ def enrich_equity(listings: list[Listing]) -> dict:
     """Attach raw['equity'] = {value, pct, arv_used, payoff, payoff_source, ...}."""
     n = 0
     amortized = 0
+    withheld = 0
     for li in listings:
         raw0 = li.raw if isinstance(li.raw, dict) else {}
         raw0.pop("_equity_amortization", None)  # never carry a stale detail block
+        # ARV TRUST GATE (see the block at the top of this module). Runs FIRST,
+        # before `_arv` — on a withheld valuation `_arv` silently substitutes
+        # market_value / tax_value x 1.25, so testing the trust level after the
+        # fallback would ask "is the number we did not use trustworthy". It also
+        # runs before `_payoff`, which is the expensive half of this enricher.
+        _level, _flags = equity_arv_trust(li)
+        if _level in _EQUITY_TRUST_BLOCKED:
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+                raw0 = li.raw
+            raw0["equity"] = _withheld_block(_level, _flags)
+            withheld += 1
+            continue
         arv = _arv(li)
         if not arv or arv <= 0:
             raw0.pop("equity", None)  # never leave a stale equity we can't recompute
@@ -263,5 +406,6 @@ def enrich_equity(listings: list[Listing]) -> dict:
             amortized += 1
         li.raw = raw
         n += 1
-    log.info("equity.done", computed=n, amortized=amortized, total=len(listings))
-    return {"computed": n, "amortized": amortized}
+    log.info("equity.done", computed=n, amortized=amortized,
+             withheld_bad_arv=withheld, total=len(listings))
+    return {"computed": n, "amortized": amortized, "withheld_bad_arv": withheld}

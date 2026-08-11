@@ -1921,15 +1921,20 @@ async def run() -> int:
     except Exception:
         log.error("validation.failed", traceback=traceback.format_exc())
 
-    # Data-quality flag enrichment — runs after validation so the flags
-    # reflect post-validation state (e.g. cross-state county nulled).
-    # Surfaces investor-facing caveats in raw.data_quality.
-    try:
-        from .enrichment_data_quality import enrich_data_quality
-        s = enrich_data_quality(enriched)
-        if s: enrichment_stats["data_quality"] = s
-    except Exception:
-        log.error("data_quality.failed", traceback=traceback.format_exc())
+    # NOTE: enrich_data_quality USED TO RUN HERE, immediately after validation.
+    # It cannot: every ARV caveat it publishes is read out of raw['calc'], and
+    # the valuation that writes raw['calc'] is ~550 lines below this point. Here
+    # it saw the PREVIOUS run's calc (or, for a brand-new lead, none at all) and
+    # captioned the board off it. Measured on the live 38,500-lead board by
+    # replaying both orders through the shipping code: from this position it
+    # emitted arv_unreliable/arv_bid_and_roi_withheld/arv_sanity_flag/
+    # arv_no_independent_check 0/0/0/0 times, against 3,049/3,049/20,443/16,310
+    # from after the valuation — 2,001 leads that should carry the loud warning
+    # rendered quiet and 161 carried a false one. It also never saw
+    # raw['footprint'] (written at footprint_sqft, below) so `sqft_estimated`
+    # could not fire, and never saw court_owner_verify's stripped addresses.
+    # It now runs after the LAST writer of raw['calc'] (the RentCast re-grade);
+    # tests/test_enrichment_order.py fails if anything moves it back.
 
     # Promote a recoverable tax/GIS owner into any empty owner_name (unblocks mailing/phone/ROD
     # downstream). Runs BEFORE voter_phone + gaston_rod so they consume the promoted names.
@@ -2172,9 +2177,10 @@ async def run() -> int:
     # Upset-bid window tagging (NCGS §45-21.27) — for every NC listing
     # whose sale_date is in the past 0-10 calendar days, attach
     # raw.upset_bid + upset_bid_deadline. Pure-Python, idempotent.
-    # Runs AFTER validation/data_quality so it sees the cleaned-up
-    # sale_date, BEFORE calc/grade so the valuation pass can read the
-    # upset-bid signal (e.g. higher confidence on recent comp matching).
+    # Runs AFTER validation so it sees the cleaned-up sale_date, BEFORE
+    # calc/grade so the valuation pass can read the upset-bid signal (e.g.
+    # higher confidence on recent comp matching). data_quality no longer runs
+    # before this point — it reads raw['calc'], so it runs after the valuation.
     try:
         from .enrichment_upset_bid import enrich_upset_bid
         s = enrich_upset_bid(enriched)
@@ -2466,6 +2472,42 @@ async def run() -> int:
             log.info("orchestrator.rentcast_blended", **rc_summary)
     except Exception:
         log.error("rentcast.failed", traceback=traceback.format_exc())
+
+    # Data-quality flag enrichment — investor-facing caveats in raw.data_quality
+    # (address placeholder, missing/estimated sqft, and every ARV trust caveat).
+    #
+    # ORDERING IS THE WHOLE POINT, so it is stated once here and enforced by
+    # tests/test_enrichment_order.py:
+    #
+    #   It MUST run after the LAST thing that writes raw['calc'].
+    #
+    # That is the RentCast blend directly above (update_grade_with_rentcast
+    # re-runs compute+grade and replaces raw['calc'] for the top-N leads), which
+    # comes after the main valuation loop and after the assessor-card re-grade.
+    # Everything this enrichment says about an ARV — arv_unreliable,
+    # arv_bid_and_roi_withheld, arv_no_independent_check, arv_sanity_flag,
+    # arv_outlier, the data_quality.summary prose and the CSV's
+    # data_quality_note — is derived from that block. Computed one line early it
+    # describes a valuation that is no longer on the board, and a stale warning
+    # is worse than none: the operator reads "no caveats" off a number that has
+    # since been flagged.
+    #
+    # Running it here rather than at the old post-validation position also means
+    # it finally sees the resolver's addresses, sc_cama/footprint/assessor_card
+    # sqft, raw['footprint'] (so `sqft_estimated` can fire at all) and
+    # court_owner_verify's stripped street_address. It reads no state that only
+    # existed earlier: nothing between the two positions writes
+    # raw['data_quality'], and the only in-process consumer is write_artifact's
+    # serialization, far below.
+    #
+    # It is still BEFORE board_quality / last_sale / board_qa / write_artifact,
+    # which is the same relative order scripts/regenerate_dashboard.py uses.
+    try:
+        from .enrichment_data_quality import enrich_data_quality
+        s = enrich_data_quality(enriched)
+        if s: enrichment_stats["data_quality"] = s
+    except Exception:
+        log.error("data_quality.failed", traceback=traceback.format_exc())
 
     # Run summary for Sheet log + email body
     by_state = Counter(li.state for li in enriched if li.state)

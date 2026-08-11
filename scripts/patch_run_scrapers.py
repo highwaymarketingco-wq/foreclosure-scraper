@@ -435,14 +435,11 @@ async def _run_address_enrichments(new_listings: list[Listing]) -> dict:
                   traceback=traceback.format_exc())
         stats["validation"] = "failed"
 
-    # Investor-facing data-quality flags (post-validation so they reflect nulls)
-    try:
-        s = enrich_data_quality(new_listings)
-        stats["data_quality"] = s
-    except Exception:
-        log.error("patch_run.data_quality_failed",
-                  traceback=traceback.format_exc())
-        stats["data_quality"] = "failed"
+    # NOTE: enrich_data_quality is deliberately NOT called here. This coroutine
+    # runs before _calc_and_grade(), and every ARV caveat data-quality publishes
+    # is read out of raw['calc'] — from here it would caption the board off the
+    # previous run's valuation. It is called by main() straight after
+    # _calc_and_grade instead; tests/test_enrichment_order.py enforces that.
 
     # NC upset-bid window tagging (NCGS §45-21.27, ~14 days from sale).
     # Pure-Python, idempotent. Reads sale_date set by the law-firm /
@@ -701,6 +698,20 @@ async def main() -> int:
     log.info("patch_run.valuation",
              ok=len(new_filtered) - valuation_failures,
              failures=valuation_failures)
+
+    # Investor-facing data-quality flags — MUST be after _calc_and_grade above,
+    # because every ARV caveat (arv_unreliable / arv_bid_and_roi_withheld /
+    # arv_no_independent_check / arv_sanity_flag / arv_outlier) is derived from
+    # raw['calc']. It used to run inside _run_address_enrichments, which is a
+    # hundred lines earlier, so this script merged a fresh valuation into
+    # docs/listings.json carrying the previous run's caveats.
+    # tests/test_enrichment_order.py fails if it moves back.
+    try:
+        enrichment_stats["data_quality"] = enrich_data_quality(new_filtered)
+    except Exception:
+        log.error("patch_run.data_quality_failed",
+                  traceback=traceback.format_exc())
+        enrichment_stats["data_quality"] = "failed"
 
     # Merge new active into existing active (dedupe-merge), then dedupe
     merged_all, merge_stats = _merge_into_existing(existing, new_filtered)

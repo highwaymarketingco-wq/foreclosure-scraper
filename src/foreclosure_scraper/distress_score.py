@@ -13,6 +13,9 @@ signal. We:
   3. Score = weighted signals (recency-aware) + equity band + contactability.
   4. Tier: HOT = stacked 2+ AND equity>=med AND contactable; WARM = stacked 2+
      OR a single high-weight signal with equity OR absentee+distress; else COLD.
+     The equity term is ARV-derived, so it passes through the ARV trust gate
+     first (`_equity_band`): a lead whose valuation the board refuses to bid off
+     ranks on its distress RECORDS, never on its equity.
 
 Contactability (a mailable owner) is a HARD GATE for HOT — a hot lead you can't
 reach isn't actionable. Already-sold properties (sold_confirmed) are excluded.
@@ -26,6 +29,7 @@ from pathlib import Path
 from typing import Optional
 
 from .models import Listing
+from .valuation.grading import ARV_TRUST_BLOCKS_DERIVED, arv_trust
 
 # ATC-45 Helene placard severity -> honest PROPERTY-signal weight. Calibrated
 # against the existing scale (generic distressed=10, code_enforcement=14,
@@ -243,8 +247,45 @@ def _signals_for(li: Listing, prior_price: Optional[float] = None) -> list[tuple
 
 def _equity_band(li: Listing) -> Optional[str]:
     """Seller's REAL equity (ARV − payoff − liens), from enrichment_equity.
-    Falls back to flip-ROI only when equity could not be computed."""
+    Falls back to flip-ROI only when equity could not be computed.
+
+    ARV TRUST GATE — the ranking half of the same decision enrichment_equity
+    makes about the figure. BOTH inputs to this function are ARV-derived:
+    `equity.pct` is (ARV − payoff − liens) / ARV, and the `roi_pct` fallback is
+    ARV minus every cost over cash in. So on a valuation the board will not bid
+    off, this function has nothing left to read that is worth ranking on, and it
+    says so by returning None.
+
+    IT IS NOT ENOUGH that enrichment_equity now withholds the figure. This runs
+    over whatever raw['equity'] is on the Listing, and on a board carried over
+    from a run that predates that gate — or one patched by a script that
+    refreshes the valuation without re-running the equity engine — the stale
+    figure is still sitting there. A gate that only holds when the writer ran
+    first is not a gate; the check is repeated here, off the same
+    `grading.arv_trust`, so the two cannot drift.
+    (The `equity.pct` read below is left as-is rather than switched to a
+    `withheld` test for the same reason: the marker only exists on a board this
+    version wrote, the trust level is computable on any board.)
+
+    WHAT RETURNING None COSTS, and why that is the right price. `equity_band`
+    feeds three things in `score_board`: the HOT gate (`eq_ok`), one WARM route
+    (`score >= 28 and eq_ok`), and the published `distress_stack.equity_band`.
+    None closes exactly those. A contradicted lead can therefore no longer reach
+    HOT — correct, because HOT is an instruction to spend money contacting an
+    owner, and equity is the ONLY term in that rule that comes from the
+    valuation. What it does NOT close is `stack >= 2` or the
+    `absentee and stack >= 1` route: those are built from probate, tax
+    delinquency, code enforcement and divorce records, which are independent of
+    the ARV and are not impugned by a bad comp set. Real distress still ranks;
+    it just cannot be promoted to HOT by a number we have withheld everywhere
+    else on the card.
+    """
     raw = li.raw or {}
+    calc = raw.get("calc") or {}
+    if isinstance(calc, dict):
+        if arv_trust(calc.get("arv_flags"), calc.get("arv_expected"),
+                     calc.get("arv_withheld")) in ARV_TRUST_BLOCKS_DERIVED:
+            return None
     pct = (raw.get("equity") or {}).get("pct")
     if pct is not None:
         if pct >= 0.40:
@@ -365,6 +406,12 @@ def score_board(listings: list[Listing], previous_path: Optional[Path] = None) -
         signals = sorted({name for c in by_cat for name, _ in by_cat[c]})
 
         # equity + contactability (best across the group)
+        # `_equity_band` returns None on a contradicted/withheld ARV, so a
+        # parcel group whose every listing carries a bad valuation contributes
+        # no band and cannot satisfy `eq_ok` below. The "best across the group"
+        # shape matters here: if ONE listing on the parcel has a clean valuation
+        # and another does not, the clean one supplies the band — which is right,
+        # because it is one property and one of the two reads is trustworthy.
         eq = next((b for li in active for b in [_equity_band(li)] if b in ("high", "med")), None) \
             or next((b for li in active for b in [_equity_band(li)] if b), None)
         # owner_mailing is usually a dict but some sources emit a bare string; guard it.

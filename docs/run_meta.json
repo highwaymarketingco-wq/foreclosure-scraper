@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-08-11T00:18:16.508842Z",
+  "run_time": "2026-08-11T11:46:08.312428Z",
   "total": 38500,
   "by_source": {
     "national.auction_dot_com": 12,
@@ -321,7 +321,7 @@
     "newspapers.tryon_bulletin",
     "national.gsa_realproperty"
   ],
-  "notes": "catchup_geocode: filled 43 of 2,136 leads missing lat/lng",
+  "notes": "valuation recompute: 24,974 ARVs, 21,843 max bids, 578 verdicts",
   "board": {
     "schema": "slim-v1",
     "count": 38500,

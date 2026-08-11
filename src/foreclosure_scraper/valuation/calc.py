@@ -13,8 +13,9 @@ Outputs (per listing):
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from ..models import Listing, PropertyKind
@@ -69,6 +70,258 @@ MAX_LAND_PPA = 2_000_000  # $/acre
 # million phantom ARV. Above this ceiling the proxy is not trustworthy, so we
 # return ARV-unavailable (honest) instead of a fabricated number.
 MAX_PROXY_ARV = 2_000_000
+
+
+# ===========================================================================
+# ARV SANITY BAND — every threshold below was measured on the live 38,500-lead
+# board (docs/listings.json + listings_detail.json), not chosen by feel. The
+# measurement script is scratch-only; the numbers it produced are quoted inline
+# so the next reader can re-derive them.
+#
+# WHY THIS SECTION EXISTS: `MAX_LAND_PPA` (:64) bounds an individual land COMP
+# and `MAX_PROXY_ARV` (:71) bounds the proxy tiers, but nothing bounded the
+# $/sqft path, nothing bounded the ARV FLOOR (the only code path that RAISES an
+# ARV), and the arv-vs-assessed cross-check ran BEFORE the floor so it published
+# a ratio that contradicted its own headline number. The result was a 1,400-sqft
+# manufactured home published at $780,300 because a general-warehouse CAMA row
+# had been joined onto it and the floor adopted that appraisal verbatim.
+# ===========================================================================
+
+# ---- $/sqft ceiling --------------------------------------------------------
+# Measured implied $/sqft (arv_expected / living_sqft) over the 3,568 board rows
+# carrying both: p50 $126, p75 $213, p90 $323, p95 $406, p99 $1,155, max $36,725.
+# These are rural/small-metro Carolina markets, so the far tail is not a hot
+# submarket — it is a bad comp or a bad sqft. Per-county medians (measured, rows
+# with n>=15) vary 4x across the footprint, so a single absolute ceiling would
+# either miss Spartanburg garbage or eat legitimate Henderson/Charleston value.
+COUNTY_MEDIAN_PPSF = {
+    ("SC", "spartanburg"): 83, ("NC", "buncombe"): 283, ("NC", "lincoln"): 215,
+    ("NC", "gaston"): 175, ("NC", "transylvania"): 200, ("SC", "anderson"): 176,
+    ("NC", "henderson"): 338, ("NC", "rutherford"): 146, ("NC", "cleveland"): 160,
+    ("SC", "pickens"): 183, ("NC", "onslow"): 214, ("NC", "burke"): 105,
+    ("SC", "laurens"): 196, ("SC", "charleston"): 352, ("SC", "cherokee"): 128,
+    ("NC", "mcdowell"): 196, ("SC", "union"): 125, ("SC", "oconee"): 172,
+    ("NC", "polk"): 251,
+}
+BOARD_MEDIAN_PPSF = 126.0     # board-wide p50, used for counties not in the table
+# 8x the county median. Measured trip counts on the live board: 4x -> 71 rows,
+# 6x -> 59, 8x -> 53, 10x -> 38, 12x -> 30. The curve flattens after 8x, i.e.
+# below 8x the ceiling starts cutting into the real spread instead of the tail.
+MAX_ARV_PPSF_MULT = 8.0
+# Absolute floor under the ceiling so a cheap county's ceiling can never land
+# somewhere a genuine renovated house could reach. 8 x Spartanburg's $83 median
+# is $664, already above this; it binds only for counties poorer still.
+MIN_ARV_PPSF_CEILING = 600.0
+# A parcel carrying real acreage has most of its value in DIRT, which inflates
+# $/sqft legitimately (a 590-sqft cabin on 8.5 acres is not a $370/sqft house).
+# Above this the $/sqft test is meaningless, so it is skipped.
+PPSF_CEILING_MAX_ACRES = 2.0
+# Manufactured housing: measured on the only county with enough of both classes
+# to compare (Spartanburg, n=145 manufactured vs n=1,792 site-built), the COUNTY'S
+# OWN appraisal per sqft is $24 vs $48 — a 0.50 ratio. Manufactured county
+# appraisals board-wide: p50 $24, p90 $128, p95 $160. The factor only ever
+# TIGHTENS a ceiling; it never rewrites a value, so a thin sample cannot inflate
+# anything.
+MANUFACTURED_PPSF_FACTOR = 0.5
+
+# ---- ARV floor bounds ------------------------------------------------------
+# 7,118 board rows (30% of all ARVs) were raised by the floor, and it is the
+# only code path in this file that RAISES an ARV.
+#
+# The obvious guard — "reject any floor that raises the ARV more than Nx" — was
+# TESTED AND LARGELY REFUTED. Measuring how many floored rows carry an
+# INDEPENDENT reason to distrust the county/sale figure (commercial CAMA class,
+# stale/undated deed, shared-centroid coordinate, cross-kind comps), the rate is
+# essentially flat with magnitude: 79.7% of raises <=2.5x, 80.5% of 2.5-5x, and
+# 83.8% of >5x. A big disagreement is NOT more likely to be a defect than a small
+# one, so magnitude is the wrong discriminator and the specific defects below are
+# the right ones. This constant survives only as a far backstop, deliberately set
+# above the 5.25x raise that tests/test_data_quality.py asserts is legitimate
+# behaviour. Rejection is cheap: we keep the comp-grounded ARV at LOW confidence
+# rather than blank the lead.
+MAX_FLOOR_RAISE_MULT = 6.0
+# Above this the floor is honoured but confidence drops and the row is flagged —
+# 20.3% of raises this size have no other detectable defect, so silently
+# publishing the raised number at MEDIUM overstates what we know.
+FLOOR_RAISE_NOTABLE_MULT = 2.5
+# A recorded sale may only floor an ARV while it still describes today's market.
+# Measured on the 1,393 rows floored by gis.last_sale: 764 have an absent or
+# unparseable date, and of the 629 that parse the years run from 1935 to 2026 —
+# 269 are pre-2016. The $5.6M "sale" on 933 S Liberty St is a 1992 deed for a
+# whole apartment complex. No date == no floor.
+FLOOR_SALE_MAX_AGE_YEARS = 10
+# A CAMA row whose building_type is commercial cannot floor a residential or
+# land lead: that is a mis-joined parcel, not a valuation. 249 board rows carry a
+# commercial building_type on a residential/land property_kind, and on 163 of
+# them arv_expected already equals market_value exactly — the join has already
+# become the headline number.
+COMMERCIAL_BUILDING_TYPE_RE = re.compile(
+    r"WHSE|WAREHOUS|RETAIL|OFFICE|INDUSTR|BANK|STORE|REST|MOTEL|HOTEL|EXT\s*CARE|"
+    r"SHOP|GARAGE|SERVICE|MARKET|CHURCH|SCHOOL|CLINIC|MEDICAL|THEAT|CLUB|PLANT",
+    re.I,
+)
+
+# ---- ARV vs the county's 100%-basis appraisal ------------------------------
+# NOT `assessed_value`. Measured: NC publishes assessed == market on 97.2% of
+# rows (7,067/7,270) and never with cents (0/7,276). SC publishes a STATUTORY
+# RATIO value — 4% legal residence / 6% everything else — so SC's median
+# market/assessed is 18.86 and 4,366 of 7,162 carry cents. Dividing an ARV by an
+# SC assessed_value therefore produces a meaningless 800x. Only market_value,
+# cama.appraised_value and tax_value are on a 100% basis; 21,552 of the 23,722
+# ARV-bearing rows have at least one of them, so nothing is lost by refusing to
+# fall back to assessed_value (60 rows).
+#
+# Thresholds are split by property kind because the two behave differently
+# against a county appraisal. Measured ARV/anchor: improved (single_family,
+# n=11,795) p50 1.00, p90 2.10, p95 3.98, p99 17.76 — land (n=8,041) p50 1.10,
+# p90 7.61, p95 14.22, p99 86.46. Land assessments genuinely lag market far
+# harder, so one threshold for both would either miss houses or gut land.
+ARV_ANCHOR_SOFT_MULT_IMPROVED = 4.0   # ~p95 for improved
+ARV_ANCHOR_HARD_MULT_IMPROVED = 10.0  # between p95 and p99
+ARV_ANCHOR_SOFT_MULT_LAND = 6.0       # just under p90 for land; see note
+ARV_ANCHOR_HARD_MULT_LAND = 20.0      # just under p99
+# The land SOFT multiple deliberately sits BELOW the measured p90 (7.61) rather
+# than at it, because that percentile is itself contaminated: it was computed on
+# the broken board, where mismatched small-lot comps had already inflated
+# thousands of land ARVs. Using it as-is would bless the very distribution being
+# repaired. 6.0 catches the 20-acre Henderson lead that otherwise re-emerged as a
+# confident 'B' with a $1.27M max bid against a $230,200 county appraisal.
+
+# ---- Land comps: acreage band ---------------------------------------------
+# $/acre is strongly size-dependent — the board's own medians decay 0-1ac
+# $153,523/ac, 1-5ac $84,091, 5-20ac $35,164, 20-50ac $22,744. Valuing an
+# 86.7-acre tract off 0.63-acre building lots (which is exactly what produced a
+# $2,769,500 ARV) is not a comp, it is a category error. enrichment_comps has a
+# +-50% band at its stage 3 but it is written `if lot_filt:` — when NOTHING falls
+# in band it silently keeps the out-of-band pool. Measured: of 4,385 land rows
+# with >=2 usable comps, only 615 have >=2 comps within +-50%, 1,539 within a 3x
+# ratio and 2,759 within 5x. So the band is applied here (which also repairs the
+# already-published board) and WIDENS rather than being all-or-nothing: a 5x
+# ratio band still excludes the 0.63-acre-vs-86.7-acre case by 27x.
+LAND_COMP_BANDS = (("tight", 2.0), ("wide", 3.0), ("loose", 5.0))
+
+# ---- Do the surviving comps AGREE with each other? -------------------------
+# The size band above asks "is this comp the right SIZE". Nothing asked "do the
+# comps that passed actually agree", so a pool could pass the band and still be
+# two numbers an order of magnitude apart — which the code then AVERAGED.
+#
+# [29184] 215 N Fork River Road, McDowell NC, 1.09 ac: two in-band comps at
+# $23,962/ac and $984,835/ac (the second is an improved sale carrying
+# kind:land). Mean $504,398/ac -> ARV $549,800, deal GREAT, max bid $412,400 —
+# and `arv_flags` was EMPTY, so no gate downstream could see it. The pair set
+# confidence to LOW (the >=3x rule below) and stopped there; a confidence label
+# nothing reads is not a guard. This is the reported "trailer on a half acre
+# says $700k" bug re-created in the land path.
+#
+# THRESHOLD, derived from this board's own comp-spread distribution (replay of
+# compute() over docs/listings.json, 38,500 leads; 14,737 land leads; 2,889 with
+# >=2 in-band comps). Two independent readings of the same data:
+#
+#  (1) The spread distribution itself. Measured over DISTINCT comp pools
+#      (n=521), not per lead (n=2,889): thousands of leads share one
+#      city-centroid comp set, so a per-lead histogram is a histogram of which
+#      pools got replicated most — its p60 through p92 are all the same single
+#      6.45x pool. Distinct-pool percentiles: p50 2.38x, p75 5.05x, p85 8.14x,
+#      p90 11.74x, p95 21.64x. The body of the distribution ends at ~8x.
+#
+#  (2) What real land $/acre variation LOOKS like here, from the same comps:
+#      p90/p10 of in-band $/acre within a size band is 10.6x (<=2 ac), 11.0x
+#      (<=5 ac), 8.0x (<=10 ac), 9.1x (>10 ac). (The 22-36x readings in the
+#      sub-1-acre bands are driven by the single $1,061,016/ac observation this
+#      guard exists to catch, so they are not evidence of natural spread.) So
+#      ~8-11x IS ordinary $/acre variation in these counties — which is why the
+#      threshold is a REFUSAL to average, not a claim that a comp is wrong.
+#
+# 8.0x is the low end of (2) and p85 of (1). At 8x the mean of a PAIR sits 4.5x
+# above its own lower comp — no comp in the pool supports the number being
+# published. That is the whole test: not "the comps disagree" (they always do)
+# but "the answer is not supported by any of its own evidence".
+#
+# WHAT HAPPENS, and why it differs by pool size:
+#   n == 2  -> REFUSE the pair. There is no central tendency between two numbers
+#              that far apart; the mean is an artifact of having exactly two.
+#              Fall through to the next tier (recorded-ratio / county anchor),
+#              which carries its own guards and its own flags. Marker ->
+#              flag `land_comps_disagree`.
+#   n >= 3  -> KEEP the median and flag it. A median of 3+ is supported by an
+#              actual comp and is robust to one mis-typed sale, so refusing it
+#              would delete a defensible answer. Marker -> flag
+#              `land_comp_spread`.
+# Both flags are WEAK_EVIDENCE in grading.py (verdict withheld, dollars kept and
+# captioned) — see the reasoning at ARV_FLAGS_WEAK_EVIDENCE.
+#
+# NOT this test: the reported $780,300-vs-$121,100 warehouse case (6.4x). That
+# is a disagreement between two DIFFERENT RECORDS (comp ARV vs CAMA floor), not
+# within one comp pool, and it is caught by floor_rejected_extreme /
+# floor_raise_large. Setting this threshold to 6.4 to "cover" it would refuse
+# 1,268 leads over ordinary $/acre variation and gut the land board.
+LAND_COMP_SPREAD_MAX = 8.0
+
+# ---- Is the county's number a LAND value at all? ---------------------------
+# Rejecting mismatched land comps promoted 1,624 leads into the county-anchor
+# fallback below, and 144 of them came out WORTH MORE than before — 104 with no
+# flag at all. 1030 US 70 TRL (Burke NC, 1.21 ac, asking $29,900) went from
+# $4,400 to $713,600 and from NEGOTIATE to GREAT with a $535,200 max bid,
+# because the tax record joined to it says $648,710 — $536,567 an acre. That is
+# not a land value; it is a house, or another parcel entirely. Refusing bad
+# comps must not become a licence to publish an unexamined county number in
+# their place, so the anchor now has to survive the same size-vs-price logic the
+# comps just failed.
+#
+# TWO BOUNDS, in preference order:
+#
+# (1) THE LEAD'S OWN COMPS. $/acre falls as parcels get bigger, so a comp NO
+#     BIGGER than the subject caps the subject's $/acre. Measured over all 1,496
+#     ordered (smaller, bigger) land-comp pairs on the board: the smaller parcel
+#     carries the higher $/acre on 70.2% of pairs overall, and the relationship
+#     tightens exactly where this test is used — 89.5% at a >=5x size gap, 94.1%
+#     at 10-50x, 100% beyond 50x. (LAND_COMP_BANDS' widest band is 5x, so a
+#     "rejected" pool always sits outside it.) The tolerance below is the price
+#     of the remaining noise: at a >=5x gap a bigger parcel out-prices a smaller
+#     one by more than 3x on 6 of 390 pairs (1.54%), vs 3.59% at 2x and 10.51%
+#     at 1x. So 3x is where the curve flattens.
+LAND_ANCHOR_PPA_TOL = 3.0
+# (2) THE MARKET, when no comp is small enough to bound anything. p99 of the
+#     $/acre of every REAL land sale on the board in the subject's size band
+#     (n=66/73/116/86/72/35/35 per band; bands merged until each held >=25
+#     sales, and the curve forced monotone because $/acre must fall with size).
+#     Deliberately the 99th percentile of ACTUAL SALES, not of county anchors:
+#     the anchor distribution is contaminated by improved parcels mis-typed as
+#     land (its 0-0.25ac median is $1.7M/acre against $234k for real sales), so
+#     calibrating on it would bless the very records being tested.
+LAND_SALE_PPA_CEILING = (
+    (0.25, 1_886_000),   # p99 $1,886,182  (max observed $2,000,000)
+    (0.5,  1_342_000),   # p99 $1,342,323
+    (1.0,    966_000),   # p99 $  966,678
+    (2.0,    536_000),   # p99 $  536,158
+    (5.0,    349_000),   # p99 $  349,360
+    (10.0,   144_000),   # p99 $  144,556
+    (float("inf"), 64_000),  # p99 $   64,543
+)
+# Note markers. `_land_arv` can only speak in notes (its return signature is
+# fixed by four other tests), so compute() reads these back to raise the flags.
+LAND_ANCHOR_REFUSED_MARKER = "not usable as a land value"
+LAND_COMPS_REJECTED_MARKER = "Land comps rejected"
+# Kept textually distinct from LAND_COMPS_REJECTED_MARKER: the read-back below
+# is a substring test, so a marker that contains another marker would raise two
+# flags off one note. "rejected" (wrong size) / "refused" (disagree) / "span".
+LAND_COMPS_DISAGREE_MARKER = "Land comp pair refused"
+LAND_COMP_SPREAD_MARKER = "Land comps span"
+# An ARV that IS the county's number times a constant cannot be checked AGAINST
+# the county's number. Every tier that does that says so, and compute() reads it
+# back to skip the cross-check and mark the lead instead of passing it.
+COUNTY_ANCHOR_MARKER = "derived from the county's own valuation"
+
+# ---- Bid-derived ARV is circular ------------------------------------------
+# When ARV is `opening_bid × 2.4` (or `× 1.5` on land), every downstream metric
+# that divides the bid by the ARV is dividing a number by a fixed multiple of
+# itself. Measured on the board: of the 405 leads whose ARV is a bid proxy, 316
+# are graded exactly C and 297 read deal_status GREAT — not because 297 bargains
+# were found, but because bid / (bid × 2.4) is always 0.4167 and bid / (bid ×
+# 1.5) is always 0.667, which land on fixed rungs of the financial-score ladder.
+# The ARV itself is a legitimate last-resort estimate; the VERDICTS derived from
+# it are not, so they are suppressed and the reason is stated.
+BID_PROXY_MARKER = "proxy from bid"
 
 
 # ---- Per-county ARV calibration --------------------------------------------
@@ -160,7 +413,14 @@ class Calc:
     # county tax/appraised value, LOW = opening-bid guess. grading.py reads this
     # to decide whether a listing is assessable enough to rate.
     arv_confidence: str | None = None
-    arv_vs_assessed: float | None = None   # comp-ARV / county appraised value (accuracy anchor)
+    arv_vs_assessed: float | None = None   # ARV / county 100%-basis appraisal (accuracy anchor)
+    # Sanity-band telemetry (see the ARV SANITY BAND block above). `arv_flags`
+    # names every guard that fired; `arv_withheld` carries the number we computed
+    # but refused to publish, so the reason is auditable instead of the lead just
+    # going blank. Both stay None on a clean lead, so `to_dict` omits them and the
+    # board's shape is unchanged for the ~87% of ARVs that trip nothing.
+    arv_flags: list[str] | None = None
+    arv_withheld: float | None = None
     notes: list[str] | None = None
     # Flip framing — what's the deal status at the listed/asking price?
     deal_status: str | None = None         # GREAT / OK / NEGOTIATE / PASS
@@ -234,6 +494,278 @@ def _acreage_for(li: Listing) -> float | None:
     return None
 
 
+# --- Property-class awareness -----------------------------------------------
+# The board carries 791 leads that are identifiably manufactured housing, but
+# only 7 of them have `property_kind == MOBILE` (523 are tagged land, 256
+# single_family). The signal was already on disk in two fields nothing in the
+# valuation path read: `land_use` (the county's own property class) and
+# `raw.cama.building_type`. Consequence before this fix: MOBILE_REHAB_TIERS —
+# a table this codebase built specifically for manufactured homes — fired on 7
+# leads out of 791, and 430 manufactured leads were valued off site-built comps.
+_MANUFACTURED_TOKENS = (
+    "mobile home", "manufactured", "mfg home", "doublewide", "double wide",
+    "singlewide", "single wide", "modular home",
+)
+# land_use is only trusted to RE-classify a lead whose own kind is unset or
+# consistent with a manufactured dwelling. A lead explicitly typed multi_family /
+# commercial / condo keeps its kind — a HUD multi-family inspection lead that
+# picked up a "Mobile Home Lot" land_use from a bad parcel join must not start
+# pricing its rehab off the manufactured table.
+_MANUFACTURED_OVERRIDABLE_KINDS = (
+    PropertyKind.UNKNOWN, PropertyKind.LAND,
+    PropertyKind.SINGLE_FAMILY, PropertyKind.MOBILE,
+)
+
+
+def _is_manufactured(li: Listing) -> bool:
+    """True when this lead is manufactured/mobile housing by ANY reliable signal.
+
+    Order: the lead's own property_kind (authoritative when set), then the
+    county's land_use class, then the assessor CAMA building_type.
+    """
+    if li.property_kind == PropertyKind.MOBILE:
+        return True
+    if li.property_kind not in _MANUFACTURED_OVERRIDABLE_KINDS:
+        return False
+    lu = (getattr(li, "land_use", "") or "").lower()
+    if any(t in lu for t in _MANUFACTURED_TOKENS):
+        return True
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    cama = raw.get("cama") if isinstance(raw.get("cama"), dict) else {}
+    bt = str(cama.get("building_type") or "").lower()
+    return any(t in bt for t in _MANUFACTURED_TOKENS)
+
+
+def _commercial_building_type(li: Listing) -> str | None:
+    """The assessor building_type when it is COMMERCIAL and the lead is not.
+
+    A non-None return means the CAMA row joined onto this lead describes a
+    different class of building than the lead itself — i.e. a mis-joined parcel,
+    which makes every dollar figure that came from that row untrustworthy.
+    """
+    if li.property_kind in (PropertyKind.COMMERCIAL, PropertyKind.MIXED,
+                            PropertyKind.MULTI_FAMILY):
+        return None
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    cama = raw.get("cama") if isinstance(raw.get("cama"), dict) else {}
+    bt = str(cama.get("building_type") or "").strip()
+    if bt and COMMERCIAL_BUILDING_TYPE_RE.search(bt):
+        return bt
+    return None
+
+
+def _anchor_value(li: Listing) -> tuple[float | None, str | None]:
+    """The county's valuation of this parcel on a 100% (full-market) basis.
+
+    Deliberately EXCLUDES `assessed_value`: in South Carolina that field is a
+    statutory ratio value (4% legal residence / 6% other), so ARV/assessed is a
+    unit error, not a signal — it is what produced the "ARV is 800x the assessed
+    value" artifact. Returns (value, source_label).
+    """
+    # A CAMA row describing a commercial building on a residential/land lead is a
+    # mis-joined parcel. Every dollar figure that came off that join is suspect,
+    # so it is not an anchor either — otherwise the same wrong record that was
+    # blocked from flooring the ARV walks straight back in as the thing we
+    # measure the ARV against, and as the land fallback value.
+    if _commercial_building_type(li):
+        return None, None
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    cama = raw.get("cama") if isinstance(raw.get("cama"), dict) else {}
+    for val, label in (
+        (li.market_value, "county market value"),
+        (cama.get("appraised_value"), "assessor appraised value"),
+        (li.tax_value, "tax-assessed value"),
+    ):
+        try:
+            v = float(val) if val is not None else None
+        except (TypeError, ValueError):
+            continue
+        if v and v > 1000:
+            return v, label
+    return None, None
+
+
+def _cross_check_anchor(li: Listing) -> tuple[float | None, str | None, bool]:
+    """The county figure to MEASURE the ARV against. Returns (value, label, trusted).
+
+    Distinct from `_anchor_value` on purpose. `_anchor_value` answers "may this
+    number RAISE the ARV / become the ARV?", and a commercial assessor row joined
+    to a house must never do either. But refusing it there also silently deleted
+    the guardrail: measured on the board, all 176 mis-joined leads that keep an
+    ARV carry `arv_vs_assessed == None`, and five of them publish an ARV more
+    than 10x the county figure the code declined to look at — 616 N CHURCH ST at
+    $643,200 against $13,435, 47.9x, at MEDIUM confidence with a max bid beside
+    it. Whichever of the two records is wrong, a 47.9x disagreement is a fact
+    about the lead and the reader is entitled to it.
+
+    So the cross-check reads the same fields WITHOUT the commercial veto, and
+    reports `trusted=False` when the join is known-bad — measuring against a
+    suspect number is worth doing; treating agreement with it as reassurance is
+    not, which is why `trusted` never upgrades anything, only labels.
+    """
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    cama = raw.get("cama") if isinstance(raw.get("cama"), dict) else {}
+    trusted = _commercial_building_type(li) is None
+    for val, label in (
+        (li.market_value, "county market value"),
+        (cama.get("appraised_value"), "assessor appraised value"),
+        (li.tax_value, "tax-assessed value"),
+    ):
+        try:
+            v = float(val) if val is not None else None
+        except (TypeError, ValueError):
+            continue
+        if v and v > 1000:
+            return v, (label if trusted else f"{label} (from a MIS-JOINED assessor record)"), trusted
+    return None, None, trusted
+
+
+def _land_sale_ppa_ceiling(acres: float) -> float:
+    """Highest $/acre any REAL land sale on the board reached at this size."""
+    for upper, ceiling in LAND_SALE_PPA_CEILING:
+        if acres < upper:
+            return float(ceiling)
+    return float(LAND_SALE_PPA_CEILING[-1][1])
+
+
+def _land_anchor_supported(subj_ac: float, anchor: float,
+                           priced: list[tuple[float, float]]) -> tuple[bool, str]:
+    """Can the county's number be read as the value of THIS dirt?
+
+    `priced` is the lead's own land-comp pool as (ppa, comp_acres) — including
+    the comps the acreage band refused, because a comp can be the wrong SIZE for
+    a $/acre transfer and still be a real sale in the right PLACE.
+
+    Returns (supported, why). See LAND_ANCHOR_PPA_TOL / LAND_SALE_PPA_CEILING
+    for where both bounds come from and what they cost.
+    """
+    ppa = anchor / subj_ac
+    # (1) A comp no bigger than the subject caps the subject's $/acre, because
+    #     $/acre falls with size. Prefer this: it is the lead's own evidence.
+    smaller = [p for p, ac in priced if ac <= subj_ac]
+    if smaller:
+        bound = max(smaller) * LAND_ANCHOR_PPA_TOL
+        if ppa > bound:
+            return False, (
+                f"${ppa:,.0f}/acre, but land no bigger than this {subj_ac:.2f}-acre "
+                f"parcel sold nearby for at most ${max(smaller):,.0f}/acre — and "
+                f"smaller parcels price HIGHER per acre, not lower"
+            )
+        return True, ""
+    # (2) Nothing small enough to bound it — fall back to what land at this size
+    #     has actually sold for anywhere on the board.
+    ceiling = _land_sale_ppa_ceiling(subj_ac)
+    if ppa > ceiling:
+        return False, (
+            f"${ppa:,.0f}/acre, above the ${ceiling:,.0f}/acre that no land sale "
+            f"of this size on the board has reached"
+        )
+    return True, ""
+
+
+def _arv_ppsf_ceiling(li: Listing, manufactured: bool) -> float:
+    """Highest defensible ARV $/sqft for this lead's county."""
+    key = ((li.state or "").strip().upper(), (li.county or "").strip().lower())
+    med = float(COUNTY_MEDIAN_PPSF.get(key, BOARD_MEDIAN_PPSF))
+    ceiling = max(MAX_ARV_PPSF_MULT * med, MIN_ARV_PPSF_CEILING)
+    if manufactured:
+        ceiling *= MANUFACTURED_PPSF_FACTOR
+    return ceiling
+
+
+_EPOCH = datetime(1970, 1, 1)
+_MONTHS = {"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
+           "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12}
+# Every shape gis.last_sale.date actually arrives in, counted on the board's
+# 19,828 sale records: 15,222 ISO `YYYY-MM-DD`; 3,347 absent; 824 a bare epoch
+# integer (662 at 13 digits, 121 at 12, 40 negative, 4 at 11); 392 a bare
+# `YYYY`; 40 Oracle-style `DD-MON-YY`.
+_ISO_RE = re.compile(r"^(1[89]\d{2}|20\d{2})[-/](\d{1,2})[-/](\d{1,2})")
+_US_RE = re.compile(r"^(\d{1,2})[-/](\d{1,2})[-/](1[89]\d{2}|20\d{2})$")
+_ORACLE_RE = re.compile(r"^(\d{1,2})-([A-Z]{3})-(\d{2})$", re.I)
+_INT_RE = re.compile(r"^-?\d+$")
+
+
+def _plausible_year(yr: int | None) -> int | None:
+    return yr if (yr is not None and 1800 <= yr <= datetime.utcnow().year + 1) else None
+
+
+def _epoch_year(v: float) -> int | None:
+    """Year of an epoch stamp, trying the scale its MAGNITUDE implies first.
+
+    Seconds and milliseconds are not distinguishable from digit count alone —
+    the board carries 11-, 12- and 13-digit millisecond stamps and negative ones
+    for pre-1970 deeds. Anything at or above 1e11 can only be milliseconds (as
+    seconds it would land past the year 5000); below that, seconds is the
+    natural reading and milliseconds is the fallback.
+    """
+    for div in ((1000.0, 1.0) if abs(v) >= 1e11 else (1.0, 1000.0)):
+        try:
+            yr = (_EPOCH + timedelta(seconds=v / div)).year
+        except (OverflowError, OSError, ValueError):
+            continue
+        if _plausible_year(yr):
+            return yr
+    return None
+
+
+def _sale_year(sale: dict | None) -> int | None:
+    """Four-digit year of a gis.last_sale record, or None when unusable.
+
+    PARSES the date rather than regexing a year out of it. The old
+    `re.search(r"(1[89]\\d{2}|20\\d{2})")` matched any four adjacent digits that
+    happened to look like a year, so an epoch-millisecond stamp answered with
+    whatever sat in its middle: "165751200000" (2022-07-01) read as 2000,
+    "20995200000" (1970) read as 2099, "-441849600000" (1956) read as 1849.
+    827 board rows carry a bare epoch date and 474 of them decode to 2016 or
+    later — every one of those was being refused as a stale floor on the
+    strength of a fabricated year, and 15 published an investor-facing note
+    asserting it.
+
+    An absent or genuinely unparseable date still returns None: an undated sale
+    amount is not evidence about today's market.
+    """
+    if not isinstance(sale, dict):
+        return None
+    s = str(sale.get("date") or "").strip()
+    if not s:
+        return None
+
+    m = _ISO_RE.match(s)
+    if m:
+        return _plausible_year(int(m.group(1)))
+    m = _US_RE.match(s)
+    if m:
+        return _plausible_year(int(m.group(3)))
+    m = _ORACLE_RE.match(s)
+    if m and m.group(2).upper() in _MONTHS:
+        yy = int(m.group(3))
+        # Two-digit years pivot on today: a deed dated "25" is 2025, "75" is
+        # 1975. Recording dates are never in the future.
+        cur2 = datetime.utcnow().year % 100
+        return _plausible_year(2000 + yy if yy <= cur2 else 1900 + yy)
+
+    if _INT_RE.match(s):
+        neg = s.startswith("-")
+        digits = s[1:] if neg else s
+        # YYYYMMDD (the assessor CAMA style, e.g. "19931014"). As an epoch this
+        # would read 1970; as a year-first date it is unambiguous.
+        if not neg and len(digits) == 8 and _plausible_year(int(digits[:4])):
+            return int(digits[:4])
+        if not neg and len(digits) == 4:
+            return _plausible_year(int(digits))
+        try:
+            return _epoch_year(float(s))
+        except (TypeError, ValueError):
+            return None
+
+    # Free text ("Sold 2019", "recorded 03/2021") — a year token is the best
+    # available read once the structured shapes are exhausted. Numeric strings
+    # never reach here, so this can no longer mine a year out of an epoch.
+    m = re.search(r"(1[89]\d{2}|20\d{2})", s)
+    return _plausible_year(int(m.group(1))) if m else None
+
+
 def _land_arv(li: Listing) -> tuple[float | None, float | None, float | None, str, list[str]]:
     """Land-specific ARV path. Comps come pre-filtered by lot acreage band
     (±50% in enrichment_comps), so use sold_price ÷ acreage to get $/acre,
@@ -244,23 +776,107 @@ def _land_arv(li: Listing) -> tuple[float | None, float | None, float | None, st
     comps = raw.get("comps") or []
     subj_ac = _acreage_for(li)
 
+    # The lead's own land-comp pool, priced per acre. Built OUTSIDE the tier-1
+    # block on purpose: when the size band refuses these comps, tier 2 still
+    # needs them to judge whether the county's number is a plausible land value.
+    # They are the wrong size for a $/acre transfer, but they are real sales in
+    # the right place, and that is enough to bound an anchor.
+    priced: list[tuple[float, float]] = []
+    for c in comps:
+        sp = c.get("sold_price")
+        lot = c.get("lot_sqft")
+        if sp and lot and float(lot) > 0:
+            comp_ac = float(lot) / 43560.0
+            ppa = float(sp) / comp_ac
+            # Reject above the rural ceiling — a $/acre this high is almost
+            # always a parse error (per-sqft figure or a near-zero lot) and
+            # would emit a multi-million phantom land ARV. Skip the bad comp.
+            if ppa > MAX_LAND_PPA:
+                continue
+            priced.append((ppa, comp_ac))
+
     # Tier 1: $/acre from land comps × subject acreage
     if comps and subj_ac:
-        ppa_list = []
-        for c in comps:
-            sp = c.get("sold_price")
-            lot = c.get("lot_sqft")
-            if sp and lot and lot > 0:
-                ppa = float(sp) / (float(lot) / 43560.0)
-                # Reject above the rural ceiling — a $/acre this high is almost
-                # always a parse error (per-sqft figure or a near-zero lot) and
-                # would emit a multi-million phantom land ARV. Skip the bad comp.
-                if ppa > MAX_LAND_PPA:
-                    continue
-                ppa_list.append(ppa)
-        ppa_list.sort()
+        # SIZE BAND (see LAND_COMP_BANDS): $/acre is strongly size-dependent, so a
+        # comp is only comparable if its own acreage is in the same league as the
+        # subject's. enrichment_comps is supposed to have filtered here, but its
+        # `if lot_filt:` silently keeps the unfiltered pool when nothing matches —
+        # which is how 0.63-acre building lots came to price an 86.7-acre tract.
+        # Re-applied here so the ALREADY-PUBLISHED board is repaired too, and
+        # widened progressively so a merely-imperfect pool still produces a value.
+        ppa_list: list[float] = []
+        band_label = None
+        for label, ratio in LAND_COMP_BANDS:
+            in_band = [p for p, ac in priced
+                       if subj_ac / ratio <= ac <= subj_ac * ratio]
+            if len(in_band) >= 2:
+                ppa_list, band_label = sorted(in_band), label
+                break
+        if len(priced) >= 2 and not ppa_list:
+            notes.append(
+                f"{LAND_COMPS_REJECTED_MARKER}: none within "
+                f"{LAND_COMP_BANDS[-1][1]:.0f}x the subject's {subj_ac:.2f} ac (comp lots "
+                f"{min(a for _, a in priced):.2f}-{max(a for _, a in priced):.2f} ac). "
+                f"$/acre does not transfer across that size gap."
+            )
+        # AGREEMENT TEST (see LAND_COMP_SPREAD_MAX). Runs after the size band and
+        # before anything is averaged, because the failure it catches is the
+        # AVERAGING itself, not the selection.
+        spread = None
+        if len(ppa_list) >= 2 and ppa_list[0] > 0:
+            spread = ppa_list[-1] / ppa_list[0]
+            if spread >= LAND_COMP_SPREAD_MAX and len(ppa_list) == 2:
+                notes.append(
+                    f"{LAND_COMPS_DISAGREE_MARKER}: the two in-band land comps disagree "
+                    f"by {spread:.0f}x (${ppa_list[0]:,.0f}/ac vs ${ppa_list[-1]:,.0f}/ac). "
+                    f"Their mean (${sum(ppa_list) / 2.0:,.0f}/ac) sits "
+                    f"{(1 + spread) / 2:.1f}x above the cheaper comp and is supported by "
+                    f"neither, so it is not published as a land value. Two numbers this "
+                    f"far apart are not a market — at least one is not a land sale."
+                )
+                ppa_list = []   # fall through to the recorded-ratio / anchor tiers
+                # `priced` IS DELIBERATELY LEFT WHOLE for the tiers below, and
+                # this is the second thing tried here, not the first.
+                #
+                # Measured consequence of the refusal, replaying both versions
+                # over the live board: 32 of these 118 leads come out worth MORE
+                # than the mean they lost, and 27 gain a max bid they did not
+                # previously publish. So the obvious next move is to stop the
+                # comp we have just called "probably not land" from underwriting
+                # the fallback: drop it from `priced`, which tier 2 uses to bound
+                # the county anchor (`_land_anchor_supported`).
+                #
+                # THAT WAS TRIED AND IT IS WRONG. `_land_anchor_supported` bounds
+                # on `max(comps no bigger than the subject) x TOL` and only falls
+                # back to the board-wide market ceiling when NO comp is small
+                # enough. Removing the top comp can therefore delete the only
+                # small comp there is and flip the test onto the LOOSER market
+                # ceiling. Measured: 5 leads changed, and it went the wrong way
+                # on 2 of them — [300] 139 Lone Eagle Ln, Henderson (0.38 ac) is
+                # refused today at $219,054/ac (3x its own 0.31-acre comp at
+                # $73,018) and would have been ACCEPTED at $969,210/ac against
+                # the <=0.5-acre market ceiling, publishing a $565,200 ARV and a
+                # $423,900 max bid out of nothing. Pruning evidence to punish a
+                # bad comp removed a good bound. Left as a comment because the
+                # idea reads as obviously correct and is not.
+                #
+                # What the 32 up-moves actually are, checked lead by lead: the
+                # value comes from a DIFFERENT tier, each with its own guards and
+                # its own flag. [1524] 259 Bull Creek Rd goes to tier 1b, priced
+                # off 19 recorded arms-length sales at MEDIUM — strictly better
+                # evidence than the pair it replaced. [20287] McDowell goes to
+                # the county anchor and carries `anchor_not_independent`. None of
+                # the 148 ends up flagless (measured: 83 -> 0), none publishes a
+                # verdict (17 -> 0), and calc's refusal note — which quotes both
+                # $/acre figures — is published in `notes` either way. The
+                # disagreement is disclosed; it is just no longer averaged.
+
         if len(ppa_list) >= 2:
-            mid = ppa_list[len(ppa_list) // 2]
+            # With exactly two comps `ppa_list[len//2]` is index 1 — the MAXIMUM,
+            # not a median. That alone put a 20-acre Henderson lead at $2,031,800
+            # (it published arv_expected == arv_high, the tell). Use the mean of
+            # the pair instead; 3+ comps keep the true median.
+            mid = (sum(ppa_list) / 2.0) if len(ppa_list) == 2 else ppa_list[len(ppa_list) // 2]
             low_ppa = ppa_list[0]
             high_ppa = ppa_list[-1]
             expected = round(mid * subj_ac, -2)
@@ -268,11 +884,45 @@ def _land_arv(li: Listing) -> tuple[float | None, float | None, float | None, st
             high = round(high_ppa * subj_ac, -2)
             notes.append(
                 f"ARV from {len(ppa_list)} land comps × {subj_ac:.2f} ac "
-                f"(${mid:,.0f}/ac median; range ${low_ppa:,.0f}-${high_ppa:,.0f}/ac)"
+                f"(${mid:,.0f}/ac median; range ${low_ppa:,.0f}-${high_ppa:,.0f}/ac; "
+                f"comp lots within {band_label} size band)"
             )
             # 2026-06-19: a >=3x low/high spread means the comps disagree wildly
             # ($/acre varies hugely by location) — don't present that as HIGH.
             conf = "LOW" if (low and high and low > 0 and high / low >= 3) else "HIGH"
+            # A widened band means the comps are NOT the same size class as the
+            # subject; the number is usable but not bankable.
+            if band_label != "tight" and conf == "HIGH":
+                conf = "MEDIUM"
+                notes.append(
+                    f"ARV confidence lowered to MEDIUM: land comps only matched at the "
+                    f"'{band_label}' acreage band, not like-for-like size."
+                )
+            # Two comps are not a market. The improved $/sqft path has capped
+            # sub-3-comp ARVs at MEDIUM since it was written (:407); the land path
+            # never did, so a 20-acre Henderson lead carrying exactly two comps
+            # published HIGH confidence — and, with the median-of-two bug above,
+            # published its own maximum as the expected value.
+            if len(ppa_list) < 3 and conf == "HIGH":
+                conf = "MEDIUM"
+                notes.append(
+                    f"ARV confidence lowered to MEDIUM: only {len(ppa_list)} land comp(s) "
+                    f"in the acreage band."
+                )
+            # A surviving pool (>=3 comps) that still spans LAND_COMP_SPREAD_MAX
+            # keeps its MEDIAN — that number is a real comp, not an artifact —
+            # but it is stated, LOW, and FLAGGED. The old code set LOW here and
+            # emitted nothing, which is precisely how a 41x pool shipped a GREAT.
+            if spread is not None and spread >= LAND_COMP_SPREAD_MAX:
+                conf = "LOW"
+                notes.append(
+                    f"{LAND_COMP_SPREAD_MARKER} {spread:.0f}x (${low_ppa:,.0f}-"
+                    f"${high_ppa:,.0f}/ac), wider than $/acre varies naturally in this "
+                    f"size class on this board (~8-11x between the 10th and 90th "
+                    f"percentile). The median is a real comp and is published, but at "
+                    f"least one sale in this pool is probably not comparable land — "
+                    f"read the ${low:,.0f}-${high:,.0f} range, not the point."
+                )
             return expected, low, high, conf, notes
 
     # Tier 1b: RECORDED sale-to-assessment ratio from nearby vacant-lot sales
@@ -294,12 +944,41 @@ def _land_arv(li: Listing) -> tuple[float | None, float | None, float | None, st
         )
         return expected, low, high, ("MEDIUM" if ratio_c.get("confidence") == "MEDIUM" else "LOW"), notes
 
-    # Tier 2: tax-assessed × 1.10 (land is assessed closer to market than improved)
-    if li.tax_value and li.tax_value > 0:
-        expected = round(float(li.tax_value) * 1.10, -2)
-        if expected <= MAX_PROXY_ARV:
-            notes.append(f"Land ARV from tax-assessed × 1.10 ({li.tax_value:,.0f})")
-            return expected, round(expected * 0.85, -2), round(expected * 1.15, -2), "LOW", notes
+    # Tier 2: county 100%-basis value × 1.10 (land is assessed closer to market
+    # than improved property). `market_value` was missing from this chain, so a
+    # land lead whose county DOES publish a full-market appraisal but no
+    # tax_value fell all the way through to a bid proxy — or to no ARV at all
+    # once the acreage band above starts rejecting mismatched comps. Never
+    # `assessed_value`: in SC that is a 4%/6% statutory ratio number.
+    #
+    # GATED (see LAND_ANCHOR_PPA_TOL / LAND_SALE_PPA_CEILING). This tier is the
+    # only place in the land path that can INVENT a large number out of nothing,
+    # and tightening the comp band above pushed 1,624 leads into it. On 144 of
+    # them the ARV came out HIGHER than the mismatched comps it replaced, 104
+    # with no flag — the same "trailer worth $700k" failure, re-created by its
+    # own fix. So the anchor now has to be readable as a value for THIS dirt
+    # before it may become the headline number.
+    anchor_val, anchor_lbl = _anchor_value(li)
+    if anchor_val:
+        supported, why = (
+            _land_anchor_supported(subj_ac, anchor_val, priced) if subj_ac
+            else (True, "")     # no acreage: nothing to test $/acre against
+        )
+        if not supported:
+            notes.append(
+                f"County value (${anchor_val:,.0f}) {LAND_ANCHOR_REFUSED_MARKER} for "
+                f"this parcel: {why}. That record is describing improvements, or a "
+                f"different parcel — either way it is not an after-repair value for "
+                f"{subj_ac:.2f} acres, so no ARV is published from it."
+            )
+        else:
+            expected = round(anchor_val * 1.10, -2)
+            if expected <= MAX_PROXY_ARV:
+                notes.append(
+                    f"Land ARV from {anchor_lbl} × 1.10 (${anchor_val:,.0f}) — "
+                    f"{COUNTY_ANCHOR_MARKER}, so it cannot be cross-checked against it"
+                )
+                return expected, round(expected * 0.85, -2), round(expected * 1.15, -2), "LOW", notes
 
     # Tier 3: bid × 1.5 (land foreclosures discount less than improved)
     if li.opening_bid and li.opening_bid > 0:
@@ -307,10 +986,15 @@ def _land_arv(li: Listing) -> tuple[float | None, float | None, float | None, st
         # Reject runaway proxies: opening_bid on a comps-empty land row may be a
         # judgment/debt figure, not a property bid — don't emit a phantom ARV.
         if expected <= MAX_PROXY_ARV:
-            notes.append(f"Land ARV proxy from bid × 1.5 ({li.opening_bid:,.0f})")
+            notes.append(f"Land ARV {BID_PROXY_MARKER} × 1.5 ({li.opening_bid:,.0f})")
             return expected, round(expected * 0.7, -2), round(expected * 1.3, -2), "LOW", notes
 
-    return None, None, None, "LOW", ["Insufficient land data for ARV"]
+    # Carry the accumulated notes through — this used to return a bare
+    # ["Insufficient land data for ARV"], silently discarding the explanation of
+    # WHY the comps were unusable. On a lead whose land comps were rejected for
+    # size mismatch, the reader was told only "insufficient data", which reads as
+    # "we found nothing" rather than "we found comps and refused them".
+    return None, None, None, "LOW", notes + ["Insufficient land data for ARV"]
 
 
 def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None, str, list[str]]:
@@ -455,11 +1139,22 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
 
     # Tier 2: Zillow zestimate
     z = raw.get("zillow", {}) if isinstance(raw, dict) else {}
-    zest = z.get("zestimate") or li.market_value
+    _zest_real = z.get("zestimate")
+    zest = _zest_real or li.market_value
     _fh = (raw.get("fhfa_value") or {}) if isinstance(raw, dict) else {}
     if zest and zest > 0:
         expected = float(zest)
-        notes.append(f"ARV from Zillow Zestimate ({zest:,.0f})")
+        if _zest_real:
+            notes.append(f"ARV from Zillow Zestimate ({zest:,.0f})")
+        else:
+            # No Zestimate — this is li.market_value wearing the Zestimate's
+            # label, which is both a mis-statement to the reader and the reason
+            # the anchor cross-check below was reading 1.00 and calling it a
+            # pass. Say what it is, and mark it as not independent of the anchor.
+            notes.append(
+                f"ARV from county market value ({zest:,.0f}) — {COUNTY_ANCHOR_MARKER}, "
+                f"so it cannot be cross-checked against it"
+            )
         confidence = "MEDIUM"
     elif _fh.get("est_value") and float(_fh["est_value"]) > 0:
         # Free FHFA-HPI rescale of the property's last recorded sale to today's
@@ -472,7 +1167,10 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
         confidence = "LOW"
     elif li.tax_value and li.tax_value > 0:
         expected = float(li.tax_value) * 1.25
-        notes.append(f"ARV from tax-assessed × 1.25 ({li.tax_value:,.0f} × 1.25)")
+        notes.append(
+            f"ARV from tax-assessed × 1.25 ({li.tax_value:,.0f} × 1.25) — "
+            f"{COUNTY_ANCHOR_MARKER}, so it cannot be cross-checked against it"
+        )
         # 2026-06-21: MEDIUM, not LOW. A county tax-assessed / appraised value
         # is an official, authoritative valuation (just conservative/stale),
         # not a guess like opening_bid × 2.4. Treating it as MEDIUM lets the
@@ -490,7 +1188,7 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
                 f"(>${MAX_PROXY_ARV:,.0f}) — likely a judgment/debt figure, not a "
                 f"property bid; ARV withheld."
             ]
-        notes.append(f"ARV proxy from opening bid × 2.4 ({li.opening_bid:,.0f} × 2.4) — rough")
+        notes.append(f"ARV {BID_PROXY_MARKER} × 2.4 ({li.opening_bid:,.0f} × 2.4) — rough")
         confidence = "LOW"
     else:
         return None, None, None, "LOW", notes + ["Insufficient data for ARV"]
@@ -506,6 +1204,131 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
     low = round(expected * 0.85, -2)
     high = round(expected * 1.15, -2)
     return round(expected, -2), low, high, confidence, notes
+
+
+def _arv_sanity(li: Listing, out: "Calc", arv_conf: str, arv_flags: list[str],
+                anchor: float | None, anchor_label: str | None) -> str:
+    """Final gate: refuse to publish an ARV the evidence does not support.
+
+    Runs once, at the end of the ARV pipeline, so it sees the number that would
+    actually ship — every tier, the calibration, the vision adjustment and the
+    floor have all already had their say.
+
+    Two severities:
+
+      HARD  → the ARV is withheld entirely (moved to `arv_withheld`), which also
+              zeroes max_bid_70 / ROI / profit / deal_status downstream, because
+              every one of those is computed `if out.arv_expected`. A blank bid
+              beside "ARV unverified — comps imply $1,734/sqft in a $83/sqft
+              county" is an actionable lead. A confident $401,400 max bid on the
+              same row is a loss at an auction with someone's own money.
+
+      SOFT  → the number is kept but confidence drops to LOW and the reason is
+              named, because the alternative (silence) would delete real leads.
+
+    Deliberately does NOT fire on the ordinary case. Measured on the live board,
+    the hard guards touch ~2% of ARV-bearing rows; the comp math itself is
+    producing defensible numbers for the rest and the board's usefulness depends
+    on them.
+    """
+    if not out.arv_expected:
+        if arv_flags:
+            out.arv_flags = sorted(set(arv_flags))
+        return arv_conf
+
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    manufactured = _is_manufactured(li)
+    is_land = li.property_kind == PropertyKind.LAND and not (li.living_sqft and li.living_sqft > 0)
+    hard: list[str] = []
+
+    # --- HARD 1: $/sqft ceiling ---------------------------------------------
+    # The $/sqft path had no ceiling at all, while the two RECORDED-comp
+    # producers (enrichment_recorded_comps / enrichment_assessor_comps) have
+    # bounded themselves at $20-$800/sqft since they were written. Skipped when
+    # the parcel carries real acreage — then most of the value is dirt and $/sqft
+    # is not measuring the dwelling.
+    acres = _acreage_for(li)
+    sqft = _plausible_living_sqft(li)
+    if sqft and (acres is None or acres <= PPSF_CEILING_MAX_ACRES):
+        ceiling = _arv_ppsf_ceiling(li, manufactured)
+        implied = out.arv_expected / sqft
+        if implied > ceiling:
+            hard.append("ppsf_ceiling")
+            out.notes.append(
+                f"ARV WITHHELD: ${out.arv_expected:,.0f} on {sqft:,.0f} sqft implies "
+                f"${implied:,.0f}/sqft in {li.county or 'this'} County"
+                + (" (manufactured housing)" if manufactured else "")
+                + f" — above the ${ceiling:,.0f}/sqft ceiling this market supports. "
+                f"The comps or the square footage are wrong."
+            )
+
+    # --- HARD 2: ARV vs the county's own 100%-basis appraisal ---------------
+    soft_mult = ARV_ANCHOR_SOFT_MULT_LAND if is_land else ARV_ANCHOR_SOFT_MULT_IMPROVED
+    hard_mult = ARV_ANCHOR_HARD_MULT_LAND if is_land else ARV_ANCHOR_HARD_MULT_IMPROVED
+    if anchor and out.arv_vs_assessed:
+        ratio = out.arv_vs_assessed
+        if ratio > hard_mult:
+            hard.append("arv_above_anchor_extreme")
+            out.notes.append(
+                f"ARV WITHHELD: ${out.arv_expected:,.0f} is {ratio:.0f}× the {anchor_label} "
+                f"(${anchor:,.0f}) — past the {hard_mult:.0f}× limit for "
+                f"{'land' if is_land else 'improved property'}. After-repair value runs above "
+                f"a county appraisal, but not by this much; one of the two records is "
+                f"describing a different parcel."
+            )
+        elif ratio > soft_mult:
+            arv_flags.append("arv_above_anchor")
+            arv_conf = "LOW"
+            out.notes.append(
+                f"ARV (${out.arv_expected:,.0f}) is {ratio:.1f}× the {anchor_label} "
+                f"(${anchor:,.0f}) — high but not impossible for distressed inventory; "
+                f"confidence LOW, verify the parcel before bidding."
+            )
+
+    # --- SOFT: manufactured home valued off site-built comps ----------------
+    # 430 board leads that are manufactured housing were priced off comps of a
+    # different kind (230 pure site-built SFR, 171 land). _classify_kind never
+    # read `land_use`, so the subject looked "unknown" and _filter_by_kind
+    # coerces unknown to "sfr". Fixed at source in enrichment_comps; flagged here
+    # so the ALREADY-PUBLISHED board says so too.
+    comps = raw.get("comps") or []
+    comp_kinds = {str(c.get("kind")) for c in comps if isinstance(c, dict) and c.get("kind")}
+    if manufactured and comp_kinds and "manufactured" not in comp_kinds:
+        arv_flags.append("comp_kind_mismatch")
+        arv_conf = "LOW"
+        out.notes.append(
+            f"This is manufactured housing (county class: "
+            f"{li.land_use or (raw.get('cama') or {}).get('building_type') or 'mobile home'}) "
+            f"but the comps used are {', '.join(sorted(comp_kinds))} — a manufactured home "
+            f"does not sell at site-built $/sqft. Confidence LOW."
+        )
+
+    # --- SOFT: ARV built on a shared/imprecise coordinate --------------------
+    # enrichment_board_quality already labels leads whose lat/lng is a shared
+    # city-centroid rather than a real situs (`geo_imprecise`). Nothing in the
+    # valuation path read it, yet the comp selector's geographic gate keys on
+    # exactly that coordinate — so hundreds of leads share one parcel's comps.
+    if raw.get("geo_imprecise") and comps and any(
+            isinstance(c, dict) and c.get("geo_anchored") for c in comps):
+        arv_flags.append("geo_imprecise_comps")
+        if arv_conf == "HIGH":
+            arv_conf = "MEDIUM"
+        out.notes.append(
+            "Comps were selected from an IMPRECISE coordinate "
+            f"({raw.get('geo_imprecise')}) — this lead's lat/lng is a shared centroid, "
+            "not its own situs, so neighbouring leads may carry identical comps."
+        )
+
+    if hard:
+        out.arv_withheld = out.arv_expected
+        out.arv_expected = out.arv_low = out.arv_high = None
+        out.arv_vs_assessed = None
+        arv_flags.extend(hard)
+        arv_conf = "LOW"
+
+    if arv_flags:
+        out.arv_flags = sorted(set(arv_flags))
+    return arv_conf
 
 
 def compute(li: Listing) -> Calc:
@@ -602,31 +1425,43 @@ def compute(li: Listing) -> Calc:
                 f"signal; preserved for investor review."
             )
 
-    # ---- Assessed-value anchor (comp accuracy cross-check) --------------
-    # A comp-grounded ARV should exceed a distressed property's county
-    # appraisal (after-repair > as-is), but a comp ARV that's WILDLY off the
-    # assessor (>2.5x or <0.6x) almost always means bad comps (wrong submarket
-    # or property type — the zip-match failure). We don't rewrite the ARV
-    # (the assessor isn't ARV), but we flag it and lower confidence so a
-    # bad-comp number can't masquerade as HIGH. Only meaningful when ARV is
-    # comp-grounded (HIGH) — the tax-value fallback would be circular.
-    assessed = li.market_value or li.assessed_value or li.tax_value
-    if out.arv_expected and assessed and float(assessed) > 0:
-        out.arv_vs_assessed = round(out.arv_expected / float(assessed), 2)
-        if arv_conf == "HIGH" and (out.arv_vs_assessed > 2.5 or out.arv_vs_assessed < 0.6):
-            arv_conf = "MEDIUM"
-            out.notes.append(
-                f"Comp ARV (${out.arv_expected:,.0f}) is {out.arv_vs_assessed:.1f}× the "
-                f"county appraisal (${float(assessed):,.0f}) — comps may be off-market; "
-                f"confidence lowered to MEDIUM, verify before bidding."
-            )
-
     # ---- ARV FLOOR at county market value / recent recorded sale --------
     # A comp-grounded ARV BELOW what the county appraises the home at (or below a
     # recent arms-length sale) is almost always a thin/weak-comp artifact — the
     # home's own market appraisal and last sale are stronger signals than 3 stray
     # comps. After-repair value should never sit under the as-is county value.
     # So when comps are NOT high-confidence, FLOOR (raise) the ARV to it.
+    #
+    # BUT THE FLOOR IS THE ONLY CODE PATH THAT RAISES AN ARV, AND IT WAS THE ONLY
+    # ONE WITH NO CEILING. It fired on 7,118 board rows and is the direct cause of
+    # the user-reported "$780,300 trailer": a general-warehouse CAMA row joined
+    # onto a 1,400-sqft manufactured home, adopted verbatim over a defensible
+    # $121,100 comp ARV. Three preconditions now gate it — each measured, each
+    # documented at its constant above. When a floor source is rejected we KEEP the
+    # comp-grounded number rather than withhold, because on every case inspected
+    # the comps were the trustworthy half of the disagreement.
+    arv_flags: list[str] = []
+    _tier_notes = arv_notes or []
+    if any(BID_PROXY_MARKER in n for n in _tier_notes):
+        arv_flags.append("bid_proxy_arv")
+    # The land path can only report through notes (its return signature is fixed
+    # by four other tests), so read its two verdicts back here.
+    if any(LAND_COMPS_REJECTED_MARKER in n for n in _tier_notes):
+        arv_flags.append("land_comps_rejected")
+    # The two AGREEMENT verdicts (LAND_COMP_SPREAD_MAX). `land_comps_disagree`
+    # means a 2-comp pool was refused for spanning >=8x and this ARV came from a
+    # later tier; `land_comp_spread` means a 3+-comp median SHIPPED off a pool
+    # that wide. Without these read-backs the land path can only lower a
+    # confidence label, which nothing downstream gates on.
+    if any(LAND_COMPS_DISAGREE_MARKER in n for n in _tier_notes):
+        arv_flags.append("land_comps_disagree")
+    if any(LAND_COMP_SPREAD_MARKER in n for n in _tier_notes):
+        arv_flags.append("land_comp_spread")
+    if any(LAND_ANCHOR_REFUSED_MARKER in n for n in _tier_notes):
+        arv_flags.append("land_ppa_ceiling")
+    # An ARV that IS a county figure times a constant cannot be validated against
+    # that figure — see the cross-check below.
+    arv_from_anchor = any(COUNTY_ANCHOR_MARKER in n for n in _tier_notes)
     mv = float(li.market_value) if (li.market_value and float(li.market_value) > 10000) else None
     sale_amt = None
     _ls = (raw.get("gis") or {}).get("last_sale") if isinstance(raw, dict) else None
@@ -635,20 +1470,169 @@ def compute(li: Listing) -> Calc:
             sale_amt = float(_ls["amount"]) if float(_ls["amount"]) > 10000 else None
         except (TypeError, ValueError):
             sale_amt = None
+
+    # REFUSING A FLOOR MUST NEVER LEAVE A LEAD MORE CONFIDENT THAN ACCEPTING IT.
+    # Accepting a floor caps confidence at MEDIUM ("the comps disagreed with the
+    # county, so this is not a clean comp read"). Refusing one used to cap
+    # nothing, so the disagreement simply vanished and a lead that had been
+    # capped at MEDIUM came out HIGH: measured, 297 leads ended MORE confident
+    # than before, 83 of them MEDIUM->HIGH and 49 of those purely because a floor
+    # source was refused. The disagreement is the same fact either way.
+    def _refused_floor_cap(conf: str) -> str:
+        return "MEDIUM" if conf == "HIGH" else conf
+
+    # (a) CLASS CONSISTENCY — a commercial CAMA row cannot value a home or a lot.
+    commercial_bt = _commercial_building_type(li)
+    if commercial_bt:
+        # The FLAG used to be gated on `mv is not None`, i.e. on market_value
+        # existing and clearing $10,000 — but `_anchor_value` suppresses the
+        # anchor for a commercial join regardless of which field carried the
+        # number. Measured: 7 leads had the anchor (and therefore the
+        # cross-check) removed with no flag at all to say so. Flag on the
+        # CONDITION, not on which field happened to be populated.
+        _xv, _xl, _ = _cross_check_anchor(li)
+        if mv is not None or _xv is not None:
+            arv_flags.append("cama_class_mismatch")
+        if mv is not None:
+            out.notes.append(
+                f"County market value (${mv:,.0f}) NOT used as an ARV floor: the assessor "
+                f"record joined to this lead is a '{commercial_bt}' — a commercial building, "
+                f"not this {li.property_kind.value.replace('_', ' ')}. Parcel join looks wrong."
+            )
+            if out.arv_expected and mv > out.arv_expected:
+                arv_conf = _refused_floor_cap(arv_conf)
+            mv = None
+        elif _xv is not None:
+            out.notes.append(
+                f"The assessor record joined to this lead is a '{commercial_bt}' — a "
+                f"commercial building, not this "
+                f"{li.property_kind.value.replace('_', ' ')} — so its ${_xv:,.0f} is "
+                f"refused as an ARV floor. Parcel join looks wrong."
+            )
+
+    # (b) SALE RECENCY — an undated or decades-old deed is not today's market.
+    # Only reported when rejecting the sale actually CHANGES the outcome (the
+    # sale would otherwise have become the floor). Flagging every lead that
+    # merely happens to carry an old deed put a scary label on 5,418 rows where
+    # 3,570 of them were never going to use it anyway — noise that trains the
+    # reader to ignore the flag.
+    if sale_amt is not None:
+        yr = _sale_year(_ls)
+        age = (datetime.utcnow().year - yr) if yr else None
+        if age is None or age > FLOOR_SALE_MAX_AGE_YEARS:
+            would_have_floored = bool(
+                out.arv_expected and sale_amt > out.arv_expected
+                and (mv is None or sale_amt > mv)
+            )
+            if would_have_floored:
+                out.notes.append(
+                    f"Recorded sale (${sale_amt:,.0f}) NOT used as an ARV floor: "
+                    + (f"sale is from {yr} ({age} years old)"
+                       if yr else "the deed carries no usable date")
+                    + f" — only sales within {FLOOR_SALE_MAX_AGE_YEARS} years describe "
+                      f"today's market."
+                )
+                arv_flags.append("stale_sale_floor")
+                arv_conf = _refused_floor_cap(arv_conf)
+            sale_amt = None
+
     floor_val = max([v for v in (mv, sale_amt) if v], default=None)
     if out.arv_expected and floor_val and out.arv_expected < floor_val:
         old_arv = out.arv_expected
-        out.arv_expected = round(floor_val, -2)
-        out.arv_low = round(min(out.arv_low or floor_val, floor_val * 0.95), -2)
-        out.arv_high = round(max(out.arv_high or floor_val, floor_val * 1.10), -2)
-        # A comp ARV that disagreed with the county/sale value is, by definition, not a
-        # clean comp read — cap confidence at MEDIUM so a floored number reads as "verify".
-        if arv_conf == "HIGH":
+        # (c) MAGNITUDE — a floor that multiplies the comp ARV by more than
+        # MAX_FLOOR_RAISE_MULT is not "comps sat a little low", it is two records
+        # describing two different buildings.
+        if floor_val > MAX_FLOOR_RAISE_MULT * old_arv:
+            arv_flags.append("floor_rejected_extreme")
+            arv_conf = "LOW"
+            out.notes.append(
+                f"County/sale value (${floor_val:,.0f}) is {floor_val / old_arv:.1f}× the "
+                f"comp-grounded ARV (${old_arv:,.0f}) — beyond the "
+                f"{MAX_FLOOR_RAISE_MULT:.1f}× floor limit, so the ARV was NOT raised to it. "
+                f"The two figures likely describe different parcels; verify the parcel join."
+            )
+        else:
+            if floor_val > FLOOR_RAISE_NOTABLE_MULT * old_arv:
+                arv_flags.append("floor_raise_large")
+                arv_conf = "LOW"
+                out.notes.append(
+                    f"ARV was raised {floor_val / old_arv:.1f}× by the county/sale floor — a "
+                    f"large disagreement with the comps. The floor was honoured (the county "
+                    f"appraises the actual parcel) but confidence is LOW: confirm the "
+                    f"assessor record belongs to this property."
+                )
+            out.arv_expected = round(floor_val, -2)
+            # Flooring TO the county value makes the published ARV that value —
+            # so the cross-check below would be dividing the county number by
+            # itself. Track it the same way the anchor-derived tiers do.
+            if mv is not None and floor_val == mv:
+                arv_from_anchor = True
+            # Keep the band anchored to the number actually published — `min()`
+            # here used to leave arv_low far under a raised expected, so the
+            # headline sat outside its own range on thousands of rows.
+            out.arv_low = round(max(out.arv_low or 0.0, floor_val * 0.95), -2)
+            out.arv_high = round(max(out.arv_high or 0.0, floor_val * 1.10), -2)
+            # A comp ARV that disagreed with the county/sale value is, by definition, not a
+            # clean comp read — cap confidence at MEDIUM so a floored number reads as "verify".
+            if arv_conf == "HIGH":
+                arv_conf = "MEDIUM"
+            out.notes.append(
+                f"ARV floored to county market value/recent sale (${floor_val:,.0f}); "
+                f"comp ARV (${old_arv:,.0f}) sat below the as-is value (after-repair can't be lower)."
+            )
+
+    # ---- Assessed-value anchor (comp accuracy cross-check) --------------
+    # A comp-grounded ARV should exceed a distressed property's county
+    # appraisal (after-repair > as-is), but an ARV that's WILDLY off the
+    # assessor (>2.5x or <0.6x) almost always means bad comps (wrong submarket
+    # or property type — the zip-match failure). We don't rewrite the ARV
+    # (the assessor isn't ARV), but we flag it and lower confidence so a
+    # bad-comp number can't masquerade as HIGH.
+    #
+    # RUNS AFTER THE FLOOR, deliberately. It used to run before, so on all 7,118
+    # floored rows the stored `arv_vs_assessed` described a number that had since
+    # been overwritten — 933 S Liberty St published `arv_vs_assessed: 4.12` on an
+    # ARV that was actually 289x its anchor. A cross-check that cannot see the
+    # published number is decoration.
+    #
+    # TWO THINGS THE CHECK COULD NOT DO, BOTH FIXED HERE.
+    #
+    # (1) It could not fire on an ARV that came FROM the county value. 7,000
+    #     board ARVs are `anchor × 1.10`, `tax × 1.25`, market_value-as-Zestimate
+    #     or the floor set to market_value — every one of them divided by the
+    #     same number it was built from, producing a fixed ratio that passes by
+    #     construction. That is not a check, it is arithmetic. It is now SKIPPED
+    #     on those leads and the lead is MARKED `anchor_not_independent` instead:
+    #     "no cross-check was possible" is a true statement, "the cross-check
+    #     passed" was not. The ratio itself is still published for transparency.
+    #
+    # (2) It could not fire when the assessor row was commercial, because
+    #     `_anchor_value` returns None there — which deleted the guardrail on
+    #     exactly the leads whose parcel join is known-wrong (the 725 Bryant
+    #     warehouse case). `_cross_check_anchor` reads those figures anyway and
+    #     reports `trusted=False`; see its docstring.
+    anchor, anchor_label, anchor_trusted = _cross_check_anchor(li)
+    if out.arv_expected and anchor:
+        out.arv_vs_assessed = round(out.arv_expected / anchor, 2)
+        if arv_from_anchor:
+            arv_flags.append("anchor_not_independent")
+            out.notes.append(
+                f"No independent cross-check: this ARV was computed FROM the "
+                f"{anchor_label} (${anchor:,.0f}), so comparing the two only restates "
+                f"the multiplier. Nothing here confirms the county's number describes "
+                f"this property."
+            )
+        elif arv_conf == "HIGH" and (out.arv_vs_assessed > 2.5 or out.arv_vs_assessed < 0.6):
             arv_conf = "MEDIUM"
-        out.notes.append(
-            f"ARV floored to county market value/recent sale (${floor_val:,.0f}); "
-            f"comp ARV (${old_arv:,.0f}) sat below the as-is value (after-repair can't be lower)."
-        )
+            out.notes.append(
+                f"Comp ARV (${out.arv_expected:,.0f}) is {out.arv_vs_assessed:.1f}× the "
+                f"county appraisal (${anchor:,.0f}) — comps may be off-market; "
+                f"confidence lowered to MEDIUM, verify before bidding."
+            )
+
+    # ---- ARV sanity band (hard guards) ----------------------------------
+    arv_conf = _arv_sanity(li, out, arv_conf, arv_flags,
+                           None if arv_from_anchor else anchor, anchor_label)
 
     # ---- Rehab range ----------------------------------------------------
     if li.property_kind == PropertyKind.LAND:
@@ -673,7 +1657,11 @@ def compute(li: Listing) -> Calc:
         # Mobile / manufactured homes use a much cheaper rehab tier table
         # (vinyl skirting, single-pane windows, cosmetic-grade fixtures).
         # Generic SFR rehab cost overstates by 30-50% on these.
-        is_mobile = li.property_kind == PropertyKind.MOBILE
+        #
+        # `property_kind == MOBILE` alone identified 7 of the board's 791
+        # manufactured leads, so this table was 99% dark. _is_manufactured also
+        # reads the county's own land_use class and the CAMA building_type.
+        is_mobile = _is_manufactured(li)
         tier_table = MOBILE_REHAB_TIERS if is_mobile else REHAB_TIERS
 
         # Photo-grounded rehab $/sqft from Vision wins over generic tier ranges
@@ -904,7 +1892,17 @@ def compute(li: Listing) -> Calc:
     #   OK          — listing price right at max bid (margin OK, do diligence)
     #   NEGOTIATE   — listing price above max bid; specifies haircut needed
     #   PASS        — math doesn't work even at $0 acquisition
-    if out.max_bid_70 is not None and bid is not None and bid > 0:
+    #
+    # SUPPRESSED when the ARV was itself derived from this same opening bid: the
+    # comparison "is the bid below the max viable bid?" reduces to "is 1 < 1.8?"
+    # and answers GREAT every time. See BID_PROXY_MARKER above.
+    if "bid_proxy_arv" in (out.arv_flags or []):
+        out.notes.append(
+            "No deal verdict: the ARV here is a multiple of the opening bid itself, so "
+            "comparing the bid against it would grade the arithmetic rather than the "
+            "property. Needs comps or a county value before a buy/pass call is meaningful."
+        )
+    elif out.max_bid_70 is not None and bid is not None and bid > 0:
         if out.max_bid_70 <= 0:
             out.deal_status = "PASS"
             out.deal_message = (

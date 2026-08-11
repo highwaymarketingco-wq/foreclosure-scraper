@@ -125,7 +125,15 @@ def test_slim_gz_matches_slim_json(tmp_path):
 def test_run_meta_carries_the_board_block(tmp_path):
     _write(tmp_path, [_lead(i) for i in range(4)])
     meta = _read(tmp_path / "run_meta.json")
-    assert meta["board"] == {"schema": "slim-v1", "count": 4}
+    # The slim payload's own two keys, pinned exactly. boardExpectedCount()
+    # gates on schema === "slim-v1" and returns null for anything else, so a
+    # rename here silently disables the client's record-count check.
+    assert meta["board"]["schema"] == "slim-v1"
+    assert meta["board"]["count"] == 4
+    # Siblings are allowed and are asserted by their own owners — detail_shards
+    # is added by the shard emitter (tests/test_detail_shards.py). What must
+    # never happen is a sibling displacing or rewriting the two keys above.
+    assert set(meta["board"]) - {"schema", "count"} <= {"detail_shards"}
     # count is the client's alignment check: slim.length must equal it.
     assert meta["board"]["count"] == meta["total"] == len(_read(tmp_path / "listings_slim.json"))
 

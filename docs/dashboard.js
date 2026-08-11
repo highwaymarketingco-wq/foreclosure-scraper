@@ -1237,6 +1237,15 @@ function applyFilters() {
     if (arvc) {
       const cc = (l.raw && l.raw.calc) || {};
       if (arvc === "comp" && cc.arv_confidence !== "HIGH") return false;
+      // "Comp-backed only (HIGH)" is a trust claim, so it must not hand back a
+      // valuation this page prints in red. Measured on a full recompute: 804
+      // leads are HIGH confidence and 14 of them render "do not bid off this"
+      // — arv_confidence describes how the number was BUILT, not whether
+      // another record contradicts it. (0 of the 804 are weak, so nothing else
+      // moves.) The "Exclude proxy (hide LOW)" option is deliberately left
+      // alone: it says "hide LOW confidence", not "hide flagged", and 8,723 of
+      // its 12,940 leads are the weak tier the board keeps on purpose.
+      if (arvc === "comp" && arvTrust(l).level === "bad") return false;
       if (arvc === "noproxy" && (cc.arv_confidence === "LOW" || !cc.arv_expected)) return false;
     }
     if (contact) {
@@ -1438,54 +1447,320 @@ function roiCell(roi) {
 // tells someone a deal is good at an auction where they bid their own money.
 // Being wrong here is much worse than being silent.
 //
-// TWO LEVELS, because they are two different claims:
+// FOUR LEVELS, because they are four different claims and one treatment for all
+// of them is how the real warning became wallpaper:
 //
-//   "bad"   — something concluded this number is wrong or unverifiable.
-//             Loud, and it visibly discounts the money derived from it.
-//   "proxy" — no comps / no sqft, so it is an estimate of an estimate. Quiet.
-//             It is true of 62% of today's board (23,874 low_arv_confidence and
-//             20,447 no_sqft out of 38,500) and a red flag on two rows in three
-//             is wallpaper, which is part of how the real one stayed invisible.
+//   "bad"   — something CONCLUDED this number is wrong, or another record
+//             contradicts it. Loud (red, ⚠, tinted). The money under it is
+//             either already gone (grading.py withholds it server-side on the
+//             contradicted tier) or is shown dimmed and labelled as derived.
+//   "weak"  — calc named a reason the EVIDENCE does not describe this exact
+//             property, but nothing disputes the magnitude. The pipeline
+//             deliberately KEEPS the money here (16,310 leads; blanking two
+//             thirds of the board's economics would delete the board), so the
+//             screen has to carry the doubt instead: amber, "≈", and the reason
+//             attached. Distinct from "fine" and from "do not bid off this".
+//   "proxy" — no named flag at all, just a low-confidence estimate (no comps /
+//             no sqft). Quiet "~", muted. True of most of the board (25,559
+//             low_arv_confidence and 20,447 no_sqft out of 38,500) and a red
+//             flag on two rows in three is wallpaper, which is part of how the
+//             real one stayed invisible.
+//   "ok"    — nothing known against it.
 //
-// HOW A "bad" IS DETECTED, in three independent layers, because the valuation
-// work is landing concurrently and this file must be useful before, during and
-// after it:
+// HOW A LEVEL IS DECIDED — an explicit table, not a keyword regex.
 //
-//   1. Named flags. The list below covers the names in play. Absent from the
-//      board, it costs nothing.
-//   2. A shape rule over any flag that mentions ARV and reads as a VERDICT
-//      ("above", "outlier", "unverified", "ceiling", …) rather than as a
-//      confidence label. So a flag named after this file ships still lands.
-//   3. Thresholds the pipeline ALREADY treats as anomalous — grading.py:295
-//      withholds the letter grade at ARV > $2M or ROI > 400%. It withholds only
-//      the LETTER: arv_expected, max_bid_70 and roi_pct still publish, and the
-//      table printed all three clean. This layer needs no board recompute and
-//      is live the moment this file deploys.
+// The old rule was `_ARV_BAD_FLAGS[n] || (n.includes("arv") && /above|outlier|
+// …/.test(n))`. Measured by recomputing all 38,500 leads under the working-tree
+// valuation code and running THIS function over the result: of the 13 flag
+// strings valuation/calc.py actually emits, 8 hit neither clause —
+// anchor_not_independent (15,991 leads), geo_imprecise_comps (6,173),
+// land_comps_rejected (1,624), bid_proxy_arv (938), comp_kind_mismatch (538),
+// floor_raise_large (377), floor_rejected_extreme (284), cama_class_mismatch
+// (249). The shape rule could not see them because calc names a flag after the
+// EVIDENCE ("comp_kind_mismatch"), not after the verdict, and none of those
+// names contains "arv". 16,310 leads published a max bid and an ROI off a
+// flagged ARV; 14,695 of them rendered with no warning louder than a "~".
 //
-// With none of the flags present the code returns "ok" or "proxy" exactly as
-// before, so a board that has not been recomputed renders as it does today
-// apart from layer 3.
+// So every flag string is now LOOKED UP. The four tables below are exhaustive
+// over what the pipeline emits today (measured, not guessed):
+//   valuation/calc.py -> calc.arv_flags          13 strings
+//   enrichment_data_quality.py -> data_quality.flags  12 strings
+//   enrichment_board_qa.py -> raw.qa_flags        14 strings (desktop only —
+//        qa_flags is NOT in web_artifact._SLIM_RAW, so a phone never sees it)
+// Anything not in a table is handled by arvFlagClass()'s documented default.
+//
+// AN UNRECOGNISED FLAG IS A CAVEAT, NOT A PASS. calc.arv_flags exists only to
+// name reasons to distrust the ARV, so a name this file has never heard of
+// still means "distrust it" — unknown entries there fall to "weak". The cost of
+// a wrong guess is one extra amber caveat; the cost of the opposite default is
+// somebody bidding off a number the engine had already doubted.
+//
+// THIS FILE DOES NOT DEPEND ON THE PIPELINE HAVING RUN IN THE RIGHT ORDER.
+// data_quality writes severity names (arv_unreliable / arv_no_independent_check)
+// that are the authoritative verdict, and they are read here — but main.py runs
+// that layer 351 lines BEFORE the valuation, so on a real run those names are
+// computed from the PREVIOUS run's calc. Classifying calc.arv_flags directly
+// means the screen is right either way: the severity names confirm, they are
+// not required.
 // ===========================================================================
-const _ARV_BAD_FLAGS = {
-  // live on the board today
-  arv_outlier: 1,
-  // QA / data-quality names in play for the valuation fixes
-  arv_above_asis: 1, arv_below_asis: 1, arv_vs_assessed_extreme: 1,
-  arv_unverified: 1, arv_unreliable: 1, arv_geo_suspect: 1, arv_floored: 1,
-  ppsf_ceiling: 1, ppsf_outlier: 1, land_ppa_ceiling: 1,
-  type_mismatch: 1, property_type_mismatch: 1, comp_type_mismatch: 1,
-  shared_centroid: 1, gis_row_shared: 1, geo_imprecise: 1,
-  assessed_is_tax_amount: 1, stale_sale_floor: 1,
-};
-// A verdict, not a confidence label. Deliberately does NOT match
-// "low_arv_confidence", which is layer-2's most important non-hit.
-const _ARV_BAD_WORDS = /(above|below|exceed|extreme|outlier|suspect|unverif|unreliab|implausib|ceiling|inflat|mismatch|withheld|suppress|overrid|floor|centroid|fanout|fan_out|shared|stale)/;
-const _ARV_PROXY_FLAGS = { low_arv_confidence: 1, no_sqft: 1, sqft_estimated: 1 };
 
-const _ARV_TRUST_OK = { level: "ok", why: [] };
+// BAD — another record, or the arithmetic itself, disputes the number. Mirrors
+// grading.ARV_FLAGS_CONTRADICTED plus the data-quality/QA names for the same
+// verdict. Values are the reason shown to the reader, so a warning always says
+// WHY and never only "flagged".
+const _ARV_BAD_FLAGS = {
+  // --- valuation/calc.py :: calc.arv_flags (contradicted tier) --------------
+  bid_proxy_arv: "the ARV is the opening bid × 2.4, so every figure under it is the bid restated",
+  arv_above_anchor: "the ARV runs several times the county's own appraisal of this parcel",
+  arv_above_anchor_extreme: "the ARV was past the hard multiple of the county appraisal and was withheld",
+  ppsf_ceiling: "the implied $/sqft is above anything this market supports — the comps or the sqft are wrong",
+  floor_raise_large: "the county/sale floor multiplied the comp ARV by more than 2.5× — confirm the assessor record belongs to this property",
+  floor_rejected_extreme: "the county record and the comps disagree by more than 6× and only one of them is right",
+  comp_kind_mismatch: "priced off site-built comps, but the county calls this manufactured housing",
+  cama_class_mismatch: "the assessor row joined to this lead describes a commercial building — the parcel join is wrong",
+  // The two ANOMALY verdicts. grading.anomaly_flags() merges these INTO
+  // calc.arv_flags so the Python trust gate can see the same garbage-in tests
+  // `grade()` has run since 2026-06-19. They arrive named after the verdict,
+  // and they are the server-side twin of the arv_over_2m / roi_over_400
+  // thresholds this file computes below — see the dedupe in arvTrust().
+  arv_above_plausible_max: "the ARV is above $2M, which is not a price a comparable property in these counties has fetched",
+  arv_implies_implausible_roi: "the implied ROI is over 400%, so the ARV and the opening bid are describing different properties",
+  // --- enrichment_data_quality.py :: data_quality.flags --------------------
+  arv_withheld: "the computed value failed a hard sanity check and was not published",
+  arv_unreliable: "the pipeline classified this valuation as contradicted",
+  arv_bid_and_roi_withheld: "max bid, ROI, profit and the deal verdict were withheld on purpose",
+  arv_outlier: "implausible magnitude for this property",
+  // --- enrichment_board_qa.py :: raw.qa_flags (desktop only) ---------------
+  arv_above_asis: "the ARV sits above the as-is value by more than the board tolerates",
+  arv_below_asis: "the after-repair value came out BELOW the as-is value, which cannot be true",
+  verdict_on_flagged_arv: "board QA caught a deal verdict published on a flagged ARV",
+  bid_on_contradicted_arv: "board QA caught a max bid published on a contradicted ARV",
+  derived_without_arv: "board QA caught money published with no ARV to derive it from",
+  // --- names not currently emitted, kept because they were in play during
+  //     the valuation work and cost nothing while absent ---------------------
+  arv_vs_assessed_extreme: "the ARV and the assessed value disagree by an extreme multiple",
+  arv_unverified: "nothing verified this value",
+  arv_geo_suspect: "the coordinates behind the comps are suspect",
+  arv_floored: "the value was forced up to a floor rather than computed",
+  ppsf_outlier: "the implied $/sqft is an outlier",
+  type_mismatch: "the comps are a different property type",
+  property_type_mismatch: "the comps are a different property type",
+  comp_type_mismatch: "the comps are a different property type",
+  shared_centroid: "several leads share one coordinate, so the comps may be another property's",
+  assessed_is_tax_amount: "the 'assessed value' read as a tax bill, not a valuation",
+};
+
+// WEAK — the inputs do not describe this exact property, or the best evidence
+// was refused and a weaker tier carried the lead. Nothing contradicts the
+// number. Mirrors grading.ARV_FLAGS_WEAK_EVIDENCE. The pipeline keeps the money
+// on these, so this file is what makes the doubt visible.
+const _ARV_WEAK_FLAGS = {
+  // --- valuation/calc.py :: calc.arv_flags (weak-evidence tier) ------------
+  anchor_not_independent: "the ARV is the county's own figure restated, so nothing independent confirms it describes this property",
+  geo_imprecise_comps: "the comps were picked by radius from a shared city centroid, not from this address",
+  stale_sale_floor: "a recorded sale was refused as a floor for being undated or more than 10 years old",
+  land_comps_rejected: "the land comps were refused — none close enough in acreage for $/acre to transfer",
+  land_ppa_ceiling: "the county's value implied a $/acre this dirt cannot support, so it was refused",
+  // The two land-AGREEMENT verdicts (calc.LAND_COMP_SPREAD_MAX). `disagree` is
+  // a 2-comp pool refused for spanning >=8x, so the ARV on screen came from a
+  // LATER tier and the comps on the card did not produce it. `spread` is a
+  // 3+-comp MEDIAN that shipped off a pool that wide — a real comp, robust to
+  // one mis-typed sale, but a band rather than a point. Both quote calc's own
+  // note, which gives the reader the actual $/acre range.
+  land_comps_disagree: "the two land comps disagreed by more than 8×, so their average was refused and this value came from a different tier",
+  land_comp_spread: "the land comps span more than 8× in $/acre — the median shipped, but read the range, not the point",
+  // --- enrichment_data_quality.py :: data_quality.flags --------------------
+  arv_no_independent_check: "nothing independent confirms this value describes this property",
+  // `arv_sanity_flag` only says "calc.arv_flags is non-empty" — it names no
+  // severity, so it cannot promote a lead to bad on its own. The specific
+  // calc flags on the same lead decide that; this one only guarantees the row
+  // is never silent when they are missing (a stale board, or the LEAN payload
+  // arriving before the shard).
+  arv_sanity_flag: "the valuation carries a sanity flag",
+  // --- enrichment_board_qa.py :: raw.qa_flags (desktop only) ---------------
+  gis_row_shared: "several leads resolved to the same GIS row, so the sqft/value behind this ARV may be another parcel's",
+  // --- not currently emitted, kept while absent ---------------------------
+  geo_imprecise: "the coordinates used to find comps are imprecise",
+};
+
+// WEAK, BUT THE SUBJECT IS THE BID — not the ARV.
+//
+// grading.py puts `placeholder_opening_bid` in ARV_FLAGS_WEAK_EVIDENCE so the
+// verdict is withheld (deal_status is literally `bid <= max_bid * 0.95`, which
+// a $1,000 upset figure makes unconditionally GREAT). But its own comment is
+// explicit that nothing here impugns the ARV, and it deliberately chose a name
+// this file would NOT paint red: "a red 'do not bid off this ARV' mark would be
+// a lie about which number is bad".
+//
+// So it is weak — the money below is genuinely wrong, because ROI, profit and
+// bid/ARV are all measured against a cost that is not the real one — but the
+// SENTENCE has to name the bid. arvTrust() tracks this as `subject`, and the
+// headline changes only when every reason on the lead is bid-scoped.
+//
+// The LEVEL is deliberately not softened for the ARV cell. Measured on a full
+// working-tree recompute: 66 leads carry this flag and 0 of them carry it
+// alone, so on today's board the ARV cell's treatment is set by a real ARV
+// reason in every single case and this decision changes nothing on screen. If
+// that ever stops being true the result is one extra amber "≈" on an ARV
+// nobody disputed, which is the cheap direction to be wrong in.
+const _ARV_BID_FLAGS = {
+  placeholder_opening_bid: "the opening bid is under 5% of the ARV — an upset or placeholder figure, not the real acquisition cost, so ROI, profit and bid/ARV are measured against the wrong number",
+};
+
+// PROXY — a confidence label, not a verdict. Quiet by design.
+const _ARV_PROXY_FLAGS = {
+  low_arv_confidence: "estimated without comp-grounded evidence",
+  no_sqft: "no known square footage",
+  sqft_estimated: "square footage is an estimate from a building footprint",
+  // Absence, not distrust: there is no raw['calc'] on this lead at all, so
+  // there is no ARV, no max bid and no ROI on screen to doubt. Classified
+  // explicitly and QUIETLY because enrichment_data_quality.py:223 designed it
+  // that way and said so in a comment — and because the alternative here is
+  // actively wrong. Left unrecognised it fell to the weak default, which made
+  // arvTrust() read "the engine priced this and refused the answer" and paint a
+  // red "not published ⚠" on a lead that was simply never valued. 0 leads on
+  // today's board (38,500/38,500 carry a calc), so this classification is
+  // insurance, not a visible change.
+  arv_not_computed: "this lead has no valuation block at all — nothing was computed, so there is nothing to distrust",
+};
+
+// DELIBERATELY IGNORED — real flags that are NOT claims about the ARV. Each one
+// already has its own treatment elsewhere on the screen, and repeating it here
+// would put an ARV warning on a lead whose ARV nobody has questioned. Listed
+// explicitly so "unclassified" can keep meaning "unknown" rather than
+// "everything we did not bother with".
+const _ARV_IGNORED_FLAGS = {
+  synthetic_address: "address quality — rendered by the ⚠ placeholder-address badge",
+  approximate_address: "address quality — rendered by the 📍 approx-address badge",
+  no_address: "address quality — the address cell is already empty",
+  dup_address: "duplicate row detection, not a valuation claim",
+  no_owner: "contactability, not a valuation claim",
+  missing_last_sale: "sale-history coverage, not a valuation claim",
+  court_owner_mismatch: "owner-name provenance, not a valuation claim",
+  rehab_vs_condition: "rehab estimate vs condition tier — about the REHAB number, not the ARV",
+};
+
+// Promotes an UNRECOGNISED arv-named flag from the weak default to bad when the
+// name reads as a verdict rather than a confidence label. Deliberately does NOT
+// match "low_arv_confidence". Only reached for names absent from every table
+// above, so it is a safety net for a flag added after this file ships, not the
+// primary rule it used to be.
+const _ARV_BAD_WORDS = /(above|below|exceed|extreme|outlier|suspect|unverif|unreliab|implausib|ceiling|inflat|mismatch|withheld|suppress|overrid|contradict)/;
+
+// calc already writes the SPECIFIC reason into calc.notes — "none within 5x the
+// subject's 2.60 ac (comp lots 0.30-0.60 ac)" is worth far more to a bidder
+// than the flag name. These map a flag to the note that explains it, so the
+// warning can quote the engine's own words instead of paraphrasing them.
+// Patterns are anchored on wording measured in the live notes.
+const _ARV_FLAG_NOTE = {
+  land_comps_rejected: /^Land comps rejected/i,
+  land_ppa_ceiling: /not usable as a land value/i,
+  geo_imprecise_comps: /IMPRECISE coordinate/i,
+  anchor_not_independent: /^No independent cross-check/i,
+  comp_kind_mismatch: /does not sell at site-built/i,
+  cama_class_mismatch: /assessor record joined to this lead/i,
+  stale_sale_floor: /^Recorded sale \(.+NOT used as an ARV floor/i,
+  floor_rejected_extreme: /floor limit/i,
+  floor_raise_large: /raised .+ by the county\/sale floor/i,
+  bid_proxy_arv: /^ARV proxy from bid/i,
+  arv_above_anchor: /not impossible for distressed inventory/i,
+  arv_above_anchor_extreme: /^ARV WITHHELD/i,
+  ppsf_ceiling: /ceiling this market supports/i,
+  // calc.LAND_COMPS_DISAGREE_MARKER / LAND_COMP_SPREAD_MARKER verbatim. These
+  // notes carry the actual $/acre numbers ("$5,263/ac vs $73,018/ac", "read the
+  // $22,500-$381,500 range, not the point"), which is the whole answer for the
+  // averaged-land-comps bug and is worth far more than either flag name.
+  land_comps_disagree: /^Land comp pair refused/i,
+  land_comp_spread: /^Land comps span/i,
+};
+
+// Why an ARV is absent, in calc's own words. Ordered: the hard refusal first.
+const _ARV_ABSENT_NOTE = /^(ARV WITHHELD|Proxy ARV \(.+\) exceeds|Insufficient (land )?data for ARV|Land comps rejected|County value \(.+\) not usable)/i;
+
+// Names that restate a severity rather than give a reason. Every one of them is
+// derived by enrichment_data_quality FROM calc.arv_flags, so when calc named
+// something specific these add nothing; when it did not (a board carried over
+// from before the guards, the LEAN payload, or main.py running the data-quality
+// layer before the valuation) they are the only thing left and they speak.
+const _ARV_GENERIC_FLAGS = {
+  arv_sanity_flag: 1, arv_unreliable: 1, arv_bid_and_roi_withheld: 1,
+  arv_no_independent_check: 1, arv_withheld: 1,
+};
+
+const _LVL = { ok: 0, proxy: 1, weak: 2, bad: 3 };
+const _LVL_NAME = ["ok", "proxy", "weak", "bad"];
+const _ARV_TRUST_OK = { level: "ok", why: [], flags: [], notes: [], absent: "", short: "", subject: "arv" };
 
 /**
- * `{level: "bad"|"proxy"|"ok", why: [reason, …]}` for one listing.
+ * Capitalise a reason so it reads as a sentence after a bold lead-in. The flag
+ * reasons are written lowercase because most of them are joined with "; " into
+ * the middle of a sentence; only the first one after a full stop needs this.
+ */
+function _cap(s) {
+  const t = String(s == null ? "" : s);
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : t;
+}
+
+/** Escape a string for use inside a double-quoted HTML attribute. */
+function _attr(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * Classify ONE flag string. Returns `{level, why, subject}` or null for "not an
+ * ARV claim". `inArvFlags` says the name came from calc.arv_flags, whose entire
+ * purpose is to name reasons to distrust the ARV — so an unknown name there is
+ * a caveat. data_quality.flags and qa_flags are MIXED namespaces (they also
+ * carry address, owner and duplicate-row names), so an unknown name there is
+ * only treated as an ARV claim when it says so: it mentions "arv".
+ *
+ * `subject` is "arv" for everything except the bid-scoped table — see
+ * _ARV_BID_FLAGS. It changes the WORDS, never the level.
+ */
+function arvFlagClass(name, inArvFlags) {
+  const n = String(name == null ? "" : name).toLowerCase();
+  if (!n) return null;
+  if (_ARV_BAD_FLAGS[n]) return { level: "bad", why: _ARV_BAD_FLAGS[n], subject: "arv" };
+  if (_ARV_WEAK_FLAGS[n]) return { level: "weak", why: _ARV_WEAK_FLAGS[n], subject: "arv" };
+  if (_ARV_BID_FLAGS[n]) return { level: "weak", why: _ARV_BID_FLAGS[n], subject: "bid" };
+  if (_ARV_PROXY_FLAGS[n]) return { level: "proxy", why: _ARV_PROXY_FLAGS[n], subject: "arv" };
+  if (_ARV_IGNORED_FLAGS[n]) return null;
+  if (!inArvFlags && n.indexOf("arv") === -1) return null;
+  const pretty = n.replace(/_/g, " ");
+  if (_ARV_BAD_WORDS.test(n)) {
+    return { level: "bad", subject: "arv", why: `unrecognised valuation flag "${pretty}", and the name reads as a verdict` };
+  }
+  return {
+    level: "weak",
+    subject: "arv",
+    why: `unrecognised valuation flag "${pretty}" — shown as a caveat because an unknown warning must never render as silence`,
+  };
+}
+
+/** calc's own note explaining `flag`, or "" when it wrote none. */
+function arvFlagNote(c, flag) {
+  const re = _ARV_FLAG_NOTE[flag];
+  if (!re || !c || !Array.isArray(c.notes)) return "";
+  for (let i = 0; i < c.notes.length; i++) {
+    if (typeof c.notes[i] === "string" && re.test(c.notes[i])) return c.notes[i];
+  }
+  return "";
+}
+
+/**
+ * `{level, why[], flags[], notes[], absent, short, subject}` for one listing.
+ *
+ *   level  — "bad" | "weak" | "proxy" | "ok" (the worst of everything seen)
+ *   why    — human reasons, worst first, for tooltips and note boxes
+ *   flags  — the raw flag strings that produced them, for the chip label
+ *   notes  — calc's own explanatory notes for those flags, verbatim
+ *   absent — "withheld" | "refused" | "unpriced" | "" — why there is no ARV
+ *   short  — a few words naming the loudest reason, for a card chip
+ *   subject— "arv" (normal) or "bid" when EVERY reason on this lead is about
+ *            the opening bid rather than the valuation. Chooses the headline
+ *            only; the level, the colour and the ≈ are unchanged either way.
  *
  * Memoised non-enumerably (the exportCsv `{...l}` spread must never pick this
  * up) and safe to memoise: every input lives in raw.calc / raw.data_quality /
@@ -1497,54 +1772,132 @@ function arvTrust(l) {
   if (l._arvTrust !== undefined) return l._arvTrust;
   const raw = l.raw || {};
   const c = raw.calc || {};
-  const why = [];
-  let bad = false, proxy = false;
+  let lvl = 0;
+  const hits = [];          // {rank, flag, why, note, subject}
+  const seen = {};
 
-  const consider = (name) => {
+  const consider = (name, inArvFlags) => {
     if (typeof name !== "string" || !name) return;
     const n = name.toLowerCase();
-    if (_ARV_BAD_FLAGS[n] || (n.indexOf("arv") !== -1 && _ARV_BAD_WORDS.test(n))) {
-      bad = true;
-      const pretty = n.replace(/_/g, " ");
-      if (why.indexOf(pretty) === -1) why.push(pretty);
-    } else if (_ARV_PROXY_FLAGS[n]) {
-      proxy = true;
-    }
+    const cls = arvFlagClass(n, inArvFlags);
+    if (!cls) return;
+    const rank = _LVL[cls.level];
+    if (rank > lvl) lvl = rank;
+    if (seen[n]) return;
+    seen[n] = 1;
+    hits.push({ rank, flag: n, why: cls.why, note: arvFlagNote(c, n), subject: cls.subject || "arv" });
   };
 
+  // calc.arv_flags FIRST: it is the authoritative, specific list, and it is the
+  // only source that survives main.py running the data-quality layer before the
+  // valuation. (calc emits `arv_flags`, NOT `flags`; reading `c.flags` was a
+  // dead branch for months and is kept only as a fallback for a future writer.)
+  if (Array.isArray(c.arv_flags)) c.arv_flags.forEach((f) => consider(f, true));
+  if (Array.isArray(c.flags)) c.flags.forEach((f) => consider(f, true));
   const dq = raw.data_quality;
-  if (dq && Array.isArray(dq.flags)) dq.flags.forEach(consider);
-  // qa_flags is written by enrichment_board_qa and is not in the slim
-  // allowlist, so it is a desktop-only signal today. Read it where it exists
-  // rather than requiring it.
-  if (Array.isArray(raw.qa_flags)) raw.qa_flags.forEach(consider);
-  // calc emits this as `arv_flags`, NOT `flags`. Reading `c.flags` was a dead
-  // branch: measured on 12,000 recomputed leads, 3,394 carried a soft flag and
-  // 2,660 of them (78.4%) rendered with no warning at all. This is the same
-  // reader-writer mismatch that made every phone report "CONFIDENCE: LOW" —
-  // when a warning has to be right to keep someone from overbidding, the key
-  // name is not a detail. `flags` is kept as a fallback in case a future
-  // producer uses it.
-  if (Array.isArray(c.arv_flags)) c.arv_flags.forEach(consider);
-  if (Array.isArray(c.flags)) c.flags.forEach(consider);
+  if (dq && Array.isArray(dq.flags)) dq.flags.forEach((f) => consider(f, false));
+  // qa_flags is written by enrichment_board_qa and is NOT in web_artifact's
+  // _SLIM_RAW allowlist, so it is a desktop-only signal. Read it where it
+  // exists rather than requiring it — nothing above depends on it.
+  if (Array.isArray(raw.qa_flags)) raw.qa_flags.forEach((f) => consider(f, false));
   // Boolean verdicts written straight onto calc — arv_geo_suspect already is one.
-  for (const k in c) { if (c[k] === true && k.indexOf("arv") === 0) consider(k); }
+  for (const k in c) { if (c[k] === true && k.indexOf("arv") === 0) consider(k, false); }
 
   const arv = c.arv_expected;
-  // grading.py:295 already refuses to letter-grade these. It withholds the
-  // letter only; the number, the max bid and the ROI publish regardless.
+  // Thresholds the pipeline ALREADY treats as anomalous: grading.py withholds
+  // the LETTER grade at ARV > $2M or ROI > 400%. Recomputing them here needs no
+  // board rebuild, which is the point — a board written before
+  // grading.anomaly_flags() existed (every published board to date: 0 of 38,500
+  // rows carry a calc.arv_flags key at all) still lights up.
+  //
+  // grading.anomaly_flags() now emits the SAME two verdicts as real flag
+  // strings, so on a fresh board both fire and the reader would be told the
+  // identical thing twice — "ARV over $2M" and "the ARV is above $2M". `seen`
+  // only dedupes by NAME, and these are different names for one fact, so the
+  // server-side flag wins and the local recompute stays silent. Levels are
+  // identical either way; this only decides which sentence is shown.
   if (typeof arv === "number" && arv > 2000000) {
-    bad = true;
-    why.push("ARV over $2M — the grader already refuses to rate this as a deal");
+    lvl = _LVL.bad;
+    if (!seen.arv_above_plausible_max) {
+      hits.push({ rank: _LVL.bad, flag: "arv_over_2m", subject: "arv",
+        why: "ARV over $2M — the grader already refuses to rate this as a deal", note: "" });
+    }
   }
   if (typeof c.roi_pct === "number" && c.roi_pct > 400) {
-    bad = true;
-    why.push("ROI over 400% — implausible, so the ARV behind it is not trustworthy");
+    lvl = _LVL.bad;
+    if (!seen.arv_implies_implausible_roi) {
+      hits.push({ rank: _LVL.bad, flag: "roi_over_400", subject: "arv",
+        why: "ROI over 400% — implausible, so the ARV behind it is not trustworthy", note: "" });
+    }
   }
-  if (!bad && c.arv_confidence === "LOW") proxy = true;
+  if (lvl === 0 && c.arv_confidence === "LOW") lvl = _LVL.proxy;
 
-  return _memo(l, "_arvTrust", bad ? { level: "bad", why }
-    : proxy ? { level: "proxy", why } : _ARV_TRUST_OK);
+  // Why there is no ARV. An empty cell reads as "not computed yet", which is
+  // the one thing it must never mean on a lead the engine priced and rejected.
+  //
+  // "refused" needs REAL evidence, not merely a hit: 12,412 leads have no ARV
+  // because there was never enough data to build one ("Insufficient data for
+  // ARV"), and they still carry low_arv_confidence / no_sqft. Keying off any
+  // hit at all painted every one of them red. Only a distrust-level reason —
+  // calc's own arv_flags, or a weak/bad flag from the layers above — means the
+  // engine priced this lead and then refused the answer.
+  // `!arv`, not `arv == null`: an arv_expected of 0 is not a valuation, and the
+  // whole pipeline already treats it as absent (every downstream block in
+  // valuation/calc.py is written `if out.arv_expected`). One lead on the live
+  // board carries a literal 0 — 599 Sunset Point Drive, Oconee SC — and a
+  // truthiness mismatch here would render it as an empty warning glyph.
+  let absent = "";
+  if (!arv) {
+    const refused = (Array.isArray(c.arv_flags) && c.arv_flags.length > 0)
+      || hits.some((h) => h.rank >= _LVL.weak);
+    absent = c.arv_withheld != null ? "withheld" : refused ? "refused" : "unpriced";
+    if (absent !== "unpriced" && lvl < _LVL.bad) lvl = _LVL.bad;
+  }
+
+  // The clean, priced lead — most of what a good board is — keeps sharing one
+  // frozen object rather than allocating 38,500 of them on a phone.
+  if (lvl === 0 && !absent) return _memo(l, "_arvTrust", _ARV_TRUST_OK);
+
+  hits.sort((a, b) => b.rank - a.rank);   // worst reason first
+  // The severity names restate calc's verdict, they do not add a reason: a
+  // reader told "cama class mismatch; comp kind mismatch; the pipeline
+  // classified this as contradicted; max bid and ROI were withheld; a sanity
+  // flag exists" has been given two facts and three ways of saying "flagged".
+  // They still set the LEVEL above — that is the whole point of reading them —
+  // but they only get to SPEAK when calc named nothing specific, which is
+  // exactly the stale-board / wrong-order case they exist for.
+  const specific = hits.filter((h) => !_ARV_GENERIC_FLAGS[h.flag]);
+  const spoken = specific.length ? specific : hits;
+  const top = spoken[0];
+  // "bid" only when EVERY reason loud enough to speak is bid-scoped. One real
+  // ARV reason anywhere on the lead and the headline goes back to the ARV,
+  // because that is the number the reader is about to bid off.
+  const loud = hits.filter((h) => h.rank >= _LVL.weak);
+  const out = {
+    level: _LVL_NAME[lvl],
+    why: spoken.filter((h) => h.rank >= _LVL.weak).map((h) => h.why),
+    flags: spoken.filter((h) => h.rank >= _LVL.weak).map((h) => h.flag),
+    notes: hits.map((h) => h.note).filter(Boolean),
+    absent,
+    short: top && top.rank >= _LVL.weak ? top.flag.replace(/_/g, " ") : "",
+    subject: loud.length && loud.every((h) => h.subject === "bid") ? "bid" : "arv",
+  };
+  // An absent ARV gets calc's own explanation even when no FLAG carried a note
+  // — "Insufficient land data for ARV" is the whole answer on 548 of the 553
+  // refused leads, and on the 12,412 unpriced ones "Insufficient data for ARV"
+  // is the difference between "—" meaning something and "—" meaning nothing.
+  if (absent && !out.notes.length && Array.isArray(c.notes)) {
+    for (let i = 0; i < c.notes.length; i++) {
+      if (typeof c.notes[i] === "string" && _ARV_ABSENT_NOTE.test(c.notes[i])) {
+        out.notes = [c.notes[i]];
+        break;
+      }
+    }
+  }
+  if (!out.why.length && lvl >= _LVL.weak) {
+    out.why = [absent === "unpriced" ? "" : "failed a valuation sanity check"].filter(Boolean);
+  }
+  return _memo(l, "_arvTrust", out);
 }
 
 /** Tooltip text for a flagged ARV. Plain, and it never claims more than it knows. */
@@ -1554,37 +1907,173 @@ function arvTrustTitle(t) {
     return "Proxy ARV — estimated without usable comps or a known square footage. "
       + "Treat it as a rough band, not a value.";
   }
-  return "ARV flagged as unreliable — do not bid off this number. "
-    + (t.why.length ? t.why.join("; ") : "failed a valuation sanity check")
-    + ". Max bid and ROI are derived from it and are shown dimmed for the same reason.";
+  // Lowercase on purpose: every use below puts it after a colon, mid-sentence.
+  // The note boxes, which put it after a full stop, run it through _cap().
+  const why = t.why.length ? t.why.join("; ") : "failed a valuation sanity check";
+  const detail = t.notes.length ? "\n\nThe engine's own note: " + t.notes.join("\n") : "";
+  if (t.absent === "withheld" || t.absent === "refused") {
+    return "No ARV published — the engine computed one and refused it: " + why
+      + ". Max bid, ROI and profit are blank on purpose, not missing." + detail;
+  }
+  if (t.level === "weak") {
+    if (t.subject === "bid") {
+      // Nothing here doubts the ARV. Saying "ARV unverified" would point the
+      // reader at the wrong number — see _ARV_BID_FLAGS.
+      return "The opening bid is a placeholder, not the real cost: " + why
+        + ". The ARV itself is not disputed, but ROI, profit and bid/ARV are "
+        + "measured against that bid, and no deal verdict is published." + detail;
+    }
+    return "ARV unverified — treat it as a band, not a number: " + why
+      + ". Max bid and ROI below are the same number restated, so they carry the "
+      + "same doubt, and no deal verdict is published." + detail;
+  }
+  return "ARV flagged as unreliable — do not bid off this number: " + why
+    + ". Max bid and ROI are derived from it and are discounted for the same reason."
+    + detail;
 }
 
 /**
  * The ARV cell for the table.
  *
- * Handles the case that matters most once the valuation guards land: an ARV the
- * pipeline WITHHELD. A suppressed number renders as an empty cell today, which
- * reads as "not computed yet" — indistinguishable from a lead nobody has priced.
- * Flagged-and-absent says "unverified" instead.
+ * An absent ARV used to render `<td class="num"></td>` — visually identical to
+ * a lead nobody has priced. Measured on a full recompute: 553 leads had no ARV,
+ * no `arv_withheld` and a live calc flag, and 374 of them rendered that empty
+ * cell (2085 SOUTHPORT RD among them). Absence is now always explicit and
+ * always carries its reason.
  */
 function arvCell(c, t) {
+  const title = _attr(arvTrustTitle(t) || "No ARV computed for this lead.");
   const v = c.arv_expected;
-  const title = arvTrustTitle(t).replace(/"/g, "&quot;");
-  if (t.level === "bad") {
-    const body = v ? fmtMoney(v) : "unverified";
-    return `<td class="num dq-arv-bad" title="${title}"><span class="dq-arv-mark">&#9888;&#xFE0E;</span>${body}</td>`;
+  if (!v) {   // 0 is not a valuation — see the `!arv` note in arvTrust()
+    if (t.absent === "withheld") {
+      return `<td class="num dq-arv-bad" title="${title}"><span class="dq-arv-mark">&#9888;&#xFE0E;</span>withheld</td>`;
+    }
+    if (t.absent === "refused") {
+      return `<td class="num dq-arv-bad" title="${title}"><span class="dq-arv-mark">&#9888;&#xFE0E;</span>not published</td>`;
+    }
+    // Genuinely unpriced. Still not blank: a blank cell is indistinguishable
+    // from a render failure, and the reason (calc's own note) is worth a hover.
+    const why = t.notes.length ? t.notes[0] : "No ARV computed — not enough data to value this property.";
+    return `<td class="num dq-none" title="${_attr(why)}">&mdash;</td>`;
   }
-  if (!v) return `<td class="num"></td>`;
+  if (t.level === "bad") {
+    return `<td class="num dq-arv-bad" title="${title}"><span class="dq-arv-mark">&#9888;&#xFE0E;</span>${fmtMoney(v)}</td>`;
+  }
+  if (t.level === "weak") {
+    return `<td class="num dq-arv-weak" title="${title}">&#8776;${fmtMoney(v)}</td>`;
+  }
   if (t.level === "proxy") {
     return `<td class="num dq-arv-proxy" title="${title}">~${fmtMoney(v)}</td>`;
   }
   return `<td class="num">${fmtMoney(v)}</td>`;
 }
 
-/** Money derived from a flagged ARV: shown, dimmed, and labelled as derived. */
+/**
+ * Money derived from the ARV.
+ *
+ * "bad": dimmed and labelled. "weak": the number is real but it is a band, so
+ * it renders in the caveat colour with a "≈" and says why on hover — a plain
+ * black $947,700 next to an ARV the engine has already doubted is the specific
+ * thing this round is closing (16,310 leads publish a max bid and an ROI off a
+ * flagged ARV; 287 of them are max bids of $500,000 or more).
+ */
 function derivedCell(inner, t) {
-  if (t.level !== "bad" || !inner) return `<td class="num">${inner}</td>`;
-  return `<td class="num dq-dim" title="Derived from an ARV flagged as unreliable">${inner}</td>`;
+  if (!inner) return `<td class="num"></td>`;
+  if (t.level === "bad") {
+    return `<td class="num dq-dim" title="${_attr("Derived from an ARV flagged as unreliable. " + arvTrustTitle(t))}">${inner}</td>`;
+  }
+  if (t.level === "weak") {
+    return `<td class="num dq-soft" title="${_attr(arvTrustTitle(t))}">&#8776;${inner}</td>`;
+  }
+  return `<td class="num">${inner}</td>`;
+}
+
+/**
+ * A few words naming why the valuation is caveated, for a card chip or a badge.
+ * Falls back to the level when calc named no flag (the $2M / 400% layer).
+ */
+function arvShortWhy(t) {
+  if (!t || t.level === "ok" || t.level === "proxy") return "";
+  if (t.level === "weak" && t.subject === "bid" && !t.short) return "placeholder opening bid";
+  return t.short || (t.level === "bad" ? "sanity check failed" : "unverified");
+}
+
+/**
+ * The headline for the WEAK tier, in three lengths. One helper so the chip, the
+ * badge and the detail note can never drift apart — and so the bid-scoped case
+ * says "bid" in all three places instead of two out of three.
+ *
+ *   chip  — a card chip, room for four words
+ *   badge — the detail-panel quick badge
+ *   note  — the bold lead-in of the note box under the big number
+ */
+function arvWeakLabel(t, form) {
+  if (t && t.subject === "bid") {
+    if (form === "chip") return "&#8776; Placeholder bid";
+    if (form === "badge") return "≈ Opening bid is a placeholder — ROI and profit rest on it";
+    return "The opening bid is a placeholder, not the real cost.";
+  }
+  if (form === "chip") return "&#8776; ARV unverified";
+  if (form === "badge") return "≈ ARV unverified — a band, not a number";
+  return "Unverified — a band, not a number.";
+}
+
+/**
+ * The rendered `data_quality.summary` line.
+ *
+ * The pipeline writes a full investor-readable caveat per lead and it reached
+ * the CSV (`data_quality_note`) and a `title=` attribute on an address badge —
+ * nowhere a reader looks. `summary` is in web_artifact._SLIM_RAW, so this works
+ * on a phone.
+ */
+function dqSummaryLine(l) {
+  const dq = (l && l.raw && l.raw.data_quality) || null;
+  const s = dq && typeof dq.summary === "string" ? dq.summary.trim() : "";
+  if (!s || /^OK\b/.test(s)) return "";
+  const t = arvTrust(l);
+  const cls = t.level === "bad" ? "dq-summary bad" : t.level === "weak" ? "dq-summary weak" : "dq-summary";
+  return `<div class="${cls}"><strong>Data quality:</strong> ${_attr(s)}</div>`;
+}
+
+/**
+ * The "Sold <date> · $<amount>" line for a card — E8.
+ *
+ * `raw.last_sale` with `basis: "assessor_value"` is the county's market value
+ * as of that date, not a sale price. On 725 BRYANT RD that figure is $780,300,
+ * read off an assessor row calc's own note rejects ("a 'GEN WHSE 50' — a
+ * commercial building, not this single family. Parcel join looks wrong"), and
+ * it printed clean beside the repaired $121,100 ARV. Measured by exact-amount
+ * match against calc's notes: 236 leads print the county value calc refused and
+ * 798 print the recorded sale calc refused — 1,034 cards where a rejected
+ * source reappears as though it corroborated something.
+ *
+ * The figure is not hidden (a record does exist); it is struck through and
+ * named as rejected, so it can never be read as a second opinion.
+ */
+const _REJECTED_FLOOR_RE = /(County market value|County value|Recorded sale) \(\$([\d,]+)\)\s*(?:NOT used as an ARV floor|not usable)/i;
+function lastSaleChip(l, c) {
+  const ls = (l && l.raw && l.raw.last_sale) || null;
+  if (!ls || !ls.date) return "";
+  const isAssessor = ls.basis === "assessor_value";
+  let rejectedNote = "";
+  if (ls.amount != null && c && Array.isArray(c.notes)) {
+    for (let i = 0; i < c.notes.length; i++) {
+      const n = c.notes[i];
+      if (typeof n !== "string") continue;
+      const m = _REJECTED_FLOOR_RE.exec(n);
+      if (m && Math.abs(parseFloat(m[2].replace(/,/g, "")) - ls.amount) < 1) { rejectedNote = n; break; }
+    }
+  }
+  const when = ls.date.slice(0, 7);
+  if (rejectedNote) {
+    return `<span class="dq-rejected" title="${_attr("This figure is the same record the valuation REFUSED to use. " + rejectedNote)}">`
+      + `Sold ${when} · <s>${fmtMoney(ls.amount)}</s> &#9888;&#xFE0E; rejected by the valuation</span>`;
+  }
+  const title = isAssessor
+    ? "county assessor market value as of the sale date (sale price not published)"
+    : "last recorded sale";
+  return `<span title="${_attr(title)}">Sold ${when}`
+    + (ls.amount ? ` · ${fmtMoney(ls.amount)}${isAssessor ? "*" : ""}` : "") + `</span>`;
 }
 
 // One-time stylesheet for the treatments this file introduces. Injected from
@@ -1601,20 +2090,68 @@ function injectDashStyles() {
   // colour. Both themes are set explicitly: index.html drives the theme off a
   // data-theme attribute, never off prefers-color-scheme.
   const css = `
-  :root{--dq-warn:#a8200f;--dq-warn-bg:rgba(217,45,32,.11)}
-  :root[data-theme="dark"]{--dq-warn:#ff8a7a;--dq-warn-bg:rgba(217,45,32,.22)}
+  :root{--dq-warn:#a8200f;--dq-warn-bg:rgba(217,45,32,.11);
+        --dq-soft:#8a5a00;--dq-soft-bg:rgba(191,132,0,.13);--dq-soft-line:rgba(191,132,0,.55)}
+  :root[data-theme="dark"]{--dq-warn:#ff8a7a;--dq-warn-bg:rgba(217,45,32,.22);
+        --dq-soft:#e8b45e;--dq-soft-bg:rgba(232,180,94,.16);--dq-soft-line:rgba(232,180,94,.6)}
   #listings-table td.dq-arv-bad{background:var(--dq-warn-bg);color:var(--dq-warn);font-weight:700}
   #listings-table td.dq-arv-bad .dq-arv-mark{margin-right:4px;font-weight:700}
   #listings-table td.dq-arv-proxy{color:var(--muted,#6b6257)}
   #listings-table td.dq-dim{opacity:.42}
   #listings-table td.dq-dim .roi-pos,#listings-table td.dq-dim .roi-neg{color:inherit}
+  /* WEAK: amber + a dotted rule, no fill. A fill on 16,310 of 38,500 rows would
+     be the wallpaper that hid the real warning; colour + the "≈" is a caveat a
+     reader can still scan past a screen of, and it is unmistakably neither the
+     plain-black "fine" nor the red-tinted "do not bid off this". */
+  #listings-table td.dq-arv-weak,#listings-table td.dq-soft{color:var(--dq-soft);
+    text-decoration:underline dotted var(--dq-soft-line);text-underline-offset:3px}
+  #listings-table td.dq-arv-weak{font-weight:600}
+  #listings-table td.dq-soft .roi-pos,#listings-table td.dq-soft .roi-neg{color:inherit}
+  #listings-table td.dq-none{color:var(--muted,#6b6257);opacity:.55}
   .dq-warn-mark{color:var(--dq-warn);font-weight:700}
+  .dq-soft-mark{color:var(--dq-soft);font-weight:700}
+  /* SPECIFICITY, the second time. style.css:622 sets '.card-meta span' to the
+     muted colour at (0,1,1), which beats a bare '.dq-warn-mark' at (0,1,0) — so
+     on the CARD the flagged-ARV chip kept its warning glyph and silently lost
+     its colour, rendering the same muted grey as "1,400 sqft · 1990". Measured
+     in the browser on 725 Bryant Rd: computed colour rgb(170,182,202), i.e. the
+     plain meta colour, in both themes. Same for the struck-through rejected
+     sale figure. '.card-meta span.x' is (0,2,1) and wins. This is the second
+     silent half-deployed warning in this file's history (the first was the
+     table, above); a treatment added to a NEW container needs its computed
+     colour checked THERE, not only where it was first written. */
+  .card-meta span.dq-warn-mark{color:var(--dq-warn)}
+  .card-meta span.dq-soft-mark{color:var(--dq-soft)}
+  .card-meta span.dq-rejected{color:var(--dq-warn)}
+  .card-meta span.dq-rejected s{opacity:.75}
   /* .val.big carries its own colour at a higher specificity than a bare class. */
   #detail-panel .val.dq-warn-mark{color:var(--dq-warn)}
+  #detail-panel .val.dq-soft-mark{color:var(--dq-soft)}
   .arv-flag-chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;
     font-weight:700;color:#fff;background:#c0392b;border:1px solid #c0392b}
+  .arv-weak-chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;
+    font-weight:700;color:var(--dq-soft);background:var(--dq-soft-bg);border:1px solid var(--dq-soft-line)}
+  /* style.css's .qbadge.warn-light is the grade-C palette, which the detail
+     panel ALSO gives to an ordinary 10-25% ROI badge — so a weak-ARV warning
+     and a mediocre-but-fine return rendered in the same colour. Repaint the
+     ones this file owns in the weak vocabulary (--dq-soft, same as the "≈"
+     everywhere else) so the caveat is a caveat and not a middling score. */
+  .qbadge.warn-light.dq-weak{color:var(--dq-soft);background:var(--dq-soft-bg);
+    border:1px solid var(--dq-soft-line)}
   .arv-flag-note{margin-top:6px;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.4;
     color:var(--dq-warn);background:var(--dq-warn-bg);border:1px solid rgba(217,45,32,.35)}
+  .arv-weak-note{margin-top:6px;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.4;
+    color:var(--dq-soft);background:var(--dq-soft-bg);border:1px solid var(--dq-soft-line)}
+  .arv-weak-note .arv-note-quote,.arv-flag-note .arv-note-quote{display:block;margin-top:4px;
+    font-style:italic;opacity:.85}
+  /* data_quality.summary, finally on screen instead of only in the CSV. */
+  .dq-summary{margin:0 0 10px;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.45;
+    color:var(--muted,#6b6257);background:rgba(127,127,127,.10);border:1px solid rgba(127,127,127,.25)}
+  .dq-summary.weak{color:var(--dq-soft);background:var(--dq-soft-bg);border-color:var(--dq-soft-line)}
+  .dq-summary.bad{color:var(--dq-warn);background:var(--dq-warn-bg);border-color:rgba(217,45,32,.35)}
+  /* A figure the valuation refused, reprinted elsewhere on the card. */
+  .dq-rejected{color:var(--dq-warn)}
+  .dq-rejected s{opacity:.75}
   .shard-loading{font-size:.9em;color:var(--muted,#6b6257);position:relative;padding-left:18px}
   .shard-loading::before{content:"";position:absolute;left:0;top:50%;width:11px;height:11px;
     margin-top:-6px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;
@@ -1664,9 +2201,15 @@ function renderTable() {
       // only in the ARV cell is therefore invisible on exactly the device this
       // change is for. The address is the one cell that renders in every
       // layout, and it is where the eye lands.
+      // "weak" gets its own mark for the same reason: below 720px the ARV, Max
+      // Bid and ROI columns are all hidden, so the amber "≈" on those cells is
+      // invisible on a phone. "≈" is one vocabulary across this file — it means
+      // "a band, not a number" wherever it appears.
       const arvMark = at.level === "bad"
-        ? `<span class="dq-warn-mark" title="${arvTrustTitle(at).replace(/"/g, "&quot;")}">&#9888;&#xFE0E; </span>`
-        : "";
+        ? `<span class="dq-warn-mark" title="${_attr(arvTrustTitle(at))}">&#9888;&#xFE0E; </span>`
+        : at.level === "weak"
+          ? `<span class="dq-soft-mark" title="${_attr(arvTrustTitle(at))}">&#8776; </span>`
+          : "";
       const addrCell = isBkSource
         ? `${arvMark}🏛 ${cl.chapter && cl.chapter !== "?" ? `Ch.${cl.chapter} ` : ""}${(l.defendant || "Bankruptcy filing").slice(0, 60)}`
         : `${arvMark}${bkXref ? "🏛 " : ""}${l.street_address || ""}`;
@@ -1689,8 +2232,8 @@ function renderTable() {
         // which reads as "not scored yet". When the ARV is flagged the grade is
         // absent on purpose, so colour it and say so in the tooltip. The loud
         // marker stays on the address cell — one glyph per row, not two.
-        (!g.overall && at.level === "bad")
-          ? `<span class="grade-badge F dq-warn-mark" style="opacity:.85" title="Unrated on purpose — ${arvTrustTitle(at).replace(/"/g, "&quot;")}">—</span>`
+        (!g.overall && (at.level === "bad" || at.level === "weak"))
+          ? `<span class="grade-badge F ${at.level === "bad" ? "dq-warn-mark" : "dq-soft-mark"}" style="opacity:.85" title="${_attr("Unrated on purpose — " + arvTrustTitle(at))}">—</span>`
           : gradeBadge(g)
       }${intentBadge(l)}</td>
       <td>${dateCell}</td>
@@ -2021,6 +2564,7 @@ function renderCards() {
       const at = arvTrust(l);
       const lowArv = at.level === "proxy";
       const badArv = at.level === "bad";
+      const weakArv = at.level === "weak";
       // Bankruptcy listings: show debtor + chapter as the "address"
       const cardAddr = isBkSource
         ? `🏛 ${cl && cl.chapter && cl.chapter !== "?" ? `Ch.${cl.chapter}` : "Bankruptcy"} · ${(l.defendant || "filing").slice(0, 50)}`
@@ -2040,7 +2584,13 @@ function renderCards() {
       // (0b) Flagged valuation — first chip after the signal stack, because
       //      every money figure on this card descends from it.
       if (badArv) {
-        signalChips.push(`<span class="arv-flag-chip" title="${arvTrustTitle(at).replace(/"/g, "&quot;")}">&#9888;&#xFE0E; ARV flagged</span>`);
+        signalChips.push(`<span class="arv-flag-chip" title="${_attr(arvTrustTitle(at))}">&#9888;&#xFE0E; ARV flagged${arvShortWhy(at) ? " · " + arvShortWhy(at) : ""}</span>`);
+      } else if (weakArv) {
+        // The reason, not just the severity. 94 Long Ridge Road publishes a
+        // $947,700 max bid off an ARV whose only flag is land_comps_rejected —
+        // and calc's own note says "none within 5x the subject's 2.60 ac". The
+        // chip names it; the tooltip quotes the note verbatim.
+        signalChips.push(`<span class="arv-weak-chip" title="${_attr(arvTrustTitle(at))}">${arvWeakLabel(at, "chip")}${arvShortWhy(at) ? " · " + arvShortWhy(at) : ""}</span>`);
       }
       // (1) Equity — mirror the detail panel's value/pct + underwater colouring.
       const eq = (l.raw && l.raw.equity) || null;
@@ -2109,16 +2659,24 @@ function renderCards() {
             ${fmtType(l.listing_type)}
             ${l.opening_bid ? `<span>Bid ${fmtMoney(l.opening_bid)}</span>` : ""}
             ${c.arv_expected
-              ? `<span${badArv ? ` class="dq-warn-mark" title="${arvTrustTitle(at).replace(/"/g, "&quot;")}"` : ""}>ARV ${badArv ? "&#9888;&#xFE0E; " : ""}${fmtMoney(c.arv_expected)}${lowArv ? " (proxy)" : ""}</span>`
-              : (badArv ? `<span class="dq-warn-mark" title="${arvTrustTitle(at).replace(/"/g, "&quot;")}">ARV &#9888;&#xFE0E; unverified</span>` : "")}
-            ${(l.raw && l.raw.last_sale && l.raw.last_sale.date) ? `<span title="${l.raw.last_sale.basis === "assessor_value" ? "county assessor market value as of the sale date (sale price not published)" : "last recorded sale"}">Sold ${l.raw.last_sale.date.slice(0, 7)}${l.raw.last_sale.amount ? " · " + fmtMoney(l.raw.last_sale.amount) + (l.raw.last_sale.basis === "assessor_value" ? "*" : "") : ""}</span>` : ""}
+              ? `<span${badArv ? ` class="dq-warn-mark" title="${_attr(arvTrustTitle(at))}"` : weakArv ? ` class="dq-soft-mark" title="${_attr(arvTrustTitle(at))}"` : ""}>ARV ${badArv ? "&#9888;&#xFE0E; " : weakArv ? "&#8776;" : ""}${fmtMoney(c.arv_expected)}${lowArv ? " (proxy)" : ""}</span>`
+              : (at.absent === "withheld" || at.absent === "refused"
+                  ? `<span class="dq-warn-mark" title="${_attr(arvTrustTitle(at))}">ARV &#9888;&#xFE0E; ${at.absent === "withheld" ? "withheld" : "not published"}</span>`
+                  : "")}
+            ${lastSaleChip(l, c)}
             ${l.sale_date ? `<span>${fmtDate(l.sale_date)}</span>` : ""}
             ${meta.length ? `<span>${meta.join(" · ")}</span>` : ""}
           </div>
           ${(l.raw && l.raw.also_seen_in && l.raw.also_seen_in.length) ? `<div class="card-sources" style="font-size:11px;opacity:.7;margin-top:2px">also at: ${l.raw.also_seen_in.map((s) => `<a href="${s.url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${(s.source || "source").split(".").pop()}</a>`).join(", ")}</div>` : ""}
           ${roi == null ? "" : badArv
             ? `<div class="card-roi" style="opacity:.5;font-weight:600" title="ROI withheld — it is derived from an ARV flagged as unreliable">ROI — <span style="font-weight:400">unreliable ARV</span></div>`
-            : `<div class="card-roi ${roiCls}"${lowArv ? ` style="opacity:.45" title="ROI suppressed — derived from a low-confidence (proxy) ARV"` : ""}>ROI ${roi.toFixed(1)}%${c.cash_on_cash_pct != null ? ` · CoC ${c.cash_on_cash_pct.toFixed(0)}%` : ""}</div>`}
+            : weakArv
+              // Kept, because the pipeline keeps it and blanking two thirds of
+              // the board's economics would delete the board — but it renders
+              // in the caveat colour with "≈" and says why, so it can never be
+              // read as plain fact.
+              ? `<div class="card-roi" style="color:var(--dq-soft);font-weight:600" title="${_attr(arvTrustTitle(at))}">ROI &#8776;${roi.toFixed(1)}%${c.cash_on_cash_pct != null ? ` · CoC &#8776;${c.cash_on_cash_pct.toFixed(0)}%` : ""} <span style="font-weight:400">— band, not a number</span></div>`
+              : `<div class="card-roi ${roiCls}"${lowArv ? ` style="opacity:.45" title="ROI suppressed — derived from a low-confidence (proxy) ARV"` : ""}>ROI ${roi.toFixed(1)}%${c.cash_on_cash_pct != null ? ` · CoC ${c.cash_on_cash_pct.toFixed(0)}%` : ""}</div>`}
         </div>
       </div>`;
     })
@@ -2604,25 +3162,45 @@ function renderDetail(l, detailState) {
   if (c) {
     const rows = [];
     const _at = arvTrust(l);
+    // data_quality.summary reached the CSV export and a title= attribute and
+    // nowhere else. It is the one place the pipeline writes the whole caveat in
+    // plain words, so it opens the block the numbers live in.
+    const _dqLine = dqSummaryLine(l);
+    if (_dqLine) rows.push(_dqLine);
+    // calc's own explanation of the flags, quoted rather than paraphrased.
+    const _quote = _at.notes.length
+      ? `<span class="arv-note-quote">The engine's note: ${_at.notes.map(_attr).join("<br>")}</span>` : "";
     // The big number carries the caveat itself. A note further down the panel
     // loses to a $780,300 in 28px type — the number anchors first and the prose
     // arrives after the reader has already decided.
-    if (c.arv_expected || _at.level === "bad") {
+    if (c.arv_expected || _at.level === "bad" || _at.level === "weak") {
+      const _absentWord = _at.absent === "withheld" ? "withheld"
+        : _at.absent === "refused" ? "not published" : "unverified";
       rows.push(`
         <div class="calc-row">
           <div class="lbl">Est. ARV</div>
           <div>
-            <div class="val big${_at.level === "bad" ? " dq-warn-mark" : ""}">${
-              _at.level === "bad" ? "&#9888;&#xFE0E; " : _at.level === "proxy" ? "~" : ""
-            }${c.arv_expected ? fmtMoney(c.arv_expected) : "unverified"}</div>
+            <div class="val big${_at.level === "bad" ? " dq-warn-mark" : _at.level === "weak" ? " dq-soft-mark" : ""}">${
+              _at.level === "bad" ? "&#9888;&#xFE0E; " : _at.level === "weak" ? "&#8776;" : _at.level === "proxy" ? "~" : ""
+            }${c.arv_expected ? fmtMoney(c.arv_expected) : _absentWord}</div>
             ${c.arv_expected ? `<div class="calc-range">range: <b>${fmtMoney(c.arv_low)}</b> – <b>${fmtMoney(c.arv_high)}</b></div>` : ""}
-            ${_at.level === "bad"
-              ? `<div class="arv-flag-note"><strong>Do not bid off this number.</strong> ${
-                  _at.why.length ? _at.why.join("; ") : "It failed a valuation sanity check"
-                }. Max bid, ROI and profit below are all derived from it.</div>`
-              : _at.level === "proxy"
-                ? `<div class="calc-range">Proxy value — estimated without usable comps or a known square footage.</div>`
-                : ""}
+            ${_at.absent === "withheld" || _at.absent === "refused"
+              ? `<div class="arv-flag-note"><strong>No ARV published — the engine computed one and refused it.</strong> ${
+                  _at.why.length ? _cap(_attr(_at.why.join("; "))) : "It failed a valuation sanity check"
+                }. Max bid, ROI and profit are blank on purpose, not missing.${_quote}</div>`
+              : _at.level === "bad"
+                ? `<div class="arv-flag-note"><strong>Do not bid off this number.</strong> ${
+                    _at.why.length ? _cap(_attr(_at.why.join("; "))) : "It failed a valuation sanity check"
+                  }. Max bid, ROI and profit below are all derived from it.${_quote}</div>`
+                : _at.level === "weak"
+                  ? `<div class="arv-weak-note"><strong>${arvWeakLabel(_at, "note")}</strong> ${
+                      _cap(_attr(_at.why.join("; ")))
+                    }. ${_at.subject === "bid"
+                      ? "The ARV itself is not disputed. The figures below are still shown, but ROI, profit and bid/ARV are measured against that placeholder bid and no deal verdict is published."
+                      : "Nothing disputes the magnitude, so the figures below are still shown, but they are this number restated and no deal verdict is published."}${_quote}</div>`
+                  : _at.level === "proxy"
+                    ? `<div class="calc-range">Proxy value — estimated without usable comps or a known square footage.</div>`
+                    : ""}
           </div>
         </div>`);
     }
@@ -2639,29 +3217,40 @@ function renderDetail(l, detailState) {
     if (l.opening_bid) {
       rows.push(`<div class="calc-row"><div class="lbl">Opening Bid</div><div class="val big">${fmtMoney(l.opening_bid)}</div></div>`);
     }
+    // Everything below is arv_expected restated. On the contradicted tier the
+    // pipeline has already deleted these fields, so this only reaches the two
+    // cases where money survives a caveat: the weak tier (kept on purpose) and
+    // the $2M / ROI>400% layer, which grading.py withholds the LETTER for but
+    // not the figures. Either way the number must not render as plain fact.
+    const _derived = (v, extraCls) => {
+      const cls = _at.level === "bad" ? " dq-warn-mark" : _at.level === "weak" ? " dq-soft-mark" : "";
+      const pre = _at.level === "weak" ? "&#8776;" : "";
+      const ttl = cls ? ` title="${_attr(arvTrustTitle(_at))}"` : "";
+      return `<div class="val ${extraCls || ""}${cls}"${ttl}>${pre}${v}</div>`;
+    };
     if (c.max_bid_70 != null) {
-      rows.push(`<div class="calc-row"><div class="lbl">Max Bid (70% rule)</div><div class="val big">${fmtMoney(c.max_bid_70)}</div></div>`);
+      rows.push(`<div class="calc-row"><div class="lbl">Max Bid (70% rule)</div>${_derived(fmtMoney(c.max_bid_70), "big")}</div>`);
     }
     if (c.wholesale_mao != null) {
-      rows.push(`<div class="calc-row"><div class="lbl">Wholesale MAO</div><div class="val">${fmtMoney(c.wholesale_mao)}${c.wholesale_spread != null ? ` <span class="muted">(spread ${fmtMoney(c.wholesale_spread)})</span>` : ""}</div></div>`);
+      rows.push(`<div class="calc-row"><div class="lbl">Wholesale MAO</div>${_derived(fmtMoney(c.wholesale_mao) + (c.wholesale_spread != null ? ` <span class="muted">(spread ${fmtMoney(c.wholesale_spread)})</span>` : ""))}</div>`);
     }
     if (c.bid_to_arv_pct != null) {
-      rows.push(`<div class="calc-row"><div class="lbl">Bid / ARV</div><div class="val">${c.bid_to_arv_pct.toFixed(1)}%</div></div>`);
+      rows.push(`<div class="calc-row"><div class="lbl">Bid / ARV</div>${_derived(c.bid_to_arv_pct.toFixed(1) + "%")}</div>`);
     }
     if (c.total_investment != null) {
-      rows.push(`<div class="calc-row"><div class="lbl">Total Investment</div><div class="val">${fmtMoney(c.total_investment)}</div></div>`);
+      rows.push(`<div class="calc-row"><div class="lbl">Total Investment</div>${_derived(fmtMoney(c.total_investment))}</div>`);
     }
     if (c.estimated_profit != null) {
-      const cls = c.estimated_profit > 0 ? "pos" : "neg";
-      rows.push(`<div class="calc-row"><div class="lbl">Est. Profit</div><div class="val big ${cls}">${fmtMoney(c.estimated_profit)}</div></div>`);
+      const cls = _at.level === "bad" || _at.level === "weak" ? "big" : "big " + (c.estimated_profit > 0 ? "pos" : "neg");
+      rows.push(`<div class="calc-row"><div class="lbl">Est. Profit</div>${_derived(fmtMoney(c.estimated_profit), cls)}</div>`);
     }
     if (c.roi_pct != null) {
-      const cls = c.roi_pct > 0 ? "pos" : "neg";
-      rows.push(`<div class="calc-row"><div class="lbl">ROI</div><div class="val big ${cls}">${c.roi_pct.toFixed(1)}%</div></div>`);
+      const cls = _at.level === "bad" || _at.level === "weak" ? "big" : "big " + (c.roi_pct > 0 ? "pos" : "neg");
+      rows.push(`<div class="calc-row"><div class="lbl">ROI</div>${_derived(c.roi_pct.toFixed(1) + "%", cls)}</div>`);
     }
     if (c.cash_on_cash_pct != null) {
-      const cls = c.cash_on_cash_pct > 0 ? "pos" : "neg";
-      rows.push(`<div class="calc-row"><div class="lbl">Cash-on-Cash</div><div class="val ${cls}">${c.cash_on_cash_pct.toFixed(1)}%</div></div>`);
+      const cls = _at.level === "bad" || _at.level === "weak" ? "" : (c.cash_on_cash_pct > 0 ? "pos" : "neg");
+      rows.push(`<div class="calc-row"><div class="lbl">Cash-on-Cash</div>${_derived(c.cash_on_cash_pct.toFixed(1) + "%", cls)}</div>`);
     }
     const _eq = (l.raw && l.raw.equity) || null;
     if (_eq && _eq.value != null) {
@@ -2680,7 +3269,8 @@ function renderDetail(l, detailState) {
     }
     $("d-calc").innerHTML = rows.join("");
   } else {
-    $("d-calc").innerHTML = "<em>Calculator data not available — listing missing key fields.</em>";
+    $("d-calc").innerHTML = dqSummaryLine(l)
+      + "<em>Calculator data not available — listing missing key fields.</em>";
   }
 
   // Property details
@@ -3051,19 +3641,51 @@ function renderDetail(l, detailState) {
 
   // ARV / max bid / ROI summary chips
   const _bat = arvTrust(l);
-  if (_bat.level === "bad") {
-    badges.push(`<span class="qbadge neg" title="${arvTrustTitle(_bat).replace(/"/g, "&quot;")}">⚠ ARV flagged — do not bid off it</span>`);
+  const _batTtl = _attr(arvTrustTitle(_bat));
+  const _batWhy = arvShortWhy(_bat);
+  if (_bat.absent === "withheld" || _bat.absent === "refused") {
+    badges.push(`<span class="qbadge neg" title="${_batTtl}">⚠ No ARV published${_batWhy ? " — " + _batWhy : ""}</span>`);
+  } else if (_bat.level === "bad") {
+    badges.push(`<span class="qbadge neg" title="${_batTtl}">⚠ ARV flagged — do not bid off it${_batWhy ? " · " + _batWhy : ""}</span>`);
+  } else if (_bat.level === "weak") {
+    // Amber, and it names the reason. "warn-light" rather than "neg": nothing
+    // contradicts this number, the evidence just does not describe this exact
+    // property, and rendering that identically to a contradicted ARV is how a
+    // real warning turns into wallpaper.
+    badges.push(`<span class="qbadge warn-light dq-weak" title="${_batTtl}">${arvWeakLabel(_bat, "badge")}${_batWhy ? " · " + _batWhy : ""}</span>`);
   }
+  // `dq-weak` repaints warn-light into the weak vocabulary — see injectDashStyles.
+  // It is added only where warn-light MEANS "caveated", never where it is just
+  // the palette for a middling ROI, so the two can be told apart.
+  const _weakCls = "warn-light dq-weak";
   if (calc.arv_expected) {
     const lowArv = _bat.level === "proxy";
-    badges.push(`<span class="qbadge ${_bat.level === "bad" ? "neg" : "info"}" title="${(calc.notes && calc.notes[0]) || ''}">ARV ~$${Number(calc.arv_expected).toLocaleString()}${lowArv ? " (proxy)" : ""}</span>`);
+    const cls = _bat.level === "bad" ? "neg" : _bat.level === "weak" ? _weakCls : "info";
+    // One glyph vocabulary across the whole file: ⚠ = do not bid off it,
+    // ≈ = a band not a number, ~ = a proxy estimate. This badge used "~" for
+    // the BAD tier too, which said "rough estimate" on the one tier that means
+    // "another record disputes this".
+    const mark = _bat.level === "bad" ? "&#9888;&#xFE0E; " : _bat.level === "weak" ? "≈" : "~";
+    badges.push(`<span class="qbadge ${cls}" title="${_attr(_bat.level === "ok" ? ((calc.notes && calc.notes[0]) || "") : arvTrustTitle(_bat))}">ARV ${mark}$${Number(calc.arv_expected).toLocaleString()}${lowArv ? " (proxy)" : ""}</span>`);
   }
   if (calc.max_bid_70) {
-    badges.push(`<span class="qbadge ${_bat.level === "bad" ? "neg" : "info"}">Max bid (70%) $${Number(calc.max_bid_70).toLocaleString()}${_bat.level === "bad" ? " — from a flagged ARV" : ""}</span>`);
+    const cls = _bat.level === "bad" ? "neg" : _bat.level === "weak" ? _weakCls : "info";
+    // The reason, in the badge itself. A bidder reading "Max bid (70%) $947,700"
+    // on a phone gets no hover, so "— band, not a number" was the only thing on
+    // screen saying the number was caveated and it did not say WHY. 94 Long
+    // Ridge Road now reads "≈$947,700 — band, not a number · land comps
+    // rejected", and the tooltip still quotes calc's note verbatim.
+    const tail = _bat.level === "bad"
+      ? " — from a flagged ARV" + (_batWhy ? " · " + _batWhy : "")
+      : _bat.level === "weak"
+        ? " — band, not a number" + (_batWhy ? " · " + _batWhy : "")
+        : "";
+    badges.push(`<span class="qbadge ${cls}" title="${_batTtl}">Max bid (70%) ${_bat.level === "weak" ? "≈" : ""}$${Number(calc.max_bid_70).toLocaleString()}${tail}</span>`);
   }
   if (calc.roi_pct != null) {
-    const cls = _bat.level === "bad" ? "neg" : calc.roi_pct > 25 ? "pos" : calc.roi_pct > 10 ? "warn-light" : "neg";
-    badges.push(`<span class="qbadge ${cls}">ROI ${calc.roi_pct.toFixed(0)}%</span>`);
+    const cls = _bat.level === "bad" ? "neg" : _bat.level === "weak" ? _weakCls
+      : calc.roi_pct > 25 ? "pos" : calc.roi_pct > 10 ? "warn-light" : "neg";
+    badges.push(`<span class="qbadge ${cls}" title="${_batTtl}">ROI ${_bat.level === "weak" ? "≈" : ""}${calc.roi_pct.toFixed(0)}%</span>`);
   }
 
   // Flood

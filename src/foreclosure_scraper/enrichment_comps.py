@@ -138,10 +138,53 @@ def _num(v):
 
 # ---- Property-kind classification ------------------------------------------
 
+# County-published property-class tokens that mean manufactured housing. These
+# live in `Listing.land_use` (the county's own class string) and in
+# `raw.cama.building_type` (the assessor record). NOTHING in the comp matcher or
+# the valuation path read either field, which is why the board carries 791
+# identifiably-manufactured leads of which only 7 had property_kind == MOBILE:
+# the rest fell through _classify_kind as "unknown", and _filter_by_kind coerces
+# unknown to "sfr". Net effect measured on the live board: 430 manufactured homes
+# valued against site-built comps (230 pure SFR, 171 land, 24 SFR+townhouse) and
+# only 12 manufactured comps used board-wide.
+_MANUFACTURED_CLASS_TOKENS = (
+    "mobile home", "manufactured", "mfg home", "doublewide", "double wide",
+    "singlewide", "single wide", "modular home",
+)
+# land_use / building_type only RE-classify a subject whose own property_kind is
+# unset or already consistent with a manufactured dwelling. A lead explicitly
+# typed multi_family or commercial keeps its kind — one HUD multi-family
+# inspection lead on the board carries a "Mobile Home Lot" land_use it picked up
+# from a bad parcel join, and must not start comping against single-wides.
+_MANUFACTURED_OVERRIDABLE = (
+    PropertyKind.UNKNOWN, PropertyKind.LAND,
+    PropertyKind.SINGLE_FAMILY, PropertyKind.MOBILE,
+)
+
+
+def _county_class_is_manufactured(li: Listing) -> bool:
+    """True when the COUNTY says this parcel is manufactured housing."""
+    if li.property_kind not in _MANUFACTURED_OVERRIDABLE:
+        return False
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    cama = raw.get("cama") if isinstance(raw.get("cama"), dict) else {}
+    blob = " ".join([
+        str(getattr(li, "land_use", "") or ""),
+        str(cama.get("building_type") or ""),
+    ]).lower()
+    return any(t in blob for t in _MANUFACTURED_CLASS_TOKENS)
+
+
 def _classify_kind(row: dict | Listing) -> str:
     """Bucket a HomeHarvest row OR a Listing into one of:
        sfr | condo | townhouse | multi | land | manufactured | unknown"""
     if isinstance(row, Listing):
+        # The county's own property class beats every other signal on the
+        # subject side — it is the assessor describing this exact parcel, not a
+        # scraper's guess. Checked FIRST so a manufactured home tagged
+        # single_family (256 of them on the board) still comps like-for-like.
+        if _county_class_is_manufactured(row):
+            return "manufactured"
         # Use Listing's own classification
         pk = row.property_kind
         if pk == PropertyKind.SINGLE_FAMILY:
@@ -160,6 +203,7 @@ def _classify_kind(row: dict | Listing) -> str:
         text_blob = " ".join(filter(None, [
             row.description or "",
             (row.raw or {}).get("style", ""),
+            str(getattr(row, "land_use", "") or ""),
         ])).lower()
     else:
         # HomeHarvest dict row
@@ -222,6 +266,15 @@ SQFT_BAND_PCT = 0.20    # ±20% of subject sqft
 YEAR_BAND = 15          # ±15 years
 BED_BAND_EXACT = True   # bedrooms must match exactly
 LAND_LOT_BAND_PCT = 0.50  # for land, ±50% acreage tolerance
+# Widened land-lot tiers, as MULTIPLICATIVE ratios (subject/r .. subject*r).
+# They are ratios, not ±percentages, because a ±percentage band wider than 100%
+# has a negative lower bound and therefore no lower bound at all — see
+# _within_band below for the bug this replaced. Chosen to match
+# valuation.calc.LAND_COMP_BANDS ("wide" 3.0, "loose" 5.0) exactly, so a comp
+# that survives to the DISPLAYED table is one the ARV path would also accept.
+# Before this alignment the two disagreed: calc rejected the mismatched comps
+# for its ARV while the comp table still showed them as the evidence.
+LAND_LOT_WIDEN_RATIOS = ((3.0, "lot~3x"), (5.0, "lot~5x"))
 # Geographic accuracy: when the subject has coordinates, comps must be
 # within this radius. Prevents a rural subject from being valued against
 # county-seat sales 20+ miles away (the "inaccurate comps" complaint).
@@ -229,9 +282,38 @@ COMP_RADIUS_MILES = 10.0
 
 
 def _within_band(value: float, target: float, pct: float) -> bool:
+    """True when `value` is within ±`pct` of `target`.
+
+    GUARD: at pct >= 1.0 the naive lower bound `target * (1 - pct)` is zero or
+    NEGATIVE, i.e. the "band" accepts every positive value and only caps the top
+    — which is not a band. That is not hypothetical: stage 3 below called this
+    with pct=2.0 and pct=4.0, so an 86.7-acre subject accepted a 0.63-acre
+    building lot as a comparable, and $/acre decays hard with size (board
+    medians $153,523/ac at 0-1ac vs $22,744/ac at 20-50ac). Measured on the live
+    board: of 4,932 land leads carrying comps and a usable lot size, 4,022 hold
+    at least one comp outside a 3x ratio of the subject and 3,097 outside 5x —
+    the worst is a 2,500-acre tract comped against a 0.34-acre lot, 7,353x.
+    At pct >= 1 the band collapses to its symmetric ratio form
+    [target/(1+pct), target*(1+pct)], which is what every call site meant.
+    Sub-1.0 callers (the ±20% sqft bands, the ±50% lot band) are untouched.
+    """
     if not value or not target:
         return False
-    return target * (1 - pct) <= value <= target * (1 + pct)
+    lo = target * (1 - pct) if pct < 1.0 else target / (1.0 + pct)
+    return lo <= value <= target * (1 + pct)
+
+
+def _within_ratio_band(value: float, target: float, ratio: float) -> bool:
+    """True when `value` is within a multiplicative `ratio` of `target` in BOTH
+    directions: target/ratio <= value <= target*ratio.
+
+    The honest way to express a wide size band. Mirrors the acreage band in
+    valuation.calc._land_arv, so the comps shown as evidence and the comps used
+    for the ARV are drawn from the same population.
+    """
+    if not value or not target or ratio <= 1.0:
+        return False
+    return target / ratio <= value <= target * ratio
 
 
 def _haversine_miles(lat1, lon1, lat2, lon2) -> float | None:
@@ -276,7 +358,13 @@ def _pick_3_comps(target: Listing, sold_pool: list[dict]) -> list[dict]:
     target_sqft = target.living_sqft
     target_beds = target.bedrooms
     target_year = target.year_built
-    target_lot = target.lot_size_sqft
+    # `acreage` is the field the board actually carries for land: 12,917 of the
+    # 14,737 land rows have acreage set and lot_size_sqft null. Reading only
+    # lot_size_sqft meant the acreage band below never even had a target to
+    # compare against on 87.6% of land leads, so it silently never ran.
+    target_lot = target.lot_size_sqft or (
+        float(target.acreage) * 43560.0 if target.acreage and target.acreage > 0 else None
+    )
 
     # Stage 1: same kind only
     kind_pool = _filter_by_kind(sold_pool, target_kind)
@@ -314,13 +402,37 @@ def _pick_3_comps(target: Listing, sold_pool: list[dict]) -> list[dict]:
             pool = city_pool
             match_quality = "city+kind" + ("+geo" if has_geo else "")
 
-    # Stage 3 (LAND ONLY): match by lot acreage band — sqft is meaningless for raw land
+    # Stage 3 (LAND ONLY): match by lot acreage band — sqft is meaningless for raw land.
+    #
+    # This used to read `if lot_filt: pool = lot_filt`, i.e. when NOTHING fell in
+    # the band it silently kept the unfiltered pool and priced the subject off
+    # whatever was left. That is how 0.63-acre building lots came to value an
+    # 86.7-acre tract at $2,769,500: $/acre decays hard with size (board medians
+    # $153,523/ac at 0-1ac vs $22,744/ac at 20-50ac), so a 100x size gap makes
+    # the comp meaningless. Widen the band in steps instead of abandoning it,
+    # and when even the widest band is empty emit NO comps — "not enough comps"
+    # is a true statement; a 100x-mismatched lot comp is not.
+    #
+    # THE WIDENING WAS ITSELF UNBOUNDED BELOW. The two wide steps were written
+    # as ±percentages (2.0 and 4.0) through _within_band, whose lower bound
+    # `target * (1 - pct)` is NEGATIVE past pct=1.0 — so "lot~3x" and "lot~5x"
+    # had a ceiling and no floor, and the 0.63-acre comp walked straight through
+    # the widened step that was supposed to catch it. valuation/calc.py
+    # re-filters before computing an ARV, so the published NUMBER was protected;
+    # these comps are the evidence table the operator reads, and evidence that
+    # does not match the subject is worse than no evidence. The wide steps are
+    # now genuine ratio bands (LAND_LOT_WIDEN_RATIOS), aligned to calc's own.
     if target_kind == "land" and target_lot:
-        lot_filt = [s for s in pool
-                    if s.get("lot_sqft") and _within_band(float(s["lot_sqft"]), target_lot, LAND_LOT_BAND_PCT)]
-        if lot_filt:
-            pool = lot_filt
-            match_quality += "+lot"
+        for band, label in ((LAND_LOT_BAND_PCT, "lot"),) + LAND_LOT_WIDEN_RATIOS:
+            test = _within_band if label == "lot" else _within_ratio_band
+            lot_filt = [s for s in pool
+                        if s.get("lot_sqft") and test(float(s["lot_sqft"]), target_lot, band)]
+            if lot_filt:
+                pool = lot_filt
+                match_quality += f"+{label}"
+                break
+        else:
+            return []
 
     # Stage 4 (NON-LAND): sqft band
     if target_kind != "land" and target_sqft:

@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from foreclosure_scraper.enrichment_data_quality import (
+    NO_CAVEATS_SUMMARY,
     enrich_data_quality,
     _is_synthetic_address,
     _arv_confidence,
@@ -154,7 +155,7 @@ def test_clean_listing_has_empty_flags():
     enrich_data_quality([li])
     dq = li.raw["data_quality"]
     assert dq["flags"] == []
-    assert dq["summary"] == "OK — no data-quality caveats."
+    assert dq["summary"] == NO_CAVEATS_SUMMARY
 
 
 # =============================================================================

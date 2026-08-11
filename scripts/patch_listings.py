@@ -147,9 +147,6 @@ async def main() -> int:
     # Re-run validation gate
     validation_stats = validate_listings(listings)
 
-    # Re-run data-quality flags (after validation, so they reflect any nulls)
-    dq_stats = enrich_data_quality(listings)
-
     # Re-run judgment_amount text-mining (cheap, idempotent)
     ja_stats = enrich_judgment_amount(listings)
 
@@ -169,6 +166,16 @@ async def main() -> int:
     log.info("patch.valuation_recomputed",
              count=len(listings) - valuation_failures,
              failures=valuation_failures)
+
+    # Re-run data-quality flags LAST — after validation so they reflect any
+    # nulls it wrote, and after the calc/grade loop above because every ARV
+    # caveat this writes (arv_unreliable / arv_bid_and_roi_withheld /
+    # arv_no_independent_check / arv_sanity_flag / arv_outlier) is read out of
+    # raw['calc']. This call used to sit above the loop, so this script wrote
+    # docs/listings.json with the fresh valuation and the PREVIOUS run's
+    # caveats — a warning that describes a number that is no longer on the
+    # board. tests/test_enrichment_order.py fails if it moves back.
+    dq_stats = enrich_data_quality(listings)
 
     # Write back
     out_data = [li.model_dump(mode="json") for li in listings]
