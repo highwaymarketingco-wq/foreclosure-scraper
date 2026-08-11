@@ -10,8 +10,22 @@ echo "=== lrcpwa_refresh $(date) ==="
 # Unescaped alternation: pgrep -f uses ERE, where `\|` is a LITERAL pipe (it
 # matched nothing, so this guard silently never fired — double board-writer +
 # git race every Tue/Fri). Matches the working sos_agent_refresh.sh pattern.
+#
+# patch_vision_gemini.py IS A BOARD WRITER AND WAS NOT LISTED. The 09:30 vision
+# job runs up to VISION_MAX_SECONDS=14400 (4h), so it is still holding a board
+# it loaded at 09:33 when this 12:00 job fires. On 2026-08-10 this pass resolved
+# 1,064 parcels, filled 343 county values, tagged 410 absentee owners, wrote
+# 38,500 listings and pushed — and the vision job wrote its 09:33 board back at
+# 13:36 and reverted every one of them. The board still carries the 09:33
+# strategy_fit count, three publishes later. Nothing errored.
+#
+# This guard is still TOCTOU-racy by construction (a real lock belongs around
+# load_board -> mutate -> write_artifact in every wrapper). It closes the
+# recurring daily case; it is not the general fix.
 if pgrep -f "merge_today_sources.py" >/dev/null \
-   || pgrep -f "foreclosure_scraper.__main__|-m foreclosure_scraper|run_local.sh" >/dev/null; then
+   || pgrep -f "foreclosure_scraper.__main__|-m foreclosure_scraper|run_local.sh" >/dev/null \
+   || pgrep -f "patch_vision_gemini.py|daily_api_refresh.py|patch_court_detail.py" >/dev/null \
+   || pgrep -f "recompute_valuation.py|regenerate_dashboard.py|sos_agent_refresh.py" >/dev/null; then
   echo "board-writer active — skipping this noon run"; exit 0
 fi
 /Users/cashhigh/.local/bin/uv run python scripts/lrcpwa_refresh.py || { echo "pass failed rc=$?"; exit 1; }

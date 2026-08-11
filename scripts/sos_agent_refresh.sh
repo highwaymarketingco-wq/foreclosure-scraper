@@ -12,9 +12,14 @@ exec >> "$LOG" 2>&1
 echo "=== sos_agent_refresh $(date) ==="
 
 # one board-writer at a time — skip if a full run / merge / lrcpwa pass is active
+# patch_vision_gemini.py was missing here too — see the note in
+# lrcpwa_refresh.sh. The 09:30 vision job can still be holding a 09:33 board
+# when this 14:00 job fires, and whoever writes last silently reverts the other.
 if pgrep -f "merge_today_sources.py" >/dev/null \
    || pgrep -f "foreclosure_scraper.__main__|-m foreclosure_scraper|run_local.sh" >/dev/null \
-   || pgrep -f "lrcpwa_refresh.py" >/dev/null; then
+   || pgrep -f "lrcpwa_refresh.py" >/dev/null \
+   || pgrep -f "patch_vision_gemini.py|daily_api_refresh.py|patch_court_detail.py" >/dev/null \
+   || pgrep -f "recompute_valuation.py|regenerate_dashboard.py" >/dev/null; then
   echo "board-writer active — skipping this run"; exit 0
 fi
 
