@@ -109,15 +109,40 @@ async def _revision_with_full_galleries(targets: list[Listing]) -> dict:
 
 
 async def main() -> int:
-    listings_path = ROOT / "docs" / "listings.json"
-    run_health_path = ROOT / "docs" / "run_health.json"
+    # THE LOCK, held across read -> re-Vision -> write_artifact. This script
+    # runs for 10-20 minutes and republishes the whole board; a concurrent board
+    # writer silently reverts whichever of the two finishes first, with no error
+    # anywhere. See web_artifact.board_lock.
+    from foreclosure_scraper.web_artifact import BoardLockBusy, board_lock
+    try:
+        with board_lock(ROOT, owner="patch_listings.py"):
+            return await _run()
+    except BoardLockBusy as exc:
+        log.error("patch.board_locked", detail=str(exc))
+        return 1
 
-    if not listings_path.exists():
+
+async def _run() -> int:
+    docs_dir = ROOT / "docs"
+    listings_path = docs_dir / "listings.json"
+    run_health_path = docs_dir / "run_health.json"
+
+    # "exists" is the wrong question: the uncompressed twin is gitignored
+    # (>100MB) and is absent on every fresh clone and every CI checkout, which
+    # is exactly where this workflow runs. The committed .gz is the board there.
+    from foreclosure_scraper.web_artifact import _board_file_present
+    if not _board_file_present(listings_path):
         log.error("patch.no_listings_file", path=str(listings_path))
         return 1
 
-    from foreclosure_scraper.web_artifact import read_board_json
-    raw_data = read_board_json(listings_path)  # falls back to listings.json.gz
+    # read_board_records, NOT read_board_json. read_board_json reads only the
+    # slim listings.json, and every heavy key lives in the index-aligned sidecar
+    # listings_detail.json: comps (33,484 records), vision (13,088), CAMA
+    # (12,952), rent comps (6,401), foreclosure sold comps (5,524). This script
+    # then wrote the board back, so it published a board with all of that
+    # stripped — and _needs_revision() saw an un-visioned board besides.
+    from foreclosure_scraper.web_artifact import read_board_records, write_artifact
+    raw_data = read_board_records(docs_dir)
     log.info("patch.loaded", listings=len(raw_data))
 
     # Hydrate
@@ -177,9 +202,22 @@ async def main() -> int:
     # board. tests/test_enrichment_order.py fails if it moves back.
     dq_stats = enrich_data_quality(listings)
 
-    # Write back
-    out_data = [li.model_dump(mode="json") for li in listings]
-    listings_path.write_text(json.dumps(out_data, indent=2, default=str))
+    # Write back THROUGH write_artifact, not by hand.
+    #
+    # `listings_path.write_text(json.dumps(...))` wrote one file out of six. It
+    # did not regenerate listings.json.gz (the file the dashboard actually
+    # fetches), listings_detail.json / .gz, listings_slim.json.gz,
+    # docs/detail_shards/ or run_meta.json — and docs/listings.json is
+    # gitignored, so on the CI runner this workflow publishes from, the entire
+    # output of the patch was a file git would never commit. The workflow then
+    # pushed run_health.json alone: a health report describing a board it did
+    # not ship. write_artifact emits all six from one payload, which is also the
+    # only way the index-aligned join across them stays true.
+    write_artifact(listings, {"notes": f"patch_listings: {len(listings)} listings "
+                                       f"revalidated, {vision_stats.get('overrides', 0)} "
+                                       f"vision overrides"},
+                   docs_dir=docs_dir)
+    out_data = listings
     log.info("patch.wrote_listings", path=str(listings_path), count=len(out_data))
 
     # Update / merge run_health.json with patch metadata

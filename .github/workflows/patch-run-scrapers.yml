@@ -174,24 +174,56 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      # THIS STEP PUBLISHED NOTHING FOR MONTHS.
+      #
+      # It ran `git add docs/listings.json docs/run_health.json 2>/dev/null ||
+      # true`, twice. docs/listings.json has been gitignored since 4120d30. git
+      # skips the ignored path, stages the rest, and exits non-zero — and the
+      # `2>/dev/null || true` swallowed both the message and the status. So the
+      # workflow committed and pushed run_health.json ALONE: a health report
+      # describing a board it did not ship. It never touched any .gz, the slim
+      # payload, the detail shards or run_meta.json. (Verified in a throwaway
+      # repo.) The cp/mv stash had the same hole — it preserved exactly the two
+      # files it staged across `git reset --hard`, so even once the add was
+      # fixed, the reset would have destroyed everything else.
+      #
+      # scripts/board_payload.sh is now the single definition of what a publish
+      # consists of: board_payload_add stages each path in its own `git add` (so
+      # one bad pathspec cannot void the whole publish), and the stash is a tar
+      # of that same list (so it survives the reset, directory and all).
       - name: Publish patched dashboard data back to repo
         run: |
           set -eu
+          . ./scripts/board_payload.sh
+          # THE ASSUMPTION THE PAYLOAD LIST RESTS ON, asserted rather than
+          # assumed. docs/listings.json is gitignored (it exceeds GitHub's
+          # 100MB/file limit and Pages excludes it), which is precisely why
+          # board_payload_paths omits it and ships the .gz twin instead. Naming
+          # an ignored path in `git add` makes git skip it, stage the rest and
+          # exit non-zero — and with `2>/dev/null || true` around it, that is how
+          # this step used to publish run_health.json alone. If it ever stops
+          # being ignored, the publish list is wrong and someone must decide
+          # what to do with a >100MB file before the next push.
+          git check-ignore -q docs/listings.json || {
+            echo "::error::docs/listings.json is no longer gitignored — the publish list in scripts/board_payload.sh needs revisiting"
+            exit 1
+          }
+          # Fail the job if a required payload would 404 behind Jekyll's
+          # prefix-matching exclude — better to keep the last good deploy than
+          # to push data the site cannot serve.
+          python3 scripts/check_pages_publish.py
           git config user.name "foreclosure-scraper-bot"
           git config user.email "actions@github.com"
           git fetch origin "${{ github.ref_name }}" || true
-          # Stash listings so a hard reset doesn't blow them away.
           mkdir -p /tmp/published
-          cp docs/listings.json /tmp/published/listings.json
-          [ -f docs/run_health.json ] && cp docs/run_health.json /tmp/published/run_health.json
+          board_payload_stash "$PWD" /tmp/published/payload.tar
           git reset --hard "origin/${{ github.ref_name }}"
-          mv /tmp/published/listings.json docs/listings.json
-          [ -f /tmp/published/run_health.json ] && mv /tmp/published/run_health.json docs/run_health.json
-          if git diff --quiet docs/; then
-            echo "No changes in docs/ vs latest origin — skipping commit"
+          board_payload_unstash "$PWD" /tmp/published/payload.tar
+          board_payload_add "$PWD"
+          if git diff --cached --quiet; then
+            echo "No payload changes vs latest origin — skipping commit"
             exit 0
           fi
-          git add docs/listings.json docs/run_health.json 2>/dev/null || true
           git commit -m "patch: re-run scrapers ($(date -u +%Y-%m-%d-%H%M))" || {
             echo "Nothing to commit"
             exit 0
@@ -204,17 +236,15 @@ jobs:
               exit 0
             fi
             echo "Push failed (attempt $attempt) — re-syncing with origin"
-            cp docs/listings.json /tmp/published/listings.json
-            [ -f docs/run_health.json ] && cp docs/run_health.json /tmp/published/run_health.json
+            board_payload_stash "$PWD" /tmp/published/payload.tar
             git fetch origin "${{ github.ref_name }}"
             git reset --hard "origin/${{ github.ref_name }}"
-            mv /tmp/published/listings.json docs/listings.json
-            [ -f /tmp/published/run_health.json ] && mv /tmp/published/run_health.json docs/run_health.json
-            if git diff --quiet docs/; then
+            board_payload_unstash "$PWD" /tmp/published/payload.tar
+            board_payload_add "$PWD"
+            if git diff --cached --quiet; then
               echo "After re-sync: no diff vs latest origin — done"
               exit 0
             fi
-            git add docs/listings.json docs/run_health.json 2>/dev/null || true
             git commit -m "patch: re-run scrapers ($(date -u +%Y-%m-%d-%H%M))" || true
             sleep $((attempt * 3))
           done

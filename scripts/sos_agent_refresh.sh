@@ -11,17 +11,18 @@ LOG="/tmp/sos_agent_refresh.log"
 exec >> "$LOG" 2>&1
 echo "=== sos_agent_refresh $(date) ==="
 
-# one board-writer at a time — skip if a full run / merge / lrcpwa pass is active
-# patch_vision_gemini.py was missing here too — see the note in
-# lrcpwa_refresh.sh. The 09:30 vision job can still be holding a 09:33 board
-# when this 14:00 job fires, and whoever writes last silently reverts the other.
-if pgrep -f "merge_today_sources.py" >/dev/null \
-   || pgrep -f "foreclosure_scraper.__main__|-m foreclosure_scraper|run_local.sh" >/dev/null \
-   || pgrep -f "lrcpwa_refresh.py" >/dev/null \
-   || pgrep -f "patch_vision_gemini.py|daily_api_refresh.py|patch_court_detail.py" >/dev/null \
-   || pgrep -f "recompute_valuation.py|regenerate_dashboard.py" >/dev/null; then
-  echo "board-writer active — skipping this run"; exit 0
+# ONE BOARD WRITER AT A TIME — a real lock held across the whole
+# load_board -> mutate -> write_artifact -> commit span, replacing the
+# hand-maintained pgrep list that used to be here. That list was TOCTOU-racy by
+# construction and was missing patch_vision_gemini.py, which is how a 09:30
+# vision job silently reverted the 12:00 lrcpwa pass on 2026-08-10. See the
+# note in lrcpwa_refresh.sh and scripts/board_lock.sh.
+. "$ROOT/scripts/board_lock.sh"
+. "$ROOT/scripts/board_payload.sh"
+if ! board_lock_acquire "$ROOT" "sos_agent_refresh.sh"; then
+  echo "board-writer active ($(board_lock_holder)) — skipping this run"; exit 0
 fi
+trap 'board_lock_release' EXIT INT TERM
 
 export SOS_AGENT=1
 export SOS_AGENT_MAX_CHECK="${SOS_AGENT_MAX_CHECK:-40}"
@@ -29,42 +30,36 @@ export SOS_AGENT_BREAKER_FAILS="${SOS_AGENT_BREAKER_FAILS:-6}"
 /Users/cashhigh/.local/bin/uv run python scripts/sos_agent_refresh.py || { echo "pass failed rc=$?"; exit 1; }
 
 # commit ONLY if the board data changed (not run_meta's timestamp) — a walled
-# run rewrites listings.json byte-identical and must not commit.
-# .gz twins only — the uncompressed listings.json/.detail.json are gitignored
-# (over GitHub's 100MB limit; load_board rebuilds from the .gz). The board-change
-# gate now checks the .gz (deterministic gzip: identical data -> identical bytes).
-# docs/listings_slim.json.gz is the payload PHONES fetch. See the note in
-# lrcpwa_refresh.sh: publishing the fat board without it strands phones on a
-# stale slim while desktop shows current data. Gate on "exists OR tracked" so a
-# deletion (the emitter's failure path) can still be staged.
-SLIM=()
-if [ -f docs/listings_slim.json.gz ] \
-   || git ls-files --error-unmatch docs/listings_slim.json.gz >/dev/null 2>&1; then
-  SLIM=(docs/listings_slim.json.gz)
-fi
-# docs/detail_shards/ is the per-lead detail payload phones fetch, emitted by the
-# same write_artifact() call. A DIRECTORY pathspec behaves like a file here:
-# absent AND untracked exits 128 and stages nothing at all, while `git add` on a
-# tracked directory stages additions, modifications AND deletions inside it.
-SHARDS=()
-if [ -d docs/detail_shards ] \
-   || git ls-files --error-unmatch docs/detail_shards >/dev/null 2>&1; then
-  SHARDS=(docs/detail_shards)
-fi
-git add docs/listings.json.gz docs/listings_detail.json.gz "${SLIM[@]}" "${SHARDS[@]}"
-# detail_shards joins the board-changed gate rather than riding on it. The gate
-# exists to stop a Cloudflare-walled run making an empty commit, and shards are a
-# pure function of the same payload — so a walled run leaves them byte-identical
-# too and still will not commit. But the FIRST run after the shards ship finds an
-# unchanged board and a brand-new shard directory, and without this the `git
-# reset -q` below would throw the shards away every time until the board happened
-# to move.
-if ! git diff --cached --quiet -- docs/listings.json.gz docs/listings_detail.json.gz docs/detail_shards; then
-  git add docs/run_meta.json
+# run rewrites listings.json byte-identical and must not commit. The .gz is what
+# the gate reads (deterministic gzip: identical data -> identical bytes).
+#
+# The payload list and its "exists OR is already tracked" rules live in
+# scripts/board_payload.sh now — five publishers were each maintaining a copy.
+board_payload_check "$ROOT" || true   # loud, non-fatal: see board_payload.sh
+board_payload_add "$ROOT"
+
+# THE CHANGE GATE MUST COVER EVERYTHING THE `git reset -q` BELOW CAN THROW AWAY.
+# It listed board/detail/shards only, while the reset discards ALL of it — so a
+# run whose only effect was on docs/listings_slim.json.gz (the payload phones
+# fetch) staged the fresh slim, was told "no change", reset it, and never
+# published it. board_payload_changed watches every staged path except
+# run_meta.json (whose run_time moves every write, which would make the gate
+# fire always and defeat its purpose).
+if board_payload_changed "$ROOT"; then
   git commit -q -m "Scheduled SOS pass: +NC entity registered-agent contacts
 
-Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>" && git push 2>&1 | tail -1
-  echo "committed + pushed"
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
+  # REBASE BEFORE PUSH — see the note in lrcpwa_refresh.sh. A bare push that
+  # loses a race leaves main diverged, and then every later run sees an empty
+  # staged diff and silently stops publishing.
+  git pull --rebase --autostash origin main >/dev/null 2>&1 || true
+  # NOT `git push … | tail -1`: a pipeline's status is the last command's.
+  if PUSH_OUT=$(git push origin main 2>&1); then
+    echo "committed + pushed"
+  else
+    echo "!! commit made locally but PUSH FAILED — main has diverged, publishing is stopped"
+    printf '%s\n' "$PUSH_OUT" | tail -3
+  fi
 else
   echo "no new contacts (sosnc.gov may be rate-limited) — no commit"
   git reset -q

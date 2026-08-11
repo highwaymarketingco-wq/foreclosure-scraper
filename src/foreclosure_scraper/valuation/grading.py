@@ -80,6 +80,20 @@ from . import calc as _calc
 # CONTRADICTED — another record, or the arithmetic itself, disputes the number
 # that shipped. Board counts are leads that KEEP an arv_expected.
 ARV_FLAGS_CONTRADICTED = frozenset({
+    # The county figure this ARV is anchored to is stamped on MANY parcels, so
+    # it is not an appraisal of this property. enrichment_board_qa emits it
+    # (SHARED_ANCHOR_FLAG). One Lincoln County value, 299,453.0, sits on 1,433
+    # leads across 1,354 distinct parcel_ids and drove $320,145,300 of max bids;
+    # the 58 of those leads carrying their own assessed_value span $3,582 to
+    # $1,491,777, a 416x spread under a constant "market value".
+    #
+    # Contradicted, not weak: the anchor is not merely unverified, it is
+    # demonstrably describing something else. Wired here during integration
+    # review — board_qa was emitting it and NOTHING classified it, so the
+    # detection worked and no money was gated by it. That is the same
+    # writer-with-no-reader failure that has produced five separate silent
+    # defects in this system; the flag is only worth what reads it.
+    "anchor_shared_across_parcels",
     # ARV is opening_bid x 2.4 (or x 1.5 on land), so bid/ARV is the constant
     # 0.4167 and every figure below is the bid restated. 938 leads.
     "bid_proxy_arv",
@@ -104,6 +118,32 @@ ARV_FLAGS_CONTRADICTED = frozenset({
     # nothing. Listed so the set is complete and stays correct if that changes.
     "arv_above_anchor_extreme",
     "ppsf_ceiling",
+    # calc.ARV_FLAG_PROXY_CEILING. A proxy tier (bid x2.4, bid x1.5, tax x1.25,
+    # market-value-as-Zestimate, sale-to-assessed) produced a number above
+    # calc.MAX_PROXY_ARV and calc REFUSED it, so no ARV is published — same
+    # shape as the two above. It is in this set for the reason those are: the
+    # refusal used to emit nothing at all, `arv_trust` scored it "ok", and 21
+    # leads went on to publish $40,194,700 of equity off the exact figures calc
+    # had just rejected (enrichment_equity falls back to market_value as its own
+    # ARV when calc published none). The leak went AROUND this gate; naming the
+    # refusal in the gate's own vocabulary is what closes it.
+    "arv_proxy_above_ceiling",
+    # calc.ARV_FLAG_ABOVE_ASK. The ARV is more than 1.6x the price the seller is
+    # publicly asking on a RETAIL land listing (calc.SELLER_ASK_SOURCES).
+    # Contradicted, not weak, and the distinction is the source: on an auction
+    # row a 7x gap between opening bid and ARV is the flip thesis, but here the
+    # parcel is on the open market at that price, so an ARV several times it is
+    # the comps disagreeing with an actual transactable price. 83 leads carry an
+    # ARV >= 1.6x their ask; 48 published a max bid ABOVE the asking price,
+    # $13,844,500 of them — including Lot 28 Big Hill Road, Transylvania NC:
+    # listed $120,000, board ARV $834,700, max bid $626,000, ROI 342.5%, GREAT.
+    "arv_above_list_price",
+    # calc.ARV_FLAG_LAND_SQFT. The county classes the parcel LAND and the record
+    # also carries a dwelling-sized living_sqft, off which this ARV was priced.
+    # Two records about one parcel that cannot both be right — the definition of
+    # this set. 315 leads; 227 published a max bid ($56,935,000), 89 of them
+    # with no other flag at all.
+    "arv_land_sqft_mismatch",
     # The county/sale floor multiplied the comp ARV by >2.5x. calc honoured it
     # but says "confirm the assessor record belongs to this property". 374.
     "floor_raise_large",
@@ -178,6 +218,48 @@ ARV_FLAGS_WEAK_EVIDENCE = frozenset({
     # Blanking the money here would delete a defensible answer; the verdict
     # (a 5%-margin GREAT/PASS call) is the part this pool cannot support.
     "land_comp_spread",
+    # calc.ARV_FLAG_TIER_CEILING. One ARV TIER produced a number above
+    # calc.MAX_PROXY_ARV and was refused; a LATER tier carried the lead. Exactly
+    # the shape of `land_comps_rejected` above and classified the same way: the
+    # refusal is the guard WORKING, and the number that shipped belongs to a
+    # different tier and is judged on ITS flags. What this flag says is "the
+    # evidence you might expect behind this figure was thrown away", which is a
+    # disclosure, not a contradiction of the figure. (Before it existed the two
+    # LAND versions of this refusal wrote nothing at all — not even a note — and
+    # simply fell through to the next tier in silence.)
+    "arv_tier_refused_ceiling",
+    # calc.ARV_FLAG_COUNTY_DISAGREE. Two of the county's own 100%-basis figures
+    # (market_value / assessor appraised / tax_value) disagree past the threshold
+    # measured for THAT PAIR — 3x where an assessor appraisal is involved (those
+    # agree exactly on ~95% of leads), 10x for market-value-vs-tax-roll (which
+    # breaks 3x on 11% of leads by field semantics alone, tax_value often being
+    # land-only). 315 leads. Weak, deliberately: nothing here impugns the
+    # ARV, it says the record the ARV was CROSS-CHECKED against is one of two
+    # that cannot both describe this parcel, and that `_anchor_value` picked
+    # between them by field order rather than by evidence. Blanking the money on
+    # 1,282 leads over a disagreement between two records neither of which is
+    # the ARV would be gutting the normal case; what it costs is the verdict,
+    # which turns on a 5% margin and cannot survive a 3x ambiguity in its own
+    # reference point.
+    "county_values_disagree",
+    # calc.MAX_BID_NO_REHAB_FLAG. The lead has no living_sqft, so no rehab tier
+    # could be applied, so `rehab_buy` was 0 and `max_bid_70` collapsed to a flat
+    # 0.75 x ARV with nothing taken out for the work. 9,190 published bids;
+    # 1,833 of them clear $250,000 and total $740,267,300.
+    #
+    # THIS FLAG IS NOT A CLAIM ABOUT THE ARV. It lives in `arv_flags` because
+    # that is one of the three lists docs/dashboard.js's `rehabTrust()` reads for
+    # this literal, and a flag the client cannot see is not a flag. Classified
+    # WEAK explicitly, and the classification is doing real work in both
+    # directions: it must never reach ARV_FLAGS_CONTRADICTED (that would blank
+    # the max bid on 9,190 leads — the bid IS the thing being captioned, and
+    # deleting it would remove most of the board's economics over a term that is
+    # genuinely unknowable without a building size), and it must not be left
+    # unclassified either, because the "unrecognised flags fail safe to weak"
+    # default would reach the same place by accident rather than on purpose.
+    # What it costs is the deal verdict, on 15 leads — a GREAT/PASS call turns on
+    # a 5% margin and cannot survive an undeducted repair bill.
+    "rehab_not_deducted",
     # The opening bid is under 5% of the ARV — an upset/placeholder figure, not
     # the real acquisition cost (see _anomaly_flags). WEAK, not contradicted,
     # because nothing here impugns the ARV: `max_bid_70` is 0.70 x ARV - rehab

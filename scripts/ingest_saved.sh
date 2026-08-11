@@ -19,18 +19,21 @@ notify(){ osascript -e "display notification \"$1\" with title \"Court Pages\"" 
 cd "$REPO" 2>/dev/null || { osascript -e 'display alert "Court Pages" message "Could not find ~/foreclosure-scraper."' >/dev/null 2>&1; exit 1; }
 mkdir -p "$DROP" logs
 
-# 1) NEVER write the board while a full run is writing it.
-if pgrep -f "run_local.sh|-m foreclosure_scraper|merge_today_sources" >/dev/null 2>&1; then
-  notify "A full run is in progress — I won't touch the board now. Try again after it finishes."
+# NEVER write the board while ANY other board writer holds it — and never run
+# two ingests at once. One lock now does both jobs.
+#
+# What was here was a pgrep list plus a private .ingest.lock. The pgrep was
+# TOCTOU-racy (a check before the critical section cannot see a writer that
+# starts after it) and it did not list the daily vision job, the noon lrcpwa
+# pass or the 2pm SOS pass — each of which holds a loaded board for minutes to
+# hours and would silently revert whatever this ingest added. The private lock
+# only ever excluded another copy of this same script. See scripts/board_lock.sh.
+. "$REPO/scripts/board_lock.sh"
+if ! board_lock_acquire "$REPO" "ingest_saved.sh"; then
+  notify "Another board job ($(board_lock_holder)) is running — I won't touch the board now. Try again after it finishes."
   exit 0
 fi
-# 2) NEVER run two ingests at once (mkdir is atomic).
-LOCK="$REPO/.ingest.lock"
-if ! mkdir "$LOCK" 2>/dev/null; then
-  notify "An ingest is already running."
-  exit 0
-fi
-trap 'rmdir "$LOCK" 2>/dev/null' EXIT
+trap 'board_lock_release' EXIT INT TERM
 
 LOG="logs/ingest-saved.log"
 { echo; echo "=== ingest_saved $(date) ==="; } >>"$LOG"

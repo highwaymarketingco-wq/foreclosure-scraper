@@ -550,7 +550,16 @@ async function loadBoardStreaming(bust, onProgress, board) {
     head = merged;
   }
   const isGzip = head.length > 1 && head[0] === 0x1f && head[1] === 0x8b;
-  if (isGzip && typeof DecompressionStream === "undefined") throw new Error("NO_DECOMPRESSION");
+  if (isGzip && typeof DecompressionStream === "undefined") {
+    // Release the body before unwinding. This throw is CAUGHT (:714 re-throws
+    // it, :732 renders the "your browser cannot inflate this" message), so the
+    // page keeps running afterwards — and a reader that was never cancelled
+    // leaves the response body locked and its socket held open for the life of
+    // the document. The one browser family that lands here (older Safari, no
+    // DecompressionStream) is also the one least able to spare the connection.
+    try { await reader.cancel("NO_DECOMPRESSION"); } catch (e) { /* already gone */ }
+    throw new Error("NO_DECOMPRESSION");
+  }
 
   let lastByteAt = Date.now();
   const watchdog = setInterval(() => {
@@ -1172,17 +1181,342 @@ function updateStageCounts() {
   });
 }
 
-// The search blob: 12 fields joined + lowercased, for every record, on every
+// ===========================================================================
+// WHICH RECORD IS THIS, AND WHERE IS IT? — three small gates, one place each.
+//
+// The board's plumbing is sound: every payload joins on every record. What it
+// could not do was notice when an INPUT record describes a different property
+// from the one the row is about. Three of those show up on screen, and each had
+// exactly one honest answer available in data the slim board already carries:
+//
+//   geoTrust()    raw.geo_imprecise — the coordinates are a city/county
+//                 centroid, so anything drawn or measured from them is about a
+//                 landmark 1-2 miles away, not this parcel. 15,608 of 38,500.
+//   ownerNames()  three owner strings exist per lead and 16,512 leads have two
+//                 that disagree. One of them was printed, a different one was
+//                 exported and skip-traced, and only the printed one was
+//                 searchable.
+//   placeOfRecord() `city` sometimes holds the COUNTY name (4,347 leads), which
+//                 is a fine label and a broken people-search query.
+//
+// All three read only slim-allowlisted fields, so a phone gets the same answer
+// as a desktop and no shard has to land first.
+// ===========================================================================
+
+/** `{}` is not data. An allowlisted block the source did not have ships as an
+ *  empty object, and `if (block)` says yes to it — which is how mobile painted
+ *  section headers with nothing underneath while desktop hid them. */
+function _nonEmpty(v) {
+  if (!v || typeof v !== "object") return false;
+  if (Array.isArray(v)) return v.length > 0;
+  for (const k in v) if (Object.prototype.hasOwnProperty.call(v, k)) return true;
+  return false;
+}
+
+/** Escape a string for use as HTML text. `_attr` is the attribute-context twin. */
+function _txt(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/**
+ * Is this lead's position real?
+ *
+ *   {imprecise:false}                       — coordinates came from the address
+ *   {imprecise:true, kind, why, radiusMi}   — they did not
+ *
+ * The engine sets raw.geo_imprecise when it had to fall back to a city or
+ * county centroid ("centroid_snap", 15,593 leads) or when the geocode landed
+ * outside the county bounding box ("out_of_bbox", 15). Both mean the same thing
+ * to anything that draws a pin or measures a distance: the point is a landmark,
+ * not the property. calc already refuses to trust comps found this way
+ * (geo_imprecise_comps), but nothing on the SCREEN did.
+ */
+function geoTrust(l) {
+  const kind = l && l.raw && l.raw.geo_imprecise;
+  if (!kind) return _GEO_OK;
+  if (l._geoTrust !== undefined) return l._geoTrust;
+  const out = kind === "out_of_bbox"
+    ? { imprecise: true, kind, radiusMi: 5,
+        why: "the geocode landed outside this county's boundary, so the point below is wrong by an unknown amount" }
+    : { imprecise: true, kind, radiusMi: 2,
+        why: "no street-level geocode was found, so these coordinates are the centre of the city or county — typically 1-2 miles from the property" };
+  return _memo(l, "_geoTrust", out);
+}
+const _GEO_OK = { imprecise: false, kind: "", why: "", radiusMi: 0 };
+
+/**
+ * Every owner string this lead carries, deduped, best first.
+ *
+ *   {primary, all:[{name, src}], conflict:bool}
+ *
+ * There are THREE of them and they are written by three different joins:
+ *   l.owner_name            the record's own owner (CSV column, skip-trace)
+ *   raw.gis.owner           the county parcel row this lead joined to
+ *   raw.owner_mailing.owner the mailing-address resolver's answer
+ * On the live board 21,140 leads carry all three, and 16,512 leads have at
+ * least two that disagree — 510 Kings Rd, Cleveland NC is "SERVICEMAC LLC" in
+ * one and "SC HOMES LP" in another. That is not cosmetic: a disagreement is the
+ * board telling you the parcel join may be wrong, and it was being hidden by
+ * printing one string and skip-tracing another.
+ *
+ * `primary` is l.owner_name when present, because that is the field the CSV
+ * exports and the people-search link already used — changing which name gets
+ * searched would be a silent behaviour change on 32,330 leads. What changes is
+ * that the panel now PRINTS that name, and prints the others next to it.
+ *
+ * (raw.owner_mailing.owner is desktop-only: web_artifact._SLIM_RAW allowlists
+ * owner_mailing as ("mailing","mail_state","absentee","out_of_state"), so it is
+ * absent on a phone. Read defensively; never require it.)
+ */
+function ownerNames(l) {
+  if (!l || typeof l !== "object") return _OWNERS_NONE;
+  if (l._owners !== undefined) return l._owners;
+  const raw = l.raw || {};
+  const gis = _nonEmpty(raw.gis) ? raw.gis : {};
+  const om = _nonEmpty(raw.owner_mailing) ? raw.owner_mailing : {};
+  const cand = [
+    { name: String(l.owner_name || "").trim(), src: "record" },
+    { name: String(gis.owner || "").trim(), src: "county parcel record" },
+    { name: String(om.owner || "").trim(), src: "mailing record" },
+  ].filter((x) => x.name);
+  if (!cand.length) return _memo(l, "_owners", _OWNERS_NONE);
+  const seen = Object.create(null);
+  const all = [];
+  for (const c of cand) {
+    const k = _ownerKey(c.name);
+    if (!k || seen[k]) continue;
+    seen[k] = 1;
+    all.push(c);
+  }
+  // LISTING A SECOND NAME AND WARNING ABOUT IT ARE TWO DIFFERENT DECISIONS.
+  //
+  // `conflict` used to be `all.length > 1`, which fired on 16,258 leads — and
+  // 3,584 of those are the SAME owner written two ways. Measured in the browser
+  // over all 38,500:
+  //   "Gibson Robert N &"          vs "Gibson Robert N & Gibson Barbara W"
+  //   "TABARES JOSE L"             vs "TABARES JOSE L & TABARES IRINA"
+  //   "CLC Independent Living, Inc." vs "C L C INDEPENDENT LIVING INC"
+  // One record simply carries the spouse, the heirs, or the punctuation the
+  // other dropped. Putting "these sources name different owners — check the
+  // parcel before you spend money on this one" on those is the wallpaper
+  // failure: 22% of the warnings would have been false, and a warning that is
+  // wrong a fifth of the time stops being read on the 12,674 where it is real.
+  //
+  // So `all` still carries every distinct spelling — the longer one is usually
+  // the better skip-trace query and is worth showing — while `conflict` is true
+  // only when two names cannot be reconciled: neither is a substring of the
+  // other once punctuation is removed, and neither one's word set contains the
+  // other's. That is the case that actually means "the parcel join may be
+  // wrong".
+  let conflict = false;
+  for (let i = 0; i < all.length && !conflict; i++) {
+    for (let j = i + 1; j < all.length; j++) {
+      if (!_ownersAgree(all[i].name, all[j].name)) { conflict = true; break; }
+    }
+  }
+  const out = { primary: all[0].name, primarySrc: all[0].src, all, conflict };
+  return _memo(l, "_owners", out);
+}
+
+/** Punctuation- and space-free form, for deduping spellings of one name. */
+function _ownerKey(s) {
+  return String(s || "").toUpperCase().replace(/[^A-Z0-9]+/g, "");
+}
+
+/** Words of 2+ chars, uppercased. "L" and "&" carry no identity. */
+function _ownerTokens(s) {
+  const out = Object.create(null);
+  const parts = String(s || "").toUpperCase().split(/[^A-Z0-9]+/);
+  let n = 0;
+  for (let i = 0; i < parts.length; i++) {
+    if (parts[i].length > 1 && !out[parts[i]]) { out[parts[i]] = 1; n++; }
+  }
+  return { set: out, size: n };
+}
+
+/**
+ * Do two owner strings describe the same owner? Deliberately generous: the
+ * caller uses a NO here to tell someone their parcel join may be wrong, so a
+ * false alarm costs more than a missed one.
+ */
+function _ownersAgree(a, b) {
+  const ka = _ownerKey(a), kb = _ownerKey(b);
+  if (!ka || !kb) return true;                                  // nothing to compare
+  if (ka === kb || ka.indexOf(kb) !== -1 || kb.indexOf(ka) !== -1) return true;
+  const ta = _ownerTokens(a), tb = _ownerTokens(b);
+  if (!ta.size || !tb.size) return true;
+  const sub = (x, y) => { for (const k in x.set) if (!y.set[k]) return false; return true; };
+  return sub(ta, tb) || sub(tb, ta);
+}
+const _OWNERS_NONE = { primary: "", primarySrc: "", all: [], conflict: false };
+
+/**
+ * Where to tell a people-search this person lives.
+ *
+ *   {q, label, trusted}
+ *
+ * The old query was `${l.city} ${l.state}`, and on 4,347 leads `city` holds the
+ * COUNTY name — all 3,309 counties_sc.spartanburg_vacant rows plus 298 Pickens
+ * and 174 national.distressed among them. TruePeopleSearch then searched a
+ * county as if it were a town.
+ *
+ * ZIP first, whenever there is one (16,470 leads): a ZIP is unambiguous and is
+ * a better query than a city name even when the city name is right, so this is
+ * not a special case bolted on for the broken rows.
+ *
+ * When there is no ZIP and city === county the city cannot be distinguished
+ * from a county label, so the query falls back to the STATE and says so.
+ * Deliberately NOT a "is this a real city" list: Spartanburg SC, Pickens SC and
+ * Cleveland NC are all genuine towns inside like-named counties, so a
+ * name-shaped test cannot tell a correct row from a broken one — 836 of the
+ * 4,347 have a ZIP and get an exact query anyway; the other 3,511 get a wider
+ * search rather than a wrong one.
+ */
+function placeOfRecord(l) {
+  const zip = String((l && l.zip_code) || "").trim();
+  const city = String((l && l.city) || "").trim();
+  const county = String((l && l.county) || "").trim();
+  const state = String((l && l.state) || "").trim();
+  if (zip) return { q: zip, label: zip, trusted: true, why: "" };
+  const cityIsCounty = city && county && city.toLowerCase() === county.toLowerCase();
+  if (city && !cityIsCounty) return { q: (city + " " + state).trim(), label: (city + ", " + state).trim(), trusted: true, why: "" };
+  if (cityIsCounty) {
+    return { q: state, label: state, trusted: false,
+      why: `the city field on this lead holds "${city}", which is also the county name and may be a county label rather than a town — `
+         + `searching the whole state instead of a place that might not exist` };
+  }
+  return { q: state, label: state || "(nowhere)", trusted: false,
+    why: "this lead has no city and no ZIP, so the search is state-wide" };
+}
+
+/** The people-search URL for a lead, or "" when there is no name to search. */
+/**
+ * One searchable person out of an owner string that may name several.
+ *
+ * ownerNames() reconciles owner_name / gis.owner / owner_mailing.owner — three
+ * SOURCES for the same owner. It does not split a SINGLE string that already
+ * holds two people, and county record joins produce those constantly:
+ * "WILLIAMS, DENNIS P;WILLIAMS, KELLY D". That whole string was being URL-
+ * encoded as one `name=`, and a people search for it matches nobody — the
+ * button looked live and silently returned nothing. ~706 leads board-wide.
+ *
+ * Only ";" is split. It is a record-join separator and never part of a name.
+ * " & " is deliberately NOT split, even though it appears on ~3,664 leads:
+ * "Gibson Robert N & Gibson Barbara W" is how one county renders a married
+ * couple on a single deed, and "Smith & Sons LLC" is one entity. Splitting
+ * there would break more searches than it fixed.
+ */
+function primarySearchName(name) {
+  const s = String(name || "");
+  const i = s.indexOf(";");
+  return (i === -1 ? s : s.slice(0, i)).trim();
+}
+
+function skipTraceUrl(l) {
+  const o = ownerNames(l);
+  if (!o.primary) return "";
+  const who = primarySearchName(o.primary);
+  if (!who) return "";
+  const p = placeOfRecord(l);
+  return "https://www.truepeoplesearch.com/results?name=" + encodeURIComponent(who)
+    + "&citystatezip=" + encodeURIComponent(p.q);
+}
+
+/**
+ * Was a rehab cost actually deducted from the max bid?
+ *
+ *   {state:"deducted"} — rehab_expected > 0, nothing to say
+ *   {state:"land"}     — rehab is 0 because it is raw land. CORRECT; say nothing.
+ *   {state:"unknown"}  — no rehab figure existed and the bid deducted nothing,
+ *                        so max_bid_70 is an upper bound, not a bid.
+ *
+ * Measured on the live board: of 21,847 published max bids, 2,594 deduct a real
+ * rehab, 10,063 are land (rehab_tier "land", rehab 0 — right), and 9,190 have
+ * rehab_expected == null with rehab_tier "unknown" — the bid was computed as if
+ * the house needed no work. Those 9,190 are the ones a bidder must see.
+ *
+ * Driven by calc.rehab_expected + calc.rehab_tier, both inside `"calc": "*"` in
+ * web_artifact._SLIM_RAW, so it works on today's published board with no
+ * republish. A named flag from the valuation side is ALSO honoured when it
+ * arrives — see _REHAB_FLAGS.
+ */
+const _REHAB_FLAGS = { rehab_not_deducted: 1, rehab_unknown_zeroed: 1, max_bid_no_rehab: 1 };
+function rehabTrust(l) {
+  const c = (l && l.raw && l.raw.calc) || {};
+  const r = c.rehab_expected;
+  if (typeof r === "number" && r > 0) return _REHAB_DEDUCTED;
+  const flagged = (Array.isArray(c.arv_flags) && c.arv_flags.some((f) => _REHAB_FLAGS[f]))
+    || (Array.isArray(l && l.raw && l.raw.qa_flags) && l.raw.qa_flags.some((f) => _REHAB_FLAGS[f]))
+    || (l && l.raw && l.raw.data_quality && Array.isArray(l.raw.data_quality.flags)
+        && l.raw.data_quality.flags.some((f) => _REHAB_FLAGS[f]));
+  const tier = String(c.rehab_tier || "").toLowerCase();
+  if (tier === "land" && !flagged) return _REHAB_LAND;
+  if (r == null || flagged) return _REHAB_UNKNOWN;
+  return _REHAB_LAND;   // rehab_expected === 0 with a named non-land tier
+}
+/**
+ * Was the max bid CAPPED at the seller's published asking price?
+ *
+ * calc.py now floors max_bid_70 at the list price on the two seller-ask
+ * sources, because a "max viable bid" above a price anyone can just pay is not
+ * a bid. It writes no flag for this — only a note — so the note prefix IS the
+ * interface. Literal, verbatim from calc.py:
+ *     "Max bid capped at the $60,000 asking price (the 70%-rule figure came
+ *      out $62,100)."
+ * Returns the note or "".
+ *
+ * This is deliberately NOT routed through arvTrust: it is not a reason to
+ * distrust anything. The ARV is fine, the arithmetic is fine, and the bid on
+ * screen is the RIGHT number — it just is not the 70%-rule output, and a reader
+ * who reconciles the two by hand deserves to know why they differ. Amber
+ * caveat styling would say "doubt this"; it gets plain muted styling that says
+ * "this was capped, here is by how much".
+ */
+const _BID_CAP_NOTE = /^Max bid capped at the \$/i;
+function bidCapNote(l) {
+  const c = (l && l.raw && l.raw.calc) || {};
+  const notes = Array.isArray(c.notes) ? c.notes : [];
+  for (let i = 0; i < notes.length; i++) {
+    if (typeof notes[i] === "string" && _BID_CAP_NOTE.test(notes[i])) return notes[i];
+  }
+  return "";
+}
+
+const _REHAB_DEDUCTED = { state: "deducted" };
+const _REHAB_LAND = { state: "land" };
+const _REHAB_UNKNOWN = { state: "unknown" };
+// One sentence, two contexts. REHAB_UNKNOWN_NOTE is the tooltip/CSV wording;
+// REHAB_UNKNOWN_BODY is the same fact as the continuation of a bolded lead-in
+// ("† No rehab was deducted.") so the panel does not read "The engine the
+// engine never established one" — which is exactly what deriving one from the
+// other by regex produced, and what rendering it in a browser caught.
+const REHAB_UNKNOWN_BODY = "The engine never established a repair cost for this property, so the "
+  + "70% rule subtracted $0. Treat the figure as a ceiling before repairs, not a number to bid.";
+const REHAB_UNKNOWN_NOTE = "No rehab cost was deducted from this bid. " + REHAB_UNKNOWN_BODY;
+
+// The search blob: 15 fields joined + lowercased, for every record, on every
 // keystroke. Memoised on FULL. NOT memoised on LEAN — ~150 UTF-16 characters
 // × 38,500 is ~12 MB held permanently, and RAM is the exact resource the phone
 // runs out of; the 250 ms debounce already removes the per-keystroke cost.
 const MEMO_BLOB = !LEAN;
 function searchBlob(l) {
   if (l._blob !== undefined) return l._blob;
+  const raw = l.raw || {};
+  // ALL THREE owner strings, not just the county one.
+  //
+  // This indexed raw.gis.owner and never l.owner_name, so 2,392 leads carried
+  // an owner name that is a CSV column, is what the skip-trace link searches,
+  // and is what the placeholder ("address, owner, case #...") promises — and
+  // typing it returned nothing. owner_mailing.owner is desktop-only (not in the
+  // slim allowlist) and is included anyway: on desktop it is 25,142 more names
+  // worth finding, and on a phone it is an empty string that costs a join.
   const b = [
     l.street_address, l.city, l.county, l.state, l.zip_code, l.case_number,
     l.plaintiff, l.defendant, l.trustee, l.source, l.parcel_id,
-    (l.raw && l.raw.gis && l.raw.gis.owner) || "",
+    l.owner_name,
+    (_nonEmpty(raw.gis) && raw.gis.owner) || "",
+    (_nonEmpty(raw.owner_mailing) && raw.owner_mailing.owner) || "",
   ].join(" ").toLowerCase();
   return MEMO_BLOB ? _memo(l, "_blob", b) : b;
 }
@@ -1533,7 +1867,20 @@ function roiCell(roi) {
 // WHY and never only "flagged".
 const _ARV_BAD_FLAGS = {
   // --- valuation/calc.py :: calc.arv_flags (contradicted tier) --------------
-  bid_proxy_arv: "the ARV is the opening bid × 2.4, so every figure under it is the bid restated",
+  // NO MULTIPLIER IN THIS STRING. calc.py has TWO bid-proxy paths and they use
+  // different factors — improved property is `opening_bid × 2.4` (134 leads on
+  // the live board), raw land is `opening_bid × 1.5` (815). Both emit the one
+  // flag `bid_proxy_arv`, so a hard-coded "× 2.4" here was actively wrong on
+  // 815 of the 949: 162 Newberry Rd, Walhalla, Oconee SC publishes ARV $225,000
+  // on a $150,000 bid — which is 1.5×, exactly right — while this sentence told
+  // the reader the ARV was bid × 2.4, i.e. that the true figure was $360,000 or
+  // that the bid behind $225,000 was $93,750. Neither is a rounding error;
+  // both invent a property.
+  // bidProxyWhy() below reads the real factor out of calc's own note and
+  // substitutes it. This string is the fallback for when no note survived, and
+  // it deliberately claims only what is true of both paths.
+  bid_proxy_arv: "the ARV is a fixed multiple of the opening bid, so every figure under it is the bid restated",
+  anchor_shared_across_parcels: "the county figure this ARV is anchored to is stamped on many other parcels — it is not an appraisal of THIS property",
   arv_above_anchor: "the ARV runs several times the county's own appraisal of this parcel",
   arv_above_anchor_extreme: "the ARV was past the hard multiple of the county appraisal and was withheld",
   ppsf_ceiling: "the implied $/sqft is above anything this market supports — the comps or the sqft are wrong",
@@ -1558,6 +1905,19 @@ const _ARV_BAD_FLAGS = {
   arv_below_asis: "the after-repair value came out BELOW the as-is value, which cannot be true",
   verdict_on_flagged_arv: "board QA caught a deal verdict published on a flagged ARV",
   bid_on_contradicted_arv: "board QA caught a max bid published on a contradicted ARV",
+  // --- ADDED THIS ROUND. Confirmed against the working tree's calc.py, not
+  //     assumed: each string below is grepped and present. grading.py puts all
+  //     three on the CONTRADICTED tier, so the dollars are already gone
+  //     server-side and this table only has to explain the hole.
+  //
+  //     Two of them would have been misread by the unrecognised-name fallback
+  //     rather than missed: _ARV_BAD_WORDS matches "above"/"ceiling"/"mismatch",
+  //     so they would have rendered as `unrecognised valuation flag "arv above
+  //     list price"` — the right LEVEL with a sentence that tells the reader
+  //     nothing. Naming them is the whole point of a lookup table.
+  arv_proxy_above_ceiling: "a proxy ARV came out past the $2M plausibility ceiling and was thrown away — the figure shown as withheld is what was rejected, not a value",
+  arv_above_list_price: "the ARV is at least 1.6× the price the seller is publicly asking for this property, and anyone can simply pay the asking price",
+  arv_land_sqft_mismatch: "the record calls this land but carries a house-sized living area, so the ARV was priced off a building that may not exist",
   derived_without_arv: "board QA caught money published with no ARV to derive it from",
   // --- names not currently emitted, kept because they were in play during
   //     the valuation work and cost nothing while absent ---------------------
@@ -1579,6 +1939,18 @@ const _ARV_BAD_FLAGS = {
 // on these, so this file is what makes the doubt visible.
 const _ARV_WEAK_FLAGS = {
   // --- valuation/calc.py :: calc.arv_flags (weak-evidence tier) ------------
+  // THIS ONE MATTERS MORE THAN THE OTHER FOUR ADDED THIS ROUND. Left
+  // unlisted, `arv_tier_refused_ceiling` hits _ARV_BAD_WORDS on "ceiling" and
+  // classifies BAD — a red "do not bid off it" on 71 leads whose valuation the
+  // engine considers merely weak, where a LATER tier supplied the ARV that is
+  // actually on screen. The fallback is deliberately pessimistic and that is
+  // right for a name nobody has read; it is wrong here, and the fix is to read
+  // it. (grading.py: ARV_FLAGS_WEAK_EVIDENCE.)
+  arv_tier_refused_ceiling: "one valuation method blew the plausibility ceiling and was discarded — the ARV shown came from a different method",
+  // No "arv" in the name, so it only classifies at all because calc.arv_flags
+  // is a trusted namespace (`inArvFlags`). Weak either way; named so it says
+  // something.
+  county_values_disagree: "the county's own two valuations of this parcel disagree with each other, so the anchor under this ARV is unreliable",
   anchor_not_independent: "the ARV is the county's own figure restated, so nothing independent confirms it describes this property",
   geo_imprecise_comps: "the comps were picked by radius from a shared city centroid, not from this address",
   stale_sale_floor: "a recorded sale was refused as a floor for being undated or more than 10 years old",
@@ -1661,6 +2033,23 @@ const _ARV_IGNORED_FLAGS = {
   missing_last_sale: "sale-history coverage, not a valuation claim",
   court_owner_mismatch: "owner-name provenance, not a valuation claim",
   rehab_vs_condition: "rehab estimate vs condition tier — about the REHAB number, not the ARV",
+  // SAME REASON AS THE LINE ABOVE, AND IT HAD TO BE STATED OR IT WOULD HAVE
+  // BEEN THE LOUDEST WRONG WARNING THIS ROUND ADDED.
+  //
+  // calc.py now emits rehab_not_deducted into calc.arv_flags on 9,586 leads.
+  // calc.arv_flags is a trusted namespace, so an unlisted name there falls to
+  // arvTrust's weak default — which would have printed `≈ ARV unverified — a
+  // band, not a number · rehab not deducted` on every one of them. Nothing
+  // about the ARV is in doubt on those leads. The rehab is, and rehabTrust()
+  // already says so ON the max bid, which is the only figure the missing rehab
+  // actually moves.
+  //
+  // grading.py does treat it as weak evidence server-side (it drops the deal
+  // verdict on 15 leads). That is the right server behaviour and it does not
+  // need the client to restate it as ARV doubt: 9,586 amber ARV captions to
+  // carry 15 verdict removals is the exact trade that turned the real warning
+  // into wallpaper the first time.
+  rehab_not_deducted: "no rehab was deducted from the max bid — rendered by rehabTrust() on the bid itself, and it is not a claim about the ARV",
 };
 
 // Promotes an UNRECOGNISED arv-named flag from the weak default to bad when the
@@ -1685,7 +2074,12 @@ const _ARV_FLAG_NOTE = {
   stale_sale_floor: /^Recorded sale \(.+NOT used as an ARV floor/i,
   floor_rejected_extreme: /floor limit/i,
   floor_raise_large: /raised .+ by the county\/sale floor/i,
-  bid_proxy_arv: /^ARV proxy from bid/i,
+  // `^ARV proxy from bid` missed calc.py's land path entirely — the note it
+  // writes there is "Land ARV proxy from bid × 1.5 (150,000)", which does not
+  // start with "ARV". Measured on the live board: 134 notes matched, 815 did
+  // not, out of 949 leads flagged bid_proxy_arv. Those 815 lost the engine's
+  // own sentence, which is the one place the real multiplier was written down.
+  bid_proxy_arv: /^(?:Land\s+)?ARV proxy from bid/i,
   arv_above_anchor: /not impossible for distressed inventory/i,
   arv_above_anchor_extreme: /^ARV WITHHELD/i,
   ppsf_ceiling: /ceiling this market supports/i,
@@ -1742,9 +2136,35 @@ function _attr(s) {
  * `subject` is "arv" for everything except the bid-scoped table — see
  * _ARV_BID_FLAGS. It changes the WORDS, never the level.
  */
-function arvFlagClass(name, inArvFlags) {
+/**
+ * The REAL bid multiplier for a bid-proxy ARV, read out of calc's own note.
+ *
+ * calc.py writes the factor into the note and nowhere else — the flag string is
+ * `bid_proxy_arv` on both paths, so the flag cannot tell 2.4 from 1.5. Matching
+ * the number here is what lets one flag produce two true sentences.
+ * Live strings, verbatim:
+ *   "ARV proxy from bid × 2.4 (150,000 × 2.4) — rough"
+ *   "Land ARV proxy from bid × 1.5 (150,000)"
+ * Returns "" when no note survived, and the caller falls back to the
+ * multiplier-free wording.
+ */
+const _BID_PROXY_MULT = /^(?:Land\s+)?ARV proxy from bid\s*[×x*]\s*([0-9]+(?:\.[0-9]+)?)/i;
+function bidProxyWhy(c) {
+  const notes = c && Array.isArray(c.notes) ? c.notes : [];
+  for (let i = 0; i < notes.length; i++) {
+    if (typeof notes[i] !== "string") continue;
+    const m = _BID_PROXY_MULT.exec(notes[i]);
+    if (m) return `the ARV is the opening bid × ${m[1]}, so every figure under it is the bid restated`;
+  }
+  return "";
+}
+
+function arvFlagClass(name, inArvFlags, c) {
   const n = String(name == null ? "" : name).toLowerCase();
   if (!n) return null;
+  if (n === "bid_proxy_arv") {
+    return { level: "bad", why: bidProxyWhy(c) || _ARV_BAD_FLAGS.bid_proxy_arv, subject: "arv" };
+  }
   if (_ARV_BAD_FLAGS[n]) return { level: "bad", why: _ARV_BAD_FLAGS[n], subject: "arv" };
   if (_ARV_WEAK_FLAGS[n]) return { level: "weak", why: _ARV_WEAK_FLAGS[n], subject: "arv" };
   if (_ARV_BID_FLAGS[n]) return { level: "weak", why: _ARV_BID_FLAGS[n], subject: "bid" };
@@ -1812,7 +2232,7 @@ function arvTrust(l) {
   const consider = (name, inArvFlags) => {
     if (typeof name !== "string" || !name) return;
     const n = name.toLowerCase();
-    const cls = arvFlagClass(n, inArvFlags);
+    const cls = arvFlagClass(n, inArvFlags, c);
     if (!cls) return;
     const rank = _LVL[cls.level];
     if (rank > lvl) lvl = rank;
@@ -1885,8 +2305,21 @@ function arvTrust(l) {
   // truthiness mismatch here would render it as an empty warning glyph.
   let absent = "";
   if (!arv) {
-    const refused = (Array.isArray(c.arv_flags) && c.arv_flags.length > 0)
-      || hits.some((h) => h.rank >= _LVL.weak);
+    // "calc.arv_flags is non-empty" was the proxy for "the engine priced this
+    // and then refused the answer". That held while every name in the list was
+    // a claim about the ARV. It stopped holding the moment calc.py started
+    // writing rehab_not_deducted there — a flag about the max bid, carried in
+    // arv_flags only so this file's rehabTrust() can see it (see
+    // _ARV_IGNORED_FLAGS). A lead with no ARV whose ONLY entry is that one has
+    // not been refused anything, and calling it "refused" paints a red "the
+    // engine computed one and refused it" over a lead that was simply never
+    // valued — the exact misreading arv_not_computed was added to prevent.
+    // So: only flags this file recognises as ARV claims count as evidence of a
+    // refusal. Ignored names are still ignored, unknown names still count.
+    const arvClaims = Array.isArray(c.arv_flags)
+      ? c.arv_flags.filter((f) => !_ARV_IGNORED_FLAGS[String(f || "").toLowerCase()])
+      : [];
+    const refused = arvClaims.length > 0 || hits.some((h) => h.rank >= _LVL.weak);
     absent = c.arv_withheld != null ? "withheld" : refused ? "refused" : "unpriced";
     if (absent !== "unpriced" && lvl < _LVL.bad) lvl = _LVL.bad;
   }
@@ -2023,6 +2456,31 @@ function derivedCell(inner, t) {
     return `<td class="num dq-soft" title="${_attr(arvTrustTitle(t))}">&#8776;${inner}</td>`;
   }
   return `<td class="num">${inner}</td>`;
+}
+
+/**
+ * The max-bid cell. derivedCell() plus the rehab question, because the rehab
+ * question is about THIS number and nothing else.
+ *
+ * 70% rule = ARV × 0.70 − rehab. On 9,190 of the 21,847 published max bids
+ * there was no rehab estimate, so the subtraction was of zero and the cell is a
+ * pre-repair ceiling wearing the clothes of a bid. That does not belong in a
+ * notes line at the bottom of a panel; it belongs on the figure, in the column
+ * a bidder reads across. The marker is "†" — deliberately not "⚠" or "≈", both
+ * of which already mean something specific about the ARV in this file, and a
+ * fourth meaning on the same two glyphs is how a warning stops being read.
+ *
+ * The 10,063 LAND rows are left completely alone: a vacant parcel correctly
+ * deducts no rehab, and a caveat on a number that is right is how the caveat on
+ * numbers that are wrong becomes wallpaper.
+ */
+function maxBidCell(c, t, l) {
+  const cell = derivedCell(fmtMoney(c.max_bid_70), t);
+  if (c.max_bid_70 == null || rehabTrust(l).state !== "unknown") return cell;
+  const ttl = _attr(REHAB_UNKNOWN_NOTE);
+  return cell
+    .replace('<td class="num', '<td class="num rehab-unknown')
+    .replace("</td>", `<span class="rehab-dag" title="${ttl}">&dagger;</span></td>`);
 }
 
 /**
@@ -2189,12 +2647,97 @@ function injectDashStyles() {
   /* A figure the valuation refused, reprinted elsewhere on the card. */
   .dq-rejected{color:var(--dq-warn)}
   .dq-rejected s{opacity:.75}
+  /* ---- Location not verified (raw.geo_imprecise) ------------------------- */
+  /* The card's photo slot when the only thing available was a centroid. It has
+     to look like an ABSENCE, not like a picture — the whole defect was a map
+     that looked like evidence. */
+  .card-img.geo-unknown{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:4px;background:repeating-linear-gradient(45deg,rgba(127,127,127,.07) 0 10px,transparent 10px 20px);
+    color:var(--dq-soft);border-bottom:1px solid var(--dq-soft-line)}
+  .card-img.geo-unknown .geo-unknown-glyph{font-size:26px;opacity:.6;filter:grayscale(1)}
+  .card-img.geo-unknown .geo-unknown-txt{font-size:11px;font-weight:700;letter-spacing:.02em;
+    text-transform:uppercase}
+  /* .geo-note / .geo-note-sm / .geo-note code are defined ONCE, below, with the
+     rest of the caveat vocabulary. */
+  /* NOTE — this string is a JS template literal. Do not use backticks in these
+     comments; one pair ends the CSS and takes the whole file with it. Caught by
+     node --check, which is the only reason it is not shipping right now. */
+  /* Owner identity, the rehab dagger and the people-search link are styled in
+     ONE place further down this sheet. A duplicate set of the same class names
+     lived here and the two blocks were silently splitting properties between
+     them — the later rule wins per PROPERTY, not per block, so .owner-src took
+     its colour from one and its italics from the other. Do not re-add them. */
+  /* SPECIFICITY, THE THIRD TIME IN THIS FILE. style.css's ".detail-grid .val"
+     is (0,2,0) and sets the ordinary text colour; a bare ".owner-conflict" is
+     (0,1,0) and LOST. Measured in the browser: computed colour rgb(230,236,247)
+     — plain body text — in dark theme, so the one line telling a reader that
+     two records name different owners rendered as if it were ordinary content.
+     Same trap as the card meta and the table cell, both documented above. */
+  #detail-panel .detail-grid .val.owner-conflict{color:var(--dq-soft)}
+  /* Comps table: the distance cell renders struck through in the caveat colour
+     when the subject's own coordinates are a centroid. The table already
+     scrolls inside its own box on mobile (premium.css), so the added column
+     cannot widen the panel — verified at 390px: table box 349px, its own
+     scrollWidth 478px, document scrollWidth == clientWidth == 390. */
+  .comps-table td.dq-soft{color:var(--dq-soft)}
+  .comps-table td.dq-soft s{opacity:.8}
   .shard-loading{font-size:.9em;color:var(--muted,#6b6257);position:relative;padding-left:18px}
   .shard-loading::before{content:"";position:absolute;left:0;top:50%;width:11px;height:11px;
     margin-top:-6px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;
     animation:shard-spin .8s linear infinite}
   @keyframes shard-spin{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){.shard-loading::before{animation:none}}
+  /* ---- Location honesty (geoTrust) ---------------------------------------
+     The card photo slot, the mini-map banner and the comps distance note all
+     emit these. They were shipping with NO rule anywhere, which renders the
+     photo slot as two lines of unstyled 40px text and the banner as bare body
+     copy — a warning that looks like a rendering accident is not a warning.
+     They live here, with the rest of the caveat vocabulary, so they reuse the
+     same --dq-soft amber as "≈" and the weak-ARV notes rather than inventing a
+     third colour for "do not trust this". */
+  .geo-note{margin:0 0 8px;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.45;
+    color:var(--dq-soft);background:var(--dq-soft-bg);border:1px solid var(--dq-soft-line)}
+  .geo-note code{font-size:11px;padding:0 3px;border-radius:3px;background:rgba(127,127,127,.18)}
+  .geo-note-sm{font-size:11px;padding:6px 8px;margin-bottom:6px}
+  /* .card-img.no-photo is flex/centred at 40px — override both, and stripe the
+     tile so it never reads as a photo that failed to load. */
+  .card-img.no-photo.geo-unknown{flex-direction:column;gap:5px;font-size:11px;color:var(--dq-soft);
+    background:repeating-linear-gradient(45deg,rgba(127,127,127,.06) 0 11px,rgba(127,127,127,.14) 11px 22px)}
+  .card-img.no-photo.geo-unknown .geo-unknown-glyph{font-size:28px;line-height:1;opacity:.65;filter:grayscale(1)}
+  .card-img.no-photo.geo-unknown .geo-unknown-txt{font-size:11px;font-weight:700;letter-spacing:.02em;
+    text-align:center;padding:0 8px}
+  /* The comps table gained a Dist column; 7 columns does not fit 390px. Scroll
+     the table, never the page. */
+  #d-comps,#d-rent,#d-fc-comps{overflow-x:auto}
+  /* ---- A max bid with no rehab deducted (rehabTrust) ----------------------
+     Rendered ON the number in all three places it appears, because a bidder
+     reads the figure and not the notes under it. Class names here MUST be the
+     ones maxBidCell() / the calc row / the badge actually emit — rehab-unknown,
+     rehab-dag, rehab-note. (They were briefly bid-norehab* here and rehab-* in
+     the markup, i.e. a silent no-op: the dagger rendered as unstyled body text.
+     Same reader/writer mismatch this file has been bitten by four times.) */
+  .rehab-dag{color:var(--dq-soft);font-weight:700;margin-left:3px;cursor:help}
+  /* Colour AND a dotted rule. The colour alone is the whole marker in a
+     monochrome print or for a colour-blind reader, and this cell is a dollar
+     figure someone bids against. */
+  #listings-table td.rehab-unknown{color:var(--dq-soft);
+    text-decoration:underline dotted var(--dq-soft-line);text-underline-offset:3px}
+  #listings-table td.rehab-unknown .rehab-dag{margin-left:2px;text-decoration:none}
+  .qbadge.rehab-unknown{border-color:var(--dq-soft-line)}
+  .rehab-note{margin-top:5px;padding:6px 8px;border-radius:6px;font-size:11px;line-height:1.4;
+    color:var(--dq-soft);background:var(--dq-soft-bg);border:1px solid var(--dq-soft-line)}
+  #detail-panel .val .rehab-dag{font-size:.6em;vertical-align:super}
+  /* ---- Owner identity (ownerNames) + people-search ------------------------
+     Names MUST match the markup in renderDetail's Owner & Contact block:
+     owner-src, owner-conflict, owner-conflict-why, skiptrace-row, skiptrace-why. */
+  .owner-src{font-size:11px;opacity:.75;font-style:italic;white-space:nowrap}
+  .owner-conflict{color:var(--dq-soft)}
+  .owner-conflict-why{margin-top:4px;font-size:11px;line-height:1.4;font-style:normal}
+  .skiptrace-row{grid-column:1 / -1;margin-top:8px;padding-top:8px;
+    border-top:1px solid var(--border-subtle,rgba(127,127,127,.25));font-size:12.5px}
+  .skiptrace-row a{font-weight:600;text-decoration:none;color:var(--accent-2,#2563eb)}
+  .skiptrace-row a:hover{text-decoration:underline}
+  .skiptrace-why{margin-top:3px;font-size:11px;line-height:1.4;color:var(--dq-soft)}
   `;
   const el = document.createElement("style");
   el.id = "dash-inline-styles";
@@ -2282,7 +2825,7 @@ function renderTable() {
       <td class="num">${fmtMoney(l.opening_bid)}</td>
       ${arvCell(c, at)}
       <td class="num">${fmtMoney(c.rehab_expected)}</td>
-      ${derivedCell(fmtMoney(c.max_bid_70), at)}
+      ${maxBidCell(c, at, l)}
       ${derivedCell(roiCell(c.roi_pct), at)}
       <td class="num">${fmtNum(l.bedrooms)}</td>
       <td class="num">${fmtNum(l.bathrooms)}</td>
@@ -2577,9 +3120,24 @@ function renderCards() {
         photo = `<div class="card-img no-photo" style="background:linear-gradient(135deg,#1a365d,#2c5282);color:#fff;font-size:48px">🏛</div>`;
       } else if (l.raw && l.raw.zillow && l.raw.zillow.photo) {
         photo = `<div class="card-img" style="background-image:url('${l.raw.zillow.photo}')"></div>`;
-      } else if (l.latitude && l.longitude) {
+      } else if (l.latitude && l.longitude && !geoTrust(l).imprecise) {
         const staticUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${l.latitude},${l.longitude}&zoom=17&size=400x250&markers=${l.latitude},${l.longitude},red-pushpin`;
         photo = `<div class="card-img" style="background-image:url('${staticUrl}')"></div>`;
+      } else if (l.latitude && l.longitude) {
+        // GATED. This slot is the PHOTO slot: whatever is in it reads as "this
+        // is the property". A zoom-17 street map with a red pushpin is the most
+        // specific claim the card can make about where a lead is, and on 8,387
+        // of the leads that reach this branch the pin is a city or county
+        // centroid — a landmark 1-2 miles away, frequently a courthouse or a
+        // town square. Nothing said so, and there is no more convincing way to
+        // tell someone a wrong address is right than to draw it on a map.
+        //
+        // The verified-geo leads (287 of 8,674 here) keep the map. This is the
+        // gate, not a removal.
+        const gt = geoTrust(l);
+        photo = `<div class="card-img no-photo geo-unknown" title="${_attr("Location not verified — " + gt.why + ". No map is drawn because a pin would name a place this property is not.")}">`
+          + `<span class="geo-unknown-glyph">📍</span>`
+          + `<span class="geo-unknown-txt">location not verified</span></div>`;
       } else {
         photo = `<div class="card-img no-photo">🏠</div>`;
       }
@@ -3077,6 +3635,28 @@ function _shardMerge(li, d, entry) {
 }
 
 /**
+ * Merge one lead from a shard body ALREADY held in the LRU. No network, no
+ * gunzip, no JSON.parse — the bytes are in `entry.data` and stay there until
+ * eviction, which is the whole reason the LRU exists.
+ *
+ * Returns false when the shard is not resident (so the caller fetches) or when
+ * the resident body has no record at this index (so the caller can try the
+ * other shard-naming convention rather than concluding "no detail exists").
+ *
+ * `entry.data` is nulled by _shardTouch on eviction, so a resident-but-evicted
+ * entry correctly reports false.
+ */
+function _shardMergeFromCache(l, i, size, key) {
+  const entry = _shardEntry(key);
+  if (!entry || !entry.data) return false;
+  const rec = shardRecordAt(entry.data, entry.start, i, size);
+  if (rec === undefined) return false;
+  _shardMerge(l, rec, entry);
+  _shardTouch(entry);
+  return true;
+}
+
+/**
  * Fetch + merge the detail for ONE listing. Never throws.
  * Returns true when the panel can be rendered as complete.
  */
@@ -3093,6 +3673,15 @@ async function ensureShardFor(l) {
 
   const have = _shardEntry(key);
   if (have && have.applied.has(l)) { _shardTouch(have); return true; }
+  // The block is ALREADY IN MEMORY — a different lead in the same 1,000-record
+  // shard pulled it. Only `applied.has(l)` was checked, so every tap on a lead
+  // whose neighbour had been opened re-fetched, re-inflated and re-parsed the
+  // whole shard on the main thread. Measured on the live board: 8 taps inside
+  // shard 0 = 8 fetches, 3,945 ms total (~493 ms each). Shard 0 is board
+  // indices 0-999, i.e. the top of the default sort, so this is the first thing
+  // anyone does. The LRU held the data the whole time; this was a lookup bug,
+  // not a caching one.
+  if (_shardMergeFromCache(l, i, size, key)) return true;
 
   if (!_SHARD.inflight[key]) {
     _SHARD.inflight[key] = (async () => {
@@ -3289,6 +3878,22 @@ function renderDetail(l, detailState) {
                   : _at.level === "proxy"
                     ? `<div class="calc-range">Proxy value — estimated without usable comps or a known square footage.</div>`
                     : ""}
+            ${
+              // calc.arv_vs_assessed: WRITTEN ON 23,156 LEADS, READ BY NOBODY.
+              // It is the ratio of the published ARV to the county's own
+              // assessed value — the one cross-check on this page that comes
+              // from a source the valuation did not produce, and it was
+              // reaching no device at all. A 1.0 says the county agrees; a 4.5
+              // says one of the two records is about a different building, and
+              // that is exactly the failure this whole round is about.
+              typeof c.arv_vs_assessed === "number" && c.arv_expected
+                ? `<div class="calc-range ${c.arv_vs_assessed >= 3 || c.arv_vs_assessed <= 0.34 ? "dq-soft-mark" : ""}" title="${_attr(
+                    "The published ARV divided by the county's assessed value. Near 1.0 means the county's own record agrees with this valuation. Far from 1.0 means they disagree, and one of the two is describing a different property.")}">`
+                  + `vs county assessment: <b>${c.arv_vs_assessed.toFixed(2)}×</b>`
+                  + (c.arv_vs_assessed >= 3 ? " — the county values this at a third of the ARV or less"
+                    : c.arv_vs_assessed <= 0.34 ? " — the county values this at three times the ARV or more" : "")
+                  + `</div>`
+                : ""}
           </div>
         </div>`);
     }
@@ -3299,6 +3904,16 @@ function renderDetail(l, detailState) {
           <div>
             <div class="val">${fmtMoney(c.rehab_expected)}</div>
             <div class="calc-range">tier: <b>${c.rehab_tier || "—"}</b> · range: <b>${fmtMoney(c.rehab_low)}</b> – <b>${fmtMoney(c.rehab_high)}</b></div>
+            ${
+              // calc.rehab_with_contingency: written on 3,455 leads, read by
+              // nobody. It is the rehab the engine actually expects someone to
+              // spend (rehab + contingency), and it is the number that decides
+              // whether a deal survives, so it belongs next to the estimate it
+              // corrects rather than in a field only the JSON has ever seen.
+              typeof c.rehab_with_contingency === "number" && c.rehab_with_contingency > (c.rehab_expected || 0)
+                ? `<div class="calc-range">with contingency: <b>${fmtMoney(c.rehab_with_contingency)}</b> `
+                  + `<span class="muted">— budget this, not the figure above</span></div>`
+                : ""}
           </div>
         </div>`);
     }
@@ -3317,7 +3932,24 @@ function renderDetail(l, detailState) {
       return `<div class="val ${extraCls || ""}${cls}"${ttl}>${pre}${v}</div>`;
     };
     if (c.max_bid_70 != null) {
-      rows.push(`<div class="calc-row"><div class="lbl">Max Bid (70% rule)</div>${_derived(fmtMoney(c.max_bid_70), "big")}</div>`);
+      // The 70% rule is ARV × 0.70 − rehab. When there was no rehab estimate
+      // the engine subtracted $0, so this is a ceiling before repairs. Said
+      // here, under the number, rather than in the notes block below where the
+      // reader arrives after they have already read the figure.
+      const _rt = rehabTrust(l).state;
+      rows.push(`<div class="calc-row"><div class="lbl">Max Bid (70% rule)</div><div>${
+        _derived(fmtMoney(c.max_bid_70) + (_rt === "unknown" ? `<span class="rehab-dag">&dagger;</span>` : ""), "big")
+      }${_rt === "unknown"
+        ? `<div class="rehab-note"><strong>&dagger; No rehab was deducted.</strong> ${_txt(REHAB_UNKNOWN_BODY)}</div>`
+        : _rt === "land"
+          ? `<div class="calc-range">No rehab deducted — this is land, so there is nothing to repair.</div>`
+          : ""}${
+        // The asking-price cap, in calc's own words. Plain muted styling, not
+        // the amber caveat vocabulary: this number is RIGHT, it just is not the
+        // 70%-rule output, and a reader doing the arithmetic themselves would
+        // otherwise find a discrepancy with no explanation on screen.
+        (() => { const _cap = bidCapNote(l); return _cap ? `<div class="calc-range">${_txt(_cap)}</div>` : ""; })()
+      }</div></div>`);
     }
     if (c.wholesale_mao != null) {
       rows.push(`<div class="calc-row"><div class="lbl">Wholesale MAO</div>${_derived(fmtMoney(c.wholesale_mao) + (c.wholesale_spread != null ? ` <span class="muted">(spread ${fmtMoney(c.wholesale_spread)})</span>` : ""))}</div>`);
@@ -3340,12 +3972,32 @@ function renderDetail(l, detailState) {
       const cls = _at.level === "bad" || _at.level === "weak" ? "" : (c.cash_on_cash_pct > 0 ? "pos" : "neg");
       rows.push(`<div class="calc-row"><div class="lbl">Cash-on-Cash</div>${_derived(c.cash_on_cash_pct.toFixed(1) + "%", cls)}</div>`);
     }
-    const _eq = (l.raw && l.raw.equity) || null;
+    const _eq = _nonEmpty(l.raw && l.raw.equity) ? l.raw.equity : null;
     if (_eq && _eq.value != null) {
       const ec = _eq.is_underwater ? "neg" : ((_eq.pct || 0) >= 0.4 ? "pos" : "");
       rows.push(`<div class="calc-row"><div class="lbl">Owner Equity</div><div class="val big ${ec}">${fmtMoney(_eq.value)} <span class="muted">(${Math.round((_eq.pct || 0) * 100)}%)</span></div></div>`);
       rows.push(`<div class="calc-row"><div class="lbl">Est. Payoff</div><div class="val">${fmtMoney(_eq.payoff_estimate)} <span class="muted">${String(_eq.payoff_source || "").replace(/_/g, " ")} · ${_eq.confidence || ""}</span></div></div>`);
       if (_eq.senior_liens) rows.push(`<div class="calc-row"><div class="lbl">Senior Liens</div><div class="val neg">${fmtMoney(_eq.senior_liens)}</div></div>`);
+    } else if (_eq && _eq.withheld_reason) {
+      // THE EQUITY GATE'S OWN REASON, FINALLY ON A SCREEN.
+      //
+      // enrichment writes equity.withheld_reason on 4,240 leads — a full
+      // paragraph explaining that equity was suppressed because the ARV it
+      // would be computed from is contradicted (3,127) or was never published
+      // (1,113). It was allowlisted into the slim payload deliberately ("the
+      // sentences that say WHY a figure is missing, the detail panel reads
+      // them" — web_artifact._SLIM_RAW), shipped to every device, and then read
+      // by no line of code in this file. The panel simply omitted the row, so
+      // "no equity figure" was indistinguishable from "we did not look".
+      //
+      // equity.arv_trust ("contradicted" | "withheld") is the same story in one
+      // word and labels the row.
+      const _et = String(_eq.arv_trust || "").replace(/_/g, " ");
+      rows.push(`<div class="calc-row"><div class="lbl">Owner Equity</div><div>`
+        + `<div class="val big dq-warn-mark">not published</div>`
+        + `<div class="arv-flag-note"><strong>Equity was withheld${_et ? ` — ARV ${_txt(_et)}` : ""}.</strong> `
+        + `${_txt(_cap(_eq.withheld_reason.replace(/^No owner-equity figure published:\s*/i, "")))}</div>`
+        + `</div></div>`);
     }
     const _mv = (l.raw && l.raw.market_velocity) || null;
     if (_mv && _mv.moi != null) {
@@ -3454,6 +4106,33 @@ function renderDetail(l, detailState) {
   }
 
   // Mini map
+  //
+  // GATED ON geoTrust(). Same lie as the card, one screen further in: a marker
+  // dropped at zoom 15 is a claim that the property is THERE, and on 15,603 of
+  // the leads that reach here the coordinate is a city/county centroid.
+  //
+  // The map is not deleted — a county-level locator is genuinely useful and
+  // most of the board is precisely placed. What is deleted is the CLAIM of
+  // precision: no pin, a shaded circle the size of the actual uncertainty, a
+  // zoom that matches that circle rather than a street, and a banner above it
+  // in words. A reader who wants the street can still pan; a reader who glances
+  // can no longer come away with a false address.
+  const _gt = geoTrust(l);
+  const _mapNote = $("d-map-note");
+  if (_mapNote) {
+    // CLEARED, not just hidden. The detail panel is one set of static nodes
+    // reused for every lead, so leaving the previous lead's sentence in a
+    // display:none node keeps another property's warning one style change away
+    // from being shown on this one. Same leak class as the skip-trace row
+    // below. Verified: opening a centroid lead and then a precisely-geocoded
+    // one left the banner text populated behind display:none.
+    const _showNote = !!(l.latitude && l.longitude && _gt.imprecise);
+    _mapNote.style.display = _showNote ? "block" : "none";
+    _mapNote.innerHTML = _showNote
+      ? `<strong>This pin is not the property.</strong> ${_txt(_cap(_gt.why))}. `
+        + `The circle is roughly how far off it can be; the address above is what to trust.`
+      : "";
+  }
   if (l.latitude && l.longitude) {
     setTimeout(() => {
       if (detailMap) detailMap.remove();
@@ -3468,9 +4147,19 @@ function renderDetail(l, detailState) {
       detailMap = L.map("d-map", LEAN ? {
         dragging: false, touchZoom: false, scrollWheelZoom: false,
         doubleClickZoom: false, boxZoom: false, zoomControl: false, keyboard: false,
-      } : {}).setView([l.latitude, l.longitude], 15);
+      } : {}).setView([l.latitude, l.longitude], _gt.imprecise ? 12 : 15);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(detailMap);
-      L.marker([l.latitude, l.longitude]).addTo(detailMap);
+      if (_gt.imprecise) {
+        // A circle, not a marker. Leaflet's default pin is a point claim, and
+        // on a centroid lead there is no honest point to make.
+        L.circle([l.latitude, l.longitude], {
+          radius: _gt.radiusMi * 1609,
+          color: "#b26a00", weight: 2, dashArray: "5,5",
+          fillColor: "#b26a00", fillOpacity: 0.12,
+        }).addTo(detailMap).bindTooltip("Approximate area only — the property is somewhere in here");
+      } else {
+        L.marker([l.latitude, l.longitude]).addTo(detailMap);
+      }
     }, 50);
     $("d-map").style.display = "block";
   } else {
@@ -3506,15 +4195,40 @@ function renderDetail(l, detailState) {
     const compHeader = (l.raw && l.raw.comp_median_ppsf)
       ? `<div class="comp-summary">Median: <strong>$${Number(l.raw.comp_median_ppsf).toFixed(0)}/sqft</strong></div>`
       : "";
-    $("d-comps").innerHTML = compHeader + `
+    // DISTANCE, and whether it means anything.
+    //
+    // Every comp carries distance_mi and it was never rendered, so "3 Sold
+    // Comps (zip + sqft + beds matched)" implied proximity without ever
+    // stating it. Showing it is the easy half. The half that matters: on
+    // 11,985 leads the subject's own coordinates are a centroid, so those
+    // 35,691 distances are measured FROM A LANDMARK — a median of 0.5 mi from
+    // a town square says nothing about how near the comp is to the house. They
+    // render struck through, in the caveat colour, with the reason on hover.
+    const _cgt = geoTrust(l);
+    const _distTh = `<th title="${_attr(_cgt.imprecise
+      ? "Distance from this lead's stored coordinate — which is a city/county centroid, not the property."
+      : "Straight-line distance from the property.")}">Dist${_cgt.imprecise ? " ⚠" : ""}</th>`;
+    const _distTd = (c) => {
+      if (c.distance_mi == null) return `<td class="num">—</td>`;
+      const v = `${Number(c.distance_mi).toFixed(1)} mi`;
+      if (!_cgt.imprecise) return `<td class="num">${v}</td>`;
+      return `<td class="num dq-soft" title="${_attr("Measured from a city/county centroid, not from this property — " + _cgt.why + ". The distance is not usable.")}"><s>${v}</s></td>`;
+    };
+    const _distNote = _cgt.imprecise
+      ? `<div class="geo-note geo-note-sm"><strong>Distances below are not measurements of this property.</strong> `
+        + `${_txt(_cap(_cgt.why))}, so every comp distance is from that landmark. The comps themselves may still be sound — `
+        + `the engine flags this as <code>geo_imprecise_comps</code> — but do not read the mileage as nearness.</div>`
+      : "";
+    $("d-comps").innerHTML = compHeader + _distNote + `
       <table class="comps-table">
-        <thead><tr><th>Address</th><th>Sold</th><th>Date</th><th>SqFt</th><th>Bd/Ba</th><th>$/SqFt</th></tr></thead>
+        <thead><tr><th>Address</th><th>Sold</th><th>Date</th>${_distTh}<th>SqFt</th><th>Bd/Ba</th><th>$/SqFt</th></tr></thead>
         <tbody>
         ${comps.map(c => `
           <tr>
             <td>${c.url ? `<a href="${c.url}" target="_blank">${c.address || "—"}</a>` : (c.address || "—")}</td>
             <td>${c.sold_price ? `$${Number(c.sold_price).toLocaleString()}` : "—"}</td>
             <td>${c.sold_date ? c.sold_date.slice(0,10) : "—"}</td>
+            ${_distTd(c)}
             <td>${c.sqft ? Number(c.sqft).toLocaleString() : "—"}</td>
             <td>${c.beds ?? "—"}/${c.baths ?? "—"}</td>
             <td>${c.price_per_sqft ? `$${Number(c.price_per_sqft).toFixed(0)}` : "—"}</td>
@@ -3645,12 +4359,24 @@ function renderDetail(l, detailState) {
   }
 
   // GIS
-  const gis = (l.raw && l.raw.gis) || null;
+  //
+  // `_nonEmpty`, not truthiness: web_artifact emits an allowlisted block even
+  // when the source had none of its sub-keys, so `raw.gis` is `{}` on 8,063
+  // leads and `if (gis)` said yes to every one of them — a "County Records"
+  // header over nothing, on mobile only, because that is the payload the phone
+  // reads. Desktop's fat board omits the key entirely and hid the section, so
+  // the two devices disagreed about whether this property has a county record.
+  const gis = _nonEmpty(l.raw && l.raw.gis) ? l.raw.gis : null;
   if (gis) {
     $("d-gis-section").style.display = "block";
     const rows = [];
-    if (gis.owner) rows.push(`<div><strong>Owner:</strong> ${gis.owner}</div>`);
-    if (gis.mailing) rows.push(`<div><strong>Mailing:</strong> ${gis.mailing}</div>`);
+    // "Owner:" used to print gis.owner flat, while the CSV column and the
+    // people-search searched l.owner_name — two different names, no label on
+    // either, and 16,512 leads where they disagree. Label WHICH record this
+    // name came from; the canonical name and the disagreement are rendered in
+    // Owner & Contact below.
+    if (gis.owner) rows.push(`<div><strong>Owner on the county parcel record:</strong> ${_txt(gis.owner)}</div>`);
+    if (gis.mailing) rows.push(`<div><strong>Mailing:</strong> ${_txt(gis.mailing)}</div>`);
     if (gis.last_sale) {
       const ls = gis.last_sale;
       const parts = [];
@@ -3661,6 +4387,13 @@ function renderDetail(l, detailState) {
     }
     $("d-gis").innerHTML = rows.join("");
   } else {
+    // CLEAR, not just hide. The detail panel is one set of nodes reused for
+    // every lead, so hiding without clearing leaves the PREVIOUS property's
+    // owner and mailing address sitting in the DOM of this one — invisible
+    // until anything unhides it, and present in a copy, a print or a11y tree
+    // either way. This section names a person and an address; it does not get
+    // to keep the last one.
+    $("d-gis").innerHTML = "";
     $("d-gis-section").style.display = "none";
   }
 
@@ -3768,7 +4501,13 @@ function renderDetail(l, detailState) {
       : _bat.level === "weak"
         ? " — band, not a number" + (_batWhy ? " · " + _batWhy : "")
         : "";
-    badges.push(`<span class="qbadge ${cls}" title="${_batTtl}">Max bid (70%) ${_bat.level === "weak" ? "≈" : ""}$${Number(calc.max_bid_70).toLocaleString()}${tail}</span>`);
+    // The rehab caveat rides the badge too. This chip row is what a phone sees
+    // above the fold; a bidder who never scrolls to the calculator still gets
+    // told that the subtraction was of zero.
+    const _rbt = rehabTrust(l).state;
+    const _rtail = _rbt === "unknown" ? " † no rehab deducted" : "";
+    const _rttl = _rbt === "unknown" ? _attr(REHAB_UNKNOWN_NOTE) : _batTtl;
+    badges.push(`<span class="qbadge ${cls}${_rbt === "unknown" ? " rehab-unknown" : ""}" title="${_rttl}">Max bid (70%) ${_bat.level === "weak" ? "≈" : ""}$${Number(calc.max_bid_70).toLocaleString()}${tail}${_rtail}</span>`);
   }
   if (calc.roi_pct != null) {
     const cls = _bat.level === "bad" ? "neg" : _bat.level === "weak" ? _weakCls
@@ -3889,11 +4628,79 @@ function renderDetail(l, detailState) {
     ? `${_op.phone} (${_op.source || "unknown source"}${_op.line_type && _op.line_type !== "unknown" ? ", " + _op.line_type : ""}${_op.needs_dnc_scrub ? " — DNC scrub required" : ""})`
     : _st.phone;
   const _alts = (_op.alternates || []).map((a) => a && a.phone ? `${a.phone} (${a.source || "?"})` : null).filter(Boolean);
-  setSec("d-contact-section", "d-contact", [
-    ["Owner", _om.owner], ["Mailing address", _om.mailing],
+  // ONE OWNER NAME, NAMED, AND IT IS THE ONE THE BUTTON SEARCHES.
+  //
+  // This row used to print raw.owner_mailing.owner. The CSV column and the
+  // people-search URL used l.owner_name. The County Records section printed
+  // raw.gis.owner. Three names, three call sites, no labels — and on 16,512 of
+  // 38,500 leads at least two of them disagree, which is the board's own signal
+  // that the parcel join may have attached this lead to a different property.
+  // Hiding it made the disagreement look like agreement.
+  //
+  // Now: the canonical name (l.owner_name where it exists — unchanged from what
+  // the export and the link already used) is the row, every other name is shown
+  // beneath it with the record it came from, and the skip-trace link is
+  // rendered right there so what is searched is what is on screen.
+  const _owners = ownerNames(l);
+  const _place = placeOfRecord(l);
+  const _tps = skipTraceUrl(l);
+  const _ownerRows = [];
+  if (_owners.primary) {
+    _ownerRows.push(`<div class="lbl">Owner</div><div class="val">${_txt(_owners.primary)}`
+      + `<span class="owner-src"> — from the ${_txt(_owners.primarySrc)}</span></div>`);
+    // Every other spelling is LISTED whenever one exists — "TABARES JOSE L &
+    // TABARES IRINA" is a better mail-merge and skip-trace target than
+    // "TABARES JOSE L", and hiding it helps nobody. The RED LINE underneath is
+    // gated separately on _owners.conflict, which is true only when the names
+    // cannot be reconciled (see ownerNames). Listing without warning: 3,584
+    // leads. Listing with the warning: 12,674.
+    if (_owners.all.length > 1) {
+      _ownerRows.push(`<div class="lbl">Also recorded as</div><div class="val${_owners.conflict ? " owner-conflict" : ""}"`
+        + (_owners.conflict
+          ? ` title="${_attr("These records name owners that cannot be reconciled. That is usually a stale county row or a sale another source has not caught up with — but it can also mean this lead is joined to the wrong parcel. Verify before mailing.")}"`
+          : ` title="${_attr("The same owner, recorded differently by each source — one carries a spouse, an heir, or punctuation the other dropped. Shown because the fuller spelling is usually the better skip-trace query.")}"`)
+        + `>`
+        + _owners.all.slice(1).map((o) => `${_txt(o.name)} <span class="owner-src">(${_txt(o.src)})</span>`).join("<br>")
+        + (_owners.conflict
+          ? `<div class="owner-conflict-why">These sources name different owners — check the parcel before you spend money on this one.</div>`
+          : "")
+        + `</div>`);
+    }
+  }
+  // BUILT IN ONE ASSIGNMENT, NOT APPENDED TO setSec's.
+  //
+  // setSec HIDES a section whose rows are all empty but does not CLEAR it, and
+  // the detail panel is one set of static nodes reused for every lead. Appending
+  // to it therefore leaks: verified in the browser, opening 510 Kings Rd and
+  // then a lead with no owner left "🔎 Look up SERVICEMAC LLC in 28150" sitting
+  // in the second lead's contact block — the wrong person, on the wrong
+  // property, behind a live link. It happened to be inside a display:none
+  // section that time, which is luck, not a design. Rendering the whole block
+  // here means the previous lead's identity cannot survive into the next one.
+  const _contactRows = kv([
+    ["Mailing address", _om.mailing],
     ["Absentee owner", _om.absentee], ["Out of state", _om.out_of_state],
     ["Phone", _phone], ["Other numbers", _alts.join(" · ")], ["Email", _st.email],
   ].concat(_saRows));
+  // The people-search was a CSV column only — a link nobody can click from a
+  // phone, pointed at a query built from `city` even when `city` holds a COUNTY
+  // name (4,347 leads). placeOfRecord() prefers the ZIP and states what it
+  // searched, so a reader can see the query is wide before they blame the
+  // result.
+  const _tpsHtml = _tps
+    ? `<div class="skiptrace-row"><a href="${_attr(_tps)}" target="_blank" rel="noopener noreferrer">`
+      + `🔎 Look up ${_txt(_owners.primary)} in ${_txt(_place.label)} →</a>`
+      + (_place.trusted ? "" : `<div class="skiptrace-why">Searching ${_txt(_place.label)} because ${_txt(_place.why)}.</div>`)
+      + `</div>`
+    : "";
+  const _gridHtml = _ownerRows.join("") + _contactRows;
+  if (_gridHtml || _tpsHtml) {
+    $("d-contact").innerHTML = (_gridHtml ? `<div class="detail-grid">${_gridHtml}</div>` : "") + _tpsHtml;
+    $("d-contact-section").style.display = "block";
+  } else {
+    $("d-contact").innerHTML = "";
+    $("d-contact-section").style.display = "none";
+  }
 
   // Distress Stack — full breakdown (only the tier badge was shown before)
   const _ds = getDistress(l);
@@ -4052,7 +4859,15 @@ function exportCsv() {
     // 2026-06-19: data-quality caveats so the export never presents a placeholder
     // address or proxy ARV as a verified value (the "nothing made up" rule).
     "address_quality", "arv_confidence", "data_quality_note",
-    "truepeoplesearch_url",
+    // APPENDED, deliberately at the end so no existing column moves.
+    //   skiptrace_locale   what the people-search URL actually searched
+    //   city_may_be_county "yes" when `city` equals `county` and could be a
+    //                      county label rather than a town (4,347 leads)
+    //   owner_name_conflict the other owner strings this lead carries, when
+    //                      they disagree with owner_name (16,512 leads)
+    //   rehab_deducted     whether max_bid_70 subtracted a rehab cost
+    "truepeoplesearch_url", "skiptrace_locale", "city_may_be_county",
+    "owner_name_conflict", "rehab_deducted",
   ];
   const rows = [cols.join(",")];
   filtered.forEach((l) => {
@@ -4066,9 +4881,14 @@ function exportCsv() {
     const ds = r.distress_stack || {};
     const rod = r.rod || {};
     const dta = l.sale_date ? Math.round((new Date(l.sale_date) - new Date()) / 86400000) : "";
-    const tps = l.owner_name
-      ? `https://www.truepeoplesearch.com/results?name=${encodeURIComponent(l.owner_name)}&citystatezip=${encodeURIComponent(((l.city || "") + " " + (l.state || "")).trim())}`
-      : "";
+    // Was `citystatezip=${l.city} ${l.state}`, which searched a COUNTY on the
+    // 4,347 leads where `city` holds the county name — every one of the 3,309
+    // spartanburg_vacant rows among them. skipTraceUrl() prefers the ZIP
+    // (16,470 leads have one) and widens to the state rather than querying a
+    // place that may not exist. Same function the detail panel's link uses, so
+    // the export and the screen can no longer drift apart.
+    const tps = skipTraceUrl(l);
+    const _plc = placeOfRecord(l);
     // This used to end with `...l`, spreading all 43 top-level keys of every
     // listing into a throwaway object 38,497 times to read 21 of them. The
     // spread came LAST, so wherever a column name collided with a listing key
@@ -4096,6 +4916,17 @@ function exportCsv() {
                        : dqf.includes("approximate_address") ? "approximate" : "verified",
       arv_confidence: c.arv_confidence || "",
       data_quality_note: dq.summary || "",
+      skiptrace_locale: tps ? _plc.label : "",
+      city_may_be_county: (l.city && l.county && String(l.city).trim().toLowerCase() === String(l.county).trim().toLowerCase()) ? "yes" : "",
+      owner_name_conflict: (() => {
+        const o = ownerNames(l);
+        return o.conflict ? o.all.slice(1).map((x) => `${x.name} (${x.src})`).join(" | ") : "";
+      })(),
+      rehab_deducted: (() => {
+        if (c.max_bid_70 == null) return "";
+        const rt = rehabTrust(l).state;
+        return rt === "deducted" ? "yes" : rt === "land" ? "n/a (land)" : "NO — bid deducted $0";
+      })(),
       // the 21 columns the `...l` spread used to supply, in its precedence
       owner_name: l.owner_name, sale_date: l.sale_date, state: l.state, county: l.county,
       street_address: l.street_address, city: l.city, zip_code: l.zip_code,

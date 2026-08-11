@@ -497,6 +497,20 @@ def _merge_into_existing(
 
 
 async def main() -> int:
+    # THE LOCK, held across read -> re-scrape -> merge -> write_artifact. This
+    # script republishes the whole board after a long scraper pass; a concurrent
+    # board writer silently reverts whichever of the two finishes first, with no
+    # error anywhere. See web_artifact.board_lock.
+    from foreclosure_scraper.web_artifact import BoardLockBusy, board_lock
+    try:
+        with board_lock(ROOT, owner="patch_run_scrapers.py"):
+            return await _run()
+    except BoardLockBusy as exc:
+        log.error("patch_run.board_locked", detail=str(exc))
+        return 1
+
+
+async def _run() -> int:
     parser = argparse.ArgumentParser(
         description="Targeted scraper re-run + merge into docs/listings.json",
     )
@@ -537,7 +551,7 @@ async def main() -> int:
     listings_path = ROOT / "docs" / "listings.json"
     sold_pool_path = ROOT / "docs" / "foreclosure_sold_pool.json"
     run_health_path = ROOT / "docs" / "run_health.json"
-    from foreclosure_scraper.web_artifact import read_board_json
+    from foreclosure_scraper.web_artifact import read_board_records, write_artifact
     if not (listings_path.exists() or listings_path.with_name("listings.json.gz").exists()):
         log.error("patch_run.no_listings_file", path=str(listings_path))
         return 1
@@ -546,7 +560,16 @@ async def main() -> int:
     # so any listings that fail today's scope (e.g. counties added to
     # SCOPE_DENY_COUNTIES after this row was first scraped) get dropped
     # rather than persisted indefinitely.
-    raw_data = read_board_json(listings_path)  # falls back to listings.json.gz
+    # read_board_records, NOT read_board_json. read_board_json reads only the
+    # slim listings.json, and every heavy key lives in the index-aligned sidecar
+    # listings_detail.json: comps (33,484 records), vision (13,088), CAMA
+    # (12,952), rent comps (6,401), foreclosure sold comps (5,524). This script
+    # merges and writes the board back, so reading past the sidecar published a
+    # board with all of that stripped. write_artifact's identity-keyed backfill
+    # (_load_prior_details_by_key) rescued part of it on the NEXT publish, which
+    # is why the damage was survivable and invisible rather than either absent
+    # or obvious. Both files fall back to the committed .gz.
+    raw_data = read_board_records(ROOT / "docs")
     existing: list[Listing] = []
     skipped = scope_dropped = 0
     for d in raw_data:
@@ -808,11 +831,25 @@ async def main() -> int:
         log.info("patch_run.dry_run_done")
         return 0
 
-    # Write back BOTH files
-    listings_path.write_text(
-        json.dumps([li.model_dump(mode="json") for li in final_active],
-                   indent=2, default=str)
-    )
+    # Write the board back THROUGH write_artifact, not by hand.
+    #
+    # `listings_path.write_text(json.dumps(...))` wrote one file out of six. It
+    # did not regenerate listings.json.gz (the file the dashboard actually
+    # fetches), listings_detail.json / .gz, listings_slim.json.gz,
+    # docs/detail_shards/ or run_meta.json — and docs/listings.json is
+    # gitignored, so on the CI runner this workflow publishes from, the entire
+    # board output of the patch was a file git would never commit. The workflow
+    # then pushed run_health.json alone: a health report describing a board it
+    # did not ship. write_artifact emits all six from one payload, which is also
+    # the only way the index-aligned join across them stays true.
+    #
+    # The sold pool is NOT part of that payload — it is a standalone file the
+    # dashboard fetches whole — so it keeps its own plain write.
+    write_artifact(final_active,
+                   {"notes": f"patch_run_scrapers: {sorted(target_slugs)} re-run, "
+                             f"{merge_stats['added']} added, "
+                             f"{merge_stats['merged']} merged"},
+                   docs_dir=ROOT / "docs")
     sold_pool_path.write_text(
         json.dumps([li.model_dump(mode="json") for li in final_sold],
                    indent=2, default=str)

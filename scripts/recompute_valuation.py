@@ -35,7 +35,6 @@ USAGE
 from __future__ import annotations
 
 import argparse
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -43,21 +42,13 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
-from foreclosure_scraper.web_artifact import load_board, write_artifact  # noqa: E402
+from foreclosure_scraper.web_artifact import (  # noqa: E402
+    BoardLockBusy, board_lock, load_board, write_artifact,
+)
 from foreclosure_scraper.valuation import calc as vcalc  # noqa: E402
 from foreclosure_scraper.valuation import grading as vgrade  # noqa: E402
 
 DOCS = REPO / "docs"
-
-
-def _engine_running() -> bool:
-    # Pattern must not start with "-": pgrep reads a leading dash as an option,
-    # matches nothing, and the guard silently never fires.
-    r = subprocess.run(
-        ["pgrep", "-f", "--", r"run_local\.sh|-m foreclosure_scraper|merge_today_sources"
-                             r"|patch_vision_gemini|regenerate_dashboard"],
-        capture_output=True, text=True)
-    return bool(r.stdout.strip())
 
 
 def main() -> int:
@@ -66,10 +57,23 @@ def main() -> int:
                     help="recompute and report deltas without writing docs/")
     args = ap.parse_args()
 
-    if _engine_running():
-        print("a board writer is running and holds the board — refusing to write.")
+    # THE LOCK, held across load_board -> recompute -> write_artifact.
+    #
+    # What was here was a pgrep of five process names, taken BEFORE the span it
+    # was protecting. That is TOCTOU-racy by construction — it cannot see a
+    # writer that starts one second later — and it had to be kept in sync by
+    # hand with a list of board writers that has grown to a dozen. Whoever
+    # writes last silently reverts the other; nothing errors. See
+    # web_artifact.board_lock.
+    try:
+        with board_lock(REPO, owner="recompute_valuation.py"):
+            return _run(args)
+    except BoardLockBusy as exc:
+        print(f"{exc} — refusing to write.")
         return 1
 
+
+def _run(args) -> int:
     t0 = time.time()
     listings = load_board(DOCS)
     print(f"[{time.strftime('%H:%M:%S')}] loaded {len(listings):,} listings "
@@ -159,12 +163,24 @@ def main() -> int:
         print("\n--dry-run: nothing written")
         return 0
 
-    import json
-    meta_path = DOCS / "run_meta.json"
-    meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
-    meta = {k: v for k, v in meta.items() if k != "board"}  # write_artifact rebuilds it
-    meta["notes"] = (f"valuation recompute: {_n(a_arv):,} ARVs, "
-                     f"{_n(a_bid):,} max bids, {_n(a_deal):,} verdicts")
+    # PASS ONLY WHAT THIS RUN ACTUALLY COMPUTED.
+    #
+    # This used to read the prior docs/run_meta.json, strip "board", and hand
+    # the whole rest back as the summary. That looks like preservation and is
+    # actually laundering: write_artifact stamps health_carried_from /
+    # health_carried_keys ONLY when a key is ABSENT from the summary it is
+    # handed, so re-supplying by_source / source_status / regressions made the
+    # carry-forward branch dead code and the published file asserted a
+    # months-old per-source health report as current. Measured on the live
+    # board: by_source listed 85 sources summing 38,650 against a 38,500 board
+    # and omitted reo.vrm_va_reo entirely, with no health_carried_from anywhere
+    # in the file. run_meta.json is the only per-source health report there is.
+    #
+    # write_artifact carries the same values forward from the same file, and
+    # labels them. by_state and by_source_on_board it derives from the board
+    # being written, so those are current rather than carried.
+    meta = {"notes": (f"valuation recompute: {_n(a_arv):,} ARVs, "
+                      f"{_n(a_bid):,} max bids, {_n(a_deal):,} verdicts")}
     write_artifact(listings, meta, docs_dir=DOCS)
     print(f"\n[{time.strftime('%H:%M:%S')}] published in {time.time()-t0:.0f}s total")
     return 0

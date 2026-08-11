@@ -21,7 +21,6 @@ BOARD I/O CONTRACT (do not regress):
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import sys
 import time
@@ -33,7 +32,9 @@ from foreclosure_scraper.models import Listing, ListingType, PropertyKind
 from foreclosure_scraper.enrichment_vision import enrich_with_vision
 from foreclosure_scraper.valuation import calc as valuation_calc
 from foreclosure_scraper.valuation import grading as valuation_grading
-from foreclosure_scraper.web_artifact import load_board, write_artifact
+from foreclosure_scraper.web_artifact import (
+    BoardLockBusy, board_lock, load_board, read_board_records, write_artifact,
+)
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
 
@@ -61,26 +62,6 @@ def _hydrate(d: dict) -> Listing | None:
     return li
 
 
-def _merge_sidecar(docs: Path) -> list[dict]:
-    """Raw board records with the index-aligned lazy-detail sidecar folded back
-    into each record's raw — the same merge load_board() performs, minus the
-    validation step. Used only by the no-shrink recovery path."""
-    records = json.loads((docs / "listings.json").read_text())
-    detail_path = docs / "listings_detail.json"
-    details: list = []
-    if detail_path.exists():
-        try:
-            details = json.loads(detail_path.read_text())
-        except Exception:  # noqa: BLE001
-            details = []
-    for i, rec in enumerate(records):
-        if i < len(details) and isinstance(details[i], dict) and details[i]:
-            raw = rec.get("raw")
-            if isinstance(raw, dict):
-                raw.update(details[i])
-    return records
-
-
 def load_board_no_shrink(docs: Path | str = DOCS) -> tuple[list[Listing], int]:
     """load_board() plus a hard never-shrink guarantee.
 
@@ -90,9 +71,17 @@ def load_board_no_shrink(docs: Path | str = DOCS) -> tuple[list[Listing], int]:
     re-load every record through the lenient hydrator and keep the strays.
 
     Returns (listings, n_records_on_disk) so the caller can hard-guard the write.
+
+    The record count and the recovery pass both come from read_board_records(),
+    which is load_board()'s own sidecar merge without the validation step — so
+    the two can no longer disagree about what "the board" is, and both work from
+    the committed .gz on a checkout where the uncompressed twin (gitignored,
+    >100MB) is absent. A local copy of that merge used to live here and read
+    docs/listings.json unconditionally.
     """
     docs = Path(docs)
-    n_records = len(json.loads((docs / "listings.json").read_text()))
+    records = read_board_records(docs)
+    n_records = len(records)
     board = load_board(docs)
     if len(board) == n_records:
         return board, n_records
@@ -100,7 +89,7 @@ def load_board_no_shrink(docs: Path | str = DOCS) -> tuple[list[Listing], int]:
           f"{n_records - len(board)} invalid record(s) — recovering them leniently "
           f"so the published board cannot shrink", flush=True)
     recovered: list[Listing] = []
-    for rec in _merge_sidecar(docs):
+    for rec in records:
         try:
             recovered.append(Listing.model_validate(rec))
             continue
@@ -128,20 +117,27 @@ def needs_vision(li: Listing) -> bool:
     return vis.get("_provider") == "ollama"
 
 
-def _prior_meta(docs: Path) -> dict:
-    """Carry the existing run_meta.json fields forward — write_artifact rebuilds
-    run_meta from the summary it is handed, so an empty summary would blank the
-    source_status / by_source panels the full run published."""
-    try:
-        meta = json.loads((docs / "run_meta.json").read_text())
-    except Exception:  # noqa: BLE001
-        return {}
-    return {k: meta[k] for k in
-            ("by_source", "by_state", "by_county_top", "source_status", "regressions", "errors")
-            if k in meta}
-
-
 async def main() -> int:
+    # THE LOCK, held across load_board -> vision -> write_artifact -> publish.
+    #
+    # This is the longest-held board in the system: VISION_MAX_SECONDS defaults
+    # to 14400 (4h), so a board loaded at 09:33 is still being written back at
+    # 13:36 — straight over the noon lrcpwa pass and the 2pm SOS pass, both of
+    # which had already published. On 2026-08-10 that reverted 1,064 resolved
+    # parcels, 343 county values and 410 absentee tags, and nothing errored.
+    #
+    # Reentrant: run_daily_vision.sh already holds this lock when it invokes
+    # this script, and passes it down through FORECLOSURE_BOARD_LOCK_HELD.
+    try:
+        with board_lock(Path(__file__).resolve().parent.parent,
+                        owner="patch_vision_gemini.py"):
+            return await _run()
+    except BoardLockBusy as exc:
+        print(f"{exc} — skipping this vision pass.", flush=True)
+        return 0
+
+
+async def _run() -> int:
     # Read through load_board so the lazy-detail sidecar (vision/comps/cama) is
     # merged into raw BEFORE needs_vision() runs — otherwise every lead looks
     # un-scored and the pass re-grades the same head of the list forever.
@@ -192,9 +188,24 @@ async def main() -> int:
               f"{n_records} records — refusing to shrink the board", flush=True)
         return 2
 
-    summary = _prior_meta(DOCS)
-    summary["notes"] = (f"daily vision pass: {scored} of {len(listings)} listings "
-                        f"have a vision report")
+    # PASS ONLY WHAT THIS RUN ACTUALLY COMPUTED.
+    #
+    # _prior_meta() used to live here: it read the prior docs/run_meta.json and
+    # handed by_source / by_state / source_status / regressions / errors straight
+    # back as this pass's summary. That looks like preservation and is actually
+    # laundering — write_artifact stamps health_carried_from /
+    # health_carried_keys ONLY when a key is ABSENT from the summary it is
+    # handed, so re-supplying them made the carry-forward branch dead code and
+    # the published file asserted a months-old per-source health report as
+    # current, unlabelled. Measured on the live board: by_state summed 36,060
+    # against a 38,500 board (2,440 leads, 6.3%, unaccounted) and no
+    # health_carried_from appeared anywhere in the file.
+    #
+    # write_artifact carries the same values forward from the same file and
+    # labels them; by_state and by_source_on_board it derives from the board
+    # being written, so those come out current instead of carried.
+    summary = {"notes": (f"daily vision pass: {scored} of {len(listings)} listings "
+                         f"have a vision report")}
     write_artifact(listings, summary, docs_dir=DOCS)
     print(f"[{time.strftime('%H:%M:%S')}] wrote {DOCS/'listings.json'} + sidecar — "
           f"{len(listings)} listings, {scored} total now have vision", flush=True)

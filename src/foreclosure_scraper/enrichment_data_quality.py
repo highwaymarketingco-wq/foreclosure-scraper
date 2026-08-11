@@ -8,8 +8,11 @@ dashboard, sheet, and email can surface investor-facing caveats:
     verify before relying.
   * approximate_address — street_address came from a parcel-centroid
     reverse-geo (not a confident situs match).
-  * low_arv_confidence — calc ARV is from tax_value × 1.25 or bid × 2.4
-    proxy, not from comp-grounded valuation.
+  * low_arv_confidence — calc ARV is a proxy (a multiplier on an anchor
+    figure) rather than a comp-grounded valuation. The multiplier is NOT
+    fixed — improved rows use bid × 2.4, land rows bid × 1.5, and the
+    assessed-value tiers use × 1.25 / × 1.10 — so the caption reads the
+    real factor back out of the calc note instead of naming one.
   * no_sqft — refused to compute rehab because living_sqft is missing.
   * synthetic_county — county was set by the resolver retag (we trust
     case# but want the dashboard to know it's derived).
@@ -74,6 +77,8 @@ ARV TRUST — TWO JOBS HERE
    slim allowlist, so it reaches every surface including the phone.
 """
 from __future__ import annotations
+
+import re
 
 import structlog
 
@@ -148,6 +153,59 @@ def _arv_confidence(li: Listing) -> str | None:
         return "LOW"
     if "× 2.4" in first or "× 1.5" in first:
         return "LOW"
+    return None
+
+
+# The ARV-source note carries the multiplier that was actually used. Read it
+# back rather than restating one, because there is no single proxy factor:
+# improved rows are bid × 2.4, land rows bid × 1.5, and the assessed-value
+# tiers are × 1.25 / × 1.10. Hard-coding "bid × 2.4" told the reader of a land
+# lead the wrong arithmetic on a number they are about to bid against.
+_BID_PROXY_MULT_RE = re.compile(
+    r"proxy from bid\s*[×x*]\s*([0-9]+(?:\.[0-9]+)?)", re.I
+)
+# CLOSED vocabulary, deliberately not `ARV from (.+?) × (N)`. The wildcard
+# version matched "ARV from 2 land comps × 0.88 ac" and read the ACREAGE as the
+# proxy multiplier — captioning 3,948 comp-grounded ARVs as proxies, and
+# printing "× 0.88" as if it were the factor. Only these four labels name an
+# anchor figure a proxy tier multiplies (see _anchor_value in valuation/calc).
+_ANCHOR_MULT_RE = re.compile(
+    r"ARV from (county market value|assessor appraised value|tax-assessed value"
+    r"|tax-assessed)\s*[×x*]\s*([0-9]+(?:\.[0-9]+)?)",
+    re.I,
+)
+# Tier notes are appended in tier order, so a REFUSED tier's note can sit ahead
+# of the tier that actually produced the ARV. Naming the refused arithmetic
+# would be the same defect wearing a different number.
+_REFUSAL_WORDS = ("WITHHELD", "exceeds the", "refused", "Insufficient")
+
+# Flags whose own message already states what happened to the ARV. When one of
+# these is present the low-confidence line must not restate it.
+_ARV_STATUS_FLAGS = (
+    "arv_not_computed",
+    "arv_withheld",
+    "arv_bid_and_roi_withheld",
+    "arv_no_independent_check",
+)
+
+
+def _arv_proxy_basis(li: Listing) -> str | None:
+    """Name the arithmetic behind a LOW-confidence proxy ARV, e.g.
+    'the opening bid × 1.5' or 'tax-assessed × 1.25'. None when no tier note
+    survived, in which case the caller must fall back to multiplier-free
+    wording rather than guessing a factor."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    calc = raw.get("calc") or {}
+    notes = calc.get("notes") or []
+    for n in notes:
+        if not isinstance(n, str) or any(w in n for w in _REFUSAL_WORDS):
+            continue
+        m = _BID_PROXY_MULT_RE.search(n)
+        if m:
+            return f"the opening bid × {m.group(1)}"
+        m = _ANCHOR_MULT_RE.search(n)
+        if m:
+            return f"{m.group(1).strip()} × {m.group(2)}"
     return None
 
 
@@ -275,7 +333,12 @@ def enrich_data_quality(listings: list[Listing]) -> dict:
             li.raw["data_quality"] = {
                 "flags": flags,
                 "arv_confidence": arv_conf,
-                "summary": _summary_text(flags, sanity if isinstance(sanity, list) else None),
+                "summary": _summary_text(
+                    flags,
+                    sanity if isinstance(sanity, list) else None,
+                    _arv_proxy_basis(li) if arv_conf == "LOW" else None,
+                    (raw.get("calc") or {}).get("arv_expected") is not None,
+                ),
             }
         except Exception as exc:  # noqa: BLE001
             stats["exceptions"] += 1
@@ -289,13 +352,27 @@ def enrich_data_quality(listings: list[Listing]) -> dict:
     return stats
 
 
-def _summary_text(flags: list[str], arv_flags: list[str] | None = None) -> str:
+def _summary_text(
+    flags: list[str],
+    arv_flags: list[str] | None = None,
+    arv_proxy_basis: str | None = None,
+    arv_published: bool = True,
+) -> str:
     """One-line investor-readable caveat string.
 
     `arv_flags` is calc's own flag list; when present the ARV caveats name the
     actual reason ("comp_kind_mismatch") instead of only the severity, because
     the operator's next action differs completely between "the assessor row is
     a warehouse" and "the comps came from a city centroid".
+
+    `arv_proxy_basis` is the proxy arithmetic THIS lead actually used, read back
+    from the calc note by `_arv_proxy_basis`. None means no proxy tier produced
+    this ARV, and the caption must then NOT claim proxy arithmetic at all.
+
+    `arv_published` says whether a value actually reached the board. A LOW
+    confidence with no ARV is 12,751 of the LOW cohort; describing the
+    arithmetic behind a number that was never published is the same defect as
+    describing it with the wrong multiplier.
     """
     if not flags:
         return NO_CAVEATS_SUMMARY
@@ -310,7 +387,22 @@ def _summary_text(flags: list[str], arv_flags: list[str] | None = None) -> str:
     if "no_sqft" in flags:
         msgs.append("⚠️ rehab/ARV unreliable — sqft missing")
     if "low_arv_confidence" in flags:
-        msgs.append("📊 ARV is a proxy (tax × 1.25 or bid × 2.4), not comp-grounded")
+        if arv_proxy_basis:
+            msgs.append(f"📊 ARV is a proxy ({arv_proxy_basis}), not comp-grounded")
+        elif arv_published:
+            # LOW but comp-grounded (3,948 leads) or from a recorded-sales /
+            # HPI-rescale tier. "not comp-grounded" was simply false on these.
+            msgs.append("📊 ARV confidence is LOW — treat the value as indicative; "
+                        "see the valuation notes for how it was derived")
+        elif not any(f in flags for f in _ARV_STATUS_FLAGS):
+            # No ARV reached the board and nothing else says so. Dropping the
+            # (false) proxy sentence here without replacing it left 1,284 leads
+            # printing "no caveats" — a harder failure than the wrong
+            # multiplier, because it reads as a clean valuation.
+            msgs.append("📊 no ARV was derived — the valuation ran and published "
+                        "no value, so there is nothing to price against")
+        # else: arv_not_computed / arv_withheld / arv_bid_and_roi_withheld /
+        # arv_no_independent_check already state the ARV's status in full.
     if "sqft_estimated" in flags:
         msgs.append("📐 living sqft is an ESTIMATE (building footprint × stories, ~2019)")
     if "arv_outlier" in flags:

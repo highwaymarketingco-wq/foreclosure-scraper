@@ -50,6 +50,24 @@ LOAN_RATE_MONTH = 0.008   # 9.5% APR (hard money) / 12
 REHAB_CONTINGENCY_PCT = 0.125  # every pro pads the repair estimate 10-15% for surprises
 ASSIGNMENT_FEE = 10000    # typical residential wholesale assignment fee
 
+# ---- A max bid that deducted NO repairs ------------------------------------
+# THE STRING IS AN INTERFACE, AND IT IS NOT A FREE CHOICE. docs/dashboard.js's
+# `rehabTrust()` already recognises exactly three literals — `rehab_not_deducted`,
+# `rehab_unknown_zeroed`, `max_bid_no_rehab` (docs/dashboard.js:1366) — in
+# `calc.arv_flags`, `raw.qa_flags` or `data_quality.flags`, and renders the same
+# "this bid deducted $0 of repairs" treatment on the bid in three places. Any
+# other spelling renders NOTHING, silently. This file emits the first of the
+# three.
+#
+# It goes in `arv_flags` rather than a field of its own for the same reason: that
+# is the list the client reads. The cost is that `grading.arv_trust` sees it and
+# withholds the deal VERDICT — measured, that is 15 leads of the 9,190, because a
+# verdict also needs an opening bid — and `grading.ARV_FLAGS_WEAK_EVIDENCE`
+# classifies it explicitly so it can never blank the money. The full reasoning
+# and the measured counts are at the write site in compute(), beside the
+# `0.75 * arv - rehab_buy` line this is about.
+MAX_BID_NO_REHAB_FLAG = "rehab_not_deducted"
+
 # Living-sqft plausibility band for $/sqft ARV. A handful of real records
 # legitimately sit in [8000,10000) (large estates), so only HARD-reject clearly
 # bad values: below this floor is a data-entry/parse error (sqft-as-acres, a lot
@@ -70,6 +88,55 @@ MAX_LAND_PPA = 2_000_000  # $/acre
 # million phantom ARV. Above this ceiling the proxy is not trustworthy, so we
 # return ARV-unavailable (honest) instead of a fabricated number.
 MAX_PROXY_ARV = 2_000_000
+
+# ===========================================================================
+# EVERY REFUSAL MUST SPEAK, NOT MERELY TAKE NOTES
+#
+# THE DEFECT. `MAX_PROXY_ARV` above is a REFUSAL: the engine computed a number,
+# decided it was a judgment/debt figure rather than a property value, and
+# declined to publish it. Six code paths do that, and every one of them wrote a
+# `notes` line and NOTHING ELSE — no `arv_flags` entry, no `arv_withheld`. So
+# `grading.arv_trust()` read "no flags, no withheld" as level "ok", every
+# downstream gate passed, and `enrichment_equity` — which falls back to
+# `market_value` as its own ARV when calc published none — went on to publish an
+# equity figure off the very number calc had just thrown away.
+#
+# Measured by replaying compute()+grade() over the live 38,500-lead board: 21
+# leads whose ARV had been refused here still published equity totalling
+# $40,194,700, the largest $7,934,600. Index 781, 200 Miracle Mile Dr, Anderson
+# SC, carried calc's own sentence — "Proxy ARV ($12,480,200) exceeds the
+# $2,000,000 plausibility ceiling ... ARV withheld" — beside "Equity $7,934,600"
+# derived from arv_used 12,480,200, the exact figure that sentence rejected,
+# with arv_flags None and arv_withheld None.
+#
+# This was a leak AROUND the withholding gate, not through it: the gate itself
+# is airtight (0 of 531 arv_withheld rows published a derived figure). The fix
+# is therefore NOT another withholding rule. It is to say the refusal in the ONE
+# vocabulary the gate already speaks — a flag string — exactly the way
+# grading.anomaly_flags() handles the ROI/$2M case.
+#
+# TWO verdicts, because a refusal has two very different outcomes:
+#
+#   ARV_FLAG_PROXY_CEILING — nothing survived it. The lead publishes no ARV at
+#       all, and `arv_withheld` now carries the number that was refused, so the
+#       row is auditable instead of merely blank. CONTRADICTED in grading.py,
+#       classified alongside `arv_above_anchor_extreme` / `ppsf_ceiling` for the
+#       same reason: calc already publishes nothing, and the set is kept
+#       complete so it stays correct if that ever changes.
+#
+#   ARV_FLAG_TIER_CEILING — one TIER's number blew the ceiling and was refused;
+#       a LATER tier carried the lead. The number on screen is a different
+#       tier's and is judged on ITS flags, so this is a disclosure ("the tier
+#       you might expect to have produced this did not"), not a contradiction of
+#       what shipped. WEAK in grading.py — the same classification, and for the
+#       same reason, as `land_comps_rejected`.
+#
+# Both strings are read by grading.py. They are deliberately `arv_`-prefixed and
+# contain a word from docs/dashboard.js's `_ARV_BAD_WORDS` / weak default, so a
+# board published before dashboard.js learns them still renders a warning rather
+# than silence.
+ARV_FLAG_PROXY_CEILING = "arv_proxy_above_ceiling"
+ARV_FLAG_TIER_CEILING = "arv_tier_refused_ceiling"
 
 
 # ===========================================================================
@@ -180,6 +247,55 @@ ARV_ANCHOR_SOFT_MULT_IMPROVED = 4.0   # ~p95 for improved
 ARV_ANCHOR_HARD_MULT_IMPROVED = 10.0  # between p95 and p99
 ARV_ANCHOR_SOFT_MULT_LAND = 6.0       # just under p90 for land; see note
 ARV_ANCHOR_HARD_MULT_LAND = 20.0      # just under p99
+# ---- When the county disagrees with ITSELF ---------------------------------
+# `_anchor_value` takes the FIRST non-null of (market_value, cama.appraised_value,
+# tax_value) and never asks whether the other two agree with it. Measured on the
+# live board, 1,282 leads carry two or more of those figures disagreeing by >= 3x
+# — [23421] holds $148,600 and $1,153,700 for one parcel. At least one of them is
+# describing something else, and which one happens to be FIRST is an accident of
+# which scraper populated which field.
+#
+# TWO consequences, and they need different treatments.
+#
+# (1) THE HARD WITHHOLD. `_arv_sanity`'s anchor test deletes an ARV outright at
+#     10x (improved) / 20x (land) the anchor. Measured: 27 leads were withheld
+#     against the FIRST figure and would have survived against the LARGEST,
+#     deleting $12,980,900 of ARV purely by field order. A withhold is the
+#     engine's strongest claim — "no county record can support this number" — so
+#     it now has to be true of EVERY county record, not of whichever one sorted
+#     first. The SOFT flag still fires off the primary anchor, so those 27 come
+#     back as `arv_above_anchor` (CONTRADICTED: published, loudly flagged, no
+#     money on it) rather than as a blank row. Publishing the number and the
+#     disagreement beats deleting both.
+# (2) THE DISAGREEMENT ITSELF is a fact about the lead. WEAK, not contradicted:
+#     it does not dispute the ARV, it says the record the ARV was measured
+#     against is one of two that cannot both be this parcel.
+#
+# THE THRESHOLD IS PER-PAIR, because the three fields are not three readings of
+# one quantity. Measured over the live board, ratio of the larger to the smaller:
+#
+#   market_value vs cama.appraised_value   n=6,901   p50 1.00  p90 1.00  p95 1.00
+#   cama.appraised_value vs tax_value      n=2,179   p50 1.00  p90 1.00  p95 1.00
+#   market_value vs tax_value             n=11,128   p50 1.00  p90 3.44  p95 6.17
+#
+# Any pair involving the assessor's own appraised value AGREES, exactly, on
+# ~95% of leads — 1.00% break 3x. So a 3x break there really is two records
+# describing two parcels.
+#
+# market_value vs tax_value does not behave that way at all: 11.11% break 3x.
+# That is not 1,236 broken joins, it is this file's own documented field
+# semantics — `li.tax_value` "is a different, often land-only figure" (see the
+# tier-1b comment in `_arv_signals`), so a full-market appraisal running several
+# times a land-only tax figure is the EXPECTED relationship. A flag that fires
+# on one lead in nine for a known difference is wallpaper, and wallpaper is how
+# the real warnings came to be ignored. Its curve flattens at ~10x (>=8x 3.02%,
+# >=10x 2.17%, >=12x 1.68%), which is where it stops describing the tax roll and
+# starts describing a different parcel: 241 leads, the same order as the other
+# pairs' natural tail.
+COUNTY_VALUE_DISAGREE_MULT = 3.0        # two appraisal-basis figures
+COUNTY_VALUE_DISAGREE_MULT_TAX = 10.0   # market value vs the tax roll
+ARV_FLAG_COUNTY_DISAGREE = "county_values_disagree"
+
 # The land SOFT multiple deliberately sits BELOW the measured p90 (7.61) rather
 # than at it, because that percentile is itself contaminated: it was computed on
 # the broken board, where mismatched small-lot comps had already inflated
@@ -361,6 +477,26 @@ def _arv_calibration_factor(li: Listing) -> float:
     return f if 0.4 <= f <= 2.5 else 1.0
 
 
+def _refuse(sink: list | None, flag: str, value: float | None = None) -> None:
+    """Record a REFUSAL so compute() can raise a flag for it.
+
+    The ARV tiers can only speak in `notes` — `_arv_signals` and `_land_arv`
+    both return a fixed 5-tuple that seven tests unpack positionally — and a
+    note is not a flag: nothing downstream gates on prose. The existing idiom
+    for this is a marker string read back out of the notes (see
+    LAND_COMPS_REJECTED_MARKER and friends), which works for a verdict but
+    cannot carry the NUMBER that was refused, and `arv_withheld` is exactly that
+    number.
+
+    So refusals go into an optional sink list instead: `sink.append((flag,
+    value))`. The parameter defaults to None, so every existing caller —
+    including the three tests that call `_arv_signals(li)` with one argument —
+    is untouched, and a caller that wants the verdicts passes a list.
+    """
+    if sink is not None:
+        sink.append((flag, value))
+
+
 def _plausible_living_sqft(li: Listing) -> float | None:
     """Subject living_sqft usable for a $/sqft ARV, or None if implausible.
 
@@ -379,6 +515,42 @@ def _plausible_living_sqft(li: Listing) -> float | None:
         return None
     return sqft
 
+# ---- The seller's own asking price ----------------------------------------
+# THE DEFECT. `RETAIL_PRICE_SOURCES` named only the two house portals, so the
+# ARV-vs-list cross-check below never ran on the two LAND portals — where
+# `opening_bid` is not an auction floor at all but a price the owner is publicly
+# asking. Measured on the live board (597 leads across the two, 555 carrying
+# both an ARV and an ask), the blind spot bit in BOTH directions:
+#
+#   OVER  — 83 leads carry an ARV >= 1.6x the ask, 31 at >= 3x (median 4.5x).
+#           48 publish a max bid that EXCEEDS the asking price, $13,844,500 of
+#           them. [1073] Lot 28 Big Hill Road, Transylvania NC is listed at
+#           $120,000 and the board answered ARV $834,700, max bid $626,000, ROI
+#           342.5%, GREAT, arv_flags None. On an AUCTION row a 7x gap is the flip
+#           thesis and clamping it would kill every real deal — which is why the
+#           check only ever fired downward. On a RETAIL row it is not a thesis,
+#           it is a contradiction: anyone may buy the parcel at the ask, so an
+#           ARV several times the ask says the comps, not the seller, are wrong.
+#   UNDER — 113 leads where the ask is more than 3x the ARV (median 6.0x, worst
+#           301x). Cause: the land tier order puts the county anchor ahead of any
+#           listing price, and an NC present-use / forestry deferment value
+#           (G.S. 105-277.2) is legally 5-20% of market. [33422] 3465 Yancey Road
+#           carries a $6,290,000 ask against a $20,900 ARV and a $15,700 max bid.
+#
+# Adding the two sources to RETAIL_PRICE_SOURCES fixes UNDER with code that
+# already exists and is already tested: the `ratio < 0.6` branch anchors the ARV
+# to the listing price, i.e. it makes a published asking price OUTRANK a
+# present-use assessment, which is the correct precedence — one is a price
+# somebody is actually asking, the other is a statutory fraction of one.
+#
+# OVER needs the new half, because that direction was deliberately silent:
+# `ARV_VS_ASK_MAX` below. Kept as its own set so the downward anchor and the
+# upward flag can never be applied to an auction source by accident.
+SELLER_ASK_SOURCES = {
+    "national.landwatch",
+    "national.landandfarm",
+}
+
 # Sources where opening_bid is a retail asking price (and therefore a useful
 # ARV sanity-check). For everything else (auctions, lis pendens, REO floors,
 # law-firm foreclosure sales) the bid is a discount-to-ARV floor — clamping
@@ -386,7 +558,32 @@ def _plausible_living_sqft(li: Listing) -> float | None:
 RETAIL_PRICE_SOURCES = {
     "national.homeharvest",
     "national.realtor_foreclosures",
-}
+} | SELLER_ASK_SOURCES
+
+# The same 1.6x the "high-discount signal" branch has always used, now given a
+# name because on a SELLER-ASK source it stops being a signal and becomes a
+# verdict. CONTRADICTED in grading.py: the ask is a price the whole market can
+# transact at today, so an ARV 60%+ above it is not upside, it is two records
+# describing different dirt.
+ARV_VS_ASK_MAX = 1.6
+ARV_FLAG_ABOVE_ASK = "arv_above_list_price"
+
+# ---- A land parcel carrying a house's square footage -----------------------
+# 315 board leads are typed `land` and carry a living_sqft inside the plausible
+# [300, 10000] dwelling band. `_arv_signals` reads that as "mis-typed house" and
+# routes them to the $/sqft path (see its comment) — a defensible reading, but
+# only one of the two available: the other is that the sqft came off a different
+# parcel. Nothing on the record says which, and both cannot be true.
+#
+# Measured after the trust gate: 227 of the 315 publish a max bid, $56,935,000
+# in total, and 89 of those carried NO arv_flag at all. [1073] Lot 28 Big Hill
+# Road is a numbered LOT priced as a 3,420-sqft house.
+#
+# So this is flagged, not resolved. CONTRADICTED, because "another record
+# disputes the number that shipped" is exactly what a kind/sqft conflict is, and
+# because the cost of being wrong runs one way: withholding a bid on a real
+# house loses a lead, publishing one on a bare lot loses an auction deposit.
+ARV_FLAG_LAND_SQFT = "arv_land_sqft_mismatch"
 
 
 @dataclass
@@ -585,6 +782,37 @@ def _anchor_value(li: Listing) -> tuple[float | None, str | None]:
     return None, None
 
 
+def _county_values(li: Listing) -> list[tuple[float, str]]:
+    """EVERY 100%-basis county figure on this lead, in preference order.
+
+    `_anchor_value` returns the first of these and `_cross_check_anchor` the
+    first without the commercial veto; both of those are "which one number do we
+    use" questions and their answers are unchanged. This is the different
+    question the file never asked: "do the county's own records agree with each
+    other?" See COUNTY_VALUE_DISAGREE_MULT for what the answer is worth.
+
+    No commercial veto here on purpose — the same reasoning as
+    `_cross_check_anchor`. A mis-joined assessor row still disagreeing 8x with
+    the tax roll is a fact about the lead; the flag it raises never upgrades
+    anything, it only discloses.
+    """
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    cama = raw.get("cama") if isinstance(raw.get("cama"), dict) else {}
+    out: list[tuple[float, str]] = []
+    for val, label in (
+        (li.market_value, "county market value"),
+        (cama.get("appraised_value"), "assessor appraised value"),
+        (li.tax_value, "tax-assessed value"),
+    ):
+        try:
+            v = float(val) if val is not None else None
+        except (TypeError, ValueError):
+            continue
+        if v and v > 1000:
+            out.append((v, label))
+    return out
+
+
 def _cross_check_anchor(li: Listing) -> tuple[float | None, str | None, bool]:
     """The county figure to MEASURE the ARV against. Returns (value, label, trusted).
 
@@ -766,10 +994,14 @@ def _sale_year(sale: dict | None) -> int | None:
     return _plausible_year(int(m.group(1))) if m else None
 
 
-def _land_arv(li: Listing) -> tuple[float | None, float | None, float | None, str, list[str]]:
+def _land_arv(li: Listing, refused: list | None = None
+              ) -> tuple[float | None, float | None, float | None, str, list[str]]:
     """Land-specific ARV path. Comps come pre-filtered by lot acreage band
     (±50% in enrichment_comps), so use sold_price ÷ acreage to get $/acre,
     then apply to the subject's acreage. No living_sqft involvement.
+
+    `refused` is the optional refusal sink — see `_refuse`. Three tiers here can
+    blow MAX_PROXY_ARV, and two of them used to do it in complete silence.
     """
     notes: list[str] = []
     raw = li.raw if isinstance(li.raw, dict) else {}
@@ -932,17 +1164,28 @@ def _land_arv(li: Listing) -> tuple[float | None, float | None, float | None, st
     ratio_c = raw.get("recorded_ratio_comps") or {}
     ratio = ratio_c.get("median_ratio")
     basis = ratio_c.get("assessed_basis")
-    if (ratio and basis and float(basis) > 0 and int(ratio_c.get("count") or 0) >= 3
-            and float(ratio) * float(basis) <= MAX_PROXY_ARV):
+    if ratio and basis and float(basis) > 0 and int(ratio_c.get("count") or 0) >= 3:
         ratio, basis = float(ratio), float(basis)
-        low = round((ratio_c.get("p25_ratio") or ratio * 0.9) * basis, -2)
-        high = round((ratio_c.get("p75_ratio") or ratio * 1.1) * basis, -2)
-        expected = min(max(round(ratio * basis, -2), low), high)
-        notes.append(
-            f"Land ARV from {ratio_c['count']} RECORDED nearby sales priced against county "
-            f"assessed value ({ratio:.2f}× median sale-to-assessed × ${basis:,.0f})"
-        )
-        return expected, low, high, ("MEDIUM" if ratio_c.get("confidence") == "MEDIUM" else "LOW"), notes
+        # The ceiling was a bare `and` in the tier's own condition, so blowing it
+        # dropped straight through to the county anchor with NOTHING written
+        # down — no note, no flag, no trace that a tier had been refused. Say it.
+        if ratio * basis > MAX_PROXY_ARV:
+            _refuse(refused, ARV_FLAG_TIER_CEILING, round(ratio * basis, -2))
+            notes.append(
+                f"Land sale-to-assessed ARV (${ratio * basis:,.0f}) exceeds the "
+                f"${MAX_PROXY_ARV:,.0f} plausibility ceiling — the assessed basis "
+                f"(${basis:,.0f}) is likely a judgment or portfolio figure, so this "
+                f"tier was refused and a later one carried the lead."
+            )
+        else:
+            low = round((ratio_c.get("p25_ratio") or ratio * 0.9) * basis, -2)
+            high = round((ratio_c.get("p75_ratio") or ratio * 1.1) * basis, -2)
+            expected = min(max(round(ratio * basis, -2), low), high)
+            notes.append(
+                f"Land ARV from {ratio_c['count']} RECORDED nearby sales priced against county "
+                f"assessed value ({ratio:.2f}× median sale-to-assessed × ${basis:,.0f})"
+            )
+            return expected, low, high, ("MEDIUM" if ratio_c.get("confidence") == "MEDIUM" else "LOW"), notes
 
     # Tier 2: county 100%-basis value × 1.10 (land is assessed closer to market
     # than improved property). `market_value` was missing from this chain, so a
@@ -979,6 +1222,16 @@ def _land_arv(li: Listing) -> tuple[float | None, float | None, float | None, st
                     f"{COUNTY_ANCHOR_MARKER}, so it cannot be cross-checked against it"
                 )
                 return expected, round(expected * 0.85, -2), round(expected * 1.15, -2), "LOW", notes
+            # Same silent drop-through as tier 1b above: the ceiling was an `if`
+            # with no `else`, so a county figure north of $1.8M on a bare lot
+            # took the lead to the bid proxy with nothing recorded.
+            _refuse(refused, ARV_FLAG_TIER_CEILING, expected)
+            notes.append(
+                f"Land ARV from {anchor_lbl} × 1.10 (${expected:,.0f}) exceeds the "
+                f"${MAX_PROXY_ARV:,.0f} plausibility ceiling — a county figure that "
+                f"large on this parcel is a judgment or a mis-joined record, so this "
+                f"tier was refused."
+            )
 
     # Tier 3: bid × 1.5 (land foreclosures discount less than improved)
     if li.opening_bid and li.opening_bid > 0:
@@ -986,8 +1239,31 @@ def _land_arv(li: Listing) -> tuple[float | None, float | None, float | None, st
         # Reject runaway proxies: opening_bid on a comps-empty land row may be a
         # judgment/debt figure, not a property bid — don't emit a phantom ARV.
         if expected <= MAX_PROXY_ARV:
-            notes.append(f"Land ARV {BID_PROXY_MARKER} × 1.5 ({li.opening_bid:,.0f})")
+            # "Land ARV proxy from bid" — the leading word defeated the client's
+            # /^ARV proxy from bid/i classifier, so 815 of the 949 bid-proxy
+            # leads rendered with no proxy caption at all while the 134 improved
+            # ones did. Same marker, same read-back, sentence re-ordered so both
+            # tiers start with the same six words.
+            notes.append(
+                f"ARV {BID_PROXY_MARKER} × 1.5 ({li.opening_bid:,.0f} × 1.5 — land)"
+            )
             return expected, round(expected * 0.7, -2), round(expected * 1.3, -2), "LOW", notes
+        # The last tier. Nothing survives, so this is a WITHHELD ARV, not a
+        # refused tier — and it used to end at the "Insufficient land data"
+        # sentence below, which tells the reader we found nothing when in fact we
+        # found an opening figure and judged it not to be a property bid.
+        _refuse(refused, ARV_FLAG_PROXY_CEILING, expected)
+        # WORDED TO AVOID `BID_PROXY_MARKER`. compute() raises `bid_proxy_arv`
+        # by substring-matching that marker across the tier notes, and this note
+        # says the ×1.5 land proxy was REFUSED — no ARV came from the bid, so
+        # letting the phrase leak in here would flag 40 leads as "the ARV is the
+        # opening bid × 1.5" on rows that publish no ARV at all.
+        return None, None, None, "LOW", notes + [
+            f"ARV WITHHELD: the ×1.5 land estimate on this opening figure "
+            f"(${expected:,.0f}) exceeds the ${MAX_PROXY_ARV:,.0f} plausibility "
+            f"ceiling — an opening figure this large on a bare parcel is a judgment "
+            f"or total-debt number, not a property bid."
+        ]
 
     # Carry the accumulated notes through — this used to return a bare
     # ["Insufficient land data for ARV"], silently discarding the explanation of
@@ -997,7 +1273,8 @@ def _land_arv(li: Listing) -> tuple[float | None, float | None, float | None, st
     return None, None, None, "LOW", notes + ["Insufficient land data for ARV"]
 
 
-def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None, str, list[str]]:
+def _arv_signals(li: Listing, refused: list | None = None
+                 ) -> tuple[float | None, float | None, float | None, str, list[str]]:
     """Return (low, expected, high, confidence, notes) for ARV.
 
     Best signal: 3 zip-matched comps × subject sqft (TRUE comp-based ARV).
@@ -1006,6 +1283,10 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
     Worst:       opening_bid × 2.4 (foreclosures often run ~40% of ARV at the floor).
 
     Range = expected ± 15%. Land takes a separate $/acre path (_land_arv).
+
+    `refused` is the optional refusal sink — see `_refuse`. Callers that pass one
+    get every MAX_PROXY_ARV verdict back as a (flag, refused_value) pair;
+    callers that do not are completely unaffected.
     """
     # 2026-06-19: a listing with living_sqft is an IMPROVED property even if
     # mis-classified as LAND — never value a house off $/acre land comps (that
@@ -1013,7 +1294,7 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
     # sqft-comp path below; if no sqft comps exist it returns ARV-unavailable
     # (honest) rather than a fabricated land value.
     if li.property_kind == PropertyKind.LAND and not (li.living_sqft and li.living_sqft > 0):
-        return _land_arv(li)
+        return _land_arv(li, refused)
 
     notes: list[str] = []
     raw = li.raw if isinstance(li.raw, dict) else {}
@@ -1118,6 +1399,11 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
         # judgment/portfolio figure that leaked into the field, and multiplying
         # it by a ratio would launder that into a confident phantom ARV.
         if expected > MAX_PROXY_ARV:
+            # A REFUSED TIER, not a withheld ARV: the zestimate / tax tiers below
+            # still get their turn. Weak flag, so the reader is told which
+            # evidence was thrown away without the money coming off a number
+            # this refusal says nothing about.
+            _refuse(refused, ARV_FLAG_TIER_CEILING, round(expected, -2))
             notes.append(
                 f"Sale-to-assessed ARV (${expected:,.0f}) exceeds the "
                 f"${MAX_PROXY_ARV:,.0f} plausibility ceiling — assessed basis "
@@ -1183,10 +1469,15 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
         # money judgment / total debt, not a property bid. Above the ceiling
         # the ×2.4 proxy emits a phantom multi-million ARV — return unavailable.
         if expected > MAX_PROXY_ARV:
+            # Prefixed "ARV WITHHELD:" so it joins the family docs/dashboard.js's
+            # _ARV_ABSENT_NOTE already recognises — the old wording started with
+            # "Opening bid (…)" and matched none of that regex's alternatives, so
+            # the one sentence explaining the blank cell was never shown.
+            _refuse(refused, ARV_FLAG_PROXY_CEILING, round(expected, -2))
             return None, None, None, "LOW", [
-                f"Opening bid (${li.opening_bid:,.0f}) too large for a ×2.4 ARV proxy "
-                f"(>${MAX_PROXY_ARV:,.0f}) — likely a judgment/debt figure, not a "
-                f"property bid; ARV withheld."
+                f"ARV WITHHELD: opening bid (${li.opening_bid:,.0f}) is too large for a "
+                f"×2.4 ARV proxy (${expected:,.0f} > ${MAX_PROXY_ARV:,.0f}) — likely a "
+                f"judgment/debt figure, not a property bid."
             ]
         notes.append(f"ARV {BID_PROXY_MARKER} × 2.4 ({li.opening_bid:,.0f} × 2.4) — rough")
         confidence = "LOW"
@@ -1195,7 +1486,13 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
 
     # Final backstop: the tax×1.25 path can also overshoot on a stale/wrong
     # assessment. Any proxy ARV above the ceiling is not trustworthy.
+    #
+    # THIS IS THE PATH THAT LEAKED. 79 leads reach it, and every one of them used
+    # to leave with an empty `arv_flags` and a null `arv_withheld` — a refusal
+    # indistinguishable, to every reader downstream, from a lead that was simply
+    # never priced. See ARV_FLAG_PROXY_CEILING at the top of this file.
     if expected > MAX_PROXY_ARV:
+        _refuse(refused, ARV_FLAG_PROXY_CEILING, round(expected, -2))
         return None, None, None, "LOW", [
             f"Proxy ARV (${expected:,.0f}) exceeds the ${MAX_PROXY_ARV:,.0f} "
             f"plausibility ceiling — input likely a judgment/debt figure; ARV withheld."
@@ -1207,7 +1504,8 @@ def _arv_signals(li: Listing) -> tuple[float | None, float | None, float | None,
 
 
 def _arv_sanity(li: Listing, out: "Calc", arv_conf: str, arv_flags: list[str],
-                anchor: float | None, anchor_label: str | None) -> str:
+                anchor: float | None, anchor_label: str | None,
+                anchor_is_weak_evidence: bool = False) -> str:
     """Final gate: refuse to publish an ARV the evidence does not support.
 
     Runs once, at the end of the ARV pipeline, so it sees the number that would
@@ -1230,6 +1528,20 @@ def _arv_sanity(li: Listing, out: "Calc", arv_conf: str, arv_flags: list[str],
     the hard guards touch ~2% of ARV-bearing rows; the comp math itself is
     producing defensible numbers for the rest and the board's usefulness depends
     on them.
+
+    `anchor_is_weak_evidence` demotes the anchor HARD withhold to the SOFT flag
+    without touching the disclosure. compute() passes it when the published ARV
+    IS the seller's asking price (see SELLER_ASK_SOURCES). Deleting a price
+    somebody is publicly asking because a county record sits far below it gets
+    the evidence backwards: on the land portals that record is routinely a
+    present-use / forestry deferment value, legally 5-20% of market, so a 20x
+    gap is the EXPECTED relationship and not proof the ask is wrong. Measured
+    without this, [33422] 3465 Yancey Road (asking $6,290,000) and [33348] 149
+    April Valley Lane (asking $3,199,000) went from a nonsense $20,900 / $88,900
+    ARV straight to a blank row — trading one wrong answer for no answer, when
+    the honest output is the ask, loudly flagged, with no money built on it.
+    The SOFT branch still fires, so these keep `arv_above_anchor` (CONTRADICTED:
+    no max bid, no ROI, no verdict, no equity) and the reader sees both numbers.
     """
     if not out.arv_expected:
         if arv_flags:
@@ -1267,11 +1579,29 @@ def _arv_sanity(li: Listing, out: "Calc", arv_conf: str, arv_flags: list[str],
     hard_mult = ARV_ANCHOR_HARD_MULT_LAND if is_land else ARV_ANCHOR_HARD_MULT_IMPROVED
     if anchor and out.arv_vs_assessed:
         ratio = out.arv_vs_assessed
-        if ratio > hard_mult:
+        # THE HARD TEST IS MEASURED AGAINST THE LARGEST COUNTY FIGURE, not the
+        # first one. `anchor` is `_cross_check_anchor`'s pick — market_value,
+        # else the assessor's appraisal, else tax_value — and 1,282 board leads
+        # carry two of those disagreeing by >= 3x. Withholding an ARV is this
+        # file's strongest claim ("no county record can support this number"),
+        # so it has to be true of every county record; measured, 27 leads were
+        # deleted against the first figure and would have survived against the
+        # largest, at a cost of $12,980,900 of published ARV, purely because of
+        # which scraper happened to fill which field. See
+        # COUNTY_VALUE_DISAGREE_MULT. The SOFT test below deliberately keeps
+        # using the primary anchor and its published `arv_vs_assessed`, so those
+        # 27 land on `arv_above_anchor` — still CONTRADICTED, still no money on
+        # them, but the number and the disagreement are both on screen instead
+        # of a blank row that explains nothing.
+        _cvals = [v for v, _ in _county_values(li)]
+        hard_anchor = max(_cvals) if _cvals else anchor
+        hard_ratio = out.arv_expected / hard_anchor if hard_anchor else ratio
+        if hard_ratio > hard_mult and not anchor_is_weak_evidence:
             hard.append("arv_above_anchor_extreme")
             out.notes.append(
-                f"ARV WITHHELD: ${out.arv_expected:,.0f} is {ratio:.0f}× the {anchor_label} "
-                f"(${anchor:,.0f}) — past the {hard_mult:.0f}× limit for "
+                f"ARV WITHHELD: ${out.arv_expected:,.0f} is {hard_ratio:.0f}× the highest "
+                f"county valuation on this parcel (${hard_anchor:,.0f}) — past the "
+                f"{hard_mult:.0f}× limit for "
                 f"{'land' if is_land else 'improved property'}. After-repair value runs above "
                 f"a county appraisal, but not by this much; one of the two records is "
                 f"describing a different parcel."
@@ -1319,6 +1649,72 @@ def _arv_sanity(li: Listing, out: "Calc", arv_conf: str, arv_flags: list[str],
             "not its own situs, so neighbouring leads may carry identical comps."
         )
 
+    # --- SOFT: the seller is publicly asking LESS than we say it is worth ----
+    # The mirror image of the "high-discount signal" branch in compute(), and the
+    # reason it cannot live there: that branch runs before the ARV floor, so on a
+    # floored lead it would be measuring a number that gets overwritten seconds
+    # later. This runs last and sees what ships. Restricted to SELLER_ASK_SOURCES
+    # — on an auction row a 7x gap between the opening bid and the ARV is the
+    # entire flip thesis and flagging it would gut the board. On a retail land
+    # listing there is no thesis: the parcel is on the open market at that price.
+    if (li.source in SELLER_ASK_SOURCES and li.opening_bid
+            and float(li.opening_bid) > 0
+            and out.arv_expected > ARV_VS_ASK_MAX * float(li.opening_bid)):
+        arv_flags.append(ARV_FLAG_ABOVE_ASK)
+        arv_conf = "LOW"
+        out.notes.append(
+            f"ARV (${out.arv_expected:,.0f}) is "
+            f"{out.arv_expected / float(li.opening_bid):.1f}× the price the seller is "
+            f"publicly asking (${float(li.opening_bid):,.0f}) on a retail listing. This "
+            f"is not a foreclosure discount — anyone may buy this parcel at the asking "
+            f"price today, so an after-repair value this far above it says the comps, "
+            f"not the seller, are wrong. No max bid or verdict is published from it."
+        )
+
+    # --- SOFT: a LAND parcel carrying a dwelling's square footage ------------
+    # See ARV_FLAG_LAND_SQFT. `_arv_signals` reads the sqft as authoritative and
+    # routes these to the $/sqft path; that is one of two readings and the record
+    # does not say which is right. Flagged here rather than resolved.
+    if li.property_kind == PropertyKind.LAND and sqft:
+        arv_flags.append(ARV_FLAG_LAND_SQFT)
+        arv_conf = "LOW"
+        out.notes.append(
+            f"The county classes this parcel as LAND, but the record also carries "
+            f"{sqft:,.0f} sqft of living area — and this ARV was priced as a building "
+            f"off that figure. Both cannot describe the same parcel: either the class "
+            f"is stale or the square footage came off a different record. Verify before "
+            f"bidding; no max bid or verdict is published from it."
+        )
+
+    # --- SOFT: the county disagrees with ITSELF ------------------------------
+    # See COUNTY_VALUE_DISAGREE_MULT. Weak, not contradicted — it does not
+    # dispute the ARV, it says the record the ARV was measured against is one of
+    # two that cannot both be this parcel.
+    _cv = _county_values(li)
+    _worst = None
+    for _ai in range(len(_cv)):
+        for _bi in range(_ai + 1, len(_cv)):
+            (_av, _al), (_bv, _bl) = _cv[_ai], _cv[_bi]
+            if _av <= 0 or _bv <= 0:
+                continue
+            _r = max(_av, _bv) / min(_av, _bv)
+            # The tax roll is only comparable to a full-market appraisal at the
+            # far end of its own spread — see COUNTY_VALUE_DISAGREE_MULT_TAX.
+            _tax_pair = "tax-assessed" in (_al + _bl) and "appraised" not in (_al + _bl)
+            _limit = (COUNTY_VALUE_DISAGREE_MULT_TAX if _tax_pair
+                      else COUNTY_VALUE_DISAGREE_MULT)
+            if _r >= _limit and (_worst is None or _r > _worst[0]):
+                _worst = (_r, _al, _av, _bl, _bv)
+    if _worst:
+        arv_flags.append(ARV_FLAG_COUNTY_DISAGREE)
+        out.notes.append(
+            f"The county's own records disagree about this parcel: {_worst[1]} "
+            f"${_worst[2]:,.0f} against {_worst[3]} ${_worst[4]:,.0f} — a "
+            f"{_worst[0]:.1f}× spread. Whichever is right, the other is describing "
+            f"something else, and the cross-check above could only be run against one "
+            f"of them."
+        )
+
     if hard:
         out.arv_withheld = out.arv_expected
         out.arv_expected = out.arv_low = out.arv_high = None
@@ -1336,7 +1732,12 @@ def compute(li: Listing) -> Calc:
     out = Calc(notes=[])
 
     # ---- ARV range ------------------------------------------------------
-    expected, low, high, arv_conf, arv_notes = _arv_signals(li)
+    # `_refusals` collects every MAX_PROXY_ARV verdict the tiers reached as
+    # (flag, refused_value). Before this existed those refusals lived only in
+    # prose and `grading.arv_trust` scored them "ok" — see the block at
+    # ARV_FLAG_PROXY_CEILING for what that cost.
+    _refusals: list[tuple[str, float | None]] = []
+    expected, low, high, arv_conf, arv_notes = _arv_signals(li, _refusals)
     # Per-county calibration — the single chokepoint every ARV tier flows
     # through (each _arv_signals tier returns its own band, so apply here, not
     # inside). Inert (factor 1.0) for any county without a calibration entry.
@@ -1402,7 +1803,14 @@ def compute(li: Listing) -> Calc:
     #
     # Therefore the guard only fires on (a), and only for retail-priced
     # sources where the listing is genuinely an asking price (HomeHarvest
-    # active for-sale, Realtor foreclosure REO list price).
+    # active for-sale, Realtor foreclosure REO list price, and — new — the two
+    # LAND portals, see SELLER_ASK_SOURCES).
+    #
+    # (b) IS NO LONGER UNIVERSALLY SILENT. It stays a note on the auction-shaped
+    # retail sources, and on a SELLER_ASK source it also raises
+    # ARV_FLAG_ABOVE_ASK in `_arv_sanity` — which runs last, on the post-floor
+    # number, so it cannot be fooled the way a test here would be.
+    _arv_from_listing = False
     if (out.arv_expected and li.opening_bid and li.opening_bid > 0
             and li.source in RETAIL_PRICE_SOURCES):
         ratio = out.arv_expected / li.opening_bid
@@ -1411,11 +1819,22 @@ def compute(li: Listing) -> Calc:
                 f"ARV (${out.arv_expected:,.0f}) was {ratio:.1f}× listing price "
                 f"(${li.opening_bid:,.0f}) — comps appear too low; anchoring ARV "
                 f"to listing price as a floor."
+                + (f" On {li.source} the listing price is the OWNER'S ASK, which "
+                   f"outranks a present-use / deferred-value county assessment "
+                   f"(NC G.S. 105-277.2 values run 5-20% of market)."
+                   if li.source in SELLER_ASK_SOURCES else "")
             )
             out.arv_expected = float(li.opening_bid)
             out.arv_low = round(li.opening_bid * 0.90, -2)
             out.arv_high = round(li.opening_bid * 1.10, -2)
             arv_conf = "MEDIUM"
+            # The ARV is now the LISTING price, not the county's figure — so the
+            # tier note saying it came from the county is stale, and letting it
+            # raise `anchor_not_independent` below would caption the lead with a
+            # sentence that is no longer true ("this ARV was computed FROM the
+            # county market value"). The cross-check against the county figure is
+            # genuinely independent again; that is the point of re-anchoring.
+            _arv_from_listing = True
         elif ratio > 1.6:
             # Don't rewrite ARV — but record the wide gap so the dashboard /
             # investor can see it's a high-discount listing (potential flip).
@@ -1459,9 +1878,22 @@ def compute(li: Listing) -> Calc:
         arv_flags.append("land_comp_spread")
     if any(LAND_ANCHOR_REFUSED_MARKER in n for n in _tier_notes):
         arv_flags.append("land_ppa_ceiling")
+    # The MAX_PROXY_ARV refusals. These arrive through `_refusals` rather than
+    # through a note marker because a marker can carry a verdict but not the
+    # NUMBER that was refused, and `arv_withheld` is exactly that number.
+    for _rflag, _rval in _refusals:
+        arv_flags.append(_rflag)
+        # Only when nothing survived — a refused TIER still leaves a published
+        # ARV, and `arv_withheld` beside a live `arv_expected` would read as
+        # "the engine refused the number on screen", which is the opposite of
+        # what happened.
+        if (_rflag == ARV_FLAG_PROXY_CEILING and _rval
+                and out.arv_expected is None and out.arv_withheld is None):
+            out.arv_withheld = _rval
     # An ARV that IS a county figure times a constant cannot be validated against
     # that figure — see the cross-check below.
-    arv_from_anchor = any(COUNTY_ANCHOR_MARKER in n for n in _tier_notes)
+    arv_from_anchor = (not _arv_from_listing) and any(
+        COUNTY_ANCHOR_MARKER in n for n in _tier_notes)
     mv = float(li.market_value) if (li.market_value and float(li.market_value) > 10000) else None
     sale_amt = None
     _ls = (raw.get("gis") or {}).get("last_sale") if isinstance(raw, dict) else None
@@ -1632,7 +2064,8 @@ def compute(li: Listing) -> Calc:
 
     # ---- ARV sanity band (hard guards) ----------------------------------
     arv_conf = _arv_sanity(li, out, arv_conf, arv_flags,
-                           None if arv_from_anchor else anchor, anchor_label)
+                           None if arv_from_anchor else anchor, anchor_label,
+                           anchor_is_weak_evidence=_arv_from_listing)
 
     # ---- Rehab range ----------------------------------------------------
     if li.property_kind == PropertyKind.LAND:
@@ -1749,6 +2182,43 @@ def compute(li: Listing) -> Calc:
             0.0,
             round(0.75 * out.arv_expected - rehab_buy, -2),
         )
+        # `rehab_buy` is `(out.rehab_expected or 0) * 1.125`, so a MISSING rehab
+        # estimate silently becomes a $0 deduction and the bid collapses to a
+        # flat 0.75 x ARV. Measured after the trust gate: 19,250 of 21,843
+        # published bids deduct $0 (88.1%) and 17,611 are exactly 0.75 x ARV to
+        # the cent. Most of that is legitimate — a LAND lead has rehab_expected
+        # 0.0 and rehab_tier "land", and there really is nothing to repair.
+        #
+        # The 9,190 that matter are the ones where rehab is UNKNOWN, not zero:
+        # rehab_tier "unknown", set 500 lines above because living_sqft is
+        # missing, so no tier table can be applied. 1,833 of those bids clear
+        # $250,000 and they total $740,267,300; every one of the board's largest
+        # bids ($1.27M-$1.50M) is in this class, on distressed inventory, at 75%
+        # of ARV with nothing taken out for the work.
+        #
+        # THE TEST IS `is None`, NOT falsiness, and that distinction is the whole
+        # of the scoping. `rehab_expected == 0.0` with rehab_tier "land" is a
+        # CORRECT zero — 10,063 of the 19,250 — and flagging it would put a
+        # warning on ten thousand numbers that are right, which is the "do not
+        # gut the normal case" line. Only `None` (tier "unknown") means the
+        # engine never established a figure at all.
+        #
+        # The bid is NOT withheld. It is the standard 70%-rule number computed
+        # from the only inputs that exist, blanking 9,190 of them would remove
+        # most of the board's economics, and the missing term is genuinely
+        # unknowable without a building size. What was wrong is that "no rehab
+        # was deducted" appeared ONLY as a notes line 500 lines away from the
+        # figure — nothing attached it to the bid. So it becomes a flag, in
+        # `arv_flags`, which is one of the three lists docs/dashboard.js's
+        # rehabTrust() reads for exactly this literal (see MAX_BID_NO_REHAB_FLAG).
+        if out.rehab_expected is None:
+            out.arv_flags = sorted(set((out.arv_flags or []) + [MAX_BID_NO_REHAB_FLAG]))
+            out.notes.append(
+                f"Max bid deducts $0 of repairs: this lead has no living_sqft, so no "
+                f"rehab could be estimated at all (rehab_tier '{out.rehab_tier}'). The "
+                f"figure is 75% of ARV with nothing taken out for the work — a CEILING, "
+                f"not a bid. Subtract your own repair estimate before using it."
+            )
         if senior_applies and out.max_bid_70 is not None:
             out.max_bid_70 = max(0.0, round(out.max_bid_70 - senior_cost, -2))
             bits = []
@@ -1828,6 +2298,47 @@ def compute(li: Listing) -> Calc:
                         f"max bid (buyer must clear/assume this surviving debt for "
                         f"clean title): ${old_bid:,.0f} → ${out.max_bid_70:,.0f}."
                     )
+
+        # ---- A max bid can never exceed a price you could simply pay --------
+        # On a SELLER_ASK source the parcel is publicly offered at `opening_bid`,
+        # so a "maximum viable bid" above that figure is not a bid at all — the
+        # buyer would pay the ask. `ARV_FLAG_ABOVE_ASK` catches the leads where
+        # the ARV itself contradicts the ask (>= 1.6x) and blanks their money;
+        # this closes the narrow band underneath it, where the ARV passes but the
+        # 0.75 rule still lands above the asking price (0.75 x ARV > ask for any
+        # ARV over 1.333x the ask).
+        #
+        # Measured: after the ask flag, 4 leads still published a bid above their
+        # own asking price, $266,800 in total — [1157] 01 Taylor Road, Anderson
+        # SC, listed at $60,000 with a $62,100 "max viable bid". A CAP rather
+        # than a flag because nothing here is uncertain: the ceiling is a
+        # published price, not an estimate, and it is exactly as much a hard
+        # bound on the bid as the `max(0.0, ...)` floor beside it.
+        #
+        # DELIBERATELY NOT lowered into a flag threshold instead. The 1.333-1.6
+        # band holds 167 ask-source leads, and ~160 of them are `bid_proxy_arv`
+        # rows whose ARV IS `ask x 1.5` by construction — so a ratio flag there
+        # would fire on the engine's own arithmetic, on leads already CONTRADICTED
+        # and already publishing no money. One more red mark saying "the ARV is
+        # above the ask" about a number defined as 1.5x the ask is noise, and it
+        # would be a false description of what is wrong with them.
+        if (out.max_bid_70 is not None and li.source in SELLER_ASK_SOURCES
+                and li.opening_bid and float(li.opening_bid) > 0
+                and out.max_bid_70 > float(li.opening_bid)):
+            _old_mb = out.max_bid_70
+            # FLOOR to the hundred, not round. Every money field here rounds to
+            # -2, and `round(42_061, -2)` is 42,100 — $39 back above the ceiling
+            # it was meant to enforce. [1193] Springview Dr, Oconee SC was the
+            # single lead still publishing a bid over its own ask after the cap
+            # went in, and that was the entire reason.
+            out.max_bid_70 = float(int(float(li.opening_bid) // 100) * 100)
+            out.notes.append(
+                f"Max bid capped at the ${float(li.opening_bid):,.0f} asking price "
+                f"(the 70%-rule figure came out ${_old_mb:,.0f}). This parcel is "
+                f"publicly listed at that price, so no bid above it is 'viable' — "
+                f"you would simply buy it. Read the gap as the engine's ARV sitting "
+                f"above what the seller is asking, not as headroom."
+            )
 
         # Wholesale lens: what an end-investor MAO leaves for an assignment fee.
         if out.max_bid_70 is not None:

@@ -10,9 +10,14 @@ a publish that stages some and not others ships a mis-joined board):
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
+import shutil
+import sys
+import time
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -22,6 +27,193 @@ from .models import Listing
 from .stale_link_fallback import annotate_stale_links
 
 log = structlog.get_logger()
+
+
+# ===========================================================================
+# THE BOARD LOCK — one board writer at a time, across shell AND Python.
+#
+# The critical section is `load_board -> mutate -> write_artifact`, and it is
+# MINUTES to HOURS long. Every guard this project had before was a pgrep check
+# taken BEFORE that span opened, which is TOCTOU-racy by construction: a check
+# that happens before the section can always lose to a writer that starts after
+# it. On 2026-08-10 the noon lrcpwa pass (1,064 parcels resolved, 343 county
+# values, 410 absentee tags) was silently reverted by the 09:30 vision job
+# writing back a board it had loaded at 09:33. Nothing errored, and the revert
+# survived three publishes.
+#
+# WHY NOT flock / shlock.
+#   * flock(1) does not exist on macOS (fcntl.flock(2) does, but it dies with
+#     the file descriptor, so it cannot be handed from a shell wrapper to the
+#     Python child it spawns, and a shell has no portable way to hold one).
+#   * /usr/bin/shlock IS present, and it does NOT break stale locks. Measured on
+#     this machine (shell_cmds-326, macOS 25.1): a lock whose owner PID is
+#     genuinely dead is refused forever —
+#         shlock: process 4514 is dead 4514
+#         shlock: lock time changed 1786455189 >= 0    -> exit 1
+#     Three consecutive invocations, and a hand-written dead-PID lock, all give
+#     exit 1. Building on it would have stopped every scheduled job the first
+#     time a job was killed mid-run. tests/test_publish_plumbing.py pins the
+#     stale-break behaviour we actually need.
+#
+# THE PROTOCOL (implemented twice — here, and in scripts/board_lock.sh — so a
+# shell wrapper and a Python board-writer contend for the SAME lock. The two
+# implementations are held together by test_publish_plumbing.py, which drives
+# each against the other; do not change one side alone):
+#
+#   lock      = a DIRECTORY, <repo>/logs/.board.lock  (mkdir is atomic
+#               everywhere, and unlike a lockfile it needs no O_EXCL dance)
+#   ownership = <lock>/pid, two lines: "<pid>\n<owner label>\n"
+#   acquire   = mkdir; on EEXIST read the pid and kill(pid, 0) it
+#   stale     = pid file unreadable after a 1s regrace, or the pid is dead
+#   break     = rename the whole directory aside, re-check the pid inside it,
+#               then remove it. rename() is atomic, so of N racers exactly one
+#               wins the right to delete, and the re-check puts it back if a
+#               live owner appeared in the gap.
+#   release   = remove the directory
+#   reentrant = env FORECLOSURE_BOARD_LOCK_HELD carries the lock path to child
+#               processes, so `run_daily_vision.sh` (holding the lock) can run
+#               patch_vision_gemini.py (which also asks for it) without
+#               deadlocking. A child that inherits it never releases it.
+# ===========================================================================
+
+BOARD_LOCK_SUBDIR = "logs"
+BOARD_LOCK_DIRNAME = ".board.lock"
+BOARD_LOCK_PID_FILE = "pid"
+BOARD_LOCK_ENV = "FORECLOSURE_BOARD_LOCK_HELD"
+# A lock directory with no readable pid file is either 20 microseconds old (the
+# window between mkdir and the pid write) or wreckage. Re-read once after this
+# long before calling it wreckage.
+BOARD_LOCK_PID_GRACE = 1.0
+
+
+class BoardLockBusy(RuntimeError):
+    """Raised when another live board writer holds the lock."""
+
+    def __init__(self, path: Path, pid: int | None, owner: str):
+        self.path = Path(path)
+        self.pid = pid
+        self.owner = owner
+        super().__init__(
+            f"board lock {path} is held by pid {pid} ({owner or 'unknown owner'})"
+        )
+
+
+def board_lock_dir(root: Path | str | None = None) -> Path:
+    """The one lock path. Under logs/ because logs/ is gitignored — a lock that
+    shows up in `git status` ends up in somebody's `git add -A`."""
+    if root is None:
+        root = Path(__file__).resolve().parents[2]
+    return Path(root) / BOARD_LOCK_SUBDIR / BOARD_LOCK_DIRNAME
+
+
+def _bl_owner(d: Path) -> tuple[int | None, str]:
+    try:
+        lines = (d / BOARD_LOCK_PID_FILE).read_text().splitlines()
+    except OSError:
+        return None, ""
+    if not lines:
+        return None, ""
+    try:
+        pid = int(lines[0].strip())
+    except ValueError:
+        return None, ""
+    return pid, (lines[1].strip() if len(lines) > 1 else "")
+
+
+def _bl_alive(pid: int | None) -> bool:
+    """kill(pid, 0). EPERM means alive-but-not-ours, which still counts."""
+    if not pid or pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return True
+    return True
+
+
+def _bl_break(d: Path, expect_pid: int | None) -> bool:
+    """Remove a stale lock. Exactly one racer can win the rename."""
+    victim = d.with_name(f"{d.name}.stale.{os.getpid()}")
+    shutil.rmtree(victim, ignore_errors=True)
+    try:
+        os.rename(d, victim)
+    except OSError:
+        return False          # somebody else broke it, or it went away
+    pid, _owner = _bl_owner(victim)
+    if pid is not None and pid != expect_pid and _bl_alive(pid):
+        # A live writer claimed the lock in the gap between our staleness
+        # verdict and the rename. Put it back and lose the race honestly.
+        try:
+            os.rename(victim, d)
+            return False
+        except OSError:
+            pass
+    shutil.rmtree(victim, ignore_errors=True)
+    return True
+
+
+def _bl_try_mkdir(d: Path, owner: str) -> bool:
+    try:
+        d.mkdir(parents=True)
+    except FileExistsError:
+        return False
+    (d / BOARD_LOCK_PID_FILE).write_text(f"{os.getpid()}\n{owner}\n")
+    return True
+
+
+@contextmanager
+def board_lock(root: Path | str | None = None, owner: str = "",
+               wait: float = 0.0, poll: float = 5.0):
+    """Hold the board-writer lock for the WHOLE load -> mutate -> write span.
+
+        with board_lock(owner="patch_vision_gemini"):
+            listings = load_board(DOCS)
+            ...
+            write_artifact(listings, summary, docs_dir=DOCS)
+
+    Raises BoardLockBusy when another live writer holds it and `wait` seconds
+    have elapsed (default: do not wait at all — a scheduled pass that collides
+    should skip today, not queue up behind a four-hour vision job).
+
+    A lock left behind by a dead process is broken automatically; if it were
+    not, one killed run would stop every scheduled job forever.
+    """
+    d = board_lock_dir(root)
+    if os.environ.get(BOARD_LOCK_ENV) == str(d):
+        yield d               # an ancestor in this process tree already holds it
+        return
+    owner = owner or Path(sys.argv[0] or "python").name or "python"
+    d.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + max(0.0, wait)
+    while True:
+        if _bl_try_mkdir(d, owner):
+            break
+        pid, holder = _bl_owner(d)
+        if pid is None:
+            time.sleep(BOARD_LOCK_PID_GRACE)
+            pid, holder = _bl_owner(d)
+        if not _bl_alive(pid):
+            log.warning("board_lock.stale_break", path=str(d), dead_pid=pid,
+                        prior_owner=holder)
+            if _bl_break(d, pid):
+                continue
+        if time.monotonic() >= deadline:
+            raise BoardLockBusy(d, pid, holder)
+        time.sleep(max(0.1, poll))
+    prior = os.environ.get(BOARD_LOCK_ENV)
+    os.environ[BOARD_LOCK_ENV] = str(d)
+    try:
+        yield d
+    finally:
+        if prior is None:
+            os.environ.pop(BOARD_LOCK_ENV, None)
+        else:
+            os.environ[BOARD_LOCK_ENV] = prior
+        shutil.rmtree(d, ignore_errors=True)
 
 
 def read_board_json(path: Path | str):
@@ -55,6 +247,37 @@ def _board_file_present(path: Path) -> bool:
     return p.exists() or p.with_name(p.name + ".gz").exists()
 
 
+def read_board_records(docs_dir: Path | str = "docs") -> list[dict]:
+    """The published board as RAW dicts, with the lazy-detail sidecar merged
+    back into each record's raw. load_board() minus the Listing validation.
+
+    Use this in a pass that works on dicts and has its own lenient hydrator
+    (patch_run_scrapers.py, patch_listings.py, retry_vision.py all do). Those
+    three used to call read_board_json() directly, which reads ONLY the slim
+    listings.json — so every one of them loaded a board with no comps (33,484
+    records), no vision (13,088), no CAMA (12,952), no rent comps (6,401) and no
+    foreclosure sold comps (5,524), and then wrote that back.
+
+    Bare read_board_json() is correct only when the caller does not write the
+    board back. If it writes, it must come through here or through load_board().
+    """
+    docs = Path(docs_dir)
+    records = read_board_json(docs / "listings.json")
+    detail_path = docs / "listings_detail.json"
+    details: list = []
+    if _board_file_present(detail_path):
+        try:
+            details = read_board_json(detail_path)
+        except Exception:  # noqa: BLE001
+            details = []
+    for i, rec in enumerate(records):
+        if i < len(details) and isinstance(details[i], dict) and details[i]:
+            raw = rec.get("raw")
+            if isinstance(raw, dict):
+                raw.update(details[i])
+    return records
+
+
 def load_board(docs_dir: Path | str = "docs") -> list[Listing]:
     """Load the published board as Listing objects WITH the lazy-detail sidecar
     merged back into each lead's raw.
@@ -69,21 +292,8 @@ def load_board(docs_dir: Path | str = "docs") -> list[Listing]:
     Reads via read_board_json, so it works from either the plain .json (local
     runner) or the committed .gz (fresh clone / cloud) — see that helper.
     """
-    docs = Path(docs_dir)
-    records = read_board_json(docs / "listings.json")
-    detail_path = docs / "listings_detail.json"
-    details: list = []
-    if detail_path.exists() or (detail_path.with_name(detail_path.name + ".gz")).exists():
-        try:
-            details = read_board_json(detail_path)
-        except Exception:  # noqa: BLE001
-            details = []
     out: list[Listing] = []
-    for i, rec in enumerate(records):
-        if i < len(details) and isinstance(details[i], dict) and details[i]:
-            raw = rec.get("raw")
-            if isinstance(raw, dict):
-                raw.update(details[i])
+    for rec in read_board_records(docs_dir):
         try:
             out.append(Listing.model_validate(rec))
         except Exception:  # noqa: BLE001
@@ -690,6 +900,22 @@ def _emit_slim(docs: Path, payload: list) -> int | None:
     slim_path = docs / "listings_slim.json"
     gz_path = docs / "listings_slim.json.gz"
     if os.getenv("FORECLOSURE_SLIM") == "0":   # emergency stop for the launchd jobs
+        # DELETE, do not merely decline to rewrite. Returning None here left the
+        # PREVIOUS board's slim files on disk: meta["board"] was then omitted,
+        # which sets boardExpectedCount() null and DISABLES the client's
+        # record-count gate, while the LEAN client still fetches
+        # listings_slim.json.gz FIRST and gets it. Phones rendered the previous
+        # board's addresses and sale dates beside a current desktop, with no
+        # error anywhere — the exact failure the flag exists to prevent, caused
+        # by the flag. Executed on a seeded temp dir before the fix: both slim
+        # files survived with previous-board content and only detail_shards was
+        # removed. Removing them makes the client 404 and stream the fat board,
+        # which is the documented fallback.
+        for p in (slim_path, gz_path):
+            try:
+                p.unlink(missing_ok=True)
+            except OSError:
+                pass
         return None
     try:
         import gzip as _gzip
@@ -1073,6 +1299,21 @@ def _to_dict(li: Listing) -> dict:
     return d
 
 
+def _count_by(listings: list[Listing], attr: str) -> dict[str, int]:
+    """Count the board being written by one Listing attribute, biggest first.
+
+    Derived, never carried: these two run_meta keys are pure functions of the
+    payload, so a stale one is a bug with no upside. See the by_state note in
+    write_artifact.
+    """
+    counts: dict[str, int] = {}
+    for li in listings:
+        v = getattr(li, attr, None)
+        v = str(v).strip() if v is not None else ""
+        counts[v or "unknown"] = counts.get(v or "unknown", 0) + 1
+    return dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
+
+
 def write_artifact(
     listings: list[Listing],
     summary: dict,
@@ -1136,7 +1377,13 @@ def write_artifact(
     # files remain the local source-of-truth + a fallback. mtime=0 keeps the gzip
     # header deterministic so identical data produces identical bytes (no git churn).
     _atomic_write_bytes(docs / "listings.json.gz", gzip.compress(listings_bytes, compresslevel=9, mtime=0))
-    _atomic_write_bytes(docs / "listings_detail.json.gz", gzip.compress(detail_bytes, compresslevel=9, mtime=0))
+    detail_gz = gzip.compress(detail_bytes, compresslevel=9, mtime=0)
+    _atomic_write_bytes(docs / "listings_detail.json.gz", detail_gz)
+    # Identity of the sidecar THIS call wrote — see the detail_count/
+    # detail_digest note where run_meta is assembled. Deterministic (sha256 of
+    # deterministic gzip bytes), so a republish of identical data does not churn.
+    detail_digest = hashlib.sha256(detail_gz).hexdigest()[:16]
+    del detail_gz
 
     # SLIM-V1, the mobile payload. Derived from the SAME `payload` list, and
     # deliberately emitted only after the two authoritative files are already on
@@ -1158,12 +1405,49 @@ def write_artifact(
         "run_time": datetime.utcnow().isoformat() + "Z",
         "total": len(listings),
         "by_source": summary.get("by_source", {}),
-        "by_state": summary.get("by_state", {}),
+        # by_state is DERIVED from the board being written, never taken from the
+        # caller and never carried forward. It is a pure function of `listings`,
+        # so there is no reason for it ever to disagree with the board — and it
+        # did: the live file said NC 18,712 / SC 17,348, summing 36,060 against a
+        # 38,500 board, while the real split was NC 20,654 / SC 17,846. 2,440
+        # leads (6.3%) unaccounted for, on the only per-source health report
+        # there is. A scrape-time count is not a description of what shipped.
+        "by_state": _count_by(listings, "state"),
+        # Same argument, for sources: this is what is ON the board right now,
+        # which is the question run_meta exists to answer ("which sources are
+        # actually contributing"). It is NOT `by_source`: that one is the
+        # scrape-time per-scraper yield the full run computes (pre-dedup,
+        # pre-scope-filter), it is carried forward by partial writers, and on
+        # the live board it listed 85 sources summing 38,650 while omitting
+        # reo.vrm_va_reo entirely. Both are useful; only one of them describes
+        # the published board, and it is this one.
+        "by_source_on_board": _count_by(listings, "source"),
         "by_county_top": summary.get("by_county_top", []),
         "source_status": summary.get("source_status", {}),
         "regressions": summary.get("regressions", []),
         "errors": summary.get("errors", []),
         "notes": summary.get("notes", ""),
+        # THE DESKTOP DETAIL JOIN, declared. dashboard.js ensureDetails() merges
+        # listings_detail.json into LISTINGS whenever details.length ===
+        # LISTINGS.length — length equality with a payload that may itself be a
+        # cached copy from another publish. The board has been exactly 38,500 for
+        # four consecutive publishes, so that test proves nothing, and a
+        # cross-publish sidecar Object.assigns one property's comps, vision and
+        # CAMA onto a different property's address with no error.
+        #
+        # run_meta.json is fetched with `?t=${Date.now()}` (dashboard.js:681), so
+        # it is the one payload that is ALWAYS current. These two keys are
+        # therefore a fresh statement to check a possibly-cached sidecar against:
+        #   detail_count  — len(listings_detail.json) as written by THIS call
+        #   detail_digest — sha256 of listings_detail.json.gz's bytes, first 16
+        #                   hex chars; changes whenever the sidecar's content
+        #                   changes even if its length does not
+        # Top level, NOT inside meta["board"]: tests/test_board_slim.py pins the
+        # board block's key set to {schema, count, detail_shards}, and the block
+        # is deliberately absent whenever the slim payload was not written, while
+        # the desktop sidecar is written unconditionally.
+        "detail_count": len(details),
+        "detail_digest": detail_digest,
     }
     # Board block: how the dashboard learns the slim payload exists and how many
     # records it must contain. run_meta.json is already in every publish list, so
@@ -1194,13 +1478,26 @@ def write_artifact(
     # sources are actually contributing". Carry the prior run's values forward
     # when this writer did not compute its own, and mark the file so the staleness
     # is visible rather than implied.
+    #
+    # THIS ONLY WORKS IF CALLERS STOP LAUNDERING THE PRIOR FILE BACK IN.
+    # health_carried_from is stamped only when a key is ABSENT from `meta`, i.e.
+    # only when THIS writer genuinely had nothing to say. Two callers used to
+    # read the prior run_meta.json themselves, strip `board`, and hand the rest
+    # back as their summary (recompute_valuation.py, patch_vision_gemini's
+    # _prior_meta) — so every key arrived already populated, the branch below
+    # never fired, and the published file asserted a months-old per-source
+    # health report as current. Both now pass only their own notes and let this
+    # block do the carrying, which produces the same values plus the label.
+    #
+    # by_state is NOT in this list: it is derived above from the board being
+    # written, so there is never a stale value to carry.
     _carried: list[str] = []
     if meta_path.exists():
         try:
             prior_meta = json.loads(meta_path.read_text())
         except Exception:  # noqa: BLE001 - a corrupt prior file must not block the write
             prior_meta = {}
-        for key in ("by_source", "by_state", "by_county_top", "source_status",
+        for key in ("by_source", "by_county_top", "source_status",
                     "regressions", "errors"):
             if not meta.get(key) and prior_meta.get(key):
                 meta[key] = prior_meta[key]

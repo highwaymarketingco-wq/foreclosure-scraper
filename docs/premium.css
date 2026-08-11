@@ -295,9 +295,23 @@ body {
 .grade-badge.F, .grade-circle.F { background: var(--grade-F-bg); color: var(--grade-F); }
 .distress-badge.hot,  .hot  { color: var(--hot); }
 .distress-badge.warm, .warm { color: var(--warm); }
-.intent-hot  { background: var(--hot-bg);  color: var(--hot); }
-.intent-warm { background: var(--warm-bg); color: var(--warm); }
-.intent-cool, .intent-cold { background: var(--cool-bg); color: var(--cool); }
+/* .intent-hot / .intent-warm / .intent-cool / .intent-cold USED TO BE HERE and
+   are deliberately gone. The only element that ever carries those classes is
+   the intent-score badge (dashboard.js intentBadge() emits
+   `class="intent-badge intent-<band>"`), and style.css already styles it as a
+   complete unit: opaque background + white text, chosen together.
+
+   These three rules were (0,1,0) and this file loads after style.css, so they
+   won the `color` and lost the `background` to style.css's (0,2,0)
+   `.intent-badge.intent-*`. The result was a themed foreground painted onto a
+   background picked for white text — contrast 1.00 on light-cool, light-hot,
+   light-warm and dark-cold, i.e. the score was literally invisible on the
+   default view. Full measurements and the replacement colours are documented
+   at style.css `.intent-badge`.
+
+   Do not re-add a bare `.intent-*` rule here. If the badge needs to change,
+   change it in style.css where its background lives, so the pair stays a
+   pair. */
 
 /* ---- Cards view ----------------------------------------------------------- */
 .card {

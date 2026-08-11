@@ -22,25 +22,28 @@ if [[ " ${FULL_RUN_DAYS//,/ } " == *" $(date +%u) "* ]]; then
   exit 0
 fi
 
-# Belt-and-suspenders: also skip if a weekly full run / merge is STILL alive —
-# e.g. a Tuesday run that hung (or now, with caffeinate, just ran long) past
-# midnight into Wednesday, a non-full-run day. Two board-writers racing
-# docs/listings.json + the git push corrupts the publish. One writer at a time.
-if pgrep -f "foreclosure_scraper.__main__|-m foreclosure_scraper|run_local.sh" >/dev/null \
-   || pgrep -f "merge_today_sources.py" >/dev/null; then
-  echo "==> a weekly full run / merge is active; skipping daily-vision to avoid a double board-writer." | tee -a "$LOG"
+# ONE BOARD WRITER AT A TIME — a real lock, held for this whole script.
+#
+# This replaces two weaker guards that used to sit here: a pgrep list (TOCTOU by
+# construction — a check before the critical section can always lose to a writer
+# that starts after it) and a private .daily-vision.lock that only ever excluded
+# ANOTHER COPY OF THIS SCRIPT. The second one is the important loss: this job
+# holds a loaded board for up to VISION_MAX_SECONDS=14400 (4h), and the private
+# lock did nothing to stop the noon lrcpwa pass and the 2pm SOS pass writing
+# inside that window. On 2026-08-10 this job wrote its 09:33 board back at 13:36
+# and reverted the noon pass's 1,064 resolved parcels, 343 county values and 410
+# absentee tags. Nothing errored.
+#
+# The lock covers daily_api_refresh.py AND patch_vision_gemini.py, both of which
+# are board writers, and it is reentrant via FORECLOSURE_BOARD_LOCK_HELD so each
+# of them proceeds inside this lock rather than deadlocking against it. A lock
+# left behind by a killed run is broken automatically — see scripts/board_lock.sh.
+. "$ROOT/scripts/board_lock.sh"
+if ! board_lock_acquire "$ROOT" "run_daily_vision.sh"; then
+  echo "==> another board writer ($(board_lock_holder)) holds the board; skipping daily-vision." | tee -a "$LOG"
   exit 0
 fi
-
-# Don't let two passes run at once (e.g. a long manual run overlapping the
-# scheduled 7:30am job) — they'd double-score and could race the git publish.
-LOCK="$ROOT/logs/.daily-vision.lock"
-if [[ -f "$LOCK" ]] && kill -0 "$(cat "$LOCK" 2>/dev/null)" 2>/dev/null; then
-  echo "==> another daily-vision run (PID $(cat "$LOCK")) is active; exiting." | tee -a "$LOG"
-  exit 0
-fi
-echo $$ > "$LOCK"
-trap 'rm -f "$LOCK"' EXIT
+trap 'board_lock_release' EXIT INT TERM
 
 # Local Ollama removed (redundant vs the 4 cloud pools; too slow/weak on 8GB).
 # Re-enable by installing Ollama + `ollama pull qwen2.5vl:3b` and unsetting this.

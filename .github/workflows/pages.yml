@@ -27,6 +27,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # THE JEKYLL PREFIX TRAP, gated at the only place that can actually stop
+      # it. Jekyll's exclude/include are PREFIX matches, not globs
+      # (EntryFilter#glob_include? -> entry.start_with?(pattern)), so
+      # `exclude: listings.json` also drops listings.json.gz. That has silently
+      # 404'd this dashboard's data on the live site three times, and it re-arms
+      # every time someone adds a payload file and follows the file's own
+      # convention of excluding the uncompressed twin.
+      #
+      # scripts/check_pages_publish.py has existed to detect this for months and
+      # `grep -rn check_pages_publish` found NO CALLER anywhere in the repo — not
+      # in the four launchd jobs, not in run_local.sh, not in any workflow. The
+      # guard for a trap that has fired three times was a script nobody ran.
+      #
+      # FAILING HERE IS THE POINT. A failed build means the previous deploy stays
+      # live: old data that works, instead of current data the site 404s on.
+      # It runs on bare python3 (no deps, no uv sync) by design.
+      - name: Prove every dashboard payload survives the Jekyll build
+        run: python3 scripts/check_pages_publish.py
       - uses: actions/configure-pages@v5
       - uses: actions/jekyll-build-pages@v1
         with:

@@ -99,6 +99,50 @@ _LTV_PROXY = 0.90   # if we only know the sale price, assume ~90% was financed
 #   raw['equity']['withheld_reason']  prose, safe to render verbatim
 #   raw['equity']['arv_trust']        "contradicted" | "withheld"
 #   raw['equity']['arv_flags']        sorted list of the calc flags responsible
+#
+# ---------------------------------------------------------------------------
+# THE HALF THE GATE ABOVE STILL MISSED: A VALUATION THAT PUBLISHED NOTHING AND
+# SAID NOTHING.
+#
+# `arv_trust` reads three fields, and its no-ARV branch is
+# `_TRUST_WITHHELD if (arv_withheld is not None or flags) else _TRUST_OK`. A
+# calc block that has `arv_expected` absent AND `arv_withheld` absent AND an
+# empty `arv_flags` therefore classifies **ok** — the gate waves it through —
+# and `_arv()` below then quietly substitutes `market_value`, or
+# `tax_value x 1.25`, as equity's own first term. That is this module inventing
+# an ARV the valuation declined to publish.
+#
+# Measured on the live board (38,500 leads, 7,677 equity figures): 26 leads
+# publish equity with NO `calc.arv_expected` at all, totalling $40,199,500 —
+# 19 off `market_value`, 7 off `tax_value x 1.25`. Every one of the 26 HAS a
+# real calc block (rehab_low/expected/high, rehab_tier, confidence,
+# arv_confidence, notes); calc ran, priced the rehab, and produced no ARV
+# without naming a reason. 200 Miracle Mile Dr, Anderson renders
+# "Equity $7,934,600" against an `arv_used` of $12,480,200 that appears nowhere
+# on the card, because there is no ARV on the card. None of them trips
+# `derived_without_arv` either — that tripwire watches `raw['calc']`, and calc
+# is innocent here: it published no money, this module did.
+#
+# THE RULE, and why it is not simply "no calc -> no equity". The distinction
+# that matters is whether a VALUATION RAN. A lead with no `raw['calc']` at all
+# is a source that never reached the valuation (a bare court record, say);
+# nothing has been decided about its value, the county's own figure is the best
+# available reference, and blanking those would delete equity on leads where
+# nothing is wrong. A lead WITH a calc block that carries no `arv_expected` is
+# the opposite: the valuation ran and came back empty. Substituting a number it
+# did not choose is not a fallback, it is an override.
+#
+#   calc block present AND no arv_expected  -> withhold (level "withheld").
+#   no calc block at all                    -> unchanged, fallback still allowed.
+#
+# It reuses the existing "withheld" level and its existing prose rather than
+# minting a third value for `raw['equity']['arv_trust']` — the interface stays
+# {"contradicted", "withheld"} for every reader, and the prose written for that
+# level ("the valuation engine refused to publish an ARV for this property at
+# all ... the county or market value this engine would otherwise fall back on
+# is not shown anywhere on this card") already describes this case exactly.
+# The run summary counts it separately as `withheld_no_arv` so the two paths
+# stay distinguishable in the logs.
 # ===========================================================================
 # Imported, not re-spelled — grading.ARV_TRUST_BLOCKS_DERIVED is the one
 # definition of "which trust levels forbid an ARV-derived figure", shared with
@@ -122,7 +166,30 @@ def _assumed_note_date() -> date:
         return today.replace(year=today.year - _ASSUMED_NOTE_AGE_YEARS, day=28)
 
 
+def valuation_ran_without_arv(li: Listing) -> bool:
+    """True when a calc block exists and carries no ``arv_expected``.
+
+    The one test that separates "nothing has been valued yet" from "the
+    valuation ran and came back empty" — see the block above `_arv`. Public
+    because `distress_score._equity_band` has to reach the same verdict from
+    the same evidence: a board carried over from a run that predates this
+    change still holds the invented figure, and the ranking must not use it.
+    """
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    calc = raw.get("calc")
+    return isinstance(calc, dict) and bool(calc) and not calc.get("arv_expected")
+
+
 def _arv(li: Listing) -> Optional[float]:
+    """The value reference equity subtracts the payoff from.
+
+    The fallbacks below fire ONLY when no valuation ran at all — `enrich_equity`
+    withholds outright when a calc block exists without an `arv_expected`, so
+    this function is never asked to second-guess a valuation that already
+    declined. Keeping the fallbacks here (rather than deleting them) preserves
+    equity on the leads that never reached calc, which is the normal case this
+    engine was built for.
+    """
     raw = li.raw if isinstance(li.raw, dict) else {}
     calc = raw.get("calc") or {}
     arv = calc.get("arv_expected")
@@ -191,6 +258,39 @@ def _withheld_block(level: str, flags: list[str]) -> dict:
         "arv_trust": level,
         "arv_flags": flags,
     }
+
+
+def withhold_equity(li: Listing, level: str = "contradicted",
+                    flags: list[str] | None = None) -> bool:
+    """Replace this lead's equity figure with the withheld marker. Idempotent.
+
+    Public because the ARV can be contradicted by evidence that does not exist
+    until AFTER this enricher has run. `enrichment_board_qa` detects a county
+    appraisal stamped across hundreds of parcels — a CROSS-ROW fact, knowable
+    only once every lead is in memory, which is exactly why board QA runs last —
+    and has to retract what the pre-detection valuation already published.
+    Retraction is safe to do late: it only ever deletes, and the sole pass
+    after board QA is the writer.
+
+    Writes the marker ONLY where a figure actually existed. On a lead that had
+    no equity anyway, "withheld because the ARV is contradicted" is not an
+    explanation, it is a guess at someone else's reason — the equity is far more
+    likely absent because no payoff could be estimated. 389 leads on the live
+    board are in that position inside the stamped clusters. Same judgement as
+    `_would_have_published` above: retract loudly, stay silent otherwise.
+
+    Returns True when a figure was actually removed, so the caller can count
+    the retractions rather than guess at them.
+    """
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    if not isinstance(li.raw, dict):
+        li.raw = raw = {}
+    prior = raw.get("equity")
+    if not isinstance(prior, dict) or prior.get("value") is None:
+        return False          # nothing published (or already withheld) — say nothing
+    raw["equity"] = _withheld_block(level, sorted(flags or []))
+    raw.pop("_equity_amortization", None)
+    return True
 
 
 def _is_deed_of_trust(doc_type: object) -> bool:
@@ -348,11 +448,31 @@ def _payoff(li: Listing, arv: float) -> tuple[Optional[float], str, str]:
     return None, "unknown", "none"
 
 
+def _would_have_published(li: Listing) -> bool:
+    """True when the market_value / tax_value fallback WOULD have yielded equity.
+
+    Decides whether the retraction above is worth explaining. Two ways to know:
+    a figure is already sitting on the lead (a board written before this
+    change), or the fallback reference plus a payoff would produce one now.
+    `_payoff` is pure Python and no more expensive here than it is on the main
+    path; its `_equity_amortization` side-effect is cleared by the caller.
+    """
+    prior = li.raw.get("equity") if isinstance(li.raw, dict) else None
+    if isinstance(prior, dict) and prior.get("value") is not None:
+        return True
+    arv = _arv(li)
+    if not arv or arv <= 0:
+        return False
+    payoff, _src, _conf = _payoff(li, arv)
+    return payoff is not None
+
+
 def enrich_equity(listings: list[Listing]) -> dict:
     """Attach raw['equity'] = {value, pct, arv_used, payoff, payoff_source, ...}."""
     n = 0
     amortized = 0
     withheld = 0
+    withheld_no_arv = 0
     for li in listings:
         raw0 = li.raw if isinstance(li.raw, dict) else {}
         raw0.pop("_equity_amortization", None)  # never carry a stale detail block
@@ -368,6 +488,30 @@ def enrich_equity(listings: list[Listing]) -> dict:
                 raw0 = li.raw
             raw0["equity"] = _withheld_block(_level, _flags)
             withheld += 1
+            continue
+        # THE SILENT NO-ARV CASE. `arv_trust` cannot see it: with no
+        # arv_expected, no arv_withheld and no flags it returns "ok", and
+        # `_arv` below would substitute market_value / tax_value x 1.25 —
+        # equity inventing the first term the valuation declined to publish.
+        # See the second block at the top of this module. Reported separately
+        # from `withheld` so the two paths never blur in the run log.
+        if valuation_ran_without_arv(li):
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+                raw0 = li.raw
+            # A withheld marker is an EXPLANATION for a number that is missing
+            # from where the reader expected one. On a lead that was never going
+            # to carry an equity figure it explains nothing and just adds a
+            # paragraph of alarming prose to the detail panel: 13,526 leads on
+            # the live board have no ARV, and only 26 of them published equity.
+            # So retract loudly where there is something to retract, and quietly
+            # everywhere else.
+            if _would_have_published(li):
+                raw0["equity"] = _withheld_block("withheld", _flags)
+                withheld_no_arv += 1
+            else:
+                raw0.pop("equity", None)
+            raw0.pop("_equity_amortization", None)
             continue
         arv = _arv(li)
         if not arv or arv <= 0:
@@ -407,5 +551,7 @@ def enrich_equity(listings: list[Listing]) -> dict:
         li.raw = raw
         n += 1
     log.info("equity.done", computed=n, amortized=amortized,
-             withheld_bad_arv=withheld, total=len(listings))
-    return {"computed": n, "amortized": amortized, "withheld_bad_arv": withheld}
+             withheld_bad_arv=withheld, withheld_no_arv=withheld_no_arv,
+             total=len(listings))
+    return {"computed": n, "amortized": amortized, "withheld_bad_arv": withheld,
+            "withheld_no_arv": withheld_no_arv}

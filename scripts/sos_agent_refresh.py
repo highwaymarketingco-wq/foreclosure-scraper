@@ -20,12 +20,29 @@ os.environ.setdefault("SOS_AGENT", "1")
 
 from foreclosure_scraper.models import Listing
 from foreclosure_scraper.enrichment_sos_agent import enrich_with_sos_agent
-from foreclosure_scraper.web_artifact import write_artifact, load_board
+from foreclosure_scraper.web_artifact import (
+    BoardLockBusy, board_lock, load_board, write_artifact,
+)
 
-DOCS = Path(__file__).resolve().parent.parent / "docs"
+REPO = Path(__file__).resolve().parent.parent
+DOCS = REPO / "docs"
 
 
 def main() -> int:
+    # THE LOCK, held across load_board -> enrich -> write_artifact.
+    #
+    # Reentrant: scripts/sos_agent_refresh.sh already holds it when it invokes
+    # this script and passes it down through FORECLOSURE_BOARD_LOCK_HELD, so
+    # this acquire is a no-op there. It matters when the pass is run by hand.
+    try:
+        with board_lock(REPO, owner="sos_agent_refresh.py"):
+            return _run()
+    except BoardLockBusy as exc:
+        print(f"{exc} — skipping this pass.", flush=True)
+        return 0
+
+
+def _run() -> int:
     listings = load_board(DOCS)  # merges lazy-detail sidecar back so it round-trips
     before = sum(1 for l in listings if (l.raw or {}).get("sos_agent"))
     # skip leads already carrying an agent record so repeat runs advance the frontier

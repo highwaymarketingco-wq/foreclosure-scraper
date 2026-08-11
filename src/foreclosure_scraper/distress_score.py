@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Optional
 
 from .models import Listing
+from .enrichment_equity import valuation_ran_without_arv
 from .valuation.grading import ARV_TRUST_BLOCKS_DERIVED, arv_trust
 
 # ATC-45 Helene placard severity -> honest PROPERTY-signal weight. Calibrated
@@ -245,6 +246,55 @@ def _signals_for(li: Listing, prior_price: Optional[float] = None) -> list[tuple
     return sig
 
 
+def _tier(stack: int, score: float, eq_ok: bool, mailable: bool,
+          absentee: bool, senior_survives: bool) -> str:
+    """The HOT/WARM/COLD rule, in ONE place.
+
+    Extracted from `score_board` so `retract_equity_rank` can re-derive a tier
+    after the equity term is pulled out from under it without restating the
+    rule. A second hand-written copy of `stack >= 2 and eq_ok and ...` is how a
+    retraction comes to disagree with the scorer it is retracting.
+    """
+    if stack >= 2 and eq_ok and mailable and not senior_survives:
+        return "HOT"
+    if stack >= 2 or (score >= 28 and eq_ok) or (absentee and stack >= 1 and score >= 20):
+        return "WARM"
+    return "COLD"
+
+
+def retract_equity_rank(li: Listing) -> bool:
+    """Pull the equity term out of an already-published ``distress_stack``.
+
+    The ranking half of a LATE retraction. `enrichment_board_qa` can only learn
+    that a county appraisal is stamped across hundreds of parcels once every
+    lead is in memory, which is after `score_board` has already banded and
+    tiered them. Withholding the equity FIGURE at that point is not enough: the
+    tier computed from it is still sitting on the card, and a HOT tier is an
+    instruction to spend money contacting an owner.
+
+    Copies the stack before mutating. `score_board` assigns the SAME dict object
+    to every listing on a parcel, so an in-place edit here would silently
+    re-tier the siblings too — and the sibling may be the clean listing that
+    legitimately supplied the band (see the "best across the group" note in
+    `score_board`). Returns True when a band was actually removed.
+    """
+    raw = li.raw if isinstance(li.raw, dict) else None
+    if not raw:
+        return False
+    ds = raw.get("distress_stack")
+    if not isinstance(ds, dict) or ds.get("equity_band") is None:
+        return False
+    ds = dict(ds)
+    ds["equity_band"] = None
+    ds["equity_retracted"] = True
+    ds["tier"] = _tier(ds.get("stack") or 0, ds.get("score") or 0,
+                       False, bool(ds.get("contactable")),
+                       bool(ds.get("absentee")),
+                       bool(ds.get("surviving_senior_debt_risk")))
+    raw["distress_stack"] = ds
+    return True
+
+
 def _equity_band(li: Listing) -> Optional[str]:
     """Seller's REAL equity (ARV − payoff − liens), from enrichment_equity.
     Falls back to flip-ROI only when equity could not be computed.
@@ -279,6 +329,24 @@ def _equity_band(li: Listing) -> Optional[str]:
     the ARV and are not impugned by a bad comp set. Real distress still ranks;
     it just cannot be promoted to HOT by a number we have withheld everywhere
     else on the card.
+
+    TWO CASES `arv_trust` CANNOT SEE, both added after it:
+
+      * A calc block with no `arv_expected`, no `arv_withheld` and no flags
+        classifies "ok" — there is nothing in those three fields to object to.
+        The valuation still ran and came back empty, and any equity sitting on
+        such a lead was computed off market_value / tax_value x 1.25 by
+        `enrichment_equity._arv`, i.e. off a denominator that appears nowhere
+        on the card. 26 leads on the live board, $40.2M of equity. Same test,
+        same function: `enrichment_equity.valuation_ran_without_arv`.
+      * The `withheld` MARKER. The note above is right that a marker test alone
+        is too weak (it only exists on a board this version wrote) — but it is
+        not too weak as an ADDITION, and it is the only signal that survives a
+        late CROSS-ROW retraction. `enrichment_board_qa` retracts equity on a
+        county appraisal stamped across hundreds of parcels; that fact is not
+        expressible in `arv_flags` on a board written before the flag was
+        classified, so without this line the withheld lead would still rank on
+        the ROI fallback below.
     """
     raw = li.raw or {}
     calc = raw.get("calc") or {}
@@ -286,6 +354,10 @@ def _equity_band(li: Listing) -> Optional[str]:
         if arv_trust(calc.get("arv_flags"), calc.get("arv_expected"),
                      calc.get("arv_withheld")) in ARV_TRUST_BLOCKS_DERIVED:
             return None
+    if valuation_ran_without_arv(li):
+        return None
+    if (raw.get("equity") or {}).get("withheld"):
+        return None
     pct = (raw.get("equity") or {}).get("pct")
     if pct is not None:
         if pct >= 0.40:
@@ -434,13 +506,8 @@ def score_board(listings: list[Listing], previous_path: Optional[Path] = None) -
         if senior_survives:
             score -= 20
 
-        eq_ok = eq in ("high", "med")
-        if stack >= 2 and eq_ok and mailable and not senior_survives:
-            tier = "HOT"
-        elif stack >= 2 or (score >= 28 and eq_ok) or (absentee and stack >= 1 and score >= 20):
-            tier = "WARM"
-        else:
-            tier = "COLD"
+        tier = _tier(stack, score, eq in ("high", "med"), mailable,
+                     absentee, senior_survives)
 
         ds = {"tier": tier, "stack": stack, "categories": categories,
               "signals": signals, "score": round(score),

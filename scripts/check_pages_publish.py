@@ -23,12 +23,35 @@ Exit code 0 = every required payload publishes. 1 = something would 404.
 """
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DOCS = ROOT / "docs"
 CONFIG = DOCS / "_config.yml"
+WEB_ARTIFACT = ROOT / "src" / "foreclosure_scraper" / "web_artifact.py"
+
+
+def _shard_dir_name() -> str:
+    """Read DETAIL_SHARD_DIR out of web_artifact.py without importing it.
+
+    This script must run under a bare system python3 with no dependencies (it is
+    called from shell wrappers and from the Pages workflow before `uv sync`), and
+    importing the package pulls in structlog and pydantic. Reading the constant
+    is still better than hardcoding it: a rename of the shard directory changes
+    what this check asks about, instead of leaving it asking about a path that
+    no longer exists and passing vacuously.
+    """
+    try:
+        text = WEB_ARTIFACT.read_text()
+    except OSError:
+        return "detail_shards"
+    m = re.search(r'^DETAIL_SHARD_DIR\s*=\s*[\'"]([^\'"]+)[\'"]', text, re.M)
+    return m.group(1) if m else "detail_shards"
+
+
+DETAIL_SHARD_DIR = _shard_dir_name()
 
 # Files the dashboard fetches at runtime. If any of these is dropped from the
 # Pages deploy, the board 404s. Keep in sync with docs/dashboard.js fetches and
@@ -41,6 +64,17 @@ REQUIRED = [
     "listings.json.gz",
     "listings_detail.json.gz",
     "listings_slim.json.gz",
+    # The mobile detail payload. It was NOT listed here, and that hole was
+    # provable: adding `- detail_shards` to docs/_config.yml's exclude turned
+    # tests/test_detail_shards.py red and left this script at exit 0. A shard is
+    # the only payload the LEAN client fetches to open a lead, so dropping the
+    # directory 404s every detail panel on every phone while desktop is fine.
+    #
+    # The FIRST shard specifically, not the directory: Jekyll's decision is per
+    # ENTRY, and `detail_shards/00000.json.gz` is what proves both the directory
+    # rule and the file inside it survive. It is in SIMULATED too, so this stays
+    # meaningful on a checkout where no publish has run yet.
+    f"{DETAIL_SHARD_DIR}/00000.json.gz",
     "run_meta.json",
     "multifamily.json",
     "foreclosure_sold_pool.json",
@@ -55,6 +89,7 @@ SIMULATED = [
     "listings_detail.json.gz",
     "listings_slim.json",
     "listings_slim.json.gz",
+    f"{DETAIL_SHARD_DIR}/00000.json.gz",
 ]
 
 

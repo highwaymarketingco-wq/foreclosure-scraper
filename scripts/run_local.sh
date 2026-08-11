@@ -20,6 +20,23 @@ mkdir -p "$ROOT/logs"
 STAMP="$(date +%Y%m%dT%H%M%S)"
 LOG="$ROOT/logs/local-run-$STAMP.log"
 
+# ONE BOARD WRITER AT A TIME, for the whole multi-hour run + publish.
+#
+# This is the longest board-holder there is, so it is also the one most often on
+# the losing side of a silent revert: every guard elsewhere was a pgrep taken
+# BEFORE the other job's critical section opened, which cannot see a writer that
+# starts later. The lock is held from here through `git push`, is reentrant via
+# FORECLOSURE_BOARD_LOCK_HELD (so the pipeline's own board writers proceed
+# inside it), and a lock left by a killed run is broken automatically. See
+# scripts/board_lock.sh.
+. "$ROOT/scripts/board_lock.sh"
+. "$ROOT/scripts/board_payload.sh"
+if ! board_lock_acquire "$ROOT" "run_local.sh"; then
+  echo "==> another board writer ($(board_lock_holder)) holds the board; refusing to start." | tee -a "$LOG"
+  exit 0
+fi
+trap 'board_lock_release' EXIT INT TERM
+
 # ---- load secrets from .secrets/ -------------------------------------------
 load() {  # load <ENV_NAME> <file> [required]
   local name="$1" file="$2" required="${3:-}"
@@ -195,41 +212,20 @@ fi
 # live dashboard; now the local run must do it. Only publish on a healthy
 # run so we never overwrite a good dashboard with a broken/empty one.
 if [[ "$RC" -eq 0 && -f "$ROOT/docs/listings.json" ]]; then
-  # Commit the .gz twins the dashboard actually fetches. The uncompressed
-  # listings.json/.detail.json are gitignored (over GitHub's 100MB/file limit,
-  # excluded from Pages); load_board rebuilds from the .gz. A gitignored path in
-  # `git add` fails the whole command, so they must NOT be listed here.
-  PUB_FILES=(docs/listings.json.gz docs/listings_detail.json.gz
-             docs/run_meta.json docs/run_health.json
-             docs/foreclosure_sold_pool.json docs/multifamily.json)
-  # docs/listings_slim.json.gz is the mobile payload write_artifact() emits
-  # alongside the board. Added ONLY IF PRESENT: a pathspec matching no file makes
-  # `git add` exit 128 and stage NOTHING AT ALL (unlike a gitignored path, which
-  # only skips itself), so hardcoding it would silently stop publishing the whole
-  # dashboard on any checkout where the slim emitter hasn't run yet.
-  # "exists OR already tracked", not just "exists". The 128-exit only happens
-  # when the path is absent AND untracked; once it is tracked we must still be
-  # able to stage its DELETION, which is how the emitter's delete-on-failure
-  # path (and FORECLOSURE_SLIM=0) actually reaches the live site. Gating on
-  # existence alone leaves the last-published slim serving phones forever.
-  if [ -f "$ROOT/docs/listings_slim.json.gz" ] \
-     || git -C "$ROOT" ls-files --error-unmatch docs/listings_slim.json.gz >/dev/null 2>&1; then
-    PUB_FILES+=(docs/listings_slim.json.gz)
-  fi
-  # docs/detail_shards/ is the per-lead detail payload phones fetch, emitted by
-  # the same write_artifact() call. Same gate, same reasons — a DIRECTORY
-  # pathspec behaves identically here: `git add <dir>` on a path that is neither
-  # on disk nor in the index exits 128 and stages nothing at all, and once the
-  # shards are tracked `git add docs/detail_shards` stages modifications,
-  # additions AND deletions inside it, which is how the emitter's
-  # delete-the-whole-directory failure path reaches the live site.
-  if [ -d "$ROOT/docs/detail_shards" ] \
-     || git -C "$ROOT" ls-files --error-unmatch docs/detail_shards >/dev/null 2>&1; then
-    PUB_FILES+=(docs/detail_shards)
-  fi
+  # The payload list — and every "exists OR is already tracked" rule behind it —
+  # lives in ONE place now: scripts/board_payload.sh, sourced above. Five
+  # publishers were each maintaining their own copy of that list and they had
+  # already drifted apart (see D4 in sos_agent_refresh.sh).
   if command -v git >/dev/null 2>&1; then
     cd "$ROOT"
-    git add "${PUB_FILES[@]}" 2>/dev/null || true
+    # Prove GitHub Pages will actually serve what we are about to push: Jekyll's
+    # exclude/include are PREFIX matches, so `exclude: listings.json` also drops
+    # listings.json.gz. That trap has 404'd this site's data three times, and
+    # until now the script that detects it had no caller anywhere in the repo.
+    # Loud but non-fatal here (the payload is not what is broken when it fires,
+    # docs/_config.yml is); the hard gate is in .github/workflows/pages.yml.
+    board_payload_check "$ROOT" | tee -a "$LOG"
+    board_payload_add "$ROOT"
     if ! git diff --staged --quiet 2>/dev/null; then
       git commit -q -m "local run: refresh dashboard data ($(date +%Y-%m-%d))" 2>>"$LOG" || true
       # Rebase over any remote changes, then push (docs/ doesn't touch

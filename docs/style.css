@@ -1107,16 +1107,43 @@ footer strong { color: var(--text-2); font-weight: 600; }
   color: #fff; border-color: transparent; font-weight: 800;
 }
 
-/* ---- Intent score badge (0-100 headline), banded by heat ---- */
+/* ---- Intent score badge (0-100 headline), banded by heat ----
+
+   THE NUMBER HAS TO BE READABLE ON THE BACKGROUND IT SITS ON. It was not, on
+   any band, in either theme. This file set `.intent-badge { color:#fff }` at
+   specificity (0,1,0); premium.css set `.intent-cool,.intent-cold { color:
+   var(--cool) }` and friends at the SAME (0,1,0) and loads SECOND, so premium
+   won the colour while these rules — (0,2,0) — kept the background. Every
+   badge therefore rendered a themed foreground on an unthemed background that
+   was never chosen to go with it. Measured WCAG contrast of the shipped
+   combinations:
+
+     light  hot   #dc2626 on #d92d20   1.00   invisible
+     light  warm  #d97706 on #b8860b   1.02   invisible
+     light  cool  #2563eb on #2563eb   1.00   invisible
+     light  cold  #2563eb on #98a2b3   2.01   unreadable
+     dark   hot   #f87171 on #d92d20   1.75   unreadable
+     dark   warm  #fbbf24 on #b8860b   1.95   unreadable
+     dark   cool  #60a5fa on #2563eb   2.03   unreadable
+     dark   cold  #60a5fa on #98a2b3   1.01   invisible
+
+   intentBadge() renders on every table row and every card, so this was the
+   whole board, not one band. The fix is to stop the two files fighting: the
+   badge is opaque and always carries white text, so it needs no theme
+   variables at all, and premium.css's bare `.intent-*` rules are deleted
+   there (see the note at that site). Backgrounds below are darkened until
+   white clears 4.5:1 across the ENTIRE gradient sweep, not just at its dark
+   end — the old hot gradient ended at #f97316, where white is 2.80.
+   Verified: hot 6.54 -> 5.18, warm 5.93 -> 4.92, cool 5.17, cold 5.40. */
 .intent-badge {
   display: inline-block; margin-left: 5px; padding: 1px 6px;
   border-radius: var(--r-pill); font-size: 10px; font-weight: 800;
   color: #fff; vertical-align: middle; font-variant-numeric: tabular-nums;
 }
-.intent-badge.intent-hot  { background: linear-gradient(135deg, #d92d20, #f97316); }
-.intent-badge.intent-warm { background: linear-gradient(135deg, #b8860b, #e0a106); }
+.intent-badge.intent-hot  { background: linear-gradient(135deg, #b3261e, #c2410c); }
+.intent-badge.intent-warm { background: linear-gradient(135deg, #8a5a00, #a16207); }
 .intent-badge.intent-cool { background: #2563eb; }
-.intent-badge.intent-cold { background: var(--muted-2, #98a2b3); }
+.intent-badge.intent-cold { background: #5d6b82; }
 
 /* ---- Intent slider (filter bar) ---- */
 .filter-slider { width: 100%; min-width: 130px; accent-color: var(--accent, #2563eb); cursor: pointer; }

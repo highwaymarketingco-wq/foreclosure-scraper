@@ -981,3 +981,380 @@ def test_a_contradicted_lead_cannot_reach_hot_but_its_records_still_rank():
     assert bad.raw["distress_stack"]["stack"] == clean.raw["distress_stack"]["stack"]
     assert "probate" in bad.raw["distress_stack"]["signals"], "the records survive"
     assert "code_enforcement" in bad.raw["distress_stack"]["signals"]
+
+
+# ===========================================================================
+# 9. EVERY REFUSAL MUST SPEAK THE FLAG VOCABULARY
+#
+# The audit's finding, in one sentence: the withholding GATE is airtight, and
+# the leak went AROUND it. `MAX_PROXY_ARV` is enforced in six places; not one of
+# them raised a flag or recorded the number, so `grading.arv_trust()` — which
+# reads exactly three fields — scored a refused lead "ok" and enrichment_equity
+# published $40,194,700 of equity across 21 leads off ARVs this file had thrown
+# away. Every test below is a named refusal path proving it now emits a verdict
+# the gate can read.
+# ===========================================================================
+
+def test_the_proxy_ceiling_emits_a_flag_and_records_the_number():
+    """[781] 200 Miracle Mile Dr, Anderson SC. calc's note said "Proxy ARV
+    ($12,480,200) exceeds the $2,000,000 plausibility ceiling ... ARV withheld"
+    and the card published Equity $7,934,600 off 12,480,200 — the exact number
+    this sentence rejected — because arv_flags and arv_withheld were both None
+    and "no flags, no withheld" reads as trust level "ok"."""
+    li = _li(state="SC", county="Anderson", property_kind=PropertyKind.SINGLE_FAMILY,
+             market_value=12_480_200.0)
+    c = vcalc.compute(li)
+    assert c.arv_expected is None, "the ceiling still refuses the number"
+    assert vcalc.ARV_FLAG_PROXY_CEILING in (c.arv_flags or []), (
+        "a refusal that emits no flag is invisible to every downstream gate")
+    assert c.arv_withheld is not None, "the refused number must stay auditable"
+    # The whole point: the trust gate can now see it.
+    assert grading.arv_trust(c.arv_flags, c.arv_expected, c.arv_withheld) == "withheld"
+
+
+def test_the_bid_x24_proxy_ceiling_speaks_too():
+    """The second of the six enforcement points — an opening_bid so large that
+    bid x 2.4 clears $2M is a money judgment, not a property bid."""
+    li = _li(state="SC", county="Spartanburg", opening_bid=891_000.0,
+             property_kind=PropertyKind.SINGLE_FAMILY)
+    c = vcalc.compute(li)
+    assert c.arv_expected is None
+    assert vcalc.ARV_FLAG_PROXY_CEILING in (c.arv_flags or [])
+    assert grading.arv_trust(c.arv_flags, c.arv_expected, c.arv_withheld) == "withheld"
+
+
+def test_a_refused_tier_is_weak_not_contradicted():
+    """Two of the six were refusals of ONE TIER with a later tier carrying the
+    lead — and two of those wrote no note at all, so a tier was discarded in
+    complete silence. A surviving ARV from a different tier is not contradicted
+    by the refusal; it is judged on its own flags. Same call as
+    `land_comps_rejected`."""
+    assert vcalc.ARV_FLAG_TIER_CEILING in grading.ARV_FLAGS_WEAK_EVIDENCE
+    assert vcalc.ARV_FLAG_TIER_CEILING not in grading.ARV_FLAGS_CONTRADICTED
+    assert vcalc.ARV_FLAG_PROXY_CEILING in grading.ARV_FLAGS_CONTRADICTED
+
+
+def test_every_new_flag_is_classified_on_purpose():
+    """An unrecognised flag falls to "weak" by design, which is the right
+    DEFAULT and the wrong way to ship a flag you already know the severity of.
+    Four separate silent failures in this project were reader/writer name
+    mismatches, so the vocabulary is asserted, not assumed."""
+    for f in (vcalc.ARV_FLAG_PROXY_CEILING, vcalc.ARV_FLAG_ABOVE_ASK,
+              vcalc.ARV_FLAG_LAND_SQFT):
+        assert f in grading.ARV_FLAGS_CONTRADICTED, f
+    for f in (vcalc.ARV_FLAG_TIER_CEILING, vcalc.ARV_FLAG_COUNTY_DISAGREE,
+              vcalc.MAX_BID_NO_REHAB_FLAG):
+        assert f in grading.ARV_FLAGS_WEAK_EVIDENCE, f
+    assert not (grading.ARV_FLAGS_CONTRADICTED & grading.ARV_FLAGS_WEAK_EVIDENCE)
+
+
+# ---------------------------------------------------------------------------
+# 10. THE SELLER'S OWN ASKING PRICE, IN BOTH DIRECTIONS
+# ---------------------------------------------------------------------------
+
+def _ask_li(**kw):
+    base = dict(source="national.landwatch", state="NC", county="Transylvania",
+                property_kind=PropertyKind.LAND)
+    base.update(kw)
+    return _li(**base)
+
+
+def test_the_land_listing_sources_are_retail_price_sources():
+    """RETAIL_PRICE_SOURCES named only the two HOUSE portals, so the cross-check
+    never ran on the two LAND portals, where opening_bid is likewise an ask."""
+    assert vcalc.SELLER_ASK_SOURCES <= vcalc.RETAIL_PRICE_SOURCES
+    assert "national.landwatch" in vcalc.RETAIL_PRICE_SOURCES
+    assert "national.landandfarm" in vcalc.RETAIL_PRICE_SOURCES
+
+
+def test_an_arv_far_above_the_ask_is_contradicted_not_a_flip_thesis():
+    """[1073] Lot 28 Big Hill Road: listed $120,000, board ARV $834,700, max bid
+    $626,000, ROI 342.5%, GREAT, arv_flags None. On an AUCTION row a 7x gap is
+    the flip thesis; on a RETAIL ASK anyone can buy the parcel at the ask, so an
+    ARV several times it says the comps are wrong, not that a bargain exists."""
+    li = _ask_li(opening_bid=120_000.0, acreage=1.0,
+                 raw={"comps": [{"sold_price": 850_000, "lot_sqft": 43_560,
+                                 "kind": "land", "geo_anchored": True}
+                                for _ in range(3)]})
+    c = vcalc.compute(li)
+    assert c.arv_expected and c.arv_expected >= vcalc.ARV_VS_ASK_MAX * 120_000
+    assert vcalc.ARV_FLAG_ABOVE_ASK in (c.arv_flags or [])
+    g = grading.grade(li, c)          # applies the trust gate
+    assert c.max_bid_70 is None, "no bid off an ARV the market price contradicts"
+    assert c.roi_pct is None and c.deal_status is None
+    assert g.overall is None, "and no confident letter either"
+
+
+def test_the_same_gap_on_an_auction_row_is_left_alone():
+    """The guard must not touch auction inventory — a big discount to ARV there
+    is the entire flip thesis and clamping it would kill every real deal."""
+    li = _li(source="counties_sc.test", state="NC", county="Transylvania",
+             property_kind=PropertyKind.LAND, opening_bid=120_000.0, acreage=1.0,
+             raw={"comps": [{"sold_price": 850_000, "lot_sqft": 43_560,
+                             "kind": "land", "geo_anchored": True}
+                            for _ in range(3)]})
+    c = vcalc.compute(li)
+    assert vcalc.ARV_FLAG_ABOVE_ASK not in (c.arv_flags or [])
+    assert c.max_bid_70, "the auction lead keeps its bid"
+
+
+def test_a_present_use_assessment_does_not_outrank_the_asking_price():
+    """[33422] 3465 Yancey Road, McDowell NC: ask $6,290,000, ARV $20,900, max
+    bid $15,700. The land tier order reached the county anchor before anything
+    saw the ask, and an NC present-use / forestry deferment value (G.S.
+    105-277.2) is legally 5-20% of market. 113 leads carried an ask more than 3x
+    their ARV, median 6.0x."""
+    li = _ask_li(county="McDowell", opening_bid=800_000.0, acreage=100.0,
+                 tax_value=20_000.0)
+    c = vcalc.compute(li)
+    assert c.arv_expected is not None
+    assert c.arv_expected >= 0.6 * 800_000, (
+        "an ARV under 60% of a published asking price must be re-anchored to it, "
+        f"got {c.arv_expected}")
+
+
+def test_a_max_bid_never_exceeds_a_price_you_could_simply_pay():
+    """The narrow band under the ask flag: 0.75 x ARV lands above the ask for any
+    ARV over 1.333x it. 4 leads published a bid above their own asking price
+    ($266,800) — [1157] 01 Taylor Road, listed $60,000, "max viable bid" $62,100.
+    """
+    li = _ask_li(county="Anderson", state="SC", opening_bid=60_000.0, acreage=1.0,
+                 raw={"comps": [{"sold_price": 82_800, "lot_sqft": 43_560,
+                                 "kind": "land", "geo_anchored": True}
+                                for _ in range(3)]})
+    c = vcalc.compute(li)
+    if c.max_bid_70 is not None:
+        assert c.max_bid_70 <= 60_000.0, (
+            "a 'maximum viable bid' above the published asking price is not a "
+            f"bid — the buyer would pay the ask. Got {c.max_bid_70}")
+
+
+def test_a_land_parcel_carrying_a_house_sqft_is_flagged_as_a_join_error():
+    """315 board leads are typed LAND and carry a dwelling-sized living_sqft, off
+    which the ARV was priced. 227 published a max bid ($56,935,000), 89 with no
+    flag at all. Both readings cannot be true, so the conflict is disclosed."""
+    li = _ask_li(county="Transylvania", living_sqft=3_420.0, opening_bid=120_000.0,
+                 raw={"comp_median_ppsf": 244.0, "comps": _comps(244.0)})
+    c = vcalc.compute(li)
+    assert c.arv_expected, "the ARV is still computed — this flags, it does not delete"
+    assert vcalc.ARV_FLAG_LAND_SQFT in (c.arv_flags or [])
+    grading.grade(li, c)
+    assert c.max_bid_70 is None, "no bid on a parcel two records disagree about"
+
+
+# ---------------------------------------------------------------------------
+# 11. THE COUNTY DISAGREEING WITH ITSELF
+# ---------------------------------------------------------------------------
+
+def test_a_hard_withhold_must_be_true_of_every_county_record():
+    """`_anchor_value` takes the FIRST non-null of (market_value, cama appraised,
+    tax_value) and never checks agreement. 1,282 leads carry two figures
+    disagreeing by >= 3x, and 27 had an ARV DELETED against the first figure that
+    would have survived against the largest — $12,980,900 of ARV lost to field
+    order. A withhold is the engine's strongest claim; it has to be true of every
+    record, not of whichever one sorted first."""
+    common = dict(state="NC", county="Gaston", property_kind=PropertyKind.SINGLE_FAMILY,
+                  living_sqft=1_500.0)
+    # ARV ~ $370,000 against a $28,600 first figure (12.9x -> past the 10x hard
+    # limit) but only 1.03x the $360,600 assessor figure sitting behind it.
+    both = vcalc.compute(_li(
+        market_value=28_600.0,
+        raw={"comp_median_ppsf": 247.0, "comps": _comps(247.0),
+             "cama": {"appraised_value": 360_600.0}}, **common))
+    assert both.arv_expected is not None, (
+        "an ARV a county record DOES support must not be deleted because a "
+        "different county field sorted first")
+    assert "arv_above_anchor_extreme" not in (both.arv_flags or [])
+
+    # With no second figure to save it, the hard guard still fires.
+    alone = vcalc.compute(_li(
+        market_value=28_600.0,
+        raw={"comp_median_ppsf": 247.0, "comps": _comps(247.0)}, **common))
+    assert alone.arv_expected is None
+    assert "arv_above_anchor_extreme" in (alone.arv_flags or [])
+
+
+def test_the_county_disagreement_itself_is_disclosed_but_keeps_its_money():
+    """WEAK, deliberately. Nothing here impugns the ARV — it says the record the
+    ARV was measured against is one of two that cannot both be this parcel. On
+    280 leads, blanking the economics over that would be gutting the normal
+    case; what it costs is the 5%-margin verdict."""
+    li = _li(state="NC", county="Gaston", property_kind=PropertyKind.SINGLE_FAMILY,
+             living_sqft=1_500.0, market_value=100_000.0, opening_bid=50_000.0,
+             raw={"comp_median_ppsf": 120.0, "comps": _comps(120.0),
+                  "cama": {"appraised_value": 400_000.0}})
+    c = vcalc.compute(li)
+    assert vcalc.ARV_FLAG_COUNTY_DISAGREE in (c.arv_flags or [])
+    grading.grade(li, c)
+    assert c.max_bid_70 is not None, "the dollars stay — this is weak, not contradicted"
+    assert c.deal_status is None, "the knife-edge verdict does not"
+
+
+def test_the_disagreement_threshold_is_measured_per_pair_not_shared():
+    """THE FIRST THRESHOLD WAS WRONG AND THE MEASUREMENT SAID SO. A single 3x
+    bar fired on 1,240 leads, and 1,236 of those were market_value vs tax_value —
+    a pair whose ratio breaks 3x on 11.11% of the 11,128 leads carrying both,
+    because `li.tax_value` is frequently a land-only figure (this file says so
+    itself, in the tier-1b comment in `_arv_signals`). That is not 1,236 broken
+    joins, it is a field-semantics difference, and a flag on one lead in nine is
+    the wallpaper that trained readers to ignore the real ones.
+
+    Measured per pair, larger/smaller: market_value vs assessor-appraised
+    (n=6,901) and assessor-appraised vs tax_value (n=2,179) both run p50 1.00,
+    p90 1.00, p95 1.00 — they agree EXACTLY on ~95% of leads, so a 3x break
+    there is genuinely two parcels. market_value vs tax_value runs p90 3.44,
+    p95 6.17 and only flattens at ~10x (>=8x 3.02%, >=10x 2.17%, >=12x 1.68%).
+    Retightened to 280 leads total, of which 4 lose a max bid."""
+    assert vcalc.COUNTY_VALUE_DISAGREE_MULT == 3.0
+    assert vcalc.COUNTY_VALUE_DISAGREE_MULT_TAX == 10.0
+
+    common = dict(state="NC", county="Gaston",
+                  property_kind=PropertyKind.SINGLE_FAMILY, living_sqft=1_500.0,
+                  raw={"comp_median_ppsf": 120.0, "comps": _comps(120.0)})
+    # market vs tax at 4x — inside the tax roll's ordinary spread. Silent.
+    quiet = vcalc.compute(_li(market_value=400_000.0, tax_value=100_000.0, **common))
+    assert vcalc.ARV_FLAG_COUNTY_DISAGREE not in (quiet.arv_flags or []), (
+        "a 4x market-vs-tax gap is the tax roll being a tax roll, not a defect")
+    # ...the same 4x between two APPRAISAL-basis figures is a contradiction.
+    loud = vcalc.compute(_li(
+        market_value=400_000.0,
+        raw={"comp_median_ppsf": 120.0, "comps": _comps(120.0),
+             "cama": {"appraised_value": 100_000.0}},
+        state="NC", county="Gaston", property_kind=PropertyKind.SINGLE_FAMILY,
+        living_sqft=1_500.0))
+    assert vcalc.ARV_FLAG_COUNTY_DISAGREE in (loud.arv_flags or [])
+    # ...and market vs tax still speaks out at the far end of its own tail.
+    extreme = vcalc.compute(_li(market_value=1_500_000.0, tax_value=100_000.0, **common))
+    assert vcalc.ARV_FLAG_COUNTY_DISAGREE in (extreme.arv_flags or [])
+
+
+def test_a_present_use_assessment_cannot_delete_a_published_asking_price():
+    """The counterpart to the hard-withhold fix, one level up. Re-anchoring the
+    ARV to the ask (above) hands `_arv_sanity` a number 20x-300x the county's
+    figure, and the anchor HARD guard then deleted it — trading a wrong answer
+    for no answer. Measured, that took [33422] 3465 Yancey Road (asking
+    $6,290,000) and [33348] 149 April Valley Lane (asking $3,199,000) to a blank
+    row. On these sources the county figure is routinely a present-use / forestry
+    deferment value at 5-20% of market, so a 20x gap is the EXPECTED
+    relationship, not evidence the ask is wrong. The SOFT branch still fires, so
+    the lead is CONTRADICTED — the ask is shown, and nothing is built on it."""
+    li = _ask_li(county="McDowell", opening_bid=6_290_000.0, acreage=130.0,
+                 tax_value=20_000.0)
+    c = vcalc.compute(li)
+    assert c.arv_expected == 6_290_000.0, (
+        "the seller's published price is the best evidence on this lead")
+    assert "arv_above_anchor_extreme" not in (c.arv_flags or []), (
+        "a deferred-value assessment may not delete a market price")
+    assert "arv_above_anchor" in (c.arv_flags or []), "but it must be disclosed"
+    grading.grade(li, c)
+    assert c.max_bid_70 is None and c.deal_status is None, (
+        "contradicted: the number is published, the money is not")
+
+
+# ---------------------------------------------------------------------------
+# 12. A MAX BID THAT DEDUCTED NO REPAIRS
+# ---------------------------------------------------------------------------
+
+def test_a_bid_with_no_rehab_estimate_says_so_on_the_bid():
+    """`rehab_buy` is `(rehab_expected or 0) * 1.125`, so a MISSING estimate
+    silently becomes a $0 deduction and the bid collapses to a flat 0.75 x ARV.
+    9,190 published bids; 1,833 clear $250,000 and total $740,267,300; every one
+    of the board's largest bids is in this class, on distressed inventory."""
+    li = _li(state="NC", county="Gaston", property_kind=PropertyKind.SINGLE_FAMILY,
+             market_value=400_000.0)          # no living_sqft -> no rehab tier
+    c = vcalc.compute(li)
+    assert c.rehab_expected is None and c.rehab_tier == "unknown"
+    assert c.max_bid_70, "the bid is flagged, NOT withheld"
+    assert vcalc.MAX_BID_NO_REHAB_FLAG in (c.arv_flags or [])
+    assert vcalc.MAX_BID_NO_REHAB_FLAG == "rehab_not_deducted", (
+        "THE STRING IS AN INTERFACE — docs/dashboard.js:1366 recognises this "
+        "literal in calc.arv_flags; any other spelling renders nothing")
+
+
+def test_land_deducting_zero_rehab_is_correct_and_stays_silent():
+    """The scoping that matters. Of 19,250 bids deducting $0, 10,063 are LAND
+    with rehab_tier 'land' — a CORRECT zero, not a missing estimate. Flagging
+    them would put a warning on ten thousand numbers that are right."""
+    li = _li(state="NC", county="Gaston", property_kind=PropertyKind.LAND,
+             acreage=5.0, tax_value=100_000.0)
+    c = vcalc.compute(li)
+    assert c.rehab_tier == "land" and c.rehab_expected == 0.0
+    assert vcalc.MAX_BID_NO_REHAB_FLAG not in (c.arv_flags or [])
+
+
+def test_the_rehab_flag_never_blanks_the_bid_it_captions():
+    """It rides in arv_flags because that is where the client reads it, so the
+    classification has to stop the trust gate treating it as a claim about the
+    ARV. WEAK: the verdict goes, the money stays."""
+    li = _li(state="NC", county="Gaston", property_kind=PropertyKind.SINGLE_FAMILY,
+             market_value=400_000.0, opening_bid=100_000.0)
+    c = vcalc.compute(li)
+    assert vcalc.MAX_BID_NO_REHAB_FLAG in (c.arv_flags or [])
+    grading.grade(li, c)
+    assert c.max_bid_70 is not None, (
+        "blanking 9,190 bids over a term that is unknowable without a building "
+        "size would remove most of the board's economics")
+    assert c.deal_status is None
+
+
+# ---------------------------------------------------------------------------
+# 13. THE BID-PROXY NOTE THE CLIENT READS
+# ---------------------------------------------------------------------------
+
+def test_both_bid_proxy_notes_start_with_the_string_the_client_anchors_on():
+    """docs/dashboard.js:1688 keys `bid_proxy_arv` to /^ARV proxy from bid/i. The
+    land tier wrote "Land ARV proxy from bid ..." and the leading word defeated
+    the anchor, so 815 of the 949 bid-proxy leads rendered no note at all."""
+    land = vcalc.compute(_li(state="NC", county="Gaston",
+                             property_kind=PropertyKind.LAND,
+                             acreage=2.0, opening_bid=150_000.0))
+    improved = vcalc.compute(_li(state="NC", county="Gaston",
+                                 property_kind=PropertyKind.SINGLE_FAMILY,
+                                 opening_bid=150_000.0))
+    for c in (land, improved):
+        assert "bid_proxy_arv" in (c.arv_flags or [])
+        hits = [n for n in (c.notes or []) if n.startswith("ARV proxy from bid")]
+        assert hits, f"no note the client can match in {c.notes}"
+
+
+def test_a_refused_bid_proxy_is_not_called_a_bid_proxy():
+    """`bid_proxy_arv` is raised by substring-matching BID_PROXY_MARKER across
+    the tier notes, so the land tier's REFUSAL note has to avoid the phrase. It
+    did not at first, and 40 leads that publish no ARV at all were captioned
+    "the ARV is the opening bid x 1.5" — a claim about a number that is not on
+    the row. The refusal is `arv_proxy_above_ceiling`; that is the whole story."""
+    c = vcalc.compute(_li(state="NC", county="Gaston",
+                          property_kind=PropertyKind.LAND, acreage=40.0,
+                          opening_bid=1_500_000.0))
+    assert c.arv_expected is None
+    assert vcalc.ARV_FLAG_PROXY_CEILING in (c.arv_flags or [])
+    assert "bid_proxy_arv" not in (c.arv_flags or []), (
+        "no ARV was published from the bid — nothing was published at all")
+    assert not any(vcalc.BID_PROXY_MARKER in n for n in (c.notes or [])), (
+        "the refusal note must not contain the marker compute() reads back")
+
+
+# ---------------------------------------------------------------------------
+# 14. THE REGRESSION GUARD THAT MATTERS MOST
+# ---------------------------------------------------------------------------
+
+def test_an_ordinary_suburban_house_is_untouched_by_all_of_it():
+    """Measured over the live board's 1,260-lead normal-suburban cohort
+    (single_family, plausible sqft, an ARV, no flags, a published bid, HIGH or
+    MEDIUM confidence, <= 2 acres): 98.97% came through bit-identical, 0 lost an
+    ARV and 0 lost a max bid. Every one of the 13 that moved gained the WEAK
+    `county_values_disagree` caption with all of its dollars intact; 3 of them
+    also lost the 5%-margin verdict, which is the whole of what that flag costs."""
+    li = _li(state="NC", county="Gaston", property_kind=PropertyKind.SINGLE_FAMILY,
+             living_sqft=1_600.0, year_built=1998, bedrooms=3, bathrooms=2.0,
+             acreage=0.35, opening_bid=120_000.0, market_value=250_000.0,
+             tax_value=250_000.0,
+             raw={"comp_median_ppsf": 175.0, "comps": _comps(175.0)})
+    c = vcalc.compute(li)
+    assert c.arv_expected, "a normal house still gets an ARV"
+    assert not c.arv_flags, f"and no flag at all, got {c.arv_flags}"
+    assert c.arv_withheld is None
+    assert c.max_bid_70 and c.roi_pct is not None and c.rehab_expected
+    g = grading.grade(li, c)
+    assert c.deal_status, "and keeps its verdict"
+    assert g.overall, "and its letter grade"

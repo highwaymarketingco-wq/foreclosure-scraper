@@ -284,3 +284,87 @@ def test_board_qa_dup_address_counts_groups():
     assert summary.get("dup_address") == 1
     assert "dup_address" in a.raw["qa_flags"]
     assert "dup_address" in b.raw["qa_flags"]
+
+
+# ---- proxy-ARV caption names the multiplier that was actually used ----------
+#
+# The caption used to be the fixed string "ARV is a proxy (tax × 1.25 or bid ×
+# 2.4)". There is no single proxy factor: improved rows are bid × 2.4, land
+# rows bid × 1.5, and the assessed-value tiers are × 1.10 / × 1.25. On the
+# published board that printed "× 2.4" under 815 land leads whose ARV was the
+# opening bid × 1.5 — a number the reader is about to bid against.
+
+def _low_calc(note, arv=200000.0):
+    calc = {"arv_confidence": "LOW", "notes": [note]}
+    if arv is not None:
+        calc["arv_expected"] = arv
+    return calc
+
+
+def test_proxy_caption_names_land_bid_multiplier():
+    li = _li(raw={"calc": _low_calc("ARV proxy from bid × 1.5 (150,000 × 1.5 — land)")})
+    enrich_data_quality([li])
+    s = li.raw["data_quality"]["summary"]
+    assert "the opening bid × 1.5" in s
+    assert "2.4" not in s
+
+
+def test_proxy_caption_names_improved_bid_multiplier():
+    li = _li(raw={"calc": _low_calc("ARV proxy from bid × 2.4 (90,000 × 2.4) — rough")})
+    enrich_data_quality([li])
+    assert "the opening bid × 2.4" in li.raw["data_quality"]["summary"]
+
+
+def test_proxy_caption_reads_legacy_land_wording():
+    """The board published RIGHT NOW still carries the pre-reword note. The
+    caption must be right against today's payload as well as tomorrow's."""
+    li = _li(raw={"calc": _low_calc("Land ARV proxy from bid × 1.5 (150,000)")})
+    enrich_data_quality([li])
+    assert "the opening bid × 1.5" in li.raw["data_quality"]["summary"]
+
+
+def test_proxy_caption_names_anchor_multiplier():
+    li = _li(raw={"calc": _low_calc("Land ARV from county market value × 1.10 ($15,000) — ok")})
+    enrich_data_quality([li])
+    assert "county market value × 1.10" in li.raw["data_quality"]["summary"]
+
+
+def test_land_comp_acreage_is_not_read_as_a_multiplier():
+    """'ARV from 2 land comps × 0.88 ac' is comp-grounded and 0.88 is ACREAGE.
+    A wildcard 'ARV from (.+?) × (N)' captioned 3,948 comp-grounded ARVs as
+    proxies and printed the acreage as the factor."""
+    li = _li(raw={"calc": _low_calc(
+        "ARV from 2 land comps × 0.88 ac ($612,697/ac median; 2 comps)")})
+    enrich_data_quality([li])
+    s = li.raw["data_quality"]["summary"]
+    assert "proxy" not in s
+    assert "0.88" not in s
+    assert "confidence is LOW" in s
+
+
+def test_refused_tier_note_is_not_mistaken_for_the_surviving_one():
+    """Tier notes accumulate in tier order, so a REFUSED tier's note can sit
+    ahead of the tier that actually produced the ARV."""
+    li = _li(raw={"calc": {
+        "arv_confidence": "LOW",
+        "arv_expected": 120000.0,
+        "notes": [
+            "Land ARV from county market value × 1.10 ($900,000) exceeds the ceiling",
+            "ARV proxy from bid × 1.5 (80,000 × 1.5 — land)",
+        ],
+    }})
+    enrich_data_quality([li])
+    assert "the opening bid × 1.5" in li.raw["data_quality"]["summary"]
+
+
+def test_low_confidence_with_no_published_arv_says_so():
+    """No value reached the board. Describing the arithmetic behind a number
+    that was never published is the same defect as the wrong multiplier — and
+    dropping the line entirely left these leads reading 'no caveats'."""
+    li = _li(raw={"calc": {"arv_confidence": "LOW",
+                           "notes": ["Insufficient data for ARV"]}})
+    enrich_data_quality([li])
+    s = li.raw["data_quality"]["summary"]
+    assert s != NO_CAVEATS_SUMMARY
+    assert "no ARV was derived" in s
+    assert "proxy" not in s

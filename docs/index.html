@@ -49,8 +49,14 @@
     }
   </style>
 
-  <link rel="stylesheet" href="style.css?v=20260810b">
-  <link rel="stylesheet" href="premium.css?v=20260810b">
+  <!-- Bump all three together whenever any of them changes. All three moved
+       this round: style.css and premium.css stopped fighting over the intent
+       badge (the score was rendering at contrast 1.00), and dashboard.js gained
+       the location/owner/rehab gates. A stale ?v on the CSS with a fresh one on
+       the JS ships new markup against old rules, which is how a caveat renders
+       as unstyled body text. -->
+  <link rel="stylesheet" href="style.css?v=20260811a">
+  <link rel="stylesheet" href="premium.css?v=20260811a">
   <script>
     // Set theme before paint — avoids flash of wrong theme.
     (function () {
@@ -406,7 +412,10 @@
     <!-- Photos -->
     <div id="d-photos" class="photos"></div>
 
-    <!-- Mini map -->
+    <!-- Mini map. d-map-note fires when raw.geo_imprecise is set: the pin is a
+         city/county centroid, so the map must say so ABOVE itself, not in a
+         tooltip nobody on a phone can reach. -->
+    <div id="d-map-note" class="geo-note" style="display:none"></div>
     <div id="d-map" class="mini-map"></div>
 
     <!-- Sold Comps (3 nearest, zip-matched) -->
@@ -496,7 +505,7 @@
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="dashboard.js?v=20260810b"></script>
+<script src="dashboard.js?v=20260811a"></script>
 <script>
   // Theme toggle wiring (kept separate from dashboard.js so data/render logic stays untouched)
   (function () {

@@ -131,9 +131,17 @@ def test_recorded_dot_label_variants_all_match():
 
 
 def test_equity_band_uses_real_equity_not_roi():
+    # The calc block carries an `arv_expected`, which it must: `roi_pct` is an
+    # ARV-derived money field, so `roi_pct` WITHOUT an ARV is the state
+    # board_qa's `derived_without_arv` tripwire declares must never exist, and
+    # `_equity_band` now refuses to rank on it (a published equity pct with no
+    # ARV behind it was computed off the market_value fallback — see the
+    # `valuation_ran_without_arv` block in enrichment_equity). The assertion
+    # this test actually makes — equity pct beats roi_pct — is unchanged.
     li = Listing(source="x", source_url="u", listing_type=ListingType.REO, state="NC",
                  county="Gaston",
-                 raw={"equity": {"pct": 0.55}, "calc": {"roi_pct": 5}})
+                 raw={"equity": {"pct": 0.55},
+                      "calc": {"arv_expected": 250000.0, "roi_pct": 5}})
     assert _equity_band(li) == "high"      # 55% equity -> high, despite low ROI
     li.raw["equity"]["pct"] = -0.1
     assert _equity_band(li) == "low"       # underwater -> low
