@@ -216,6 +216,17 @@ if [[ "$RC" -eq 0 && -f "$ROOT/docs/listings.json" ]]; then
      || git -C "$ROOT" ls-files --error-unmatch docs/listings_slim.json.gz >/dev/null 2>&1; then
     PUB_FILES+=(docs/listings_slim.json.gz)
   fi
+  # docs/detail_shards/ is the per-lead detail payload phones fetch, emitted by
+  # the same write_artifact() call. Same gate, same reasons — a DIRECTORY
+  # pathspec behaves identically here: `git add <dir>` on a path that is neither
+  # on disk nor in the index exits 128 and stages nothing at all, and once the
+  # shards are tracked `git add docs/detail_shards` stages modifications,
+  # additions AND deletions inside it, which is how the emitter's
+  # delete-the-whole-directory failure path reaches the live site.
+  if [ -d "$ROOT/docs/detail_shards" ] \
+     || git -C "$ROOT" ls-files --error-unmatch docs/detail_shards >/dev/null 2>&1; then
+    PUB_FILES+=(docs/detail_shards)
+  fi
   if command -v git >/dev/null 2>&1; then
     cd "$ROOT"
     git add "${PUB_FILES[@]}" 2>/dev/null || true

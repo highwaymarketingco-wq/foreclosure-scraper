@@ -106,15 +106,25 @@ async def main() -> int:
     # publishing here would ship a fresh board beside a slim file describing the
     # PREVIOUS one — phones silently stale on sale dates and case detail while
     # desktop shows current. Nothing is lost by refusing: the mutation is already
-    # on disk, and the next write_artifact() caller re-emits all three together.
-    if (_p.parent / "listings_slim.json.gz").exists():
+    # on disk, and the next write_artifact() caller re-emits all four together.
+    #
+    # docs/detail_shards/ is under the identical rule and is checked separately
+    # rather than assumed to travel with the slim file: they are independent
+    # emits (either can fail or be switched off alone), and a shard set is joined
+    # to the board BY ARRAY INDEX, so a board written here that reorders or
+    # changes the record count would hand one lead's comps, vision and CAMA to a
+    # different lead's address on every phone.
+    _stale = [n for n in ("listings_slim.json.gz", "detail_shards")
+              if (_p.parent / n).exists()]
+    if _stale:
         print(f"[{time.strftime('%H:%M:%S')}] NOT PUBLISHING: docs/listings.json was "
               "updated in place, but this script cannot regenerate "
-              "docs/listings_slim.json.gz (the mobile payload), which would go "
-              "stale against the board.\n"
+              f"{' or '.join('docs/' + n for n in _stale)} (the mobile payload), "
+              "which would go stale against the board.\n"
               "  Next step:  python scripts/regenerate_dashboard.py\n"
               "  That calls write_artifact(), which re-emits listings.json.gz, "
-              "listings_detail.json.gz and listings_slim.json.gz from one payload.",
+              "listings_detail.json.gz, listings_slim.json.gz and "
+              "detail_shards/ from one payload.",
               flush=True)
         return 0
 

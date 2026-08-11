@@ -1,8 +1,12 @@
 """Generate the static-site JSON files consumed by docs/index.html (the live dashboard).
 
-Writes:
-  docs/listings.json   — array of sanitized listings (Pydantic-dumped, raw kept slim)
-  docs/run_meta.json   — run timestamp, source_status, totals, sources contributing
+Writes (every one of these, plus a .gz twin for the four payloads, in ONE call —
+a publish that stages some and not others ships a mis-joined board):
+  docs/listings.json        — array of sanitized listings (Pydantic-dumped, raw kept slim)
+  docs/listings_detail.json — index-aligned sidecar: the heavy comps/vision keys
+  docs/listings_slim.json   — SLIM-V1, the board payload phones fetch
+  docs/detail_shards/*.json.gz — index-aligned detail, cut so a phone can fetch one lead
+  docs/run_meta.json        — run timestamp, source_status, totals, sources contributing
 """
 from __future__ import annotations
 
@@ -661,6 +665,184 @@ def _emit_slim(docs: Path, payload: list) -> int | None:
         return None
 
 
+# ===========================================================================
+# DETAIL SHARDS — docs/detail_shards/NNNNN.json.gz, the mobile detail payload
+#
+# Phase 3 gave phones docs/listings_slim.json.gz, so the BOARD fits. Opening one
+# lead still did not: listings_detail.json inflates to 70.8 MB and the client
+# Object.assigns all 38,500 of them permanently into LISTINGS[i].raw, so on the
+# device whose whole problem is memory the first tap finished it. dashboard.js
+# therefore skips the sidecar entirely on LEAN and prints "Open this lead on a
+# desktop for comps, photo analysis and CAMA."
+#
+# A shard is that file, cut into 39 index-aligned pieces. Shard k covers board
+# indices [k*SIZE, (k+1)*SIZE). A phone fetches the ONE shard holding the lead
+# it opened — 413 KB at the median, 6 MB inflated — instead of 7.6 MB / 70.8 MB.
+#
+# WHY THE CONTENT IS THE COMPLEMENT OF SLIM AND NOT JUST LAZY_DETAIL_KEYS.
+# The detail panel's "Everything We Found" (dashboard.js:1641) is not a named
+# read, it is a reflective sweep over Object.keys(raw). The slim projection is a
+# name allowlist, and a name allowlist cannot preserve a reflective reader: the
+# board carries 107 distinct raw.* keys and slim keeps 29. A shard carrying only
+# the five LAZY_DETAIL_KEYS would restore comps/vision/CAMA and leave ~46 other
+# blocks blank — eviction_market (80.9% of records), amount_owed (59.9%), tenure
+# (43.7%), recorded_comps, recorded_sales, condemned, divorce, nc_ecourts. So a
+# shard record is listings_detail.json[i] MERGED WITH every raw key that
+# listings.json carries and the slim projection does NOT reproduce in full.
+#
+# _SHARD_SKIP_RAW is derived from _SLIM_RAW / _SLIM_RAW_SCALARS rather than
+# written out, so it cannot drift from the projector the way a hand-kept second
+# list would. Only two classes of key are skipped:
+#   * _SLIM_RAW entries marked "*" (grade, calc) — slim ships them WHOLE.
+#   * _SLIM_RAW_SCALARS — slim ships the scalar verbatim.
+# A block slim keeps only a SUB-TUPLE of (zillow -> photo, gis -> owner,
+# signal_stack -> count, equity -> value/pct/is_underwater, ...) is emitted here
+# in FULL, on purpose. The client merge is a top-level assign, so a partial
+# block in the shard would REPLACE, not deepen, the partial block already on the
+# record — and the panel reads exactly the sub-keys slim drops (zillow
+# .description, gis.mailing, signal_stack.signals, equity.payoff_source). The
+# duplicated sub-keys cost bytes; a half-populated block costs facts.
+#
+# THE INVARIANT THIS CODE IS UNDER, same as SLIM-V1's rule 1: ADDITIVE, NEVER
+# AUTHORITATIVE. listings.json + listings_detail.json are TOGETHER the only
+# full-fidelity board on disk. Shards are emitted from the SAME payload/details
+# lists AFTER all six authoritative files are already written, they never mutate
+# either list, and load_board() must NEVER read them.
+# ===========================================================================
+
+DETAIL_SHARD_DIR = "detail_shards"
+DETAIL_SHARD_SIZE = 1000          # records per shard -> 39 files at 38,500 leads
+DETAIL_SHARD_SCHEMA = "shard-v1"
+
+# Raw keys the slim payload already reproduces IN FULL, so a shard would only
+# duplicate them. Derived, never hand-listed — see the block comment above.
+_SHARD_SKIP_RAW = frozenset(k for k, v in _SLIM_RAW.items() if v == "*") | frozenset(_SLIM_RAW_SCALARS)
+
+
+def _shard_record(rec: dict, det) -> dict:
+    """One shard entry: the raw keys slim does not carry, plus the sidecar.
+
+    Pure — never mutates `rec`, `rec["raw"]` or `det`. Sub-objects are passed by
+    REFERENCE (this runs 38,500 times right after two multi-hundred-MB
+    serializations), so nothing below may write into them.
+
+    `det` is applied LAST. It cannot collide today — write_artifact pops every
+    LAZY_DETAIL_KEY out of raw before building details, so the two key sets are
+    disjoint — but if that ever changes, the sidecar is the copy that survived
+    the identity-keyed cross-run backfill and is the one to keep.
+
+    An empty result is still emitted by the caller: index alignment IS the join.
+    """
+    out: dict = {}
+    raw = rec.get("raw") if isinstance(rec, dict) else None
+    if isinstance(raw, dict):
+        for k, v in raw.items():
+            if k not in _SHARD_SKIP_RAW:
+                out[k] = v
+    if isinstance(det, dict) and det:
+        out.update(det)
+    return out
+
+
+def _rm_detail_shards(shard_dir: Path) -> None:
+    """Remove the shard directory and any temp files, never raising.
+
+    Deliberately a real deletion and not a no-op: index i is the join across
+    listings.json / listings_detail.json / detail_shards, and that alignment
+    only holds within one write_artifact call. Shards left behind from a
+    PREVIOUS board would silently show one lead's comps and vision under another
+    lead's address — worse than the honest "open on desktop" note the client
+    falls back to when the metadata is absent.
+
+    Leaving the (now-empty) directory would be equally wrong: every publish site
+    gates `git add docs/detail_shards` on "exists OR already tracked", and the
+    tracked half of that gate is what lets this deletion reach the repo.
+    """
+    try:
+        import shutil
+        shutil.rmtree(shard_dir, ignore_errors=True)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _emit_detail_shards(docs: Path, payload: list, details: list,
+                        slim_ok: bool = True) -> dict | None:
+    """Write docs/detail_shards/NNNNN.json.gz. Returns the run_meta board
+    sub-block describing them, or None when no usable shard set exists.
+
+    Never raises. This runs inside four unattended launchd jobs, after the
+    authoritative board is already safely on disk, and a derivative file is not
+    worth failing a run over.
+
+    On ANY failure — or when `slim_ok` is False — the whole directory is REMOVED
+    rather than left half-written or left behind: the client keys off the
+    metadata, which is omitted in lockstep, so it falls back to today's
+    desktop-only note instead of rendering half a lead or a stale one.
+
+    `slim_ok` is the deliberate coupling of the two mobile derivatives. Shards
+    are only ever fetched by the LEAN client, they are advertised inside the
+    same run_meta "board" block the slim payload owns, and that block is defined
+    as describing the payload THIS call wrote. So when slim is absent — the
+    FORECLOSURE_SLIM=0 emergency stop, or a projection failure — the honest
+    outcome is that the whole mobile payload is absent together, and mobile
+    degrades to exactly what it does today. Emitting 28 MB of shards that
+    nothing advertises would be the worst of both.
+    """
+    shard_dir = docs / DETAIL_SHARD_DIR
+    if not slim_ok:
+        _rm_detail_shards(shard_dir)
+        return None
+    if os.getenv("FORECLOSURE_DETAIL_SHARDS") == "0":   # emergency stop
+        # Unlike the slim stop, this REMOVES. A stale shard set is mis-joined
+        # data on a phone; a stale slim file at least still describes a board.
+        _rm_detail_shards(shard_dir)
+        return None
+    if not payload:
+        _rm_detail_shards(shard_dir)
+        return None
+    try:
+        import gzip as _gzip
+        shard_dir.mkdir(parents=True, exist_ok=True)
+        written: set[str] = set()
+        for start in range(0, len(payload), DETAIL_SHARD_SIZE):
+            stop = start + DETAIL_SHARD_SIZE
+            recs = payload[start:stop]
+            dets = details[start:stop]
+            # Joined bytes rather than json.dumps over a built list, matching
+            # _slim_payload_bytes: the merged object graph is never resident.
+            parts = [
+                json.dumps(_shard_record(rec, dets[i] if i < len(dets) else None),
+                           ensure_ascii=False, default=str,
+                           separators=(",", ":")).encode("utf-8")
+                for i, rec in enumerate(recs)
+            ]
+            body = b"[" + b",".join(parts) + b"]"
+            name = f"{start // DETAIL_SHARD_SIZE:05d}.json.gz"
+            _atomic_write_bytes(shard_dir / name,
+                                _gzip.compress(body, compresslevel=9, mtime=0))
+            written.add(name)
+        # Purge shards from a LARGER previous board plus any orphaned .tmp. A
+        # board that shrinks from 38,500 to 20,000 leaves shards 20..38 on disk
+        # holding indices that no longer exist.
+        for stale in shard_dir.iterdir():
+            if stale.name not in written:
+                try:
+                    stale.unlink()
+                except OSError:
+                    pass
+        return {
+            "schema": DETAIL_SHARD_SCHEMA,
+            "dir": DETAIL_SHARD_DIR,
+            "size": DETAIL_SHARD_SIZE,   # records per shard: index i -> i // size
+            "count": len(written),       # number of shard files
+            "records": len(payload),     # indices covered: must equal board.count
+        }
+    except Exception as exc:  # noqa: BLE001
+        _rm_detail_shards(shard_dir)
+        log.warning("web_artifact.detail_shards_failed", error=str(exc))
+        return None
+
+
 def _identity_keys(rec: dict):
     """Candidate cross-run identity keys for a published record.
 
@@ -869,6 +1051,15 @@ def write_artifact(
     del listings_bytes, detail_bytes    # free ~350 MB before projecting (8 GB box)
     slim_count = _emit_slim(docs, payload)
 
+    # DETAIL SHARDS, the mobile detail payload. Same contract as the slim file
+    # and deliberately last: every authoritative byte is already on disk, this
+    # reads `payload` and `details` without mutating either, and a failure here
+    # costs a derivative, never a board. Gated on the slim emit having succeeded
+    # — the two are one mobile payload, advertised in one metadata block. See
+    # the DETAIL SHARDS block above.
+    shard_meta = _emit_detail_shards(docs, payload, details,
+                                     slim_ok=slim_count is not None)
+
     meta = {
         "run_time": datetime.utcnow().isoformat() + "Z",
         "total": len(listings),
@@ -886,8 +1077,18 @@ def write_artifact(
     # slim emit was skipped or failed — and it is NOT carried forward from the
     # prior meta by the health-preservation block below, which is the point: a
     # board block always describes the slim file written by THIS call.
+    #
+    # detail_shards is a SIBLING key, added without touching schema/count: the
+    # client's boardExpectedCount() (dashboard.js:469) gates on board.schema ===
+    # "slim-v1" and returns null for anything else, so renaming or re-shaping
+    # the outer block would silently disable the record-count gate that stops a
+    # short payload rendering as a whole board. It carries `size` so the client
+    # derives shard index i // size instead of hardcoding 1000, and `records` so
+    # a client that fetched a shard set from a different write can tell.
     if slim_count is not None:
         meta["board"] = {"schema": "slim-v1", "count": slim_count}
+        if shard_meta is not None:
+            meta["board"]["detail_shards"] = shard_meta
 
     # PRESERVE per-source health across partial writers.
     # Fourteen maintenance scripts (sos_agent_refresh, lrcpwa_refresh,

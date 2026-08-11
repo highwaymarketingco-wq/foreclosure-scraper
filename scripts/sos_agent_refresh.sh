@@ -37,8 +37,24 @@ if [ -f docs/listings_slim.json.gz ] \
    || git ls-files --error-unmatch docs/listings_slim.json.gz >/dev/null 2>&1; then
   SLIM=(docs/listings_slim.json.gz)
 fi
-git add docs/listings.json.gz docs/listings_detail.json.gz "${SLIM[@]}"
-if ! git diff --cached --quiet -- docs/listings.json.gz docs/listings_detail.json.gz; then
+# docs/detail_shards/ is the per-lead detail payload phones fetch, emitted by the
+# same write_artifact() call. A DIRECTORY pathspec behaves like a file here:
+# absent AND untracked exits 128 and stages nothing at all, while `git add` on a
+# tracked directory stages additions, modifications AND deletions inside it.
+SHARDS=()
+if [ -d docs/detail_shards ] \
+   || git ls-files --error-unmatch docs/detail_shards >/dev/null 2>&1; then
+  SHARDS=(docs/detail_shards)
+fi
+git add docs/listings.json.gz docs/listings_detail.json.gz "${SLIM[@]}" "${SHARDS[@]}"
+# detail_shards joins the board-changed gate rather than riding on it. The gate
+# exists to stop a Cloudflare-walled run making an empty commit, and shards are a
+# pure function of the same payload — so a walled run leaves them byte-identical
+# too and still will not commit. But the FIRST run after the shards ship finds an
+# unchanged board and a brand-new shard directory, and without this the `git
+# reset -q` below would throw the shards away every time until the board happened
+# to move.
+if ! git diff --cached --quiet -- docs/listings.json.gz docs/listings_detail.json.gz docs/detail_shards; then
   git add docs/run_meta.json
   git commit -q -m "Scheduled SOS pass: +NC entity registered-agent contacts
 

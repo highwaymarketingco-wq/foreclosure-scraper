@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-08-10T20:38:43.100252Z",
+  "run_time": "2026-08-11T00:18:16.508842Z",
   "total": 38500,
   "by_source": {
     "national.auction_dot_com": 12,
@@ -324,14 +324,13 @@
   "notes": "catchup_geocode: filled 43 of 2,136 leads missing lat/lng",
   "board": {
     "schema": "slim-v1",
-    "count": 38500
-  },
-  "health_carried_from": "2026-08-10T18:02:11.554293Z",
-  "health_carried_keys": [
-    "by_source",
-    "by_state",
-    "by_county_top",
-    "source_status",
-    "errors"
-  ]
+    "count": 38500,
+    "detail_shards": {
+      "schema": "shard-v1",
+      "dir": "detail_shards",
+      "size": 1000,
+      "count": 39,
+      "records": 38500
+    }
+  }
 }

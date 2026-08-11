@@ -1421,6 +1421,213 @@ function roiCell(roi) {
   return `<span class="${cls}">${roi.toFixed(1)}%</span>`;
 }
 
+// ===========================================================================
+// ARV TRUST — one place decides whether a published valuation can be believed,
+// and the answer is rendered where the user actually looks.
+//
+// WHY THIS IS HERE. The reported bug was "a trailer on a half acre will say
+// 700k". It was found by eye, scanning the TABLE. The table is the one surface
+// that carried no caveat at all: `<td class="num">${fmtMoney(c.arv_expected)}</td>`,
+// a bare number, at every confidence level. The "(proxy)" suffix existed only on
+// the card chip and the detail badge, and only when arv_confidence was "LOW" —
+// so every MEDIUM row rendered clean, including the $780,300 one. A warning
+// nobody is looking at is not a warning.
+//
+// ARV is not a display field. max_bid_70, ROI, estimated profit, the letter
+// grade and the default sort are all derived from it, so a 10x-inflated ARV
+// tells someone a deal is good at an auction where they bid their own money.
+// Being wrong here is much worse than being silent.
+//
+// TWO LEVELS, because they are two different claims:
+//
+//   "bad"   — something concluded this number is wrong or unverifiable.
+//             Loud, and it visibly discounts the money derived from it.
+//   "proxy" — no comps / no sqft, so it is an estimate of an estimate. Quiet.
+//             It is true of 62% of today's board (23,874 low_arv_confidence and
+//             20,447 no_sqft out of 38,500) and a red flag on two rows in three
+//             is wallpaper, which is part of how the real one stayed invisible.
+//
+// HOW A "bad" IS DETECTED, in three independent layers, because the valuation
+// work is landing concurrently and this file must be useful before, during and
+// after it:
+//
+//   1. Named flags. The list below covers the names in play. Absent from the
+//      board, it costs nothing.
+//   2. A shape rule over any flag that mentions ARV and reads as a VERDICT
+//      ("above", "outlier", "unverified", "ceiling", …) rather than as a
+//      confidence label. So a flag named after this file ships still lands.
+//   3. Thresholds the pipeline ALREADY treats as anomalous — grading.py:295
+//      withholds the letter grade at ARV > $2M or ROI > 400%. It withholds only
+//      the LETTER: arv_expected, max_bid_70 and roi_pct still publish, and the
+//      table printed all three clean. This layer needs no board recompute and
+//      is live the moment this file deploys.
+//
+// With none of the flags present the code returns "ok" or "proxy" exactly as
+// before, so a board that has not been recomputed renders as it does today
+// apart from layer 3.
+// ===========================================================================
+const _ARV_BAD_FLAGS = {
+  // live on the board today
+  arv_outlier: 1,
+  // QA / data-quality names in play for the valuation fixes
+  arv_above_asis: 1, arv_below_asis: 1, arv_vs_assessed_extreme: 1,
+  arv_unverified: 1, arv_unreliable: 1, arv_geo_suspect: 1, arv_floored: 1,
+  ppsf_ceiling: 1, ppsf_outlier: 1, land_ppa_ceiling: 1,
+  type_mismatch: 1, property_type_mismatch: 1, comp_type_mismatch: 1,
+  shared_centroid: 1, gis_row_shared: 1, geo_imprecise: 1,
+  assessed_is_tax_amount: 1, stale_sale_floor: 1,
+};
+// A verdict, not a confidence label. Deliberately does NOT match
+// "low_arv_confidence", which is layer-2's most important non-hit.
+const _ARV_BAD_WORDS = /(above|below|exceed|extreme|outlier|suspect|unverif|unreliab|implausib|ceiling|inflat|mismatch|withheld|suppress|overrid|floor|centroid|fanout|fan_out|shared|stale)/;
+const _ARV_PROXY_FLAGS = { low_arv_confidence: 1, no_sqft: 1, sqft_estimated: 1 };
+
+const _ARV_TRUST_OK = { level: "ok", why: [] };
+
+/**
+ * `{level: "bad"|"proxy"|"ok", why: [reason, …]}` for one listing.
+ *
+ * Memoised non-enumerably (the exportCsv `{...l}` spread must never pick this
+ * up) and safe to memoise: every input lives in raw.calc / raw.data_quality /
+ * raw.grade, none of which is a lazy-detail key, so a shard merge cannot change
+ * the answer.
+ */
+function arvTrust(l) {
+  if (!l || typeof l !== "object") return _ARV_TRUST_OK;
+  if (l._arvTrust !== undefined) return l._arvTrust;
+  const raw = l.raw || {};
+  const c = raw.calc || {};
+  const why = [];
+  let bad = false, proxy = false;
+
+  const consider = (name) => {
+    if (typeof name !== "string" || !name) return;
+    const n = name.toLowerCase();
+    if (_ARV_BAD_FLAGS[n] || (n.indexOf("arv") !== -1 && _ARV_BAD_WORDS.test(n))) {
+      bad = true;
+      const pretty = n.replace(/_/g, " ");
+      if (why.indexOf(pretty) === -1) why.push(pretty);
+    } else if (_ARV_PROXY_FLAGS[n]) {
+      proxy = true;
+    }
+  };
+
+  const dq = raw.data_quality;
+  if (dq && Array.isArray(dq.flags)) dq.flags.forEach(consider);
+  // qa_flags is written by enrichment_board_qa and is not in the slim
+  // allowlist, so it is a desktop-only signal today. Read it where it exists
+  // rather than requiring it.
+  if (Array.isArray(raw.qa_flags)) raw.qa_flags.forEach(consider);
+  // calc emits this as `arv_flags`, NOT `flags`. Reading `c.flags` was a dead
+  // branch: measured on 12,000 recomputed leads, 3,394 carried a soft flag and
+  // 2,660 of them (78.4%) rendered with no warning at all. This is the same
+  // reader-writer mismatch that made every phone report "CONFIDENCE: LOW" —
+  // when a warning has to be right to keep someone from overbidding, the key
+  // name is not a detail. `flags` is kept as a fallback in case a future
+  // producer uses it.
+  if (Array.isArray(c.arv_flags)) c.arv_flags.forEach(consider);
+  if (Array.isArray(c.flags)) c.flags.forEach(consider);
+  // Boolean verdicts written straight onto calc — arv_geo_suspect already is one.
+  for (const k in c) { if (c[k] === true && k.indexOf("arv") === 0) consider(k); }
+
+  const arv = c.arv_expected;
+  // grading.py:295 already refuses to letter-grade these. It withholds the
+  // letter only; the number, the max bid and the ROI publish regardless.
+  if (typeof arv === "number" && arv > 2000000) {
+    bad = true;
+    why.push("ARV over $2M — the grader already refuses to rate this as a deal");
+  }
+  if (typeof c.roi_pct === "number" && c.roi_pct > 400) {
+    bad = true;
+    why.push("ROI over 400% — implausible, so the ARV behind it is not trustworthy");
+  }
+  if (!bad && c.arv_confidence === "LOW") proxy = true;
+
+  return _memo(l, "_arvTrust", bad ? { level: "bad", why }
+    : proxy ? { level: "proxy", why } : _ARV_TRUST_OK);
+}
+
+/** Tooltip text for a flagged ARV. Plain, and it never claims more than it knows. */
+function arvTrustTitle(t) {
+  if (!t || t.level === "ok") return "";
+  if (t.level === "proxy") {
+    return "Proxy ARV — estimated without usable comps or a known square footage. "
+      + "Treat it as a rough band, not a value.";
+  }
+  return "ARV flagged as unreliable — do not bid off this number. "
+    + (t.why.length ? t.why.join("; ") : "failed a valuation sanity check")
+    + ". Max bid and ROI are derived from it and are shown dimmed for the same reason.";
+}
+
+/**
+ * The ARV cell for the table.
+ *
+ * Handles the case that matters most once the valuation guards land: an ARV the
+ * pipeline WITHHELD. A suppressed number renders as an empty cell today, which
+ * reads as "not computed yet" — indistinguishable from a lead nobody has priced.
+ * Flagged-and-absent says "unverified" instead.
+ */
+function arvCell(c, t) {
+  const v = c.arv_expected;
+  const title = arvTrustTitle(t).replace(/"/g, "&quot;");
+  if (t.level === "bad") {
+    const body = v ? fmtMoney(v) : "unverified";
+    return `<td class="num dq-arv-bad" title="${title}"><span class="dq-arv-mark">&#9888;&#xFE0E;</span>${body}</td>`;
+  }
+  if (!v) return `<td class="num"></td>`;
+  if (t.level === "proxy") {
+    return `<td class="num dq-arv-proxy" title="${title}">~${fmtMoney(v)}</td>`;
+  }
+  return `<td class="num">${fmtMoney(v)}</td>`;
+}
+
+/** Money derived from a flagged ARV: shown, dimmed, and labelled as derived. */
+function derivedCell(inner, t) {
+  if (t.level !== "bad" || !inner) return `<td class="num">${inner}</td>`;
+  return `<td class="num dq-dim" title="Derived from an ARV flagged as unreliable">${inner}</td>`;
+}
+
+// One-time stylesheet for the treatments this file introduces. Injected from
+// here rather than added to style.css / premium.css because those files belong
+// to another owner in this change and a split definition is how a warning ends
+// up half-deployed. Everything is scoped to its own class names.
+let _DASH_STYLES_DONE = false;
+function injectDashStyles() {
+  if (_DASH_STYLES_DONE || typeof document === "undefined") return;
+  _DASH_STYLES_DONE = true;
+  // #listings-table wins the specificity fight with premium.css's own
+  // `#listings-table td.num` colour rule — verified in the browser, the plain
+  // `td.dq-arv-bad` selector lost and the warning rendered in the default text
+  // colour. Both themes are set explicitly: index.html drives the theme off a
+  // data-theme attribute, never off prefers-color-scheme.
+  const css = `
+  :root{--dq-warn:#a8200f;--dq-warn-bg:rgba(217,45,32,.11)}
+  :root[data-theme="dark"]{--dq-warn:#ff8a7a;--dq-warn-bg:rgba(217,45,32,.22)}
+  #listings-table td.dq-arv-bad{background:var(--dq-warn-bg);color:var(--dq-warn);font-weight:700}
+  #listings-table td.dq-arv-bad .dq-arv-mark{margin-right:4px;font-weight:700}
+  #listings-table td.dq-arv-proxy{color:var(--muted,#6b6257)}
+  #listings-table td.dq-dim{opacity:.42}
+  #listings-table td.dq-dim .roi-pos,#listings-table td.dq-dim .roi-neg{color:inherit}
+  .dq-warn-mark{color:var(--dq-warn);font-weight:700}
+  /* .val.big carries its own colour at a higher specificity than a bare class. */
+  #detail-panel .val.dq-warn-mark{color:var(--dq-warn)}
+  .arv-flag-chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:10px;
+    font-weight:700;color:#fff;background:#c0392b;border:1px solid #c0392b}
+  .arv-flag-note{margin-top:6px;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.4;
+    color:var(--dq-warn);background:var(--dq-warn-bg);border:1px solid rgba(217,45,32,.35)}
+  .shard-loading{font-size:.9em;color:var(--muted,#6b6257);position:relative;padding-left:18px}
+  .shard-loading::before{content:"";position:absolute;left:0;top:50%;width:11px;height:11px;
+    margin-top:-6px;border-radius:50%;border:2px solid currentColor;border-right-color:transparent;
+    animation:shard-spin .8s linear infinite}
+  @keyframes shard-spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){.shard-loading::before{animation:none}}
+  `;
+  const el = document.createElement("style");
+  el.id = "dash-inline-styles";
+  el.textContent = css;
+  document.head.appendChild(el);
+}
+
 // ------------- Table render --------------------------------------------------
 // Desktop keeps 800 rows — 800 × 17 columns ≈ 18,400 elements per render, which
 // is fine on a desktop and is not fine on a phone that is already at its heap
@@ -1443,15 +1650,26 @@ function renderTable() {
     .map((l, i) => {
       const g = getGrade(l) || {};
       const c = getCalc(l) || {};
+      const at = arvTrust(l);
       const rowClass = g.overall ? `row-${g.overall}` : "";
       // Bankruptcy listings have no address — show debtor name + chapter so
       // they're identifiable in the table view. Cross-ref hits get a 🏛 prefix.
       const isBkSource = l.source === "national.courtlistener_bankruptcy";
       const cl = isBkSource ? (l.raw && l.raw.courtlistener) || {} : null;
       const bkXref = !isBkSource && l.raw && l.raw.bankruptcy ? l.raw.bankruptcy : null;
+      // The flagged-ARV marker rides on the ADDRESS, not only on the ARV cell.
+      // Below 720px style.css hides the ARV, Max Bid, Rehab and every other
+      // numeric column — verified in the browser: of 17 columns the phone shows
+      // grade, date, address, city, opening bid and ROI. A warning that lives
+      // only in the ARV cell is therefore invisible on exactly the device this
+      // change is for. The address is the one cell that renders in every
+      // layout, and it is where the eye lands.
+      const arvMark = at.level === "bad"
+        ? `<span class="dq-warn-mark" title="${arvTrustTitle(at).replace(/"/g, "&quot;")}">&#9888;&#xFE0E; </span>`
+        : "";
       const addrCell = isBkSource
-        ? `🏛 ${cl.chapter && cl.chapter !== "?" ? `Ch.${cl.chapter} ` : ""}${(l.defendant || "Bankruptcy filing").slice(0, 60)}`
-        : `${bkXref ? "🏛 " : ""}${l.street_address || ""}`;
+        ? `${arvMark}🏛 ${cl.chapter && cl.chapter !== "?" ? `Ch.${cl.chapter} ` : ""}${(l.defendant || "Bankruptcy filing").slice(0, 60)}`
+        : `${arvMark}${bkXref ? "🏛 " : ""}${l.street_address || ""}`;
       let dateCell = isBkSource && cl && cl.date_filed ? cl.date_filed : fmtDate(l.sale_date);
       // In the deadline track the clock IS the point, so it replaces the date.
       if (STAGE === "deadline") {
@@ -1466,7 +1684,15 @@ function renderTable() {
       }
       return `
     <tr class="${rowClass}" data-id="${i}">
-      <td>${(() => { const ds = getDistress(l); return ds && distressLabel[ds.tier] ? `<span class="tier-dot ${distressLabel[ds.tier].cls}" title="${ds.tier} · ${(ds.signals || []).join(', ')}"></span>` : ""; })()}${gradeBadge(g)}${intentBadge(l)}</td>
+      <td>${(() => { const ds = getDistress(l); return ds && distressLabel[ds.tier] ? `<span class="tier-dot ${distressLabel[ds.tier].cls}" title="${ds.tier} · ${(ds.signals || []).join(', ')}"></span>` : ""; })()}${
+        // A WITHHELD grade and a MISSING grade both render as the same dim "—",
+        // which reads as "not scored yet". When the ARV is flagged the grade is
+        // absent on purpose, so colour it and say so in the tooltip. The loud
+        // marker stays on the address cell — one glyph per row, not two.
+        (!g.overall && at.level === "bad")
+          ? `<span class="grade-badge F dq-warn-mark" style="opacity:.85" title="Unrated on purpose — ${arvTrustTitle(at).replace(/"/g, "&quot;")}">—</span>`
+          : gradeBadge(g)
+      }${intentBadge(l)}</td>
       <td>${dateCell}</td>
       <td>${l.state || ""}</td>
       <td>${l.county || ""}</td>
@@ -1474,10 +1700,10 @@ function renderTable() {
       <td>${l.city || ""}</td>
       <td>${fmtType(l.listing_type)}</td>
       <td class="num">${fmtMoney(l.opening_bid)}</td>
-      <td class="num">${fmtMoney(c.arv_expected)}</td>
+      ${arvCell(c, at)}
       <td class="num">${fmtMoney(c.rehab_expected)}</td>
-      <td class="num">${fmtMoney(c.max_bid_70)}</td>
-      <td class="num">${roiCell(c.roi_pct)}</td>
+      ${derivedCell(fmtMoney(c.max_bid_70), at)}
+      ${derivedCell(roiCell(c.roi_pct), at)}
       <td class="num">${fmtNum(l.bedrooms)}</td>
       <td class="num">${fmtNum(l.bathrooms)}</td>
       <td class="num">${l.living_sqft ? Math.round(l.living_sqft).toLocaleString() : ""}</td>
@@ -1788,10 +2014,13 @@ function renderCards() {
       // ARV proxy caveat: when the ARV is LOW-confidence (no real comps / no sqft)
       // mirror the detail panel — append " (proxy)" to the ARV chip and dim the ROI
       // chip so a guessed ARV never reads as a verified value.
-      const dqf = (l.raw && l.raw.data_quality && Array.isArray(l.raw.data_quality.flags))
-        ? l.raw.data_quality.flags : [];
-      const lowArv = c.arv_confidence === "LOW"
-        || dqf.includes("low_arv_confidence") || dqf.includes("no_sqft");
+      // arvTrust() is the single decision (see :1423). "proxy" keeps the old
+      // quiet treatment verbatim; "bad" gets its own chip below and blanks the
+      // derived ROI line rather than dimming it, because a dimmed number is
+      // still a number someone can read off the card.
+      const at = arvTrust(l);
+      const lowArv = at.level === "proxy";
+      const badArv = at.level === "bad";
       // Bankruptcy listings: show debtor + chapter as the "address"
       const cardAddr = isBkSource
         ? `🏛 ${cl && cl.chapter && cl.chapter !== "?" ? `Ch.${cl.chapter}` : "Bankruptcy"} · ${(l.defendant || "filing").slice(0, 50)}`
@@ -1808,6 +2037,11 @@ function renderCards() {
       //     this property (enrichment_lead_signals). The single loudest lead tell.
       const sscChip = signalStackChip(l);
       if (sscChip) signalChips.push(sscChip);
+      // (0b) Flagged valuation — first chip after the signal stack, because
+      //      every money figure on this card descends from it.
+      if (badArv) {
+        signalChips.push(`<span class="arv-flag-chip" title="${arvTrustTitle(at).replace(/"/g, "&quot;")}">&#9888;&#xFE0E; ARV flagged</span>`);
+      }
       // (1) Equity — mirror the detail panel's value/pct + underwater colouring.
       const eq = (l.raw && l.raw.equity) || null;
       if (eq && eq.value != null) {
@@ -1874,13 +2108,17 @@ function renderCards() {
           <div class="card-meta">
             ${fmtType(l.listing_type)}
             ${l.opening_bid ? `<span>Bid ${fmtMoney(l.opening_bid)}</span>` : ""}
-            ${c.arv_expected ? `<span>ARV ${fmtMoney(c.arv_expected)}${lowArv ? " (proxy)" : ""}</span>` : ""}
+            ${c.arv_expected
+              ? `<span${badArv ? ` class="dq-warn-mark" title="${arvTrustTitle(at).replace(/"/g, "&quot;")}"` : ""}>ARV ${badArv ? "&#9888;&#xFE0E; " : ""}${fmtMoney(c.arv_expected)}${lowArv ? " (proxy)" : ""}</span>`
+              : (badArv ? `<span class="dq-warn-mark" title="${arvTrustTitle(at).replace(/"/g, "&quot;")}">ARV &#9888;&#xFE0E; unverified</span>` : "")}
             ${(l.raw && l.raw.last_sale && l.raw.last_sale.date) ? `<span title="${l.raw.last_sale.basis === "assessor_value" ? "county assessor market value as of the sale date (sale price not published)" : "last recorded sale"}">Sold ${l.raw.last_sale.date.slice(0, 7)}${l.raw.last_sale.amount ? " · " + fmtMoney(l.raw.last_sale.amount) + (l.raw.last_sale.basis === "assessor_value" ? "*" : "") : ""}</span>` : ""}
             ${l.sale_date ? `<span>${fmtDate(l.sale_date)}</span>` : ""}
             ${meta.length ? `<span>${meta.join(" · ")}</span>` : ""}
           </div>
           ${(l.raw && l.raw.also_seen_in && l.raw.also_seen_in.length) ? `<div class="card-sources" style="font-size:11px;opacity:.7;margin-top:2px">also at: ${l.raw.also_seen_in.map((s) => `<a href="${s.url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${(s.source || "source").split(".").pop()}</a>`).join(", ")}</div>` : ""}
-          ${roi != null ? `<div class="card-roi ${roiCls}"${lowArv ? ` style="opacity:.45" title="ROI suppressed — derived from a low-confidence (proxy) ARV"` : ""}>ROI ${roi.toFixed(1)}%${c.cash_on_cash_pct != null ? ` · CoC ${c.cash_on_cash_pct.toFixed(0)}%` : ""}</div>` : ""}
+          ${roi == null ? "" : badArv
+            ? `<div class="card-roi" style="opacity:.5;font-weight:600" title="ROI withheld — it is derived from an ARV flagged as unreliable">ROI — <span style="font-weight:400">unreliable ARV</span></div>`
+            : `<div class="card-roi ${roiCls}"${lowArv ? ` style="opacity:.45" title="ROI suppressed — derived from a low-confidence (proxy) ARV"` : ""}>ROI ${roi.toFixed(1)}%${c.cash_on_cash_pct != null ? ` · CoC ${c.cash_on_cash_pct.toFixed(0)}%` : ""}</div>`}
         </div>
       </div>`;
     })
@@ -1978,8 +2216,9 @@ function initMap() {
 // LEAN skips this entirely. listings_detail.json inflates to 70.8 MB and then
 // Object.assigns every sub-object permanently into LISTINGS[i].raw, so the heap
 // never comes back down: on a phone that survived boot, the first tap on a row
-// was what finished it. Until the detail shards land, mobile shows an
-// "open on desktop" note in place of comps / vision / CAMA (see openDetail).
+// was what finished it. Mobile takes the sharded path below instead — see
+// ensureShardFor() — and falls back to the "open on desktop" note only when a
+// shard is genuinely unavailable.
 const _DETAILS_MERGED = {};
 async function ensureDetails() {
   if (LEAN) return;
@@ -1996,9 +2235,345 @@ async function ensureDetails() {
   } catch (e) { /* detail panels degrade gracefully */ }
 }
 
+// ===========================================================================
+// PER-LISTING DETAIL SHARDS — the mobile detail panel, completed.
+//
+// The whole point of the LEAN work was that the phone must never hold the
+// board's heavy keys. listings_detail.json is 70.8 MB inflated and ensureDetails
+// Object.assigns EVERY one of its 38,500 records permanently into LISTINGS, so
+// it can never be the mobile path — which is why the panel has been telling
+// people to go find a desktop.
+//
+// The build side now also emits docs/detail_shards/NNNNN.json.gz: the same
+// index-aligned detail array, cut into fixed-size blocks. Opening one lead
+// costs one block instead of the whole file.
+//
+// THREE THINGS THIS CODE IS CAREFUL ABOUT, all of them memory:
+//
+//  1. It merges ONE record, not the block. The other 999 detail records are
+//     parsed (unavoidable — it is one JSON document) and then dropped when the
+//     shard falls out of the LRU. Nothing but the opened lead is retained.
+//  2. The LRU is 3 shards and eviction is REAL: it deletes the keys it added
+//     back off LISTINGS[i].raw. Without that, thumbing through 200 leads would
+//     reassemble listings_detail.json inside the heap one record at a time,
+//     which is precisely the failure this change exists to prevent. The keys
+//     removed are only the ones this code added (recorded at merge time), so an
+//     eviction can never strip a field the board itself carried.
+//  3. Desktop does not come through here at all. ensureDetails() is untouched
+//     and still owns listings_detail.json.
+//
+// DESKTOP IS UNCHANGED. If a change is visible at 1440px, it is a bug.
+// ===========================================================================
+const DETAIL_SHARD_DIR = "detail_shards";
+// Records per shard. The build side declares it; this is the value to assume
+// when it does not, and it is also what the shards are cut at today.
+const DETAIL_SHARD_SIZE_DEFAULT = 1000;
+// Three, not one: opening a lead, backing out, and opening its neighbour is the
+// actual browsing pattern, and neighbours share a shard. Three covers a scroll
+// across a shard boundary without ever holding a meaningful fraction of the
+// detail file.
+const DETAIL_SHARD_LRU = 3;
+
+/**
+ * Records per shard, from run_meta.json's "board" block.
+ *
+ * Read defensively and from several plausible key names. This file ships before
+ * the first sharded board is published, the naming is the build side's to
+ * choose, and the failure mode of guessing wrong is a 404 on every shard —
+ * i.e. the "open on desktop" note, forever, silently. A wrong SIZE is worse
+ * than a missing one: it would fetch a real shard and read the wrong record out
+ * of it, so every candidate is validated as a positive integer and anything
+ * else falls back to the default rather than being coerced.
+ */
+function detailShardSize(board) {
+  const b = (board && typeof board === "object" && !Array.isArray(board)) ? board : {};
+  const nested = (b.detail_shards && typeof b.detail_shards === "object") ? b.detail_shards : {};
+  const cands = [
+    b.detail_shard_size, b.shard_size, b.detail_shard_records,
+    nested.size, nested.shard_size, nested.count_per_shard,
+  ];
+  for (let i = 0; i < cands.length; i++) {
+    const n = cands[i];
+    if (typeof n === "number" && isFinite(n) && n > 0 && Math.floor(n) === n) return n;
+  }
+  return DETAIL_SHARD_SIZE_DEFAULT;
+}
+
+const _SHARD = {
+  size: DETAIL_SHARD_SIZE_DEFAULT,
+  sized: false,
+  // "start" (00000, 01000, 02000 …) or "index" (00000, 00001, 00002 …). Both
+  // are 5-digit and both are reasonable readings of "NNNNN"; shard 0 is
+  // spelled identically under either, so the naming is learned from the first
+  // shard that actually distinguishes them and latched from then on.
+  naming: null,
+  lru: [],                 // [{key, start, data:null, applied: Map<listing, string[]>}]
+  inflight: Object.create(null),
+  // Set once a shard fetch fails in a way that says the directory is not there
+  // (as opposed to one bad block). Stops a 404 per tap for the rest of the
+  // session; the panel then reads exactly as it did before this change.
+  dead: false,
+};
+
+let _BI_LIST = null;   // the LISTINGS array _BI was built from
+let _BI = null;        // WeakMap<listing, board index>
+
+/**
+ * A listing's index in the board — which IS its index in the detail array
+ * (web_artifact writes them index-aligned from the same list).
+ *
+ * Built lazily and only on the LEAN path: it is 38,500 WeakMap entries that a
+ * desktop never needs, and a phone only needs after the first tap.
+ */
+function boardIndexOf(l) {
+  if (!l || typeof l !== "object") return -1;
+  if (_BI_LIST !== LISTINGS) {
+    _BI_LIST = LISTINGS;
+    _BI = new WeakMap();
+    for (let i = 0; i < LISTINGS.length; i++) {
+      const r = LISTINGS[i];
+      if (r && typeof r === "object") _BI.set(r, i);
+    }
+  }
+  const v = _BI.get(l);
+  return v === undefined ? -1 : v;
+}
+
+/** Zero-padded shard filename stem for a naming convention. */
+function _shardStem(shardIdx, start, naming) {
+  const n = naming === "index" ? shardIdx : start;
+  let s = String(n);
+  while (s.length < 5) s = "0" + s;
+  return s;
+}
+
+/**
+ * Pull one detail record out of a parsed shard.
+ *
+ * The shard is expected to be a plain array of `size` records covering
+ * [start, start+size). It is read tolerantly anyway — a wrapper object carrying
+ * its own `start`, or an index-keyed map — because the alternative to tolerating
+ * a shape is silently rendering an empty panel as though the property had no
+ * comps, and this panel's whole job is to not do that.
+ *
+ * Returns undefined when the record cannot be located, which the caller treats
+ * as a failed shard, NOT as "this lead has no detail".
+ */
+function shardRecordAt(shard, start, i, size) {
+  if (Array.isArray(shard)) {
+    // A block longer than one shard is not the file we asked for — most likely
+    // the whole detail array, or a shard cut at a different size than run_meta
+    // declares. Reading positionally out of it would merge a DIFFERENT
+    // property's comps and photo analysis into this lead and show it as fact.
+    // Refuse, and let the caller say "open on desktop".
+    if (size > 0 && shard.length > size) return undefined;
+    const r = shard[i - start];
+    return (r && typeof r === "object") ? r : undefined;
+  }
+  if (!shard || typeof shard !== "object") return undefined;
+  const inner = Array.isArray(shard.records) ? shard.records
+    : Array.isArray(shard.items) ? shard.items
+    : Array.isArray(shard.detail) ? shard.detail
+    : Array.isArray(shard.details) ? shard.details : null;
+  if (inner) {
+    const s = (typeof shard.start === "number" && isFinite(shard.start)) ? shard.start : start;
+    if (size > 0 && inner.length > size) return undefined;
+    const r = inner[i - s];
+    return (r && typeof r === "object") ? r : undefined;
+  }
+  const byAbs = shard[String(i)];
+  if (byAbs && typeof byAbs === "object") return byAbs;
+  const byRel = shard[String(i - start)];
+  if (byRel && typeof byRel === "object") return byRel;
+  return undefined;
+}
+
+/** Most-recently-used last. Evicting un-merges, so the heap actually comes back. */
+function _shardTouch(entry) {
+  const at = _SHARD.lru.indexOf(entry);
+  if (at !== -1) _SHARD.lru.splice(at, 1);
+  _SHARD.lru.push(entry);
+  while (_SHARD.lru.length > DETAIL_SHARD_LRU) {
+    const gone = _SHARD.lru.shift();
+    gone.applied.forEach((keys, li) => {
+      const raw = li && li.raw;
+      if (!raw) return;
+      for (let i = 0; i < keys.length; i++) delete raw[keys[i]];
+    });
+    gone.applied = new Map();
+    gone.data = null;
+  }
+}
+
+function _shardEntry(key) {
+  for (let i = 0; i < _SHARD.lru.length; i++) if (_SHARD.lru[i].key === key) return _SHARD.lru[i];
+  return null;
+}
+
+/**
+ * Merge one detail record into one listing, recording exactly which keys were
+ * added so eviction can take them back out again.
+ *
+ * A key the board already carried is left alone: the shard is a derivative and
+ * must never be able to overwrite the authoritative payload, and more
+ * practically, "put it back how you found it" is only possible for keys we own.
+ */
+function _shardMerge(li, d, entry) {
+  const raw = li.raw || (li.raw = {});
+  const added = [];
+  for (const k in d) {
+    if (!Object.prototype.hasOwnProperty.call(d, k)) continue;
+    if (Object.prototype.hasOwnProperty.call(raw, k)) continue;
+    raw[k] = d[k];
+    added.push(k);
+  }
+  entry.applied.set(li, added);
+}
+
+/**
+ * Fetch + merge the detail for ONE listing. Never throws.
+ * Returns true when the panel can be rendered as complete.
+ */
+async function ensureShardFor(l) {
+  if (!LEAN || DATASET !== "foreclosure" || _SHARD.dead) return false;
+  const i = boardIndexOf(l);
+  if (i < 0) return false;
+
+  if (!_SHARD.sized) { _SHARD.size = detailShardSize(META && META.board); _SHARD.sized = true; }
+  const size = _SHARD.size;
+  const shardIdx = Math.floor(i / size);
+  const start = shardIdx * size;
+  const key = String(shardIdx);
+
+  const have = _shardEntry(key);
+  if (have && have.applied.has(l)) { _shardTouch(have); return true; }
+
+  if (!_SHARD.inflight[key]) {
+    _SHARD.inflight[key] = (async () => {
+      // Cache-key on run_time, the convention ensureDetails() already uses:
+      // shards change only when the board does, and a phone on cell data should
+      // not re-download one it already has.
+      const bust = (META && META.run_time) || "";
+      const namings = _SHARD.naming ? [_SHARD.naming] : ["start", "index"];
+      const tried = Object.create(null);
+      // Shard 0 spells the same under BOTH conventions ("00000"), so a hit on
+      // it proves nothing about which convention the emitter used. Latching on
+      // that ambiguous success was silently fatal: shard 0 is board indices
+      // 0-999, i.e. the top of the default sort and the most likely first tap.
+      // Latch "start" there and every subsequent lead misses — measured, 1 of 39
+      // shards reachable for the rest of the session, so 38,000 of 38,500 leads
+      // fell back to "open this lead on a desktop" with no error shown.
+      // Only latch when the spelling was actually discriminating.
+      const ambiguous = _shardStem(shardIdx, start, "start") === _shardStem(shardIdx, start, "index");
+      for (let n = 0; n < namings.length; n++) {
+        const stem = _shardStem(shardIdx, start, namings[n]);
+        if (tried[stem]) continue;
+        tried[stem] = true;
+        try {
+          const data = await fetchJsonMaybeGz(`${DETAIL_SHARD_DIR}/${stem}.json`, bust);
+          if (data && typeof data === "object") {
+            if (!ambiguous) _SHARD.naming = namings[n];
+            return data;
+          }
+        } catch (e) { /* try the other spelling, then give up */ }
+      }
+      return null;
+    })();
+  }
+
+  let data = null;
+  try { data = await _SHARD.inflight[key]; } catch (e) { data = null; }
+  delete _SHARD.inflight[key];
+
+  if (!data) {
+    // Shard 0 covers the whole board's first block and is spelled identically
+    // under both conventions, so failing it means the directory is not there.
+    // Any other shard failing is a per-block problem and must not disable a
+    // feature that works everywhere else.
+    if (shardIdx === 0) _SHARD.dead = true;
+    return false;
+  }
+
+  const rec = shardRecordAt(data, start, i, size);
+  if (rec === undefined) return false;
+
+  let entry = _shardEntry(key);
+  if (!entry) { entry = { key, start, data, applied: new Map() }; }
+  else { entry.data = data; }
+  _shardMerge(l, rec, entry);
+  _shardTouch(entry);
+  return true;
+}
+
+/**
+ * Can the detail panel be rendered as COMPLETE for this lead right now?
+ *   "ready"   — everything the desktop shows is in hand
+ *   "pending" — a shard fetch would complete it
+ *   "missing" — it cannot be completed; say so rather than showing blanks
+ */
+function detailShardState(l) {
+  if (!LEAN) return "ready";                       // desktop: ensureDetails owns it
+  if (DATASET !== "foreclosure" || _SHARD.dead) return "missing";
+  if (boardIndexOf(l) < 0) return "missing";
+  for (let i = 0; i < _SHARD.lru.length; i++) if (_SHARD.lru[i].applied.has(l)) return "ready";
+  return "pending";
+}
+
+/**
+ * What a heavy section shows when it cannot honestly claim the property has
+ * none of that data.
+ *
+ * Returns "" in the "ready" state, and that is the point: an empty section is
+ * then allowed to mean empty. Half-populating the panel and letting it read as
+ * complete is the one outcome worth more than a round trip to avoid — the
+ * sections this covers are comps and condition, which is what a bid is built
+ * from.
+ */
+function detailPendingNote(detailState, what) {
+  if (detailState === "loading") {
+    return `<div class="shard-loading">Loading ${what} for this lead…</div>`;
+  }
+  if (detailState === "failed") {
+    return `<div class="muted" style="font-size:.9em">Open this lead on a desktop for comps, photo analysis and CAMA. `
+      + `They are held in a separate 70 MB file that will not fit in a phone browser.</div>`;
+  }
+  return "";
+}
+
+// Guards against a slow shard painting over a lead the user has since left.
+// A phone on rural cell data is the target environment; two taps inside one
+// round trip is normal, not exotic.
+let _DETAIL_TOKEN = 0;
+
 async function openDetail(l) {
   if (!l) return;
-  await ensureDetails();
+  if (!LEAN) { await ensureDetails(); renderDetail(l, "ready"); return; }
+
+  const tok = ++_DETAIL_TOKEN;
+  const st = detailShardState(l);
+  if (st !== "pending") { renderDetail(l, st === "ready" ? "ready" : "failed"); return; }
+
+  // Paint immediately with what the board already carries, then fill in. The
+  // alternative is a tap that does nothing for the length of a cellular round
+  // trip, which reads as a broken button.
+  renderDetail(l, "loading");
+  const ok = await ensureShardFor(l);
+  if (tok !== _DETAIL_TOKEN) return;               // user moved on; leave their panel alone
+  renderDetail(l, ok ? "ready" : "failed");
+}
+
+/**
+ * Render the detail panel.
+ *
+ * `detailState` is about the HEAVY keys only (comps / vision / cama /
+ * rent_comps / foreclosure_sold_comps — web_artifact.LAZY_DETAIL_KEYS), and it
+ * exists so an empty section can say WHY it is empty:
+ *   "ready"   — the property genuinely has none of that data
+ *   "loading" — still fetching; do not claim either way
+ *   "failed"  — could not be fetched; do not claim the property has none
+ * Desktop always passes "ready", which is exactly what it did before.
+ */
+function renderDetail(l, detailState) {
   const g = getGrade(l);
   const c = getCalc(l);
 
@@ -2028,13 +2603,26 @@ async function openDetail(l) {
   // Investor calculator
   if (c) {
     const rows = [];
-    if (c.arv_expected) {
+    const _at = arvTrust(l);
+    // The big number carries the caveat itself. A note further down the panel
+    // loses to a $780,300 in 28px type — the number anchors first and the prose
+    // arrives after the reader has already decided.
+    if (c.arv_expected || _at.level === "bad") {
       rows.push(`
         <div class="calc-row">
           <div class="lbl">Est. ARV</div>
           <div>
-            <div class="val big">${fmtMoney(c.arv_expected)}</div>
-            <div class="calc-range">range: <b>${fmtMoney(c.arv_low)}</b> – <b>${fmtMoney(c.arv_high)}</b></div>
+            <div class="val big${_at.level === "bad" ? " dq-warn-mark" : ""}">${
+              _at.level === "bad" ? "&#9888;&#xFE0E; " : _at.level === "proxy" ? "~" : ""
+            }${c.arv_expected ? fmtMoney(c.arv_expected) : "unverified"}</div>
+            ${c.arv_expected ? `<div class="calc-range">range: <b>${fmtMoney(c.arv_low)}</b> – <b>${fmtMoney(c.arv_high)}</b></div>` : ""}
+            ${_at.level === "bad"
+              ? `<div class="arv-flag-note"><strong>Do not bid off this number.</strong> ${
+                  _at.why.length ? _at.why.join("; ") : "It failed a valuation sanity check"
+                }. Max bid, ROI and profit below are all derived from it.</div>`
+              : _at.level === "proxy"
+                ? `<div class="calc-range">Proxy value — estimated without usable comps or a known square footage.</div>`
+                : ""}
           </div>
         </div>`);
     }
@@ -2175,7 +2763,16 @@ async function openDetail(l) {
       ${obsRows ? `<div class="vision-obs">${obsRows}</div>` : ""}
     `;
   } else {
-    $("d-vision-section").style.display = "none";
+    // `vision` is a lazy-detail key, so on mobile its absence means one of two
+    // completely different things. Only hide the section when we actually know
+    // the property has no photo analysis.
+    const note = detailPendingNote(detailState, "photo analysis");
+    if (note) {
+      $("d-vision-section").style.display = "block";
+      $("d-vision").innerHTML = note;
+    } else {
+      $("d-vision-section").style.display = "none";
+    }
   }
 
   // Mini map
@@ -2247,15 +2844,18 @@ async function openDetail(l) {
         `).join("")}
         </tbody>
       </table>`;
-  } else if (LEAN) {
-    // Be honest about WHY it is empty rather than hiding the section and
-    // letting it read as "no comps exist for this property".
-    $("d-comps-section").style.display = "block";
-    $("d-comps").innerHTML =
-      `<div class="muted" style="font-size:.9em">Open this lead on a desktop for comps, photo analysis and CAMA. ` +
-      `They are held in a separate 70 MB file that will not fit in a phone browser.</div>`;
   } else {
-    $("d-comps-section").style.display = "none";
+    // Be honest about WHY it is empty rather than hiding the section and
+    // letting it read as "no comps exist for this property". Once the shard is
+    // in hand the note goes away and an empty section means empty — which is
+    // the whole difference between this and what mobile showed before.
+    const note = detailPendingNote(detailState, "comps");
+    if (note) {
+      $("d-comps-section").style.display = "block";
+      $("d-comps").innerHTML = note;
+    } else {
+      $("d-comps-section").style.display = "none";
+    }
   }
 
   // Foreclosure-sold comps — recently-finished foreclosure sales in
@@ -2450,15 +3050,19 @@ async function openDetail(l) {
   }
 
   // ARV / max bid / ROI summary chips
+  const _bat = arvTrust(l);
+  if (_bat.level === "bad") {
+    badges.push(`<span class="qbadge neg" title="${arvTrustTitle(_bat).replace(/"/g, "&quot;")}">⚠ ARV flagged — do not bid off it</span>`);
+  }
   if (calc.arv_expected) {
-    const lowArv = calc.arv_confidence === "LOW" || dqf.includes("low_arv_confidence") || dqf.includes("no_sqft");
-    badges.push(`<span class="qbadge info" title="${(calc.notes && calc.notes[0]) || ''}">ARV ~$${Number(calc.arv_expected).toLocaleString()}${lowArv ? " (proxy)" : ""}</span>`);
+    const lowArv = _bat.level === "proxy";
+    badges.push(`<span class="qbadge ${_bat.level === "bad" ? "neg" : "info"}" title="${(calc.notes && calc.notes[0]) || ''}">ARV ~$${Number(calc.arv_expected).toLocaleString()}${lowArv ? " (proxy)" : ""}</span>`);
   }
   if (calc.max_bid_70) {
-    badges.push(`<span class="qbadge info">Max bid (70%) $${Number(calc.max_bid_70).toLocaleString()}</span>`);
+    badges.push(`<span class="qbadge ${_bat.level === "bad" ? "neg" : "info"}">Max bid (70%) $${Number(calc.max_bid_70).toLocaleString()}${_bat.level === "bad" ? " — from a flagged ARV" : ""}</span>`);
   }
   if (calc.roi_pct != null) {
-    const cls = calc.roi_pct > 25 ? "pos" : calc.roi_pct > 10 ? "warn-light" : "neg";
+    const cls = _bat.level === "bad" ? "neg" : calc.roi_pct > 25 ? "pos" : calc.roi_pct > 10 ? "warn-light" : "neg";
     badges.push(`<span class="qbadge ${cls}">ROI ${calc.roi_pct.toFixed(0)}%</span>`);
   }
 
@@ -2813,5 +3417,6 @@ function exportCsv() {
 }
 
 // ------------- Boot ----------------------------------------------------------
+injectDashStyles();  // classes this file owns: flagged-ARV treatment + shard spinner
 initCrm();  // wire the CRM-lite controls once (static DOM, survives dataset swaps)
 loadData();

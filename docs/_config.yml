@@ -20,6 +20,20 @@
 #   python3 scripts/check_pages_publish.py
 # which reimplements Jekyll's start_with? over these two lists and every real
 # filename in docs/, and fails if any dashboard payload would be dropped.
+#
+# detail_shards/ — the per-lead mobile detail payload (docs/detail_shards/
+# NNNNN.json.gz, 39 files, ~28 MB) — is DELIBERATELY ABSENT FROM BOTH LISTS, and
+# that is the whole design. It ships gzipped only, with no uncompressed twin in
+# docs/, so there is nothing to exclude and therefore no prefix trap to spring.
+# No entry above prefix-matches "detail_shards/...", and the directory name has
+# no leading `_`, `.` or `#`, so it does not trip Jekyll's special-entry rule
+# either. DO NOT "tidy up" by adding `- detail_shards` to exclude: one
+# `include:` line would NOT bring it back the way the .gz twins above are
+# brought back, because there are 39 differently-named files and the phone would
+# 404 on whichever ones you forgot. If the shard payload ever grows an
+# uncompressed twin, gitignore it instead of excluding it here.
+# tests/test_detail_shards.py asserts this against check_pages_publish.py's own
+# model of the rule, so an exclude added here fails the suite rather than the site.
 exclude:
   - listings.json
   - listings_detail.json

@@ -35,6 +35,17 @@ if [ -f docs/listings_slim.json.gz ] \
    || git ls-files --error-unmatch docs/listings_slim.json.gz >/dev/null 2>&1; then
   PUB+=(docs/listings_slim.json.gz)
 fi
+# docs/detail_shards/ is the per-lead detail payload phones fetch, emitted by the
+# same write_artifact() call this script makes. Same gate, same reason — and a
+# DIRECTORY pathspec behaves the same way as a file here: absent AND untracked
+# exits 128 and stages nothing at all, while `git add docs/detail_shards` on a
+# tracked directory stages additions, modifications AND deletions inside it,
+# which is what carries the emitter's remove-the-directory failure path through
+# to the live site.
+if [ -d docs/detail_shards ] \
+   || git ls-files --error-unmatch docs/detail_shards >/dev/null 2>&1; then
+  PUB+=(docs/detail_shards)
+fi
 git add "${PUB[@]}" 2>/dev/null
 if ! git diff --cached --quiet; then
   git commit -q -m "Scheduled land-records refresh: lrcpwa addresses/values/photos + tags

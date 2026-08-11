@@ -226,6 +226,16 @@ async def main() -> int:
                     ["git", "ls-files", "--error-unmatch", "docs/listings_slim.json.gz"],
                     cwd=root, capture_output=True).returncode == 0:
                 pub.append("docs/listings_slim.json.gz")
+            # docs/detail_shards/ is the per-lead detail payload phones fetch,
+            # emitted by the same write_artifact() call. Same gate, same reasons
+            # — a DIRECTORY pathspec behaves identically: absent AND untracked
+            # exits 128 and stages nothing, while `git add <dir>` on a tracked
+            # directory stages deletions inside it, which is how the emitter's
+            # remove-the-directory failure path reaches the live site.
+            if (DOCS / "detail_shards").is_dir() or subprocess.run(
+                    ["git", "ls-files", "--error-unmatch", "docs/detail_shards"],
+                    cwd=root, capture_output=True).returncode == 0:
+                pub.append("docs/detail_shards")
             subprocess.run(["git", "add", *pub], cwd=root, check=False)
             r = subprocess.run(["git", "diff", "--staged", "--quiet"], cwd=root)
             if r.returncode != 0:  # there are changes
