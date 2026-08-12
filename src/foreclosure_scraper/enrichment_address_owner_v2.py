@@ -63,8 +63,7 @@ from .enrichment_address_backfill import _populate_from_attrs
 from .enrichment_arcgis import (
     FIELD_ALIASES,
     NC_GIS,
-    SC_LAYER,
-    SCDOT_BASE,
+    SC_GIS,
     _detect_addr_field,
     _pick,
 )
@@ -87,6 +86,8 @@ _OWNER_FIELD_CANDIDATES_V2 = (
     "Owner1", "OwnerAll", "PROPERTY_OWNER", "full_owner_name", "CurrentOwner1",
     "TaxpayerName", "OWNER_NAME", "NAME_1", "NAME1", "Name1", "ownname",
     "owner", "OWNER", "NAMECO", "Name", "CURR_NAME2",
+    # SC county-native (2026-08-12): Colleton=OwnerName1, Beaufort=GisFile_Owner1.
+    "OwnerName1", "GisFile_Owner1",
 )
 
 # Field-name fragments that look like an owner/name column but are actually a
@@ -447,8 +448,10 @@ def _endpoint_for(li: Listing) -> Optional[str]:
             county = county[: -len(suffix)].strip()
     county = county.split(",")[0].strip().title()
     if li.state == "SC":
-        layer = SC_LAYER.get(county)
-        return f"{SCDOT_BASE}/{layer}/query" if layer else None
+        # SCDOT SC_Parcels is token-walled (2026-08-12) — resolve against the
+        # county-native SC_GIS endpoints instead (same shape as NC_GIS).
+        cfg = SC_GIS.get(county)
+        return cfg["url"] if cfg else None
     if li.state == "NC":
         cfg = NC_GIS.get(county)
         return cfg["url"] if cfg else None

@@ -57,6 +57,45 @@ SC_LAYER: dict[str, int] = {
     "York": 46,
 }
 
+# SCDOT SC_Parcels went TOKEN-WALLED 2026-08-12 (HTTP 200 + body
+# {"error":{"code":499,"message":"Token Required"}} on the service root AND every
+# layer query), which silently killed owner/situs resolution for every SC county.
+# SC_GIS is the county-native replacement: same {url, addr_field} shape as NC_GIS.
+# addr_field=None -> situs auto-detects via FIELD_ALIASES; a pinned string -> the
+# situs column to LIKE-match (for layers whose field name isn't in the aliases).
+# Endpoints probed live 2026-08-12 (docs/sc_gis_endpoints_*.md). Counties with no
+# free county-native owner+situs path are in docs/walls_register.md.
+SC_GIS: dict[str, dict[str, Any]] = {
+    "Spartanburg": {
+        "url": "https://maps.spartanburgcounty.org/server/rest/services/GIS/CAMA_Parcels/FeatureServer/0/query",
+        "addr_field": None,   # situs PropertyLocation, owner OwnerName (both aliased)
+    },
+    "Laurens": {
+        "url": "https://laurenscountygis.org/arcgis/rest/services/Pebble/TaxParcel/MapServer/5/query",
+        "addr_field": None,   # situs Property_Address (aliased), owner Owner/Name1
+    },
+    "Pickens": {
+        "url": "https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services/Pickens_Open_data/FeatureServer/6/query",
+        "addr_field": None,   # situs LOCADD (added to aliases), owner NAME1 (aliased)
+    },
+    "Colleton": {
+        "url": "https://services1.arcgis.com/m0cnLGKdhwao8WvM/arcgis/rest/services/Public_Data/FeatureServer/2/query",
+        "addr_field": None,   # situs PropertyAddress (aliased), owner OwnerName1 (added)
+    },
+    "Beaufort": {
+        # Every column is GisFile_-prefixed so situs won't auto-detect; pin it.
+        # owner GisFile_Owner1 + value GisFile_Appraised + deed GisFile_Book/Page
+        # are added to the alias tables below.
+        "url": "https://gis.beaufortcountysc.gov/server/rest/services/EnerGov/MapServer/1/query",
+        "addr_field": "GisFile_SitusAddre",
+    },
+    # DEFERRED (buildable, need extra work — see docs/road_to_100_build_queue.md):
+    #   Georgetown — split situs (StreetNumber + StreetName), needs a concat stitch.
+    #   Charleston — parcel layer is mailing-only; situs needs a PID join to chascogis.
+    # WALLED (no free county-native owner+situs) — see docs/walls_register.md:
+    #   Cherokee, Union (WAF-403), Oconee (owner only, no situs), Anderson (owner masked).
+}
+
 
 # ---- NC: direct ArcGIS REST per county ------------------------------------------
 
@@ -277,7 +316,11 @@ FIELD_ALIASES = {
                    # Gaston county layer 11 = CURR_NAME1; Cleveland Basemap =
                    # COUNTY_OWNER_1, but GIS_Owner1 is the SAME name untruncated
                    # so it is listed first (see _repair_cleveland).
-                   "GIS_Owner1", "CURR_NAME1", "COUNTY_OWNER_1"),
+                   "GIS_Owner1", "CURR_NAME1", "COUNTY_OWNER_1",
+                   # SC county-native (2026-08-12): Colleton=OwnerName1,
+                   # Beaufort=GisFile_Owner1 (Spartanburg=OwnerName, Pickens=NAME1,
+                   # Laurens=Name1 already covered above).
+                   "OwnerName1", "GisFile_Owner1"),
     "mailing_addr": ("txt_mailaddr1", "MailAddr", "OWNER_MAIL_1", "mailadd",
                      "Mailing_Address", "OwnerMailingAddress",
                      # Gaston county layer 11 = CURR_ADDR1 (owner mailing, NOT
@@ -294,7 +337,11 @@ FIELD_ALIASES = {
                      "propertyaddress",
                      # Cleveland Basemap: LOCATE_ADDRESS is the untruncated
                      # situs, COUNTY_ADDRESS the 20-char-capped one.
-                     "LOCATE_ADDRESS", "COUNTY_ADDRESS"),
+                     "LOCATE_ADDRESS", "COUNTY_ADDRESS",
+                     # SC county-native (2026-08-12): Pickens=LOCADD,
+                     # Beaufort=GisFile_SitusAddre (pinned as addr_field but must
+                     # also be readable back here).
+                     "LOCADD", "GisFile_SitusAddre"),
     "acreage": ("Acreage", "ACRES", "gisacres", "ACREAGE", "LegalAc",
                 "DEEDED_ACRES", "Acres", "ACRE", "Acres_Calc",
                 # Gaston county layer 11 = CALCAC/DEEDAC; Cleveland = COUNTY_ACRES
@@ -326,18 +373,22 @@ FIELD_ALIASES = {
                   "CURRENT_VA",
                   # Gaston county layer 11 = FMV_TOTAL (TOTVAL is the same
                   # figure on the older city layer); Cleveland = COUNTY_TOTAL_VALUE.
-                  "FMV_TOTAL", "TOTVAL", "COUNTY_TOTAL_VALUE"),
+                  "FMV_TOTAL", "TOTVAL", "COUNTY_TOTAL_VALUE",
+                  # SC county-native (2026-08-12): Beaufort=GisFile_Appraised.
+                  "GisFile_Appraised"),
     "deed_book": ("DEEDBK", "Deed_Book", "DEED_BK", "DeedBook", "DB",
                   # SC SCDOT: Charleston=DEED_BOOK_, Anderson=DBOOK,
                   # Beaufort=Book, Laurens=DEEDBOOK
                   "DEED_BOOK_", "DBOOK", "Book", "DEEDBOOK",
                   # Gaston county layer 11 = DEED_BOOK; Cleveland = COUNTY_DEED
-                  "DEED_BOOK", "COUNTY_DEED"),
+                  "DEED_BOOK", "COUNTY_DEED",
+                  "GisFile_Book"),  # SC Beaufort county-native (2026-08-12)
     "deed_page": ("DEEDPG", "Deed_Page", "PAGE", "DeedPage", "DP",
                   # SC SCDOT: Anderson=DPAGE, Beaufort=Page, Laurens=DEEDPAGE
                   "DPAGE", "Page", "DEEDPAGE",
                   # Gaston county layer 11 = DEED_PAGE; Cleveland = COUNTY_PAGE
-                  "DEED_PAGE", "COUNTY_PAGE"),
+                  "DEED_PAGE", "COUNTY_PAGE",
+                  "GisFile_Page"),  # SC Beaufort county-native (2026-08-12)
     "sale_date": ("SaleDate", "SALEDATE", "DEED_YEAR", "SaleYear", "Sale_Year",
                   # SC SCDOT: Pickens=SALEDT (epoch ms), Charleston=RECORDED_D
                   # (epoch ms; DOC_DATE is the instrument date), Anderson=SALE_YEAR,
@@ -939,15 +990,16 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
 
         out_fields = "*"
         if li.state == "SC":
-            layer = SC_LAYER.get(county_clean)
-            if not layer:
+            # SCDOT SC_Parcels is token-walled (2026-08-12); resolve against the
+            # county-native SC_GIS endpoints instead. Same {url, addr_field} shape
+            # as NC_GIS: addr_field=None auto-detects situs, a pinned string is the
+            # situs column to LIKE-match (Beaufort's GisFile_-prefixed layer).
+            cfg = SC_GIS.get(county_clean)
+            if not cfg:
                 return
-            base = f"{SCDOT_BASE}/{layer}/query"
-            # Most SC layers auto-detect cleanly (LOCADD/PHYS_ADDR/SitusAddre).
-            # A few split situs across number+name columns or only expose an
-            # owner-mailing field; pin those via SC_SITUS so the LIKE matches the
-            # property's street and the SALEP/SALEDT/value aliases can fire.
-            addr_field = SC_SITUS.get(county_clean)  # None -> auto-detect
+            base = cfg["url"]
+            out_fields = cfg.get("out_fields") or "*"
+            addr_field = cfg.get("addr_field")  # None -> auto-detect
         elif li.state == "NC":
             cfg = NC_GIS.get(county_clean)
             if not cfg:
