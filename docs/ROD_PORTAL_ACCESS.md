@@ -90,3 +90,55 @@ Haywood and Yancey run the same platform ("The Lookup"), so one reader should
 serve both, and probably more — the widened pattern sweep in
 `build_county_registry.py` looks for `search.<county>deeds.com` precisely
 because that shape was invisible to the first run.
+
+---
+
+# PLATFORM FINGERPRINT — 2026-08-12
+
+The widened sweep located **86 of 146** county recorders (up from 42), of which
+**71 are not referenced anywhere in src/** and **46 carry no CAPTCHA or login**.
+Fingerprinting those 46 by fetching each one:
+
+| platform | counties | usable as a record source? |
+|---|---|---|
+| **"The Lookup"** | **12** | **YES — index + search, no restriction language** |
+| Permitium | 18 | **NO — see below** |
+| unknown / bespoke | 15 | needs individual inspection |
+| AmericanLandRecords | 1 | not yet mapped (Anderson SC) |
+
+## Permitium is an ordering counter, not an index
+
+18 NC counties link `<county>rod.permitium.com/rod`, which looks like a
+register-of-deeds portal and is not one. Fetched: the page offers "order",
+"certified copy" and "fee" — it sells certified copies of documents you already
+know the reference for. There is no name index and no date-range search behind
+it, so it yields no leads.
+
+Counting those 18 as coverage would have inflated the recorder story by 40% with
+systems that cannot answer "what was filed last week". Recorded here so the next
+sweep does not re-discover them as a win.
+
+## The Lookup — one reader, twelve counties
+
+Same platform, same `?Accept=Accept` entry, same `content.php?<nonce>` search
+surface documented above:
+
+    SC   abbeville · barnwell · berkeley · colleton · dorchester ·
+         florence · georgetown · york
+    NC   bertie · clay · haywood · yancey
+
+Haywood and Yancey were invisible to the fingerprint at first because the
+registry holds their LANDING page (`haywooddeeds.com`) while the platform lives
+on `search.haywooddeeds.com`. Probing `search.<county>deeds.com` directly
+confirmed both. The same probe found no Lookup for henderson, lincoln, guilford
+or wilson, so those four are genuinely a different system and still unclassified.
+
+Of these twelve, only Colleton, Georgetown and York sit outside the core
+footprint by the core-county rule — but a reader written once serves all of
+them, so the marginal cost of the coastal ones is zero.
+
+## What must be solved before any of this yields a lead
+
+The DataTables AJAX endpoint, above. Every county here shares it, which cuts
+both ways: solving it once opens twelve counties, and getting it wrong reports
+twelve empty counties that look healthy.
