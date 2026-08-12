@@ -57,6 +57,15 @@ SC_LAYER: dict[str, int] = {
     "York": 46,
 }
 
+# Sentinel addr_field for layers with NO single situs column — the address is
+# split across component fields. When a county's addr_field starts with
+# "__concat:", _arcgis_query LIKE-matches the street-name component and
+# _stitch_situs() rebuilds the full situs on read.
+_BRUNSWICK_CONCAT = "__concat:HouseNumber+StreetDirection+StreetName+StreetType__"
+# Georgetown SC splits situs across StreetNumber + StreetName (2026-08-12).
+_GEORGETOWN_CONCAT = "__concat:StreetNumber+StreetName__"
+
+
 # SCDOT SC_Parcels went TOKEN-WALLED 2026-08-12 (HTTP 200 + body
 # {"error":{"code":499,"message":"Token Required"}} on the service root AND every
 # layer query), which silently killed owner/situs resolution for every SC county.
@@ -89,8 +98,13 @@ SC_GIS: dict[str, dict[str, Any]] = {
         "url": "https://gis.beaufortcountysc.gov/server/rest/services/EnerGov/MapServer/1/query",
         "addr_field": "GisFile_SitusAddre",
     },
-    # DEFERRED (buildable, need extra work — see docs/road_to_100_build_queue.md):
-    #   Georgetown — split situs (StreetNumber + StreetName), needs a concat stitch.
+    "Georgetown": {
+        # Situs is split across StreetNumber + StreetName; match on the name and
+        # stitch the full situs on read (owner Owner1 is already aliased).
+        "url": "https://gis1.georgetowncountysc.org/portal/rest/services/GCGIS_Energov/MapServer/2/query",
+        "addr_field": _GEORGETOWN_CONCAT,
+    },
+    # DEFERRED (buildable, needs extra work — see docs/road_to_100_build_queue.md):
     #   Charleston — parcel layer is mailing-only; situs needs a PID join to chascogis.
     # WALLED (no free county-native owner+situs) — see docs/walls_register.md:
     #   Cherokee, Union (WAF-403), Oconee (owner only, no situs), Anderson (owner masked).
@@ -98,12 +112,6 @@ SC_GIS: dict[str, dict[str, Any]] = {
 
 
 # ---- NC: direct ArcGIS REST per county ------------------------------------------
-
-# Sentinel addr_field for layers that have NO single situs column and instead
-# store the address across several fields (house #, street name, street type).
-# When a county's addr_field is this object, _arcgis_query builds a multi-field
-# LIKE on the street name and _stitch_situs() rebuilds the full situs on read.
-_BRUNSWICK_CONCAT = "__concat:HouseNumber+StreetDirection+StreetName+StreetType__"
 
 NC_GIS: dict[str, dict[str, Any]] = {
     # Audited 2026-06-15 against live FeatureServer schemas. Each addr_field
@@ -426,19 +434,38 @@ def _pick(attrs: dict[str, Any], candidates: tuple[str, ...]) -> Any:
     return None
 
 
-def _stitch_situs(attrs: dict[str, Any]) -> str | None:
-    """Rebuild a full situs from Brunswick-style component fields.
+def _concat_fields(sentinel: str) -> tuple[str, ...]:
+    """Parse a ``__concat:A+B+C__`` addr_field sentinel into its component fields."""
+    inner = sentinel.split("__concat:", 1)[1].rstrip("_")
+    return tuple(p for p in inner.split("+") if p)
 
-    Brunswick stores no single situs column; the address is spread across
-    HouseNumber (zero-padded, e.g. '000552'), StreetDirection, StreetName, and
-    StreetType. Join the non-empty parts, stripping leading zeros off the house #.
+
+def _stitch_situs(
+    attrs: dict[str, Any], fields: tuple[str, ...] | None = None
+) -> str | None:
+    """Rebuild a full situs from component fields for layers with no single
+    situs column.
+
+    ``fields`` lists the component columns in address order; the FIRST is the
+    house number (leading zeros stripped), and a component whose name contains
+    'name' is required (that is the street). Defaults to Brunswick's layout
+    (HouseNumber/StreetDirection/StreetName/StreetType); Georgetown passes
+    (StreetNumber/StreetName). Join the non-empty, non-null parts in order.
     """
-    house = str(attrs.get("HouseNumber") or "").strip().lstrip("0")
-    direction = str(attrs.get("StreetDirection") or "").strip()
-    name = str(attrs.get("StreetName") or "").strip()
-    sttype = str(attrs.get("StreetType") or "").strip()
-    parts = [p for p in (house, direction, name, sttype) if p and p != "<Null>"]
-    if not name:
+    if fields is None:
+        fields = ("HouseNumber", "StreetDirection", "StreetName", "StreetType")
+    parts: list[str] = []
+    name_val = ""
+    for i, fld in enumerate(fields):
+        v = str(attrs.get(fld) or "").strip()
+        if not v or v == "<Null>":
+            continue
+        if i == 0:
+            v = v.lstrip("0")  # house number
+        if "name" in fld.lower():
+            name_val = v
+        parts.append(v)
+    if not name_val:
         return None
     return " ".join(parts)
 
@@ -609,11 +636,16 @@ async def _arcgis_query(
     sensitive column (Lincoln NC has historically exposed TCSSN1/TCSSN2 on a
     public layer) and having it land in li.raw via a blanket "*".
     """
-    # Brunswick has no single situs column. Match on StreetName only and rebuild
-    # the full situs from HouseNumber/StreetDirection/StreetName/StreetType on read.
-    concat_situs = addr_field == _BRUNSWICK_CONCAT
+    # Some layers have no single situs column (Brunswick, Georgetown). Match on
+    # the street-name component only and rebuild the full situs from the parsed
+    # component fields on read.
+    concat_situs = isinstance(addr_field, str) and addr_field.startswith("__concat:")
+    concat_fields: tuple[str, ...] = ()
     if concat_situs:
-        addr_field = "StreetName"
+        concat_fields = _concat_fields(addr_field)
+        addr_field = next(
+            (f for f in concat_fields if "name" in f.lower()), concat_fields[-1]
+        )
 
     if not addr_field:
         addr_field = await _detect_addr_field(c, base_url)
@@ -651,7 +683,7 @@ async def _arcgis_query(
                 # Rebuild Brunswick's situs from its component fields and stash it
                 # under a real situs key so _pick(site_address) resolves it.
                 if concat_situs:
-                    situs = _stitch_situs(attrs)
+                    situs = _stitch_situs(attrs, concat_fields)
                     if situs:
                         attrs["SITUS_ADDR"] = situs
                 # Cleveland ships a 20-char-truncated CAMA join; swap in the
@@ -1007,7 +1039,7 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
             base = cfg["url"]
             out_fields = cfg.get("out_fields") or "*"
             cfg_addr = cfg.get("addr_field")
-            if cfg_addr == _BRUNSWICK_CONCAT:
+            if isinstance(cfg_addr, str) and cfg_addr.startswith("__concat:"):
                 # Concat sentinel — auto-detect can't reconstruct it.
                 addr_field = cfg_addr
             elif cfg_addr is None:

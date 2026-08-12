@@ -18,7 +18,8 @@ import pytest
 from foreclosure_scraper.enrichment_arcgis import SC_GIS
 
 #: Counties validated live 2026-08-12 (owner + situs both resolve).
-BUILT = {"Spartanburg", "Laurens", "Pickens", "Colleton", "Beaufort"}
+#: Georgetown uses a split-situs concat (StreetNumber+StreetName) via layer 2.
+BUILT = {"Spartanburg", "Laurens", "Pickens", "Colleton", "Beaufort", "Georgetown"}
 
 #: Probed live and confirmed to have NO free county-native owner+situs path.
 #: They must NOT be in SC_GIS (adding a broken endpoint silently returns 0 rows).

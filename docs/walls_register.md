@@ -13,12 +13,12 @@ stream, 2026-08-12+). Each entry: what, how it fails, date probed, workaround.
 ## SC county-native GIS resolution (SCDOT replacement) — probed live 2026-08-12
 
 **Built + validated (owner+situs resolve live), now in `SC_GIS`:** Spartanburg, Laurens,
-Pickens, Colleton, Beaufort. (5 of 11 SC in-scope counties restored from the dead SCDOT.)
+Pickens, Colleton, Beaufort, **Georgetown** (split situs via `_GEORGETOWN_CONCAT`, layer 2).
+(6 of 11 SC in-scope counties restored from the dead SCDOT.)
 
 **Deferred (buildable, extra work):**
 | County | Why | Path |
 |---|---|---|
-| Georgetown | situs split across StreetNumber+StreetName | concat-stitch like Brunswick's `_BRUNSWICK_CONCAT` |
 | Charleston | parcel layer (New_Parcel_Search/61) is owner+MAILING only, no situs | PID join to `chascogis` Charleston_County_Addresses |
 
 **WALLED — no free county-native owner+situs path (probed live):**
