@@ -202,6 +202,13 @@ class Listing(BaseModel):
     sale_date: datetime | None = None
 
     first_seen: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # Bumped to "now" every time a listing is re-observed in a fresh
+    # crawl. Stale rows (last_seen > N days ago) get purged so the
+    # dashboard doesn't accumulate sold-and-gone auction lots forever.
+    # Defaults to first_seen on creation; defaults to None when missing
+    # from older porsche.json files (treated as "unknown freshness" and
+    # given a one-cycle grace period by the purge step).
+    last_seen: datetime | None = None
     raw: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("source_url")
