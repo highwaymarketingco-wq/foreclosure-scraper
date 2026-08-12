@@ -82,10 +82,14 @@ _RDO_TYPE = {"AND": "ctl00_ContentPlaceHolder1_as1_rdoType_0",   # All Words
              "EXACT": "ctl00_ContentPlaceHolder1_as1_rdoType_2"}  # Exact Phrase
 _RENDER_TIMEOUT_MS = 600_000
 
-#: The 11 NC footprint counties, in the platform's own label spelling.
+#: The 19 NC footprint counties (11 WNC core + 8 coastal added 2026-08-12),
+#: in the platform's own label spelling.
 FOOTPRINT: tuple[str, ...] = (
     "Buncombe", "Henderson", "Gaston", "Cleveland", "Rutherford", "Burke",
     "Lincoln", "McDowell", "Polk", "Transylvania", "Mitchell",
+    # Coastal NC (brought into scope 2026-08-12):
+    "Currituck", "Dare", "Hyde", "Carteret", "Onslow", "Pender",
+    "New Hanover", "Brunswick",
 )
 _FOOTPRINT_LOWER = {c.lower(): c for c in FOOTPRINT}
 

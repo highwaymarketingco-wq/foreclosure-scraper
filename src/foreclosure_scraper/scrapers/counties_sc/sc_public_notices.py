@@ -100,12 +100,17 @@ _CATEGORIES: dict[str, tuple[str, ListingType, str]] = {
     "23": ("Probate Notices",     ListingType.PROBATE_NOTICE, "probate"),
 }
 
-_IN_SCOPE = {"spartanburg", "anderson", "pickens", "oconee", "cherokee", "union", "laurens"}
+_IN_SCOPE = {"spartanburg", "anderson", "pickens", "oconee", "cherokee", "union", "laurens",
+             # Coastal SC (brought into scope 2026-08-12; Horry/Myrtle Beach excluded):
+             "charleston", "georgetown", "colleton", "beaufort"}
 #: Title-cased county names exactly as the site's checkbox labels render them.
-_COUNTIES = ("Spartanburg", "Anderson", "Pickens", "Oconee", "Cherokee", "Union", "Laurens")
+_COUNTIES = ("Spartanburg", "Anderson", "Pickens", "Oconee", "Cherokee", "Union", "Laurens",
+             "Charleston", "Georgetown", "Colleton", "Beaufort")
 #: SC judicial county codes — the middle field of a CP/ES case number.
 _COUNTY_CODE = {"04": "Anderson", "11": "Cherokee", "30": "Laurens", "37": "Oconee",
-                "39": "Pickens", "42": "Spartanburg", "44": "Union"}
+                "39": "Pickens", "42": "Spartanburg", "44": "Union",
+                # Coastal SC (2026-08-12):
+                "10": "Charleston", "22": "Georgetown", "15": "Colleton", "07": "Beaufort"}
 
 _ROW_RE = re.compile(r"<tr[^>]*>(.*?)</tr>", re.S)
 _ID_RE = re.compile(r"Details\.aspx\?SID=[^&]+&(?:amp;)?ID=(\d+)")
