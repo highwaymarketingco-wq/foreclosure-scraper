@@ -79,3 +79,6 @@ docs/listings_detail.json
 # Same rule for the mobile slim payload: the .gz twin (docs/listings_slim.json.gz)
 # is committed and served; the uncompressed twin stays local only.
 docs/listings_slim.json
+
+# 356MB of regenerable, dashboard-served parcel/streetview photos: kept on disk, out of git
+docs/parcel_photos/

@@ -1,0 +1,213 @@
+{
+ "probed": "2026-08-06",
+ "walls": {
+  "greenville_sc_probate": {
+   "url": "https://www.greenvillecounty.org/appsAS400/Probate/Search.aspx",
+   "bucket": "E",
+   "note": "manual ranks this the largest free win on the board",
+   "tier": "plain",
+   "status": 200,
+   "size": 74819
+  },
+  "irsauctions": {
+   "url": "https://www.irsauctions.gov/auction/items?state=NC",
+   "bucket": "E",
+   "note": "accepts ?state=NC",
+   "tier": "plain",
+   "status": 200,
+   "size": 48630
+  },
+  "logs_shapiro": {
+   "url": "https://www.logs.com/nc-upcoming-sales-report.html",
+   "bucket": "E",
+   "note": "PowerBI embed, NC trustee sales",
+   "tier": "plain",
+   "status": 200,
+   "size": 53205
+  },
+  "govdeals": {
+   "url": "https://www.govdeals.com/",
+   "bucket": "E",
+   "note": "re-key",
+   "tier": "parity",
+   "status": 200,
+   "size": 70423
+  },
+  "usda_rd_resales": {
+   "url": "https://properties.sc.egov.usda.gov/resales/public/RealEstate",
+   "bucket": "E",
+   "note": "was 200, now 500 as of 2026-08-06",
+   "tier": "dead",
+   "status": 500,
+   "size": 531
+  },
+  "businessesforsale_nc": {
+   "url": "https://www.businessesforsale.com/us/search/businesses-for-sale-in-north-carolina",
+   "bucket": "E",
+   "note": "manual said 200; flipped back to 403 on 2026-08-06",
+   "tier": "browser",
+   "status": 200,
+   "size": 27791
+  },
+  "legacy_obits_nc": {
+   "url": "https://www.legacy.com/us/obituaries/local/north-carolina",
+   "bucket": "E",
+   "note": "manual said 288 links; URL 404s as of 2026-08-06, find new path",
+   "tier": "browser",
+   "status": 200,
+   "size": 27590
+  },
+  "fannie_homepath": {
+   "url": "https://www.homepath.com/",
+   "bucket": "E",
+   "note": "re-resolver",
+   "tier": "plain",
+   "status": 200,
+   "size": 9685
+  },
+  "aldridge_pite": {
+   "url": "https://www.aldridgepite.com/",
+   "bucket": "E",
+   "note": "sales URL 404s, find current path",
+   "tier": "plain",
+   "status": 200,
+   "size": 123735
+  },
+  "nc_ecourts_portal": {
+   "url": "https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29",
+   "bucket": "A",
+   "note": "AWS WAF image grid",
+   "tier": "browser",
+   "status": 200,
+   "size": 9746
+  },
+  "nc_judgment_search": {
+   "url": "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/",
+   "bucket": "B",
+   "note": "open JSON, serves FAM-Divorce cause filter",
+   "tier": "plain",
+   "status": 200,
+   "size": 10063
+  },
+  "sc_publicindex": {
+   "url": "https://publicindex.sccourts.org/Spartanburg/PublicIndex/",
+   "bucket": "A",
+   "note": "F5/Shape + Rule 610 ToS ban. DO NOT WIDEN",
+   "tier": "parity",
+   "status": 200,
+   "size": 10215
+  },
+  "sc_sos_business": {
+   "url": "https://businessfilings.sc.gov/BusinessFiling/Entity/Search",
+   "bucket": "A",
+   "note": "reCAPTCHA",
+   "tier": "plain",
+   "status": 200,
+   "size": 82579
+  },
+  "nc_sos": {
+   "url": "https://www.sosnc.gov/online_services/search/by_title/_Business_Registration",
+   "bucket": "A",
+   "note": "Cloudflare; stealth-only",
+   "tier": "browser",
+   "status": 200,
+   "size": 27727
+  },
+  "propwire": {
+   "url": "https://propwire.com/",
+   "bucket": "A",
+   "note": "DataDome",
+   "tier": "parity",
+   "status": 200,
+   "size": 59202
+  },
+  "kofile_oconee_rod": {
+   "url": "https://oconee.sc.publicsearch.us/",
+   "bucket": "A",
+   "note": "robots.txt Disallow: / \u2014 belongs in bucket A, not BUILD_NOW",
+   "tier": "plain",
+   "status": 200,
+   "size": 98041
+  },
+  "scdot_parcels": {
+   "url": "https://services2.arcgis.com/XZg2efAbaieYAXmu/arcgis/rest/services/SC_Parcels/FeatureServer/0?f=json",
+   "bucket": "A",
+   "note": "went token-required; watch for re-open",
+   "tier": "dead",
+   "status": 200,
+   "size": 66
+  },
+  "hutchens": {
+   "url": "https://sales.hutchenslawfirm.com/NCfcSalesList.aspx",
+   "bucket": "LIVE",
+   "note": "largest NC trustee feed",
+   "tier": "plain",
+   "status": 200,
+   "size": 257187
+  },
+  "brock_scott": {
+   "url": "https://www.brockandscott.com/foreclosure-sales/",
+   "bucket": "LIVE",
+   "note": "NC+SC",
+   "tier": "parity",
+   "status": 200,
+   "size": 40993
+  },
+  "ingle_firm": {
+   "url": "https://www.theinglefirm.com/Sales.aspx",
+   "bucket": "LIVE",
+   "note": "carries postponement dates",
+   "tier": "plain",
+   "status": 200,
+   "size": 29081
+  },
+  "kania": {
+   "url": "https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/",
+   "bucket": "LIVE",
+   "note": "NC tax FC, 25 counties",
+   "tier": "browser",
+   "status": 200,
+   "size": 153099
+  },
+  "zls": {
+   "url": "https://www.zls-nc.com/listings",
+   "bucket": "LIVE",
+   "note": "Blazor; needs browser",
+   "tier": "plain",
+   "status": 200,
+   "size": 23967
+  },
+  "ncnotices": {
+   "url": "https://www.ncnotices.com/",
+   "bucket": "LIVE",
+   "note": "WebForms viewstate",
+   "tier": "plain",
+   "status": 200,
+   "size": 250307
+  },
+  "scpublicnotices": {
+   "url": "https://www.scpublicnotices.com/",
+   "bucket": "LIVE",
+   "note": "saved-search email alerts",
+   "tier": "plain",
+   "status": 200,
+   "size": 158876
+  },
+  "nc_onemap_parcels": {
+   "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1?f=json",
+   "bucket": "LIVE",
+   "note": "join spine",
+   "tier": "plain",
+   "status": 200,
+   "size": 19484
+  },
+  "ncsbe_voter": {
+   "url": "https://dl.ncsbe.gov/?prefix=data/",
+   "bucket": "LIVE",
+   "note": "weekly Saturday refresh",
+   "tier": "plain",
+   "status": 200,
+   "size": 523
+  }
+ }
+}
