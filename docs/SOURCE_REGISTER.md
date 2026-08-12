@@ -551,3 +551,95 @@ them never asked whether a search returns rows.
 County TENNESSEE**. Both were one step from adoption as NC sources on pattern
 match. `build_county_registry.py` now carries a `state_confirmed` check and the
 registry marks any shared-name county `unverified` until evidence exists.
+
+### Register-of-deeds hosts — every URL, with what each one actually does
+
+Named in prose above but the hosts were missing, which is exactly the thing this
+register exists to hold. All eleven, verified by fetching on 2026-08-12.
+
+`state ok?` — `<county>deeds.com` never states its state and county names repeat
+across states. "linked" means the county's own government site links the domain;
+"unique" means only one county in the United States carries that name.
+
+#### The Lookup — `enrichment_rod_lookup.py`
+
+| county | host | bulk date search | state ok? |
+|---|---|---|---|
+| Haywood NC | `http://search.haywooddeeds.com` | **yes** | linked from haywoodcountync.gov |
+| Clay NC | `http://search.claydeeds.com` | **yes** | resolves to deeds.claync.us |
+| Yancey NC | `http://search.yanceydeeds.com` | **yes** | unique name |
+
+Entry `GET /index.php?Accept=Accept`. Search `GET /content.php` — **GET only**;
+POST returns a 2,065-byte shell. Bulk path is a name search with the name blank
+plus `show_pick_list=1`, then the pick list's `entityID[]` values. Pick list caps
+at **1000**, so a capped window is halved and re-read.
+
+Feeds `counties_nc.wnc_rod_foreclosure_starts` (substitutions of trustee = NC
+foreclosure starts). Free, click-through disclaimer, no CAPTCHA, and the terms
+carry no automated/robot/spider/scrape/bulk/commercial language.
+
+#### Online Record System — `enrichment_rod_name_index.py`
+
+| county | host | date window | notes |
+|---|---|---|---|
+| Georgetown SC | `https://georgetowndeeds.com` | **honoured** | 161/527/1374 across three windows |
+| Barnwell SC | `https://barnwelldeeds.com` | **honoured** | 24 in 7 days vs 230 in January |
+| Abbeville SC | `http://search.abbevilledeeds.com` | ignored | 2000 for a single day |
+| Berkeley SC | `http://search.berkeleydeeds.com` | ignored | 2000 for a single day; linked from berkeleycountysc.gov |
+| Colleton SC | `http://search.colletondeeds.com` | ignored | 2000 for a single day; linked from colletoncounty.org |
+| Dorchester SC | `http://search.dorchesterdeeds.com` | ignored | 1996 for every window; linked from dorchestercountysc.gov |
+| Florence SC | `http://search.florencedeeds.com` | ignored | 1973 for every window; linked from florenceco.org |
+| York SC | `http://search.yorkdeeds.com` | **undetermined** | repeated timeouts on a 470 KB page — not a wall |
+
+Entry `GET /NameSearch.php?Accept=Accept` (**not** `index.php` — that is the
+other platform). Then `POST /NamePick.php` for the party index, then
+`POST /NameDisplay.php` with `igheader` + `igquerystring` + `displaybutton` +
+`entityID[<ID>]`. Step 3 takes only its own fields; echoing the search
+parameters back returns a 21-byte rejection.
+
+This platform's index carries a recorded **Amount**, which The Lookup's does not.
+
+`bulk_by_date()` refuses the six counties not marked "honoured", because those
+return the head of the whole index as a well-formed HTTP 200 and publishing it
+would put years-old instruments on the board as fresh distress.
+
+#### Walled or wrong
+
+| host | verdict |
+|---|---|
+| `https://bertiedeeds.com` | 2,617-byte disclaimer loop, no search reachable |
+| `https://averydeeds.com` | reCAPTCHA — out of scope by policy |
+| `<county>rod.permitium.com/rod` (18 NC counties) | ordering counter for certified copies; no name index, no date search |
+| `https://hendersondeeds.com` | **Henderson County KENTUCKY**, not NC |
+| `https://wilsondeeds.com` | **Wilson County TENNESSEE**, not NC |
+| `http://www.titlesearcher.com` | paid subscription (serves Wilson TN) |
+| `https://americanlandrecords.com/land-record?countyId=2429` | Anderson SC, not yet mapped |
+
+### Walls that cost real time — measured 2026-08-12
+
+A wall is cheap when it fails fast and expensive when it fails slowly. Timing
+the 2026-08-11 run showed **16 of its 23 hours** went to three hosts that are
+already known to be unusable. Recorded here with what each one costs, because
+"walled" was documented but "walled AND slow" was not.
+
+| host | used by | behaviour | cost |
+|---|---|---|---|
+| `portal-nc.tylertech.cloud` | `enrichment_nc_case_status*`, `enrichment_nc_divorce` | HTTP **202** AWS-WAF escalating image CAPTCHA; stealth browser retries | **5.5 h** of the scrape phase |
+| `fastpeoplesearch.com` | `enrichment_skip_trace` | HTTP **403** on every request | **10.5 h**, previously undocumented |
+| `publicindex.sccourts.org` | `enrichment_case_detail`, `enrichment_court_bid` | `ERR_HTTP_RESPONSE_CODE_FAILURE` after 3 attempts; ToS forbids automated querying | inside the same window |
+
+Neither the scrape phase nor skip trace emitted a log line while this happened.
+Both are now bounded — `SCRAPE_PHASE_MAX_SECONDS` (10800) and
+`SKIP_TRACE_MAX_SECONDS` (900) — so a slow wall now costs a capped amount and
+says so in the log.
+
+**Still open:** enrichers have no `dormant` flag the way scrapers do, so these
+three are retried every run rather than skipped outright. Bounding them limits
+the damage; it does not stop the attempt.
+
+To find the next one, read the timeline rather than the volume — the log is
+mostly untimestamped httpx noise, so the gaps are the signal:
+
+```bash
+grep -oE '\[2026-[0-9-]+ [0-9]{2}:' logs/local-run-*.log | uniq -c
+```
