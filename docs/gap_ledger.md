@@ -493,3 +493,69 @@ $700k, an app that would not open — or from an audit that only ran because it 
 asked for. The board does not grade itself between runs and does not report when
 a number moved for no reason. That, not more sources, is what separates this from
 trustworthy.
+
+---
+
+## 2026-08-12 — register of deeds: what is closed, and why
+
+Each of these was tried against the live system, not reasoned about. They are
+recorded so the next pass spends its time somewhere new.
+
+### Closed by policy
+
+| thing | why |
+|---|---|
+| `averydeeds.com` (Avery NC recorder) | reCAPTCHA on entry. Out of scope: no CAPTCHA solving. |
+| `publicindex.sccourts.org` | disclaimer forbids automated / repetitive querying |
+| `portal-nc.tylertech.cloud` | AWS-WAF escalating image CAPTCHA (serves HTTP 202) |
+| `cherokeesc.avenuinsights.com` | terms forbid "data mining, robots, spiders, data harvesting" |
+
+### Closed by evidence — tried, does not work
+
+**`received_from` on The Lookup.** Its `received` search takes a date range and
+would be the clean "what was filed this week" path, but demands a free-text
+`received_from`. Omitting it returns 72 bytes of
+`alert('Must key in received from text')`. Eight variants all returned **0
+bytes**: `%`, `A`, `TRUSTEE`, `TRUSTEE SERVICES`, `SUBSTITUTE TRUSTEE`, `BROCK`,
+`HUTCHENS`, `TITLE`; each also without `embed=1`, against both the nonce action
+URL and bare `content.php`.
+
+Superseded anyway — a blank name search with `show_pick_list=1` is the working
+bulk path. Do not spend more time on `received_from`.
+
+**Permitium** (`<county>rod.permitium.com/rod`, 18 NC counties). Looks like a
+register-of-deeds portal, is not one. It sells certified copies of documents you
+already have a reference for: "order", "certified copy", "fee". No name index,
+no date search, so it yields no leads. Counting these as recorder coverage would
+inflate the number by 40%.
+
+**Six SC counties ignore the date window.** Abbeville, Berkeley, Colleton,
+Dorchester and Florence return the head of the whole index for any window — a
+single day in Colleton (population ~38k) returns exactly 2000 parties, which is
+the `searchLimit`, not a count. York is *undetermined* rather than walled: it
+timed out repeatedly on a 470 KB page and deserves a retry with a longer timeout.
+
+The bulk date path therefore works on **Barnwell and Georgetown only**, both
+outside the core footprint. This is a genuine ceiling, not a bug to fix.
+
+**Bertie NC** (`bertiedeeds.com`) serves a 2,617-byte disclaimer loop with no
+reachable search.
+
+### The trap that produced a false capability claim
+
+Nine counties were recorded as sharing The Lookup platform. They do not — they
+404 with a **16-byte body**, which a status-code check reads as "this county has
+no records". All nine answered HTTP 200 to the accept step, so a reachability
+sweep passed for every one.
+
+The general lesson, and the one worth carrying: **reachability is not
+capability.** Ask whether the response contains what you requested, never
+whether the request succeeded.
+
+### What cannot be resolved from the recorder at all
+
+The index gives party names, book/page, doc type, a legal description and
+sometimes an amount. It gives **no street address and no parcel ID**. Turning an
+`S/T` into a property still depends on the name -> property resolver, whose
+measured ceiling is roughly 25-30%. The recorder widens the top of the funnel;
+it does not fix the middle.
