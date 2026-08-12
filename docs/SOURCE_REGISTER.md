@@ -410,3 +410,77 @@ SNAPSHOT/UNKNOWN   27 sources
 
 Regenerate: the measurement script is inline in the session that produced this;
 the durable version belongs in scripts/ if this needs to be repeated.
+
+---
+
+# DISCOVERY SWEEP — 2026-08-12
+
+Prompted by the operator finding six record systems in minutes by searching
+within one county site, none of which were in the scraper set. The gap was
+method: the source list was being AUDITED (is this URL up?) instead of the sites
+being EXPLORED (what else is here?). Auditing a list can only return the list.
+
+Two new tools now cover this — `scripts/discover_linked_systems.py` (crawl the
+sites we use, find what they link) and `scripts/build_county_registry.py`
+(enumerate the universe of counties, accessible or not).
+
+## The denominator, which did not exist before
+
+    100 NC counties (nccourts.gov/locations) + 46 SC (sccounties.org) = 146
+    438 (county, system) pairs probed across recorder / court / tax / assessor
+    102 systems located, 50 already in src/, 52 NEVER USED
+
+## USABLE AND UNBUILT — verified, in footprint
+
+Register of deeds is where deeds of trust, lis pendens and satisfactions are
+recorded: the primary distress record. These publish openly and are not read:
+
+| county | entry point | gate | disclaimer restricts automation? |
+|---|---|---|---|
+| Haywood NC | search.haywooddeeds.com | click-through | **NO** — liability/accuracy only |
+| Yancey NC  | search.yanceydeeds.com  | click-through | **NO** — liability/accuracy only |
+| Anderson SC| americanlandrecords.com?countyId=2429 | none | not stated |
+| Henderson NC | hendersondeeds.com | disclaimer | unread |
+| Lincoln NC | lincolnrod.com | disclaimer | unread |
+| Avery NC | averydeeds.com | reCAPTCHA | — CAPTCHA, out of scope |
+
+Both Haywood and Yancey disclaimers were read in full: pure accuracy and
+liability text, ZERO occurrences of automated / robot / spider / scrape / data
+mining / bulk / commercial. The gate is a single `Accept` POST to index.php.
+
+## WALLED — recorded, not omitted
+
+| system | wall |
+|---|---|
+| cherokeesc.avenuinsights.com | ToS: "data mining, robots, spiders, data harvesting" |
+| publicindex.sccourts.org | ToS prohibits automated/repetitive querying |
+| portal-nc.tylertech.cloud | AWS-WAF escalating image CAPTCHA |
+| qpublic.schneidercorp.com | reCAPTCHA (a module exists; gate is real) |
+| madisoncountync.gov/tax | reCAPTCHA + login |
+| averydeeds.com | reCAPTCHA |
+
+## SC PROBATE — mapped, and mostly unavailable for the core
+
+southcarolinaprobate.net has no robots.txt, no CAPTCHA and no prohibition
+language, but covers only 20 of 46 counties: Aiken, Bamberg, Barnwell,
+Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown,
+Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Saluda, Sumter, York.
+
+Of the 1,421 SC leads already carrying an estate/elderly/heir signal, the
+cohort splits Spartanburg 637, Pickens 351, Charleston 251, Laurens 83,
+Oconee 61, Anderson 25, Union 7, Cherokee 4 — so the aggregator reaches
+Cherokee, Oconee and Charleston and MISSES the two largest.
+
+The uncovered counties run their own probate courts, but those route back
+through PublicIndex: greenvillecounty.org/Probate links
+www2.greenvillecounty.org/scjd/publicindex/. So SC probate for the core
+footprint sits behind the same ToS wall as the rest of PublicIndex. NC estates
+are already covered compliantly via Column.
+
+## THE HONEST LIMIT
+
+104 of 146 counties have NO recorder located. That means the URL patterns in
+build_county_registry.py did not find it — NOT that the county lacks one.
+Nearly every county has a register of deeds. Those 104 are the hand-check list,
+and they are why that script ships with an editable pattern table rather than as
+a finished answer.
