@@ -7,187 +7,199 @@ knowledge, while omitting it looks identical to it not existing.
 
 - counties: **100 NC + 46 SC = 146**
 - (county, system) pairs probed: **438**
-- systems located: **145**
-- of those, already referenced in `src/`: **53**
+- systems located: **142**
+- of those, already referenced in `src/`: **65**
 
 `not found` means these URL patterns did not locate it. It does NOT mean
 the county has no such system — most will, on a host shape this does not
 yet know. Those are the ones worth hand-checking.
 
-## assessor  (27 of 146 located)
+## assessor  (28 of 146 located)
 
-| county | state | url | gates | in src |
-|---|---|---|---|---|
-| ashe | NC | https://qpublic.schneidercorp.com/Application.aspx?App=AsheCountyNC&Layer=Parcels&PageType=Search | subscription, login, disclaimer | yes |
-| halifax | NC | https://qpublic.schneidercorp.com/Application.aspx?App=HalifaxCountyNC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| allendale | SC | https://qpublic.schneidercorp.com/Application.aspx?App=AllendaleCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, subscription, login, disclaimer | yes |
-| bamberg | SC | https://qpublic.schneidercorp.com/Application.aspx?App=BambergCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, subscription, login, disclaimer | yes |
-| barnwell | SC | https://qpublic.schneidercorp.com/Application.aspx?App=BarnwellCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| cherokee | SC | https://qpublic.schneidercorp.com/Application.aspx?App=CherokeeCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| chester | SC | https://qpublic.schneidercorp.com/Application.aspx?App=ChesterCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| clarendon | SC | https://qpublic.schneidercorp.com/Application.aspx?App=ClarendonCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| colleton | SC | https://qpublic.schneidercorp.com/Application.aspx?App=ColletonCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| darlington | SC | https://qpublic.schneidercorp.com/Application.aspx?App=DarlingtonCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| edgefield | SC | https://qpublic.schneidercorp.com/Application.aspx?App=EdgefieldCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| fairfield | SC | https://qpublic.schneidercorp.com/Application.aspx?App=FairfieldCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| georgetown | SC | https://qpublic.schneidercorp.com/Application.aspx?App=GeorgetownCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| hampton | SC | https://qpublic.schneidercorp.com/Application.aspx?App=HamptonCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, subscription, login, disclaimer | yes |
-| jasper | SC | https://qpublic.schneidercorp.com/Application.aspx?App=JasperCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| kershaw | SC | https://qpublic.schneidercorp.com/Application.aspx?App=KershawCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| lancaster | SC | https://qpublic.schneidercorp.com/Application.aspx?App=LancasterCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| laurens | SC | https://qpublic.schneidercorp.com/Application.aspx?App=LaurensCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| lee | SC | https://qpublic.schneidercorp.com/Application.aspx?App=LeeCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| marlboro | SC | https://qpublic.schneidercorp.com/Application.aspx?App=MarlboroCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| newberry | SC | https://qpublic.schneidercorp.com/Application.aspx?App=NewberryCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| oconee | SC | https://qpublic.schneidercorp.com/Application.aspx?App=OconeeCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| orangeburg | SC | https://qpublic.schneidercorp.com/Application.aspx?App=OrangeburgCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| pickens | SC | https://qpublic.schneidercorp.com/Application.aspx?App=PickensCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| spartanburg | SC | https://qpublic.schneidercorp.com/Application.aspx?App=SpartanburgCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| union | SC | https://qpublic.schneidercorp.com/Application.aspx?App=UnionCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
-| york | SC | https://qpublic.schneidercorp.com/Application.aspx?App=YorkCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | yes |
+`state?` — is this really that state's county? Blank means the
+name is nationally unique. `unverified` means the name is shared
+with another state's county and the page never says which it is;
+confirm before using it.
 
-<details><summary>not located by pattern (119)</summary>
+| county | state | url | gates | state? | in src |
+|---|---|---|---|---|---|
+| ashe | NC | https://qpublic.schneidercorp.com/Application.aspx?App=AsheCountyNC&Layer=Parcels&PageType=Search | subscription, login, disclaimer |  | yes |
+| halifax | NC | https://qpublic.schneidercorp.com/Application.aspx?App=HalifaxCountyNC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| allendale | SC | https://qpublic.schneidercorp.com/Application.aspx?App=AllendaleCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, subscription, login, disclaimer |  | yes |
+| bamberg | SC | https://qpublic.schneidercorp.com/Application.aspx?App=BambergCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, subscription, login, disclaimer |  | yes |
+| barnwell | SC | https://qpublic.schneidercorp.com/Application.aspx?App=BarnwellCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| cherokee | SC | https://qpublic.schneidercorp.com/Application.aspx?App=CherokeeCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| chester | SC | https://qpublic.schneidercorp.com/Application.aspx?App=ChesterCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| clarendon | SC | https://qpublic.schneidercorp.com/Application.aspx?App=ClarendonCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| colleton | SC | https://qpublic.schneidercorp.com/Application.aspx?App=ColletonCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| darlington | SC | https://qpublic.schneidercorp.com/Application.aspx?App=DarlingtonCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| edgefield | SC | https://qpublic.schneidercorp.com/Application.aspx?App=EdgefieldCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| fairfield | SC | https://qpublic.schneidercorp.com/Application.aspx?App=FairfieldCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| florence | SC | https://qpublic.schneidercorp.com/Application.aspx?App=FlorenceCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| georgetown | SC | https://qpublic.schneidercorp.com/Application.aspx?App=GeorgetownCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| hampton | SC | https://qpublic.schneidercorp.com/Application.aspx?App=HamptonCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, subscription, login, disclaimer |  | yes |
+| jasper | SC | https://qpublic.schneidercorp.com/Application.aspx?App=JasperCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| kershaw | SC | https://qpublic.schneidercorp.com/Application.aspx?App=KershawCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| lancaster | SC | https://qpublic.schneidercorp.com/Application.aspx?App=LancasterCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| laurens | SC | https://qpublic.schneidercorp.com/Application.aspx?App=LaurensCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| lee | SC | https://qpublic.schneidercorp.com/Application.aspx?App=LeeCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| marlboro | SC | https://qpublic.schneidercorp.com/Application.aspx?App=MarlboroCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | **unverified** | yes |
+| newberry | SC | https://qpublic.schneidercorp.com/Application.aspx?App=NewberryCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | **unverified** | yes |
+| oconee | SC | https://qpublic.schneidercorp.com/Application.aspx?App=OconeeCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| orangeburg | SC | https://qpublic.schneidercorp.com/Application.aspx?App=OrangeburgCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| pickens | SC | https://qpublic.schneidercorp.com/Application.aspx?App=PickensCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| spartanburg | SC | https://qpublic.schneidercorp.com/Application.aspx?App=SpartanburgCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer |  | yes |
+| union | SC | https://qpublic.schneidercorp.com/Application.aspx?App=UnionCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | **unverified** | yes |
+| york | SC | https://qpublic.schneidercorp.com/Application.aspx?App=YorkCountySC&Layer=Parcels&PageType=Search | CAPTCHA, reCAPTCHA, login, disclaimer | **unverified** | yes |
 
-alamance (NC), alexander (NC), alleghany (NC), anson (NC), avery (NC), beaufort (NC), bertie (NC), bladen (NC), brunswick (NC), buncombe (NC), burke (NC), cabarrus (NC), caldwell (NC), camden (NC), carteret (NC), caswell (NC), catawba (NC), chatham (NC), cherokee (NC), chowan (NC), clay (NC), cleveland (NC), columbus (NC), craven (NC), cumberland (NC), currituck (NC), dare (NC), davidson (NC), davie (NC), duplin (NC), durham (NC), edgecombe (NC), forsyth (NC), franklin (NC), gaston (NC), gates (NC), graham (NC), granville (NC), greene (NC), guilford (NC), harnett (NC), haywood (NC), henderson (NC), hertford (NC), hoke (NC), hyde (NC), iredell (NC), jackson (NC), johnston (NC), jones (NC), lee (NC), lenoir (NC), lincoln (NC), macon (NC), madison (NC), martin (NC), mcdowell (NC), mecklenburg (NC), mitchell (NC), montgomery (NC), moore (NC), nash (NC), new-hanover (NC), northampton (NC), onslow (NC), orange (NC), pamlico (NC), pasquotank (NC), pender (NC), perquimans (NC), person (NC), pitt (NC), polk (NC), randolph (NC), richmond (NC), robeson (NC), rockingham (NC), rowan (NC), rutherford (NC), sampson (NC), scotland (NC), stanly (NC), stokes (NC), surry (NC), swain (NC), transylvania (NC), tyrrell (NC), union (NC), vance (NC), wake (NC), warren (NC), washington (NC), watauga (NC), wayne (NC), wilkes (NC), wilson (NC), yadkin (NC), yancey (NC), abbeville (SC), aiken (SC), anderson (SC), beaufort (SC), berkeley (SC), calhoun (SC), charleston (SC), chesterfield (SC), dillon (SC), dorchester (SC), florence (SC), greenville (SC), greenwood (SC), horry (SC), lexington (SC), marion (SC), newly-elected (SC), richland (SC), saluda (SC), sumter (SC), williamsburg (SC)
+<details><summary>not located by pattern (118)</summary>
 
-</details>
-
-## recorder  (86 of 146 located)
-
-| county | state | url | gates | in src |
-|---|---|---|---|---|
-| alamance | NC | https://rod.alamancecountync.gov/ | disclaimer | **NO** |
-| alexander | NC | https://alexanderdeeds.com/ | CAPTCHA, reCAPTCHA, login, disclaimer | **NO** |
-| alleghany | NC | https://alleghanyrod.org/ | - | **NO** |
-| anson | NC | https://ansonrod.permitium.com/rod | - | **NO** |
-| avery | NC | https://averydeeds.com/ | CAPTCHA, reCAPTCHA | **NO** |
-| beaufort | NC | https://beaufortcountysc.gov/register-of-deeds/ | disclaimer | **NO** |
-| bertie | NC | https://bertiedeeds.com/ | disclaimer | **NO** |
-| bladen | NC | https://bladenrod.permitium.com/rod | - | **NO** |
-| brunswick | NC | https://brunswickcountync.gov/register-of-deeds/ | - | yes |
-| caldwell | NC | https://caldwellrod.com/ | CAPTCHA, reCAPTCHA, login | **NO** |
-| camden | NC | https://camdenrod.permitium.com/rod | login | **NO** |
-| carteret | NC | https://deeds.carteretcountync.gov/ | login, disclaimer | **NO** |
-| catawba | NC | https://www.catawbacountync.gov/departments/register-of-deeds/ | login, disclaimer | yes |
-| cherokee | NC | https://cherokeecountysc.gov/register-of-deeds/ | login, disclaimer | yes |
-| clay | NC | http://search.claydeeds.com/ | disclaimer | **NO** |
-| cleveland | NC | https://clevelandcountync.gov/register-of-deeds/ | CAPTCHA, login | yes |
-| columbus | NC | https://columbusdeeds.com/ | CAPTCHA, reCAPTCHA, disclaimer | **NO** |
-| craven | NC | https://cravenrod.permitium.com/rod | - | **NO** |
-| cumberland | NC | https://www.cumberlandcountync.gov/departments/register-of-deeds/ | disclaimer | **NO** |
-| currituck | NC | https://www.currituckcountync.gov/departments/register-of-deeds/ | CAPTCHA, reCAPTCHA, disclaimer | **NO** |
-| dare | NC | https://darerod.permitium.com/rod | - | **NO** |
-| davidson | NC | https://davidsonrod.permitium.com/rod | - | **NO** |
-| duplin | NC | https://duplinrod.permitium.com/rod | login | **NO** |
-| durham | NC | https://durhamrod.permitium.com/rod | - | **NO** |
-| edgecombe | NC | https://www.edgecombecountync.gov/departments/register_of_deeds/index.php | CAPTCHA, login | **NO** |
-| forsyth | NC | https://forsythrod.permitium.com/rod | - | **NO** |
-| franklin | NC | https://franklindeeds.com/ | CAPTCHA, reCAPTCHA, login, disclaimer | **NO** |
-| gates | NC | https://www.gatescountync.gov/departments/register-of-deeds/ | - | **NO** |
-| granville | NC | https://granvillerod.permitium.com/rod | - | **NO** |
-| greene | NC | https://greenecountync.gov/register-of-deeds/ | login | **NO** |
-| guilford | NC | https://guilforddeeds.com/ | disclaimer | **NO** |
-| halifax | NC | https://halifaxrod.permitium.com/rod | - | **NO** |
-| harnett | NC | https://harnettrod.permitium.com/rod | - | **NO** |
-| haywood | NC | https://haywooddeeds.com/ | - | **NO** |
-| henderson | NC | https://hendersondeeds.com/ | disclaimer | **NO** |
-| iredell | NC | https://iredellrod.permitium.com/rod | - | **NO** |
-| jackson | NC | https://jacksonrod.permitium.com/rod | - | **NO** |
-| jones | NC | https://jonescountync.gov/register-of-deeds/ | login | **NO** |
-| lee | NC | https://www.leecountync.gov/departments/register_of_deeds/index.php | CAPTCHA, login | **NO** |
-| lenoir | NC | https://lenoircountync.gov/register-of-deeds/ | login | **NO** |
-| lincoln | NC | https://lincolnrod.com/ | disclaimer | **NO** |
-| macon | NC | https://macondeeds.com/ | CAPTCHA, reCAPTCHA | **NO** |
-| martin | NC | https://www.martincountync.gov/departments/register_of_deeds/index.php | CAPTCHA, login, disclaimer | **NO** |
-| mcdowell | NC | https://mcdowelldeeds.com/ | - | yes |
-| mecklenburg | NC | https://mecklenburgcountync.gov/register-of-deeds/ | - | yes |
-| mitchell | NC | https://mitchelldeeds.com/ | CAPTCHA, reCAPTCHA | yes |
-| montgomery | NC | https://montgomerycountync.gov/register-of-deeds/ | - | **NO** |
-| moore | NC | https://rod.moorecountync.gov/ | login, disclaimer | **NO** |
-| nash | NC | https://nashrod.com/ | login | **NO** |
-| northampton | NC | https://northamptonrod.org/ | disclaimer | **NO** |
-| onslow | NC | https://deeds.onslowcountync.gov/ | CAPTCHA, reCAPTCHA, subscription, login | **NO** |
-| orange | NC | https://rod.orangecountync.gov/ | disclaimer | **NO** |
-| pamlico | NC | https://www.pamlicocountync.gov/departments/register_of_deeds/index.php | CAPTCHA, login | **NO** |
-| perquimans | NC | https://www.perquimanscountync.gov/departments/register-of-deeds/ | - | **NO** |
-| polk | NC | https://cotthosting.com/NCPolkEXTERNAL/LandRecords/protected/v4/SrchName.aspx | CAPTCHA, reCAPTCHA, login | yes |
-| randolph | NC | https://randolphrod.permitium.com/rod | - | **NO** |
-| rowan | NC | https://rod.rowancountync.gov/ | CAPTCHA, reCAPTCHA, subscription, login | **NO** |
-| rutherford | NC | https://rutherfordcountync.gov/register-of-deeds/ | CAPTCHA, login | yes |
-| sampson | NC | https://sampsonrod.permitium.com/rod | - | **NO** |
-| scotland | NC | https://scotlandrod.permitium.com/rod | login | **NO** |
-| stokes | NC | https://stokesrod.permitium.com/rod | login | **NO** |
-| swain | NC | https://swaincountync.gov/register-of-deeds/ | login, disclaimer | **NO** |
-| transylvania | NC | https://transylvaniadeeds.com/ | disclaimer | yes |
-| wake | NC | https://wakerod.permitium.com/rod | - | **NO** |
-| warren | NC | https://warrenrod.org/ | - | **NO** |
-| wayne | NC | https://waynerod.permitium.com/rod | - | **NO** |
-| wilson | NC | https://wilsondeeds.com/ | - | **NO** |
-| yancey | NC | https://yanceydeeds.com/ | - | **NO** |
-| abbeville | SC | http://search.abbevilledeeds.com/ | disclaimer | **NO** |
-| anderson | SC | https://andersondeeds.com/ | - | **NO** |
-| barnwell | SC | https://barnwelldeeds.com/ | disclaimer | **NO** |
-| beaufort | SC | https://beaufortcountysc.gov/register-of-deeds/ | disclaimer | **NO** |
-| berkeley | SC | http://search.berkeleydeeds.com/ | disclaimer | **NO** |
-| cherokee | SC | https://cherokeecountysc.gov/register-of-deeds/ | login, disclaimer | yes |
-| chester | SC | https://chestercountysc.gov/register-of-deeds/ | - | **NO** |
-| colleton | SC | http://search.colletondeeds.com/ | disclaimer | **NO** |
-| dorchester | SC | http://search.dorchesterdeeds.com/ | disclaimer | **NO** |
-| florence | SC | http://search.florencedeeds.com/ | disclaimer | **NO** |
-| georgetown | SC | https://georgetowndeeds.com/ | disclaimer | **NO** |
-| horry | SC | https://www.horrycountysc.gov/departments/register-of-deeds/ | login | yes |
-| lancaster | SC | https://lancasterdeeds.com/ | CAPTCHA, reCAPTCHA, disclaimer | **NO** |
-| laurens | SC | https://laurensdeeds.com/ | CAPTCHA, reCAPTCHA | yes |
-| lee | SC | https://leerod.permitium.com/rod | - | **NO** |
-| pickens | SC | https://pickenscountysc.gov/register-of-deeds/ | CAPTCHA, login | yes |
-| spartanburg | SC | http://search.spartanburgdeeds.com/ | disclaimer | yes |
-| york | SC | http://search.yorkdeeds.com/ | disclaimer | **NO** |
-
-<details><summary>not located by pattern (60)</summary>
-
-ashe (NC), buncombe (NC), burke (NC), cabarrus (NC), caswell (NC), chatham (NC), chowan (NC), davie (NC), gaston (NC), graham (NC), hertford (NC), hoke (NC), hyde (NC), johnston (NC), madison (NC), new-hanover (NC), pasquotank (NC), pender (NC), person (NC), pitt (NC), richmond (NC), robeson (NC), rockingham (NC), stanly (NC), surry (NC), tyrrell (NC), union (NC), vance (NC), washington (NC), watauga (NC), wilkes (NC), yadkin (NC), aiken (SC), allendale (SC), bamberg (SC), calhoun (SC), charleston (SC), chesterfield (SC), clarendon (SC), darlington (SC), dillon (SC), edgefield (SC), fairfield (SC), greenville (SC), greenwood (SC), hampton (SC), jasper (SC), kershaw (SC), lexington (SC), marion (SC), marlboro (SC), newberry (SC), newly-elected (SC), oconee (SC), orangeburg (SC), richland (SC), saluda (SC), sumter (SC), union (SC), williamsburg (SC)
+alamance (NC), alexander (NC), alleghany (NC), anson (NC), avery (NC), beaufort (NC), bertie (NC), bladen (NC), brunswick (NC), buncombe (NC), burke (NC), cabarrus (NC), caldwell (NC), camden (NC), carteret (NC), caswell (NC), catawba (NC), chatham (NC), cherokee (NC), chowan (NC), clay (NC), cleveland (NC), columbus (NC), craven (NC), cumberland (NC), currituck (NC), dare (NC), davidson (NC), davie (NC), duplin (NC), durham (NC), edgecombe (NC), forsyth (NC), franklin (NC), gaston (NC), gates (NC), graham (NC), granville (NC), greene (NC), guilford (NC), harnett (NC), haywood (NC), henderson (NC), hertford (NC), hoke (NC), hyde (NC), iredell (NC), jackson (NC), johnston (NC), jones (NC), lee (NC), lenoir (NC), lincoln (NC), macon (NC), madison (NC), martin (NC), mcdowell (NC), mecklenburg (NC), mitchell (NC), montgomery (NC), moore (NC), nash (NC), new-hanover (NC), northampton (NC), onslow (NC), orange (NC), pamlico (NC), pasquotank (NC), pender (NC), perquimans (NC), person (NC), pitt (NC), polk (NC), randolph (NC), richmond (NC), robeson (NC), rockingham (NC), rowan (NC), rutherford (NC), sampson (NC), scotland (NC), stanly (NC), stokes (NC), surry (NC), swain (NC), transylvania (NC), tyrrell (NC), union (NC), vance (NC), wake (NC), warren (NC), washington (NC), watauga (NC), wayne (NC), wilkes (NC), wilson (NC), yadkin (NC), yancey (NC), abbeville (SC), aiken (SC), anderson (SC), beaufort (SC), berkeley (SC), calhoun (SC), charleston (SC), chesterfield (SC), dillon (SC), dorchester (SC), greenville (SC), greenwood (SC), horry (SC), lexington (SC), marion (SC), newly-elected (SC), richland (SC), saluda (SC), sumter (SC), williamsburg (SC)
 
 </details>
 
-## tax  (32 of 146 located)
+## recorder  (83 of 146 located)
 
-| county | state | url | gates | in src |
-|---|---|---|---|---|
-| alamance | NC | https://www.alamancecountync.gov/tax/ | - | **NO** |
-| alexander | NC | https://www.alexandercountync.gov/tax/ | - | **NO** |
-| brunswick | NC | https://www.brunswickcountync.gov/tax/ | subscription | yes |
-| catawba | NC | https://www.catawbacountync.gov/tax/ | login, disclaimer | yes |
-| cherokee | NC | https://cherokeecountysc.gov/delinquent-tax/ | login | yes |
-| cleveland | NC | https://www.clevelandcountync.gov/tax/ | CAPTCHA, login | yes |
-| cumberland | NC | https://www.cumberlandcountync.gov/tax/ | login, disclaimer | **NO** |
-| currituck | NC | https://www.currituckcountync.gov/tax/ | CAPTCHA, reCAPTCHA, login, disclaimer | **NO** |
-| dare | NC | https://tax.darecountync.gov/ | subscription | **NO** |
-| forsyth | NC | https://www.forsythcountync.gov/tax/ | - | **NO** |
-| greene | NC | https://www.greenecountync.gov/tax/ | login | **NO** |
-| guilford | NC | https://www.guilfordcountync.gov/tax/ | login, disclaimer | **NO** |
-| henderson | NC | https://www.hendersoncountync.gov/tax/ | login, disclaimer | yes |
-| jones | NC | https://www.jonescountync.gov/tax/ | login | **NO** |
-| lee | NC | https://www.leecountync.gov/tax/ | CAPTCHA, login | **NO** |
-| lenoir | NC | https://www.lenoircountync.gov/tax/ | login | **NO** |
-| madison | NC | https://www.madisoncountync.gov/tax/ | CAPTCHA, reCAPTCHA, login | **NO** |
-| mecklenburg | NC | https://www.mecklenburgcountync.gov/tax/ | - | yes |
-| mitchell | NC | https://www.mitchellcountync.gov/tax/ | CAPTCHA, subscription, login | yes |
-| onslow | NC | https://www.onslowcountync.gov/tax/ | subscription | yes |
-| pender | NC | https://tax.pendercountync.gov/ | CAPTCHA, reCAPTCHA, disclaimer | **NO** |
-| person | NC | https://www.personcountync.gov/tax/ | CAPTCHA, reCAPTCHA, login | **NO** |
-| robeson | NC | https://www.robesoncountync.gov/tax/ | CAPTCHA, subscription, login | **NO** |
-| rowan | NC | https://tax.rowancountync.gov/ | - | **NO** |
-| rutherford | NC | https://www.rutherfordcountync.gov/tax/ | CAPTCHA, login | yes |
-| swain | NC | https://www.swaincountync.gov/tax/ | login | **NO** |
-| wake | NC | https://www.wakecountync.gov/tax/ | disclaimer | **NO** |
-| berkeley | SC | https://berkeleycountysc.gov/delinquent-tax/ | subscription, disclaimer | **NO** |
-| cherokee | SC | https://cherokeecountysc.gov/delinquent-tax/ | login | yes |
-| chester | SC | https://chestercountysc.gov/delinquent-tax/ | - | **NO** |
-| lee | SC | https://www.leecountync.gov/tax/ | CAPTCHA, login | **NO** |
-| pickens | SC | https://pickenscountysc.gov/delinquent-tax/ | CAPTCHA, login | yes |
+`state?` — is this really that state's county? Blank means the
+name is nationally unique. `unverified` means the name is shared
+with another state's county and the page never says which it is;
+confirm before using it.
 
-<details><summary>not located by pattern (114)</summary>
+| county | state | url | gates | state? | in src |
+|---|---|---|---|---|---|
+| alamance | NC | https://rod.alamancecountync.gov/ | disclaimer |  | **NO** |
+| alexander | NC | https://alexanderdeeds.com/ | CAPTCHA, reCAPTCHA, login, disclaimer |  | **NO** |
+| alleghany | NC | https://alleghanyrod.org/ | - |  | **NO** |
+| anson | NC | https://ansonrod.permitium.com/rod | - |  | **NO** |
+| avery | NC | https://averydeeds.com/ | CAPTCHA, reCAPTCHA |  | **NO** |
+| beaufort | NC | https://beaufortcountysc.gov/register-of-deeds/ | disclaimer |  | **NO** |
+| bertie | NC | https://bertiedeeds.com/ | disclaimer |  | **NO** |
+| bladen | NC | https://bladenrod.permitium.com/rod | - |  | **NO** |
+| brunswick | NC | https://brunswickcountync.gov/register-of-deeds/ | - |  | yes |
+| caldwell | NC | https://caldwellrod.com/ | CAPTCHA, reCAPTCHA, login |  | **NO** |
+| camden | NC | https://camdenrod.permitium.com/rod | login |  | **NO** |
+| carteret | NC | https://deeds.carteretcountync.gov/ | login, disclaimer |  | **NO** |
+| catawba | NC | https://www.catawbacountync.gov/departments/register-of-deeds/ | login, disclaimer |  | yes |
+| cherokee | NC | https://cherokeecountysc.gov/register-of-deeds/ | login, disclaimer |  | yes |
+| clay | NC | http://search.claydeeds.com/ | disclaimer | **unverified** | yes |
+| cleveland | NC | https://clevelandcountync.gov/register-of-deeds/ | CAPTCHA, login |  | yes |
+| columbus | NC | https://columbusdeeds.com/ | CAPTCHA, reCAPTCHA, disclaimer |  | **NO** |
+| craven | NC | https://cravenrod.permitium.com/rod | - |  | **NO** |
+| cumberland | NC | https://www.cumberlandcountync.gov/departments/register-of-deeds/ | disclaimer |  | **NO** |
+| currituck | NC | https://www.currituckcountync.gov/departments/register-of-deeds/ | CAPTCHA, reCAPTCHA, disclaimer |  | **NO** |
+| dare | NC | https://darerod.permitium.com/rod | - |  | **NO** |
+| davidson | NC | https://davidsonrod.permitium.com/rod | - |  | **NO** |
+| duplin | NC | https://duplinrod.permitium.com/rod | login |  | **NO** |
+| durham | NC | https://durhamrod.permitium.com/rod | - |  | **NO** |
+| edgecombe | NC | https://www.edgecombecountync.gov/departments/register_of_deeds/index.php | CAPTCHA, login |  | **NO** |
+| forsyth | NC | https://forsythrod.permitium.com/rod | - |  | **NO** |
+| franklin | NC | https://franklinrod.permitium.com/rod | - |  | **NO** |
+| gates | NC | https://www.gatescountync.gov/departments/register-of-deeds/ | - |  | **NO** |
+| granville | NC | https://granvillerod.permitium.com/rod | - |  | **NO** |
+| greene | NC | https://greenecountync.gov/register-of-deeds/ | login |  | **NO** |
+| guilford | NC | https://guilforddeeds.com/ | disclaimer |  | **NO** |
+| halifax | NC | https://halifaxrod.permitium.com/rod | - |  | **NO** |
+| harnett | NC | https://harnettrod.permitium.com/rod | - |  | **NO** |
+| haywood | NC | https://haywooddeeds.com/ | - |  | yes |
+| iredell | NC | https://iredellrod.permitium.com/rod | - |  | **NO** |
+| jackson | NC | https://jacksonrod.permitium.com/rod | - |  | **NO** |
+| jones | NC | https://jonescountync.gov/register-of-deeds/ | login |  | **NO** |
+| lee | NC | https://www.leecountync.gov/departments/register_of_deeds/index.php | CAPTCHA, login |  | **NO** |
+| lenoir | NC | https://lenoircountync.gov/register-of-deeds/ | login |  | **NO** |
+| lincoln | NC | https://lincolnrod.com/ | disclaimer |  | **NO** |
+| macon | NC | https://macondeeds.com/ | CAPTCHA, reCAPTCHA |  | **NO** |
+| martin | NC | https://www.martincountync.gov/departments/register_of_deeds/index.php | CAPTCHA, login, disclaimer |  | **NO** |
+| mcdowell | NC | https://mcdowelldeeds.com/ | - |  | yes |
+| mecklenburg | NC | https://mecklenburgcountync.gov/register-of-deeds/ | - |  | yes |
+| mitchell | NC | https://mitchelldeeds.com/ | CAPTCHA, reCAPTCHA |  | yes |
+| montgomery | NC | https://montgomerycountync.gov/register-of-deeds/ | - |  | **NO** |
+| moore | NC | https://rod.moorecountync.gov/ | login, disclaimer |  | **NO** |
+| nash | NC | https://nashrod.com/ | login |  | **NO** |
+| northampton | NC | https://northamptonrod.org/ | disclaimer |  | **NO** |
+| onslow | NC | https://deeds.onslowcountync.gov/ | CAPTCHA, reCAPTCHA, subscription, login |  | **NO** |
+| orange | NC | https://rod.orangecountync.gov/ | disclaimer | **unverified** | **NO** |
+| pamlico | NC | https://www.pamlicocountync.gov/departments/register_of_deeds/index.php | CAPTCHA, login |  | **NO** |
+| perquimans | NC | https://www.perquimanscountync.gov/departments/register-of-deeds/ | - |  | **NO** |
+| polk | NC | https://cotthosting.com/NCPolkEXTERNAL/LandRecords/protected/v4/SrchName.aspx | CAPTCHA, reCAPTCHA, login |  | yes |
+| randolph | NC | https://randolphrod.permitium.com/rod | - |  | **NO** |
+| rowan | NC | https://rod.rowancountync.gov/ | CAPTCHA, reCAPTCHA, subscription, login |  | **NO** |
+| rutherford | NC | https://rutherfordcountync.gov/register-of-deeds/ | CAPTCHA, login |  | yes |
+| sampson | NC | https://sampsonrod.permitium.com/rod | - |  | **NO** |
+| scotland | NC | https://scotlandrod.permitium.com/rod | login |  | **NO** |
+| stokes | NC | https://stokesrod.permitium.com/rod | login |  | **NO** |
+| swain | NC | https://swaincountync.gov/register-of-deeds/ | login, disclaimer |  | **NO** |
+| transylvania | NC | https://transylvaniadeeds.com/ | disclaimer |  | yes |
+| wake | NC | https://wakerod.permitium.com/rod | - |  | **NO** |
+| warren | NC | https://warrenrod.org/ | - |  | **NO** |
+| wayne | NC | https://waynerod.permitium.com/rod | - |  | **NO** |
+| wilson | NC | https://www.wilsoncountync.gov/departments/register-of-deeds/ | CAPTCHA, reCAPTCHA, login |  | **NO** |
+| yancey | NC | https://yanceydeeds.com/ | - |  | yes |
+| abbeville | SC | http://search.abbevilledeeds.com/ | disclaimer |  | yes |
+| anderson | SC | https://andersondeeds.com/ | - |  | **NO** |
+| barnwell | SC | https://barnwelldeeds.com/ | disclaimer |  | yes |
+| beaufort | SC | https://beaufortcountysc.gov/register-of-deeds/ | disclaimer |  | **NO** |
+| berkeley | SC | http://search.berkeleydeeds.com/ | disclaimer | **unverified** | yes |
+| cherokee | SC | https://cherokeecountysc.gov/register-of-deeds/ | login, disclaimer |  | yes |
+| chester | SC | https://chestercountysc.gov/register-of-deeds/ | - |  | **NO** |
+| colleton | SC | http://search.colletondeeds.com/ | disclaimer |  | yes |
+| dorchester | SC | http://search.dorchesterdeeds.com/ | disclaimer | **unverified** | yes |
+| florence | SC | http://search.florencedeeds.com/ | disclaimer | **unverified** | yes |
+| georgetown | SC | https://georgetowndeeds.com/ | disclaimer |  | yes |
+| horry | SC | https://www.horrycountysc.gov/departments/register-of-deeds/ | login |  | yes |
+| laurens | SC | https://laurensdeeds.com/ | CAPTCHA, reCAPTCHA |  | yes |
+| pickens | SC | https://pickenscountysc.gov/register-of-deeds/ | CAPTCHA, login |  | yes |
+| spartanburg | SC | http://search.spartanburgdeeds.com/ | disclaimer |  | yes |
+| york | SC | http://search.yorkdeeds.com/ | disclaimer | **unverified** | yes |
 
-alleghany (NC), anson (NC), ashe (NC), avery (NC), beaufort (NC), bertie (NC), bladen (NC), buncombe (NC), burke (NC), cabarrus (NC), caldwell (NC), camden (NC), carteret (NC), caswell (NC), chatham (NC), chowan (NC), clay (NC), columbus (NC), craven (NC), davidson (NC), davie (NC), duplin (NC), durham (NC), edgecombe (NC), franklin (NC), gaston (NC), gates (NC), graham (NC), granville (NC), halifax (NC), harnett (NC), haywood (NC), hertford (NC), hoke (NC), hyde (NC), iredell (NC), jackson (NC), johnston (NC), lincoln (NC), macon (NC), martin (NC), mcdowell (NC), montgomery (NC), moore (NC), nash (NC), new-hanover (NC), northampton (NC), orange (NC), pamlico (NC), pasquotank (NC), perquimans (NC), pitt (NC), polk (NC), randolph (NC), richmond (NC), rockingham (NC), sampson (NC), scotland (NC), stanly (NC), stokes (NC), surry (NC), transylvania (NC), tyrrell (NC), union (NC), vance (NC), warren (NC), washington (NC), watauga (NC), wayne (NC), wilkes (NC), wilson (NC), yadkin (NC), yancey (NC), abbeville (SC), aiken (SC), allendale (SC), anderson (SC), bamberg (SC), barnwell (SC), beaufort (SC), calhoun (SC), charleston (SC), chesterfield (SC), clarendon (SC), colleton (SC), darlington (SC), dillon (SC), dorchester (SC), edgefield (SC), fairfield (SC), florence (SC), georgetown (SC), greenville (SC), greenwood (SC), hampton (SC), horry (SC), jasper (SC), kershaw (SC), lancaster (SC), laurens (SC), lexington (SC), marion (SC), marlboro (SC), newberry (SC), newly-elected (SC), oconee (SC), orangeburg (SC), richland (SC), saluda (SC), spartanburg (SC), sumter (SC), union (SC), williamsburg (SC), york (SC)
+<details><summary>not located by pattern (63)</summary>
+
+ashe (NC), buncombe (NC), burke (NC), cabarrus (NC), caswell (NC), chatham (NC), chowan (NC), davie (NC), gaston (NC), graham (NC), henderson (NC), hertford (NC), hoke (NC), hyde (NC), johnston (NC), madison (NC), new-hanover (NC), pasquotank (NC), pender (NC), person (NC), pitt (NC), richmond (NC), robeson (NC), rockingham (NC), stanly (NC), surry (NC), tyrrell (NC), union (NC), vance (NC), washington (NC), watauga (NC), wilkes (NC), yadkin (NC), aiken (SC), allendale (SC), bamberg (SC), calhoun (SC), charleston (SC), chesterfield (SC), clarendon (SC), darlington (SC), dillon (SC), edgefield (SC), fairfield (SC), greenville (SC), greenwood (SC), hampton (SC), jasper (SC), kershaw (SC), lancaster (SC), lee (SC), lexington (SC), marion (SC), marlboro (SC), newberry (SC), newly-elected (SC), oconee (SC), orangeburg (SC), richland (SC), saluda (SC), sumter (SC), union (SC), williamsburg (SC)
+
+</details>
+
+## tax  (31 of 146 located)
+
+`state?` — is this really that state's county? Blank means the
+name is nationally unique. `unverified` means the name is shared
+with another state's county and the page never says which it is;
+confirm before using it.
+
+| county | state | url | gates | state? | in src |
+|---|---|---|---|---|---|
+| alamance | NC | https://www.alamancecountync.gov/tax/ | - |  | **NO** |
+| alexander | NC | https://www.alexandercountync.gov/tax/ | - |  | **NO** |
+| brunswick | NC | https://www.brunswickcountync.gov/tax/ | subscription |  | yes |
+| catawba | NC | https://www.catawbacountync.gov/tax/ | login, disclaimer |  | yes |
+| cherokee | NC | https://cherokeecountysc.gov/delinquent-tax/ | login |  | yes |
+| cleveland | NC | https://www.clevelandcountync.gov/tax/ | CAPTCHA, login |  | yes |
+| cumberland | NC | https://www.cumberlandcountync.gov/tax/ | login, disclaimer |  | **NO** |
+| currituck | NC | https://www.currituckcountync.gov/tax/ | CAPTCHA, reCAPTCHA, login, disclaimer |  | **NO** |
+| dare | NC | https://tax.darecountync.gov/ | subscription |  | **NO** |
+| forsyth | NC | https://www.forsythcountync.gov/tax/ | - |  | **NO** |
+| greene | NC | https://www.greenecountync.gov/tax/ | login |  | **NO** |
+| guilford | NC | https://www.guilfordcountync.gov/tax/ | login, disclaimer |  | **NO** |
+| henderson | NC | https://www.hendersoncountync.gov/tax/ | login, disclaimer |  | yes |
+| jones | NC | https://www.jonescountync.gov/tax/ | login |  | **NO** |
+| lee | NC | https://www.leecountync.gov/tax/ | CAPTCHA, login |  | **NO** |
+| lenoir | NC | https://www.lenoircountync.gov/tax/ | login |  | **NO** |
+| madison | NC | https://www.madisoncountync.gov/tax/ | CAPTCHA, reCAPTCHA, login |  | **NO** |
+| mecklenburg | NC | https://www.mecklenburgcountync.gov/tax/ | - |  | yes |
+| mitchell | NC | https://www.mitchellcountync.gov/tax/ | CAPTCHA, subscription, login |  | yes |
+| onslow | NC | https://www.onslowcountync.gov/tax/ | subscription |  | yes |
+| pender | NC | https://tax.pendercountync.gov/ | CAPTCHA, reCAPTCHA, disclaimer |  | **NO** |
+| person | NC | https://www.personcountync.gov/tax/ | CAPTCHA, reCAPTCHA, login |  | **NO** |
+| robeson | NC | https://www.robesoncountync.gov/tax/ | CAPTCHA, subscription, login |  | **NO** |
+| rowan | NC | https://tax.rowancountync.gov/ | - |  | **NO** |
+| rutherford | NC | https://www.rutherfordcountync.gov/tax/ | CAPTCHA, login |  | yes |
+| swain | NC | https://www.swaincountync.gov/tax/ | login |  | **NO** |
+| wake | NC | https://www.wakecountync.gov/tax/ | disclaimer |  | **NO** |
+| berkeley | SC | https://berkeleycountysc.gov/delinquent-tax/ | subscription, disclaimer |  | **NO** |
+| cherokee | SC | https://cherokeecountysc.gov/delinquent-tax/ | login |  | yes |
+| chester | SC | https://chestercountysc.gov/delinquent-tax/ | - |  | **NO** |
+| pickens | SC | https://pickenscountysc.gov/delinquent-tax/ | CAPTCHA, login |  | yes |
+
+<details><summary>not located by pattern (115)</summary>
+
+alleghany (NC), anson (NC), ashe (NC), avery (NC), beaufort (NC), bertie (NC), bladen (NC), buncombe (NC), burke (NC), cabarrus (NC), caldwell (NC), camden (NC), carteret (NC), caswell (NC), chatham (NC), chowan (NC), clay (NC), columbus (NC), craven (NC), davidson (NC), davie (NC), duplin (NC), durham (NC), edgecombe (NC), franklin (NC), gaston (NC), gates (NC), graham (NC), granville (NC), halifax (NC), harnett (NC), haywood (NC), hertford (NC), hoke (NC), hyde (NC), iredell (NC), jackson (NC), johnston (NC), lincoln (NC), macon (NC), martin (NC), mcdowell (NC), montgomery (NC), moore (NC), nash (NC), new-hanover (NC), northampton (NC), orange (NC), pamlico (NC), pasquotank (NC), perquimans (NC), pitt (NC), polk (NC), randolph (NC), richmond (NC), rockingham (NC), sampson (NC), scotland (NC), stanly (NC), stokes (NC), surry (NC), transylvania (NC), tyrrell (NC), union (NC), vance (NC), warren (NC), washington (NC), watauga (NC), wayne (NC), wilkes (NC), wilson (NC), yadkin (NC), yancey (NC), abbeville (SC), aiken (SC), allendale (SC), anderson (SC), bamberg (SC), barnwell (SC), beaufort (SC), calhoun (SC), charleston (SC), chesterfield (SC), clarendon (SC), colleton (SC), darlington (SC), dillon (SC), dorchester (SC), edgefield (SC), fairfield (SC), florence (SC), georgetown (SC), greenville (SC), greenwood (SC), hampton (SC), horry (SC), jasper (SC), kershaw (SC), lancaster (SC), laurens (SC), lee (SC), lexington (SC), marion (SC), marlboro (SC), newberry (SC), newly-elected (SC), oconee (SC), orangeburg (SC), richland (SC), saluda (SC), spartanburg (SC), sumter (SC), union (SC), williamsburg (SC), york (SC)
 
 </details>
