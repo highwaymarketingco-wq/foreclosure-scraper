@@ -23,12 +23,29 @@ of an hour of rediscovery, and so long sessions can be abandoned cheaply.
 A full engine run started **2026-08-11 13:24** and passed 23 hours. It was
 **not hung** — it was re-reading FEMA flood zones for every geocoded lead.
 
-**Fixed 2026-08-12.** `enrich_with_flood` was querying FEMA once per lead per
-run, at concurrency 4, with no cache — even though a flood zone is a fixed
-polygon and `raw["flood"]` persists on the board. It now skips already-tagged
-leads, caches by coordinate rounded to 4 decimals (~11 m, same parcel), and runs
-at concurrency 8. A 5,000-lead board across 50 buildings is **50 requests, not
-5,000**. `FLOOD_REFRESH=1` forces a full re-read after a FEMA map revision.
+**Where the 23 hours actually went** (measured from the log's 365 timestamped
+events — the rest of the file is untimestamped httpx noise):
+
+| span | duration | what |
+|---|---|---|
+| 13:52 → 19:22 | **5.5 h** | scrape phase, stealth browser on `portal-nc.tylertech.cloud` returning 202 (AWS-WAF CAPTCHA) |
+| 19:23 → 05:57 | **10.5 h** | skip trace, grinding `fastpeoplesearch.com` 403s |
+
+**16 of 23 hours were spent retrying sources already documented as permanently
+walled**, and neither phase emitted a single log line while it happened.
+
+Both are now bounded. `SKIP_TRACE_MAX_SECONDS` (default 900) and
+`SCRAPE_PHASE_MAX_SECONDS` (default 10800) join the budgets the court and vision
+phases already had. The scrape budget uses `asyncio.wait`, **not**
+`wait_for(gather(...))` — the naive form cancels every task on expiry and throws
+away sources that already finished. A test pins that.
+
+**Flood was NOT the bottleneck.** I fixed it before measuring and briefly said it
+was; at ~860 req/min the whole FEMA phase is about 35 minutes. The fix is still
+worth having (it removes ~30k redundant requests per run) but it was not why runs
+take 23 hours. `enrich_with_flood` now skips already-tagged leads, caches by
+coordinate rounded to 4 decimals (~11 m, same parcel) and runs at concurrency 8;
+`FLOOD_REFRESH=1` forces a full re-read.
 
 Geocode's 1 req/sec is **Nominatim's stated policy, not a bug** — and a batch
 pre-pass already resolves the bulk so only the tail reaches that tier. Leave it.
@@ -102,10 +119,14 @@ Full derivation: [`ROD_PORTAL_ACCESS.md`](ROD_PORTAL_ACCESS.md).
 
 ## Do next, in order
 
-1. **Time a full run** now that the flood enricher is fixed, and find the next
-   binding constraint. The remaining per-lead enrichers (opportunity zone,
-   repetitive loss, Helene damage) all already skip work they have done.
-2. **Wire `wnc_rod_foreclosure_starts` into a scheduled run** and confirm its
+1. **Time a full run** now that both unbounded phases are capped. Expect
+   roughly 7 hours rather than 23. If it is still long, get the timeline the
+   same way: `grep -oE '\[2026-[0-9-]+ [0-9:]+\]' <log> | uniq -c` and look for
+   the silent gaps, not the noisy parts.
+2. **Mark the walled sources dormant.** Tyler NC portal, SC PublicIndex and
+   fastpeoplesearch are known permanent walls but still get retried every run.
+   Enrichers have no `dormant` flag the way scrapers do; that is the gap.
+3. **Wire `wnc_rod_foreclosure_starts` into a scheduled run** and confirm its
    leads survive a board merge.
 3. **York SC** date-window behaviour is *undetermined*, not walled — it timed
    out repeatedly on a 470 KB page. Retry with a longer timeout.

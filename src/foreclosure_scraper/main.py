@@ -690,7 +690,38 @@ async def run() -> int:
         async with sem:
             return s.slug, await s.safe_run()
 
-    results = await asyncio.gather(*(bounded(s) for s in scrapers))
+    # WALL-CLOCK BUDGET for the whole scrape phase. Every other long phase in
+    # this orchestrator has one; this did not, and the 2026-08-11 run spent 5.5
+    # hours in it with no log line while a stealth browser retried an AWS-WAF
+    # portal that is documented as permanently walled.
+    #
+    # Per-scraper timeout_s does NOT bound this: 90+ sources at
+    # parallel_scrapers concurrency can legitimately sum to many hours.
+    #
+    # Deliberately NOT wait_for(gather(...)) — that cancels every task on
+    # expiry and throws away sources that already finished. asyncio.wait keeps
+    # the completed ones and cancels only what is still hanging.
+    scrape_budget_s = float(os.environ.get("SCRAPE_PHASE_MAX_SECONDS", "10800"))
+    tasks = [asyncio.create_task(bounded(s), name=s.slug) for s in scrapers]
+    done, pending = await asyncio.wait(tasks, timeout=scrape_budget_s)
+    if pending:
+        stalled = sorted(t.get_name() for t in pending)
+        log.warning("orchestrator.scrape_time_capped",
+                    budget_s=scrape_budget_s, completed=len(done),
+                    cancelled=len(pending), stalled_sources=stalled[:20],
+                    reason="phase budget hit; completed sources are kept")
+        for t in pending:
+            t.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+
+    results = []
+    for t in done:
+        try:
+            results.append(t.result())
+        except Exception:  # noqa: BLE001 - safe_run should not raise, but a
+            # task that dies here must not take the whole phase with it.
+            log.error("orchestrator.scraper_task_failed", source=t.get_name(),
+                      traceback=traceback.format_exc())
 
     raw: list[Listing] = []
     by_source: Counter = Counter()
@@ -1433,9 +1464,20 @@ async def run() -> int:
     #   - "batchskiptracing" / etc.: PAID, $0.05-0.20/lead
     # Cap via SKIP_TRACE_MAX_PER_RUN (default 100), prioritized by sale_date
     # proximity so the imminent-sale leads always get traced first.
+    #
+    # WALL-CLOCK BUDGET. The 2026-08-11 run spent 10.5 hours here with no log
+    # line, grinding through fastpeoplesearch 403s. Every other long phase in
+    # this orchestrator is already wrapped in wait_for; this one was not, so a
+    # provider that starts refusing turns a 7-hour run into a 23-hour one and
+    # says nothing while it happens.
+    skip_trace_budget_s = float(os.environ.get("SKIP_TRACE_MAX_SECONDS", "900"))
     try:
         from .enrichment_skip_trace import enrich_with_skip_trace
-        await enrich_with_skip_trace(enriched)
+        await asyncio.wait_for(enrich_with_skip_trace(enriched),
+                               timeout=skip_trace_budget_s)
+    except asyncio.TimeoutError:
+        log.warning("skip_trace.time_capped", budget_s=skip_trace_budget_s,
+                    reason="provider slow or refusing; leads keep prior contact data")
     except Exception:
         log.error("skip_trace.failed", traceback=traceback.format_exc())
 
