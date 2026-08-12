@@ -197,3 +197,118 @@ route; the alert says it wants text, so it is likely a starting instrument or
 book reference rather than a date.
 
 All twelve Lookup counties share this, so one reader serves all of them.
+
+---
+
+# CORRECTION — 2026-08-12: the "twelve counties, one platform" claim was wrong
+
+Everything above about The Lookup is accurate for **three** counties. The claim
+that twelve counties share it is not. Nine of them run a **different platform**,
+and one is still walled. This section is the measured replacement.
+
+## How the error happened, and why nothing caught it
+
+All twelve sit on `<county>deeds.com` and all twelve answered **HTTP 200** to an
+accept step, so a reachability check passed for every one. The fingerprint never
+asked the only question that mattered: *does a search return rows?*
+
+Pointing the Lookup reader at the other nine returns **404 with a 16-byte body**
+— which a status check reads as "this county has no records". The enricher would
+have reported nine empty counties forever. Worse, the only county with board
+coverage (Georgetown, 409 leads) is one of the nine, so the enricher as shipped
+enriched exactly nothing.
+
+## Two platforms, no shared endpoints
+
+| | The Lookup | Online Record System |
+|---|---|---|
+| entry | `index.php?Accept=Accept` | `NameSearch.php?Accept=Accept` |
+| search | `content.php` (GET) | `NamePick.php` → `NameDisplay.php` (POST) |
+| amount in index | no | **yes** |
+| counties | clay, haywood, yancey (NC) | 8 SC (below) |
+| reader | `enrichment_rod_lookup.py` | `enrichment_rod_name_index.py` |
+
+Bertie NC is neither: it serves a 2,617-byte disclaimer loop and is still walled.
+
+## Wrong-state counties — a live trap in the URL pattern
+
+`<county>deeds.com` does not say which state it is, and county names repeat:
+
+- **hendersondeeds.com is Henderson County KENTUCKY** (assets under `/ky/henderson/`)
+- **wilsondeeds.com is Wilson County TENNESSEE**
+
+Both were one step from being adopted as NC register-of-deeds sources on pattern
+match alone. Every host now in use was confirmed against the county's own site:
+`haywoodcountync.gov` links `haywooddeeds.com`; `claydeeds.com` resolves to
+`deeds.claync.us`; Yancey is the only Yancey County in the country.
+`build_county_registry.py` now carries a `state_confirmed` check so a shared
+county name cannot be adopted silently again.
+
+## The Online Record System — working three-step flow
+
+    1. GET  NameSearch.php?Accept=Accept        clears disclaimer, sets PHPSESSID
+    2. POST NamePick.php                        -> PARTY index (checkbox per name)
+       search_type=Standard sort_type=Date entity_type=Both
+       start_date=MM/DD/YYYY end_date=MM/DD/YYYY instType[ALL]=ALL
+       tor_last_name=<grantor>  tee_last_name=<grantee>   (both may be blank)
+    3. POST NameDisplay.php                     -> the DOCUMENTS
+       igheader=ALL  igquerystring=  displaybutton=Display Detail Listing
+       entityID[<ID>]=<ID>  for each party
+
+**Step 3 takes only its own fields.** Echoing the step-2 search parameters back
+returns a 21-byte rejection. That cost several attempts to find.
+
+A row is: `Date | Code-Book-Page | Type | Description | Amount | Reverse Party |
+Cross-Ref | Img?` — verified live, e.g.
+
+    08/10/2026  RECORD BOOK-5057-427  SATISFACTIO  PD:FORECLOSURE BK 4589 PG 312
+    08/10/2026  REVOCATION OF RELEASE OF TAX LIEN  PD:21MS22-14 / 105239.55
+
+**`instType` is ignored at step 2.** Sending `instType[LIS PENDENS]`, the paired
+`instType[LIS PENDENS][MORT]`, and an `igheader` variant all returned byte-identical
+responses to `instType[ALL]`. Filter on the row `Type` at parse time instead.
+
+## Only two of the eight honour the date window
+
+`searchLimit = 2000` is declared in the page. Measured with a one-day window
+against a one-month window, fresh session each time:
+
+| county | 1 day | 1 month | date window |
+|---|---|---|---|
+| barnwell | 24 (7d) | 230 | **honoured** |
+| georgetown | 161 | 1374 | **honoured** |
+| abbeville | 2000 | 2000 | ignored |
+| berkeley | 2000 | 2000 | ignored |
+| colleton | 2000 | 2000 | ignored |
+| dorchester | 1996 | 1996 | ignored |
+| florence | 1973 | 1973 | ignored |
+| york | — | — | undetermined (repeated timeouts on a 470 KB page) |
+
+A single day in Colleton (population ~38k) cannot produce 2,000 transacting
+parties. Those counties return the head of the whole index for any window.
+
+This is the dangerous case: the response is large, well-formed and HTTP 200.
+Publishing it as "last week's filings" would put years-old instruments on the
+board as fresh distress. `bulk_by_date()` therefore **refuses** to run unless the
+date filter is measured `True`, and refuses a window that comes back at the cap.
+
+## What is actually open, and what it is worth
+
+- **Bulk date-range lead source**: barnwell + georgetown only. Both are outside
+  the core Upstate-SC / Western-NC footprint, so the capability is built and
+  documented but not wired as a new lead source.
+- **Name lookup**: all 8 SC counties, useful as enrichment wherever a lead
+  already has an owner name.
+- **The real prize is still The Lookup's `browse`**: clay, haywood and yancey are
+  core Western NC counties holding **zero** board leads, and `browse` walks the
+  party index with no name needed. That is the highest-value unbuilt item here.
+
+## `received_from` — closed as a dead end
+
+The Lookup's `received` date-range search demands `received_from` (label:
+"Received From Text"). Omitting it returns 72 bytes of `alert('Must key in
+received from text')`. Tested and **all returned 0 bytes**: `%`, `A`, `TRUSTEE`,
+`TRUSTEE SERVICES`, `SUBSTITUTE TRUSTEE`, `BROCK`, `HUTCHENS`, `TITLE`; each also
+without `embed=1`, against both the nonce action URL and bare `content.php`.
+
+Do not re-attempt without new information. `browse` is the working bulk path.

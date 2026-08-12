@@ -138,17 +138,64 @@ def gates_of(html: str) -> list[str]:
     return out
 
 
+#: Counties whose name is shared with a county in another state. A URL built
+#: from the name alone can silently land on the wrong one, and these sites often
+#: never name their state: hendersondeeds.com is Henderson County KENTUCKY and
+#: wilsondeeds.com is Wilson County TENNESSEE. Both were about to be adopted as
+#: NC register-of-deeds sources purely because the pattern matched.
+#:
+#: This is not a complete list of shared names — it is the ones in this
+#: footprint that a `<county>deeds.com` guess can actually collide with.
+AMBIGUOUS_NAMES = {
+    "henderson", "wilson", "clay", "haywood", "york", "florence", "berkeley",
+    "dorchester", "jackson", "lincoln", "montgomery", "orange", "union",
+    "warren", "franklin", "greene", "jones", "monroe",
+    "lee", "madison",
+    "randolph", "richmond", "washington", "wayne", "chester", "lancaster",
+    "marion", "marlboro", "newberry", "sumter",
+}
+
+
+def state_confirmed(county: str, state: str, url: str, html: str) -> bool | None:
+    """Is this really that state's county? True / False / None = undetermined.
+
+    Checked in the order the evidence is trustworthy: an explicit state name or
+    a state-qualified domain in the page beats anything inferred. A county whose
+    name is nationally unique needs no check at all.
+    """
+    if county.replace("-", "").lower() not in AMBIGUOUS_NAMES:
+        return True  # only one county in the US has this name
+    full = {"NC": "north carolina", "SC": "south carolina"}[state.upper()]
+    other = {"NC": "south carolina", "SC": "north carolina"}[state.upper()]
+    b = (html or "").lower()
+    if full in b and other not in b:
+        return True
+    # state-qualified domains, e.g. deeds.claync.us / haywoodcountync.gov
+    if re.search(rf"[a-z]+(?:county)?{state.lower()}\.(?:gov|us|org)", b):
+        return True
+    if other in b and full not in b:
+        return False
+    return None
+
+
 def probe_system(county: str, state: str, kind: str) -> dict:
     c = county.replace("-", "")
     row = {"county": county, "state": state, "system": kind,
-           "url": None, "status": None, "gates": [], "found": False}
+           "url": None, "status": None, "gates": [], "found": False,
+           "state_confirmed": None}
     for pat in PATTERNS[kind]:
         url = pat.format(c=c, C=county.replace("-", " ").title().replace(" ", ""),
                          st=state.lower(), ST=state.upper())
         r = _get(url)
         if r is not None and r.status_code == 200 and len(r.content) > 2000:
+            confirmed = state_confirmed(county, state, url, r.text)
             row.update(url=url, status=r.status_code, found=True,
-                       gates=gates_of(r.text))
+                       gates=gates_of(r.text), state_confirmed=confirmed)
+            # A page that positively identifies as the OTHER state is not this
+            # county's system. Keep looking rather than recording a wrong hit.
+            if confirmed is False:
+                row.update(url=None, found=False)
+                continue
             return row
         if r is not None and row["status"] is None:
             row["status"] = r.status_code
@@ -227,13 +274,20 @@ def main() -> int:
     for kind, rs in sorted(by_kind.items()):
         f = [r for r in rs if r["found"]]
         lines += [f"## {kind}  ({len(f)} of {len(rs)} located)", "",
-                  "| county | state | url | gates | in src |",
-                  "|---|---|---|---|---|"]
+                  "`state?` — is this really that state's county? Blank means the",
+                  "name is nationally unique. `unverified` means the name is shared",
+                  "with another state's county and the page never says which it is;",
+                  "confirm before using it.",
+                  "",
+                  "| county | state | url | gates | state? | in src |",
+                  "|---|---|---|---|---|---|"]
         for r in sorted(rs, key=lambda x: (x["state"], x["county"])):
             if not r["found"]:
                 continue
+            sc = r.get("state_confirmed")
+            mark = "" if sc is True else ("**unverified**" if sc is None else "**WRONG STATE**")
             lines.append(f"| {r['county']} | {r['state']} | {r['url']} | "
-                         f"{', '.join(r['gates']) or '-'} | "
+                         f"{', '.join(r['gates']) or '-'} | {mark} | "
                          f"{'yes' if r['in_src'] else '**NO**'} |")
         missing = [r for r in rs if not r["found"]]
         lines += ["", f"<details><summary>not located by pattern "

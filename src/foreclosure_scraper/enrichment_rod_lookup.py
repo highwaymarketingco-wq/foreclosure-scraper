@@ -1,4 +1,4 @@
-"""Register-of-deeds lookup across the twelve "The Lookup" counties.
+"""Register-of-deeds lookup across the three verified "The Lookup" counties.
 
 WHAT THIS READS
     The county register of deeds — where deeds of trust, substitutions of
@@ -29,8 +29,14 @@ WHY THIS IS AN ENRICHER AND NOT A SCRAPER
     enrich leads already on the board.
 
     That limit is worth stating plainly: it makes this a lookup, not a source of
-    new leads. Board coverage in these twelve counties is currently 409 leads,
-    all Georgetown SC.
+    new leads. Clay, Haywood and Yancey hold ZERO board leads today, so with a
+    name-keyed reader alone this enricher has nothing to enrich — the bulk path
+    below is what would actually open them.
+
+    The `browse` search is that path: it returns the full party index with a
+    document count per name and needs no name in advance. Walking it is how
+    these three counties become a source rather than a lookup, and it is the
+    single highest-value piece of unbuilt work this module points at.
 
 ACCESS — the three traps, every one of which returns HTTP 200
     1. GET, never POST. A POST to content.php returns a 2,065-byte tab shell for
@@ -60,23 +66,38 @@ from .models import Listing
 
 log = structlog.get_logger()
 
-#: county -> search host. All twelve run the same platform; confirmed by
-#: fingerprinting every ungated recorder found by build_county_registry.py.
-#: Haywood and Yancey publish a landing page on <county>deeds.com while the
-#: platform itself lives on search.<county>deeds.com.
+#: county -> search host, VERIFIED BY FETCHING, not by URL pattern.
+#:
+#: A previous version of this file listed twelve counties here. Nine of them do
+#: not run this platform at all: they 404 on content.php and serve a different
+#: system ("<County> County Online Record System", entered at NameSearch.php),
+#: which lives in scrapers/counties_sc/sc_rod_name_index.py. Bertie NC serves
+#: only a 2,617-byte disclaimer loop.
+#:
+#: Every one of those nine returned HTTP 200 to the accept step, so the wrong
+#: list looked healthy and this enricher would have reported "no records" for
+#: them forever. The three below are the ones where a browse actually returns
+#: rows. Verify before adding a fourth — see docs/ROD_PORTAL_ACCESS.md.
+#:
+#: All three are core-footprint Western NC counties that currently hold ZERO
+#: board leads, which is exactly where new coverage is worth the most.
 LOOKUP_HOSTS: dict[tuple[str, str], str] = {
-    ("abbeville", "SC"): "http://search.abbevilledeeds.com",
-    ("barnwell", "SC"): "https://barnwelldeeds.com",
-    ("berkeley", "SC"): "http://search.berkeleydeeds.com",
-    ("colleton", "SC"): "http://search.colletondeeds.com",
-    ("dorchester", "SC"): "http://search.dorchesterdeeds.com",
-    ("florence", "SC"): "http://search.florencedeeds.com",
-    ("georgetown", "SC"): "https://georgetowndeeds.com",
-    ("york", "SC"): "http://search.yorkdeeds.com",
-    ("bertie", "NC"): "https://bertiedeeds.com",
     ("clay", "NC"): "http://search.claydeeds.com",
     ("haywood", "NC"): "http://search.haywooddeeds.com",
     ("yancey", "NC"): "http://search.yanceydeeds.com",
+}
+
+#: Same-named counties exist in other states and `<county>deeds.com` does not
+#: say which one it is. hendersondeeds.com is Henderson County KENTUCKY and
+#: wilsondeeds.com is Wilson County TENNESSEE; both were nearly adopted as NC
+#: sources by pattern matching alone. Each host above was confirmed against the
+#: county's own government site: haywoodcountync.gov links haywooddeeds.com, and
+#: claydeeds.com resolves to deeds.claync.us. Yancey is the only Yancey County
+#: in the United States, so its name is unambiguous.
+VERIFIED_AGAINST = {
+    ("clay", "NC"): "www.clayconc.com -> deeds.claync.us",
+    ("haywood", "NC"): "www.haywoodcountync.gov links haywooddeeds.com",
+    ("yancey", "NC"): "nationally unique county name",
 }
 
 #: Instruments that change a decision, mapped to what they mean.
