@@ -57,13 +57,15 @@ def test_target_counties_match_user_territory():
               "McDowell", "Lincoln", "Mitchell", "Burke"):
         assert c in TARGET_COUNTIES, f"{c} missing from TARGET_COUNTIES"
     # Coastal counties — intentionally queried (oceanfront gate re-admits the
-    # near-beach rows):
-    for c in ("Brunswick", "Pender", "Onslow", "Carteret", "Dare"):
+    # near-beach rows). 2026-08-12: Currituck/Hyde/New Hanover added per explicit
+    # user direction ("dare, wilmington ... literally on the coast").
+    for c in ("Brunswick", "Pender", "Onslow", "Carteret", "Dare",
+              "Currituck", "Hyde", "New Hanover"):
         assert c in TARGET_COUNTIES, f"coastal {c} missing from TARGET_COUNTIES"
-    # Counties still out of scope (eastern NC + Charlotte + New Hanover, which
-    # is NOT in the user's coastal list):
+    # Counties still out of scope (eastern NC + Charlotte). New Hanover moved
+    # INTO scope 2026-08-12 (user named "wilmington").
     for c in ("Wake", "Forsyth", "Guilford", "Durham", "Cumberland",
-              "Mecklenburg", "Madison", "Yancey", "New Hanover"):
+              "Mecklenburg", "Madison", "Yancey"):
         assert c not in TARGET_COUNTIES, (
             f"{c} should NOT be in TARGET_COUNTIES"
         )
