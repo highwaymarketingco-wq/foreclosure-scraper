@@ -20,13 +20,18 @@ of an hour of rediscovery, and so long sessions can be abandoned cheaply.
 
 ## What is running right now
 
-A full engine run started **2026-08-11 13:24** and is at **~23 hours**. It is
-**not hung** — it is in the final GIS phase doing FEMA flood-zone lookups **one
-lead at a time**. That is the current binding constraint on run time and is the
-next thing worth fixing (see Do Next).
+A full engine run started **2026-08-11 13:24** and passed 23 hours. It was
+**not hung** — it was re-reading FEMA flood zones for every geocoded lead.
 
-Prior known hang: `run_local.sh` at 8.5h from geocode-at-1/sec plus a comps
-CPU-spin. Same family of problem.
+**Fixed 2026-08-12.** `enrich_with_flood` was querying FEMA once per lead per
+run, at concurrency 4, with no cache — even though a flood zone is a fixed
+polygon and `raw["flood"]` persists on the board. It now skips already-tagged
+leads, caches by coordinate rounded to 4 decimals (~11 m, same parcel), and runs
+at concurrency 8. A 5,000-lead board across 50 buildings is **50 requests, not
+5,000**. `FLOOD_REFRESH=1` forces a full re-read after a FEMA map revision.
+
+Geocode's 1 req/sec is **Nominatim's stated policy, not a bug** — and a batch
+pre-pass already resolves the bulk so only the tail reaches that tier. Leave it.
 
 ---
 
@@ -97,9 +102,9 @@ Full derivation: [`ROD_PORTAL_ACCESS.md`](ROD_PORTAL_ACCESS.md).
 
 ## Do next, in order
 
-1. **Batch or cap the per-lead GIS enrichers** (FEMA flood zone, geocode). One
-   request per lead is why a full run cannot finish overnight. Highest leverage
-   item on the list.
+1. **Time a full run** now that the flood enricher is fixed, and find the next
+   binding constraint. The remaining per-lead enrichers (opportunity zone,
+   repetitive loss, Helene damage) all already skip work they have done.
 2. **Wire `wnc_rod_foreclosure_starts` into a scheduled run** and confirm its
    leads survive a board merge.
 3. **York SC** date-window behaviour is *undetermined*, not walled — it timed
