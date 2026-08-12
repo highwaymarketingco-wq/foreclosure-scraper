@@ -153,7 +153,7 @@ def explore(seed: str, hops: int = 1) -> set[str]:
 
 def already_used(url: str) -> bool:
     """Is this host referenced anywhere in src/ already?"""
-    host = urlparse(url).netloc.lower().lstrip("www.")
+    host = urlparse(url).netloc.lower().removeprefix("www.")
     if not host:
         return False
     r = subprocess.run(["grep", "-rl", host, str(SRC)],
@@ -184,7 +184,7 @@ def main() -> int:
     rows = []
     for seed_host, urls in found.items():
         for u in sorted(urls):
-            h = urlparse(u).netloc.lower().lstrip("www.")
+            h = urlparse(u).netloc.lower().removeprefix("www.")
             if h not in seen_hosts:
                 seen_hosts[h] = already_used(u)
             rows.append({"seed": seed_host, "url": u, "host": h,

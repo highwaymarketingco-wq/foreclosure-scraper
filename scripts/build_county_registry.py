@@ -156,6 +156,25 @@ AMBIGUOUS_NAMES = {
 }
 
 
+#: Hosts positively confirmed to serve a DIFFERENT state's county, with the
+#: evidence. Matched on registrable domain, so subdomains are covered too --
+#: rejecting `wilsondeeds.com` on its homepage text is not enough, because the
+#: sweep then finds `search.wilsondeeds.com`, a login portal that names no state
+#: at all and so comes back merely "undetermined".
+#:
+#: This is knowledge that cost real requests to establish. Keeping it here means
+#: a later sweep cannot quietly re-adopt these.
+KNOWN_WRONG_STATE: dict[str, str] = {
+    "hendersondeeds.com": "Henderson County KENTUCKY (assets under /assets/css/ky/henderson/)",
+    "wilsondeeds.com": "Wilson County TENNESSEE (homepage names Tennessee)",
+}
+
+
+def _registrable(host: str) -> str:
+    parts = host.lower().removeprefix("www.").split(".")
+    return ".".join(parts[-2:]) if len(parts) >= 2 else host.lower()
+
+
 def state_confirmed(county: str, state: str, url: str, html: str) -> bool | None:
     """Is this really that state's county? True / False / None = undetermined.
 
@@ -163,19 +182,49 @@ def state_confirmed(county: str, state: str, url: str, html: str) -> bool | None
     a state-qualified domain in the page beats anything inferred. A county whose
     name is nationally unique needs no check at all.
     """
+    from urllib.parse import urlparse
+    dom = _registrable(urlparse(url).netloc)
+    if dom in KNOWN_WRONG_STATE:
+        return False  # already proven; do not re-litigate from page text
+
     if county.replace("-", "").lower() not in AMBIGUOUS_NAMES:
         return True  # only one county in the US has this name
     full = {"NC": "north carolina", "SC": "south carolina"}[state.upper()]
-    other = {"NC": "south carolina", "SC": "north carolina"}[state.upper()]
     b = (html or "").lower()
-    if full in b and other not in b:
+
+    if full in b:
         return True
     # state-qualified domains, e.g. deeds.claync.us / haywoodcountync.gov
     if re.search(rf"[a-z]+(?:county)?{state.lower()}\.(?:gov|us|org)", b):
         return True
-    if other in b and full not in b:
+
+    # Any OTHER state named, with ours absent, means this is that state's county.
+    # Checking only the NC<->SC pair was not enough: hendersondeeds.com says
+    # KENTUCKY and wilsondeeds.com says TENNESSEE, so a sibling-only check
+    # returned "undetermined" for the two hosts that motivated this guard.
+    for other in OTHER_STATES:
+        if other != full and other in b:
+            return False
+    # vendor asset paths give the state away even when the prose does not:
+    # hendersondeeds.com loads cdn.bisonline.com/assets/css/ky/henderson/
+    m = re.search(r"/assets/(?:css|js|img)/([a-z]{2})/", b)
+    if m and m.group(1) != state.lower():
         return False
     return None
+
+
+#: Full names of every state whose presence on a page contradicts NC or SC.
+OTHER_STATES = (
+    "alabama", "alaska", "arizona", "arkansas", "california", "colorado",
+    "connecticut", "delaware", "florida", "georgia", "hawaii", "idaho",
+    "illinois", "indiana", "iowa", "kansas", "kentucky", "louisiana", "maine",
+    "maryland", "massachusetts", "michigan", "minnesota", "mississippi",
+    "missouri", "montana", "nebraska", "nevada", "new hampshire", "new jersey",
+    "new mexico", "new york", "north carolina", "north dakota", "ohio",
+    "oklahoma", "oregon", "pennsylvania", "rhode island", "south carolina",
+    "south dakota", "tennessee", "texas", "utah", "vermont", "virginia",
+    "washington", "west virginia", "wisconsin", "wyoming",
+)
 
 
 def probe_system(county: str, state: str, kind: str) -> dict:
@@ -206,7 +255,7 @@ def in_src(url: str | None) -> bool:
     if not url:
         return False
     from urllib.parse import urlparse
-    host = urlparse(url).netloc.lower().lstrip("www.")
+    host = urlparse(url).netloc.lower().removeprefix("www.")
     if not host:
         return False
     return bool(subprocess.run(["grep", "-rl", host, str(SRC)],
