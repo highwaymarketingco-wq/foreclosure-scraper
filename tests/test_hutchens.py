@@ -142,9 +142,10 @@ def test_sc_grid_column_map_survives_the_extra_deficiency_column():
 
 def test_sc_footprint_gate_keeps_in_scope_plus_coastal():
     _, kept = _grid("hutchens_sc_grid.html", SC_URL, "SC")
-    # Anderson is in-footprint; Horry rides the coastal lane. Greenville is
-    # denied, and Dorchester / Richland / Berkeley are simply out.
-    assert sorted(r.county for r in kept) == ["Anderson", "Horry"]
+    # Anderson is in-footprint. Horry (Myrtle Beach) is now excluded per user
+    # direction 2026-08-12. Greenville is denied, and Dorchester / Richland /
+    # Berkeley are simply out.
+    assert sorted(r.county for r in kept) == ["Anderson"]
 
 
 def test_missing_grid_yields_nothing_without_raising():
@@ -173,7 +174,7 @@ def test_fetch_pulls_both_nc_and_sc_lists(monkeypatch):
     )
     rows = asyncio.run(_collect(Hutchens()))
     assert seen == [NC_URL, SC_URL]
-    assert sorted(r.county for r in rows) == ["Anderson", "Buncombe", "Buncombe", "Horry"]
+    assert sorted(r.county for r in rows) == ["Anderson", "Buncombe", "Buncombe"]
     assert {r.state for r in rows} == {"NC", "SC"}
 
 

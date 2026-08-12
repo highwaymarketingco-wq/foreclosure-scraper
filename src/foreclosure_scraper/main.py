@@ -67,7 +67,8 @@ log = structlog.get_logger()
 OCEANFRONT_COASTAL_COUNTIES: frozenset[tuple[str, str]] = frozenset({
     ("Currituck", "NC"), ("Dare", "NC"), ("Hyde", "NC"), ("Carteret", "NC"),
     ("Onslow", "NC"), ("Pender", "NC"), ("New Hanover", "NC"), ("Brunswick", "NC"),
-    ("Horry", "SC"), ("Georgetown", "SC"), ("Charleston", "SC"),
+    # Horry SC (Myrtle Beach) intentionally excluded per user direction 2026-08-12.
+    ("Georgetown", "SC"), ("Charleston", "SC"),
     ("Beaufort", "SC"), ("Colleton", "SC"),
 })
 
@@ -282,7 +283,7 @@ COASTAL_COUNTY_BYPASS_SOURCES = {
     "counties_nc.nc_govdeals_real_property",   # Pender county-owned real property
     "counties_nc.new_hanover_foreclosures",    # New Hanover tax-foreclosures (Kania-administered)
     "counties_sc.charleston_delinquent_tax",   # Charleston FLC sealed-bid + delinquent tax
-    "counties_sc.horry_flc",                   # Horry Forfeited Land Commission
+    # counties_sc.horry_flc removed 2026-08-12 — Myrtle Beach/Horry excluded per user direction.
     "counties_sc.georgetown_civicengage",      # Georgetown FLC + tax-sale + MIE
     "counties_sc.colleton_tax_sale",           # Colleton delinquent-tax / tax-sale
     "counties_sc.sc_probate_net",              # SC probate (coastal counties via this gate)
@@ -340,7 +341,7 @@ DATELESS_OK_SOURCES = {
     # rows are long-runway (pre-sale) and routinely carry no sale_date.
     "counties_sc.oconee_forfeited_land",         # Oconee FLC available + assignment lists
     "counties_sc.spartanburg_flc",               # Spartanburg FLC assignable-surplus PDF (dateless)
-    "counties_sc.horry_flc",                     # Horry FLC year-round inventory
+    # counties_sc.horry_flc removed 2026-08-12 — Myrtle Beach/Horry excluded per user direction.
     "counties_sc.georgetown_civicengage",        # Georgetown FLC (dateless) + tax + MIE
     "counties_sc.charleston_delinquent_tax",     # Charleston FLC sealed-bid + delinquent tax
     "counties_sc.colleton_tax_sale",             # Colleton delinquent-tax list

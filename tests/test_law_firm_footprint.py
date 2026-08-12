@@ -53,10 +53,18 @@ def test_in_footprint_matches_the_18_tracked_counties():
 
 
 def test_coastal_counties_pass_the_gate_but_are_not_in_footprint():
-    for county, state in (("Carteret", "NC"), ("Horry", "SC"), ("Beaufort", "SC")):
+    for county, state in (("Carteret", "NC"), ("Georgetown", "SC"), ("Beaufort", "SC")):
         assert is_coastal(county, state) is True
         assert in_footprint(county, state) is False
         assert keep(county, state) is True
+
+
+def test_horry_is_excluded():
+    """Horry SC (Myrtle Beach) is excluded per user direction 2026-08-12 —
+    not coastal, not in footprint, and dropped by the parse-time gate."""
+    assert is_coastal("Horry", "SC") is False
+    assert in_footprint("Horry", "SC") is False
+    assert keep("Horry", "SC") is False
 
 
 def test_keep_rejects_plain_out_of_footprint_rows():

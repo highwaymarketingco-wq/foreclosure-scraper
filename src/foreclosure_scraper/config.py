@@ -126,6 +126,10 @@ SCOPE_DENY_COUNTIES: tuple[tuple[str, str], ...] = (
     # zip prefix covers Greenville too, so without explicit deny the
     # zip-fallback would re-let it in.
     ("Greenville", "SC"),
+    # 2026-08-12 — Horry SC (Myrtle Beach) excluded per user direction ("do not
+    # do myrtle beach or the county it's in"). Also removed from the oceanfront +
+    # coastal-bypass admission in main.py; this deny blocks the 295xx zip fallback.
+    ("Horry", "SC"),
     # 2026-05-15 — coastal NC pruned per user direction ("anything east
     # of Charlotte should be removed"). New Hanover / Brunswick / Onslow
     # were previously in NC_COUNTIES; explicit deny ensures the 284 zip

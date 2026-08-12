@@ -58,15 +58,15 @@ def test_bypass_source_with_parcel_id_is_unconditional_not_pending():
 
 
 def test_bypass_source_with_street_address_is_unconditional_not_pending():
-    li = _lead("counties_sc.horry_flc", "Horry", street_address="123 Main St")
+    li = _lead("counties_sc.colleton_tax_sale", "Colleton", street_address="123 Main St")
     assert _in_scope(li) is True
     assert _tag(li) == "coastal_county"
 
 
 def test_bypass_source_far_inland_still_survives_the_publish_repass():
-    """Conway is ~20 miles inland. A bypass row there must NOT be beach-tested."""
-    li = _lead("counties_sc.horry_flc", "Horry", street_address="500 Elm St",
-               city="Conway", latitude=33.8360, longitude=-79.0470)
+    """Andrews is ~25 miles inland in Georgetown county. A bypass row there must NOT be beach-tested."""
+    li = _lead("counties_sc.georgetown_civicengage", "Georgetown", street_address="500 Elm St",
+               city="Andrews", latitude=33.4510, longitude=-79.5600)
     assert _in_scope(li) is True
     assert _tag(li) != "oceanfront_pending"
 
@@ -92,13 +92,13 @@ def test_every_bypass_source_survives_with_a_parcel_id():
 
 def test_genuine_oceanfront_row_is_still_tagged_oceanfront():
     """The strict check runs FIRST, so real beachfront keeps its own tag."""
-    li = _lead("counties_sc.horry_flc", "Horry", street_address="1 Ocean Blvd",
-               latitude=33.6060, longitude=-78.9670)   # Surfside Beach
+    li = _lead("counties_sc.sc_coastal_rosters", "Beaufort", street_address="1 Ocean Blvd",
+               latitude=32.1900, longitude=-80.7000)   # Hilton Head oceanfront (Beaufort County)
     assert _in_scope(li) is True
     assert _tag(li) == "oceanfront"
 
 
 def test_non_coastal_county_is_unaffected_by_the_bypass():
     """A bypass source pointed at a non-coastal denied county must not sneak in."""
-    li = _lead("counties_sc.horry_flc", "Greenville", parcel_id="1")
+    li = _lead("counties_sc.georgetown_civicengage", "Greenville", parcel_id="1")
     assert _in_scope(li) is False
