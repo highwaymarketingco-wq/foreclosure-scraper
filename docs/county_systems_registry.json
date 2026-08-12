@@ -1,0 +1,4692 @@
+[
+ {
+  "county": "alamance",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://rod.alamancecountync.gov/",
+  "status": 200,
+  "gates": [
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "alamance",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.alamancecountync.gov/tax/",
+  "status": 200,
+  "gates": [],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "alamance",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "alexander",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://alexanderdeeds.com/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "alexander",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.alexandercountync.gov/tax/",
+  "status": 200,
+  "gates": [],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "alexander",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "alleghany",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "alleghany",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "alleghany",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 403,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "anson",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 520,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "anson",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 520,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "anson",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "ashe",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "ashe",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "ashe",
+  "state": "NC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=AsheCountyNC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "subscription",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "avery",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://averydeeds.com/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "avery",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "avery",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "beaufort",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://beaufortcountysc.gov/register-of-deeds/",
+  "status": 200,
+  "gates": [
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "beaufort",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 403,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "beaufort",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "bertie",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://bertiedeeds.com/",
+  "status": 200,
+  "gates": [
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "bertie",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "bertie",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 403,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "bladen",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "bladen",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "bladen",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "brunswick",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://brunswickcountync.gov/register-of-deeds/",
+  "status": 200,
+  "gates": [],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "brunswick",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.brunswickcountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "subscription"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "brunswick",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "buncombe",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "buncombe",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "buncombe",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "burke",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "burke",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "burke",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 403,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "cabarrus",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "cabarrus",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "cabarrus",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "caldwell",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://caldwellrod.com/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "caldwell",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "caldwell",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "camden",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "camden",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "camden",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "carteret",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "carteret",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "carteret",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "caswell",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "caswell",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "caswell",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 403,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "catawba",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "catawba",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.catawbacountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "catawba",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "chatham",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "chatham",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "chatham",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "cherokee",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://cherokeecountysc.gov/register-of-deeds/",
+  "status": 200,
+  "gates": [
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "cherokee",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://cherokeecountysc.gov/delinquent-tax/",
+  "status": 200,
+  "gates": [
+   "login"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "cherokee",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "chowan",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "chowan",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "chowan",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "clay",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 200,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "clay",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 200,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "clay",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "cleveland",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://clevelandcountync.gov/register-of-deeds/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "login"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "cleveland",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.clevelandcountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "login"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "cleveland",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "columbus",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://columbusdeeds.com/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "columbus",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "columbus",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "craven",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "craven",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "craven",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "cumberland",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "cumberland",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.cumberlandcountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "cumberland",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "currituck",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "currituck",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.currituckcountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "currituck",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "dare",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "dare",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://tax.darecountync.gov/",
+  "status": 200,
+  "gates": [
+   "subscription"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "dare",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "davidson",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 200,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "davidson",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "davidson",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 403,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "davie",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "davie",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "davie",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "duplin",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 200,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "duplin",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "duplin",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 403,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "durham",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "durham",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "durham",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "edgecombe",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "edgecombe",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "edgecombe",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "forsyth",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 200,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "forsyth",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.forsythcountync.gov/tax/",
+  "status": 200,
+  "gates": [],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "forsyth",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "franklin",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://franklindeeds.com/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "franklin",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "franklin",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "gaston",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "gaston",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "gaston",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "gates",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "gates",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "gates",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "graham",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "graham",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "graham",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "granville",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "granville",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "granville",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "greene",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://greenecountync.gov/register-of-deeds/",
+  "status": 200,
+  "gates": [
+   "login"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "greene",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.greenecountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "login"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "greene",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "guilford",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://guilforddeeds.com/",
+  "status": 200,
+  "gates": [
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "guilford",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.guilfordcountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "guilford",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "halifax",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "halifax",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "halifax",
+  "state": "NC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=HalifaxCountyNC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "harnett",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "harnett",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "harnett",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "haywood",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://haywooddeeds.com/",
+  "status": 200,
+  "gates": [],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "haywood",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "haywood",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "henderson",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://hendersondeeds.com/",
+  "status": 200,
+  "gates": [
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "henderson",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.hendersoncountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "henderson",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "hertford",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "hertford",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "hertford",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "hoke",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "hoke",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "hoke",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "hyde",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 200,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "hyde",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "hyde",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "iredell",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "iredell",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "iredell",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "jackson",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "jackson",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "jackson",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "johnston",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "johnston",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "johnston",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "jones",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://jonescountync.gov/register-of-deeds/",
+  "status": 200,
+  "gates": [
+   "login"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "jones",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.jonescountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "login"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "jones",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "lee",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "lee",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.leecountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "login"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "lee",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "lenoir",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://lenoircountync.gov/register-of-deeds/",
+  "status": 200,
+  "gates": [
+   "login"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "lenoir",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.lenoircountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "login"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "lenoir",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "lincoln",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://lincolnrod.com/",
+  "status": 200,
+  "gates": [
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "lincoln",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "lincoln",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "macon",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://macondeeds.com/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "macon",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "macon",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "madison",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 429,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "madison",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.madisoncountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "madison",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "martin",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 403,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "martin",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "martin",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "mcdowell",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://mcdowelldeeds.com/",
+  "status": 200,
+  "gates": [],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "mcdowell",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "mcdowell",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "mecklenburg",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://mecklenburgcountync.gov/register-of-deeds/",
+  "status": 200,
+  "gates": [],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "mecklenburg",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.mecklenburgcountync.gov/tax/",
+  "status": 200,
+  "gates": [],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "mecklenburg",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "mitchell",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://mitchelldeeds.com/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "mitchell",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.mitchellcountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "subscription",
+   "login"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "mitchell",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "montgomery",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://montgomerycountync.gov/register-of-deeds/",
+  "status": 200,
+  "gates": [],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "montgomery",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "montgomery",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "moore",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://rod.moorecountync.gov/",
+  "status": 200,
+  "gates": [
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "moore",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "moore",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "nash",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://nashrod.com/",
+  "status": 200,
+  "gates": [
+   "login"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "nash",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "nash",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "new-hanover",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 403,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "new-hanover",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "new-hanover",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "northampton",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "northampton",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "northampton",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "onslow",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "onslow",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.onslowcountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "subscription"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "onslow",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "orange",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://rod.orangecountync.gov/",
+  "status": 200,
+  "gates": [
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "orange",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "orange",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "pamlico",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "pamlico",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "pamlico",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "pasquotank",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "pasquotank",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "pasquotank",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "pender",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "pender",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://tax.pendercountync.gov/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "pender",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "perquimans",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "perquimans",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "perquimans",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "person",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 525,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "person",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.personcountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "person",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "pitt",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "pitt",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "pitt",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "polk",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "polk",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "polk",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "randolph",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "randolph",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "randolph",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "richmond",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 200,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "richmond",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 200,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "richmond",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "robeson",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "robeson",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.robesoncountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "subscription",
+   "login"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "robeson",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "rockingham",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "rockingham",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "rockingham",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "rowan",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://rod.rowancountync.gov/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "subscription",
+   "login"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "rowan",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://tax.rowancountync.gov/",
+  "status": 200,
+  "gates": [],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "rowan",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "rutherford",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://rutherfordcountync.gov/register-of-deeds/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "login"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "rutherford",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.rutherfordcountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "login"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "rutherford",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "sampson",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "sampson",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "sampson",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "scotland",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "scotland",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "scotland",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "stanly",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "stanly",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "stanly",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "stokes",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "stokes",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "stokes",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "surry",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "surry",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "surry",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "swain",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://swaincountync.gov/register-of-deeds/",
+  "status": 200,
+  "gates": [
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "swain",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.swaincountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "login"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "swain",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "transylvania",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://transylvaniadeeds.com/",
+  "status": 200,
+  "gates": [
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "transylvania",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "transylvania",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "tyrrell",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "tyrrell",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "tyrrell",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "union",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 200,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "union",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "union",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "vance",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "vance",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "vance",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "wake",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "wake",
+  "state": "NC",
+  "system": "tax",
+  "url": "https://www.wakecountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "wake",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "warren",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "warren",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "warren",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "washington",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "washington",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "washington",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "watauga",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "watauga",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "watauga",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "wayne",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": 200,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "wayne",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "wayne",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "wilkes",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "wilkes",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "wilkes",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "wilson",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://wilsondeeds.com/",
+  "status": 200,
+  "gates": [],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "wilson",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "wilson",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "yadkin",
+  "state": "NC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "yadkin",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "yadkin",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "yancey",
+  "state": "NC",
+  "system": "recorder",
+  "url": "https://yanceydeeds.com/",
+  "status": 200,
+  "gates": [],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "yancey",
+  "state": "NC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "yancey",
+  "state": "NC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "abbeville",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "abbeville",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "abbeville",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "aiken",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "aiken",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "aiken",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "allendale",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "allendale",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "allendale",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=AllendaleCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "subscription",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "anderson",
+  "state": "SC",
+  "system": "recorder",
+  "url": "https://andersondeeds.com/",
+  "status": 200,
+  "gates": [],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "anderson",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "anderson",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "bamberg",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "bamberg",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "bamberg",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=BambergCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "subscription",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "barnwell",
+  "state": "SC",
+  "system": "recorder",
+  "url": "https://barnwelldeeds.com/",
+  "status": 200,
+  "gates": [
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "barnwell",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "barnwell",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=BarnwellCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "beaufort",
+  "state": "SC",
+  "system": "recorder",
+  "url": "https://beaufortcountysc.gov/register-of-deeds/",
+  "status": 200,
+  "gates": [
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "beaufort",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": 403,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "beaufort",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "berkeley",
+  "state": "SC",
+  "system": "recorder",
+  "url": "https://berkeleycountysc.gov/register-of-deeds/",
+  "status": 200,
+  "gates": [
+   "subscription",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "berkeley",
+  "state": "SC",
+  "system": "tax",
+  "url": "https://berkeleycountysc.gov/delinquent-tax/",
+  "status": 200,
+  "gates": [
+   "subscription",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "berkeley",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "calhoun",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "calhoun",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "calhoun",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "charleston",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "charleston",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "charleston",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "cherokee",
+  "state": "SC",
+  "system": "recorder",
+  "url": "https://cherokeecountysc.gov/register-of-deeds/",
+  "status": 200,
+  "gates": [
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "cherokee",
+  "state": "SC",
+  "system": "tax",
+  "url": "https://cherokeecountysc.gov/delinquent-tax/",
+  "status": 200,
+  "gates": [
+   "login"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "cherokee",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=CherokeeCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "chester",
+  "state": "SC",
+  "system": "recorder",
+  "url": "https://chestercountysc.gov/register-of-deeds/",
+  "status": 200,
+  "gates": [],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "chester",
+  "state": "SC",
+  "system": "tax",
+  "url": "https://chestercountysc.gov/delinquent-tax/",
+  "status": 200,
+  "gates": [],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "chester",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=ChesterCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "chesterfield",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "chesterfield",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "chesterfield",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "clarendon",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "clarendon",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "clarendon",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=ClarendonCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "colleton",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": 403,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "colleton",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "colleton",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=ColletonCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "darlington",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "darlington",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "darlington",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=DarlingtonCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "dillon",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "dillon",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "dillon",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "dorchester",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "dorchester",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "dorchester",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "edgefield",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "edgefield",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "edgefield",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=EdgefieldCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "fairfield",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "fairfield",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "fairfield",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=FairfieldCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "florence",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "florence",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "florence",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=FlorenceCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "georgetown",
+  "state": "SC",
+  "system": "recorder",
+  "url": "https://georgetowndeeds.com/",
+  "status": 200,
+  "gates": [
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "georgetown",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "georgetown",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=GeorgetownCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "greenville",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "greenville",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "greenville",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "greenwood",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "greenwood",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "greenwood",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "hampton",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "hampton",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "hampton",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=HamptonCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "subscription",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "horry",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "horry",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "horry",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "jasper",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "jasper",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "jasper",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=JasperCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "kershaw",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "kershaw",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "kershaw",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=KershawCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "lancaster",
+  "state": "SC",
+  "system": "recorder",
+  "url": "https://lancasterdeeds.com/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "lancaster",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "lancaster",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=LancasterCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "laurens",
+  "state": "SC",
+  "system": "recorder",
+  "url": "https://laurensdeeds.com/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "laurens",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "laurens",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=LaurensCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "lee",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "lee",
+  "state": "SC",
+  "system": "tax",
+  "url": "https://www.leecountync.gov/tax/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "login"
+  ],
+  "found": true,
+  "in_src": false
+ },
+ {
+  "county": "lee",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=LeeCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "lexington",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "lexington",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "lexington",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "marion",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": 200,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "marion",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "marion",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "marlboro",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "marlboro",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "marlboro",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=MarlboroCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "newberry",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "newberry",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "newberry",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=NewberryCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "newly-elected",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "newly-elected",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "newly-elected",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "oconee",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "oconee",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "oconee",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=OconeeCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "orangeburg",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "orangeburg",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "orangeburg",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=OrangeburgCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "pickens",
+  "state": "SC",
+  "system": "recorder",
+  "url": "https://pickenscountysc.gov/register-of-deeds/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "login"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "pickens",
+  "state": "SC",
+  "system": "tax",
+  "url": "https://pickenscountysc.gov/delinquent-tax/",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "login"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "pickens",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=PickensCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "richland",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "richland",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "richland",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "saluda",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "saluda",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "saluda",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "spartanburg",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "spartanburg",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "spartanburg",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=SpartanburgCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "sumter",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "sumter",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "sumter",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "union",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": 200,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "union",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "union",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=UnionCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ },
+ {
+  "county": "williamsburg",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "williamsburg",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": null,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "williamsburg",
+  "state": "SC",
+  "system": "assessor",
+  "url": null,
+  "status": 500,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "york",
+  "state": "SC",
+  "system": "recorder",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "york",
+  "state": "SC",
+  "system": "tax",
+  "url": null,
+  "status": 404,
+  "gates": [],
+  "found": false,
+  "in_src": false
+ },
+ {
+  "county": "york",
+  "state": "SC",
+  "system": "assessor",
+  "url": "https://qpublic.schneidercorp.com/Application.aspx?App=YorkCountySC&Layer=Parcels&PageType=Search",
+  "status": 200,
+  "gates": [
+   "CAPTCHA",
+   "reCAPTCHA",
+   "login",
+   "disclaimer"
+  ],
+  "found": true,
+  "in_src": true
+ }
+]
