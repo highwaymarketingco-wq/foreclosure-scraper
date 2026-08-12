@@ -80,6 +80,11 @@ TARGET_COUNTIES = [
     # signals. Inland coastal-county rows are dropped by the post-geocode
     # oceanfront re-pass — exactly the "on the beach / within 2-3 blocks" rule.
     "Brunswick", "Pender", "Onslow", "Carteret", "Dare",
+    # 2026-08-12 — remaining coastal NC counties brought fully into scope.
+    # Same oceanfront-lane admission (OCEANFRONT_COASTAL_COUNTIES) as the five
+    # above; querying their facets surfaces coastal foreclosure/lis-pendens +
+    # (via nc_ecourts_divorce reusing this list) divorce signals.
+    "Currituck", "Hyde", "New Hanover",
 ]
 
 
