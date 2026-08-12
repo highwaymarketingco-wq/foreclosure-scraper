@@ -84,13 +84,31 @@ def load_counties() -> None:
 #: URL shapes these counties genuinely use. Ordered cheapest-first; the first
 #: that answers 200 wins. Deliberately not exhaustive — see METHOD above.
 PATTERNS: dict[str, list[str]] = {
+    # Widened 2026-08-12 from what the first full run actually hit: of 42
+    # recorders located, 19 were <county>deeds.com, 16 a /register-of-deeds/
+    # path on the county site, 3 <county>rod.com. The search subdomain shape
+    # (search.<county>deeds.com) was found by hand on Haywood and Yancey and was
+    # missing entirely, as were the vendor-hosted portals several counties use
+    # instead of their own domain.
     "recorder": [
         "https://{c}rod.com/", "https://www.{c}rod.com/",
-        "https://deeds.{c}{st}.gov/", "https://{c}deeds.com/",
-        "https://www.{c}deeds.com/", "https://rod.{c}county{st}.gov/",
+        "https://{c}deeds.com/", "https://www.{c}deeds.com/",
+        "http://search.{c}deeds.com/", "https://search.{c}deeds.com/",
+        "https://deeds.{c}{st}.gov/", "https://deeds.{c}county{st}.gov/",
+        "https://rod.{c}county{st}.gov/",
         "https://registerofdeeds.{c}county{st}.gov/",
+        "https://registerofdeeds.{c}{st}.gov/",
         "https://{c}countync.gov/register-of-deeds/",
+        "https://www.{c}countync.gov/register-of-deeds/",
         "https://{c}countysc.gov/register-of-deeds/",
+        "https://www.{c}county{st}.gov/departments/register-of-deeds/",
+        "https://www.{c}county{st}.gov/departments/register_of_deeds/index.php",
+        "https://{c}countync.gov/county-services/register-of-deeds/",
+        # vendor-hosted portals seen in the wild in this footprint
+        "https://{c}rod.permitium.com/rod",
+        "https://cotthosting.com/{ST}{C}EXTERNAL/LandRecords/protected/v4/SrchName.aspx",
+        "https://{c}.landmarkweb.net/",
+        "https://{c}rod.org/", "https://www.{c}rod.org/",
     ],
     "tax": [
         "https://{c}countysc.gov/delinquent-tax/",
