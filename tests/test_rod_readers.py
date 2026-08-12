@@ -94,3 +94,82 @@ def test_rows_ignores_the_repeating_header():
 def test_unknown_county_returns_empty_not_raises():
     assert name_index.lookup_name("buncombe", "NC", "SMITH") == []
     assert lookup.lookup_name("buncombe", "NC", "SMITH") == []
+
+
+# --- pick-list cap ---------------------------------------------------------
+# Haywood returned EXACTLY 1000 parties for a 21-day window and 385 for a
+# 3-day one. 1000 is a cap, not a count, and a capped window silently drops
+# filings — for a foreclosure-start feed that means missing the leads the
+# source exists to find.
+
+def test_split_halves_a_window():
+    assert lookup._split("08/01/2026", "08/11/2026") == [
+        ("08/01/2026", "08/06/2026"), ("08/07/2026", "08/11/2026")]
+
+
+def test_split_refuses_to_go_below_one_day():
+    assert lookup._split("08/01/2026", "08/01/2026") == []
+
+
+def test_split_halves_are_contiguous_and_do_not_overlap():
+    from datetime import datetime
+    (a1, b1), (a2, b2) = lookup._split("01/01/2026", "01/31/2026")
+    d = lambda s: datetime.strptime(s, "%m/%d/%Y")  # noqa: E731
+    assert d(a1) == d("01/01/2026") and d(b2) == d("01/31/2026")
+    assert (d(a2) - d(b1)).days == 1, "a day would be skipped between halves"
+
+
+class _FakeResp:
+    def __init__(self, text):
+        self.status_code, self.text = 200, text
+
+
+class _FakeSession:
+    """Serves a capped pick list for any window wider than 3 days, and a small
+    one below that — the shape Haywood actually exhibits."""
+
+    def __init__(self, seen):
+        self.seen = seen
+
+    def get(self, url, params=None, headers=None, timeout=None):
+        p = dict(params or {})
+        if p.get("show_pick_list") == "1":
+            from datetime import datetime
+            a = datetime.strptime(p["start_date"], "%m/%d/%Y")
+            b = datetime.strptime(p["end_date"], "%m/%d/%Y")
+            self.seen.append((p["start_date"], p["end_date"]))
+            n = lookup.PICK_LIST_CAP if (b - a).days > 3 else 2
+            ids = "".join(f'<input name="entityID[]" value="{i}"/>'
+                          for i in range(n))
+            return _FakeResp('<input type="hidden" name="searchType" '
+                             f'value="name"/>{ids}')
+        # document fetch — one parseable row, padded past the 4000-byte floor
+        row = ("<tr><td>19860911 08/01/2026</td><td>RB 1 1</td><td>S/T</td>"
+               "<td></td><td>GRANTOR</td><td>DOE JANE</td><td>BANK</td></tr>")
+        return _FakeResp(row + "<!--" + "x" * 4200 + "-->")
+
+
+def test_capped_window_is_split_until_it_fits(monkeypatch):
+    """A capped window must be halved and both halves read, never returned."""
+    seen: list[tuple[str, str]] = []
+    monkeypatch.setattr(lookup, "_session", lambda host: _FakeSession(seen))
+    monkeypatch.setattr(lookup, "_throttle", lambda host: None)
+
+    rows = lookup.bulk_by_date("haywood", "NC", "08/01/2026", "08/29/2026")
+
+    assert seen[0] == ("08/01/2026", "08/29/2026"), "should try the full window"
+    assert len(seen) > 1, "capped window was returned instead of being split"
+    # every window finally read must be small enough to be under the cap
+    from datetime import datetime
+    d = lambda s: datetime.strptime(s, "%m/%d/%Y")  # noqa: E731
+    assert any((d(b) - d(a)).days <= 3 for a, b in seen)
+    assert rows, "splitting produced no rows at all"
+
+
+def test_uncapped_window_is_not_split(monkeypatch):
+    seen: list[tuple[str, str]] = []
+    monkeypatch.setattr(lookup, "_session", lambda host: _FakeSession(seen))
+    monkeypatch.setattr(lookup, "_throttle", lambda host: None)
+
+    lookup.bulk_by_date("haywood", "NC", "08/01/2026", "08/03/2026")
+    assert seen == [("08/01/2026", "08/03/2026")]

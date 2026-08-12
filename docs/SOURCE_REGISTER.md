@@ -484,3 +484,70 @@ build_county_registry.py did not find it — NOT that the county lacks one.
 Nearly every county has a register of deeds. Those 104 are the hand-check list,
 and they are why that script ships with an editable pattern table rather than as
 a finished answer.
+
+---
+
+## 2026-08-12 — county register of deeds becomes a source, not just a lookup
+
+### NEW SOURCE: `counties_nc.wnc_rod_foreclosure_starts`
+
+Reads **substitutions of trustee** from the register of deeds in **Clay,
+Haywood and Yancey NC** — three core Western NC counties that held **zero**
+board leads.
+
+In NC a power-of-sale foreclosure begins when the lender records an `S/T` to
+swap in a foreclosure trustee. That is recorded **before** the notice of hearing
+reaches the clerk and well before any sale is advertised, so every other NC
+foreclosure source this project reads is downstream of it. `TR/D` (trustee's
+deed, sale completed) is emitted as REO.
+
+| | |
+|---|---|
+| URL | `search.{clay,haywood,yancey}deeds.com/index.php?Accept=Accept` |
+| gate | click-through disclaimer, no CAPTCHA, no login |
+| terms | checked in full: no automated / robot / spider / scrape / bulk / commercial language |
+| cost | free |
+| cadence | recording days; run reads a 21-day window |
+| measured | Haywood 3-day window = 385 parties, 133 unique documents, 2 `S/T` |
+
+**The bulk path.** A name search with the name left blank plus
+`show_pick_list=1` returns every party active in a date range; the pick list's
+`entityID[]` values then return the documents. Both steps must be **GET** — the
+pick-list form declares `method="post"` and posting it returns a 2,065-byte
+shell. Full recipe in `docs/ROD_PORTAL_ACCESS.md`.
+
+**One document is many rows.** The index emits a row per party and batching
+repeats a document once per batch it appears in: a raw 3-day Haywood window is
+**8,528 rows and 133 documents**. Dedupe on (date, book, type) before counting.
+The lead is the natural-person GRANTOR — the other parties on the instrument are
+the servicer, the lender and two trustees.
+
+### NEW READER: `enrichment_rod_name_index.py` — 8 SC counties
+
+Abbeville, Barnwell, Berkeley, Colleton, Dorchester, Florence, Georgetown, York
+run a **different** platform (`NameSearch.php` → `NamePick.php` →
+`NameDisplay.php`). Unlike The Lookup its index carries a recorded **Amount**.
+
+Only **Barnwell and Georgetown** honour the date window; the other five return
+the head of the whole index (exactly 2000 parties for any window, including a
+single day) with a perfectly well-formed HTTP 200. `bulk_by_date()` refuses
+those five. Both working counties are outside the core footprint, so the
+capability is built and documented but not wired as a new lead source.
+
+### CORRECTION to the 2026-08-12 sweep above
+
+That sweep recorded **12 counties on one platform**. Nine of those run the SC
+platform and return 404 with a 16-byte body to the Lookup reader — read as "no
+records". Georgetown, the only one of the twelve with board coverage (409
+leads), was among them, so the enricher as shipped enriched nothing.
+
+All twelve answered HTTP 200 to the accept step. The fingerprint that adopted
+them never asked whether a search returns rows.
+
+### Wrong-state hosts — a standing trap
+
+`<county>deeds.com` never says which state it is and county names repeat:
+**hendersondeeds.com is Henderson County KENTUCKY**, **wilsondeeds.com is Wilson
+County TENNESSEE**. Both were one step from adoption as NC sources on pattern
+match. `build_county_registry.py` now carries a `state_confirmed` check and the
+registry marks any shared-name county `unverified` until evidence exists.

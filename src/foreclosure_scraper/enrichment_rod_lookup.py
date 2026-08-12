@@ -100,13 +100,17 @@ VERIFIED_AGAINST = {
     ("yancey", "NC"): "nationally unique county name",
 }
 
-#: Instruments that change a decision, mapped to what they mean.
+#: Instruments that change a decision, mapped to what they mean. Codes confirmed
+#: live in bulk windows: a Haywood pick-list run returns DEED, P/A, SAT, D/T,
+#: EASE, AFDVT, S/T, M/A — note the bare "SAT", which an earlier version of this
+#: map missed because it only listed "SAT D/T".
 DISTRESS_DOC_TYPES = {
     "S/T": "substitution_of_trustee",
     "SUB TRUSTEE": "substitution_of_trustee",
     "TR/D": "trustees_deed",
     "TRUSTEE DEED": "trustees_deed",
     "CAN D/T": "deed_of_trust_cancelled",
+    "SAT": "deed_of_trust_satisfied",
     "SAT D/T": "deed_of_trust_satisfied",
     "CERT/SAT": "deed_of_trust_satisfied",
     "D/T": "deed_of_trust",
@@ -201,6 +205,104 @@ def lookup_name(county: str, state: str, name: str) -> list[dict]:
         return _rows(r.text)
     except Exception as exc:  # noqa: BLE001 - a lookup must never kill a run
         log.warning("rod_lookup.failed", county=county, name=name[:40],
+                    error=f"{type(exc).__name__}: {str(exc)[:90]}")
+        return []
+
+
+#: The pick list truncates. Haywood returned EXACTLY 1000 parties for a 21-day
+#: window while a 3-day window returned 385, so 1000 is a cap and not a count.
+#: A capped window silently drops filings, which for a foreclosure-start feed
+#: means missing the very leads the source exists to find.
+PICK_LIST_CAP = 1000
+
+
+def _split(start: str, end: str) -> list[tuple[str, str]]:
+    """Halve a MM/DD/YYYY window. [] when it is already a single day."""
+    from datetime import datetime, timedelta
+    a = datetime.strptime(start, "%m/%d/%Y")
+    b = datetime.strptime(end, "%m/%d/%Y")
+    if (b - a).days < 1:
+        return []
+    mid = a + (b - a) / 2
+    return [(a.strftime("%m/%d/%Y"), mid.strftime("%m/%d/%Y")),
+            ((mid + timedelta(days=1)).strftime("%m/%d/%Y"), b.strftime("%m/%d/%Y"))]
+
+
+def bulk_by_date(county: str, state: str, start: str, end: str,
+                 batch: int = 30, _depth: int = 0) -> list[dict]:
+    """Every instrument recorded in a window, no name needed. MM/DD/YYYY.
+
+    This is the path that turns these counties into a SOURCE. It is a name
+    search with the name left blank, which the platform accepts, plus
+    `show_pick_list=1`:
+
+        1. GET content.php searchType=name last_name= start_date= end_date=
+           show_pick_list=1        -> pick list: entityID[] + hidden fields
+        2. GET content.php <hidden fields> entityID[]=... (repeated)
+           -> the documents
+
+    Step 2 must be GET. Posting the pick-list form the way the page's own
+    `method="post"` declares returns the 2,065-byte shell.
+
+    Batches are small on purpose: step 2 with 30 ids already returns 1.7 MB.
+    """
+    from urllib.parse import urlencode  # noqa: F401  (kept for clarity of intent)
+
+    key = (county.strip().lower(), state.strip().upper())
+    host = LOOKUP_HOSTS.get(key)
+    if not host:
+        return []
+    try:
+        s = _session(host)
+        _throttle(host)
+        r = s.get(f"{host}/content.php", params={
+            "embed": "1", "searchType": "name", "last_name": "", "first_name": "",
+            "party_type": "", "entity_type": "", "start_date": start,
+            "end_date": end, "exact_match": "", "search_type": "Standard",
+            "sort_type": "Date", "show_pick_list": "1"},
+            headers={"Referer": f"{host}/index.php?Accept=Accept"},
+            timeout=_TIMEOUT_S)
+        if r.status_code != 200:
+            return []
+        ids = re.findall(r'name="entityID\[\]" value="(\d+)"', r.text)
+        hidden = dict(re.findall(
+            r'<input type="hidden" name="(\w+)" value="([^"]*)"', r.text))
+        if not ids:
+            return []
+
+        # Capped: this window is truncated, so halve it and read both halves.
+        # Returning the capped rows would look like a complete window.
+        if len(ids) >= PICK_LIST_CAP and _depth < 6:
+            halves = _split(start, end)
+            if halves:
+                log.info("rod_lookup.window_capped", county=county, start=start,
+                         end=end, parties=len(ids), splitting_into=halves)
+                out: list[dict] = []
+                for a2, b2 in halves:
+                    out += bulk_by_date(county, state, a2, b2, batch, _depth + 1)
+                return out
+            log.warning("rod_lookup.single_day_capped", county=county,
+                        day=start, parties=len(ids),
+                        reason="one day exceeds the pick-list cap; filings dropped")
+
+        rows: list[dict] = []
+        for i in range(0, len(ids), batch):
+            q = [*hidden.items(), ("embed", "1")]
+            q += [("entityID[]", e) for e in ids[i:i + batch]]
+            _throttle(host)
+            rr = s.get(f"{host}/content.php", params=q,
+                       headers={"Referer": f"{host}/content.php"},
+                       timeout=_TIMEOUT_S)
+            if rr.status_code == 200 and len(rr.text) > 4000:
+                rows += _rows(rr.text)
+
+        log.info("rod_lookup.bulk", county=county, state=state, start=start,
+                 end=end, parties=len(ids), rows=len(rows),
+                 substitution_of_trustee=sum(
+                     1 for x in rows if x["kind"] == "substitution_of_trustee"))
+        return rows
+    except Exception as exc:  # noqa: BLE001
+        log.warning("rod_lookup.bulk_failed", county=county,
                     error=f"{type(exc).__name__}: {str(exc)[:90]}")
         return []
 
