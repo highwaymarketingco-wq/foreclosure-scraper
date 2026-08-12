@@ -79,8 +79,22 @@ nothing. All twelve answered HTTP 200 to the accept step.
 - **hendersondeeds.com is Henderson County KENTUCKY**
 - **wilsondeeds.com is Wilson County TENNESSEE**
 
-Both were one step from adoption as NC sources on pattern match alone.
-`scripts/build_county_registry.py` now carries a `state_confirmed` check.
+Both were one step from adoption as NC sources on pattern match alone. Both are
+now absent from `COUNTY_SYSTEMS_REGISTRY.md` entirely.
+
+The guard took three passes to actually work, which is worth knowing before
+touching it:
+
+1. comparing NC against SC only missed both of them (one says Kentucky, the
+   other Tennessee). It now checks all 50 state names, plus vendor asset paths
+   — `hendersondeeds.com` names no state in prose but loads CSS from
+   `/assets/css/ky/henderson/`.
+2. rejecting the domain was not enough: the sweep then found
+   `search.wilsondeeds.com`, which names no state, and re-adopted it. Hence
+   `KNOWN_WRONG_STATE`, matched on registrable domain so subdomains are covered.
+3. **13 rows are still marked `unverified`.** That is the honest state, not a
+   failure — a shared county name on a page that says nothing. Hand-check
+   before using any of them; silence must never read as a pass.
 
 ### What is open
 
@@ -128,16 +142,16 @@ Full derivation: [`ROD_PORTAL_ACCESS.md`](ROD_PORTAL_ACCESS.md).
    Enrichers have no `dormant` flag the way scrapers do; that is the gap.
 3. **Wire `wnc_rod_foreclosure_starts` into a scheduled run** and confirm its
    leads survive a board merge.
-3. **York SC** date-window behaviour is *undetermined*, not walled — it timed
+4. **York SC** date-window behaviour is *undetermined*, not walled — it timed
    out repeatedly on a 470 KB page. Retry with a longer timeout.
-4. **15 bespoke recorder platforms** still unclassified: alamance, beaufort
+5. **15 bespoke recorder platforms** still unclassified: alamance, beaufort
    NC+SC, cumberland, gates, guilford, henderson, lincoln, montgomery, orange,
    perquimans, warren, wilson, chester SC. Beaufort SC = Tyler, Wilson =
    TitleSearcher (paid).
-5. **104 counties** have no recorder located by pattern. A miss is recorded as
+6. **104 counties** have no recorder located by pattern. A miss is recorded as
    "not found", never "does not exist".
-6. **`americanlandrecords.com`** (Anderson SC recorder) unmapped.
-7. SC court URL patterns absent from the registry (NC's 100 are exact).
+7. **`americanlandrecords.com`** (Anderson SC recorder) unmapped.
+8. SC court URL patterns absent from the registry (NC's 100 are exact).
 
 ---
 
