@@ -65,7 +65,7 @@ import structlog
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
-from ...http_client import client
+from ...http_client import client, get_text_impersonate, mark_host_blocked
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -76,9 +76,15 @@ COUNTY_URLS: dict[str, list[str]] = {
     "Anderson": [
         "https://www.andersoncountysc.org/departments-a-z/treasurer/",
     ],
+    # 2026-08-12: both previous Spartanburg URLs 404. The county moved to a
+    # CivicPlus site whose pages are numeric (/<id>/<slug>); the old bare paths
+    # are gone. These three came out of the live sitemap.xml (820 URLs) and are
+    # verified 200. /640 is the tax-sale page, /178 the collector, /408 the
+    # procedures page that links the notice when one is posted.
     "Spartanburg": [
-        "https://www.spartanburgcounty.gov/treasurer",
-        "https://www.spartanburgcounty.gov/delinquent-tax",
+        "https://www.spartanburgcounty.gov/640/2025-Tax-Sale-Info",
+        "https://www.spartanburgcounty.gov/178/Tax-Collector",
+        "https://www.spartanburgcounty.gov/408/Tax-Procedures",
     ],
     "Cherokee": [
         "https://cherokeecountysc.gov/delinquent-tax/",
@@ -91,9 +97,14 @@ COUNTY_URLS: dict[str, list[str]] = {
         "https://oconeesc.com/delinquent-tax",
         "https://oconeesc.com/departments/delinquent-tax",
     ],
+    # 2026-08-12: Union is broken ON THE COUNTY'S SIDE, not ours, and no client
+    # change reaches it. unioncountysc.gov does not resolve at all (NXDOMAIN).
+    # countyofunion.com resolves but: https:// resets the connection mid-TLS,
+    # the bare host fails certificate verification, and http:// returns 500.
+    # Kept here so the prober keeps watching for the county to fix its server;
+    # expect 0 rows until then.
     "Union": [
         "https://www.countyofunion.com/treasurer",
-        "https://www.unioncountysc.gov/treasurer",
     ],
     # 2026-08-04: the two previous Laurens entries were dead — bare "/" is the
     # county homepage (200 but carries nothing) and "/treasurer" 404s. The
@@ -300,21 +311,49 @@ async def _scrape_pdf(c, url: str, county: str) -> list[Listing]:
 
 async def _scrape_html(c, url: str, county: str) -> list[Listing]:
     """Pull listings from HTML tables when present. Also follows linked PDFs."""
+    # ESCALATE ON A BLOCK INSTEAD OF GIVING UP.
+    #
+    # This called raw c.get() and returned [] on anything but 200, which meant
+    # Cherokee was recorded as permanently dead: docs/blocked_sources_forensic.md
+    # lists it "CANT — Cherokee returns 403 (Cloudflare)". It is not Cloudflare
+    # and it is not dead. Measured 2026-08-11:
+    #     plain httpx           403,   4 KB
+    #     curl_cffi chrome      200, 263 KB
+    # A TLS/JA3 fingerprint mismatch, not a challenge. http_client already walks
+    # exactly these tiers (get_text(impersonate=True) -> curl-cffi chrome) and
+    # remembers blocking hosts process-wide; this scraper simply never used it.
+    #
+    # The happy path still uses c.get so the real response URL is available for
+    # resolving relative links after a redirect. Only the block path escalates,
+    # where the requested URL is the best base we have.
+    html: str | None = None
+    join_base = url
     try:
         r = await c.get(url, follow_redirects=True, timeout=20.0)
-        if r.status_code != 200:
-            return []
+        if r.status_code == 200:
+            html = r.text
+            join_base = str(r.url) if getattr(r, "url", None) else url
+        elif r.status_code in (401, 403, 406, 409, 429):
+            html = await get_text_impersonate(url, timeout=30.0)
+            mark_host_blocked(url)
     except Exception:
+        try:
+            html = await get_text_impersonate(url, timeout=30.0)
+            mark_host_blocked(url)
+        except Exception:
+            return []
+    if not html:
         return []
 
     out: list[Listing] = []
-    tree = HTMLParser(r.text)
+    tree = HTMLParser(html)
 
     # Resolve relative links against the page URL, honoring any <base href>
     # in the document (Revize/CMS pages set one; the manual rsplit approach
     # 404s on Pickens). urljoin handles "/abs", "rel", "../up" and absolute
-    # hrefs correctly.
-    join_base = str(r.url) if getattr(r, "url", None) else url
+    # hrefs correctly. join_base was set above — it is the post-redirect URL on
+    # the plain path and the requested URL on the impersonate path, where `r`
+    # does not exist at all.
     try:
         base_nodes = tree.css("base")
         if base_nodes:
