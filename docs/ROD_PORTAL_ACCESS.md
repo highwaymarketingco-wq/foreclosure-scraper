@@ -137,8 +137,63 @@ Of these twelve, only Colleton, Georgetown and York sit outside the core
 footprint by the core-county rule — but a reader written once serves all of
 them, so the marginal cost of the coastal ones is zero.
 
-## What must be solved before any of this yields a lead
+## SOLVED — the working request (2026-08-12)
 
-The DataTables AJAX endpoint, above. Every county here shares it, which cuts
-both ways: solving it once opens twelve counties, and getting it wrong reports
-twelve empty counties that look healthy.
+There is no DataTables AJAX endpoint. That guess was wrong. `submitSearch()` in
+`js/functions.js` does nothing but `$('#'+st+'_form').submit()` — an ordinary
+form submit. Three real facts explain the empty shell:
+
+**1. It must be GET, not POST.** POSTing to `content.php?<nonce>` returns a
+2,065-byte tab shell for every search type, including a plain name search. The
+same parameters as a GET return records.
+
+**2. `embed=1` is required**, and it is not in any form on the page. It was
+found by reading the row links inside a working browse result, which are emitted
+as:
+
+    content.php?embed=1&display_name=<NAME>&party_type=&entity_type=
+               &searchType=name&wildCard=Exact
+
+**3. `received` needs `received_from`.** Omitting it returns 72 bytes:
+`<script>alert('Must key in received from text');history.back();</script>` —
+a client-side alert, which is why it reads as an empty success to anything that
+only checks the status code.
+
+### The two calls that work
+
+Accept once per session, then:
+
+    GET content.php?searchType=browse&last_name=SMITH&first_name=
+        &browse_others=&excludeVoids=
+      -> 21 KB name index, every party with its document count:
+         "SMITH ALAN DALE (58)", "SMITH ALBERT H III (50)"
+
+    GET content.php?embed=1&display_name=SMITH+ALAN+DALE&party_type=
+        &entity_type=&searchType=name&wildCard=Exact
+      -> 163 KB, 72 rows
+
+Send `Referer: <base>/index.php?Accept=Accept`. Reuse the `PHPSESSID`.
+
+### What a row contains
+
+    Date | Book Info | Doc Type | Property Desc | Search Party Type |
+    Searched Party | Reverse Party | XRef | Image?
+
+Verified live, e.g.:
+
+    19860911  DT T296 343  CAN D/T  PD:BK T286 PG 627  GRANTOR
+              SMITH ALAN DALE -> ENKA CREDIT UNION      TIFF PDF
+
+Doc types seen include DEED and D/T (deed of trust). Both grantor and grantee
+are present, so the grantor/grantee direction is queryable via `party_type`, and
+every row carries TIFF/PDF image links.
+
+### Why this matters beyond one county
+
+`browse` gives the complete party index with per-name document counts, which
+means the index can be walked without knowing a name in advance — the bulk path.
+`received_from` remains unsolved and is the cleaner "what was filed this week"
+route; the alert says it wants text, so it is likely a starting instrument or
+book reference rather than a date.
+
+All twelve Lookup counties share this, so one reader serves all of them.
