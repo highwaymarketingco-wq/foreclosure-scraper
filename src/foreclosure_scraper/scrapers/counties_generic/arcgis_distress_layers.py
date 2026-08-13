@@ -237,6 +237,26 @@ LAYERS: tuple[Layer, ...] = (
         detail="damage_cat_cal", process="storm_damage",
         source_page="https://www.burkenc.org/",
     ),
+    Layer(
+        # New Hanover (Wilmington) DEMOLITION permits — teardown / condemned-structure
+        # signal for the coastal county. `WORK_CLASS LIKE '%Demolition%'` isolates the
+        # ~1,708 demolition rows out of the 100k+ permit file (routine permits are noise
+        # and deliberately NOT harvested). No owner field on the permit layer — PID
+        # resolves the owner downstream. Contractor/contact columns are NOT requested.
+        slug="new_hanover_demolition_permits",
+        state="NC", county="New Hanover",
+        url=("https://gis.nhcgov.com/server/rest/services/Thematic/"
+             "BuildingPermits/FeatureServer/0"),
+        listing_type=ListingType.DISTRESSED,
+        fields=("PERMIT_NUMBER", "WORK_CLASS", "PERMIT_STATUS", "APPLICATION_DATE",
+                "NUMBER", "DIR", "STREET", "TYPE", "CITY", "ZIPCODE", "PID"),
+        where="WORK_CLASS LIKE '%Demolition%'",
+        parcel="PID",
+        situs_parts=("NUMBER", "DIR", "STREET", "TYPE"),
+        city="CITY", zip_="ZIPCODE",
+        detail="PERMIT_STATUS", process="demolition_permit",
+        source_page="https://gis.nhcgov.com/",
+    ),
     # A curated redevelopment-eligibility list carrying a "Problem" column —
     # the city has already judged these parcels problematic.
     Layer(

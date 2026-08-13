@@ -283,6 +283,7 @@ COASTAL_COUNTY_BYPASS_SOURCES = {
     "counties_nc.nc_govdeals_real_property",   # Pender county-owned real property
     "counties_nc.new_hanover_foreclosures",    # New Hanover tax-foreclosures (Kania-administered)
     "counties_nc.nc_county_csv_delinquent_tax",  # New Hanover delinquent-tax CSV (full county)
+    "counties_generic.arcgis_distress.new_hanover_demolition_permits",  # NH demolition permits (full county)
     "counties_sc.charleston_delinquent_tax",   # Charleston FLC sealed-bid + delinquent tax
     # counties_sc.horry_flc removed 2026-08-12 — Myrtle Beach/Horry excluded per user direction.
     "counties_sc.georgetown_civicengage",      # Georgetown FLC + tax-sale + MIE
@@ -355,6 +356,7 @@ DATELESS_OK_SOURCES = {
     "counties_sc.spartanburg_vacant",            # Spartanburg City vacant registry (absentee+vacant, dateless)
     "counties_sc.spartanburg_condemned",         # Spartanburg condemned/dilapidated CAMA-condition signal (dateless)
     "counties_nc.asheville_str_permits",         # Asheville lapsed STR/homestay permits (motivated landlord, dateless)
+    "counties_generic.arcgis_distress.new_hanover_demolition_permits",  # NH demolition permits (dateless)
     "counties.column_legal_notices",             # Column API SC estate/probate notices (no sale date)
     "law_firms.zacchaeus",                       # ZLS tax foreclosures (status-driven; upset/pending leads outlive sale date)
     "national.first_citizens_reo",               # First Citizens bank-owned REO listings
