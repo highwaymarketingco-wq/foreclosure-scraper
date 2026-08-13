@@ -26,6 +26,13 @@ Pickens, Colleton, Beaufort, **Georgetown** (split situs via `_GEORGETOWN_CONCAT
 | **Oconee SC** | `arcserver2.oconeesc.com/.../PARCELDATA_owner` has owner (`current_owner`) but only a MAILING address — NO situs. Owner-only, can't fill property address. |
 | **Anderson SC** | `NewPropertyViewer/MapServer/5` has situs (`PHYS_ADDR`)+value+deed but owner (`TAXOWNSTR`) is masked/always-null — cannot resolve by name. |
 
+## Build-queue items that turned out walled / not worth building (probed 2026-08-12)
+
+| Source | How it fails / why skipped | Disposition |
+|---|---|---|
+| **Beaufort Treasurer tax-sale list** (`beaufortcountytreasurer.com`) | Squarespace, JS-rendered, NO direct file link; the list is SEASONAL (annual fall sale — latest visible ref is 2023, absent in Aug); Beaufort already has FLC + MIE + the new parcel resolver. Per "when data is absent, stop." | SKIP — low incremental value; revisit in fall if a machine-readable list appears |
+| **NC SoS Federal Tax Lien search** (`sosnc.gov/online_services/search/by_title/_Federal_Tax_Lien`) | **Cloudflare JS challenge** ("Just a moment…", `__cf_chl_tk`) to a plain client — a bot wall, not a simple 403 (the discovery agent mis-called it Incapsula). Narrow signal (only entity/LLC-owned federal liens). | Needs a deliberate stealth-browser build + compliance review → **spawned as a task**, not rushed |
+
 ## Known walls carried from gap_ledger / build queue (not re-tested here)
 - SC PublicIndex family court (FCCMS) divorce — Rule 610 ToS.
 - NC eCourts Smart Search / Search Hearings — AWS-WAF.
