@@ -44,7 +44,11 @@ saved-HTML lane (`scripts/ingest_saved.sh` + `scripts/parse_nc_ecourts_export.py
   Search → Search By = **Case** → Case Number = **`26SP*`** (wildcard year) → filter the
   county → Submit → save the results page → offline parser ingests it. This is the
   method for the SP-foreclosure signal we otherwise lack (Smart Search is WAF-walled to
-  scrapers). Verify the parser handles the results-grid format against a real saved page.
+  scrapers). **BUILT + verified live 2026-08-13** (`0fb6e14`): `parse_nc_ecourts_export.py`
+  Strategy 0 parses the Smart Search Kendo grid (`.party-case-*` classes) → case# + clean
+  owner name + county + type; keep `case_type == "Foreclosure (Special Proceeding)"`.
+  Operator tips: bump the results pager to 200/page and filter the Location column (or the
+  case-number county suffix, e.g. -660=Onslow) — a bare `26SP*` caps/samples at ~23.
 - **NC SP — the 9 legacy VCAP counties** (Buncombe, Burke, Cleveland, Henderson, Hyde,
   Mitchell, Polk, Rutherford, Transylvania): NOT on the portal — courthouse public
   terminal only for the full docket. BUT the trustee's **notice of sale** is legally
