@@ -93,7 +93,7 @@ _ESTATE_SUFFIX_RE = re.compile(
     r"[,\s]+(deceased|decedent|an?\s+incompetent|a\s+minor|estate)\.?\s*$", re.I)
 # NC eCourts location labels are "<County> County" / "<County> District Court"
 _COURT_SUFFIX_RE = re.compile(
-    r"\s*(county|district|superior|civil|criminal|clerk of court|"
+    r"\s*(county|district|superior|civil|criminal|clerk of|"
     r"court(?:house)?|magistrate|division).*$", re.I)
 
 
@@ -335,6 +335,49 @@ def _finalize(records: list[dict], default_county: str | None,
     return deduped
 
 
+# --------------------------------------------------------------------------- #
+# Strategy 0 — Tyler "Smart Search" Kendo results grid. Its cells carry stable
+# per-field classes (.party-case-caseid / -style / -type / -location /
+# -partyname / -filedate), so we read those directly. This MUST run before the
+# generic strategies: the grid's tr.k-master-row rows otherwise trip
+# _parse_detail_cards into label/value garbage (case# <- style, defendant <-
+# file date, county null — verified against a live 26SP* page). The `26SP*`
+# foreclosure operator lane for the 10 NC-Courts-Portal counties depends on this.
+# All SP rows are returned with an accurate case_type; the caller filters to
+# case_type == "Foreclosure (Special Proceeding)" for the foreclosure lane.
+# --------------------------------------------------------------------------- #
+
+def _parse_smartsearch_grid(soup: BeautifulSoup) -> list[dict]:
+    records: list[dict] = []
+    for tr in soup.select("tr.k-master-row"):
+        cid = tr.select_one(".party-case-caseid a") or tr.select_one(".party-case-caseid")
+        if cid is None:
+            continue  # not a Smart Search grid row
+        case_number = (cid.get("title") or _txt(cid)).strip()
+        if not case_number:
+            continue
+
+        def _cell(cls: str) -> str | None:
+            el = tr.select_one(f".{cls}")
+            return _txt(el) or None if el is not None else None
+
+        fd = (tr.select_one(".party-case-filedate span[title]")
+              or tr.select_one(".party-case-filedate"))
+        filing_date = None
+        if fd is not None:
+            filing_date = (fd.get("title") or _txt(fd)) or None
+
+        records.append({
+            "case_number": re.sub(r"\s+", " ", case_number).strip(),
+            "style": _cell("party-case-style"),
+            "case_type": _cell("party-case-type"),
+            "filing_date": filing_date,
+            "county": _strip_court_suffix(_cell("party-case-location") or "") or None,
+            "defendant": _cell("party-case-partyname"),
+        })
+    return records
+
+
 def parse_nc_ecourts_html(html: str, default_county: str | None = None,
                           default_case_type: str | None = None) -> list[dict]:
     """Parse a saved Odyssey results page into per-case records.
@@ -347,10 +390,11 @@ def parse_nc_ecourts_html(html: str, default_county: str | None = None,
         return []
     soup = BeautifulSoup(html, "html.parser")
 
-    # Try the three strategies in order of specificity; use the first that
-    # yields records (cards > tables > text), so we don't double-count the same
-    # cases parsed two different ways.
-    for strategy in (_parse_detail_cards, _parse_result_tables, _parse_text_fallback):
+    # Try strategies in order of specificity; use the first that yields records
+    # (smart-search grid > cards > tables > text), so we don't double-count the
+    # same cases parsed two different ways.
+    for strategy in (_parse_smartsearch_grid, _parse_detail_cards,
+                     _parse_result_tables, _parse_text_fallback):
         raw = strategy(soup)
         final = _finalize(raw, default_county, default_case_type)
         if final:
