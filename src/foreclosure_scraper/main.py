@@ -282,6 +282,7 @@ COASTAL_COUNTY_BYPASS_SOURCES = {
     # inventory (not only literal beachfront), same rationale as above.
     "counties_nc.nc_govdeals_real_property",   # Pender county-owned real property
     "counties_nc.new_hanover_foreclosures",    # New Hanover tax-foreclosures (Kania-administered)
+    "counties_nc.nc_county_csv_delinquent_tax",  # New Hanover delinquent-tax CSV (full county)
     "counties_sc.charleston_delinquent_tax",   # Charleston FLC sealed-bid + delinquent tax
     # counties_sc.horry_flc removed 2026-08-12 — Myrtle Beach/Horry excluded per user direction.
     "counties_sc.georgetown_civicengage",      # Georgetown FLC + tax-sale + MIE
@@ -337,6 +338,7 @@ DATELESS_OK_SOURCES = {
     "national.courtlistener_bankruptcy",        # Ch 7/11/13 federal bankruptcy filings
     "counties_sc.sc_tax_delinquent",            # delinquent property tax / pre-tax-sale
     "counties_sc.sc_flc",                        # SC Forfeited Land Commission inventory (no sale date)
+    "counties_nc.nc_county_csv_delinquent_tax",  # NC delinquent-tax CSV rolls (New Hanover); no sale date
     # 2026-06 expansion — new FLC/tax/probate/estate/lien/surplus sources whose
     # rows are long-runway (pre-sale) and routinely carry no sale_date.
     "counties_sc.oconee_forfeited_land",         # Oconee FLC available + assignment lists
