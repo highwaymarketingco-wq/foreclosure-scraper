@@ -31,7 +31,7 @@ Pickens, Colleton, Beaufort, **Georgetown** (split situs via `_GEORGETOWN_CONCAT
 | Source | How it fails / why skipped | Disposition |
 |---|---|---|
 | **Beaufort Treasurer tax-sale list** (`beaufortcountytreasurer.com`) | Squarespace, JS-rendered, NO direct file link; the list is SEASONAL (annual fall sale — latest visible ref is 2023, absent in Aug); Beaufort already has FLC + MIE + the new parcel resolver. Per "when data is absent, stop." | SKIP — low incremental value; revisit in fall if a machine-readable list appears |
-| **NC SoS Federal Tax Lien search** (`sosnc.gov/online_services/search/by_title/_Federal_Tax_Lien`) | **Cloudflare JS challenge** ("Just a moment…", `__cf_chl_tk`) to a plain client — a bot wall, not a simple 403 (the discovery agent mis-called it Incapsula). Narrow signal (only entity/LLC-owned federal liens). | Needs a deliberate stealth-browser build + compliance review → **spawned as a task**, not rushed |
+| **NC SoS Federal Tax Lien search** (`sosnc.gov/online_services/search/by_title/_Federal_Tax_Lien`) | **HARD Cloudflare wall (2026-08-13).** Both accepted stealth paths FAIL: curl_cffi `impersonate=chrome` → 403; StealthyFetcher/camoufox (headless, network_idle, 180s) → 307→403 with the "Just a moment"/`__cf_chl` challenge still present, no real form. This scrapling has no `solve_cloudflare`. Clearing it would need an ACTIVE challenge/CAPTCHA solver, which breaches the constitution's "no automated solvers" rule. Narrow signal anyway (entity/LLC federal liens only). | HARD WALL — not compliantly buildable. Build task withdrawn. |
 
 ## Known walls carried from gap_ledger / build queue (not re-tested here)
 - SC PublicIndex family court (FCCMS) divorce — Rule 610 ToS.
