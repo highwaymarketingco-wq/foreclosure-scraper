@@ -33,6 +33,27 @@ Pickens, Colleton, Beaufort, **Georgetown** (split situs via `_GEORGETOWN_CONCAT
 | **Beaufort Treasurer tax-sale list** (`beaufortcountytreasurer.com`) | Squarespace, JS-rendered, NO direct file link; the list is SEASONAL (annual fall sale — latest visible ref is 2023, absent in Aug); Beaufort already has FLC + MIE + the new parcel resolver. Per "when data is absent, stop." | SKIP — low incremental value; revisit in fall if a machine-readable list appears |
 | **NC SoS Federal Tax Lien search** (`sosnc.gov/online_services/search/by_title/_Federal_Tax_Lien`) | **DOUBLE wall (2026-08-13).** (1) **ToS prohibits automation** — the search page states verbatim: "Automated or scripted searches … are not permitted. For bulk access to public data, please use our Data Subscription Services" (paid). Confirmed on the live page after a human cleared the interstitial. (2) **Cloudflare technical wall** — curl_cffi `impersonate=chrome` → 403; StealthyFetcher/camoufox (headless, network_idle, 180s) → 307→403, challenge intact; this scrapling has no `solve_cloudflare`. | HARD WALL — do not automate. ToS forbids scripted access regardless of whether Cloudflare is cleared (even human-cleared operator lane). Human interactive search is permitted; bulk = paid only. Narrow signal (entity/LLC federal liens). |
 
+## Operator-lane workarounds (human-cleared wall → offline parser; compliant)
+
+These stay WALLED to automation but are RETRIEVABLE by a human via the existing
+saved-HTML lane (`scripts/ingest_saved.sh` + `scripts/parse_nc_ecourts_export.py`).
+
+- **NC SP (power-of-sale foreclosure) — the 10 NC-Courts-Portal counties** (Brunswick,
+  Carteret, Currituck, Dare, New Hanover, Onslow, Pender, Gaston, Lincoln, McDowell):
+  operator does ONE mass search instead of name-by-name — NC Courts Portal → Advanced
+  Search → Search By = **Case** → Case Number = **`26SP*`** (wildcard year) → filter the
+  county → Submit → save the results page → offline parser ingests it. This is the
+  method for the SP-foreclosure signal we otherwise lack (Smart Search is WAF-walled to
+  scrapers). Verify the parser handles the results-grid format against a real saved page.
+- **NC SP — the 9 legacy VCAP counties** (Buncombe, Burke, Cleveland, Henderson, Hyde,
+  Mitchell, Polk, Rutherford, Transylvania): NOT on the portal — courthouse public
+  terminal only for the full docket. BUT the trustee's **notice of sale** is legally
+  published, so `ncnotices.com` (already wired) covers the sale-stage subset automatically.
+- **SC senior/disabled exemption** (28 counties, FOIA gap): free MANUAL per-parcel lane —
+  county assessor property search / `qpublic.net/sc/scassessors` / SCDOR exempt-property
+  portal show the homestead-exemption line on a parcel card. Not bulk-automatable (qPublic
+  CAPTCHA); a human can verify a specific parcel or FOIA the whole roll.
+
 ## Known walls carried from gap_ledger / build queue (not re-tested here)
 - SC PublicIndex family court (FCCMS) divorce — Rule 610 ToS.
 - NC eCourts Smart Search / Search Hearings — AWS-WAF.
