@@ -408,6 +408,18 @@ def parse_nc_ecourts_html(html: str, default_county: str | None = None,
 # can consume the output directly.
 # --------------------------------------------------------------------------- #
 
+def _listing_type_for(case_type: str | None) -> str:
+    """Map the eCourts case-type text to a board ListingType value so estates and
+    divorce score as themselves, not as generic lis-pendens. Foreclosure/lien and
+    anything unrecognized fall through to lis_pendens (the name-driven default)."""
+    t = (case_type or "").lower()
+    if "estate" in t or "decedent" in t:
+        return "probate_notice"
+    if "divorce" in t:
+        return "divorce_notice"
+    return "lis_pendens"
+
+
 def record_to_listing_dict(rec: dict, slug: str = "counties_nc.nc_ecourts_manual") -> dict | None:
     """Turn one parsed case record into a Listing-shaped dict.
 
@@ -435,7 +447,7 @@ def record_to_listing_dict(rec: dict, slug: str = "counties_nc.nc_ecourts_manual
             f"https://portal-nc.tylertech.cloud/Portal/#/search?caseNumber={quote(case_number)}"
             if case_number else "https://portal-nc.tylertech.cloud/Portal/"
         ),
-        "listing_type": "lis_pendens",  # generic court-distress; resolver is name-driven
+        "listing_type": _listing_type_for(case_type),  # estate/divorce/foreclosure-aware
         "property_kind": "unknown",
         "state": "NC",
         "county": county,
