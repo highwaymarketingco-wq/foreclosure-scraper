@@ -104,8 +104,14 @@ SC_GIS: dict[str, dict[str, Any]] = {
         "url": "https://gis1.georgetowncountysc.org/portal/rest/services/GCGIS_Energov/MapServer/2/query",
         "addr_field": _GEORGETOWN_CONCAT,
     },
-    # DEFERRED (buildable, needs extra work — see docs/road_to_100_build_queue.md):
-    #   Charleston — parcel layer is mailing-only; situs needs a PID join to chascogis.
+    "Charleston": {
+        # Parcel layer (61): owner OWNER1 + PID, NO situs. address_owner_v2 joins
+        # the sibling Address-Points layer (1) by PID for the situs (SC_SITUS_JOIN
+        # below). addr_field=None here: enrich's address path no-ops for Charleston
+        # (61 has no situs), while the name->address resolver does the PID join.
+        "url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/GIS_VIEWER/New_Parcel_Search/MapServer/61/query",
+        "addr_field": None,
+    },
     # WALLED (no free county-native owner+situs) — see docs/walls_register.md:
     #   Cherokee, Union (WAF-403), Oconee (owner only, no situs), Anderson (owner masked).
 }

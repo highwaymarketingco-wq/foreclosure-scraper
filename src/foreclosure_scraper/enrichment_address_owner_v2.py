@@ -140,6 +140,56 @@ async def _detect_site_field(c: httpx.AsyncClient, base_url: str) -> Optional[st
     return await _detect_addr_field(c, base_url)
 
 
+# Counties whose owner layer carries NO situs column: after matching the owner,
+# join a sibling Address-Points layer by PID to recover the property address.
+# Charleston SC: New_Parcel_Search parcels (61) -> Address Points (1) on PID.
+SC_SITUS_JOIN: dict[str, dict[str, str]] = {
+    "Charleston": {
+        "pid_field": "PID",
+        "addr_url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/GIS_VIEWER/New_Parcel_Search/MapServer/1/query",
+        "addr_pid": "PID",
+        "situs_field": "WHOLE_ADDRESS",
+    },
+}
+
+
+async def _join_situs_by_pid(
+    c: httpx.AsyncClient, county: str, best: dict
+) -> None:
+    """For a SC_SITUS_JOIN county, fetch the property address from the sibling
+    Address-Points layer by PID and inject it into ``best`` under SITUS_ADDR so
+    _populate_from_attrs writes it exactly like any other resolved situs."""
+    cfg = SC_SITUS_JOIN.get(county)
+    if not cfg:
+        return
+    pid = str(best.get(cfg["pid_field"]) or "").strip()
+    if not pid:
+        return
+    esc = pid.replace("'", "''")
+    try:
+        r = await c.get(
+            cfg["addr_url"],
+            params={
+                "where": f"{cfg['addr_pid']}='{esc}'",
+                "outFields": cfg["situs_field"],
+                "returnGeometry": "false",
+                "resultRecordCount": "1",
+                "f": "json",
+            },
+            timeout=20.0,
+        )
+        if r.status_code != 200:
+            return
+        feats = (r.json() or {}).get("features") or []
+    except (httpx.HTTPError, ValueError):
+        return
+    if not feats:
+        return
+    situs = str(feats[0].get("attributes", {}).get(cfg["situs_field"]) or "").strip()
+    if situs:
+        best["SITUS_ADDR"] = situs
+
+
 # ---------------------------------------------------------------------------
 # Name parsing -- surname-anchored, format-aware
 # ---------------------------------------------------------------------------
@@ -533,6 +583,13 @@ async def enrich_addresses_from_owner_v2(
                     stats["no_rows"] += 1
                 continue
 
+            # Owner layer has no situs column (Charleston): join the property
+            # address from the sibling Address-Points layer by PID first.
+            if not site_field and li.county:
+                _county = li.county.replace(" County", "").strip().title()
+                if _county in SC_SITUS_JOIN:
+                    async with sem:
+                        await _join_situs_by_pid(c, _county, best)
             _inject_site_alias(best, site_field)
             had_addr = bool((li.street_address or "").strip())
             filled = _populate_from_attrs(li, best)

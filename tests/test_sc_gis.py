@@ -19,11 +19,13 @@ from foreclosure_scraper.enrichment_arcgis import SC_GIS
 
 #: Counties validated live 2026-08-12 (owner + situs both resolve).
 #: Georgetown uses a split-situs concat (StreetNumber+StreetName) via layer 2.
-BUILT = {"Spartanburg", "Laurens", "Pickens", "Colleton", "Beaufort", "Georgetown"}
+#: Charleston resolves owner on layer 61 then PID-joins layer 1 for the situs.
+BUILT = {"Spartanburg", "Laurens", "Pickens", "Colleton", "Beaufort",
+         "Georgetown", "Charleston"}
 
 #: Probed live and confirmed to have NO free county-native owner+situs path.
 #: They must NOT be in SC_GIS (adding a broken endpoint silently returns 0 rows).
-#: See docs/walls_register.md. Georgetown/Charleston are deferred (buildable).
+#: See docs/walls_register.md.
 WALLED = {"Cherokee", "Union", "Oconee", "Anderson"}
 
 
@@ -47,6 +49,17 @@ def test_sc_gis_urls_are_query_endpoints():
         url = cfg.get("url", "")
         assert url.startswith("https://"), f"{county}: url not https: {url!r}"
         assert url.endswith("/query"), f"{county}: url must end in /query: {url!r}"
+
+
+def test_charleston_has_a_pid_situs_join():
+    # Charleston's owner layer (61) has no situs; it must have a PID-join config
+    # to the Address-Points layer or its resolved leads get no property address.
+    from foreclosure_scraper.enrichment_address_owner_v2 import SC_SITUS_JOIN
+
+    assert "Charleston" in SC_SITUS_JOIN
+    cfg = SC_SITUS_JOIN["Charleston"]
+    assert cfg["addr_url"].endswith("/query")
+    assert cfg["pid_field"] and cfg["addr_pid"] and cfg["situs_field"]
 
 
 def test_beaufort_situs_is_pinned():
