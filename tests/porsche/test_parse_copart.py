@@ -42,10 +42,19 @@ def test_drops_parts_only_via_filter():
     assert "75613444" not in kept_lots
 
 
-def test_high_priced_salvage_kept_above_cap():
-    # Salvage listings ignore the price cap; verify the Solr 911 is kept
-    # even if we set the cap below its bid.
+def test_salvage_kept_when_bid_under_cap():
+    # New intent (2026-08-12): under the cap on every source. A $12,500 salvage
+    # 911 is kept because it is under $40k, not because salvage bypasses the cap.
+    listings = parse_solr_response(json.loads(FIXTURE.read_text()))
+    crit = FilterCriteria(min_year=2014, max_year=2026, max_price_usd=40_000)
+    kept_lots = {l.listing_id for l in filter_listings(listings, crit)}
+    assert "75612345" in kept_lots  # $12,500 bid, salvage, under cap
+
+
+def test_salvage_dropped_when_bid_over_cap():
+    # The same lot is dropped once the cap sits below its bid — salvage no
+    # longer buys a pass around a known price.
     listings = parse_solr_response(json.loads(FIXTURE.read_text()))
     crit = FilterCriteria(min_year=2014, max_year=2026, max_price_usd=5_000)
     kept_lots = {l.listing_id for l in filter_listings(listings, crit)}
-    assert "75612345" in kept_lots  # $12,500 bid, salvage — still kept
+    assert "75612345" not in kept_lots

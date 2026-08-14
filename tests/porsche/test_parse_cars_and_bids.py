@@ -47,10 +47,14 @@ def test_extracts_bid_and_mileage():
     assert boxster.mileage == 58000
 
 
-def test_filter_keeps_cayenne_boxster_and_rebuilt_911():
-    crit = FilterCriteria(min_year=2014, max_year=2026, max_price_usd=45_000)
-    kept = filter_listings(parse_search_html(FIXTURE.read_text()), crit)
-    kept_titles = {l.title for l in kept}
-    assert any("Cayenne" in t for t in kept_titles)  # now included, under cap
-    assert any("Boxster" in t for t in kept_titles)  # under price cap
-    assert any("911" in t for t in kept_titles)  # above cap but rebuilt-title exception
+def test_filter_keeps_under_cap_drops_rebuilt_911_over_cap():
+    # New intent (2026-08-12): under $40k on every source, not just salvage.
+    # Fixture bids: Boxster $22.5k, Cayenne $25k, rebuilt 911 $55k.
+    crit = FilterCriteria(min_year=2014, max_year=2026, max_price_usd=40_000)
+    kept_titles = {l.title for l in
+                   filter_listings(parse_search_html(FIXTURE.read_text()), crit)}
+    assert any("Cayenne" in t for t in kept_titles)  # $25k, not an excluded model
+    assert any("Boxster" in t for t in kept_titles)  # $22.5k
+    # The rebuilt 911 bid is $55k — over the cap, so it is now dropped despite
+    # the rebuilt title. Known price beats title on a bargain board.
+    assert not any("911" in t for t in kept_titles)

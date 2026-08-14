@@ -39,12 +39,13 @@ def test_rebuilt_detected_from_title():
 
 def test_user_criteria_keeps_cayman_drops_macan_keeps_rebuilt_911():
     listings = parse_results_html(FIXTURE.read_text())
-    crit = FilterCriteria(min_year=2014, max_year=2026, max_price_usd=45_000)
+    crit = FilterCriteria(min_year=2014, max_year=2026, max_price_usd=40_000)
     kept = filter_listings(listings, crit)
     titles = {l.title for l in kept}
     assert "2016 Porsche Cayman S" in titles
     assert "2015 Porsche Boxster" in titles
-    # Rebuilt 911 over $45k is kept (rebuilt-title exception).
-    assert "2017 Porsche 911 Carrera - rebuilt title" in titles
-    # Macan excluded.
+    # New intent (2026-08-12): the rebuilt 911 is $62k in the fixture — over the
+    # $40k cap, so it is dropped despite the rebuilt title.
+    assert "2017 Porsche 911 Carrera - rebuilt title" not in titles
+    # Macan still excluded outright.
     assert not any("Macan" in t for t in titles)

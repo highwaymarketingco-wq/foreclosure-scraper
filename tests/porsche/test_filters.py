@@ -51,30 +51,51 @@ def test_keeps_unknown_year_when_explicit_opt_in():
     assert matches(_l(year=None, title="Porsche 911"), crit)
 
 
-# ---------- price OR salvage/rebuilt ----------
+# ---------- price cap applies to EVERY source ----------
+# 2026-08-12: the board is a steals board — every Porsche under $40k, from any
+# source, not just salvage. A known price over the cap is dropped regardless of
+# title. Only price-TBD auction cars survive without a number.
 
 
 def test_keeps_below_price_cap():
-    assert matches(_l(price_usd=44_999))
+    assert matches(_l(price_usd=39_999))
+
+
+def test_drops_just_over_price_cap():
+    assert not matches(_l(price_usd=40_001, title_status=TitleStatus.CLEAN))
 
 
 def test_drops_over_price_cap_with_clean_title():
-    # Default cap is $200k (raised from $45k in 3f96d90 to capture clean-title
-    # GT3/Turbo/GT4 holds); a clean-title car above it is still dropped.
-    assert not matches(_l(price_usd=210_000, title_status=TitleStatus.CLEAN))
+    assert not matches(_l(price_usd=60_000, title_status=TitleStatus.CLEAN))
 
 
-def test_keeps_over_price_cap_when_salvage():
-    assert matches(_l(price_usd=80_000, title_status=TitleStatus.SALVAGE))
+def test_drops_over_cap_salvage_when_price_is_known():
+    # A $60k salvage GT3 is not a steal. Known price beats title now.
+    assert not matches(_l(price_usd=60_000, title_status=TitleStatus.SALVAGE))
 
 
-def test_keeps_over_price_cap_when_rebuilt():
-    assert matches(_l(price_usd=80_000, title_status=TitleStatus.REBUILT))
+def test_drops_over_cap_rebuilt_when_price_is_known():
+    assert not matches(_l(price_usd=60_000, title_status=TitleStatus.REBUILT))
+
+
+def test_keeps_cheap_salvage():
+    assert matches(_l(price_usd=18_000, title_status=TitleStatus.SALVAGE))
+
+
+def test_keeps_price_tbd_auction_car():
+    # Copart / IAAI / GovDeals — no asking price, salvage title, price set at sale.
+    assert matches(_l(price_usd=None, current_bid_usd=None,
+                      title_status=TitleStatus.SALVAGE))
 
 
 def test_uses_current_bid_when_no_price():
     l = _l(price_usd=None, current_bid_usd=20_000)
     assert matches(l)
+
+
+def test_drops_auction_car_when_current_bid_over_cap():
+    l = _l(price_usd=None, current_bid_usd=55_000, title_status=TitleStatus.SALVAGE)
+    assert not matches(l)
 
 
 def test_drops_no_price_unless_allowed():

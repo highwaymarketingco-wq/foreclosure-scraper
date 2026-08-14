@@ -23,8 +23,8 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--year-max", type=int, default=0, help="0 → current year")
     p.add_argument(
         "--price-max", type=int, default=int(MAX_PRICE_USD),
-        help="Asking-price ceiling. Listings above this are kept only if "
-        "title is salvage/rebuilt.",
+        help="Asking-price ceiling (default $40,000). Applies to every source "
+        "and title. Only price-TBD auction cars are kept without a number.",
     )
     p.add_argument(
         "--only", nargs="*", choices=[s for s, _ in ALL_SCRAPERS],

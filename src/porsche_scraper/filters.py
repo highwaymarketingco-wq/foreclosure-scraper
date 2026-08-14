@@ -2,9 +2,12 @@
 
 Rule:
 - Year between MIN_YEAR (2014) and CURRENT_YEAR inclusive.
-- Price <= MAX_PRICE_USD ($45,000)  OR  title status is salvage/rebuilt.
+- Price <= MAX_PRICE_USD ($40,000) for EVERY source and title type. This is a
+  bargain board: a clean-title car and a salvage car are both in only if the
+  number is under the cap. Auction listings with no price yet (Copart, IAAI,
+  GovDeals) are the one exception — price is revealed at sale, so they are kept.
 - Must not be a known-non-drivable car (parts-only, blown engine, etc.).
-- Model must not contain Panamera / Cayenne / Macan.
+- Model must not contain Panamera / Macan.
 """
 from __future__ import annotations
 
@@ -14,11 +17,12 @@ from datetime import datetime, timezone
 from .models import EXCLUDED_MODELS, Listing, TitleStatus
 
 MIN_YEAR = 2014
-# Raised 2026-05-13 from $45,000 → $200,000 so clean-title late-model
-# 911 / Cayman / Boxster / 718 holds (GT3, Turbo, GT4) make it into
-# the dashboard. Salvage/rebuilt-title cars still bypass the cap
-# entirely via _price_or_title_ok().
-MAX_PRICE_USD = 200_000.0
+# 2026-08-12: back down to $40,000 at the operator's request. The board is a
+# steals board — every Porsche under $40k from ANY source, not just salvage.
+# The May bump to $200k had turned it into a general 911 listing and buried the
+# actual deals. A known price over the cap is now dropped regardless of title;
+# only price-TBD auction cars survive without a number.
+MAX_PRICE_USD = 40_000.0
 
 
 def current_year() -> int:
@@ -81,9 +85,16 @@ def _is_excluded_model(listing: Listing, excluded: tuple[str, ...]) -> bool:
 
 
 def _price_or_title_ok(listing: Listing, max_price: float, allow_unknown_price: bool) -> bool:
-    if listing.title_status in (TitleStatus.SALVAGE, TitleStatus.REBUILT):
-        return True
+    """Under the cap on EVERY source, not just salvage.
+
+    A known price is judged against the cap no matter the title — a $60k salvage
+    GT3 is not a steal and does not belong on a bargain board. Only listings with
+    no price yet get special handling, and only when they are auction/salvage
+    (price is set at the sale) or the caller explicitly allows unknown prices.
+    """
     price = listing.effective_price
-    if price is None:
-        return allow_unknown_price
-    return price <= max_price
+    if price is not None:
+        return price <= max_price
+    if listing.title_status in (TitleStatus.SALVAGE, TitleStatus.REBUILT):
+        return True  # Copart / IAAI / GovDeals — price revealed at auction
+    return allow_unknown_price
