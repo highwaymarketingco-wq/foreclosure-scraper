@@ -150,8 +150,12 @@ ALL_SCRAPERS: list[tuple[str, Callable[[int, int | None], BaseScraper]]] = [
     ("classiccars_com", lambda y, p: ClassicCarsDotComScraper(year_min=y, price_max=p or 45000)),
     ("autotrader_classics", lambda y, p: AutoTraderClassicsScraper(year_min=y, price_max=p or 45000)),
     # Peer-to-peer (off by default)
-    ("fb_marketplace", lambda y, p: FacebookMarketplaceScraper(year_min=y, price_max=p or 45000)),
-    ("craigslist", lambda y, p: CraigslistScraper(year_min=y, price_max=p or 45000)),
+    ("fb_marketplace", lambda y, p: FacebookMarketplaceScraper(year_min=y, price_max=p or 40000)),
+    ("craigslist", lambda y, p: CraigslistScraper(year_min=y, price_max=p or 40000)),
+    # OfferUp is deliberately NOT wired — its public explore endpoint ignores the
+    # search keyword (returns a generic category feed: washing machines, dryers),
+    # and the real keyword search only SSR-ships two tiles before a token-gated
+    # API takes over. See scrapers/offerup.py for the full finding.
     # Sitemap-driven (high-volume URL discovery)
     ("elferspot_sitemap", lambda y, p: ElferspotSitemapScraper(year_min=y)),
     ("classiccars_sitemap", lambda y, p: ClassicCarsSitemapScraper(year_min=y)),

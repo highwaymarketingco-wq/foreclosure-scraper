@@ -62,12 +62,37 @@ class FacebookMarketplaceScraper(BaseScraper):
         self.year_min = year_min
         self.max_pages = max_pages
 
-    async def fetch(self) -> list[Listing]:
+    @staticmethod
+    def _load_cookie() -> str | None:
+        """FB_USER_COOKIE env wins; otherwise ~/.porsche_fb_cookie (one line).
+
+        The file path lets the operator set the cookie once instead of exporting
+        it into every shell. Whitespace and a leading `Cookie:` label are
+        stripped so pasting the raw request header just works.
+        """
         cookie = os.environ.get("FB_USER_COOKIE")
         if not cookie:
+            path = os.path.expanduser("~/.porsche_fb_cookie")
+            if os.path.exists(path):
+                try:
+                    with open(path, encoding="utf-8") as fh:
+                        cookie = fh.read()
+                except OSError:
+                    cookie = None
+        if not cookie:
+            return None
+        cookie = cookie.strip()
+        if cookie.lower().startswith("cookie:"):
+            cookie = cookie.split(":", 1)[1].strip()
+        return cookie or None
+
+    async def fetch(self) -> list[Listing]:
+        cookie = self._load_cookie()
+        if not cookie:
             log.info(
-                "fb_marketplace skipped: set FB_USER_COOKIE (full cookie string "
-                "from a logged-in browser) to enable this scraper."
+                "fb_marketplace skipped: set FB_USER_COOKIE, or put the cookie "
+                "string in ~/.porsche_fb_cookie, to enable this scraper. Copy it "
+                "from a logged-in facebook.com request in your browser devtools."
             )
             return []
         headers = {
@@ -81,6 +106,7 @@ class FacebookMarketplaceScraper(BaseScraper):
         url = (
             "https://www.facebook.com/marketplace/category/cars/"
             f"?query=porsche&maxPrice={self.price_max}&minYear={self.year_min}"
+            "&sortBy=price_ascend"
         )
         try:
             html = await fetch_text_stealth(url, timeout=60, headers=headers)
