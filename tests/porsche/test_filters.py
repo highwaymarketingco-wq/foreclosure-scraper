@@ -52,17 +52,18 @@ def test_keeps_unknown_year_when_explicit_opt_in():
 
 
 # ---------- price cap applies to EVERY source ----------
-# 2026-08-12: the board is a steals board — every Porsche under $40k, from any
-# source, not just salvage. A known price over the cap is dropped regardless of
-# title. Only price-TBD auction cars survive without a number.
+# The board is a steals board — every Porsche under the cap ($50k as of
+# 2026-08-15), from any source, not just salvage. A known price over the cap is
+# dropped regardless of title. Only price-TBD auction cars survive without a
+# number. These tests use the default cap, so they track MAX_PRICE_USD.
 
 
 def test_keeps_below_price_cap():
-    assert matches(_l(price_usd=39_999))
+    assert matches(_l(price_usd=49_999))
 
 
 def test_drops_just_over_price_cap():
-    assert not matches(_l(price_usd=40_001, title_status=TitleStatus.CLEAN))
+    assert not matches(_l(price_usd=50_001, title_status=TitleStatus.CLEAN))
 
 
 def test_drops_over_price_cap_with_clean_title():
