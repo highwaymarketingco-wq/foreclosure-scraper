@@ -116,9 +116,22 @@ class FacebookMarketplaceScraper(BaseScraper):
         return list(parse_fb_html(html))
 
 
-_FB_LISTING_RE = re.compile(r'"listing_id":"(\d+)"')
-_FB_CONTEXT_LOOKAHEAD = 4096
-_FB_CONTEXT_LOOKBEHIND = 1024
+# Facebook's Marketplace JSON shape (confirmed live 2026-08-14). Each car is a
+# GroupCommerceProductItem, and the fields sit in the object in this order:
+#   id ... primary_listing_photo ... listing_price ... location ... TITLE ... miles
+# The old `"listing_id":"..."` anchor is GONE — FB stopped emitting that key,
+# which is why the previous parser silently returned zero.
+#
+# Anchor on the TITLE, not the id: FB's normalized Relay store repeats each item
+# id (once with full data, once or more as a bare reference), so slicing between
+# id anchors collapses most items to empty. The title appears exactly once per
+# real listing, so it is the reliable anchor. Read a window behind it for the id,
+# price and location, and a small window ahead for mileage.
+_FB_TITLE_RE = re.compile(
+    r'"marketplace_listing_title":"([^"\\]*(?:\\.[^"\\]*)*)"')
+_FB_ID_RE = re.compile(r'"__typename":"GroupCommerceProductItem","id":"(\d+)"')
+_FB_LOOKBEHIND = 2500
+_FB_LOOKAHEAD = 600
 
 
 def _fb_unescape(s: str) -> str:
@@ -131,71 +144,65 @@ def _fb_unescape(s: str) -> str:
 
 
 def parse_fb_html(html: str) -> Iterable[Listing]:
-    """Parse FB Marketplace's embedded Relay JSON dumps. Best-effort.
+    """Parse FB Marketplace's embedded Relay JSON. Best-effort, current as of
+    2026-08-14.
 
-    Anchors on `"listing_id":"<digits>"` and harvests the surrounding fields.
-    FB ships Porsche listings via `RelayPrefetchedStreamCache` inside
-    script tags. Regex over a wide context window beats trying to
-    round-trip the whole dump.
+    Each listing is a `GroupCommerceProductItem` block:
+
+        "__typename":"GroupCommerceProductItem","id":"<LISTING_ID>",
+          ...,"listing_price":{...,"amount":"40000.00"},
+          ...,"location":{...,"display_name":"Inman, South Carolina"},
+          ...,"marketplace_listing_title":"2016 Porsche Cayman ...",
+          ...,"custom_sub_titles_with_rendering_flags":[{"subtitle":"62K miles"}]
+
+    Anchor on the item id, then read the slice up to the next item.
     """
     seen: set[str] = set()
-    for m in _FB_LISTING_RE.finditer(html):
-        lid = m.group(1)
-        if lid in seen:
+    for m in _FB_TITLE_RE.finditer(html):
+        title = _fb_unescape(m.group(1))
+        low = title.lower()
+        if "porsche" not in low:
+            continue
+        if any(em in low for em in ("panamera", "macan")):
+            continue
+
+        behind = html[max(0, m.start() - _FB_LOOKBEHIND):m.start()]
+        ahead = html[m.end():m.end() + _FB_LOOKAHEAD]
+
+        # The item id, price and location all sit BEFORE the title in the block,
+        # so take the nearest (last) match in the lookbehind window.
+        ids = _FB_ID_RE.findall(behind)
+        lid = ids[-1] if ids else None
+        if not lid or lid in seen:
             continue
         seen.add(lid)
-        start = max(0, m.start() - _FB_CONTEXT_LOOKBEHIND)
-        end = min(len(html), m.end() + _FB_CONTEXT_LOOKAHEAD)
-        chunk = html[start:end]
 
-        title_m = re.search(r'"marketplace_listing_title":"([^"\\]*(?:\\.[^"\\]*)*)"', chunk)
-        price_m = (
-            re.search(r'"listing_price":\{"amount":"([\d.]+)"', chunk)
-            or re.search(r'"formatted_price":\{[^}]*"text":"\$([\d,.]+)"', chunk)
+        prices = re.findall(r'"listing_price":\{[^}]*?"amount":"([\d.]+)"', behind)
+        locs = re.findall(r'"display_name":"([^"]+)"', behind)
+        photos = re.findall(r'"image":\{"uri":"([^"]+)"', behind)
+        # Mileage ("62K miles") sits just AFTER the title.
+        miles_m = (
+            re.search(r'"subtitle":"([\d,.]+\s*[Kk]?\s*miles)"', ahead)
+            or re.search(r'([\d,]+\s*[Kk]?)\s*miles', ahead)
         )
-        image_m = (
-            re.search(r'"primary_listing_photo":\{[^}]*?"image":\{"uri":"([^"]+)"', chunk)
-            or re.search(r'"primary_photo_url":"([^"]+)"', chunk)
-        )
-        loc_m = (
-            re.search(
-                r'"location":\{[^}]*?"reverse_geocode":\{[^}]*?'
-                r'"city_page":\{[^}]*?"display_name":"([^"]+)"',
-                chunk,
-            )
-            or re.search(r'"location_text":\{"text":"([^"]+)"', chunk)
-        )
-        mileage_m = (
-            re.search(r'"mileage":\{"value":(\d+)', chunk)
-            or re.search(r'"odometer":\{"value":(\d+)', chunk)
-        )
-        year_m = re.search(r'"year":(\d{4})', chunk)
-        vin_m = re.search(r'"vin":"([A-HJ-NPR-Z0-9]{17})"', chunk)
 
-        title = _fb_unescape(title_m.group(1) if title_m else "")
-        if "porsche" not in title.lower():
-            continue
-        if any(em in title.lower() for em in ("panamera", "macan")):
-            continue
-
-        year_val = int(year_m.group(1)) if year_m else parse_year(title)
-        mileage_val = parse_miles(mileage_m.group(1)) if mileage_m else parse_miles(title)
-        price_val = parse_price(price_m.group(1)) if price_m else None
+        price_val = parse_price(prices[-1]) if prices else None
+        mileage_val = parse_miles(miles_m.group(1)) if miles_m else parse_miles(title)
+        status = infer_title_status(title)
         listing = Listing(
             source="fb_marketplace",
             source_url=f"https://www.facebook.com/marketplace/item/{lid}/",
             listing_id=lid,
-            vin=vin_m.group(1) if vin_m else None,
             title=title,
-            year=year_val,
+            year=parse_year(title),
             mileage=mileage_val,
             price_usd=price_val,
-            location=(loc_m.group(1) if loc_m else None),
-            photo_url=_fb_unescape(image_m.group(1)) if image_m else None,
-            title_status=infer_title_status(title),
+            location=_fb_unescape(locs[-1]) if locs else None,
+            photo_url=_fb_unescape(photos[-1]) if photos else None,
+            title_status=status,
             seller_type="private",
         )
-        listing.drivable = infer_drivable(title, listing.title_status)
+        listing.drivable = infer_drivable(title, status)
         yield listing
 
 
