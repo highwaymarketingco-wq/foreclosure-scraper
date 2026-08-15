@@ -17,12 +17,12 @@ from datetime import datetime, timezone
 from .models import EXCLUDED_MODELS, Listing, TitleStatus
 
 MIN_YEAR = 2014
-# 2026-08-12: back down to $40,000 at the operator's request. The board is a
-# steals board — every Porsche under $40k from ANY source, not just salvage.
-# The May bump to $200k had turned it into a general 911 listing and buried the
-# actual deals. A known price over the cap is now dropped regardless of title;
-# only price-TBD auction cars survive without a number.
-MAX_PRICE_USD = 40_000.0
+# 2026-08-15: raised to $50,000 at the operator's request (from $40k on 08-12).
+# The board is a steals board — every Porsche under the cap from ANY source,
+# not just salvage. A known price over the cap is dropped regardless of title;
+# only price-TBD auction cars survive without a number. One number to change if
+# the ceiling should move again.
+MAX_PRICE_USD = 50_000.0
 
 
 def current_year() -> int:
