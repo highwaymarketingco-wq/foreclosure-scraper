@@ -55,9 +55,17 @@ class FacebookMarketplaceScraper(BaseScraper):
 
     slug = "fb_marketplace"
     name = "Facebook Marketplace"
-    timeout_s = 180.0
+    timeout_s = 600.0
 
-    def __init__(self, *, price_max: int = 45_000, year_min: int = 2014, max_pages: int = 3):
+    #: Marketplace search results load via GraphQL after render and paginate on
+    #: scroll, so this drives a real logged-in browser. One query per model keeps
+    #: each search tight and multiplies coverage; the search redirects to the
+    #: cookie's home location automatically.
+    QUERIES = ("porsche 911", "porsche cayman", "porsche boxster",
+               "porsche 718", "porsche cayenne", "porsche")
+    SCROLLS = 8
+
+    def __init__(self, *, price_max: int = 40_000, year_min: int = 2014, max_pages: int = 3):
         self.price_max = price_max
         self.year_min = year_min
         self.max_pages = max_pages
@@ -86,6 +94,33 @@ class FacebookMarketplaceScraper(BaseScraper):
             cookie = cookie.split(":", 1)[1].strip()
         return cookie or None
 
+    @staticmethod
+    def _cookie_pairs(cookie: str) -> list[dict]:
+        """Cookie header string -> Playwright cookie objects on .facebook.com."""
+        out = []
+        for part in cookie.split(";"):
+            if "=" in part:
+                k, v = part.strip().split("=", 1)
+                if k:
+                    out.append({"name": k, "value": v,
+                                "domain": ".facebook.com", "path": "/"})
+        return out
+
+    # DOM extractor: every marketplace item card is an <a href="/marketplace/
+    # item/<id>/">, whose innerText is price(s) + title + location (+ miles),
+    # newline-separated. Scroll-loaded cards are real DOM, not JSON, so this
+    # reads the rendered page rather than the Relay blob.
+    _JS_EXTRACT = """() => {
+      const out = [], seen = new Set();
+      document.querySelectorAll('a[href*="/marketplace/item/"]').forEach(a => {
+        const m = a.href.match(/\\/marketplace\\/item\\/(\\d+)/);
+        if (!m || seen.has(m[1])) return;
+        seen.add(m[1]);
+        out.push({id: m[1], text: a.innerText || ""});
+      });
+      return out;
+    }"""
+
     async def fetch(self) -> list[Listing]:
         cookie = self._load_cookie()
         if not cookie:
@@ -95,25 +130,55 @@ class FacebookMarketplaceScraper(BaseScraper):
                 "from a logged-in facebook.com request in your browser devtools."
             )
             return []
-        headers = {
-            "Cookie": cookie,
-            "User-Agent": os.environ.get(
-                "FB_USER_AGENT",
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 "
-                "(KHTML, like Gecko) Version/17.5 Safari/605.1.15",
-            ),
-        }
-        url = (
-            "https://www.facebook.com/marketplace/category/cars/"
-            f"?query=porsche&maxPrice={self.price_max}&minYear={self.year_min}"
-            "&sortBy=price_ascend"
-        )
         try:
-            html = await fetch_text_stealth(url, timeout=60, headers=headers)
-        except Exception as exc:  # noqa: BLE001
-            log.warning("fb_marketplace fetch failed: %s", exc)
+            from playwright.async_api import async_playwright
+        except ImportError:
+            log.warning("fb_marketplace: playwright not installed")
             return []
-        return list(parse_fb_html(html))
+
+        ua = os.environ.get(
+            "FB_USER_AGENT",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
+        cards: dict[str, str] = {}
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                ctx = await browser.new_context(user_agent=ua, locale="en-US")
+                await ctx.add_cookies(self._cookie_pairs(cookie))
+                page = await ctx.new_page()
+                from urllib.parse import quote
+                for q in self.QUERIES:
+                    # Keep the URL to just the query — adding maxPrice/sortBy
+                    # made the search return nothing. Price and year are filtered
+                    # in code from the card text instead.
+                    url = ("https://www.facebook.com/marketplace/search/"
+                           f"?query={quote(q)}")
+                    try:
+                        await page.goto(url, wait_until="domcontentloaded",
+                                        timeout=45000)
+                        await page.wait_for_timeout(5000)
+                        for _ in range(self.SCROLLS):
+                            await page.evaluate(
+                                "window.scrollTo(0, document.body.scrollHeight)")
+                            await page.wait_for_timeout(2200)
+                        for row in await page.evaluate(self._JS_EXTRACT):
+                            cards.setdefault(row["id"], row["text"])
+                    except Exception as exc:  # noqa: BLE001
+                        log.warning("fb_marketplace query %r failed: %s", q, exc)
+                await browser.close()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("fb_marketplace browser session failed: %s", exc)
+            return []
+
+        listings = []
+        for lid, text in cards.items():
+            li = _card_to_listing(lid, text)
+            if li is not None:
+                listings.append(li)
+        log.info("fb_marketplace: %d cards -> %d porsche cars", len(cards),
+                 len(listings))
+        return listings
 
 
 # Facebook's Marketplace JSON shape (confirmed live 2026-08-14). Each car is a
@@ -204,6 +269,67 @@ def parse_fb_html(html: str) -> Iterable[Listing]:
         )
         listing.drivable = infer_drivable(title, status)
         yield listing
+
+
+# Marketplace search returns Porsche CARS mixed with PARTS (wheels, doors,
+# emblems, coils, bumpers) and other makes. Parts are the noise to drop.
+_FB_PARTS_RE = re.compile(
+    r"\b(wheel|wheels|tire|tires|rim|rims|door|doors|bumper|emblem|badge|coil|"
+    r"coils|seat|seats|interior|hood|fender|mirror|headlight|taillight|engine|"
+    r"transmission|part|parts|oem|steering|exhaust|spoiler|hubcap|manual|book|"
+    r"key|fob|cover|mat|mats|shifter|caliper|brake|rotor|bra\b|nose bra)\b",
+    re.I)
+_FB_YEAR_RE = re.compile(r"\b(19[89]\d|20[0-3]\d)\b")
+_FB_PRICE_LINE_RE = re.compile(r"\$([\d,]+)")
+_FB_LOC_LINE_RE = re.compile(r"^[A-Za-z .'-]+,\s*[A-Z]{2}$")
+_FB_MILES_RE = re.compile(r"([\d,.]+\s*[Kk]?)\s*miles", re.I)
+
+
+def _card_to_listing(lid: str, text: str):
+    """Turn one Marketplace card's visible text into a Listing, or None.
+
+    Card text is newline-separated: one or two prices, the title, the location,
+    and sometimes a mileage subtitle. Keeps only actual Porsche cars — a title
+    with a Porsche model AND a plausible model year, and NOT a parts listing.
+    """
+    lines = [ln.strip() for ln in (text or "").splitlines() if ln.strip()]
+    if not lines:
+        return None
+    joined = " ".join(lines)
+    low = joined.lower()
+    if "porsche" not in low:
+        return None
+    if any(em in low for em in ("panamera", "macan")):
+        return None
+    if _FB_PARTS_RE.search(low):
+        return None
+
+    # The title is the line that names a year and Porsche; parts/non-cars fail.
+    title = next((ln for ln in lines
+                  if _FB_YEAR_RE.search(ln) and "porsche" in ln.lower()), None)
+    if not title:
+        return None
+
+    prices = _FB_PRICE_LINE_RE.findall(joined)
+    price_val = parse_price(prices[0]) if prices else None
+    location = next((ln for ln in lines if _FB_LOC_LINE_RE.match(ln)), None)
+    miles_m = _FB_MILES_RE.search(joined)
+
+    status = infer_title_status(title)
+    listing = Listing(
+        source="fb_marketplace",
+        source_url=f"https://www.facebook.com/marketplace/item/{lid}/",
+        listing_id=lid,
+        title=title,
+        year=parse_year(title),
+        mileage=parse_miles(miles_m.group(1)) if miles_m else parse_miles(title),
+        price_usd=price_val,
+        location=location,
+        title_status=status,
+        seller_type="private",
+    )
+    listing.drivable = infer_drivable(title, status)
+    return listing
 
 
 # ---------- Craigslist ----------
