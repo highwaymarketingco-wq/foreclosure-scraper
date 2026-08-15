@@ -197,6 +197,22 @@ PRESETS: dict[str, SitePreset] = {
         include_regex="",
         max_urls=2000,
     ),
+    # Nationwide dealer inventory — real-browser JSON-LD readers, run in-tree.
+    "carvana": SitePreset(
+        slug="carvana", name="Carvana (API)",
+        seed="https://www.carvana.com/cars/porsche",
+        crawl_mode="api", include_regex="", max_urls=2000,
+    ),
+    "truecar": SitePreset(
+        slug="truecar", name="TrueCar (API)",
+        seed="https://www.truecar.com/used-cars-for-sale/listings/porsche/",
+        crawl_mode="api", include_regex="", max_urls=2000,
+    ),
+    "carfax": SitePreset(
+        slug="carfax", name="CarFax (API)",
+        seed="https://www.carfax.com/Used-Porsche_m28",
+        crawl_mode="api", include_regex="", max_urls=2000,
+    ),
 }
 
 
@@ -268,24 +284,39 @@ async def _run_api_preset(preset: SitePreset) -> list[dict]:
     crawling pointless (e.g. Copart sitemap → Incapsula "Loading" wall).
     Run the in-tree porsche_scraper for that source instead, return rows
     in the same shape _enrich_urls produces."""
+    # Pull the year floor and price ceiling from the single source of truth so
+    # this path can't drift from the filter (it used to hardcode year_min=2014,
+    # which silently hid every pre-2014 911/Cayman/Boxster from the refresh).
+    from porsche_scraper.filters import MIN_YEAR, MAX_PRICE_USD
+    ymin, pmax = MIN_YEAR, int(MAX_PRICE_USD)
+
     if preset.slug == "copart":
         from porsche_scraper.scrapers.copart import CopartScraper
         scraper = CopartScraper()
     elif preset.slug == "cars_com":
         from porsche_scraper.scrapers.cars_com import CarsComScraper
-        scraper = CarsComScraper(year_min=2014, price_max=45000)
+        scraper = CarsComScraper(year_min=ymin, price_max=pmax)
     elif preset.slug == "bring_a_trailer":
         from porsche_scraper.scrapers.bring_a_trailer import BringATrailerScraper
         scraper = BringATrailerScraper()
     elif preset.slug == "iaai":
         from porsche_scraper.scrapers.iaai import IaaiScraper
-        scraper = IaaiScraper(year_min=2014)
+        scraper = IaaiScraper(year_min=ymin)
     elif preset.slug == "cars_and_bids":
         from porsche_scraper.scrapers.cars_and_bids import CarsAndBidsScraper
-        scraper = CarsAndBidsScraper(year_min=2014, max_bid=45000)
+        scraper = CarsAndBidsScraper(year_min=ymin, max_bid=pmax)
     elif preset.slug == "autobidmaster":
         from porsche_scraper.scrapers.salvage_brokers import make_autobidmaster
-        scraper = make_autobidmaster(2014, 45000)
+        scraper = make_autobidmaster(ymin, pmax)
+    elif preset.slug == "carvana":
+        from porsche_scraper.scrapers.carvana import CarvanaScraper
+        scraper = CarvanaScraper(year_min=ymin, price_max=pmax)
+    elif preset.slug == "truecar":
+        from porsche_scraper.scrapers.truecar import TrueCarScraper
+        scraper = TrueCarScraper(year_min=ymin, price_max=pmax)
+    elif preset.slug == "carfax":
+        from porsche_scraper.scrapers.carfax import CarfaxScraper
+        scraper = CarfaxScraper(year_min=ymin, price_max=pmax)
     else:
         raise ValueError(f"no api scraper wired for preset slug {preset.slug!r}")
     listings = await scraper.fetch()
