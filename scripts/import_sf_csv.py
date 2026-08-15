@@ -49,6 +49,51 @@ from porsche_scraper.models import (
 )
 from porsche_scraper.pipeline import dedupe
 
+# A source is considered "authoritatively re-scraped" this run only if it
+# returned at least this many rows. Guards against a single blocked run (which
+# might return 0-2 rows) wiping a whole source from the board.
+_REFRESH_MIN_ROWS = 3
+
+
+def prune_sold_and_stale(listings: list[Listing], fresh: list[Listing]) -> list[Listing]:
+    """Drop cars that are no longer buyable. Two rules, both about freshness:
+
+    1. **Past auctions.** A listing whose sale_date has already passed is over —
+       the car sold at the block. These were never being removed, so Copart/IAA
+       lots and BaT results from months (even years) ago piled up on the board.
+
+    2. **Fell off a re-scraped source.** If a source came back with a healthy
+       batch this run, any OLD listing from that source that is NOT in the fresh
+       batch has been taken down (sold, delisted) and is dropped. Sources that
+       were not scraped this run are left untouched — absence of data is not
+       evidence a car is gone.
+    """
+    from collections import Counter
+
+    today = datetime.now(timezone.utc).date()
+    fresh_counts = Counter(l.source for l in fresh)
+    refreshed = {s for s, c in fresh_counts.items() if c >= _REFRESH_MIN_ROWS}
+    fresh_keys = {l.dedupe_key() for l in fresh}
+
+    kept: list[Listing] = []
+    dropped_sold = dropped_stale = 0
+    for l in listings:
+        sd = l.sale_date
+        if sd is not None:
+            sd_date = sd.date() if hasattr(sd, "date") else sd
+            if sd_date < today:
+                dropped_sold += 1
+                continue
+        if l.source in refreshed and l.dedupe_key() not in fresh_keys:
+            dropped_stale += 1
+            continue
+        kept.append(l)
+
+    if dropped_sold or dropped_stale:
+        print(f"  pruned {dropped_sold} past-auction + {dropped_stale} "
+              f"fell-off-source listings")
+    return kept
+
 
 # Column aliases — left side is what we want, right side is anything SF
 # might call it. Lower-cased exact match.
@@ -315,6 +360,11 @@ def main(argv: list[str] | None = None) -> int:
         combined = fresh + base
         deduped = dedupe(combined)
         filtered = filter_listings(deduped, criteria)
+
+    # Freshness: drop past-auction lots and listings that fell off a re-scraped
+    # source. This is what keeps the board current instead of an ever-growing
+    # pile of months-old sold cars.
+    filtered = prune_sold_and_stale(filtered, fresh)
     filtered.sort(key=lambda l: (l.effective_price is None, l.effective_price or 9e9))
 
     from porsche_scraper.output import write_json, write_csv
