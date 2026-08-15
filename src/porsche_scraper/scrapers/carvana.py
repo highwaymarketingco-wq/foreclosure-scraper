@@ -35,7 +35,7 @@ log = logging.getLogger(__name__)
 # a naive brace scan, so field regex over a window is the reliable path (it is
 # what actually extracted all 21 per page in testing).
 _JSONLD_START = re.compile(r'\{"@context":"https://schema\.org","@type":"Vehicle"')
-_PAGES = 5  # Carvana paginates ?page=N; each page is ~20 cars.
+_PAGES = 12  # Carvana paginates ?page=N; each page is ~20 cars.
 
 
 def _parse_vehicle_chunk(chunk: str) -> Listing | None:

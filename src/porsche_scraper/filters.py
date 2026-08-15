@@ -16,7 +16,12 @@ from datetime import datetime, timezone
 
 from .models import EXCLUDED_MODELS, Listing, TitleStatus
 
-MIN_YEAR = 2014
+# 2026-08-15: dropped from 2014 to 1990. The 2014 floor was silently hiding the
+# cheapest sports Porsches — 996/997 911 Carreras (1999-2012) and 986/987
+# Boxster/Cayman (1997-2012) are the ones that actually land under $50k, and they
+# were all being filtered out. 1990 keeps air-cooled 964/993 in reach while the
+# $50k cap naturally excludes the collector-priced older cars.
+MIN_YEAR = 1990
 # 2026-08-15: raised to $50,000 at the operator's request (from $40k on 08-12).
 # The board is a steals board — every Porsche under the cap from ANY source,
 # not just salvage. A known price over the cap is dropped regardless of title;

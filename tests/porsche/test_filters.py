@@ -30,12 +30,13 @@ def _l(**kw) -> Listing:
 
 
 def test_keeps_in_year_range():
-    assert matches(_l(year=2014))
+    assert matches(_l(year=1990))                 # air-cooled floor
+    assert matches(_l(year=2001, title="2001 Porsche 911 Carrera", model="911"))
     assert matches(_l(year=current_year()))
 
 
 def test_drops_too_old():
-    assert not matches(_l(year=2013))
+    assert not matches(_l(year=1989))
 
 
 def test_drops_future_year():
