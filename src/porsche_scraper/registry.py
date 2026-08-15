@@ -162,6 +162,13 @@ ALL_SCRAPERS: list[tuple[str, Callable[[int, int | None], BaseScraper]]] = [
     # search keyword (returns a generic category feed: washing machines, dryers),
     # and the real keyword search only SSR-ships two tiles before a token-gated
     # API takes over. See scrapers/offerup.py for the full finding.
+    #
+    # CarGurus (regular inventory) is NOT wired either — investigated 2026-08-14.
+    # Its inventory API (ajaxFetch / viewDetailsFilterViewInventoryListing) returns
+    # 403 from every transport, and its SEO URLs use opaque entity ids that
+    # redirect to the wrong make (l-Used-Porsche-911-d842 served Hummer). The three
+    # working nationwide dealer sources are Carvana, TrueCar and CarFax; CarGurus
+    # is only present here via the salvage-only cargurus_salvage aggregator.
     # Sitemap-driven (high-volume URL discovery)
     ("elferspot_sitemap", lambda y, p: ElferspotSitemapScraper(year_min=y)),
     ("classiccars_sitemap", lambda y, p: ClassicCarsSitemapScraper(year_min=y)),
