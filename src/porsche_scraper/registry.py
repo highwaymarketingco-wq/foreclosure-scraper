@@ -99,6 +99,7 @@ from .scrapers.salvage_aggregators import (
 from .scrapers.peer_to_peer import CraigslistScraper, FacebookMarketplaceScraper
 from .scrapers.carvana import CarvanaScraper
 from .scrapers.truecar import TrueCarScraper
+from .scrapers.carfax import CarfaxScraper
 
 
 # (slug, factory). Factory takes (year_min, price_max) and returns a scraper.
@@ -156,6 +157,7 @@ ALL_SCRAPERS: list[tuple[str, Callable[[int, int | None], BaseScraper]]] = [
     ("craigslist", lambda y, p: CraigslistScraper(year_min=y, price_max=p or 40000)),
     ("carvana", lambda y, p: CarvanaScraper(year_min=y, price_max=p or 40000)),
     ("truecar", lambda y, p: TrueCarScraper(year_min=y, price_max=p or 40000)),
+    ("carfax", lambda y, p: CarfaxScraper(year_min=y, price_max=p or 40000)),
     # OfferUp is deliberately NOT wired — its public explore endpoint ignores the
     # search keyword (returns a generic category feed: washing machines, dryers),
     # and the real keyword search only SSR-ships two tiles before a token-gated
