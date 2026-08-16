@@ -35,7 +35,8 @@ from .models import Listing
 # --- calibratable assumptions (one place) ----------------------------------
 
 #: Repair as a fraction of a clean example's value, by title status. Porsche
-#: parts + labor are expensive, so salvage recon runs high.
+#: parts + labor are expensive, so salvage recon runs high. Used only when the
+#: source gives NO damage detail; Copart/IAA cars use DAMAGE_RECON below.
 RECON_FRACTION = {
     "clean": 0.02,       # detail / minor reconditioning
     "unknown": 0.02,     # dealer retail cars land here; treated as clean
@@ -44,6 +45,30 @@ RECON_FRACTION = {
     "flood": 0.55,       # usually a write-off; shown so it reads as one
     "parts": 1.0,        # not a runner
 }
+
+#: Repair as a fraction of clean value, keyed on Copart/IAA PRIMARY DAMAGE. This
+#: is the real per-car signal: a front-end hit and an all-over wreck are not the
+#: same repair. Porsche panels/electronics/radiators run high, so these are not
+#: economy-car fractions. Matched as a substring, most-specific first.
+DAMAGE_RECON = [
+    ("water/flood", 0.75), ("flood", 0.75), ("burn", 0.92), ("fire", 0.92),
+    ("rollover", 0.55), ("all over", 0.45), ("undercarriage", 0.32),
+    ("front end", 0.30), ("front", 0.28), ("rear end", 0.24), ("rear", 0.22),
+    ("side", 0.26), ("mechanical", 0.18), ("suspension", 0.20),
+    ("vandalism", 0.18), ("stripped", 0.60), ("biohazard", 0.70),
+    ("minor dent", 0.08), ("dent/scratches", 0.08), ("normal wear", 0.06),
+    ("hail", 0.15), ("theft", 0.20), ("unknown", 0.33),
+]
+_SECONDARY_BUMP = 0.06  # a real secondary hit adds cost, unless it's cosmetic
+
+
+def _damage_recon_fraction(primary: str, secondary: str) -> float:
+    p = (primary or "").lower()
+    frac = next((f for key, f in DAMAGE_RECON if key in p), 0.33)
+    s = (secondary or "").lower()
+    if s and not any(m in s for m in ("minor", "scratch", "normal", "none")):
+        frac += _SECONDARY_BUMP
+    return frac
 
 #: Buyer-side fees. Auctions add a premium on top of the bid; dealers add doc +
 #: transport.
@@ -142,7 +167,23 @@ def analyze(listing: Listing, comps: dict[tuple[str, int], list[float]],
             target: float = DEFAULT_TARGET) -> dict | None:
     """Full deal analysis for one car. None when it can't be valued."""
     bid = _bid(listing)
-    clean_value = estimate_clean_value(listing, comps)
+
+    # Damage data (Copart/IAA) is the real signal when we have it: their own
+    # retail value beats a comp guess, and the primary-damage type gives a
+    # per-car repair estimate instead of a flat title fraction.
+    dmg = (listing.raw or {}).get("damage") if isinstance(listing.raw, dict) else None
+
+    clean_value = None
+    damage_note = None
+    if dmg:
+        try:
+            retail = float(str(dmg.get("retail") or "").replace(",", ""))
+            if retail > 3000:
+                clean_value = retail
+        except (TypeError, ValueError):
+            pass
+    if clean_value is None:
+        clean_value = estimate_clean_value(listing, comps)
     if clean_value is None:
         return None
 
@@ -156,7 +197,14 @@ def analyze(listing: Listing, comps: dict[tuple[str, int], list[float]],
     if is_salvage_source and status in ("unknown", "clean"):
         status = "salvage"
 
-    recon = round(clean_value * RECON_FRACTION.get(status, 0.33))
+    if dmg and dmg.get("primary"):
+        frac = _damage_recon_fraction(dmg.get("primary"), dmg.get("secondary"))
+        recon = round(clean_value * frac)
+        damage_note = dmg["primary"].title()
+        if dmg.get("secondary") and "none" not in dmg["secondary"].lower():
+            damage_note += " + " + dmg["secondary"].title()
+    else:
+        recon = round(clean_value * RECON_FRACTION.get(status, 0.33))
     resale = round(clean_value * RESALE_TITLE_FACTOR.get(status, 0.72))
 
     fees_now = _fees(listing, bid or 0)
@@ -195,6 +243,9 @@ def analyze(listing: Listing, comps: dict[tuple[str, int], list[float]],
         note = f"clean, all-in ${all_in:,} — ready to drive, under ${int(target/1000)}k"
         feasible = True
 
+    if damage_note:
+        note = f"{damage_note} — {note}"
+
     return {
         "est_clean_value": round(clean_value),
         "est_recon": recon,
@@ -205,6 +256,7 @@ def analyze(listing: Listing, comps: dict[tuple[str, int], list[float]],
         "max_bid_target": max_bid_target,
         "target": int(target),
         "feasible": feasible,
+        "damage": damage_note,
         "note": note,
     }
 

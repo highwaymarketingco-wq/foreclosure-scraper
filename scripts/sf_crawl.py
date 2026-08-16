@@ -322,6 +322,7 @@ async def _run_api_preset(preset: SitePreset) -> list[dict]:
     listings = await scraper.fetch()
     rows = []
     for li in listings:
+        dmg = _damage_fields(li)
         rows.append({
             "URL":          li.source_url,
             "Source":       li.source,
@@ -338,8 +339,35 @@ async def _run_api_preset(preset: SitePreset) -> list[dict]:
             "Sale Date":    li.sale_date.isoformat() if li.sale_date else "",
             "Lot Number":   li.lot_number or "",
             "Title 1":      li.title or "",
+            # Copart/IAA carry real damage data in their API dict; forward it so
+            # the deal analysis can estimate repair off the actual damage instead
+            # of a flat title-based guess.
+            "Primary Damage":   dmg["primary"],
+            "Secondary Damage": dmg["secondary"],
+            "Est Retail":       dmg["retail"],
+            "Repair Cost":      dmg["repair"],
+            "Odo Status":       dmg["odo_status"],
         })
     return rows
+
+
+def _damage_fields(li) -> dict:
+    """Pull primary/secondary damage, est retail and repair cost out of the
+    source's raw API dict. Copart uses dd/sdd/la/rc/ord; IAA primaryDamage/
+    secondaryDamage/lossType. Empty strings when a source has none."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    c = raw.get("copart") or {}
+    i = raw.get("iaai") or {}
+    if c:
+        return {"primary": c.get("dd") or "", "secondary": c.get("sdd") or "",
+                "retail": c.get("la") or "", "repair": c.get("rc") or "",
+                "odo_status": c.get("ord") or ""}
+    if i:
+        return {"primary": i.get("primaryDamage") or i.get("primaryDamageDescription") or "",
+                "secondary": i.get("secondaryDamage") or "",
+                "retail": i.get("acv") or i.get("estimatedRetailValue") or "",
+                "repair": i.get("repairCost") or "", "odo_status": ""}
+    return {"primary": "", "secondary": "", "retail": "", "repair": "", "odo_status": ""}
 
 
 def run_site(preset: SitePreset, binary: str, work_root: Path) -> list[Path]:

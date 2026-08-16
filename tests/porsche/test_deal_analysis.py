@@ -76,3 +76,42 @@ def test_max_bid_keeps_all_in_under_target():
     # bidding exactly max_bid_target should land all-in at/under the cap
     fee = d["max_bid_target"] * 0.12 + 1000
     assert d["max_bid_target"] + fee + d["est_recon"] <= 50000 + 50  # rounding
+
+
+# --- damage-based recon (Copart/IAA real damage, not a flat guess) ----------
+
+def _dmg(primary, secondary="", retail="", bid=20000):
+    li = _l(source="copart", seller_type="salvage_auction",
+            title="2018 Porsche Cayman", model="cayman", year=2018,
+            current_bid_usd=bid, title_status="unknown")
+    li.raw = {"damage": {"primary": primary, "secondary": secondary,
+                         "retail": retail}}
+    return li
+
+
+def test_minor_damage_costs_far_less_than_all_over():
+    minor = analyze(_dmg("MINOR DENT/SCRATCHES", retail="50000"), {}, 50000)
+    allover = analyze(_dmg("ALL OVER", retail="50000"), {}, 50000)
+    assert minor["est_recon"] < allover["est_recon"] / 3   # not the same repair
+    assert minor["damage"] == "Minor Dent/Scratches"
+
+
+def test_copart_retail_used_as_clean_value():
+    d = analyze(_dmg("FRONT END", retail="70347"), {}, 50000)
+    assert d["est_clean_value"] == 70347         # Copart's own ACV, not a comp
+
+
+def test_flood_damage_reads_as_near_writeoff():
+    d = analyze(_dmg("WATER/FLOOD DAMAGE", retail="50000"), {}, 50000)
+    assert d["est_recon"] > 50000 * 0.6
+
+
+def test_secondary_damage_adds_cost():
+    one = analyze(_dmg("FRONT END", retail="50000"), {}, 50000)["est_recon"]
+    two = analyze(_dmg("FRONT END", "REAR END", retail="50000"), {}, 50000)["est_recon"]
+    assert two > one
+
+
+def test_damage_shows_in_note():
+    d = analyze(_dmg("SIDE", "FRONT END", retail="50000"), {}, 50000)
+    assert "Side" in d["note"] and "Front End" in d["note"]

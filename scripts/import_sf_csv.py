@@ -113,6 +113,11 @@ COLUMN_ALIASES = {
     "title_text":   ("title 1", "page title", "name"),
     "sale_date":    ("sale date", "auction date", "ends", "end date", "close date"),
     "lot_number":   ("lot number", "lot #", "lot", "stock number", "lot id"),
+    "dmg_primary":  ("primary damage", "primary damage description"),
+    "dmg_secondary": ("secondary damage",),
+    "dmg_retail":   ("est retail", "estimated retail value", "acv"),
+    "dmg_repair":   ("repair cost",),
+    "dmg_odo":      ("odo status", "odometer status"),
 }
 
 
@@ -200,6 +205,12 @@ def _row_to_listing(row: dict, idx: dict[str, str]) -> Listing | None:
         seller_type=_infer_seller(source),
         raw={"sf_csv": True},
     )
+    dmg = {k: v for k, v in (
+        ("primary", get("dmg_primary")), ("secondary", get("dmg_secondary")),
+        ("retail", get("dmg_retail")), ("repair", get("dmg_repair")),
+        ("odo_status", get("dmg_odo"))) if v}
+    if dmg:
+        listing.raw["damage"] = dmg
     listing.drivable = infer_drivable(listing.title, listing.title_status)
     return listing
 
