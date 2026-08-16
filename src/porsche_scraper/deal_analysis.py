@@ -173,6 +173,14 @@ def analyze(listing: Listing, comps: dict[tuple[str, int], list[float]],
     # per-car repair estimate instead of a flat title fraction.
     dmg = (listing.raw or {}).get("damage") if isinstance(listing.raw, dict) else None
 
+    # Effective status: a car on Copart/IAA is a wreck being auctioned no matter
+    # what its title_status parsed to. Treating an auction "unknown" as clean is
+    # exactly how you end up bidding $42k on a salvage 911 that needs $21k of
+    # work. Only genuine dealer/clean retail cars keep the light recon number.
+    status = (listing.title_status or "unknown").lower()
+    is_salvage_source = (listing.source in ("copart", "iaai")
+                         or "salvage" in (listing.seller_type or "").lower())
+
     clean_value = None
     damage_note = None
     if dmg:
@@ -182,18 +190,15 @@ def analyze(listing: Listing, comps: dict[tuple[str, int], list[float]],
                 clean_value = retail
         except (TypeError, ValueError):
             pass
+    if clean_value is None and not is_salvage_source and listing.price_usd:
+        # A retail car's asking price IS its clean value — don't second-guess it
+        # with a comp/table estimate that can push it over the cap on rounding.
+        clean_value = listing.price_usd
     if clean_value is None:
         clean_value = estimate_clean_value(listing, comps)
     if clean_value is None:
         return None
 
-    # Effective status: a car on Copart/IAA is a wreck being auctioned no matter
-    # what its title_status parsed to. Treating an auction "unknown" as clean is
-    # exactly how you end up bidding $42k on a salvage 911 that needs $21k of
-    # work. Only genuine dealer/clean retail cars keep the light recon number.
-    status = (listing.title_status or "unknown").lower()
-    is_salvage_source = (listing.source in ("copart", "iaai")
-                         or "salvage" in (listing.seller_type or "").lower())
     if is_salvage_source and status in ("unknown", "clean"):
         status = "salvage"
 
@@ -223,6 +228,31 @@ def analyze(listing: Listing, comps: dict[tuple[str, int], list[float]],
     # A project car (salvage/rebuilt) has to clear a repair-margin bar; a clean
     # retail car just has to be a real car under the budget.
     is_project = status in ("salvage", "rebuilt", "flood", "parts")
+
+    # Hard disqualifiers — cars that are a bad buy regardless of the math:
+    #   - a salvage Taycan is a wrecked EV: high-voltage battery/pack damage is
+    #     dangerous and ruinously expensive, so skip it outright
+    #   - flood/water is a slow-death electrical nightmare on a Porsche
+    #   - frame/structural/rollover damage means the car's bones are bent
+    dmg_text = " ".join(str(x) for x in (
+        (dmg or {}).get("primary"), (dmg or {}).get("secondary"),
+        listing.title)).lower()
+    disqualified = None
+    if is_salvage_source and _model_of(listing) == "taycan":
+        disqualified = "salvage Taycan — wrecked EV, HV battery risk, skip"
+    elif "flood" in dmg_text or "water" in dmg_text or status == "flood":
+        disqualified = "flood/water damage — skip"
+    elif any(w in dmg_text for w in ("frame", "structural", "rollover", "pillar", "unibody")):
+        disqualified = "frame/structural damage — skip"
+
+    if disqualified:
+        return {
+            "est_clean_value": round(clean_value), "est_recon": recon,
+            "est_fees": fees_now, "all_in": all_in, "resale_value": resale,
+            "est_margin": margin, "max_bid_target": 0, "target": int(target),
+            "feasible": False, "disqualified": disqualified,
+            "damage": damage_note, "note": disqualified,
+        }
 
     if status in ("flood", "parts"):
         note = f"{status} — likely a write-off"

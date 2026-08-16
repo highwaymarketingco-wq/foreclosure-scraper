@@ -56,7 +56,7 @@ def test_flood_is_a_write_off():
             current_bid_usd=500, title_status="flood")
     d = analyze(li, comps={}, target=50000)
     assert d["feasible"] is False
-    assert "write-off" in d["note"]
+    assert "flood" in (d.get("disqualified") or d["note"]).lower()
 
 
 def test_clean_dealer_car_feasible_without_flip_margin():
@@ -115,3 +115,41 @@ def test_secondary_damage_adds_cost():
 def test_damage_shows_in_note():
     d = analyze(_dmg("SIDE", "FRONT END", retail="50000"), {}, 50000)
     assert "Side" in d["note"] and "Front End" in d["note"]
+
+
+# --- hard disqualifiers: salvage Taycan / flood / frame ---------------------
+
+def test_salvage_taycan_disqualified():
+    li = _l(source="copart", seller_type="salvage_auction",
+            title="2021 Porsche Taycan 4S", model="taycan", year=2021,
+            current_bid_usd=15000, title_status="salvage")
+    d = analyze(li, {}, 50000)
+    assert d["feasible"] is False
+    assert "Taycan" in d["disqualified"]
+
+
+def test_clean_dealer_taycan_is_fine():
+    # A non-salvage Taycan from a dealer is NOT disqualified.
+    li = _l(source="carvana", seller_type="dealer", title="2021 Porsche Taycan",
+            model="taycan", year=2021, price_usd=48000, title_status="unknown")
+    d = analyze(li, {}, 50000)
+    assert d.get("disqualified") is None
+    assert d["feasible"] is True
+
+
+def test_flood_damage_disqualified():
+    li = _l(source="copart", seller_type="salvage_auction",
+            title="2016 Porsche 911", model="911", year=2016,
+            current_bid_usd=5000, title_status="unknown")
+    li.raw = {"damage": {"primary": "WATER/FLOOD", "retail": "60000"}}
+    d = analyze(li, {}, 50000)
+    assert d["feasible"] is False and "flood" in d["disqualified"].lower()
+
+
+def test_frame_damage_disqualified():
+    li = _l(source="copart", seller_type="salvage_auction",
+            title="2016 Porsche Cayman", model="cayman", year=2016,
+            current_bid_usd=5000, title_status="unknown")
+    li.raw = {"damage": {"primary": "ROLLOVER", "retail": "45000"}}
+    d = analyze(li, {}, 50000)
+    assert d["feasible"] is False and "frame" in d["disqualified"].lower()

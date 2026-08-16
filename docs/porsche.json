@@ -32,6 +32,7 @@
         "max_bid_target": 31672,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $14,544, ~$14,969 under $29,513 fixed value"
       }
     },
@@ -70,6 +71,7 @@
         "max_bid_target": 39626,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $5,647, ~$4,432 under $10,079 fixed value"
       }
     },
@@ -99,54 +101,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 47998,
-        "est_recon": 15839,
+        "est_clean_value": 43590,
+        "est_recon": 14385,
         "est_fees": 1007,
-        "all_in": 16906,
-        "resale_value": 34559,
-        "est_margin": 17653,
-        "max_bid_target": 29608,
+        "all_in": 15452,
+        "resale_value": 31385,
+        "est_margin": 15933,
+        "max_bid_target": 30906,
         "target": 50000,
         "feasible": true,
-        "note": "project: all-in $16,906, ~$17,653 under $34,559 fixed value"
-      }
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/47504116",
-    "listing_id": "WP0BC2Y18NS******",
-    "title": "2022 Porsche TAYCAN CROSS TURISMO TURBO",
-    "year": 2022,
-    "make": "Porsche",
-    "model": "TAYCAN",
-    "trim": "CROSS TURISMO TURBO",
-    "price_usd": null,
-    "current_bid_usd": 80.0,
-    "mileage": null,
-    "location": "NY - LONG ISLAND",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0726/0bc1c5f9e8534c9abcc89b085d867c84_thb.jpg",
-    "vin": "WP0BC2Y18NS******",
-    "lot_number": "47504116",
-    "sale_date": "2026-08-19T14:00:00Z",
-    "first_seen": "2026-08-16T21:00:39.856911Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 16167,
-        "est_fees": 1010,
-        "all_in": 17257,
-        "resale_value": 35273,
-        "est_margin": 18016,
-        "max_bid_target": 29315,
-        "target": 50000,
-        "feasible": true,
-        "note": "project: all-in $17,257, ~$18,016 under $35,273 fixed value"
+        "damage": null,
+        "note": "project: all-in $15,452, ~$15,933 under $31,385 fixed value"
       }
     },
     "project_tier": "salvage"
@@ -184,6 +149,7 @@
         "max_bid_target": 36239,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $9,502, ~$8,851 under $18,353 fixed value"
       }
     },
@@ -222,6 +188,7 @@
         "max_bid_target": 23950,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $23,316, ~$25,068 under $48,384 fixed value"
       }
     },
@@ -260,6 +227,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $8,925, ~$8,060 under $16,985 fixed value"
       }
     },
@@ -289,16 +257,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 44415,
+        "est_recon": 14657,
         "est_fees": 1015,
-        "all_in": 17145,
-        "resale_value": 34920,
-        "est_margin": 17775,
-        "max_bid_target": 29460,
+        "all_in": 15797,
+        "resale_value": 31979,
+        "est_margin": 16182,
+        "max_bid_target": 30663,
         "target": 50000,
         "feasible": true,
-        "note": "project: all-in $17,145, ~$17,775 under $34,920 fixed value"
+        "damage": null,
+        "note": "project: all-in $15,797, ~$16,182 under $31,979 fixed value"
       }
     },
     "project_tier": "salvage"
@@ -327,16 +296,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 44415,
+        "est_recon": 14657,
         "est_fees": 1018,
-        "all_in": 17173,
-        "resale_value": 34920,
-        "est_margin": 17747,
-        "max_bid_target": 29460,
+        "all_in": 15825,
+        "resale_value": 31979,
+        "est_margin": 16154,
+        "max_bid_target": 30663,
         "target": 50000,
         "feasible": true,
-        "note": "project: all-in $17,173, ~$17,747 under $34,920 fixed value"
+        "damage": null,
+        "note": "project: all-in $15,825, ~$16,154 under $31,979 fixed value"
       }
     },
     "project_tier": "clean"
@@ -365,16 +335,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 13197,
+        "est_clean_value": 39847,
+        "est_recon": 13150,
         "est_fees": 1018,
-        "all_in": 14365,
-        "resale_value": 28793,
-        "est_margin": 14428,
-        "max_bid_target": 31967,
+        "all_in": 14318,
+        "resale_value": 28690,
+        "est_margin": 14372,
+        "max_bid_target": 32009,
         "target": 50000,
         "feasible": true,
-        "note": "project: all-in $14,365, ~$14,428 under $28,793 fixed value"
+        "damage": null,
+        "note": "project: all-in $14,318, ~$14,372 under $28,690 fixed value"
       }
     },
     "project_tier": "salvage"
@@ -412,6 +383,7 @@
         "max_bid_target": 36239,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $9,608, ~$8,745 under $18,353 fixed value"
       }
     },
@@ -450,6 +422,7 @@
         "max_bid_target": 36239,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $9,636, ~$8,717 under $18,353 fixed value"
       }
     },
@@ -488,6 +461,7 @@
         "max_bid_target": 39626,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $5,843, ~$4,236 under $10,079 fixed value"
       }
     },
@@ -526,6 +500,7 @@
         "max_bid_target": 39626,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $5,843, ~$4,236 under $10,079 fixed value"
       }
     },
@@ -564,6 +539,7 @@
         "max_bid_target": 35915,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $9,999, ~$9,146 under $19,145 fixed value"
       }
     },
@@ -602,6 +578,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $9,037, ~$7,948 under $16,985 fixed value"
       }
     },
@@ -640,6 +617,7 @@
         "max_bid_target": 31967,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $14,477, ~$14,316 under $28,793 fixed value"
       }
     },
@@ -678,6 +656,7 @@
         "max_bid_target": 36239,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $9,692, ~$8,661 under $18,353 fixed value"
       }
     },
@@ -716,6 +695,7 @@
         "max_bid_target": 39626,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $5,899, ~$4,180 under $10,079 fixed value"
       }
     },
@@ -745,54 +725,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 44590,
-        "est_recon": 14715,
+        "est_clean_value": 44290,
+        "est_recon": 14616,
         "est_fees": 1033,
-        "all_in": 16023,
-        "resale_value": 32105,
-        "est_margin": 16082,
-        "max_bid_target": 30612,
+        "all_in": 15924,
+        "resale_value": 31889,
+        "est_margin": 15965,
+        "max_bid_target": 30700,
         "target": 50000,
         "feasible": true,
-        "note": "project: all-in $16,023, ~$16,082 under $32,105 fixed value"
-      }
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/60944096",
-    "listing_id": "WP0BA2Y16RS******",
-    "title": "2024 Porsche TAYCAN CROSS TURISMO 4",
-    "year": 2024,
-    "make": "Porsche",
-    "model": "TAYCAN",
-    "trim": "CROSS TURISMO 4",
-    "price_usd": null,
-    "current_bid_usd": 300.0,
-    "mileage": null,
-    "location": "IL - CHICAGO NORTH",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0726/f5772fa573ee4aafb3b6d4760283e14d_thb.jpg",
-    "vin": "WP0BA2Y16RS******",
-    "lot_number": "60944096",
-    "sale_date": "2026-09-08T17:00:00Z",
-    "first_seen": "2026-08-16T21:00:39.856936Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 63800,
-        "est_recon": 21054,
-        "est_fees": 1036,
-        "all_in": 22390,
-        "resale_value": 45936,
-        "est_margin": 23546,
-        "max_bid_target": 24952,
-        "target": 50000,
-        "feasible": true,
-        "note": "project: all-in $22,390, ~$23,546 under $45,936 fixed value"
+        "damage": null,
+        "note": "project: all-in $15,924, ~$15,965 under $31,889 fixed value"
       }
     },
     "project_tier": "salvage"
@@ -830,6 +773,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $9,149, ~$7,836 under $16,985 fixed value"
       }
     },
@@ -859,16 +803,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 44415,
+        "est_recon": 14657,
         "est_fees": 1039,
-        "all_in": 17369,
-        "resale_value": 34920,
-        "est_margin": 17551,
-        "max_bid_target": 29460,
+        "all_in": 16021,
+        "resale_value": 31979,
+        "est_margin": 15958,
+        "max_bid_target": 30663,
         "target": 50000,
         "feasible": true,
-        "note": "project: all-in $17,369, ~$17,551 under $34,920 fixed value"
+        "damage": null,
+        "note": "project: all-in $16,021, ~$15,958 under $31,979 fixed value"
       }
     },
     "project_tier": "salvage"
@@ -906,6 +851,7 @@
         "max_bid_target": 47448,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $548 \u2014 ready to drive, under $50k"
       }
     },
@@ -935,16 +881,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 13197,
+        "est_clean_value": 39847,
+        "est_recon": 13150,
         "est_fees": 1045,
-        "all_in": 14617,
-        "resale_value": 28793,
-        "est_margin": 14176,
-        "max_bid_target": 31967,
+        "all_in": 14570,
+        "resale_value": 28690,
+        "est_margin": 14120,
+        "max_bid_target": 32009,
         "target": 50000,
         "feasible": true,
-        "note": "project: all-in $14,617, ~$14,176 under $28,793 fixed value"
+        "damage": null,
+        "note": "project: all-in $14,570, ~$14,120 under $28,690 fixed value"
       }
     },
     "project_tier": "salvage"
@@ -973,16 +920,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 40994,
-        "est_recon": 13528,
+        "est_clean_value": 40124,
+        "est_recon": 13241,
         "est_fees": 1045,
-        "all_in": 14948,
-        "resale_value": 29516,
-        "est_margin": 14568,
-        "max_bid_target": 31671,
+        "all_in": 14661,
+        "resale_value": 28889,
+        "est_margin": 14228,
+        "max_bid_target": 31928,
         "target": 50000,
         "feasible": true,
-        "note": "project: all-in $14,948, ~$14,568 under $29,516 fixed value"
+        "damage": null,
+        "note": "project: all-in $14,661, ~$14,228 under $28,889 fixed value"
       }
     },
     "project_tier": "salvage"
@@ -1020,6 +968,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $9,233, ~$7,752 under $16,985 fixed value"
       }
     },
@@ -1058,6 +1007,7 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $12,561, ~$11,624 under $24,185 fixed value"
       }
     },
@@ -1096,45 +1046,8 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $12,645, ~$11,540 under $24,185 fixed value"
-      }
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/64566306",
-    "listing_id": "WP0CD2A99GS******",
-    "title": "2016 Porsche 911 TURBO",
-    "year": 2016,
-    "make": "Porsche",
-    "model": "911",
-    "trim": "TURBO",
-    "price_usd": null,
-    "current_bid_usd": 525.0,
-    "mileage": null,
-    "location": "NY - NEWBURGH",
-    "seller_type": "salvage_auction",
-    "title_status": "flood",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0826/8189061746f04e1c855024bf423492c1_thb.jpg",
-    "vin": "WP0CD2A99GS******",
-    "lot_number": "64566306",
-    "sale_date": "2026-08-18T14:00:00Z",
-    "first_seen": "2026-08-16T21:00:39.855723Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 70000,
-        "est_recon": 38500,
-        "est_fees": 1063,
-        "all_in": 40088,
-        "resale_value": 38500,
-        "est_margin": -1588,
-        "max_bid_target": 9375,
-        "target": 50000,
-        "feasible": false,
-        "note": "flood \u2014 likely a write-off"
       }
     },
     "project_tier": "salvage"
@@ -1172,6 +1085,7 @@
         "max_bid_target": 36239,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $10,140, ~$8,213 under $18,353 fixed value"
       }
     },
@@ -1210,6 +1124,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $9,737, ~$7,248 under $16,985 fixed value"
       }
     },
@@ -1248,45 +1163,8 @@
         "max_bid_target": 47238,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $1,406 \u2014 ready to drive, under $50k"
-      }
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/86818785",
-    "listing_id": "WP0AB2Y1XMS******",
-    "title": "2021 Porsche TAYCAN 4S",
-    "year": 2021,
-    "make": "Porsche",
-    "model": "TAYCAN",
-    "trim": "4S",
-    "price_usd": null,
-    "current_bid_usd": 1000.0,
-    "mileage": 64494,
-    "location": "ON - TORONTO",
-    "seller_type": "salvage_auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/1125/b4467aa636924358b942859d178acf8a_thb.jpg",
-    "vin": "WP0AB2Y1XMS******",
-    "lot_number": "86818785",
-    "sale_date": "2026-08-20T14:00:00Z",
-    "first_seen": "2026-08-16T21:00:39.856921Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 16167,
-        "est_fees": 1120,
-        "all_in": 18287,
-        "resale_value": 35273,
-        "est_margin": 16986,
-        "max_bid_target": 29315,
-        "target": 50000,
-        "feasible": true,
-        "note": "project: all-in $18,287, ~$16,986 under $35,273 fixed value"
       }
     },
     "project_tier": "clean"
@@ -1324,45 +1202,8 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $13,261, ~$10,924 under $24,185 fixed value"
-      }
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/57429306",
-    "listing_id": "WP0AC2Y11MS******",
-    "title": "2021 Porsche TAYCAN",
-    "year": 2021,
-    "make": "Porsche",
-    "model": "TAYCAN",
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 1100.0,
-    "mileage": null,
-    "location": "MI - FLINT",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0726/b5ab5fa23b4345b294b1afa4315c8840_thb.jpg",
-    "vin": "WP0AC2Y11MS******",
-    "lot_number": "57429306",
-    "sale_date": "2026-09-02T14:00:00Z",
-    "first_seen": "2026-08-16T21:00:39.856929Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 16167,
-        "est_fees": 1132,
-        "all_in": 18399,
-        "resale_value": 35273,
-        "est_margin": 16874,
-        "max_bid_target": 29315,
-        "target": 50000,
-        "feasible": true,
-        "note": "project: all-in $18,399, ~$16,874 under $35,273 fixed value"
       }
     },
     "project_tier": "salvage"
@@ -1400,6 +1241,7 @@
         "max_bid_target": 14639,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $34,948, ~$36,188 under $71,136 fixed value"
       }
     },
@@ -1438,6 +1280,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $10,633, ~$6,352 under $16,985 fixed value"
       }
     },
@@ -1476,6 +1319,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $10,857, ~$6,128 under $16,985 fixed value"
       }
     },
@@ -1514,6 +1358,7 @@
         "max_bid_target": 31965,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $16,439, ~$12,360 under $28,799 fixed value"
       }
     },
@@ -1552,6 +1397,7 @@
         "max_bid_target": 47036,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $2,714 \u2014 ready to drive, under $50k"
       }
     },
@@ -1590,6 +1436,7 @@
         "max_bid_target": 31967,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $16,549, ~$12,244 under $28,793 fixed value"
       }
     },
@@ -1628,83 +1475,8 @@
         "max_bid_target": 30612,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $18,123, ~$13,982 under $32,105 fixed value"
-      }
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/59889196",
-    "listing_id": "WP0AB2Y18LS******",
-    "title": "2020 Porsche TAYCAN 4S",
-    "year": 2020,
-    "make": "Porsche",
-    "model": "TAYCAN",
-    "trim": "4S",
-    "price_usd": null,
-    "current_bid_usd": 2150.0,
-    "mileage": 51837,
-    "location": "CA - VAN NUYS",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0726/fa993b3133684255b6664003a966c5c9_thb.jpg",
-    "vin": "WP0AB2Y18LS******",
-    "lot_number": "59889196",
-    "sale_date": "2026-08-18T19:00:00Z",
-    "first_seen": "2026-08-16T21:00:39.856885Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 16167,
-        "est_fees": 1258,
-        "all_in": 19575,
-        "resale_value": 35273,
-        "est_margin": 15698,
-        "max_bid_target": 29315,
-        "target": 50000,
-        "feasible": true,
-        "note": "project: all-in $19,575, ~$15,698 under $35,273 fixed value"
-      }
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/63880106",
-    "listing_id": "WP0AC2Y11LS******",
-    "title": "2020 Porsche TAYCAN TURBO",
-    "year": 2020,
-    "make": "Porsche",
-    "model": "TAYCAN",
-    "trim": "TURBO",
-    "price_usd": null,
-    "current_bid_usd": 2200.0,
-    "mileage": 18136,
-    "location": "FL - WEST PALM BEACH",
-    "seller_type": "salvage_auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0826/26c29d9956054345a0bd2553f16ca4fe_thb.jpg",
-    "vin": "WP0AC2Y11LS******",
-    "lot_number": "63880106",
-    "sale_date": "2026-08-18T14:00:00Z",
-    "first_seen": "2026-08-16T21:00:39.856859Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 16167,
-        "est_fees": 1264,
-        "all_in": 19631,
-        "resale_value": 35273,
-        "est_margin": 15642,
-        "max_bid_target": 29315,
-        "target": 50000,
-        "feasible": true,
-        "note": "project: all-in $19,631, ~$15,642 under $35,273 fixed value"
       }
     },
     "project_tier": "clean"
@@ -1742,6 +1514,7 @@
         "max_bid_target": 27309,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $22,102, ~$18,074 under $40,176 fixed value"
       }
     },
@@ -1806,6 +1579,7 @@
         "max_bid_target": 36239,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $12,324, ~$6,029 under $18,353 fixed value"
       }
     },
@@ -1844,6 +1618,7 @@
         "max_bid_target": 46728,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $4,083 \u2014 ready to drive, under $50k"
       }
     },
@@ -1882,6 +1657,7 @@
         "max_bid_target": 47105,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $3,690 \u2014 ready to drive, under $50k"
       }
     },
@@ -1920,6 +1696,7 @@
         "max_bid_target": 47345,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $3,438 \u2014 ready to drive, under $50k"
       }
     },
@@ -1958,6 +1735,7 @@
         "max_bid_target": 27839,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $22,292, ~$16,588 under $38,880 fixed value"
       }
     },
@@ -1996,6 +1774,7 @@
         "max_bid_target": 35915,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $13,247, ~$5,898 under $19,145 fixed value"
       }
     },
@@ -2025,16 +1804,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 40994,
-        "est_recon": 13528,
+        "est_clean_value": 40124,
+        "est_recon": 13241,
         "est_fees": 1372,
-        "all_in": 18000,
-        "resale_value": 29516,
-        "est_margin": 11516,
-        "max_bid_target": 31671,
+        "all_in": 17713,
+        "resale_value": 28889,
+        "est_margin": 11176,
+        "max_bid_target": 31928,
         "target": 50000,
         "feasible": true,
-        "note": "project: all-in $18,000, ~$11,516 under $29,516 fixed value"
+        "damage": null,
+        "note": "project: all-in $17,713, ~$11,176 under $28,889 fixed value"
       }
     },
     "project_tier": "salvage"
@@ -2072,6 +1852,7 @@
         "max_bid_target": 46899,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $4,431 \u2014 ready to drive, under $50k"
       }
     },
@@ -2110,6 +1891,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $12,817, ~$4,168 under $16,985 fixed value"
       }
     },
@@ -2148,6 +1930,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $13,377, ~$3,608 under $16,985 fixed value"
       }
     },
@@ -2177,16 +1960,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 13197,
+        "est_clean_value": 39847,
+        "est_recon": 13150,
         "est_fees": 1546,
-        "all_in": 19293,
-        "resale_value": 28793,
-        "est_margin": 9500,
-        "max_bid_target": 31967,
+        "all_in": 19246,
+        "resale_value": 28690,
+        "est_margin": 9444,
+        "max_bid_target": 32009,
         "target": 50000,
         "feasible": true,
-        "note": "project: all-in $19,293, ~$9,500 under $28,793 fixed value"
+        "damage": null,
+        "note": "project: all-in $19,246, ~$9,444 under $28,690 fixed value"
       }
     },
     "project_tier": "salvage"
@@ -2215,16 +1999,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 44415,
+        "est_recon": 14657,
         "est_fees": 1576,
-        "all_in": 22381,
-        "resale_value": 34920,
-        "est_margin": 12539,
-        "max_bid_target": 29460,
+        "all_in": 21033,
+        "resale_value": 31979,
+        "est_margin": 10946,
+        "max_bid_target": 30663,
         "target": 50000,
         "feasible": true,
-        "note": "project: all-in $22,381, ~$12,539 under $34,920 fixed value"
+        "damage": null,
+        "note": "project: all-in $21,033, ~$10,946 under $31,979 fixed value"
       }
     },
     "project_tier": "clean"
@@ -2262,6 +2047,7 @@
         "max_bid_target": 24775,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $27,796, ~$18,572 under $46,368 fixed value"
       }
     },
@@ -2300,6 +2086,7 @@
         "max_bid_target": 47317,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $5,567 \u2014 ready to drive, under $50k"
       }
     },
@@ -2338,6 +2125,7 @@
         "max_bid_target": 47317,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $5,672 \u2014 ready to drive, under $50k"
       }
     },
@@ -2376,6 +2164,7 @@
         "max_bid_target": 47354,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $5,633 \u2014 ready to drive, under $50k"
       }
     },
@@ -2414,6 +2203,7 @@
         "max_bid_target": 47358,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $5,734 \u2014 ready to drive, under $50k"
       }
     },
@@ -2443,16 +2233,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 40994,
-        "est_recon": 13528,
+        "est_clean_value": 40124,
+        "est_recon": 13241,
         "est_fees": 1624,
-        "all_in": 20352,
-        "resale_value": 29516,
-        "est_margin": 9164,
-        "max_bid_target": 31671,
+        "all_in": 20065,
+        "resale_value": 28889,
+        "est_margin": 8824,
+        "max_bid_target": 31928,
         "target": 50000,
         "feasible": true,
-        "note": "project: all-in $20,352, ~$9,164 under $29,516 fixed value"
+        "damage": null,
+        "note": "project: all-in $20,065, ~$8,824 under $28,889 fixed value"
       }
     },
     "project_tier": "salvage"
@@ -2490,6 +2281,7 @@
         "max_bid_target": 16879,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $37,928, ~$27,736 under $65,664 fixed value"
       }
     },
@@ -2528,6 +2320,7 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $19,365, ~$4,820 under $24,185 fixed value"
       }
     },
@@ -2566,6 +2359,7 @@
         "max_bid_target": 47010,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $7,639 \u2014 ready to drive, under $50k"
       }
     },
@@ -2604,6 +2398,7 @@
         "max_bid_target": 47331,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $7,301 \u2014 ready to drive, under $50k"
       }
     },
@@ -2642,6 +2437,7 @@
         "max_bid_target": 47133,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $7,827 \u2014 ready to drive, under $50k"
       }
     },
@@ -2680,6 +2476,7 @@
         "max_bid_target": 47162,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $7,830 \u2014 ready to drive, under $50k"
       }
     },
@@ -2718,6 +2515,7 @@
         "max_bid_target": 24775,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $30,204, ~$16,164 under $46,368 fixed value"
       }
     },
@@ -2756,6 +2554,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": false,
+        "damage": null,
         "note": "project: all-in $17,521 vs $16,985 fixed value \u2014 too thin to be worth the work"
       }
     },
@@ -2794,6 +2593,7 @@
         "max_bid_target": 31965,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $23,159, ~$5,640 under $28,799 fixed value"
       }
     },
@@ -2832,6 +2632,7 @@
         "max_bid_target": 43750,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $10,072, ~$36,296 under $46,368 fixed value"
       }
     },
@@ -2870,6 +2671,7 @@
         "max_bid_target": 47238,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $9,325 \u2014 ready to drive, under $50k"
       }
     },
@@ -2934,6 +2736,7 @@
         "max_bid_target": 47301,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $9,784 \u2014 ready to drive, under $50k"
       }
     },
@@ -2972,6 +2775,7 @@
         "max_bid_target": 47170,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $9,922 \u2014 ready to drive, under $50k"
       }
     },
@@ -3010,6 +2814,7 @@
         "max_bid_target": 47083,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $10,118 \u2014 ready to drive, under $50k"
       }
     },
@@ -3048,6 +2853,7 @@
         "max_bid_target": 23125,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $34,404, ~$15,996 under $50,400 fixed value"
       }
     },
@@ -3086,6 +2892,7 @@
         "max_bid_target": 47170,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $10,636 \u2014 ready to drive, under $50k"
       }
     },
@@ -3124,6 +2931,7 @@
         "max_bid_target": 47133,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $10,912 \u2014 ready to drive, under $50k"
       }
     },
@@ -3162,6 +2970,7 @@
         "max_bid_target": 46968,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $11,184 \u2014 ready to drive, under $50k"
       }
     },
@@ -3200,6 +3009,7 @@
         "max_bid_target": 21475,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $37,148, ~$17,284 under $54,432 fixed value"
       }
     },
@@ -3238,6 +3048,7 @@
         "max_bid_target": 31820,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "project: all-in $25,674, ~$3,479 under $29,153 fixed value"
       }
     },
@@ -3276,6 +3087,7 @@
         "max_bid_target": 47334,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $10,904 \u2014 ready to drive, under $50k"
       }
     },
@@ -3314,6 +3126,7 @@
         "max_bid_target": 47139,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $11,266 \u2014 ready to drive, under $50k"
       }
     },
@@ -3352,6 +3165,7 @@
         "max_bid_target": 47162,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $11,505 \u2014 ready to drive, under $50k"
       }
     },
@@ -3390,6 +3204,7 @@
         "max_bid_target": 47352,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $11,737 \u2014 ready to drive, under $50k"
       }
     },
@@ -3428,6 +3243,7 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": false,
+        "damage": null,
         "note": "project: all-in $24,965 vs $24,185 fixed value \u2014 too thin to be worth the work"
       }
     },
@@ -3466,6 +3282,7 @@
         "max_bid_target": 47105,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $13,864 \u2014 ready to drive, under $50k"
       }
     },
@@ -3495,16 +3312,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 44415,
+        "est_recon": 14657,
         "est_fees": 2524,
-        "all_in": 31229,
-        "resale_value": 34920,
-        "est_margin": 3691,
-        "max_bid_target": 29460,
+        "all_in": 29881,
+        "resale_value": 31979,
+        "est_margin": 2098,
+        "max_bid_target": 30663,
         "target": 50000,
-        "feasible": true,
-        "note": "project: all-in $31,229, ~$3,691 under $34,920 fixed value"
+        "feasible": false,
+        "damage": null,
+        "note": "project: all-in $29,881 vs $31,979 fixed value \u2014 too thin to be worth the work"
       }
     },
     "project_tier": "salvage"
@@ -3533,16 +3351,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 15120,
-        "est_recon": 302,
+        "est_clean_value": 12950,
+        "est_recon": 259,
         "est_fees": 1000,
-        "all_in": 14252,
-        "resale_value": 15120,
-        "est_margin": 868,
-        "max_bid_target": 48698,
+        "all_in": 14209,
+        "resale_value": 12950,
+        "est_margin": -1259,
+        "max_bid_target": 48741,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $14,252 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $14,209 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -3571,57 +3390,20 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 13998,
-        "est_recon": 280,
+        "est_clean_value": 12991,
+        "est_recon": 260,
         "est_fees": 1000,
-        "all_in": 14271,
-        "resale_value": 13998,
-        "est_margin": -273,
-        "max_bid_target": 48720,
+        "all_in": 14251,
+        "resale_value": 12991,
+        "est_margin": -1260,
+        "max_bid_target": 48740,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $14,271 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $14,251 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/61133186",
-    "listing_id": "WP0AC2Y18LS******",
-    "title": "2020 Porsche TAYCAN TURBO/TURBO S",
-    "year": 2020,
-    "make": "Porsche",
-    "model": "TAYCAN",
-    "trim": "TURBO/TURBO S",
-    "price_usd": null,
-    "current_bid_usd": 13100.0,
-    "mileage": 31208,
-    "location": "GA - ATLANTA SOUTH",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0726/f3ac90dd316f4dfe98a8c2477d589fad_thb.jpg",
-    "vin": "WP0AC2Y18LS******",
-    "lot_number": "61133186",
-    "sale_date": "2026-08-18T14:00:00Z",
-    "first_seen": "2026-08-16T21:00:39.856869Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 16167,
-        "est_fees": 2572,
-        "all_in": 31839,
-        "resale_value": 35273,
-        "est_margin": 3434,
-        "max_bid_target": 29315,
-        "target": 50000,
-        "feasible": true,
-        "note": "project: all-in $31,839, ~$3,434 under $35,273 fixed value"
-      }
-    },
-    "project_tier": "salvage"
   },
   {
     "source": "copart",
@@ -3647,16 +3429,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 57600,
+        "est_recon": 19008,
         "est_fees": 2608,
-        "all_in": 32013,
-        "resale_value": 34920,
-        "est_margin": 2907,
-        "max_bid_target": 29460,
+        "all_in": 35016,
+        "resale_value": 41472,
+        "est_margin": 6456,
+        "max_bid_target": 26779,
         "target": 50000,
-        "feasible": false,
-        "note": "project: all-in $32,013 vs $34,920 fixed value \u2014 too thin to be worth the work"
+        "feasible": true,
+        "damage": null,
+        "note": "project: all-in $35,016, ~$6,456 under $41,472 fixed value"
       }
     },
     "project_tier": "salvage"
@@ -3694,6 +3477,7 @@
         "max_bid_target": 47124,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $14,590 \u2014 ready to drive, under $50k"
       }
     },
@@ -3732,6 +3516,7 @@
         "max_bid_target": 48722,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $15,175 \u2014 ready to drive, under $50k"
       }
     },
@@ -3761,95 +3546,20 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 19994,
-        "est_recon": 400,
+        "est_clean_value": 13998,
+        "est_recon": 280,
         "est_fees": 1000,
-        "all_in": 15398,
-        "resale_value": 19994,
-        "est_margin": 4596,
-        "max_bid_target": 48600,
+        "all_in": 15278,
+        "resale_value": 13998,
+        "est_margin": -1280,
+        "max_bid_target": 48720,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $15,398 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $15,278 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/62459716",
-    "listing_id": "WP0AA2Y19NS******",
-    "title": "2022 Porsche TAYCAN",
-    "year": 2022,
-    "make": "Porsche",
-    "model": "TAYCAN",
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 15100.0,
-    "mileage": 51943,
-    "location": "GA - CARTERSVILLE",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0726/dd20e0b4893a46b4a4684ea933cfbd7a_thb.jpg",
-    "vin": "WP0AA2Y19NS******",
-    "lot_number": "62459716",
-    "sale_date": "2026-08-18T01:00:00Z",
-    "first_seen": "2026-08-16T21:00:39.856850Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 16167,
-        "est_fees": 2812,
-        "all_in": 34079,
-        "resale_value": 35273,
-        "est_margin": 1194,
-        "max_bid_target": 29315,
-        "target": 50000,
-        "feasible": false,
-        "note": "project: all-in $34,079 vs $35,273 fixed value \u2014 too thin to be worth the work"
-      }
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/63431256",
-    "listing_id": "WP0AC2Y15LS******",
-    "title": "2020 Porsche TAYCAN TURBO",
-    "year": 2020,
-    "make": "Porsche",
-    "model": "TAYCAN",
-    "trim": "TURBO",
-    "price_usd": null,
-    "current_bid_usd": 15700.0,
-    "mileage": null,
-    "location": "CA - SUN VALLEY",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0726/16c66691fd6743a88a7d0665ad7fef73_thb.jpg",
-    "vin": "WP0AC2Y15LS******",
-    "lot_number": "63431256",
-    "sale_date": "2026-08-17T19:00:00Z",
-    "first_seen": "2026-08-16T21:00:39.856841Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 16167,
-        "est_fees": 2884,
-        "all_in": 34751,
-        "resale_value": 35273,
-        "est_margin": 522,
-        "max_bid_target": 29315,
-        "target": 50000,
-        "feasible": false,
-        "note": "project: all-in $34,751 vs $35,273 fixed value \u2014 too thin to be worth the work"
-      }
-    },
-    "project_tier": "salvage"
   },
   {
     "source": "bring_a_trailer",
@@ -3884,6 +3594,7 @@
         "max_bid_target": 47345,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $17,088 \u2014 ready to drive, under $50k"
       }
     },
@@ -3922,6 +3633,7 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": false,
+        "damage": null,
         "note": "project: all-in $30,341 vs $24,185 fixed value \u2014 too thin to be worth the work"
       }
     },
@@ -3960,48 +3672,11 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": false,
+        "damage": null,
         "note": "project: all-in $31,013 vs $24,185 fixed value \u2014 too thin to be worth the work"
       }
     },
     "project_tier": "clean"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/58432726",
-    "listing_id": "WP0AC2Y17LS******",
-    "title": "2020 Porsche TAYCAN TURBO",
-    "year": 2020,
-    "make": "Porsche",
-    "model": "TAYCAN",
-    "trim": "TURBO",
-    "price_usd": null,
-    "current_bid_usd": 17200.0,
-    "mileage": 45518,
-    "location": "KY - LEXINGTON EAST",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0626/839426a2f3134328bb980f844c6e8b38_thb.jpg",
-    "vin": "WP0AC2Y17LS******",
-    "lot_number": "58432726",
-    "sale_date": "2026-08-17T14:00:00Z",
-    "first_seen": "2026-08-16T21:00:39.856831Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 16167,
-        "est_fees": 3064,
-        "all_in": 36431,
-        "resale_value": 35273,
-        "est_margin": -1158,
-        "max_bid_target": 29315,
-        "target": 50000,
-        "feasible": false,
-        "note": "project: all-in $36,431 vs $35,273 fixed value \u2014 too thin to be worth the work"
-      }
-    },
-    "project_tier": "salvage"
   },
   {
     "source": "truecar",
@@ -4027,16 +3702,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 25490,
-        "est_recon": 510,
+        "est_clean_value": 17245,
+        "est_recon": 345,
         "est_fees": 1000,
-        "all_in": 18755,
-        "resale_value": 25490,
-        "est_margin": 6735,
-        "max_bid_target": 48490,
+        "all_in": 18590,
+        "resale_value": 17245,
+        "est_margin": -1345,
+        "max_bid_target": 48655,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $18,755 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $18,590 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -4074,6 +3750,7 @@
         "max_bid_target": 47105,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $18,915 \u2014 ready to drive, under $50k"
       }
     },
@@ -4112,6 +3789,7 @@
         "max_bid_target": 31672,
         "target": 50000,
         "feasible": false,
+        "damage": null,
         "note": "project: all-in $34,799 vs $29,513 fixed value \u2014 too thin to be worth the work"
       }
     },
@@ -4150,6 +3828,7 @@
         "max_bid_target": 47162,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $19,695 \u2014 ready to drive, under $50k"
       }
     },
@@ -4188,6 +3867,7 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": false,
+        "damage": null,
         "note": "project: all-in $33,253 vs $24,185 fixed value \u2014 too thin to be worth the work"
       }
     },
@@ -4226,6 +3906,7 @@
         "max_bid_target": 47263,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $20,324 \u2014 ready to drive, under $50k"
       }
     },
@@ -4264,6 +3945,7 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": false,
+        "damage": null,
         "note": "project: all-in $34,149 vs $24,185 fixed value \u2014 too thin to be worth the work"
       }
     },
@@ -4302,6 +3984,7 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": false,
+        "damage": null,
         "note": "project: all-in $34,373 vs $24,185 fixed value \u2014 too thin to be worth the work"
       }
     },
@@ -4340,6 +4023,7 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": false,
+        "damage": null,
         "note": "project: all-in $34,373 vs $24,185 fixed value \u2014 too thin to be worth the work"
       }
     },
@@ -4378,6 +4062,7 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": false,
+        "damage": null,
         "note": "project: all-in $34,485 vs $24,185 fixed value \u2014 too thin to be worth the work"
       }
     },
@@ -4407,16 +4092,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 47998,
-        "est_recon": 15839,
+        "est_clean_value": 43590,
+        "est_recon": 14385,
         "est_fees": 3412,
-        "all_in": 39351,
-        "resale_value": 34559,
-        "est_margin": -4792,
-        "max_bid_target": 29608,
+        "all_in": 37897,
+        "resale_value": 31385,
+        "est_margin": -6512,
+        "max_bid_target": 30906,
         "target": 50000,
         "feasible": false,
-        "note": "project: all-in $39,351 vs $34,559 fixed value \u2014 too thin to be worth the work"
+        "damage": null,
+        "note": "project: all-in $37,897 vs $31,385 fixed value \u2014 too thin to be worth the work"
       }
     },
     "project_tier": "salvage"
@@ -4445,16 +4131,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 47998,
-        "est_recon": 15839,
+        "est_clean_value": 43590,
+        "est_recon": 14385,
         "est_fees": 3424,
-        "all_in": 39463,
-        "resale_value": 34559,
-        "est_margin": -4904,
-        "max_bid_target": 29608,
+        "all_in": 38009,
+        "resale_value": 31385,
+        "est_margin": -6624,
+        "max_bid_target": 30906,
         "target": 50000,
         "feasible": false,
-        "note": "project: all-in $39,463 vs $34,559 fixed value \u2014 too thin to be worth the work"
+        "damage": null,
+        "note": "project: all-in $38,009 vs $31,385 fixed value \u2014 too thin to be worth the work"
       }
     },
     "project_tier": "salvage"
@@ -4492,6 +4179,7 @@
         "max_bid_target": 46979,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $21,934 \u2014 ready to drive, under $50k"
       }
     },
@@ -4530,6 +4218,7 @@
         "max_bid_target": 31965,
         "target": 50000,
         "feasible": false,
+        "damage": null,
         "note": "project: all-in $37,383 vs $28,799 fixed value \u2014 too thin to be worth the work"
       }
     },
@@ -4559,16 +4248,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 23590,
-        "est_recon": 472,
+        "est_clean_value": 20894,
+        "est_recon": 418,
         "est_fees": 1000,
-        "all_in": 22366,
-        "resale_value": 23590,
-        "est_margin": 1224,
-        "max_bid_target": 48528,
+        "all_in": 22312,
+        "resale_value": 20894,
+        "est_margin": -1418,
+        "max_bid_target": 48582,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $22,366 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $22,312 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -4597,16 +4287,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 23995,
-        "est_recon": 480,
+        "est_clean_value": 20894,
+        "est_recon": 418,
         "est_fees": 1000,
-        "all_in": 22374,
-        "resale_value": 23995,
-        "est_margin": 1621,
-        "max_bid_target": 48520,
+        "all_in": 22312,
+        "resale_value": 20894,
+        "est_margin": -1418,
+        "max_bid_target": 48582,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $22,374 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $22,312 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -4644,6 +4335,7 @@
         "max_bid_target": 46857,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $22,850 \u2014 ready to drive, under $50k"
       }
     },
@@ -4673,16 +4365,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 23590,
-        "est_recon": 472,
+        "est_clean_value": 21990,
+        "est_recon": 440,
         "est_fees": 1000,
-        "all_in": 23462,
-        "resale_value": 23590,
-        "est_margin": 128,
-        "max_bid_target": 48528,
+        "all_in": 23430,
+        "resale_value": 21990,
+        "est_margin": -1440,
+        "max_bid_target": 48560,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $23,462 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $23,430 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -4720,6 +4413,7 @@
         "max_bid_target": 47162,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $23,580 \u2014 ready to drive, under $50k"
       }
     },
@@ -4758,6 +4452,7 @@
         "max_bid_target": 46968,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $23,784 \u2014 ready to drive, under $50k"
       }
     },
@@ -4796,6 +4491,7 @@
         "max_bid_target": 46857,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $23,900 \u2014 ready to drive, under $50k"
       }
     },
@@ -4825,16 +4521,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 57600,
+        "est_recon": 19008,
         "est_fees": 3664,
-        "all_in": 41869,
-        "resale_value": 34920,
-        "est_margin": -6949,
-        "max_bid_target": 29460,
+        "all_in": 44872,
+        "resale_value": 41472,
+        "est_margin": -3400,
+        "max_bid_target": 26779,
         "target": 50000,
         "feasible": false,
-        "note": "project: all-in $41,869 vs $34,920 fixed value \u2014 too thin to be worth the work"
+        "damage": null,
+        "note": "project: all-in $44,872 vs $41,472 fixed value \u2014 too thin to be worth the work"
       }
     },
     "project_tier": "salvage"
@@ -4872,6 +4569,7 @@
         "max_bid_target": 47208,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $24,057 \u2014 ready to drive, under $50k"
       }
     },
@@ -4901,16 +4599,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 42590,
-        "est_recon": 852,
+        "est_clean_value": 38794,
+        "est_recon": 776,
         "est_fees": 1125,
-        "all_in": 24477,
-        "resale_value": 42590,
-        "est_margin": 18113,
-        "max_bid_target": 46808,
+        "all_in": 24401,
+        "resale_value": 38794,
+        "est_margin": 14393,
+        "max_bid_target": 46880,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $24,477 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $24,401 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -4948,6 +4647,7 @@
         "max_bid_target": 47034,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $25,026 \u2014 ready to drive, under $50k"
       }
     },
@@ -4986,6 +4686,7 @@
         "max_bid_target": 48528,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $25,062 \u2014 ready to drive, under $50k"
       }
     },
@@ -5024,6 +4725,7 @@
         "max_bid_target": 48528,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $25,062 \u2014 ready to drive, under $50k"
       }
     },
@@ -5062,6 +4764,7 @@
         "max_bid_target": 48528,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $25,062 \u2014 ready to drive, under $50k"
       }
     },
@@ -5091,16 +4794,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 25490,
-        "est_recon": 510,
+        "est_clean_value": 23624,
+        "est_recon": 472,
         "est_fees": 1000,
-        "all_in": 25134,
-        "resale_value": 25490,
-        "est_margin": 356,
-        "max_bid_target": 48490,
+        "all_in": 25096,
+        "resale_value": 23624,
+        "est_margin": -1472,
+        "max_bid_target": 48528,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $25,134 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $25,096 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -5129,16 +4833,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 47998,
-        "est_recon": 15839,
+        "est_clean_value": 64480,
+        "est_recon": 21278,
         "est_fees": 3844,
-        "all_in": 43383,
-        "resale_value": 34559,
-        "est_margin": -8824,
-        "max_bid_target": 29608,
+        "all_in": 48822,
+        "resale_value": 46426,
+        "est_margin": -2396,
+        "max_bid_target": 24752,
         "target": 50000,
         "feasible": false,
-        "note": "project: all-in $43,383 vs $34,559 fixed value \u2014 too thin to be worth the work"
+        "damage": null,
+        "note": "project: all-in $48,822 vs $46,426 fixed value \u2014 too thin to be worth the work"
       }
     },
     "project_tier": "salvage"
@@ -5167,16 +4872,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 23590,
-        "est_recon": 472,
+        "est_clean_value": 23990,
+        "est_recon": 480,
         "est_fees": 1000,
-        "all_in": 25462,
-        "resale_value": 23590,
-        "est_margin": -1872,
-        "max_bid_target": 48528,
+        "all_in": 25470,
+        "resale_value": 23990,
+        "est_margin": -1480,
+        "max_bid_target": 48520,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $25,462 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $25,470 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -5214,6 +4920,7 @@
         "max_bid_target": 48520,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $25,475 \u2014 ready to drive, under $50k"
       }
     },
@@ -5252,6 +4959,7 @@
         "max_bid_target": 46968,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $25,884 \u2014 ready to drive, under $50k"
       }
     },
@@ -5281,16 +4989,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 25490,
-        "est_recon": 510,
+        "est_clean_value": 24498,
+        "est_recon": 490,
         "est_fees": 1000,
-        "all_in": 26008,
-        "resale_value": 25490,
-        "est_margin": -518,
-        "max_bid_target": 48490,
+        "all_in": 25988,
+        "resale_value": 24498,
+        "est_margin": -1490,
+        "max_bid_target": 48510,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $26,008 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $25,988 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -5319,16 +5028,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 25490,
-        "est_recon": 510,
+        "est_clean_value": 24590,
+        "est_recon": 492,
         "est_fees": 1000,
-        "all_in": 26100,
-        "resale_value": 25490,
-        "est_margin": -610,
-        "max_bid_target": 48490,
+        "all_in": 26082,
+        "resale_value": 24590,
+        "est_margin": -1492,
+        "max_bid_target": 48508,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $26,100 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $26,082 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -5357,16 +5067,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 23590,
-        "est_recon": 472,
+        "est_clean_value": 24590,
+        "est_recon": 492,
         "est_fees": 1000,
-        "all_in": 26062,
-        "resale_value": 23590,
-        "est_margin": -2472,
-        "max_bid_target": 48528,
+        "all_in": 26082,
+        "resale_value": 24590,
+        "est_margin": -1492,
+        "max_bid_target": 48508,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $26,062 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $26,082 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -5404,6 +5115,7 @@
         "max_bid_target": 31672,
         "target": 50000,
         "feasible": false,
+        "damage": null,
         "note": "project: all-in $42,191 vs $29,513 fixed value \u2014 too thin to be worth the work"
       }
     },
@@ -5442,6 +5154,7 @@
         "max_bid_target": 31965,
         "target": 50000,
         "feasible": false,
+        "damage": null,
         "note": "project: all-in $41,975 vs $28,799 fixed value \u2014 too thin to be worth the work"
       }
     },
@@ -5471,16 +5184,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 23590,
-        "est_recon": 472,
+        "est_clean_value": 24899,
+        "est_recon": 498,
         "est_fees": 1000,
-        "all_in": 26371,
-        "resale_value": 23590,
-        "est_margin": -2781,
-        "max_bid_target": 48528,
+        "all_in": 26397,
+        "resale_value": 24899,
+        "est_margin": -1498,
+        "max_bid_target": 48502,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $26,371 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $26,397 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -5518,6 +5232,7 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": false,
+        "damage": null,
         "note": "project: all-in $39,973 vs $24,185 fixed value \u2014 too thin to be worth the work"
       }
     },
@@ -5547,16 +5262,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 25490,
-        "est_recon": 510,
+        "est_clean_value": 24990,
+        "est_recon": 500,
         "est_fees": 1000,
-        "all_in": 26500,
-        "resale_value": 25490,
-        "est_margin": -1010,
-        "max_bid_target": 48490,
+        "all_in": 26490,
+        "resale_value": 24990,
+        "est_margin": -1500,
+        "max_bid_target": 48500,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $26,500 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $26,490 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -5585,16 +5301,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 26590,
-        "est_recon": 532,
+        "est_clean_value": 24990,
+        "est_recon": 500,
         "est_fees": 1000,
-        "all_in": 26522,
-        "resale_value": 26590,
-        "est_margin": 68,
-        "max_bid_target": 48468,
+        "all_in": 26490,
+        "resale_value": 24990,
+        "est_margin": -1500,
+        "max_bid_target": 48500,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $26,522 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $26,490 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -5632,6 +5349,7 @@
         "max_bid_target": 46857,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $27,050 \u2014 ready to drive, under $50k"
       }
     },
@@ -5661,16 +5379,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 980,
+        "est_clean_value": 59400,
+        "est_recon": 1188,
         "est_fees": 1250,
-        "all_in": 27230,
-        "resale_value": 48990,
-        "est_margin": 21760,
-        "max_bid_target": 46686,
+        "all_in": 27438,
+        "resale_value": 59400,
+        "est_margin": 31962,
+        "max_bid_target": 46488,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $27,230 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $27,438 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -5708,6 +5427,7 @@
         "max_bid_target": 47112,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $27,307 \u2014 ready to drive, under $50k"
       }
     },
@@ -5737,16 +5457,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 26590,
-        "est_recon": 532,
+        "est_clean_value": 25590,
+        "est_recon": 512,
         "est_fees": 1000,
-        "all_in": 27122,
-        "resale_value": 26590,
-        "est_margin": -532,
-        "max_bid_target": 48468,
+        "all_in": 27102,
+        "resale_value": 25590,
+        "est_margin": -1512,
+        "max_bid_target": 48488,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $27,122 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $27,102 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -5784,6 +5505,7 @@
         "max_bid_target": 46830,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $28,035 \u2014 ready to drive, under $50k"
       }
     },
@@ -5813,16 +5535,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 19994,
-        "est_recon": 400,
+        "est_clean_value": 25990,
+        "est_recon": 520,
         "est_fees": 1000,
-        "all_in": 27390,
-        "resale_value": 19994,
-        "est_margin": -7396,
-        "max_bid_target": 48600,
+        "all_in": 27510,
+        "resale_value": 25990,
+        "est_margin": -1520,
+        "max_bid_target": 48480,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $27,390 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $27,510 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -5851,16 +5574,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 25490,
-        "est_recon": 510,
+        "est_clean_value": 25990,
+        "est_recon": 520,
         "est_fees": 1000,
-        "all_in": 27500,
-        "resale_value": 25490,
-        "est_margin": -2010,
-        "max_bid_target": 48490,
+        "all_in": 27510,
+        "resale_value": 25990,
+        "est_margin": -1520,
+        "max_bid_target": 48480,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $27,500 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $27,510 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -5898,6 +5622,7 @@
         "max_bid_target": 48468,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $28,122 \u2014 ready to drive, under $50k"
       }
     },
@@ -5927,16 +5652,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 26697,
+        "est_recon": 534,
         "est_fees": 1000,
-        "all_in": 28497,
-        "resale_value": 39990,
-        "est_margin": 11493,
-        "max_bid_target": 48200,
+        "all_in": 28231,
+        "resale_value": 26697,
+        "est_margin": -1534,
+        "max_bid_target": 48466,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $28,497 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $28,231 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -5965,16 +5691,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 26590,
-        "est_recon": 532,
+        "est_clean_value": 27990,
+        "est_recon": 560,
         "est_fees": 1000,
-        "all_in": 29522,
-        "resale_value": 26590,
-        "est_margin": -2932,
-        "max_bid_target": 48468,
+        "all_in": 29550,
+        "resale_value": 27990,
+        "est_margin": -1560,
+        "max_bid_target": 48440,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $29,522 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $29,550 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6012,6 +5739,7 @@
         "max_bid_target": 46857,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $30,200 \u2014 ready to drive, under $50k"
       }
     },
@@ -6041,16 +5769,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33590,
-        "est_recon": 672,
+        "est_clean_value": 28990,
+        "est_recon": 580,
         "est_fees": 1000,
-        "all_in": 30662,
-        "resale_value": 33590,
-        "est_margin": 2928,
-        "max_bid_target": 48328,
+        "all_in": 30570,
+        "resale_value": 28990,
+        "est_margin": -1580,
+        "max_bid_target": 48420,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $30,662 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $30,570 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6079,16 +5808,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33590,
-        "est_recon": 672,
+        "est_clean_value": 29590,
+        "est_recon": 592,
         "est_fees": 1000,
-        "all_in": 31262,
-        "resale_value": 33590,
-        "est_margin": 2328,
-        "max_bid_target": 48328,
+        "all_in": 31182,
+        "resale_value": 29590,
+        "est_margin": -1592,
+        "max_bid_target": 48408,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $31,262 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $31,182 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6126,6 +5856,7 @@
         "max_bid_target": 47413,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $31,678 \u2014 ready to drive, under $50k"
       }
     },
@@ -6155,16 +5886,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 25490,
-        "est_recon": 510,
+        "est_clean_value": 29990,
+        "est_recon": 600,
         "est_fees": 1000,
-        "all_in": 31500,
-        "resale_value": 25490,
-        "est_margin": -6010,
-        "max_bid_target": 48490,
+        "all_in": 31590,
+        "resale_value": 29990,
+        "est_margin": -1600,
+        "max_bid_target": 48400,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $31,500 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $31,590 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6202,6 +5934,7 @@
         "max_bid_target": 45375,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $33,856 \u2014 ready to drive, under $50k"
       }
     },
@@ -6240,6 +5973,7 @@
         "max_bid_target": 46808,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $32,352 \u2014 ready to drive, under $50k"
       }
     },
@@ -6269,16 +6003,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33590,
-        "est_recon": 672,
+        "est_clean_value": 30590,
+        "est_recon": 612,
         "est_fees": 1000,
-        "all_in": 32262,
-        "resale_value": 33590,
-        "est_margin": 1328,
-        "max_bid_target": 48328,
+        "all_in": 32202,
+        "resale_value": 30590,
+        "est_margin": -1612,
+        "max_bid_target": 48388,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $32,262 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $32,202 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6307,16 +6042,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33590,
-        "est_recon": 672,
+        "est_clean_value": 30590,
+        "est_recon": 612,
         "est_fees": 1000,
-        "all_in": 32262,
-        "resale_value": 33590,
-        "est_margin": 1328,
-        "max_bid_target": 48328,
+        "all_in": 32202,
+        "resale_value": 30590,
+        "est_margin": -1612,
+        "max_bid_target": 48388,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $32,262 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $32,202 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6345,16 +6081,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 23995,
-        "est_recon": 480,
+        "est_clean_value": 30879,
+        "est_recon": 618,
         "est_fees": 1000,
-        "all_in": 32359,
-        "resale_value": 23995,
-        "est_margin": -8364,
-        "max_bid_target": 48520,
+        "all_in": 32497,
+        "resale_value": 30879,
+        "est_margin": -1618,
+        "max_bid_target": 48382,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $32,359 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $32,497 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6383,16 +6120,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 25990,
-        "est_recon": 520,
+        "est_clean_value": 30990,
+        "est_recon": 620,
         "est_fees": 1000,
-        "all_in": 32510,
-        "resale_value": 25990,
-        "est_margin": -6520,
-        "max_bid_target": 48480,
+        "all_in": 32610,
+        "resale_value": 30990,
+        "est_margin": -1620,
+        "max_bid_target": 48380,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $32,510 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $32,610 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6421,16 +6159,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 26590,
-        "est_recon": 532,
+        "est_clean_value": 30998,
+        "est_recon": 620,
         "est_fees": 1000,
-        "all_in": 32530,
-        "resale_value": 26590,
-        "est_margin": -5940,
-        "max_bid_target": 48468,
+        "all_in": 32618,
+        "resale_value": 30998,
+        "est_margin": -1620,
+        "max_bid_target": 48380,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $32,530 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $32,618 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6468,6 +6207,7 @@
         "max_bid_target": 43750,
         "target": 50000,
         "feasible": false,
+        "damage": null,
         "note": "project: all-in $36,000 vs $28,799 fixed value \u2014 too thin to be worth the work"
       }
     },
@@ -6497,16 +6237,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33590,
-        "est_recon": 672,
+        "est_clean_value": 31590,
+        "est_recon": 632,
         "est_fees": 1000,
-        "all_in": 33262,
-        "resale_value": 33590,
-        "est_margin": 328,
-        "max_bid_target": 48328,
+        "all_in": 33222,
+        "resale_value": 31590,
+        "est_margin": -1632,
+        "max_bid_target": 48368,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $33,262 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $33,222 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6535,16 +6276,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33590,
-        "est_recon": 672,
+        "est_clean_value": 31590,
+        "est_recon": 632,
         "est_fees": 1000,
-        "all_in": 33262,
-        "resale_value": 33590,
-        "est_margin": 328,
-        "max_bid_target": 48328,
+        "all_in": 33222,
+        "resale_value": 31590,
+        "est_margin": -1632,
+        "max_bid_target": 48368,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $33,262 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $33,222 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6573,16 +6315,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33590,
-        "est_recon": 672,
+        "est_clean_value": 31990,
+        "est_recon": 640,
         "est_fees": 1000,
-        "all_in": 33662,
-        "resale_value": 33590,
-        "est_margin": -72,
-        "max_bid_target": 48328,
+        "all_in": 33630,
+        "resale_value": 31990,
+        "est_margin": -1640,
+        "max_bid_target": 48360,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $33,662 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $33,630 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6611,16 +6354,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 31991,
+        "est_recon": 640,
         "est_fees": 1000,
-        "all_in": 33791,
-        "resale_value": 39990,
-        "est_margin": 6199,
-        "max_bid_target": 48200,
+        "all_in": 33631,
+        "resale_value": 31991,
+        "est_margin": -1640,
+        "max_bid_target": 48360,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $33,791 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $33,631 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6649,16 +6393,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 32100,
+        "est_recon": 642,
         "est_fees": 1000,
-        "all_in": 33900,
-        "resale_value": 39990,
-        "est_margin": 6090,
-        "max_bid_target": 48200,
+        "all_in": 33742,
+        "resale_value": 32100,
+        "est_margin": -1642,
+        "max_bid_target": 48358,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $33,900 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $33,742 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6696,6 +6441,7 @@
         "max_bid_target": 47162,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $34,342 \u2014 ready to drive, under $50k"
       }
     },
@@ -6725,16 +6471,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33590,
-        "est_recon": 672,
+        "est_clean_value": 32365,
+        "est_recon": 647,
         "est_fees": 1000,
-        "all_in": 34037,
-        "resale_value": 33590,
-        "est_margin": -447,
-        "max_bid_target": 48328,
+        "all_in": 34012,
+        "resale_value": 32365,
+        "est_margin": -1647,
+        "max_bid_target": 48353,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $34,037 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $34,012 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6763,16 +6510,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 47998,
-        "est_recon": 960,
+        "est_clean_value": 64480,
+        "est_recon": 1290,
         "est_fees": 1625,
-        "all_in": 35085,
-        "resale_value": 47998,
-        "est_margin": 12913,
-        "max_bid_target": 46705,
+        "all_in": 35415,
+        "resale_value": 64480,
+        "est_margin": 29065,
+        "max_bid_target": 46390,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $35,085 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $35,415 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6801,16 +6549,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39998,
-        "est_recon": 800,
+        "est_clean_value": 32849,
+        "est_recon": 657,
         "est_fees": 1000,
-        "all_in": 34649,
-        "resale_value": 39998,
-        "est_margin": 5349,
-        "max_bid_target": 48200,
+        "all_in": 34506,
+        "resale_value": 32849,
+        "est_margin": -1657,
+        "max_bid_target": 48343,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $34,649 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $34,506 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6839,16 +6588,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 32990,
+        "est_recon": 660,
         "est_fees": 1000,
-        "all_in": 34790,
-        "resale_value": 39990,
-        "est_margin": 5200,
-        "max_bid_target": 48200,
+        "all_in": 34650,
+        "resale_value": 32990,
+        "est_margin": -1660,
+        "max_bid_target": 48340,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $34,790 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $34,650 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6877,16 +6627,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 980,
+        "est_clean_value": 61600,
+        "est_recon": 1232,
         "est_fees": 1662,
-        "all_in": 35892,
-        "resale_value": 48990,
-        "est_margin": 13098,
-        "max_bid_target": 46686,
+        "all_in": 36144,
+        "resale_value": 61600,
+        "est_margin": 25456,
+        "max_bid_target": 46446,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $35,892 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $36,144 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6924,6 +6675,7 @@
         "max_bid_target": 48328,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $35,262 \u2014 ready to drive, under $50k"
       }
     },
@@ -6953,16 +6705,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39998,
-        "est_recon": 800,
+        "est_clean_value": 34405,
+        "est_recon": 688,
         "est_fees": 1000,
-        "all_in": 36205,
-        "resale_value": 39998,
-        "est_margin": 3793,
-        "max_bid_target": 48200,
+        "all_in": 36093,
+        "resale_value": 34405,
+        "est_margin": -1688,
+        "max_bid_target": 48312,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $36,205 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $36,093 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -6991,16 +6744,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 34498,
+        "est_recon": 690,
         "est_fees": 1000,
-        "all_in": 36298,
-        "resale_value": 39990,
-        "est_margin": 3692,
-        "max_bid_target": 48200,
+        "all_in": 36188,
+        "resale_value": 34498,
+        "est_margin": -1690,
+        "max_bid_target": 48310,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $36,298 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $36,188 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7029,16 +6783,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33590,
-        "est_recon": 672,
+        "est_clean_value": 34590,
+        "est_recon": 692,
         "est_fees": 1000,
-        "all_in": 36262,
-        "resale_value": 33590,
-        "est_margin": -2672,
-        "max_bid_target": 48328,
+        "all_in": 36282,
+        "resale_value": 34590,
+        "est_margin": -1692,
+        "max_bid_target": 48308,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $36,262 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $36,282 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7067,16 +6822,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33590,
-        "est_recon": 672,
+        "est_clean_value": 34590,
+        "est_recon": 692,
         "est_fees": 1000,
-        "all_in": 36262,
-        "resale_value": 33590,
-        "est_margin": -2672,
-        "max_bid_target": 48328,
+        "all_in": 36282,
+        "resale_value": 34590,
+        "est_margin": -1692,
+        "max_bid_target": 48308,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $36,262 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $36,282 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7105,16 +6861,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 38794,
-        "est_recon": 776,
+        "est_clean_value": 34900,
+        "est_recon": 698,
         "est_fees": 1000,
-        "all_in": 36676,
-        "resale_value": 38794,
-        "est_margin": 2118,
-        "max_bid_target": 48224,
+        "all_in": 36598,
+        "resale_value": 34900,
+        "est_margin": -1698,
+        "max_bid_target": 48302,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $36,676 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $36,598 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7143,16 +6900,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 25490,
-        "est_recon": 510,
+        "est_clean_value": 34990,
+        "est_recon": 700,
         "est_fees": 1000,
-        "all_in": 36500,
-        "resale_value": 25490,
-        "est_margin": -11010,
-        "max_bid_target": 48490,
+        "all_in": 36690,
+        "resale_value": 34990,
+        "est_margin": -1700,
+        "max_bid_target": 48300,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $36,500 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $36,690 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7190,6 +6948,7 @@
         "max_bid_target": 47036,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $37,358 \u2014 ready to drive, under $50k"
       }
     },
@@ -7219,16 +6978,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 42590,
-        "est_recon": 852,
+        "est_clean_value": 34999,
+        "est_recon": 700,
         "est_fees": 1000,
-        "all_in": 36851,
-        "resale_value": 42590,
-        "est_margin": 5739,
-        "max_bid_target": 48148,
+        "all_in": 36699,
+        "resale_value": 34999,
+        "est_margin": -1700,
+        "max_bid_target": 48300,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $36,851 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $36,699 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7266,6 +7026,7 @@
         "max_bid_target": 47105,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $37,290 \u2014 ready to drive, under $50k"
       }
     },
@@ -7295,16 +7056,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 39847,
+        "est_recon": 797,
         "est_fees": 1750,
-        "all_in": 37550,
-        "resale_value": 39990,
-        "est_margin": 2440,
-        "max_bid_target": 46857,
+        "all_in": 37547,
+        "resale_value": 39847,
+        "est_margin": 2300,
+        "max_bid_target": 46860,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $37,550 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $37,547 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7342,6 +7104,7 @@
         "max_bid_target": 47413,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $37,228 \u2014 ready to drive, under $50k"
       }
     },
@@ -7380,6 +7143,7 @@
         "max_bid_target": 46659,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $38,020 \u2014 ready to drive, under $50k"
       }
     },
@@ -7409,16 +7173,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33590,
-        "est_recon": 672,
+        "est_clean_value": 35598,
+        "est_recon": 712,
         "est_fees": 1000,
-        "all_in": 37270,
-        "resale_value": 33590,
-        "est_margin": -3680,
-        "max_bid_target": 48328,
+        "all_in": 37310,
+        "resale_value": 35598,
+        "est_margin": -1712,
+        "max_bid_target": 48288,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $37,270 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $37,310 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7447,16 +7212,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 35990,
+        "est_recon": 720,
         "est_fees": 1000,
-        "all_in": 37790,
-        "resale_value": 39990,
-        "est_margin": 2200,
-        "max_bid_target": 48200,
+        "all_in": 37710,
+        "resale_value": 35990,
+        "est_margin": -1720,
+        "max_bid_target": 48280,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $37,790 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $37,710 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7485,16 +7251,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 25490,
-        "est_recon": 510,
+        "est_clean_value": 35990,
+        "est_recon": 720,
         "est_fees": 1000,
-        "all_in": 37500,
-        "resale_value": 25490,
-        "est_margin": -12010,
-        "max_bid_target": 48490,
+        "all_in": 37710,
+        "resale_value": 35990,
+        "est_margin": -1720,
+        "max_bid_target": 48280,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $37,500 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $37,710 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7523,16 +7290,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33590,
-        "est_recon": 672,
+        "est_clean_value": 35998,
+        "est_recon": 720,
         "est_fees": 1000,
-        "all_in": 37670,
-        "resale_value": 33590,
-        "est_margin": -4080,
-        "max_bid_target": 48328,
+        "all_in": 37718,
+        "resale_value": 35998,
+        "est_margin": -1720,
+        "max_bid_target": 48280,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $37,670 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $37,718 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7561,16 +7329,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 35998,
+        "est_recon": 720,
         "est_fees": 1000,
-        "all_in": 37798,
-        "resale_value": 39990,
-        "est_margin": 2192,
-        "max_bid_target": 48200,
+        "all_in": 37718,
+        "resale_value": 35998,
+        "est_margin": -1720,
+        "max_bid_target": 48280,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $37,798 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $37,718 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7599,16 +7368,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 40490,
-        "est_recon": 810,
+        "est_clean_value": 36990,
+        "est_recon": 740,
         "est_fees": 1000,
-        "all_in": 38800,
-        "resale_value": 40490,
-        "est_margin": 1690,
-        "max_bid_target": 48190,
+        "all_in": 38730,
+        "resale_value": 36990,
+        "est_margin": -1740,
+        "max_bid_target": 48260,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $38,800 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $38,730 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7637,16 +7407,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33590,
-        "est_recon": 672,
+        "est_clean_value": 36990,
+        "est_recon": 740,
         "est_fees": 1000,
-        "all_in": 38662,
-        "resale_value": 33590,
-        "est_margin": -5072,
-        "max_bid_target": 48328,
+        "all_in": 38730,
+        "resale_value": 36990,
+        "est_margin": -1740,
+        "max_bid_target": 48260,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $38,662 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $38,730 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7675,16 +7446,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 40490,
-        "est_recon": 810,
+        "est_clean_value": 37590,
+        "est_recon": 752,
         "est_fees": 1000,
-        "all_in": 39400,
-        "resale_value": 40490,
-        "est_margin": 1090,
-        "max_bid_target": 48190,
+        "all_in": 39342,
+        "resale_value": 37590,
+        "est_margin": -1752,
+        "max_bid_target": 48248,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $39,400 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $39,342 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7713,16 +7485,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39998,
-        "est_recon": 800,
+        "est_clean_value": 37600,
+        "est_recon": 752,
         "est_fees": 1000,
-        "all_in": 39400,
-        "resale_value": 39998,
-        "est_margin": 598,
-        "max_bid_target": 48200,
+        "all_in": 39352,
+        "resale_value": 37600,
+        "est_margin": -1752,
+        "max_bid_target": 48248,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $39,400 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $39,352 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7751,16 +7524,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 37740,
+        "est_recon": 755,
         "est_fees": 1000,
-        "all_in": 39540,
-        "resale_value": 39990,
-        "est_margin": 450,
-        "max_bid_target": 48200,
+        "all_in": 39495,
+        "resale_value": 37740,
+        "est_margin": -1755,
+        "max_bid_target": 48245,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $39,540 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $39,495 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7789,16 +7563,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 44290,
-        "est_recon": 886,
+        "est_clean_value": 37995,
+        "est_recon": 760,
         "est_fees": 1000,
-        "all_in": 39881,
-        "resale_value": 44290,
-        "est_margin": 4409,
-        "max_bid_target": 48114,
+        "all_in": 39755,
+        "resale_value": 37995,
+        "est_margin": -1760,
+        "max_bid_target": 48240,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $39,881 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $39,755 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7827,16 +7602,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 25490,
-        "est_recon": 510,
+        "est_clean_value": 37998,
+        "est_recon": 760,
         "est_fees": 1000,
-        "all_in": 39508,
-        "resale_value": 25490,
-        "est_margin": -14018,
-        "max_bid_target": 48490,
+        "all_in": 39758,
+        "resale_value": 37998,
+        "est_margin": -1760,
+        "max_bid_target": 48240,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $39,508 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $39,758 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7865,16 +7641,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 38590,
+        "est_recon": 772,
         "est_fees": 1000,
-        "all_in": 40390,
-        "resale_value": 39990,
-        "est_margin": -400,
-        "max_bid_target": 48200,
+        "all_in": 40362,
+        "resale_value": 38590,
+        "est_margin": -1772,
+        "max_bid_target": 48228,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $40,390 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $40,362 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7902,16 +7679,17 @@
     "first_seen": "2026-05-13T15:04:17.717054Z",
     "raw": {
       "deal": {
-        "est_clean_value": 42590,
-        "est_recon": 852,
+        "est_clean_value": 38850,
+        "est_recon": 777,
         "est_fees": 1000,
-        "all_in": 40702,
-        "resale_value": 42590,
-        "est_margin": 1888,
-        "max_bid_target": 48148,
+        "all_in": 40627,
+        "resale_value": 38850,
+        "est_margin": -1777,
+        "max_bid_target": 48223,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $40,702 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $40,627 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7940,16 +7718,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39998,
-        "est_recon": 800,
+        "est_clean_value": 38990,
+        "est_recon": 780,
         "est_fees": 1000,
-        "all_in": 40790,
-        "resale_value": 39998,
-        "est_margin": -792,
-        "max_bid_target": 48200,
+        "all_in": 40770,
+        "resale_value": 38990,
+        "est_margin": -1780,
+        "max_bid_target": 48220,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $40,790 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $40,770 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -7978,16 +7757,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 38990,
+        "est_recon": 780,
         "est_fees": 1000,
-        "all_in": 40790,
-        "resale_value": 39990,
-        "est_margin": -800,
-        "max_bid_target": 48200,
+        "all_in": 40770,
+        "resale_value": 38990,
+        "est_margin": -1780,
+        "max_bid_target": 48220,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $40,790 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $40,770 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8016,16 +7796,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33590,
-        "est_recon": 672,
+        "est_clean_value": 38990,
+        "est_recon": 780,
         "est_fees": 1000,
-        "all_in": 40662,
-        "resale_value": 33590,
-        "est_margin": -7072,
-        "max_bid_target": 48328,
+        "all_in": 40770,
+        "resale_value": 38990,
+        "est_margin": -1780,
+        "max_bid_target": 48220,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $40,662 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $40,770 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8054,16 +7835,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 39590,
+        "est_recon": 792,
         "est_fees": 1000,
-        "all_in": 41390,
-        "resale_value": 39990,
-        "est_margin": -1400,
-        "max_bid_target": 48200,
+        "all_in": 41382,
+        "resale_value": 39590,
+        "est_margin": -1792,
+        "max_bid_target": 48208,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $41,390 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $41,382 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8092,16 +7874,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 39704,
+        "est_recon": 794,
         "est_fees": 1000,
-        "all_in": 41504,
-        "resale_value": 39990,
-        "est_margin": -1514,
-        "max_bid_target": 48200,
+        "all_in": 41498,
+        "resale_value": 39704,
+        "est_margin": -1794,
+        "max_bid_target": 48206,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $41,504 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $41,498 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8130,16 +7913,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 40490,
-        "est_recon": 810,
+        "est_clean_value": 39990,
+        "est_recon": 800,
         "est_fees": 1000,
-        "all_in": 41800,
-        "resale_value": 40490,
-        "est_margin": -1310,
-        "max_bid_target": 48190,
+        "all_in": 41790,
+        "resale_value": 39990,
+        "est_margin": -1800,
+        "max_bid_target": 48200,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $41,800 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $41,790 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8177,6 +7961,7 @@
         "max_bid_target": 48200,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $41,790 \u2014 ready to drive, under $50k"
       }
     },
@@ -8215,6 +8000,7 @@
         "max_bid_target": 48200,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $41,798 \u2014 ready to drive, under $50k"
       }
     },
@@ -8253,6 +8039,7 @@
         "max_bid_target": 48200,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $41,798 \u2014 ready to drive, under $50k"
       }
     },
@@ -8282,16 +8069,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 40994,
-        "est_recon": 820,
+        "est_clean_value": 40124,
+        "est_recon": 802,
         "est_fees": 1000,
-        "all_in": 41944,
-        "resale_value": 40994,
-        "est_margin": -950,
-        "max_bid_target": 48180,
+        "all_in": 41926,
+        "resale_value": 40124,
+        "est_margin": -1802,
+        "max_bid_target": 48198,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $41,944 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $41,926 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8320,16 +8108,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 40490,
-        "est_recon": 810,
+        "est_clean_value": 40990,
+        "est_recon": 820,
         "est_fees": 1000,
-        "all_in": 42800,
-        "resale_value": 40490,
-        "est_margin": -2310,
-        "max_bid_target": 48190,
+        "all_in": 42810,
+        "resale_value": 40990,
+        "est_margin": -1820,
+        "max_bid_target": 48180,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $42,800 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $42,810 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8358,16 +8147,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39998,
-        "est_recon": 800,
+        "est_clean_value": 40990,
+        "est_recon": 820,
         "est_fees": 1000,
-        "all_in": 42790,
-        "resale_value": 39998,
-        "est_margin": -2792,
-        "max_bid_target": 48200,
+        "all_in": 42810,
+        "resale_value": 40990,
+        "est_margin": -1820,
+        "max_bid_target": 48180,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $42,790 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $42,810 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8396,16 +8186,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 40490,
-        "est_recon": 810,
+        "est_clean_value": 40990,
+        "est_recon": 820,
         "est_fees": 1000,
-        "all_in": 42800,
-        "resale_value": 40490,
-        "est_margin": -2310,
-        "max_bid_target": 48190,
+        "all_in": 42810,
+        "resale_value": 40990,
+        "est_margin": -1820,
+        "max_bid_target": 48180,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $42,800 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $42,810 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8434,16 +8225,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 40990,
+        "est_recon": 820,
         "est_fees": 1000,
-        "all_in": 42790,
-        "resale_value": 39990,
-        "est_margin": -2800,
-        "max_bid_target": 48200,
+        "all_in": 42810,
+        "resale_value": 40990,
+        "est_margin": -1820,
+        "max_bid_target": 48180,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $42,790 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $42,810 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8472,16 +8264,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39998,
-        "est_recon": 800,
+        "est_clean_value": 40998,
+        "est_recon": 820,
         "est_fees": 1000,
-        "all_in": 42798,
-        "resale_value": 39998,
-        "est_margin": -2800,
-        "max_bid_target": 48200,
+        "all_in": 42818,
+        "resale_value": 40998,
+        "est_margin": -1820,
+        "max_bid_target": 48180,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $42,798 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $42,818 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8510,16 +8303,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 40998,
+        "est_recon": 820,
         "est_fees": 1000,
-        "all_in": 42798,
-        "resale_value": 39990,
-        "est_margin": -2808,
-        "max_bid_target": 48200,
+        "all_in": 42818,
+        "resale_value": 40998,
+        "est_margin": -1820,
+        "max_bid_target": 48180,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $42,798 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $42,818 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8548,16 +8342,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 40490,
-        "est_recon": 810,
+        "est_clean_value": 41590,
+        "est_recon": 832,
         "est_fees": 1000,
-        "all_in": 43400,
-        "resale_value": 40490,
-        "est_margin": -2910,
-        "max_bid_target": 48190,
+        "all_in": 43422,
+        "resale_value": 41590,
+        "est_margin": -1832,
+        "max_bid_target": 48168,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $43,400 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $43,422 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8586,16 +8381,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39600,
-        "est_recon": 792,
+        "est_clean_value": 41995,
+        "est_recon": 840,
         "est_fees": 1000,
-        "all_in": 43787,
-        "resale_value": 39600,
-        "est_margin": -4187,
-        "max_bid_target": 48208,
+        "all_in": 43835,
+        "resale_value": 41995,
+        "est_margin": -1840,
+        "max_bid_target": 48160,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $43,787 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $43,835 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8624,16 +8420,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39998,
-        "est_recon": 800,
+        "est_clean_value": 41995,
+        "est_recon": 840,
         "est_fees": 1000,
-        "all_in": 43795,
-        "resale_value": 39998,
-        "est_margin": -3797,
-        "max_bid_target": 48200,
+        "all_in": 43835,
+        "resale_value": 41995,
+        "est_margin": -1840,
+        "max_bid_target": 48160,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $43,795 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $43,835 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8662,16 +8459,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 41998,
+        "est_recon": 840,
         "est_fees": 1000,
-        "all_in": 43798,
-        "resale_value": 39990,
-        "est_margin": -3808,
-        "max_bid_target": 48200,
+        "all_in": 43838,
+        "resale_value": 41998,
+        "est_margin": -1840,
+        "max_bid_target": 48160,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $43,798 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $43,838 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8709,6 +8507,7 @@
         "max_bid_target": 46899,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $45,381 \u2014 ready to drive, under $50k"
       }
     },
@@ -8747,6 +8546,7 @@
         "max_bid_target": 48148,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $44,442 \u2014 ready to drive, under $50k"
       }
     },
@@ -8785,6 +8585,7 @@
         "max_bid_target": 48148,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $44,442 \u2014 ready to drive, under $50k"
       }
     },
@@ -8814,16 +8615,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 42590,
+        "est_recon": 852,
         "est_fees": 1000,
-        "all_in": 44390,
-        "resale_value": 39990,
-        "est_margin": -4400,
-        "max_bid_target": 48200,
+        "all_in": 44442,
+        "resale_value": 42590,
+        "est_margin": -1852,
+        "max_bid_target": 48148,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $44,390 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $44,442 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8852,16 +8654,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 42998,
+        "est_recon": 860,
         "est_fees": 1000,
-        "all_in": 44798,
-        "resale_value": 39990,
-        "est_margin": -4808,
-        "max_bid_target": 48200,
+        "all_in": 44858,
+        "resale_value": 42998,
+        "est_margin": -1860,
+        "max_bid_target": 48140,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $44,798 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $44,858 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8890,16 +8693,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33590,
-        "est_recon": 672,
+        "est_clean_value": 42998,
+        "est_recon": 860,
         "est_fees": 1000,
-        "all_in": 44670,
-        "resale_value": 33590,
-        "est_margin": -11080,
-        "max_bid_target": 48328,
+        "all_in": 44858,
+        "resale_value": 42998,
+        "est_margin": -1860,
+        "max_bid_target": 48140,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $44,670 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $44,858 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8928,16 +8732,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 42998,
+        "est_recon": 860,
         "est_fees": 1000,
-        "all_in": 44798,
-        "resale_value": 39990,
-        "est_margin": -4808,
-        "max_bid_target": 48200,
+        "all_in": 44858,
+        "resale_value": 42998,
+        "est_margin": -1860,
+        "max_bid_target": 48140,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $44,798 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $44,858 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -8966,16 +8771,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 42998,
+        "est_recon": 860,
         "est_fees": 1000,
-        "all_in": 44798,
-        "resale_value": 39990,
-        "est_margin": -4808,
-        "max_bid_target": 48200,
+        "all_in": 44858,
+        "resale_value": 42998,
+        "est_margin": -1860,
+        "max_bid_target": 48140,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $44,798 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $44,858 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -9004,16 +8810,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39998,
-        "est_recon": 800,
+        "est_clean_value": 42998,
+        "est_recon": 860,
         "est_fees": 1000,
-        "all_in": 44798,
-        "resale_value": 39998,
-        "est_margin": -4800,
-        "max_bid_target": 48200,
+        "all_in": 44858,
+        "resale_value": 42998,
+        "est_margin": -1860,
+        "max_bid_target": 48140,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $44,798 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $44,858 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -9051,6 +8858,7 @@
         "max_bid_target": 46865,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $45,943 \u2014 ready to drive, under $50k"
       }
     },
@@ -9080,16 +8888,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 47998,
-        "est_recon": 960,
+        "est_clean_value": 43590,
+        "est_recon": 872,
         "est_fees": 1000,
-        "all_in": 45550,
-        "resale_value": 47998,
-        "est_margin": 2448,
-        "max_bid_target": 48040,
+        "all_in": 45462,
+        "resale_value": 43590,
+        "est_margin": -1872,
+        "max_bid_target": 48128,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $45,550 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $45,462 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -9118,16 +8927,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 44290,
-        "est_recon": 886,
+        "est_clean_value": 43990,
+        "est_recon": 880,
         "est_fees": 1000,
-        "all_in": 45876,
-        "resale_value": 44290,
-        "est_margin": -1586,
-        "max_bid_target": 48114,
+        "all_in": 45870,
+        "resale_value": 43990,
+        "est_margin": -1880,
+        "max_bid_target": 48120,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $45,876 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $45,870 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -9156,16 +8966,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 43998,
+        "est_recon": 880,
         "est_fees": 1000,
-        "all_in": 45798,
-        "resale_value": 39990,
-        "est_margin": -5808,
-        "max_bid_target": 48200,
+        "all_in": 45878,
+        "resale_value": 43998,
+        "est_margin": -1880,
+        "max_bid_target": 48120,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $45,798 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $45,878 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -9194,16 +9005,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 43998,
+        "est_recon": 880,
         "est_fees": 1000,
-        "all_in": 45798,
-        "resale_value": 39990,
-        "est_margin": -5808,
-        "max_bid_target": 48200,
+        "all_in": 45878,
+        "resale_value": 43998,
+        "est_margin": -1880,
+        "max_bid_target": 48120,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $45,798 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $45,878 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -9232,16 +9044,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 970,
+        "est_clean_value": 44415,
+        "est_recon": 888,
         "est_fees": 1000,
-        "all_in": 46385,
-        "resale_value": 48500,
-        "est_margin": 2115,
-        "max_bid_target": 48030,
+        "all_in": 46303,
+        "resale_value": 44415,
+        "est_margin": -1888,
+        "max_bid_target": 48112,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $46,385 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $46,303 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -9270,16 +9083,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33590,
-        "est_recon": 672,
+        "est_clean_value": 44453,
+        "est_recon": 889,
         "est_fees": 1000,
-        "all_in": 46125,
-        "resale_value": 33590,
-        "est_margin": -12535,
-        "max_bid_target": 48328,
+        "all_in": 46342,
+        "resale_value": 44453,
+        "est_margin": -1889,
+        "max_bid_target": 48111,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $46,125 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $46,342 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -9308,16 +9122,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 44290,
-        "est_recon": 886,
+        "est_clean_value": 44590,
+        "est_recon": 892,
         "est_fees": 1000,
-        "all_in": 46476,
-        "resale_value": 44290,
-        "est_margin": -2186,
-        "max_bid_target": 48114,
+        "all_in": 46482,
+        "resale_value": 44590,
+        "est_margin": -1892,
+        "max_bid_target": 48108,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $46,476 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $46,482 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -9346,16 +9161,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 37800,
-        "est_recon": 756,
+        "est_clean_value": 44995,
+        "est_recon": 900,
         "est_fees": 1000,
-        "all_in": 46751,
-        "resale_value": 37800,
-        "est_margin": -8951,
-        "max_bid_target": 48244,
+        "all_in": 46895,
+        "resale_value": 44995,
+        "est_margin": -1900,
+        "max_bid_target": 48100,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $46,751 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $46,895 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -9384,16 +9200,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 47998,
-        "est_recon": 960,
+        "est_clean_value": 59520,
+        "est_recon": 1190,
         "est_fees": 2250,
-        "all_in": 48210,
-        "resale_value": 47998,
-        "est_margin": -212,
-        "max_bid_target": 46705,
+        "all_in": 48440,
+        "resale_value": 59520,
+        "est_margin": 11080,
+        "max_bid_target": 46486,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $48,210 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $48,440 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -9431,6 +9248,7 @@
         "max_bid_target": 46838,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $48,332 \u2014 ready to drive, under $50k"
       }
     },
@@ -9460,16 +9278,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 980,
+        "est_clean_value": 45590,
+        "est_recon": 912,
         "est_fees": 1000,
-        "all_in": 47570,
-        "resale_value": 48990,
-        "est_margin": 1420,
-        "max_bid_target": 48020,
+        "all_in": 47502,
+        "resale_value": 45590,
+        "est_margin": -1912,
+        "max_bid_target": 48088,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $47,570 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $47,502 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -9498,16 +9317,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 40994,
-        "est_recon": 820,
+        "est_clean_value": 45990,
+        "est_recon": 920,
         "est_fees": 1000,
-        "all_in": 47810,
-        "resale_value": 40994,
-        "est_margin": -6816,
-        "max_bid_target": 48180,
+        "all_in": 47910,
+        "resale_value": 45990,
+        "est_margin": -1920,
+        "max_bid_target": 48080,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $47,810 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $47,910 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -9536,16 +9356,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 44290,
-        "est_recon": 886,
+        "est_clean_value": 46990,
+        "est_recon": 940,
         "est_fees": 1000,
-        "all_in": 48876,
-        "resale_value": 44290,
-        "est_margin": -4586,
-        "max_bid_target": 48114,
+        "all_in": 48930,
+        "resale_value": 46990,
+        "est_margin": -1940,
+        "max_bid_target": 48060,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $48,876 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $48,930 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -9583,6 +9404,7 @@
         "max_bid_target": 48040,
         "target": 50000,
         "feasible": true,
+        "damage": null,
         "note": "clean, all-in $49,958 \u2014 ready to drive, under $50k"
       }
     },
@@ -9612,16 +9434,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 44590,
-        "est_recon": 892,
+        "est_clean_value": 47998,
+        "est_recon": 960,
         "est_fees": 1000,
-        "all_in": 49890,
-        "resale_value": 44590,
-        "est_margin": -5300,
-        "max_bid_target": 48108,
+        "all_in": 49958,
+        "resale_value": 47998,
+        "est_margin": -1960,
+        "max_bid_target": 48040,
         "target": 50000,
         "feasible": true,
-        "note": "clean, all-in $49,890 \u2014 ready to drive, under $50k"
+        "damage": null,
+        "note": "clean, all-in $49,958 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -9659,6 +9482,7 @@
         "max_bid_target": 10161,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $10,161 to stay under $50k all-in"
       }
     },
@@ -9697,6 +9521,7 @@
         "max_bid_target": 13520,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $13,520 to stay under $50k all-in"
       }
     },
@@ -9735,6 +9560,7 @@
         "max_bid_target": 22300,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $22,300 to stay under $50k all-in"
       }
     },
@@ -9773,6 +9599,7 @@
         "max_bid_target": 22300,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $22,300 to stay under $50k all-in"
       }
     },
@@ -9811,6 +9638,7 @@
         "max_bid_target": 11280,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $11,280 to stay under $50k all-in"
       }
     },
@@ -9839,120 +9667,6 @@
     "first_seen": "2026-08-16T21:00:39.856447Z",
     "raw": {
       "sf_csv": true
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/61070706",
-    "listing_id": "WP0AB2Y11LS******",
-    "title": "2020 Porsche TAYCAN 4S",
-    "year": 2020,
-    "make": "Porsche",
-    "model": "TAYCAN",
-    "trim": "4S",
-    "price_usd": null,
-    "current_bid_usd": null,
-    "mileage": null,
-    "location": "TX - HOUSTON EAST",
-    "seller_type": "salvage_auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0726/8764a84e6fd84c2faa53d2900641a61b_thb.jpg",
-    "vin": "WP0AB2Y11LS******",
-    "lot_number": "61070706",
-    "sale_date": "2026-08-18T16:00:00Z",
-    "first_seen": "2026-08-16T21:00:39.856877Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 16167,
-        "est_fees": 1000,
-        "all_in": null,
-        "resale_value": 35273,
-        "est_margin": null,
-        "max_bid_target": 29315,
-        "target": 50000,
-        "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $29,315 to stay under $50k all-in"
-      }
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/55035316",
-    "listing_id": "WP0AD2Y19RS******",
-    "title": "2024 Porsche TAYCAN GTS",
-    "year": 2024,
-    "make": "Porsche",
-    "model": "TAYCAN",
-    "trim": "GTS",
-    "price_usd": null,
-    "current_bid_usd": null,
-    "mileage": 57855,
-    "location": "CA - SAN JOSE",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0526/ec98ab52d63a47a3ada092c24c3440ba_thb.jpg",
-    "vin": "WP0AD2Y19RS******",
-    "lot_number": "55035316",
-    "sale_date": "2026-08-18T19:00:00Z",
-    "first_seen": "2026-08-16T21:00:39.856902Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 63800,
-        "est_recon": 21054,
-        "est_fees": 1000,
-        "all_in": null,
-        "resale_value": 45936,
-        "est_margin": null,
-        "max_bid_target": 24952,
-        "target": 50000,
-        "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $24,952 to stay under $50k all-in"
-      }
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/47994316",
-    "listing_id": "WP0AA2Y14RS******",
-    "title": "2024 Porsche TAYCAN",
-    "year": 2024,
-    "make": "Porsche",
-    "model": "TAYCAN",
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": null,
-    "mileage": null,
-    "location": "NC - GASTONIA",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0426/0b02faadb9fa4aac816dd7b5625117a5_thb.jpg",
-    "vin": "WP0AA2Y14RS******",
-    "lot_number": "47994316",
-    "sale_date": "2026-09-09T14:00:00Z",
-    "first_seen": "2026-08-16T21:00:39.856944Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 63800,
-        "est_recon": 21054,
-        "est_fees": 1000,
-        "all_in": null,
-        "resale_value": 45936,
-        "est_margin": null,
-        "max_bid_target": 24952,
-        "target": 50000,
-        "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $24,952 to stay under $50k all-in"
-      }
     },
     "project_tier": "salvage"
   },
@@ -9989,6 +9703,7 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $33,853 to stay under $50k all-in"
       }
     },
@@ -10018,16 +9733,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 44415,
+        "est_recon": 14657,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 34920,
+        "resale_value": 31979,
         "est_margin": null,
-        "max_bid_target": 29460,
+        "max_bid_target": 30663,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $29,460 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $30,663 to stay under $50k all-in"
       }
     },
     "project_tier": "clean"
@@ -10056,16 +9772,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 44415,
+        "est_recon": 14657,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 34920,
+        "resale_value": 31979,
         "est_margin": null,
-        "max_bid_target": 29460,
+        "max_bid_target": 30663,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $29,460 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $30,663 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -10094,16 +9811,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 44415,
+        "est_recon": 14657,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 34920,
+        "resale_value": 31979,
         "est_margin": null,
-        "max_bid_target": 29460,
+        "max_bid_target": 30663,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $29,460 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $30,663 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -10141,6 +9859,7 @@
         "max_bid_target": 31965,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $31,965 to stay under $50k all-in"
       }
     },
@@ -10179,6 +9898,7 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $33,853 to stay under $50k all-in"
       }
     },
@@ -10217,6 +9937,7 @@
         "max_bid_target": 35915,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $35,915 to stay under $50k all-in"
       }
     },
@@ -10246,16 +9967,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 40994,
-        "est_recon": 13528,
+        "est_clean_value": 40124,
+        "est_recon": 13241,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 29516,
+        "resale_value": 28889,
         "est_margin": null,
-        "max_bid_target": 31671,
+        "max_bid_target": 31928,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $31,671 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $31,928 to stay under $50k all-in"
       }
     },
     "project_tier": "clean"
@@ -10284,16 +10006,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 13197,
+        "est_clean_value": 39847,
+        "est_recon": 13150,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 28793,
+        "resale_value": 28690,
         "est_margin": null,
-        "max_bid_target": 31967,
+        "max_bid_target": 32009,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $31,967 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $32,009 to stay under $50k all-in"
       }
     },
     "project_tier": "clean"
@@ -10322,16 +10045,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 44415,
+        "est_recon": 14657,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 34920,
+        "resale_value": 31979,
         "est_margin": null,
-        "max_bid_target": 29460,
+        "max_bid_target": 30663,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $29,460 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $30,663 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -10369,6 +10093,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -10407,6 +10132,7 @@
         "max_bid_target": 36239,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,239 to stay under $50k all-in"
       }
     },
@@ -10445,6 +10171,7 @@
         "max_bid_target": 31965,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $31,965 to stay under $50k all-in"
       }
     },
@@ -10483,6 +10210,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -10521,6 +10249,7 @@
         "max_bid_target": 35915,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $35,915 to stay under $50k all-in"
       }
     },
@@ -10559,6 +10288,7 @@
         "max_bid_target": 35915,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $35,915 to stay under $50k all-in"
       }
     },
@@ -10597,6 +10327,7 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $33,853 to stay under $50k all-in"
       }
     },
@@ -10635,6 +10366,7 @@
         "max_bid_target": 36239,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,239 to stay under $50k all-in"
       }
     },
@@ -10673,6 +10405,7 @@
         "max_bid_target": 35915,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $35,915 to stay under $50k all-in"
       }
     },
@@ -10711,6 +10444,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -10740,16 +10474,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 44415,
+        "est_recon": 14657,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 34920,
+        "resale_value": 31979,
         "est_margin": null,
-        "max_bid_target": 29460,
+        "max_bid_target": 30663,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $29,460 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $30,663 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -10787,6 +10522,7 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $33,853 to stay under $50k all-in"
       }
     },
@@ -10825,6 +10561,7 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $33,853 to stay under $50k all-in"
       }
     },
@@ -10863,6 +10600,7 @@
         "max_bid_target": 31965,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $31,965 to stay under $50k all-in"
       }
     },
@@ -10901,6 +10639,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -10939,6 +10678,7 @@
         "max_bid_target": 33853,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $33,853 to stay under $50k all-in"
       }
     },
@@ -10977,6 +10717,7 @@
         "max_bid_target": 36239,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,239 to stay under $50k all-in"
       }
     },
@@ -11015,6 +10756,7 @@
         "max_bid_target": 36239,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,239 to stay under $50k all-in"
       }
     },
@@ -11053,6 +10795,7 @@
         "max_bid_target": 39626,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $39,626 to stay under $50k all-in"
       }
     },
@@ -11091,6 +10834,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -11129,6 +10873,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -11158,16 +10903,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 13197,
+        "est_clean_value": 39847,
+        "est_recon": 13150,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 28793,
+        "resale_value": 28690,
         "est_margin": null,
-        "max_bid_target": 31967,
+        "max_bid_target": 32009,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $31,967 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $32,009 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -11196,16 +10942,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 13197,
+        "est_clean_value": 39847,
+        "est_recon": 13150,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 28793,
+        "resale_value": 28690,
         "est_margin": null,
-        "max_bid_target": 31967,
+        "max_bid_target": 32009,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $31,967 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $32,009 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -11243,6 +10990,7 @@
         "max_bid_target": 35915,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $35,915 to stay under $50k all-in"
       }
     },
@@ -11281,6 +11029,7 @@
         "max_bid_target": 31965,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $31,965 to stay under $50k all-in"
       }
     },
@@ -11319,6 +11068,7 @@
         "max_bid_target": 39626,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $39,626 to stay under $50k all-in"
       }
     },
@@ -11357,6 +11107,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -11395,6 +11146,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -11433,6 +11185,7 @@
         "max_bid_target": 39626,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $39,626 to stay under $50k all-in"
       }
     },
@@ -11471,6 +11224,7 @@
         "max_bid_target": 39626,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $39,626 to stay under $50k all-in"
       }
     },
@@ -11509,6 +11263,7 @@
         "max_bid_target": 36239,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,239 to stay under $50k all-in"
       }
     },
@@ -11547,6 +11302,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -11576,16 +11332,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 40994,
-        "est_recon": 13528,
+        "est_clean_value": 40124,
+        "est_recon": 13241,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 29516,
+        "resale_value": 28889,
         "est_margin": null,
-        "max_bid_target": 31671,
+        "max_bid_target": 31928,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $31,671 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $31,928 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -11623,6 +11380,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -11661,6 +11419,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -11699,6 +11458,7 @@
         "max_bid_target": 39626,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $39,626 to stay under $50k all-in"
       }
     },
@@ -11737,6 +11497,7 @@
         "max_bid_target": 38046,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $38,046 to stay under $50k all-in"
       }
     },
@@ -11775,6 +11536,7 @@
         "max_bid_target": 38046,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $38,046 to stay under $50k all-in"
       }
     },
@@ -11813,6 +11575,7 @@
         "max_bid_target": 38046,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $38,046 to stay under $50k all-in"
       }
     },
@@ -11842,16 +11605,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 44415,
+        "est_recon": 14657,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 34920,
+        "resale_value": 31979,
         "est_margin": null,
-        "max_bid_target": 29460,
+        "max_bid_target": 30663,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $29,460 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $30,663 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -11889,45 +11653,8 @@
         "max_bid_target": 39295,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $39,295 to stay under $50k all-in"
-      }
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "iaai",
-    "source_url": "https://www.iaai.com/VehicleDetail/46050594~US",
-    "listing_id": "46050594~US",
-    "title": "2024 Porsche Taycan",
-    "year": 2024,
-    "make": "Porsche",
-    "model": "Taycan",
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": null,
-    "mileage": null,
-    "location": null,
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": null,
-    "vin": null,
-    "lot_number": "46050594",
-    "sale_date": null,
-    "first_seen": "2026-08-16T21:00:39.858936Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 63800,
-        "est_recon": 21054,
-        "est_fees": 1000,
-        "all_in": null,
-        "resale_value": 45936,
-        "est_margin": null,
-        "max_bid_target": 24952,
-        "target": 50000,
-        "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $24,952 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -11965,6 +11692,7 @@
         "max_bid_target": 36680,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,680 to stay under $50k all-in"
       }
     },
@@ -12003,6 +11731,7 @@
         "max_bid_target": 36092,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,092 to stay under $50k all-in"
       }
     },
@@ -12041,6 +11770,7 @@
         "max_bid_target": 36092,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,092 to stay under $50k all-in"
       }
     },
@@ -12079,45 +11809,8 @@
         "max_bid_target": 39342,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $39,342 to stay under $50k all-in"
-      }
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "iaai",
-    "source_url": "https://www.iaai.com/VehicleDetail/46071760~US",
-    "listing_id": "46071760~US",
-    "title": "2023 Porsche Taycan",
-    "year": 2023,
-    "make": "Porsche",
-    "model": "Taycan",
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": null,
-    "mileage": null,
-    "location": null,
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": null,
-    "vin": null,
-    "lot_number": "46071760",
-    "sale_date": null,
-    "first_seen": "2026-08-16T21:00:39.858974Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 16167,
-        "est_fees": 1000,
-        "all_in": null,
-        "resale_value": 35273,
-        "est_margin": null,
-        "max_bid_target": 29315,
-        "target": 50000,
-        "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $29,315 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -12146,16 +11839,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 40994,
-        "est_recon": 13528,
+        "est_clean_value": 40124,
+        "est_recon": 13241,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 29516,
+        "resale_value": 28889,
         "est_margin": null,
-        "max_bid_target": 31671,
+        "max_bid_target": 31928,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $31,671 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $31,928 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -12193,6 +11887,7 @@
         "max_bid_target": 33143,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $33,143 to stay under $50k all-in"
       }
     },
@@ -12231,6 +11926,7 @@
         "max_bid_target": 29430,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $29,430 to stay under $50k all-in"
       }
     },
@@ -12260,16 +11956,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 40994,
-        "est_recon": 13528,
+        "est_clean_value": 40124,
+        "est_recon": 13241,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 29516,
+        "resale_value": 28889,
         "est_margin": null,
-        "max_bid_target": 31671,
+        "max_bid_target": 31928,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $31,671 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $31,928 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -12307,6 +12004,7 @@
         "max_bid_target": 31965,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $31,965 to stay under $50k all-in"
       }
     },
@@ -12345,6 +12043,7 @@
         "max_bid_target": 31672,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $31,672 to stay under $50k all-in"
       }
     },
@@ -12374,16 +12073,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 44415,
+        "est_recon": 14657,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 34920,
+        "resale_value": 31979,
         "est_margin": null,
-        "max_bid_target": 29460,
+        "max_bid_target": 30663,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $29,460 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $30,663 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -12412,16 +12112,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 44415,
+        "est_recon": 14657,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 34920,
+        "resale_value": 31979,
         "est_margin": null,
-        "max_bid_target": 29460,
+        "max_bid_target": 30663,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $29,460 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $30,663 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -12450,16 +12151,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 44415,
+        "est_recon": 14657,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 34920,
+        "resale_value": 31979,
         "est_margin": null,
-        "max_bid_target": 29460,
+        "max_bid_target": 30663,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $29,460 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $30,663 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -12488,54 +12190,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 13197,
+        "est_clean_value": 39847,
+        "est_recon": 13150,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 28793,
+        "resale_value": 28690,
         "est_margin": null,
-        "max_bid_target": 31967,
+        "max_bid_target": 32009,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $31,967 to stay under $50k all-in"
-      }
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "iaai",
-    "source_url": "https://www.iaai.com/VehicleDetail/45979873~US",
-    "listing_id": "45979873~US",
-    "title": "2023 Porsche Taycan Gts",
-    "year": 2023,
-    "make": "Porsche",
-    "model": "Taycan",
-    "trim": "Gts",
-    "price_usd": null,
-    "current_bid_usd": null,
-    "mileage": null,
-    "location": null,
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": null,
-    "vin": null,
-    "lot_number": "45979873",
-    "sale_date": null,
-    "first_seen": "2026-08-16T21:00:39.859053Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 16167,
-        "est_fees": 1000,
-        "all_in": null,
-        "resale_value": 35273,
-        "est_margin": null,
-        "max_bid_target": 29315,
-        "target": 50000,
-        "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $29,315 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $32,009 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -12573,6 +12238,7 @@
         "max_bid_target": 10161,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $10,161 to stay under $50k all-in"
       }
     },
@@ -12611,83 +12277,8 @@
         "max_bid_target": 9041,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $9,041 to stay under $50k all-in"
-      }
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "iaai",
-    "source_url": "https://www.iaai.com/VehicleDetail/45819369~US",
-    "listing_id": "45819369~US",
-    "title": "2021 Porsche Taycan Turbo/Turbo S",
-    "year": 2021,
-    "make": "Porsche",
-    "model": "Taycan",
-    "trim": "Turbo/Turbo S",
-    "price_usd": null,
-    "current_bid_usd": null,
-    "mileage": null,
-    "location": null,
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": null,
-    "vin": null,
-    "lot_number": "45819369",
-    "sale_date": null,
-    "first_seen": "2026-08-16T21:00:39.859075Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 16167,
-        "est_fees": 1000,
-        "all_in": null,
-        "resale_value": 35273,
-        "est_margin": null,
-        "max_bid_target": 29315,
-        "target": 50000,
-        "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $29,315 to stay under $50k all-in"
-      }
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "iaai",
-    "source_url": "https://www.iaai.com/VehicleDetail/45685703~US",
-    "listing_id": "45685703~US",
-    "title": "2025 Porsche Taycan 4S",
-    "year": 2025,
-    "make": "Porsche",
-    "model": "Taycan",
-    "trim": "4S",
-    "price_usd": null,
-    "current_bid_usd": null,
-    "mileage": null,
-    "location": null,
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": null,
-    "vin": null,
-    "lot_number": "45685703",
-    "sale_date": null,
-    "first_seen": "2026-08-16T21:00:39.859082Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 66000,
-        "est_recon": 21780,
-        "est_fees": 1000,
-        "all_in": null,
-        "resale_value": 47520,
-        "est_margin": null,
-        "max_bid_target": 24304,
-        "target": 50000,
-        "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $24,304 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -12716,54 +12307,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 44415,
+        "est_recon": 14657,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 34920,
+        "resale_value": 31979,
         "est_margin": null,
-        "max_bid_target": 29460,
+        "max_bid_target": 30663,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $29,460 to stay under $50k all-in"
-      }
-    },
-    "project_tier": "salvage"
-  },
-  {
-    "source": "iaai",
-    "source_url": "https://www.iaai.com/VehicleDetail/45515546~US",
-    "listing_id": "45515546~US",
-    "title": "2022 Porsche Taycan",
-    "year": 2022,
-    "make": "Porsche",
-    "model": "Taycan",
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": null,
-    "mileage": null,
-    "location": null,
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": null,
-    "vin": null,
-    "lot_number": "45515546",
-    "sale_date": null,
-    "first_seen": "2026-08-16T21:00:39.859096Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 48990,
-        "est_recon": 16167,
-        "est_fees": 1000,
-        "all_in": null,
-        "resale_value": 35273,
-        "est_margin": null,
-        "max_bid_target": 29315,
-        "target": 50000,
-        "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $29,315 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $30,663 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -12792,16 +12346,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 16005,
+        "est_clean_value": 44415,
+        "est_recon": 14657,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 34920,
+        "resale_value": 31979,
         "est_margin": null,
-        "max_bid_target": 29460,
+        "max_bid_target": 30663,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $29,460 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $30,663 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -12839,6 +12394,7 @@
         "max_bid_target": 36092,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,092 to stay under $50k all-in"
       }
     },
@@ -12877,6 +12433,7 @@
         "max_bid_target": 14639,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $14,639 to stay under $50k all-in"
       }
     },
@@ -12915,6 +12472,7 @@
         "max_bid_target": 36092,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,092 to stay under $50k all-in"
       }
     },
@@ -12953,6 +12511,7 @@
         "max_bid_target": 39720,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $39,720 to stay under $50k all-in"
       }
     },
@@ -12991,6 +12550,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -13029,6 +12589,7 @@
         "max_bid_target": 37859,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $37,859 to stay under $50k all-in"
       }
     },
@@ -13067,6 +12628,7 @@
         "max_bid_target": 35264,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $35,264 to stay under $50k all-in"
       }
     },
@@ -13105,6 +12667,7 @@
         "max_bid_target": 36239,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,239 to stay under $50k all-in"
       }
     },
@@ -13143,6 +12706,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -13181,6 +12745,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -13219,6 +12784,7 @@
         "max_bid_target": 35264,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $35,264 to stay under $50k all-in"
       }
     },
@@ -13257,6 +12823,7 @@
         "max_bid_target": 38823,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $38,823 to stay under $50k all-in"
       }
     },
@@ -13295,6 +12862,7 @@
         "max_bid_target": 38823,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $38,823 to stay under $50k all-in"
       }
     },
@@ -13333,6 +12901,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -13371,6 +12940,7 @@
         "max_bid_target": 35915,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $35,915 to stay under $50k all-in"
       }
     },
@@ -13409,6 +12979,7 @@
         "max_bid_target": 39626,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $39,626 to stay under $50k all-in"
       }
     },
@@ -13447,6 +13018,7 @@
         "max_bid_target": 37859,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $37,859 to stay under $50k all-in"
       }
     },
@@ -13485,6 +13057,7 @@
         "max_bid_target": 36092,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,092 to stay under $50k all-in"
       }
     },
@@ -13523,6 +13096,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -13561,6 +13135,7 @@
         "max_bid_target": 36799,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
       }
     },
@@ -13599,6 +13174,7 @@
         "max_bid_target": 38305,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $38,305 to stay under $50k all-in"
       }
     },
@@ -13637,6 +13213,7 @@
         "max_bid_target": 36680,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,680 to stay under $50k all-in"
       }
     },
@@ -13675,6 +13252,7 @@
         "max_bid_target": 36092,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $36,092 to stay under $50k all-in"
       }
     },
@@ -13713,6 +13291,7 @@
         "max_bid_target": 45810,
         "target": 50000,
         "feasible": null,
+        "damage": null,
         "note": "no price/bid yet \u2014 bid up to $45,810 to stay under $50k all-in"
       }
     },
@@ -13742,16 +13321,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 48500,
-        "est_recon": 970,
+        "est_clean_value": 44415,
+        "est_recon": 888,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 48500,
+        "resale_value": 44415,
         "est_margin": null,
-        "max_bid_target": 48030,
+        "max_bid_target": 48112,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $48,030 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $48,112 to stay under $50k all-in"
       }
     },
     "project_tier": "clean"
@@ -13780,16 +13360,17 @@
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 39990,
-        "est_recon": 800,
+        "est_clean_value": 39847,
+        "est_recon": 797,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 39990,
+        "resale_value": 39847,
         "est_margin": null,
-        "max_bid_target": 48200,
+        "max_bid_target": 48203,
         "target": 50000,
         "feasible": null,
-        "note": "no price/bid yet \u2014 bid up to $48,200 to stay under $50k all-in"
+        "damage": null,
+        "note": "no price/bid yet \u2014 bid up to $48,203 to stay under $50k all-in"
       }
     },
     "project_tier": "clean"

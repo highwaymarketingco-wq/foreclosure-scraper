@@ -387,14 +387,20 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  deal analysis: {da['feasible']} feasible, {da['over_target']} over "
           f"all-in cap, {da['unvaluable']} unvaluable")
     kept = []
-    dropped_allin = 0
+    dropped_allin = dropped_disq = 0
     for l in filtered:
         deal = (l.raw or {}).get("deal") if isinstance(l.raw, dict) else None
+        # Hard disqualifiers: salvage Taycans (wrecked EV), flood, frame damage.
+        if deal and deal.get("disqualified"):
+            dropped_disq += 1
+            continue
         allin = deal.get("all_in") if deal else None
         if allin is not None and allin > MAX_PRICE_USD:
             dropped_allin += 1
             continue
         kept.append(l)
+    if dropped_disq:
+        print(f"  dropped {dropped_disq} disqualified (salvage Taycan / flood / frame)")
     if dropped_allin:
         print(f"  dropped {dropped_allin} over the ${int(MAX_PRICE_USD):,} all-in cap")
     filtered = kept
