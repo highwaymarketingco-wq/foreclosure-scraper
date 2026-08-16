@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cheap Porsches — 2014+ under $45k or salvage/rebuilt</title>
+<title>Cheap Porsches — all-in under $50k</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏁</text></svg>">
 <style>
   :root {
@@ -92,6 +92,14 @@
                text-transform: uppercase; letter-spacing: 0.04em;
                margin-top: 2px; opacity: 0.7; text-decoration: none; }
   .title { font-size: 15px; font-weight: 600; color: var(--fg); margin: 2px 0; }
+  .deal { margin: 8px 0 4px; padding: 8px 10px; border-radius: 8px;
+    background: var(--card2, rgba(127,127,127,0.08)); border-left: 3px solid var(--muted); }
+  .deal-rows { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+  .deal-rows b { color: var(--fg); font-weight: 700; }
+  .deal-note { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .deal.deal-yes { border-left-color: #22c55e; }
+  .deal.deal-no { border-left-color: #ef4444; opacity: 0.85; }
+  .deal.deal-maybe { border-left-color: #eab308; }
   .meta { color: var(--muted); font-size: 13px; }
   .meta span { margin-right: 12px; }
   .open { margin-top: auto; padding-top: 10px; }
@@ -113,8 +121,9 @@
 <header>
   <h1>Cheap <span class="accent">Porsches</span></h1>
   <div class="sub">
-    2014–current model years, under $45k <em>or</em> rebuilt/salvage title.
-    Excludes Panamera, Cayenne, Macan.
+    1990–current, <em>all-in</em> (bid + est. repair + fees) under $50k — not just
+    the bid. Each card shows clean value, cost to fix, all-in and a max bid.
+    Excludes Panamera and Macan.
   </div>
 </header>
 
@@ -321,6 +330,24 @@
       const urgent = t - Date.now() < 3600000 && t > Date.now();
       return `<span class="sale${urgent ? ' urgent' : ''}" data-end="${t}" title="${new Date(t).toLocaleString()}">${fmtRemaining(t)}</span>`;
     })();
+    // Deal analysis block: cost-to-fix, all-in, max bid, feasibility.
+    const dealBlock = (() => {
+      const d = l.raw && l.raw.deal;
+      if (!d) return '';
+      const money = (v) => v == null ? '—' : '$' + Math.round(v).toLocaleString();
+      const isProject = d.est_recon && d.est_clean_value && d.est_recon > d.est_clean_value * 0.1;
+      const cls = d.feasible === false ? 'deal-no' : (d.feasible ? 'deal-yes' : 'deal-maybe');
+      const rows = [];
+      if (isProject) {
+        rows.push(`<span>Clean value <b>${money(d.est_clean_value)}</b></span>`);
+        rows.push(`<span>Est. fix <b>${money(d.est_recon)}</b></span>`);
+      }
+      if (d.all_in != null) rows.push(`<span>All-in <b>${money(d.all_in)}</b></span>`);
+      if (d.max_bid_target != null && isProject)
+        rows.push(`<span>Max bid <b>${money(d.max_bid_target)}</b></span>`);
+      return `<div class="deal ${cls}"><div class="deal-rows">${rows.join('')}</div>`
+           + `<div class="deal-note">${d.note || ''}</div></div>`;
+    })();
     div.innerHTML = `
       <div class="thumb" style="background-image:url('${l.photo_url || ''}')">
         <span class="src">${l.source}</span>
@@ -342,6 +369,7 @@
           ${l.mileage ? `<span>${fmtMileage(l.mileage)}</span>` : ''}
           ${l.location ? `<span>${l.location}</span>` : ''}
         </div>
+        ${dealBlock}
         <div class="open"><a href="${l.source_url}" target="_blank" rel="noopener">View listing →</a></div>
       </div>
     `;

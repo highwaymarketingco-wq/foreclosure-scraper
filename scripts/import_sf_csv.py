@@ -365,6 +365,28 @@ def main(argv: list[str] | None = None) -> int:
     # source. This is what keeps the board current instead of an ever-growing
     # pile of months-old sold cars.
     filtered = prune_sold_and_stale(filtered, fresh)
+
+    # Deal analysis: cost-to-fix, all-in, max bid, feasibility. Then enforce the
+    # operator's rule -- ALL-IN under the cap, not just the bid. A salvage car
+    # whose bid + repair + fees exceeds the ceiling is dropped even if its bid is
+    # low. Cars with no bid yet (all_in is None) stay, carrying a max-bid target.
+    from porsche_scraper.deal_analysis import enrich_deal_analysis
+    from porsche_scraper.filters import MAX_PRICE_USD
+    da = enrich_deal_analysis(filtered, target=MAX_PRICE_USD)
+    print(f"  deal analysis: {da['feasible']} feasible, {da['over_target']} over "
+          f"all-in cap, {da['unvaluable']} unvaluable")
+    kept = []
+    dropped_allin = 0
+    for l in filtered:
+        deal = (l.raw or {}).get("deal") if isinstance(l.raw, dict) else None
+        allin = deal.get("all_in") if deal else None
+        if allin is not None and allin > MAX_PRICE_USD:
+            dropped_allin += 1
+            continue
+        kept.append(l)
+    if dropped_allin:
+        print(f"  dropped {dropped_allin} over the ${int(MAX_PRICE_USD):,} all-in cap")
+    filtered = kept
     filtered.sort(key=lambda l: (l.effective_price is None, l.effective_price or 9e9))
 
     from porsche_scraper.output import write_json, write_csv
