@@ -29,7 +29,7 @@ from ..models import Listing, infer_drivable, infer_title_status, parse_year
 log = logging.getLogger(__name__)
 
 _VEHICLE_START = re.compile(r'"@type":"Vehicle"')
-_PAGES = 12  # CarFax paginates ?page=N.
+_PAGES = 6  # CarFax paginates ?page=N.
 
 
 def _parse_vehicle_chunk(chunk: str) -> Listing | None:
