@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-08-18T05:23:31.923598Z",
+  "run_time": "2026-08-18T16:24:59.588490Z",
   "total": 40593,
   "by_source": {
     "law_firms.finkel": 8,
@@ -485,9 +485,9 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "horizon=120d, scrapers=140, regressions=0",
+  "notes": "scheduled land-records refresh",
   "detail_count": 40593,
-  "detail_digest": "e186c3d20e91984f",
+  "detail_digest": "ef971022ebd442f4",
   "board": {
     "schema": "slim-v1",
     "count": 40593,
@@ -498,5 +498,12 @@
       "count": 41,
       "records": 40593
     }
-  }
+  },
+  "health_carried_from": "2026-08-18T05:23:31.923598Z",
+  "health_carried_keys": [
+    "by_source",
+    "by_county_top",
+    "source_status",
+    "errors"
+  ]
 }
