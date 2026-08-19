@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-08-18T18:02:50.260682Z",
-  "total": 40593,
+  "run_time": "2026-08-19T13:41:15.432119Z",
+  "total": 40008,
   "by_source": {
     "law_firms.finkel": 8,
     "counties.column_legal_notices": 129,
@@ -145,42 +145,44 @@
     "courts.lis_pendens_discovery": 0
   },
   "by_state": {
-    "NC": 22871,
-    "SC": 17722
+    "NC": 21371,
+    "SC": 18637
   },
   "by_source_on_board": {
-    "counties_nc.rutherford_tax": 4673,
+    "counties_nc.rutherford_tax": 4458,
     "counties_sc.sc_public_index": 3733,
     "counties_nc.buncombe_elderly": 3560,
-    "counties_nc.nc_county_pdf_delinquent_tax": 3499,
-    "counties_sc.spartanburg_vacant": 3444,
-    "counties_nc.nc_ptscloud_delinquent_tax": 2267,
-    "counties_sc.spartanburg_delinquent_tax": 1967,
+    "counties_sc.spartanburg_vacant": 3443,
+    "counties_nc.nc_county_pdf_delinquent_tax": 3349,
+    "counties_sc.spartanburg_delinquent_tax": 1966,
     "counties_sc.pickens_delinquent_parcels": 1930,
     "counties_sc.spartanburg_condemned": 1649,
     "counties_nc.nc_county_csv_delinquent_tax": 1406,
     "counties_nc.buncombe_delinquent_tax": 1153,
     "counties_generic.arcgis_distress.new_hanover_demolition_permits": 1118,
-    "counties_nc.nc_heir_estate_parcels": 1003,
+    "counties_nc.nc_ptscloud_delinquent_tax": 1040,
+    "counties_nc.nc_heir_estate_parcels": 976,
     "counties.multi_year_delinquent_tax": 725,
-    "national.courtlistener_bankruptcy": 717,
+    "national.courtlistener_bankruptcy": 711,
+    "national.fannie_homepath": 667,
     "counties_nc.asheville_str_permits": 639,
     "counties_sc.sc_public_index_export": 602,
     "counties_sc.oconee_flc_assignment": 584,
+    "counties_sc.cherokee_delinquent_tax": 528,
     "counties_sc.oconee_forfeited_land": 453,
-    "national.distressed": 449,
     "counties_sc.georgetown_civicengage": 406,
     "counties_nc.nc_ecourts_lis_pendens": 399,
     "counties_sc.sc_public_index_lis_pendens": 360,
+    "national.distressed": 338,
     "counties_nc.asheville_helene": 313,
     "national.landandfarm": 294,
     "national.landwatch": 270,
     "counties_sc.sc_probate_net": 265,
-    "national.hud_reac_inspection": 238,
+    "national.hud_reac_inspection": 220,
     "counties_sc.spartan_weekly_legals": 205,
-    "counties_sc.sc_rod_acclaim": 198,
+    "counties_sc.sc_rod_acclaim": 197,
     "counties_nc.henderson_code_violations": 163,
-    "counties_sc.sc_public_notices": 157,
+    "counties_sc.sc_public_notices": 155,
     "counties_nc.nc_ecourts_divorce": 153,
     "public_notices.nc_notices_counties": 143,
     "public_notices.gannett_obituaries": 142,
@@ -194,10 +196,9 @@
     "law_firms.shapiro_ingle_powerbi": 65,
     "counties_sc.charleston_mie": 54,
     "counties_nc.hendersonville_vacant_structures": 51,
-    "law_firms.kania": 40,
-    "national.hud_section8_contracts": 40,
+    "law_firms.kania": 39,
+    "national.hud_section8_contracts": 39,
     "counties_sc.terry_howe_flc": 37,
-    "national.fannie_homepath": 32,
     "national.zillow_foreclosures": 30,
     "national.cash_buyer_deeds": 29,
     "national.estate_sales": 27,
@@ -208,7 +209,8 @@
     "national.crexi_multifamily": 22,
     "national.nc_upset_bids": 22,
     "counties_sc.anderson_master_in_equity": 21,
-    "national.homeharvest": 18,
+    "reo.vrm_va_reo": 18,
+    "national.homeharvest": 16,
     "national.hubzu": 16,
     "law_firms.rogers_townsend": 15,
     "law_firms.bell_carrington": 14,
@@ -217,88 +219,108 @@
     "counties_sc.pickens_master_in_equity": 11,
     "counties_sc.sc_county_rosters": 11,
     "counties_nc.henderson_foreclosure_parcels": 10,
+    "national.hud_homestore": 10,
     "law_firms.mcmichael_taylor_gray": 9,
-    "national.hud_homestore": 9,
-    "counties.nod_discovery": 8,
     "national.jail_bookings": 8,
     "national.xome": 8,
+    "counties.nod_discovery": 7,
     "counties_sc.sc_state_tax_lien": 7,
     "counties_nc.cleveland_tax": 6,
     "counties_sc.spartanburg_flc": 6,
     "counties_nc.nc_rod_substitute_trustee": 5,
     "counties_nc.nc_county_tax_foreclosure": 4,
-    "derived.probate_deed": 4,
     "national.trulia": 4,
     "counties_sc.spartanburg_master_in_equity": 3,
-    "national.realtor_foreclosures": 3,
+    "derived.probate_deed": 3,
     "counties_nc.nc_govdeals_real_property": 1,
     "counties_sc.sc_rod_cott": 1,
     "law_firms.ingle_firm": 1,
     "manual.watchlist": 1,
     "national.freddie_homesteps": 1,
+    "national.realtor_foreclosures": 1,
     "national.sheriff_sales": 1,
     "newspapers.coastland_times": 1
   },
   "by_county_top": [
     [
-      "Spartanburg, SC",
-      9224
+      "Spartanburg/SC",
+      9171
     ],
     [
-      "Buncombe, NC",
-      6836
+      "Buncombe/NC",
+      6832
     ],
     [
-      "Rutherford, NC",
-      4952
+      "Rutherford/NC",
+      4737
     ],
     [
-      "Pickens, SC",
-      2850
+      "Pickens/SC",
+      2834
     ],
     [
-      "New Hanover, NC",
+      "New Hanover/NC",
       2662
     ],
     [
-      "McDowell, NC",
+      "McDowell/NC",
       2282
     ],
     [
-      "Oconee, SC",
-      1691
+      "Oconee/SC",
+      1683
     ],
     [
-      "Lincoln, NC",
-      1612
+      "Henderson/NC",
+      1522
     ],
     [
-      "Henderson, NC",
-      1569
+      "Lincoln/NC",
+      1462
     ],
     [
-      "Anderson, SC",
-      1275
+      "Anderson/SC",
+      1246
     ],
     [
-      "Hyde, NC",
-      1219
+      "Cherokee/SC",
+      1130
     ],
     [
-      "Laurens, SC",
-      952
+      "Laurens/SC",
+      940
     ],
     [
-      "Cherokee, SC",
-      606
+      "Hyde/NC",
+      660
     ],
     [
-      "Union, SC",
+      "Union/SC",
       495
     ],
     [
-      "Georgetown, SC",
+      "Georgetown/SC",
       407
+    ],
+    [
+      "Gaston/NC",
+      357
+    ],
+    [
+      "Charleston/SC",
+      327
+    ],
+    [
+      "Cleveland/NC",
+      254
+    ],
+    [
+      "Transylvania/NC",
+      228
+    ],
+    [
+      "Polk/NC",
+      223
     ]
   ],
   "source_status": {
@@ -485,21 +507,21 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "scheduled NC SOS registered-agent refresh",
-  "detail_count": 40593,
-  "detail_digest": "ef971022ebd442f4",
+  "notes": "",
+  "detail_count": 40008,
+  "detail_digest": "5b243da4d24547cd",
   "board": {
     "schema": "slim-v1",
-    "count": 40593,
+    "count": 40008,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
       "count": 41,
-      "records": 40593
+      "records": 40008
     }
   },
-  "health_carried_from": "2026-08-18T16:24:59.588490Z",
+  "health_carried_from": "2026-08-19T03:12:08.201651Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
