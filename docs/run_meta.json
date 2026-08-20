@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-08-20T13:39:24.599311Z",
+  "run_time": "2026-08-20T17:42:44.417123Z",
   "total": 40046,
   "by_source": {
     "law_firms.finkel": 8,
@@ -507,9 +507,9 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "",
+  "notes": "daily vision pass: 15254 of 40046 listings have a vision report",
   "detail_count": 40046,
-  "detail_digest": "d4b1c2364a383d39",
+  "detail_digest": "e518f360c42a8afa",
   "board": {
     "schema": "slim-v1",
     "count": 40046,
@@ -521,7 +521,7 @@
       "records": 40046
     }
   },
-  "health_carried_from": "2026-08-20T06:40:09.874896Z",
+  "health_carried_from": "2026-08-20T17:41:33.990636Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
