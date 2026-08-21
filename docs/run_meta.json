@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-08-20T18:01:27.845241Z",
+  "run_time": "2026-08-21T16:25:00.667058Z",
   "total": 40046,
   "by_source": {
     "law_firms.finkel": 8,
@@ -507,7 +507,7 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "scheduled NC SOS registered-agent refresh",
+  "notes": "scheduled land-records refresh",
   "detail_count": 40046,
   "detail_digest": "e518f360c42a8afa",
   "board": {
@@ -521,7 +521,7 @@
       "records": 40046
     }
   },
-  "health_carried_from": "2026-08-20T17:51:05.377930Z",
+  "health_carried_from": "2026-08-20T18:22:23.502337Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
