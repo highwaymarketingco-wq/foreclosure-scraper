@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-08-22T00:25:34.431582Z",
-  "total": 39936,
+  "run_time": "2026-08-22T13:39:00.154690Z",
+  "total": 39786,
   "by_source": {
     "law_firms.finkel": 8,
     "counties.column_legal_notices": 129,
@@ -145,8 +145,8 @@
     "courts.lis_pendens_discovery": 0
   },
   "by_state": {
-    "NC": 21340,
-    "SC": 18596
+    "NC": 21312,
+    "SC": 18474
   },
   "by_source_on_board": {
     "counties_nc.rutherford_tax": 4458,
@@ -165,17 +165,17 @@
     "counties.multi_year_delinquent_tax": 725,
     "national.courtlistener_bankruptcy": 707,
     "counties_nc.asheville_str_permits": 637,
-    "national.fannie_homepath": 626,
     "counties_sc.sc_public_index_export": 601,
     "counties_sc.oconee_flc_assignment": 584,
     "counties_sc.cherokee_delinquent_tax": 528,
+    "national.fannie_homepath": 510,
     "counties_sc.oconee_forfeited_land": 453,
     "counties_sc.georgetown_civicengage": 406,
     "counties_nc.nc_ecourts_lis_pendens": 399,
     "counties_sc.sc_public_index_lis_pendens": 360,
-    "national.distressed": 326,
     "counties_nc.asheville_helene": 313,
     "national.landandfarm": 294,
+    "national.distressed": 292,
     "national.landwatch": 269,
     "counties_sc.sc_probate_net": 265,
     "national.hud_reac_inspection": 220,
@@ -209,10 +209,10 @@
     "national.crexi_multifamily": 22,
     "national.nc_upset_bids": 22,
     "counties_sc.anderson_master_in_equity": 21,
-    "reo.vrm_va_reo": 19,
-    "national.homeharvest": 16,
+    "reo.vrm_va_reo": 21,
     "national.hubzu": 16,
     "law_firms.rogers_townsend": 15,
+    "national.homeharvest": 15,
     "law_firms.bell_carrington": 14,
     "national.courtlistener_adversary": 14,
     "national.auction_dot_com": 13,
@@ -236,7 +236,6 @@
     "counties_sc.sc_rod_cott": 1,
     "law_firms.ingle_firm": 1,
     "manual.watchlist": 1,
-    "national.freddie_homesteps": 1,
     "national.realtor_foreclosures": 1,
     "national.sheriff_sales": 1,
     "newspapers.coastland_times": 1
@@ -508,20 +507,20 @@
     "newspapers.carolina_coast"
   ],
   "notes": "",
-  "detail_count": 39936,
-  "detail_digest": "0665e53679a136b0",
+  "detail_count": 39786,
+  "detail_digest": "1a55ab6f64afb9a6",
   "board": {
     "schema": "slim-v1",
-    "count": 39936,
+    "count": 39786,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
       "count": 40,
-      "records": 39936
+      "records": 39786
     }
   },
-  "health_carried_from": "2026-08-22T00:06:38.926879Z",
+  "health_carried_from": "2026-08-22T00:25:34.431582Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
