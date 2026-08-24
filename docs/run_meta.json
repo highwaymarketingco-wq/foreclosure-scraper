@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-08-24T14:02:52.252642Z",
+  "run_time": "2026-08-24T18:05:24.060501Z",
   "total": 33615,
   "by_source": {
     "law_firms.finkel": 8,
@@ -243,19 +243,19 @@
   "by_county_top": [
     [
       "Spartanburg/SC",
-      9424
+      9327
     ],
     [
       "Buncombe/NC",
-      6816
+      6812
     ],
     [
       "Rutherford/NC",
-      4748
+      4746
     ],
     [
       "Pickens/SC",
-      2850
+      2824
     ],
     [
       "New Hanover/NC",
@@ -263,43 +263,43 @@
     ],
     [
       "McDowell/NC",
-      2276
+      2274
     ],
     [
       "Oconee/SC",
-      1683
+      1675
     ],
     [
       "Henderson/NC",
-      1513
+      1510
     ],
     [
       "Lincoln/NC",
-      1481
+      1471
     ],
     [
       "Anderson/SC",
-      1265
+      1241
     ],
     [
       "Cherokee/SC",
-      1145
+      1137
     ],
     [
       "Laurens/SC",
-      1028
+      1008
     ],
     [
       "Union/SC",
-      507
+      501
     ],
     [
       "Georgetown/SC",
-      418
+      417
     ],
     [
       "Gaston/NC",
-      382
+      361
     ],
     [
       "Charleston/SC",
@@ -307,19 +307,19 @@
     ],
     [
       "Cleveland/NC",
-      259
+      245
     ],
     [
       "Polk/NC",
-      231
+      228
     ],
     [
       "Transylvania/NC",
-      226
+      224
     ],
     [
       "Burke/NC",
-      215
+      214
     ]
   ],
   "source_status": {
@@ -506,9 +506,9 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "",
+  "notes": "daily vision pass: 13405 of 33615 listings have a vision report",
   "detail_count": 33615,
-  "detail_digest": "902f1b6f08e37451",
+  "detail_digest": "56c9fc51b691767c",
   "board": {
     "schema": "slim-v1",
     "count": 33615,
@@ -520,7 +520,7 @@
       "records": 33615
     }
   },
-  "health_carried_from": "2026-08-22T18:01:00.537345Z",
+  "health_carried_from": "2026-08-24T17:04:08.979681Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
