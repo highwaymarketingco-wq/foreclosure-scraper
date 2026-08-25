@@ -503,3 +503,33 @@ Score = how complete the county's **free** data is now, counting the net-new sou
 | **Union, SC** | **4** | Beacon parcel detail with owner + mailing + values + sales history; the tgis API (parcels with CAMA ID, addresses, road centerlines, countywide free-text search); qPayBill unpaid balances; Cott RecordRoom ROD; scpublicnotices coverage; a documented tax-sale and FLC calendar | **Nothing about the delinquent or FLC inventory is online.** The FLC bid-assignment list is available only in person at the Auditor's Office, cash only, from mid-January. There is no Master-in-Equity roster, no code-enforcement list, no bulk GIS without a signed release form, and both sheriff crime feeds have been dead since 2018 and 2020. |
 
 **Footprint-wide observations from the scores.** The strongest counties (Buncombe, Anderson, Pickens) all share one trait: a county-run system that publishes owner, mailing and money in the same response, whether that is an ArcGIS org, a CGI assessor, or annual AGOL services. The weakest (Union, Mitchell, Polk, Cherokee) all fail on the same axis: **dollars owed are unavailable**, either walled, absent, or only in newsprint. Delinquent-balance capture is now the single highest-leverage remaining category across the footprint, and after the additions above it is solved for Buncombe, Rutherford, McDowell, Gaston (per-parcel), Henderson, Pickens, Oconee, Anderson, Spartanburg, Laurens, Cherokee (partial) and Union (per-parcel via qPayBill), and remains unsolved for Cleveland, Burke, Lincoln, Polk, Mitchell and Transylvania.
+
+---
+
+## 6. REGISTER-OF-DEEDS HOST INDEX
+
+The following SC and NC counties run free ROD platforms that are scraped by `enrichment_rod_lookup.py` (LOOKUP_HOSTS) and `enrichment_rod_name_index.py` (NAME_INDEX_HOSTS). Each host is a free, no-login search interface for deed records.
+
+### LOOKUP_HOSTS (enrichment_rod_lookup)
+- Clay NC: `https://search.claydeeds.com`
+- Haywood NC: `https://search.haywooddeeds.com`
+- Yancey NC: `https://search.yanceydeeds.com`
+
+### NAME_INDEX_HOSTS (enrichment_rod_name_index)
+- Abbeville SC: `https://search.abbevilledeeds.com`
+- Barnwell SC: `https://barnwelldeeds.com`
+- Berkeley SC: `https://search.berkeleydeeds.com`
+- Colleton SC: `https://search.colletondeeds.com`
+- Dorchester SC: `https://search.dorchesterdeeds.com`
+- Florence SC: `https://search.florencedeeds.com`
+- Georgetown SC: `https://georgetowndeeds.com`
+- York SC: `https://search.yorkdeeds.com`
+
+---
+
+## 7. EXPENSIVE / SLOW WALLS DOCUMENTED
+
+The following hosts burn significant run time and are documented here so the cost is visible:
+- `portal-nc.tylertech.cloud` — NC eCourts judgment search, free but slow (multi-request per case)
+- `publicindex.sccourts.org` — SC public index, free but slow (per-county per-case)
+- `fastpeoplesearch.com` — free people search, extremely slow per-request, used for phone/email enrichment

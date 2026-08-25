@@ -255,8 +255,10 @@ const _LEAN_RAW = {
   strategy_fit: ["tags"],
   owner_mailing: ["mailing", "mail_state", "absentee", "out_of_state"],
   owner_phone: ["phone", "source", "needs_dnc_scrub"],
+  free_phones: ["phone", "source", "confidence", "needs_dnc_scrub"],
+  sc_voter_xref: ["phone", "source", "match_type", "needs_dnc_scrub"],
   sos_agent: ["sosid", "best_contact_name", "best_contact_address"],
-  rod: ["has_mortgage", "has_adverse_lien"],
+  rod: ["has_mortgage", "has_adverse_lien", "has_hoa_lien", "hoa_lien_count"],
   equity: "*",
   title_risk: ["surviving_senior_debt_risk"],
   corroboration: ["court_confirmed", "label", "tier", "multi_source"],
@@ -284,11 +286,15 @@ const _LEAN_RAW = {
   // gis_row_shared, and until now the key was in no allowlist, so a phone
   // silently saw none of them — 21,678 records on today's board carry one.
   qa_flags: "*",
+  // New enrichment fields — keep whole so dashboard can read all sub-keys.
+  property_category: "*",
+  deed_chain: "*",
 };
 const _LEAN_RAW_KEYS = Object.keys(_LEAN_RAW);
 const _LEAN_RAW_SCALARS = [
   "intent_score", "intent_band", "multifamily_class",
   "stale_case", "geo_imprecise", "sold_confirmed", "kw_vacant", "acres",
+  "child_support",
 ];
 const _ACRE_KEYS = ["acreage", "acres", "calculatedAcres", "deededAcres"];
 
@@ -860,7 +866,7 @@ function fillStats() {
 
 // ------------- Filter init ---------------------------------------------------
 // Every control except #search. #search is bound separately, debounced.
-const FILTER_IDS = ["filter-state", "filter-county", "filter-type", "filter-contact",
+const FILTER_IDS = ["filter-state", "filter-county", "filter-category", "filter-type", "filter-contact",
   "filter-land", "filter-strategy", "filter-arv", "filter-source", "filter-distress",
   "filter-signals", "filter-intent", "filter-grade", "filter-window", "filter-roi"];
 // The listener half of initFilters() must run EXACTLY once. It used to run on
@@ -1534,6 +1540,7 @@ function applyFilters() {
   const st = $("filter-state").value;
   const co = $("filter-county").value;
   const ty = $("filter-type").value;
+  const cat = ($("filter-category") || {}).value || "";
   const land = $("filter-land").value;
   const src = $("filter-source").value;
   const contact = $("filter-contact").value;
@@ -1562,6 +1569,10 @@ function applyFilters() {
     if (st && l.state !== st) return false;
     if (co && `${l.county || ""}, ${l.state || "?"}` !== co) return false;
     if (ty && l.listing_type !== ty) return false;
+    if (cat) {
+      const pc = (l.raw && l.raw.property_category) ? l.raw.property_category.category : "";
+      if (pc !== cat) return false;
+    }
     if (src && l.source !== src) return false;
     if (land) {
       // property_kind is unreliable (some houses are mislabeled "land"), so a real
@@ -3070,6 +3081,7 @@ const _EV_COVERED = new Set([
   "skip_trace","upset_bid","bankruptcy","sos_agent","rod_docs","incarceration",
   "owner_mismatch","sc_tax_delinquent","liens","sold_confirmed","fema_repetitive_loss",
   "vision","comps","cama","rent_comps","foreclosure_sold_comps","images","outreach","crm",
+  "property_category","child_support",
 ]);
 // Plumbing, not insight — safe to hide.
 const _EV_NOISE = new Set([
@@ -3484,6 +3496,7 @@ function renderCards() {
           ${signalChipsHtml}
           ${strategyBuyerChips(l)}
           <div class="card-meta">
+            ${(l.raw && l.raw.property_category) ? '<span class="cat-badge" style="background:'+({"foreclosure":"#e74c3c","preforeclosure":"#f39c12","tax_delinquency":"#9b59b6","distressed_property":"#3498db"}[l.raw.property_category.category]||"#7f8c8d")+';color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;">'+l.raw.property_category.category.replace(/_/g," ")+'</span>' : ""}
             ${fmtType(l.listing_type)}
             ${l.opening_bid ? `<span>Bid ${fmtMoney(l.opening_bid)}</span>` : ""}
             ${c.arv_expected
@@ -4045,7 +4058,23 @@ function renderDetail(l, detailState) {
   const g = getGrade(l);
   const c = getCalc(l);
 
-  $("d-title").textContent = `${l.listing_type ? l.listing_type.replace(/_/g, " ") : "Listing"} — ${l.county || ""} County`;
+  // Category badge
+  const pc = (l.raw && l.raw.property_category) ? l.raw.property_category : null;
+  const cs = (l.raw && l.raw.child_support) ? l.raw.child_support : null;
+  const hoa = (l.raw && l.raw.rod) ? l.raw.rod.has_hoa_lien : false;
+  let catBadge = "";
+  if (pc) {
+    const catColors = {"foreclosure":"#e74c3c","preforeclosure":"#f39c12","tax_delinquency":"#9b59b6","distressed_property":"#3498db"};
+    const cc = catColors[pc.category] || "#7f8c8d";
+    catBadge = ' <span class="cat-badge" style="background:'+cc+';color:#fff;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;text-transform:uppercase;">'+pc.category.replace(/_/g," ")+'</span>';
+    if (pc.subcategory && pc.subcategory !== pc.category) {
+      catBadge += ' <span class="cat-sub" style="color:#888;font-size:11px;">'+pc.subcategory.replace(/_/g," ")+'</span>';
+    }
+  }
+  let extraFlags = "";
+  if (cs && cs.flag) extraFlags += ' <span class="cs-flag" style="background:#c0392b;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">CHILD SUPPORT</span>';
+  if (hoa) extraFlags += ' <span class="hoa-flag" style="background:#8e44ad;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">HOA LIEN</span>';
+  $("d-title").innerHTML = (l.listing_type || "listing").replace(/_/g, " ")+" — "+(l.county || "")+" County"+catBadge+extraFlags;
   $("d-address").textContent = [l.street_address, l.city, l.state, l.zip_code].filter(Boolean).join(", ");
 
   // Grade block

@@ -1,12 +1,12 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-08-07 03:17 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-08-20 03:17 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
-- Scrapers in the registry: **138**
-- Producing rows on the board: **86**
-- Registered but contributing ZERO rows: **52**
+- Scrapers in the registry: **205**
+- Producing rows on the board: **87**
+- Registered but contributing ZERO rows: **118**
 - Confirmed real and not yet built: **9**
-- Board read: `data/checkpoint/board.json.gz` (47,125 rows)
+- Board read: `docs/listings.json.gz` (40,008 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
 
@@ -18,93 +18,97 @@ Live row counts are what the source actually contributed to the board read above
 
 | Slug | Rows | Top counties | URLs in the module |
 |---|---:|---|---|
-| `counties_nc.rutherford_tax` | 6,830 | Rutherford NC (6830) | `https://www.rutherfordcountync.gov/`<br>`https://www.rutherfordcountync.gov/departments/` |
-| `national.courtlistener_bankruptcy` | 4,215 | Anderson SC (105), Laurens SC (49), Buncombe NC (47) | `https://www.courtlistener.com/sign-up/`<br>`https://www.courtlistener.com/profile/api/`<br>`https://www.courtlistener.com/api/rest/v4`<br>_+1 more_ |
-| `counties_nc.nc_county_pdf_delinquent_tax` | 3,839 | McDowell NC (2247), Lincoln NC (1592) | `https://www.lincolncountync.gov/DocumentCenter/View/25558/2025-TAXESDelinquentAdvertisementNotice`<br>`https://www.catawbacountync.gov/site/assets/files/11653/delinquent_advertisement_list-hdr_2026.pdf`<br>`https://mcdowellnc.gov/departments/tax-collections/tax-lien-advertisement/ADVERTISEMENT-LIST-FINAL-2025.pdf` |
-| `counties_nc.nc_county_csv_delinquent_tax` | 1,440 | New Hanover NC (1440) | `https://www.nhcgov.com/DocumentCenter/View/11283/Delinquent_Taxpayers_Report_CSV` |
-| `counties_sc.sc_public_index` | 3,796 | Anderson SC (673), Spartanburg SC (665), Laurens SC (663) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county` |
-| `counties_nc.buncombe_elderly` | 3,548 | Buncombe NC (3547), Gaston NC (1) | `https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query` |
-| `counties_sc.spartanburg_vacant` | 3,310 | Spartanburg SC (3310) | `https://services9.arcgis.com/HoRra3ATPLGmyjn6/arcgis/rest/services/`<br>`https://services9.arcgis.com/HoRra3ATPLGmyjn6/` |
-| `counties_nc.nc_ptscloud_delinquent_tax` | 2,880 | Henderson NC (1513), Hyde NC (1367) | `https://bcpwa.ncptscloud.com` |
-| `counties_sc.spartanburg_delinquent_tax` | 2,082 | Spartanburg SC (2082) | `https://www.spartanburgcounty.gov/DocumentCenter/View/11161/Real-Property-Tax-Sale-List-PDF`<br>`https://www.spartanburgcounty.gov/DocumentCenter/View/11161/`<br>`https://www.spartanburgcounty.gov/640/2025-Tax-Sale-Info` |
-| `counties_sc.pickens_delinquent_parcels` | 1,928 | Pickens SC (1928) | `https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services`<br>`https://www.co.pickens.sc.us/departments/delinquent_tax/index.php` |
-| `counties_sc.spartanburg_condemned` | 1,658 | Spartanburg SC (1658) | `https://maps.spartanburgcounty.org/server/rest/services/` |
-| `counties_nc.buncombe_delinquent_tax` | 1,155 | Buncombe NC (1155) | `https://media.buncombenc.gov/common/tax/buncombe-county-tax-department-advertisement-of-tax-liens.pdf`<br>`https://media.buncombenc.gov/common/tax/` |
-| `counties_nc.nc_heir_estate_parcels` | 982 | Rutherford NC (149), Polk NC (135), Gaston NC (79) | _(no literal URL in module)_ |
-| `counties_nc.asheville_helene` | 823 | Buncombe NC (823) | `https://services.arcgis.com/aJ16ENn1AaqdFlqx/arcgis/rest/services/` |
-| `counties.multi_year_delinquent_tax` | 731 | Buncombe NC (595), Oconee SC (135), Pickens SC (1) | `https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services`<br>`https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services`<br>`https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services`<br>_+3 more_ |
-| `counties_nc.asheville_str_permits` | 640 | Buncombe NC (640) | `https://gis.ashevillenc.gov/server/rest/services/Permits/`<br>`https://gis.ashevillenc.gov/server/rest/services/Permits/HomestayPermitsView/MapServer/5` |
-| `counties_nc.nc_ecourts_lis_pendens` | 597 | Brunswick NC (122), Onslow NC (83), Henderson NC (63) | `https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/`<br>`https://portal-nc.tylertech.cloud/app/NCJudgmentSearchService/search`<br>`https://portal-nc.tylertech.cloud` |
-| `counties_sc.oconee_flc_assignment` | 585 | Oconee SC (585) | `https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services/`<br>`https://oconeesc.com/auditor-home/forfeited-land` |
-| `national.landwatch` | 478 | Burke NC (38), Dare NC (32), Carteret NC (26) | `https://www.landwatch.com/{state_slug` |
-| `counties_sc.oconee_forfeited_land` | 454 | Oconee SC (454) | `https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services/`<br>`https://oconeesc.com/auditor-home/forfeited-land` |
-| `national.distressed` | 444 | Spartanburg SC (72), Anderson SC (61), Gaston NC (57) | _(no literal URL in module)_ |
-| `counties_sc.georgetown_civicengage` | 408 | Georgetown SC (408) | `https://www.gtcountysc.gov` |
-| `public_notices.nc_notices_counties` | 393 | Buncombe NC (152), Gaston NC (82), Henderson NC (40) | `https://www.ncnotices.com/Search.aspx`<br>`https://www.ncnotices.com/Details.aspx?ID={` |
-| `counties_sc.sc_public_index_lis_pendens` | 382 | Anderson SC (143), Spartanburg SC (131), Laurens SC (37) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county` |
-| `national.hud_reac_inspection` | 381 | Spartanburg SC (63), Buncombe NC (35), Gaston NC (31) | `https://www.hud.gov/sites/default/files/Housing/documents/MF-Inspection-Report.xls```<br>`https://www.hud.gov/sites/default/files/Housing/documents/`<br>`https://www.hud.gov/stat/mfh/inspection-scores` |
-| `national.landandfarm` | 378 | Gaston NC (28), Henderson NC (27), Mitchell NC (26) | `https://www.landandfarm.com/search/{state_slug` |
-| `counties_sc.sc_public_notices` | 349 | Cherokee SC (116), Laurens SC (62), Oconee SC (57) | `https://www.scpublicnotices.com/Search.aspx`<br>`https://www.scpublicnotices.com/Details.aspx?ID={n[` |
-| `counties_sc.sc_probate_net` | 250 | Charleston SC (250) | `https://www.southcarolinaprobate.net/search/```<br>`https://www.southcarolinaprobate.net/search/` |
-| `national.hud_section8_contracts` | 245 | Spartanburg SC (29), Gaston NC (25), Buncombe NC (18) | `https://www.hud.gov/hud-partners/multifamily-assist-section8-database`<br>`https://www.hud.gov/sites/dfiles/Housing/documents/`<br>`https://www.hud.gov/hud-partners/` |
-| `counties_nc.nc_ecourts_divorce` | 197 | Buncombe NC (42), Gaston NC (41), Brunswick NC (31) | `https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29`<br>`https://portal-nc.tylertech.cloud/Portal`<br>`https://portal-nc.tylertech.cloud` |
-| `national.fannie_homepath` | 188 | Spartanburg SC (49), Pickens SC (29), Laurens SC (27) | `https://homepath.fanniemae.com/cfl/property-inventory/search`<br>`https://homepath.fanniemae.com/`<br>`https://homepath.fanniemae.com/property/{uuid` |
-| `public_notices.gannett_obituaries` | 188 | Buncombe NC (58), Henderson NC (32), Spartanburg SC (32) | `https://www.{host` |
-| `counties_sc.spartan_weekly_legals` | 187 | Spartanburg SC (187) | `https://www.spartanweeklyonline.com` |
-| `counties_sc.sc_rod_acclaim` | 179 | Pickens SC (179) | _(no literal URL in module)_ |
-| `counties_nc.henderson_code_violations` | 156 | Henderson NC (156) | `https://services1.arcgis.com/ZfV5vUaX5QvLLBi9/arcgis/rest/services/`<br>`https://www.hendersoncountync.gov/planning/page/` |
-| `counties.column_legal_notices` | 134 | McDowell NC (54), Burke NC (27), Gaston NC (19) | `https://us-central1-enotice-production.cloudfunctions.net/api/search/public-notices`<br>`https://us-central1-enotice-production.cloudfunctions.net` |
-| `national.courtlistener_adversary` | 122 | Buncombe NC (6), Cleveland NC (3), Polk NC (2) | `https://www.courtlistener.com` |
-| `law_firms.brock_scott` | 108 | Spartanburg SC (22), Anderson SC (11), Gaston NC (10) | `https://www.brockandscott.com/foreclosure-sales/` |
-| `national.foreclosure_dot_com` | 94 | Gaston NC (21), Anderson SC (17), Spartanburg SC (16) | `https://www.foreclosure.com/listings/north-carolina/`<br>`https://www.foreclosure.com/listings/south-carolina/` |
-| `law_firms.hutchens` | 93 | Horry SC (14), Buncombe NC (8), Gaston NC (8) | `https://sales.hutchenslawfirm.com/NCfcSalesList.aspx`<br>`https://sales.hutchenslawfirm.com/SCfcSalesList.aspx` |
+| `counties_nc.rutherford_tax` | 4,458 | Rutherford NC (4458) | `https://www.rutherfordcountync.gov/`<br>`https://www.rutherfordcountync.gov/departments/` |
+| `counties_sc.sc_public_index` | 3,733 | Anderson SC (673), Spartanburg SC (656), Laurens SC (642) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county` |
+| `counties_nc.buncombe_elderly` | 3,560 | Buncombe NC (3560) | `https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query` |
+| `counties_sc.spartanburg_vacant` | 3,443 | Spartanburg SC (3443) | `https://services9.arcgis.com/HoRra3ATPLGmyjn6/arcgis/rest/services/`<br>`https://services9.arcgis.com/HoRra3ATPLGmyjn6/` |
+| `counties_nc.nc_county_pdf_delinquent_tax` | 3,349 | McDowell NC (2050), Lincoln NC (1299) | `https://www.lincolncountync.gov/DocumentCenter/View/25558/2025-TAXESDelinquentAdvertisementNotice`<br>`https://www.catawbacountync.gov/site/assets/files/11653/delinquent_advertisement_list-hdr_2026.pdf`<br>`https://mcdowellnc.gov/departments/tax-collections/tax-lien-advertisement/ADVERTISEMENT-LIST-FINAL-2025.pdf` |
+| `counties_sc.spartanburg_delinquent_tax` | 1,966 | Spartanburg SC (1966) | `https://www.spartanburgcounty.gov/DocumentCenter/View/11161/Real-Property-Tax-Sale-List-PDF`<br>`https://www.spartanburgcounty.gov/DocumentCenter/View/11161/`<br>`https://www.spartanburgcounty.gov/640/2025-Tax-Sale-Info` |
+| `counties_sc.pickens_delinquent_parcels` | 1,930 | Pickens SC (1930) | `https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services`<br>`https://www.co.pickens.sc.us/departments/delinquent_tax/index.php` |
+| `counties_sc.spartanburg_condemned` | 1,649 | Spartanburg SC (1649) | `https://maps.spartanburgcounty.org/server/rest/services/` |
+| `counties_nc.nc_county_csv_delinquent_tax` | 1,406 | New Hanover NC (1406) | `https://www.nhcgov.com/DocumentCenter/View/11283/Delinquent_Taxpayers_Report_CSV` |
+| `counties_nc.buncombe_delinquent_tax` | 1,153 | Buncombe NC (1153) | `https://media.buncombenc.gov/common/tax/buncombe-county-tax-department-advertisement-of-tax-liens.pdf`<br>`https://media.buncombenc.gov/common/tax/` |
+| `counties_nc.nc_ptscloud_delinquent_tax` | 1,040 | Henderson NC (1002), Hyde NC (38) | `https://bcpwa.ncptscloud.com` |
+| `counties_nc.nc_heir_estate_parcels` | 976 | Rutherford NC (181), Polk NC (122), Gaston NC (79) | _(no literal URL in module)_ |
+| `counties.multi_year_delinquent_tax` | 725 | Buncombe NC (589), Oconee SC (135), Pickens SC (1) | `https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services`<br>`https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services`<br>`https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services`<br>_+3 more_ |
+| `national.courtlistener_bankruptcy` | 711 | Anderson SC (109), Buncombe NC (104), Henderson NC (72) | `https://www.courtlistener.com/sign-up/`<br>`https://www.courtlistener.com/profile/api/`<br>`https://www.courtlistener.com/api/rest/v4`<br>_+1 more_ |
+| `national.fannie_homepath` | 667 | Spartanburg SC (262), Laurens SC (91), Anderson SC (54) | `https://homepath.fanniemae.com/cfl/property-inventory/search`<br>`https://homepath.fanniemae.com/`<br>`https://homepath.fanniemae.com/property/{uuid` |
+| `counties_nc.asheville_str_permits` | 639 | Buncombe NC (639) | `https://gis.ashevillenc.gov/server/rest/services/Permits/`<br>`https://gis.ashevillenc.gov/server/rest/services/Permits/HomestayPermitsView/MapServer/5` |
+| `counties_sc.oconee_flc_assignment` | 584 | Oconee SC (584) | `https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services/`<br>`https://oconeesc.com/auditor-home/forfeited-land` |
+| `counties_sc.cherokee_delinquent_tax` | 528 | Cherokee SC (528) | `https://www.cherokeecountysc.gov/wp-json/wp/v2/media` |
+| `counties_sc.oconee_forfeited_land` | 453 | Oconee SC (453) | `https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services/`<br>`https://oconeesc.com/auditor-home/forfeited-land` |
+| `counties_sc.georgetown_civicengage` | 406 | Georgetown SC (406) | `https://www.gtcountysc.gov` |
+| `counties_nc.nc_ecourts_lis_pendens` | 399 | New Hanover NC (90), Brunswick NC (86), Onslow NC (48) | `https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/`<br>`https://portal-nc.tylertech.cloud/app/NCJudgmentSearchService/search`<br>`https://portal-nc.tylertech.cloud` |
+| `counties_sc.sc_public_index_lis_pendens` | 360 | Anderson SC (141), Spartanburg SC (124), Laurens SC (29) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county` |
+| `national.distressed` | 338 | Gaston NC (54), Spartanburg SC (49), Anderson SC (44) | _(no literal URL in module)_ |
+| `counties_nc.asheville_helene` | 313 | Buncombe NC (313) | `https://services.arcgis.com/aJ16ENn1AaqdFlqx/arcgis/rest/services/` |
+| `national.landandfarm` | 294 | Gaston NC (25), Henderson NC (22), Cleveland NC (21) | `https://www.landandfarm.com/search/{state_slug` |
+| `national.landwatch` | 270 | McDowell NC (37), Burke NC (36), Buncombe NC (22) | `https://www.landwatch.com/{state_slug` |
+| `counties_sc.sc_probate_net` | 265 | Charleston SC (265) | `https://www.southcarolinaprobate.net/search/```<br>`https://www.southcarolinaprobate.net/search/` |
+| `national.hud_reac_inspection` | 220 | Spartanburg SC (44), Gaston NC (24), Anderson SC (23) | `https://www.hud.gov/sites/default/files/Housing/documents/MF-Inspection-Report.xls```<br>`https://www.hud.gov/sites/default/files/Housing/documents/`<br>`https://www.hud.gov/stat/mfh/inspection-scores` |
+| `counties_sc.spartan_weekly_legals` | 205 | Spartanburg SC (205) | `https://www.spartanweeklyonline.com` |
+| `counties_sc.sc_rod_acclaim` | 197 | Pickens SC (197) | _(no literal URL in module)_ |
+| `counties_nc.henderson_code_violations` | 163 | Henderson NC (163) | `https://services1.arcgis.com/ZfV5vUaX5QvLLBi9/arcgis/rest/services/`<br>`https://www.hendersoncountync.gov/planning/page/` |
+| `counties_sc.sc_public_notices` | 155 | Pickens SC (39), Cherokee SC (25), Laurens SC (25) | `https://www.scpublicnotices.com/Search.aspx`<br>`https://www.scpublicnotices.com/Details.aspx?ID={n[` |
+| `counties_nc.nc_ecourts_divorce` | 153 | New Hanover NC (46), Buncombe NC (38), Brunswick NC (25) | `https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29`<br>`https://portal-nc.tylertech.cloud/Portal`<br>`https://portal-nc.tylertech.cloud` |
+| `public_notices.nc_notices_counties` | 143 | Buncombe NC (78), Rutherford NC (26), Gaston NC (15) | `https://www.ncnotices.com/Search.aspx`<br>`https://www.ncnotices.com/Details.aspx?ID={` |
+| `public_notices.gannett_obituaries` | 142 | Buncombe NC (60), Spartanburg SC (38), Anderson SC (26) | `https://www.{host` |
+| `national.foreclosure_dot_com` | 91 | Gaston NC (20), Anderson SC (17), Spartanburg SC (16) | `https://www.foreclosure.com/listings/north-carolina/`<br>`https://www.foreclosure.com/listings/south-carolina/` |
 | `counties_sc.spartanburg_city_condemned` | 90 | Spartanburg SC (90) | `https://www.cityofspartanburg.org/robots.txt`<br>`https://www.cityofspartanburg.org/DocumentCenter/View/1901/`<br>`https://www.cityofspartanburg.org/` |
-| `national.zillow_bulk` | 86 | Spartanburg SC (17), Gaston NC (12), Anderson SC (10) | `https://www.zillow.com/{state.lower(` |
-| `national.zillow_foreclosures` | 86 | Buncombe NC (6), Spartanburg SC (6), Gaston NC (5) | `https://www.zillow.com/{state.lower(` |
-| `national.cash_buyer_deeds` | 66 | McDowell NC (66) | `https://{host` |
-| `counties_sc.charleston_mie` | 60 | Charleston SC (60) | `https://charlestoncounty.gov/foreclosure/runninglist.html`<br>`https://charlestoncounty.gov/departments/master-in-equity/rosters/` |
-| `law_firms.shapiro_ingle_powerbi` | 57 | Gaston NC (19), Buncombe NC (15), Cleveland NC (5) | `https://www.logs.com/nc-upcoming-sales-report.html`<br>`https://app.powerbi.com/view?r=`<br>`https://wabi-us-north-central-h-primary-api.analysis.windows.net`<br>_+2 more_ |
-| `counties_nc.hendersonville_vacant_structures` | 50 | Henderson NC (50) | `https://services1.arcgis.com/UTZTmZoX2rsa9yFA/arcgis/rest/services/`<br>`https://www.hvlnc.gov/departments/development-assistance` |
-| `public_notices.ncnotices` | 42 | Buncombe NC (32), Polk NC (5), Lincoln NC (1) | `https://www.ncnotices.com/`<br>`https://www.ncnotices.com{raw_href` |
-| `national.auction_dot_com` | 35 | Spartanburg SC (3), Henderson NC (2), Cherokee SC (2) | `https://www.auction.com/residential/nc/`<br>`https://www.auction.com/residential/sc/`<br>`https://www.auction.com/details/{slug` |
-| `law_firms.kania` | 34 | Burke NC (13), Cleveland NC (8), Lincoln NC (6) | `https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/`<br>`https://kanialawfirm.com/wp-admin/admin-ajax.php` |
-| `counties_sc.terry_howe_flc` | 31 | Laurens SC (29), Spartanburg SC (2) | `https://terryhowe.com/wp-json/wp/v2/auctions?per_page=100&_fields=id,title,link,content` |
-| `counties_nc.nc_rod_logan` | 28 | Transylvania NC (15), McDowell NC (13) | _(no literal URL in module)_ |
-| `counties_sc.sc_state_tax_lien` | 28 | Horry SC (14), Charleston SC (5), Spartanburg SC (3) | `https://mydorway.dor.sc.gov/?link=delinquentind`<br>`https://dor.sc.gov/delinquent-taxpayers` |
-| `law_firms.bell_carrington` | 28 | Spartanburg SC (7), Anderson SC (4), Horry SC (4) | `https://docs.google.com/spreadsheets/d/e/`<br>`https://bellcarrington.com/foreclosure-sales/` |
-| `national.nc_upset_bids` | 28 | Rutherford NC (20), Cleveland NC (4), Lincoln NC (2) | `https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/`<br>`https://kanialawfirm.com/wp-admin/admin-ajax.php`<br>`https://www.rutherfordcountync.gov/departments/` |
-| `national.crexi_multifamily` | 24 | Spartanburg SC (3), Polk NC (2), Gaston NC (2) | `https://www.crexi.com` |
-| `national.servicelink_auction` | 24 | Gaston NC (5), Buncombe NC (4), Spartanburg SC (4) | `https://ui.exostechnology.com/api/listingsvc/v1/listings?limit=100&state={ST`<br>`https://ui.exostechnology.com/api/listingsvc/v1/listings`<br>`https://www.servicelinkauction.com`<br>_+1 more_ |
-| `counties_sc.horry_flc` | 23 | Horry SC (23) | `https://www.horrycountysc.gov/boards-and-commissions/`<br>`https://www.horrycountysc.gov/media/om1d2bwo/2025-flc-list-42126.xlsx`<br>`https://www.horrycountysc.gov` |
-| `counties_nc.buncombe_tax` | 21 | Buncombe NC (21) | `https://www.trumba.com/calendars/tax-foreclosures-all.json`<br>`https://taxforeclosures.buncombenc.gov/` |
-| `national.hubzu` | 21 | Spartanburg SC (5), Buncombe NC (2), Anderson SC (2) | `https://www.hubzu.com/portal/auctions?state={state`<br>`https://www.hubzu.com/`<br>`https://www.hubzu.com{url` |
-| `law_firms.mcmichael_taylor_gray` | 20 | New Hanover NC (3), Anderson SC (3), Charleston SC (2) | `https://app.powerbi.com/view?r=eyJrIjoiOTQwOTdiYWYtOGQwMy00OGUzLWI4MjktOTczNDc0ODE2ZGY1IiwidCI6IjEzZDFlNzhjLTgyNDgtNGVlYS04OWY3LWQzNGIzZWJkOGM3OSIsImMiOjN9`<br>`https://app.powerbi.com/view?r=eyJrIjoiOTQwOTdiYWYtOGQwMy00OGUzLWI4MjktOTczNDc0ODE2ZGY1Ii` |
-| `national.xome` | 20 | Anderson SC (3), Gaston NC (2), Cleveland NC (2) | `https://www.xome.com/auctions/bank-owned`<br>`https://www.xome.com/auctions/foreclosure-homes`<br>`https://www.xome.com/auctions/foreclosuresales`<br>_+1 more_ |
-| `national.homeharvest` | 18 | Anderson SC (5), Spartanburg SC (3), Burke NC (3) | `https://github.com/ZacharyHampton/HomeHarvest` |
-| `counties.nod_discovery` | 17 | Cleveland NC (8), Burke NC (7), Lincoln NC (2) | `https://{host`<br>`https://{kofile.KOFILE_COUNTIES[(state`<br>`https://example.invalid/` |
-| `counties_nc.nc_rod_substitute_trustee` | 17 | Cleveland NC (8), Burke NC (7), Henderson NC (1) | `https://buncombe-recordings.permitium.com/```<br>`https://www.nccourts.gov/` |
-| `counties_nc.henderson_foreclosure_parcels` | 14 | Henderson NC (14) | `https://www.arcgis.com`<br>`https://hendersoncounty.maps.arcgis.com`<br>`https://experience.arcgis.com/experience/` |
-| `national.estate_sales` | 13 | Spartanburg SC (4), Cleveland NC (3), Buncombe NC (2) | `https://www.estatesales.net`<br>`https://www.estatesale.com`<br>`https://{host` |
-| `counties_sc.pickens_master_in_equity` | 12 | Pickens SC (12) | `https://www.co.pickens.sc.us/departments/master_in_equity/sales_rosters.php`<br>`https://www.co.pickens.sc.us/` |
-| `reo.vrm_va_reo` | 12 | - | `https://vrmproperties.com/`<br>`https://vrmproperties.com` |
-| `counties_sc.anderson_master_in_equity` | 11 | Anderson SC (11) | `https://www.andersoncountysc.org/departments-a-z/master-in-equity/`<br>`https://www.andersoncountysc.org{href` |
+| `law_firms.brock_scott` | 75 | Spartanburg SC (25), Gaston NC (10), Anderson SC (7) | `https://www.brockandscott.com/foreclosure-sales/` |
+| `counties_sc.sc_flc` | 74 | Anderson SC (74) | `https://www.spartanburgcounty.gov/216/Tax-Collector`<br>`https://www.andersoncountysc.org/departments-a-z/treasurer/`<br>`https://www.pickenscountysc.gov/treasurer/tax-sale`<br>_+5 more_ |
+| `law_firms.hutchens` | 72 | Spartanburg SC (13), Gaston NC (11), Buncombe NC (8) | `https://sales.hutchenslawfirm.com/NCfcSalesList.aspx`<br>`https://sales.hutchenslawfirm.com/SCfcSalesList.aspx` |
+| `national.zillow_bulk` | 69 | Spartanburg SC (17), Gaston NC (13), Anderson SC (10) | `https://www.zillow.com/{state.lower(` |
+| `counties.column_legal_notices` | 68 | McDowell NC (29), Burke NC (9), Gaston NC (7) | `https://us-central1-enotice-production.cloudfunctions.net/api/search/public-notices`<br>`https://us-central1-enotice-production.cloudfunctions.net` |
+| `law_firms.shapiro_ingle_powerbi` | 65 | Gaston NC (23), Buncombe NC (15), Cleveland NC (7) | `https://www.logs.com/nc-upcoming-sales-report.html`<br>`https://app.powerbi.com/view?r=`<br>`https://wabi-us-north-central-h-primary-api.analysis.windows.net`<br>_+2 more_ |
+| `counties_sc.charleston_mie` | 54 | Charleston SC (54) | `https://charlestoncounty.gov/foreclosure/runninglist.html`<br>`https://charlestoncounty.gov/departments/master-in-equity/rosters/` |
+| `counties_nc.hendersonville_vacant_structures` | 51 | Henderson NC (51) | `https://services1.arcgis.com/UTZTmZoX2rsa9yFA/arcgis/rest/services/`<br>`https://www.hvlnc.gov/departments/development-assistance` |
+| `law_firms.kania` | 39 | Burke NC (16), Lincoln NC (8), Cleveland NC (7) | `https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/`<br>`https://kanialawfirm.com/wp-admin/admin-ajax.php` |
+| `national.hud_section8_contracts` | 39 | Gaston NC (9), Spartanburg SC (6), Anderson SC (5) | `https://www.hud.gov/hud-partners/multifamily-assist-section8-database`<br>`https://www.hud.gov/sites/dfiles/Housing/documents/`<br>`https://www.hud.gov/hud-partners/` |
+| `counties_sc.terry_howe_flc` | 37 | Laurens SC (29), Spartanburg SC (8) | `https://terryhowe.com/wp-json/wp/v2/auctions?per_page=100&_fields=id,title,link,content` |
+| `national.zillow_foreclosures` | 30 | Spartanburg SC (6), Buncombe NC (5), Gaston NC (4) | `https://www.zillow.com/{state.lower(` |
+| `national.cash_buyer_deeds` | 29 | McDowell NC (24), Burke NC (5) | `https://{host` |
+| `national.estate_sales` | 27 | Cleveland NC (8), Buncombe NC (7), Gaston NC (5) | `https://www.estatesales.net`<br>`https://www.estatesale.com`<br>`https://{host` |
+| `public_notices.ncnotices` | 25 | Buncombe NC (17), Polk NC (3), Lincoln NC (1) | `https://www.ncnotices.com/`<br>`https://www.ncnotices.com{raw_href` |
+| `counties_nc.nc_rod_logan` | 24 | Transylvania NC (13), McDowell NC (11) | _(no literal URL in module)_ |
+| `national.servicelink_auction` | 23 | Gaston NC (5), Spartanburg SC (5), Buncombe NC (3) | `https://ui.exostechnology.com/api/listingsvc/v1/listings?limit=100&state={ST`<br>`https://ui.exostechnology.com/api/listingsvc/v1/listings`<br>`https://www.servicelinkauction.com`<br>_+1 more_ |
+| `counties_nc.buncombe_tax` | 22 | Buncombe NC (22) | `https://www.trumba.com/calendars/tax-foreclosures-all.json`<br>`https://taxforeclosures.buncombenc.gov/` |
+| `national.crexi_multifamily` | 22 | Spartanburg SC (3), Polk NC (2), Gaston NC (2) | `https://www.crexi.com` |
+| `national.nc_upset_bids` | 22 | Rutherford NC (19), Cleveland NC (2), Burke NC (1) | `https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/`<br>`https://kanialawfirm.com/wp-admin/admin-ajax.php`<br>`https://www.rutherfordcountync.gov/departments/` |
+| `counties_sc.anderson_master_in_equity` | 21 | Anderson SC (21) | `https://www.andersoncountysc.org/departments-a-z/master-in-equity/`<br>`https://www.andersoncountysc.org{href` |
+| `reo.vrm_va_reo` | 18 | - | `https://vrmproperties.com/`<br>`https://vrmproperties.com` |
+| `national.homeharvest` | 16 | Anderson SC (5), Spartanburg SC (4), Burke NC (3) | `https://github.com/ZacharyHampton/HomeHarvest` |
+| `national.hubzu` | 16 | Spartanburg SC (4), Anderson SC (2), Laurens SC (2) | `https://www.hubzu.com/portal/auctions?state={state`<br>`https://www.hubzu.com/`<br>`https://www.hubzu.com{url` |
+| `law_firms.rogers_townsend` | 15 | Spartanburg SC (9), Anderson SC (3), Laurens SC (1) | `https://rogerstownsend.com/reports/SC_Listings.pdf`<br>`https://rogerstownsend.com/reports/NC_Listings.pdf` |
+| `law_firms.bell_carrington` | 14 | Spartanburg SC (7), Pickens SC (2), Anderson SC (2) | `https://docs.google.com/spreadsheets/d/e/`<br>`https://bellcarrington.com/foreclosure-sales/` |
+| `national.courtlistener_adversary` | 14 | Buncombe NC (5), Cleveland NC (3), Lincoln NC (2) | `https://www.courtlistener.com` |
+| `national.auction_dot_com` | 13 | Spartanburg SC (3), Cherokee SC (2), Lincoln NC (2) | `https://www.auction.com/residential/nc/`<br>`https://www.auction.com/residential/sc/`<br>`https://www.auction.com/details/{slug` |
+| `counties_sc.pickens_master_in_equity` | 11 | Pickens SC (11) | `https://www.co.pickens.sc.us/departments/master_in_equity/sales_rosters.php`<br>`https://www.co.pickens.sc.us/` |
 | `counties_sc.sc_county_rosters` | 11 | Oconee SC (7), Laurens SC (4) | `https://publicindex.sccourts.org` |
-| `law_firms.rogers_townsend` | 9 | Spartanburg SC (4), Anderson SC (3), Oconee SC (1) | `https://rogerstownsend.com/reports/SC_Listings.pdf`<br>`https://rogerstownsend.com/reports/NC_Listings.pdf` |
-| `national.jail_bookings` | 9 | Buncombe NC (2), Cleveland NC (2), Anderson SC (2) | `http://mugshots.spartanburgsheriff.org/`<br>`https://buncombecountyso.policetocitizen.com|23`<br>`http://74.218.167.200/p2c`<br>_+8 more_ |
-| `national.trulia` | 8 | Spartanburg SC (5) | `https://www.trulia.com/foreclosures/`<br>`https://www.trulia.com{href` |
-| `counties_nc.nc_county_tax_foreclosure` | 6 | Rutherford NC (3), Gaston NC (2), McDowell NC (1) | `https://www.gastongov.com/669/Tax-Foreclosure-Sales`<br>`https://www.gastongov.com/671/Previous-Tax-Foreclosure-Sales`<br>`https://mcdowellnc.gov/departments/tax-collections/tax-foreclosures/upcoming-tax-foreclosure-sales`<br>_+1 more_ |
-| `national.freddie_homesteps` | 6 | Spartanburg SC (1) | `https://www.homesteps.com/listing/search?search=NC`<br>`https://www.homesteps.com/listing/search?search=SC`<br>`https://www.homesteps.com/`<br>_+1 more_ |
-| `counties_nc.cleveland_tax` | 5 | Cleveland NC (5) | `https://www.clevelandcounty.com/main/departments/` |
-| `counties_sc.spartanburg_flc` | 5 | Spartanburg SC (5) | `https://www.spartanburgcounty.gov/DocumentCenter/View/104130` |
-| `national.hud_homestore` | 5 | Spartanburg SC (3), Burke NC (1), Gaston NC (1) | `https://www.hudhomestore.gov/searchresult?handler=GetFilteredResult`<br>`https://www.hudhomestore.gov` |
-| `national.realtor_foreclosures` | 3 | Spartanburg SC (2), Burke NC (1) | _(no literal URL in module)_ |
-| `counties_nc.nc_govdeals_real_property` | 2 | Anderson SC (2) | `https://maestro.lqdt1.com/search/list`<br>`https://www.transylvaniacounty.org/news`<br>`https://www.govdeals.com/asset/{asset_id`<br>_+2 more_ |
-| `national.sheriff_sales` | 2 | Cleveland NC (2) | `https://www.brunswicksheriff.com`<br>`https://www.charlestoncounty.org`<br>`https://www.sheriffclevelandcounty.com`<br>_+1 more_ |
-| `newspapers.carolina_coast` | 2 | Onslow NC (2) | `https://www.carolinacoastonline.com/classifieds/?f=rss&q=foreclosure`<br>`https://www.carolinacoastonline.com/classifieds/?f=rss&q=substitute+trustee`<br>`https://www.carolinacoastonline.com/classifieds/?f=rss&q=trustee+sale` |
+| `counties_nc.henderson_foreclosure_parcels` | 10 | Henderson NC (10) | `https://www.arcgis.com`<br>`https://hendersoncounty.maps.arcgis.com`<br>`https://experience.arcgis.com/experience/` |
+| `national.hud_homestore` | 10 | Gaston NC (3), Spartanburg SC (3), Cleveland NC (2) | `https://www.hudhomestore.gov/searchresult?handler=GetFilteredResult`<br>`https://www.hudhomestore.gov` |
+| `law_firms.mcmichael_taylor_gray` | 9 | Anderson SC (3), Spartanburg SC (2), McDowell NC (1) | `https://app.powerbi.com/view?r=eyJrIjoiOTQwOTdiYWYtOGQwMy00OGUzLWI4MjktOTczNDc0ODE2ZGY1IiwidCI6IjEzZDFlNzhjLTgyNDgtNGVlYS04OWY3LWQzNGIzZWJkOGM3OSIsImMiOjN9`<br>`https://app.powerbi.com/view?r=eyJrIjoiOTQwOTdiYWYtOGQwMy00OGUzLWI4MjktOTczNDc0ODE2ZGY1Ii` |
+| `national.jail_bookings` | 8 | Buncombe NC (2), Anderson SC (2), Cleveland NC (1) | `http://mugshots.spartanburgsheriff.org/`<br>`https://buncombecountyso.policetocitizen.com|23`<br>`http://74.218.167.200/p2c`<br>_+8 more_ |
+| `national.xome` | 8 | Anderson SC (3), Cleveland NC (2), Spartanburg SC (1) | `https://www.xome.com/auctions/bank-owned`<br>`https://www.xome.com/auctions/foreclosure-homes`<br>`https://www.xome.com/auctions/foreclosuresales`<br>_+1 more_ |
+| `counties.nod_discovery` | 7 | Cleveland NC (6), Buncombe NC (1) | `https://{host`<br>`https://{kofile.KOFILE_COUNTIES[(state`<br>`https://example.invalid/` |
+| `counties_sc.sc_state_tax_lien` | 7 | Spartanburg SC (3), Pickens SC (1), Anderson SC (1) | `https://mydorway.dor.sc.gov/?link=delinquentind`<br>`https://dor.sc.gov/delinquent-taxpayers` |
+| `counties_nc.cleveland_tax` | 6 | Cleveland NC (6) | `https://www.clevelandcounty.com/main/departments/` |
+| `counties_sc.spartanburg_flc` | 6 | Spartanburg SC (6) | `https://www.spartanburgcounty.gov/DocumentCenter/View/104130` |
+| `counties_nc.nc_rod_substitute_trustee` | 5 | Cleveland NC (3), Henderson NC (1), Transylvania NC (1) | `https://buncombe-recordings.permitium.com/```<br>`https://www.nccourts.gov/` |
+| `counties_nc.nc_county_tax_foreclosure` | 4 | Rutherford NC (3), Gaston NC (1) | `https://www.gastongov.com/669/Tax-Foreclosure-Sales`<br>`https://www.gastongov.com/671/Previous-Tax-Foreclosure-Sales`<br>`https://mcdowellnc.gov/departments/tax-collections/tax-foreclosures/upcoming-tax-foreclosure-sales`<br>_+1 more_ |
+| `national.trulia` | 4 | Spartanburg SC (4) | `https://www.trulia.com/foreclosures/`<br>`https://www.trulia.com/foreclosures/Charlotte,NC/`<br>`https://www.trulia.com/foreclosures/Raleigh,NC/`<br>_+6 more_ |
+| `counties_sc.spartanburg_master_in_equity` | 3 | Spartanburg SC (3) | `https://www.spartanburgcounty.gov/DocumentCenter/View/3392/Sale-Results`<br>`https://www.spartanburgcounty.gov/DocumentCenter/View/11824/Deficiency-Sale` |
+| `counties_nc.nc_govdeals_real_property` | 1 | Anderson SC (1) | `https://maestro.lqdt1.com/search/list`<br>`https://www.transylvaniacounty.org/news`<br>`https://www.govdeals.com/asset/{asset_id`<br>_+2 more_ |
 | `counties_sc.sc_rod_cott` | 1 | Union SC (1) | _(no literal URL in module)_ |
-| `counties_sc.spartanburg_master_in_equity` | 1 | Spartanburg SC (1) | `https://www.spartanburgcounty.gov/DocumentCenter/View/3392/Sale-Results`<br>`https://www.spartanburgcounty.gov/DocumentCenter/View/11824/Deficiency-Sale` |
-| `national.courtlistener_civil` | 1 | - | `https://www.courtlistener.com` |
+| `law_firms.ingle_firm` | 1 | Gaston NC (1) | `https://www.theinglefirm.com/Sales.aspx` |
+| `national.freddie_homesteps` | 1 | Spartanburg SC (1) | `https://www.homesteps.com/listing/search?search=NC`<br>`https://www.homesteps.com/listing/search?search=SC`<br>`https://www.homesteps.com/`<br>_+1 more_ |
+| `national.realtor_foreclosures` | 1 | Spartanburg SC (1) | _(no literal URL in module)_ |
+| `national.sheriff_sales` | 1 | Cleveland NC (1) | `https://www.brunswicksheriff.com`<br>`https://www.charlestoncounty.org`<br>`https://www.sheriffclevelandcounty.com`<br>_+1 more_ |
 | `newspapers.coastland_times` | 1 | Dare NC (1) | `https://www.thecoastlandtimes.com` |
+| `national.irs_treasury` | 0 | _(none yet — seasonal)_ | `https://www.irsauctions.gov/auction/items`<br>`https://www.irsauctions.gov` |
+| `national.sc_public_index` | 0 | _(none yet — requires nodriver)_ | `https://publicindex.sccourts.org/{county}/publicindex/`<br>`https://jcmsweb.charlestoncounty.org/PublicIndex/PISearch.aspx` |
+| `national.tranzon` | 0 | _(none yet — empty upstream)_ | `https://www.tranzon.com/online-real-estate-auctions.aspx` |
+| `national.williams` | 0 | _(none yet — empty upstream)_ | `https://www.williamsauction.com` |
 
 ## 2. Built but producing zero rows
 
@@ -112,49 +116,115 @@ Registered and importable, contributing nothing to the board read above. A zero 
 
 | Slug | URLs in the module |
 |---|---|
+| `city_websites.asheville_min_housing` | `https://www.ashevillenc.gov/department/development-services/minimum-housing/` |
+| `city_websites.charlotte_open_data` | `https://data.charlottenc.gov/resource/c6er-5c2c.json`<br>`https://data.charlottenc.gov/resource/6jx5-894j.json`<br>_+1 more_ |
 | `city_websites.search` | `https://{domain` |
 | `counties.sitemap_walker` | `https://www.spartanburgcounty.gov`<br>`https://www.cherokeecountysc.gov`<br>_+10 more_ |
-| `counties_generic.arcgis_distress_layers` | `https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services/`<br>`https://www.buncombecounty.org/governing/depts/tax/`<br>_+20 more_ |
+| `counties_generic.arcgis_distress_layers` | `https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services/`<br>`https://www.buncombecounty.org/governing/depts/tax/`<br>_+22 more_ |
 | `counties_generic.epa_frs_sites` | `https://data.epa.gov/dmapservice/frs.frs_program_facility`<br>`https://www.epa.gov/frs` |
 | `counties_generic.state_contamination` | `https://services2.arcgis.com/kCu40SDxsCGcuUWO/arcgis/rest/services`<br>`https://www.deq.nc.gov/about/divisions/waste-management/underground-storage-tanks`<br>_+2 more_ |
 | `counties_nc.brunswick_legal_notices` | `https://www.brunswickcountync.gov/912/Legal-Notices`<br>`https://www.brunswickcountync.gov`<br>_+1 more_ |
 | `counties_nc.buncombe_tax_foreclosure` | `https://www.trumba.com/calendars/tax-foreclosures-all.ics`<br>`https://taxforeclosures.buncombenc.gov/` |
+| `counties_nc.cumberland_tax_foreclosure` | `https://www.co.cumberland.nc.us/departments/tax/tax-foreclosures` |
+| `counties_nc.edgecombe_tax_foreclosure` | `https://www.edgecombecountync.gov/departments/tax/foreclosures` |
 | `counties_nc.gaston_surplus_properties` | `https://www.gastongov.com/709/Surplus-Properties`<br>`https://www.gastongov.com`<br>_+1 more_ |
+| `counties_nc.gaston_tax_foreclosures` | `https://www.gastongov.com/668/Tax-Foreclosures` |
+| `counties_nc.haywood_tax_foreclosures` | `https://www.haywoodcountync.gov/337/Tax-Foreclosures` |
 | `counties_nc.henderson_tax` | `https://www.hendersoncountync.gov/tax/page/tax-foreclosure-sales` |
-| `counties_nc.nc_coastal_tax_foreclosure` | `https://www.brunswickcountync.gov/912/Legal-Notices`<br>`https://www.brunswickcountync.gov`<br>_+4 more_ |
+| `counties_nc.lincoln_code_violations` | `https://arcgisserver.lincolncountync.gov/arcgis/rest/services/` |
+| `counties_nc.nc_bankruptcy_sales` | `https://www.nceb.uscourts.gov/Public-Sales-Notice`<br>`https://www.ncmb.uscourts.gov/public-sales` |
+| `counties_nc.nc_civicplus_tax_sale` | `https://www.alamance-nc.com`<br>`https://www.alexandercountync.gov`<br>_+65 more_ |
+| `counties_nc.nc_coastal_tax_foreclosure` | `https://www.brunswickcountync.gov/912/Legal-Notices`<br>`https://www.brunswickcountync.gov`<br>_+5 more_ |
+| `counties_nc.nc_deq_dsca` | `https://www.deq.nc.gov/frac/dry-cleaning-solvent-cleanup-act-dsca/dsca-sites` |
 | `counties_nc.nc_ecourts_estates` | `https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29`<br>`https://portal-nc.tylertech.cloud/Portal`<br>_+1 more_ |
+| `counties_nc.nchfa_reo` | `https://www.nchfa.com/home-buyers/properties-sale` |
 | `counties_nc.new_hanover_foreclosures` | `https://www.nhcgov.com/345/Foreclosures` |
 | `counties_nc.polk_tax` | `https://www.polknc.gov/upcoming_auction.php` |
 | `counties_nc.rutherford_wildfire_tax` | `https://www.rutherfordcountync.gov/tax_search/index.php`<br>`https://d1ebsyxxbc7tep.cloudfront.net`<br>_+1 more_ |
+| `counties_nc.stokes_delinquent_tax` | `https://www.co.stokes.nc.us/tax/delinquent-taxes` |
+| `counties_nc.swain_tax_foreclosures` | `https://www.swaincountync.gov/` |
+| `counties_nc.wake_tax_foreclosure` | `https://www.wake.gov/departments-government/tax-administration/real-estate/foreclosures`<br>`https://services` |
+| `counties_nc.wnc_rod_foreclosure_starts` | _(no literal URL in module)_ |
+| `counties_nc.wnc_tax_foreclosures` | `https://www.wataugacounty.org/`<br>`https://www.averycounty.com/`<br>_+3 more_ |
+| `counties_sc.abbeville_delinquent_tax` | `https://abbevillecountysc.com/delinquent-tax-collector/` |
+| `counties_sc.aiken_delinquent_tax` | `https://sc-aikencounty.civicplus.com/309/Tax-Foreclosures` |
+| `counties_sc.anderson_sheriff` | `https://www.andersonsheriff.com/sheriff-sales` |
+| `counties_sc.bamberg_sheriff` | `https://www.bambergcounty.sc.gov/sheriff/sheriff-sales` |
+| `counties_sc.barnwell_sheriff` | `https://www.barnwellcounty.com/sheriff/sheriff-sales` |
 | `counties_sc.charleston_delinquent_tax` | `https://charlestoncounty.gov/departments/delinquent-tax/`<br>`https://www.charlestoncounty.gov/departments/delinquent-tax/files/RP-Tax-Sale-Listing.pdf`<br>_+1 more_ |
-| `counties_sc.cherokee_delinquent_tax` | `https://cherokeecountysc.gov/delinquent-tax/`<br>`https://cherokeecountysc.gov/delinquent-tax/tax-sale-bidders/` |
+| `counties_sc.cherokee_rod` | `https://www.sclandrecords.net` |
+| `counties_sc.chester_delinquent_tax` | `https://www.chestercounty.org/treasurer/delinquent-tax-sale` |
+| `counties_sc.clarendon_tax_auction` | `https://www.clarendoncountysc.gov/` |
 | `counties_sc.colleton_tax_sale` | `https://www.colletoncounty.org/delinquent-tax`<br>`https://www.colletoncounty.org/delinquent-tax/tax-sale`<br>_+1 more_ |
+| `counties_sc.darlington_delinquent_tax` | `https://www.darcosc.com/treasurer/delinquent-tax-sale` |
+| `counties_sc.dillon_sheriff` | `https://www.dilloncountysheriff.com/sheriff-sales` |
+| `counties_sc.edgefield_delinquent_tax` | `https://www.edgefieldcountysc.com/treasurer/delinquent-tax-sale` |
+| `counties_sc.fairfield_delinquent_tax` | `https://www.fairfieldsc.com/treasurer/delinquent-tax-sale` |
+| `counties_sc.florence_delinquent_tax` | `https://www.florenceco.org/` |
 | `counties_sc.greenville_tax_distress` | `https://www.gcgis.org/arcgis/rest/services/GreenvilleJS/Map_Layers_JS/MapServer`<br>`https://www.greenvillecounty.org/appsAS400/Taxsale/`<br>_+2 more_ |
+| `counties_sc.greenwood_delinquent_tax` | `https://www.greenwoodsc.gov/treasurer/delinquent-tax-sale` |
+| `counties_sc.horry_flc` | `https://www.horrycountysc.gov/boards-and-commissions/`<br>`https://www.horrycountysc.gov/media/om1d2bwo/2025-flc-list-42126.xlsx`<br>_+1 more_ |
+| `counties_sc.kershaw_flc` | `https://www.kershaw.sc.gov/treasurer/forfeited-land-commission` |
+| `counties_sc.lancaster_delinquent_tax` | `https://www.lancastercountysc.gov/government/tax-office`<br>`https://www.lancastercountysc.gov{pdf_url` |
+| `counties_sc.laurens_delinquent_tax` | `https://www.laurenscountysc.us/treasurer/delinquent-tax-sale` |
+| `counties_sc.lexington_flc` | `https://lex-co.sc.gov/treasurer/forfeited-land-commission`<br>`https://lex-co.sc.gov/central-stores-auction-items`<br>_+1 more_ |
+| `counties_sc.marlboro_delinquent_tax` | `https://www.marlborocountysc.us/treasurer/delinquent-tax-sale` |
+| `counties_sc.mccormick_flc` | `https://www.mccormickcountysc.org/treasurer/forfeited-land-commission` |
+| `counties_sc.meares_auctions` | `https://www.mpa-sc.com/```<br>`https://maps.google.com/?q=`<br>_+1 more_ |
+| `counties_sc.newberry_delinquent_tax` | `https://www.newberrycounty.net/treasurer/delinquent-tax-sale` |
+| `counties_sc.oconee_flc` | `https://www.oconeecounty.com/treasurer/forfeited-land-commission` |
 | `counties_sc.oconee_tax_sale` | `https://docs.google.com/spreadsheets/d/e/{_PUB_ID`<br>`https://oconeesc.com/delinquent-tax/sale-list` |
 | `counties_sc.pickens_tax_sale` | `https://www.co.pickens.sc.us/departments/delinquent_tax/index.php`<br>`https://www.co.pickens.sc.us/` |
+| `counties_sc.saluda_delinquent_tax` | `https://www.saludacountysc.us/treasurer/delinquent-tax-sale` |
 | `counties_sc.sc_coastal_rosters` | _(no literal URL in module)_ |
 | `counties_sc.sc_delinquent_tax_list` | `https://cherokeecountysc.gov/delinquent-tax/tax-sale-bidders/`<br>`https://cherokeecountysc.gov/wp-content/uploads/{year` |
+| `counties_sc.sc_des_brownfields` | `https://des.sc.gov/programs/bureau-land-waste-management/`<br>`https://des.sc.gov/community/environmental-sites-projects` |
 | `counties_sc.sc_dew_lien_registry` | `https://uitax.dew.sc.gov/LienRegistry/`<br>`https://dew.sc.gov/benefit-lien-registry`<br>_+2 more_ |
-| `counties_sc.sc_flc` | `https://www.spartanburgcounty.gov/216/Tax-Collector`<br>`https://www.andersoncountysc.org/departments-a-z/treasurer/`<br>_+6 more_ |
+| `counties_sc.sc_dor_delinquent_taxpayers` | `https://mydorway.dor.sc.gov/?link=delinquentind` |
 | `counties_sc.sc_probate_notices` | `https://{paper.host` |
 | `counties_sc.sc_tax_delinquent` | `https://1543.newstogo.us/editionviewer/default.aspx?Edition=`<br>`https://www.andersoncountysc.org/departments-a-z/treasurer/`<br>_+11 more_ |
 | `counties_sc.sc_ust_registry` | `https://apps.des.sc.gov/USTRegistry/` |
+| `counties_sc.sumter_surplus` | `https://www.sumtercountysc.gov/online_services/property/surplus_sales.php` |
+| `counties_sc.terry_howe_auctions` | `https://terryhowe.com/wp-json/wp/v2/auctions` |
+| `counties_sc.union_delinquent_tax` | `https://www.unioncountysc.org/treasurer/delinquent-tax-sale` |
+| `counties_sc.york_delinquent_tax` | `https://www.yorkcountysc.gov/216/Tax-Collection`<br>`https://www.yorkcountysc.gov{pdf_url` |
+| `counties_sc.zombie_properties` | _(no literal URL in module)_ |
 | `law_firms.alaw` | `https://www.alaw.net/foreclosure-sales/north-carolina/`<br>`https://www.alaw.net/foreclosure-sales/south-carolina/` |
 | `law_firms.aldridge_pite` | `https://aldridgepite.com/sale-day-listings-selection/foreclosure-listings-north-carolina/`<br>`https://aldridgepite.com/disclaimer-north-carolina/` |
 | `law_firms.finkel` | `https://www.finkellaw.com/images/Webs.pdf`<br>`https://www.finkellawcharleston.com/images/Webs.pdf` |
-| `law_firms.ingle_firm` | `https://www.theinglefirm.com/Sales.aspx` |
 | `law_firms.korn` | `https://www.kornlawfirm.com/foreclosure-sales/`<br>`https://www.kornlawfirm.com/sales/` |
 | `law_firms.mewborn_deselms` | `https://www.mewbornlaw.biz` |
 | `law_firms.zacchaeus` | `https://www.zls-nc.com/listings` |
 | `national.auction_bank_reo` | `https://apiweb.realtybid.com/rest/RBIAPI/`<br>`https://bid.auctionnetwork.com/Auctions`<br>_+2 more_ |
 | `national.bid4assets` | `https://www.bid4assets.com/storefront/index.cfm?searchstate=NC&searchprop=Real+Estate`<br>`https://www.bid4assets.com/storefront/index.cfm?searchstate=SC&searchprop=Real+Estate`<br>_+1 more_ |
-| `national.craigslist_fsbo` | `https://{subdomain`<br>`https://{host` |
+| `national.courtlistener_civil` | `https://www.courtlistener.com` |
+| `national.craigslist_fsbo` | `https://sapi.craigslist.org/web/v8/postings/search/full`<br>`https://{host` |
+| `national.cws_marketing` | `https://www.cwsmarketing.com/real-estate/`<br>`https://bid` |
+| `national.epa_superfund` | `https://ejscreen.epa.gov/mapper`<br>`https://enviro.epa.gov`<br>_+3 more_ |
+| `national.fdic_failed_banks` | `https://www.fdic.gov/bank-failures/failed-bank-list` |
+| `national.fema_disasters` | `https://www.fema.gov/disaster/declarations` |
 | `national.first_citizens_reo` | `https://www.firstcitizens.com/real-estate` |
+| `national.govdeals` | `https://www.govdeals.com/api/esolutions/search`<br>`https://www.govdeals.com/esolutions/auction/`<br>_+1 more_ |
 | `national.gsa_realproperty` | `https://realestatesales.gov` |
+| `national.gsa_surplus` | `https://www.gsa.gov/about-us/organization/office-of-governmentwide-policy/`<br>`https://www.gsa.gov/real-estate/real-estate-listings`<br>_+1 more_ |
+| `national.hibid_real_estate` | `https://hibid.com/graphql```<br>`https://hibid.com/graphql`<br>_+3 more_ |
+| `national.homepath_json` | `https://homepath.fanniemae.com/cfl/property-inventory/search-listings`<br>`https://homepath.fanniemae.com/`<br>_+1 more_ |
+| `national.irs_judicial_sales` | `https://www.irsauctions.gov` |
 | `national.landsofamerica` | `https://www.land.com/{county`<br>`https://www.land.com{url` |
+| `national.legacy_obituaries` | `https://www.legacy.com` |
+| `national.liensnc` | `https://www.liensnc.com` |
+| `national.loopnet` | `https://www.loopnet.com` |
+| `national.nc_sos_ucc` | `https://www.sosnc.gov/online_services/search/by_title/_uniform_commercial_code` |
+| `national.opencorporates` | `https://api.opencorporates.com/v0.4/`<br>`https://api.opencorporates.com/v0.4/companies/search` |
 | `national.probate_foreclosure_leads` | _(no literal URL in module)_ |
 | `national.propwire` | _(no literal URL in module)_ |
-| `newspapers.daily_courier` | `https://www.thedigitalcourier.com/classifieds/community/announcements/legal/`<br>`https://www.thedigitalcourier.com`<br>_+2 more_ |
+| `national.sc_sos_entity` | `https://businessfilings.sc.gov/BusinessFiling/Web/Reporting/SearchByName`<br>`https://businessfilings.sc.gov{href` |
+| `national.seeclickfix` | `https://developer.seeclickfix.com/`<br>`https://seeclickfix.com/api/v2/issues` |
+| `national.usda_properties` | `https://usdaproperties.com/property/`<br>`https://www.usdaproperties.com/property/sc/county/`<br>_+2 more_ |
+| `national.usmarshals_realproperty` | `https://www.usmarshals.gov/what-we-do/asset-forfeiture/real-property`<br>`https://www.usmarshals.gov/what-we-do/asset-forfeiture/real-property/`<br>_+1 more_ |
+| `national.va_acquired` | `https://www.va.gov/va-forms/real-property/properties/`<br>`https://www.benefits.va.gov/homeloans/property/property.asp` |
+| `newspapers.carolina_coast` | `https://www.carolinacoastonline.com/classifieds/?f=rss&q=foreclosure`<br>`https://www.carolinacoastonline.com/classifieds/?f=rss&q=substitute+trustee`<br>_+1 more_ |
+| `newspapers.daily_courier` | `https://www.thedigitalcourier.com/classifieds/community/announcements/legal/`<br>`https://www.thedigitalcourier.com` |
 | `newspapers.hendersonville_lightning` | `https://www.hendersonvillelightning.com/legal-ads/130-foreclosures.html` |
 | `newspapers.index_journal` | `https://www.indexjournal.com/classifieds/community/announcements/legal/?f=rss` |
 | `newspapers.post_and_courier` | `https://www.postandcourier.com/classifieds_new/community/announcements/` |
@@ -303,344 +373,3 @@ Investigated, found real and reachable, and deliberately NOT turned into leads. 
 - `docs/manual_playbook_and_limits.md` — what stays manual and the exact operator steps for each manual lane.
 - `docs/net_new_source_register.md` — deep per-county URL register. **WARNING: physically truncated** — it begins mid-table-row and its sections 1.1 through 1.14 (all 11 NC counties) do not exist anywhere.
 
----
-
-# MEASURED PUBLICATION CADENCE — 2026-08-11
-
-Added because "should we poll these daily?" kept being answered by assumption.
-This is measured from the DATES ON THE RECORDS THEMSELVES (sale_date, filed_date,
-and the date fields inside nc_ecourts / court_record / upset_bid / rod /
-county_sales blocks), counting how many DISTINCT days in the last 180 a source
-actually published on. Sources with fewer than 25 leads are omitted.
-
-## Why not measure it from when leads arrive
-
-The obvious metric — new leads per source per day — is censored by our own
-schedule. Full runs fire Tue/Fri only, so no source can show daily inflow no
-matter how often it publishes. Measured 2026-08-11: 0 of 66 sources had a lead
-whose first_seen was inside 24h, purely because that day's run was skipped. The
-record dates are independent of when we happen to look.
-
-## The finding, which reverses the obvious plan
-
-ONLY TWO SOURCES PUBLISH DAILY, AND THEY ARE THE TWO WE CANNOT SCRAPE.
-
-  counties_nc.nc_ecourts_lis_pendens   55 distinct filing days out of 180
-  counties_nc.nc_ecourts_divorce       46
-
-~45% of calendar days is essentially every business day. Both are NC eCourts,
-which is WAF-walled — which is exactly why the manual court-page lane
-(scripts/ingest_saved.sh + the "Ingest Saved Court Pages" app) exists.
-
-Everything else is PERIODIC or a SNAPSHOT. Delinquent tax rolls, condemned
-lists, forfeited-land lists and code-violation exports publish on 1 day in 180.
-Polling them daily would re-fetch an identical file 7x a week, add WAF exposure
-on sources we depend on, and surface nothing. The weekly cadence already matches
-their publication cadence.
-
-The 10 REO/API sources on the daily job (scripts/daily_api_refresh.py
-DEFAULT_SLUGS: fannie_homepath, foreclosure_dot_com, hud_homestore,
-freddie_homesteps, realtor_foreclosures, homeharvest, distressed, vrm_va_reo,
-usda_rd, treasury_seized) are correctly daily for a different reason: their
-inventory CHURNS. A house sells and the listing 404s, so absence is the signal
-and it has to be checked often. That is not the same property as publishing.
-
-## What this means for freshness
-
-A delinquent-tax lead that gets paid off does NOT disappear from the county's
-list the next day, because the county does not republish the list the next day.
-Scraping daily cannot make the board fresher than the source is. The residual
-staleness is the source's, not ours.
-
-Where we ARE behind: the two genuinely-daily sources are wall-blocked and depend
-on a human saving pages. That lane currently runs on the Tue/Fri prompt. Running
-it more often is the only change here that would buy real freshness.
-
-## SNAPSHOT/UNKNOWN is not a verdict
-
-27 sources carry no usable per-record date, so their cadence cannot be
-determined offline at all. They are not proven static — they are unmeasured.
-Deciding their cadence requires polling and diffing, which is the scrape itself.
-
-## The table
-
-```
-cadence            source                                           leads  distinct filing days /180
-DAILY              counties_nc.nc_ecourts_lis_pendens                 214                         55
-DAILY              counties_nc.nc_ecourts_divorce                      78                         46
-PERIODIC           counties_nc.nc_county_pdf_delinquent_tax         2,162                         10
-PERIODIC           counties_nc.buncombe_elderly                     3,482                          9
-PERIODIC           public_notices.nc_notices_counties                 108                          8
-PERIODIC           national.nc_upset_bids                              27                          7
-PERIODIC           national.courtlistener_bankruptcy                  370                          5
-PERIODIC           national.landandfarm                               287                          4
-PERIODIC           law_firms.kania                                     29                          2
-SNAPSHOT/UNKNOWN   counties_sc.spartanburg_delinquent_tax           2,080                          1
-SNAPSHOT/UNKNOWN   counties_sc.pickens_delinquent_parcels           1,928                          1
-SNAPSHOT/UNKNOWN   counties_nc.buncombe_delinquent_tax              1,151                          1
-SNAPSHOT/UNKNOWN   counties_nc.asheville_str_permits                  587                          1
-SNAPSHOT/UNKNOWN   national.hud_reac_inspection                       191                          1
-SNAPSHOT/UNKNOWN   counties_nc.henderson_code_violations              156                          1
-SNAPSHOT/UNKNOWN   counties_sc.sc_public_notices                      124                          1
-SNAPSHOT/UNKNOWN   counties_sc.spartanburg_city_condemned              90                          1
-SNAPSHOT/UNKNOWN   law_firms.shapiro_ingle_powerbi                     47                          1
-SNAPSHOT/UNKNOWN   counties_sc.spartanburg_vacant                   3,307                          0
-SNAPSHOT/UNKNOWN   counties_sc.sc_public_index                      1,670                          0
-SNAPSHOT/UNKNOWN   counties_sc.spartanburg_condemned                1,658                          0
-SNAPSHOT/UNKNOWN   counties_sc.oconee_flc_assignment                  585                          0
-SNAPSHOT/UNKNOWN   counties_sc.oconee_forfeited_land                  453                          0
-SNAPSHOT/UNKNOWN   counties_nc.nc_heir_estate_parcels                 295                          0
-SNAPSHOT/UNKNOWN   national.distressed                                283                          0
-SNAPSHOT/UNKNOWN   counties_sc.sc_probate_net                         236                          0
-SNAPSHOT/UNKNOWN   counties_nc.asheville_helene                       179                          0
-SNAPSHOT/UNKNOWN   counties_sc.spartan_weekly_legals                   94                          0
-SNAPSHOT/UNKNOWN   national.landwatch                                  90                          0
-SNAPSHOT/UNKNOWN   counties_sc.sc_rod_acclaim                          90                          0
-SNAPSHOT/UNKNOWN   counties_sc.sc_public_index_lis_pendens             70                          0
-SNAPSHOT/UNKNOWN   public_notices.gannett_obituaries                   60                          0
-SNAPSHOT/UNKNOWN   counties_nc.hendersonville_vacant_structures        50                          0
-SNAPSHOT/UNKNOWN   national.hud_section8_contracts                     45                          0
-SNAPSHOT/UNKNOWN   law_firms.brock_scott                               45                          0
-SNAPSHOT/UNKNOWN   law_firms.hutchens                                  33                          0
-
-DAILY              2 sources
-WEEKLY             0 sources
-PERIODIC           7 sources
-SNAPSHOT/UNKNOWN   27 sources
-```
-
-Regenerate: the measurement script is inline in the session that produced this;
-the durable version belongs in scripts/ if this needs to be repeated.
-
----
-
-# DISCOVERY SWEEP — 2026-08-12
-
-Prompted by the operator finding six record systems in minutes by searching
-within one county site, none of which were in the scraper set. The gap was
-method: the source list was being AUDITED (is this URL up?) instead of the sites
-being EXPLORED (what else is here?). Auditing a list can only return the list.
-
-Two new tools now cover this — `scripts/discover_linked_systems.py` (crawl the
-sites we use, find what they link) and `scripts/build_county_registry.py`
-(enumerate the universe of counties, accessible or not).
-
-## The denominator, which did not exist before
-
-    100 NC counties (nccourts.gov/locations) + 46 SC (sccounties.org) = 146
-    438 (county, system) pairs probed across recorder / court / tax / assessor
-    102 systems located, 50 already in src/, 52 NEVER USED
-
-## USABLE AND UNBUILT — verified, in footprint
-
-Register of deeds is where deeds of trust, lis pendens and satisfactions are
-recorded: the primary distress record. These publish openly and are not read:
-
-| county | entry point | gate | disclaimer restricts automation? |
-|---|---|---|---|
-| Haywood NC | search.haywooddeeds.com | click-through | **NO** — liability/accuracy only |
-| Yancey NC  | search.yanceydeeds.com  | click-through | **NO** — liability/accuracy only |
-| Anderson SC| americanlandrecords.com?countyId=2429 | none | not stated |
-| Henderson NC | hendersondeeds.com | disclaimer | unread |
-| Lincoln NC | lincolnrod.com | disclaimer | unread |
-| Avery NC | averydeeds.com | reCAPTCHA | — CAPTCHA, out of scope |
-
-Both Haywood and Yancey disclaimers were read in full: pure accuracy and
-liability text, ZERO occurrences of automated / robot / spider / scrape / data
-mining / bulk / commercial. The gate is a single `Accept` POST to index.php.
-
-## WALLED — recorded, not omitted
-
-| system | wall |
-|---|---|
-| cherokeesc.avenuinsights.com | ToS: "data mining, robots, spiders, data harvesting" |
-| publicindex.sccourts.org | ToS prohibits automated/repetitive querying |
-| portal-nc.tylertech.cloud | AWS-WAF escalating image CAPTCHA |
-| qpublic.schneidercorp.com | reCAPTCHA (a module exists; gate is real) |
-| madisoncountync.gov/tax | reCAPTCHA + login |
-| averydeeds.com | reCAPTCHA |
-
-## SC PROBATE — mapped, and mostly unavailable for the core
-
-southcarolinaprobate.net has no robots.txt, no CAPTCHA and no prohibition
-language, but covers only 20 of 46 counties: Aiken, Bamberg, Barnwell,
-Charleston, Cherokee, Chester, Colleton, Dorchester, Florence, Georgetown,
-Kershaw, Lancaster, Marlboro, Oconee, Orangeburg, Saluda, Sumter, York.
-
-Of the 1,421 SC leads already carrying an estate/elderly/heir signal, the
-cohort splits Spartanburg 637, Pickens 351, Charleston 251, Laurens 83,
-Oconee 61, Anderson 25, Union 7, Cherokee 4 — so the aggregator reaches
-Cherokee, Oconee and Charleston and MISSES the two largest.
-
-The uncovered counties run their own probate courts, but those route back
-through PublicIndex: greenvillecounty.org/Probate links
-www2.greenvillecounty.org/scjd/publicindex/. So SC probate for the core
-footprint sits behind the same ToS wall as the rest of PublicIndex. NC estates
-are already covered compliantly via Column.
-
-## THE HONEST LIMIT
-
-104 of 146 counties have NO recorder located. That means the URL patterns in
-build_county_registry.py did not find it — NOT that the county lacks one.
-Nearly every county has a register of deeds. Those 104 are the hand-check list,
-and they are why that script ships with an editable pattern table rather than as
-a finished answer.
-
----
-
-## 2026-08-12 — county register of deeds becomes a source, not just a lookup
-
-### NEW SOURCE: `counties_nc.wnc_rod_foreclosure_starts`
-
-Reads **substitutions of trustee** from the register of deeds in **Clay,
-Haywood and Yancey NC** — three core Western NC counties that held **zero**
-board leads.
-
-In NC a power-of-sale foreclosure begins when the lender records an `S/T` to
-swap in a foreclosure trustee. That is recorded **before** the notice of hearing
-reaches the clerk and well before any sale is advertised, so every other NC
-foreclosure source this project reads is downstream of it. `TR/D` (trustee's
-deed, sale completed) is emitted as REO.
-
-| | |
-|---|---|
-| URL | `search.{clay,haywood,yancey}deeds.com/index.php?Accept=Accept` |
-| gate | click-through disclaimer, no CAPTCHA, no login |
-| terms | checked in full: no automated / robot / spider / scrape / bulk / commercial language |
-| cost | free |
-| cadence | recording days; run reads a 21-day window |
-| measured | Haywood 3-day window = 385 parties, 133 unique documents, 2 `S/T` |
-
-**The bulk path.** A name search with the name left blank plus
-`show_pick_list=1` returns every party active in a date range; the pick list's
-`entityID[]` values then return the documents. Both steps must be **GET** — the
-pick-list form declares `method="post"` and posting it returns a 2,065-byte
-shell. Full recipe in `docs/ROD_PORTAL_ACCESS.md`.
-
-**One document is many rows.** The index emits a row per party and batching
-repeats a document once per batch it appears in: a raw 3-day Haywood window is
-**8,528 rows and 133 documents**. Dedupe on (date, book, type) before counting.
-The lead is the natural-person GRANTOR — the other parties on the instrument are
-the servicer, the lender and two trustees.
-
-### NEW READER: `enrichment_rod_name_index.py` — 8 SC counties
-
-Abbeville, Barnwell, Berkeley, Colleton, Dorchester, Florence, Georgetown, York
-run a **different** platform (`NameSearch.php` → `NamePick.php` →
-`NameDisplay.php`). Unlike The Lookup its index carries a recorded **Amount**.
-
-Only **Barnwell and Georgetown** honour the date window; the other five return
-the head of the whole index (exactly 2000 parties for any window, including a
-single day) with a perfectly well-formed HTTP 200. `bulk_by_date()` refuses
-those five. Both working counties are outside the core footprint, so the
-capability is built and documented but not wired as a new lead source.
-
-### CORRECTION to the 2026-08-12 sweep above
-
-That sweep recorded **12 counties on one platform**. Nine of those run the SC
-platform and return 404 with a 16-byte body to the Lookup reader — read as "no
-records". Georgetown, the only one of the twelve with board coverage (409
-leads), was among them, so the enricher as shipped enriched nothing.
-
-All twelve answered HTTP 200 to the accept step. The fingerprint that adopted
-them never asked whether a search returns rows.
-
-### Wrong-state hosts — a standing trap
-
-`<county>deeds.com` never says which state it is and county names repeat:
-**hendersondeeds.com is Henderson County KENTUCKY**, **wilsondeeds.com is Wilson
-County TENNESSEE**. Both were one step from adoption as NC sources on pattern
-match. `build_county_registry.py` now carries a `state_confirmed` check and the
-registry marks any shared-name county `unverified` until evidence exists.
-
-### Register-of-deeds hosts — every URL, with what each one actually does
-
-Named in prose above but the hosts were missing, which is exactly the thing this
-register exists to hold. All eleven, verified by fetching on 2026-08-12.
-
-`state ok?` — `<county>deeds.com` never states its state and county names repeat
-across states. "linked" means the county's own government site links the domain;
-"unique" means only one county in the United States carries that name.
-
-#### The Lookup — `enrichment_rod_lookup.py`
-
-| county | host | bulk date search | state ok? |
-|---|---|---|---|
-| Haywood NC | `http://search.haywooddeeds.com` | **yes** | linked from haywoodcountync.gov |
-| Clay NC | `http://search.claydeeds.com` | **yes** | resolves to deeds.claync.us |
-| Yancey NC | `http://search.yanceydeeds.com` | **yes** | unique name |
-
-Entry `GET /index.php?Accept=Accept`. Search `GET /content.php` — **GET only**;
-POST returns a 2,065-byte shell. Bulk path is a name search with the name blank
-plus `show_pick_list=1`, then the pick list's `entityID[]` values. Pick list caps
-at **1000**, so a capped window is halved and re-read.
-
-Feeds `counties_nc.wnc_rod_foreclosure_starts` (substitutions of trustee = NC
-foreclosure starts). Free, click-through disclaimer, no CAPTCHA, and the terms
-carry no automated/robot/spider/scrape/bulk/commercial language.
-
-#### Online Record System — `enrichment_rod_name_index.py`
-
-| county | host | date window | notes |
-|---|---|---|---|
-| Georgetown SC | `https://georgetowndeeds.com` | **honoured** | 161/527/1374 across three windows |
-| Barnwell SC | `https://barnwelldeeds.com` | **honoured** | 24 in 7 days vs 230 in January |
-| Abbeville SC | `http://search.abbevilledeeds.com` | ignored | 2000 for a single day |
-| Berkeley SC | `http://search.berkeleydeeds.com` | ignored | 2000 for a single day; linked from berkeleycountysc.gov |
-| Colleton SC | `http://search.colletondeeds.com` | ignored | 2000 for a single day; linked from colletoncounty.org |
-| Dorchester SC | `http://search.dorchesterdeeds.com` | ignored | 1996 for every window; linked from dorchestercountysc.gov |
-| Florence SC | `http://search.florencedeeds.com` | ignored | 1973 for every window; linked from florenceco.org |
-| York SC | `http://search.yorkdeeds.com` | **undetermined** | repeated timeouts on a 470 KB page — not a wall |
-
-Entry `GET /NameSearch.php?Accept=Accept` (**not** `index.php` — that is the
-other platform). Then `POST /NamePick.php` for the party index, then
-`POST /NameDisplay.php` with `igheader` + `igquerystring` + `displaybutton` +
-`entityID[<ID>]`. Step 3 takes only its own fields; echoing the search
-parameters back returns a 21-byte rejection.
-
-This platform's index carries a recorded **Amount**, which The Lookup's does not.
-
-`bulk_by_date()` refuses the six counties not marked "honoured", because those
-return the head of the whole index as a well-formed HTTP 200 and publishing it
-would put years-old instruments on the board as fresh distress.
-
-#### Walled or wrong
-
-| host | verdict |
-|---|---|
-| `https://bertiedeeds.com` | 2,617-byte disclaimer loop, no search reachable |
-| `https://averydeeds.com` | reCAPTCHA — out of scope by policy |
-| `<county>rod.permitium.com/rod` (18 NC counties) | ordering counter for certified copies; no name index, no date search |
-| `https://hendersondeeds.com` | **Henderson County KENTUCKY**, not NC |
-| `https://wilsondeeds.com` | **Wilson County TENNESSEE**, not NC |
-| `http://www.titlesearcher.com` | paid subscription (serves Wilson TN) |
-| `https://americanlandrecords.com/land-record?countyId=2429` | Anderson SC, not yet mapped |
-
-### Walls that cost real time — measured 2026-08-12
-
-A wall is cheap when it fails fast and expensive when it fails slowly. Timing
-the 2026-08-11 run showed **16 of its 23 hours** went to three hosts that are
-already known to be unusable. Recorded here with what each one costs, because
-"walled" was documented but "walled AND slow" was not.
-
-| host | used by | behaviour | cost |
-|---|---|---|---|
-| `portal-nc.tylertech.cloud` | `enrichment_nc_case_status*`, `enrichment_nc_divorce` | HTTP **202** AWS-WAF escalating image CAPTCHA; stealth browser retries | **5.5 h** of the scrape phase |
-| `fastpeoplesearch.com` | `enrichment_skip_trace` | HTTP **403** on every request | **10.5 h**, previously undocumented |
-| `publicindex.sccourts.org` | `enrichment_case_detail`, `enrichment_court_bid` | `ERR_HTTP_RESPONSE_CODE_FAILURE` after 3 attempts; ToS forbids automated querying | inside the same window |
-
-Neither the scrape phase nor skip trace emitted a log line while this happened.
-Both are now bounded — `SCRAPE_PHASE_MAX_SECONDS` (10800) and
-`SKIP_TRACE_MAX_SECONDS` (900) — so a slow wall now costs a capped amount and
-says so in the log.
-
-**Still open:** enrichers have no `dormant` flag the way scrapers do, so these
-three are retried every run rather than skipped outright. Bounding them limits
-the damage; it does not stop the attempt.
-
-To find the next one, read the timeline rather than the volume — the log is
-mostly untimestamped httpx noise, so the gaps are the signal:
-
-```bash
-grep -oE '\[2026-[0-9-]+ [0-9]{2}:' logs/local-run-*.log | uniq -c
-```
