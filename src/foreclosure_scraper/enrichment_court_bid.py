@@ -88,7 +88,7 @@ log = structlog.get_logger()
 
 
 # --- config ----------------------------------------------------------------
-CONCURRENCY = int(os.environ.get("COURT_BID_CONCURRENCY", "2"))
+CONCURRENCY = int(os.environ.get("COURT_BID_CONCURRENCY", "1"))
 PER_CASE_TIMEOUT_S = float(os.environ.get("COURT_BID_TIMEOUT_S", "75"))
 CAP = int(os.environ.get("COURT_BID_CAP", "80"))
 # Stall-breaker: bail after N consecutive render failures (a degraded headless
