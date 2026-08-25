@@ -135,6 +135,12 @@ Rehab tiers (Carolina market, 2026 dollars):
 
 When the only photo is a basemap or generic Realtor placeholder (no actual property visible), set the JSON value of condition_tier to null (the literal null, not the text) and confidence to "LOW".
 
+CRITICAL — AERIAL-ONLY LISTINGS: When only aerial/satellite imagery is available (no listing photos or street views), do NOT assume the property is vacant land. Aerial views of wooded or overgrown lots frequently contain a house obscured by tree canopy. Use the property_kind field: if it indicates a structure (SINGLE_FAMILY, MULTI_FAMILY, TOWNHOUSE, CONDO, etc.), a building exists even if the aerial doesn't clearly show it. In that case:
+- Assess what you CAN see from the aerial: roof shape/condition, lot condition, surrounding neighborhood quality, driveway/parking.
+- Set confidence to "LOW" since you cannot see the structure's actual condition.
+- Do NOT classify as "gut" based solely on an overgrown aerial appearance — that is tree cover, not structural distress.
+- A "cosmetic" or "major" tier with LOW confidence is appropriate when you can see a roof but not the walls/interior.
+
 Output ONLY valid JSON, no markdown fences, no preamble."""
 
 
@@ -155,6 +161,24 @@ def _user_prompt(li: Listing) -> str:
     if li.description:
         d = li.description[:300]
         parts.append(f"Listing text: {d}")
+
+    # Detect imagery mode so the LLM knows what it's looking at.
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    images = raw.get("images") or {}
+    has_real = bool(images.get("real"))
+    has_street = bool(images.get("street"))
+    has_aerial = bool(images.get("aerial"))
+    if not has_real and not has_street and has_aerial:
+        parts.append("")
+        parts.append(
+            "NOTE: Only aerial/satellite imagery is available for this property — "
+            "no street-level or interior photos. If the property_kind indicates a "
+            "structure (house, townhouse, condo, etc.), a building exists on this "
+            "lot even if tree canopy obscures it in the aerial view. Do NOT mistake "
+            "tree cover or overgrown vegetation for a distressed or vacant-land "
+            "property. Grade the roof and lot from what you CAN see, set confidence "
+            "to LOW, and avoid 'gut' unless you see clear structural collapse."
+        )
 
     parts.append("")
     parts.append("Look at the attached photos and aerial views. Return JSON ONLY:")
