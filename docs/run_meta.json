@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-08-24T18:05:24.060501Z",
-  "total": 33615,
+  "run_time": "2026-08-25T16:21:41.705963Z",
+  "total": 33245,
   "by_source": {
     "law_firms.finkel": 8,
     "counties.column_legal_notices": 129,
@@ -145,14 +145,14 @@
     "courts.lis_pendens_discovery": 0
   },
   "by_state": {
-    "NC": 18352,
+    "NC": 17982,
     "SC": 15263
   },
   "by_source_on_board": {
     "counties_nc.rutherford_tax": 4288,
     "counties_sc.sc_public_index": 3699,
     "counties_nc.buncombe_elderly": 2996,
-    "counties_nc.nc_county_pdf_delinquent_tax": 2392,
+    "counties_nc.nc_county_pdf_delinquent_tax": 2023,
     "counties_sc.pickens_delinquent_parcels": 1885,
     "counties_sc.spartanburg_delinquent_tax": 1718,
     "counties_sc.spartanburg_vacant": 1577,
@@ -178,7 +178,7 @@
     "counties_sc.sc_probate_net": 265,
     "national.landwatch": 264,
     "counties_sc.oconee_forfeited_land": 218,
-    "national.hud_reac_inspection": 215,
+    "national.hud_reac_inspection": 214,
     "counties_sc.spartan_weekly_legals": 190,
     "counties_sc.sc_rod_acclaim": 178,
     "counties_nc.henderson_code_violations": 154,
@@ -243,83 +243,83 @@
   "by_county_top": [
     [
       "Spartanburg/SC",
-      9327
+      6583
     ],
     [
       "Buncombe/NC",
-      6812
+      5651
     ],
     [
       "Rutherford/NC",
-      4746
+      4518
     ],
     [
       "Pickens/SC",
-      2824
+      2747
     ],
     [
       "New Hanover/NC",
-      2665
+      2373
     ],
     [
       "McDowell/NC",
-      2274
-    ],
-    [
-      "Oconee/SC",
-      1675
+      1550
     ],
     [
       "Henderson/NC",
-      1510
+      1414
     ],
     [
-      "Lincoln/NC",
-      1471
+      "Oconee/SC",
+      1330
     ],
     [
       "Anderson/SC",
-      1241
+      1230
     ],
     [
       "Cherokee/SC",
-      1137
+      1136
+    ],
+    [
+      "Lincoln/NC",
+      1014
     ],
     [
       "Laurens/SC",
-      1008
+      980
     ],
     [
       "Union/SC",
-      501
+      496
     ],
     [
       "Georgetown/SC",
       417
     ],
     [
-      "Gaston/NC",
-      361
-    ],
-    [
       "Charleston/SC",
       330
     ],
     [
-      "Cleveland/NC",
-      245
+      "Gaston/NC",
+      319
     ],
     [
-      "Polk/NC",
-      228
+      "Cleveland/NC",
+      226
     ],
     [
       "Transylvania/NC",
-      224
+      214
     ],
     [
       "Burke/NC",
-      214
+      213
+    ],
+    [
+      "Polk/NC",
+      191
     ]
   ],
   "source_status": {
@@ -506,21 +506,21 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "daily vision pass: 13405 of 33615 listings have a vision report",
-  "detail_count": 33615,
-  "detail_digest": "56c9fc51b691767c",
+  "notes": "scheduled land-records refresh",
+  "detail_count": 33245,
+  "detail_digest": "bf4b0f2ac7c2a67c",
   "board": {
     "schema": "slim-v1",
-    "count": 33615,
+    "count": 33245,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
       "count": 34,
-      "records": 33615
+      "records": 33245
     }
   },
-  "health_carried_from": "2026-08-24T17:04:08.979681Z",
+  "health_carried_from": "2026-08-25T14:53:24.675522Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
