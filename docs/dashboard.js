@@ -2968,10 +2968,7 @@ function renderTable() {
 // ---- Strategy-fit pills + buyer-match chip (this session's new intelligence) ----
 const STRATEGY_META = {
   LAND_WHOLESALE: { label: "Land wholesale", cls: "strat-land" },
-  WHOLESALE: { label: "Wholesale", cls: "strat-whsl" },
-  SUBJECT_TO: { label: "Subject-to", cls: "strat-subto" },
   FIX_FLIP: { label: "Fix & flip", cls: "strat-flip" },
-  GATOR: { label: "Gator", cls: "strat-gator" },
 };
 function strategyBuyerChips(l) {
   const chips = [];
@@ -4228,9 +4225,6 @@ function renderDetail(l, detailState) {
         // otherwise find a discrepancy with no explanation on screen.
         (() => { const _cap = bidCapNote(l); return _cap ? `<div class="calc-range">${_txt(_cap)}</div>` : ""; })()
       }</div></div>`);
-    }
-    if (c.wholesale_mao != null) {
-      rows.push(`<div class="calc-row"><div class="lbl">Wholesale MAO</div>${_derived(fmtMoney(c.wholesale_mao) + (c.wholesale_spread != null ? ` <span class="muted">(spread ${fmtMoney(c.wholesale_spread)})</span>` : ""))}</div>`);
     }
     if (c.bid_to_arv_pct != null) {
       rows.push(`<div class="calc-row"><div class="lbl">Bid / ARV</div>${_derived(c.bid_to_arv_pct.toFixed(1) + "%")}</div>`);

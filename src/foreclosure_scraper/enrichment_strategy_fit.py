@@ -91,23 +91,9 @@ def enrich_strategy_fit(listings: Iterable[Listing]) -> dict:
                 "delinquent tax" if tax_owed else "long-held (equity)" if long_tenure else
                 "probate/estate" if probate else "distress signal")
 
-        if (not is_land) and high_equity and has_distress:
-            tags.append("WHOLESALE")
-            reasons["WHOLESALE"] = ("residential + "
-                + (f"~{int(eq*100)}% equity" if eq is not None else "long-held (equity proxy)")
-                + " + distress")
-
-        if (not is_land) and is_foreclosure and low_equity:
-            tags.append("SUBJECT_TO")
-            reasons["SUBJECT_TO"] = f"foreclosure w/ low equity (~{int(eq*100)}%) — take over payments"
-
         if (not is_land) and cond in _ROUGH_CONDITION and some_equity:
             tags.append("FIX_FLIP")
             reasons["FIX_FLIP"] = f"rough condition ({cond}) + equity to renovate"
-
-        if "WHOLESALE" in tags or "LAND_WHOLESALE" in tags:
-            tags.append("GATOR")
-            reasons["GATOR"] = "assignable deal — transactional/EMD funding fit"
 
         if tags:
             raw["strategy_fit"] = {"tags": tags, "reasons": reasons}

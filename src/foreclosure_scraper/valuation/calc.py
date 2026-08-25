@@ -1318,7 +1318,8 @@ def _arv_signals(li: Listing, refused: list | None = None
 
     rec = raw.get("recorded_comps") or {}
     rec_ppsf = raw.get("comp_median_ppsf_recorded")
-    if rec_ppsf and arv_sqft:
+    sqft_from_comp = raw.get("sqft_source") == "comp_backfill"
+    if rec_ppsf and arv_sqft and not sqft_from_comp:
         expected = float(rec_ppsf) * arv_sqft
         notes.append(
             f"ARV from {rec.get('count', '?')} RECORDED arms-length sales within "
@@ -1333,7 +1334,10 @@ def _arv_signals(li: Listing, refused: list | None = None
         return round(expected, -2), low, high, conf, notes
 
     # Tier 1: comp-based ARV (HIGHEST confidence)
-    if comps and comp_ppsf and arv_sqft:
+    # 2026-08-25: Refuse comp-based ARV when sqft was backfilled FROM a comp —
+    # that's circular (pricing the comp, not the subject). Fall through to
+    # assessed-value / bid-proxy paths instead.
+    if comps and comp_ppsf and arv_sqft and not sqft_from_comp:
         # Build the adjusted $/sqft series ONCE and derive both `expected` (median)
         # and low/high (min/max) from it, so the headline ARV can never fall
         # outside its own band (Pass-2 fix: expected used the comp_median_ppsf

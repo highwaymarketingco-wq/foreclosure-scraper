@@ -249,6 +249,8 @@ def _backfill_property_data(li: Listing, sold_pool: list[dict]) -> None:
         if s_street == target_street or s_street in target_street or target_street in s_street:
             if li.living_sqft is None and s.get("sqft"):
                 li.living_sqft = _num(s.get("sqft"))
+                li.raw.setdefault("sqft_source", "comp_backfill")
+                li.raw["living_sqft_estimated"] = True
             if li.bedrooms is None and s.get("beds"):
                 li.bedrooms = _num(s.get("beds"))
             if li.bathrooms is None and s.get("full_baths"):
