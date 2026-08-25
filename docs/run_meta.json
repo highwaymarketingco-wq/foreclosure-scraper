@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-08-25T16:21:41.705963Z",
-  "total": 33245,
+  "run_time": "2026-08-25T18:01:02.223111Z",
+  "total": 53851,
   "by_source": {
     "law_firms.finkel": 8,
     "counties.column_legal_notices": 129,
@@ -145,10 +145,11 @@
     "courts.lis_pendens_discovery": 0
   },
   "by_state": {
-    "NC": 17982,
-    "SC": 15263
+    "NC": 37463,
+    "SC": 16388
   },
   "by_source_on_board": {
+    "counties_nc.nc_ptscloud_delinquent_tax": 20486,
     "counties_nc.rutherford_tax": 4288,
     "counties_sc.sc_public_index": 3699,
     "counties_nc.buncombe_elderly": 2996,
@@ -157,23 +158,23 @@
     "counties_sc.spartanburg_delinquent_tax": 1718,
     "counties_sc.spartanburg_vacant": 1577,
     "counties_nc.nc_county_csv_delinquent_tax": 1226,
+    "counties_sc.charleston_delinquent_tax": 1125,
     "counties_sc.spartanburg_condemned": 1109,
     "counties_generic.arcgis_distress.new_hanover_demolition_permits": 1006,
-    "counties_nc.nc_ptscloud_delinquent_tax": 1003,
     "counties_nc.buncombe_delinquent_tax": 954,
     "counties_nc.nc_heir_estate_parcels": 713,
     "national.courtlistener_bankruptcy": 646,
     "counties_sc.sc_public_index_export": 592,
     "counties_nc.asheville_str_permits": 555,
     "counties_sc.cherokee_delinquent_tax": 528,
-    "national.fannie_homepath": 498,
+    "national.fannie_homepath": 497,
     "counties_sc.oconee_flc_assignment": 495,
     "counties.multi_year_delinquent_tax": 481,
     "counties_sc.georgetown_civicengage": 406,
     "counties_nc.nc_ecourts_lis_pendens": 390,
     "counties_sc.sc_public_index_lis_pendens": 351,
     "counties_nc.asheville_helene": 302,
-    "national.distressed": 284,
+    "national.distressed": 283,
     "national.landandfarm": 283,
     "counties_sc.sc_probate_net": 265,
     "national.landwatch": 264,
@@ -506,21 +507,21 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "scheduled land-records refresh",
-  "detail_count": 33245,
-  "detail_digest": "bf4b0f2ac7c2a67c",
+  "notes": "scheduled NC SOS registered-agent refresh",
+  "detail_count": 53851,
+  "detail_digest": "cf41c3a2356cfa95",
   "board": {
     "schema": "slim-v1",
-    "count": 33245,
+    "count": 53851,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
-      "count": 34,
-      "records": 33245
+      "count": 54,
+      "records": 53851
     }
   },
-  "health_carried_from": "2026-08-25T14:53:24.675522Z",
+  "health_carried_from": "2026-08-25T16:50:39.891003Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
