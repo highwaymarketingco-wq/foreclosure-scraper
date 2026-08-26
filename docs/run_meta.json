@@ -1,40 +1,39 @@
 {
-  "run_time": "2026-08-26T18:01:20.004450Z",
-  "total": 38108,
+  "run_time": "2026-08-26T19:02:03.774885Z",
+  "total": 37462,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 60,
     "counties_sc.spartanburg_flc": 6,
     "law_firms.hutchens": 70,
     "law_firms.ingle_firm": 1,
-    "national.cash_buyer_deeds": 27,
-    "counties_sc.spartanburg_vacant": 1577,
+    "national.cash_buyer_deeds": 23,
+    "counties_sc.spartanburg_vacant": 1566,
     "law_firms.kania": 34,
     "counties_sc.terry_howe_flc": 23,
-    "counties_nc.asheville_helene": 302,
-    "national.courtlistener_bankruptcy": 646,
+    "counties_nc.asheville_helene": 278,
     "law_firms.mcmichael_taylor_gray": 9,
     "counties_nc.asheville_str_permits": 555,
     "law_firms.rogers_townsend": 15,
-    "counties_nc.buncombe_delinquent_tax": 954,
+    "counties_nc.buncombe_delinquent_tax": 950,
     "law_firms.shapiro_ingle_powerbi": 65,
     "national.estate_sales": 25,
-    "counties_nc.buncombe_elderly": 2996,
-    "national.fannie_homepath": 497,
+    "counties_nc.buncombe_elderly": 2993,
+    "national.fannie_homepath": 434,
     "counties_nc.buncombe_tax": 19,
     "counties_sc.anderson_master_in_equity": 19,
     "counties_nc.cleveland_tax": 6,
     "counties_sc.charleston_mie": 54,
     "national.homeharvest": 15,
     "counties_nc.henderson_code_violations": 154,
-    "national.distressed": 283,
+    "national.distressed": 280,
     "counties_nc.henderson_foreclosure_parcels": 4,
     "counties_sc.georgetown_civicengage": 406,
     "national.hubzu": 16,
     "counties_nc.hendersonville_vacant_structures": 45,
     "national.hud_homestore": 10,
     "counties_sc.oconee_flc_assignment": 495,
-    "national.hud_reac_inspection": 214,
+    "national.hud_reac_inspection": 213,
     "counties_nc.nc_county_csv_delinquent_tax": 1226,
     "counties_sc.oconee_forfeited_land": 218,
     "national.hud_section8_contracts": 37,
@@ -54,7 +53,7 @@
     "national.sheriff_sales": 1,
     "counties_sc.sc_probate_net": 265,
     "national.zillow_bulk": 64,
-    "counties_nc.rutherford_tax": 4288,
+    "counties_nc.rutherford_tax": 4287,
     "counties_sc.sc_rod_acclaim": 178,
     "public_notices.gannett_obituaries": 136,
     "counties_generic.arcgis_distress.new_hanover_demolition_permits": 1006,
@@ -70,7 +69,7 @@
     "national.auction_dot_com": 13,
     "counties_sc.spartanburg_condemned": 1109,
     "law_firms.brock_scott": 71,
-    "counties_sc.spartanburg_delinquent_tax": 1718,
+    "counties_sc.spartanburg_delinquent_tax": 1715,
     "counties_sc.sc_public_index": 3699,
     "counties_sc.sc_public_index_lis_pendens": 351,
     "counties_sc.sc_public_notices": 151,
@@ -78,7 +77,7 @@
     "national.landwatch": 264,
     "national.zillow_foreclosures": 27,
     "counties_nc.nc_govdeals_real_property": 1,
-    "counties_nc.nc_ptscloud_delinquent_tax": 20486,
+    "counties_nc.nc_ptscloud_delinquent_tax": 4863,
     "counties_nc.nc_rod_logan": 23,
     "national.courtlistener_adversary": 13,
     "national.xome": 8,
@@ -91,12 +90,12 @@
     "counties_sc.spartanburg_master_in_equity": 3,
     "newspapers.coastland_times": 1,
     "manual.watchlist": 1,
-    "reo.vrm_va_reo": 21,
+    "reo.vrm_va_reo": 18,
     "counties_sc.charleston_delinquent_tax": 1125
   },
   "by_state": {
-    "NC": 21760,
-    "SC": 16348
+    "NC": 21360,
+    "SC": 16102
   },
   "by_source_on_board": {
     "counties_nc.nc_ptscloud_delinquent_tax": 4863,
@@ -113,7 +112,6 @@
     "counties_generic.arcgis_distress.new_hanover_demolition_permits": 1006,
     "counties_nc.buncombe_delinquent_tax": 950,
     "counties_nc.nc_heir_estate_parcels": 713,
-    "national.courtlistener_bankruptcy": 645,
     "counties_sc.sc_public_index_export": 592,
     "counties_nc.asheville_str_permits": 555,
     "counties_sc.cherokee_delinquent_tax": 528,
@@ -124,7 +122,7 @@
     "counties_nc.nc_ecourts_lis_pendens": 390,
     "counties_sc.sc_public_index_lis_pendens": 351,
     "national.landandfarm": 283,
-    "national.distressed": 281,
+    "national.distressed": 280,
     "counties_nc.asheville_helene": 278,
     "counties_sc.sc_probate_net": 265,
     "national.landwatch": 264,
@@ -193,84 +191,64 @@
   },
   "by_county_top": [
     [
-      "Spartanburg/SC",
-      6583
+      "SC/Spartanburg",
+      6529
     ],
     [
-      "Buncombe/NC",
-      5651
+      "NC/Buncombe",
+      5534
     ],
     [
-      "Rutherford/NC",
-      4518
+      "NC/Rutherford",
+      4507
     ],
     [
-      "Pickens/SC",
-      2747
+      "SC/Pickens",
+      2723
     ],
     [
-      "New Hanover/NC",
-      2373
+      "NC/Beaufort",
+      2680
     ],
     [
-      "McDowell/NC",
-      1550
+      "NC/New Hanover",
+      2371
     ],
     [
-      "Henderson/NC",
-      1414
+      "NC/McDowell",
+      1525
     ],
     [
-      "Oconee/SC",
-      1330
+      "NC/Henderson",
+      1514
     ],
     [
-      "Anderson/SC",
-      1230
+      "SC/Charleston",
+      1455
     ],
     [
-      "Cherokee/SC",
-      1136
+      "SC/Oconee",
+      1306
     ],
     [
-      "Lincoln/NC",
-      1014
+      "SC/Cherokee",
+      1137
     ],
     [
-      "Laurens/SC",
-      980
+      "SC/Anderson",
+      1122
     ],
     [
-      "Union/SC",
-      496
+      "NC/Hyde",
+      1043
     ],
     [
-      "Georgetown/SC",
-      417
+      "SC/Laurens",
+      926
     ],
     [
-      "Charleston/SC",
-      330
-    ],
-    [
-      "Gaston/NC",
-      319
-    ],
-    [
-      "Cleveland/NC",
-      226
-    ],
-    [
-      "Transylvania/NC",
-      214
-    ],
-    [
-      "Burke/NC",
-      213
-    ],
-    [
-      "Polk/NC",
-      191
+      "NC/Lincoln",
+      752
     ]
   ],
   "source_status": {
@@ -457,24 +435,22 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "scheduled NC SOS registered-agent refresh",
-  "detail_count": 38108,
-  "detail_digest": "754a4631e6a1b0f7",
+  "notes": "regenerated in-place from persisted dataset (no re-scrape)",
+  "detail_count": 37462,
+  "detail_digest": "9b1063bf123628bb",
   "board": {
     "schema": "slim-v1",
-    "count": 38108,
+    "count": 37462,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
-      "count": 39,
-      "records": 38108
+      "count": 38,
+      "records": 37462
     }
   },
-  "health_carried_from": "2026-08-26T17:50:35.812306Z",
+  "health_carried_from": "2026-08-26T18:52:48.828604Z",
   "health_carried_keys": [
-    "by_source",
-    "by_county_top",
     "source_status",
     "errors"
   ]
