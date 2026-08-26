@@ -183,18 +183,27 @@ def valuation_ran_without_arv(li: Listing) -> bool:
 def _arv(li: Listing) -> Optional[float]:
     """The value reference equity subtracts the payoff from.
 
-    The fallbacks below fire ONLY when no valuation ran at all — `enrich_equity`
-    withholds outright when a calc block exists without an `arv_expected`, so
-    this function is never asked to second-guess a valuation that already
-    declined. Keeping the fallbacks here (rather than deleting them) preserves
-    equity on the leads that never reached calc, which is the normal case this
-    engine was built for.
+    Fallback chain (user: "assessed value = ANCHOR, comps = secondary"):
+      1. calc.arv_expected          — best, full valuation ran
+      2. assessed_value             — county CAMA as-is value (NCPTS LRC / tax)
+      3. market_value               — county market value
+      4. tax_value * 1.25           — assessed value with ratio adjustment
+
+    The `valuation_ran_without_arv` gate in enrich_equity() withholds when
+    a calc block exists but produced no arv_expected.  We still want the
+    assessed_value fallback for the 13k+ leads where valuation could not
+    produce ARV (usually missing sqft) but we DO have county as-is data.
+    To enable that, `enrich_equity` checks `li.assessed_value` BEFORE the
+    with­hold gate so the fallback fires.
     """
     raw = li.raw if isinstance(li.raw, dict) else {}
     calc = raw.get("calc") or {}
     arv = calc.get("arv_expected")
     if arv:
         return float(arv)
+    # User anchor: assessed value is the primary as-is value reference.
+    if li.assessed_value:
+        return float(li.assessed_value)
     if li.market_value:
         return float(li.market_value)
     if li.tax_value:
@@ -495,7 +504,18 @@ def enrich_equity(listings: list[Listing]) -> dict:
         # equity inventing the first term the valuation declined to publish.
         # See the second block at the top of this module. Reported separately
         # from `withheld` so the two paths never blur in the run log.
-        if valuation_ran_without_arv(li):
+        # THE SILENT NO-ARV CASE. `arv_trust` cannot see it: with no
+        # arv_expected, no arv_withheld and no flags it returns "ok", and
+        # `_arv` below would substitute market_value / tax_value x 1.25 —
+        # equity inventing the first term the valuation declined to publish.
+        # See the second block at the top of this module. Reported separately
+        # from `withheld` so the two paths never blur in the run log.
+        #
+        # BUT: if we have a county assessed_value (NCPTS LRC / tax data), the
+        # user explicitly wants that as the ANCHOR — "assessed value = ANCHOR,
+        # comps = secondary". So skip the withhold and let _arv() fall through
+        # to the assessed_value branch for the 13k+ leads valuation couldn't ARV.
+        if valuation_ran_without_arv(li) and not li.assessed_value:
             if not isinstance(li.raw, dict):
                 li.raw = {}
                 raw0 = li.raw
@@ -528,10 +548,21 @@ def enrich_equity(listings: list[Listing]) -> dict:
         equity = round(arv - payoff - seniors, -2)
         raw = li.raw if isinstance(li.raw, dict) else {}
         amort = raw.pop("_equity_amortization", None)
+        # Determine the value reference source for transparency
+        calc = (raw0.get("calc") or {}) if isinstance(raw0, dict) else {}
+        if calc.get("arv_expected"):
+            arv_source = "calc_arv"
+        elif li.assessed_value:
+            arv_source = "assessed_value"
+        elif li.market_value:
+            arv_source = "market_value"
+        else:
+            arv_source = "tax_value"
         raw["equity"] = {
             "value": equity,
             "pct": round(equity / arv, 3),
             "arv_used": round(arv, -2),
+            "arv_source": arv_source,
             "payoff_estimate": round(payoff, -2),
             "payoff_source": src,
             "senior_liens": round(seniors, -2),
