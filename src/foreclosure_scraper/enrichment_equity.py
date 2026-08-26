@@ -454,6 +454,26 @@ def _payoff(li: Listing, arv: float) -> tuple[Optional[float], str, str]:
                 if bal is not None and bal <= 2.0 * arv:
                     raw["_equity_amortization"] = est
                     return bal, src, conf
+    # 5) ASSESSED-VALUE-BASED PAYOFF ESTIMATE. For tax-delinquent leads that
+    #    have no recorded deed of trust, no foreclosure judgment, and no last
+    #    sale data — the majority of the NCPTS LRC delinquent-tax inventory —
+    #    we estimate the payoff from the assessed value. These properties are
+    #    typically 10-30 years into a 30-year mortgage at ~80% LTV. A property
+    #    that's 15 years into a 30yr at 80% LTV has paid down ~25% of principal,
+    #    so current balance ≈ assessed_value * 0.60. For 2yr+ delinquent
+    #    (tax_aging_high), the owner has likely stopped paying the mortgage
+    #    too, so balance has grown with interest/penalties → ~0.70.
+    #    Confidence is LOW — this is a statistical estimate, not a figure of
+    #    record. The payoff_is_estimate flag is already set by enrich_equity.
+    if li.assessed_value and li.assessed_value > 0:
+        raw0 = li.raw if isinstance(li.raw, dict) else {}
+        tax_aging = raw0.get("tax_aging_high")
+        if tax_aging:
+            est_payoff = float(li.assessed_value) * 0.70
+        else:
+            est_payoff = float(li.assessed_value) * 0.60
+        if 0 < est_payoff < arv:  # payoff must be less than value for equity to exist
+            return est_payoff, "assessed_value_estimate", "low"
     return None, "unknown", "none"
 
 
