@@ -339,7 +339,18 @@ RAW_KEEP = {
     "loan_amount": "*",               # scalar mirror of dot_ocr.loan_amount (recorded principal)
     "nc_ptscloud_delinquent_tax": "*",
     "lrcpwa": "*",                       # land-records parcel resolve: assessed/mailing/absentee   # PTS delinquent roll: parcel/assessed/mailing/tax_year (skip-trace)
-    "nc_county_pdf_delinquent_tax": "*", # county PDF delinquent roll: county_id/owner provenance
+    "nc_county_pdf_delinquent_tax": "*",
+    "nc_county_csv_delinquent_tax": "*",
+    "buncombe_delinquent_tax": "*",     # delinquent tax roll: balance + tax_year (needed for tax_owed year extraction)
+    "rutherford_wildfire": "*",         # delinquent tax roll: taxes_owed + tax_years (list)
+    "multi_year_delinquent_tax": "*",   # delinquent tax roll: total_due + year
+    "spartanburg_delinquent_tax": "*",  # SC delinquent tax: balance
+    "sc_state_tax_lien": "*",           # SC DeptRev state tax lien: balance
+    "deed_chain": "*",                  # synthesized ownership transfer timeline + summary
+    "dot_ocr": "*",                     # recorded deed-of-trust principal + estimated balance
+    "loan_amount": "*",                 # scalar loan principal from dot_ocr
+    "property_category": "*",           # foreclosure | preforeclosure | tax_delinquency | distressed_property
+    "child_support": "*",              # child support obligation flag from court detail parser
     "rent_median_ppsf": "*",
     "estimated_monthly_rent": "*",
     "data_quality": "*",              # investor-facing caveats: synthetic_address / no_sqft / low_arv_confidence
@@ -392,11 +403,15 @@ RAW_KEEP = {
     "sold_confirmed": "*",            # court-confirmed sale → already sold, filter off active board
     "owner_mailing": "*",             # #0 contactability: owner name + mailing addr + absentee/out-of-state flags
     "owner_phone": "*",               # NC voter-file phone (name+address match) — DNC-gated, needs_dnc_scrub
+    "free_phones": "*",               # TruePeopleSearch/FastPeopleSearch phones (free, bot-protected)
+    "sc_voter_xref": "*",             # SC phone via NC voter file cross-reference (free, unambiguous match)
     "rod": "*",                       # Gaston NC ROD lien existence (D/T mortgage + adverse liens) by owner name
     "divorce": "*",                   # SC Family-Court divorce / marital-dissolution match on owner party-name (FCCMS)
     "geo_imprecise": "*",             # out_of_bbox (geo nulled) | centroid_snap (county/town-center fallback)
     "stale_case": "*",                # presumed_withdrawn lis-pendens — likely resolved, down-ranked from HOT
+    "staleness": "*",                 # staleness_sweep verdict {state: upset_closed|sale_passed|gone_quiet, ...} for dashboard filtering
     "life_events": "*",               # elderly/probate signals: life_estate | estate_probate | multiple_heirs | trust
+    "probate": "*",                   # probate court case search result: case_number, filing_date, court, decedent, status
     "gis_exempt": "*",                # statutory tax-relief exemption (ELD/DIS/BLD/VET) -> hard elderly/disabled signal
     "owner_name_source": "*",         # provenance when owner_name was promoted from tax/GIS
     "notice_contact": "*",            # attributable attorney/trustee email from the legal-notice body
@@ -440,6 +455,10 @@ RAW_KEEP = {
     "storm_damage": "*",              # Hurricane Helene damage-assessment match {damage_level, estimated_loss, ...}
     "rollback_exposure": "*",         # present-use/elderly deferral: rollback tax that comes due ON SALE
     "condemned": "*",                 # condemned/dilapidated flag from county condemned inventory
+    "vacant_lot": "*",                # undeveloped/vacant land-use from the parcel cache (land-wholesale signal)
+    "bankruptcy_stay": "*",           # foreclosure stayed by an automatic stay (§362) + resume-risk
+    "liensnc": "*",                   # LiensNC lien-agent filing (builder/investor distress)
+    "builder_distress": "*",          # LiensNC cluster/related-filings = over-leveraged flipper
     "owner_mismatch": "*",            # court lead whose geo-snapped property was stripped (name-only, unverified)
     "resolved_from_name": "*",        # name->property resolver provenance {county, strategy, confidence}
     "_resolved_deep_enriched": "*",   # marker: resolved lead already got the same-run comps/Vision catch-up
@@ -448,6 +467,38 @@ RAW_KEEP = {
     "contact": "*",                   # ingested skip-trace contact {phones, emails, mailing, needs_dnc_scrub}
     "link_kind": "*",                 # 'record' (real per-record link) | 'search' (portal only)
     "search_url": "*",                # portal search page when there's no direct record link
+    "derivation_flags": "*",          # free_and_clear / tired_landlord / divorce derivation
+    "burke_history": "*",             # Burke County ownership changes + structure loss
+    "buyer_match": "*",               # buyer pool match {by_type, count, category, note}
+    "derived_signals": "*",           # discount_to_arv / lien_to_value ratios
+    "opportunity_zone": "*",         # OZ tract GEOID + designation
+    "sale_date_passed": "*",         # flag: auction/sale date has passed
+    "sale_date_passed_days": "*",    # days since sale date passed
+    "propwire": "*",                  # already above, keep for safety
+    "loopnet": "*",                   # already above, keep for safety
+    "ocr_extraction": "*",            # OCR of legal notice PDFs: case#s, sale dates, phones, emails
+    "sale_date": "*",                 # sale/auction date surfaced from OCR or scrape
+    "fmr_monthly": "*",               # HUD Fair Market Rent amounts by bedroom count
+    "fmr_area": "*",                  # HUD FMR area name for this listing
+    "fmr_bedrooms": "*",              # HUD FMR bedroom count matched to listing
+    "hud_fmr": "*",                   # HUD FMR enricher output block
+    "census_rent": "*",               # rent data (sourced from HUD FMR or Census ACS)
+    "court_bid": "*",                 # court auction bid/upset/sale status
+    "rod_name_index": "*",            # ROD name-based lien index provenance
+    "usps_vacancy": "*",              # USPS vacancy scan result
+    "recap": "*",                     # PACER/RECAP document fetch
+    "septic": "*",                    # septic system status
+    "land_distress": "*",             # land-specific distress flag
+    "flood_zone": "*",                # FEMA flood-zone tag (alternate key name)
+    "courtlistener_adversary": "*",  # bankruptcy adversary proceeding
+    "geocoded_by_name": "*",          # name-based geocoding provenance
+    "gis_attrs_full": "*",            # full GIS attribute snapshot
+    "situs_address_source": "*",      # situs address provenance
+    "owner_email": "*",               # surfaced owner email from OCR/skip-trace
+    "red_flags": "*",                  # unified red flag array [{severity, type, description, source}]
+    "sos_dissolution": "*",            # NC SOS LLC dissolution status
+    "tax_aging_surfaced": "*",         # surfaced tax aging status for all listings
+    "two_year_delinquent": "*",        # 2yr+ delinquent flag for all listings
 }
 
 
@@ -635,8 +686,10 @@ _SLIM_RAW: dict[str, str | tuple[str, ...]] = {
     "strategy_fit": ("tags",),
     "owner_mailing": ("mailing", "mail_state", "absentee", "out_of_state"),
     "owner_phone": ("phone", "source", "needs_dnc_scrub"),
+    "free_phones": ("phone", "source", "confidence", "needs_dnc_scrub"),
+    "sc_voter_xref": ("phone", "source", "match_type", "needs_dnc_scrub"),
     "sos_agent": ("sosid", "best_contact_name", "best_contact_address"),
-    "rod": ("has_mortgage", "has_adverse_lien"),
+    "rod": ("has_mortgage", "has_adverse_lien", "has_hoa_lien", "hoa_lien_count"),
     # Whole-block: withheld_reason / withheld / arv_trust / arv_flags are the
     # sentences that say WHY a figure is missing, the detail panel reads them,
     # and they change with the valuation. This is the largest of the four moves
@@ -671,14 +724,18 @@ _SLIM_RAW: dict[str, str | tuple[str, ...]] = {
     # — arv_above_asis, arv_below_asis, verdict_on_flagged_arv,
     # bid_on_contradicted_arv, derived_without_arv, gis_row_shared. Until now it
     # was in no slim allowlist at all, so a phone had no board-QA backstop: on
-    # today's board 21,678 records carry it and mobile saw none of them.
     "qa_flags": "*",
+    # New enrichment fields — keep whole so dashboard can read all sub-keys.
+    "property_category": "*",
+    "deed_chain": "*",
 }
+
 
 # Mirrors _LEAN_RAW_SCALARS.
 _SLIM_RAW_SCALARS = (
     "intent_score", "intent_band", "multifamily_class",
     "stale_case", "geo_imprecise", "sold_confirmed", "kw_vacant", "acres",
+    "child_support",
 )
 
 # Mirrors _ACRE_KEYS. The client probes three containers x four names = the

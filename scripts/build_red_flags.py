@@ -12,53 +12,16 @@ and surfaces a composite red_flags array with severity levels:
 
 Each flag has: type, severity, description, source field.
 """
-import gc, gzip, json, os, sys, time
+import gc, json, os, sys, time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 os.environ.setdefault("PATH", os.path.expanduser("~/bin") + ":" + os.environ.get("PATH", ""))
 
-from foreclosure_scraper.web_artifact import load_board, _to_dict
+from foreclosure_scraper.web_artifact import load_board, _to_dict, write_artifact
 
 DOCS = REPO / "docs"
-
-
-def stream_save(board):
-    t0 = time.time()
-    n = len(board)
-    print(f"  [save] Writing {n} listings...", flush=True)
-    tmp = str(DOCS / "listings.json") + ".tmp"
-    total = 0
-    with open(tmp, "w", encoding="utf-8") as f:
-        f.write("[")
-        for i, li in enumerate(board):
-            if i > 0:
-                f.write(",")
-            d = _to_dict(li)
-            raw = d.get("raw")
-            if isinstance(raw, dict):
-                for k in ("comps", "vision", "cama"):
-                    raw.pop(k, None)
-            chunk = json.dumps(d, ensure_ascii=False, default=str)
-            f.write(chunk)
-            total += len(chunk)
-            if (i + 1) % 10000 == 0:
-                print(f"    ...{i+1}/{n} ({total//1024}KB)", flush=True)
-                gc.collect()
-        f.write("]")
-    os.replace(tmp, str(DOCS / "listings.json"))
-    print(f"  [save] JSON: {os.path.getsize(str(DOCS/'listings.json'))//1024}KB")
-    tmp_gz = str(DOCS / "listings.json.gz") + ".tmp"
-    with open(str(DOCS / "listings.json"), "rb") as src, \
-         gzip.GzipFile(filename=tmp_gz, mode="wb", compresslevel=9, mtime=0) as dst:
-        while True:
-            block = src.read(65536)
-            if not block:
-                break
-            dst.write(block)
-    os.replace(tmp_gz, str(DOCS / "listings.json.gz"))
-    print(f"  [save] GZ: {os.path.getsize(str(DOCS/'listings.json.gz'))//1024}KB ({time.time()-t0:.1f}s)")
 
 
 def build_red_flags(li, li_dict):
@@ -379,8 +342,8 @@ def main():
     for ft, cnt in sorted(flag_type_counts.items(), key=lambda x: -x[1]):
         print(f"    {ft}: {cnt:,}")
 
-    print("\n  Saving board...", flush=True)
-    stream_save(board)
+    print("\n  Saving board with write_artifact()...", flush=True)
+    write_artifact(board, {})
     print("  Done!")
 
 
