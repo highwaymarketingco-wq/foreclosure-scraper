@@ -19,7 +19,7 @@
     "vin": "WP0AB2A86GK******",
     "lot_number": "49375036",
     "sale_date": "2026-09-02T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.424250Z",
+    "first_seen": "2026-08-29T14:14:03.007007Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -65,7 +65,7 @@
     "vin": "WP0AB2A9XKS******",
     "lot_number": "55552486",
     "sale_date": "2026-09-03T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.422909Z",
+    "first_seen": "2026-08-29T14:14:03.005634Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -111,7 +111,7 @@
     "vin": "WP1AD2A21GL******",
     "lot_number": "64812876",
     "sale_date": "2026-09-04T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426667Z",
+    "first_seen": "2026-08-29T14:14:03.010058Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -157,7 +157,7 @@
     "vin": "WP1AA2A21GL******",
     "lot_number": "77515555",
     "sale_date": "2026-09-01T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426175Z",
+    "first_seen": "2026-08-29T14:14:03.009407Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -166,17 +166,17 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 24290,
-        "est_recon": 4372,
+        "est_clean_value": 23790,
+        "est_recon": 4282,
         "est_fees": 1015,
-        "all_in": 5512,
-        "resale_value": 17489,
-        "est_margin": 11977,
-        "max_bid_target": 39846,
+        "all_in": 5422,
+        "resale_value": 17129,
+        "est_margin": 11707,
+        "max_bid_target": 39927,
         "target": 50000,
         "feasible": true,
         "damage": "Mechanical",
-        "note": "Mechanical \u2014 project: all-in $5,512, ~$11,977 under $17,489 fixed value"
+        "note": "Mechanical \u2014 project: all-in $5,422, ~$11,707 under $17,129 fixed value"
       }
     },
     "project_tier": "clean"
@@ -201,7 +201,7 @@
     "vin": "WP0AC2A82GK******",
     "lot_number": "56549196",
     "sale_date": "2026-09-01T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.424232Z",
+    "first_seen": "2026-08-29T14:14:03.006985Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -246,7 +246,7 @@
     "vin": "WP1AB2AY6KD******",
     "lot_number": "49489346",
     "sale_date": "2026-09-04T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426634Z",
+    "first_seen": "2026-08-29T14:14:03.010016Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -291,7 +291,7 @@
     "vin": "WP1AA2A28JK******",
     "lot_number": "62057136",
     "sale_date": "2026-09-02T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426354Z",
+    "first_seen": "2026-08-29T14:14:03.009644Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -336,7 +336,7 @@
     "vin": "WP1AA2A2XEL******",
     "lot_number": "63663356",
     "sale_date": "2026-09-03T13:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426448Z",
+    "first_seen": "2026-08-29T14:14:03.009764Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -381,7 +381,7 @@
     "vin": "WP1AE2A2XGL******",
     "lot_number": "64308966",
     "sale_date": "2026-08-31T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425652Z",
+    "first_seen": "2026-08-29T14:14:03.008711Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -425,7 +425,7 @@
     "vin": "WP1AA2AY1KD******",
     "lot_number": "59680136",
     "sale_date": "2026-08-31T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425727Z",
+    "first_seen": "2026-08-29T14:14:03.008813Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -515,7 +515,7 @@
     "vin": "WP1AA2A25EL******",
     "lot_number": "65850826",
     "sale_date": "2026-09-22T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426924Z",
+    "first_seen": "2026-08-29T14:14:03.010342Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -561,7 +561,7 @@
     "vin": "WP1AC2A23EL******",
     "lot_number": "54119936",
     "sale_date": "2026-09-22T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426953Z",
+    "first_seen": "2026-08-29T14:14:03.010380Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -606,7 +606,7 @@
     "vin": "WP1AA2A25GK******",
     "lot_number": "64578246",
     "sale_date": "2026-08-31T18:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425575Z",
+    "first_seen": "2026-08-29T14:14:03.008608Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -651,7 +651,7 @@
     "vin": "WP0AB2A85EK******",
     "lot_number": "63680186",
     "sale_date": "2026-09-28T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.424364Z",
+    "first_seen": "2026-08-29T14:14:03.007074Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -696,7 +696,7 @@
     "vin": "WP1AD2A27EL******",
     "lot_number": "94499535",
     "sale_date": "2026-09-04T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426558Z",
+    "first_seen": "2026-08-29T14:14:03.009913Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -741,7 +741,7 @@
     "vin": "WP0AB2A83FK******",
     "lot_number": "59838346",
     "sale_date": "2026-08-31T18:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.424189Z",
+    "first_seen": "2026-08-29T14:14:03.006923Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -787,7 +787,7 @@
     "vin": "WP0AB2A89KS******",
     "lot_number": "61604316",
     "sale_date": "2026-09-17T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.424266Z",
+    "first_seen": "2026-08-29T14:14:03.007029Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -832,7 +832,7 @@
     "vin": "WP1AB2AY5MD******",
     "lot_number": "63033666",
     "sale_date": "2026-08-31T18:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425590Z",
+    "first_seen": "2026-08-29T14:14:03.008627Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -878,7 +878,7 @@
     "vin": "WP1BE2AY8ND******",
     "lot_number": "66079606",
     "sale_date": "2026-08-31T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425637Z",
+    "first_seen": "2026-08-29T14:14:03.008693Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -922,7 +922,7 @@
     "vin": "WP1AA2A29GK******",
     "lot_number": "58807386",
     "sale_date": "2026-09-01T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426083Z",
+    "first_seen": "2026-08-29T14:14:03.009319Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -967,7 +967,7 @@
     "vin": "WP0CA2A83KS******",
     "lot_number": "54010296",
     "sale_date": "2026-08-31T22:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.424650Z",
+    "first_seen": "2026-08-29T14:14:03.007280Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -1012,7 +1012,7 @@
     "vin": "WP1AD2A23HL******",
     "lot_number": "94309295",
     "sale_date": "2026-09-01T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425865Z",
+    "first_seen": "2026-08-29T14:14:03.009004Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -1038,51 +1038,6 @@
     "project_tier": "clean"
   },
   {
-    "source": "copart",
-    "source_url": "https://www.copart.com/lot/65988656",
-    "listing_id": "WP1AE2AY0KD******",
-    "title": "2019 Porsche CAYENNE SE HYBRID",
-    "year": 2019,
-    "make": "Porsche",
-    "model": "CAYENNE",
-    "trim": "SE HYBRID",
-    "price_usd": null,
-    "current_bid_usd": 1100.0,
-    "mileage": 73629,
-    "location": "PA - PHILADELPHIA",
-    "seller_type": "salvage_auction",
-    "title_status": "salvage",
-    "drivable": null,
-    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0826/8e134636154045d188bbfebe51ccaeb4_thb.jpg",
-    "vin": "WP1AE2AY0KD******",
-    "lot_number": "65988656",
-    "sale_date": "2026-09-01T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425883Z",
-    "raw": {
-      "sf_csv": true,
-      "damage": {
-        "primary": "FRONT END",
-        "retail": "32917.35",
-        "repair": "21872.0",
-        "odo_status": "ACTUAL"
-      },
-      "deal": {
-        "est_clean_value": 32917,
-        "est_recon": 9875,
-        "est_fees": 1132,
-        "all_in": 12107,
-        "resale_value": 23700,
-        "est_margin": 11593,
-        "max_bid_target": 34933,
-        "target": 50000,
-        "feasible": true,
-        "damage": "Front End",
-        "note": "Front End \u2014 project: all-in $12,107, ~$11,593 under $23,700 fixed value"
-      }
-    },
-    "project_tier": "salvage"
-  },
-  {
     "source": "bring_a_trailer",
     "source_url": "https://bringatrailer.com/listing/2007-porsche-cayman-s-156/",
     "listing_id": "2007-porsche-cayman-s-156",
@@ -1102,7 +1057,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421856Z",
+    "first_seen": "2026-08-29T14:14:03.004848Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -1141,7 +1096,7 @@
     "vin": "WP1AE2A26GL******",
     "lot_number": "60403706",
     "sale_date": "2026-09-04T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426589Z",
+    "first_seen": "2026-08-29T14:14:03.009958Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -1185,7 +1140,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419203Z",
+    "first_seen": "2026-08-29T14:14:03.002879Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -1224,7 +1179,7 @@
     "vin": "WP1AA2A27GK******",
     "lot_number": "65302666",
     "sale_date": "2026-08-31T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425528Z",
+    "first_seen": "2026-08-29T14:14:03.008541Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -1268,7 +1223,7 @@
     "vin": "WP1AE2A24GL******",
     "lot_number": "62829866",
     "sale_date": "2026-08-31T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425682Z",
+    "first_seen": "2026-08-29T14:14:03.008753Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -1278,20 +1233,65 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 24290,
-        "est_recon": 8744,
+        "est_clean_value": 23790,
+        "est_recon": 8564,
         "est_fees": 1252,
-        "all_in": 12096,
-        "resale_value": 17489,
-        "est_margin": 5393,
-        "max_bid_target": 35943,
+        "all_in": 11916,
+        "resale_value": 17129,
+        "est_margin": 5213,
+        "max_bid_target": 36104,
         "target": 50000,
         "feasible": true,
         "damage": "Front End + Rear End",
-        "note": "Front End + Rear End \u2014 project: all-in $12,096, ~$5,393 under $17,489 fixed value"
+        "note": "Front End + Rear End \u2014 project: all-in $11,916, ~$5,213 under $17,129 fixed value"
       }
     },
     "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/65988656",
+    "listing_id": "WP1AE2AY0KD******",
+    "title": "2019 Porsche CAYENNE SE HYBRID",
+    "year": 2019,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": "SE HYBRID",
+    "price_usd": null,
+    "current_bid_usd": 2100.0,
+    "mileage": 73629,
+    "location": "PA - PHILADELPHIA",
+    "seller_type": "salvage_auction",
+    "title_status": "salvage",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0826/8e134636154045d188bbfebe51ccaeb4_thb.jpg",
+    "vin": "WP1AE2AY0KD******",
+    "lot_number": "65988656",
+    "sale_date": "2026-09-01T14:00:00Z",
+    "first_seen": "2026-08-29T14:14:03.009026Z",
+    "raw": {
+      "sf_csv": true,
+      "damage": {
+        "primary": "FRONT END",
+        "retail": "32917.35",
+        "repair": "21872.0",
+        "odo_status": "ACTUAL"
+      },
+      "deal": {
+        "est_clean_value": 32917,
+        "est_recon": 9875,
+        "est_fees": 1252,
+        "all_in": 13227,
+        "resale_value": 23700,
+        "est_margin": 10473,
+        "max_bid_target": 34933,
+        "target": 50000,
+        "feasible": true,
+        "damage": "Front End",
+        "note": "Front End \u2014 project: all-in $13,227, ~$10,473 under $23,700 fixed value"
+      }
+    },
+    "project_tier": "salvage"
   },
   {
     "source": "bring_a_trailer",
@@ -1313,7 +1313,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421841Z",
+    "first_seen": "2026-08-29T14:14:03.004826Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -1352,7 +1352,7 @@
     "vin": "WP1BA2AY5ND******",
     "lot_number": "57783816",
     "sale_date": "2026-09-15T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426858Z",
+    "first_seen": "2026-08-29T14:14:03.010258Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -1398,7 +1398,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421488Z",
+    "first_seen": "2026-08-29T14:14:03.004233Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -1482,7 +1482,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.429953Z",
+    "first_seen": "2026-08-29T14:14:03.013658Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -1521,7 +1521,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.422018Z",
+    "first_seen": "2026-08-29T14:14:03.005055Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -1560,7 +1560,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419113Z",
+    "first_seen": "2026-08-29T14:14:03.002781Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -1599,7 +1599,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421990Z",
+    "first_seen": "2026-08-29T14:14:03.005016Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -1638,7 +1638,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.429745Z",
+    "first_seen": "2026-08-29T14:14:03.013471Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -1677,7 +1677,7 @@
     "vin": "WP0CB2A92FS******",
     "lot_number": "58848106",
     "sale_date": "2026-09-01T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.422841Z",
+    "first_seen": "2026-08-29T14:14:03.005547Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -1723,7 +1723,7 @@
     "vin": "WP1BK2AY3PD******",
     "lot_number": "59161946",
     "sale_date": "2026-09-02T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426431Z",
+    "first_seen": "2026-08-29T14:14:03.009745Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -1768,7 +1768,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419847Z",
+    "first_seen": "2026-08-29T14:14:03.003538Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -1807,7 +1807,7 @@
     "vin": "WP1AA2AY0KD******",
     "lot_number": "64287616",
     "sale_date": "2026-09-02T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426307Z",
+    "first_seen": "2026-08-29T14:14:03.009576Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -1816,17 +1816,17 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 33990,
-        "est_recon": 8158,
+        "est_clean_value": 34990,
+        "est_recon": 8398,
         "est_fees": 1600,
-        "all_in": 14758,
-        "resale_value": 24473,
-        "est_margin": 9715,
-        "max_bid_target": 36466,
+        "all_in": 14998,
+        "resale_value": 25193,
+        "est_margin": 10195,
+        "max_bid_target": 36252,
         "target": 50000,
         "feasible": true,
         "damage": "Rear End",
-        "note": "Rear End \u2014 project: all-in $14,758, ~$9,715 under $24,473 fixed value"
+        "note": "Rear End \u2014 project: all-in $14,998, ~$10,195 under $25,193 fixed value"
       }
     },
     "project_tier": "clean"
@@ -1851,7 +1851,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421098Z",
+    "first_seen": "2026-08-29T14:14:03.003784Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -1890,7 +1890,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419251Z",
+    "first_seen": "2026-08-29T14:14:03.002931Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -1929,7 +1929,7 @@
     "vin": "WP0CB2A83GS******",
     "lot_number": "57831386",
     "sale_date": "2026-08-31T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.424634Z",
+    "first_seen": "2026-08-29T14:14:03.007257Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -1975,7 +1975,7 @@
     "vin": "WP1AA2AY0KD******",
     "lot_number": "64279136",
     "sale_date": "2026-09-14T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426746Z",
+    "first_seen": "2026-08-29T14:14:03.010168Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -2021,7 +2021,7 @@
     "vin": "WP1AA2AY8KD******",
     "lot_number": "66222776",
     "sale_date": "2026-08-31T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425622Z",
+    "first_seen": "2026-08-29T14:14:03.008674Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -2067,7 +2067,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421117Z",
+    "first_seen": "2026-08-29T14:14:03.003803Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -2082,6 +2082,45 @@
         "feasible": true,
         "damage": null,
         "note": "clean, all-in $6,147 \u2014 ready to drive, under $50k"
+      }
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2013-porsche-cayenne-gts-94/",
+    "listing_id": "2013-porsche-cayenne-gts-94",
+    "title": "2013 Porsche Cayenne GTS",
+    "year": 2013,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 6000.0,
+    "mileage": null,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/07/IMG_0954-1-scaled-copy-2026-08-17-aoo-04306.jpeg?w=470&h=318&crop=1",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-08-29T14:14:03.002799Z",
+    "raw": {
+      "sf_csv": true,
+      "deal": {
+        "est_clean_value": 24990,
+        "est_recon": 500,
+        "est_fees": 300,
+        "all_in": 6800,
+        "resale_value": 24990,
+        "est_margin": 18190,
+        "max_bid_target": 47143,
+        "target": 50000,
+        "feasible": true,
+        "damage": null,
+        "note": "clean, all-in $6,800 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -2106,7 +2145,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419354Z",
+    "first_seen": "2026-08-29T14:14:03.003053Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -2121,45 +2160,6 @@
         "feasible": true,
         "damage": null,
         "note": "clean, all-in $6,800 \u2014 ready to drive, under $50k"
-      }
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2013-porsche-cayenne-gts-94/",
-    "listing_id": "2013-porsche-cayenne-gts-94",
-    "title": "2013 Porsche Cayenne GTS",
-    "year": 2013,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 6500.0,
-    "mileage": null,
-    "location": null,
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/07/IMG_0954-1-scaled-copy-2026-08-17-aoo-04306.jpeg?w=470&h=318&crop=1",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419130Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 24990,
-        "est_recon": 500,
-        "est_fees": 325,
-        "all_in": 7325,
-        "resale_value": 24990,
-        "est_margin": 17665,
-        "max_bid_target": 47143,
-        "target": 50000,
-        "feasible": true,
-        "damage": null,
-        "note": "clean, all-in $7,325 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -2184,7 +2184,7 @@
     "vin": "WP0AB2A85JK******",
     "lot_number": "48766456",
     "sale_date": "2026-09-24T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.424281Z",
+    "first_seen": "2026-08-29T14:14:03.007054Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -2229,7 +2229,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419020Z",
+    "first_seen": "2026-08-29T14:14:03.002678Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -2268,7 +2268,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419516Z",
+    "first_seen": "2026-08-29T14:14:03.003236Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -2307,7 +2307,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421915Z",
+    "first_seen": "2026-08-29T14:14:03.004929Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -2336,7 +2336,7 @@
     "model": null,
     "trim": null,
     "price_usd": null,
-    "current_bid_usd": 7500.0,
+    "current_bid_usd": 7400.0,
     "mileage": null,
     "location": null,
     "seller_type": "auction",
@@ -2346,21 +2346,21 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419416Z",
+    "first_seen": "2026-08-29T14:14:03.003127Z",
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 24290,
-        "est_recon": 486,
-        "est_fees": 375,
-        "all_in": 8361,
-        "resale_value": 24290,
-        "est_margin": 15929,
-        "max_bid_target": 47156,
+        "est_clean_value": 23790,
+        "est_recon": 476,
+        "est_fees": 370,
+        "all_in": 8246,
+        "resale_value": 23790,
+        "est_margin": 15544,
+        "max_bid_target": 47166,
         "target": 50000,
         "feasible": true,
         "damage": null,
-        "note": "clean, all-in $8,361 \u2014 ready to drive, under $50k"
+        "note": "clean, all-in $8,246 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -2385,7 +2385,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421536Z",
+    "first_seen": "2026-08-29T14:14:03.004300Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -2424,7 +2424,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.429679Z",
+    "first_seen": "2026-08-29T14:14:03.013379Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -2463,7 +2463,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.429729Z",
+    "first_seen": "2026-08-29T14:14:03.013449Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -2502,7 +2502,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.429793Z",
+    "first_seen": "2026-08-29T14:14:03.013536Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -2541,7 +2541,7 @@
     "vin": "WP1AA2AY5KD******",
     "lot_number": "62817976",
     "sale_date": "2026-08-31T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425696Z",
+    "first_seen": "2026-08-29T14:14:03.008774Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -2586,7 +2586,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430000Z",
+    "first_seen": "2026-08-29T14:14:03.013722Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -2625,7 +2625,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421714Z",
+    "first_seen": "2026-08-29T14:14:03.004524Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -2664,7 +2664,7 @@
     "vin": "WP1BE2AY7MD******",
     "lot_number": "63913716",
     "sale_date": "2026-09-02T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426338Z",
+    "first_seen": "2026-08-29T14:14:03.009622Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -2690,6 +2690,45 @@
   },
   {
     "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2023-porsche-911-targa-4s-16/",
+    "listing_id": "2023-porsche-911-targa-4s-16",
+    "title": "6k-Mile 2023 Porsche 911 Targa 4S 7-Speed",
+    "year": 2023,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 9921.0,
+    "mileage": null,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/2023_porsche_911-targa-4s_2023_porsche_911-targa-4s_53c8bd55-733a-448b-9bb2-7070a6158c3b-slySmN-42355-42356-scaled.jpg?w=470&h=318&crop=1",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-08-29T14:14:03.004907Z",
+    "raw": {
+      "sf_csv": true,
+      "deal": {
+        "est_clean_value": 106400,
+        "est_recon": 2128,
+        "est_fees": 496,
+        "all_in": 12545,
+        "resale_value": 106400,
+        "est_margin": 93855,
+        "max_bid_target": 45592,
+        "target": 50000,
+        "feasible": true,
+        "damage": null,
+        "note": "clean, all-in $12,545 \u2014 ready to drive, under $50k"
+      }
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "bring_a_trailer",
     "source_url": "https://bringatrailer.com/listing/2000-porsche-911-carrera-coupe-74/",
     "listing_id": "2000-porsche-911-carrera-coupe-74",
     "title": "2000 Porsche 911 Carrera Coupe 6-Speed",
@@ -2708,7 +2747,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421555Z",
+    "first_seen": "2026-08-29T14:14:03.004323Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -2747,7 +2786,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421643Z",
+    "first_seen": "2026-08-29T14:14:03.004436Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -2762,6 +2801,84 @@
         "feasible": true,
         "damage": null,
         "note": "clean, all-in $11,508 \u2014 ready to drive, under $50k"
+      }
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2001-porsche-911-carrera-cabriolet-139/",
+    "listing_id": "2001-porsche-911-carrera-cabriolet-139",
+    "title": "27k-Mile 2001 Porsche 911 Carrera Cabriolet 6-Speed",
+    "year": 2001,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 10000.0,
+    "mileage": 27000,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/08/DSC00931-scaled-copy-2026-08-25-yvr-75993.jpg?w=470&h=318&crop=1",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-08-29T14:14:03.004459Z",
+    "raw": {
+      "sf_csv": true,
+      "deal": {
+        "est_clean_value": 28800,
+        "est_recon": 576,
+        "est_fees": 500,
+        "all_in": 11076,
+        "resale_value": 28800,
+        "est_margin": 17724,
+        "max_bid_target": 47070,
+        "target": 50000,
+        "feasible": true,
+        "damage": null,
+        "note": "clean, all-in $11,076 \u2014 ready to drive, under $50k"
+      }
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2012-porsche-cayman-10/",
+    "listing_id": "2012-porsche-cayman-10",
+    "title": "2012 Porsche Cayman",
+    "year": 2012,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 10250.0,
+    "mileage": null,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/08/IMG_3978-scaled-copy-2026-08-19-ve9-78802.jpeg?w=470&h=318&crop=1",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-08-29T14:14:03.002591Z",
+    "raw": {
+      "sf_csv": true,
+      "deal": {
+        "est_clean_value": 34560,
+        "est_recon": 691,
+        "est_fees": 512,
+        "all_in": 11453,
+        "resale_value": 34560,
+        "est_margin": 23107,
+        "max_bid_target": 46961,
+        "target": 50000,
+        "feasible": true,
+        "damage": null,
+        "note": "clean, all-in $11,453 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -2786,7 +2903,7 @@
     "vin": "WP0AF2A99GS******",
     "lot_number": "66979476",
     "sale_date": "2026-09-01T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.422741Z",
+    "first_seen": "2026-08-29T14:14:03.005403Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -2812,45 +2929,6 @@
     "project_tier": "clean"
   },
   {
-    "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2012-porsche-cayman-10/",
-    "listing_id": "2012-porsche-cayman-10",
-    "title": "2012 Porsche Cayman",
-    "year": 2012,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 10750.0,
-    "mileage": null,
-    "location": null,
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/08/IMG_3978-scaled-copy-2026-08-19-ve9-78802.jpeg?w=470&h=318&crop=1",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.418945Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 34560,
-        "est_recon": 691,
-        "est_fees": 538,
-        "all_in": 11979,
-        "resale_value": 34560,
-        "est_margin": 22581,
-        "max_bid_target": 46961,
-        "target": 50000,
-        "feasible": true,
-        "damage": null,
-        "note": "clean, all-in $11,979 \u2014 ready to drive, under $50k"
-      }
-    },
-    "project_tier": "clean"
-  },
-  {
     "source": "cars_and_bids",
     "source_url": "https://carsandbids.com/auctions/rNk5Jn4b/2016-porsche-cayenne-turbo-s",
     "listing_id": "2016-porsche-cayenne-turbo-s",
@@ -2860,7 +2938,7 @@
     "model": null,
     "trim": null,
     "price_usd": null,
-    "current_bid_usd": 11000.0,
+    "current_bid_usd": 11100.0,
     "mileage": null,
     "location": "Jacksonville, OR 97530",
     "seller_type": "auction",
@@ -2870,21 +2948,21 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.429840Z",
+    "first_seen": "2026-08-29T14:14:03.013597Z",
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 24290,
-        "est_recon": 486,
-        "est_fees": 550,
-        "all_in": 12036,
-        "resale_value": 24290,
-        "est_margin": 12254,
-        "max_bid_target": 47156,
+        "est_clean_value": 23790,
+        "est_recon": 476,
+        "est_fees": 555,
+        "all_in": 12131,
+        "resale_value": 23790,
+        "est_margin": 11659,
+        "max_bid_target": 47166,
         "target": 50000,
         "feasible": true,
         "damage": null,
-        "note": "clean, all-in $12,036 \u2014 ready to drive, under $50k"
+        "note": "clean, all-in $12,131 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -2909,7 +2987,7 @@
     "vin": "WP1AE2A24HL******",
     "lot_number": "64015166",
     "sale_date": "2026-09-01T01:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425807Z",
+    "first_seen": "2026-08-29T14:14:03.008924Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -2918,17 +2996,17 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 24590,
-        "est_recon": 1967,
+        "est_clean_value": 24290,
+        "est_recon": 1943,
         "est_fees": 2344,
-        "all_in": 15511,
-        "resale_value": 17705,
-        "est_margin": 2194,
-        "max_bid_target": 41994,
+        "all_in": 15487,
+        "resale_value": 17489,
+        "est_margin": 2002,
+        "max_bid_target": 42015,
         "target": 50000,
         "feasible": false,
         "damage": "Minor Dent/Scratches",
-        "note": "Minor Dent/Scratches \u2014 project: all-in $15,511 vs $17,705 fixed value \u2014 too thin to be worth the work"
+        "note": "Minor Dent/Scratches \u2014 project: all-in $15,487 vs $17,489 fixed value \u2014 too thin to be worth the work"
       }
     },
     "project_tier": "clean"
@@ -2953,7 +3031,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421147Z",
+    "first_seen": "2026-08-29T14:14:03.003849Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -2992,7 +3070,7 @@
     "vin": "WP0CA2A90HS******",
     "lot_number": "46372396",
     "sale_date": "2026-09-10T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.422939Z",
+    "first_seen": "2026-08-29T14:14:03.005678Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -3036,7 +3114,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.429713Z",
+    "first_seen": "2026-08-29T14:14:03.013427Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -3075,7 +3153,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419267Z",
+    "first_seen": "2026-08-29T14:14:03.002949Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -3114,7 +3192,7 @@
     "vin": "WP0AA2A91KS******",
     "lot_number": "62106606",
     "sale_date": "2026-09-01T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.422825Z",
+    "first_seen": "2026-08-29T14:14:03.005521Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -3199,7 +3277,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430030Z",
+    "first_seen": "2026-08-29T14:14:03.013762Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -3277,7 +3355,7 @@
     "vin": "WP1AA2AY4ND******",
     "lot_number": "59947066",
     "sale_date": "2026-09-01T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425912Z",
+    "first_seen": "2026-08-29T14:14:03.009063Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -3322,7 +3400,7 @@
     "vin": "WP1AA2AY2KD******",
     "lot_number": "65366766",
     "sale_date": "2026-09-01T01:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425760Z",
+    "first_seen": "2026-08-29T14:14:03.008856Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -3331,17 +3409,17 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 33990,
-        "est_recon": 31271,
+        "est_clean_value": 34990,
+        "est_recon": 32191,
         "est_fees": 2704,
-        "all_in": 48175,
-        "resale_value": 24473,
-        "est_margin": -23702,
-        "max_bid_target": 15829,
+        "all_in": 49095,
+        "resale_value": 25193,
+        "est_margin": -23902,
+        "max_bid_target": 15008,
         "target": 50000,
         "feasible": false,
         "damage": "Burn - Interior",
-        "note": "Burn - Interior \u2014 project: all-in $48,175 vs $24,473 fixed value \u2014 too thin to be worth the work"
+        "note": "Burn - Interior \u2014 project: all-in $49,095 vs $25,193 fixed value \u2014 too thin to be worth the work"
       }
     },
     "project_tier": "salvage"
@@ -3366,7 +3444,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419535Z",
+    "first_seen": "2026-08-29T14:14:03.003274Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -3405,7 +3483,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419631Z",
+    "first_seen": "2026-08-29T14:14:03.003381Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -3444,7 +3522,7 @@
     "vin": "WP1BG2AY4PD******",
     "lot_number": "52490166",
     "sale_date": "2026-09-01T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426139Z",
+    "first_seen": "2026-08-29T14:14:03.009361Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -3489,7 +3567,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421242Z",
+    "first_seen": "2026-08-29T14:14:03.003968Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -3528,7 +3606,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419370Z",
+    "first_seen": "2026-08-29T14:14:03.003072Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -3567,7 +3645,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419690Z",
+    "first_seen": "2026-08-29T14:14:03.003455Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -3606,7 +3684,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.429825Z",
+    "first_seen": "2026-08-29T14:14:03.013574Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -3665,6 +3743,45 @@
     "project_tier": "clean"
   },
   {
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2003-porsche-911-carrera-cabriolet-107/",
+    "listing_id": "2003-porsche-911-carrera-cabriolet-107",
+    "title": "40k-Mile 2003 Porsche 911 Carrera Cabriolet 6-Speed",
+    "year": 2003,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 17246.0,
+    "mileage": null,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/08/IMG-6125-scaled-89334.jpg?w=470&h=318&crop=1",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-08-29T14:14:03.002659Z",
+    "raw": {
+      "sf_csv": true,
+      "deal": {
+        "est_clean_value": 32400,
+        "est_recon": 648,
+        "est_fees": 862,
+        "all_in": 18756,
+        "resale_value": 32400,
+        "est_margin": 13644,
+        "max_bid_target": 47002,
+        "target": 50000,
+        "feasible": true,
+        "damage": null,
+        "note": "clean, all-in $18,756 \u2014 ready to drive, under $50k"
+      }
+    },
+    "project_tier": "clean"
+  },
+  {
     "source": "copart",
     "source_url": "https://www.copart.com/lot/61449526",
     "listing_id": "WP1AA2AYXKD******",
@@ -3684,7 +3801,7 @@
     "vin": "WP1AA2AYXKD******",
     "lot_number": "61449526",
     "sale_date": "2026-09-01T01:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425842Z",
+    "first_seen": "2026-08-29T14:14:03.008974Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -3693,56 +3810,17 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 33990,
-        "est_recon": 2719,
+        "est_clean_value": 34990,
+        "est_recon": 2799,
         "est_fees": 3088,
-        "all_in": 23207,
-        "resale_value": 24473,
-        "est_margin": 1266,
-        "max_bid_target": 41322,
+        "all_in": 23287,
+        "resale_value": 25193,
+        "est_margin": 1906,
+        "max_bid_target": 41251,
         "target": 50000,
         "feasible": false,
         "damage": "Minor Dent/Scratches",
-        "note": "Minor Dent/Scratches \u2014 project: all-in $23,207 vs $24,473 fixed value \u2014 too thin to be worth the work"
-      }
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2001-porsche-911-carrera-cabriolet-139/",
-    "listing_id": "2001-porsche-911-carrera-cabriolet-139",
-    "title": "27k-Mile 2001 Porsche 911 Carrera Cabriolet 6-Speed",
-    "year": 2001,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 17777.0,
-    "mileage": 27000,
-    "location": null,
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/08/DSC00931-scaled-copy-2026-08-25-yvr-75993.jpg?w=470&h=318&crop=1",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421661Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 28800,
-        "est_recon": 576,
-        "est_fees": 889,
-        "all_in": 19242,
-        "resale_value": 28800,
-        "est_margin": 9558,
-        "max_bid_target": 47070,
-        "target": 50000,
-        "feasible": true,
-        "damage": null,
-        "note": "clean, all-in $19,242 \u2014 ready to drive, under $50k"
+        "note": "Minor Dent/Scratches \u2014 project: all-in $23,287 vs $25,193 fixed value \u2014 too thin to be worth the work"
       }
     },
     "project_tier": "clean"
@@ -3767,7 +3845,7 @@
     "vin": "WP1AB2AY2KD******",
     "lot_number": "64361526",
     "sale_date": "2026-09-01T01:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425776Z",
+    "first_seen": "2026-08-29T14:14:03.008877Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -3777,56 +3855,17 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 33990,
-        "est_recon": 8837,
+        "est_clean_value": 34990,
+        "est_recon": 9097,
         "est_fees": 3136,
-        "all_in": 29773,
-        "resale_value": 24473,
-        "est_margin": -5300,
-        "max_bid_target": 35860,
+        "all_in": 30033,
+        "resale_value": 25193,
+        "est_margin": -4840,
+        "max_bid_target": 35628,
         "target": 50000,
         "feasible": false,
         "damage": "Side + Minor Dent/Scratches",
-        "note": "Side + Minor Dent/Scratches \u2014 project: all-in $29,773 vs $24,473 fixed value \u2014 too thin to be worth the work"
-      }
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2003-porsche-911-carrera-cabriolet-107/",
-    "listing_id": "2003-porsche-911-carrera-cabriolet-107",
-    "title": "40k-Mile 2003 Porsche 911 Carrera Cabriolet 6-Speed",
-    "year": 2003,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 17996.0,
-    "mileage": null,
-    "location": null,
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/08/IMG-6125-scaled-89334.jpg?w=470&h=318&crop=1",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.418997Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 32400,
-        "est_recon": 648,
-        "est_fees": 900,
-        "all_in": 19544,
-        "resale_value": 32400,
-        "est_margin": 12856,
-        "max_bid_target": 47002,
-        "target": 50000,
-        "feasible": true,
-        "damage": null,
-        "note": "clean, all-in $19,544 \u2014 ready to drive, under $50k"
+        "note": "Side + Minor Dent/Scratches \u2014 project: all-in $30,033 vs $25,193 fixed value \u2014 too thin to be worth the work"
       }
     },
     "project_tier": "clean"
@@ -3851,7 +3890,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.418979Z",
+    "first_seen": "2026-08-29T14:14:03.002639Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -3890,7 +3929,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419058Z",
+    "first_seen": "2026-08-29T14:14:03.002720Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -3929,7 +3968,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421600Z",
+    "first_seen": "2026-08-29T14:14:03.004378Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -3968,7 +4007,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.429811Z",
+    "first_seen": "2026-08-29T14:14:03.013557Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -4007,7 +4046,7 @@
     "vin": "WP1AE2AY4KD******",
     "lot_number": "54117146",
     "sale_date": "2026-09-02T01:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426258Z",
+    "first_seen": "2026-08-29T14:14:03.009515Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -4017,17 +4056,17 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 33990,
-        "est_recon": 4759,
+        "est_clean_value": 34990,
+        "est_recon": 4899,
         "est_fees": 3280,
-        "all_in": 27039,
-        "resale_value": 24473,
-        "est_margin": -2566,
-        "max_bid_target": 39501,
+        "all_in": 27179,
+        "resale_value": 25193,
+        "est_margin": -1986,
+        "max_bid_target": 39376,
         "target": 50000,
         "feasible": false,
         "damage": "Minor Dent/Scratches + Mechanical",
-        "note": "Minor Dent/Scratches + Mechanical \u2014 project: all-in $27,039 vs $24,473 fixed value \u2014 too thin to be worth the work"
+        "note": "Minor Dent/Scratches + Mechanical \u2014 project: all-in $27,179 vs $25,193 fixed value \u2014 too thin to be worth the work"
       }
     },
     "project_tier": "clean"
@@ -4052,7 +4091,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.429856Z",
+    "first_seen": "2026-08-29T14:14:03.013615Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -4091,7 +4130,7 @@
     "vin": "WP1AA2AY3KD******",
     "lot_number": "64147776",
     "sale_date": "2026-09-01T01:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425791Z",
+    "first_seen": "2026-08-29T14:14:03.008896Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -4100,17 +4139,17 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 33990,
-        "est_recon": 2719,
+        "est_clean_value": 34990,
+        "est_recon": 2799,
         "est_fees": 3388,
-        "all_in": 26007,
-        "resale_value": 24473,
-        "est_margin": -1534,
-        "max_bid_target": 41322,
+        "all_in": 26087,
+        "resale_value": 25193,
+        "est_margin": -894,
+        "max_bid_target": 41251,
         "target": 50000,
         "feasible": false,
         "damage": "Minor Dent/Scratches",
-        "note": "Minor Dent/Scratches \u2014 project: all-in $26,007 vs $24,473 fixed value \u2014 too thin to be worth the work"
+        "note": "Minor Dent/Scratches \u2014 project: all-in $26,087 vs $25,193 fixed value \u2014 too thin to be worth the work"
       }
     },
     "project_tier": "clean"
@@ -4135,7 +4174,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421372Z",
+    "first_seen": "2026-08-29T14:14:03.004128Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -4174,7 +4213,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421760Z",
+    "first_seen": "2026-08-29T14:14:03.004712Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -4213,7 +4252,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.429984Z",
+    "first_seen": "2026-08-29T14:14:03.013703Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -4291,7 +4330,7 @@
     "vin": "WP1AB2AY1KD******",
     "lot_number": "63194546",
     "sale_date": "2026-09-02T01:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426239Z",
+    "first_seen": "2026-08-29T14:14:03.009494Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -4300,17 +4339,17 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 33990,
-        "est_recon": 2719,
+        "est_clean_value": 34990,
+        "est_recon": 2799,
         "est_fees": 3424,
-        "all_in": 26343,
-        "resale_value": 24473,
-        "est_margin": -1870,
-        "max_bid_target": 41322,
+        "all_in": 26423,
+        "resale_value": 25193,
+        "est_margin": -1230,
+        "max_bid_target": 41251,
         "target": 50000,
         "feasible": false,
         "damage": "Minor Dent/Scratches",
-        "note": "Minor Dent/Scratches \u2014 project: all-in $26,343 vs $24,473 fixed value \u2014 too thin to be worth the work"
+        "note": "Minor Dent/Scratches \u2014 project: all-in $26,423 vs $25,193 fixed value \u2014 too thin to be worth the work"
       }
     },
     "project_tier": "clean"
@@ -4335,7 +4374,7 @@
     "vin": "WP1AE2AY5KD******",
     "lot_number": "67020826",
     "sale_date": "2026-09-02T01:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426207Z",
+    "first_seen": "2026-08-29T14:14:03.009453Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -4345,17 +4384,17 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 33990,
-        "est_recon": 2719,
+        "est_clean_value": 34990,
+        "est_recon": 2799,
         "est_fees": 3508,
-        "all_in": 27127,
-        "resale_value": 24473,
-        "est_margin": -2654,
-        "max_bid_target": 41322,
+        "all_in": 27207,
+        "resale_value": 25193,
+        "est_margin": -2014,
+        "max_bid_target": 41251,
         "target": 50000,
         "feasible": false,
         "damage": "Minor Dent/Scratches + Normal Wear",
-        "note": "Minor Dent/Scratches + Normal Wear \u2014 project: all-in $27,127 vs $24,473 fixed value \u2014 too thin to be worth the work"
+        "note": "Minor Dent/Scratches + Normal Wear \u2014 project: all-in $27,207 vs $25,193 fixed value \u2014 too thin to be worth the work"
       }
     },
     "project_tier": "clean"
@@ -4380,7 +4419,7 @@
     "vin": "WP1AA2AY2MD******",
     "lot_number": "63620316",
     "sale_date": "2026-09-02T01:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426223Z",
+    "first_seen": "2026-08-29T14:14:03.009475Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -4415,7 +4454,7 @@
     "model": null,
     "trim": null,
     "price_usd": null,
-    "current_bid_usd": 21500.0,
+    "current_bid_usd": 21050.0,
     "mileage": null,
     "location": null,
     "seller_type": "auction",
@@ -4425,21 +4464,21 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419879Z",
+    "first_seen": "2026-08-29T14:14:03.003575Z",
     "raw": {
       "sf_csv": true,
       "deal": {
         "est_clean_value": 41400,
         "est_recon": 828,
-        "est_fees": 1075,
-        "all_in": 23403,
+        "est_fees": 1052,
+        "all_in": 22930,
         "resale_value": 41400,
-        "est_margin": 17997,
+        "est_margin": 18470,
         "max_bid_target": 46830,
         "target": 50000,
         "feasible": true,
         "damage": null,
-        "note": "clean, all-in $23,403 \u2014 ready to drive, under $50k"
+        "note": "clean, all-in $22,930 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -4460,11 +4499,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/3006342229/post-large/normalized/zoomcrop/3006342229-edc-02.jpg?v=2026.8.29_13.15.39",
+    "photo_url": "https://cdnblob.fastly.carvana.io/3006342229/post-large/normalized/zoomcrop/3006342229-edc-02.jpg?v=2026.8.29_14.11.48",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430309Z",
+    "first_seen": "2026-08-29T14:14:03.013965Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -4479,6 +4518,45 @@
         "feasible": true,
         "damage": null,
         "note": "clean, all-in $24,042 \u2014 ready to drive, under $50k"
+      }
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "carvana",
+    "source_url": "https://www.carvana.com/vehicle/4652375",
+    "listing_id": "4652375",
+    "title": "2016 Porsche Cayenne",
+    "year": 2016,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": 22990.0,
+    "current_bid_usd": null,
+    "mileage": null,
+    "location": null,
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://cdnblob.fastly.carvana.io/3006413093/post-large/normalized/zoomcrop/3006413093-edc-02.jpg?v=2026.8.29_14.12.32",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-08-29T14:14:03.014276Z",
+    "raw": {
+      "sf_csv": true,
+      "deal": {
+        "est_clean_value": 22990,
+        "est_recon": 460,
+        "est_fees": 1000,
+        "all_in": 24450,
+        "resale_value": 22990,
+        "est_margin": -1460,
+        "max_bid_target": 48540,
+        "target": 50000,
+        "feasible": true,
+        "damage": null,
+        "note": "clean, all-in $24,450 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -4542,7 +4620,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421322Z",
+    "first_seen": "2026-08-29T14:14:03.004067Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -4557,45 +4635,6 @@
         "feasible": true,
         "damage": null,
         "note": "clean, all-in $25,033 \u2014 ready to drive, under $50k"
-      }
-    },
-    "project_tier": "clean"
-  },
-  {
-    "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2023-porsche-911-targa-4s-16/",
-    "listing_id": "2023-porsche-911-targa-4s-16",
-    "title": "6k-Mile 2023 Porsche 911 Targa 4S 7-Speed",
-    "year": 2023,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 23000.0,
-    "mileage": null,
-    "location": null,
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/2023_porsche_911-targa-4s_2023_porsche_911-targa-4s_53c8bd55-733a-448b-9bb2-7070a6158c3b-slySmN-42355-42356-scaled.jpg?w=470&h=318&crop=1",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421900Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 106400,
-        "est_recon": 2128,
-        "est_fees": 1150,
-        "all_in": 26278,
-        "resale_value": 106400,
-        "est_margin": 80122,
-        "max_bid_target": 45592,
-        "target": 50000,
-        "feasible": true,
-        "damage": null,
-        "note": "clean, all-in $26,278 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -4616,11 +4655,50 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/2004809411/post-large/normalized/zoomcrop/2004809411-edc-02.jpg?v=2026.8.29_13.15.39",
+    "photo_url": "https://cdnblob.fastly.carvana.io/2004809411/post-large/normalized/zoomcrop/2004809411-edc-02.jpg?v=2026.8.29_14.11.48",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430268Z",
+    "first_seen": "2026-08-29T14:14:03.013866Z",
+    "raw": {
+      "sf_csv": true,
+      "deal": {
+        "est_clean_value": 23590,
+        "est_recon": 472,
+        "est_fees": 1000,
+        "all_in": 25062,
+        "resale_value": 23590,
+        "est_margin": -1472,
+        "max_bid_target": 48528,
+        "target": 50000,
+        "feasible": true,
+        "damage": null,
+        "note": "clean, all-in $25,062 \u2014 ready to drive, under $50k"
+      }
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "carvana",
+    "source_url": "https://www.carvana.com/vehicle/4543474",
+    "listing_id": "4543474",
+    "title": "2017 Porsche Cayenne",
+    "year": 2017,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": 23590.0,
+    "current_bid_usd": null,
+    "mileage": null,
+    "location": null,
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://cdnblob.fastly.carvana.io/2005038559/post-large/normalized/zoomcrop/2005038559-edc-02.jpg?v=2026.8.29_14.12.18",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-08-29T14:14:03.014193Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -4655,11 +4733,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/2005074454/post-large/normalized/zoomcrop/2005074454-edc-02.jpg?v=2026.8.29_13.24.3",
+    "photo_url": "https://cdnblob.fastly.carvana.io/2005074454/post-large/normalized/zoomcrop/2005074454-edc-02.jpg?v=2026.8.29_14.12.32",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430536Z",
+    "first_seen": "2026-08-29T14:14:03.014261Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -4733,11 +4811,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/3006369860/post-large/normalized/zoomcrop/3006369860-edc-02.jpg?v=2026.8.29_13.24.16",
+    "photo_url": "https://cdnblob.fastly.carvana.io/3006369860/post-large/normalized/zoomcrop/3006369860-edc-02.jpg?v=2026.8.29_14.12.47",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430643Z",
+    "first_seen": "2026-08-29T14:14:03.014488Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -4772,11 +4850,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/2004978146/post-large/normalized/zoomcrop/2004978146-edc-02.jpg?v=2026.8.29_13.18.27",
+    "photo_url": "https://cdnblob.fastly.carvana.io/2004978146/post-large/normalized/zoomcrop/2004978146-edc-02.jpg?v=2026.8.29_14.12.3",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430417Z",
+    "first_seen": "2026-08-29T14:14:03.014036Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -4811,11 +4889,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/3006419004/post-large/normalized/zoomcrop/3006419004-edc-02.jpg?v=2026.8.29_13.15.39",
+    "photo_url": "https://cdnblob.fastly.carvana.io/3006419004/post-large/normalized/zoomcrop/3006419004-edc-02.jpg?v=2026.8.29_14.11.48",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430391Z",
+    "first_seen": "2026-08-29T14:14:03.014019Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -4850,11 +4928,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/2005093387/post-large/normalized/zoomcrop/2005093387-edc-02.jpg?v=2026.8.29_13.27.4",
+    "photo_url": "https://cdnblob.fastly.carvana.io/2005093387/post-large/normalized/zoomcrop/2005093387-edc-02.jpg?v=2026.8.29_14.13.1",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430777Z",
+    "first_seen": "2026-08-29T14:14:03.014699Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -4893,7 +4971,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419500Z",
+    "first_seen": "2026-08-29T14:14:03.003216Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -4928,11 +5006,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/2004741945/post-large/normalized/zoomcrop/2004741945-edc-02.jpg?v=2026.8.29_13.21.13",
+    "photo_url": "https://cdnblob.fastly.carvana.io/2004741945/post-large/normalized/zoomcrop/2004741945-edc-02.jpg?v=2026.8.29_14.12.18",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430470Z",
+    "first_seen": "2026-08-29T14:14:03.014109Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -4971,7 +5049,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419469Z",
+    "first_seen": "2026-08-29T14:14:03.003182Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5010,7 +5088,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419616Z",
+    "first_seen": "2026-08-29T14:14:03.003361Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5045,11 +5123,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/2004933873/post-large/normalized/zoomcrop/2004933873-edc-02.jpg?v=2026.8.29_13.24.16",
+    "photo_url": "https://cdnblob.fastly.carvana.io/2004933873/post-large/normalized/zoomcrop/2004933873-edc-02.jpg?v=2026.8.29_14.12.47",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430681Z",
+    "first_seen": "2026-08-29T14:14:03.014472Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5123,11 +5201,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/3006347406/post-large/normalized/zoomcrop/3006347406-edc-02.jpg?v=2026.8.29_13.18.27",
+    "photo_url": "https://cdnblob.fastly.carvana.io/3006347406/post-large/normalized/zoomcrop/3006347406-edc-02.jpg?v=2026.8.29_14.11.48",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430404Z",
+    "first_seen": "2026-08-29T14:14:03.013981Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5162,11 +5240,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/2004759379/post-large/normalized/zoomcrop/2004759379-edc-02.jpg?v=2026.8.29_13.15.39",
+    "photo_url": "https://cdnblob.fastly.carvana.io/2004759379/post-large/normalized/zoomcrop/2004759379-edc-02.jpg?v=2026.8.29_14.11.48",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430352Z",
+    "first_seen": "2026-08-29T14:14:03.013928Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5244,7 +5322,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.422081Z",
+    "first_seen": "2026-08-29T14:14:03.005156Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5283,7 +5361,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421730Z",
+    "first_seen": "2026-08-29T14:14:03.004669Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5357,11 +5435,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/2005136837/post-large/normalized/zoomcrop/2005136837-edc-02.jpg?v=2026.8.29_13.24.16",
+    "photo_url": "https://cdnblob.fastly.carvana.io/2005136837/post-large/normalized/zoomcrop/2005136837-edc-02.jpg?v=2026.8.29_14.12.47",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430669Z",
+    "first_seen": "2026-08-29T14:14:03.014513Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5435,11 +5513,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/2004993520/post-large/normalized/zoomcrop/2004993520-edc-02.jpg?v=2026.8.29_13.24.3",
+    "photo_url": "https://cdnblob.fastly.carvana.io/2004993520/post-large/normalized/zoomcrop/2004993520-edc-02.jpg?v=2026.8.29_14.13.1",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430616Z",
+    "first_seen": "2026-08-29T14:14:03.014641Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5478,7 +5556,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421386Z",
+    "first_seen": "2026-08-29T14:14:03.004145Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5517,7 +5595,7 @@
     "vin": "WP1AF2AY7LD******",
     "lot_number": "62445706",
     "sale_date": "2026-09-01T01:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425824Z",
+    "first_seen": "2026-08-29T14:14:03.008944Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -5557,11 +5635,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/2004899855/post-large/normalized/zoomcrop/2004899855-edc-02.jpg?v=2026.8.29_13.21.13",
+    "photo_url": "https://cdnblob.fastly.carvana.io/2004899855/post-large/normalized/zoomcrop/2004899855-edc-02.jpg?v=2026.8.29_14.12.18",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430445Z",
+    "first_seen": "2026-08-29T14:14:03.014052Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5600,7 +5678,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421629Z",
+    "first_seen": "2026-08-29T14:14:03.004417Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5635,11 +5713,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/3006497057/post-large/normalized/zoomcrop/3006497057-edc-02.jpg?v=2026.8.29_13.21.13",
+    "photo_url": "https://cdnblob.fastly.carvana.io/3006497057/post-large/normalized/zoomcrop/3006497057-edc-02.jpg?v=2026.8.29_14.12.18",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430457Z",
+    "first_seen": "2026-08-29T14:14:03.014069Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5654,6 +5732,45 @@
         "feasible": true,
         "damage": null,
         "note": "clean, all-in $37,710 \u2014 ready to drive, under $50k"
+      }
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2008-porsche-911-turbo-coupe-85/",
+    "listing_id": "2008-porsche-911-turbo-coupe-85",
+    "title": "2008 Porsche 911 Turbo Coupe 6-Speed",
+    "year": 2008,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 35997.0,
+    "mileage": null,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/06/2008_porsche_911-turbo-coupe_2008_porsche_911-turbo-coupe_827cacff-2c14-433c-909d-053f9d25e9e4-jYy3gm-44544-44545-scaled-1-copy-2026-07-28-k5j-66032.jpg?w=470&h=318&crop=1",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-08-29T14:14:03.004889Z",
+    "raw": {
+      "sf_csv": true,
+      "deal": {
+        "est_clean_value": 41400,
+        "est_recon": 828,
+        "est_fees": 1800,
+        "all_in": 38625,
+        "resale_value": 41400,
+        "est_margin": 2775,
+        "max_bid_target": 46830,
+        "target": 50000,
+        "feasible": true,
+        "damage": null,
+        "note": "clean, all-in $38,625 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -5674,11 +5791,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/3006436632/post-large/normalized/zoomcrop/3006436632-edc-02.jpg?v=2026.8.29_13.21.13",
+    "photo_url": "https://cdnblob.fastly.carvana.io/3006436632/post-large/normalized/zoomcrop/3006436632-edc-02.jpg?v=2026.8.29_14.12.18",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430483Z",
+    "first_seen": "2026-08-29T14:14:03.014125Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5693,6 +5810,45 @@
         "feasible": true,
         "damage": null,
         "note": "clean, all-in $38,322 \u2014 ready to drive, under $50k"
+      }
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "carvana",
+    "source_url": "https://www.carvana.com/vehicle/4537098",
+    "listing_id": "4537098",
+    "title": "2019 Porsche Cayenne",
+    "year": 2019,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": 36990.0,
+    "current_bid_usd": null,
+    "mileage": null,
+    "location": null,
+    "seller_type": "dealer",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://cdnblob.fastly.carvana.io/2004809823/post-large/normalized/zoomcrop/2004809823-edc-02.jpg?v=2026.8.29_14.12.32",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-08-29T14:14:03.014312Z",
+    "raw": {
+      "sf_csv": true,
+      "deal": {
+        "est_clean_value": 36990,
+        "est_recon": 740,
+        "est_fees": 1000,
+        "all_in": 38730,
+        "resale_value": 36990,
+        "est_margin": -1740,
+        "max_bid_target": 48260,
+        "target": 50000,
+        "feasible": true,
+        "damage": null,
+        "note": "clean, all-in $38,730 \u2014 ready to drive, under $50k"
       }
     },
     "project_tier": "clean"
@@ -5752,11 +5908,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/3006375138/post-large/normalized/zoomcrop/3006375138-edc-02.jpg?v=2026.8.29_13.21.13",
+    "photo_url": "https://cdnblob.fastly.carvana.io/3006375138/post-large/normalized/zoomcrop/3006375138-edc-02.jpg?v=2026.8.29_14.12.18",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430496Z",
+    "first_seen": "2026-08-29T14:14:03.014143Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5834,7 +5990,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.419676Z",
+    "first_seen": "2026-08-29T14:14:03.003439Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5873,7 +6029,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.429761Z",
+    "first_seen": "2026-08-29T14:14:03.013491Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -5985,11 +6141,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/2005099628/post-large/normalized/zoomcrop/2005099628-edc-02.jpg?v=2026.8.29_13.15.39",
+    "photo_url": "https://cdnblob.fastly.carvana.io/2005099628/post-large/normalized/zoomcrop/2005099628-edc-02.jpg?v=2026.8.29_14.12.18",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430365Z",
+    "first_seen": "2026-08-29T14:14:03.014159Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -6067,7 +6223,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421824Z",
+    "first_seen": "2026-08-29T14:14:03.004803Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -6106,7 +6262,7 @@
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.429969Z",
+    "first_seen": "2026-08-29T14:14:03.013681Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -6219,11 +6375,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/2005108962/post-large/normalized/zoomcrop/2005108962-edc-02.jpg?v=2026.8.29_13.24.16",
+    "photo_url": "https://cdnblob.fastly.carvana.io/2005108962/post-large/normalized/zoomcrop/2005108962-edc-02.jpg?v=2026.8.29_14.12.32",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430656Z",
+    "first_seen": "2026-08-29T14:14:03.014401Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -6258,11 +6414,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/2005000802/post-large/normalized/zoomcrop/2005000802-edc-02.jpg?v=2026.8.29_13.24.3",
+    "photo_url": "https://cdnblob.fastly.carvana.io/2005000802/post-large/normalized/zoomcrop/2005000802-edc-02.jpg?v=2026.8.29_14.12.47",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430564Z",
+    "first_seen": "2026-08-29T14:14:03.014450Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -6360,6 +6516,45 @@
     "project_tier": "clean"
   },
   {
+    "source": "bring_a_trailer",
+    "source_url": "https://bringatrailer.com/listing/2023-porsche-taycan-gts-4/",
+    "listing_id": "2023-porsche-taycan-gts-4",
+    "title": "2023 Porsche Taycan GTS",
+    "year": 2023,
+    "make": "Porsche",
+    "model": null,
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": 42875.0,
+    "mileage": null,
+    "location": null,
+    "seller_type": "auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/08/edited-168-scaled-38597-1-copy-2026-08-26-gyu-13371.jpg?w=470&h=318&crop=1",
+    "vin": null,
+    "lot_number": null,
+    "sale_date": null,
+    "first_seen": "2026-08-29T14:14:03.004996Z",
+    "raw": {
+      "sf_csv": true,
+      "deal": {
+        "est_clean_value": 45837,
+        "est_recon": 917,
+        "est_fees": 2144,
+        "all_in": 45936,
+        "resale_value": 45837,
+        "est_margin": -99,
+        "max_bid_target": 46746,
+        "target": 50000,
+        "feasible": true,
+        "damage": null,
+        "note": "clean, all-in $45,936 \u2014 ready to drive, under $50k"
+      }
+    },
+    "project_tier": "clean"
+  },
+  {
     "source": "carvana",
     "source_url": "https://www.carvana.com/vehicle/4619955",
     "listing_id": "4619955",
@@ -6375,11 +6570,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/2005127402/post-large/normalized/zoomcrop/2005127402-edc-02.jpg?v=2026.8.29_13.27.4",
+    "photo_url": "https://cdnblob.fastly.carvana.io/2005127402/post-large/normalized/zoomcrop/2005127402-edc-02.jpg?v=2026.8.29_14.13.1",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430818Z",
+    "first_seen": "2026-08-29T14:14:03.014850Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -6414,11 +6609,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/3006506566/post-large/normalized/zoomcrop/3006506566-edc-02.jpg?v=2026.8.29_13.27.4",
+    "photo_url": "https://cdnblob.fastly.carvana.io/3006506566/post-large/normalized/zoomcrop/3006506566-edc-02.jpg?v=2026.8.29_14.13.1",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430739Z",
+    "first_seen": "2026-08-29T14:14:03.014661Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -6516,45 +6711,6 @@
     "project_tier": "clean"
   },
   {
-    "source": "bring_a_trailer",
-    "source_url": "https://bringatrailer.com/listing/2023-porsche-taycan-gts-4/",
-    "listing_id": "2023-porsche-taycan-gts-4",
-    "title": "2023 Porsche Taycan GTS",
-    "year": 2023,
-    "make": "Porsche",
-    "model": null,
-    "trim": null,
-    "price_usd": null,
-    "current_bid_usd": 45000.0,
-    "mileage": null,
-    "location": null,
-    "seller_type": "auction",
-    "title_status": "unknown",
-    "drivable": null,
-    "photo_url": "https://bringatrailer.com/wp-content/uploads/2026/08/edited-168-scaled-38597-1-copy-2026-08-26-gyu-13371.jpg?w=470&h=318&crop=1",
-    "vin": null,
-    "lot_number": null,
-    "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.421976Z",
-    "raw": {
-      "sf_csv": true,
-      "deal": {
-        "est_clean_value": 45837,
-        "est_recon": 917,
-        "est_fees": 2250,
-        "all_in": 48167,
-        "resale_value": 45837,
-        "est_margin": -2330,
-        "max_bid_target": 46746,
-        "target": 50000,
-        "feasible": true,
-        "damage": null,
-        "note": "clean, all-in $48,167 \u2014 ready to drive, under $50k"
-      }
-    },
-    "project_tier": "clean"
-  },
-  {
     "source": "carfax",
     "source_url": "https://www.carfax.com/vehicle/WP1AA2AY1NDA03313",
     "listing_id": "WP1AA2AY1NDA03313",
@@ -6574,7 +6730,7 @@
     "vin": "WP1AA2AY1NDA03313",
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.433436Z",
+    "first_seen": "2026-08-29T14:14:03.015038Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -6648,11 +6804,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/3006456646/post-large/normalized/zoomcrop/3006456646-edc-02.jpg?v=2026.8.29_13.15.39",
+    "photo_url": "https://cdnblob.fastly.carvana.io/3006456646/post-large/normalized/zoomcrop/3006456646-edc-02.jpg?v=2026.8.29_14.11.48",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430378Z",
+    "first_seen": "2026-08-29T14:14:03.013947Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -6687,11 +6843,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/2005082613/post-large/normalized/zoomcrop/2005082613-edc-02.jpg?v=2026.8.29_13.21.13",
+    "photo_url": "https://cdnblob.fastly.carvana.io/2005082613/post-large/normalized/zoomcrop/2005082613-edc-02.jpg?v=2026.8.29_14.12.18",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430431Z",
+    "first_seen": "2026-08-29T14:14:03.014177Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -6726,11 +6882,11 @@
     "seller_type": "dealer",
     "title_status": "unknown",
     "drivable": null,
-    "photo_url": "https://cdnblob.fastly.carvana.io/3006407877/post-large/normalized/zoomcrop/3006407877-edc-02.jpg?v=2026.8.29_13.27.4",
+    "photo_url": "https://cdnblob.fastly.carvana.io/3006407877/post-large/normalized/zoomcrop/3006407877-edc-02.jpg?v=2026.8.29_14.13.1",
     "vin": null,
     "lot_number": null,
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.430789Z",
+    "first_seen": "2026-08-29T14:14:03.014715Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -6769,7 +6925,7 @@
     "vin": "WP0AF2A95SS******",
     "lot_number": "64671446",
     "sale_date": "2026-08-31T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.422703Z",
+    "first_seen": "2026-08-29T14:14:03.005338Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -6814,7 +6970,7 @@
     "vin": "WP0AD2A98NS******",
     "lot_number": "78606545",
     "sale_date": "2026-08-31T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.422722Z",
+    "first_seen": "2026-08-29T14:14:03.005375Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -6859,7 +7015,7 @@
     "vin": "WP0CA2A94HS******",
     "lot_number": "49285266",
     "sale_date": "2026-09-01T18:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.422794Z",
+    "first_seen": "2026-08-29T14:14:03.005477Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -6904,7 +7060,7 @@
     "vin": "WP0AD2A91JS******",
     "lot_number": "65360816",
     "sale_date": "2026-09-01T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.422810Z",
+    "first_seen": "2026-08-29T14:14:03.005496Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -6948,7 +7104,7 @@
     "vin": "WP0AA2A97RS******",
     "lot_number": "64443296",
     "sale_date": "2026-09-28T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.422953Z",
+    "first_seen": "2026-08-29T14:14:03.005700Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -6994,7 +7150,7 @@
     "vin": "WP0BB2A98MS******",
     "lot_number": "59235026",
     "sale_date": "2026-09-29T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.422966Z",
+    "first_seen": "2026-08-29T14:14:03.005717Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7039,7 +7195,7 @@
     "vin": "WP1AA2A25JK******",
     "lot_number": "62249576",
     "sale_date": "2026-08-31T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425495Z",
+    "first_seen": "2026-08-29T14:14:03.008498Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7084,7 +7240,7 @@
     "vin": "WP1AA2AY4PD******",
     "lot_number": "53221536",
     "sale_date": "2026-08-31T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425511Z",
+    "first_seen": "2026-08-29T14:14:03.008522Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7129,7 +7285,7 @@
     "vin": "WP1AL2AY8RD******",
     "lot_number": "59127306",
     "sale_date": "2026-08-31T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425543Z",
+    "first_seen": "2026-08-29T14:14:03.008564Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7174,7 +7330,7 @@
     "vin": "WP1AB2A26GL******",
     "lot_number": "58971536",
     "sale_date": "2026-08-31T18:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425605Z",
+    "first_seen": "2026-08-29T14:14:03.008650Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7219,7 +7375,7 @@
     "vin": "WP1AA2AYXKD******",
     "lot_number": "63248086",
     "sale_date": "2026-08-31T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425665Z",
+    "first_seen": "2026-08-29T14:14:03.008730Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7263,7 +7419,7 @@
     "vin": "WP1AA2AY6RD******",
     "lot_number": "60868736",
     "sale_date": "2026-08-31T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425710Z",
+    "first_seen": "2026-08-29T14:14:03.008793Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7309,7 +7465,7 @@
     "vin": "WP1AA2AY0KD******",
     "lot_number": "56408906",
     "sale_date": "2026-08-31T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425745Z",
+    "first_seen": "2026-08-29T14:14:03.008835Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7318,17 +7474,62 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 33990,
-        "est_recon": 2719,
+        "est_clean_value": 34990,
+        "est_recon": 2799,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 24473,
+        "resale_value": 25193,
         "est_margin": null,
-        "max_bid_target": 41322,
+        "max_bid_target": 41251,
         "target": 50000,
         "feasible": null,
         "damage": "Minor Dent/Scratches",
-        "note": "Minor Dent/Scratches \u2014 no price/bid yet \u2014 bid up to $41,322 to stay under $50k all-in"
+        "note": "Minor Dent/Scratches \u2014 no price/bid yet \u2014 bid up to $41,251 to stay under $50k all-in"
+      }
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/63948216",
+    "listing_id": "WP1AA2A21JK******",
+    "title": "2018 Porsche CAYENNE",
+    "year": 2018,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": null,
+    "mileage": null,
+    "location": "PA - HARRISBURG",
+    "seller_type": "salvage_auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0826/5fc66b25cc354dca8d65e94f2c65761a_thb.jpg",
+    "vin": "WP1AA2A21JK******",
+    "lot_number": "63948216",
+    "sale_date": "2026-09-01T14:00:00Z",
+    "first_seen": "2026-08-29T14:14:03.009043Z",
+    "raw": {
+      "sf_csv": true,
+      "damage": {
+        "primary": "FRONT END",
+        "secondary": "SIDE",
+        "retail": "-1.0",
+        "odo_status": "NOT ACTUAL"
+      },
+      "deal": {
+        "est_clean_value": 26090,
+        "est_recon": 9392,
+        "est_fees": 1000,
+        "all_in": null,
+        "resale_value": 18785,
+        "est_margin": null,
+        "max_bid_target": 35364,
+        "target": 50000,
+        "feasible": null,
+        "damage": "Front End + Side",
+        "note": "Front End + Side \u2014 no price/bid yet \u2014 bid up to $35,364 to stay under $50k all-in"
       }
     },
     "project_tier": "clean"
@@ -7353,7 +7554,7 @@
     "vin": "WP1AA2AY6KD******",
     "lot_number": "58133956",
     "sale_date": "2026-09-01T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425929Z",
+    "first_seen": "2026-08-29T14:14:03.009084Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7362,17 +7563,17 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 33990,
-        "est_recon": 6118,
+        "est_clean_value": 34990,
+        "est_recon": 6298,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 24473,
+        "resale_value": 25193,
         "est_margin": null,
-        "max_bid_target": 38287,
+        "max_bid_target": 38127,
         "target": 50000,
         "feasible": null,
         "damage": "Mechanical",
-        "note": "Mechanical \u2014 no price/bid yet \u2014 bid up to $38,287 to stay under $50k all-in"
+        "note": "Mechanical \u2014 no price/bid yet \u2014 bid up to $38,127 to stay under $50k all-in"
       }
     },
     "project_tier": "clean"
@@ -7397,7 +7598,7 @@
     "vin": "WP1AA2AY6KD******",
     "lot_number": "57435466",
     "sale_date": "2026-09-01T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425945Z",
+    "first_seen": "2026-08-29T14:14:03.009108Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7406,17 +7607,17 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 33990,
-        "est_recon": 2719,
+        "est_clean_value": 34990,
+        "est_recon": 2799,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 24473,
+        "resale_value": 25193,
         "est_margin": null,
-        "max_bid_target": 41322,
+        "max_bid_target": 41251,
         "target": 50000,
         "feasible": null,
         "damage": "Minor Dent/Scratches",
-        "note": "Minor Dent/Scratches \u2014 no price/bid yet \u2014 bid up to $41,322 to stay under $50k all-in"
+        "note": "Minor Dent/Scratches \u2014 no price/bid yet \u2014 bid up to $41,251 to stay under $50k all-in"
       }
     },
     "project_tier": "clean"
@@ -7441,7 +7642,7 @@
     "vin": "WP1AA2A28EL******",
     "lot_number": "55410396",
     "sale_date": "2026-09-01T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425960Z",
+    "first_seen": "2026-08-29T14:14:03.009128Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7485,7 +7686,7 @@
     "vin": "WP1AB2AY6MD******",
     "lot_number": "51492996",
     "sale_date": "2026-09-01T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.425975Z",
+    "first_seen": "2026-08-29T14:14:03.009149Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7531,7 +7732,7 @@
     "vin": "WP1AB2A24HL******",
     "lot_number": "66053426",
     "sale_date": "2026-09-01T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426009Z",
+    "first_seen": "2026-08-29T14:14:03.009189Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7540,17 +7741,17 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 24590,
-        "est_recon": 7377,
+        "est_clean_value": 24290,
+        "est_recon": 7287,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 17705,
+        "resale_value": 17489,
         "est_margin": null,
-        "max_bid_target": 37163,
+        "max_bid_target": 37244,
         "target": 50000,
         "feasible": null,
         "damage": "Front End",
-        "note": "Front End \u2014 no price/bid yet \u2014 bid up to $37,163 to stay under $50k all-in"
+        "note": "Front End \u2014 no price/bid yet \u2014 bid up to $37,244 to stay under $50k all-in"
       }
     },
     "project_tier": "clean"
@@ -7575,7 +7776,7 @@
     "vin": "WP1AB2A24FL******",
     "lot_number": "64072756",
     "sale_date": "2026-09-01T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426039Z",
+    "first_seen": "2026-08-29T14:14:03.009237Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7584,17 +7785,17 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 23590,
-        "est_recon": 1887,
+        "est_clean_value": 23290,
+        "est_recon": 1863,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 16985,
+        "resale_value": 16769,
         "est_margin": null,
-        "max_bid_target": 42065,
+        "max_bid_target": 42087,
         "target": 50000,
         "feasible": null,
         "damage": "Minor Dent/Scratches",
-        "note": "Minor Dent/Scratches \u2014 no price/bid yet \u2014 bid up to $42,065 to stay under $50k all-in"
+        "note": "Minor Dent/Scratches \u2014 no price/bid yet \u2014 bid up to $42,087 to stay under $50k all-in"
       }
     },
     "project_tier": "clean"
@@ -7619,7 +7820,7 @@
     "vin": "WP1AF2A24EL******",
     "lot_number": "61296436",
     "sale_date": "2026-09-01T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426054Z",
+    "first_seen": "2026-08-29T14:14:03.009275Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7664,7 +7865,7 @@
     "vin": "WP1AA2A27GL******",
     "lot_number": "59810816",
     "sale_date": "2026-09-01T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426067Z",
+    "first_seen": "2026-08-29T14:14:03.009300Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7709,7 +7910,7 @@
     "vin": "WP1AB2AY6MD******",
     "lot_number": "54450906",
     "sale_date": "2026-09-01T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426097Z",
+    "first_seen": "2026-08-29T14:14:03.009341Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7753,7 +7954,7 @@
     "vin": "WP1AE2A21FL******",
     "lot_number": "61881816",
     "sale_date": "2026-09-01T18:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426159Z",
+    "first_seen": "2026-08-29T14:14:03.009387Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7797,7 +7998,7 @@
     "vin": "WP1AA2A25GK******",
     "lot_number": "64563496",
     "sale_date": "2026-09-01T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426190Z",
+    "first_seen": "2026-08-29T14:14:03.009428Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7842,7 +8043,7 @@
     "vin": "WP1AA2A27GL******",
     "lot_number": "67047276",
     "sale_date": "2026-09-02T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426273Z",
+    "first_seen": "2026-08-29T14:14:03.009534Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7851,17 +8052,61 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 24290,
-        "est_recon": 1943,
+        "est_clean_value": 23790,
+        "est_recon": 1903,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 17489,
+        "resale_value": 17129,
         "est_margin": null,
-        "max_bid_target": 42015,
+        "max_bid_target": 42051,
         "target": 50000,
         "feasible": null,
         "damage": "Minor Dent/Scratches",
-        "note": "Minor Dent/Scratches \u2014 no price/bid yet \u2014 bid up to $42,015 to stay under $50k all-in"
+        "note": "Minor Dent/Scratches \u2014 no price/bid yet \u2014 bid up to $42,051 to stay under $50k all-in"
+      }
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/65942696",
+    "listing_id": "WP1AA2AY9KD******",
+    "title": "2019 Porsche CAYENNE",
+    "year": 2019,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": null,
+    "mileage": 123969,
+    "location": "MA - NORTH BOSTON",
+    "seller_type": "salvage_auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0826/848b3cf5d8a84c88a2e0c512f0c52210_thb.jpg",
+    "vin": "WP1AA2AY9KD******",
+    "lot_number": "65942696",
+    "sale_date": "2026-09-02T14:00:00Z",
+    "first_seen": "2026-08-29T14:14:03.009555Z",
+    "raw": {
+      "sf_csv": true,
+      "damage": {
+        "primary": "MINOR DENT/SCRATCHES",
+        "retail": "-1.0",
+        "odo_status": "ACTUAL"
+      },
+      "deal": {
+        "est_clean_value": 34990,
+        "est_recon": 2799,
+        "est_fees": 1000,
+        "all_in": null,
+        "resale_value": 25193,
+        "est_margin": null,
+        "max_bid_target": 41251,
+        "target": 50000,
+        "feasible": null,
+        "damage": "Minor Dent/Scratches",
+        "note": "Minor Dent/Scratches \u2014 no price/bid yet \u2014 bid up to $41,251 to stay under $50k all-in"
       }
     },
     "project_tier": "clean"
@@ -7886,7 +8131,7 @@
     "vin": "WP1AE2A27HL******",
     "lot_number": "61795916",
     "sale_date": "2026-09-02T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426370Z",
+    "first_seen": "2026-08-29T14:14:03.009664Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7930,7 +8175,7 @@
     "vin": "WP1AE2A26JL******",
     "lot_number": "60324996",
     "sale_date": "2026-09-02T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426386Z",
+    "first_seen": "2026-08-29T14:14:03.009688Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -7975,7 +8220,7 @@
     "vin": "WP1AA2A21GL******",
     "lot_number": "60274826",
     "sale_date": "2026-09-02T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426401Z",
+    "first_seen": "2026-08-29T14:14:03.009707Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8020,7 +8265,7 @@
     "vin": "WP1AA2A21GK******",
     "lot_number": "62438956",
     "sale_date": "2026-09-02T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426416Z",
+    "first_seen": "2026-08-29T14:14:03.009725Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8065,7 +8310,7 @@
     "vin": "WP1AA2A21GK******",
     "lot_number": "62507966",
     "sale_date": "2026-09-03T18:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426509Z",
+    "first_seen": "2026-08-29T14:14:03.009848Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8110,7 +8355,7 @@
     "vin": "WP1AA2A27EL******",
     "lot_number": "61362386",
     "sale_date": "2026-09-03T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426526Z",
+    "first_seen": "2026-08-29T14:14:03.009868Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8156,7 +8401,7 @@
     "vin": "WP1AA2AY4KD******",
     "lot_number": "46943776",
     "sale_date": "2026-09-03T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426540Z",
+    "first_seen": "2026-08-29T14:14:03.009891Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8165,17 +8410,61 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 33990,
-        "est_recon": 2039,
+        "est_clean_value": 34990,
+        "est_recon": 2099,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 24473,
+        "resale_value": 25193,
         "est_margin": null,
-        "max_bid_target": 41929,
+        "max_bid_target": 41876,
         "target": 50000,
         "feasible": null,
         "damage": "Normal Wear",
-        "note": "Normal Wear \u2014 no price/bid yet \u2014 bid up to $41,929 to stay under $50k all-in"
+        "note": "Normal Wear \u2014 no price/bid yet \u2014 bid up to $41,876 to stay under $50k all-in"
+      }
+    },
+    "project_tier": "clean"
+  },
+  {
+    "source": "copart",
+    "source_url": "https://www.copart.com/lot/66541996",
+    "listing_id": "WP1AA2A20GL******",
+    "title": "2016 Porsche CAYENNE",
+    "year": 2016,
+    "make": "Porsche",
+    "model": "CAYENNE",
+    "trim": null,
+    "price_usd": null,
+    "current_bid_usd": null,
+    "mileage": 184094,
+    "location": "CT - HARTFORD",
+    "seller_type": "salvage_auction",
+    "title_status": "unknown",
+    "drivable": null,
+    "photo_url": "https://cs.copart.com/v1/AUTH_svc.pdoc00001/lpp/0826/e71e6773e4974c64bb71e9b4659e5de1_thb.jpg",
+    "vin": "WP1AA2A20GL******",
+    "lot_number": "66541996",
+    "sale_date": "2026-09-04T14:00:00Z",
+    "first_seen": "2026-08-29T14:14:03.009935Z",
+    "raw": {
+      "sf_csv": true,
+      "damage": {
+        "primary": "MINOR DENT/SCRATCHES",
+        "retail": "14650.0",
+        "odo_status": "ACTUAL"
+      },
+      "deal": {
+        "est_clean_value": 14650,
+        "est_recon": 1172,
+        "est_fees": 1000,
+        "all_in": null,
+        "resale_value": 10548,
+        "est_margin": null,
+        "max_bid_target": 42704,
+        "target": 50000,
+        "feasible": null,
+        "damage": "Minor Dent/Scratches",
+        "note": "Minor Dent/Scratches \u2014 no price/bid yet \u2014 bid up to $42,704 to stay under $50k all-in"
       }
     },
     "project_tier": "clean"
@@ -8200,7 +8489,7 @@
     "vin": "WP1AA2AY2PD******",
     "lot_number": "59705146",
     "sale_date": "2026-09-04T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426604Z",
+    "first_seen": "2026-08-29T14:14:03.009977Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8245,7 +8534,7 @@
     "vin": "WP1AA2AY6LD******",
     "lot_number": "54627966",
     "sale_date": "2026-09-04T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426619Z",
+    "first_seen": "2026-08-29T14:14:03.009997Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8290,7 +8579,7 @@
     "vin": "WP1AE2A26GL******",
     "lot_number": "65480976",
     "sale_date": "2026-09-04T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426649Z",
+    "first_seen": "2026-08-29T14:14:03.010038Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8301,17 +8590,17 @@
         "odo_status": "ACTUAL"
       },
       "deal": {
-        "est_clean_value": 24290,
-        "est_recon": 7773,
+        "est_clean_value": 23790,
+        "est_recon": 7613,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 17489,
+        "resale_value": 17129,
         "est_margin": null,
-        "max_bid_target": 36810,
+        "max_bid_target": 36953,
         "target": 50000,
         "feasible": null,
         "damage": "Side + Mechanical",
-        "note": "Side + Mechanical \u2014 no price/bid yet \u2014 bid up to $36,810 to stay under $50k all-in"
+        "note": "Side + Mechanical \u2014 no price/bid yet \u2014 bid up to $36,953 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -8336,7 +8625,7 @@
     "vin": "WP1AE2A21GL******",
     "lot_number": "58926986",
     "sale_date": "2026-09-04T19:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426685Z",
+    "first_seen": "2026-08-29T14:14:03.010079Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8380,7 +8669,7 @@
     "vin": "WP1AA2AYXTD******",
     "lot_number": "65471676",
     "sale_date": "2026-09-08T04:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426700Z",
+    "first_seen": "2026-08-29T14:14:03.010099Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8426,7 +8715,7 @@
     "vin": "WP1AA2AY4LD******",
     "lot_number": "67571185",
     "sale_date": "2026-09-10T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426714Z",
+    "first_seen": "2026-08-29T14:14:03.010123Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8472,7 +8761,7 @@
     "vin": "WP1AA2A21HK******",
     "lot_number": "63990666",
     "sale_date": "2026-09-15T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426770Z",
+    "first_seen": "2026-08-29T14:14:03.010200Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8518,7 +8807,7 @@
     "vin": "WP1AA2A2XGK******",
     "lot_number": "61421596",
     "sale_date": "2026-09-15T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426843Z",
+    "first_seen": "2026-08-29T14:14:03.010224Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8563,7 +8852,7 @@
     "vin": "WP1AE2A29HL******",
     "lot_number": "65284686",
     "sale_date": "2026-09-17T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426877Z",
+    "first_seen": "2026-08-29T14:14:03.010277Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8608,7 +8897,7 @@
     "vin": "WP1AA2A21HK******",
     "lot_number": "57697916",
     "sale_date": "2026-09-17T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426893Z",
+    "first_seen": "2026-08-29T14:14:03.010300Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8653,7 +8942,7 @@
     "vin": "WP1AF2A21EL******",
     "lot_number": "64632176",
     "sale_date": "2026-09-18T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426909Z",
+    "first_seen": "2026-08-29T14:14:03.010321Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8698,7 +8987,7 @@
     "vin": "WP1AE2AY1PD******",
     "lot_number": "57877376",
     "sale_date": "2026-09-22T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426937Z",
+    "first_seen": "2026-08-29T14:14:03.010361Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8744,7 +9033,7 @@
     "vin": "WP1AA2AY9PD******",
     "lot_number": "65546926",
     "sale_date": "2026-09-23T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426968Z",
+    "first_seen": "2026-08-29T14:14:03.010401Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8788,7 +9077,7 @@
     "vin": "WP1AA2A28GL******",
     "lot_number": "62856926",
     "sale_date": "2026-09-24T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426984Z",
+    "first_seen": "2026-08-29T14:14:03.010419Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8834,7 +9123,7 @@
     "vin": "WP1AG2AY1MD******",
     "lot_number": "60662136",
     "sale_date": "2026-09-24T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.426998Z",
+    "first_seen": "2026-08-29T14:14:03.010440Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8879,7 +9168,7 @@
     "vin": "WP1AA2AY3LD******",
     "lot_number": "61800366",
     "sale_date": "2026-09-25T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.427013Z",
+    "first_seen": "2026-08-29T14:14:03.010461Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8924,7 +9213,7 @@
     "vin": "WP1BA2AY7MD******",
     "lot_number": "58823186",
     "sale_date": "2026-09-25T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.427028Z",
+    "first_seen": "2026-08-29T14:14:03.010481Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -8969,7 +9258,7 @@
     "vin": "WP1AA2A25GK******",
     "lot_number": "66084576",
     "sale_date": "2026-09-28T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.427043Z",
+    "first_seen": "2026-08-29T14:14:03.010500Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -9014,7 +9303,7 @@
     "vin": "WP1AA2AY1RD******",
     "lot_number": "64887396",
     "sale_date": "2026-09-28T14:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.427057Z",
+    "first_seen": "2026-08-29T14:14:03.010525Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -9059,7 +9348,7 @@
     "vin": "WP1AF2AY4KD******",
     "lot_number": "66032236",
     "sale_date": "2026-09-28T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.427072Z",
+    "first_seen": "2026-08-29T14:14:03.010546Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -9104,7 +9393,7 @@
     "vin": "WP1AF2A27EL******",
     "lot_number": "62902466",
     "sale_date": "2026-09-28T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.427090Z",
+    "first_seen": "2026-08-29T14:14:03.010566Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -9148,7 +9437,7 @@
     "vin": "WP1AA2AY3KD******",
     "lot_number": "66224246",
     "sale_date": "2026-09-29T17:00:00Z",
-    "first_seen": "2026-08-29T13:47:12.427105Z",
+    "first_seen": "2026-08-29T14:14:03.010586Z",
     "raw": {
       "sf_csv": true,
       "damage": {
@@ -9193,7 +9482,7 @@
     "vin": null,
     "lot_number": "46327286",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.427918Z",
+    "first_seen": "2026-08-29T14:14:03.011699Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9232,7 +9521,7 @@
     "vin": null,
     "lot_number": "46283562",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.427933Z",
+    "first_seen": "2026-08-29T14:14:03.011719Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9271,7 +9560,7 @@
     "vin": null,
     "lot_number": "46206837",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.427945Z",
+    "first_seen": "2026-08-29T14:14:03.011742Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9310,7 +9599,7 @@
     "vin": null,
     "lot_number": "45892335",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.427958Z",
+    "first_seen": "2026-08-29T14:14:03.011758Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9349,7 +9638,7 @@
     "vin": null,
     "lot_number": "46423613",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.427972Z",
+    "first_seen": "2026-08-29T14:14:03.011774Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9388,7 +9677,7 @@
     "vin": null,
     "lot_number": "46307925",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.427984Z",
+    "first_seen": "2026-08-29T14:14:03.011793Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9427,7 +9716,7 @@
     "vin": null,
     "lot_number": "46233371",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.427999Z",
+    "first_seen": "2026-08-29T14:14:03.011811Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9466,7 +9755,7 @@
     "vin": null,
     "lot_number": "46128666",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428010Z",
+    "first_seen": "2026-08-29T14:14:03.011828Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9505,7 +9794,7 @@
     "vin": null,
     "lot_number": "45218780",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428022Z",
+    "first_seen": "2026-08-29T14:14:03.011842Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9544,7 +9833,7 @@
     "vin": null,
     "lot_number": "46413224",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428033Z",
+    "first_seen": "2026-08-29T14:14:03.011859Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9583,7 +9872,7 @@
     "vin": null,
     "lot_number": "46252915",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428045Z",
+    "first_seen": "2026-08-29T14:14:03.011877Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9622,21 +9911,21 @@
     "vin": null,
     "lot_number": "46219300",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428058Z",
+    "first_seen": "2026-08-29T14:14:03.011898Z",
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33990,
-        "est_recon": 11217,
+        "est_clean_value": 34990,
+        "est_recon": 11547,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 24473,
+        "resale_value": 25193,
         "est_margin": null,
-        "max_bid_target": 33735,
+        "max_bid_target": 33440,
         "target": 50000,
         "feasible": null,
         "damage": null,
-        "note": "no price/bid yet \u2014 bid up to $33,735 to stay under $50k all-in"
+        "note": "no price/bid yet \u2014 bid up to $33,440 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -9661,7 +9950,7 @@
     "vin": null,
     "lot_number": "46131539",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428069Z",
+    "first_seen": "2026-08-29T14:14:03.011913Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9700,7 +9989,7 @@
     "vin": null,
     "lot_number": "46096112",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428082Z",
+    "first_seen": "2026-08-29T14:14:03.011932Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9739,7 +10028,7 @@
     "vin": null,
     "lot_number": "45647939",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428095Z",
+    "first_seen": "2026-08-29T14:14:03.011947Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9778,7 +10067,7 @@
     "vin": null,
     "lot_number": "46380419",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428108Z",
+    "first_seen": "2026-08-29T14:14:03.011967Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9817,7 +10106,7 @@
     "vin": null,
     "lot_number": "46363955",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428120Z",
+    "first_seen": "2026-08-29T14:14:03.011982Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9856,7 +10145,7 @@
     "vin": null,
     "lot_number": "46323004",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428132Z",
+    "first_seen": "2026-08-29T14:14:03.012000Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9895,7 +10184,7 @@
     "vin": null,
     "lot_number": "46307047",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428145Z",
+    "first_seen": "2026-08-29T14:14:03.012017Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9934,7 +10223,7 @@
     "vin": null,
     "lot_number": "46190101",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428156Z",
+    "first_seen": "2026-08-29T14:14:03.012035Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -9973,7 +10262,7 @@
     "vin": null,
     "lot_number": "46137638",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428170Z",
+    "first_seen": "2026-08-29T14:14:03.012052Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10012,7 +10301,7 @@
     "vin": null,
     "lot_number": "46017510",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428182Z",
+    "first_seen": "2026-08-29T14:14:03.012069Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10051,7 +10340,7 @@
     "vin": null,
     "lot_number": "46013460",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428195Z",
+    "first_seen": "2026-08-29T14:14:03.012083Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10090,7 +10379,7 @@
     "vin": null,
     "lot_number": "45985090",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428207Z",
+    "first_seen": "2026-08-29T14:14:03.012100Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10129,7 +10418,7 @@
     "vin": null,
     "lot_number": "45916716",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428219Z",
+    "first_seen": "2026-08-29T14:14:03.012115Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10168,7 +10457,7 @@
     "vin": null,
     "lot_number": "45908657",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428231Z",
+    "first_seen": "2026-08-29T14:14:03.012138Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10207,7 +10496,7 @@
     "vin": null,
     "lot_number": "45760072",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428244Z",
+    "first_seen": "2026-08-29T14:14:03.012154Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10246,7 +10535,7 @@
     "vin": null,
     "lot_number": "45736257",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428256Z",
+    "first_seen": "2026-08-29T14:14:03.012172Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10285,7 +10574,7 @@
     "vin": null,
     "lot_number": "45608857",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428269Z",
+    "first_seen": "2026-08-29T14:14:03.012190Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10324,7 +10613,7 @@
     "vin": null,
     "lot_number": "45444832",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428281Z",
+    "first_seen": "2026-08-29T14:14:03.012207Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10363,7 +10652,7 @@
     "vin": null,
     "lot_number": "44409242",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428299Z",
+    "first_seen": "2026-08-29T14:14:03.012221Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10402,7 +10691,7 @@
     "vin": null,
     "lot_number": "46358634",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428311Z",
+    "first_seen": "2026-08-29T14:14:03.012253Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10441,7 +10730,7 @@
     "vin": null,
     "lot_number": "46267156",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428323Z",
+    "first_seen": "2026-08-29T14:14:03.012274Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10480,21 +10769,21 @@
     "vin": null,
     "lot_number": "46220817",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428334Z",
+    "first_seen": "2026-08-29T14:14:03.012291Z",
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 24290,
-        "est_recon": 8016,
+        "est_clean_value": 23790,
+        "est_recon": 7851,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 17489,
+        "resale_value": 17129,
         "est_margin": null,
-        "max_bid_target": 36593,
+        "max_bid_target": 36740,
         "target": 50000,
         "feasible": null,
         "damage": null,
-        "note": "no price/bid yet \u2014 bid up to $36,593 to stay under $50k all-in"
+        "note": "no price/bid yet \u2014 bid up to $36,740 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -10519,21 +10808,21 @@
     "vin": null,
     "lot_number": "46157456",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428346Z",
+    "first_seen": "2026-08-29T14:14:03.012305Z",
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 24290,
-        "est_recon": 8016,
+        "est_clean_value": 23790,
+        "est_recon": 7851,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 17489,
+        "resale_value": 17129,
         "est_margin": null,
-        "max_bid_target": 36593,
+        "max_bid_target": 36740,
         "target": 50000,
         "feasible": null,
         "damage": null,
-        "note": "no price/bid yet \u2014 bid up to $36,593 to stay under $50k all-in"
+        "note": "no price/bid yet \u2014 bid up to $36,740 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -10558,7 +10847,7 @@
     "vin": null,
     "lot_number": "46091935",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428357Z",
+    "first_seen": "2026-08-29T14:14:03.012323Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10597,7 +10886,7 @@
     "vin": null,
     "lot_number": "45806718",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428369Z",
+    "first_seen": "2026-08-29T14:14:03.012338Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10636,7 +10925,7 @@
     "vin": null,
     "lot_number": "45742552",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428382Z",
+    "first_seen": "2026-08-29T14:14:03.012355Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10675,7 +10964,7 @@
     "vin": null,
     "lot_number": "46300314",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428396Z",
+    "first_seen": "2026-08-29T14:14:03.012371Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10714,7 +11003,7 @@
     "vin": null,
     "lot_number": "46256936",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428409Z",
+    "first_seen": "2026-08-29T14:14:03.012393Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10753,7 +11042,7 @@
     "vin": null,
     "lot_number": "46081091",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428420Z",
+    "first_seen": "2026-08-29T14:14:03.012408Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10792,7 +11081,7 @@
     "vin": null,
     "lot_number": "46043248",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428432Z",
+    "first_seen": "2026-08-29T14:14:03.012425Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10831,7 +11120,7 @@
     "vin": null,
     "lot_number": "45661781",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428444Z",
+    "first_seen": "2026-08-29T14:14:03.012442Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10870,7 +11159,7 @@
     "vin": null,
     "lot_number": "46466002",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428456Z",
+    "first_seen": "2026-08-29T14:14:03.012459Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10909,7 +11198,7 @@
     "vin": null,
     "lot_number": "46440968",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428467Z",
+    "first_seen": "2026-08-29T14:14:03.012473Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10948,7 +11237,7 @@
     "vin": null,
     "lot_number": "46201019",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428478Z",
+    "first_seen": "2026-08-29T14:14:03.012494Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -10987,7 +11276,7 @@
     "vin": null,
     "lot_number": "46501394",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428491Z",
+    "first_seen": "2026-08-29T14:14:03.012511Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -11026,21 +11315,21 @@
     "vin": null,
     "lot_number": "46496307",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428503Z",
+    "first_seen": "2026-08-29T14:14:03.012527Z",
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33990,
-        "est_recon": 11217,
+        "est_clean_value": 34990,
+        "est_recon": 11547,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 24473,
+        "resale_value": 25193,
         "est_margin": null,
-        "max_bid_target": 33735,
+        "max_bid_target": 33440,
         "target": 50000,
         "feasible": null,
         "damage": null,
-        "note": "no price/bid yet \u2014 bid up to $33,735 to stay under $50k all-in"
+        "note": "no price/bid yet \u2014 bid up to $33,440 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -11065,21 +11354,21 @@
     "vin": null,
     "lot_number": "46489776",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428514Z",
+    "first_seen": "2026-08-29T14:14:03.012544Z",
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33990,
-        "est_recon": 11217,
+        "est_clean_value": 34990,
+        "est_recon": 11547,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 24473,
+        "resale_value": 25193,
         "est_margin": null,
-        "max_bid_target": 33735,
+        "max_bid_target": 33440,
         "target": 50000,
         "feasible": null,
         "damage": null,
-        "note": "no price/bid yet \u2014 bid up to $33,735 to stay under $50k all-in"
+        "note": "no price/bid yet \u2014 bid up to $33,440 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -11104,7 +11393,7 @@
     "vin": null,
     "lot_number": "46365522",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428528Z",
+    "first_seen": "2026-08-29T14:14:03.012562Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -11143,7 +11432,7 @@
     "vin": null,
     "lot_number": "46273785",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428540Z",
+    "first_seen": "2026-08-29T14:14:03.012578Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -11182,7 +11471,7 @@
     "vin": null,
     "lot_number": "46213860",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428552Z",
+    "first_seen": "2026-08-29T14:14:03.012592Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -11221,7 +11510,7 @@
     "vin": null,
     "lot_number": "46212933",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428564Z",
+    "first_seen": "2026-08-29T14:14:03.012610Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -11260,7 +11549,7 @@
     "vin": null,
     "lot_number": "46183356",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428577Z",
+    "first_seen": "2026-08-29T14:14:03.012624Z",
     "raw": {
       "sf_csv": true,
       "deal": {
@@ -11299,21 +11588,21 @@
     "vin": null,
     "lot_number": "46179935",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428590Z",
+    "first_seen": "2026-08-29T14:14:03.012640Z",
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 23590,
-        "est_recon": 7785,
+        "est_clean_value": 23290,
+        "est_recon": 7686,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 16985,
+        "resale_value": 16769,
         "est_margin": null,
-        "max_bid_target": 36799,
+        "max_bid_target": 36888,
         "target": 50000,
         "feasible": null,
         "damage": null,
-        "note": "no price/bid yet \u2014 bid up to $36,799 to stay under $50k all-in"
+        "note": "no price/bid yet \u2014 bid up to $36,888 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
@@ -11338,21 +11627,21 @@
     "vin": null,
     "lot_number": "46179873",
     "sale_date": null,
-    "first_seen": "2026-08-29T13:47:12.428601Z",
+    "first_seen": "2026-08-29T14:14:03.012657Z",
     "raw": {
       "sf_csv": true,
       "deal": {
-        "est_clean_value": 33990,
-        "est_recon": 11217,
+        "est_clean_value": 34990,
+        "est_recon": 11547,
         "est_fees": 1000,
         "all_in": null,
-        "resale_value": 24473,
+        "resale_value": 25193,
         "est_margin": null,
-        "max_bid_target": 33735,
+        "max_bid_target": 33440,
         "target": 50000,
         "feasible": null,
         "damage": null,
-        "note": "no price/bid yet \u2014 bid up to $33,735 to stay under $50k all-in"
+        "note": "no price/bid yet \u2014 bid up to $33,440 to stay under $50k all-in"
       }
     },
     "project_tier": "salvage"
