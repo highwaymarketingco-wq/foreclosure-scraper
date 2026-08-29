@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-08-27T12:15:59.514472Z",
-  "total": 41225,
+  "run_time": "2026-08-27T12:57:08.584879Z",
+  "total": 94384,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -93,28 +93,33 @@
     "manual.watchlist": 1,
     "reo.vrm_va_reo": 20,
     "counties_sc.charleston_delinquent_tax": 1125,
-    "nc_ecourts_judgments": 1618,
-    "liensnc": 6460
+    "nc_ecourts_judgments": 3829,
+    "liensnc": 6460,
+    "counties_generic.liensnc": 49992,
+    "publicnoticesc": 11,
+    "courtlistener.recap": 945
   },
   "by_state": {
-    "NC": 25319,
-    "SC": 15906
+    "NC": 77930,
+    "SC": 16454
   },
   "by_source_on_board": {
+    "counties_generic.liensnc": 49992,
     "liensnc": 6460,
     "counties_nc.rutherford_tax": 4171,
+    "nc_ecourts_judgments": 3829,
     "counties_sc.sc_public_index": 3698,
     "counties_nc.buncombe_elderly": 2988,
     "counties_sc.pickens_delinquent_parcels": 1854,
     "counties_nc.nc_county_pdf_delinquent_tax": 1777,
     "counties_sc.spartanburg_delinquent_tax": 1709,
-    "nc_ecourts_judgments": 1618,
     "counties_sc.spartanburg_vacant": 1257,
     "counties_nc.nc_county_csv_delinquent_tax": 1222,
     "counties_nc.nc_ptscloud_delinquent_tax": 1155,
     "counties_sc.charleston_delinquent_tax": 1125,
     "counties_sc.spartanburg_condemned": 1071,
     "counties_generic.arcgis_distress.new_hanover_demolition_permits": 1003,
+    "courtlistener.recap": 945,
     "counties_nc.buncombe_delinquent_tax": 938,
     "counties_nc.nc_heir_estate_parcels": 682,
     "national.courtlistener_bankruptcy": 644,
@@ -171,6 +176,7 @@
     "counties_nc.buncombe_tax": 13,
     "national.auction_dot_com": 13,
     "national.courtlistener_adversary": 13,
+    "publicnoticesc": 11,
     "counties_sc.pickens_master_in_equity": 10,
     "counties_sc.sc_county_rosters": 10,
     "national.hud_homestore": 10,
@@ -441,22 +447,23 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "regenerated in-place from persisted dataset (no re-scrape)",
-  "detail_count": 41225,
-  "detail_digest": "b8cff6052e7590cb",
+  "notes": "",
+  "detail_count": 94384,
+  "detail_digest": "b08c4073b476a970",
   "board": {
     "schema": "slim-v1",
-    "count": 41225,
+    "count": 94384,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
-      "count": 42,
-      "records": 41225
+      "count": 95,
+      "records": 94384
     }
   },
-  "health_carried_from": "2026-08-27T07:46:18.786731Z",
+  "health_carried_from": "2026-08-27T12:15:59.514472Z",
   "health_carried_keys": [
+    "by_county_top",
     "source_status",
     "errors"
   ]
