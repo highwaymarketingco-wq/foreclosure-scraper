@@ -78,8 +78,20 @@ _TAG_RE = {
     "title": re.compile(r"<title>(.*?)</title>", re.S | re.I),
     "link": re.compile(r"<link>(.*?)</link>", re.S | re.I),
     "pubDate": re.compile(r"<pubDate>(.*?)</pubDate>", re.S | re.I),
+    # The RSS <description> / <content:encoded> carry the obituary body
+    # (age / DOB / survivors / funeral-home) that title+link+date discard.
+    "description": re.compile(r"<description>(.*?)</description>", re.S | re.I),
+    "content": re.compile(r"<content:encoded>(.*?)</content:encoded>", re.S | re.I),
 }
 _CDATA_RE = re.compile(r"<!\[CDATA\[(.*?)\]\]>", re.S)
+# Age ("87 years", "aged 87 years"); survivors clause ("survived by ...").
+_AGE_RE = re.compile(r"\b(\d{1,3})\s+years?\b", re.I)
+_SURVIVORS_RE = re.compile(
+    r"(?:is|are|was|were)?\s*survived by\s+(.{5,240}?)(?:\.|;|$)", re.I
+)
+# Frazer titles append the death/publish date after a pipe: "Full Name | MM/DD/YYYY".
+_TITLE_DATE_RE = re.compile(r"\|\s*(\d{1,2}/\d{1,2}/\d{2,4})")
+_TAGSTRIP_RE = re.compile(r"<[^>]+>")
 
 
 def _unescape(s: str) -> str:
@@ -107,25 +119,71 @@ def _name_from_title(title: str, kind: str) -> str:
     return name.strip()
 
 
+def _date_from_title(title: str) -> str | None:
+    """Pull the 'MM/DD/YYYY' the Frazer title carries after the pipe (kept as
+    raw['obituary']['title_date'] instead of being discarded)."""
+    m = _TITLE_DATE_RE.search(_unescape(title))
+    return m.group(1) if m else None
+
+
+def _summary_fields(summary_html: str) -> dict:
+    """Parse the obituary body (RSS <description>/<content:encoded>) for the
+    summary text + age + survivors. HTML/entities are stripped first."""
+    if not summary_html:
+        return {}
+    # _unescape first (extracts CDATA + decodes entities), then strip tags, so a
+    # stdlib-path <![CDATA[...]]> wrapper doesn't leave a "]]>" artifact behind.
+    text = re.sub(r"\s+", " ", _TAGSTRIP_RE.sub(" ", _unescape(summary_html))).strip()
+    if not text:
+        return {}
+    out: dict = {"summary": text[:800]}
+    am = _AGE_RE.search(text)
+    if am:
+        try:
+            age = int(am.group(1))
+            if 1 <= age <= 120:
+                out["age"] = age
+        except (ValueError, TypeError):
+            pass
+    sm = _SURVIVORS_RE.search(text)
+    if sm:
+        surv = re.sub(r"\s+", " ", sm.group(1)).strip(" ,;")
+        if len(surv) >= 5:
+            out["survivors"] = surv[:240]
+    return out
+
+
 def _iter_entries(text: str, kind: str):
-    """Yield (name, link, pubdate_raw) per feed <item>. feedparser first,
-    stdlib regex fallback so a missing dep never silences the source."""
+    """Yield (name, link, pubdate_raw, summary_html, title_date) per feed
+    <item>. feedparser first, stdlib regex fallback so a missing dep never
+    silences the source."""
     if feedparser is not None:
         parsed = feedparser.parse(text)
         for e in parsed.entries:
-            name = _name_from_title(getattr(e, "title", "") or "", kind)
+            raw_title = getattr(e, "title", "") or ""
+            name = _name_from_title(raw_title, kind)
             link = (getattr(e, "link", "") or "").strip()
             pub = (getattr(e, "published", "") or "").strip()
-            yield name, link, pub
+            summary = getattr(e, "summary", "") or getattr(e, "description", "") or ""
+            content = getattr(e, "content", None)
+            if content:
+                try:
+                    summary = content[0].get("value") or summary
+                except (AttributeError, IndexError, KeyError, TypeError):
+                    pass
+            yield name, link, pub, summary, _date_from_title(raw_title)
         return
     for block in _ITEM_RE.findall(text):
         tm = _TAG_RE["title"].search(block)
         lm = _TAG_RE["link"].search(block)
         pm = _TAG_RE["pubDate"].search(block)
-        name = _name_from_title(tm.group(1) if tm else "", kind)
+        dm = _TAG_RE["content"].search(block) or _TAG_RE["description"].search(block)
+        raw_title = tm.group(1) if tm else ""
+        name = _name_from_title(raw_title, kind)
         link = _unescape(lm.group(1)) if lm else ""
         pub = _unescape(pm.group(1)) if pm else ""
-        yield name, link, pub
+        summary = dm.group(1) if dm else ""
+        yield name, link, pub, summary, _date_from_title(raw_title)
 
 
 class FuneralHomeRss(BaseScraper):
@@ -161,7 +219,9 @@ class FuneralHomeRss(BaseScraper):
                     continue
 
                 kept = 0
-                for name, link, pub in _iter_entries(r.text, kind):
+                for name, link, pub, summary_html, title_date in _iter_entries(
+                    r.text, kind
+                ):
                     if len(name) < 5 or name.replace(" ", "").isdigit():
                         continue
                     if " " not in name:  # need at least first + last
@@ -171,6 +231,14 @@ class FuneralHomeRss(BaseScraper):
                     if key in seen:
                         continue
                     seen.add(key)
+                    obituary = {"decedent": name, "home": host,
+                                "county": county, "state": state,
+                                "cms": kind, "pub_date": pub or None}
+                    # Keep the Frazer title date instead of discarding it.
+                    if title_date:
+                        obituary["title_date"] = title_date
+                    # Age / survivors / summary from the RSS body.
+                    obituary.update(_summary_fields(summary_html))
                     out.append(Listing(
                         source=self.slug,
                         source_url=link,
@@ -182,9 +250,7 @@ class FuneralHomeRss(BaseScraper):
                                     f"— pre-probate heir/estate signal (funeral-home feed)",
                         first_seen=now, last_seen=now,
                         raw={
-                            "obituary": {"decedent": name, "home": host,
-                                         "county": county, "state": state,
-                                         "cms": kind, "pub_date": pub or None},
+                            "obituary": obituary,
                             "life_event": "death",
                             "relationship_signal": {"kind": "probate",
                                                     "keyword": "obituary"},

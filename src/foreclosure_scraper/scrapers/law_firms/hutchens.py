@@ -150,7 +150,7 @@ class Hutchens(BaseScraper):
     slug = "law_firms.hutchens"
     name = "Hutchens Law Firm (Foundation Legal Group)"
     category = "law_firm"
-    timeout_s = 240.0
+    timeout_s = 480.0
     expected_min_count = 20
 
     async def fetch(self) -> Iterable[Listing]:
@@ -159,11 +159,19 @@ class Hutchens(BaseScraper):
         failed: list[str] = []
 
         for url, state in URLS:
+            html: str | None = None
             try:
-                html = await get_text(url, timeout=60.0)
+                html = await get_text(url, timeout=120.0)
+                if not html or len(html) < 500:
+                    html = None
             except Exception as exc:  # noqa: BLE001 — reported below
-                failed.append(f"{state}: {str(exc)[:120]}")
-                log.warning("hutchens.fetch_failed", state=state, error=str(exc)[:160])
+                log.warning("hutchens.get_text_failed", state=state, error=str(exc)[:160])
+            if not html:
+                # Server is intermittently slow / connection-reset. Try
+                # StealthyFetcher as a fallback before declaring failure.
+                html = await self._stealth_fetch(url)
+            if not html:
+                failed.append(f"{state}: fetch failed (httpx + stealth)")
                 continue
             scraped, kept = self._parse_grid(html, url, state)
             total += scraped
@@ -183,6 +191,27 @@ class Hutchens(BaseScraper):
             # than a clean-looking zero.
             raise RuntimeError(f"hutchens: no grid reachable ({'; '.join(failed)})")
         return out
+
+    @staticmethod
+    async def _stealth_fetch(url: str) -> str | None:
+        """StealthyFetcher fallback for slow/blocked Hutchens pages."""
+        try:
+            from scrapling.fetchers import StealthyFetcher
+        except ImportError:
+            return None
+        try:
+            result = await StealthyFetcher.async_fetch(
+                url, headless=True, network_idle=False, timeout=180000,
+                solve_cloudflare=False,
+            )
+        except Exception as exc:
+            log.warning("hutchens.stealth_failed", url=url, error=str(exc)[:160])
+            return None
+        body = getattr(result, "body", b"")
+        html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
+        if not html or len(html) < 500:
+            return None
+        return html
 
     def _parse_grid(self, html: str, url: str, state: str) -> tuple[int, list[Listing]]:
         tree = HTMLParser(html)

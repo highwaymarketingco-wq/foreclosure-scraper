@@ -54,7 +54,7 @@ log = structlog.get_logger()
 # terminal (the auction happened, the NC 10-day upset-bid window has closed) and
 # dropped so the board doesn't accumulate dead post-sale rows.
 TERMINAL_SALE_GRACE_DAYS = int(
-    os.environ.get("FULLRUN_PERSIST_TERMINAL_GRACE_DAYS", "45")
+    os.environ.get("FULLRUN_PERSIST_TERMINAL_GRACE_DAYS", "365")
 )
 
 # Sentinels stamped onto raw so the post-dedupe pass can tell, per merged row,
@@ -101,8 +101,9 @@ def merge_prior_board(
     """Merge the prior published board into this run's fresh (deduped) scrape.
 
     Returns ``(merged_listings, stats)``. On an empty/missing prior board (the
-    first-ever run) the fresh set is returned unchanged. The caller guards this
-    with try/except so any failure falls back to fresh-only behavior.
+    first-ever run) the fresh set is returned unchanged. On dedupe failure, this
+    function re-raises — the caller must treat merge_prior_board as a critical
+    phase: falling back to fresh-only silently drops 72% of the board.
     """
     if now is None:
         now = datetime.utcnow()
@@ -158,14 +159,11 @@ def merge_prior_board(
     try:
         merged = dedupe(combined)
     except Exception:
-        log.error("board_persist.dedupe_failed", traceback=traceback.format_exc())
-        # Fall back to fresh-only; strip the sentinels we stamped.
-        for li in fresh_deduped:
-            if isinstance(li.raw, dict):
-                li.raw.pop(_SEEN_FLAG, None)
-        stats["merged_count"] = len(fresh_deduped)
-        stats["fresh_only"] = len(fresh_deduped)
-        return list(fresh_deduped), stats
+        log.critical("board_persist.dedupe_failed", traceback=traceback.format_exc())
+        # CRITICAL: do not fall back to fresh-only. Returning 22k instead of
+        # 94k silently drops 72k records and the pipeline publishes it as the
+        # full board (exit 0). Re-raise so the caller halts.
+        raise
 
     kept: list[Listing] = []
     for li in merged:

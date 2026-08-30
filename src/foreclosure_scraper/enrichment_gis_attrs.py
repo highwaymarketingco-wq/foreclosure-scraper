@@ -47,7 +47,7 @@ import structlog
 
 from pathlib import Path
 
-from .enrichment_arcgis import NC_GIS, SCDOT_BASE, SC_LAYER
+from .enrichment_arcgis import NC_GIS, SCDOT_BASE, SC_LAYER, SC_GIS, host_walled
 from .http_client import client
 
 # ---------------------------------------------------------------------------
@@ -183,6 +183,14 @@ ACRE_FIELDS = ("Acreage", "ACREAGE", "ACRES", "Acres", "CalcAcres", "TACRES",
 LANDUSE_FIELDS = ("LandUse", "LANDUSE", "Land_Use", "LandUseDesc", "PROPTYPE",
                   "PropertyType", "ZONINGDESC", "use_desc", "USE_DESC",
                   "PropClass", "PROP_CLASS", "NLUCDESC")
+# Situs / physical address — the street address of the property itself.
+ADDRESS_FIELDS = (
+    "StreetAddress", "situs", "siteadd", "Physical_Address", "LOCATION_ADDR",
+    "LOCATE_ADDRESS", "Property_Address", "ADDRESS", "SiteAddr", "SITUS",
+    "address", "phys_addr", "PHYS_ADDR", "propertyaddress", "PropAddr",
+    "PropertyAddress", "PHYSICALADDRESS", "physicaladdress",
+    "ADDRLINE1", "addrline1", "SITE_ADDR", "site_address",
+)
 
 
 def _norm(attrs: dict[str, Any]) -> dict[str, Any]:
@@ -239,8 +247,18 @@ def _resolve_layer(li: Listing) -> str | None:
             county = county[: -len(sfx)].strip()
     county = county.split(",")[0].strip().title()
     if li.state == "SC":
+        # Prefer county-native endpoints (SC_GIS) — SCDOT SC_LAYER went
+        # token-walled 2026-08-12 (HTTP 200 + {"error":{"code":499}}).
+        # SCDOT is kept as a fallback: if a county has no county-native
+        # endpoint AND SCDOT hasn't been tripped this process, it still
+        # works. If SCDOT IS walled, host_walled() short-circuits it.
+        cfg = SC_GIS.get(county)
+        if cfg:
+            return cfg["url"]
         layer = SC_LAYER.get(county)
-        return f"{SCDOT_BASE}/{layer}/query" if layer else None
+        if layer and not host_walled(SCDOT_BASE):
+            return f"{SCDOT_BASE}/{layer}/query"
+        return None
     if li.state == "NC":
         cfg = NC_GIS.get(county)
         return cfg["url"] if cfg else None
@@ -371,7 +389,8 @@ def apply_gis_attrs(li: Listing, attrs: dict[str, Any]) -> dict[str, int]:
     Returns per-field fill flags (1 = newly populated this call)."""
     norm = _norm(attrs)
     flags = {k: 0 for k in ("market_value", "assessed_value", "owner_name",
-                            "living_sqft", "year_built", "acreage", "land_use")}
+                            "living_sqft", "year_built", "acreage", "land_use",
+                            "street_address")}
 
     if not li.market_value:
         mv = _sum_components(norm, MARKET_FIELDS, LAND_FIELDS, IMPROVE_FIELDS)
@@ -424,6 +443,17 @@ def apply_gis_attrs(li: Listing, attrs: dict[str, Any]) -> dict[str, int]:
             if s and not s.isdigit():
                 li.land_use = s.title() if s.isupper() else s
                 flags["land_use"] = 1
+
+    # Backfill street_address from the GIS situs field — addresses the 27%
+    # gap where tax-sale / PDF-sourced leads have a parcel ID but no situs.
+    if not (li.street_address or "").strip():
+        ad = _pick(norm, ADDRESS_FIELDS)
+        if ad:
+            s = re.sub(r"\s+", " ", str(ad).strip())
+            # Skip PO boxes, vacant lot markers, and noise.
+            if s and len(s) >= 5 and not s.upper().startswith("P.O."):
+                li.street_address = s
+                flags["street_address"] = 1
 
     # Mirror owner into raw['gis']['owner'] (dashboard renders this) + stash attrs.
     if isinstance(li.raw, dict):
@@ -482,6 +512,40 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
         if not _force and (raw.get("gis") or {}).get("queried"):
             stats["skipped_done"] += 1
             return
+        # PERSISTENT parcel cache — a LOCAL JOIN against the weekly bulk-downloaded county
+        # parcel layer (data/parcel_cache). No network: fills owner/value/sqft/acreage/situs
+        # in microseconds instead of a ~1.5s live GIS query. Only OPEN counties are cached
+        # (walled ones aren't), so this is a fast path, not a replacement — a miss falls
+        # through to the live query below. Proven Buncombe 2026-08-14: 99% hit, 95ms/6.6k leads.
+        if li.parcel_id:
+            from .parcel_cache import lookup as _pcache_lookup
+            pc = _pcache_lookup(li.county or "", li.parcel_id)
+            if pc:
+                if not isinstance(li.raw, dict):
+                    li.raw = {}
+                if not li.owner_name and pc.get("owner"):
+                    li.owner_name = pc["owner"]; stats["filled_owner"] += 1
+                if not li.market_value and pc.get("market_value"):
+                    li.market_value = pc["market_value"]; stats["filled_market"] += 1
+                if not li.tax_value and pc.get("tax_value"):
+                    li.tax_value = pc["tax_value"]
+                if not li.living_sqft and pc.get("living_sqft"):
+                    li.living_sqft = pc["living_sqft"]; stats["filled_sqft"] += 1
+                if not li.acreage and pc.get("acreage"):
+                    li.acreage = pc["acreage"]; stats["filled_acre"] += 1
+                if not (li.street_address or "").strip() and pc.get("address"):
+                    li.street_address = pc["address"]
+                # Skip the live GIS query ONLY when we now have a situs address (the main thing
+                # the live point/parcel query resolves). If the cache row had no address, fall
+                # through to the live query to try for one via gis_attrs' own layer — we keep
+                # the owner/value/sqft/acre just filled either way (they won't be overwritten).
+                if (li.street_address or "").strip():
+                    stats["parcel_cache_hit"] = stats.get("parcel_cache_hit", 0) + 1
+                    li.raw.setdefault("gis", {})["queried"] = True
+                    li.raw["gis"]["source"] = "parcel_cache"
+                    stats["matched"] += 1
+                    return
+                stats["parcel_cache_partial"] = stats.get("parcel_cache_partial", 0) + 1
         base = _resolve_layer(li)
         if not base:
             return
@@ -537,10 +601,16 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
             stats["filled_year"] += flags["year_built"]
             stats["filled_acre"] += flags["acreage"]
             stats["filled_landuse"] += flags["land_use"]
+            stats["filled_address"] = stats.get("filled_address", 0) + flags["street_address"]
 
     _load_cache()
+    # Batch processing to avoid OOM on 8GB machines — process in chunks of 2500
+    # instead of creating 53k+ coroutines via asyncio.gather all at once.
+    BATCH = 2500
     async with client(timeout=20.0) as c:
-        await asyncio.gather(*(one(c, li) for li in listings))
+        for i in range(0, len(listings), BATCH):
+            batch = listings[i:i + BATCH]
+            await asyncio.gather(*(one(c, li) for li in batch))
     _save_cache()
     stats["cache_hit"] = stats.get("cache_hit", 0)
     stats["cache_size"] = len(_ATTR_CACHE)

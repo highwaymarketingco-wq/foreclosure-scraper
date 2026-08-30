@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from typing import Any
 
 import httpx
@@ -317,8 +318,10 @@ async def enrich_addresses_from_owner(
     log.info("addr_backfill.start", target_count=len(targets), of_total=len(listings))
 
     sem = asyncio.Semaphore(concurrency)
+    _BUDGET_S = 1800  # 30-min cap
+    _start = time.monotonic()
     counts = {"queried": 0, "matched_single": 0, "matched_multi": 0,
-              "fields_filled": 0, "no_layer": 0, "no_owner_field": 0}
+              "fields_filled": 0, "no_layer": 0, "no_owner_field": 0, "budget_skip": 0}
     owner_field_cache: dict[str, str | None] = {}
 
     async def one(c: httpx.AsyncClient, li: Listing) -> None:
@@ -353,6 +356,9 @@ async def enrich_addresses_from_owner(
             return
 
         async with sem:
+            if (time.monotonic() - _start) > _BUDGET_S:
+                counts["budget_skip"] += 1
+                return
             counts["queried"] += 1
             results = await _query_by_owner(c, base, owner_field, li.defendant)
             if not results:
@@ -387,4 +393,8 @@ async def enrich_addresses_from_owner(
     async with client(timeout=20.0) as c:
         await asyncio.gather(*(one(c, li) for li in targets))
 
+    elapsed = time.monotonic() - _start
+    if counts["budget_skip"] > 0:
+        log.warning("addr_backfill.time_capped", budget_s=_BUDGET_S, elapsed_s=round(elapsed),
+                    skipped=counts["budget_skip"], **counts)
     log.info("addr_backfill.done", **counts)

@@ -117,6 +117,29 @@ CAMA_SOURCES: dict[tuple[str, str], dict[str, Any]] = {
         "join": "pin",
         "pin_pad15": False,
     },
+    ("SC", "Spartanburg"): {
+        # Full CAMA layer: BuildingGrade + ConditionFactor + CDUC + YearBuilt + LivingArea.
+        # Verified live 2026-08-19: 99 fields, rich CAMA data. 9k+ listings benefit.
+        "url": "https://maps.spartanburgcounty.org/server/rest/services/"
+               "GIS/CAMA_Parcels/FeatureServer/0",
+        "pin_field": "GISParcelNumber",
+        "condition_field": "ConditionFactor",
+        "grade_field": "BuildingGrade",
+        "year_field": "YearBuilt",
+        "join": "pin",
+        "pin_pad15": False,
+    },
+    ("NC", "Gaston"): {
+        # Gaston CAMA: YEARBLT + SQFT (no Condition/Grade, year only).
+        "url": "https://gis.gastoncountync.gov/publicgis/rest/services/"
+               "PublicGIS/Parcels/FeatureServer/11",
+        "pin_field": "PIN",
+        "condition_field": None,
+        "grade_field": None,
+        "year_field": "YEARBLT",
+        "join": "pin",
+        "pin_pad15": True,
+    },
 }
 
 # Property kinds with no building the appraiser rates — skip (raw land).
@@ -196,7 +219,12 @@ def _year_int(val: Any) -> int | None:
 async def _fetch_by_pins(
     c: httpx.AsyncClient, cfg: dict[str, Any], pins: list[str]
 ) -> dict[str, dict[str, Any]]:
-    """Batched ``PIN IN (...)`` query. Returns {pin: {condition,grade,year}}."""
+    """Batched ``PIN IN (...)`` query. Returns {pin: {condition,grade,year}}.
+
+    Wall-guarded: if the first batch to a county endpoint fails (network error,
+    non-200, or ArcGIS error), all remaining batches are skipped — the endpoint
+    is almost certainly down. A per-call wall budget also caps total time.
+    """
     out: dict[str, dict[str, Any]] = {}
     base = cfg["url"].rstrip("/") + "/query"
     pin_field = cfg["pin_field"]
@@ -204,7 +232,13 @@ async def _fetch_by_pins(
         f for f in (pin_field, cfg.get("condition_field"), cfg.get("grade_field"),
                     cfg.get("year_field")) if f
     )
+    _consecutive_fail = 0
+    _WALL_FAIL_LIMIT = 3  # skip remaining batches after 3 consecutive failures
     for i in range(0, len(pins), _PIN_BATCH):
+        if _consecutive_fail >= _WALL_FAIL_LIMIT:
+            log.warning("cama_condition.wall_skip",
+                        url=base, remaining=len(pins) - i)
+            break
         chunk = pins[i:i + _PIN_BATCH]
         quoted = ",".join("'" + p.replace("'", "''") + "'" for p in chunk)
         params = {
@@ -216,12 +250,16 @@ async def _fetch_by_pins(
         try:
             r = await c.get(base, params=params, timeout=30.0)
             if r.status_code != 200:
+                _consecutive_fail += 1
                 continue
             data = r.json()
             if "error" in data:
+                _consecutive_fail += 1
                 continue
         except (httpx.HTTPError, ValueError):
+            _consecutive_fail += 1
             continue
+        _consecutive_fail = 0  # reset on success
         for feat in data.get("features", []):
             attrs = feat.get("attributes") or {}
             pin = attrs.get(pin_field)
@@ -416,9 +454,11 @@ async def enrich_cama_condition(listings: list[Listing], concurrency: int = 6) -
                     for li in pin_map.get(pk, []):
                         stats["matched"] += 1
                         _apply(li, rows, source, stats)
-            # Address fallback (only leads with no parcel_id).
-            for li in no_pin:
-                rec = await _fetch_by_address(c, cfg, li.street_address)
+            # Address fallback (only leads with no parcel_id). Cap at 50
+            # to avoid a long per-lead loop on a slow/dead endpoint.
+            _ADDR_CAP = 50
+            for li in no_pin[:_ADDR_CAP]:
+                rec = await _fetch_by_address(c, cfg, li.street_address or "")
                 if rec:
                     stats["matched"] += 1
                     _apply(li, rec, source, stats)

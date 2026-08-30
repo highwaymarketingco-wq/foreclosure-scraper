@@ -1,11 +1,25 @@
 """Shared types + helpers for per-parcel assessor-card adapters."""
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 _MONEY = re.compile(r"[\d,]+(?:\.\d+)?")
+
+
+def cf_solving_disabled() -> bool:
+    """Global kill-switch for Cloudflare/Turnstile SOLVING in the render-based card
+    adapters (qpublic_render, buncombe_nc, cherokee_sc).
+
+    When FORECLOSURE_NO_CF_SOLVE=1, those adapters pass solve_cloudflare=False, so a
+    challenged page (e.g. qPublic Turnstile) simply FAILS to render rather than being
+    solved — a compliant pass that still lets NON-challenged renders (Buncombe
+    Spatialest) work normally. Default OFF preserves existing behaviour for the
+    operator's own full runs; set it when a run must not defeat human-verification.
+    """
+    return os.environ.get("FORECLOSURE_NO_CF_SOLVE", "").strip().lower() in ("1", "true", "yes")
 
 # A transfer at/below this is a nominal/family/exempt move, not an arms-length sale.
 ARMS_LENGTH_MIN = 1000.0

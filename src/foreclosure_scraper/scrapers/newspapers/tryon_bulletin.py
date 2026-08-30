@@ -27,12 +27,13 @@ from selectolax.parser import HTMLParser
 from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
+from .column_legal_notices import _notice_email
 
 BASE = "https://tryondailybulletin.com"
 SEARCH_URLS = [
     "https://tryondailybulletin.com/?s=foreclosure+sale",
     "https://tryondailybulletin.com/?s=substitute+trustee",
-    "https://tryondailybulletin.com/category/legal-notices/",
+    "https://tryondailybulletin.com/?s=notice+of+sale",
 ]
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -192,6 +193,17 @@ class TryonBulletinForeclosures(BaseScraper):
                 if d_m2:
                     defendant = d_m2.group(1).strip()[:200]
 
+                # Attorney/trustee phone + email from the full notice body (a
+                # reachable case contact). Reuses the Column extractor so
+                # parcel-PIN digit runs can't leak in as a phantom phone.
+                raw = {"tryon_bulletin": {
+                    "title": title,
+                    "body_preview": body[:1500],
+                }}
+                contact = _notice_email(body)
+                if contact:
+                    raw["notice_contact"] = contact
+
                 out.append(
                     Listing(
                         source=self.slug,
@@ -212,10 +224,7 @@ class TryonBulletinForeclosures(BaseScraper):
                         description=title[:500] or None,
                         first_seen=datetime.utcnow(),
                         last_seen=datetime.utcnow(),
-                        raw={"tryon_bulletin": {
-                            "title": title,
-                            "body_preview": body[:1500],
-                        }},
+                        raw=raw,
                     )
                 )
         return out

@@ -143,6 +143,124 @@ async def _fetch_text(url: str, timeout: float = 20.0,
         return r.text
 
 
+# --- schema.org JSON-LD SaleEvent ------------------------------------------
+
+def _saleevent_to_listing(node: dict, source_url: str, city: str, state: str,
+                          county: str, source_site: str) -> Listing | None:
+    """Build a Listing from a schema.org SaleEvent JSON-LD node.
+
+    Captures organizer.telephone/url (contactability the HTML cards lack),
+    endDate, and — when location is a Place — its address.streetAddress.
+    """
+    if not isinstance(node, dict):
+        return None
+    name = node.get("name") or ""
+    url = node.get("url") or source_url
+    if isinstance(url, str) and not url.startswith("http"):
+        url = urljoin(ESTATESALES_NET_BASE, url)
+
+    organizer = node.get("organizer")
+    if not isinstance(organizer, dict):
+        organizer = {}
+    org_name = organizer.get("name") or None
+    org_phone = organizer.get("telephone") or None
+    org_url = organizer.get("url") or None
+
+    street = None
+    ev_city, ev_state, ev_zip = city, state, None
+    location = node.get("location")
+    if isinstance(location, dict):
+        loc_type = location.get("@type")
+        loc_types = loc_type if isinstance(loc_type, list) else [loc_type]
+        addr = location.get("address")
+        if "Place" in loc_types or addr is not None:
+            if isinstance(addr, dict):
+                street = addr.get("streetAddress") or None
+                ev_city = addr.get("addressLocality") or city
+                ev_state = addr.get("addressRegion") or state
+                ev_zip = addr.get("postalCode") or None
+            elif isinstance(addr, str):
+                street = addr or None
+
+    start_date = node.get("startDate")
+    end_date = node.get("endDate")
+    sale_date = _parse_date(start_date) if isinstance(start_date, str) else None
+    description = node.get("description") or ""
+
+    if not street and not name:
+        return None
+
+    return Listing(
+        source="national.estate_sales",
+        source_url=url,
+        listing_type=ListingType.ESTATE_LEAD,
+        property_kind=PropertyKind.UNKNOWN,
+        street_address=street,
+        city=ev_city,
+        state=ev_state,
+        zip_code=ev_zip,
+        county=county,
+        sale_date=sale_date,
+        trustee=org_name,  # company/organizer name stored in trustee field
+        description=(f"{name} | {description}"[:500] if description else name[:500]) or None,
+        first_seen=datetime.utcnow(),
+        last_seen=datetime.utcnow(),
+        raw={
+            "estate_sales": {
+                "source_site": source_site,
+                "title": name,
+                "company": org_name,
+                "organizer_phone": org_phone,
+                "organizer_url": org_url,
+                "start_date": start_date,
+                "end_date": end_date,
+            },
+        },
+    )
+
+
+def _parse_jsonld_sale_events(html: str, source_url: str, city: str, state: str,
+                              county: str, source_site: str) -> list[Listing]:
+    """Parse schema.org SaleEvent blocks from <script type=application/ld+json>.
+
+    The prior JSON gate keyed on window.__INITIAL_STATE__ markers
+    ('saleEvents'/'events'), so the ld+json SaleEvent blocks estatesales.net
+    actually emits were never parsed. Detects @type=='SaleEvent' nodes (incl.
+    inside @graph arrays) and maps organizer/location/dates."""
+    out: list[Listing] = []
+    tree = HTMLParser(html)
+    for script in tree.css('script[type="application/ld+json"]'):
+        txt = script.text()
+        if not txt or "SaleEvent" not in txt:
+            continue
+        try:
+            data = json.loads(txt)
+        except (json.JSONDecodeError, ValueError, TypeError):
+            continue
+        nodes: list[dict] = []
+
+        def _collect(obj):
+            if isinstance(obj, list):
+                for x in obj:
+                    _collect(x)
+            elif isinstance(obj, dict):
+                if isinstance(obj.get("@graph"), list):
+                    _collect(obj["@graph"])
+                nodes.append(obj)
+
+        _collect(data)
+        for node in nodes:
+            t = node.get("@type")
+            types = t if isinstance(t, list) else [t]
+            if "SaleEvent" not in types:
+                continue
+            li = _saleevent_to_listing(node, source_url, city, state, county,
+                                       source_site)
+            if li:
+                out.append(li)
+    return out
+
+
 # --- estatesales.net -------------------------------------------------------
 
 def _parse_estatesales_net(html: str, source_url: str,
@@ -152,6 +270,10 @@ def _parse_estatesales_net(html: str, source_url: str,
     event cards, and sometimes embedded JSON. We handle both."""
     tree = HTMLParser(html)
     out: list[Listing] = []
+
+    # schema.org SaleEvent JSON-LD (organizer phone/url, endDate, Place address)
+    out.extend(_parse_jsonld_sale_events(
+        html, source_url, city, state, county, "estatesales.net"))
 
     # Try embedded JSON first (more structured)
     for script in tree.css("script"):
@@ -397,6 +519,10 @@ def _parse_estatesale_com(html: str, source_url: str,
     """Parse estatesale.com search results."""
     tree = HTMLParser(html)
     out: list[Listing] = []
+
+    # schema.org SaleEvent JSON-LD (organizer phone/url, endDate, Place address)
+    out.extend(_parse_jsonld_sale_events(
+        html, source_url, city, state, county, "estatesale.com"))
 
     for card in tree.css(
         "div.sale-listing, div.listing, div.event, "

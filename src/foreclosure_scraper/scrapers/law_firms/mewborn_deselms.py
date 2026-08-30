@@ -61,6 +61,7 @@ from dateutil import parser as dateparser
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
+from ...document_links import harvest_document_links, stamp_documents
 from ...http_client import client, get_text
 from ...models import Listing, ListingType, PropertyKind
 from ._helpers import ADDR_RE, DATE_RE, ZIP_RE
@@ -248,6 +249,7 @@ def _parse_html(html: str, slug: str) -> list[Listing]:
                 text=node_text, county=current_county, source_url=row_url, slug=slug
             )
             if li:
+                stamp_documents(li, harvest_document_links(node.html or "", base_url=INDEX_URL))
                 _add_unique(li, out, seen)
 
     return out
@@ -300,12 +302,15 @@ async def _fetch_index() -> str:
     try:
         from scrapling.fetchers import StealthyFetcher
 
+        # FORECLOSURE_NO_CF_SOLVE=1 disables Cloudflare/Turnstile SOLVING (compliant run).
+        import os as _os
+        _solve = _os.environ.get("FORECLOSURE_NO_CF_SOLVE", "").strip().lower() not in ("1", "true", "yes")
         result = await StealthyFetcher.async_fetch(
             INDEX_URL,
             headless=True,
             network_idle=True,
             timeout=120000,
-            solve_cloudflare=True,
+            solve_cloudflare=_solve,
         )
         body = getattr(result, "body", b"")
         if isinstance(body, (bytes, bytearray)):

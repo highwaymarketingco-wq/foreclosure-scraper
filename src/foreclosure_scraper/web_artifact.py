@@ -1428,6 +1428,86 @@ def write_artifact(
     # truncated 100MB+ file — the prior good file survives. git history is the
     # rollback backup for a completed-but-bad write (the count-drop guard flags
     # those before publish).
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    # BACKUP-BEFORE-OVERWRITE + COUNT GUARD
+    #
+    # Two data-loss events (actions #16, #22) happened because a script wrote
+    # a smaller board (scope filter dropped 16K+ leads) and the prior data was
+    # gone — _atomic_write_bytes replaces the file, so the old content is lost.
+    #
+    # This block does TWO things before any write:
+    #   1. COUNT GUARD — if the new board is >10% smaller than the existing
+    #      board AND the caller didn't set BOARD_ALLOW_SHRINK, it RAISES.
+    #      This catches the exact bug that killed 53K→37K: a script calling
+    #      write_artifact with a filtered subset. The caller must either fix
+    #      their data or explicitly opt in with BOARD_ALLOW_SHRINK=1.
+    #   2. TIMESTAMPED BACKUP — copies the existing listings.json + detail
+    #      to backups/ with a timestamp, so even if the guard is bypassed,
+    #      the prior board is recoverable. Keeps the last 10 backups.
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    _backup_dir = docs.parent / "backups"
+    _backup_dir.mkdir(parents=True, exist_ok=True)
+    if _board_file_present(listings_path):
+        # --- count guard (high-water mark) ---
+        # Bug fix: the old guard compared against the current on-disk board.
+        # Once a bad 22K run published, the guard's baseline became 22K — so
+        # the NEXT 22K run looked flat and passed. The guard measured
+        # run-over-run drift, not drift from the true high-water mark, so it
+        # structurally could not catch a drop that already landed.
+        #
+        # Fix: compare against a persisted high-water mark
+        # (board_highwater.json), not the last board. A poisoned baseline
+        # can no longer hide the drop.
+        _highwater_path = docs / "board_highwater.json"
+        _highwater_count = None
+        try:
+            if _highwater_path.exists():
+                _hw = json.loads(_highwater_path.read_text())
+                _highwater_count = _hw.get("count")
+        except Exception:  # noqa: BLE001
+            pass
+        # Fallback to on-disk board if no high-water mark exists (first run)
+        if _highwater_count is None:
+            try:
+                _prior_data = read_board_json(listings_path)
+                _highwater_count = len(_prior_data) if isinstance(_prior_data, list) else None
+            except Exception:  # noqa: BLE001
+                pass
+        if _highwater_count is not None and len(payload) < _highwater_count:
+            _shrink_pct = (1 - len(payload) / _highwater_count) * 100
+            _allow = os.environ.get("BOARD_ALLOW_SHRINK", "").strip()
+            if _shrink_pct > 10 and _allow not in ("1", "true", "yes"):
+                raise RuntimeError(
+                    f"COUNT GUARD: refusing to write {len(payload):,} listings "
+                    f"over high-water mark {_highwater_count:,} ({_shrink_pct:.1f}% shrink). "
+                    f"This has happened before (72K dropped silently). If this "
+                    f"shrink is intentional, set BOARD_ALLOW_SHRINK=1."
+                )
+        # --- timestamped backup ---
+        _ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        try:
+            import shutil as _sh
+            _sh.copy2(listings_path, _backup_dir / f"listings_{_ts}.json")
+            if (docs / "listings_detail.json").exists():
+                _sh.copy2(docs / "listings_detail.json",
+                          _backup_dir / f"listings_detail_{_ts}.json")
+            elif (docs / "listings_detail.json.gz").exists():
+                _sh.copy2(docs / "listings_detail.json.gz",
+                          _backup_dir / f"listings_detail_{_ts}.json.gz")
+            log.info("web_artifact.backup_saved", path=str(_backup_dir / f"listings_{_ts}.json"))
+        except Exception:  # noqa: BLE001 - backup failure must not block the write
+            log.warning("web_artifact.backup_failed", exc_info=True)
+        # --- prune old backups (keep last 10) ---
+        try:
+            _old = sorted(_backup_dir.glob("listings_2*.json"),
+                          key=lambda p: p.stat().st_mtime, reverse=True)[10:]
+            for _f in _old:
+                _f.unlink(missing_ok=True)
+                _stem = _f.stem.rsplit("_", 1)[0]  # listings_20260826_123456
+                for _sib in _backup_dir.glob(f"{_stem}_*.json*"):
+                    _sib.unlink(missing_ok=True)
+        except Exception:  # noqa: BLE001
+            pass
     _atomic_write_bytes(listings_path, listings_bytes)
     _atomic_write_bytes(detail_path, detail_bytes)
     # Also emit gzipped copies the dashboard fetches (16x smaller). The .json
@@ -1563,6 +1643,25 @@ def write_artifact(
             meta["health_carried_from"] = prior_meta.get("run_time")
             meta["health_carried_keys"] = _carried
     _atomic_write_bytes(meta_path, json.dumps(meta, ensure_ascii=False, default=str, indent=2).encode("utf-8"))
+
+    # --- update high-water mark ---
+    # After a successful write, persist the new count as the high-water mark.
+    # This is what the count guard above compares against next run. Only moves
+    # UP (a smaller board never lowers the high-water mark — that's the point).
+    try:
+        _hw_path = docs / "board_highwater.json"
+        _prev_hw = 0
+        if _hw_path.exists():
+            _prev_hw = json.loads(_hw_path.read_text()).get("count", 0)
+        if len(listings) > _prev_hw:
+            _atomic_write_bytes(_hw_path, json.dumps({
+                "count": len(listings),
+                "updated_at": datetime.utcnow().isoformat() + "Z",
+            }, indent=2).encode("utf-8"))
+            log.info("web_artifact.highwater_updated",
+                     old=_prev_hw, new=len(listings))
+    except Exception:  # noqa: BLE001
+        pass
 
     log.info("web_artifact.written", listings=len(listings), bytes=listings_path.stat().st_size)
     return listings_path, meta_path

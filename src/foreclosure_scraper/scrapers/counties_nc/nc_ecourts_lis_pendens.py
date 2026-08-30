@@ -85,6 +85,12 @@ TARGET_COUNTIES = [
     # above; querying their facets surfaces coastal foreclosure/lis-pendens +
     # (via nc_ecourts_divorce reusing this list) divorce signals.
     "Currituck", "Hyde", "New Hanover",
+    # 2026-08-19 — remaining NC coastal counties with zero leads because
+    # their eCourts facets were never queried. Beaufort (county seat:
+    # Washington, NC — Outer Banks area), Craven (New Bern — Pamlico Sound,
+    # home to MCAS Cherry Point), Pamlico (Oriental — sound-side county).
+    # Same oceanfront-lane admission as the counties above.
+    "Beaufort", "Craven", "Pamlico",
 ]
 
 

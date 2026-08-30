@@ -58,6 +58,7 @@ from dateutil import parser as dateparser
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
+from ...document_links import stamp_documents
 from ...http_client import client, get_bytes, get_text
 from ...models import Listing, ListingType, PropertyKind
 
@@ -385,6 +386,10 @@ class BrunswickLegalNotices(BaseScraper):
                     }
                 },
             )
+            # The per-parcel notice PDF is the document the OCR pass should read
+            # (address / opening bid live inside it). Stamp it so enrich_doc_ocr
+            # picks it up even on today's image-only notices.
+            stamp_documents(li, [pdf_url])
             out.append(li)
 
         # Geo-resolve parcel-only rows so the oceanfront gate can place them at

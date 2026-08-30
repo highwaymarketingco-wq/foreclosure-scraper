@@ -20,10 +20,14 @@ import structlog
 
 log = structlog.get_logger()
 
-NFHL_URL = "https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer"
+# CORRECT endpoint: /arcgis/ path (NOT /gis/nfhl/ which is behind Tivoli WebSEAL)
+# Discovered 2026-08-25: the /gis/nfhl/ path returns 404 HTML from Tivoli WebSEAL.
+# The /arcgis/ path serves the real ArcGIS REST endpoint.
+NFHL_URL = "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer"
 
-# Layer 27 = Flood Zones in the NFHL service
-FLOOD_ZONES_LAYER = 27
+# Layer 28 = Flood Hazard Zones (FLD_ZONE field)
+# Layer 27 = Flood Hazard Boundaries (does NOT have FLD_ZONE)
+FLOOD_ZONES_LAYER = 28
 
 # SFHA (high-risk) flood zone prefixes
 SFHA_ZONES = {"A", "AE", "AH", "AO", "A1", "A2", "A3", "A4", "A5", "A6",
@@ -39,11 +43,8 @@ SFHA_ZONES = {"A", "AE", "AH", "AO", "A1", "A2", "A3", "A4", "A5", "A6",
 # If all fail, the enrichment is skipped (best-effort, non-blocking).
 
 _FLOOD_QUERY_URLS = [
-    # FEMA NFHL primary
+    # FEMA NFHL primary — /arcgis/ path (NOT /gis/nfhl/ which is Tivoli-walled)
     (NFHL_URL, FLOOD_ZONES_LAYER, "FLD_ZONE,ZONE_SUBTY"),
-    # FEMA Prelim fallback (preliminary flood hazard data)
-    ("https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHLPre/MapServer",
-     FLOOD_ZONES_LAYER, "FLD_ZONE,ZONE_SUBTY"),
 ]
 
 
@@ -69,10 +70,10 @@ async def check_flood_zone(lat: float, lon: float) -> dict:
 
     geom = json.dumps({"x": lon, "y": lat, "spatialReference": {"wkid": 4326}})
 
-    # Try curl_cffi with chrome impersonation (passes TLS fingerprint checks)
-    try:
-        from curl_cffi import requests as cffi_requests
-
+    # Use httpx — curl_cffi gets "Connection reset by peer" on this endpoint.
+    # httpx works reliably (verified 2026-08-25).
+    features = []
+    async with httpx.AsyncClient(timeout=15.0) as c:
         for base_url, layer_id, out_fields in _FLOOD_QUERY_URLS:
             query_url = f"{base_url}/{layer_id}/query"
             params = {
@@ -85,8 +86,7 @@ async def check_flood_zone(lat: float, lon: float) -> dict:
                 "f": "json",
             }
             try:
-                r = cffi_requests.get(query_url, params=params,
-                                      impersonate="chrome", timeout=15)
+                r = await c.get(query_url, params=params)
                 if r.status_code != 200 or not r.text.startswith("{"):
                     continue
                 data = r.json()
@@ -95,33 +95,6 @@ async def check_flood_zone(lat: float, lon: float) -> dict:
                     break
             except Exception:
                 continue
-        else:
-            features = []
-    except ImportError:
-        # curl_cffi not available, try httpx
-        features = []
-        async with httpx.AsyncClient(timeout=15.0) as c:
-            for base_url, layer_id, out_fields in _FLOOD_QUERY_URLS:
-                query_url = f"{base_url}/{layer_id}/query"
-                params = {
-                    "geometry": geom,
-                    "geometryType": "esriGeometryPoint",
-                    "inSR": "4326",
-                    "spatialRel": "esriSpatialRelIntersects",
-                    "outFields": out_fields,
-                    "returnGeometry": "false",
-                    "f": "json",
-                }
-                try:
-                    r = await c.get(query_url, params=params)
-                    if r.status_code != 200 or not r.text.startswith("{"):
-                        continue
-                    data = r.json()
-                    features = data.get("features", [])
-                    if features:
-                        break
-                except Exception:
-                    continue
 
     if not features:
         return result
@@ -163,9 +136,14 @@ async def enrich_flood_zones(listings: list) -> dict:
         in_sfha, zone, zone_description, flood_risk
     }
     """
-    targets = [li for li in listings if li.latitude and li.longitude]
+    # Idempotent skip: only query listings that don't already have flood_zone
+    targets = [
+        li for li in listings
+        if li.latitude and li.longitude
+        and not (isinstance(li.raw, dict) and li.raw.get("flood_zone"))
+    ]
     if not targets:
-        log.info("flood_zone.no_targets")
+        log.info("flood_zone.all_cached")
         return {"queried": 0, "in_sfha": 0, "moderate": 0, "low": 0, "unknown": 0}
 
     log.info("flood_zone.start", target_count=len(targets))
@@ -175,7 +153,11 @@ async def enrich_flood_zones(listings: list) -> dict:
 
     async def one(li):
         async with sem:
-            result = await check_flood_zone(li.latitude, li.longitude)
+            try:
+                result = await check_flood_zone(li.latitude, li.longitude)
+            except Exception:
+                stats["failed"] += 1
+                return
             stats["queried"] += 1
 
             if result.get("in_sfha"):
@@ -193,7 +175,30 @@ async def enrich_flood_zones(listings: list) -> dict:
                 li.raw = {}
             li.raw["flood_zone"] = result
 
-    await asyncio.gather(*[one(li) for li in targets], return_exceptions=True)
+    # Process in batches of 200 with hard per-batch timeout.
+    # Use asyncio.wait() (NOT gather with return_exceptions=True, which
+    # swallows CancelledError and makes wait_for unable to actually cancel).
+    # Overall deadline: bail after 300s to stay well under the 600s
+    # _run_offline outer timeout.
+    import time as _time
+    BATCH = 200
+    BATCH_TIMEOUT = 60  # 1 min per batch of 200
+    OVERALL_DEADLINE = _time.monotonic() + 300  # 5 min hard cap
+    for i in range(0, len(targets), BATCH):
+        if _time.monotonic() >= OVERALL_DEADLINE:
+            log.info("flood_zone.deadline_reached", queried=stats["queried"],
+                     remaining=len(targets) - i)
+            break
+        batch = targets[i:i + BATCH]
+        tasks = [asyncio.ensure_future(one(li)) for li in batch]
+        done, pending = await asyncio.wait(tasks, timeout=BATCH_TIMEOUT)
+        # Cancel any still-running tasks
+        for t in pending:
+            t.cancel()
+        if not done:
+            log.info("flood_zone.batch_empty", batch_start=i,
+                     queried_so_far=stats["queried"])
+            continue
 
     log.info("flood_zone.done", **stats)
     return stats

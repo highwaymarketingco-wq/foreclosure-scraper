@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from .rod import cchs
 from .rod.classify import classify_rod_docs, is_stale, refresh_windows
 
-_COUNTIES = {"Burke", "Cleveland", "Madison", "Henderson"}
+_COUNTIES = {"Burke", "Cleveland", "Madison", "Henderson", "Lincoln"}
 # Match on the alpha-only normalized code (D/T -> DT, D OF TR -> DOFTR, TAX_LIEN -> TAXLIEN).
 _MORTGAGE_N = {"DT", "DOT", "DOFTR", "MORT", "MTG", "MORTGAGE", "DEEDOFTRUST"}
 _ADVERSE_N = {"LIEN", "TAXLIEN", "TAX", "JUDG", "JUDGMENT", "LP", "LISP", "EXECUTION",

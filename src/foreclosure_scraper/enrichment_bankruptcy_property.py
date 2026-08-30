@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from typing import Any
 
 import httpx
@@ -58,7 +59,8 @@ log = structlog.get_logger()
 # district covering all counties.
 COURT_FOOTPRINT_COUNTIES: dict[str, list[tuple[str, str]]] = {
     "ncwb": [("NC", c) for c in NC_GIS.keys()],
-    "nceb": [],  # out of footprint
+    "nceb": [],  # statewide OneMap query handles these
+    "ncmb": [],  # statewide OneMap query handles these
     "scb": [("SC", c) for c in SC_LAYER.keys() if c in {
         "Spartanburg", "Anderson", "Pickens", "Oconee",
         "Cherokee", "Union", "Laurens",
@@ -252,10 +254,23 @@ async def enrich_bankruptcy_property(
     BK court's footprint via owner-name search. Populate full property
     info on confident match.
     """
+    # Pre-populate defendant from raw.courtlistener if missing
+    for li in listings:
+        if not li.defendant:
+            cl = (li.raw or {}).get("courtlistener", {})
+            name = cl.get("case_name") or ""
+            if not name and cl.get("parties"):
+                name = cl["parties"][0] if isinstance(cl["parties"], list) else str(cl["parties"])
+            if name:
+                li.defendant = name
+        if not li.case_number:
+            cl = (li.raw or {}).get("courtlistener", {})
+            li.case_number = cl.get("docket_number") or li.case_number
     targets = [
         li
         for li in listings
-        if li.source == "national.courtlistener_bankruptcy"
+        if "courtlistener" in (li.source or "").lower()
+        and "bankrupt" in (li.source or "").lower()
         and li.defendant
         and not li.street_address
     ]
@@ -266,26 +281,32 @@ async def enrich_bankruptcy_property(
     log.info("bk_property.start", target_count=len(targets))
 
     sem = asyncio.Semaphore(concurrency)
+    _BUDGET_S = 1800  # 30-min cap
+    _start = time.monotonic()
     counts = {
         "queried": 0,
         "matched": 0,
         "no_match": 0,
         "fields_filled": 0,
         "kind_inferred": 0,
+        "budget_skip": 0,
     }
     owner_field_cache: dict[str, str | None] = {}
 
     async def one(c: httpx.AsyncClient, li: Listing) -> None:
         court = (li.raw or {}).get("courtlistener", {}).get("court", "").lower()
         counties = COURT_FOOTPRINT_COUNTIES.get(court, [])
-        if not counties:
+        if not counties and court not in ("nceb", "ncmb", "ncwb", "scb"):
             return
         async with sem:
+            if (time.monotonic() - _start) > _BUDGET_S:
+                counts["budget_skip"] += 1
+                return
             counts["queried"] += 1
-            # NC: one statewide OneMap query (covers all 11 footprint counties
+            # NC: one statewide OneMap query (covers all NC counties
             # AND carries parval value) before the per-county layers. This
             # recovers value the per-county NC layers often lack.
-            if court == "ncwb":
+            if court in ("ncwb", "nceb", "ncmb"):
                 om = await _try_nc_onemap(c, li.defendant)
                 if om is not None:
                     _apply_match(li, om, str(om.get("cntyname") or "") or None, counts)
@@ -303,4 +324,8 @@ async def enrich_bankruptcy_property(
     async with client(timeout=20.0) as c:
         await asyncio.gather(*(one(c, li) for li in targets))
 
+    elapsed = time.monotonic() - _start
+    if counts["budget_skip"] > 0:
+        log.warning("bk_property.time_capped", budget_s=_BUDGET_S, elapsed_s=round(elapsed),
+                     skipped=counts["budget_skip"], **{k: v for k, v in counts.items() if k != "budget_skip"})
     log.info("bk_property.done", **counts)

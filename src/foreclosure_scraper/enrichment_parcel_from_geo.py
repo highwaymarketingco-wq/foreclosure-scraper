@@ -44,7 +44,12 @@ from typing import Any, Optional
 
 import structlog
 
-from .enrichment_arcgis import SCDOT_BASE, SC_LAYER
+from .enrichment_arcgis import (
+    SCDOT_BASE, SC_LAYER,
+    scdot_walled, mark_scdot_walled, is_scdot_token_error,  # noqa: F401  (compat)
+    host_walled, mark_host_walled, note_host_ok, note_host_hard_failure,
+    is_token_error,
+)
 from .http_client import client
 from .models import Listing
 from .parcel_inventory import _scdot_parcel
@@ -107,15 +112,27 @@ async def _arc_query(c, layer_query_url: str, params: dict) -> Optional[list]:
     """GET an ArcGIS /query and return its feature list (None on any failure).
     ArcGIS reports failure as HTTP 200 + an `error` key, so status alone is not
     enough — a token-required response looks exactly like an empty result set."""
+    # Generic per-host breaker: skip a host that's already been tripped (token
+    # wall or repeated timeouts) instead of re-hitting it for every lead.
+    if host_walled(layer_query_url):
+        return None
     try:
         r = await c.get(layer_query_url, params=params, timeout=25.0)
         if r.status_code != 200:
+            note_host_hard_failure(layer_query_url)
             return None
         data = r.json()
         if "error" in data:
+            # A token/auth wall (SCDOT-class) trips the host immediately so no
+            # later lead re-hits it; an ordinary query error (bad where clause)
+            # does not — it's per-request, not a dead host.
+            if is_token_error(data):
+                mark_host_walled(layer_query_url, reason="token/auth error")
             return None
+        note_host_ok(layer_query_url)
         return data.get("features") or []
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001  (timeout / connection — a HARD failure)
+        note_host_hard_failure(layer_query_url)
         return None
 
 
@@ -169,6 +186,10 @@ async def _point_query(
 
 
 async def _parcel_from_point_sc(c, li: Listing) -> str:
+    # SCDOT is the only SC point-parcel source here; once the token wall is tripped
+    # every subsequent SC lead would just re-hit it, so short-circuit immediately.
+    if scdot_walled():
+        return ""
     layer = SC_LAYER.get(_norm_county(li.county))
     if layer is None:
         return ""
@@ -199,6 +220,12 @@ _NC_OUT_FIELDS = (
 
 
 async def _parcel_from_point_nc(c, li: Listing) -> str:
+    # NC OneMap is the ONLY NC point-parcel source here; if it's tripped (token
+    # wall on its /secure/ path, or repeated timeouts) skip it — re-hitting it for
+    # every NC lead is the SCDOT-class 16h hang. (_point_query fires TWO 25s calls
+    # per lead, so an unguarded degradation is especially expensive here.)
+    if host_walled(NC_ONEMAP_PARCELS):
+        return ""
     attrs = await _point_query(
         c, NC_ONEMAP_PARCELS, li.latitude, li.longitude, out_fields=_NC_OUT_FIELDS
     )

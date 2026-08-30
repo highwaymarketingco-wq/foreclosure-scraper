@@ -61,17 +61,24 @@ def _clean(v) -> str | None:
 
 
 async def _resolve_parcel_key(c, li) -> str | None:
-    """Return the internal NCPTS ParcelId (the `id` field from SimpleParcelSearch)."""
+    """Return the internal NCPTS ParcelId (the `id` field from SimpleParcelSearch).
+
+    SEARCH FIRST. The board's Rutherford ``parcel_id`` is usually the REID (e.g.
+    909421) or the formatted PIN (1566-94-1441) — NOT the internal ParcelId
+    (e.g. 13906). Both REID and internal-id are bare integers of overlapping
+    length, so a "<=6 digits means it's already the internal key" shortcut
+    silently hijacks the REID and calls getParcelDetails with the wrong key
+    (verified live 2026-08-13: query=909421 -> id 13906; direct ParcelId=909421
+    -> non-JSON error). SimpleParcelSearch resolves REID/PIN/address to the
+    correct internal id, so we ALWAYS search first and only fall back to using
+    the value directly when search comes up empty.
+    """
     pid = (li.parcel_id or "").strip()
 
-    # A short bare integer is likely already the internal key — try it as-is first.
-    if pid and pid.isdigit() and len(pid) <= 6:
-        return pid
-
-    # Search candidates in priority order: PIN as-given, bare-digit PIN, street address.
-    # Only treat a value as a PIN if it's PIN-shaped (digits/dashes/dots/spaces) — an
-    # alphanumeric junk string must NOT be reduced to a digit fragment that happens to
-    # collide with a real internal key.
+    # Search candidates in priority order: PIN/REID as-given, bare-digit form,
+    # street address. Only treat a value as a PIN if it's PIN-shaped (digits/
+    # dashes/dots/spaces) — an alphanumeric junk string must NOT be reduced to a
+    # digit fragment that happens to collide with a real key.
     candidates: list[str] = []
     if pid and re.fullmatch(r"[\d.\-\s]+", pid):
         candidates.append(pid)
@@ -109,6 +116,11 @@ async def _resolve_parcel_key(c, li) -> str | None:
         key = _clean(rows[0].get("id"))
         if key:
             return key
+
+    # Last resort: the board value might already BE the internal ParcelId
+    # (short bare integer). Only reached when search resolved nothing.
+    if pid and pid.isdigit() and len(pid) <= 6:
+        return pid
     return None
 
 

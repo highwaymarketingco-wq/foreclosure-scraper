@@ -13,6 +13,13 @@ from pathlib import Path
 
 import structlog
 
+# Load .env early so all enrichers (ACPASS, GEMINI_API_KEY, etc.) see credentials.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 from .config import (
     RuntimeConfig,
     SCOPE_DENY_COUNTIES_NORMALIZED,
@@ -60,6 +67,46 @@ def _setup_logging() -> None:
 log = structlog.get_logger()
 
 
+async def _await_capped(coro, name: str, default_s: int = 900):
+    """Run an awaitable enrichment phase under a wall-clock cap so a wedged socket (e.g. a
+    mid-run wifi drop hitting a non-hardened HTTP session) can't stall the whole run before
+    the board write. On timeout/error, log and return None — the phase's partial in-place
+    fills persist. Env ENRICH_PHASE_MAX_SECONDS overrides the per-phase default."""
+    try:
+        return await asyncio.wait_for(
+            coro, timeout=float(os.environ.get("ENRICH_PHASE_MAX_SECONDS", str(default_s))))
+    except asyncio.TimeoutError:
+        log.warning("enrich.time_capped", phase=name, budget_s=default_s)
+    except Exception:
+        log.error(f"{name}.failed", traceback=traceback.format_exc())
+    return None
+
+
+async def _gather_phases(phases: dict, default_s: int = 900):
+    """Run multiple independent enrichment phases concurrently under individual
+    wall-clock caps.  Each phase runs under its own ENRICH_PHASE_MAX_SECONDS
+    timeout; on timeout/error the phase's partial in-place fills persist.
+
+    ``phases`` is a ``{name: coro}`` dict.  Returns ``{name: result_or_None}``.
+    """
+    if not phases:
+        return {}
+
+    budget = float(os.environ.get("ENRICH_PHASE_MAX_SECONDS", str(default_s)))
+
+    async def _wrap(name: str, coro):
+        try:
+            return name, await asyncio.wait_for(coro, timeout=budget)
+        except asyncio.TimeoutError:
+            log.warning("enrich.time_capped", phase=name, budget_s=default_s)
+        except Exception:
+            log.error(f"{name}.failed", traceback=traceback.format_exc())
+        return name, None
+
+    results = await asyncio.gather(*[_wrap(n, c) for n, c in phases.items()])
+    return dict(results)
+
+
 # NC + SC ocean-facing counties. Listings in these counties are denied by
 # default (they're east of Charlotte / outside the upstate footprint), but
 # get re-admitted through the OCEANFRONT_OVERRIDE in _in_scope when the
@@ -67,6 +114,7 @@ log = structlog.get_logger()
 OCEANFRONT_COASTAL_COUNTIES: frozenset[tuple[str, str]] = frozenset({
     ("Currituck", "NC"), ("Dare", "NC"), ("Hyde", "NC"), ("Carteret", "NC"),
     ("Onslow", "NC"), ("Pender", "NC"), ("New Hanover", "NC"), ("Brunswick", "NC"),
+    ("Beaufort", "NC"), ("Craven", "NC"), ("Pamlico", "NC"),
     # Horry SC (Myrtle Beach) intentionally excluded per user direction 2026-08-12.
     ("Georgetown", "SC"), ("Charleston", "SC"),
     ("Beaufort", "SC"), ("Colleton", "SC"),
@@ -221,6 +269,14 @@ def _in_scope(li: Listing) -> bool:
             li.raw = {}
         li.raw["downtown_charleston_pending"] = True
         return True
+    # LiensNC is a state-wide NC builder-distress signal — ALL NC counties
+    # are in-scope, including deny-listed ones (Wake, Mecklenburg, Forsyth,
+    # Guilford, Durham, etc.). This check MUST run before the deny-set
+    # filter below, otherwise LiensNC leads in those counties get silently
+    # dropped. (2026-08-26: this was the root cause of 128K LiensNC leads
+    # being erased by regenerate_dashboard.py's scope re-filter.)
+    if li.source in ("counties_generic.liensnc", "liensnc") and (li.state or "").upper() == "NC":
+        return True
     # Deny set takes precedence over EVERY other scope path. Without this,
     # a listing tagged with a denied county still gets through via the zip-
     # prefix fallback (288/287/296 cover Haywood NC, Mecklenburg NC,
@@ -240,6 +296,7 @@ def _in_scope(li: Listing) -> bool:
             return True
         # Has a county — keep ONLY if it's actually in-footprint. A bankruptcy
         # filing in an out-of-footprint county must NOT leak onto the board.
+        # (LiensNC is handled above, before the deny-set check.)
         return in_scope(li.county, li.state)
     if in_scope(li.county, li.state):
         return True
@@ -263,6 +320,8 @@ SCOPE_BYPASS_SOURCES = {
     "national.courtlistener_bankruptcy",
     "national.courtlistener_civil",
     "national.courtlistener_adversary",
+    "counties_generic.liensnc",  # State-wide builder/investor distress signal (mechanic's liens)
+    "liensnc",  # same source, bare name used by ingest_all.py — both forms must match
 }
 
 #: Coastal foreclosure sources whose COUNTY is the whole point of the lead. They
@@ -356,10 +415,12 @@ DATELESS_OK_SOURCES = {
     "counties_sc.spartanburg_vacant",            # Spartanburg City vacant registry (absentee+vacant, dateless)
     "counties_sc.spartanburg_condemned",         # Spartanburg condemned/dilapidated CAMA-condition signal (dateless)
     "counties_nc.asheville_str_permits",         # Asheville lapsed STR/homestay permits (motivated landlord, dateless)
+    "counties_nc.lincoln_code_violations",       # Lincoln County open code-enforcement violations (address-keyed, dateless)
     "counties_generic.arcgis_distress.new_hanover_demolition_permits",  # NH demolition permits (dateless)
     "counties.column_legal_notices",             # Column API SC estate/probate notices (no sale date)
     "law_firms.zacchaeus",                       # ZLS tax foreclosures (status-driven; upset/pending leads outlive sale date)
     "national.first_citizens_reo",               # First Citizens bank-owned REO listings
+    "national.usda_properties",                  # USDA Rural Development eligible / REO resales (SC); no sale date
     "counties_sc.sc_rod_acclaim",                # SC ROD (Acclaim vendor) recorded NOD/deed filings
     "counties_sc.sc_rod_cott",                   # SC ROD (Cott vendor) recorded NOD/deed filings
     # 2026-05 expansion — new sources added in this PR. Without these
@@ -367,6 +428,7 @@ DATELESS_OK_SOURCES = {
     # is missing (which is most of the time for monthly/annual cadence).
     "counties_nc.nc_rod_substitute_trustee",      # ROD substitute-trustee deed filings
     "counties_sc.terry_howe_flc",                 # current FLC auction catalog (no sale dates)
+    "counties_sc.terry_howe_auctions",            # broad real-estate auction catalog; older/overflow posts dateless
     "counties_sc.spartan_weekly_legals",          # current Spartanburg legal notices (sale_date best-effort)
     "counties_nc.nc_rod_logan",                   # recent NOD recordings (date-range limited, current)
     "reo.usda_rd",                                # USDA Rural Development resale REO
@@ -469,6 +531,10 @@ DATELESS_OK_SOURCES = {
     "national.sheriff_sales",                     # Sheriff sale listings (dateless)
     "national.nc_upset_bids",                     # NC upset bid period listings (dateless)
     "national.jail_bookings",                     # County jail booking rosters (dateless)
+    # Meares Property Advisors (SC upstate auctions). Live lots carry an auction
+    # END date, but brokered "real-estate-listings" rows + between-cycle items are
+    # routinely dateless; without this, _active_only would drop those.
+    "counties_sc.meares_auctions",
 }
 
 
@@ -612,11 +678,13 @@ def _situs_is_junk(address: str | None) -> bool:
     return bool(_SITUS_ENTITY_RE.search(first))
 
 
-def _active_only(li: Listing, horizon_days: int) -> bool:
+def _active_only(li: Listing, horizon_days: int, *, now: datetime | None = None) -> bool:
     """Drop listings whose sale is too far past or > horizon_days out, and any
     auction marked withdrawn/cancelled or in a TERMINAL court status (redeemed /
     dismissed / satisfied / disposed — the lien/case is resolved, not a live
-    lead). Run #20 audit: 2 REDEEMED + 24 dismissed court records were shipping."""
+    lead). Run #20 audit: 2 REDEEMED + 24 dismissed court records were shipping.
+    Pass ``now`` to pin the reference time in tests; in production it defaults
+    to ``datetime.utcnow()``."""
     if li.auction_status and li.auction_status.lower() in {
         "withdrawn",
         "cancelled",
@@ -650,8 +718,9 @@ def _active_only(li: Listing, horizon_days: int) -> bool:
     # investor can chase. Default 2-day grace for other states; SC also
     # gets 14 (its §29-3-680 confirmation window is even longer).
     past_grace_days = 14 if li.state in ("NC", "SC") else 2
-    cutoff_past = datetime.utcnow() - timedelta(days=past_grace_days)
-    cutoff_future = datetime.utcnow() + timedelta(days=horizon_days)
+    ref = now or datetime.utcnow()
+    cutoff_past = ref - timedelta(days=past_grace_days)
+    cutoff_future = ref + timedelta(days=horizon_days)
     return cutoff_past <= sale <= cutoff_future
 
 
@@ -758,11 +827,14 @@ async def run() -> int:
     # for new foreclosure filings per county (catches early-warning cases that
     # haven't hit the law-firm trustee calendars yet)
     try:
-        lp = await discover_lis_pendens()
+        lp = await asyncio.wait_for(discover_lis_pendens(), timeout=120)
         for li in lp:
             raw.append(li)
         by_source["courts.lis_pendens_discovery"] = len(lp)
         log.info("orchestrator.lis_pendens_discovered", count=len(lp))
+    except asyncio.TimeoutError:
+        log.warning("orchestrator.lis_pendens_timeout",
+                    reason="discover_lis_pendens exceeded 120s — skipping (scrapers already cover this)")
     except Exception as exc:  # noqa: BLE001
         log.warning("orchestrator.lis_pendens_failed", error=str(exc))
 
@@ -873,8 +945,12 @@ async def run() -> int:
     # (dropped when terminal or after N misses). This is the additive equivalent
     # of scripts/merge_today_sources.py, run inline in the full pipeline.
     #
-    # Guarded so a merge failure FALLS BACK to fresh-only behavior (below) rather
-    # than crashing the 14h run.
+    # CRITICAL PHASE: merge_prior_board folds the prior published board (~94k)
+    # into the fresh scrape (~22k). If this fails, the pipeline would continue
+    # with only 22k records — silently dropping 72k+ listings and publishing
+    # that as the full board (exit 0). This happened 5 times before we caught
+    # it. The fix: this is a critical phase. A failure MUST halt the pipeline
+    # with a non-zero exit, not log-and-continue.
     persist_applied = False
     if os.environ.get("FULLRUN_PERSIST", "1") != "0":
         try:
@@ -885,7 +961,8 @@ async def run() -> int:
             # pulled-sales enricher below — nothing was persisted/aged here.
             persist_applied = persist_stats.get("prior_count", 0) > 0
         except Exception:
-            log.error("board_persist.failed", traceback=traceback.format_exc())
+            log.critical("board_persist.failed", traceback=traceback.format_exc())
+            raise  # HALT: do not publish a fresh-only board as the full board
 
     # Pulled-sale detection (dad's #6): listings that existed last week
     # but didn't show up this run get tagged raw['pulled_sale'] with
@@ -918,9 +995,21 @@ async def run() -> int:
     # raise out of the whole run before the artifact write. On failure keep the
     # validated (un-GIS-enriched) leads and press on — downstream enrichers +
     # the write still run.
+    # HARD wall-clock cap — this phase runs one live GIS query per address-having lead and
+    # ran ~6.8h UNCAPPED on the 2026-08-14 run (the single biggest time sink). enrich_gis
+    # mutates each Listing IN PLACE and returns the same list, so on a timeout `valid` still
+    # holds every partial fill — set enriched=valid and press on. The parcel-cache fast path
+    # (above, in enrich) skips the network for cached-county leads, so this budget is ample.
+    _gis_budget_s = float(os.environ.get("GIS_PHASE_MAX_SECONDS",
+                                         os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
     try:
-        enriched = await enrich_gis(valid)
+        await asyncio.wait_for(enrich_gis(valid), timeout=_gis_budget_s)
+        enriched = valid
         log.info("orchestrator.gis_enriched", count=len(enriched))
+        checkpoint.save(enriched, "gis")
+    except asyncio.TimeoutError:
+        enriched = valid
+        log.warning("gis_enrich.time_capped", budget_s=_gis_budget_s, count=len(enriched))
         checkpoint.save(enriched, "gis")
     except Exception:
         log.error("gis_enrich.failed", traceback=traceback.format_exc())
@@ -971,7 +1060,7 @@ async def run() -> int:
     # Runs BEFORE geocode + parcel_from_geo so the filled geo unlocks the GIS chain.
     try:
         from .enrichment_hud_reac_address import enrich_hud_reac_address
-        s = await enrich_hud_reac_address(enriched)
+        s = await _await_capped(enrich_hud_reac_address(enriched), "hud_reac_address")
         if s:
             enrichment_stats["hud_reac_address"] = s
     except Exception:
@@ -1025,9 +1114,13 @@ async def run() -> int:
     # lat/lng is maximally populated) and BEFORE parcel_lookup / owner_mailing /
     # assessor_card (which all consume parcel_id). Writes only li.parcel_id +
     # raw.parcel_from_geo provenance; free, pure-HTTP, idempotent.
+    _resolver_budget_s = float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400"))
     try:
         from .enrichment_parcel_from_geo import enrich_parcel_from_geo
-        await enrich_parcel_from_geo(enriched)
+        await asyncio.wait_for(enrich_parcel_from_geo(enriched), timeout=_resolver_budget_s)
+    except asyncio.TimeoutError:
+        log.warning("parcel_from_geo.time_capped", budget_s=_resolver_budget_s,
+                    note="proceeding; unresolved leads keep prior fields")
     except Exception:
         log.error("parcel_from_geo.failed", traceback=traceback.format_exc())
 
@@ -1063,7 +1156,12 @@ async def run() -> int:
     # OR a unique multi-token match).
     try:
         from .enrichment_address_backfill import enrich_addresses_from_owner
-        await enrich_addresses_from_owner(enriched)
+        await asyncio.wait_for(
+            enrich_addresses_from_owner(enriched),
+            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
+    except asyncio.TimeoutError:
+        log.warning("address_backfill.time_capped",
+                    note="proceeding; unenriched leads keep prior fields")
     except Exception:
         log.error("address_backfill.failed", traceback=traceback.format_exc())
 
@@ -1074,7 +1172,7 @@ async def run() -> int:
     # nothing flows downstream (no photos, no comps, no ARV).
     try:
         from .enrichment_bankruptcy_property import enrich_bankruptcy_property
-        await enrich_bankruptcy_property(enriched)
+        await _await_capped(enrich_bankruptcy_property(enriched), "bk_property")
     except Exception:
         log.error("bk_property.failed", traceback=traceback.format_exc())
 
@@ -1084,7 +1182,14 @@ async def run() -> int:
     # when the GIS has "0 NO ADDRESS ASSIGNED" (undeveloped lots).
     try:
         from .enrichment_parcel_lookup import enrich_with_parcel_lookup
-        await enrich_with_parcel_lookup(enriched)
+        # WALL-CLOCK CAP like every sibling resolver phase — this was a bare await and ran
+        # ~2h uncapped on the 2026-08-14 run (per-lead live GIS). wait_for bounds it; partial
+        # work persists in-place and converges over runs.
+        await asyncio.wait_for(enrich_with_parcel_lookup(enriched),
+                               timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
+    except asyncio.TimeoutError:
+        log.warning("parcel_lookup.time_capped",
+                    budget_s=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
     except Exception:
         log.error("parcel_lookup.failed", traceback=traceback.format_exc())
 
@@ -1097,7 +1202,12 @@ async def run() -> int:
     # junk. Lifts value ~6%->~30% and owner_name 0%->~80%.
     try:
         from .enrichment_gis_attrs import enrich_gis_attrs
-        await enrich_gis_attrs(enriched)
+        await asyncio.wait_for(
+            enrich_gis_attrs(enriched),
+            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
+    except asyncio.TimeoutError:
+        log.warning("gis_attrs.time_capped",
+                    note="proceeding; unenriched leads keep prior fields")
     except Exception:
         log.error("gis_attrs.failed", traceback=traceback.format_exc())
 
@@ -1105,9 +1215,14 @@ async def run() -> int:
     # condition layer; backfills year_built + a distressed-condition signal.
     try:
         from .enrichment_cama_condition import enrich_cama_condition
-        s = await enrich_cama_condition(enriched)
+        s = await asyncio.wait_for(
+            enrich_cama_condition(enriched),
+            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
         if s:
             enrichment_stats["cama_condition"] = s
+    except asyncio.TimeoutError:
+        log.warning("cama_condition.time_capped",
+                    note="proceeding; unenriched leads keep prior fields")
     except Exception:
         log.error("cama_condition.failed", traceback=traceback.format_exc())
 
@@ -1128,7 +1243,12 @@ async def run() -> int:
     # markers + photo lookup. The address->photo unlock.
     try:
         from .enrichment_situs_address import enrich_situs_address
-        await enrich_situs_address(enriched)
+        await asyncio.wait_for(
+            enrich_situs_address(enriched),
+            timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
+    except asyncio.TimeoutError:
+        log.warning("situs_address.time_capped",
+                    note="proceeding; unenriched leads keep prior fields")
     except Exception:
         log.error("situs_address.failed", traceback=traceback.format_exc())
 
@@ -1137,7 +1257,7 @@ async def run() -> int:
     # fuzzy partial-token match in the stated county.
     try:
         from .enrichment_aggressive_address import enrich_with_aggressive_address
-        await enrich_with_aggressive_address(enriched)
+        await _await_capped(enrich_with_aggressive_address(enriched), "aggressive_address")
     except Exception:
         log.error("aggressive_address.failed", traceback=traceback.format_exc())
 
@@ -1152,7 +1272,7 @@ async def run() -> int:
     # any source that mistags SC lis pendens). Free, pure-HTTP, idempotent.
     try:
         from .enrichment_lis_pendens_resolver import enrich_lis_pendens_addresses
-        s = await enrich_lis_pendens_addresses(enriched)
+        s = await _await_capped(enrich_lis_pendens_addresses(enriched), "lis_pendens_addresses")
         if s: enrichment_stats["lis_pendens_resolver"] = s
     except Exception:
         log.error("lis_pendens_resolver.failed", traceback=traceback.format_exc())
@@ -1376,9 +1496,14 @@ async def run() -> int:
     # crawl so contactability is automatic — no manual backfill needed.
     if not os.environ.get("OWNER_MAILING_OFF"):
         try:
-            om = await enrich_owner_mailing(enriched)
+            om = await asyncio.wait_for(
+                enrich_owner_mailing(enriched),
+                timeout=float(os.environ.get("RESOLVER_PHASE_MAX_SECONDS", "2400")))
             enrichment_stats["owner_mailing"] = om
             checkpoint.save(enriched, "owner_mailing")
+        except asyncio.TimeoutError:
+            log.warning("owner_mailing.time_capped",
+                        note="proceeding; unenriched leads keep prior fields")
         except Exception:
             log.error("owner_mailing.failed", traceback=traceback.format_exc())
 
@@ -1387,7 +1512,7 @@ async def run() -> int:
     # by parcel and a lead without one cannot be reached.
     try:
         from .enrichment_county_sales import enrich_county_sales
-        enrichment_stats["county_sales"] = await enrich_county_sales(enriched)
+        enrichment_stats["county_sales"] = await _await_capped(enrich_county_sales(enriched), "county_sales")
     except Exception:  # noqa: BLE001
         log.error("county_sales.failed", traceback=traceback.format_exc())
 
@@ -1441,9 +1566,19 @@ async def run() -> int:
     # foreclosure signal: Ch.13 = trying to stop the sale, Ch.7 = liquidation.
     try:
         from .enrichment_bankruptcy import enrich_with_bankruptcy
-        await enrich_with_bankruptcy(enriched)
+        await _await_capped(enrich_with_bankruptcy(enriched), "with_bankruptcy")
     except Exception:
         log.error("bankruptcy.failed", traceback=traceback.format_exc())
+
+    # Bankruptcy STAY derivation — a matched foreclosure is PAUSED by the automatic stay, not
+    # gone; flag it stayed + resume-risk so it stays a high-motivation lead (pure-local, no net).
+    try:
+        from .enrichment_bankruptcy_stay import enrich_bankruptcy_stay
+        s = enrich_bankruptcy_stay(enriched)
+        if s and s.get("stayed"):
+            enrichment_stats["bankruptcy_stay"] = s
+    except Exception:
+        log.error("bankruptcy_stay.failed", traceback=traceback.format_exc())
 
     # Relationship-deed detection — scan ROD pool (active + sold) for
     # executor's-deed / quitclaim-divorce patterns. Emits new
@@ -1494,7 +1629,12 @@ async def run() -> int:
     # valuation tier order is recorded > scraped > zestimate > tax.
     try:
         from .enrichment_recorded_comps import enrich as enrich_recorded_comps
-        await enrich_recorded_comps(enriched)
+        await asyncio.wait_for(
+            enrich_recorded_comps(enriched),
+            timeout=float(os.environ.get("COMPS_PHASE_MAX_SECONDS", "2400")))
+    except asyncio.TimeoutError:
+        log.warning("recorded_comps.time_capped",
+                    note="proceeding; uncomped leads keep prior comps")
     except Exception:
         log.error("recorded_comps.failed", traceback=traceback.format_exc())
 
@@ -1514,7 +1654,11 @@ async def run() -> int:
     # 3 comparable sales per listing matched by zip + sqft + beds.
     try:
         from .enrichment_comps import enrich_with_comps
-        await enrich_with_comps(enriched)
+        await asyncio.wait_for(
+            enrich_with_comps(enriched),
+            timeout=float(os.environ.get("COMPS_PHASE_MAX_SECONDS", "2400")))
+    except asyncio.TimeoutError:
+        log.warning("comps.time_capped", note="proceeding; uncomped leads keep prior comps")
     except Exception:
         log.error("comps.failed", traceback=traceback.format_exc())
 
@@ -1525,9 +1669,33 @@ async def run() -> int:
     # contributes 0 — its Parcel_Sales layer returns "Unable to complete operation".
     try:
         from .enrichment_recorded_sales import enrich as enrich_recorded_sales
-        await enrich_recorded_sales(enriched)
+        await asyncio.wait_for(
+            enrich_recorded_sales(enriched),
+            timeout=float(os.environ.get("COMPS_PHASE_MAX_SECONDS", "2400")))
+    except asyncio.TimeoutError:
+        log.warning("recorded_sales.time_capped",
+                    note="proceeding; uncomped leads keep prior comps")
     except Exception:
         log.error("recorded_sales.failed", traceback=traceback.format_exc())
+
+    # FREE Zillow zestimate enrichment via stealth-browser address search.
+    # The board had 0% zestimate coverage despite 77% having Zillow photos.
+    # This hits Zillow's search page (StealthyFetcher bypasses PerimeterX),
+    # extracts __NEXT_DATA__ JSON for zestimate, rentZestimate, beds, baths,
+    # sqft, tax assessed value. Capped at ZESTIMATE_MAX_PER_RUN (500) and
+    # wall-clock bounded at ZESTIMATE_MAX_SECONDS (900s). Idempotent.
+    try:
+        from .enrichment_zestimate import enrich_zestimates
+        s = await asyncio.wait_for(
+            enrich_zestimates(enriched),
+            timeout=float(os.environ.get("ZESTIMATE_MAX_SECONDS", "900")))
+        if s:
+            enrichment_stats["zestimate"] = s
+    except asyncio.TimeoutError:
+        log.warning("zestimate.time_capped",
+                    note="proceeding; leads keep prior valuation data")
+    except Exception:
+        log.error("zestimate.failed", traceback=traceback.format_exc())
 
     # Per-address photo gallery enrichment — for listings that came from
     # courthouse / law-firm / sitemap sources WITHOUT photos, look up the
@@ -1549,7 +1717,7 @@ async def run() -> int:
     # Gated by FORECLOSURE_ASSESSOR_PHOTO; capped + wall-clock bounded.
     try:
         from .enrichment_assessor_photo import enrich_assessor_photo
-        s = await enrich_assessor_photo(enriched)
+        s = await _await_capped(enrich_assessor_photo(enriched), "assessor_photo")
         if s:
             enrichment_stats["assessor_photo"] = s
     except Exception:
@@ -1563,7 +1731,7 @@ async def run() -> int:
     # so it never buys an image we already have.
     try:
         from .enrichment_streetview import enrich_streetview
-        s = await enrich_streetview(enriched)
+        s = await _await_capped(enrich_streetview(enriched), "streetview")
         if s:
             enrichment_stats["streetview"] = s
     except Exception:
@@ -1630,7 +1798,7 @@ async def run() -> int:
     # Only touches leads that carry a document URL and are missing those fields.
     try:
         from .enrichment_doc_ocr import enrich_doc_ocr
-        s = await enrich_doc_ocr(enriched)
+        s = await _await_capped(enrich_doc_ocr(enriched), "doc_ocr")
         if s:
             enrichment_stats["doc_ocr"] = s
             checkpoint.save(enriched, "doc_ocr")
@@ -1782,58 +1950,47 @@ async def run() -> int:
         log.error("foreclosure_sold_comps.failed",
                   traceback=traceback.format_exc())
 
-    # FEMA flood-zone tag — free public NFHL API, marks SFHA (high-risk) zones
-    # so grade can dock points and the calculator can include flood insurance.
+    # ---- Hazard / environmental enrichment group (concurrent) ----
+    # These 6 enrichers all read lat/lng and write INDEPENDENT raw keys
+    # (flood, environmental, fema_repetitive_loss, helene_damage,
+    # code_enforcement, building_permits). No data dependency between
+    # them, so they run concurrently via _gather_phases instead of
+    # sequentially — turns 6 serial network round-trips into 1.
+    _hazard_phases: dict = {}
     try:
         from .enrichment_flood import enrich_with_flood
-        await enrich_with_flood(enriched)
+        _hazard_phases["flood"] = enrich_with_flood(enriched)
     except Exception:
         log.error("flood.failed", traceback=traceback.format_exc())
-
-    # EPA ECHO + (optional) FBI crime data — environmental hazards within 1 mi
-    # and county-level crime stats. Both free; FBI requires a free api.data.gov key.
     try:
         from .enrichment_environmental import enrich_with_environmental
-        await enrich_with_environmental(enriched)
+        _hazard_phases["environmental"] = enrich_with_environmental(enriched)
     except Exception:
         log.error("environmental.failed", traceback=traceback.format_exc())
-
-    # FEMA repetitive flood loss — beyond basic flood zone, this catches
-    # structures with multiple historical claims (much stronger distress
-    # signal). Free OpenFEMA API.
     try:
         from .enrichment_fema_repetitive_loss import enrich_with_fema_repetitive_loss
-        await enrich_with_fema_repetitive_loss(enriched)
+        _hazard_phases["fema_repetitive_loss"] = enrich_with_fema_repetitive_loss(enriched)
     except Exception:
         log.error("fema_repetitive_loss.failed", traceback=traceback.format_exc())
-
-    # Hurricane Helene structural damage — parcel/address-matched county+FEMA
-    # damage-assessment layers (Spartanburg/Henderson/Buncombe). Free ArcGIS REST;
-    # TIME-SENSITIVE (these public layers decay). Kill switch: FORECLOSURE_HELENE_DAMAGE_OFF=1.
     try:
         from .enrichment_helene_damage import enrich_with_helene_damage
-        s = await enrich_with_helene_damage(enriched)
-        if s and s.get("matched"):
-            enrichment_stats["helene_damage"] = s
+        _hazard_phases["helene_damage"] = enrich_with_helene_damage(enriched)
     except Exception:
         log.error("helene_damage.failed", traceback=traceback.format_exc())
-
-    # Code enforcement violations — Charlotte 311 + other city open-data
-    # portals. Active open violations are direct distress signal. Free
-    # ArcGIS REST endpoints.
     try:
         from .enrichment_code_enforcement import enrich_with_code_enforcement
-        await enrich_with_code_enforcement(enriched)
+        _hazard_phases["code_enforcement"] = enrich_with_code_enforcement(enriched)
     except Exception:
         log.error("code_enforcement.failed", traceback=traceback.format_exc())
-
-    # Building permits — recent permits = active investment, stale 3+ year
-    # open permits = abandoned project. Free ArcGIS REST per city.
     try:
         from .enrichment_building_permits import enrich_with_building_permits
-        await enrich_with_building_permits(enriched)
+        _hazard_phases["building_permits"] = enrich_with_building_permits(enriched)
     except Exception:
         log.error("building_permits.failed", traceback=traceback.format_exc())
+    _hazard_results = await _gather_phases(_hazard_phases)
+    _hd = _hazard_results.get("helene_damage")
+    if _hd and _hd.get("matched"):
+        enrichment_stats["helene_damage"] = _hd
 
     # NC SOS LLC dissolution check — for listings with LLC/Inc defendants,
     # check NC Secretary of State for dissolved/suspended status. Capped
@@ -1874,9 +2031,29 @@ async def run() -> int:
     # broaden to zip-level for-rent pool. Free via HomeHarvest.
     try:
         from .enrichment_rent_comps_extra import enrich_with_extra_rent_comps
-        await enrich_with_extra_rent_comps(enriched)
+        # WALL-CLOCK CAP — this HomeHarvest phase was a bare await and WEDGED for 3.2h when
+        # wifi dropped mid-run 2026-08-15 (HomeHarvest uses its own requests session, not the
+        # hardened client, so a dead socket hung it). Bound it so a network blip can't stall
+        # the whole run before the write; uncomped leads just keep prior comps.
+        await asyncio.wait_for(
+            enrich_with_extra_rent_comps(enriched),
+            timeout=float(os.environ.get("RENT_COMPS_PHASE_MAX_SECONDS", "1200")))
+    except asyncio.TimeoutError:
+        log.warning("rent_comps_extra.time_capped", budget_s=1200)
     except Exception:
         log.error("rent_comps_extra.failed", traceback=traceback.format_exc())
+
+    # Census ACS rent estimate — free, keyless fallback for listings still
+    # missing rent data after HomeHarvest comps. Fills the 85% gap using
+    # ACS 5-year median gross rent by ZIP (ZCTA5). Needs CENSUS_API_KEY
+    # in .env (free at api.census.gov/data/key_signup.html).
+    try:
+        from .enrichment_census_rent import enrich_census_rent
+        s = enrich_census_rent(enriched)
+        if s and s.get("filled"):
+            enrichment_stats["census_rent"] = s
+    except Exception:
+        log.error("census_rent.failed", traceback=traceback.format_exc())
 
     # Multifamily classifier — promote mislabeled apartment / multi-unit
     # distressed properties to MULTI_FAMILY using precise party/owner/title +
@@ -1910,7 +2087,7 @@ async def run() -> int:
     # enrichment text-mines for property address + lender balance.
     try:
         from .enrichment_recap_document import enrich_recap_documents
-        s = await enrich_recap_documents(enriched)
+        s = await _await_capped(enrich_recap_documents(enriched), "recap_documents")
         if s: enrichment_stats["recap_documents"] = s
     except Exception:
         log.error("recap_documents.failed", traceback=traceback.format_exc())
@@ -1937,7 +2114,7 @@ async def run() -> int:
         from .enrichment_judgment_detail import (
             enrich_judgment_amount_via_detail_pages,
         )
-        s = await enrich_judgment_amount_via_detail_pages(enriched)
+        s = await _await_capped(enrich_judgment_amount_via_detail_pages(enriched), "judgment_detail")
         if s: enrichment_stats["judgment_amount_detail"] = s
     except Exception:
         log.error("judgment_detail.failed", traceback=traceback.format_exc())
@@ -2009,7 +2186,7 @@ async def run() -> int:
     # county_published/consent="none"/needs_dnc_scrub=True. No dialing is built.
     try:
         from .enrichment_county_phone import enrich_county_phone
-        s = await enrich_county_phone(enriched)
+        s = await _await_capped(enrich_county_phone(enriched), "county_phone")
         if s and "skipped" not in s: enrichment_stats["county_phone"] = s
     except Exception:
         log.error("county_phone.failed", traceback=traceback.format_exc())
@@ -2018,77 +2195,74 @@ async def run() -> int:
     # compliant call lane; runs AFTER voter_phone so it sees the numbers it just set.
     try:
         from .enrichment_line_type import enrich_line_type
-        s = await enrich_line_type(enriched)
+        s = await _await_capped(enrich_line_type(enriched), "line_type")
         if s: enrichment_stats["line_type"] = s
     except Exception:
         log.error("line_type.failed", traceback=traceback.format_exc())
 
-    # Gaston NC Register of Deeds lien-existence by owner name (gated FORECLOSURE_GASTON_ROD=1).
-    # Free name-index search over the public ROD; attaches raw['rod'] (D/T mortgage + adverse liens).
+    # ---- ROD lien-existence group (concurrent) ----
+    # 4 independent county ROD enrichers: gaston (NC), cchs (Burke+Cleveland NC),
+    # aumentum (Buncombe NC), spartanburg (SC). Each reads owner_name and writes
+    # raw['rod'] for DIFFERENT counties — no cross-dependency. dot_ocr runs AFTER
+    # this group because it reads raw['rod'] that spartanburg_rod writes.
+    _rod_phases: dict = {}
     try:
         from .enrichment_gaston_rod import enrich_gaston_rod
-        s = await enrich_gaston_rod(enriched)
-        if s and "skipped" not in s: enrichment_stats["gaston_rod"] = s
+        _rod_phases["gaston_rod"] = enrich_gaston_rod(enriched)
     except Exception:
         log.error("gaston_rod.failed", traceback=traceback.format_exc())
-
-    # Burke + Cleveland NC ROD lien-existence (CCHS SearchService.asp) — same shape as Gaston.
     try:
         from .enrichment_cchs_rod import enrich_cchs_rod
-        s = await enrich_cchs_rod(enriched)
-        if s and "skipped" not in s: enrichment_stats["cchs_rod"] = s
+        _rod_phases["cchs_rod"] = enrich_cchs_rod(enriched)
     except Exception:
         log.error("cchs_rod.failed", traceback=traceback.format_exc())
-
-    # Buncombe NC ROD lien-existence (Cott/Aumentum v4 name search — fixed adapter).
     try:
         from .enrichment_aumentum_rod import enrich_aumentum_rod
-        s = await enrich_aumentum_rod(enriched)
-        if s and "skipped" not in s: enrichment_stats["aumentum_rod"] = s
+        _rod_phases["aumentum_rod"] = enrich_aumentum_rod(enriched)
     except Exception:
         log.error("aumentum_rod.failed", traceback=traceback.format_exc())
-
-    # Spartanburg SC ROD lien-existence (render-based Logan/DataTables, HOT/WARM-first capped —
-    # biggest SC county, 0% otherwise; ~25s/owner so bounded per run + idempotent across runs).
     try:
         from .enrichment_spartanburg_rod import enrich_spartanburg_rod
-        s = await enrich_spartanburg_rod(enriched)
-        if s and "skipped" not in s: enrichment_stats["spartanburg_rod"] = s
+        _rod_phases["spartanburg_rod"] = enrich_spartanburg_rod(enriched)
     except Exception:
         log.error("spartanburg_rod.failed", traceback=traceback.format_exc())
+    _rod_results = await _gather_phases(_rod_phases)
+    for _rod_name in ("gaston_rod", "cchs_rod", "aumentum_rod", "spartanburg_rod"):
+        _rs = _rod_results.get(_rod_name)
+        if _rs and "skipped" not in _rs:
+            enrichment_stats[_rod_name] = _rs
 
     # Spartanburg DOT loan-amount OCR — turns raw['rod'] mortgage EXISTENCE into a
     # dollar figure (free view_image PDF -> Gemini OCR) so the equity engine has a
     # real payoff basis. HOT/WARM-first, capped, idempotent, budget-bailed.
     try:
         from .enrichment_dot_ocr import enrich_dot_ocr
-        s = await enrich_dot_ocr(enriched)
+        s = await _await_capped(enrich_dot_ocr(enriched), "dot_ocr")
         if s and "skipped" not in s: enrichment_stats["dot_ocr"] = s
         checkpoint.save(enriched, "dot_ocr")
     except Exception:
         log.error("dot_ocr.failed", traceback=traceback.format_exc())
 
-    # NC absolute-divorce (CVD) distress, by owner party-name in the NC eCourts
-    # Tyler portal (render path; 50B DV excluded). GATED OFF by default
-    # (FORECLOSURE_NC_DIVORCE=1) — the portal Smart Search is AWS-WAF/CAPTCHA-
-    # walled to automated renders today, so it makes zero calls until enabled.
+    # ---- Divorce enrichment group (concurrent) ----
+    # NC and SC divorce enrichers hit different court portals and write the
+    # same raw['divorce'] key, but for DISJOINT sets of leads (NC owners vs
+    # SC owners). Safe to run concurrently.
+    _divorce_phases: dict = {}
     try:
         from .enrichment_nc_divorce import enrich_nc_divorce
-        s = await enrich_nc_divorce(enriched)
-        if s and "skipped" not in s: enrichment_stats["nc_divorce"] = s
+        _divorce_phases["nc_divorce"] = enrich_nc_divorce(enriched)
     except Exception:
         log.error("nc_divorce.failed", traceback=traceback.format_exc())
-
-    # SC divorce / marital-dissolution distress by owner party-name in the SC
-    # Family Court FCCMS PublicAccess portal (free public API; one CSRF session
-    # reused across leads). Default-ON (FORECLOSURE_SC_DIVORCE=0 to disable);
-    # attaches raw['divorce'] + the 'divorce' distress category on a name match.
     try:
         from .enrichment_sc_divorce import enrich_sc_divorce
-        s = await enrich_sc_divorce(enriched)
-        if s and "skipped" not in s: enrichment_stats["sc_divorce"] = s
+        _divorce_phases["sc_divorce"] = enrich_sc_divorce(enriched)
     except Exception:
         log.error("sc_divorce.failed", traceback=traceback.format_exc())
+    _divorce_results = await _gather_phases(_divorce_phases)
+    for _dv_name in ("nc_divorce", "sc_divorce"):
+        _ds = _divorce_results.get(_dv_name)
+        if _ds and "skipped" not in _ds:
+            enrichment_stats[_dv_name] = _ds
 
     # NAME -> PROPERTY resolver — the backbone that turns name-indexed leads
     # (SC Public Index civil/criminal, SC/NC divorce, NC court ingest, probate
@@ -2099,10 +2273,20 @@ async def run() -> int:
     # FORECLOSURE_NAME_RESOLVE (default on), per-run cap + budget, core counties.
     try:
         from .enrichment_resolve_name_to_property import enrich_resolve_name_to_property
-        s = await enrich_resolve_name_to_property(enriched)
+        s = await _await_capped(enrich_resolve_name_to_property(enriched), "resolve_name")
         if s: enrichment_stats["name_resolve"] = s
     except Exception:
         log.error("name_resolve.failed", traceback=traceback.format_exc())
+
+    # ACPASS: Anderson County SC login-walled property search. Fills the gap
+    # left by the GIS resolver (Anderson public GIS has no owner-name column).
+    # Credentials in .env (ACPASS_EMAIL / ACPASS_PASSWORD). Budget-capped.
+    try:
+        from .enrichment_acpass import enrich as acpass_enrich
+        s = await _await_capped(acpass_enrich(enriched), "acpass")
+        if s: enrichment_stats["acpass"] = s
+    except Exception:
+        log.error("acpass.failed", traceback=traceback.format_exc())
 
     # SAME-RUN catch-up for freshly-resolved leads. The resolver (above) just gave
     # a name-only court/probate lead its address+parcel — but the address-gated deep
@@ -2403,6 +2587,17 @@ async def run() -> int:
     except Exception:
         log.error("flags.failed", traceback=traceback.format_exc())
 
+    # Vacant-land-use proxy — free USPS-vacancy substitute. Reads the parcel cache's
+    # land-class field (no network) and stamps a `vacant_lot` signal on undeveloped lots
+    # so it stacks into distress + lead_signals below. No-op for un-cached counties.
+    try:
+        from .enrichment_vacant_landuse import enrich_vacant_landuse
+        s = enrich_vacant_landuse(enriched)
+        if s and s.get("stamped"):
+            enrichment_stats["vacant_landuse"] = s
+    except Exception:
+        log.error("vacant_landuse.failed", traceback=traceback.format_exc())
+
     # Stacked-distress score (HOT/WARM/COLD operator board) — runs last so it
     # can stack every signal + equity + contactability gathered above.
     try:
@@ -2426,6 +2621,26 @@ async def run() -> int:
         if s: enrichment_stats["derived_signals"] = s
     except Exception:
         log.error("derived_signals.failed", traceback=traceback.format_exc())
+
+    # Derivation flags — free_and_clear (no mortgage in ROD), tired_landlord
+    # (absentee + 10yr ownership), divorce (from nc_ecourts_divorce scraper).
+    # Pure compute over existing ROD + GIS + court data.
+    try:
+        from .enrichment_derivation_flags import enrich_derivation_flags
+        s = enrich_derivation_flags(enriched)
+        if s:
+            enrichment_stats["derivation_flags"] = s
+    except Exception:
+        log.error("derivation_flags.failed", traceback=traceback.format_exc())
+
+    # Burke County parcel-history diff (ownership changes, structure loss).
+    try:
+        from .enrichment_burke_history import enrich_burke_parcel_history
+        s = await enrich_burke_parcel_history(enriched)
+        if s:
+            enrichment_stats["burke_history"] = s
+    except Exception:
+        log.error("burke_history.failed", traceback=traceback.format_exc())
 
     # Land-records PROPERTY PHOTOS — the county's building photo for
     # Henderson/Madison/Rutherford/Burke leads, downloaded + hosted under
@@ -2689,36 +2904,40 @@ async def run() -> int:
     except Exception:
         log.error("source_link.failed", traceback=traceback.format_exc())
 
-    # FEMA disaster declaration flag (Helene IA registrations by county).
+    # ---- Post-board geographic flag group (concurrent) ----
+    # FEMA disaster declarations, Opportunity Zone, and USPS vacancy all
+    # read geographic identifiers (county/lat-lng/zip) and write INDEPENDENT
+    # raw keys. Safe to run concurrently.
+    _geo_flag_phases: dict = {}
     try:
         from .enrichment_fema_disaster import fetch_helene_disaster_data
-        fema_data = await fetch_helene_disaster_data()
-        if fema_data:
-            enrichment_stats["fema_disaster"] = {"declarations": len(fema_data)}
-            for li in enriched:
-                if not isinstance(li.raw, dict):
-                    li.raw = {}
-                li.raw["fema_disaster"] = fema_data
+        _geo_flag_phases["fema_disaster"] = fetch_helene_disaster_data()
     except Exception:
         log.error("fema_disaster.failed", traceback=traceback.format_exc())
-
-    # Opportunity Zone flag (point-in-polygon against HUD OZ layer).
     try:
         from .enrichment_opportunity_zone import enrich_opportunity_zones
-        s = await enrich_opportunity_zones(enriched)
-        if s:
-            enrichment_stats["opportunity_zone"] = s
+        _geo_flag_phases["opportunity_zone"] = enrich_opportunity_zones(enriched)
     except Exception:
         log.error("opportunity_zone.failed", traceback=traceback.format_exc())
-
-    # USPS vacancy flag (census-tract-level vacancy rate by ZIP).
     try:
         from .enrichment_usps_vacancy import enrich_usps_vacancy
-        s = await enrich_usps_vacancy(enriched)
-        if s:
-            enrichment_stats["usps_vacancy"] = s
+        _geo_flag_phases["usps_vacancy"] = enrich_usps_vacancy(enriched)
     except Exception:
         log.error("usps_vacancy.failed", traceback=traceback.format_exc())
+    _geo_results = await _gather_phases(_geo_flag_phases)
+    _fd = _geo_results.get("fema_disaster")
+    if _fd:
+        enrichment_stats["fema_disaster"] = {"declarations": len(_fd)}
+        for li in enriched:
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            li.raw["fema_disaster"] = _fd
+    _oz = _geo_results.get("opportunity_zone")
+    if _oz:
+        enrichment_stats["opportunity_zone"] = _oz
+    _uv = _geo_results.get("usps_vacancy")
+    if _uv:
+        enrichment_stats["usps_vacancy"] = _uv
 
     # Outreach stack — owner contact actions (letter/email/SMS), a postcard
     # mail-merge CSV, and persistent CRM status. Runs after skip-trace +

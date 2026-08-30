@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import math
 import sqlite3
+import threading
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -39,7 +40,41 @@ STATE_URL = {
 # Generous lon/lat bounding boxes per county (point-in-polygon at lookup time
 # guarantees correctness; an over-inclusive bbox only stores a few extra rows).
 COUNTY_BBOX = {
+    # SC counties
     ("SC", "Spartanburg"): (-82.33, 34.77, -81.73, 35.24),
+    ("SC", "Pickens"): (-83.15, 34.55, -82.40, 35.20),
+    ("SC", "Oconee"): (-83.65, 34.40, -82.85, 35.20),
+    ("SC", "Anderson"): (-83.10, 34.30, -82.30, 34.85),
+    ("SC", "Cherokee"): (-82.15, 34.85, -81.55, 35.30),
+    ("SC", "Laurens"): (-82.45, 34.30, -81.70, 34.95),
+    ("SC", "Union"): (-82.10, 34.30, -81.40, 35.05),
+    ("SC", "Georgetown"): (-79.70, 33.15, -79.00, 33.90),
+    ("SC", "Charleston"): (-80.55, 32.55, -79.40, 33.50),
+    ("SC", "Greenville"): (-82.80, 34.50, -82.05, 35.30),
+    ("SC", "Lexington"): (-81.45, 33.55, -80.70, 34.25),
+    ("SC", "Richland"): (-81.30, 33.75, -80.50, 34.45),
+    ("SC", "Berkeley"): (-80.65, 32.80, -79.55, 33.75),
+    ("SC", "Dorchester"): (-80.70, 32.80, -79.90, 33.55),
+    ("SC", "Beaufort"): (-81.15, 32.05, -80.50, 32.65),
+    # NC counties
+    ("NC", "Buncombe"): (-83.20, 35.30, -82.20, 36.10),
+    ("NC", "New Hanover"): (-78.10, 33.90, -77.60, 34.50),
+    ("NC", "McDowell"): (-82.55, 35.30, -81.75, 36.05),
+    ("NC", "Rutherford"): (-82.50, 34.90, -81.55, 35.85),
+    ("NC", "Henderson"): (-83.00, 34.85, -82.10, 35.65),
+    ("NC", "Lincoln"): (-81.55, 35.30, -80.80, 35.80),
+    ("NC", "Cleveland"): (-82.10, 35.10, -81.30, 35.65),
+    ("NC", "Polk"): (-82.45, 35.05, -81.70, 35.75),
+    ("NC", "Gaston"): (-81.50, 34.90, -80.80, 35.55),
+    ("NC", "Brunswick"): (-79.05, 33.75, -78.30, 34.40),
+    ("NC", "Transylvania"): (-83.15, 35.05, -82.40, 35.75),
+    ("NC", "Haywood"): (-83.25, 35.30, -82.45, 36.10),
+    ("NC", "Jackson"): (-84.05, 34.80, -82.85, 35.75),
+    ("NC", "Macon"): (-84.25, 34.90, -83.20, 35.70),
+    ("NC", "Clay"): (-84.25, 35.00, -83.65, 35.75),
+    ("NC", "Cherokee"): (-84.50, 34.95, -83.60, 35.75),
+    ("NC", "Swain"): (-84.20, 35.10, -83.05, 35.75),
+    ("NC", "Graham"): (-84.35, 34.85, -83.40, 35.75),
 }
 
 _FT_PER_DEG_LAT = 364000.0  # ~constant; good to <0.5% for area estimates
@@ -69,14 +104,26 @@ def _point_in_ring(x: float, y: float, ring: list) -> bool:
     return inside
 
 
+_DB_CON: sqlite3.Connection | None = None
+_DB_LOCK = threading.Lock()
+
 def _connect() -> sqlite3.Connection:
+    """Return a shared, persistent connection.  Opening a new sqlite3
+    connection on a 2 GB DB is expensive (schema parse + index check); we
+    cache one at module level and reuse it for every lookup."""
+    global _DB_CON
+    if _DB_CON is not None:
+        return _DB_CON
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(DB_PATH)
-    con.execute("""CREATE TABLE IF NOT EXISTS footprints (
-        state TEXT, county TEXT, cx REAL, cy REAL,
-        minx REAL, miny REAL, maxx REAL, maxy REAL, area_sqft REAL, ring TEXT)""")
+    con = sqlite3.connect(DB_PATH, check_same_thread=False)
+    con.execute("PRAGMA journal_mode=OFF")  # read-only, skip WAL overhead
+    con.execute("PRAGMA mmap_size=268435456")  # 256MB mmap for faster reads
+    con.execute("CREATE TABLE IF NOT EXISTS footprints (\n        state TEXT, county TEXT, cx REAL, cy REAL,\n        minx REAL, miny REAL, maxx REAL, maxy REAL, area_sqft REAL, ring TEXT)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_fp_box ON footprints(state, county, minx, maxx)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_fp_y ON footprints(state, county, miny, maxy)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_fp_bbox ON footprints(state, county, miny, maxy)")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_fp_cxcy ON footprints(state, county, cx, cy)")
+    _DB_CON = con
     return con
 
 
@@ -132,12 +179,10 @@ def build_footprints(state: str, county: str) -> int:
                              json.dumps([[round(p[0], 6), round(p[1], 6)] for p in ring])))
     log.info("footprints.parsed", state=state, county=county, scanned=seen, kept=kept)
     con = _connect()
-    try:
+    with _DB_LOCK:
         con.execute("DELETE FROM footprints WHERE state=? AND county=?", (state, county))
         con.executemany("INSERT INTO footprints VALUES (?,?,?,?,?,?,?,?,?,?)", rows)
         con.commit()
-    finally:
-        con.close()
     log.info("footprints.stored", state=state, county=county, stored=len(rows))
     return len(rows)
 
@@ -146,11 +191,9 @@ def has_data(state: str, county: str) -> bool:
     if not DB_PATH.exists():
         return False
     con = _connect()
-    try:
+    with _DB_LOCK:
         return con.execute("SELECT 1 FROM footprints WHERE state=? AND county=? LIMIT 1",
                            (state, county)).fetchone() is not None
-    finally:
-        con.close()
 
 
 def largest_in_polygon(state: str, county: str, ring: list) -> tuple | None:
@@ -163,15 +206,13 @@ def largest_in_polygon(state: str, county: str, ring: list) -> tuple | None:
     xs = [p[0] for p in ring]
     ys = [p[1] for p in ring]
     con = _connect()
-    try:
+    with _DB_LOCK:
         cand = con.execute(
             """SELECT area_sqft, cx, cy FROM footprints
                WHERE state=? AND county=? AND cx BETWEEN ? AND ? AND cy BETWEEN ? AND ?""",
             (state, county, min(xs), max(xs), min(ys), max(ys))).fetchall()
-        inside = [a for (a, cx, cy) in cand if _point_in_ring(cx, cy, ring)]
-        return (round(max(inside), 1), "in_parcel") if inside else None
-    finally:
-        con.close()
+    inside = [a for (a, cx, cy) in cand if _point_in_ring(cx, cy, ring)]
+    return (round(max(inside), 1), "in_parcel") if inside else None
 
 
 def lookup_area(state: str, county: str, lon: float, lat: float) -> tuple | None:
@@ -182,24 +223,23 @@ def lookup_area(state: str, county: str, lon: float, lat: float) -> tuple | None
     if not DB_PATH.exists() or lon is None or lat is None:
         return None
     con = _connect()
-    try:
-        pad = 0.0007  # ~75 m search pad
+    pad = 0.0007  # ~75 m search pad
+    with _DB_LOCK:
         cand = con.execute(
             """SELECT area_sqft, cx, cy, ring FROM footprints
                WHERE state=? AND county=? AND minx<=? AND maxx>=? AND miny<=? AND maxy>=?""",
             (state, county, lon, lon, lat, lat)).fetchall()
-        for area, cx, cy, ring in cand:
-            if _point_in_ring(lon, lat, json.loads(ring)):
-                return round(area, 1), "contains"
-        # No footprint contains the parcel point (centroid may sit off the house):
-        # take the nearest footprint centroid within the pad.
+    for area, cx, cy, ring in cand:
+        if _point_in_ring(lon, lat, json.loads(ring)):
+            return round(area, 1), "contains"
+    # No footprint contains the parcel point (centroid may sit off the house):
+    # take the nearest footprint centroid within the pad.
+    with _DB_LOCK:
         near = con.execute(
             """SELECT area_sqft, cx, cy FROM footprints
                WHERE state=? AND county=? AND cx BETWEEN ? AND ? AND cy BETWEEN ? AND ?""",
             (state, county, lon - pad, lon + pad, lat - pad, lat + pad)).fetchall()
-        if near:
-            best = min(near, key=lambda r: (r[1] - lon) ** 2 + (r[2] - lat) ** 2)
-            return round(best[0], 1), "nearest"
-        return None
-    finally:
-        con.close()
+    if near:
+        best = min(near, key=lambda r: (r[1] - lon) ** 2 + (r[2] - lat) ** 2)
+        return round(best[0], 1), "nearest"
+    return None

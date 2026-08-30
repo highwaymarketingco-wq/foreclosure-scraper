@@ -27,7 +27,13 @@ CONC = int(os.environ.get("OWNER_MAILING_CONCURRENCY", "2"))
 
 
 def _has_mail(li) -> bool:
-    return bool((li.raw or {}).get("owner_mailing", {}).get("mailing"))
+    raw = li.raw
+    if not isinstance(raw, dict):
+        return False
+    om = raw.get("owner_mailing")
+    if not isinstance(om, dict):
+        return False
+    return bool(om.get("mailing"))
 
 
 def main() -> int:
@@ -55,7 +61,10 @@ def main() -> int:
     # mailing/absentee affects tier -> rescore
     score_board(listings, previous_path=DOCS / "listings.json")
     a_mail = sum(1 for li in listings if _has_mail(li))
-    absentee = sum(1 for li in listings if (li.raw or {}).get("owner_mailing", {}).get("absentee"))
+    absentee = sum(1 for li in listings
+                   if isinstance(li.raw, dict)
+                   and isinstance(li.raw.get("owner_mailing"), dict)
+                   and li.raw["owner_mailing"].get("absentee"))
     write_artifact(listings, {"notes": "board-wide owner-mailing contactability enrichment"}, docs_dir=DOCS)
     print(f"wrote board | mailing={a_mail}(+{a_mail - b_mail}) absentee={absentee}", flush=True)
     return 0

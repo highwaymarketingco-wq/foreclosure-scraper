@@ -200,6 +200,31 @@ def parse_auction_list(raw: bytes, source_url: str = AUCTION_LIST_URL) -> list[L
             except ValueError:
                 pass
 
+        # After the $ amount the row tail carries: <lien position> <attorney
+        # firm> <phone> <city> (e.g. "1 st Riley Pope & Laney 803-799-9993 West
+        # Ashley"). The parser historically stopped at the amount and dropped
+        # all of these. Recover firm -> trustee, phone -> raw, city -> city.
+        attorney_firm = None
+        attorney_phone = None
+        city = None
+        if amt_m:
+            tail = after[amt_m.end():]
+            phone_m = re.search(r"\d{3}-\d{3}-\d{4}", tail)
+            if phone_m:
+                attorney_phone = phone_m.group(0)
+                firm_seg = tail[: phone_m.start()]
+                # Drop the leading lien-position token ("1 st", "2nd", "1").
+                firm_seg = re.sub(
+                    r"^\s*\d+\s*(?:st|nd|rd|th)?\.?\s*", "", firm_seg, flags=re.I
+                )
+                attorney_firm = re.sub(r"\s+", " ", firm_seg).strip(" .-,") or None
+                city_seg = tail[phone_m.end():]
+                # Bound the city to THIS row: stop at the next row's MM-DD-YY.
+                ndm = _SALE_DATE_RE.search(city_seg)
+                if ndm:
+                    city_seg = city_seg[: ndm.start()]
+                city = re.sub(r"\s+", " ", city_seg).strip(" .-,") or None
+
         # Plaintiff/defendant: between the case# and the TMS. Best-effort split —
         # the names have no delimiter, so we record the raw blob in `description`
         # and only attempt a light plaintiff capture (text right after the case#).
@@ -218,6 +243,13 @@ def parse_auction_list(raw: bytes, source_url: str = AUCTION_LIST_URL) -> list[L
             seen_case.add(_norm_case(case_number))
 
         party_blob = re.sub(r"\s+", " ", before).strip()
+        raw_cm = {
+            "method": "auction_list",
+            "tms": tms,
+            "reopened": reopened,
+        }
+        if attorney_phone:
+            raw_cm["attorney_phone"] = attorney_phone
         out.append(
             Listing(
                 source="counties_sc.charleston_mie",
@@ -225,7 +257,7 @@ def parse_auction_list(raw: bytes, source_url: str = AUCTION_LIST_URL) -> list[L
                 listing_type=ListingType.FORECLOSURE_SALE,
                 property_kind=PropertyKind.UNKNOWN,
                 street_address=address,
-                city=None,
+                city=city,
                 state="SC",
                 county="Charleston",
                 parcel_id=tms,
@@ -234,19 +266,14 @@ def parse_auction_list(raw: bytes, source_url: str = AUCTION_LIST_URL) -> list[L
                 judgment_amount=opening_bid,
                 plaintiff=plaintiff,
                 defendant=defendant,
+                trustee=attorney_firm,
                 case_number=case_number,
                 foreclosure_process="judicial",
                 auction_status="reopen" if reopened else "active",
                 description=(party_blob[:400] or None),
                 first_seen=datetime.utcnow(),
                 last_seen=datetime.utcnow(),
-                raw={
-                    "charleston_mie": {
-                        "method": "auction_list",
-                        "tms": tms,
-                        "reopened": reopened,
-                    }
-                },
+                raw={"charleston_mie": raw_cm},
             )
         )
     return out

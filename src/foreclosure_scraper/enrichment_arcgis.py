@@ -30,6 +30,89 @@ log = structlog.get_logger()
 
 SCDOT_BASE = "https://smpesri.scdot.org/arcgis/rest/services/GISMapping/SC_Parcels/MapServer"
 
+# ---- Generic per-host ArcGIS circuit-breaker --------------------------------
+# Generalized from the SCDOT token-wall (2026-08-12: HTTP 200 +
+# {"error":{"code":499,"Token Required"}}). ANY ArcGIS host that goes token-walled
+# OR starts timing out will otherwise be re-hit per-lead across
+# parcel_from_geo / gis_attrs / cama / recorded_comps / owner_mailing / footprint
+# with no cross-lead memory — the class that dragged a run to 16h on 2026-08-13.
+# The breaker trips a host on the FIRST token/auth error OR after N consecutive
+# hard failures (timeout/connection), and every later call to that host
+# short-circuits for the life of the process. Hosts stay WIRED — a fresh process
+# (or a lifted wall / provided token) resolves against them normally again.
+from urllib.parse import urlparse as _urlparse
+
+_WALLED_HOSTS: set[str] = set()
+_HOST_FAILS: dict[str, int] = {}
+_HOST_FAIL_TRIP = 8  # consecutive hard failures before a host is presumed dead
+
+
+def _host_of(url: str) -> str:
+    try:
+        return (_urlparse(url).hostname or "").lower()
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def host_walled(url: str) -> bool:
+    """True once the host behind ``url`` has been tripped this process."""
+    return _host_of(url) in _WALLED_HOSTS
+
+
+def mark_host_walled(url: str, reason: str = "") -> None:
+    """Trip the breaker for a host (idempotent; logs once)."""
+    h = _host_of(url)
+    if h and h not in _WALLED_HOSTS:
+        _WALLED_HOSTS.add(h)
+        log.warning("arcgis.host_walled", host=h,
+                    reason=reason or "arcgis error / repeated timeout",
+                    note="skipping this host for the rest of this run")
+
+
+def note_host_ok(url: str) -> None:
+    """A clean response — reset the host's consecutive-failure counter."""
+    h = _host_of(url)
+    if h:
+        _HOST_FAILS[h] = 0
+
+
+def note_host_hard_failure(url: str) -> None:
+    """A timeout/connection error (NOT a normal empty result). Trip after N in a row."""
+    h = _host_of(url)
+    if not h:
+        return
+    _HOST_FAILS[h] = _HOST_FAILS.get(h, 0) + 1
+    if _HOST_FAILS[h] >= _HOST_FAIL_TRIP:
+        mark_host_walled(url, reason=f"{_HOST_FAILS[h]} consecutive hard failures")
+
+
+def is_arcgis_error(data: Any) -> bool:
+    """ArcGIS reports failure as HTTP 200 + an ``error`` object, so status alone lies."""
+    return isinstance(data, dict) and isinstance(data.get("error"), dict)
+
+
+def is_token_error(data: Any) -> bool:
+    """Auth/token wall: code 499/498/403 or a 'token'/'not authorized' message."""
+    if not is_arcgis_error(data):
+        return False
+    err = data["error"]
+    msg = str(err.get("message", "")).lower()
+    return err.get("code") in (499, 498, 403) or "token" in msg or "not authorized" in msg
+
+
+# --- backward-compat SCDOT aliases (existing wiring + tests use these) --------
+def scdot_walled() -> bool:
+    return host_walled(SCDOT_BASE)
+
+
+def mark_scdot_walled() -> None:
+    mark_host_walled(SCDOT_BASE, reason="SC_Parcels 200+Token Required")
+
+
+def is_scdot_token_error(data: Any) -> bool:
+    return is_token_error(data)
+
+
 # Per-county situs-field overrides for SC SCDOT layers whose address column
 # can't be auto-detected by _detect_addr_field (verified live 2026-06-26).
 # The auto-detector looks for ADDR/STREET/SITUS-style names; these layers either
@@ -994,6 +1077,30 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
     async def one(c: httpx.AsyncClient, li: Listing) -> None:
         if not (li.street_address and li.county and li.state):
             return
+        # PARCEL-CACHE fast path — this phase's dominant cost is one live address query
+        # PER LEAD across ~48k address-having leads (it ran ~6.8h uncapped on 2026-08-14).
+        # When a lead already carries a parcel_id in a bulk-cached county, fill owner/value/
+        # sqft/acre from the local table and skip the network entirely. Only short-circuits
+        # when owner or value is still missing (else fall through to refresh minor fields).
+        if li.parcel_id and not (li.owner_name and li.market_value):
+            try:
+                from .parcel_cache import lookup as _pc_lookup
+                pcr = _pc_lookup(li.county or "", li.parcel_id)
+            except Exception:  # noqa: BLE001 — cache is best-effort; never break the phase
+                pcr = None
+            if pcr:
+                if not li.owner_name and pcr.get("owner"):
+                    li.owner_name = pcr["owner"]
+                if not li.market_value and pcr.get("market_value"):
+                    li.market_value = pcr["market_value"]
+                if not li.tax_value and pcr.get("tax_value"):
+                    li.tax_value = pcr["tax_value"]
+                if not li.living_sqft and pcr.get("living_sqft"):
+                    li.living_sqft = pcr["living_sqft"]
+                if not li.acreage and pcr.get("acreage"):
+                    li.acreage = pcr["acreage"]
+                counts["cache_hit"] = counts.get("cache_hit", 0) + 1
+                return
         # Normalize county: strip "County", trailing ", NC" or ", SC", whitespace
         county_clean = li.county.replace(" County", "").strip()
         for suffix in (", NC", ", SC", ",NC", ",SC"):
@@ -1056,6 +1163,47 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
                 # SECOND OWNER'S NAME on that layer. There is nothing correct to
                 # match on here, and a bad match writes a wrong parcel_id into
                 # the dedupe key, so skip the county's address path entirely.
+                #
+                # 2026-08-18: fall back to NC OneMap statewide parcel service
+                # for situs. OneMap exposes siteadd (situs) for all 100 NC
+                # counties — counties like Rutherford, Transylvania, and New
+                # Hanover whose own ArcGIS layer has no situs column can still
+                # resolve a street address via OneMap's parcel match.
+                if li.street_address and li.parcel_id:
+                    onemap_url = (
+                        "https://services.nconemap.gov/secure/rest/services/"
+                        "NC1Map_Parcels/FeatureServer/1/query"
+                    )
+                    async with sem:
+                        counts["queried"] += 1
+                        # Try parcel_id match first (most reliable)
+                        pid = li.parcel_id.replace("'", "''")
+                        # OneMap requires exact parno match — LIKE queries return 500
+                        where = f"parno='{pid}'"
+                        params = {
+                            "where": where,
+                            "outFields": "parno,siteadd,ownname,ownname2,cntyname",
+                            "returnGeometry": "true",
+                            "outSR": "4326",
+                            "resultRecordCount": "5",
+                            "f": "json",
+                        }
+                        try:
+                            r = await c.get(onemap_url, params=params, timeout=20.0)
+                            if r.status_code == 200:
+                                data = r.json()
+                                if "error" not in data:
+                                    feats = data.get("features", [])
+                                    if feats:
+                                        attrs = dict(feats[0].get("attributes", {}))
+                                        situs = str(attrs.get("siteadd") or "").strip()
+                                        if situs:
+                                            li.street_address = situs
+                                            counts["matched"] += 1
+                                            counts["fields_filled"] += 1
+                                            return
+                        except Exception:
+                            pass
                 return
             else:
                 # Auto-detect (robust against schema drift); the configured

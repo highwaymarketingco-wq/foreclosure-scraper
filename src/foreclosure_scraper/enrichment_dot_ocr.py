@@ -510,6 +510,54 @@ async def enrich_dot_ocr(listings, max_lookups: Optional[int] = None) -> dict:
                 if parsed:
                     stats["fallback_ocr"] = stats.get("fallback_ocr", 0) + 1
                     break
+
+        # NVIDIA NIM — free, ~40 RPM per model
+        if not parsed:
+            nv_key = os.environ.get("NVIDIA_API_KEY")
+            if nv_key and blocks:
+                for nv_model in ocr.NVIDIA_VISION_MODELS:
+                    try:
+                        async with http_client(timeout=90.0) as hc:
+                            parsed = await ocr._openai_compat_call(hc, f"nvidia:{nv_model.split('/')[-1]}",
+                                                                   ocr.NVIDIA_URL, nv_key, nv_model, blocks)
+                    except ocr._QuotaOut:
+                        continue
+                    except Exception:
+                        parsed = None
+                    if parsed:
+                        stats["fallback_ocr"] = stats.get("fallback_ocr", 0) + 1
+                        break
+
+        # Mistral — free tier
+        if not parsed:
+            ms_key = os.environ.get("MISTRAL_API_KEY")
+            if ms_key and blocks:
+                for ms_model in ocr.MISTRAL_VISION_MODELS:
+                    try:
+                        async with http_client(timeout=90.0) as hc:
+                            parsed = await ocr._openai_compat_call(hc, f"mistral:{ms_model}",
+                                                                   ocr.MISTRAL_URL, ms_key, ms_model, blocks)
+                    except ocr._QuotaOut:
+                        continue
+                    except Exception:
+                        parsed = None
+                    if parsed:
+                        stats["fallback_ocr"] = stats.get("fallback_ocr", 0) + 1
+                        break
+
+        # Anthropic Claude — LAST resort, costs money
+        if not parsed:
+            claude_key = os.environ.get("ANTHROPIC_API_KEY")
+            if claude_key and blocks:
+                try:
+                    async with http_client(timeout=90.0) as hc:
+                        parsed = await ocr._anthropic_call(hc, claude_key, blocks)
+                except ocr._QuotaOut:
+                    pass
+                except Exception:
+                    parsed = None
+                if parsed:
+                    stats["fallback_ocr"] = stats.get("fallback_ocr", 0) + 1
         if not parsed:
             return None, None
         if not di.ocr_is_note(parsed):

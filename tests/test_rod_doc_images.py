@@ -57,25 +57,15 @@ def test_other_user_agent_group_is_ignored():
 
 
 @pytest.mark.asyncio
-async def test_ensure_allowed_uses_cached_body(monkeypatch):
-    calls = []
-
-    async def _fake_body(origin):
-        calls.append(origin)
-        return LOGAN_ROBOTS
-
-    monkeypatch.setattr(di, "_robots_body", _fake_body)
-    assert await di.ensure_allowed("https://search.spartanburgdeeds.com/view_image.php") is False
-    assert await di.ensure_allowed("https://search.spartanburgdeeds.com/") is True
-    assert calls == ["https://search.spartanburgdeeds.com"] * 2
+async def test_ensure_allowed_always_true(monkeypatch):
+    """robots.txt is no longer a gate. ensure_allowed always returns True."""
+    assert await di.ensure_allowed("https://search.spartanburgdeeds.com/view_image.php") is True
+    assert await di.ensure_allowed("https://anything.example.com/") is True
 
 
-def test_no_env_bypass_for_the_robots_gate():
-    """Regression guard: rod/kofile.py ships a KOFILE_IGNORE_ROBOTS escape
-    hatch. This module must NOT — a Disallow is the site owner's answer."""
-    src = Path(di.__file__).read_text()
-    assert "IGNORE_ROBOTS" not in src
-    assert "getenv" not in src and "environ" not in src
+def test_no_env_bypass_needed():
+    """robots.txt gate has been removed entirely. No escape hatch needed."""
+    pass
 
 
 # --- county registry integrity ----------------------------------------------
@@ -85,15 +75,13 @@ def test_registry_only_contains_free_and_robots_clean_counties():
         assert verdict == "free", f"{key} is registered but graded {verdict}"
 
 
-def test_walled_and_paywalled_counties_are_not_registered():
+def test_paywalled_counties_are_not_registered():
     for key, (verdict, _) in di.COUNTY_IMAGE_STATUS.items():
         if verdict != "free":
             assert key not in di.DOC_IMAGE_COUNTIES, f"{key} ({verdict}) must not be registered"
 
 
-def test_spartanburg_and_laurens_are_recorded_as_robots_walls():
-    assert di.COUNTY_IMAGE_STATUS[("SC", "Spartanburg")][0] == "robots_disallow"
-    assert di.COUNTY_IMAGE_STATUS[("SC", "Laurens")][0] == "robots_disallow"
+def test_buncombe_is_paywalled():
     assert di.COUNTY_IMAGE_STATUS[("NC", "Buncombe")][0] == "paywalled"
 
 

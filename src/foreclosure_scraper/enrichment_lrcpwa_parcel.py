@@ -38,7 +38,9 @@ from .models import Listing
 log = structlog.get_logger(__name__)
 
 BASE = "https://lrcpwa.ncptscloud.com"
-TENANTS = {"Henderson", "Madison", "Rutherford", "Burke"}   # NC land-records cluster
+TENANTS = {"Henderson", "Madison", "Rutherford", "Burke", "Hyde"}   # NC land-records cluster
+# Hyde added 2026-08-15: its delinquent roll (1,382 leads, ALL address-less) resolves on this
+# same cluster with X-Tenant: Hyde — verified 11/12 sample parcels return situs+value+owner.
 _ENABLED = os.environ.get("FORECLOSURE_LRCPWA") != "0"
 _BUDGET_S = float(os.environ.get("LRCPWA_BUDGET_S", "900"))
 _MAX = int(os.environ.get("LRCPWA_MAX", "6000"))
@@ -96,8 +98,10 @@ async def _lookup(http: httpx.AsyncClient, tenant: str, parcel: str) -> Optional
 
 def _is_placeholder_addr(addr: str) -> bool:
     a = addr.upper()
+    # "0 DEFAULT STREET" is the Hyde/NCPTS placeholder for an unaddressed parcel — must NOT
+    # be written as a situs (vs "0 BRITISH CEMETERY RD", a real rural road with no house #).
     return ("NO ADDRESS" in a or "NOT ASSIGNED" in a or a in ("0", "", "TBD")
-            or a.startswith("0 NO ") or "NO SITUS" in a)
+            or a.startswith("0 NO ") or "NO SITUS" in a or "DEFAULT STREET" in a)
 
 
 def _apply(li: Listing, rec: dict) -> bool:
@@ -159,10 +163,10 @@ async def enrich_lrcpwa_parcel(listings: Iterable[Listing]) -> dict:
     sem = asyncio.Semaphore(_CONC)
     async with client(timeout=25.0) as http:
         async def one(li: Listing):
-            if (time.monotonic() - start) > _BUDGET_S:
-                stats["skipped_budget"] += 1
-                return
             async with sem:
+                if (time.monotonic() - start) > _BUDGET_S:
+                    stats["skipped_budget"] += 1
+                    return
                 rec = await _lookup(http, _county(li), _search_key(li))
             if not rec:
                 return

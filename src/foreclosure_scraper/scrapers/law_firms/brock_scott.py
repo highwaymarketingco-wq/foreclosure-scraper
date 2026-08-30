@@ -214,7 +214,14 @@ class BrockScott(BaseScraper):
         url = f"{BASE}?_sft_foreclosure_state={state}&sf_paged={page}"
         for attempt in range(PAGE_ATTEMPTS):
             try:
-                return HTMLParser(await get_text(url, timeout=45.0))
+                html = await get_text(url, timeout=45.0)
+                if html and len(html) > 500:
+                    return HTMLParser(html)
+                # Site now returns "Forbidden" (9 bytes) to plain httpx.
+                # Fall back to StealthyFetcher which passes the WAF check.
+                html = await self._stealth_fetch(url)
+                if html:
+                    return HTMLParser(html)
             except Exception as exc:  # noqa: BLE001 — retried, then reported
                 if attempt == PAGE_ATTEMPTS - 1:
                     log.warning(
@@ -224,6 +231,27 @@ class BrockScott(BaseScraper):
                     return None
                 await asyncio.sleep(2.0 * (attempt + 1))
         return None
+
+    @staticmethod
+    async def _stealth_fetch(url: str) -> str | None:
+        """StealthyFetcher fallback for WAF-blocked pages."""
+        try:
+            from scrapling.fetchers import StealthyFetcher
+        except ImportError:
+            return None
+        try:
+            result = await StealthyFetcher.async_fetch(
+                url, headless=True, network_idle=False, timeout=60000,
+                solve_cloudflare=False,
+            )
+        except Exception as exc:
+            log.warning("brock_scott.stealth_failed", url=url, error=str(exc)[:160])
+            return None
+        body = getattr(result, "body", b"")
+        html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
+        if not html or len(html) < 500:
+            return None
+        return html
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []

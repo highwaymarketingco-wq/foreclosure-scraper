@@ -59,6 +59,7 @@ from dateutil import parser as dateparser
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
+from ...document_links import stamp_documents
 from ...http_client import client, get_bytes, get_text
 from ...models import Listing, ListingType, PropertyKind
 
@@ -199,6 +200,9 @@ def parse_brunswick(html: str, page_url: str = BRUNSWICK_LEGAL_NOTICES) -> list[
                                                     "notice_pdf": href}},
             )
         )
+        # The per-parcel notice PDF holds the address / opening bid — hand it to
+        # the OCR pass.
+        stamp_documents(out[-1], [href])
     return out
 
 
@@ -331,7 +335,8 @@ def parse_carteret(html: str, page_url: str = CARTERET_TAX_FORECLOSURE) -> list[
             return v or None
 
         for r in rows[header_idx + 1:]:
-            cells = [c.text(strip=True) for c in r.css("td")]
+            tds = r.css("td")
+            cells = [c.text(strip=True) for c in tds]
             if not cells or not any(c.strip() for c in cells):
                 continue
             parcel = get(cells, "parcel id")
@@ -343,6 +348,19 @@ def parse_carteret(html: str, page_url: str = CARTERET_TAX_FORECLOSURE) -> list[
             bid = _money(get(cells, "minimum opening bid"))
             legal = get(cells, "legal description")
             name = get(cells, "name")
+            deed_book = get(cells, "deed book")
+            deed_page = get(cells, "deed page")
+            # Deed Link column holds an <a> to the recorded deed image; the cell
+            # text is often just "Link"/"Deed", so pull the href off the anchor.
+            deed_link = None
+            dli = col.get("deed link")
+            if dli is not None and dli < len(tds):
+                a = tds[dli].css_first("a")
+                if a is not None:
+                    href = (a.attributes.get("href") or "").strip()
+                    if href:
+                        deed_link = href if href.startswith("http") else (
+                            "https://www.carteretcountync.gov" + href)
 
             out.append(
                 Listing(
@@ -355,6 +373,7 @@ def parse_carteret(html: str, page_url: str = CARTERET_TAX_FORECLOSURE) -> list[
                     street_address=addr,
                     parcel_id=parcel,
                     owner_name=owner,
+                    legal_description=legal,
                     opening_bid=bid,
                     sale_date=sale_date,
                     foreclosure_process="tax",
@@ -367,9 +386,15 @@ def parse_carteret(html: str, page_url: str = CARTERET_TAX_FORECLOSURE) -> list[
                     first_seen=datetime.utcnow(),
                     last_seen=datetime.utcnow(),
                     raw={"nc_coastal_tax_foreclosure": {"county": "Carteret",
-                                                        "legal": legal}},
+                                                        "legal": legal,
+                                                        "deed_book": deed_book,
+                                                        "deed_page": deed_page,
+                                                        "deed_link": deed_link}},
                 )
             )
+            # Carteret's Deed Link column points at the recorded deed image —
+            # the OCR pass reads the loan/consideration off it. (No-op if empty.)
+            stamp_documents(out[-1], [deed_link])
     return out
 
 
@@ -454,6 +479,14 @@ def _apply_onemap(li: Listing, attrs: dict[str, Any]) -> None:
     if val and not li.tax_value:
         try:
             li.tax_value = float(val)
+        except (ValueError, TypeError):
+            pass
+    acres = attrs.get("gisacres")
+    if acres is not None and li.acreage is None:
+        try:
+            a = float(acres)
+            if a > 0:
+                li.acreage = a
         except (ValueError, TypeError):
             pass
     if not isinstance(li.raw, dict):

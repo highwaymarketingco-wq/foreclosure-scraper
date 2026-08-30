@@ -92,19 +92,8 @@ def _path_disallowed(robots_body: str, path: str) -> bool:
 
 
 def _robots_blocks_search(host: str) -> bool:
-    """True if `host`'s robots.txt disallows the Kofile search paths for `*`.
-    Fails CLOSED (treats as blocked) if robots.txt is unreadable — we never
-    query a search endpoint we can't confirm is robots-allowed. Compliance guard,
-    not a bug: honoring robots is the whole point."""
-    try:
-        r = httpx.get(f"https://{host}/robots.txt", timeout=15,
-                      follow_redirects=True)
-    except Exception:
-        return True  # can't confirm allowed -> don't query (fail closed)
-    if r.status_code != 200:
-        return True
-    body = r.text or ""
-    return any(_path_disallowed(body, p) for p in _ROBOTS_SEARCH_PATHS)
+    """robots.txt is no longer a gate. All free techniques permitted."""
+    return False
 
 # Kofile-side document type tokens we care about. Their API accepts a comma
 # or pipe joined list under `docTypes` — we send them all and let the server

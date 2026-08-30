@@ -5,17 +5,9 @@ Reads the signals the pipeline already computed (equity, tenure, condition,
 listing type, property kind, tax status, distress stack) and sets
 raw['strategy_fit'] = {"tags": [...], "reasons": {...}}. Tags:
 
-  WHOLESALE       improved residential + real equity + a distress signal — an
-                  assignable cash deal with spread (offer < ARV, assign the contract).
-  LAND_WHOLESALE  vacant land + a motivation (delinquent tax / long-held / probate)
-                  — the construction-company "buy box" play: tie it up, assign to a
-                  builder who wants land in that area.
-  SUBJECT_TO      residential foreclosure/lis-pendens with LOW equity — take over the
-                  existing mortgage instead of buying the (thin) equity.
   FIX_FLIP        residential in rough condition (major/gut) with equity to renovate.
   BUY_HOLD        residential, livable, not severely distressed — rental hold.
-  GATOR           any assignable deal (WHOLESALE/LAND_WHOLESALE) — a transactional /
-                  EMD funding fit, not a property type.
+  LAND            vacant land parcel — buyable land (not a wholesale assignment play).
 
 Heuristic + transparent; every tag carries a one-line reason. Gate STRATEGY_FIT=0.
 """
@@ -86,8 +78,8 @@ def enrich_strategy_fit(listings: Iterable[Listing]) -> dict:
         low_equity = eq is not None and eq < 0.20
 
         if is_land and (tax_owed or long_tenure or probate or has_distress):
-            tags.append("LAND_WHOLESALE")
-            reasons["LAND_WHOLESALE"] = "vacant land + " + (
+            tags.append("LAND")
+            reasons["LAND"] = "vacant land + " + (
                 "delinquent tax" if tax_owed else "long-held (equity)" if long_tenure else
                 "probate/estate" if probate else "distress signal")
 

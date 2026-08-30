@@ -130,19 +130,19 @@ async def enrich_lrcpwa_photo(listings: Iterable[Listing],
     sem = asyncio.Semaphore(int(os.environ.get("LRCPWA_PHOTO_CONCURRENCY", "6")))
     async with client(timeout=30.0) as http:
         async def one(li: Listing):
-            if stats["fetched"] + stats["cached"] >= _MAX or (time.monotonic() - start) > _BUDGET_S:
-                stats["skipped_budget"] += 1
-                return
-            county = _county(li)
-            parcel = (li.parcel_id or "").strip()
-            fname = _slug(county, parcel)
-            fpath = pdir / fname
-            if fpath.exists() and fpath.stat().st_size > 0:
-                _set_image(li, fname)
-                stats["cached"] += 1
-                return
-            pid = ((li.raw or {}).get("lrcpwa") or {}).get("id")
             async with sem:
+                if stats["fetched"] + stats["cached"] >= _MAX or (time.monotonic() - start) > _BUDGET_S:
+                    stats["skipped_budget"] += 1
+                    return
+                county = _county(li)
+                parcel = (li.parcel_id or "").strip()
+                fname = _slug(county, parcel)
+                fpath = pdir / fname
+                if fpath.exists() and fpath.stat().st_size > 0:
+                    _set_image(li, fname)
+                    stats["cached"] += 1
+                    return
+                pid = ((li.raw or {}).get("lrcpwa") or {}).get("id")
                 if not pid:  # not address-resolved yet — resolve id via search
                     pid = await _resolve_id(http, county, parcel)
                 if not pid:

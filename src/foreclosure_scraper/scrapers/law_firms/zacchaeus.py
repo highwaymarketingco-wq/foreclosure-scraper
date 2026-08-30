@@ -159,10 +159,29 @@ def _row_to_listing(row: dict, slug: str) -> Listing | None:
     if county is None:
         county = upstate_county_for(city or municipality, "NC")
 
+    sale_dt = _parse_date(row.get("sale"))
+    upset_dt = _parse_date(row.get("upset"))
+
+    # Actionable-date keying. An "Upset Bidding in Progress" row has already gone
+    # to courthouse sale (past sale_date) but stays LIVE until the upset-bid
+    # deadline — under NCGS §45-21.27 anyone can raise the bid until that date,
+    # so it is the strongest actionable signal on the grid. The orchestrator's
+    # active-window filter (main._active_only) keys purely on sale_date, so a
+    # past courthouse-sale date strands these leads even while the window is open.
+    # When the upset deadline is present and still ahead of the sale date, surface
+    # it as the sale_date the board keys on; the true courthouse-sale date is
+    # preserved in raw.zls.sale_date. Rows without a future upset deadline
+    # (upcoming Courthouse Sale = future sale_date; stale Pending Confirmation =
+    # long-past date, no deadline) are unchanged and filter normally.
+    actionable_date = sale_dt
+    if upset_dt is not None and (sale_dt is None or upset_dt > sale_dt):
+        actionable_date = upset_dt
+
     zls_raw = {
         "status": status,
         "tax_office": (row.get("office") or "").strip() or None,
         "municipality": municipality,
+        "sale_date": (row.get("sale") or "").strip() or None,
         "upset_deadline": (row.get("upset") or "").strip() or None,
         "current_bid": (row.get("current_bid") or "").strip() or None,
         "notice_url": (row.get("notice_url") or "").strip() or None,
@@ -179,8 +198,8 @@ def _row_to_listing(row: dict, slug: str) -> Listing | None:
         street_address=street,
         city=city,
         zip_code=zip_code,
-        sale_date=_parse_date(row.get("sale")),
-        upset_bid_deadline=_parse_date(row.get("upset")),
+        sale_date=actionable_date,
+        upset_bid_deadline=upset_dt,
         opening_bid=_clean_money(row.get("opening_bid")),
         auction_status=status,
         foreclosure_process="tax",

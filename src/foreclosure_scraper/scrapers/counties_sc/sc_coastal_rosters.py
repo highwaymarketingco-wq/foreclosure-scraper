@@ -71,7 +71,6 @@ log = structlog.get_logger()
 # 2026-06-24). Charleston omitted on purpose (no Master roster at all — see
 # module docstring).
 COASTAL_COUNTIES: dict[str, str] = {
-    "horry": "Horry",
     "beaufort": "Beaufort",
     "georgetown": "Georgetown",
     "colleton": "Colleton",
@@ -86,7 +85,6 @@ COASTAL_COUNTIES: dict[str, str] = {
 # We try every listed code per county and keep whatever yields Foreclosure-420
 # rows with a parcel identifier. Order matters only for de-dupe stability.
 COUNTY_SALE_CODES: dict[str, tuple[str, ...]] = {
-    "horry": ("MO",),
     "beaufort": ("SALE", "MO"),
     "georgetown": ("SALE", "MO"),
     "colleton": ("SALE", "MO"),
@@ -284,21 +282,21 @@ async def _fetch_county(county_slug: str, codes: tuple[str, ...]) -> list[tuple[
         await page.goto(f"{base}/Disclaimer.aspx", wait_until="domcontentloaded")
         try:
             await page.click(f'input[name="{ACCEPT_BTN}"]', timeout=8000)
-            await page.wait_for_load_state("networkidle", timeout=15000)
+            await page.wait_for_load_state("networkidle", timeout=8000)
         except Exception:
             pass
         await page.goto(f"{base}/RosterSelection.aspx", wait_until="domcontentloaded")
-        await page.wait_for_load_state("networkidle", timeout=12000)
+        await page.wait_for_load_state("networkidle", timeout=8000)
         selection = await page.content()
         for path, rdate in _select_sale_rosters(selection, codes):
             await page.goto(f"{base}/{path}", wait_until="domcontentloaded")
-            await page.wait_for_load_state("networkidle", timeout=12000)
+            await page.wait_for_load_state("networkidle", timeout=8000)
             roster_pages.append((await page.content(), rdate))
         return page
 
     try:
         await StealthyFetcher.async_fetch(
-            f"{base}/Disclaimer.aspx", headless=True, timeout=120000, page_action=action
+            f"{base}/Disclaimer.aspx", headless=True, timeout=60000, page_action=action
         )
     except Exception:
         return []
@@ -471,7 +469,7 @@ async def _geo_enrich(listings: list[Listing]) -> int:
         return 0
 
     resolved = 0
-    sem = asyncio.Semaphore(6)
+    sem = asyncio.Semaphore(10)
 
     async def one(c: httpx.AsyncClient, county: str, li: Listing) -> None:
         nonlocal resolved
@@ -500,24 +498,30 @@ class SCCoastalRosters(BaseScraper):
     category = "county_court"
     expected_min_count = 0  # roster cadence varies; some weeks a county has 0 sales
     requires_render = True
-    timeout_s = 1200.0
+    timeout_s = 900.0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         seen: set[tuple] = set()
+
+        # Run all counties in PARALLEL — each gets its own stealth browser session
+        # so they don't block on each other's page loads.
+        county_tasks = []
         for slug, county in COASTAL_COUNTIES.items():
-            base = f"{HOST}/{slug}/courtrosters"
             codes = COUNTY_SALE_CODES.get(slug, ("MO",))
-            try:
-                pages = await _fetch_county(slug, codes)
-            except Exception:
+            county_tasks.append(_fetch_county(slug, codes))
+        all_pages = await asyncio.gather(*county_tasks, return_exceptions=True)
+
+        for slug_idx, (slug, county) in enumerate(COASTAL_COUNTIES.items()):
+            pages = all_pages[slug_idx]
+            if isinstance(pages, Exception):
+                log.error("sc_coastal_rosters.county_failed", county=county, error=str(pages))
                 continue
+            base = f"{HOST}/{slug}/courtrosters"
             for html, rdate in pages:
                 for li in parse_sale_roster(
                     html, f"{base}/RosterSelection.aspx", county, rdate
                 ):
-                    # parcel + case dedupe (the same case can repeat across the
-                    # MO hearing docket and the SALE roster of a county).
                     key = (li.county, li.case_number or li.parcel_id)
                     if key in seen:
                         continue

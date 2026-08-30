@@ -355,7 +355,10 @@ class CharlestonDelinquentTax(BaseScraper):
     expected_min_count = 0  # seasonal — 0 off-season is legitimate
     requires_apify = False
     timeout_s = 180.0
-    active_months = (10, 11, 12, 1, 2)  # list posts ~Oct; sale ~Dec; FLC sealed bid into Feb
+    # PDFs are published ~Oct and stay live year-round (verified 2026-08-25:
+    # 834 listings parsed from RP-Tax-Sale-Listing.pdf in August).
+    # No month gating — always attempt fetch, return 0 if PDFs are absent.
+    active_months = None
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []

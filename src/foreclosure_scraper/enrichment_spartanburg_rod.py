@@ -17,6 +17,10 @@ from datetime import datetime, timezone
 from .rod.logan_render import search_by_name_render
 
 _MORTGAGE = re.compile(r"DEED OF TRUST|MORTGAGE|\bMTG\b|SECURITY (DEED|AGREEMENT)|\bD\s*/?\s*T\b", re.I)
+# Documents that REFERENCE a mortgage but are NOT a new mortgage recording.
+_NOT_NEW_MORTGAGE = re.compile(
+    r"ASSIGN|MODIF|SATISF|CANCEL|RELEASE|CORRECT|SUBSTITUT|AMEND|EXTEN|CONSOLEN"
+    r"|CONSOLI|RESCISSION|RATIFICATION|RECORDING|SUBORDINAT", re.I)
 _ADVERSE = re.compile(r"JUDG|\bLIEN\b|\bTAX\b|EXECUTION|FORECLOS|LIS PEND|MECHANIC|HOA", re.I)
 # Liens that are NOT real-estate distress (don't flag these as adverse).
 _NOT_REALTY_LIEN = re.compile(r"AIRPLANE|AIRCRAFT|\bUCC\b|VESSEL|\bBOAT\b", re.I)
@@ -54,7 +58,7 @@ def _classify(docs) -> dict:
         k = (d.doc_type or "").upper().strip()
         if k:
             kinds[k] = kinds.get(k, 0) + 1
-        if _MORTGAGE.search(k):
+        if _MORTGAGE.search(k) and not _NOT_NEW_MORTGAGE.search(k):
             has_m = True
             mtg += 1
         if _ADVERSE.search(k) and not _NOT_REALTY_LIEN.search(k):

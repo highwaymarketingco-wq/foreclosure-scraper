@@ -32,10 +32,47 @@ from ...models import Listing, ListingType, PropertyKind
 log = structlog.get_logger()
 
 URL = "https://www.trulia.com/foreclosures/"
+# Trulia geo-detects from IP and returns ~16 results per fetch. To maximize
+# NC+SC coverage, try multiple URL variants that may yield different result
+# sets. Each is a best-effort probe — if it returns 0 homes, we move on.
+URL_VARIANTS = (
+    "https://www.trulia.com/foreclosures/",
+    "https://www.trulia.com/foreclosures/Charlotte,NC/",
+    "https://www.trulia.com/foreclosures/Raleigh,NC/",
+    "https://www.trulia.com/foreclosures/Greenville,SC/",
+    "https://www.trulia.com/foreclosures/Columbia,SC/",
+    "https://www.trulia.com/foreclosures/Asheville,NC/",
+    "https://www.trulia.com/foreclosures/Wilmington,NC/",
+    "https://www.trulia.com/foreclosures/Myrtle_Beach,SC/",
+)
 NEXT_DATA_RE = re.compile(
     r'<script[^>]+id="__NEXT_DATA__"[^>]*>(.*?)</script>',
     re.S,
 )
+
+
+def _num_field(v):
+    """Trulia home dimension fields come as a plain number OR a
+    {value, formattedValue/formattedDimension} object depending on the graph
+    slice. Pull a float defensively; return None when the shape is unclear
+    (so a wrong key never yields a wrong value)."""
+    if v is None or isinstance(v, bool):
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, dict):
+        if isinstance(v.get("value"), (int, float)) and not isinstance(v.get("value"), bool):
+            return float(v["value"])
+        for k in ("formattedValue", "formattedDimension"):
+            s = v.get(k)
+            if isinstance(s, str):
+                m = re.search(r"[\d,]+(?:\.\d+)?", s)
+                if m:
+                    try:
+                        return float(m.group(0).replace(",", ""))
+                    except (TypeError, ValueError):
+                        return None
+    return None
 
 
 def _ltype_from_tags(tags: list[dict] | None) -> ListingType:
@@ -79,6 +116,11 @@ def _to_listing(h: dict, slug: str) -> Listing | None:
     img_url = url_obj.get("medium") or url_obj.get("small") if isinstance(url_obj, dict) else None
     if isinstance(img_url, str) and img_url.startswith("http"):
         photos.append(img_url)
+    # beds/baths/sqft — only price was captured before. Trulia's home object
+    # carries these under bedrooms/bathrooms/floorSpace (shape varies).
+    beds = _num_field(h.get("bedrooms"))
+    baths = _num_field(h.get("bathrooms"))
+    sqft = _num_field(h.get("floorSpace") or h.get("floorSpaceInSqFt"))
     return Listing(
         source=slug,
         source_url=f"https://www.trulia.com{href}" if href.startswith("/") else (href or URL),
@@ -92,6 +134,9 @@ def _to_listing(h: dict, slug: str) -> Listing | None:
         latitude=coords.get("latitude") if isinstance(coords.get("latitude"), (int, float)) else None,
         longitude=coords.get("longitude") if isinstance(coords.get("longitude"), (int, float)) else None,
         opening_bid=price,
+        bedrooms=beds,
+        bathrooms=baths,
+        living_sqft=sqft,
         description=(
             f"Trulia foreclosure ({', '.join((t.get('formattedName') or '') for t in (h.get('fullTags') or []) if isinstance(t, dict)) or 'Foreclosure'})"
         ),
@@ -101,23 +146,26 @@ def _to_listing(h: dict, slug: str) -> Listing | None:
             "trulia_id": home_id,
             "is_foreclosure": True,
             "is_recently_sold": status.get("isRecentlySold"),
+            "beds_raw": h.get("bedrooms"),
+            "baths_raw": h.get("bathrooms"),
+            "floor_space_raw": h.get("floorSpace") or h.get("floorSpaceInSqFt"),
             "images": {"real": photos} if photos else {},
         },
     )
 
 
-async def _fetch_page() -> list[Listing]:
+async def _fetch_page(url: str = URL) -> list[Listing]:
     try:
         from scrapling.fetchers import StealthyFetcher
     except ImportError:
         return []
     try:
         result = await StealthyFetcher.async_fetch(
-            URL, headless=True, network_idle=False, timeout=90000,
+            url, headless=True, network_idle=False, timeout=90000,
             solve_cloudflare=False,
         )
     except Exception as exc:
-        log.warning("trulia.fetch_failed", error=str(exc)[:200])
+        log.warning("trulia.fetch_failed", url=url, error=str(exc)[:200])
         return []
     body = getattr(result, "body", b"")
     html = body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")
@@ -151,6 +199,23 @@ class TruliaForeclosures(BaseScraper):
     timeout_s = 120.0
 
     async def fetch(self) -> Iterable[Listing]:
-        listings = await _fetch_page()
+        listings: list[Listing] = []
+        seen_ids: set[str] = set()
+        for url in URL_VARIANTS:
+            try:
+                page_listings = await _fetch_page(url)
+            except Exception as exc:
+                log.warning("trulia.variant_failed", url=url, error=str(exc)[:160])
+                continue
+            for li in page_listings:
+                # Dedupe by case_number (trulia-{home_id}) across URL variants
+                key = li.case_number or li.street_address or ""
+                if key and key in seen_ids:
+                    continue
+                if key:
+                    seen_ids.add(key)
+                listings.append(li)
+            log.info("trulia.variant_done", url=url, found=len(page_listings),
+                     total_unique=len(listings))
         log.info("trulia.done", total=len(listings))
         return listings

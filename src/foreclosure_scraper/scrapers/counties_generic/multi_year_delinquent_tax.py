@@ -107,7 +107,7 @@ PICKENS_ORG = "https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/service
 # Human-reachable pages for source_url (the FeatureServer itself is a JSON API).
 BUNCOMBE_PAGE = "https://www.buncombecounty.org/governing/depts/tax/"
 OCONEE_PAGE = "https://oconeesc.com/delinquent-tax"
-PICKENS_PAGE = "https://www.co.pickens.sc.us/departments/delinquent-tax"
+PICKENS_PAGE = "https://www.co.pickens.sc.us/departments/delinquent_tax/index.php"
 
 # ArcGIS hard cap on these servers is maxRecordCount=2000; we page with
 # resultOffset and stop on exceededTransferLimit=false.

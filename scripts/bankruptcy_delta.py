@@ -13,6 +13,7 @@ Requires .secrets/courtlistener_token.txt (or COURTLISTENER_TOKEN env var).
 from __future__ import annotations
 
 import asyncio
+import os
 import json
 import sys
 from datetime import datetime
@@ -30,9 +31,10 @@ from foreclosure_scraper.models import Listing  # noqa: E402
 from foreclosure_scraper.scrapers.national.courtlistener_bankruptcy import (  # noqa: E402
     CourtListenerBankruptcy,
 )
-from foreclosure_scraper.web_artifact import _to_dict  # noqa: E402
+from foreclosure_scraper.web_artifact import _to_dict, write_artifact  # noqa: E402
 
 LISTINGS_PATH = ROOT / "docs" / "listings.json"
+DOCS = ROOT / "docs"
 META_PATH = ROOT / "docs" / "run_meta.json"
 
 
@@ -80,10 +82,19 @@ async def main() -> int:
     dropped = pre_drop - len(listings)
     _print(f"dropped {dropped} stale bankruptcy listings before refresh")
 
-    _print("running CourtListener bankruptcy scraper...")
-    scraper = CourtListenerBankruptcy()
-    new_listings = list(await scraper.fetch())
-    _print(f"scraper: {len(new_listings)} bankruptcy filings pulled")
+    # CourtListener scraper — skip if SKIP_CL_SCRAPER=1 (API timeouts common).
+    if os.environ.get("SKIP_CL_SCRAPER") == "1":
+        _print("SKIP_CL_SCRAPER=1 — skipping CourtListener scraper fetch")
+        new_listings = []
+    else:
+        _print("running CourtListener bankruptcy scraper...")
+        scraper = CourtListenerBankruptcy()
+        try:
+            new_listings = list(await asyncio.wait_for(scraper.fetch(), timeout=300))
+        except asyncio.TimeoutError:
+            _print("CourtListener scraper timed out after 300s — using empty result")
+            new_listings = []
+        _print(f"scraper: {len(new_listings)} bankruptcy filings pulled")
 
     # Merge: dedupe by (source, source_url, case_number).
     seen: set[tuple[str, str, str | None]] = {_key(li) for li in listings}
@@ -99,23 +110,25 @@ async def main() -> int:
     # 2b. Bankruptcy property lookup — for every BK listing, scan county GIS
     #     by debtor name to recover address + property specs. Without this,
     #     BK listings are just "Mary Lee Harrell, Ch.7" with no property info.
-    _print("running bankruptcy property lookup (debtor name → county GIS)...")
-    await enrich_bankruptcy_property(listings)
-    bk_with_addr = sum(
-        1
-        for li in listings
-        if li.source == "national.courtlistener_bankruptcy" and li.street_address
-    )
-    _print(f"bk-property: {bk_with_addr} bankruptcy listings now have addresses")
+    #     Skip if SKIP_BK_PROPERTY=1 (county GIS endpoints hang).
+    if os.environ.get("SKIP_BK_PROPERTY") == "1":
+        _print("SKIP_BK_PROPERTY=1 — skipping bankruptcy property lookup")
+    elif not new_listings:
+        _print("no new bankruptcy listings — skipping property lookup")
+    else:
+        _print("running bankruptcy property lookup (debtor name → county GIS)...")
+        await enrich_bankruptcy_property(listings)
+        bk_with_addr = sum(
+            1
+            for li in listings
+            if li.source == "national.courtlistener_bankruptcy" and li.street_address
+        )
+        _print(f"bk-property: {bk_with_addr} bankruptcy listings now have addresses")
 
-    # 3. Rewrite listings.json with the same trim logic the orchestrator uses.
-    _print("rewriting listings.json...")
-    payload = [_to_dict(li) for li in listings]
-    LISTINGS_PATH.write_text(
-        json.dumps(payload, ensure_ascii=False, default=str), encoding="utf-8"
-    )
-    size_kb = LISTINGS_PATH.stat().st_size // 1024
-    _print(f"wrote {LISTINGS_PATH} ({len(payload)} listings, {size_kb} KB)")
+    # 3. Rewrite listings.json via write_artifact (writes JSON + GZ + detail sidecar).
+    _print("rewriting board via write_artifact...")
+    write_artifact(listings, {}, DOCS)
+    _print(f"wrote {len(listings)} listings via write_artifact")
 
     # 4. Patch run_meta.json with the bankruptcy delta info (best-effort).
     if META_PATH.exists():
@@ -127,12 +140,12 @@ async def main() -> int:
                 "new_listings_added": added,
                 "scraper_total": len(new_listings),
             }
-            meta["total"] = len(payload)
+            meta["total"] = len(listings)
             by_source = meta.get("by_source") or {}
             # SET the count from actual listings — re-running delta should not
             # accumulate; idempotent based on current listings.json state.
             bk_count = sum(
-                1 for r in payload if r.get("source") == "national.courtlistener_bankruptcy"
+                1 for li in listings if getattr(li, "source", "") == "national.courtlistener_bankruptcy"
             )
             by_source["national.courtlistener_bankruptcy"] = bk_count
             meta["by_source"] = by_source

@@ -111,6 +111,22 @@ def _mailing(a: dict) -> str | None:
     return re.sub(r"\s+", " ", out).strip() or None
 
 
+def _owner_mailing(a: dict) -> Any:
+    """owner_mailing for this row, with the TaxpayerName folded in.
+
+    TaxpayerName (the name the tax bill is mailed to — often an LLC, relative,
+    or heir distinct from OwnerName) was fetched in _OUT_FIELDS but never read.
+    When present we emit the standard {name, mailing} dict (the shape
+    mailing_shape/enrich_owner_mailing already expect); otherwise the bare
+    mailing string (historical behaviour).
+    """
+    mail = _mailing(a)
+    name = _clean(a.get("TaxpayerName"))
+    if name:
+        return {"name": name, "mailing": mail} if mail else {"name": name}
+    return mail
+
+
 def _is_absentee(a: dict) -> bool:
     """Owner mails from outside Spartanburg County / SC, or from a PO box."""
     city = (a.get("City") or "").strip().upper()
@@ -154,6 +170,15 @@ def _parcel(a: dict) -> str | None:
 def _appraised_total(a: dict) -> float | None:
     b = _num(a.get("CurrentAppraisedBuildingValue")) or 0
     land = _num(a.get("CurrentAppraisedLandValue")) or 0
+    tot = b + land
+    return tot or None
+
+
+def _taxable_total(a: dict) -> float | None:
+    """Sum of the current taxable building + land values. Fetched in
+    _OUT_FIELDS but previously unused — promoted to the first-class tax_value."""
+    b = _num(a.get("CurrentTaxableBuildingValue")) or 0
+    land = _num(a.get("CurrentTaxableLandValue")) or 0
     tot = b + land
     return tot or None
 
@@ -267,7 +292,7 @@ class SpartanburgCondemned(BaseScraper):
                 "tier": tier,
             },
             "distressed": True,                 # distressed_condition (w=8)
-            "owner_mailing": _mailing(a),
+            "owner_mailing": _owner_mailing(a),
             "absentee": absentee,
             "cama_specs": specs or None,
         }
@@ -277,6 +302,7 @@ class SpartanburgCondemned(BaseScraper):
             raw["code_enforcement"] = True
 
         appraised = _appraised_total(a)
+        taxable = _taxable_total(a)
 
         return Listing(
             source=self.slug,
@@ -295,6 +321,7 @@ class SpartanburgCondemned(BaseScraper):
             year_built=_int(a.get("YearBuilt")),
             living_sqft=_num(a.get("LivingArea")),
             market_value=appraised,
+            tax_value=taxable,
             sale_date=None,
             description=desc,
             first_seen=datetime.utcnow(),

@@ -186,8 +186,14 @@ def test_both_lists_unreachable_raises_so_the_run_reports_blocked(monkeypatch):
     async def boom(url, **kwargs):
         raise RuntimeError("HTTP 403")
 
+    async def stealth_boom(url):
+        return None
+
     monkeypatch.setattr(
         "foreclosure_scraper.scrapers.law_firms.hutchens.get_text", boom
+    )
+    monkeypatch.setattr(
+        Hutchens, "_stealth_fetch", staticmethod(stealth_boom)
     )
     with pytest.raises(RuntimeError, match="no grid reachable"):
         asyncio.run(_collect(Hutchens()))

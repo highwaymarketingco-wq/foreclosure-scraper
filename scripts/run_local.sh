@@ -104,10 +104,15 @@ export FORECLOSURE_STREETVIEW="${FORECLOSURE_STREETVIEW:-1}"
 export STREETVIEW_MAX="${STREETVIEW_MAX:-300}"
 load GOOGLE_MAPS_API_KEY "$SECRETS/google_maps_api_key.txt"
 
-# Assessor property-card enricher — ON for the weekly run. The default cap
-# (150) is below the ~280 live targets, so raise it to 400 to cover them all.
+# Assessor property-card enricher — ON for the weekly run. Fills REAL heated
+# sqft + beds + baths from the county card, which clears the ESTIMATE flag and
+# lets ARV grade at HIGH confidence (calc caps to MEDIUM without true sqft). The
+# board un-freeze left a ~12k backlog of built homes in card-covered counties
+# still missing sqft (Rutherford 4.7k, Buncombe 3.1k, ...), so the per-run cap
+# is raised 400 -> 900 to chew that down faster. For a hard catch-up, run
+# scripts/sqft_backfill.py in daylight (bounded, resumable, ~1500/pass).
 export ASSESSOR_CARD_ON="${ASSESSOR_CARD_ON:-1}"
-export ASSESSOR_CARD_MAX="${ASSESSOR_CARD_MAX:-400}"
+export ASSESSOR_CARD_MAX="${ASSESSOR_CARD_MAX:-900}"
 
 # Enrichment budget — keep the run finishing in a sane window. The cloud
 # run died at 4h partly on a Gemini-quota Vision spiral; locally we use

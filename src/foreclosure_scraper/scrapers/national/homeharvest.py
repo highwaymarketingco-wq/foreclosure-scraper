@@ -73,6 +73,14 @@ def _to_listing(row, county_name: str | None = None) -> Listing | None:
         except (TypeError, ValueError):
             return None
 
+    def _clean(v):
+        # pandas NaN / empty -> None; pass strings + phone lists through
+        if v is None or (isinstance(v, float) and v != v):
+            return None
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
     photos: list[str] = []
     primary = row.get("primary_photo") or ""
     if primary and not (isinstance(primary, float) and primary != primary):
@@ -112,8 +120,14 @@ def _to_listing(row, county_name: str | None = None) -> Listing | None:
                 "mls_status": row.get("mls_status"),
                 "list_date": str(row.get("list_date") or "") or None,
                 "days_on_mls": _num(row.get("days_on_mls")),
-                "agent_name": row.get("agent_name"),
-                "broker_name": row.get("broker_name"),
+                "agent_name": _clean(row.get("agent_name")),
+                "agent_email": _clean(row.get("agent_email")),
+                "agent_phones": _clean(row.get("agent_phones")),
+                "broker_name": _clean(row.get("broker_name")),
+                "office_phones": _clean(row.get("office_phones")),
+                "office_email": _clean(row.get("office_email")),
+                "half_baths": _num(row.get("half_baths")),
+                "tax": _num(row.get("tax")),  # annual property-tax $ (Realtor.com tax_history latest)
             },
             "zillow": {
                 "photo": photos[0] if photos else None,

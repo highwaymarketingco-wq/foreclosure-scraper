@@ -71,10 +71,14 @@ async def _fetch_url(url: str) -> str:
             pass
 
     try:
+        # FORECLOSURE_NO_CF_SOLVE=1 disables Cloudflare/Turnstile SOLVING (compliant run);
+        # the page then simply fails to render rather than defeating the challenge.
+        import os as _os
+        _solve = _os.environ.get("FORECLOSURE_NO_CF_SOLVE", "").strip().lower() not in ("1", "true", "yes")
         result = await StealthyFetcher.async_fetch(
             url, headless=True, network_idle=True,
             timeout=180000, page_action=page_action,
-            solve_cloudflare=True,
+            solve_cloudflare=_solve,
         )
         body = getattr(result, "body", b"")
         return body.decode("utf-8", errors="replace") if isinstance(body, bytes) else str(body or "")

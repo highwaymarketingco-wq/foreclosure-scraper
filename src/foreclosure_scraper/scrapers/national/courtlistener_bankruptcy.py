@@ -1,8 +1,9 @@
-"""CourtListener bankruptcy filings scraper (NC W/E + SC bankruptcy courts).
+"""CourtListener bankruptcy filings scraper (NC W/M/E + SC bankruptcy courts).
 
 Pulls Chapter 7, 11, 13 bankruptcy filings from the past 90 days for the
-3 federal bankruptcy courts covering our footprint:
+4 federal bankruptcy courts covering our footprint:
   - ncwb : NC Western District (Charlotte, Asheville, Statesville)
+  - ncmb : NC Middle District (Greensboro, Winston-Salem, Durham)
   - nceb : NC Eastern District (Raleigh, Wilson, Greenville)
   - scb  : SC District (Columbia, Charleston, Spartanburg)
 
@@ -64,7 +65,7 @@ from ...models import Listing, ListingType, PropertyKind
 log = structlog.get_logger()
 
 API_BASE = "https://www.courtlistener.com/api/rest/v4"
-COURTS = ("ncwb", "nceb", "scb")
+COURTS = ("ncwb", "ncmb", "nceb", "scb")
 LOOKBACK_DAYS = 90
 # /search/ hard-caps page_size at 20 regardless of what we ask for (verified:
 # page_size=100 and page_size=200 both return 20). Pages are cheap because each
@@ -131,7 +132,7 @@ CITY_TO_COUNTY = {
 
 # Court → default state (so listings always carry at least state). County is
 # only set when we can recover it from the case name.
-COURT_STATE = {"ncwb": "NC", "nceb": "NC", "scb": "SC"}
+COURT_STATE = {"ncwb": "NC", "ncmb": "NC", "nceb": "NC", "scb": "SC"}
 
 
 def _county_from_text(text: str) -> tuple[str | None, str | None]:
@@ -208,6 +209,11 @@ def _normalize_search_hit(hit: dict, court: str) -> dict:
         "court_id": hit.get("court_id") or court,
         "docket_id": hit.get("docket_id"),
         "trustee": hit.get("trustee_str") or "",
+        "party": hit.get("party"),
+        "attorney": hit.get("attorney") or hit.get("attorney_str") or "",
+        "firm": hit.get("firm") or hit.get("firm_str") or "",
+        "date_terminated": hit.get("dateTerminated"),
+        "pacer_case_id": hit.get("pacer_case_id"),
     }
 
 
@@ -261,7 +267,7 @@ async def _fetch_court(c, court: str, token: str | None, deadline: float | None 
 
 class CourtListenerBankruptcy(BaseScraper):
     slug = "national.courtlistener_bankruptcy"
-    name = "CourtListener Bankruptcy (NC W/E + SC, Ch 7/11/13)"
+    name = "CourtListener Bankruptcy (NC W/M/E + SC, Ch 7/11/13)"
     category = "national_aggregator"
     expected_min_count = 0  # graceful when the API is unreachable
     requires_apify = False
@@ -347,6 +353,7 @@ class CourtListenerBankruptcy(BaseScraper):
                             county=county,
                             case_number=docket_no,
                             defendant=case_name[:200] or None,
+                            trustee=d.get("trustee") or None,  # §363 seller / disposition trustee
                             description=desc,
                             first_seen=datetime.utcnow(),
                             last_seen=datetime.utcnow(),
@@ -363,6 +370,11 @@ class CourtListenerBankruptcy(BaseScraper):
                                     "bankruptcy_information": d.get("bankruptcy_information"),
                                     "docket_id": d.get("docket_id"),
                                     "trustee": d.get("trustee") or None,
+                                    "party": d.get("party") or None,  # joint filers = co-owners
+                                    "attorney": d.get("attorney") or None,
+                                    "firm": d.get("firm") or None,
+                                    "date_terminated": d.get("date_terminated"),
+                                    "pacer_case_id": d.get("pacer_case_id"),
                                 },
                             },
                         )

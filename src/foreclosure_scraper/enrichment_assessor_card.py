@@ -66,6 +66,15 @@ _DEFAULT_MAX = 300
 _RENDER_COUNTIES = {("SC", "Spartanburg"), ("SC", "Oconee"), ("SC", "Pickens"),
                     ("SC", "Union"), ("NC", "Buncombe")}
 
+# Counties whose card renders behind a Cloudflare/WAF challenge that can ONLY be
+# reached by SOLVING it (qPublic Turnstile + Union WAF). When
+# FORECLOSURE_NO_CF_SOLVE=1 the render passes solve_cloudflare=False, so these can
+# never yield — attempting them just burns ~2 min/lead on an unsolved challenge.
+# Buncombe (Spatialest) renders WITHOUT a challenge, so it is NOT here and still
+# fills under no-solve. Skipping these keeps a compliant backfill efficient.
+_SOLVE_REQUIRED_COUNTIES = {("SC", "Spartanburg"), ("SC", "Oconee"),
+                            ("SC", "Pickens"), ("SC", "Union")}
+
 # Property kinds that have no heated/finished living area — a card render returns no
 # sqft for these, so they're excluded to keep the (capped) budget on built homes.
 _NO_STRUCTURE_KINDS = {PropertyKind.LAND}
@@ -165,6 +174,11 @@ def _is_card_eligible(li: Listing, grades: set[str], adapters: dict,
     if (li.state, li.county) not in adapters:
         return False
     if skip_render and (li.state, li.county) in _RENDER_COUNTIES:
+        return False
+    # Under the no-CAPTCHA-solve policy, the solve-required counties can't yield —
+    # skip them so a compliant backfill doesn't burn its budget on unsolved challenges.
+    from .assessor_cards.base import cf_solving_disabled
+    if cf_solving_disabled() and (li.state, li.county) in _SOLVE_REQUIRED_COUNTIES:
         return False
     if not _grade_ok(li, grades):
         return False

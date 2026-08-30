@@ -47,6 +47,20 @@ _add("NC", "Brunswick", "Bald Head Island", "Oak Island", "Caswell Beach",
      "Southport", "Holden Beach", "Ocean Isle Beach", "Sunset Beach",
      "Calabash", "Shallotte", "Boiling Spring Lakes", "Leland",
      "Saint James", "St James")
+# 2026-08-19 — new NC coastal counties added to eCourts + oceanfront gate.
+# Beaufort NC county seat is Washington (Inner Banks, Pamlico River); Belhaven
+# is on the Pungo River. Bath is the oldest NC town (Archdale Precinct).
+_add("NC", "Beaufort", "Washington", "Bath", "Belhaven", "Chocowinity",
+     "Aurora", "Bayboro", "Pantego")
+# Craven NC: New Bern (county seat, founded 1710, confluence of Neuse + Trent).
+# Havelock is home to MCAS Cherry Point. Riverfront and sound-side towns.
+_add("NC", "Craven", "New Bern", "Havelock", "Bridgeton", "Vanceboro",
+     "Cove City", "Dover", "Ernest")
+# Pamlico NC: Oriental is the "Sailing Capital of NC" on the sound side.
+# All of these are sound/riverfront — no ocean beaches, but the user wants
+# everything on the coast.
+_add("NC", "Pamlico", "Oriental", "Bayboro", "Alliance", "Vandemere",
+     "Arapahoe", "Minnesott Beach", "Stonewall")
 
 # SC coast (north -> south)
 _add("SC", "Horry", "North Myrtle Beach", "Cherry Grove", "Myrtle Beach",

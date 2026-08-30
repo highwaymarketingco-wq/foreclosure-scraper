@@ -283,6 +283,17 @@ def _last_sale(li: Listing) -> tuple[Optional[float], Optional[date]]:
         candidates.append((card.get("sale_price"), first.get("sale_date")))
         candidates.append((first.get("price"), first.get("sale_date")))
 
+    # Top-level raw["last_sale"] — the recorded-sales / deed enricher's block, and
+    # the MOST populated last-sale source on the board (~34%). It was the missing
+    # source: FHFA read gis.last_sale + card.sales only, so the stale-sale
+    # appreciation fired on ~0% (verified 2026-08-13). Key names vary by producer
+    # (price/amount, date/sale_date/sale_date_iso), so try each pairing.
+    top = raw.get("last_sale") if isinstance(raw.get("last_sale"), dict) else {}
+    if top:
+        amt = top.get("price") if top.get("price") is not None else top.get("amount")
+        dt = top.get("date") or top.get("sale_date") or top.get("sale_date_iso")
+        candidates.append((amt, dt))
+
     for amt_raw, date_raw in candidates:
         try:
             amt = float(amt_raw) if amt_raw not in (None, "") else None

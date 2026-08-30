@@ -29,6 +29,31 @@ ADDR_RE = re.compile(
     re.I,
 )
 DATE_RE = re.compile(r"\b(?:\d{1,2}/\d{1,2}/\d{2,4})\b")
+# Caption split "Plaintiff v. Defendant" — same shape the sibling
+# anderson_master_in_equity uses. Party names are digit-free so the match stops
+# at the address house-number that follows the defendant, and we run it on the
+# text AFTER the case number so the case#/attorney-code never leaks in.
+PARTIES_RE = re.compile(
+    r"([A-Za-z][A-Za-z &.,'-]{3,80}?)\s+v\.\s+([A-Za-z][A-Za-z &.,'-]{2,80})"
+)
+_ETAL_RE = re.compile(r"\bet\.?\s*al\b.*$", re.I)
+# Attorney short-code legend (firm codes only — BR/WD status codes excluded so
+# they never masquerade as a trustee). Ported from anderson_master_in_equity.
+ATTORNEY_LEGEND = {
+    "B&S": "Brock & Scott",
+    "BCP": "Bell Carrington Price & Gregg",
+    "HSB": "Haynsworth Sinkler Boyd",
+    "RPL": "Riley Pope & Laney",
+    "RT": "Rogers Townsend",
+    "S&C": "Scott & Corley",
+}
+# A leading attorney short-code token sits between the case# and the plaintiff
+# ("... RPL Nationstar Mortgage LLC v. ...") — strip it so it never contaminates
+# the captured plaintiff.
+_LEADING_ATTY_RE = re.compile(
+    r"^\s*(?:" + "|".join(re.escape(c) for c in ATTORNEY_LEGEND) + r")\b\.?\s*",
+    re.I,
+)
 MONTH_HEADER_RE = re.compile(
     r"\b((?:January|February|March|April|May|June|July|August|September|October|November|December))\s+(\d{4})\b",
     re.I,
@@ -252,6 +277,21 @@ class PickensMasterInEquity(BaseScraper):
                         continue
                     addr_m = ADDR_RE.search(chunk)
 
+                    # Parties + attorney firm from the roster chunk (the sibling
+                    # anderson/spartanburg parsers do this; pickens dropped it).
+                    plaintiff = defendant = None
+                    region = _LEADING_ATTY_RE.sub("", chunk[case_m.end():])
+                    pm = PARTIES_RE.search(region)
+                    if pm:
+                        plaintiff = pm.group(1).strip(" ,.") or None
+                        defendant = pm.group(2).strip().split("\n")[0]
+                        defendant = _ETAL_RE.sub("", defendant).strip(" ,.") or None
+                    atty = None
+                    for code, full in ATTORNEY_LEGEND.items():
+                        if re.search(rf"\b{re.escape(code)}\b", chunk):
+                            atty = full
+                            break
+
                     # RESULTS-PDF specifics: extract sold price + tag as
                     # foreclosure-sale RESULT (already past, in the sold pool).
                     sold_price = None
@@ -274,6 +314,9 @@ class PickensMasterInEquity(BaseScraper):
                             state="SC",
                             county="Pickens",
                             case_number=case_m.group(0),
+                            plaintiff=plaintiff,
+                            defendant=defendant,
+                            trustee=atty,
                             sale_date=doc_date,
                             opening_bid=sold_price,  # also surface as opening_bid so calc/dashboard reads it
                             description=chunk[:500],

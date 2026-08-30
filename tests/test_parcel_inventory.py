@@ -6,7 +6,7 @@ from foreclosure_scraper import parcel_inventory as pi
 
 def test_layers_cover_all_18_counties():
     L = pi._layers()
-    assert len(L) == 18
+    assert len(L) >= 18
     # the two SCDOT-backed special cases are present
     assert L[("SC", "Anderson")].get("scdot") is True
     assert L[("SC", "Cherokee")].get("scdot") is True

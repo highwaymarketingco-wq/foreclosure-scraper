@@ -25,7 +25,7 @@ log = structlog.get_logger()
 
 # ---------- URL templates ----------------------------------------------------------
 
-SC_PUBLICINDEX = "https://publicindex.sccourts.org/{county}/PublicIndex/CaseDetails.aspx?Case={case}"
+SC_PUBLICINDEX = "https://publicindex.sccourts.org/{county}/PublicIndex/CaseDetails.aspx?CaseNum={case}"
 SC_PUBLICINDEX_SEARCH = (
     "https://publicindex.sccourts.org/{county}/PublicIndex/CaseSearchResults.aspx?"
     "casetype=CP&casesubtype=Foreclosure&filedstart={start}&filedend={end}"
@@ -113,7 +113,7 @@ async def _build_nc_case_index() -> dict:
         return {}
     from datetime import datetime, timedelta
     end = datetime.now()
-    start = end - timedelta(days=90)
+    start = end - timedelta(days=730)  # 2yr window — most foreclosure cases span 1-2yr
     index: dict = {}
     try:
         async with client(timeout=45.0, headers=SERVICE_HEADERS) as c:
@@ -123,7 +123,7 @@ async def _build_nc_case_index() -> dict:
                 return {}
             template = r.json()
             page_from = 0
-            for _ in range(25):
+            for _ in range(100):  # up to 20k cases in 2yr window
                 so = _build_search_object(template, counties=TARGET_COUNTIES,
                                           from_date=start, to_date=end,
                                           page_from=page_from, page_size=200)
@@ -197,44 +197,64 @@ async def enrich_with_court_records(listings: list[Listing]) -> list[Listing]:
                 if isinstance(li.raw, dict) and li.raw.get("court_record"):
                     counts["court_records"] += 1
 
-    # ---- SC: per-case render (legal-gated; breaker-protected) ----
-    sem = asyncio.Semaphore(4)
-    state = {"consec_fail": 0, "tripped": False}
+    # ---- SC: batch search-page enrichment (replaces per-case detail pages) ----
+    # The SC Public Index case DETAIL pages (CaseDetails.aspx) are F5/Shape WAF-
+    # protected and return ERR_HTTP_RESPONSE_CODE_FAILURE even with a stealth
+    # browser.  The SEARCH page (PISearch.aspx) loads fine (200 OK) and returns
+    # plaintiff/defendant in the results grid's title attributes — same data the
+    # scraper already captures.  Instead of making one failing request per case,
+    # we run the scraper's _scrape_county() once per county and build a
+    # case-number → {plaintiff, defendant} map, then backfill all SC listings.
+    sc_targets = [li for li in listings if li.state == "SC" and li.case_number]
+    counts["sc_queried"] = len(sc_targets)
 
-    async def lookup_sc(li: Listing) -> None:
-        if li.state != "SC" or not (li.case_number and li.county) or state["tripped"]:
-            return
-        county_clean = li.county.replace(" County", "").strip().split(",")[0].strip()
-        url = SC_PUBLICINDEX.format(county=county_clean, case=li.case_number)
-        async with sem:
-            if state["tripped"]:
-                return
-            counts["sc_queried"] += 1
-            try:
-                # raise_on_http_failure=True so an HTTP-level render failure
-                # (bad status / ERR_HTTP_RESPONSE_CODE_FAILURE) raises instead of
-                # returning "" — otherwise it would look like a benign empty miss
-                # and never count toward the breaker, so the breaker never trips.
-                content = (await asyncio.wait_for(
-                                fetch_rendered(url, token=token, raise_on_http_failure=True),
-                                timeout=_COURT_CALL_TIMEOUT_S)
-                           if _COURT_CALL_TIMEOUT_S > 0
-                           else await fetch_rendered(url, token=token, raise_on_http_failure=True))
-            except (Exception, asyncio.TimeoutError):
-                counts["sc_failed"] += 1
-                state["consec_fail"] += 1
-                if _COURT_BREAKER_FAILS and state["consec_fail"] >= _COURT_BREAKER_FAILS:
-                    state["tripped"] = True
-                    log.warning("courts.enrich.circuit_open", consec_fail=state["consec_fail"])
-                return
-            state["consec_fail"] = 0
-            if not content:
-                return
-            counts["sc_matched"] += 1
-            counts["fields_filled"] += _apply_court_text(li, content)
+    if sc_targets:
+        try:
+            from .scrapers.counties_sc.sc_public_index import (
+                _scrape_county as _scpi_scrape,
+                _format_cp_case as _scpi_fmt,
+                COUNTIES as _SCPI_COUNTIES,
+            )
 
-    await asyncio.gather(*(lookup_sc(li) for li in listings))
-    log.info("courts.enrich.done", tripped=state["tripped"], **counts)
+            # Determine which counties we need to search
+            needed = set()
+            for li in sc_targets:
+                c = (li.county or "").replace(" County", "").strip().split(",")[0].strip()
+                if c and c in _SCPI_COUNTIES:
+                    needed.add(c)
+
+            sc_case_map: dict[str, dict] = {}
+            for county in sorted(needed):
+                try:
+                    results = await _scpi_scrape(county)
+                    for r in results:
+                        cn = (r.case_number or "").replace(" ", "").upper()
+                        if cn:
+                            sc_case_map[cn] = {
+                                "plaintiff": r.plaintiff,
+                                "defendant": r.defendant,
+                            }
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("courts.enrich.sc_county_fail", county=county, error=str(exc)[:200])
+                    counts["sc_failed"] += 1
+                await asyncio.sleep(2.5)  # polite pause between counties
+
+            # Backfill: only fill EMPTY fields (never clobber existing data)
+            for li in sc_targets:
+                cn = (li.case_number or "").replace(" ", "").upper()
+                hit = sc_case_map.get(cn)
+                if not hit:
+                    continue
+                counts["sc_matched"] += 1
+                if hit.get("plaintiff") and not li.plaintiff:
+                    li.plaintiff = hit["plaintiff"]
+                    counts["fields_filled"] += 1
+                if hit.get("defendant") and not li.defendant:
+                    li.defendant = hit["defendant"]
+                    counts["fields_filled"] += 1
+        except ImportError:
+            log.warning("courts.enrich.sc_scaper_unavailable")
+    log.info("courts.enrich.done", **counts)
     return listings
 
 

@@ -15,6 +15,7 @@ from dateutil import parser as dateparser
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
+from ...document_links import harvest_document_links, stamp_documents
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
@@ -165,6 +166,7 @@ def _parse_nc_html(html: str, slug: str) -> list[Listing]:
                     last_seen=datetime.utcnow(),
                 )
             )
+            stamp_documents(out[-1], harvest_document_links(row.html or "", base_url=NC_URL))
     return out
 
 

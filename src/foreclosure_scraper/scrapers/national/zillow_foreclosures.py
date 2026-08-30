@@ -110,6 +110,10 @@ def _to_listing(item: dict, state: str, slug: str) -> Listing | None:
         latitude=lat_lng.get("latitude") if isinstance(lat_lng.get("latitude"), (int, float)) else None,
         longitude=lat_lng.get("longitude") if isinstance(lat_lng.get("longitude"), (int, float)) else None,
         opening_bid=price if isinstance(price, (int, float)) else None,
+        # beds/baths/area were only in raw — promote to first-class fields.
+        bedrooms=item.get("beds") if isinstance(item.get("beds"), (int, float)) else None,
+        bathrooms=item.get("baths") if isinstance(item.get("baths"), (int, float)) else None,
+        living_sqft=item.get("area") if isinstance(item.get("area"), (int, float)) else None,
         description=(
             f"Zillow foreclosure ({item.get('statusText') or 'For Sale'}) — "
             f"{item.get('beds') or ''}bd/{item.get('baths') or ''}ba "

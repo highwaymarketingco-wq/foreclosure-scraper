@@ -43,7 +43,7 @@ async def lookup_zip(zip_code: str) -> dict[str, Any] | None:
         "for": f"zip code tabulation area:{z}",
     }
     try:
-        async with client(timeout=15.0) as c:
+        async with client(timeout=15.0, follow_redirects=True) as c:
             r = await c.get(ACS_URL, params=params)
             if r.status_code != 200:
                 return None

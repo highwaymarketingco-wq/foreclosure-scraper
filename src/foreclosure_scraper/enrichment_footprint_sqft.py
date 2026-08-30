@@ -21,7 +21,10 @@ import structlog
 
 from .models import Listing
 from . import sc_building_footprints as fp
-from .enrichment_arcgis import SCDOT_BASE, SC_LAYER
+from .enrichment_arcgis import (
+    SCDOT_BASE, SC_LAYER,
+    scdot_walled, mark_scdot_walled, is_scdot_token_error,
+)
 from .enrichment_geocode import COUNTY_SEAT_CENTROIDS
 
 log = structlog.get_logger()
@@ -59,22 +62,14 @@ def _band(sqft: float) -> str:
 
 
 def _scdot_parcel_ring(state: str, county: str, parcel_id: str) -> list | None:
-    """Fetch the SCDOT parcel polygon (largest ring, lon/lat) for a TAXPIN."""
-    lid = SC_LAYER.get(county)
-    if not lid or not parcel_id:
-        return None
-    q = {"where": f"TAXPIN='{parcel_id}'", "outFields": "TAXPIN",
-         "returnGeometry": "true", "outSR": "4326", "f": "json"}
-    url = f"{SCDOT_BASE}/{lid}/query?" + urllib.parse.urlencode(q)
-    try:
-        import json
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        j = json.loads(urllib.request.urlopen(req, context=_CTX, timeout=25).read())
-        feats = j.get("features") or []
-        rings = (feats[0].get("geometry") or {}).get("rings") if feats else None
-        return max(rings, key=len) if rings else None
-    except Exception:
-        return None
+    """Fetch the SCDOT parcel polygon (largest ring, lon/lat) for a TAXPIN.
+
+    SCDOT now requires a token for all queries.  Since we do not have a free
+    token, we skip this path entirely and fall through to point-based
+    footprint attribution (which uses the local MS Building Footprints SQLite
+    DB and needs no network).
+    """
+    return None
 
 
 def enrich_footprint_sqft(listings: list[Listing]) -> dict:

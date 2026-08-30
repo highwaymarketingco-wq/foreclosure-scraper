@@ -230,7 +230,13 @@ class StateContamination(BaseScraper):
         if os.environ.get("FORECLOSURE_STATE_CONTAMINATION") == "0":
             return []
         out: list[Listing] = []
-        guard = LayerHarvest(self.slug, [r.slug for r in REGISTRIES], attempts=3)
+        # nc_land_use_restrictions layer intermittently 500s — tolerate its
+        # failure so the other 3 live registries still ship their 5,000+ rows
+        # instead of being discarded by PartialHarvest.
+        guard = LayerHarvest(
+            self.slug, [r.slug for r in REGISTRIES],
+            tolerate={"nc_land_use_restrictions"}, attempts=3,
+        )
         async with client(timeout=90.0) as c:
             with guard:
                 for reg in REGISTRIES:

@@ -250,10 +250,16 @@ async def enrich_with_aggressive_address(listings: list[Listing]) -> None:
 
     # Prioritize: soonest-sale-date first, then highest opening_bid. The
     # cap is a budget, so we want the listings most likely to matter.
-    targets.sort(key=lambda li: (
-        li.sale_date or _dt.max,
-        -(li.opening_bid or 0.0),
-    ))
+    # Defensive: strip tzinfo before sorting — some scrapers produce tz-aware
+    # datetimes (e.g. dateutil with tz), others naive. Mixing them raises
+    # TypeError. Normalize everything to naive for a stable sort.
+    def _sort_key(li):
+        sd = li.sale_date
+        if sd is not None and hasattr(sd, "tzinfo") and sd.tzinfo is not None:
+            sd = sd.replace(tzinfo=None)
+        return (sd or _dt.max, -(li.opening_bid or 0.0))
+
+    targets.sort(key=_sort_key)
 
     total_targets = len(targets)
     if len(targets) > MAX_TARGETS:

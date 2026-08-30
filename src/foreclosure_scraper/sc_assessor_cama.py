@@ -31,6 +31,7 @@ import io
 import re
 import sqlite3
 import ssl
+import threading
 import urllib.parse
 import urllib.request
 from datetime import datetime
@@ -94,9 +95,34 @@ def _num(v):
         return None
 
 
+_DB_CON: sqlite3.Connection | None = None
+_DB_LOCK = threading.Lock()
+
+
 def _connect() -> sqlite3.Connection:
+    """Return a shared, persistent connection.  Opening a new sqlite3
+    connection on every ``lookup()`` call is expensive (schema probe +
+    page cache warm-up).  We cache one module-level connection with
+    ``check_same_thread=False`` so it works inside ``_run_offline`` worker
+    threads, and guard every query with ``_DB_LOCK`` for thread safety."""
+    global _DB_CON
+    if _DB_CON is not None:
+        try:
+            _DB_CON.execute("SELECT 1")
+            # Verify the cached connection points to the *current* DB_PATH
+            # (tests change DB_PATH via monkeypatch; a stale connection from
+            # a previous test's tmp database will silently query the wrong db).
+            if str(_DB_CON.execute("PRAGMA database_list").fetchall()[0][2]) != str(DB_PATH):
+                _DB_CON.close()
+                _DB_CON = None
+            else:
+                return _DB_CON
+        except sqlite3.ProgrammingError:
+            _DB_CON = None
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(DB_PATH)
+    con = sqlite3.connect(DB_PATH, check_same_thread=False)
+    con.execute("PRAGMA journal_mode=OFF")
+    con.execute("PRAGMA mmap_size=268435456")
     con.execute("""CREATE TABLE IF NOT EXISTS sc_cama (
         state TEXT, county TEXT, tms TEXT, map_digits TEXT, address_norm TEXT,
         market_value REAL, year_built INTEGER, beds REAL, baths REAL,
@@ -105,6 +131,7 @@ def _connect() -> sqlite3.Connection:
         PRIMARY KEY (state, county, tms))""")
     con.execute("CREATE INDEX IF NOT EXISTS idx_cama_map ON sc_cama(state, county, map_digits)")
     con.execute("CREATE INDEX IF NOT EXISTS idx_cama_addr ON sc_cama(state, county, address_norm)")
+    _DB_CON = con
     return con
 
 
@@ -120,7 +147,7 @@ def _blank_rec() -> dict:
 def _store_records(state: str, county: str, best: dict[str, dict]) -> int:
     ts = datetime.utcnow().isoformat()
     con = _connect()
-    try:
+    with _DB_LOCK:
         con.execute("DELETE FROM sc_cama WHERE state=? AND county=?", (state, county))
         con.executemany(
             "INSERT OR REPLACE INTO sc_cama VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -129,8 +156,6 @@ def _store_records(state: str, county: str, best: dict[str, dict]) -> int:
               r["condition_distressed"], r["grade"], r["building_type"], r["sale_date"],
               r["street_address"], r["story_height"], ts) for r in best.values()])
         con.commit()
-    finally:
-        con.close()
     log.info("sc_cama.stored", county=county, stored=len(best))
     return len(best)
 
@@ -279,11 +304,9 @@ def has_data(state: str, county: str) -> bool:
     if not DB_PATH.exists():
         return False
     con = _connect()
-    try:
+    with _DB_LOCK:
         return con.execute("SELECT 1 FROM sc_cama WHERE state=? AND county=? LIMIT 1",
                            (state, county)).fetchone() is not None
-    finally:
-        con.close()
 
 
 def lookup(state: str, county: str, *, parcel_id: str | None = None,
@@ -291,31 +314,32 @@ def lookup(state: str, county: str, *, parcel_id: str | None = None,
     if not DB_PATH.exists():
         return None
     con = _connect()
-    try:
-        cols = ", ".join(_FIELDS)
+    cols = ", ".join(_FIELDS)
+    with _DB_LOCK:
         row = None
         pid = _norm_tms(parcel_id)
         if pid:
-            # Try the digits as-is, the leading-zero-stripped form (map_digits),
-            # and common zero-padded widths, so 9- vs 10-digit board ids resolve
-            # regardless of how leading zeros were preserved upstream.
             stripped = pid.lstrip("0") or pid
-            variants = [pid, stripped, pid.zfill(10), pid.zfill(11)]
-            seen = set()
-            for v in variants:
-                if v in seen:
-                    continue
-                seen.add(v)
-                row = con.execute(
-                    f"SELECT {cols} FROM sc_cama WHERE state=? AND county=? AND (tms=? OR map_digits=?)",
-                    (state, county, v, v)).fetchone()
-                if row:
-                    break
+            # Build a set of unique variants to try, each with a single-index
+            # lookup.  Using UNION ALL lets SQLite pick the best index per
+            # subquery (PK for tms, idx_cama_map for map_digits) instead of
+            # the OR-scan that the combined query plan devolves to.
+            variants: list[str] = []
+            seen: set[str] = set()
+            for v in (pid, stripped, pid.zfill(10), pid.zfill(11)):
+                if v not in seen:
+                    seen.add(v)
+                    variants.append(v)
+            placeholders = ",".join("?" * len(variants))
+            row = con.execute(
+                f"SELECT {cols} FROM sc_cama WHERE state=? AND county=? AND tms IN ({placeholders}) "
+                f"UNION ALL "
+                f"SELECT {cols} FROM sc_cama WHERE state=? AND county=? AND map_digits IN ({placeholders}) "
+                f"LIMIT 1",
+                (state, county, *variants, state, county, *variants)).fetchone()
         if not row and street_address:
             an = norm_addr(street_address)
             if an:
                 row = con.execute(f"SELECT {cols} FROM sc_cama WHERE state=? AND county=? AND address_norm=?",
                                   (state, county, an)).fetchone()
         return dict(zip(_FIELDS, row)) if row else None
-    finally:
-        con.close()

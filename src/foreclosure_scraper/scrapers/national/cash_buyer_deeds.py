@@ -315,6 +315,18 @@ def _deed_to_listing(deed: RodDoc, source_url: str) -> Listing | None:
     county = deed.county
     price = deed.consideration_amount
 
+    # NC excise tax stamp = $1 per $500 of consideration. When the index
+    # omits the sale price (consideration None) but carries the stamp, the
+    # sale price back-computes as stamp x 500.
+    stamp = deed.excise_tax_stamp
+    price_from_stamp = False
+    if price is None and stamp is not None:
+        try:
+            price = float(stamp) * 500.0
+            price_from_stamp = True
+        except (TypeError, ValueError):
+            price = None
+
     address = _extract_address(deed.notes)
 
     description_parts = []
@@ -336,6 +348,8 @@ def _deed_to_listing(deed: RodDoc, source_url: str) -> Listing | None:
         street_address=address,
         county=county,
         state=deed.state,
+        parcel_id=deed.parcel_id,  # strengthens dedupe (parcel-match tax/foreclosure twin)
+        legal_description=deed.notes,
         case_number=f"{county}:{book or '???'}/{page or '???'}" if book or page else None,
         owner_name=grantee,
         plaintiff=None,
@@ -355,6 +369,8 @@ def _deed_to_listing(deed: RodDoc, source_url: str) -> Listing | None:
                 "grantor": deed.grantor,
                 "grantee": grantee,
                 "price": price,
+                "excise_tax_stamp": stamp,
+                "price_from_stamp": price_from_stamp,
                 "recorded_date": recorded.isoformat() if recorded else None,
                 "is_cash_buyer": True,
                 "instrument_no": deed.instrument_no,

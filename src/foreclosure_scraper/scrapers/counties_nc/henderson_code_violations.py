@@ -56,8 +56,7 @@ LAYER = ("https://services1.arcgis.com/ZfV5vUaX5QvLLBi9/arcgis/rest/services/"
          "OVT_PublicDashboard_View/FeatureServer/1")
 
 #: Public dashboard the layer backs — the human-readable source link.
-DASHBOARD_URL = ("https://www.hendersoncountync.gov/planning/page/"
-                 "ordinance-violation-tracking")
+DASHBOARD_URL = "https://www.hendersoncountync.gov/planning"
 
 _FIELDS = ("OBJECTID", "caseID", "complaintID", "dateReceived", "parcelOwner",
            "address", "violationType", "PIN", "dispositionStatus", "dispositionDate")

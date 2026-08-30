@@ -112,6 +112,8 @@ def _doc_to_listing(doc: RodDoc, vendor_label: str) -> Listing:
         property_kind=PropertyKind.UNKNOWN,
         state="NC",
         county=doc.county,
+        parcel_id=doc.parcel_id,
+        legal_description=doc.notes,
         case_number=_case_id_from_doc(doc),
         defendant=doc.grantor,
         plaintiff=doc.grantee,
@@ -163,6 +165,8 @@ def _sold_doc_to_listing(doc: RodDoc, vendor_label: str) -> Listing:
         property_kind=PropertyKind.UNKNOWN,
         state="NC",
         county=doc.county,
+        parcel_id=doc.parcel_id,
+        legal_description=doc.notes,
         case_number=_case_id_from_doc(doc),
         defendant=doc.grantor,        # Borrower / former owner
         plaintiff=doc.grantee,        # Auction winner / lender

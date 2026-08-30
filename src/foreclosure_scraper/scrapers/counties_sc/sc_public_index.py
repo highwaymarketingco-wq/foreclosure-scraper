@@ -316,6 +316,38 @@ def _parse_results(
     status_i = col_idx("case status")
     type_i = col_idx("type")          # the court "Type" column (e.g. Common Pleas)
     subtype_i = col_idx("subtype")
+    dispo_i = col_idx("disposition date")
+    judgment_no_i = col_idx("judgment #", "judgment#", "judgment number", "judgment")
+    agency_i = col_idx("court agency", "agency")
+
+    # Pre-pass: collect EVERY defendant-party row per case. The grid emits one
+    # row per party and the main loop keeps only the FIRST — which dropped the
+    # co-defendants (co-owners / heirs that are themselves resolvable owner
+    # leads). Build case_number -> ordered unique list of defendant names here.
+    defendants_by_case: dict[str, list[str]] = {}
+    for prow in grid.css("tr.standardRow, tr.altRow"):
+        pcells = prow.css("td")
+        if not pcells or case_i is None or case_i >= len(pcells):
+            continue
+        p_anchor = pcells[case_i].css_first("a")
+        p_craw = (
+            p_anchor.text(strip=True) if p_anchor else pcells[case_i].text(strip=True)
+        ).strip()
+        if not p_craw:
+            continue
+        p_case = _format_cp_case(p_craw)
+        p_party = (
+            pcells[party_type_i].text(strip=True).lower()
+            if party_type_i is not None and party_type_i < len(pcells) else ""
+        )
+        p_name = (
+            pcells[name_i].text(strip=True)
+            if name_i is not None and name_i < len(pcells) else ""
+        )
+        if "defendant" in p_party and p_name:
+            lst = defendants_by_case.setdefault(p_case, [])
+            if p_name not in lst:
+                lst.append(p_name)
 
     seen: set[str] = set()
 
@@ -389,6 +421,10 @@ def _parse_results(
         status_txt = cell(status_i)
         type_txt = cell(type_i)
         subtype_txt = cell(subtype_i)
+        dispo_txt = cell(dispo_i)
+        judgment_no_txt = cell(judgment_no_i)
+        agency_txt = cell(agency_i)
+        co_defendants = defendants_by_case.get(case_number) or []
 
         # Authoritative county: for CP the case-number county code wins (SC
         # §15-11-10 ties venue to property situs); criminal stays as queried.
@@ -440,6 +476,12 @@ def _parse_results(
                             "plaintiff": plaintiff,
                             "defendant": defendant,
                         },
+                        # Every defendant-party row for this case (co-owners /
+                        # heirs) — each is a resolvable owner lead downstream.
+                        "co_defendants": co_defendants or None,
+                        "disposition_date": dispo_txt or None,
+                        "judgment_number": judgment_no_txt or None,
+                        "court_agency": agency_txt or None,
                         "role": "defendant",
                         "court_system": court_system,
                         "status": status_txt,

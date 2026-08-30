@@ -226,10 +226,13 @@ async def _scrape_pdf(c, url: str, county: str) -> list[Listing]:
                 first_text = pdf.pages[0].extract_text() if pdf.pages else ""
             except Exception:
                 first_text = ""
-            if _is_post_sale_text(first_text or ""):
-                log.info("sc_tax_delinquent.skip_post_sale_pdf",
-                         county=county, url=url, reason="post-sale RESULT markers in PDF text")
-                return []
+            # Post-sale RESULT PDFs (BIDDER # / SALE-BID PRICE / NOW OR FORMERLY)
+            # are still extracted: the properties are tax-delinquent and owners
+            # may be in the redemption period. Flag but don't skip.
+            is_post_sale = _is_post_sale_text(first_text or "")
+            if is_post_sale:
+                log.info("sc_tax_delinquent.post_sale_text",
+                         county=county, url=url)
             for page in pdf.pages:
                 # Collect text for fallback extraction
                 try:
@@ -426,13 +429,13 @@ async def _scrape_html(c, url: str, county: str) -> list[Listing]:
         if not any(k in (href.lower() + text) for k in
                    ("delinquent", "tax-sale", "tax sale", "tax-foreclosure", "forfeit")):
             continue
-        # Skip post-sale RESULT PDFs by filename/label before fetching — these
-        # are already-auctioned sheets, not fresh pre-sale leads. (e.g. Pickens
-        # "...TAX SALE RESULTS FOR WEBSITE.pdf" / "2025 Delinquent Tax Sale Results")
-        if _is_post_sale_filename(href) or _is_post_sale_filename(text):
-            log.info("sc_tax_delinquent.skip_post_sale_link",
+        # Post-sale RESULT PDFs (already-auctioned sheets) are still useful:
+        # the properties are tax-delinquent and owners may be in the redemption
+        # period. Don't skip them entirely - flag them as post-sale instead.
+        is_post_sale = _is_post_sale_filename(href) or _is_post_sale_filename(text)
+        if is_post_sale:
+            log.info("sc_tax_delinquent.post_sale_pdf",
                      county=county, href=href[:160], label=text[:80])
-            continue
         href = urljoin(join_base, href)
         pdf_listings = await _scrape_pdf(c, href, county)
         out.extend(pdf_listings)

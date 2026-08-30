@@ -104,6 +104,8 @@ NEW_SOURCES = {
     "law_firms.zacchaeus",
     # net-new (2026-06-27): Greenwood newspaper + Spartanburg FLC tax-sale PDF
     "newspapers.index_journal", "counties_sc.spartanburg_flc",
+    # net-new (2026-08-16): Craigslist FSBO (motivated-seller by-owner listings)
+    "national.craigslist_fsbo",
     # motivated-seller life-event + delinquency sources (2026-06-30): these were
     # pipeline-wired (DATELESS_OK + main.py) but never added here, so the partial
     # merge never LANDED them onto the board. The ~8.6k un-landed leads live here.
@@ -368,6 +370,10 @@ def main() -> int:
     from foreclosure_scraper.enrichment_buyer_match import enrich_buyer_match
     _safe("enrich_equity", lambda: enrich_equity(merged))
     _safe("enrich_title_risk", lambda: enrich_title_risk(merged))
+    from foreclosure_scraper.enrichment_vacant_landuse import enrich_vacant_landuse
+    _safe("vacant_landuse", lambda: enrich_vacant_landuse(merged))
+    from foreclosure_scraper.enrichment_bankruptcy_stay import enrich_bankruptcy_stay
+    _safe("bankruptcy_stay", lambda: enrich_bankruptcy_stay(merged))
     _safe("distress score_board", lambda: score_board(merged))
     _safe("strategy_fit", lambda: enrich_strategy_fit(merged))
     _safe("buyer_match", lambda: enrich_buyer_match(merged))

@@ -114,6 +114,14 @@ def _to_listing(row, slug: str) -> Listing | None:
         except (ValueError, TypeError):
             return None
 
+    def _clean(v):
+        # pandas NaN / empty -> None; pass strings and phone lists through unchanged
+        if v is None or (isinstance(v, float) and v != v):
+            return None
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
     return Listing(
         source=slug,
         source_url=url,
@@ -128,6 +136,10 @@ def _to_listing(row, slug: str) -> Listing | None:
         bedrooms=_f(row.get("beds")),
         bathrooms=_f(row.get("full_baths")),
         living_sqft=_f(row.get("sqft")),
+        lot_size_sqft=_f(row.get("lot_sqft")),
+        # estimated_value -> market_value, assessed_value -> tax_value (mirrors homeharvest.py)
+        market_value=_f(row.get("estimated_value")),
+        tax_value=_f(row.get("assessed_value")),
         year_built=int(row["year_built"]) if row.get("year_built") and str(row["year_built"]).isdigit() else None,
         latitude=_f(row.get("latitude")),
         longitude=_f(row.get("longitude")),
@@ -139,7 +151,16 @@ def _to_listing(row, slug: str) -> Listing | None:
                 "status": row.get("status"),
                 "mls_status": row.get("mls_status"),
                 "list_date": str(row.get("list_date") or ""),
-                "agent": row.get("agent"),
+                # Realtor.com DOES return agent/office contact — the columns are
+                # agent_name/agent_email/agent_phones (the old "agent" key was null every row).
+                "agent_name": _clean(row.get("agent_name")),
+                "agent_email": _clean(row.get("agent_email")),
+                "agent_phones": _clean(row.get("agent_phones")),
+                "office_name": _clean(row.get("office_name")),
+                "office_phones": _clean(row.get("office_phones")),
+                "broker_name": _clean(row.get("broker_name")),
+                "mls_id": _clean(row.get("mls_id")),
+                "half_baths": _f(row.get("half_baths")),
             },
             "zillow": {
                 "photo": photos[0] if photos else None,

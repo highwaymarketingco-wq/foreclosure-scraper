@@ -102,6 +102,10 @@ ROSTERS: list[tuple[str, str, str, str]] = [
 # AgencyID query param selects the agency and seeds the PHP session.
 CITIZEN_CONNECT_BASE = "https://cc.southernsoftware.com"
 
+# Charge-string cap. Was 300, which truncated multi-charge rosters mid-charge
+# (a booking can list 10+ counts). 2000 keeps the full charge list.
+_CHARGE_CAP = 2000
+
 # Generational suffixes to drop before deciding which token is the surname.
 _NAME_SUFFIXES = frozenset(
     {"JR", "SR", "II", "III", "IV", "V", "JUNIOR", "SENIOR"})
@@ -209,12 +213,31 @@ async def _fetch_zuercher(subdomain: str) -> list[dict]:
         last, first = parts
         charges = rec.get("hold_reasons") or rec.get("charges") or ""
         if isinstance(charges, list):
-            charges = "; ".join(str(x) for x in charges)[:300]
+            charges = "; ".join(str(x) for x in charges)[:_CHARGE_CAP]
+        # Extra Zuercher fields (live-verified present): race/sex/cell_block,
+        # a release date, and a mugshot ref. Carry them through for skip-trace.
+        cell_block = rec.get("cell_block")
+        release_date = (rec.get("release_date")
+                        or rec.get("actual_release_date")
+                        or rec.get("projected_release_date"))
+        # Refine the otherwise-hardcoded in_custody flag from cell_block/release.
+        if release_date:
+            release_status = f"release_scheduled {release_date}"
+        elif cell_block:
+            release_status = f"in_custody cell_block={cell_block}"
+        else:
+            release_status = "in_custody"
         out.append({
             "last": last, "first": first,
             "dob": rec.get("dob"),
             "arrest_date": rec.get("arrest_date"),
-            "charge": str(charges)[:300],
+            "charge": str(charges)[:_CHARGE_CAP],
+            "race": rec.get("race"),
+            "sex": rec.get("sex"),
+            "cell_block": cell_block,
+            "release_date": release_date,
+            "mugshot": rec.get("mugshot") or rec.get("image") or rec.get("photo"),
+            "release_status": release_status,
         })
     log.info("jail_scraper.zuercher_ok", subdomain=subdomain, count=len(out))
     return out
@@ -256,7 +279,7 @@ async def _fetch_p2c_jqgrid(base: str) -> list[dict]:
             "last": last, "first": first,
             "dob": rw.get("dob"),
             "arrest_date": rw.get("disp_arrest_date"),
-            "charge": (rw.get("chrgdesc") or rw.get("disp_charge") or "")[:300],
+            "charge": (rw.get("chrgdesc") or rw.get("disp_charge") or "")[:_CHARGE_CAP],
         })
     log.info("jail_scraper.p2c_jqgrid_ok", base=base, count=len(out))
     return out
@@ -324,7 +347,7 @@ async def _fetch_p2c_centralsquare(target: str) -> list[dict]:
                         "dob": rec.get("DateOfBirth"),
                         "age": rec.get("Age"),
                         "arrest_date": rec.get("ArrestDate"),
-                        "charge": (rec.get("PrimaryChargeDescription") or "")[:300],
+                        "charge": (rec.get("PrimaryChargeDescription") or "")[:_CHARGE_CAP],
                     })
                 if len(recs) < page_size:
                     break
@@ -380,10 +403,14 @@ def _parse_citizen_connect_cards(html_text: str) -> list[dict]:
             "age": age,
             "arrest_date": (fields.get("Booked")
                             or fields.get("Arrest Date/Time") or None),
-            "charge": "; ".join(charges)[:300],
+            "charge": "; ".join(charges)[:_CHARGE_CAP],
             # This feed is the CURRENT-confinements list, so every row is a
             # person still in custody; the vendor publishes no release column.
             "release_status": "in_custody",
+            # Forward the full label:value card dict (Demographics, Booked,
+            # Facility, etc.) — the parser reads few of these but they carry
+            # extra skip-trace signal.
+            "fields": fields,
         })
     return out
 
@@ -482,6 +509,9 @@ def _parse_tyler_rows(html_text: str) -> list[dict]:
             "scheduled_release": sched,
             "facility": cells.get("HousingFacility") or None,
             "detail_id": det.group(1) if det else None,
+            # Forward the full parsed grid-cell dict (Name/DateOfBirth/
+            # InCustody/HousingFacility/ScheduledReleaseDate/...).
+            "cells": cells,
         })
     return out
 
@@ -503,7 +533,7 @@ def _parse_tyler_detail(html_text: str) -> dict:
             continue
         booking_date = fields.get("BookingDate") or None
         break
-    return {"arrest_date": booking_date, "charge": "; ".join(charges)[:300]}
+    return {"arrest_date": booking_date, "charge": "; ".join(charges)[:_CHARGE_CAP]}
 
 
 async def _fetch_tyler_detail(base: str, detail_id: str) -> dict:
@@ -650,6 +680,15 @@ def _to_listing(rec: dict, state: str, county: str) -> Listing:
                 "release_status": rec.get("release_status") or "in_custody",
                 "scheduled_release": rec.get("scheduled_release"),
                 "facility": rec.get("facility"),
+                # Zuercher demographics + release detail (dropped before).
+                "race": rec.get("race"),
+                "sex": rec.get("sex"),
+                "cell_block": rec.get("cell_block"),
+                "release_date": rec.get("release_date"),
+                "mugshot": rec.get("mugshot"),
+                # Full vendor field/cell dicts (Citizen-Connect / Tyler).
+                "fields": rec.get("fields"),
+                "cells": rec.get("cells"),
                 "vendor": "jail_bookings_scraper",
             },
         },

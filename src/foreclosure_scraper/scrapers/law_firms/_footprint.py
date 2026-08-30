@@ -24,6 +24,7 @@ from ...config import ALL_COUNTIES, in_scope
 COASTAL_COUNTIES: frozenset[tuple[str, str]] = frozenset({
     ("Currituck", "NC"), ("Dare", "NC"), ("Hyde", "NC"), ("Carteret", "NC"),
     ("Onslow", "NC"), ("Pender", "NC"), ("New Hanover", "NC"), ("Brunswick", "NC"),
+    ("Beaufort", "NC"), ("Craven", "NC"), ("Pamlico", "NC"),
     # Horry SC (Myrtle Beach) intentionally excluded per user direction 2026-08-12.
     ("Georgetown", "SC"), ("Charleston", "SC"),
     ("Beaufort", "SC"), ("Colleton", "SC"),

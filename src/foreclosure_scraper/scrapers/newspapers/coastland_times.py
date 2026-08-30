@@ -47,6 +47,8 @@ from selectolax.parser import HTMLParser
 from ...base_scraper import BaseScraper
 from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
+from ._townnews import NC_CASE_RE
+from .column_legal_notices import _notice_email
 
 BASE = "https://www.thecoastlandtimes.com"
 # Both the tag view and the section view list the same notices; we read both and
@@ -138,6 +140,16 @@ TRUSTEE_LABEL_RE = re.compile(
     r"Substitute\s+Trustee[:\s]+"
     r"((?:[A-Z][A-Za-z.'\-]+[,\s]+){1,4}"
     r"(?:Inc\.?|LLC|LLP|PLLC|P\.?A\.?|P\.?C\.?|Law\s+Offices?))",
+)
+# Grantor of the foreclosed Deed of Trust = the current record owner ("...Deed
+# of Trust executed and delivered by Jackie H. Willis" / "made by Sea Strand LLC").
+# Stop at the clause boundary so we don't swallow "to <Trustee>, dated ...".
+GRANTOR_RE = re.compile(
+    r"(?:executed(?:\s+and\s+delivered)?|made|given)\s+by\s+"
+    r"([A-Z][A-Za-z0-9.'\- ]{2,70}?)"
+    r"(?:\s*\(|,|;|\s+(?:dated|to\s+[A-Z]|and\s+recorded|in\s+favor|"
+    r"as\s+grantor|Trustee)|$)",
+    re.I,
 )
 
 
@@ -239,6 +251,35 @@ def _parse_detail(html: str, url: str, slug: str) -> Listing | None:
         if len(cand) > 4 and cand.lower() not in {"the", "this"}:
             trustee = cand
 
+    # NC Special-Proceedings case number ("26 SP 000132-110").
+    case_number = None
+    cn_m = NC_CASE_RE.search(blob)
+    if cn_m:
+        case_number = re.sub(r"\s+", "", cn_m.group(1)).upper()
+
+    # Grantor of the foreclosed Deed of Trust = the current record owner.
+    owner_name = None
+    defendant = None
+    g_m = GRANTOR_RE.search(body)
+    if g_m:
+        cand = _clean(g_m.group(1)).rstrip(",.;: ")
+        if len(cand) >= 3 and re.search(r"[A-Za-z]{2}", cand):
+            owner_name = cand
+            defendant = cand
+
+    # Attorney/trustee phone + email printed in the notice foot (a reachable
+    # case contact, NOT the owner). Reuses the Column gold-standard extractor
+    # so parcel-PIN / case-number digit runs can't leak in as a phantom phone.
+    raw = {
+        "coastland_times": {
+            "headline": headline,
+            "body": body[:1500],
+        }
+    }
+    contact = _notice_email(body)
+    if contact:
+        raw["notice_contact"] = contact
+
     # SC mortgage-foreclosure summons would be lis-pendens-stage; these Dare
     # notices are power-of-sale trustee SALES, so classify as the sale itself.
     return Listing(
@@ -256,16 +297,14 @@ def _parse_detail(html: str, url: str, slug: str) -> Listing | None:
         sale_time=sale_time,
         sale_location="Dare County Courthouse, Manteo NC",
         foreclosure_process="power_of_sale",
+        case_number=case_number,
+        owner_name=owner_name,
+        defendant=defendant,
         trustee=trustee,
         description=(headline or body)[:500] or None,
         first_seen=datetime.utcnow(),
         last_seen=datetime.utcnow(),
-        raw={
-            "coastland_times": {
-                "headline": headline,
-                "body": body[:1500],
-            }
-        },
+        raw=raw,
     )
 
 

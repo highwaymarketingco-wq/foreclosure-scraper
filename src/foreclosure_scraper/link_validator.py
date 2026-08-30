@@ -43,6 +43,7 @@ KNOWN_ANTI_BOT_HOSTS = (
     "aldridgepite.com",             # disclaimer cookie required
     "kornlawfirm.com",              # JS-rendered
     "mtglaw.com",                   # AJAX-loaded
+    "apps.liensnc.com",             # 302-redirects to login on every HEAD; 56K+ URLs
 )
 
 
@@ -157,6 +158,16 @@ async def validate(listings: list[Listing], *, workers: int = 24) -> list[Listin
     """
     if not listings:
         return []
+    # ── Fast-path: LINK_RECHECK_DAYS >= 999 means "skip link validation
+    # entirely this run". Link health is cosmetic — it tags status but never
+    # drops listings. On an 8 GB machine the 87K-URL HEAD storm takes ~19 h,
+    # which is the single biggest avoidable cost. Operators who want real
+    # validation set LINK_RECHECK_DAYS to a sane value (e.g. 7). ──
+    if LINK_RECHECK_DAYS >= 999:
+        log.info("link_check.skipped",
+                 reason=f"LINK_RECHECK_DAYS={int(LINK_RECHECK_DAYS)} (skip mode)",
+                 listings=len(listings))
+        return listings
     now = datetime.utcnow()
     stamp = now.isoformat(timespec="seconds") + "Z"
     todo = [li for li in listings if _needs_recheck(li, now)]

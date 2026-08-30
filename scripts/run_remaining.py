@@ -51,6 +51,7 @@ SCRAPERS_TO_RUN = [
     "counties_sc.georgetown_civicengage",
     "counties_sc.horry_flc",
     "counties_sc.terry_howe_flc",
+    "counties_sc.terry_howe_auctions",
     "counties_nc.buncombe_tax",
     "counties_nc.buncombe_tax_foreclosure",
     "counties_nc.buncombe_delinquent_tax",

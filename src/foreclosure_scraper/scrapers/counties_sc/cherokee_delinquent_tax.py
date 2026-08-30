@@ -1,185 +1,180 @@
-"""Cherokee County SC delinquent-tax watcher — cherokeecountysc.gov.
+"""Cherokee SC delinquent tax sale PDFs via WordPress wp-json media API.
 
-Cherokee County (Gaffney, SC — Upstate core) posts its annual delinquent-tax
-SALE material under /delinquent-tax/ as wp-content/uploads PDFs. When the
-year-end PARCEL LIST is published (~Oct–Dec) it carries owner name + TMS map
-number + property situs per delinquent parcel — strong pre-sale distress: the
-owner owes back taxes and the property heads to the December tax sale unless
-redeemed (SC 12-51 redemption ~12 months).
+Cherokee County SC publishes its annual delinquent tax sale list as PDFs on
+its WordPress site. The wp-json media endpoint exposes all attachments
+matching a search query, returning direct PDF URLs without HTML scraping.
 
-This is SEASONAL. Most of the year the page only has procedural docs (bidder
-registration, web policy), and the actual parcel list is absent — so off-season
-runs must return 0 CLEANLY, never error. We do that two ways:
-  * active_months gates the run to the Oct–Jan window (dormant otherwise), and
-  * even in-window, we only emit rows from a PDF that actually parses into
-    parcel records; a procedural PDF yields 0 rows and is skipped.
+PDF layout (verified from 2024 Tax Sale List):
+    Item Number Owner Name Map Number Description
+    1 A AND R PROPERTY MANAGEMENT 099-01-00-022.000 946 N LOGAN ST
+    2 A.T.O. 21 LLC 081-12-00-025.000 W FAIRVIEW AVE//800 1/2
 
-Access path (free, public .gov — NO login, NO CAPTCHA, plain HTTP + pypdf):
-  1. GET /delinquent-tax/ (and the /tax-sale-bidders/ subpage) -> list every
-     wp-content/uploads *.pdf link.
-  2. Rank candidates: current/prior year + "delinquent / tax list / ledger"
-     score up; "bidder / registration / policy / privacy / procedure" score
-     down (those are the procedural docs, not the parcel list).
-  3. Download each candidate, pypdf-extract text, parse `owner TMS situs` rows.
-     The first PDF that yields real parcel rows is the list; stop there.
+No dollar amounts in the PDF rows. The TMS (Map Number) is the parcel_id.
 
-TMS format (Cherokee): NNN-NN-NN-NNN(.NNN)  e.g. 029-00-00-028.001.
-
-Verified live 2026-06-30: page reachable, 3 PDFs present — all procedural
-(2025 bidder-info, web-additions, web-policy), NO current parcel list. The
-watcher returns 0 cleanly (off-season), which is the expected DORMANT/ZERO
-outcome, not a failure.
+FREE, no login, no CAPTCHA. Endpoint verified live 2026-08-18:
+  12 tax sale PDFs found (2021-2025).
 """
 from __future__ import annotations
 
 import io
+import json
 import re
-from datetime import datetime
+import urllib.request
 from typing import Iterable
-from urllib.parse import urljoin
 
 import structlog
 
-from ...http_client import get_bytes, get_text
-from ...base_scraper import BaseScraper
+from ...base_scraper import BaseScraper, OUTCOME_OK, OUTCOME_ZERO
+from ...http_client import get_bytes
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
-PAGES = (
-    "https://cherokeecountysc.gov/delinquent-tax/",
-    "https://cherokeecountysc.gov/delinquent-tax/tax-sale-bidders/",
+WP_MEDIA_URL = (
+    "https://www.cherokeecountysc.gov/wp-json/wp/v2/media"
+    "?search=tax%20sale&per_page=100&mime_type=application/pdf"
 )
-# Cherokee TMS: NNN-NN-NN-NNN(.NNN)
-TMS_PAT = r"\d{3}-\d{2}-\d{2}-[\d.]+"
 
-# A parcel row in the list PDF starts with an item number, then owner name,
-# then the TMS, then the situs/description. Same shape the SC annual-list parser
-# uses, kept self-contained here so this county can diverge if its format does.
-_ITEM_RE = re.compile(r"^\s*(\d{3,6}|NEW OWNER)\s+(.+)$")
+# Cherokee TMS format: NNN-NN-NN-NNN.NNN (e.g. 099-01-00-022.000)
+_TMS_RE = re.compile(r"\b(\d{3}-\d{2}-\d{2}-\d{3}\.\d{3})\b")
 
-
-def discover_pdf_links(html: str, base: str, year: int) -> list[str]:
-    """Return candidate list-PDF URLs on a Cherokee delinquent-tax page, ranked
-    so the parcel LIST sorts above procedural docs (bidder info / policy)."""
-    hrefs = re.findall(r'href=["\']([^"\']+\.pdf[^"\']*)["\']', html, re.I)
-    cands: list[tuple[int, str]] = []
-    for h in hrefs:
-        u = urljoin(base, h)
-        low = u.lower()
-        score = 0
-        if str(year) in low:
-            score += 4
-        if str(year - 1) in low:
-            score += 2
-        if any(k in low for k in ("delinquent", "tax-list", "tax_list",
-                                   "ledger", "sale-list", "taxsale")):
-            score += 3
-        if any(k in low for k in ("bidder", "registration", "register",
-                                   "policy", "privacy", "procedure",
-                                   "addition", "info", "faq")):
-            score -= 4  # procedural doc, not the parcel list
-        cands.append((score, u))
-    # Keep even non-positive-scoring PDFs as low-priority candidates: a list
-    # whose filename gives no hints will still be tried after the obvious ones.
-    return [u for _s, u in sorted(cands, key=lambda x: -x[0])]
+# Row: <item#> <owner name> <TMS> <description/address>
+# Item number is 1-4 digits at the start of the line
+_ROW_RE = re.compile(
+    r"^\s*(\d{1,4})\s+"        # item number
+    r"(.+?)\s+"                 # owner name (non-greedy)
+    r"(\d{3}-\d{2}-\d{2}-\d{3}\.\d{3})\s+"  # TMS
+    r"(.+)$"                    # description
+)
 
 
-def parse_list(text: str, url: str, year: int) -> list[Listing]:
-    """Parse delinquent-tax list PDF text into per-parcel Listings.
-    Row shape: `00005 ADAMS ISAAC 029-00-00-028.001 1240 LOVE SPRINGS RD`."""
-    tms_re = re.compile(rf"({TMS_PAT})")
-    out: list[Listing] = []
-    seen: set[str] = set()
-    redemption = datetime(year, 12, 31)  # ~12-mo redemption off the Dec sale
-    for raw_line in (text or "").splitlines():
-        line = raw_line.strip()
-        m = _ITEM_RE.match(line)
-        if not m:
+def _parse_pdf_text(text: str) -> list[dict]:
+    """Parse Cherokee tax sale PDF text into rows.
+
+    Each data row: <item#> <owner name> <TMS> <description>
+    Returns list of dicts with keys: tms, owner, description, item.
+    """
+    rows: list[dict] = []
+    for ln in text.splitlines():
+        s = ln.strip()
+        if not s or len(s) < 15:
             continue
-        tm = tms_re.search(line)
-        if not tm:
+        # Skip header lines
+        if "Item Number" in s or "DELINQUENT" in s.upper() or "NOTICE" in s.upper():
             continue
-        tms = tm.group(1)
-        head = line[m.start(2):tm.start()].strip() if tm.start() > m.start(2) else ""
-        name = re.sub(r"^\s*(NEW OWNER)\s*", "", head).strip() or None
-        situs = line[tm.end():].strip() or None
-        key = f"{tms}|{name}"
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(Listing(
-            source="counties_sc.cherokee_delinquent_tax",
-            source_url=url,
-            listing_type=ListingType.TAX_SALE,
-            property_kind=PropertyKind.UNKNOWN,
-            state="SC",
-            county="Cherokee",
-            street_address=situs,
-            defendant=name,
-            parcel_id=tms,
-            redemption_deadline=redemption,
-            foreclosure_process="tax",
-            description=re.sub(r"\s+", " ", line)[:300],
-            first_seen=datetime.utcnow(),
-            last_seen=datetime.utcnow(),
-            raw={"cherokee_delinquent_tax": {"item_line": line[:200], "year": year}},
-        ))
-    return out
+
+        m = _ROW_RE.match(s)
+        if m:
+            item = int(m.group(1))
+            owner = re.sub(r"\s+", " ", m.group(2)).strip()
+            tms = m.group(3)
+            desc = re.sub(r"\s+", " ", m.group(4)).strip()
+            if owner and len(owner) > 1:
+                rows.append({
+                    "item": item,
+                    "tms": tms,
+                    "owner": owner,
+                    "description": desc,
+                })
+
+    return rows
 
 
-def _pdf_text(data: bytes) -> str:
-    try:
-        import pypdf
-        reader = pypdf.PdfReader(io.BytesIO(data))
-        return "\n".join((p.extract_text() or "") for p in reader.pages)
-    except Exception as exc:  # noqa: BLE001
-        log.warning("cherokee_delinquent.pdf_parse_fail", error=str(exc)[:160])
-        return ""
+def _extract_pdf_text(pdf_bytes: bytes) -> str:
+    """Extract text from PDF bytes using pypdf."""
+    from pypdf import PdfReader
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    parts = []
+    for page in reader.pages:
+        parts.append(page.extract_text() or "")
+    return "\n".join(parts)
 
 
-class CherokeeDelinquentTax(BaseScraper):
+class CherokeeDelinquentTaxScraper(BaseScraper):
     slug = "counties_sc.cherokee_delinquent_tax"
-    name = "Cherokee County (SC) Delinquent Tax Sale List (annual PDF)"
-    category = "county_tax"
+    name = "Cherokee SC Delinquent Tax Sale"
+    category = "tax_sale"
     timeout_s = 120.0
-    expected_min_count = 0          # off-season the list is absent -> clean 0
-    active_months = (10, 11, 12, 1)  # SC list posts ~Nov; dormant off-season
+    expected_min_count = 0  # annual list, may be empty off-season
 
     async def fetch(self) -> Iterable[Listing]:
-        year = datetime.utcnow().year
-        candidates: list[str] = []
-        seen_url: set[str] = set()
-        for page in PAGES:
+        # Step 1: Fetch the wp-json media listing (sync urllib, free, no auth)
+        req = urllib.request.Request(
+            WP_MEDIA_URL,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                              "AppleWebKit/537.36 (KHTML, like Gecko) "
+                              "Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                media_items = json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            log.error("cherokee_delinquent_tax.media_fetch_error", error=str(e)[:120])
+            self.last_outcome = OUTCOME_ZERO
+            return
+
+        if not media_items:
+            self.last_outcome = OUTCOME_ZERO
+            return
+
+        log.info("cherokee_delinquent_tax.media_found", count=len(media_items))
+
+        # Step 2: Download and parse each PDF
+        all_rows: list[dict] = []
+        for item in media_items:
+            pdf_url = item.get("source_url", "")
+            if not pdf_url or not pdf_url.endswith(".pdf"):
+                continue
+            # Skip bidder lists and legal descriptions (no parcels)
+            title = ""
+            if isinstance(item.get("title"), dict):
+                title = item["title"].get("rendered", "")
+            else:
+                title = str(item.get("title", ""))
+            title_lower = title.lower()
+            if "bidder" in title_lower or "legal-description" in title_lower:
+                continue
+
             try:
-                html = await get_text(page, impersonate=True, timeout=40.0)
-            except Exception as exc:  # noqa: BLE001
-                log.warning("cherokee_delinquent.page_fail", page=page,
-                            error=str(exc)[:160])
+                pdf_bytes = await get_bytes(pdf_url, timeout=60)
+                text = _extract_pdf_text(pdf_bytes)
+                rows = _parse_pdf_text(text)
+                log.info("cherokee_delinquent_tax.pdf_parsed",
+                         url=pdf_url[-50:], rows=len(rows))
+                all_rows.extend(rows)
+            except Exception as e:
+                log.warning("cherokee_delinquent_tax.pdf_error",
+                            url=pdf_url[-50:], error=str(e)[:100])
                 continue
-            for u in discover_pdf_links(html, page, year):
-                if u not in seen_url:
-                    seen_url.add(u)
-                    candidates.append(u)
 
-        if not candidates:
-            log.info("cherokee_delinquent.no_pdfs")
-            return []
-
-        out: list[Listing] = []
-        for url in candidates:
-            try:
-                data = await get_bytes(url, timeout=60.0)
-            except Exception:  # noqa: BLE001
+        # Step 3: Emit listings (dedupe by TMS)
+        seen: set[str] = set()
+        for row in all_rows:
+            tms = row.get("tms", "")
+            owner = row.get("owner", "")
+            if not tms or not owner:
                 continue
-            if not (data and data[:4] == b"%PDF"):
+            if tms in seen:
                 continue
-            rows = parse_list(_pdf_text(data), url, year)
-            if rows:  # the actual parcel list (procedural PDFs yield 0)
-                out.extend(rows)
-                log.info("cherokee_delinquent.list_ok", url=url, count=len(rows))
-                break
+            seen.add(tms)
 
-        log.info("cherokee_delinquent.done", count=len(out),
-                 candidates=len(candidates))
-        return out
+            yield Listing(
+                source=self.slug,
+                source_url=WP_MEDIA_URL,
+                county="Cherokee",
+                state="SC",
+                parcel_id=tms,
+                defendant=owner,
+                listing_type=ListingType.TAX_SALE,
+                property_kind=PropertyKind.UNKNOWN,
+                raw={
+                    "sale_type": "delinquent_tax",
+                    "description": row.get("description"),
+                    "item_number": row.get("item"),
+                },
+            )
+
+        self.last_outcome = OUTCOME_OK if all_rows else OUTCOME_ZERO

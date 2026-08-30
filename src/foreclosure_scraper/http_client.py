@@ -306,6 +306,45 @@ async def get_text_impersonate(
     raise RuntimeError("unreachable")
 
 
+async def _curl_fallback_text(
+    url: str,
+    *,
+    timeout: float = 45.0,
+    headers: dict | None = None,
+    referer: str | None = None,
+) -> str:
+    """Fallback: use the system curl binary to fetch text.
+
+    On some networks (e.g. macOS with IPv6 issues), httpx times out while
+    the system curl binary works fine. This is a last-resort tier BEFORE
+    impersonation, used when httpx raises TransportError/TimeoutException.
+    """
+    import shlex
+    cmd = ["curl", "-s", "-m", str(int(timeout)), "-L", "--compressed"]
+    cmd += ["-A", _SESSION_UA]
+    if headers:
+        for k, v in headers.items():
+            cmd += ["-H", f"{k}: {v}"]
+    if referer:
+        cmd += ["-e", referer]
+    proxy = os.environ.get("PROXY_URL")
+    if proxy:
+        cmd += ["--proxy", proxy]
+    cmd.append(url)
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout + 10)
+        if proc.returncode == 0 and stdout:
+            return stdout.decode("utf-8", errors="replace")
+    except (asyncio.TimeoutError, OSError) as e:
+        log.warning("curl_fallback.failed", url=url[:100], error=str(e))
+    return ""
+
+
 async def get_text(
     url: str,
     *,
@@ -316,11 +355,15 @@ async def get_text(
 ) -> str:
     """GET a URL and return text, with retry on transient errors.
 
-    With `impersonate=True`, plain httpx is tried first; if the host returns a
-    block status (401/403/406/409/429) or any HTTPStatusError, we transparently
-    escalate to the curl-cffi Chrome-fingerprint tier (a fast static fallback
-    BEFORE any browser render). Hosts seen blocking plain httpx are remembered
-    process-wide so later fetches impersonate first and skip the doomed attempt.
+    Fetch tier order:
+    1. plain httpx (HTTP/2, gzip) + rotated real-browser UA — for friendly hosts.
+    2. curl subprocess fallback — when httpx times out (network issue), the
+       system curl binary often succeeds where httpx fails on macOS.
+    3. curl-cffi Chrome impersonation — real TLS fingerprint for hosts that
+       403/406 on plain httpx.
+
+    Hosts seen blocking plain httpx are remembered process-wide so later
+    fetches impersonate first and skip the doomed attempt.
     """
     h = dict(headers or {})
     if referer:
@@ -364,6 +407,22 @@ async def get_text(
         return await get_text_impersonate(
             url, timeout=timeout, headers=headers, referer=referer
         )
+    except (httpx.TransportError, httpx.TimeoutException) as exc:
+        # httpx timed out — try curl subprocess fallback before giving up.
+        # This is the key workaround for macOS networks where httpx hangs but
+        # the system curl binary works fine (IPv6, DNS, or TLS issues).
+        log.info("get_text.curl_fallback", host=host, error=type(exc).__name__)
+        result = await _curl_fallback_text(
+            url, timeout=min(timeout, 45.0), headers=h, referer=referer
+        )
+        if result:
+            return result
+        # curl also failed — try impersonation as last resort
+        if impersonate:
+            return await get_text_impersonate(
+                url, timeout=timeout, headers=headers, referer=referer
+            )
+        raise
 
 
 async def get_bytes(url: str, *, timeout: float = 60.0) -> bytes:
@@ -386,6 +445,29 @@ async def get_bytes(url: str, *, timeout: float = 60.0) -> bytes:
                 r.raise_for_status()
                 return r.content
     raise RuntimeError("unreachable")
+
+
+async def get_wayback_text(url: str, *, timeout: float = 45.0) -> str | None:
+    """Fetch a URL's most recent archived snapshot from the Wayback Machine.
+
+    Use when a source page is down (404/500/DNS fail) or returns a block.
+    Returns None if no archive exists or the archive is empty.
+    """
+    api = f"https://archive.org/wayback/available?url={url}"
+    try:
+        async with client(timeout=timeout) as c:
+            r = await c.get(api)
+            r.raise_for_status()
+            data = r.json()
+            snap = data.get("archived_snapshots", {}).get("closest", {})
+            if not snap or not snap.get("available"):
+                return None
+            snap_url = snap["url"]
+            snap_r = await c.get(snap_url)
+            snap_r.raise_for_status()
+            return snap_r.text
+    except Exception:
+        return None
 
 
 async def gather_with_concurrency(n: int, *aws):

@@ -98,8 +98,10 @@ DISTRESS_TYPE_RE = re.compile(
 )
 
 _MIN_INTERVAL_S = float(os.environ.get("ROD_NAME_INDEX_INTERVAL_S", "4.0"))
-_TIMEOUT_S = float(os.environ.get("ROD_NAME_INDEX_TIMEOUT_S", "90"))
+_TIMEOUT_S = float(os.environ.get("ROD_NAME_INDEX_TIMEOUT_S", "30"))
 _MAX_ENTITIES = int(os.environ.get("ROD_NAME_INDEX_MAX_ENTITIES", "60"))
+_MAX_LOOKUPS = int(os.environ.get("ROD_NAME_INDEX_MAX_LOOKUPS", "200"))
+_WALL_BUDGET_S = float(os.environ.get("ROD_NAME_INDEX_WALL_BUDGET_S", "120"))
 
 _last_call: dict[str, float] = {}
 
@@ -258,6 +260,7 @@ def enrich_rod_name_index(listings: Iterable[Listing]) -> dict:
     """Attach raw['rod_name_index'] to leads in the eight covered counties."""
     stats = {"eligible": 0, "looked_up": 0, "with_records": 0, "distress": 0}
     cache: dict[tuple[str, str, str], list[dict]] = {}
+    _wall_t0 = time.monotonic()
 
     for li in listings:
         county = (getattr(li, "county", "") or "").strip().lower()
@@ -271,6 +274,8 @@ def enrich_rod_name_index(listings: Iterable[Listing]) -> dict:
 
         key = (county, state, owner.upper())
         if key not in cache:
+            if stats["looked_up"] >= _MAX_LOOKUPS or (time.monotonic() - _wall_t0) > _WALL_BUDGET_S:
+                continue
             cache[key] = lookup_name(county, state, owner)
             stats["looked_up"] += 1
         recs = cache[key]

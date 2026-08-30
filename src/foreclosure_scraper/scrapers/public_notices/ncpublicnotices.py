@@ -33,6 +33,14 @@ from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
+from ..newspapers.column_legal_notices import _notice_email
+from .nc_notices_counties import (
+    _CASE_RE as _NCC_CASE_RE,
+    _CASE_SPACED_RE as _NCC_CASE_SPACED_RE,
+    _PLAINTIFF_RE as _NCC_PLAINTIFF_RE,
+    _sale_date as _ncc_sale_date,
+    _tidy_name as _ncc_tidy_name,
+)
 
 log = structlog.get_logger()
 
@@ -248,12 +256,19 @@ async def _fetch_probate_detail(fetcher, detail_url: str) -> dict | None:
             return None
         pr = _PROBATE_PR.search(text)
         dod = _PROBATE_DOD.search(text)
-        if not (pr or dod):
+        # Attorney/PR phone from the full detail body (a reachable case contact).
+        # Reuses the Column extractor so parcel-PIN / case-number digit runs
+        # can't leak in as a phantom phone.
+        contact = _notice_email(text)
+        phone = contact.get("phone")
+        if not (pr or dod or phone):
             return None
         return {
             "personal_representative": pr.group(1).strip() if pr else None,
             "pr_address": pr.group(2).strip() if pr else None,
             "date_of_death": dod.group(1).strip() if dod else None,
+            "phone": phone,
+            "notice_body": text[:2000],
         }
     except Exception as exc:
         log.debug("ncnotices.detail_fetch_fail", url=detail_url[:120], error=str(exc)[:160])
@@ -699,9 +714,25 @@ def _parse_results_html(html: str, query: str, category: str) -> list[Listing]:
         # address backfill can resolve the property, and leave street_address
         # None (even if ADDR_RE matched a PR's mailing address in the body)
         # so the backfill gate `not li.street_address` fires.
+        #
+        # For foreclosure the named party (grantor / "vs. <Defendant>") is ALSO
+        # the owner — it was being computed then thrown away. Keep it as the
+        # defendant alongside the parsed street address.
+        case_number = None
+        sale_date = None
+        plaintiff = None
         if require_address:
             street_address = addr_m.group(1) if addr_m else None
-            defendant = None
+            defendant = named_party
+            # Reuse the sibling county-notice extractors (validated regexes) to
+            # pull case #, sale date, and the government plaintiff from the text.
+            cm = _NCC_CASE_RE.search(text) or _NCC_CASE_SPACED_RE.search(text)
+            if cm:
+                case_number = re.sub(r"\s+", "", cm.group(1)).upper()
+            sale_date = _ncc_sale_date(text)
+            pm = _NCC_PLAINTIFF_RE.search(text)
+            if pm:
+                plaintiff = _ncc_tidy_name(pm.group(1))
         else:
             street_address = None
             defendant = named_party
@@ -716,6 +747,9 @@ def _parse_results_html(html: str, query: str, category: str) -> list[Listing]:
                 state="NC",
                 county=county,
                 defendant=defendant,
+                plaintiff=plaintiff,
+                case_number=case_number,
+                sale_date=sale_date,
                 description=text[:500],
                 first_seen=datetime.utcnow(),
                 last_seen=datetime.utcnow(),

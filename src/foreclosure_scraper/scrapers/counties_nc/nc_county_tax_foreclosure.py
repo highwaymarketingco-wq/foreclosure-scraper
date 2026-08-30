@@ -102,11 +102,13 @@ def parse_text(text: str, county: str, url: str) -> list[Listing]:
         low = block.lower()
         status = next((s for pat, s in _STATUS_PATTERNS if re.search(pat, low)), None)
         upset_deadline = None
+        upset_deadline_dt = None
         um = _UPSET_DEADLINE_RE.search(block)
         if um:
             try:
                 from dateutil import parser as dp
-                upset_deadline = dp.parse(um.group(1)).date().isoformat()
+                upset_deadline_dt = dp.parse(um.group(1))
+                upset_deadline = upset_deadline_dt.date().isoformat()
             except (ValueError, TypeError, OverflowError):
                 pass
 
@@ -133,6 +135,7 @@ def parse_text(text: str, county: str, url: str) -> list[Listing]:
                 case_number=file_no,
                 opening_bid=bid,
                 sale_date=sale_date,
+                upset_bid_deadline=upset_deadline_dt,
                 description=re.sub(r"\s+", " ", block)[:400],
                 first_seen=datetime.utcnow(),
                 last_seen=datetime.utcnow(),

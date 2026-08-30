@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from typing import Any, Optional
 
 import httpx
@@ -36,6 +37,9 @@ from .http_client import client
 from .models import Listing, PropertyKind
 
 log = structlog.get_logger()
+
+# Cache layer field-name detection to avoid redundant ?f=json metadata calls.
+_layer_field_cache: dict[str, list[str]] = {}
 
 
 # Parcel-id field-name candidates per layer schema (case-insensitive).
@@ -184,13 +188,18 @@ async def _query_by_parcel(
 ) -> list[dict[str, Any]]:
     """Try multiple parcel-field names. First match wins."""
     layer_url = base_url.rsplit("/query", 1)[0]
-    try:
-        r = await c.get(layer_url, params={"f": "json"}, timeout=10.0)
-        if r.status_code != 200:
+    # Use cached fields if available to avoid redundant metadata calls
+    if layer_url not in _layer_field_cache:
+        try:
+            r = await c.get(layer_url, params={"f": "json"}, timeout=10.0)
+            if r.status_code != 200:
+                return []
+            _layer_field_cache[layer_url] = [
+                f["name"] for f in r.json().get("fields", []) if "name" in f
+            ]
+        except Exception:
             return []
-        fields = [f["name"] for f in r.json().get("fields", []) if "name" in f]
-    except Exception:
-        return []
+    fields = _layer_field_cache[layer_url]
     field_lower = {f.lower(): f for f in fields}
     candidates: list[str] = []
     for cand in PARCEL_FIELD_CANDIDATES:
@@ -323,7 +332,9 @@ async def enrich_with_parcel_lookup(listings: list[Listing]) -> None:
     log.info("parcel_lookup.start", target_count=len(targets))
 
     sem = asyncio.Semaphore(6)
-    counts = {"queried": 0, "matched": 0, "addr_resolved": 0, "synthesized": 0}
+    _BUDGET_S = 1800  # 30-min cap
+    _start = time.monotonic()
+    counts = {"queried": 0, "matched": 0, "addr_resolved": 0, "synthesized": 0, "budget_skip": 0}
 
     async def one(c: httpx.AsyncClient, li: Listing) -> None:
         # Resolve county GIS endpoint
@@ -352,6 +363,9 @@ async def enrich_with_parcel_lookup(listings: list[Listing]) -> None:
         candidates = [c for c in candidates if not (c in seen or seen.add(c))]
 
         async with sem:
+            if (time.monotonic() - _start) > _BUDGET_S:
+                counts["budget_skip"] += 1
+                return
             counts["queried"] += 1
             for pv in candidates[:5]:  # cap attempts per listing
                 results = await _query_by_parcel(c, base, pv)
@@ -376,4 +390,8 @@ async def enrich_with_parcel_lookup(listings: list[Listing]) -> None:
     async with client(timeout=20.0) as c:
         await asyncio.gather(*(one(c, li) for li in targets))
 
+    elapsed = time.monotonic() - _start
+    if counts["budget_skip"] > 0:
+        log.warning("parcel_lookup.time_capped", budget_s=_BUDGET_S, elapsed_s=round(elapsed),
+                     skipped=counts["budget_skip"], **{k: v for k, v in counts.items() if k != "budget_skip"})
     log.info("parcel_lookup.done", **counts)

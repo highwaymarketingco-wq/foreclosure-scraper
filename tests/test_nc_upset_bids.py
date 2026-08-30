@@ -394,7 +394,7 @@ def test_open_window_rows_survive_the_active_only_filter(kania_rows):
     live = [li for li in kania_rows
             if li.upset_bid_deadline and li.upset_bid_deadline >= NOW]
     assert live
-    dropped = [li for li in live if not _active_only(li, 120)]
+    dropped = [li for li in live if not _active_only(li, 120, now=NOW)]
     assert dropped == [], [li.street_address for li in dropped]
 
 

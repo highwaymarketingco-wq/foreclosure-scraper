@@ -27,10 +27,16 @@ from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
 BASE = "https://www.thedigitalcourier.com"
+#: TownNews caps this classifieds index at the ~9 currently-active legal ads and
+#: ignores paging params (verified live 2026-08-13: ``?o=10&l=10``, ``?page=2``,
+#: ``?l=40`` all return the SAME 9 ads). The old three-URL offset list implied
+#: 30-ad coverage it never delivered — one URL is the honest surface. NOTE: this
+#: means a foreclosure Notice of Sale is only reachable here while it is one of
+#: the ~9 live ads; once it rolls off (e.g. a property already past sale and into
+#: the upset-bid period) this source can no longer see it. Deeper/older notices
+#: need the statewide ncnotices.com archive (see public_notices.nc_notices_counties).
 LISTING_URLS = [
     "https://www.thedigitalcourier.com/classifieds/community/announcements/legal/",
-    "https://www.thedigitalcourier.com/classifieds/community/announcements/legal/?o=10&l=10",
-    "https://www.thedigitalcourier.com/classifieds/community/announcements/legal/?o=20&l=10",
 ]
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -180,6 +186,13 @@ class DailyCourierForeclosures(BaseScraper):
                 d_m2 = DEFENDANT_RE.search(body)
                 if d_m2:
                     defendant = d_m2.group(1).strip()[:200]
+
+                # Precision gate: a foreclosure notice with neither a court file
+                # nor a usable street address is not an actionable lead — it was
+                # emitting one junk Rutherford row per run (zip-only, no address,
+                # no case #). Require at least one property identifier.
+                if not case_number and not address:
+                    continue
 
                 out.append(
                     Listing(

@@ -94,20 +94,63 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
 
     merged = list(buckets.values())
 
-    # Pass 2: fuzzy address merge (only across listings that have addresses + zip)
+    # Pass 2: fuzzy address merge — across listings that have addresses.
+    # Original required zip on both sides; now also matches when both have
+    # same county+state (catches the 73 cross-source dups where one source
+    # had zip and the other didn't).
+    #
+    # BLOCKING OPTIMIZATION (2026-08-27): Pre-index by zip and (county, state)
+    # so we only compare listings within the same geographic block. This cuts
+    # O(n²) on 116K listings (6.7B comparisons) down to ~67M — 100x faster.
+    # Without this, merge_prior_board on 94K+22K hangs for hours and the
+    # try/except in main.py silently swallows the failure, dropping 72K leads.
+    by_zip: dict[str, list[int]] = {}
+    by_locale: dict[tuple, list[int]] = {}
+    for idx, li in enumerate(merged):
+        z = (li.zip_code or "").strip()[:5]
+        if z:
+            by_zip.setdefault(z, []).append(idx)
+        cty = (li.county or "").strip().lower()
+        st = (li.state or "").strip().lower()
+        if cty and st:
+            by_locale.setdefault((cty, st), []).append(idx)
+
     final: list[Listing] = []
     consumed: set[int] = set()
     for i, a in enumerate(merged):
         if i in consumed:
             continue
         addr_a = _norm_addr(a.street_address)
-        for j in range(i + 1, len(merged)):
+        if not addr_a:
+            final.append(a)
+            continue
+        county_a = (a.county or "").strip().lower()
+        state_a = (a.state or "").strip().lower()
+        zip_a = (a.zip_code or "").strip()[:5]
+
+        # Build candidate set from blocking indexes — NOT all j > i
+        candidates: set[int] = set()
+        if zip_a and zip_a in by_zip:
+            candidates.update(j for j in by_zip[zip_a] if j > i)
+        locale_key = (county_a, state_a)
+        if county_a and state_a and locale_key in by_locale:
+            candidates.update(j for j in by_locale[locale_key] if j > i)
+
+        for j in candidates:
             if j in consumed:
                 continue
             b = merged[j]
-            if not (addr_a and b.street_address and a.zip_code and b.zip_code):
+            if not b.street_address:
                 continue
-            if a.zip_code != b.zip_code:
+            # Must be same county+state OR same zip (guaranteed by blocking,
+            # but keep the check for safety on edge cases)
+            zip_b = (b.zip_code or "").strip()[:5]
+            county_b = (b.county or "").strip().lower()
+            state_b = (b.state or "").strip().lower()
+            same_zip = zip_a and zip_b and zip_a == zip_b
+            same_locale = (county_a == county_b and state_a == state_b
+                           and county_a and state_a)
+            if not (same_zip or same_locale):
                 continue
             score = fuzz.token_set_ratio(addr_a, _norm_addr(b.street_address))
             if score >= 92:

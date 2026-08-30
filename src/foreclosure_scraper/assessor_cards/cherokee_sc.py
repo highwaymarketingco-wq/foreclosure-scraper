@@ -295,9 +295,10 @@ async def _fetch_render(url: str) -> str | None:
             holder["html"] = ""
 
     try:
+        from .base import cf_solving_disabled
         await StealthyFetcher.async_fetch(
             url, headless=True, network_idle=True, timeout=90000,
-            page_action=page_action, solve_cloudflare=True)
+            page_action=page_action, solve_cloudflare=not cf_solving_disabled())
     except Exception:
         return None
     return holder.get("html") or None

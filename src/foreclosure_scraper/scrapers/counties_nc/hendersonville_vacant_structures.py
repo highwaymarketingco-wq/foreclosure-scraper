@@ -71,7 +71,7 @@ ENV_OFF = "FORECLOSURE_HENDERSONVILLE_VACANT"
 LAYER = ("https://services1.arcgis.com/UTZTmZoX2rsa9yFA/arcgis/rest/services/"
          "VACANT_STRUCTURES_7_24_24/FeatureServer/0")
 
-PAGE_URL = "https://www.hvlnc.gov/departments/development-assistance"
+PAGE_URL = "https://www.hvlnc.gov/community-development"
 
 #: EXPLICIT allow-list. PHONE__, EMAIL and column19 exist on the layer and are
 #: intentionally absent — see the PRIVACY note in the module docstring.

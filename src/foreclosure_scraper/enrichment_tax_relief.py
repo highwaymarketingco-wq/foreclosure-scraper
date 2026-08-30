@@ -29,8 +29,8 @@ MEASURED YIELD, 2026-08-06 — read this before investing more here
     (the one hit carries a $73,300 rollback lien that comes due on sale), but
     do not expect volume from adding more counties here.
 
-THE ELDERLY EXEMPTION DOES NOT EXTEND BEYOND BUNCOMBE — checked 2026-08-06
-    All 17 county parcel layers were probed for an exemption/relief field.
+THE ELDERLY EXEMPTION DOES NOT EXTEND BEYOND BUNCOMBE (NC) — checked 2026-08-06
+    All 17 NC county parcel layers were probed for an exemption/relief field.
     Seven have one, and on inspection the VALUES are institutional, not
     personal: Rutherford is Religious/Public Service/Charitable/Lodges, Gaston
     is GOV/REL/UTL/CEM, Henderson is Government/Religious/Conservation/Burial.
@@ -38,12 +38,16 @@ THE ELDERLY EXEMPTION DOES NOT EXTEND BEYOND BUNCOMBE — checked 2026-08-06
     2 rows in Rutherford, 13 in Gaston ("CAGE" = a charity for the aged, an
     institution rather than a homeowner) and 3 in Henderson.
 
+    York SC publishes HOMESTEAD='Y' (80,620 parcels) — SC's homestead exemption
+    for age 65+/disabled/blind — which IS a personal exemption, unlike the NC
+    layers above. Also flags FARM USE parcels (5,254) for agricultural rollback.
+
     Anderson SC RATIO is the 4%/6% assessment class, not a relief flag, and
     Spartanburg HomesteadNumber has 32 non-empty values that look like book
     codes. So the note that once stood here, that Gaston and Anderson SC "drop
-    straight in" for senior exemption, was WRONG and is retracted. Buncombe is
-    unusual in publishing the elderly-or-disabled exclusion per parcel; do not
-    go looking for it elsewhere again.
+    straight in" for senior exemption, was WRONG and is retracted. Buncombe NC
+    is unusual in publishing the elderly-or-disabled exclusion per parcel.
+    York SC is the SC equivalent for homestead exemption flags.
 """
 from __future__ import annotations
 
@@ -106,6 +110,20 @@ _RELIEF_LAYERS: dict[tuple[str, str], dict] = {
         "fields": "Parcel_Number,Property_Owner,Use_Value_Deferred",
         "classify": "use_value_deferral_str",
     },
+    # York SC — 80,620 parcels with HOMESTEAD='Y' (SC homestead exemption: age 65+,
+    # disabled, or legally blind). This is a KEY lead signal: senior owner-occupants
+    # are the archetype who sell on health/downsizing/estate transition. Also flags
+    # 5,254 FARM USE parcels (SC agricultural use-value assessment → 3-year rollback
+    # on sale per SC Code 12-43-220(d)(4)). Neither field carries a dollar amount,
+    # so we report the flag only. ParcelID matches the owner_mailing enricher key.
+    ("SC", "York"): {
+        "url": ("https://services1.arcgis.com/2AGLxyiJoNiVHKwq/arcgis/rest/services/"
+                "Parcels/FeatureServer/0"),
+        "pin_field": "ParcelID",
+        "where_extra": "HOMESTEAD='Y' OR LandUseDesc LIKE '%FARM%'",
+        "fields": "ParcelID,HOMESTEAD,LandUseDesc",
+        "classify": "york_sc",
+    },
 }
 
 _EXEMPT_KIND = {"ELD": "elderly", "DIS": "disabled", "BLD": "blind"}
@@ -146,6 +164,19 @@ def _classify(cfg: dict, attrs: dict) -> Optional[dict]:
             return None
         return {"kind": "use_value_deferral", "basis": "present_use_rollback_lien",
                 "deferred_value": None}
+    if cfg["classify"] == "york_sc":
+        # York SC: HOMESTEAD='Y' is the SC homestead exemption (age 65+/disabled/
+        # blind). LandUseDesc containing FARM is agricultural use-value assessment
+        # (3-year rollback on sale). Neither carries a dollar amount.
+        hs = str(attrs.get("HOMESTEAD") or "").strip().upper()
+        lu = str(attrs.get("LandUseDesc") or "").strip().upper()
+        if hs == "Y":
+            return {"kind": "homestead_exemption", "basis": "sc_homestead_age65_disabled",
+                    "deferred_value": None}
+        if "FARM" in lu:
+            return {"kind": "use_value_deferral", "basis": "sc_ag_use_value_rollback",
+                    "deferred_value": None}
+        return None
     return None
 
 

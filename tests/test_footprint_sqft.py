@@ -30,9 +30,10 @@ def test_point_in_ring():
 
 def _seed_fp(db, rows):
     fp.DB_PATH = db
+    fp._DB_CON = None   # reset cached connection so _connect() opens against the new path
     con = fp._connect()
     con.executemany("INSERT INTO footprints VALUES (?,?,?,?,?,?,?,?,?,?)", rows)
-    con.commit(); con.close()
+    con.commit()
 
 
 def _fprow(cx, cy, area, half=0.0003):

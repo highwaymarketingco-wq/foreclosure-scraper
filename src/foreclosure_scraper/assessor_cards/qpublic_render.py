@@ -180,9 +180,10 @@ async def _render(url: str, *, on_loaded=None) -> str:
     async def _attempt(solve: bool) -> str:
         holder["html"] = ""
         try:
+            from .base import cf_solving_disabled
             resp = await StealthyFetcher.async_fetch(
                 url, headless=True, network_idle=True, timeout=_TIMEOUT_MS,
-                page_action=page_action, solve_cloudflare=solve)
+                page_action=page_action, solve_cloudflare=solve and not cf_solving_disabled())
         except Exception as exc:
             # solve_cloudflare=True raises "No Cloudflare challenge found" on parcels that
             # load WITHOUT a challenge — that must not fail the parcel. page_action may have

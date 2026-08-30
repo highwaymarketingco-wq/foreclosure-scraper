@@ -286,6 +286,33 @@ def _parse_results(html: str, county: str) -> list[Listing]:
     party_type_i = col_idx("party type")
     name_i = col_idx("name")
 
+    # Pre-pass: collect EVERY defendant-party row per case. The grid emits one
+    # row per party and the main loop keeps only the FIRST — dropping the
+    # co-defendants (co-owners / heirs that are themselves resolvable owner
+    # leads). Build case_number -> ordered unique list of defendant names.
+    defendants_by_case: dict[str, list[str]] = {}
+    for prow in grid.css("tr.standardRow, tr.altRow"):
+        pcells = prow.css("td")
+        if not pcells or case_i is None or case_i >= len(pcells):
+            continue
+        p_anchor = pcells[case_i].css_first("a")
+        p_craw = p_anchor.text(strip=True) if p_anchor else pcells[case_i].text(strip=True)
+        p_case = _format_case_number(p_craw)
+        if not p_case:
+            continue
+        p_party = (
+            pcells[party_type_i].text(strip=True).lower()
+            if party_type_i is not None and party_type_i < len(pcells) else ""
+        )
+        p_name = (
+            pcells[name_i].text(strip=True)
+            if name_i is not None and name_i < len(pcells) else ""
+        )
+        if "defendant" in p_party and p_name:
+            lst = defendants_by_case.setdefault(p_case, [])
+            if p_name not in lst:
+                lst.append(p_name)
+
     seen: set[str] = set()
 
     for row in grid.css("tr.standardRow, tr.altRow"):
@@ -396,6 +423,9 @@ def _parse_results(html: str, county: str) -> list[Listing]:
                     "status": status_txt,
                     "subtype": subtype,
                     "case_raw": case_raw,
+                    # Every defendant-party row for this case (co-owners / heirs)
+                    # — each is a resolvable owner lead downstream.
+                    "co_defendants": (defendants_by_case.get(case_number) or None),
                 }},
             )
         )

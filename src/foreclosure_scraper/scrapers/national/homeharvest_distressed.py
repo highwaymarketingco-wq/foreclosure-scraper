@@ -58,6 +58,15 @@ def _num(v):
         return None
 
 
+def _clean(v):
+    # pandas NaN / empty -> None; pass strings + phone lists through unchanged
+    if v is None or (isinstance(v, float) and v != v):
+        return None
+    if isinstance(v, str) and not v.strip():
+        return None
+    return v
+
+
 def _matches_distress(row: dict) -> tuple[bool, list[str]]:
     """Check listing text for distress signals. Returns (is_distressed, matched_keywords)."""
     text_fields = []
@@ -125,6 +134,9 @@ def _to_listing(row: dict, county: str, matches: list[str]) -> Listing | None:
         zip_code=str(row.get("zip_code") or "").strip() or None,
         county=county,
         opening_bid=_num(row.get("list_price")),
+        # estimated_value -> market_value, assessed_value -> tax_value (mirrors homeharvest.py:96-97)
+        market_value=_num(row.get("estimated_value")),
+        tax_value=_num(row.get("assessed_value")),
         bedrooms=_num(row.get("beds")),
         bathrooms=_num(row.get("full_baths")),
         living_sqft=_num(row.get("sqft")),
@@ -141,6 +153,12 @@ def _to_listing(row: dict, county: str, matches: list[str]) -> Listing | None:
                 "mls_status": row.get("mls_status"),
                 "list_date": str(row.get("list_date") or "") or None,
                 "days_on_mls": _num(row.get("days_on_mls")),
+                "agent_name": _clean(row.get("agent_name")),
+                "agent_email": _clean(row.get("agent_email")),
+                "agent_phones": _clean(row.get("agent_phones")),
+                "broker_name": _clean(row.get("broker_name")),
+                "office_phones": _clean(row.get("office_phones")),
+                "half_baths": _num(row.get("half_baths")),
             },
             "zillow": {
                 "photo": photos[0] if photos else None,

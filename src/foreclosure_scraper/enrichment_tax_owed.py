@@ -35,6 +35,16 @@ _SOURCES = {
     "buncombe_delinquent_tax": ("buncombe_delinquent_tax", "principal_tax_due", "delinquent_tax"),
     "sc_state_tax_lien": ("sc_state_tax_lien", "balance", "state_tax_lien"),
     "oconee_forfeited_land": ("oconee_forfeited_land", "fll_bid", "flc_opening_bid"),
+    "nc_ptscloud_delinquent_tax": ("nc_ptscloud_delinquent_tax", "principal_tax_due", "delinquent_tax"),
+    "nc_county_pdf_delinquent_tax": ("nc_county_pdf_delinquent_tax", "total_due", "delinquent_tax"),
+    "nc_county_csv_delinquent_tax": ("nc_county_csv_delinquent_tax", "total_due", "delinquent_tax"),
+    "rutherford_wildfire": ("rutherford_wildfire", "taxes_owed", "delinquent_tax"),
+    "multi_year_delinquent_tax": ("multi_year_delinquent_tax", "total_due", "delinquent_tax"),
+    "spartanburg_delinquent_tax": ("spartanburg_delinquent_tax", "balance", "delinquent_tax"),
+    "chesterfield_delinquent_tax": ("chesterfield_delinquent_tax", "total_due", "delinquent_tax"),
+    "york_delinquent_tax": ("york_delinquent_tax", "total_due", "delinquent_tax"),
+    "florence_delinquent_tax": ("florence_delinquent_tax", "total_due", "delinquent_tax"),
+    "sumter_delinquent_tax": ("sumter_delinquent_tax", "total_due", "delinquent_tax"),
 }
 
 # generic amount keys scanned for any other tax/FLC/lien source subdict
@@ -69,24 +79,87 @@ def _county_county_key(li: Listing) -> tuple:
             _pkey(li.parcel_id))
 
 
+_YEAR_KEYS = ("year", "tax_year", "taxyear", "bill_year", "bill_years",
+              "year_span", "latest_cycle", "first_cycle")
+
+
+def _coerce_year(val) -> Optional[int]:
+    """Extract a 4-digit year from int, str, list, or None."""
+    if val is None:
+        return None
+    if isinstance(val, (list, tuple)):
+        # bill_years is a list like ['2023', '2024', '2025'] — take the oldest
+        for v in sorted(val):
+            y = _coerce_year(v)
+            if y:
+                return y
+        return None
+    try:
+        s = str(val).strip()
+        # year_span like "2023-2025" — take the first year
+        if "-" in s:
+            s = s.split("-")[0].strip()
+        y = int(s[:4])
+        return y if 1990 <= y <= 2030 else None
+    except (ValueError, TypeError):
+        return None
+
+
 def _extract(li: Listing) -> tuple[Optional[float], Optional[str], object]:
     """(balance, kind, year) from a lead's OWN source record, else (None, None, None)."""
     raw = li.raw if isinstance(li.raw, dict) else {}
     src = li.source or ""
+
+    # --- Pass A: explicit source mapping ---
     for sub, (key, fld, kind) in _SOURCES.items():
         if sub in src:
             blk = raw.get(key) or {}
             bal = _money(blk.get(fld))
             if bal:
-                return bal, kind, blk.get("year")
-    # generic scan for any other tax-ish source
+                year = None
+                for yk in _YEAR_KEYS:
+                    year = _coerce_year(blk.get(yk))
+                    if year:
+                        break
+                return bal, kind, year
+
+    # --- Pass B: generic scan for any other tax-ish source ---
     if any(k in src for k in _TAXISH):
-        for blk in raw.values():
+        for blk_name, blk in raw.items():
+            if blk_name == "tax_owed":  # skip pre-existing tax_owed from prior runs
+                continue
             if isinstance(blk, dict):
                 for gk in _GENERIC_KEYS:
                     bal = _money(blk.get(gk))
                     if bal:
-                        return bal, "delinquent_tax", blk.get("year")
+                        year = None
+                        for yk in _YEAR_KEYS:
+                            year = _coerce_year(blk.get(yk))
+                            if year:
+                                break
+                        return bal, "delinquent_tax", year
+
+    # --- Pass C: fallback — pre-existing tax_owed balance with year=None ---
+    # On board re-runs, source sub-dicts may be stripped but tax_owed survived.
+    # Try to find a year in ANY remaining raw sub-dict (lrcpwa, gis, cama, etc.).
+    to = raw.get("tax_owed")
+    if isinstance(to, dict) and to.get("balance"):
+        bal = _money(to["balance"])
+        if bal:
+            year = None
+            # Check lrcpwa (has tax_year from PTS roll)
+            for blk_name, blk in raw.items():
+                if blk_name == "tax_owed":
+                    continue
+                if isinstance(blk, dict):
+                    for yk in _YEAR_KEYS:
+                        year = _coerce_year(blk.get(yk))
+                        if year:
+                            break
+                    if year:
+                        break
+            return bal, to.get("kind", "delinquent_tax"), year
+
     return None, None, None
 
 
@@ -103,6 +176,11 @@ def enrich_tax_owed(listings: Iterable[Listing]) -> dict:
         bal, kind, year = _extract(li)
         if bal is None:
             continue
+        # Preserve existing year if _extract couldn't find one (source sub-dict stripped on re-run)
+        if year is None and isinstance(li.raw, dict):
+            prev = li.raw.get("tax_owed")
+            if isinstance(prev, dict) and prev.get("year"):
+                year = prev["year"]
         if not isinstance(li.raw, dict):
             li.raw = {}
         li.raw["tax_owed"] = {

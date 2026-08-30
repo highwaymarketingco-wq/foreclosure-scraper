@@ -103,6 +103,22 @@ def _money(v) -> float | None:
         return None
 
 
+# PROP_SIZE comes as e.g. "0.17 AC" / "1.5 AC" / "12.3 ACRES" — pull the leading
+# numeric and treat it as acreage. Anything non-numeric (blank, "0", junk) -> None.
+_ACRES_RE = re.compile(r"([0-9]+(?:\.[0-9]+)?)")
+
+
+def _acres(v) -> float | None:
+    m = _ACRES_RE.search(str(v or ""))
+    if not m:
+        return None
+    try:
+        f = float(m.group(1))
+    except (ValueError, TypeError):
+        return None
+    return f if f > 0 else None
+
+
 class TenantExportBroken(RuntimeError):
     """The tenant's export pipeline failed. Distinct from 'published nothing'."""
 
@@ -195,11 +211,25 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
         r = a["row"]
         owner = _clean_owner(r.get("OWNER_NAME"))
         assessed = _money(r.get("ABSTRACT_ASSESS_VALUE"))
+        legal = (r.get("DESCRIPTION") or "").strip() or None
+        acreage = _acres(r.get("PROP_SIZE"))
+        in_care_of = (r.get("IN_CARE_OF") or "").strip() or None
+        # Full mailing street: join ADDR1-3 (some rolls put unit/attn on 2/3) so
+        # skip-trace doesn't lose the suite line. Keep the parts too.
+        addr_parts = [
+            (r.get("MAIL_ADDR1") or "").strip(),
+            (r.get("MAIL_ADDR2") or "").strip(),
+            (r.get("MAIL_ADDR3") or "").strip(),
+        ]
         mail = {
-            "addr": (r.get("MAIL_ADDR1") or "").strip() or None,
+            "addr": ", ".join(p for p in addr_parts if p) or None,
+            "addr1": addr_parts[0] or None,
+            "addr2": addr_parts[1] or None,
+            "addr3": addr_parts[2] or None,
             "city": (r.get("MAIL_CITY") or "").strip() or None,
             "state": (r.get("MAIL_STATE") or "").strip() or None,
             "zip": (r.get("MAIL_ZIP") or "").strip() or None,
+            "in_care_of": in_care_of,
         }
         out.append(Listing(
             source="counties_nc.nc_ptscloud_delinquent_tax",
@@ -211,6 +241,8 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
             owner_name=owner,
             defendant=owner,
             parcel_id=parcel,
+            legal_description=legal,
+            acreage=acreage,
             # The county's assessed value IS a real value (NC assesses ~market) —
             # set it so these leads grade/score without needing GIS. calc caps
             # confidence + data_quality flags it as assessed-basis.
@@ -229,6 +261,9 @@ def _parse_csv(text: str, county: str, state: str, tenant: str) -> list[Listing]
                     "assessed_value": assessed,
                     "tax_year": a["year"] or None,
                     "owner": owner,
+                    "in_care_of": in_care_of,
+                    "legal_description": legal,
+                    "prop_size": (r.get("PROP_SIZE") or "").strip() or None,
                     "mailing": mail,
                     "bill_number": (r.get("BILL_NUMBER") or "").strip() or None,
                 }
@@ -253,7 +288,15 @@ class NCPtsCloudDelinquentTax(BaseScraper):
         # LayerHarvest is a SYNC context manager; putting it in the `async with`
         # header raises TypeError at runtime, which is exactly the kind of break
         # a test that only exercises the helpers will not catch.
-        guard = LayerHarvest(self.slug, list(TENANTS))
+        # Tenants without a live delinquent export today are tolerated —
+        # their connection failures must NOT discard the 20k+ good rows from
+        # counties that DID publish. (Cumberland/Durham/Mecklenburg/etc often
+        # have intermittent connectivity but no data to lose when they're down.)
+        _tolerate = {
+            "Rutherford", "Burke", "Cumberland", "Durham", "Hertford",
+            "Mecklenburg", "Randolph", "Stokes", "Wayne",
+        }
+        guard = LayerHarvest(self.slug, list(TENANTS), tolerate=_tolerate)
         # Sequential per tenant — one shared throttled client, gentle on the host.
         async with client(timeout=30.0) as c:
             with guard:

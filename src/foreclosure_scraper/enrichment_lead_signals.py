@@ -90,6 +90,8 @@ def _facet_signals(li: Listing) -> set[str]:
     # --- LEGAL ---
     if _truthy(raw.get("bankruptcy")):
         out.add("bankruptcy")
+    if _truthy(raw.get("bankruptcy_stay")):
+        out.add("bankruptcy_stay")   # foreclosure paused by an automatic stay; will likely resume
     if _truthy(raw.get("incarceration")):
         out.add("incarcerated_owner")
 
@@ -107,6 +109,10 @@ def _facet_signals(li: Listing) -> set[str]:
         out.add("condemned")
     if _truthy(raw.get("vacant")) or _truthy(raw.get("vacancy")):
         out.add("vacant")
+    if _truthy(raw.get("vacant_lot")):
+        out.add("vacant_lot")
+    if _truthy(raw.get("builder_distress")):
+        out.add("builder_distress")   # LiensNC cluster: over-leveraged flipper / stalled build
     hel = raw.get("helene")
     if isinstance(hel, dict) and hel.get("worst_placard"):
         out.add("storm_damage")

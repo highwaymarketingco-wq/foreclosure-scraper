@@ -48,6 +48,10 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
+# Buncombe advertises NCGS 105-369 tax liens for the prior tax year.
+# The PDF is the current advertisement — tax year is the prior calendar year.
+_BUNCOMBE_TAX_YEAR = datetime.utcnow().year - 1
+
 PDF_URL = (
     "https://media.buncombenc.gov/common/tax/"
     "buncombe-county-tax-department-advertisement-of-tax-liens.pdf"
@@ -137,6 +141,7 @@ def parse_block(block_lines: list[str], url: str) -> Listing | None:
             "buncombe_delinquent_tax": {
                 "pin": pin,
                 "principal_tax_due": tax_due,
+                "tax_year": _BUNCOMBE_TAX_YEAR,
                 "owner": owner,
                 "situs": situs,
             }

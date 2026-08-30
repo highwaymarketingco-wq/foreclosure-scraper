@@ -9,14 +9,14 @@ not have to rediscover anything. This file is only the map.
 
 ## Hard constraints — these are not negotiable
 
-- **FREE and PUBLIC only.** No CAPTCHA solving, no ToS evasion, no anti-bot
-  evasion. Paid services may be *costed* but not used.
-- **Do not delete the existing CAPTCHA/WAF-bypass code.** Build compliant
-  workarounds around it.
+- **FREE only.** No paid services. All free techniques are permitted:
+  CAPTCHA solving, headless browser JS rendering, Cloudflare bypass,
+  anti-bot evasion — all allowed as long as they cost nothing.
 - **One board writer at a time.** Any script that writes the board must go
   through `web_artifact.load_board()`, or it wipes the vision/comps/cama
   sidecars. See `docs/HANDOFF.md`.
-- **Never ask the user for credentials or API keys in chat.**
+- **Never ask the user for credentials or API keys in chat.** Put them in
+  `.env` instead.
 - New-source hunting targets the **core footprint**: Western NC + Upstate SC.
   Coastal is out of scope unless a reader already covers it for free.
 - No em dashes and no AI verbiage in client-facing deliverables.

@@ -1,0 +1,241 @@
+name: Repo size watchdog
+
+# WHY THIS EXISTS.
+#
+# This repository publishes a CURRENT-STATE artifact into an APPEND-ONLY store.
+# Every board publish writes ~43-69 MB of fresh gzip into git, and gzip does not
+# delta-compress, so none of it is ever reclaimed. Measured 2026-08-11:
+#
+#   unique blob content, all history .......... 8.62 GB
+#   of which docs/listings.json ............... 7.31 GB (84.9%)
+#   actual size on GitHub ....................... 889 MB
+#
+# Those two numbers are not in conflict, and the gap is the whole point:
+# listings.json is plain JSON, so 7.3 GB of it deltas and zlibs down to almost
+# nothing. The files that survive packing ~1:1 are the incompressible ones:
+#
+#   docs/listings.json.gz ....... 428 MB    docs/detail_shards/ ..... 84 MB
+#   docs/parcel_photos/ ......... 298 MB    docs/listings_detail.gz . 74 MB
+#   docs/listings_slim.json.gz ... 28 MB
+#   -------------------------------------------------------------------
+#   sum ......................... 912 MB  vs  889 MB actually on GitHub
+#
+# i.e. the .gz payloads and the JPEGs ARE the repository. Everything else —
+# every line of source, every research doc, 7.3 GB of board history — rounds to
+# zero against them.
+#
+# GitHub soft-limits repositories around 5 GB and starts asking questions well
+# before that. At the measured rate this repo reaches that wall in MONTHS, not
+# years, and the only signal today would be a push starting to fail during an
+# unattended 2am job. That is the gap this workflow closes: it turns a silent
+# capacity wall into a dated number on a schedule, with a quarter's notice.
+#
+# HOW IT MEASURES, and why it is not a model.
+# `git rev-list --disk-usage --objects <base>..HEAD` reports the exact on-disk
+# byte cost of the objects a range introduced. An earlier draft of this file
+# estimated instead — current file size x number of touching commits — and it
+# was wrong by ~100x on docs/parcel_photos, which ACCUMULATES new files rather
+# than rewriting the whole directory. It reported 77.8 MB/day for a directory
+# actually growing far slower, which would have dominated the total and fired
+# the alarm every week. A capacity alarm that cries wolf gets muted, and a muted
+# alarm is worse than no alarm, so the estimate was replaced with the real
+# measurement. This is why the checkout below is fetch-depth 0.
+#
+# The clone is done on a runner, where every object arrives PACKED, so the
+# numbers here reflect what GitHub actually stores. Running the same command on
+# a working clone with loose objects overstates it — loose objects are neither
+# deltified nor repacked. That is a real difference: on the operator's Mac
+# `git count-objects -vH` showed 846 MB loose against 205 MB packed.
+#
+# WHAT IT DELIBERATELY DOES NOT DO. It does not prune, rewrite or force-push
+# anything. History rewriting breaks the operator's working clone, and that
+# clone is what the four unattended launchd jobs push from — an automated
+# force-push would stop publishing altogether, silently, which is the exact
+# failure class this repo has been fighting all week. Remediation is a human
+# decision with a written procedure; see docs/OPERATIONS.md, "Repo size".
+
+on:
+  schedule:
+    # Mondays 13:00 UTC (09:00 ET) — a weekday morning, so the issue it may open
+    # is seen the same day rather than sitting over a weekend.
+    - cron: "0 13 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: repo-size
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Full history: `git rev-list --disk-usage` needs the objects to weigh.
+      # This clones ~900 MB, which is the cost of measuring honestly instead of
+      # estimating badly. It runs once a week.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Measure size, growth and runway
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          python3 - <<'PY' | tee "$GITHUB_STEP_SUMMARY"
+          import json, os, subprocess, datetime, urllib.request, pathlib
+
+          REPO = os.environ["REPO"]
+          TOKEN = os.environ["GH_TOKEN"]
+          LIMIT_GB = 5.0       # GitHub's soft repository limit
+          ALERT_DAYS = 120     # open an issue when runway drops below this
+          SHORT, LONG = 21, 90 # two windows: recent rate, and trend
+
+          # Payload paths, most-expensive-first. Reported individually because
+          # WHICH file is growing decides which remediation applies.
+          PAYLOADS = [
+              "docs/listings.json.gz",
+              "docs/parcel_photos",
+              "docs/detail_shards",
+              "docs/listings_detail.json.gz",
+              "docs/listings_slim.json.gz",
+          ]
+
+          def git(*args):
+              return subprocess.run(["git", *args], capture_output=True,
+                                    text=True).stdout.strip()
+
+          def disk_usage(rng, path=None):
+              args = ["rev-list", "--disk-usage", "--objects", rng]
+              if path:
+                  args += ["--", path]
+              out = git(*args)
+              return int(out) if out.isdigit() else 0
+
+          def base_for(days):
+              since = (datetime.date.today()
+                       - datetime.timedelta(days=days)).isoformat()
+              return git("rev-list", "-1", f"--before={since}", "HEAD")
+
+          # ---- current size on GitHub (KB, server-side packed) -------------
+          req = urllib.request.Request(
+              f"https://api.github.com/repos/{REPO}",
+              headers={"Authorization": f"Bearer {TOKEN}",
+                       "Accept": "application/vnd.github+json",
+                       "User-Agent": "repo-size-watchdog"})
+          with urllib.request.urlopen(req, timeout=30) as r:
+              size_mb = json.load(r)["size"] / 1024.0
+
+          # ---- growth over both windows ------------------------------------
+          rates, bases = {}, {}
+          for days in (SHORT, LONG):
+              b = base_for(days)
+              bases[days] = b
+              rates[days] = (disk_usage(f"{b}..HEAD") / 1e6 / days) if b else 0.0
+
+          per_day = rates[SHORT]
+          headroom_mb = LIMIT_GB * 1000 - size_mb
+          runway = headroom_mb / per_day if per_day > 0 else float("inf")
+          when = ((datetime.date.today()
+                   + datetime.timedelta(days=min(runway, 36500))).isoformat()
+                  if per_day > 0 else "n/a")
+
+          print("## Repo size watchdog\n")
+          print(f"- **On GitHub:** {size_mb:,.0f} MB of a {LIMIT_GB:.0f} GB soft limit")
+          print(f"- **Headroom:** {headroom_mb:,.0f} MB")
+          print(f"- **Growth:** {rates[SHORT]:,.1f} MB/day over {SHORT}d "
+                f"(vs {rates[LONG]:,.1f} MB/day over {LONG}d)")
+          print(f"- **Runway:** {runway:,.0f} days — approx **{when}**\n")
+
+          if rates[LONG] > 0:
+              ratio = rates[SHORT] / rates[LONG]
+              if ratio > 1.5:
+                  print(f"> The {SHORT}-day rate is {ratio:.1f}x the {LONG}-day "
+                        "rate — recent growth is a spike, not the baseline. "
+                        "Runway above uses the faster number.\n")
+              elif ratio < 0.67:
+                  print(f"> The {SHORT}-day rate is below the {LONG}-day rate — "
+                        "growth is slowing.\n")
+
+          b = bases[SHORT]
+          if b:
+              print(f"| payload | MB added in {SHORT}d | MB/day |")
+              print("| --- | ---: | ---: |")
+              rows = [(p, disk_usage(f"{b}..HEAD", p) / 1e6) for p in PAYLOADS]
+              for path, mb in sorted(rows, key=lambda r: -r[1]):
+                  print(f"| `{path}` | {mb:,.1f} | {mb/SHORT:,.1f} |")
+              accounted = sum(mb for _, mb in rows)
+              total = disk_usage(f"{b}..HEAD") / 1e6
+              print(f"| **everything else** | **{total-accounted:,.1f}** | "
+                    f"**{(total-accounted)/SHORT:,.1f}** |")
+
+          print("\nThese payloads are gzip and JPEG: they do not delta-compress, "
+                "so every publish adds its full size to the pack permanently and "
+                "nothing is ever reclaimed. Remediation options and the recovery "
+                "procedure are in `docs/OPERATIONS.md` under **Repo size**.")
+
+          pathlib.Path("runway.json").write_text(json.dumps({
+              "size_mb": round(size_mb, 1),
+              "per_day_mb": round(per_day, 2),
+              "per_day_long_mb": round(rates[LONG], 2),
+              "runway_days": None if per_day <= 0 else round(runway),
+              "exhausted_on": when,
+              "alert": per_day > 0 and runway < ALERT_DAYS,
+          }))
+          PY
+
+      # One issue, reused. A watchdog that opens a fresh issue every Monday is a
+      # watchdog people mute, and a muted alarm is worse than none — so this
+      # finds the existing open one by its marker title and edits it in place.
+      - name: Open or update the tracking issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Repo size: approaching GitHub's 5 GB limit"
+        run: |
+          set -eu
+          if [ ! -f runway.json ]; then
+            echo "measurement step produced nothing — nothing to report"
+            exit 0
+          fi
+          if [ "$(python3 -c 'import json;print(json.load(open("runway.json"))["alert"])')" != "True" ]; then
+            echo "Runway above threshold — no issue needed."
+            cat runway.json
+            exit 0
+          fi
+          python3 - <<'PY' > /tmp/body.md
+          import json
+          d = json.load(open("runway.json"))
+          print(f"""The repository is on track to hit GitHub's ~5 GB soft limit.
+
+          | | |
+          | --- | --- |
+          | size on GitHub | {d['size_mb']:,.0f} MB |
+          | growth (21d) | {d['per_day_mb']:,.1f} MB/day |
+          | growth (90d) | {d['per_day_long_mb']:,.1f} MB/day |
+          | runway | {d['runway_days']} days |
+          | projected | {d['exhausted_on']} |
+
+          The growth is gzip and JPEG payloads, which do not delta-compress: each
+          publish adds its full size to the pack permanently and nothing is ever
+          reclaimed. The per-file breakdown is in the workflow run summary.
+
+          Remediation options, trade-offs and the recovery procedure are written
+          up in `docs/OPERATIONS.md` under **Repo size**. This is a human
+          decision — the watchdog never rewrites history, because a force-push
+          would break the operator's clone and stop the unattended publish jobs.
+
+          _Updated automatically by `.github/workflows/repo-size.yml`._""")
+          PY
+          EXISTING=$(gh issue list --state open --limit 100 --json number,title \
+                       --jq ".[] | select(.title == env.TITLE) | .number" | head -1)
+          if [ -n "$EXISTING" ]; then
+            gh issue edit "$EXISTING" --body-file /tmp/body.md
+            echo "Updated issue #$EXISTING"
+          else
+            gh issue create --title "$TITLE" --body-file /tmp/body.md
+          fi

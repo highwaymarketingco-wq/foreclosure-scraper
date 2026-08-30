@@ -85,6 +85,8 @@ class BuncombeElderly(BaseScraper):
                         parcel_id=pin,
                         market_value=_f(a.get("TotalMarketValue")),
                         assessed_value=_f(a.get("TaxValue")),
+                        land_use=(a.get("LandUse") or "").strip() or None,
+                        acreage=_f(a.get("Acreage")),
                         description=f"Statutory {_TAGS.get(code, 'exemption').replace('_', ' ')} on file "
                                     f"(owner age/disability property-tax relief).",
                         first_seen=now,

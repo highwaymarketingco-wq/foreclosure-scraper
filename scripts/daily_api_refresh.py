@@ -90,6 +90,8 @@ async def main() -> int:
         "national.hud_homestore", "national.freddie_homesteps",
         "national.realtor_foreclosures", "national.homeharvest", "national.distressed",
         "reo.vrm_va_reo", "reo.usda_rd", "reo.treasury_seized",
+        "national.tranzon", "national.williams", "national.irs_treasury",
+        "national.sc_public_index",
     }
     env_slugs = os.environ.get("DAILY_REFRESH_SLUGS", "").strip()
     allow = set(s.strip() for s in env_slugs.split(",") if s.strip()) or DEFAULT_SLUGS

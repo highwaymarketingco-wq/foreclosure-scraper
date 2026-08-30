@@ -67,6 +67,9 @@ TARGET_COUNTIES = [
     "Buncombe", "Transylvania", "McDowell", "Lincoln",
     "Mitchell", "Burke",
     "Brunswick", "Pender", "Onslow", "Carteret", "Dare",
+    # 2026-08-19 — sync with lis_pendens TARGET_COUNTIES (remaining coastal NC).
+    "Currituck", "Hyde", "New Hanover",
+    "Beaufort", "Craven", "Pamlico",
 ]
 
 # Case-category labels Tyler exposes for divorce / family. NC files absolute

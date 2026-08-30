@@ -203,26 +203,29 @@ def main() -> int:
         except Exception as e:  # noqa: BLE001
             print("enrich_gaston_rod: ERROR", str(e)[:80])
 
-    # Burke + Cleveland NC ROD lien-existence (CCHS) — default-on.
-    try:
-        from foreclosure_scraper.enrichment_cchs_rod import enrich_cchs_rod
-        print("enrich_cchs_rod:", asyncio.run(enrich_cchs_rod(listings)))
-    except Exception as e:  # noqa: BLE001
-        print("enrich_cchs_rod: ERROR", str(e)[:80])
+    # Burke + Cleveland NC ROD lien-existence (CCHS) — env-gated (FORECLOSURE_CCHS_ROD=1).
+    if os.environ.get("FORECLOSURE_CCHS_ROD") == "1":
+        try:
+            from foreclosure_scraper.enrichment_cchs_rod import enrich_cchs_rod
+            print("enrich_cchs_rod:", asyncio.run(enrich_cchs_rod(listings)))
+        except Exception as e:  # noqa: BLE001
+            print("enrich_cchs_rod: ERROR", str(e)[:80])
 
-    # Buncombe NC ROD lien-existence (Cott/Aumentum v4) — default-on.
-    try:
-        from foreclosure_scraper.enrichment_aumentum_rod import enrich_aumentum_rod
-        print("enrich_aumentum_rod:", asyncio.run(enrich_aumentum_rod(listings)))
-    except Exception as e:  # noqa: BLE001
-        print("enrich_aumentum_rod: ERROR", str(e)[:80])
+    # Buncombe NC ROD lien-existence (Cott/Aumentum v4) — env-gated.
+    if os.environ.get("FORECLOSURE_AUMENTUM_ROD") == "1":
+        try:
+            from foreclosure_scraper.enrichment_aumentum_rod import enrich_aumentum_rod
+            print("enrich_aumentum_rod:", asyncio.run(enrich_aumentum_rod(listings)))
+        except Exception as e:  # noqa: BLE001
+            print("enrich_aumentum_rod: ERROR", str(e)[:80])
 
-    # Spartanburg SC ROD (render-based, HOT/WARM-first capped) — biggest SC county.
-    try:
-        from foreclosure_scraper.enrichment_spartanburg_rod import enrich_spartanburg_rod
-        print("enrich_spartanburg_rod:", asyncio.run(enrich_spartanburg_rod(listings)))
-    except Exception as e:  # noqa: BLE001
-        print("enrich_spartanburg_rod: ERROR", str(e)[:80])
+    # Spartanburg SC ROD (render-based, HOT/WARM-first capped) — env-gated.
+    if os.environ.get("FORECLOSURE_SPARTANBURG_ROD") == "1":
+        try:
+            from foreclosure_scraper.enrichment_spartanburg_rod import enrich_spartanburg_rod
+            print("enrich_spartanburg_rod:", asyncio.run(enrich_spartanburg_rod(listings)))
+        except Exception as e:  # noqa: BLE001
+            print("enrich_spartanburg_rod: ERROR", str(e)[:80])
 
     # NC absolute-divorce (CVD) distress by owner party-name (render path; 50B DV
     # excluded). GATED OFF by default (FORECLOSURE_NC_DIVORCE=1) — NC eCourts
@@ -266,14 +269,14 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         print("enrich_life_events: ERROR", str(e)[:80])
 
-    # Drop sold/removed snapshot-REO (Fannie) — stale carryover whose per-property
-    # SPA URL renders a browser 404 once the uuid leaves inventory. Fail-safe.
-    from foreclosure_scraper.enrichment_reo_freshness import prune_stale_reo
-    try:
-        listings, _pstats = asyncio.run(prune_stale_reo(listings))
-        print("prune_stale_reo:", _pstats)
-    except Exception as e:  # noqa: BLE001
-        print("prune_stale_reo: ERROR", str(e)[:80])
+    # Drop sold/removed snapshot-REO (Fannie) — env-gated (FORECLOSURE_REO_PRUNE=1).
+    if os.environ.get("FORECLOSURE_REO_PRUNE") == "1":
+        from foreclosure_scraper.enrichment_reo_freshness import prune_stale_reo
+        try:
+            listings, _pstats = asyncio.run(prune_stale_reo(listings))
+            print("prune_stale_reo:", _pstats)
+        except Exception as e:  # noqa: BLE001
+            print("prune_stale_reo: ERROR", str(e)[:80])
 
     # Data-quality corrections (LAST, after tiers set): bbox/centroid geo guards,
     # auction_status normalization, presumed-withdrawn stale-case flag + HOT down-rank.

@@ -144,6 +144,7 @@ def _node_listing(detail_id: str, slug: str, state: str,
 
     street = city = zip_code = None
     price = None
+    images: list[str] = []
     kind = PropertyKind.UNKNOWN
     lat = lng = None
     beds = baths = sqft = year = None
@@ -165,6 +166,35 @@ def _node_listing(detail_id: str, slug: str, state: str,
         if isinstance(fs, dict):
             sqft = fs.get("value")
         kind = _kind(node.get("@type"))
+
+        # Opening bid — the JSON-LD offer price. Was never read, so
+        # opening_bid was null on every enriched row. offers can be a dict
+        # or a list of dicts; price may be numeric or a "$123,456" string.
+        offers = node.get("offers")
+        raw_price = None
+        if isinstance(offers, dict):
+            raw_price = offers.get("price")
+        elif isinstance(offers, list):
+            for off in offers:
+                if isinstance(off, dict) and off.get("price") is not None:
+                    raw_price = off.get("price")
+                    break
+        if isinstance(raw_price, (int, float)):
+            price = float(raw_price)
+        elif isinstance(raw_price, str):
+            pm = PRICE_RE.search(raw_price)
+            if pm:
+                try:
+                    price = float(pm.group(1).replace(",", ""))
+                except (TypeError, ValueError):
+                    price = None
+
+        # Property image(s) — node.image can be a string or list of strings.
+        img = node.get("image")
+        if isinstance(img, str) and img:
+            images.append(img)
+        elif isinstance(img, list):
+            images.extend(str(i) for i in img if isinstance(i, str) and i)
 
     # Fall back to slug-derived street/city when JSON-LD absent.
     if not street:
@@ -210,6 +240,7 @@ def _node_listing(detail_id: str, slug: str, state: str,
             "sqft": _int(sqft),
             "year_built": _int(year),
             "enriched": node is not None,
+            "images": images or None,
         }},
     )
 

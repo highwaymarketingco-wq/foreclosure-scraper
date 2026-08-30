@@ -79,6 +79,9 @@ TARGET_COUNTIES = [
     "Mitchell", "Burke",
     # COASTAL NC track (re-admitted via the oceanfront gate once geocoded).
     "Brunswick", "Pender", "Onslow", "Carteret", "Dare",
+    # 2026-08-19 — sync with lis_pendens TARGET_COUNTIES (remaining coastal NC).
+    "Currituck", "Hyde", "New Hanover",
+    "Beaufort", "Craven", "Pamlico",
 ]
 
 # Case-category labels Tyler exposes in the Smart Search "Case Category"

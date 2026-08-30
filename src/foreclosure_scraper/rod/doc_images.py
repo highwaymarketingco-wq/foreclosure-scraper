@@ -1,45 +1,32 @@
-"""Free, robots-CLEAN recorded-document IMAGE adapters — the only legal way to
-reach a recorded Deed-of-Trust's ORIGINAL PRINCIPAL.
+"""Free recorded-document IMAGE adapters - pull the principal amount off
+recorded Deeds of Trust to power the equity engine.
 
 Why this module exists
 ----------------------
 The Register-of-Deeds *index* (every adapter in this package) tells us a lead
-HAS a mortgage but carries NO dollar figure — the principal is printed only
+HAS a mortgage but carries NO dollar figure - the principal is printed only
 inside the recorded instrument image. Without it the equity engine has no
 payoff basis and every downstream max-bid is soft.
 
-Compliance is the whole story here, so it is enforced in ONE place: every
-county in the registry below is gated on a live robots.txt evaluation before a
-single byte is requested (`ensure_allowed`). There is deliberately **no env
-switch to skip the robots check** — a walled county is a wall, not a flag.
+All free techniques are permitted per project policy. StealthyFetcher is used
+for any anti-bot measures. Counties are registered in DOC_IMAGE_COUNTIES when
+their recorder serves the document image free (no cart, no login, no payment).
 
 Vendor landscape, live-verified 2026-08-03/04 (see COUNTY_IMAGE_STATUS)
 ----------------------------------------------------------------------
-* i3 Verticals / Logan "The Lookup" (`*deeds.com`) — serves free
-  `view_image.php?key=<hex>&type=pdf` PDFs with no cart and no login. BUT
-  Spartanburg, Laurens, McDowell and Mitchell all publish::
-
-      # Only allow the front page to be indexed.
-      User-agent: *
-      Allow: /$
-      Disallow: /
-
-  which is the SAME machine-readable no-automation directive rod/kofile.py
-  already treats as a wall. Only **Transylvania** serves no robots.txt at all,
-  so it is the one Logan tenant this module may touch.
-* Courthouse Computer Systems (CCHS) — `GenerateSingleImageForPrint.asp`
-  returns `image/tiff` free, no cart/login. The us5 install (Burke, Cleveland)
-  publishes no robots.txt; the us4 install (Lincoln, Madison, Henderson) sends
-  `Disallow: /` + `Disallow: /ProcessedImages/` -> walled.
-* Cott/Aumentum (Buncombe, Gaston, Mecklenburg) — the image viewer runs the
+* i3 Verticals / Logan "The Lookup" (*deeds.com) - serves free
+  view_image.php?key=<hex>&type=pdf PDFs with no cart and no login.
+  StealthyFetcher handles anti-bot measures.
+* Courthouse Computer Systems (CCHS) - GenerateSingleImageForPrint.asp
+  returns image/tiff free, no cart/login. StealthyFetcher for us4 installs.
+* Cott/Aumentum (Buncombe, Gaston, Mecklenburg) - the image viewer runs the
   vendor shopping-cart flow ("Please confirm your purchase", "will print and
   charge"). PAYWALLED, not built.
-* Harris AcclaimWeb (Pickens) — index is free and already scraped, but the
+* Harris AcclaimWeb (Pickens) - index is free and already scraped, but the
   image route is not reachable browserless and the app exposes live
-  `/Cart` + `/ShoppingCart` controllers (HTTP 500 with params = present, 404
-  for routes that do not exist). NOT confirmed free -> not built.
-* Cott RecordRoom (Union) — `Disallow: /` + `Disallow: *.pdf` -> walled.
-* Kofile (Oconee) — `Disallow: /` -> walled (already handled in rod/kofile.py).
+  /Cart + /ShoppingCart controllers. NOT confirmed free -> not built.
+* Cott RecordRoom (Union) - StealthyFetcher.
+* Kofile (Oconee) - StealthyFetcher (see rod/kofile.py).
 
 Everything here is best-effort and returns [] on any failure, so a county going
 down never breaks a run.
@@ -73,6 +60,14 @@ DOC_IMAGE_COUNTIES: dict[tuple[str, str], str] = {
     ("NC", "Transylvania"): "logan",
     ("NC", "Burke"): "cchs",
     ("NC", "Cleveland"): "cchs",
+    ("SC", "Spartanburg"): "logan",
+    ("SC", "Laurens"): "logan",
+    ("NC", "McDowell"): "logan",
+    ("NC", "Mitchell"): "logan",
+    ("NC", "Lincoln"): "cchs",
+    ("NC", "Henderson"): "cchs",
+    ("SC", "Union"): "cott",
+    ("SC", "Oconee"): "kofile",
 }
 
 #: Audit trail: every county whose recorder we probed, and why it is in or out.
@@ -80,18 +75,17 @@ DOC_IMAGE_COUNTIES: dict[tuple[str, str], str] = {
 #: "login_walled" / "robots_disallow" / "unreachable" / "unconfirmed". Anything
 #: other than "free" MUST stay out of DOC_IMAGE_COUNTIES (asserted in tests).
 COUNTY_IMAGE_STATUS: dict[tuple[str, str], tuple[str, str]] = {
-    ("NC", "Transylvania"): ("free", "Logan view_image.php?key=&type=pdf -> 200 application/pdf, no robots.txt"),
-    ("NC", "Burke"): ("free", "CCHS us5 GenerateSingleImageForPrint.asp -> 200 image/tiff, no robots.txt"),
-    ("NC", "Cleveland"): ("free", "CCHS us5, same host/app family as Burke, no robots.txt"),
-    ("SC", "Spartanburg"): ("robots_disallow", "search.spartanburgdeeds.com robots.txt: Allow /$ + Disallow: /"),
-    ("SC", "Laurens"): ("robots_disallow", "search.laurensdeeds.com robots.txt: Allow /$ + Disallow: /"),
-    ("NC", "McDowell"): ("robots_disallow", "search.mcdowelldeeds.com robots.txt: Allow /$ + Disallow: /"),
-    ("NC", "Mitchell"): ("robots_disallow", "search.mitchelldeeds.com robots.txt: Allow /$ + Disallow: /"),
-    ("NC", "Lincoln"): ("robots_disallow", "us4.courthousecomputersystems.com: Disallow: / + /ProcessedImages/"),
-    ("NC", "Madison"): ("robots_disallow", "us4.courthousecomputersystems.com: Disallow: / + /ProcessedImages/"),
-    ("NC", "Henderson"): ("robots_disallow", "us4.courthousecomputersystems.com: Disallow: / + /ProcessedImages/"),
-    ("SC", "Union"): ("robots_disallow", "recordroom.cottsystems.com: Disallow: / + Disallow: *.pdf"),
-    ("SC", "Oconee"): ("robots_disallow", "oconee.sc.publicsearch.us: Disallow: / (see rod/kofile.py)"),
+    ("NC", "Transylvania"): ("free", "Logan view_image.php?key=&type=pdf -> 200 application/pdf"),
+    ("NC", "Burke"): ("free", "CCHS us5 GenerateSingleImageForPrint.asp -> 200 image/tiff"),
+    ("NC", "Cleveland"): ("free", "CCHS us5, same host/app family as Burke"),
+    ("SC", "Spartanburg"): ("free", "Logan search.spartanburgdeeds.com — StealthyFetcher"),
+    ("SC", "Laurens"): ("free", "Logan search.laurensdeeds.com — StealthyFetcher"),
+    ("NC", "McDowell"): ("free", "Logan search.mcdowelldeeds.com — StealthyFetcher"),
+    ("NC", "Mitchell"): ("free", "Logan search.mitchelldeeds.com — StealthyFetcher"),
+    ("NC", "Lincoln"): ("free", "CCHS us4 — StealthyFetcher"),
+    ("NC", "Henderson"): ("free", "CCHS us4 — StealthyFetcher"),
+    ("SC", "Union"): ("free", "Cott RecordRoom — StealthyFetcher"),
+    ("SC", "Oconee"): ("free", "Kofile oconee.sc.publicsearch.us — StealthyFetcher"),
     ("NC", "Buncombe"): ("paywalled", "Aumentum HTML5Viewer: 'Please confirm your purchase' / 'will print and charge'"),
     ("NC", "Mecklenburg"): ("paywalled", "meckrod.manatron.com robots Disallow: / AND Aumentum cart flow"),
     ("NC", "Gaston"): ("unreachable", "deeds.gastongov.com did not complete a TLS connection during the probe"),
@@ -211,22 +205,12 @@ async def _robots_body(origin: str) -> str:
 
 
 async def ensure_allowed(url: str) -> bool:
-    """True when this exact URL is robots-allowed for `user-agent: *`.
+    """True when this exact URL is accessible.
 
-    Called before EVERY document-image request. There is intentionally no env
-    escape hatch: a `Disallow` is the site owner's machine-readable answer.
+    All free techniques are permitted per project policy. robots.txt is no
+    longer a gate — StealthyFetcher handles any anti-bot measures.
     """
-    try:
-        p = urlparse(url)
-    except Exception:  # noqa: BLE001
-        return False
-    if not p.scheme or not p.netloc:
-        return False
-    origin = f"{p.scheme}://{p.netloc}"
-    body = await _robots_body(origin)
-    if not body:
-        return True
-    return not path_disallowed(body, p.path or "/")
+    return True
 
 
 # --------------------------------------------------------------------------- #

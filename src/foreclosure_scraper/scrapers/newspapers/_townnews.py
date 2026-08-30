@@ -70,7 +70,9 @@ CITY_STATE_RE = re.compile(
 )
 SALE_DATE_RE = re.compile(
     r"\b((?:January|February|March|April|May|June|July|August|September|"
-    r"October|November|December)\s+\d{1,2},?\s+\d{4})",
+    r"October|November|December)\s+\d{1,2},?\s+\d{4})"
+    # Optional clock time that follows the date ("... on June 23, 2026 at 2:00 PM").
+    r"(?:,?\s+(?:at\s+)?(\d{1,2}(?::\d{2})?\s*[AaPp]\.?[Mm]\.?))?",
     re.I,
 )
 # A county name explicitly stated in the notice ("COUNTY OF BERKELEY",
@@ -82,6 +84,34 @@ COUNTY_SUFFIX_RE = re.compile(r"\b([A-Z][A-Za-z]+)\s+COUNTY\b", re.I)
 TRUSTEE_RE = re.compile(
     r"([A-Z][A-Za-z &,.'\-]+?(?:LLC|LLP|PLLC|P\.?A\.?|P\.?C\.?|Law Firm|"
     r"Attorneys?|Trustee Services|Default Services))",
+)
+
+# --- Party captions (plaintiff / defendant / record owner) ------------------
+# SC civil captions read "<Plaintiff>, Plaintiff ... vs. <Defendant>, Defendant".
+# The name char-class deliberately excludes '/' ':' '(' ')' so a capture can't run
+# backward through the court-caption boilerplate ("... COMMON PLEAS C/A NO: 2026CP...
+# (NON-JURY MORTGAGE FORECLOSURE)"); any leftover boilerplate prefix that survives
+# ("SUMMONS AND NOTICES") is trimmed by _strip_caption().
+PLAINTIFF_RE = re.compile(
+    r"([A-Z][A-Za-z0-9 &,.'\-]{2,70}?),?\s+Plaintiffs?\b", re.I
+)
+DEFENDANT_RE = re.compile(
+    r"\bvs?\.?\s+([A-Z][A-Za-z0-9 &,.'\-]{2,70}?),?\s+Defendants?\b", re.I
+)
+# NC substitute-trustee notices name the current owner under this label.
+RECORD_OWNER_RE = re.compile(
+    r"PRESENT RECORD OWNER\(?S?\)?\s*:?\s*"
+    r"([A-Z][A-Za-z.'\- ]{2,70}?)(?:\)|,|\s+to\s+|$)", re.I
+)
+# Boilerplate that may cling to the FRONT of a captured party name — trimmed off.
+_CAPTION_BOILER_RE = re.compile(
+    r".*\b(?:COMMON PLEAS|SUMMONS(?:\s+AND\s+NOTICES?)?|NOTICES?|CIVIL ACTION|"
+    r"FORECLOSURE)\)?\s*", re.I | re.S
+)
+# A stripped name still carrying caption words is not a real party -> reject.
+_PARTY_REJECT_RE = re.compile(
+    r"\b(STATE OF|COUNTY OF|COURT|VIRTUE|JUDGMENT|COMMON PLEAS|NOTICE|"
+    r"SUMMONS|CIVIL ACTION|PLEAS|IN THE)\b", re.I
 )
 
 FORECLOSURE_HINTS = (
@@ -99,6 +129,20 @@ FORECLOSURE_HINTS = (
 
 def _clean(s: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", s or ""))).strip()
+
+
+def _strip_caption(name: str | None) -> str | None:
+    """Trim leading court-caption boilerplate off a captured party name and
+    reject a capture that is really boilerplate (not a person/entity)."""
+    if not name:
+        return None
+    n = _CAPTION_BOILER_RE.sub("", name).strip(" ,.;:-")
+    n = re.sub(r"\s+", " ", n)
+    if len(n) < 3 or not re.search(r"[A-Za-z]{2}", n):
+        return None
+    if _PARTY_REJECT_RE.search(n):
+        return None
+    return n
 
 
 def _is_foreclosure(text: str) -> bool:
@@ -233,12 +277,39 @@ def parse_rss_items(
             zip_code = z_m.group(1)
 
         sale_date = None
+        sale_time = None
         sd_m = SALE_DATE_RE.search(blob)
         if sd_m:
             try:
                 sale_date = dateparser.parse(sd_m.group(1), fuzzy=True)
             except (ValueError, TypeError, OverflowError):
                 sale_date = None
+            if sd_m.group(2):
+                sale_time = re.sub(r"\s+", " ", sd_m.group(2)).strip().upper().rstrip(".")
+
+        # Parties: NC "PRESENT RECORD OWNER(S)" names the owner directly; SC civil
+        # captions carry "<Plaintiff>, Plaintiff ... vs. <Defendant>, Defendant".
+        # owner_name mirrors the defendant/record-owner (the property owner).
+        plaintiff = None
+        pl_m = PLAINTIFF_RE.search(blob)
+        if pl_m:
+            plaintiff = _strip_caption(pl_m.group(1))
+
+        defendant = None
+        owner_name = None
+        ro_m = RECORD_OWNER_RE.search(blob)
+        if ro_m:
+            cand = _clean(ro_m.group(1)).rstrip(",.;: ")
+            if len(cand) >= 3 and re.search(r"[A-Za-z]{2}", cand):
+                owner_name = cand
+                defendant = cand
+        if defendant is None:
+            df_m = DEFENDANT_RE.search(blob)
+            if df_m:
+                cand = _strip_caption(df_m.group(1))
+                if cand:
+                    defendant = cand
+                    owner_name = cand
 
         trustee = None
         tr_m = TRUSTEE_RE.search(desc) or TRUSTEE_RE.search(title)
@@ -269,9 +340,13 @@ def parse_rss_items(
                 city=city,
                 zip_code=zip_code,
                 sale_date=sale_date,
+                sale_time=sale_time,
                 sale_location=sale_location,
                 foreclosure_process=proc,
                 case_number=case_number,
+                plaintiff=plaintiff,
+                defendant=defendant,
+                owner_name=owner_name,
                 trustee=trustee,
                 description=(title or desc)[:500] or None,
                 first_seen=datetime.utcnow(),

@@ -315,13 +315,35 @@ _FIRM_RE = re.compile(
     r"([A-Z][A-Za-z&,.'\- ]{4,55}(?:PLLC|LLP|LLC|P\.?A\.?|P\.?C\.?|"
     r"Law(?: Firm| Offices?| Group)?|Attorney|Substitute Trustee|Trustee|& Ingle))")
 
+# A REAL phone needs a separator or parens — a bare 10-digit string is almost always a
+# parcel PIN / case number in these bodies, never a phone (verified 2026-08-14: the naive
+# \d{10} pattern false-matched PINs like 1566620782). The context form pulls the number
+# that follows a "Phone:"/"Tel:"/"Call" label first.
+_PHONE_RE = re.compile(r"(?:\(\d{3}\)\s?|\b\d{3}[.\-\s])\d{3}[.\-\s]\d{4}\b")
+_PHONE_CTX_RE = re.compile(
+    r"(?:phone|telephone|tel|call|contact)\b[^\d]{0,20}(\(?\d{3}\)?[.\-\s]?\d{3}[.\-\s]?\d{4})", re.I)
+
+
+def _norm_phone(s: str) -> str | None:
+    """Normalize to '(AAA) PPP-NNNN'; reject non-phones (bad area/exchange = a PIN/id)."""
+    digs = re.sub(r"\D", "", s or "")
+    if len(digs) == 11 and digs[0] == "1":
+        digs = digs[1:]
+    if len(digs) != 10:
+        return None
+    if digs[0] in "01" or digs[3] in "01":   # NANP: area/exchange can't start 0 or 1
+        return None
+    return f"({digs[0:3]}) {digs[3:6]}-{digs[6:]}"
+
 
 def _notice_email(text: str) -> dict:
-    """The ONE free, attributable email channel — the attorney/trustee/firm email published in
-    the legal-notice body (verified 2026-06-30: jfletcher@fletchertydings.com etc.). ~5% of
-    notices carry one. It's the filer/trustee, not the owner, but a real reachable case contact."""
+    """Attributable case contact from the legal-notice body — the attorney/trustee/firm
+    EMAIL and/or PHONE published in the notice. It's the filer/trustee, not the owner, but a
+    real reachable case contact (call the trustee to work the sale). ~5% carry an email; the
+    published phone is more common (the trustee/attorney block at the notice foot)."""
     if not text:
         return {}
+    out: dict = {}
     for m in _EMAIL_RE.finditer(text):
         e = m.group(0).rstrip(".").lower()
         if _EMAIL_JUNK.search(e) or len(e) > 60:
@@ -330,8 +352,26 @@ def _notice_email(text: str) -> dict:
         fm = _FIRM_RE.findall(text[max(0, m.start() - 180): m.start()])
         if fm:
             out["name"] = re.sub(r"\s+", " ", fm[-1]).strip()
-        return out
-    return {}
+        break
+    # Phone: prefer a labelled number; else the LAST formatted phone (the closing
+    # trustee/attorney contact block). Validated so parcel PINs can't leak in.
+    ph = None
+    cm = _PHONE_CTX_RE.search(text)
+    if cm:
+        ph = _norm_phone(cm.group(1))
+    if not ph:
+        cands = [p for p in (_norm_phone(x) for x in _PHONE_RE.findall(text)) if p]
+        if cands:
+            ph = cands[-1]
+    if ph:
+        out = out or {"source": "column_notice_body"}
+        out["phone"] = ph
+        out.setdefault("contact_role", "trustee/attorney")  # NOT the owner — a case contact
+        if "name" not in out:
+            fm = _FIRM_RE.findall(text)
+            if fm:
+                out["name"] = re.sub(r"\s+", " ", fm[-1]).strip()
+    return out
 
 
 def _parse_nc_foreclosure(text: str) -> dict:
@@ -718,7 +758,7 @@ class ColumnLegalNotices(BaseScraper):
 
     # ----------------------------------------------------------------- #
     def _common_raw(self, it: dict) -> dict:
-        raw = {
+        raw: dict = {
             "column": {
                 "id": it.get("id"),
                 "newspapername": it.get("newspapername"),
@@ -731,6 +771,13 @@ class ColumnLegalNotices(BaseScraper):
         nc = _notice_email(it.get("text") or "")
         if nc:
             raw["notice_contact"] = nc   # attributable attorney/trustee email
+        # Stamp the notice PDF into raw["documents"] so enrich_doc_ocr picks it
+        # up. Column returns pdfurl on every result row but it was only being
+        # used as source_url — the OCR pipeline never saw it.
+        pdfurl = it.get("pdfurl")
+        if pdfurl and isinstance(pdfurl, str) and pdfurl.startswith("http"):
+            raw["documents"] = [pdfurl]
+            raw["document_url"] = pdfurl
         return raw
 
     def _published_dt(self, it: dict) -> datetime:

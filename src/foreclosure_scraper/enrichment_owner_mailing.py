@@ -27,6 +27,8 @@ import httpx
 import structlog
 
 from .models import Listing
+from .enrichment_arcgis import scdot_walled  # SCDOT circuit-breaker
+from .http_client import client  # shared throttled transport (per-host rate limit + timeout hardening)
 # Re-export so existing importers keep working; the definition lives in a
 # leaf module so a mid-run edit can never leave it half-loaded.
 from .mailing_shape import mailing_dict  # noqa: F401  (re-export)
@@ -157,6 +159,29 @@ COUNTY_GIS: dict[str, dict] = {
     "SC:Union": {"url": "https://services6.arcgis.com/xQgypOVdY84tFTiW/arcgis/rest/services/UNION_SC_PARCELS_WFL1/FeatureServer/2",
         "owner": ["Name"], "mail": ["Address_1", "Address_2", "Address_3"],
         "situs": [], "parcel": "ParcelID"},  # situs on a different layer → parcel-match only
+    # York SC — full county parcel layer w/ owner, mailing, situs, sale, sqft, values.
+    # Verified 2026-08-22: 67 fields, live data, no auth.
+    "SC:York": {"url": "https://services1.arcgis.com/2AGLxyiJoNiVHKwq/arcgis/rest/services/Parcels/FeatureServer/0",
+        "owner": ["Owner1", "Owner2", "Owner3"],
+        "mail": ["MailAddr1", "MailAddr2", "MailApt", "MailCity", "MailState", "MailZip"],
+        "situs": ["PropertyAddress"], "parcel": "ParcelID",
+        "alt_parcel": "TAXMAPID",
+        "value": ["AprTotVal"],
+        "sqft": ["FinishedSQFT"],
+        "year_built": ["YearBuilt"],
+        "sale": ["SalePrice"],
+        "out_fields": "ParcelID,TAXMAPID,Owner1,Owner2,Owner3,MailAddr1,MailAddr2,MailApt,MailCity,MailState,MailZip,PropertyAddress,AprTotVal,FinishedSQFT,YearBuilt,SalePrice,TransferBook,TransferPage"},
+    # Charleston SC — limited layer (PID, OWNER, ADDR only, no mailing).
+    # Verified 2026-08-22: 10 fields, live, no auth. Parcel-match only.
+    "SC:Charleston": {"url": "https://services1.arcgis.com/G0z1RCvykC1mcsVI/arcgis/rest/services/Parcels/FeatureServer/0",
+        "owner": ["OWNER"], "mail": [],
+        "situs": ["ADDR"], "parcel": "PID"},
+    # Beaufort SC — delinquent tax parcels only (not full roll), but has
+    # OWNER_NAME, SITUSADDR, PIN, BALANCEDUE. Useful for delinquent-tax leads.
+    "SC:Beaufort": {"url": "https://services.arcgis.com/mbPLXL6SDfBjrAmS/arcgis/rest/services/InteractiveTaxMap2021_OctoberUpdate/FeatureServer/0",
+        "owner": ["OWNER_NAME"], "mail": [],
+        "situs": ["SITUSADDR"], "parcel": "PIN",
+        "delinquent_balance": ["BALANCEDUE"]},
 }
 # Cherokee SC: no ArcGIS owner/mailing layer (qPublic-only) → not here.
 
@@ -345,7 +370,7 @@ def _spec_out_fields(spec: dict) -> str:
         names = []
         for key in ("owner", "mail", "situs"):
             names += list(spec.get(key) or [])
-        for key in ("care_of", "mail_state", "situs_match", "parcel", "order_by", "county_field"):
+        for key in ("care_of", "mail_state", "situs_match", "parcel", "alt_parcel", "order_by", "county_field"):
             v = spec.get(key)
             if v:
                 names.append(v)
@@ -425,6 +450,8 @@ _VALUE_PRIORITY = [
     re.compile(r"^(appraised_?value|apprval|appr_?val)$", re.I),                       # Buncombe AppraisedValue
     re.compile(r"^(total_?tax_?value|cost_?total_?value|total_?value|totval|totalvalue|parval|present_?val|presentval)$", re.I),  # Polk/Henderson/Lincoln/Gaston + NC OneMap parval/presentval
     re.compile(r"^(assessed_?value|assessed_?v|taxvalue|tax_?value)$", re.I),          # Transylvania ASSESSED_V, Buncombe TaxValue
+    re.compile(r"^(apr_?tot_?val|aprtotval|appr_?tot_?val|appraised_?total_?value)$", re.I),  # York SC AprTotVal
+    re.compile(r"^(tax_?tot_?val|taxtotval)$", re.I),                                  # York SC TaxTotVal
 ]
 _LAND_PAT = re.compile(r"^(land_?value|landval)$", re.I)
 _IMPROV_PAT = re.compile(r"^(improvement_?value|improv_?value|improvval|bldg_?value|building_?value|building_?v)$", re.I)
@@ -468,10 +495,10 @@ def _extract_value(attrs: dict) -> Optional[float]:
 # homestead marker (blank is the majority, so blank != absentee).
 _HOMESTEAD_PAT = re.compile(r"^(homestead.*|hmstd.*|owner_?occ.*|oo_?flag)$", re.I)
 _CONDITION_PAT = re.compile(r"^(condition.*|cond_?cd|cond_?code|bldg_?cond.*|cdu)$", re.I)
-_SALEDATE_PAT = re.compile(r"^(sale_?date|saledate|last_?sale_?date|deed_?date|transfer_?date)$", re.I)
+_SALEDATE_PAT = re.compile(r"^(sale_?date|saledate|last_?sale_?date|deed_?date|transfer_?date|date_?sold|datesold)$", re.I)
 _SALEAMT_PAT = re.compile(r"^(sale_?amt|sale_?amount|saleamount|sale_?price|saleprice|last_?sale_?(amount|price))$", re.I)
-_DEEDBOOK_PAT = re.compile(r"^(deed_?book|deedbook)$", re.I)
-_DEEDPAGE_PAT = re.compile(r"^(deed_?page|deedpage)$", re.I)
+_DEEDBOOK_PAT = re.compile(r"^(deed_?book|deedbook|transfer_?book|transferbook)$", re.I)
+_DEEDPAGE_PAT = re.compile(r"^(deed_?page|deedpage|transfer_?page|transferpage)$", re.I)
 _PREVOWNER_PAT = re.compile(r"^(previous_?ow.*|prev_?ow.*|prior_?ow.*|former_?ow.*)$", re.I)
 
 _POOR_CONDITION = {"PR", "VP", "DL", "UN", "POOR", "VERY POOR", "DILAPIDATED",
@@ -531,7 +558,7 @@ NC_ONEMAP = {
     "url": "https://services.nconemap.gov/secure/rest/services/NC1Map_Parcels/FeatureServer/1",
     "owner": ["ownname", "ownname2"],
     "mail": ["mailadd", "munit", "mcity", "mstate", "mzip"], "mail_state": "mstate",
-    "situs": ["siteadd"], "parcel": "parno", "county_field": "cntyname",
+    "situs": ["siteadd"], "parcel": "parno", "alt_parcel": "altparno", "county_field": "cntyname",
     "source_label": "nc_onemap",
 }
 
@@ -594,13 +621,21 @@ async def _match_attrs(http: httpx.AsyncClient, li: Listing, spec: dict) -> Opti
     # 1) exact parcel match if we already have a parcel id. Try each candidate
     #    format (raw dashed → suffix-trimmed → stripped) because parcel layers
     #    differ on whether they store the TMS/PIN with or without separators.
+    #    Also try an alternate-parcel field if the spec declares one (NC OneMap
+    #    stores county-format PINs like R01000-005-026-016 in `altparno`, while
+    #    `parno` holds the state-internal 3222-93-0565.000 — querying parno alone
+    #    missed ~2000+ New Hanover leads whose only parcel_id was the alt format).
     if li.parcel_id:
+        parcel_fields = [spec["parcel"]]
+        if spec.get("alt_parcel"):
+            parcel_fields.append(spec["alt_parcel"])
         for cand in _pid_variants(li.parcel_id):
             safe = cand.replace("'", "''")
-            rows = await _query(http, spec["url"], f"{spec['parcel']} LIKE '%{safe}%'{cc}",
-                                _spec_out_fields(spec))
-            if rows:
-                return rows[0]
+            for pf in parcel_fields:
+                rows = await _query(http, spec["url"], f"{pf} LIKE '%{safe}%'{cc}",
+                                    _spec_out_fields(spec))
+                if rows:
+                    return rows[0]
     # 2) else match on situs street address. Query the street-NAME field broadly
     #    (the longest, most distinctive street word) so format differences don't
     #    block the hit, then verify house-number + street client-side.
@@ -750,7 +785,7 @@ async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
                     res["_value"] = v
                     res["value_source"] = "nc_onemap"
 
-    if li.state == "SC" and li.county and res is None:
+    if li.state == "SC" and li.county and res is None and not scdot_walled():
         # 3) SCDOT statewide SC fallback — the contactability path for SC
         #    counties with no dedicated COUNTY_GIS layer (Anderson, Greenville,
         #    Beaufort, Cherokee, …) and for covered SC counties the dedicated
@@ -763,16 +798,20 @@ async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
     return res
 
 
-async def enrich_owner_mailing(listings: list[Listing], max_concurrency: int = 4) -> dict:
-    """Fill owner + mailing + absentee/out-of-state + parcel_id from county GIS."""
+async def enrich_owner_mailing(listings: list[Listing], max_concurrency: int = 12) -> dict:
+    """Fill owner + mailing + absentee/out-of-state + parcel_id from county GIS.
+
+    Concurrency raised from 4 to 12 — the sequential 4-concurrent pattern caused
+    900s+ timeouts on the full board (40K listings). 12 concurrent keeps us well
+    under county ArcGIS rate limits while cutting wall time ~3x."""
     def _reachable(li: Listing) -> bool:
         # Dedicated county layer, OR an NC OneMap / SCDOT statewide fallback.
         if _county_key(li) in COUNTY_GIS:
             return True
         if li.state == "NC" and li.county:
             return True  # NC OneMap covers all 100 NC counties
-        if li.state == "SC" and _scdot_spec(li.county or "") is not None:
-            return True  # SCDOT covers all 46 SC counties
+        if li.state == "SC" and not scdot_walled() and _scdot_spec(li.county or "") is not None:
+            return True  # SCDOT covers all 46 SC counties (unless the token wall is up)
         return False
 
     def _has_mailing(li) -> bool:
@@ -794,7 +833,10 @@ async def enrich_owner_mailing(listings: list[Listing], max_concurrency: int = 4
     sem = asyncio.Semaphore(max_concurrency)
     counts = {"queried": 0, "resolved": 0, "absentee": 0, "out_of_state": 0}
 
-    async with httpx.AsyncClient(timeout=httpx.Timeout(25.0)) as http:
+    # Use the shared throttled client so per-host politeness + connect/pool timeout
+    # hardening + BLOCKED classification apply (a raw AsyncClient risked IP bans on
+    # bursty county-ArcGIS hosts and skipped the tuned connect timeout).
+    async with client(timeout=25.0) as http:
         async def one(li: Listing):
             async with sem:
                 counts["queried"] += 1

@@ -324,6 +324,15 @@ def _resolve_address(attrs: dict, schema: dict, defendant: str) -> dict:
 
 
 async def main() -> None:
+    # GUARD (2026-08-14): writes docs/listings.json directly (write_text/json.dumps),
+    # bypassing load_board()/write_artifact() — wipes the sidecar + emits 1 of 6 board
+    # files, corrupting the board (dashboard reads listings.json.gz). Use the proper
+    # address lane instead: ADDR_WRITE=1 .venv/bin/python scripts/resolve_addresses.py.
+    import os as _os
+    if _os.environ.get("ALLOW_UNSAFE_BOARD_WRITE") != "1":
+        print("REFUSING: corrupts the board (writes listings.json without write_artifact). "
+              "Use scripts/resolve_addresses.py ADDR_WRITE=1 instead.")
+        return
     listings = json.loads(LISTINGS_PATH.read_text())
 
     # Targets: every SC lis-pendens listing whose street_address is either a

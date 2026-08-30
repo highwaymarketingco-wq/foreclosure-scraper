@@ -22,7 +22,8 @@ from foreclosure_scraper.scrapers.counties_nc.nc_ecourts_lis_pendens import (
 # list, per explicit user direction to cover the coast. Querying their Tyler
 # facets is intentional; the WNC footprint targets must still all be in scope.
 NC_ECOURTS_COASTAL = {"Brunswick", "Pender", "Onslow", "Carteret", "Dare",
-                      "Currituck", "Hyde", "New Hanover"}
+                      "Currituck", "Hyde", "New Hanover",
+                      "Beaufort", "Craven", "Pamlico"}
 
 
 # Sources that emit listings which typically lack sale_date — these must

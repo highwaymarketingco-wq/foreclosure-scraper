@@ -46,9 +46,57 @@ from .enrichment_vision import (
     GITHUB_MODELS_MODEL,
     GROQ_URL,
     GROQ_MODEL,
+    NVIDIA_URL,
+    NVIDIA_VISION_MODELS,
+    MISTRAL_URL,
+    MISTRAL_VISION_MODELS,
 )
 
 log = structlog.get_logger(__name__)
+
+# --- Anthropic Claude vision OCR --------------------------------------------
+# Claude uses a different API shape (messages, not chat/completions) so it
+# needs its own caller. Only used as a last-resort fallback when all free
+# providers are quota-exhausted — costs ~$0.01-0.03/call.
+ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_VISION_MODEL", "claude-sonnet-4-20250514")
+
+async def _anthropic_call(http: httpx.AsyncClient, key: str,
+                          blocks: list, text: Optional[str] = None) -> Optional[dict]:
+    """One Anthropic Claude vision call for doc OCR. blocks = [(bytes, mime)]."""
+    content = []
+    if text:
+        content.append({"type": "text", "text": f"{OCR_PROMPT}\n\nDOCUMENT TEXT:\n{text}"})
+    else:
+        content.append({"type": "text", "text": OCR_PROMPT})
+        for d, m in (blocks or []):
+            b64 = base64.b64encode(d).decode("ascii")
+            media = "image/jpeg" if not m.startswith("image/") else m
+            content.append({"type": "image", "source": {
+                "type": "base64", "media_type": media, "data": b64}})
+    body = {"model": ANTHROPIC_MODEL, "max_tokens": 1500,
+            "messages": [{"role": "user", "content": content}]}
+    try:
+        r = await http.post(ANTHROPIC_URL, json=body, timeout=90.0,
+                            headers={"x-api-key": key,
+                                     "anthropic-version": "2023-06-01",
+                                     "Content-Type": "application/json"})
+    except Exception as exc:
+        log.warning("doc_ocr.anthropic_error", error=str(exc)[:160])
+        return None
+    if r.status_code == 429:
+        raise _QuotaOut("anthropic")
+    if r.status_code >= 400:
+        log.warning("doc_ocr.anthropic_error", status=r.status_code, error=r.text[:120])
+        return None
+    try:
+        txt = r.json()["content"][0]["text"]
+        parsed = _parse_json_response(txt)
+    except Exception:
+        return None
+    if parsed is not None:
+        parsed["_provider"] = "anthropic"
+    return parsed
 
 # --- gating / budgets -------------------------------------------------------
 DOC_OCR_ENABLED = os.environ.get("FORECLOSURE_DOC_OCR", "1") != "0"
@@ -70,7 +118,7 @@ _DOC_EXT = (".pdf", ".tif", ".tiff", ".jpg", ".jpeg", ".png", ".gif", ".bmp")
 _DOC_FIELDS = (
     "document_url", "doc_url", "notice_url", "notice_image", "doc_image",
     "instrument_image", "instrument_url", "pdf_url", "image_url", "scan_url",
-    "recorded_document_url", "deed_url", "source_pdf",
+    "recorded_document_url", "deed_url", "source_pdf", "documents",
 )
 
 OCR_PROMPT = (
@@ -297,6 +345,44 @@ async def _ocr_document(li: Listing, http: httpx.AsyncClient,
                         return res
                 except _QuotaOut:
                     continue
+
+            # NVIDIA + Mistral text fallback (same OpenAI-compat path)
+            nv_key = os.environ.get("NVIDIA_API_KEY")
+            if nv_key:
+                for nv_model in NVIDIA_VISION_MODELS:
+                    try:
+                        res = await _openai_compat_call(http, f"nvidia:{nv_model.split('/')[-1]}",
+                                                        NVIDIA_URL, nv_key, nv_model, text=txt)
+                        if res:
+                            res["_source"] = "pdf_text"
+                            return res
+                    except _QuotaOut:
+                        continue
+                    except Exception:
+                        continue
+            ms_key = os.environ.get("MISTRAL_API_KEY")
+            if ms_key:
+                for ms_model in MISTRAL_VISION_MODELS:
+                    try:
+                        res = await _openai_compat_call(http, f"mistral:{ms_model}",
+                                                        MISTRAL_URL, ms_key, ms_model, text=txt)
+                        if res:
+                            res["_source"] = "pdf_text"
+                            return res
+                    except _QuotaOut:
+                        continue
+                    except Exception:
+                        continue
+            # Claude text fallback
+            claude_key = os.environ.get("ANTHROPIC_API_KEY")
+            if claude_key:
+                try:
+                    res = await _anthropic_call(http, claude_key, blocks=None, text=txt)
+                    if res:
+                        res["_source"] = "pdf_text"
+                        return res
+                except _QuotaOut:
+                    pass
             return None
         # scanned PDF: only Gemini accepts application/pdf directly
         for k in gemini_keys:
@@ -338,6 +424,48 @@ async def _ocr_document(li: Listing, http: httpx.AsyncClient,
                 return res
         except _QuotaOut:
             pass
+
+    # NVIDIA NIM — free, ~40 RPM per model, OpenAI-compatible
+    nv_key = os.environ.get("NVIDIA_API_KEY")
+    if nv_key and not getattr(_ocr_document, "_nv_disabled", False):
+        for nv_model in NVIDIA_VISION_MODELS:
+            try:
+                res = await _openai_compat_call(http, f"nvidia:{nv_model.split('/')[-1]}",
+                                                NVIDIA_URL, nv_key, nv_model, blocks)
+                if res:
+                    res["_source"] = "image"
+                    return res
+            except _QuotaOut:
+                continue
+            except Exception:
+                continue
+
+    # Mistral — free tier, OpenAI-compatible
+    ms_key = os.environ.get("MISTRAL_API_KEY")
+    if ms_key and not getattr(_ocr_document, "_ms_disabled", False):
+        for ms_model in MISTRAL_VISION_MODELS:
+            try:
+                res = await _openai_compat_call(http, f"mistral:{ms_model}",
+                                                MISTRAL_URL, ms_key, ms_model, blocks)
+                if res:
+                    res["_source"] = "image"
+                    return res
+            except _QuotaOut:
+                continue
+            except Exception:
+                continue
+
+    # Anthropic Claude — LAST resort, costs money ($0.01-0.03/call)
+    claude_key = os.environ.get("ANTHROPIC_API_KEY")
+    if claude_key:
+        try:
+            res = await _anthropic_call(http, claude_key, blocks)
+            if res:
+                res["_source"] = "image"
+                return res
+        except _QuotaOut:
+            pass
+
     return None
 
 

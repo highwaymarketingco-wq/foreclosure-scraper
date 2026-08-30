@@ -250,6 +250,14 @@ def _row_to_listing(
     bid_text = bid_raw or _find(
         ("bid", "opening", "minimum", "price", "amount")
     )
+    # Promote plaintiff (foreclosing creditor) + judgment amount from the row.
+    plaintiff = _find(
+        ("plaintiff", "creditor", "lienholder", "petitioner", "mortgagee")
+    )
+    judgment_text = _find(
+        ("judgment", "debt", "amount owed", "judgment amount", "balance due")
+    )
+    judgment_amount = _parse_money(judgment_text)
 
     # If we still don't have an address, try regex on all cell text
     if not address:
@@ -261,6 +269,17 @@ def _row_to_listing(
 
     sale_date = _parse_date(sale_date_text)
     opening_bid = _parse_money(bid_text)
+
+    # Upset-bid deadline (NC power-of-sale). _UPSET_BID_RE was dead code. When
+    # the row mentions an upset bid, take a date near the phrase; otherwise
+    # fall back to the 10-day statutory window off the sale date.
+    upset_bid_deadline = None
+    row_blob = " ".join(row.values())
+    um = _UPSET_BID_RE.search(row_blob)
+    if um:
+        upset_bid_deadline = _parse_date(row_blob[um.end():um.end() + 80])
+        if upset_bid_deadline is None and sale_date is not None:
+            upset_bid_deadline = sale_date + timedelta(days=10)
 
     # Need at least an address OR case number to be useful
     if not address and not case_number:
@@ -284,6 +303,9 @@ def _row_to_listing(
         state=state,
         case_number=case_number,
         defendant=defendant,
+        plaintiff=plaintiff,
+        judgment_amount=judgment_amount,
+        upset_bid_deadline=upset_bid_deadline,
         sale_date=sale_date,
         opening_bid=opening_bid,
         sale_location=f"{county} County Sheriff's Office",
@@ -296,6 +318,7 @@ def _row_to_listing(
                 "state": state,
                 "sale_date_raw": sale_date_text,
                 "bid_raw": bid_text,
+                "judgment_raw": judgment_text,
                 "full_row": row,
             },
         },

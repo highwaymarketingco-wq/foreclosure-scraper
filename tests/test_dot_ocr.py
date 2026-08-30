@@ -213,15 +213,14 @@ def test_eligible_requires_registered_county():
     assert disabled.get("targets", 0) == 0
 
 
-def test_walled_and_unregistered_counties_are_never_targeted(monkeypatch):
-    """Spartanburg (robots Disallow) and Buncombe (vendor cart) must both be
-    skipped even at HOT tier — the compliance gate is not a grade gate."""
+def test_paywalled_and_unregistered_counties_are_never_targeted(monkeypatch):
+    """Buncombe (vendor cart) must be skipped even at HOT tier — the
+    paywall gate is not a grade gate. Spartanburg is now eligible (free via
+    StealthyFetcher)."""
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key-for-gate")
-    spartanburg = _hot(owner_name="GARRETT, JAMES")           # robots-disallowed
     buncombe = _hot(county="Buncombe", state="NC", owner_name="SMITH, JOHN")  # paywalled
-    stats = asyncio.run(dm.enrich_dot_ocr([spartanburg, buncombe]))
+    stats = asyncio.run(dm.enrich_dot_ocr([buncombe]))
     assert stats["targets"] == 0
-    assert "SC:Spartanburg" in stats["walled_counties"]
     assert "NC:Buncombe" in stats["walled_counties"]
 
 

@@ -1,11 +1,2 @@
-{
-  "version": "0.0.1",
-  "configurations": [
-    {
-      "name": "dashboard",
-      "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "cd /Users/cashhigh/foreclosure-scraper/docs && exec python3 -m http.server 8765"],
-      "port": 8765
-    }
-  ]
-}
+{ "version": "0.0.1", "configurations": [
+  { "name": "dashboard", "runtimeExecutable": "python3", "runtimeArgs": ["-m","http.server","8099","--directory","docs"], "port": 8099 } ] }

@@ -209,9 +209,10 @@ async def _render_card(pin: str) -> dict | None:
         await page.wait_for_timeout(6000)
 
     try:
+        from .base import cf_solving_disabled
         await StealthyFetcher.async_fetch(
             SOURCE_URL, headless=True, network_idle=True, timeout=120000,
-            page_action=page_action, solve_cloudflare=True,
+            page_action=page_action, solve_cloudflare=not cf_solving_disabled(),
         )
     except Exception:
         return None

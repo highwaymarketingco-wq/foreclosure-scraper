@@ -155,6 +155,15 @@ class NCHeirEstateParcels(BaseScraper):
                     situs = _stitch(spec, attrs, "situs")
                     mail = _stitch(spec, attrs, "mail")
                     parcel = attrs.get(spec.get("parcel")) if spec.get("parcel") else None
+                    # Care-of / attn line (e.g. Buncombe "CareOf") — the executor
+                    # or heir's agent, a resolvable contact. Spec-declared field
+                    # name only (no guessing); absent on counties that don't map it.
+                    care_of_field = spec.get("care_of")
+                    care_of = None
+                    if care_of_field:
+                        cv = attrs.get(care_of_field)
+                        if cv and str(cv).strip():
+                            care_of = re.sub(r"\s+", " ", _html(str(cv))).strip() or None
                     li = Listing(
                         source=self.slug,
                         source_url=spec["url"],
@@ -173,6 +182,7 @@ class NCHeirEstateParcels(BaseScraper):
                             "heir_estate": {
                                 "owner_of_record": owner,
                                 "mailing": mail,
+                                "care_of": care_of,
                                 "match": "heirs" if "HEIR" in owner.upper() else "estate",
                             },
                             # Score as a probate/life-event distress signal.

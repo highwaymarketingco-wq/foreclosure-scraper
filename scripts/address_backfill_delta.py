@@ -31,6 +31,18 @@ def _print(msg: str) -> None:
 
 
 async def main() -> int:
+    # GUARD (2026-08-14): this script writes docs/listings.json directly with
+    # write_text(json.dumps(...)) — it does NOT go through load_board()/write_artifact(),
+    # so it wipes the vision/comps/cama/staleness sidecar (RAW_KEEP) and emits only 1 of
+    # the 6 board files. The dashboard streams listings.json.gz, so its edits never land AND
+    # the next full run reads a misaligned board. Superseded by scripts/resolve_addresses.py
+    # (ADDR_WRITE=1) — same address lanes, correct board writer + board_lock + dedupe.
+    import os as _os
+    if _os.environ.get("ALLOW_UNSAFE_BOARD_WRITE") != "1":
+        print("REFUSING: this script corrupts the board (writes listings.json without "
+              "load_board/write_artifact). Use:  ADDR_WRITE=1 .venv/bin/python "
+              "scripts/resolve_addresses.py")
+        return 2
     rows = json.loads(LISTINGS_PATH.read_text(encoding="utf-8"))
     listings: list[Listing] = []
     for r in rows:

@@ -140,6 +140,17 @@ SCOPE_DENY_COUNTIES: tuple[tuple[str, str], ...] = (
     # Other coastal/eastern NC counties the 284 prefix might catch.
     ("Pender", "NC"),
     ("Sampson", "NC"),
+    # 2026-08-18 — remaining out-of-footprint counties found on board audit.
+    # Hyde (eastern NC), Georgetown/Charleston/Beaufort (coastal SC), and
+    # other eastern NC coastal counties that leak via CourtListener or
+    # zip-prefix fallback. None are in the 18-county WNC+Upstate scope.
+    ("Hyde", "NC"),
+    ("Dare", "NC"),
+    ("Carteret", "NC"),
+    ("Currituck", "NC"),
+    ("Beaufort", "SC"),
+    ("Georgetown", "SC"),
+    ("Charleston", "SC"),
 )
 # Pre-normalized for fast lookup in in_scope() + main._in_scope.
 SCOPE_DENY_COUNTIES_NORMALIZED: frozenset[tuple[str, str]] = frozenset(
@@ -179,7 +190,7 @@ class RuntimeConfig:
     )
     request_timeout_s: float = 30.0
     request_retries: int = 3
-    parallel_scrapers: int = 8
+    parallel_scrapers: int = 24
     link_check_workers: int = 24
     sale_horizon_days: int = 120  # only keep listings with a sale date within this many days
 
@@ -199,4 +210,6 @@ class RuntimeConfig:
             gmail_sender=os.environ.get("GMAIL_SENDER", "highwaymarketingco@gmail.com"),
             gmail_app_password=os.environ.get("GMAIL_APP_PASSWORD", ""),
             email_recipients=recipients,
+            parallel_scrapers=int(os.environ.get("PARALLEL_SCRAPERS", "24")),
+            link_check_workers=int(os.environ.get("LINK_CHECK_WORKERS", "24")),
         )

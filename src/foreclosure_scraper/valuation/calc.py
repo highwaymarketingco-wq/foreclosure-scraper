@@ -243,8 +243,8 @@ COMMERCIAL_BUILDING_TYPE_RE = re.compile(
 # n=11,795) p50 1.00, p90 2.10, p95 3.98, p99 17.76 — land (n=8,041) p50 1.10,
 # p90 7.61, p95 14.22, p99 86.46. Land assessments genuinely lag market far
 # harder, so one threshold for both would either miss houses or gut land.
-ARV_ANCHOR_SOFT_MULT_IMPROVED = 4.0   # ~p95 for improved
-ARV_ANCHOR_HARD_MULT_IMPROVED = 10.0  # between p95 and p99
+ARV_ANCHOR_SOFT_MULT_IMPROVED = 2.5   # was 4.0 — nearly half of ARVs were >2.5× assessed
+ARV_ANCHOR_HARD_MULT_IMPROVED = 3.5   # was 10.0 — 10× was no guard at all for improved
 ARV_ANCHOR_SOFT_MULT_LAND = 6.0       # just under p90 for land; see note
 ARV_ANCHOR_HARD_MULT_LAND = 20.0      # just under p99
 # ---- When the county disagrees with ITSELF ---------------------------------
@@ -549,6 +549,7 @@ def _plausible_living_sqft(li: Listing) -> float | None:
 SELLER_ASK_SOURCES = {
     "national.landwatch",
     "national.landandfarm",
+    "national.distressed",  # Realtor.com foreclosures/REO — list price is asking price, not auction bid
 }
 
 # Sources where opening_bid is a retail asking price (and therefore a useful
@@ -1337,7 +1338,13 @@ def _arv_signals(li: Listing, refused: list | None = None
     # 2026-08-25: Refuse comp-based ARV when sqft was backfilled FROM a comp —
     # that's circular (pricing the comp, not the subject). Fall through to
     # assessed-value / bid-proxy paths instead.
-    if comps and comp_ppsf and arv_sqft and not sqft_from_comp:
+    # 2026-08-27: Also skip when recorded_ratio_comps has ≥50 sales — county
+    # recorded transactions are more reliable than scraped listings (no
+    # list-vs-sold gap, tighter geography, no luxury-home contamination).
+    # Fall through to Tier 1b which uses that data.
+    ratio_c = raw.get("recorded_ratio_comps") or {}
+    _strong_recorded = int(ratio_c.get("count") or 0) >= 50
+    if comps and comp_ppsf and arv_sqft and not sqft_from_comp and not _strong_recorded:
         # Build the adjusted $/sqft series ONCE and derive both `expected` (median)
         # and low/high (min/max) from it, so the headline ARV can never fall
         # outside its own band (Pass-2 fix: expected used the comp_median_ppsf
@@ -1392,7 +1399,7 @@ def _arv_signals(li: Listing, refused: list | None = None
     # board's li.tax_value is a different, often land-only figure) it is a real
     # market-grounded ARV. It is a proxy, not a like-for-like comp, so it sits
     # BELOW both $/sqft tiers and is never graded HIGH.
-    ratio_c = raw.get("recorded_ratio_comps") or {}
+    # NOTE: ratio_c was already read above (Tier 1 gate) — reuse it here.
     ratio = ratio_c.get("median_ratio")
     basis = ratio_c.get("assessed_basis")
     if ratio and basis and float(basis) > 0 and int(ratio_c.get("count") or 0) >= 3:
@@ -1565,7 +1572,7 @@ def _arv_sanity(li: Listing, out: "Calc", arv_conf: str, arv_flags: list[str],
     # is not measuring the dwelling.
     acres = _acreage_for(li)
     sqft = _plausible_living_sqft(li)
-    if sqft and (acres is None or acres <= PPSF_CEILING_MAX_ACRES):
+    if sqft and (is_land or acres is None or acres <= PPSF_CEILING_MAX_ACRES):
         ceiling = _arv_ppsf_ceiling(li, manufactured)
         implied = out.arv_expected / sqft
         if implied > ceiling:

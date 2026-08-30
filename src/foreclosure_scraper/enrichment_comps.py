@@ -404,6 +404,31 @@ def _pick_3_comps(target: Listing, sold_pool: list[dict]) -> list[dict]:
             pool = city_pool
             match_quality = "city+kind" + ("+geo" if has_geo else "")
 
+    # Stage 2.5: PRICE-BAND filter — reject comps whose sale price is wildly
+    # different from the subject's value. A $2M lakefront luxury home is not
+    # a comp for a $440K property no matter how close the sqft/beds match.
+    # Uses the subject's assessed/market value as anchor; ratio band of 3×
+    # keeps comps in the same value tier while allowing reasonable spread.
+    _anchor_val = None
+    try:
+        _anchor_val = float(target.market_value) if target.market_value else None
+    except (TypeError, ValueError):
+        pass
+    if not _anchor_val:
+        try:
+            _anchor_val = float(target.tax_value) if target.tax_value else None
+        except (TypeError, ValueError):
+            pass
+    if _anchor_val and _anchor_val > 10000 and len(pool) > 3:
+        price_filt = []
+        for s in pool:
+            sp = _num(s.get("sold_price"))
+            if sp and _anchor_val / 3.0 <= sp <= _anchor_val * 3.0:
+                price_filt.append(s)
+        if len(price_filt) >= 3:
+            pool = price_filt
+            match_quality += "+price"
+
     # Stage 3 (LAND ONLY): match by lot acreage band — sqft is meaningless for raw land.
     #
     # This used to read `if lot_filt: pool = lot_filt`, i.e. when NOTHING fell in

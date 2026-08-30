@@ -103,6 +103,22 @@ def _mailing(a: dict) -> str | None:
     return re.sub(r"\s+", " ", out).strip() or None
 
 
+def _owner_mailing(a: dict) -> Any:
+    """owner_mailing for this row, with the TaxpayerNa folded in.
+
+    TaxpayerNa is the name the tax bill is mailed to — often a relative, an LLC,
+    or an heir distinct from OwnerName — and was fetched but never read. When it
+    is present we emit the standard {name, mailing} dict (the shape
+    mailing_shape/enrich_owner_mailing already expect); otherwise the bare
+    mailing string (historical behaviour).
+    """
+    mail = _mailing(a)
+    name = _clean(a.get("TaxpayerNa"))
+    if name:
+        return {"name": name, "mailing": mail} if mail else {"name": name}
+    return mail
+
+
 def _is_absentee(a: dict) -> bool:
     """Owner mails from outside Spartanburg / SC, or from a PO box."""
     city = (a.get("City") or "").strip().upper()
@@ -246,14 +262,17 @@ class SpartanburgVacant(BaseScraper):
                             "vacant": {"source": "spartanburg_city_registry", "condition": cond or None},
                             # scores via distress_score PROPERTY "distressed_condition" (w=8)
                             "distressed": True,
-                            "owner_mailing": _mailing(a),
+                            "owner_mailing": _owner_mailing(a),
                             "absentee": absentee,
                             **({"code_enforcement": True} if poor else {}),
                             "cama_specs": {
                                 k: a.get(v) for k, v in (
                                     ("living_sqft", "LivingArea"), ("year_built", "YearBuilt"),
                                     ("bedrooms", "BedRooms"), ("full_baths", "FullBaths"),
+                                    ("half_baths", "HalfBaths"),
                                     ("condition", "ConditionF"), ("land_use", "LandUse"),
+                                    ("property_type", "PropertyTy"),
+                                    ("last_sale_date", "SaleDate"), ("last_sale_amount", "SaleAmount"),
                                 ) if a.get(v) not in (None, "", 0, "0")
                             },
                         },

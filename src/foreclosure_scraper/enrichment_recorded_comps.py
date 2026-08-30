@@ -14,6 +14,8 @@ the $/sqft path until a CAMA sqft join is wired (Pass-2 follow-up).
 """
 from __future__ import annotations
 
+import asyncio
+import time
 from statistics import median
 from typing import Optional
 
@@ -40,12 +42,20 @@ RECORDED_COMP_CONFIG: dict[tuple[str, str], dict] = {
     ("NC", "Transylvania"): {"price": "SALE_PRICE",      "date": "SALE_DATE",     "date_kind": "yyyymm",   "sqft": "HEATED_SQ_",    "since": "202301"},
     # SC layers carry price+date+geometry but NO heated-sqft on the owner layer.
     # Kept here (sqft=None) so the engine is ready the moment a CAMA sqft join lands.
-    ("SC", "Pickens"):      {"price": "SALEP",           "date": "SALEDT",        "date_kind": "date",     "sqft": None,            "since": "2023-01-01"},
+    ("SC", "Pickens"):      {"price": "SALEP",           "date": "SALEDT",        "date_kind": "date",     "sqft": "CalcArea",      "since": "2023-01-01"},
     ("SC", "Spartanburg"):  {"price": "SaleAmount",      "date": "SaleDate",      "date_kind": "date",     "sqft": None,            "since": "2023-01-01"},
     ("SC", "Laurens"):      {"price": "Sale_Price",      "date": "Sale_Date",     "date_kind": "yyyymmdd", "sqft": None,            "since": "20230101"},
+    # --- 2026-08-19: Added McDowell (has saledate+transfdate+parval+recareano) ---
+    ("NC", "McDowell"):     {"price": "parval",           "date": "saledate",      "date_kind": "date",     "sqft": "recareano",     "since": "2023-01-01"},
+    # --- 2026-08-19: Anderson SC (SALE_PRICE + SALE_YEAR, no sqft yet) ---
+    ("SC", "Anderson"):     {"price": "SALE_PRICE",       "date": "SALE_YEAR",     "date_kind": "year",     "sqft": None,            "since": 2023},
+    # --- 2026-08-19: Carteret NC (SALE_PRICE + SaleDate + HtdSqFt, 114 fields) ---
+    ("NC", "Carteret"):     {"price": "SALE_PRICE",       "date": "SaleDate",      "date_kind": "date",     "sqft": "HtdSqFt",       "since": "2023-01-01"},
 }
 
 _DEFAULT_BUFFER_FT = 5280       # 1 mile
+_BUCKET_DEG = 0.005             # ~500 m coordinate-bucket cache grid
+_COMP_CACHE: dict[tuple, list[dict]] = {}  # (base, bucket_lat, bucket_lon) -> features
 _MIN_ARMS_LENGTH = 10000        # exclude $1 / nominal family transfers
 _MIN_SQFT = 200                 # exclude land / outbuildings
 _PPSF_FLOOR, _PPSF_CEIL = 20.0, 800.0   # drop garbage $/sqft
@@ -86,6 +96,13 @@ def _ppsf_list(features: list[dict], cfg: dict) -> list[float]:
 
 
 async def _query_comps(http, base: str, lat: float, lon: float, cfg: dict) -> list[dict]:
+    # Cache by ~500m coordinate bucket to avoid re-querying the same radius
+    # for listings that share coordinates or sit within the same bucket.
+    bucket_lat = round(lat / _BUCKET_DEG) * _BUCKET_DEG
+    bucket_lon = round(lon / _BUCKET_DEG) * _BUCKET_DEG
+    ckey = (base, bucket_lat, bucket_lon)
+    if ckey in _COMP_CACHE:
+        return _COMP_CACHE[ckey]
     buffer_ft = cfg.get("buffer_ft", _DEFAULT_BUFFER_FT)
     params = {
         "geometry": f"{lon},{lat}", "geometryType": "esriGeometryPoint", "inSR": "4326",
@@ -96,12 +113,16 @@ async def _query_comps(http, base: str, lat: float, lon: float, cfg: dict) -> li
     }
     r = await http.get(base.rstrip("/") + "/query", params=params, timeout=45.0)
     if r.status_code != 200:
+        _COMP_CACHE[ckey] = []
         return []
     j = r.json()
     if "error" in j:
         log.warning("recorded_comps.query_error", msg=str(j["error"].get("message"))[:80])
+        _COMP_CACHE[ckey] = []
         return []
-    return j.get("features", []) or []
+    feats = j.get("features", []) or []
+    _COMP_CACHE[ckey] = feats
+    return feats
 
 
 def _percentile(vals: list[float], p: float) -> float:
@@ -112,7 +133,10 @@ def _percentile(vals: list[float], p: float) -> float:
 
 
 async def enrich(listings: list[Listing]) -> list[Listing]:
-    """Attach recorded-sales comps (median $/sqft from real nearby transactions)."""
+    """Attach recorded-sales comps (median $/sqft from real nearby transactions).
+
+    Parallelized with asyncio.gather + semaphore for concurrency (was sequential,
+    causing 1200s+ timeout on large county groups)."""
     targets = [li for li in listings
                if li.latitude and li.longitude
                and (li.state, li.county) in RECORDED_COMP_CONFIG
@@ -124,6 +148,40 @@ async def enrich(listings: list[Listing]) -> list[Listing]:
     for li in targets:
         by_county.setdefault((li.state, li.county), []).append(li)
     enriched_n = 0
+    sem = asyncio.Semaphore(15)  # 15 concurrent queries per county
+    _BUDGET_S = 1800  # 30-min cap
+    _start = time.monotonic()
+    _budget_skip = 0
+
+    async def _one(http, li: Listing, cfg: dict, base: str, county: str) -> int:
+        nonlocal _budget_skip
+        async with sem:
+            if (time.monotonic() - _start) > _BUDGET_S:
+                _budget_skip += 1
+                return 0
+            try:
+                feats = await _query_comps(http, base, li.latitude, li.longitude, cfg)
+            except Exception:
+                log.warning("recorded_comps.failed", county=county)
+                return 0
+            ppsf = _ppsf_list(feats, cfg)
+            if len(ppsf) < 3:
+                return 0
+            raw = li.raw if isinstance(li.raw, dict) else {}
+            med = round(median(ppsf), 2)
+            raw["recorded_comps"] = {
+                "median_ppsf": med,
+                "count": len(ppsf),
+                "p25_ppsf": _percentile(ppsf, 0.25),
+                "p75_ppsf": _percentile(ppsf, 0.75),
+                "radius_mi": round(cfg.get("buffer_ft", _DEFAULT_BUFFER_FT) / 5280, 1),
+                "confidence": "HIGH" if len(ppsf) >= _MIN_COMPS_HIGH else "MEDIUM",
+                "source": "county_gis_recorded_sales",
+            }
+            raw["comp_median_ppsf_recorded"] = med
+            li.raw = raw
+            return 1
+
     try:
         async with client(timeout=60.0) as http:
             for (state, county), group in by_county.items():
@@ -131,31 +189,22 @@ async def enrich(listings: list[Listing]) -> list[Listing]:
                 base = COUNTY_GIS.get(f"{state}:{county}", {}).get("url")
                 if not base:
                     continue
-                for li in group:
-                    try:
-                        feats = await _query_comps(http, base, li.latitude, li.longitude, cfg)
-                    except Exception:
-                        log.warning("recorded_comps.failed", county=county)
-                        continue
-                    ppsf = _ppsf_list(feats, cfg)
-                    if len(ppsf) < 3:
-                        continue
-                    raw = li.raw if isinstance(li.raw, dict) else {}
-                    med = round(median(ppsf), 2)
-                    raw["recorded_comps"] = {
-                        "median_ppsf": med,
-                        "count": len(ppsf),
-                        "p25_ppsf": _percentile(ppsf, 0.25),
-                        "p75_ppsf": _percentile(ppsf, 0.75),
-                        "radius_mi": round(cfg.get("buffer_ft", _DEFAULT_BUFFER_FT) / 5280, 1),
-                        "confidence": "HIGH" if len(ppsf) >= _MIN_COMPS_HIGH else "MEDIUM",
-                        "source": "county_gis_recorded_sales",
-                    }
-                    raw["comp_median_ppsf_recorded"] = med
-                    li.raw = raw
-                    enriched_n += 1
+                results = await asyncio.gather(
+                    *(_one(http, li, cfg, base, county) for li in group),
+                    return_exceptions=True,
+                )
+                for r in results:
+                    if isinstance(r, int):
+                        enriched_n += r
     except Exception:
         log.warning("recorded_comps.enrich_aborted")
         return listings
-    log.info("recorded_comps.done", enriched=enriched_n, candidates=len(targets))
+    elapsed = time.monotonic() - _start
+    if _budget_skip > 0:
+        log.warning("recorded_comps.time_capped",
+                    budget_s=_BUDGET_S, elapsed=round(elapsed, 1),
+                    budget_skip=_budget_skip, enriched=enriched_n, candidates=len(targets))
+    else:
+        log.info("recorded_comps.done", enriched=enriched_n, candidates=len(targets),
+                 elapsed=round(elapsed, 1), cache_size=len(_COMP_CACHE))
     return listings

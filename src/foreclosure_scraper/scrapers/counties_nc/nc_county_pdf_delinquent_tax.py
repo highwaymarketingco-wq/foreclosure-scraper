@@ -38,14 +38,17 @@ COUNTIES: dict[str, dict] = {
     "Lincoln": {
         "url": "https://www.lincolncountync.gov/DocumentCenter/View/25558/2025-TAXESDelinquentAdvertisementNotice",
         "layout": "name_id_amt", "id_digits": (4, 6), "id_is_parcel": True,
+        "tax_year": 2025,
     },
     "Catawba": {
         "url": "https://www.catawbacountync.gov/site/assets/files/11653/delinquent_advertisement_list-hdr_2026.pdf",
         "layout": "name_id_amt", "id_digits": (1, 7), "id_is_parcel": False,  # ID = account #, not GIS PIN
+        "tax_year": 2025,
     },
     "McDowell": {
         "url": "https://mcdowellnc.gov/departments/tax-collections/tax-lien-advertisement/ADVERTISEMENT-LIST-FINAL-2025.pdf",
         "layout": "parcel_amt_owner", "id_is_parcel": True,
+        "tax_year": 2025,
     },
 }
 
@@ -126,6 +129,7 @@ def _to_listing(owner, ident, amt, county, cfg) -> Listing:
                 "county_id": ident,      # PIN (Lincoln/McDowell) or account # (Catawba)
                 "id_is_parcel": cfg.get("id_is_parcel", False),
                 "principal_tax_due": round(amt, 2),  # OWED, not value
+                "tax_year": cfg.get("tax_year"),
                 "owner": owner,
             }
         },

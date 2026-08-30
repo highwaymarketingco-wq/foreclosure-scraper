@@ -39,7 +39,12 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
-_HOST = "https://www.spartanweeklyonline.com"
+# NOTE: www.spartanweeklyonline.com is DEAD as of 2026-08-24 — domain returns
+# 404 for all pages, no replacement found. The scraper will fail gracefully
+# (get_text returns empty / raises) and produce 0 listings until a new host
+# is identified.  Do NOT remove the module — the parsing logic is sound and
+# will work again once a replacement publisher is found.
+_HOST = "https://www.spartanweeklyonline.com"  # DEAD — kept for reference
 _LIST = _HOST + "/legal-notices/?page={page}"
 _MAX_PAGES = 40          # safety cap; loop also stops when a page adds nothing new
 _ENRICH_DETAILS = True   # follow each notice to its detail page for the body text
@@ -71,6 +76,22 @@ _VS_RE = re.compile(
 _ESTATE_RE = re.compile(
     r"(?:estate of|in re:?|decedent:?)\s+([A-Z][A-Za-z .,'-]{3,70}?)"
     r"(?:,|\s+deceased|\s+date of death|\s*\()",
+    re.I,
+)
+# Caption plaintiff. SC master's-sale notices read "...in the case of PLAINTIFF
+# v. DEFENDANT..." or "PLAINTIFF, Plaintiff(s), vs. DEFENDANT, Defendant(s)".
+# Primary anchors on "case/matter/action of ... v."; fallback on the ", Plaintiff"
+# label. Both best-effort — only set when matched.
+_PLAINTIFF_RE = re.compile(
+    r"\b(?:case|matter|action)\s+of\s+"
+    r"([A-Z][A-Za-z0-9 .,'&#/()\-]{3,150}?)"
+    r"\s+(?:vs?\.?|against)\s+[A-Z]",
+    re.I,
+)
+_PLAINTIFF_KW_RE = re.compile(
+    r"(?:^|[.;]\s+|\bof\s+)"
+    r"([A-Z][A-Za-z0-9 .,'&#/()\-]{3,150}?)"
+    r"\s*,?\s+Plaintiff[s]?\b",
     re.I,
 )
 _SALE_RE = re.compile(r"\b(master'?s sale|notice of sale|will be sold|will sell|public auction|sold to the highest)\b", re.I)
@@ -115,6 +136,34 @@ def _classify(notice_type: str) -> tuple[ListingType, str]:
 def _defendant(body: str, kind: str) -> str | None:
     m = _ESTATE_RE.search(body) if kind == "probate" else _VS_RE.search(body)
     return _clean(m.group(1)) if m else None
+
+
+def _plaintiff(body: str) -> str | None:
+    """Caption plaintiff from a foreclosure sale-notice body, best-effort."""
+    m = _PLAINTIFF_RE.search(body) or _PLAINTIFF_KW_RE.search(body)
+    return _clean(m.group(1)) if m else None
+
+
+def _parse_notice_date(s: str | None) -> datetime | None:
+    """A 'Month D, YYYY' notice-date string -> datetime (None on failure)."""
+    if not s:
+        return None
+    t = re.sub(r"\s+", " ", s.replace(",", " ")).strip()
+    try:
+        return datetime.strptime(t, "%B %d %Y")
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_amount(s: str | None) -> float | None:
+    """A '$453,617.57' amount string -> float (None on failure / zero)."""
+    if not s:
+        return None
+    digits = re.sub(r"[^\d.]", "", s)
+    try:
+        return float(digits) or None
+    except (ValueError, TypeError):
+        return None
 
 
 class SpartanWeeklyLegals(BaseScraper):
@@ -191,6 +240,9 @@ class SpartanWeeklyLegals(BaseScraper):
         source_url = _HOST + row["href"]
 
         body, defendant, sale_date, amount = "", None, None, None
+        sale_date_dt = None
+        judgment_amount = None
+        plaintiff = None
         probate = None
         es_case = None
         if enrich:
@@ -205,6 +257,12 @@ class SpartanWeeklyLegals(BaseScraper):
                         sale_date = sm.group(1) if sm else None
                         am = _AMOUNT_RE.search(body)
                         amount = am.group(0) if am else None
+                        # Promote the parsed strings to first-class fields (were
+                        # dropped into raw-only before): sale_date -> datetime,
+                        # amount -> judgment_amount, plus the caption plaintiff.
+                        sale_date_dt = _parse_notice_date(sale_date)
+                        judgment_amount = _parse_amount(amount)
+                        plaintiff = _plaintiff(body)
                     if kind == "probate":
                         em = _PROBATE_ESTATE.search(body)
                         decedent = _clean(em.group(1)) if em else defendant
@@ -250,6 +308,9 @@ class SpartanWeeklyLegals(BaseScraper):
             listing_type=lt, property_kind=PropertyKind.UNKNOWN,
             state="SC", county="Spartanburg",
             defendant=defendant,
+            plaintiff=plaintiff,
+            sale_date=sale_date_dt,
+            judgment_amount=judgment_amount,
             street_address=address or None,
             case_number=(es_case or (case_m.group(1) if case_m else None)),
             description=(f"{row['type'].strip()}"

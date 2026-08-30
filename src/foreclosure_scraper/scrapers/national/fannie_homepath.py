@@ -16,6 +16,7 @@ bbox overlaps; the post-fetch state filter drops them.
 """
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Iterable
 
@@ -38,12 +39,37 @@ HEADERS = {
 }
 
 # (state, lat_sw, lng_sw, lat_ne, lng_ne) — bbox boundaries for our 2-state scope.
-# Numbers picked to fully cover NC/SC with minimal overlap into neighbors;
-# filtering happens by state code on each row regardless.
+# Fannie's API caps at 400 properties per request. A single NC+SC bbox returns
+# ~400 but totalProperties is 26,955 nationwide. We subdivide each state into
+# a grid of smaller bboxes so we stay under the 400-per-request ceiling and
+# capture every listing. Grid cells are ~0.7 degrees (~50mi) which yields
+# 10-80 properties per cell in NC/SC density.
 BBOXES = (
     ("NC", 33.75, -84.50, 36.60, -75.30),
     ("SC", 32.00, -83.40, 35.25, -78.50),
 )
+
+# Grid subdivision: split each state bbox into NxM cells to stay under the
+# 400-per-request API cap. Tuned so no cell in NC/SC exceeds ~200 results.
+_GRID_ROWS = 4
+_GRID_COLS = 4
+
+
+def _subdivide(sw_lat: float, sw_lng: float, ne_lat: float, ne_lng: float,
+               rows: int = _GRID_ROWS, cols: int = _GRID_COLS) -> list[tuple[float, float, float, float]]:
+    """Split a bbox into a rows x cols grid of smaller bboxes."""
+    dlat = (ne_lat - sw_lat) / rows
+    dlng = (ne_lng - sw_lng) / cols
+    cells: list[tuple[float, float, float, float]] = []
+    for r in range(rows):
+        for c in range(cols):
+            cells.append((
+                sw_lat + r * dlat,
+                sw_lng + c * dlng,
+                sw_lat + (r + 1) * dlat,
+                sw_lng + (c + 1) * dlng,
+            ))
+    return cells
 
 
 _PROP_KIND_MAP = {
@@ -157,16 +183,22 @@ class FannieHomePath(BaseScraper):
         out: list[Listing] = []
         seen: set[str] = set()
         for state, sw_lat, sw_lng, ne_lat, ne_lng in BBOXES:
-            try:
-                rows = await _fetch_bbox(state, sw_lat, sw_lng, ne_lat, ne_lng, self.slug)
-            except Exception as exc:
-                log.warning("fannie_homepath.state_failed", state=state, error=str(exc)[:200])
-                continue
-            for li in rows:
-                if li.case_number and li.case_number in seen:
+            cells = _subdivide(sw_lat, sw_lng, ne_lat, ne_lng)
+            tasks = [
+                _fetch_bbox(state, c[0], c[1], c[2], c[3], self.slug)
+                for c in cells
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    log.warning("fannie_homepath.cell_failed", state=state,
+                                cell=i, error=str(result)[:200])
                     continue
-                if li.case_number:
-                    seen.add(li.case_number)
-                out.append(li)
-        log.info("fannie_homepath.done", total=len(out))
+                for li in result:
+                    if li.case_number and li.case_number in seen:
+                        continue
+                    if li.case_number:
+                        seen.add(li.case_number)
+                    out.append(li)
+        log.info("fannie_homepath.done", total=len(out), cells=len(BBOXES) * _GRID_ROWS * _GRID_COLS)
         return out

@@ -338,6 +338,10 @@ class CourtListenerAdversary(BaseScraper):
                             "date_filed": date_filed,
                             "suit_nature": res.get("suitNature"),
                             "party": res.get("party"),
+                            "trustee": res.get("trustee_str") or None,  # §363 seller
+                            "attorney": res.get("attorney") or res.get("attorney_str") or None,
+                            "firm": res.get("firm") or res.get("firm_str") or None,
+                            "date_terminated": res.get("dateTerminated"),
                             "docket_id": res.get("docket_id"),
                             "docket_absolute_url": abs_url,
                             "recap_documents": rd_refs,
