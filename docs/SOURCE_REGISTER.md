@@ -227,6 +227,7 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `national.probate_foreclosure_leads` | _(no literal URL in module)_ |
 | `national.propwire` | _(no literal URL in module)_ |
 | `national.sc_sos_entity` | `https://businessfilings.sc.gov/BusinessFiling/Web/Reporting/SearchByName`<br>`https://businessfilings.sc.gov{href` |
+| `national.stealth_handoff` | _(internal, no external URL)_ reads `docs/handoff/stealth_leads.json` — the Mac→VM cloud-split hand-off (see `deploy/oracle/README.md`); leads keep their original source. |
 | `national.seeclickfix` | `https://developer.seeclickfix.com/`<br>`https://seeclickfix.com/api/v2/issues` |
 | `national.usda_properties` | `https://usdaproperties.com/property/`<br>`https://www.usdaproperties.com/property/sc/county/`<br>_+2 more_ |
 | `national.usmarshals_realproperty` | `https://www.usmarshals.gov/what-we-do/asset-forfeiture/real-property`<br>`https://www.usmarshals.gov/what-we-do/asset-forfeiture/real-property/`<br>_+1 more_ |

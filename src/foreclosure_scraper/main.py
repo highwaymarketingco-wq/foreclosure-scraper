@@ -520,6 +520,7 @@ DATELESS_OK_SOURCES = {
     "national.hud_reac_inspection",               # HUD REAC failing-inspection multifamily (no sale date)
     "national.hud_section8_contracts",            # HUD Section-8 contract-expiry multifamily (no sale date)
     "counties_nc.rutherford_tax",                 # NC tax-foreclosure (dateless in-rem/upset rows) — leak fix
+    "counties_nc.rutherford_foreclosure",         # Rutherford in-office + Kania tax-foreclosure docket (soft/upset dates)
     "counties_nc.nc_county_tax_foreclosure",      # NC Gaston/McDowell/Rutherford tax-foreclosure + upset-bid
     "counties_nc.nc_coastal_tax_foreclosure",     # NEW coastal NC (Brunswick/Onslow/Carteret) tax-foreclosure
     "newspapers.post_and_courier",                # Charleston legal notices (pre-auction, no sale date)
@@ -764,6 +765,35 @@ async def run() -> int:
         _keep = [k.strip() for k in _only.split(",") if k.strip()]
         scrapers = [s for s in scrapers if any(k in s.slug for k in _keep)]
         log.info("orchestrator.filtered", only=_keep, kept=len(scrapers))
+
+    # FORECLOSURE_SKIP_SOURCES=substr,substr — the mirror of ONLY: drop any slug
+    # matching one of these substrings.
+    _skip = os.environ.get("FORECLOSURE_SKIP_SOURCES")
+    if _skip:
+        _drop = [k.strip() for k in _skip.split(",") if k.strip()]
+        _before = len(scrapers)
+        scrapers = [s for s in scrapers if not any(k in s.slug for k in _drop)]
+        log.info("orchestrator.skip_filtered", skip=_drop,
+                 dropped=_before - len(scrapers), kept=len(scrapers))
+
+    # FORECLOSURE_ROLE — cloud-split shorthand (source_split.py is the source of
+    # truth for which sources are residential-IP-only):
+    #   vm  = datacenter host — drop the residential stealth scrapers; the Mac
+    #         runs those and feeds their leads back via national.stealth_handoff.
+    #   mac = residential host — keep ONLY the stealth scrapers.
+    #   all/unset = normal single-host run (everything).
+    _role = (os.environ.get("FORECLOSURE_ROLE") or "all").strip().lower()
+    if _role in ("vm", "mac"):
+        from .source_split import residential_slugs
+        _res = residential_slugs()
+        _before = len(scrapers)
+        if _role == "vm":
+            scrapers = [s for s in scrapers if s.slug not in _res]
+        else:  # mac
+            scrapers = [s for s in scrapers if s.slug in _res]
+        log.info("orchestrator.role_filtered", role=_role,
+                 kept=len(scrapers), was=_before)
+
     log.info("orchestrator.start", scrapers=len(scrapers))
 
     sem = asyncio.Semaphore(cfg.parallel_scrapers)
