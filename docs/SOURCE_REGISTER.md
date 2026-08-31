@@ -117,6 +117,9 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | Slug | URLs in the module |
 |---|---|
 | `counties_nc.gaston_vacant` | `https://gis.gastoncountync.gov/publicgis/rest/services/PublicGIS/Parcels/MapServer/11/query` _(2026-08-30 build: 21,288 vacant parcels + owner/mailing/value/sqft/sale)_ |
+| `counties_nc.rutherford_foreclosure` | `https://www.rutherfordcountync.gov/` _(2026-08-30 build: NEW foreclosure feed, board had 0% — 20 rows)_ |
+| `counties_nc.mcdowell_tax_foreclosure` | `https://mcdowellnc.gov/departments/tax-collections/tax-foreclosures/upcoming-tax-foreclosure-sales` _(read_html upset+pending)_ |
+| `counties_nc.cleveland_tax_foreclosure` | `https://www.clevelandcounty.com/main/departments/` _(county tax-foreclosure HTML table — 14 rows)_ |
 | `counties_nc.lincoln_vacant` | `https://arcgisserver.lincolncounty.org/arcgis/rest/services/ComDevData/MapServer/25/query` _(14,798 vacant; expired-cert host, verify=False)_ |
 | `counties_nc.transylvania_vacant` | `https://gis.transylvaniacounty.org/server/rest/services/Parcels/FeatureServer/2/query` _(11,131 vacant-land)_ |
 | `counties_nc.transylvania_delinquent_tax` | `https://tax.transylvaniacounty.org/TaxBillSearch` _(443 unpaid, 3-step JSON cookie chain)_ |

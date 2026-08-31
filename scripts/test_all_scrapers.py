@@ -25,7 +25,7 @@ async def _collect_fetch(s):
     return list(awaited) if awaited else []
 
 
-async def test_one(s, timeout_s=30):
+async def _probe_one(s, timeout_s=30):
     slug = getattr(s, "source", type(s).__name__)
     try:
         listings = await asyncio.wait_for(_collect_fetch(s), timeout=timeout_s)
@@ -44,7 +44,7 @@ async def main():
     results = []
     for i, s in enumerate(scrapers):
         slug = getattr(s, "source", type(s).__name__)
-        r = await test_one(s)
+        r = await _probe_one(s)
         results.append(r)
         status = "OK" if r["count"] > 0 else ("ERR" if r["error"] else "ZERO")
         if status == "OK":
