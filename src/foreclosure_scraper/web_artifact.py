@@ -394,6 +394,29 @@ RAW_KEEP = {
     # match and then stripped here because it was never whitelisted: 621
     # matches on the 2026-08-04 run, ZERO of them on the published board.
     "court_record": "*",
+    # 2026-08-30 gap-audit fix: enrichment_case_detail._apply_court_detail writes
+    # these 11 court_* keys (SC PublicIndex + NC eCourts case-detail: judgment $,
+    # parties, costs, docket) and they were NEVER whitelisted — parsed on every
+    # run, stripped at publish. Same class of bug as court_record above.
+    "court_case_number": "*",
+    "court_case_caption": "*",
+    "court_parties": "*",
+    "court_judgment": "*",            # the money figure — parties owe $X
+    "court_judgment_details": "*",
+    "court_docket": "*",
+    "court_summary": "*",
+    "court_costs": "*",
+    "court_payments": "*",
+    "court_property": "*",
+    "court_associated_cases": "*",
+    # Also stripped-but-fetched (2026-08-30): real tax status/balance, tax relief,
+    # jail-booking DOB+charges, multifamily + FEMA signals, ACPASS resolution.
+    "tax_status": "*",                # paid_through / actual balance from GIS/qPayBill
+    "tax_relief": "*",                # deferral / exemption (York HOMESTEAD, Anderson AG-rollback)
+    "jail_booking": "*",             # net-new owner DOB + charges (contactability)
+    "mf_signal": "*",                 # multifamily classification
+    "fema_disaster": "*",             # FEMA declared-disaster overlay
+    "acpass_resolved": "*",           # Anderson ACPASS owner/parcel resolution
     # County sales roll: the parcel's own sale history (date/price/sqft/
     # arms-length flag) plus the fields it backfills. comps sat at 0% on the
     # 2026-08-03 board; forgetting to whitelist this would gather them and

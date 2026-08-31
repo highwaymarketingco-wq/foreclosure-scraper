@@ -376,6 +376,13 @@ def _coastal_county_source(li: Listing) -> bool:
 # inventory, not historical events. For everything else (court rosters, law-firm
 # trustee calendars, tax-sale lists, public notices) we require a parseable date.
 DATELESS_OK_SOURCES = {
+    # 2026-08-30 new county sources (dateless: vacant / tax-delinquent / probate —
+    # no sale_date, so they must be whitelisted or _active_only drops every row).
+    "counties_nc.gaston_vacant",
+    "counties_nc.lincoln_vacant",
+    "counties_nc.transylvania_vacant",
+    "counties_nc.transylvania_delinquent_tax",
+    "counties_nc.mcdowell_probate",
     "national.hud_homestore",
     "national.fannie_homepath",
     "national.freddie_homesteps",

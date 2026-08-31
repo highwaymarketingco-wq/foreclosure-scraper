@@ -116,6 +116,11 @@ Registered and importable, contributing nothing to the board read above. A zero 
 
 | Slug | URLs in the module |
 |---|---|
+| `counties_nc.gaston_vacant` | `https://gis.gastoncountync.gov/publicgis/rest/services/PublicGIS/Parcels/MapServer/11/query` _(2026-08-30 build: 21,288 vacant parcels + owner/mailing/value/sqft/sale)_ |
+| `counties_nc.lincoln_vacant` | `https://arcgisserver.lincolncounty.org/arcgis/rest/services/ComDevData/MapServer/25/query` _(14,798 vacant; expired-cert host, verify=False)_ |
+| `counties_nc.transylvania_vacant` | `https://gis.transylvaniacounty.org/server/rest/services/Parcels/FeatureServer/2/query` _(11,131 vacant-land)_ |
+| `counties_nc.transylvania_delinquent_tax` | `https://tax.transylvaniacounty.org/TaxBillSearch` _(443 unpaid, 3-step JSON cookie chain)_ |
+| `counties_nc.mcdowell_probate` | `https://services9.arcgis.com/ETP7IuCigkUz7iI9/arcgis/rest/services/McDowell_Parcels/FeatureServer/0/query` _(414 deceased-owner probate/heir leads)_ |
 | `city_websites.asheville_min_housing` | `https://www.ashevillenc.gov/department/development-services/minimum-housing/` |
 | `city_websites.charlotte_open_data` | `https://data.charlottenc.gov/resource/c6er-5c2c.json`<br>`https://data.charlottenc.gov/resource/6jx5-894j.json`<br>_+1 more_ |
 | `city_websites.search` | `https://{domain` |
