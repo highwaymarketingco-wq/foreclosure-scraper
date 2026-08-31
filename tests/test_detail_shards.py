@@ -346,6 +346,11 @@ def test_stale_shards_from_a_larger_board_are_purged(tmp_path, monkeypatch):
     write_artifact([_lead(i) for i in range(9)], {"notes": "t"}, docs_dir=tmp_path)
     assert len(list((tmp_path / DETAIL_SHARD_DIR).glob("*.json.gz"))) == 5
 
+    # Shrinking the board 9 -> 3 is the whole point of this test, but it trips
+    # web_artifact's count-shrink guard (>10% drop over the high-water mark).
+    # Opt in to the deliberate shrink so the shard-purge behavior under test can
+    # actually run; the guard itself is exercised by the count-guard tests.
+    monkeypatch.setenv("BOARD_ALLOW_SHRINK", "1")
     write_artifact([_lead(i) for i in range(3)], {"notes": "t"}, docs_dir=tmp_path)
     names = sorted(p.name for p in (tmp_path / DETAIL_SHARD_DIR).iterdir())
     assert names == ["00000.json.gz", "00001.json.gz"]

@@ -174,12 +174,22 @@ def test_prior_only_terminal_sold_confirmed_dropped(tmp_path):
     assert stats["aged_out_terminal"] == 1
 
 
-def test_prior_only_terminal_sale_past_upset_window_dropped(tmp_path):
+def test_prior_only_terminal_sale_past_upset_window_dropped(tmp_path, monkeypatch):
+    # NOTE: the module DEFAULT for FULLRUN_PERSIST_TERMINAL_GRACE_DAYS is now 365
+    # (Hermes bumped it from 45 to avoid dropping ~47K records) — that is a pending
+    # product decision that contradicts the module's own drop-after-the-10-day-
+    # upset-window comment. This test pins the drop-at-45 behavior deterministically
+    # by forcing the grace window to 45, regardless of whatever the default is.
+    import foreclosure_scraper.board_persist as bp
+
+    monkeypatch.setenv("FULLRUN_PERSIST_TERMINAL_GRACE_DAYS", "45")
+    monkeypatch.setattr(bp, "TERMINAL_SALE_GRACE_DAYS", 45)
+
     prior = [
         _li(
             street_address="11 Walnut St",
             zip_code="28801",
-            sale_date=NOW - timedelta(days=90),  # well past the upset window
+            sale_date=NOW - timedelta(days=90),  # 90d > 45d grace => past upset window
         )
     ]
     _write_board(tmp_path, prior)

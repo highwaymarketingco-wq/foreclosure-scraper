@@ -78,8 +78,8 @@ def enrich_strategy_fit(listings: Iterable[Listing]) -> dict:
         low_equity = eq is not None and eq < 0.20
 
         if is_land and (tax_owed or long_tenure or probate or has_distress):
-            tags.append("LAND")
-            reasons["LAND"] = "vacant land + " + (
+            tags.append("LAND_WHOLESALE")
+            reasons["LAND_WHOLESALE"] = "vacant land + " + (
                 "delinquent tax" if tax_owed else "long-held (equity)" if long_tenure else
                 "probate/estate" if probate else "distress signal")
 

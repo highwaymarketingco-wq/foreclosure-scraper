@@ -387,7 +387,7 @@ def test_payload_add_stages_the_whole_payload(tmp_path):
     )
 
 
-def test_payload_stash_survives_a_hard_reset(tmp_path):
+def test_payload_stash_survives_a_hard_reset(tmp_path, monkeypatch):
     """The workflows `git reset --hard origin/main` to rebase their output onto
     whatever landed during the run. That destroys every tracked payload file;
     the old cp/mv preserved exactly the two files it (wrongly) staged."""
@@ -406,7 +406,12 @@ def test_payload_stash_survives_a_hard_reset(tmp_path):
     subprocess.run(["/bin/sh", "-c",
                     f'. "{PAYLOAD_SH}"; board_payload_stash "$1" "$2"',
                     "sh", str(root), str(tar)], check=True)
+    # The clobber deliberately shrinks the board 3 -> 1 to prove the stash
+    # survives a destructive overwrite. That shrink now trips the count guard,
+    # so opt in exactly as a real caller with an intentional shrink would.
+    monkeypatch.setenv("BOARD_ALLOW_SHRINK", "1")
     write_artifact([_lead(0)], {"notes": "clobbered"}, docs_dir=root / "docs")
+    monkeypatch.delenv("BOARD_ALLOW_SHRINK", raising=False)
     assert (root / "docs" / "listings.json.gz").read_bytes() != before
     subprocess.run(["/bin/sh", "-c",
                     f'. "{PAYLOAD_SH}"; board_payload_unstash "$1" "$2"',

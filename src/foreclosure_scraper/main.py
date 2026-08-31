@@ -320,8 +320,9 @@ SCOPE_BYPASS_SOURCES = {
     "national.courtlistener_bankruptcy",
     "national.courtlistener_civil",
     "national.courtlistener_adversary",
-    "counties_generic.liensnc",  # State-wide builder/investor distress signal (mechanic's liens)
-    "liensnc",  # same source, bare name used by ingest_all.py — both forms must match
+    # (liensnc bypass removed 2026-08-30: NC liensnc is already handled by the
+    # state-guarded early-return above (~L278); the un-guarded set entries let
+    # county-less non-NC liensnc rows leak in. Guarded handler preserves NC.)
 }
 
 #: Coastal foreclosure sources whose COUNTY is the whole point of the lead. They

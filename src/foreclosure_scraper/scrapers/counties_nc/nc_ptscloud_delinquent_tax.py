@@ -277,6 +277,11 @@ class NCPtsCloudDelinquentTax(BaseScraper):
     name = "NC PTS Cloud Delinquent Tax Roll (Farragut bcpwa cluster, ~17 NC tenants)"
     category = "county_tax"
     expected_min_count = 0  # depends on which tenants have a live export
+    # 2026-08-30 fix: the ~17 tenants download SEQUENTIALLY, so the 180s BaseScraper
+    # default soft-timeout killed the loop after ~1 tenant (1,155 rows of ~21,506 —
+    # the single biggest lead-loss in the system). Give the sequential CSV pulls
+    # room to finish; this is the largest source, so it earns a generous budget.
+    timeout_s = 1200.0
 
     async def fetch(self) -> Iterable[Listing]:
         if os.environ.get("FORECLOSURE_NC_PTSCLOUD") == "0":

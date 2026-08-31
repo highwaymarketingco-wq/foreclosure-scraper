@@ -8,7 +8,7 @@ sys.path.insert(0, '.venv/lib/python3.12/site-packages')
 
 from foreclosure_scraper.render import fetch_rendered
 
-async def test():
+async def main():
     url = 'https://www.truepeoplesearch.com/results?name=John+Smith&city=Spartanburg&state=SC'
     html = await fetch_rendered(url)
     if html:
@@ -25,4 +25,4 @@ async def test():
     else:
         print('No HTML returned')
 
-asyncio.run(test())
+asyncio.run(main())

@@ -295,8 +295,13 @@ def test_five_hundred_raises_source_down_instead_of_looping():
 
 # --- calculator tier --------------------------------------------------------
 def test_ratio_tier_prices_improved_lead_and_is_capped_medium():
+    # tax_value sits high enough that the calibrated ARV lands inside the 2.5x
+    # soft anchor band (was 100k, which put ARV at 2.59x assessed and tripped the
+    # tightened SOFT downgrade to LOW). The ratio tier still prices off the COUNTY
+    # basis (200k), not li.tax_value, so the lead-improvement + MEDIUM cap remain
+    # the point of the test.
     li = _li(state="NC", county="Buncombe", property_kind=PropertyKind.SINGLE_FAMILY,
-             tax_value=100000.0,
+             tax_value=150000.0,
              raw={"recorded_ratio_comps": {"median_ratio": 1.45, "p25_ratio": 1.30,
                                            "p75_ratio": 1.62, "count": 40,
                                            "assessed_basis": 200000.0,
@@ -308,7 +313,8 @@ def test_ratio_tier_prices_improved_lead_and_is_capped_medium():
     # and it survives to the calculator (Buncombe's ×0.89 county calibration applies)
     c = calc.compute(li)
     assert any("sale-to-assessed" in n for n in c.notes)
-    assert c.arv_confidence == "MEDIUM"
+    assert c.arv_vs_assessed < calc.ARV_ANCHOR_SOFT_MULT_IMPROVED  # inside the 2.5x soft band
+    assert c.arv_confidence == "MEDIUM"      # so the MEDIUM ratio cap is NOT soft-downgraded
 
 
 def test_sqft_recorded_comps_still_outrank_the_ratio_tier():

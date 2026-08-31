@@ -20,33 +20,72 @@ def _nc(case: str, **kw) -> Listing:
                    state="NC", county="Gaston", case_number=case, **kw)
 
 
-# ---- SC per-case render breaker -------------------------------------------------
-
-def test_sc_breaker_trips_on_consecutive_failures(monkeypatch):
-    monkeypatch.setattr(ec, "_COURT_BREAKER_FAILS", 12)
-    calls = {"n": 0}
-
-    async def boom(url, token=None, raise_on_http_failure=False):
-        calls["n"] += 1
-        raise RuntimeError("render hung")
-
-    monkeypatch.setattr(ec, "fetch_rendered", boom)
-    asyncio.run(ec.enrich_with_court_records([_sc(i) for i in range(80)]))
-    assert calls["n"] <= 20, f"breaker did not trip: {calls['n']}"
+# ---- SC bulk county-scrape enrichment ------------------------------------------
+# The per-case render + stall-breaker path was intentionally removed: SC case
+# DETAIL pages are WAF-walled, so enrich now runs the search-page scraper ONCE
+# per county (_scrape_county) and backfills every SC listing from that grid.
+# No per-case fetch_rendered, no breaker.
 
 
-def test_sc_no_trip_when_healthy(monkeypatch):
-    monkeypatch.setattr(ec, "_COURT_BREAKER_FAILS", 12)
-    calls = {"n": 0}
+async def _fake_no_sleep(*a, **k):
+    return None
 
-    async def ok(url, token=None, raise_on_http_failure=False):
-        calls["n"] += 1
-        return ""  # returned render, no match — healthy, must process all
 
-    monkeypatch.setattr(ec, "fetch_rendered", ok)
-    monkeypatch.setattr(ec, "_apply_court_text", lambda li, content: 0)
-    asyncio.run(ec.enrich_with_court_records([_sc(i) for i in range(40)]))
-    assert calls["n"] == 40
+def test_sc_bulk_scrapes_once_per_county_not_per_case(monkeypatch):
+    """40 SC cases in one county => exactly ONE county scrape (bulk), and the
+    removed per-case renderer must never be touched."""
+    from foreclosure_scraper.scrapers.counties_sc import sc_public_index as scpi
+
+    calls = {"counties": [], "render": 0}
+
+    async def fake_scrape(county):
+        calls["counties"].append(county)
+        # one search returns the whole grid for the county
+        return [
+            Listing(source="scpi", source_url="u",
+                    listing_type=ListingType.FORECLOSURE_SALE,
+                    state="SC", county="Spartanburg",
+                    case_number=f"2026CP{i:06d}",
+                    plaintiff="Acme Bank", defendant=f"Debtor {i}")
+            for i in range(40)
+        ]
+
+    async def boom_render(*a, **k):
+        calls["render"] += 1
+        raise AssertionError("bulk SC path must not render per case")
+
+    monkeypatch.setattr(scpi, "_scrape_county", fake_scrape)
+    monkeypatch.setattr(ec, "fetch_rendered", boom_render)
+    monkeypatch.setattr(ec.asyncio, "sleep", _fake_no_sleep)
+
+    targets = [_sc(i) for i in range(40)]
+    asyncio.run(ec.enrich_with_court_records(targets))
+
+    assert calls["counties"] == ["Spartanburg"]  # bulk: one scrape, all 40 cases
+    assert calls["render"] == 0                  # per-case render/breaker path gone
+    assert all(li.plaintiff == "Acme Bank" for li in targets)  # empty fields backfilled
+    assert targets[7].defendant == "Debtor 7"
+
+
+def test_sc_bulk_does_not_overwrite_existing(monkeypatch):
+    """Backfill fills EMPTY fields only — never clobbers a parsed name."""
+    from foreclosure_scraper.scrapers.counties_sc import sc_public_index as scpi
+
+    async def fake_scrape(county):
+        return [Listing(source="scpi", source_url="u",
+                        listing_type=ListingType.FORECLOSURE_SALE,
+                        state="SC", county="Spartanburg",
+                        case_number="2026CP000001",
+                        plaintiff="Grid Bank", defendant="Grid Debtor")]
+
+    monkeypatch.setattr(scpi, "_scrape_county", fake_scrape)
+    monkeypatch.setattr(ec.asyncio, "sleep", _fake_no_sleep)
+
+    li = _sc(1)
+    li.plaintiff = "Original Plaintiff"
+    asyncio.run(ec.enrich_with_court_records([li]))
+    assert li.plaintiff == "Original Plaintiff"  # preserved, not clobbered
+    assert li.defendant == "Grid Debtor"         # empty field still backfilled
 
 
 # ---- NC batch-search path ------------------------------------------------------

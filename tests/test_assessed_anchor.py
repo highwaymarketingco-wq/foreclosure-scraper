@@ -16,11 +16,16 @@ def _comp_listing(living_sqft, ppsf, tax_value):
 
 
 def test_comp_arv_far_above_assessment_downgrades():
-    # ARV = 200 * 1500 = 300k vs 80k appraisal -> 3.75x -> flagged, HIGH->MEDIUM
+    # ARV = 200 * 1500 = 300k vs 80k appraisal -> 3.75x. With the tightened anchor
+    # caps (SOFT 2.5x / HARD 3.5x for improved), 3.75x is past the HARD limit, so
+    # the ARV is now WITHHELD entirely rather than kept at MEDIUM -- the intended
+    # safer behavior after the $1M ARV-hallucination fix. The comp-vs-appraisal
+    # cross-check still fires and the withheld figure is preserved for transparency.
     c = calc.compute(_comp_listing(1500, 200, 80000))
-    assert c.arv_expected == 300000
-    assert c.arv_vs_assessed == 3.75
-    assert c.arv_confidence == "MEDIUM"
+    assert c.arv_expected is None
+    assert c.arv_withheld == 300000
+    assert c.arv_vs_assessed is None
+    assert "arv_above_anchor_extreme" in (c.arv_flags or [])
     assert any("county appraisal" in n for n in c.notes)
 
 
