@@ -98,6 +98,24 @@ PARCEL_LAYERS: dict[str, dict] = {
         "id_fields": ["TMS"],
         "map": {"owner": "Owner", "address": "Property_Address", "acreage": "Acres"},
     },
+    # --- 2026-08-30 backbone additions (field maps probed live, valid certs) ---
+    "Pickens": {  # SC dashed PIN e.g. "4037-00-34-5506"; open FeatureServer layer 6 (66k parcels)
+        "url": "https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services/Pickens_Open_data/FeatureServer/6/query",
+        "id_fields": ["PIN", "ACCTNO"],   # ACCTNO = tax account (e.g. "R0084565")
+        "map": {"owner": "NAME1", "address": "LOCADD", "acreage": "ACRES"},  # no total-value field on this layer
+    },
+    "Gaston": {  # PIN = dashed 10-digit; PID = numeric account; 117k parcels
+        "url": "https://gis.gastoncountync.gov/publicgis/rest/services/PublicGIS/Parcels/MapServer/11/query",
+        "id_fields": ["PIN", "PID"],
+        # FMV_TOTAL (not TOTVAL — reads 0 on exempt parcels); CALCAC (not DEEDAC)
+        "map": {"owner": "JAN1_NAME1", "address": "WHOLE_ADDRESS", "market_value": "FMV_TOTAL", "acreage": "CALCAC"},
+    },
+    "Polk": {  # TMS map-page format e.g. "P92-42"; 17k parcels
+        "url": "https://services1.arcgis.com/23uf7jKvz6SRPFWJ/arcgis/rest/services/Parcel_view/FeatureServer/0/query",
+        "id_fields": ["TMS"],
+        "map": {"owner": "OWNAM1", "address": "PHYSICAL_STREET_ADDRESS",
+                "market_value": "TOTAL_TAX_VALUE", "acreage": "DEEDED_ACRES"},
+    },
     # Oconee (arcserver2.oconeesc.com) is intentionally NOT cached: its ArcGIS server
     # rejects bulk paginated export (returns 0 rows to resultOffset queries, though a
     # single-row query works), and the layer carries no situs street field anyway — so
