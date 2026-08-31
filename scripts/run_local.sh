@@ -112,7 +112,7 @@ load GOOGLE_MAPS_API_KEY "$SECRETS/google_maps_api_key.txt"
 # is raised 400 -> 900 to chew that down faster. For a hard catch-up, run
 # scripts/sqft_backfill.py in daylight (bounded, resumable, ~1500/pass).
 export ASSESSOR_CARD_ON="${ASSESSOR_CARD_ON:-1}"
-export ASSESSOR_CARD_MAX="${ASSESSOR_CARD_MAX:-900}"
+export ASSESSOR_CARD_MAX="${ASSESSOR_CARD_MAX:-400}"
 
 # Enrichment budget — keep the run finishing in a sane window. The cloud
 # run died at 4h partly on a Gemini-quota Vision spiral; locally we use
