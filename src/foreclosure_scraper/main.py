@@ -1131,7 +1131,7 @@ async def run() -> int:
     # so the recovered street addresses get lat/lng (and then an aerial).
     try:
         from .enrichment_lrcpwa_parcel import enrich_lrcpwa_parcel
-        s = await enrich_lrcpwa_parcel(enriched)
+        s = await _await_capped(enrich_lrcpwa_parcel(enriched), "lrcpwa_parcel")
         if s:
             enrichment_stats["lrcpwa"] = s
     except Exception:
@@ -1140,7 +1140,7 @@ async def run() -> int:
     # Geocoding fallback — fills lat/lng for any listing the county GIS didn't
     # return geometry for. Rate-limited per Nominatim's policy.
     try:
-        await enrich_geocode(enriched)
+        await _await_capped(enrich_geocode(enriched), "geocode")
     except Exception:
         log.error("geocode.failed", traceback=traceback.format_exc())
 
@@ -1323,7 +1323,7 @@ async def run() -> int:
     # only to raw blob for human review.
     try:
         from .enrichment_parcel_reverse_geo import enrich_parcel_reverse_geo
-        s = await enrich_parcel_reverse_geo(enriched)
+        s = await _await_capped(enrich_parcel_reverse_geo(enriched), "parcel_reverse_geo")
         if s: enrichment_stats["parcel_reverse_geo"] = s
     except Exception:
         log.error("parcel_reverse_geo.failed", traceback=traceback.format_exc())
@@ -1559,13 +1559,13 @@ async def run() -> int:
     if not os.environ.get("INCARCERATION_OFF"):
         try:
             from .enrichment_incarceration import enrich_incarceration
-            enrichment_stats["incarceration"] = await enrich_incarceration(enriched)
+            enrichment_stats["incarceration"] = await _await_capped(enrich_incarceration(enriched), "incarceration")
         except Exception:
             log.error("incarceration.failed", traceback=traceback.format_exc())
         # County-jail bookings (pre-trial/local holds the state rosters miss).
         try:
             from .enrichment_jail_bookings import enrich_jail_bookings
-            enrichment_stats["jail_bookings"] = await enrich_jail_bookings(enriched)
+            enrichment_stats["jail_bookings"] = await _await_capped(enrich_jail_bookings(enriched), "jail_bookings")
         except Exception:
             log.error("jail_bookings.failed", traceback=traceback.format_exc())
 
@@ -1745,7 +1745,7 @@ async def run() -> int:
     #  Vision = 'major' / $63k rehab).
     try:
         from .enrichment_photos import enrich_with_address_photos
-        await enrich_with_address_photos(enriched)
+        await _await_capped(enrich_with_address_photos(enriched), "with_address_photos")
     except Exception:
         log.error("photos.failed", traceback=traceback.format_exc())
 
@@ -1781,7 +1781,7 @@ async def run() -> int:
     # populated with the full Realtor gallery, not just the primary.
     try:
         from .enrichment_images import enrich_with_images
-        await enrich_with_images(enriched, use_mapillary=False)
+        await _await_capped(enrich_with_images(enriched, use_mapillary=False), "with_images")
     except Exception:
         log.error("images.failed", traceback=traceback.format_exc())
 
@@ -1857,7 +1857,7 @@ async def run() -> int:
                 from .enrichment_address_backfill import (
                     enrich_addresses_from_owner,
                 )
-                await enrich_addresses_from_owner(sold_pool)
+                await _await_capped(enrich_addresses_from_owner(sold_pool), "sold_addr")
             except Exception:
                 log.error("sold_pool.addr_backfill_failed",
                           traceback=traceback.format_exc())
@@ -1866,7 +1866,7 @@ async def run() -> int:
             # beds/baths/sqft fields stay empty for many SC results-PDF
             # listings since SC MIE PDFs don't carry property specs.
             try:
-                await enrich_gis(sold_pool)
+                await _await_capped(enrich_gis(sold_pool), "sold_gis")
             except Exception:
                 log.error("sold_pool.gis_failed",
                           traceback=traceback.format_exc())
@@ -1882,14 +1882,14 @@ async def run() -> int:
             # Pull a Realtor.com gallery for each sold comp's address.
             try:
                 from .enrichment_photos import enrich_with_address_photos
-                await enrich_with_address_photos(sold_pool)
+                await _await_capped(enrich_with_address_photos(sold_pool), "sold_photos")
             except Exception:
                 log.error("sold_pool.photos_failed",
                           traceback=traceback.format_exc())
             # OSM map fallback.
             try:
                 from .enrichment_images import enrich_with_images
-                await enrich_with_images(sold_pool, use_mapillary=False)
+                await _await_capped(enrich_with_images(sold_pool, use_mapillary=False), "sold_images")
             except Exception:
                 log.error("sold_pool.images_failed",
                           traceback=traceback.format_exc())
@@ -2037,7 +2037,7 @@ async def run() -> int:
     if not os.environ.get("SOS_DISSOLUTION_OFF"):
         try:
             from .enrichment_sos_dissolution import enrich_with_sos_dissolution
-            await enrich_with_sos_dissolution(enriched)
+            await _await_capped(enrich_with_sos_dissolution(enriched), "with_sos_dissolution")
         except Exception:
             log.error("sos_dissolution.failed", traceback=traceback.format_exc())
 
@@ -2047,7 +2047,7 @@ async def run() -> int:
     # gated OFF by default (SOS_AGENT=1); runs in the scheduled land-records pass.
     try:
         from .enrichment_sos_agent import enrich_with_sos_agent
-        s = await enrich_with_sos_agent(enriched)
+        s = await _await_capped(enrich_with_sos_agent(enriched), "with_sos_agent")
         if s:
             enrichment_stats["sos_agent"] = s
     except Exception:
@@ -2059,7 +2059,7 @@ async def run() -> int:
     # runs in a scheduled/opt-in pass, not the weekly crawl.
     try:
         from .enrichment_qpaybill_tax import enrich_qpaybill_tax
-        s = await enrich_qpaybill_tax(enriched)
+        s = await _await_capped(enrich_qpaybill_tax(enriched), "qpaybill_tax")
         if s:
             enrichment_stats["qpaybill_tax"] = s
     except Exception:
@@ -2417,7 +2417,7 @@ async def run() -> int:
     # use deferral rollback lien. Parcel-keyed, reads the county exemption layer.
     try:
         from .enrichment_tax_relief import enrich_tax_relief
-        s = await enrich_tax_relief(enriched)
+        s = await _await_capped(enrich_tax_relief(enriched), "tax_relief")
         if s:
             enrichment_stats["tax_relief"] = s
     except Exception:
@@ -2429,7 +2429,7 @@ async def run() -> int:
     # leads (all Buncombe), not the 47 the build reported with Anderson enabled.
     try:
         from .enrichment_rollback_deferral import enrich_with_rollback_exposure
-        s = await enrich_with_rollback_exposure(enriched)
+        s = await _await_capped(enrich_with_rollback_exposure(enriched), "with_rollback_exposure")
         if s and s.get("matched"):
             enrichment_stats["rollback_exposure"] = s
     except Exception:
@@ -2508,7 +2508,7 @@ async def run() -> int:
     # NC SP is gated, skipped). Runs before calc/grade so any filled bid feeds ARV.
     try:
         from .enrichment_court_bid import enrich_court_bid
-        s = await enrich_court_bid(enriched)
+        s = await _await_capped(enrich_court_bid(enriched), "court_bid")
         if s:
             enrichment_stats["court_bid"] = s
     except Exception:
@@ -2520,7 +2520,7 @@ async def run() -> int:
     # ARV input when every real comp tier is empty.
     try:
         from .enrichment_fhfa_value import enrich_fhfa_value
-        s = await enrich_fhfa_value(enriched)
+        s = await _await_capped(enrich_fhfa_value(enriched), "fhfa_value")
         if s:
             enrichment_stats["fhfa_value"] = s
     except Exception:
@@ -2531,7 +2531,7 @@ async def run() -> int:
     # scraper is disabled); this one-time render fetch is the only DEW touch.
     try:
         from .enrichment_dew_liens import enrich_dew_liens
-        s = await enrich_dew_liens(enriched)
+        s = await _await_capped(enrich_dew_liens(enriched), "dew_liens")
         if s:
             enrichment_stats["dew_liens"] = s
     except Exception:
@@ -2674,7 +2674,7 @@ async def run() -> int:
     # Burke County parcel-history diff (ownership changes, structure loss).
     try:
         from .enrichment_burke_history import enrich_burke_parcel_history
-        s = await enrich_burke_parcel_history(enriched)
+        s = await _await_capped(enrich_burke_parcel_history(enriched), "burke_parcel_history")
         if s:
             enrichment_stats["burke_history"] = s
     except Exception:
@@ -2686,7 +2686,7 @@ async def run() -> int:
     # worked leads (HOT/WARM or graded) that otherwise have no image.
     try:
         from .enrichment_lrcpwa_photo import enrich_lrcpwa_photo
-        s = await enrich_lrcpwa_photo(enriched)
+        s = await _await_capped(enrich_lrcpwa_photo(enriched), "lrcpwa_photo")
         if s and s.get("fetched"):
             enrichment_stats["lrcpwa_photo"] = s
     except Exception:
@@ -2886,7 +2886,7 @@ async def run() -> int:
     # freshness prune, so a merely-rotated uuid isn't mistaken for a sold-out lead.
     try:
         from .enrichment_homepath_uuid import enrich_homepath_uuids
-        _hp = await enrich_homepath_uuids(enriched)
+        _hp = await _await_capped(enrich_homepath_uuids(enriched), "homepath_uuids")
         if _hp:
             enrichment_stats["homepath_uuid"] = _hp
     except Exception:
