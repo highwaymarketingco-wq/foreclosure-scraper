@@ -1021,8 +1021,19 @@ async def run() -> int:
         except Exception:
             log.error("pulled_sales.failed", traceback=traceback.format_exc())
 
-    # Link reachability — drop any listing whose URL is dead
-    valid = await validate(deduped, workers=cfg.link_check_workers)
+    # Link reachability — drop any listing whose URL is dead. HARD wall-clock cap:
+    # on a 90k+ board this HEAD-checks every URL and ran ~3h uncapped — the single
+    # biggest enrichment time sink measured on the Oracle VM run. On timeout keep
+    # everything unvalidated: a stale link beats a 3h stall that starves the
+    # grading phases (vision/ARV) downstream. Env LINK_VALIDATE_MAX_SECONDS.
+    _link_budget_s = float(os.environ.get("LINK_VALIDATE_MAX_SECONDS", "600"))
+    try:
+        valid = await asyncio.wait_for(
+            validate(deduped, workers=cfg.link_check_workers), timeout=_link_budget_s)
+    except asyncio.TimeoutError:
+        log.warning("orchestrator.link_validate_time_capped",
+                    budget_s=_link_budget_s, count=len(deduped))
+        valid = deduped
     log.info("orchestrator.valid_links", count=len(valid))
     checkpoint.save(valid, "link_validation")
 
