@@ -1015,24 +1015,23 @@ async def run() -> int:
     # a downstream filter that can't re-verify it from this IP (scope_repass,
     # reo_freshness, countyless, etc.). Restored right before the write. Left OFF
     # on the Mac, where full residential resolution makes those filters correct.
-    _grandfather: dict = {}
+    _grandfather: list = []
     if persist_applied and os.environ.get("GRANDFATHER_CARRIED") == "1":
-        # Snapshot the PRIOR PUBLISHED board (pre-merge), NOT the post-merge set.
-        # A datacenter/VM run can't re-scrape the residential sources, so the
-        # merge's miss-counter would age those leads out over repeated runs
-        # (exactly what shrank 94,384 -> 80,283). Restoring from the prior board
-        # keeps every already-published lead; the Mac's residential runs still do
-        # the real aging. Guarantees the write is a superset of the prior board.
+        # Snapshot the PRIOR PUBLISHED board (pre-merge) as a ROW LIST, not a
+        # key-dict: the board keeps rows the simple dedupe_key() would collapse
+        # (it dedupes with a fuzzier matcher), so a dict silently loses ~10k
+        # rows. A list preserves every published row. A datacenter/VM run can't
+        # re-scrape residential sources, so the merge's miss-counter would age
+        # those leads out over repeated runs (what shrank 94,384 -> 80,283);
+        # restoring the prior rows keeps every already-published lead. The Mac's
+        # residential runs still do the real aging.
         try:
             import json as _gj
             _pp = Path(__file__).resolve().parents[2] / "docs" / "listings.json"
             _praw = _gj.loads(_pp.read_text()) if _pp.exists() else []
             for _r in (_praw if isinstance(_praw, list) else []):
                 try:
-                    _pli = Listing.model_validate(_r)
-                    _pk = _safe_dedupe_key(_pli)
-                    if _pk and _pk not in _grandfather:
-                        _grandfather[_pk] = _pli
+                    _grandfather.append(Listing.model_validate(_r))
                 except Exception:  # noqa: BLE001 - skip a malformed prior row
                     pass
             log.info("orchestrator.grandfather_captured",
@@ -3057,7 +3056,8 @@ async def run() -> int:
     # genuinely-gone leads over subsequent runs.
     if _grandfather:
         _final_keys = {k for li in enriched if (k := _safe_dedupe_key(li))}
-        _restored = [li for k, li in _grandfather.items() if k not in _final_keys]
+        _restored = [li for li in _grandfather
+                     if (_gk := _safe_dedupe_key(li)) and _gk not in _final_keys]
         if _restored:
             log.warning("orchestrator.grandfather_restored",
                         restored=len(_restored), before=len(enriched),
