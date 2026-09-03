@@ -215,6 +215,14 @@ def _oceanfront_pending(li: Listing) -> bool:
     return True
 
 
+def _safe_dedupe_key(li: Listing):
+    """Stable per-lead identity for the grandfather guard; None if unkeyable."""
+    try:
+        return li.dedupe_key()
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _in_scope(li: Listing) -> bool:
     # Oceanfront override — runs BEFORE the deny check so the otherwise-
     # denied coastal counties (New Hanover/Brunswick/Onslow + the SC
@@ -1001,6 +1009,16 @@ async def run() -> int:
         except Exception:
             log.critical("board_persist.failed", traceback=traceback.format_exc())
             raise  # HALT: do not publish a fresh-only board as the full board
+
+    # GRANDFATHER guard (opt-in via GRANDFATHER_CARRIED=1 — for the datacenter/VM
+    # host): snapshot the merged board so no lead already IN it can be evicted by
+    # a downstream filter that can't re-verify it from this IP (scope_repass,
+    # reo_freshness, countyless, etc.). Restored right before the write. Left OFF
+    # on the Mac, where full residential resolution makes those filters correct.
+    _grandfather: dict = {}
+    if persist_applied and os.environ.get("GRANDFATHER_CARRIED") == "1":
+        _grandfather = {k: li for li in deduped if (k := _safe_dedupe_key(li))}
+        log.info("orchestrator.grandfather_captured", count=len(_grandfather))
 
     # Pulled-sale detection (dad's #6): listings that existed last week
     # but didn't show up this run get tagged raw['pulled_sale'] with
@@ -3012,6 +3030,19 @@ async def run() -> int:
         "source_alarms": source_alarms,
         "notes": f"horizon={cfg.sale_horizon_days}d, scrapers={len(scrapers)}, regressions={len(regressions)}",
     }
+
+    # GRANDFATHER restore: re-add any snapshotted merged lead that a downstream
+    # filter dropped, so the published board is a SUPERSET of the merge and can
+    # never fall below it. Natural aging (pulled_sale / miss-counter) still trims
+    # genuinely-gone leads over subsequent runs.
+    if _grandfather:
+        _final_keys = {k for li in enriched if (k := _safe_dedupe_key(li))}
+        _restored = [li for k, li in _grandfather.items() if k not in _final_keys]
+        if _restored:
+            log.warning("orchestrator.grandfather_restored",
+                        restored=len(_restored), before=len(enriched),
+                        after=len(enriched) + len(_restored))
+            enriched.extend(_restored)
 
     # ---- Fail-loud guard: catastrophic week-over-week count drop ----------
     # A silent drop in total listings is the failure mode that hid for a
