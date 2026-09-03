@@ -1017,8 +1017,28 @@ async def run() -> int:
     # on the Mac, where full residential resolution makes those filters correct.
     _grandfather: dict = {}
     if persist_applied and os.environ.get("GRANDFATHER_CARRIED") == "1":
-        _grandfather = {k: li for li in deduped if (k := _safe_dedupe_key(li))}
-        log.info("orchestrator.grandfather_captured", count=len(_grandfather))
+        # Snapshot the PRIOR PUBLISHED board (pre-merge), NOT the post-merge set.
+        # A datacenter/VM run can't re-scrape the residential sources, so the
+        # merge's miss-counter would age those leads out over repeated runs
+        # (exactly what shrank 94,384 -> 80,283). Restoring from the prior board
+        # keeps every already-published lead; the Mac's residential runs still do
+        # the real aging. Guarantees the write is a superset of the prior board.
+        try:
+            import json as _gj
+            _pp = Path(__file__).resolve().parents[2] / "docs" / "listings.json"
+            _praw = _gj.loads(_pp.read_text()) if _pp.exists() else []
+            for _r in (_praw if isinstance(_praw, list) else []):
+                try:
+                    _pli = Listing.model_validate(_r)
+                    _pk = _safe_dedupe_key(_pli)
+                    if _pk and _pk not in _grandfather:
+                        _grandfather[_pk] = _pli
+                except Exception:  # noqa: BLE001 - skip a malformed prior row
+                    pass
+            log.info("orchestrator.grandfather_captured",
+                     count=len(_grandfather), source="prior_board")
+        except Exception:  # noqa: BLE001 - never let the snapshot fail the run
+            log.error("grandfather_capture.failed", traceback=traceback.format_exc())
 
     # Pulled-sale detection (dad's #6): listings that existed last week
     # but didn't show up this run get tagged raw['pulled_sale'] with
