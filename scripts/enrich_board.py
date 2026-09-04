@@ -429,12 +429,12 @@ async def main():
         stats["pulled_sales"] = f"ERR: {e}"
         print(f"ERR: {e}")
 
-    # 2an. REO freshness
-    try:
-        from foreclosure_scraper.enrichment_reo_freshness import prune_stale_reo
-        await _run_offline("reo_freshness", prune_stale_reo)
-    except ImportError:
-        print("  [reo_freshness] SKIP - module not found")
+    # 2an. REO freshness — SKIPPED on the enrich-only / VM path. It prunes leads
+    # by re-checking REO liveness, which false-drops from a datacenter IP (the
+    # residential REO sources 403 the VM). Enrich-only must NEVER drop a lead;
+    # the Mac's residential runs do the real REO aging. (Env ENRICH_ONLY_KEEP_ALL
+    # left as the default here.)
+    print("  [reo_freshness] SKIP - enrich-only must not drop leads")
 
     # 2ao. Multifamily classification
     try:
