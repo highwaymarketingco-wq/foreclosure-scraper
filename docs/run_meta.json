@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-09-08T16:17:10.227632Z",
+  "run_time": "2026-09-08T17:31:58.403891Z",
   "total": 94384,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
@@ -447,7 +447,7 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "scheduled land-records refresh",
+  "notes": "liensnc raw re-parse: +14163 addresses, +56452 phones, +56452 owners",
   "detail_count": 94384,
   "detail_digest": "b53843790d64c653",
   "board": {
@@ -461,9 +461,8 @@
       "records": 94384
     }
   },
-  "health_carried_from": "2026-09-07T18:01:38.925328Z",
+  "health_carried_from": "2026-09-08T16:17:10.227632Z",
   "health_carried_keys": [
-    "by_source",
     "by_county_top",
     "source_status",
     "errors"
