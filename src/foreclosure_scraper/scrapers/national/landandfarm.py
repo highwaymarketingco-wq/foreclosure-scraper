@@ -255,7 +255,9 @@ class LandAndFarm(BaseScraper):
     timeout_s = 600.0
 
     async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
+        # Bank rows as they are collected: if the soft timeout fires,
+        # base_scraper ships self.partial instead of discarding the run.
+        out = self.partial
         seen: set[str] = set()
         for county, state, url in _build_urls():
             try:

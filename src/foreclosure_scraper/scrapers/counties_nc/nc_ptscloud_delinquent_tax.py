@@ -286,7 +286,9 @@ class NCPtsCloudDelinquentTax(BaseScraper):
     async def fetch(self) -> Iterable[Listing]:
         if os.environ.get("FORECLOSURE_NC_PTSCLOUD") == "0":
             return []
-        out: list[Listing] = []
+        # Bank rows as they are collected: if the soft timeout fires,
+        # base_scraper ships self.partial instead of discarding the run.
+        out = self.partial
         # Every declared tenant must account for itself. A tenant that breaks is
         # now a hard failure the run report shows, instead of 21,463 rows that
         # look fine because nobody has last week's per-county number to compare.

@@ -363,6 +363,9 @@ class CrexiMultifamily(BaseScraper):
                             state=state, error=str(exc)[:200])
                 continue
             merged.update(rows)
+            # Bank after each state: if the soft timeout fires mid-run,
+            # base_scraper ships self.partial instead of discarding everything.
+            self.partial[:] = list(merged.values())
             log.info("crexi_multifamily.state_done", state=state,
                      count=len(rows))
         out = list(merged.values())

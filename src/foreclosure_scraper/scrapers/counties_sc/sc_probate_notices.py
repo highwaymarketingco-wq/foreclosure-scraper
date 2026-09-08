@@ -348,7 +348,9 @@ class SCProbateNotices(BaseScraper):
     async def fetch(self) -> Iterable[Listing]:
         if os.environ.get("FORECLOSURE_SC_PROBATE_NOTICES") == "0":
             return []
-        out: list[Listing] = []
+        # Bank rows as they are collected: if the soft timeout fires,
+        # base_scraper ships self.partial instead of discarding the run.
+        out = self.partial
         # The two secondary papers are tolerated because they genuinely wobble:
         # the Gaffney Ledger is read through article pages and rate-limits, and
         # the Laurens Advertiser runs only a handful of notices at a time.

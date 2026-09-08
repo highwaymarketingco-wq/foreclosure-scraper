@@ -242,7 +242,9 @@ class Xome(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         pages_cap = int(os.environ.get("XOME_PAGES", str(PAGES_CAP)))
-        out: list[Listing] = []
+        # Bank rows as they are collected: if the soft timeout fires,
+        # base_scraper ships self.partial instead of discarding the run.
+        out = self.partial
         seen: set[str] = set()
         for url in URLS:
             try:

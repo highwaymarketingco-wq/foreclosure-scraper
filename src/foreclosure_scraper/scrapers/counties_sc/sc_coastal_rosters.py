@@ -501,7 +501,9 @@ class SCCoastalRosters(BaseScraper):
     timeout_s = 900.0
 
     async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
+        # Bank rows as they are collected: if the soft timeout fires,
+        # base_scraper ships self.partial instead of discarding the run.
+        out = self.partial
         seen: set[tuple] = set()
 
         # Run all counties in PARALLEL — each gets its own stealth browser session

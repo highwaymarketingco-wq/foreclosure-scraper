@@ -150,7 +150,9 @@ class NCRodLogan(BaseScraper):
     timeout_s = 180.0
 
     async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
+        # Bank rows as they are collected: if the soft timeout fires,
+        # base_scraper ships self.partial instead of discarding the run.
+        out = self.partial
         for (state, county), host in logan.LOGAN_COUNTIES.items():
             src = f"{host}/index.php"
             for d in await logan.discover_recent_nods(state, county, days_back=_LOOKBACK_DAYS):

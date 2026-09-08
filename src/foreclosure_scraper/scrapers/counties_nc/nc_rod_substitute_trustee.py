@@ -193,7 +193,9 @@ class NCRodSubstituteTrustee(BaseScraper):
     timeout_s = 600.0
 
     async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
+        # Bank rows as they are collected: if the soft timeout fires,
+        # base_scraper ships self.partial instead of discarding the run.
+        out = self.partial
         per_county_pre: dict[str, int] = {}
         per_county_post: dict[str, int] = {}
         for county, vendor, vendor_label in SOURCES:

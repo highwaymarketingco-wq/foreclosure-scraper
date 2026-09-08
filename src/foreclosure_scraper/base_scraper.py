@@ -20,6 +20,7 @@ OUTCOME_TIMEOUT = "TIMEOUT"       # exceeded the soft timeout / network timeout
 OUTCOME_BLOCKED = "BLOCKED"       # 401/403/406/429 or WAF/connection refused
 OUTCOME_ERROR = "ERROR"           # code/parse exception (a real bug)
 OUTCOME_DORMANT = "DORMANT"       # intentionally skipped (off-season)
+OUTCOME_PARTIAL = "PARTIAL"       # timed out, but shipped what it had collected
 
 
 class BaseScraper(ABC):
@@ -36,6 +37,12 @@ class BaseScraper(ABC):
 
     #: Soft timeout for the full scrape, seconds.
     timeout_s: float = 180.0
+
+    #: Rows collected SO FAR. A scraper that appends here as it goes will have
+    #: that work SHIPPED if the soft timeout fires, instead of the whole run
+    #: being discarded. safe_run resets this before every run, so a scraper that
+    #: never touches it behaves exactly as it always did (empty -> return []).
+    partial: list
 
     #: If True, scraper is skipped automatically on errors instead of failing the run.
     optional: bool = True
@@ -89,6 +96,7 @@ class BaseScraper(ABC):
         from .http_client import reset_block_signal, take_block_signal
         bound = log.bind(scraper=self.slug)
         self.last_outcome, self.last_reason = OUTCOME_OK, ""
+        self.partial = []
         reset_block_signal()
         if self.disabled:
             self.last_outcome = OUTCOME_DORMANT
@@ -117,11 +125,29 @@ class BaseScraper(ABC):
             bound.info("scraper.ok", count=len(results), outcome=self.last_outcome)
             return results
         except asyncio.TimeoutError:
+            salvaged = list(getattr(self, "partial", None) or [])
+            if salvaged:
+                # Everything collected before the cutoff is real data. Discarding
+                # it turned a slow source into a silently-zero source.
+                self.last_outcome = OUTCOME_PARTIAL
+                self.last_reason = (
+                    f"exceeded soft timeout {self.timeout_s:.0f}s — "
+                    f"shipped {len(salvaged)} rows collected before the cutoff")
+                bound.warning("scraper.timeout_partial", salvaged=len(salvaged))
+                return salvaged
             self.last_outcome = OUTCOME_TIMEOUT
             self.last_reason = f"exceeded soft timeout {self.timeout_s:.0f}s"
             bound.warning("scraper.timeout")
             return []
         except httpx.TimeoutException as exc:
+            salvaged = list(getattr(self, "partial", None) or [])
+            if salvaged:
+                self.last_outcome = OUTCOME_PARTIAL
+                self.last_reason = (
+                    f"network timeout ({type(exc).__name__}) — "
+                    f"shipped {len(salvaged)} rows collected before the cutoff")
+                bound.warning("scraper.net_timeout_partial", salvaged=len(salvaged))
+                return salvaged
             self.last_outcome = OUTCOME_TIMEOUT
             self.last_reason = f"network timeout ({type(exc).__name__})"
             bound.warning("scraper.net_timeout", exc_type=type(exc).__name__)

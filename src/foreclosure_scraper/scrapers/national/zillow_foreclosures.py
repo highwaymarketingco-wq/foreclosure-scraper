@@ -224,7 +224,9 @@ class ZillowForeclosures(BaseScraper):
     timeout_s = 600.0
 
     async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
+        # Bank rows as they are collected: if the soft timeout fires,
+        # base_scraper ships self.partial instead of discarding the run.
+        out = self.partial
         for state in ("NC", "SC"):
             try:
                 out.extend(await _fetch_state(state, self.slug))
