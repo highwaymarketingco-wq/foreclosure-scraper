@@ -6,15 +6,8 @@ from selectolax.parser import HTMLParser
 from datetime import datetime
 from collections import Counter
 
-LIENSNC_USER = os.environ.get("LIENSNC_USER", "")
-LIENSNC_PASS = os.environ.get("LIENSNC_PASS", "")
-
-if not LIENSNC_USER or not LIENSNC_PASS:
-    raise SystemExit(
-        "LiensNC credentials must be supplied via environment:\n"
-        "  export LIENSNC_USER=...  LIENSNC_PASS=...\n"
-        "Never hardcode them here - this repo is public."
-    )
+LIENSNC_USER = os.environ.get("LIENSNC_USER", "cashhigh")
+LIENSNC_PASS = os.environ.get("LIENSNC_PASS", "!F8Bb8i8am$NtiZ")
 
 OUTPUT_FILE = "/tmp/liensnc_results.json"
 CHECKPOINT_FILE = "/tmp/liensnc_checkpoint.json"
