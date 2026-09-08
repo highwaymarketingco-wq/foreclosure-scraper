@@ -4316,8 +4316,9 @@ function renderDetail(l, detailState) {
   // Buyers wanting this — computed from the registry (region + property category)
   const _bt = buyersForListing(l);
   const _bcount = Object.values(_bt).reduce((n, a) => n + a.length, 0);
-  if (_bcount) {
-    $("d-buyers-section").style.display = "block";
+  const _bsec = $("d-buyers-section");
+  if (_bsec && _bcount) {
+    _bsec.style.display = "block";
     // Collapsed by default and names-only: this registry is the SAME on every
     // property, so expanding its prose on each card buried the property-specific
     // findings. The full blurbs live in the Land Buyers tab (and in each row's tooltip).
@@ -4331,9 +4332,10 @@ function renderDetail(l, detailState) {
       }).join(" · ");
       return `<div class="buyer-row"><span class="buyer-group-title">${BUYER_TYPE_LABEL[type] || type}</span> ${rows}</div>`;
     }).join("");
-    $("d-buyers").innerHTML =
+    const _bel = $("d-buyers");
+    if (_bel) _bel.innerHTML =
       `<details class="ev-details"><summary>${_bcount} matching buyers — hover a name for what they buy, full detail in the <strong>Land Buyers</strong> tab</summary>${_names}</details>`;
-  } else { $("d-buyers-section").style.display = "none"; }
+  } else if (_bsec) { _bsec.style.display = "none"; }
 
   renderEverything(l);
 
