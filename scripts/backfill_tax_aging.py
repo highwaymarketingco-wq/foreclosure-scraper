@@ -92,7 +92,11 @@ def main() -> int:
     from foreclosure_scraper.enrichment_tax_owed import enrich_tax_owed
     from foreclosure_scraper.config import in_scope
 
-    with board_lock(DOCS):
+    # board_lock takes the REPO ROOT, not docs/. Passing DOCS builds
+    # docs/logs/.board.lock - a phantom lock that excludes nothing, so this
+    # writer runs concurrently with the 4h-holding vision pass and its work is
+    # silently reverted when that pass flushes its stale in-memory board.
+    with board_lock(REPO):
         board = load_board(DOCS)
         before = _stats(board, in_scope)
         print(f"board {len(board):,} | tax-delinquent {before['tax']:,}")

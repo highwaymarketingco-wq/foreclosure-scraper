@@ -46,7 +46,11 @@ def main() -> int:
     from foreclosure_scraper._upstate_city_to_county import upstate_county_for
     from foreclosure_scraper.config import in_scope
 
-    with board_lock(DOCS):
+    # board_lock takes the REPO ROOT, not docs/. Passing DOCS builds
+    # docs/logs/.board.lock - a phantom lock that excludes nothing, so this
+    # writer runs concurrently with the 4h-holding vision pass and its work is
+    # silently reverted when that pass flushes its stale in-memory board.
+    with board_lock(REPO):
         board = load_board(DOCS)
         st = collections.Counter()
         recovered = collections.Counter()

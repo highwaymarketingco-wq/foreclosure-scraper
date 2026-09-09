@@ -137,7 +137,11 @@ def main() -> int:
                         s["foot3"] += 1
         return s
 
-    with board_lock(DOCS):
+    # board_lock takes the REPO ROOT, not docs/. Passing DOCS builds
+    # docs/logs/.board.lock - a phantom lock that excludes nothing, so this
+    # writer runs concurrently with the 4h-holding vision pass and its work is
+    # silently reverted when that pass flushes its stale in-memory board.
+    with board_lock(REPO):
         board = load_board(DOCS)
         before = stats(board)
         print(f"\nboard {len(board):,} | tax leads {before['tax']:,}")

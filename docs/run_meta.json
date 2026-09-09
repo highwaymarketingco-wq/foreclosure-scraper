@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-09-09T18:17:08.955000Z",
+  "run_time": "2026-09-09T18:43:19.540250Z",
   "total": 94384,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
@@ -447,7 +447,7 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "daily vision pass: 20664 of 94384 listings have a vision report",
+  "notes": "tax year recovered from checkpoint: 2391->7035, in-footprint 2yr+ 513->2206",
   "detail_count": 94384,
   "detail_digest": "1086459f0a07bb11",
   "board": {
@@ -461,9 +461,8 @@
       "records": 94384
     }
   },
-  "health_carried_from": "2026-09-09T17:19:06.768658Z",
+  "health_carried_from": "2026-09-09T18:17:08.955000Z",
   "health_carried_keys": [
-    "by_source",
     "by_county_top",
     "source_status",
     "errors"

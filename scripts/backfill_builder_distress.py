@@ -46,7 +46,11 @@ def main() -> int:
     from foreclosure_scraper.web_artifact import load_board, write_artifact, board_lock
     from foreclosure_scraper.enrichment_lead_signals import enrich_lead_signals
 
-    with board_lock(DOCS):
+    # board_lock takes the REPO ROOT, not docs/. Passing DOCS builds
+    # docs/logs/.board.lock - a phantom lock that excludes nothing, so this
+    # writer runs concurrently with the 4h-holding vision pass and its work is
+    # silently reverted when that pass flushes its stale in-memory board.
+    with board_lock(REPO):
         board = load_board(DOCS)
         rows = [li for li in board
                 if "liensnc" in str(getattr(li, "source", "") or "")]
