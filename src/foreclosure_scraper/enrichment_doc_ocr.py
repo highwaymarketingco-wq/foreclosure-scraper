@@ -101,8 +101,8 @@ async def _anthropic_call(http: httpx.AsyncClient, key: str,
 # --- gating / budgets -------------------------------------------------------
 DOC_OCR_ENABLED = os.environ.get("FORECLOSURE_DOC_OCR", "1") != "0"
 DOC_OCR_FORCE = os.environ.get("FORECLOSURE_DOC_OCR_FORCE", "0") == "1"
-DOC_OCR_MAX = int(os.environ.get("DOC_OCR_MAX", "400"))
-DOC_OCR_BUDGET_S = float(os.environ.get("DOC_OCR_BUDGET_S", "600"))
+DOC_OCR_MAX = int(os.environ.get("DOC_OCR_MAX", "2500"))
+DOC_OCR_BUDGET_S = float(os.environ.get("DOC_OCR_BUDGET_S", "2400"))
 # A document URL shared across MORE than this many leads is an AGGREGATE LIST
 # (a county tax-advertisement PDF, a MIE sale roster) — not a per-property
 # notice. OCRing it per-lead would burn quota and stamp the list's top row onto
@@ -518,6 +518,80 @@ def apply_ocr(li: Listing, parsed: dict) -> list[str]:
 
 
 # --- entry point ------------------------------------------------------------
+_ADDR_IN_ROW = re.compile(
+    # (?<![.\-\d]) stops the match starting inside a parcel/account number such
+    # as "6-21-00-456.00", which otherwise swallowed the owner name with it.
+    r"(?<![.\-\d])\b\d{1,6}\s+"
+    r"(?:[A-Za-z0-9][A-Za-z0-9.'\-]*\s+){1,4}?"
+    r"(?:ST|STREET|RD|ROAD|DR|DRIVE|AVE|AVENUE|LN|LANE|CT|COURT|CIR|CIRCLE|"
+    r"BLVD|WAY|HWY|HIGHWAY|PL|PLACE|TRL|TRAIL|PKWY|TER|LOOP)\b\.?",
+    re.I)
+
+
+def _lead_identifiers(li: Listing) -> list[str]:
+    """Tokens that should appear on THIS lead's own row of a shared roster."""
+    out: list[str] = []
+    for v in (getattr(li, "parcel_id", None), getattr(li, "case_number", None)):
+        if isinstance(v, str) and len(v.strip()) >= 5:
+            out.append(v.strip())
+    for v in (getattr(li, "owner_name", None), getattr(li, "defendant", None)):
+        if isinstance(v, str) and len(v.strip()) >= 6:
+            out.append(v.strip())
+    return out
+
+
+def _row_backfill_from_aggregate(li: Listing, text: str) -> list[str]:
+    """Fill blanks on ONE lead from ITS OWN row of a shared multi-property doc.
+
+    A county tax-sale roster is one PDF referenced by hundreds of leads. OCRing
+    it per-lead is wasteful, and applying one parse to every lead stamps the top
+    row onto all of them — which is why the aggregate guard skipped these
+    entirely and doc_ocr covered 2 of 94,384 rows.
+
+    Instead: read the document ONCE, then locate the row that carries THIS
+    lead's parcel id / case number / owner name and read only that row. No
+    identifier match means no write — a lead is never given another property's
+    address.
+    """
+    if not text:
+        return []
+    idents = _lead_identifiers(li)
+    if not idents:
+        return []
+    # LINE-SCOPED, deliberately. A character window around the match reaches into
+    # the NEIGHBOURING row of a roster and hands this lead the previous
+    # property's address — verified by test: parcel ...456.00 was given the
+    # ...123.00 row's street. Only the line carrying the identifier may be read.
+    row = ""
+    for ident in idents:
+        needle = ident.lower()
+        for line in text.splitlines():
+            if needle in line.lower():
+                row = line
+                break
+        if row:
+            break
+    if not row:
+        return []
+    filled: list[str] = []
+    if not (getattr(li, "street_address", None) or "").strip():
+        # Take the LAST plausible address on the row, and never start one inside
+        # a parcel/account number: "6-21-00-456.00  DOE JANE  264 WEEPING OAK DR"
+        # otherwise matches from the ".00" tail and swallows the owner name.
+        best = None
+        for m in _ADDR_IN_ROW.finditer(row):
+            best = m
+        if best:
+            li.street_address = re.sub(r"\s+", " ", best.group(0)).strip()[:70]
+            filled.append("street_address")
+    if filled:
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw["doc_ocr"] = {"_source": "aggregate_row_match",
+                             "matched_on": idents[0], "fields": filled}
+    return filled
+
+
 async def enrich_doc_ocr(listings: Iterable[Listing],
                          http: Optional[httpx.AsyncClient] = None) -> dict:
     stats = {"targets": 0, "ocr_ok": 0, "backfilled": 0, "skipped_budget": 0, "no_provider": 0}
@@ -542,10 +616,20 @@ async def enrich_doc_ocr(listings: Iterable[Listing],
     aggregate = {u for u, c in url_counts.items() if c > DOC_OCR_MAX_SHARE}
     targets = [li for li in candidates if _doc_urls(li)[0] not in aggregate]
     stats["targets"] = len(targets)
-    stats["skipped_aggregate"] = len(candidates) - len(targets)
+    # Aggregate documents are no longer discarded. Each shared doc is read ONCE
+    # and every lead that references it is matched to its OWN row (see
+    # _row_backfill_from_aggregate). Previously these were dropped outright,
+    # which is why doc_ocr reached 2 of 94,384 leads.
+    agg_map: dict[str, list] = {}
+    for li in candidates:
+        u = _doc_urls(li)[0]
+        if u in aggregate:
+            agg_map.setdefault(u, []).append(li)
+    stats["aggregate_docs"] = len(agg_map)
+    stats["aggregate_leads"] = sum(len(v) for v in agg_map.values())
     if aggregate:
-        log.info("doc_ocr.aggregate_skipped", lists=len(aggregate), leads=stats["skipped_aggregate"])
-    if not targets:
+        log.info("doc_ocr.aggregate_queued", docs=len(agg_map), leads=stats["aggregate_leads"])
+    if not targets and not agg_map:
         return stats
 
     async def _run(hc: httpx.AsyncClient) -> None:
@@ -566,6 +650,33 @@ async def enrich_doc_ocr(listings: Iterable[Listing],
             stats["ocr_ok"] += 1
             if apply_ocr(li, parsed):
                 stats["backfilled"] += 1
+
+        # ---- aggregate pass: read each shared document once, match per lead ----
+        stats.setdefault("agg_docs_read", 0)
+        stats.setdefault("agg_backfilled", 0)
+        for url, leads in agg_map.items():
+            if (time.monotonic() - start) > DOC_OCR_BUDGET_S:
+                log.info("doc_ocr.aggregate_budget_stop", remaining=len(agg_map) - stats["agg_docs_read"])
+                break
+            try:
+                fetched = await asyncio.wait_for(_fetch_doc(hc, url), timeout=60.0)
+            except Exception:  # noqa: BLE001
+                continue
+            if not fetched:
+                continue
+            data, mime = fetched
+            if not (mime == "application/pdf" or data[:4] == b"%PDF"):
+                continue
+            text = _pdf_text(data)
+            if not text:
+                continue
+            stats["agg_docs_read"] += 1
+            for li in leads:
+                try:
+                    if _row_backfill_from_aggregate(li, text):
+                        stats["agg_backfilled"] += 1
+                except Exception:  # noqa: BLE001
+                    continue
 
     if http is not None:
         await _run(http)
