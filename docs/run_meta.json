@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-09-08T17:55:42.410700Z",
+  "run_time": "2026-09-09T11:05:33.213017Z",
   "total": 94384,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
@@ -447,7 +447,7 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "builder_distress backfill: 28601 liensnc leads flagged (cluster/related filings)",
+  "notes": "liensnc county repair: 2424 re-derived (861 in-footprint), 2874 cleared",
   "detail_count": 94384,
   "detail_digest": "b53843790d64c653",
   "board": {
@@ -461,7 +461,7 @@
       "records": 94384
     }
   },
-  "health_carried_from": "2026-09-08T17:31:58.403891Z",
+  "health_carried_from": "2026-09-08T18:01:23.159781Z",
   "health_carried_keys": [
     "by_county_top",
     "source_status",

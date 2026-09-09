@@ -41,6 +41,11 @@ EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 PHONE_RE = re.compile(r"Phone:\s*([0-9][0-9\-.\s()]{9,})")
 STATE_ZIP_RE = re.compile(r"^([A-Z]{2})\s+(\d{5})(?:-\d{4})?$")
 COUNTY_RE = re.compile(r"([A-Za-z .'-]+?)\s+County\b", re.I)
+# Filers often type the STATE into the county line ("NC County",
+# "North Carolina County"). That is not a county: storing it makes
+# scope_repass judge an in-footprint lead off-footprint and drop it.
+STATE_NOT_COUNTY = {"nc", "n.c.", "north carolina", "sc", "s.c.",
+                    "south carolina", "none", "n/a", "na", "unknown"}
 STREET_RE = re.compile(r"^\d+\s+\S")
 
 
@@ -63,7 +68,8 @@ def parse_property(pt: str) -> dict:
     lines = [l.rstrip(",").strip() for l in raw_lines]
     m = COUNTY_RE.search(pt.replace("\xa0", " "))
     if m:
-        res["county"] = re.sub(r"\s+", " ", m.group(1)).strip().title()
+        _c = re.sub(r"\s+", " ", m.group(1)).strip().title()
+        res["county"] = None if _c.lower() in STATE_NOT_COUNTY else _c
     sidx = None
     for i, l in enumerate(lines):
         m2 = STATE_ZIP_RE.match(l)
