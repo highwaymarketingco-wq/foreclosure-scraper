@@ -1016,6 +1016,17 @@ async def run() -> int:
     # reo_freshness, countyless, etc.). Restored right before the write. Left OFF
     # on the Mac, where full residential resolution makes those filters correct.
     _grandfather: list = []
+    # Rows removed on purpose because they are NOT IN THE BUY BOX (resolved to an
+    # off-footprint county, or a national/REO row that never resolved to one).
+    # These are tallied separately from data loss because the count guard in
+    # web_artifact treats any large shrink as "a source broke" -- and on
+    # 2026-09-08 that misread killed a good 15h run: scope_repass correctly
+    # removed 30,509 off-footprint rows, the board landed at 39,088 against a
+    # high-water mark of 94,384 set while those same rows were still unresolved,
+    # and the guard refused the write. The high-water only ever moves UP, so that
+    # was a permanent deadlock: every honest run from then on was blocked and the
+    # published board stayed frozen at a stale, inflated 94,384.
+    _off_footprint_removed = 0
     if persist_applied and os.environ.get("GRANDFATHER_CARRIED") == "1":
         # Snapshot the PRIOR PUBLISHED board (pre-merge) as a ROW LIST, not a
         # key-dict: the board keeps rows the simple dedupe_key() would collapse
@@ -1536,6 +1547,7 @@ async def run() -> int:
     _pre_scope = len(enriched)
     enriched = [li for li in enriched if not _safe_pred(_denied_now, li, False)]
     if _pre_scope != len(enriched):
+        _off_footprint_removed += _pre_scope - len(enriched)
         log.info("orchestrator.scope_repass", dropped=_pre_scope - len(enriched))
 
     # Drop national / REO records that never resolved to a county — without one
@@ -1551,6 +1563,7 @@ async def run() -> int:
     _pre_natl = len(enriched)
     enriched = [li for li in enriched if not _safe_pred(_countyless_national, li, False)]
     if _pre_natl != len(enriched):
+        _off_footprint_removed += _pre_natl - len(enriched)
         log.info("orchestrator.drop_countyless_national", dropped=_pre_natl - len(enriched))
 
     # SITUS SANITY guard — a street_address that is a business/entity name or a
@@ -3094,6 +3107,9 @@ async def run() -> int:
         "regressions": regressions,
         "source_status": source_status,
         "source_alarms": source_alarms,
+        # Read by web_artifact's count guard: shrink explained by these is a
+        # buy-box correction, not data loss.
+        "off_footprint_removed": _off_footprint_removed,
         "notes": f"horizon={cfg.sale_horizon_days}d, scrapers={len(scrapers)}, regressions={len(regressions)}",
     }
 

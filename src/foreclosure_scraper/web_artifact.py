@@ -1470,6 +1470,9 @@ def write_artifact(
     # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     _backup_dir = docs.parent / "backups"
     _backup_dir.mkdir(parents=True, exist_ok=True)
+    # Set unconditionally: the high-water block below reads it, and on a first run
+    # (no board file yet) the guard block never executes.
+    _accepted_intentional = 0
     if _board_file_present(listings_path):
         # --- count guard (high-water mark) ---
         # Bug fix: the old guard compared against the current on-disk board.
@@ -1496,16 +1499,48 @@ def write_artifact(
                 _highwater_count = len(_prior_data) if isinstance(_prior_data, list) else None
             except Exception:  # noqa: BLE001
                 pass
-        if _highwater_count is not None and len(payload) < _highwater_count:
-            _shrink_pct = (1 - len(payload) / _highwater_count) * 100
+        # Rows the run removed ON PURPOSE because they are not in the buy box
+        # (resolved to an off-footprint county; national/REO rows that never
+        # resolved to one) are not shrink. The guard exists to catch a source
+        # dying silently or a script writing a filtered subset -- it must compare
+        # like with like, or a correct cleanup reads as a catastrophe.
+        #
+        # This is not hypothetical. On 2026-09-08 a 15h run scraped fine, merged
+        # to 80,789, then scope_repass correctly dropped 30,509 off-footprint
+        # rows (mostly statewide-NC LiensNC construction filings whose real
+        # county only resolves during enrichment). Final board 39,088 vs a
+        # high-water of 94,384 that had been set while those very rows were still
+        # unresolved -> 59% "shrink" -> write refused, dashboard not published.
+        # Because the mark only ever moves UP, that was permanent: every honest
+        # run afterwards hit the same wall and the board stayed frozen on a stale
+        # count inflated by rows that were never in the footprint.
+        _intentional = 0
+        try:
+            _intentional = max(0, int(summary.get("off_footprint_removed") or 0))
+        except (TypeError, ValueError):
+            _intentional = 0
+        # Never let the allowance swallow the whole baseline -- a run claiming it
+        # meant to remove everything is exactly the bug this guard is for.
+        _intentional = min(_intentional, int(_highwater_count * 0.6)) if _highwater_count else 0
+        _effective_baseline = max(1, (_highwater_count or 0) - _intentional)
+
+        if _highwater_count is not None and len(payload) < _effective_baseline:
+            _shrink_pct = (1 - len(payload) / _effective_baseline) * 100
             _allow = os.environ.get("BOARD_ALLOW_SHRINK", "").strip()
             if _shrink_pct > 10 and _allow not in ("1", "true", "yes"):
                 raise RuntimeError(
                     f"COUNT GUARD: refusing to write {len(payload):,} listings "
-                    f"over high-water mark {_highwater_count:,} ({_shrink_pct:.1f}% shrink). "
+                    f"over high-water mark {_highwater_count:,} "
+                    f"(effective baseline {_effective_baseline:,} after "
+                    f"{_intentional:,} intentional off-footprint removals; "
+                    f"{_shrink_pct:.1f}% unexplained shrink). "
                     f"This has happened before (72K dropped silently). If this "
                     f"shrink is intentional, set BOARD_ALLOW_SHRINK=1."
                 )
+        # Remember the accepted allowance so the high-water update below can
+        # REBASE rather than keep a baseline that describes a different
+        # population than the one we now publish.
+        _accepted_intentional = _intentional
         # --- timestamped backup ---
         _ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         try:
@@ -1676,6 +1711,13 @@ def write_artifact(
         _prev_hw = 0
         if _hw_path.exists():
             _prev_hw = json.loads(_hw_path.read_text()).get("count", 0)
+        # Normally the mark only moves UP -- a smaller board must never lower the
+        # bar the next run has to clear. The ONE exception is a shrink we just
+        # accepted as an intentional buy-box correction: after removing rows that
+        # were never in the footprint, the old mark describes a DIFFERENT
+        # population, and leaving it in place deadlocks every future run (see the
+        # 2026-09-08 note on the guard above). So rebase down by at most the
+        # allowance we actually granted, never further.
         if len(listings) > _prev_hw:
             _atomic_write_bytes(_hw_path, json.dumps({
                 "count": len(listings),
@@ -1683,6 +1725,16 @@ def write_artifact(
             }, indent=2).encode("utf-8"))
             log.info("web_artifact.highwater_updated",
                      old=_prev_hw, new=len(listings))
+        elif _accepted_intentional > 0 and len(listings) >= _prev_hw - _accepted_intentional:
+            _atomic_write_bytes(_hw_path, json.dumps({
+                "count": len(listings),
+                "updated_at": datetime.utcnow().isoformat() + "Z",
+                "rebased_from": _prev_hw,
+                "reason": f"{_accepted_intentional:,} off-footprint rows removed",
+            }, indent=2).encode("utf-8"))
+            log.warning("web_artifact.highwater_rebased",
+                        old=_prev_hw, new=len(listings),
+                        off_footprint_removed=_accepted_intentional)
     except Exception:  # noqa: BLE001
         pass
 

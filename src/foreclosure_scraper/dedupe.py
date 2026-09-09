@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import re
 
+import structlog
 from rapidfuzz import fuzz
 
 from .models import Listing
+
+log = structlog.get_logger()
 
 
 _SUFFIX = {
@@ -85,12 +88,32 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
         return []
 
     buckets: dict[str, Listing] = {}
+    # Track the DISTINCT street addresses absorbed by each primary key. This is
+    # pass 1, where the bulk of merging happens -- and where a bad parcel_id does
+    # its damage, because dedupe_key's parcel branch trusts the value with no
+    # sanity check. Measured: `scrape_liensnc.py`'s PIN_RE
+    # (`(?:pin|tms|parcel|tax\s*map)` IGNORECASE, no word boundary) captured
+    # 'ehurst' from "Pinehurst" and 'number' from "PIN number:", so 122 distinct
+    # Pinehurst properties shared one key and collapsed into a single row. The run
+    # logged nothing. Now it does.
+    _addrs_per_key: dict[str, set] = {}
     for li in listings:
         k = li.dedupe_key()
+        a = _norm_addr(li.street_address)
+        if a:
+            _addrs_per_key.setdefault(k, set()).add(a)
         if k in buckets:
             buckets[k] = buckets[k].merge(li)
         else:
             buckets[k] = li
+
+    _fused = [(len(v), k) for k, v in _addrs_per_key.items() if len(v) >= 4]
+    if _fused:
+        _fused.sort(reverse=True)
+        log.warning("dedupe.suspicious_primary_key",
+                    keys=len(_fused),
+                    addresses_fused=sum(n - 1 for n, _ in _fused),
+                    worst=[{"key": k, "distinct_addresses": n} for n, k in _fused[:10]])
 
     merged = list(buckets.values())
 
@@ -179,9 +202,35 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
     for i in range(len(final)):
         groups.setdefault(_find(i), []).append(i)
     out: list[Listing] = []
+    # SUSPICIOUS-FUSION REPORT. A wrong signature does not fail, it silently
+    # deletes properties -- which is how `scrape_liensnc.py`'s PIN_RE
+    # (`(?:pin|tms|parcel|tax\s*map)` with IGNORECASE and no word boundary)
+    # turned "Pinehurst" into parcel_id 'ehurst' and fused 122 distinct
+    # Pinehurst properties into one row, plus 'eville' (130), 'number' (247).
+    # Nothing in any log said so. Union groups that swallow many DISTINCT
+    # street addresses are the signature of that class of bug, so they are now
+    # reported at WARNING with the shared key named.
+    _suspicious: list[tuple[int, int, str]] = []
     for idxs in groups.values():
         m = final[idxs[0]]
         for j in idxs[1:]:
             m = m.merge(final[j])
         out.append(m)
+        if len(idxs) >= 5:
+            addrs = {_norm_addr(final[j].street_address) for j in idxs}
+            addrs.discard("")
+            # Same property from many sources is normal and fine. Many DIFFERENT
+            # street addresses under one signature is not.
+            if len(addrs) >= 4:
+                shared = [s for s, first in sigmap.items()
+                          if _find(first) == _find(idxs[0])]
+                key = str(sorted(shared, key=lambda x: (x[0], str(x)))[:2])
+                _suspicious.append((len(idxs), len(addrs), key))
+    if _suspicious:
+        _suspicious.sort(reverse=True)
+        log.warning("dedupe.suspicious_fusion",
+                    groups=len(_suspicious),
+                    rows_fused=sum(n - 1 for n, _, _ in _suspicious),
+                    worst=[{"rows": n, "distinct_addresses": a, "shared_signature": k}
+                           for n, a, k in _suspicious[:10]])
     return out
