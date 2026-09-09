@@ -2167,6 +2167,28 @@ async def run() -> int:
     except Exception:
         log.error("property_kind.failed", traceback=traceback.format_exc())
 
+    # Commercial land-use reclassifier — property_kind is set by whichever
+    # scraper found the lead and was never reconciled against the county's own
+    # land_use code: 189 leads carry a plainly commercial land_use while typed as
+    # something else (84 "Eating & Drinking Estab" filed as land, service
+    # stations filed as land). A former station at $159k as-is sitting in the
+    # land bucket is an environmental-liability property valued as a vacant lot,
+    # so fuel/solvent sites are additionally stamped raw.environmental_risk.
+    #
+    # MUST run HERE, beside enrich_property_kind and BEFORE valuation. Placing it
+    # later (next to the vacant-land-use classifier) meant ARV, rehab tier and
+    # comps were all computed treating these as LAND and only then relabelled —
+    # exactly what test_no_enrichment_runs_after_valuation_that_changes_property_kind
+    # exists to catch, and it did. land_use is populated upstream by
+    # enrichment_gis_attrs, so it is available at this point.
+    try:
+        from .enrichment_commercial_landuse import enrich_commercial_landuse
+        _cs = enrich_commercial_landuse(enriched)
+        if _cs:
+            enrichment_stats["commercial_landuse"] = _cs
+    except Exception:
+        log.error("commercial_landuse.failed", traceback=traceback.format_exc())
+
     # RECAP document body fetch — pull the actual motion PDFs (plain text)
     # from CourtListener for adversary-proceeding listings (lift-stay,
     # §363 sale). Adds raw.recap.plain_text which the judgment_amount
@@ -2696,21 +2718,6 @@ async def run() -> int:
         log.info("orchestrator.flagged", count=len(enriched))
     except Exception:
         log.error("flags.failed", traceback=traceback.format_exc())
-
-    # Commercial land-use reclassifier — property_kind comes from whichever
-    # scraper found the lead and is never reconciled against the county's own
-    # land-use code. 189 leads carry a plainly commercial land_use while typed as
-    # something else (84 "Eating & Drinking Estab" filed as land, gas stations
-    # filed as land). A former service station at $159k as-is sitting in the land
-    # bucket is an environmental-liability property valued as a vacant lot, so
-    # fuel/solvent sites are additionally tagged raw.environmental_risk.
-    try:
-        from .enrichment_commercial_landuse import enrich_commercial_landuse
-        _cs = enrich_commercial_landuse(enriched)
-        if _cs:
-            enrichment_stats["commercial_landuse"] = _cs
-    except Exception:
-        log.error("commercial_landuse.failed", traceback=traceback.format_exc())
 
     # Vacant-land-use proxy — free USPS-vacancy substitute. Reads the parcel
     # cache's land-class field (no network) and stamps a `vacant_lot` signal on
