@@ -233,6 +233,23 @@ async def _fetch_image_bytes(c: httpx.AsyncClient, url: str) -> Optional[tuple[b
         return None
 
 
+def _has_real_image(li: Listing) -> bool:
+    """True when this lead has an image vision can actually grade.
+
+    The OSM basemap does not count: _select_image_urls appends it only as a last
+    resort and the model is instructed to return a null condition_tier for it, so
+    grading a basemap-only lead spends quota and produces nothing.
+    """
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    images = raw.get("images") or {}
+    if not isinstance(images, dict):
+        return False
+    if images.get("real") or images.get("street") or images.get("aerial"):
+        return True
+    z = raw.get("zillow") or {}
+    return bool(isinstance(z, dict) and (z.get("photos") or z.get("photo")))
+
+
 def _select_image_urls(li: Listing) -> list[str]:
     """Pick up to MAX_PHOTOS_PER_LISTING image URLs to send to Vision.
 
@@ -1230,7 +1247,15 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
         has_date = 0 if sd else 1
         raw = li.raw if isinstance(li.raw, dict) else {}
         already_scored = 1 if raw.get("vision") else 0
-        return (has_date, sd or _dt.max, already_scored,
+        # PHOTO FIRST. Grading is only possible where an image exists, so a lead
+        # with one must outrank a lead without one regardless of sale date.
+        # Previously the key led with sale_date, which spent the whole budget on
+        # the soonest-selling leads whether or not they had a photo: 26,434 leads
+        # had a photo but only 10,250 were ever graded, leaving 16,184 gradable
+        # leads unreached while quota went to basemap-only rows that can only
+        # return a null tier. Sale date still orders within each group.
+        no_photo = 0 if _has_real_image(li) else 1
+        return (no_photo, has_date, sd or _dt.max, already_scored,
                 0 if li.opening_bid else 1)
     targets.sort(key=_vpri)
     if max_listings:
