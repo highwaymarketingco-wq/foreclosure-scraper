@@ -2697,9 +2697,25 @@ async def run() -> int:
     except Exception:
         log.error("flags.failed", traceback=traceback.format_exc())
 
-    # Vacant-land-use proxy — free USPS-vacancy substitute. Reads the parcel cache's
-    # land-class field (no network) and stamps a `vacant_lot` signal on undeveloped lots
-    # so it stacks into distress + lead_signals below. No-op for un-cached counties.
+    # Commercial land-use reclassifier — property_kind comes from whichever
+    # scraper found the lead and is never reconciled against the county's own
+    # land-use code. 189 leads carry a plainly commercial land_use while typed as
+    # something else (84 "Eating & Drinking Estab" filed as land, gas stations
+    # filed as land). A former service station at $159k as-is sitting in the land
+    # bucket is an environmental-liability property valued as a vacant lot, so
+    # fuel/solvent sites are additionally tagged raw.environmental_risk.
+    try:
+        from .enrichment_commercial_landuse import enrich_commercial_landuse
+        _cs = enrich_commercial_landuse(enriched)
+        if _cs:
+            enrichment_stats["commercial_landuse"] = _cs
+    except Exception:
+        log.error("commercial_landuse.failed", traceback=traceback.format_exc())
+
+    # Vacant-land-use proxy — free USPS-vacancy substitute. Reads the parcel
+    # cache's land-class field (no network) and stamps a `vacant_lot` signal on
+    # undeveloped lots so it stacks into distress + lead_signals below. No-op for
+    # un-cached counties.
     try:
         from .enrichment_vacant_landuse import enrich_vacant_landuse
         s = enrich_vacant_landuse(enriched)
