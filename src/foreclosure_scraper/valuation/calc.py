@@ -292,6 +292,18 @@ ARV_ANCHOR_HARD_MULT_LAND = 20.0      # just under p99
 # >=10x 2.17%, >=12x 1.68%), which is where it stops describing the tax roll and
 # starts describing a different parcel: 241 leads, the same order as the other
 # pairs' natural tail.
+# ---- AS-IS offer math (buy-light-cleanup-resell) ---------------------------
+# This operator does NOT rehab and does NOT price off ARV. The baseline is the
+# county's 100%-basis appraisal (as-is), the buy is 10-50 cents on that dollar
+# (target ~30), and the exit is a cleaned-but-unrenovated resale at 85-95 cents.
+# Above AS_IS_OFFER_MAX_PCT the deal is dead by their own rule. Published
+# ALONGSIDE the ARV/70%-rule figures, which stay untouched for the flip lens.
+AS_IS_OFFER_LOW_PCT = 0.10
+AS_IS_OFFER_TARGET_PCT = 0.30
+AS_IS_OFFER_MAX_PCT = 0.50
+AS_IS_RESALE_PCT = 0.90          # midpoint of the stated 85-95% band
+AS_IS_CLEANUP_COST = 5000.0      # flat mow/trim/haul, NOT a $/sqft rehab tier
+
 COUNTY_VALUE_DISAGREE_MULT = 3.0        # two appraisal-basis figures
 COUNTY_VALUE_DISAGREE_MULT_TAX = 10.0   # market value vs the tax roll
 ARV_FLAG_COUNTY_DISAGREE = "county_values_disagree"
@@ -605,6 +617,14 @@ class Calc:
     roi_pct: float | None = None
     cash_on_cash_pct: float | None = None
     bid_to_arv_pct: float | None = None
+    # ---- as-is lens (see AS_IS_* constants) ----
+    as_is_value: float | None = None
+    as_is_source: str | None = None
+    offer_low: float | None = None
+    offer_target: float | None = None
+    offer_max: float | None = None
+    est_resale_as_is: float | None = None
+    est_gross_margin: float | None = None
     confidence: str = "LOW"
     # ARV-METHOD confidence (distinct from `confidence`, which scores overall
     # data completeness): HIGH = sold-comp grounded, MEDIUM = zestimate or
@@ -2180,6 +2200,21 @@ def compute(li: Listing) -> Calc:
     rehab_buy = round((out.rehab_expected or 0) * (1 + REHAB_CONTINGENCY_PCT), -2)
     if out.rehab_expected:
         out.rehab_with_contingency = rehab_buy
+
+    # ---- AS-IS offer band (independent of ARV; see AS_IS_* constants) ----
+    # _anchor_value is the county 100%-basis figure and deliberately EXCLUDES
+    # assessed_value - in SC that is a 4%/6% statutory ratio, so pricing off it
+    # understates the property several-fold.
+    _av, _asrc = _anchor_value(li)
+    if _av and _av > 0:
+        out.as_is_value = float(_av)
+        out.as_is_source = _asrc
+        out.offer_low = round(_av * AS_IS_OFFER_LOW_PCT, -2)
+        out.offer_target = round(_av * AS_IS_OFFER_TARGET_PCT, -2)
+        out.offer_max = round(_av * AS_IS_OFFER_MAX_PCT, -2)
+        out.est_resale_as_is = round(_av * AS_IS_RESALE_PCT, -2)
+        out.est_gross_margin = round(
+            out.est_resale_as_is - out.offer_target - AS_IS_CLEANUP_COST, -2)
 
     # ---- Max bid (70% rule, expected case) ------------------------------
     if out.arv_expected:
