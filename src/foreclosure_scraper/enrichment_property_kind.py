@@ -179,11 +179,45 @@ def enrich_property_kind(listings: list[Listing]) -> None:
         "from_listing_type": 0,
         "from_source": 0,
         "fallback_sfr": 0,
+        "land_corrected_by_structure": 0,
     }
 
     counts["exceptions"] = 0
     for li in listings:
         try:
+            # LAND is the one label structure evidence may CORRECT.
+            #
+            # Scrapers stamp a kind at scrape time, before the GIS enrichers have
+            # filled living_sqft / bedrooms. spartanburg_vacant returns LAND when
+            # its LivingArea and YearBuilt attributes read 0, which they do when
+            # the layer does not carry those keys - so occupied houses arrive
+            # tagged LAND. The GIS pass then fills sqft=1,792 and bedrooms=4, and
+            # the "already classified" skip below meant this cascade never
+            # re-examined them. Measured: 1,369 leads carrying a bedroom count and
+            # a house-sized footprint were typed LAND, worth $235,308,889 as-is,
+            # every one assigned rehab_tier "land" (zero rehab deducted) and
+            # routed to the LAND_WHOLESALE lane.
+            #
+            # Deliberately narrow: only LAND is revisited, only on positive
+            # dwelling evidence, and a "0 Foo Rd" situs (the vacant-lot marker)
+            # still wins - that address form means no structure regardless of a
+            # mis-joined sqft.
+            if li.property_kind == PropertyKind.LAND:
+                _addr = (li.street_address or "").strip()
+                _sqft = li.living_sqft or 0
+                # REQUIRES a bedroom count. sqft alone is not enough: 11,665
+                # LAND leads carry sqft>=400 with no bedrooms, and 10,800 of
+                # those have no year_built either - a parcel-join artifact, not
+                # evidence of a dwelling (one such "address" is the string
+                # "350 NOTICE OF SUBSTITUTE TRUST" carrying 1,430 sqft).
+                # Correct only the unambiguous contradiction; leave the weak
+                # population alone rather than silently retyping it.
+                if not _addr.startswith("0 ") and li.bedrooms and _sqft > 400:
+                    li.property_kind = PropertyKind.SINGLE_FAMILY
+                    counts["land_corrected_by_structure"] = counts.get(
+                        "land_corrected_by_structure", 0) + 1
+                    continue
+
             # Skip if already classified (anything other than UNKNOWN/None)
             if li.property_kind and li.property_kind != PropertyKind.UNKNOWN:
                 counts["already_classified"] += 1
