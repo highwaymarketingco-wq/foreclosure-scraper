@@ -42,7 +42,21 @@ class BaseScraper(ABC):
     #: that work SHIPPED if the soft timeout fires, instead of the whole run
     #: being discarded. safe_run resets this before every run, so a scraper that
     #: never touches it behaves exactly as it always did (empty -> return []).
-    partial: list
+    #:
+    #: Lazily created per instance rather than set only in safe_run: tests (and
+    #: __main__ probes) call fetch()/_collect() DIRECTLY, and those must not
+    #: blow up with AttributeError just because safe_run never ran.
+    @property
+    def partial(self) -> list:
+        p = self.__dict__.get("_partial")
+        if p is None:
+            p = []
+            self.__dict__["_partial"] = p
+        return p
+
+    @partial.setter
+    def partial(self, value) -> None:
+        self.__dict__["_partial"] = list(value) if value else []
 
     #: If True, scraper is skipped automatically on errors instead of failing the run.
     optional: bool = True
