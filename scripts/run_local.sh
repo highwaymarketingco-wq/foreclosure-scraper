@@ -88,6 +88,11 @@ if [[ -n "${GEMINI_API_KEY:-}${GEMINI_API_KEY_1:-}${GEMINI_API_KEY_2:-}" ]]; the
 else
   export VISION_PROVIDER="${VISION_PROVIDER:-anthropic}"
 fi
+# 8GB Mac: 24 concurrent scrapers drove 4.3GB of swap on the 2026-09-08 run and
+# starved simple sources (epa_superfund/fdic/fema logged ZERO activity before
+# their soft timeout fired) - 39 "timeouts" that were memory pressure, not
+# broken sources. Override with PARALLEL_SCRAPERS=N.
+export PARALLEL_SCRAPERS="${PARALLEL_SCRAPERS:-8}"
 export LOG_LEVEL="${LOG_LEVEL:-INFO}"
 export PYTHONUNBUFFERED=1
 
