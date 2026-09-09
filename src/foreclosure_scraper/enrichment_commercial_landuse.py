@@ -12,9 +12,22 @@ bucket is an environmental-liability property being valued and routed as a
 vacant lot. Fuel-storage sites carry contamination exposure that changes the
 deal entirely, so they are tagged separately here rather than folded in.
 
+MEASURED FALSE-POSITIVE PROBLEM (2026-09-09). Spartanburg's land_use encodes a
+HISTORICAL or ZONING use, not current physical use. Of 190 leads a naive
+land_use match would flip, 185 carry residential structure signals:
+"Groceries-Retail" with 4 bedrooms / 1,130 sqft, "Drinking Places" with 8
+bedrooms, "Gasoline Service Station" with 3 bedrooms. Those are houses. A ~97%
+false-positive rate, and tagging a 3-bedroom house as a contaminated fuel site is
+worse than leaving it alone.
+
+So this NEVER changes property_kind on structure evidence alone. It requires
+land_use to say commercial AND the parcel to show no residential structure
+(no bedroom count, and either no living_sqft or a footprint too large to be a
+house). Everything else gets an advisory raw.land_use_commercial_hint only -
+visible for review, authoritative for nothing.
+
 Pure-local: reads `land_use`, already present from the GIS/parcel enrichers. No
-network. Fills only — an existing `commercial` kind is never rewritten, and the
-original value is preserved on the stamp so the change is auditable.
+network.
 """
 from __future__ import annotations
 
@@ -52,7 +65,7 @@ _NEGATIVE_RE = re.compile(
 
 
 def enrich_commercial_landuse(listings: Iterable[Listing]) -> dict:
-    stats = {"scanned": 0, "reclassified": 0, "environmental": 0, "already": 0}
+    stats = {"scanned": 0, "reclassified": 0, "environmental": 0, "already": 0, "hint_only": 0}
     for li in listings:
         lu = getattr(li, "land_use", None)
         if not isinstance(lu, str) or not lu.strip():
@@ -63,8 +76,30 @@ def enrich_commercial_landuse(listings: Iterable[Listing]) -> dict:
         if not _COMMERCIAL_RE.search(lu):
             continue
 
+        # RESIDENTIAL-STRUCTURE GUARD. A bedroom count, or a house-sized
+        # footprint, means the county code is stale/zoning-derived and must not
+        # override what is physically there.
+        beds = getattr(li, "bedrooms", None)
+        sqft = getattr(li, "living_sqft", None)
+        looks_residential = bool(beds) or (
+            isinstance(sqft, (int, float)) and 0 < sqft < 5000)
+
         kind = getattr(li, "property_kind", None)
         kind_s = getattr(kind, "value", kind)
+
+        if looks_residential:
+            # Advisory only. Never rewrites the kind, never asserts contamination.
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            li.raw["land_use_commercial_hint"] = {
+                "land_use": lu.strip()[:60],
+                "note": "county land_use reads commercial but the parcel has "
+                        "residential structure - likely historical or zoning code",
+                "source": "county_land_use",
+            }
+            stats["hint_only"] = stats.get("hint_only", 0) + 1
+            continue
+
         if str(kind_s or "").lower() == "commercial":
             stats["already"] += 1
         else:
