@@ -2650,6 +2650,30 @@ async def run() -> int:
     except Exception:
         log.error("equity.failed", traceback=traceback.format_exc())
 
+    # Deed chain — chronological ownership timeline synthesised from data other
+    # enrichers already gathered (assessor_card.sales, county_sales,
+    # gis.last_sale, rod_docs, relationship_signal). Pure-Python, offline, no
+    # network, no quota.
+    #
+    # This was NEVER wired into the run: it existed only inside four ad-hoc
+    # scripts (enrich_board / enrich_batch / title_search_pipeline / enrich_gaps),
+    # so deed_chain sat frozen at 17.6% and could not grow as new leads arrived.
+    # Chain data is the core of the buy-light title-curative thesis - chain_breaks
+    # flags quitclaims, $1 sales, inheritance and divorce transfers, i.e. exactly
+    # the "margin lives in the mess" signal - so leaving it out of the pipeline
+    # capped the whole strategy.
+    #
+    # Placed AFTER assessor_card (its richest source) and BEFORE title_risk, which
+    # benefits from a resolved chain.
+    try:
+        from .enrichment_deed_chain import enrich_deed_chain
+        s = enrich_deed_chain(enriched)
+        if s:
+            enrichment_stats["deed_chain"] = s
+            log.info("orchestrator.deed_chain", stats=s)
+    except Exception:
+        log.error("deed_chain.failed", traceback=traceback.format_exc())
+
     # Title-risk classifier — flag the foreclosing party as senior-lien (sale
     # clears junior liens) vs junior-lien/HOA/credit-union/individual (a senior
     # bank mortgage likely SURVIVES the sale = bidding trap). Pure-compute over
