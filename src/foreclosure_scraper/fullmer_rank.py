@@ -307,7 +307,20 @@ def score(li: Listing, msa_tier: dict | None = None) -> dict:
 
     # --- contactability: a hot lead you can't reach isn't one -------------
     ds = raw.get("distress_stack") if isinstance(raw.get("distress_stack"), dict) else {}
-    if ds.get("absentee") or raw.get("absentee"):
+    om = raw.get("owner_mailing") if isinstance(raw.get("owner_mailing"), dict) else {}
+    # THE THIRD KEY IS WHERE THE SIGNAL ACTUALLY LIVES. Measured on the live board
+    # 2026-09-10: raw["owner_mailing"]["absentee"] is True on 56,091 rows, while the
+    # two keys this scorer originally read (distress_stack.absentee, raw.absentee)
+    # covered 10,647. So 45,450 absentee owners -- 81% of the signal -- were invisible
+    # to the ranking, on a factor the scorer explicitly wants to reward.
+    #
+    # enrichment_owner_mailing is the authority here and it is careful: _is_absentee
+    # tolerates a mailing that carries extra city/state/zip, accepts a token-subset
+    # match so Anderson's 'SPRINGSIDE  300 SPRINGSIDE CIR' situs does not flag its own
+    # owner-occupant, and an authoritative county homestead marker sets owner_occupied
+    # which forces absentee back to False. Its verdict is better than either of the
+    # keys that were being read.
+    if ds.get("absentee") or raw.get("absentee") or om.get("absentee") is True:
         # "Look for older owners, long-term ownership, high dollar amounts
         # delinquent, or folks who live out of state."
         add("absentee", 8, "absentee_owner")

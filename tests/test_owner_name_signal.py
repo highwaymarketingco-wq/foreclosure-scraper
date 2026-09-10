@@ -117,3 +117,68 @@ def test_enrich_tags_and_never_drops():
 def test_signal_survives_the_publish_slim():
     from foreclosure_scraper.web_artifact import RAW_KEEP
     assert "owner_name_signal" in RAW_KEEP
+
+
+# ===========================================================================
+# THE ABSENTEE SIGNAL WAS BEING SCORED FROM TWO EMPTY KEYS
+#
+# fullmer_rank.score() awards 8 points for an absentee owner -- Fullmer is
+# explicit that out-of-state and non-occupying owners are the target. It read
+# raw["distress_stack"]["absentee"] and raw["absentee"].
+#
+# Measured on the live 94,384-row board, 2026-09-10:
+#     raw["owner_mailing"]["absentee"] is True on   56,091 rows
+#     the two keys the scorer read covered           10,647 rows
+#     absentee rows the scorer could NOT see         45,450   (81% of the signal)
+#
+# enrichment_owner_mailing is the authority: its _is_absentee tolerates a mailing
+# carrying extra city/state/zip, accepts a token-subset match so Anderson's
+# 'SPRINGSIDE  300 SPRINGSIDE CIR' situs does not flag its own owner-occupant,
+# and an authoritative county homestead marker forces absentee back to False.
+# ===========================================================================
+
+def _bare_listing(**raw):
+    from datetime import datetime
+    from foreclosure_scraper.models import Listing, ListingType, PropertyKind
+    return Listing(source="t", source_url="u", listing_type=ListingType.TAX_SALE,
+                   property_kind=PropertyKind.UNKNOWN, state="NC", county="Buncombe",
+                   first_seen=datetime.utcnow(), last_seen=datetime.utcnow(), raw=raw)
+
+
+def _has_absentee(li) -> bool:
+    from foreclosure_scraper.fullmer_rank import score
+    r = score(li)
+    return any("absentee" in str(f) for f in (r.get("factors") or r.get("reasons") or []))
+
+
+@pytest.mark.parametrize("raw,expect", [
+    ({"owner_mailing": {"absentee": True}}, True),      # the 45,450 that were invisible
+    ({"distress_stack": {"absentee": True}}, True),     # the key that already worked
+    ({"absentee": True}, True),                         # the other key that already worked
+    ({"owner_mailing": {"absentee": False}}, False),    # owner mails to the property
+    ({"owner_mailing": {}}, False),                     # no mailing known
+    ({}, False),
+])
+def test_absentee_is_scored_from_the_key_that_is_actually_populated(raw, expect):
+    from foreclosure_scraper.fullmer_rank import score
+    r = score(_bare_listing(**raw))
+    txt = str(r)
+    assert ("absentee" in txt) is expect, f"raw={raw} -> {txt[:220]}"
+
+
+def test_owner_occupied_is_never_read_as_absentee():
+    """A False must stay False. enrichment_owner_mailing sets absentee=False when a
+    county homestead marker says the owner lives there, and that authoritative
+    suppression must survive into the score -- flagging a homeowner absentee puts
+    them on an absentee call list."""
+    from foreclosure_scraper.fullmer_rank import score
+    r = score(_bare_listing(owner_mailing={"absentee": False, "owner_occupied": True}))
+    assert "absentee" not in str(r)
+
+
+def test_a_non_dict_owner_mailing_does_not_crash_the_scorer():
+    """Some sources emit owner_mailing as a bare string; distress_score.py already
+    guards for exactly this, and the scorer must too."""
+    from foreclosure_scraper.fullmer_rank import score
+    assert isinstance(score(_bare_listing(owner_mailing="123 MAIN ST")), dict)
+    assert isinstance(score(_bare_listing(owner_mailing=None)), dict)
