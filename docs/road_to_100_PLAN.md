@@ -67,3 +67,87 @@ foreclosure / estate / probate / tax-sale notices for the whole footprint.
 
 ## What does NOT get touched
 - `rutherford_wildfire_tax.py` (robots, fails closed by design) and every other robots/ToS wall stays walled. We use the named free alternate, never ride the wall.
+
+---
+
+## MEASURED RECONCILIATION — 2026-09-10
+
+The grid above is what the plan says SHOULD exist. This section is what the
+published board actually CONTAINS, measured by `scripts/county_coverage_matrix.py`
+against `docs/listings.json.gz`. Where they disagree, the measurement wins.
+
+### The plan counts SIGNALS. A signal is not a lead.
+
+A lead is workable only when five layers exist: SIGNAL, IDENTITY (parcel + situs
+address), VALUE (county 100%-basis appraisal), CONTACT (owner name + phone or
+mailing), RANKED. The Aug-12 grid scores only the first. That is why "40% HAVE"
+and a board you cannot call from are both true at once.
+
+Measured, per footprint county, worst layer first:
+
+| county | rows | ident | value | mail | phone | signal families |
+|---|---|---|---|---|---|---|
+| Cherokee,SC | 1,136 | 0% | 1% | 0% | 8% | 3/9 |
+| Union,SC | 496 | 6% | 3% | 2% | 16% | 4/9 |
+| Gaston,NC | 2,473 | 23% | 18% | 7% | 66% | 6/9 |
+| Cleveland,NC | 1,105 | 25% | 26% | 10% | 62% | 6/9 |
+| Laurens,SC | 979 | 27% | 22% | 12% | 11% | 6/9 |
+| Anderson,SC | 1,230 | 28% | 32% | 5% | 18% | 6/9 |
+| Lincoln,NC | 1,354 | 28% | 43% | 29% | 75% | 7/9 |
+| Transylvania,NC | 580 | 28% | 32% | 13% | 57% | 5/9 |
+| Oconee,SC | 1,315 | 31% | 1% | 62% | 11% | 4/9 |
+| Burke,NC | 671 | 39% | 31% | 16% | 68% | 6/9 |
+| Henderson,NC | 2,810 | 48% | 56% | 11% | 56% | 7/9 |
+| Polk,NC | 421 | 49% | 26% | 15% | 56% | 5/9 |
+| McDowell,NC | 1,913 | 67% | 80% | 73% | 56% | 6/9 |
+| Spartanburg,SC | 6,195 | 68% | 75% | 68% | 13% | 7/9 |
+| Pickens,SC | 2,711 | 69% | 78% | 70% | 13% | 6/9 |
+| Rutherford,NC | 4,929 | 69% | 86% | 84% | 50% | 6/9 |
+| Buncombe,NC | 7,404 | 75% | 70% | 66% | 89% | 6/9 |
+| Mitchell,NC | 187 | 78% | 63% | 38% | 50% | 5/9 |
+
+### The one finding that reframes the whole plan
+
+**NC phone 50-89%. SC phone 8-18%.** NC's phones are a side effect of LiensNC
+lien-agent filings, where the owner publishes their own number: 56,452 of the
+board's 67,217 phones carry `match="self_filed_lien_agent_appointment"`. SC has no
+free equivalent, so all seven SC counties are mail-only. 14,062 SC leads, no phone
+lane. That is the engine's binding constraint, and no amount of additional SIGNAL
+scraping relieves it.
+
+Two corrections to assumptions worth recording:
+- `raw.skip_trace` carries NO phone numbers. `phone_numbers` is empty on all 21,400
+  rows that have it and `provider` is 100% `tax_records_only`. It is a mailing-address
+  source and was being counted as a contact source.
+- Only 240 phones are `attorney_in_notice`, so the phone count is not meaningfully
+  inflated by attorney/trustee numbers.
+
+### Signal families, measured across the 18 footprint counties
+
+    divorce                 0/18   plan lists it; board has none anywhere
+    code_vacancy            2/18
+    tax_foreclosure         6/18   the book's sharpest filter
+    tax_delinquent         10/18   the book's PRIMARY source, missing from 8 counties
+    liens                  15/18
+    probate_estate         16/18
+    mortgage_foreclosure   17/18
+    bankruptcy             17/18
+    lis_pendens            18/18
+
+### "HARD-WALL 0" needs one amendment
+
+The Aug-12 claim that no cell is a true hard wall holds for SIGNAL. It does not
+hold for CONTACT in South Carolina: free people-search is bot-walled, the SC voter
+file is paid and carries no phone, and SC SoS is captcha-walled. SC phone is a real
+wall until a paid lane or a manual-save lane is accepted.
+
+### Build queue, ranked by what actually blocks a deal
+
+1. SC phone lane. Binding constraint on 14,062 leads. No free path identified.
+2. Cherokee SC (identity 0%, value 1%) and Union SC (6%/3%) — 1,632 rows that can
+   be neither underwritten nor contacted. Either resolve them or stop counting them.
+3. Gaston NC identity 23% / value 18% on 2,473 rows — worst NC county, and Gaston
+   is in a major MSA so the exit is good if the data can be filled.
+4. tax_delinquent into the 8 counties missing it; tax_foreclosure into the 12.
+5. divorce (0/18) and code_vacancy (2/18) as whole missing families.
+6. Oconee SC value 1% — has mail (62%) but nothing to underwrite against.
