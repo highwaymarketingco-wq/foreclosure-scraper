@@ -167,6 +167,20 @@ MAX_PREFIX_DEPTH = int(os.getenv("QPAYBILL_ROLL_DEPTH", "4"))
 REQUEST_BUDGET_PER_COUNTY = int(os.getenv("QPAYBILL_ROLL_BUDGET", "2500"))
 
 _PER_HOST_CONCURRENCY = 3
+
+#: Ceiling across ALL counties at once. Nineteen counties x 3 = 57 simultaneous new
+#: clients, each doing its own DNS lookup, and macOS's resolver started returning
+#: "nodename nor servname provided" -- a transient failure that reads exactly like a
+#: dead host. Capping the total keeps the sweep inside what the resolver will take.
+_GLOBAL_CONCURRENCY = int(os.getenv("QPAYBILL_ROLL_CONCURRENCY", "12"))
+_GLOBAL_SEM: "asyncio.Semaphore | None" = None
+
+
+def _global_sem() -> "asyncio.Semaphore":
+    global _GLOBAL_SEM
+    if _GLOBAL_SEM is None:
+        _GLOBAL_SEM = asyncio.Semaphore(_GLOBAL_CONCURRENCY)
+    return _GLOBAL_SEM
 _OWED_STATUSES = ("unpaid", "sold at tax sale", "delinquent", "bankruptcy")
 
 
@@ -300,17 +314,33 @@ async def _walk_prefix(client: httpx.AsyncClient, sub: str, prefix: str,
     every character at or after the last one seen, since anything past the last name
     on the last page we managed to read is unread rather than absent.
     """
-    if not budget.take():
-        return False, set()
-    try:
-        vs = await _fresh_vs(client, sub)
-        if not vs["vs"]:
-            stats["errors"] += 1
+    # A prefix abandoned on one exception is a whole initial silently missing from the
+    # county, with nothing but an errors counter to show it. Observed live: two
+    # transient macOS DNS failures ("nodename nor servname provided") dropped letters
+    # A and B outright. So retry with backoff, and if it still fails, name the prefix
+    # in the log so the hole is identifiable rather than merely counted.
+    rows = None
+    vs = None
+    for attempt in range(3):
+        if not budget.take():
             return False, set()
-        rows, vs = await _post(client, sub, vs, prefix, None)
-    except Exception as exc:  # noqa: BLE001
-        stats["errors"] += 1
-        log.warning("qpaybill_roll.search_fail", prefix=prefix, error=str(exc)[:120])
+        try:
+            vs = await _fresh_vs(client, sub)
+            if not vs["vs"]:
+                raise RuntimeError("no __VIEWSTATE on the search page")
+            rows, vs = await _post(client, sub, vs, prefix, None)
+            break
+        except Exception as exc:  # noqa: BLE001
+            if attempt == 2:
+                stats["errors"] += 1
+                stats.setdefault("lost_prefixes", []).append(prefix)
+                log.warning("qpaybill_roll.search_lost", prefix=prefix,
+                            attempts=3, error=str(exc)[:120],
+                            note="this prefix contributed NOTHING; the county roll is "
+                                 "incomplete for owners whose name starts with it")
+                return False, set()
+            await asyncio.sleep(1.5 * (attempt + 1))
+    if rows is None:
         return False, set()
     stats["queries"] += 1
     if rows and not _all_match(rows, prefix):
@@ -388,13 +418,13 @@ async def sweep_county(client: httpx.AsyncClient, county: str, sub: str,
     rejected pages were never read.
     """
     sink: dict[tuple[str, str, str], dict] = {}
-    stats = {"queries": 0, "errors": 0, "page_capped_prefixes": 0,
-             "pager_stalled": 0, "drifted": 0, "deepened": 0,
-             "truncated_prefixes": 0}
+    stats: dict = {"queries": 0, "errors": 0, "page_capped_prefixes": 0,
+                   "pager_stalled": 0, "drifted": 0, "deepened": 0,
+                   "truncated_prefixes": 0, "lost_prefixes": []}
     sem = asyncio.Semaphore(_PER_HOST_CONCURRENCY)
 
     async def guarded(prefix: str) -> tuple[str, bool, set]:
-        async with sem:
+        async with _global_sem(), sem:
             async with httpx.AsyncClient(timeout=45.0, follow_redirects=True,
                                          headers={"User-Agent": _UA}) as own:
                 deeper, chars = await _walk_prefix(own, sub, prefix, budget,
@@ -513,8 +543,15 @@ class QPayBillDelinquentRoll(BaseScraper):
             listings = _to_listings(county, rows)
             per_county[county] = len(listings)
             out.extend(listings)
+            lost = stats.pop("lost_prefixes", [])
             log.info("qpaybill_roll.county_done", county=county,
-                     parcels=len(listings), rows=len(rows), **stats)
+                     parcels=len(listings), rows=len(rows),
+                     lost_prefixes=len(lost), **stats)
+            if lost:
+                log.warning("qpaybill_roll.county_incomplete", county=county,
+                            prefixes=sorted(lost),
+                            note="owners whose name starts with these were never "
+                                 "read; this county's roll is INCOMPLETE")
 
         starved = sorted(c for c, b in budgets.items() if b.left <= 0)
         if starved:
