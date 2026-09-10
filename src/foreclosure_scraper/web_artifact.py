@@ -481,6 +481,33 @@ RAW_KEEP = {
     "vacant_lot": "*",                # undeveloped/vacant land-use from the parcel cache (land-wholesale signal)
     "bankruptcy_stay": "*",           # foreclosure stayed by an automatic stay (§362) + resume-risk
     "liensnc": "*",                   # LiensNC lien-agent filing (builder/investor distress)
+    # Followed-through LiensNC related filings: the Notice-to-Lien-Agent filings a
+    # supplier or sub recorded against the project (which NAMES them), plus the
+    # OWNER's phone / email / mailing address off the same report. 18,932 board rows
+    # carry related_filings="Yes" and none had ever been followed; measured
+    # 2026-09-10 the owner phone + email come back on 1500/1500 fetches, against a
+    # published outreach file that reported with_phone=0. Contactability, not lead
+    # count, is this engine's real ceiling — so this must survive the publish slim.
+    "liensnc_related": "*",
+    # Fullmer deal-economics rank {rank, why, flags, cad_value, owner_count,
+    # liquidity, margin_coverage}. The dashboard sorts and filters on it, so
+    # stripping it here would make the whole ranking invisible.
+    "fullmer": "*",
+    # --- keys the 2026-09-10 RAW_KEEP audit found were being silently dropped ---
+    # tests/test_raw_keep_covers_enrichers.py now fails if a new enricher joins them.
+    "estimated_monthly_rent_acs": "*",  # ACS $/sqft rent estimate — the rental-exit number
+    "land_use_commercial_hint": "*",    # commercial land-use signal (warehouse/retail/MF)
+    "environmental_risk": "*",          # contamination / UST / brownfield proximity
+    "dnc_scrub": "*",                   # DNC check result per phone — needed to show WHY a
+                                        # number is or is not dialable, not just to filter
+    "marriage_license": "*",            # marriage/divorce distress match
+    "address_is_approximate": "*",      # DATA QUALITY: without it an approximated address
+                                        # renders as though it were surveyed-exact
+    "rod_lookup": "*",                  # Register of Deeds lookup result
+    "assessor_photo": "*",              # which county/endpoint supplied the photo in
+                                        # zillow.photo — provenance for image trust
+    "vision_unscored": "*",             # why an image could not be graded (answers the
+                                        # recurring "why isn't this one scored" question)
     "builder_distress": "*",          # LiensNC cluster/related-filings = over-leveraged flipper
     "owner_mismatch": "*",            # court lead whose geo-snapped property was stripped (name-only, unverified)
     "resolved_from_name": "*",        # name->property resolver provenance {county, strategy, confidence}

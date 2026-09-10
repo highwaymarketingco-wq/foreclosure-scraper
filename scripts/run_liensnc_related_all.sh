@@ -10,10 +10,13 @@ for i in $(seq 1 12); do
   echo "=== batch $i exit=$rc  $(date) ==="
   [ $rc -ne 0 ] && { echo "batch failed, stopping"; break; }
   grep -q "nothing to do" /dev/null 2>&1
+  # Count from the SIDECAR, the durable store -- the checkpoint once claimed 1,508
+  # entries were captured whose data had been stripped at publish.
   remaining=$(python3 -c "
-import json
-d=json.load(open('logs/liensnc_related_checkpoint.json'))
-print(18932-len(d['done']))" 2>/dev/null || echo 0)
+import pathlib
+p=pathlib.Path('logs/liensnc_related.jsonl')
+n=sum(1 for _ in p.open()) if p.exists() else 0
+print(18932-n)" 2>/dev/null || echo 0)
   echo "remaining: $remaining"
   [ "$remaining" -le 0 ] && { echo "queue dry"; break; }
 done

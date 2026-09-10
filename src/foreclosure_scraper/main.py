@@ -2776,6 +2776,26 @@ async def run() -> int:
     except Exception:
         log.error("derived_signals.failed", traceback=traceback.format_exc())
 
+    # Fullmer deal-economics rank — the buy box from Distressed Property Secrets and
+    # the Dirty Deeds interviews, expressed as POINTS. Runs after derived_signals
+    # because it reads calc.est_gross_margin, distress_stack.absentee, deed_chain and
+    # the CAD anchor, all of which the passes above populate.
+    #
+    # It ORDERS the board and never trims it (rank_board asserts the row count is
+    # unchanged). That is deliberate: his CAD>=$200k / won't-touch-<$50k / $50k-margin
+    # floors are Bexar County arithmetic — that county taxes at ~2.7% against NC/SC's
+    # ~0.6-0.9%, so arrears accrue ~3x slower here and the same margin shows up at a
+    # far lower value; a flat floor would delete most of Rutherford, Polk, McDowell,
+    # Cherokee, Union and Abbeville. He does not delete leads either, he ranks them
+    # ("there are hundreds of other people in my CRM right now"). The operator moves
+    # their own bar in the dashboard instead of waiting on a re-run.
+    try:
+        from .fullmer_rank import rank_board
+        enrichment_stats["fullmer_rank"] = rank_board(enriched)
+        log.info("orchestrator.fullmer_ranked", **enrichment_stats["fullmer_rank"]["buckets"])
+    except Exception:
+        log.error("fullmer_rank.failed", traceback=traceback.format_exc())
+
     # Derivation flags — free_and_clear (no mortgage in ROD), tired_landlord
     # (absentee + 10yr ownership), divorce (from nc_ecourts_divorce scraper).
     # Pure compute over existing ROD + GIS + court data.

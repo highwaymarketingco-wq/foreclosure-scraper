@@ -77,6 +77,41 @@ MARGIN_COVERAGE_MIN = 2.0
 # slower exit, not an impossible one -- he still says "just lower the price".
 LIQUIDITY_POINTS = {"major": 12, "mid": 8, "thin": 3, "unknown": 4}
 
+# Which MSA's buyer pool actually absorbs the exit. Tiered by metro, not county
+# population, because "when I'm done fixing my title problem I want to exit this
+# property and get paid" (ep 019) -- and a 300-person town has one investor who
+# already bought his rent house this year. Counties the operator does not track are
+# left "unknown" rather than penalised; the footprint gate is main.py's job, not
+# this module's, and this module must never be the thing that hides a lead.
+MSA_TIER: dict[tuple[str, str], str] = {
+    # Charlotte-Concord-Gastonia (~2.8M)
+    ("gaston", "NC"): "major", ("lincoln", "NC"): "major", ("cleveland", "NC"): "major",
+    # Asheville (~475K)
+    ("buncombe", "NC"): "mid", ("henderson", "NC"): "mid", ("madison", "NC"): "mid",
+    ("haywood", "NC"): "mid",
+    # Hickory-Lenoir-Morganton (~365K)
+    ("burke", "NC"): "mid",
+    # Greenville-Anderson (~950K) + Spartanburg (~330K)
+    ("greenville", "SC"): "major", ("spartanburg", "SC"): "mid",
+    ("anderson", "SC"): "mid", ("pickens", "SC"): "mid",
+    # Upstate SC rural -- real markets, thin exits
+    ("laurens", "SC"): "thin", ("greenwood", "SC"): "thin", ("cherokee", "SC"): "thin",
+    ("union", "SC"): "thin", ("oconee", "SC"): "thin", ("abbeville", "SC"): "thin",
+    ("newberry", "SC"): "thin",
+    # Rural WNC
+    ("rutherford", "NC"): "thin", ("polk", "NC"): "thin", ("mcdowell", "NC"): "thin",
+    ("transylvania", "NC"): "thin", ("yancey", "NC"): "thin", ("mitchell", "NC"): "thin",
+    ("avery", "NC"): "thin", ("swain", "NC"): "thin", ("jackson", "NC"): "thin",
+    ("macon", "NC"): "thin", ("clay", "NC"): "thin", ("graham", "NC"): "thin",
+    ("cherokee", "NC"): "thin",
+    # Coastal (operator authorised these for foreclosure + all distressed)
+    ("new hanover", "NC"): "major", ("brunswick", "NC"): "mid", ("onslow", "NC"): "mid",
+    ("carteret", "NC"): "thin", ("pender", "NC"): "thin",
+    ("charleston", "SC"): "major", ("berkeley", "SC"): "major",
+    ("dorchester", "SC"): "major", ("horry", "SC"): "major",
+    ("beaufort", "SC"): "mid", ("georgetown", "SC"): "thin", ("colleton", "SC"): "thin",
+}
+
 
 def _num(v) -> Optional[float]:
     try:
@@ -182,7 +217,7 @@ def liquidity_tier(li: Listing, msa_tier: dict) -> str:
 
 def score(li: Listing, msa_tier: dict | None = None) -> dict:
     """Return the rank breakdown for one lead. Pure; mutates nothing."""
-    msa_tier = msa_tier or {}
+    msa_tier = msa_tier if msa_tier is not None else MSA_TIER
     pts = 0
     flags: list[str] = []
     why: dict[str, int] = {}
@@ -309,6 +344,7 @@ def rank_board(listings: list[Listing], msa_tier: dict | None = None) -> dict:
     asserted, because a "ranking" pass that silently trims is the exact failure
     this project keeps hitting.
     """
+    msa_tier = msa_tier if msa_tier is not None else MSA_TIER
     before = len(listings)
     buckets = {"A (70+)": 0, "B (50-69)": 0, "C (30-49)": 0, "D (<30)": 0}
     for li in listings:

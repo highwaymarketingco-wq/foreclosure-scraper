@@ -42,6 +42,13 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
 CHECKPOINT = REPO / "logs" / "liensnc_related_checkpoint.json"
+# DURABLE STORE, appended per fetch. The first 1,500-entry run wrote results only
+# into raw['liensnc_related'] and web_artifact.RAW_KEEP -- an allowlist that strips
+# any raw key not named in it -- silently discarded every one: a scan of the written
+# board found 0 rows carrying the key. The allowlist now names it, but an expensive,
+# politely-rate-limited harvest must not depend on a publish-time allowlist at all.
+# This file is the source of truth; the board copy is a convenience.
+SIDECAR = REPO / "logs" / "liensnc_related.jsonl"
 REPORT_PATH = "/scr/filing/report/relatedFilings.html?entryNumber={entry}"
 
 _CELL_RE = re.compile(r"<t[dh][^>]*>(.*?)</t[dh]>", re.S | re.I)
@@ -186,8 +193,19 @@ async def main() -> int:
     print(f"board rows {before:,} | related_filings=Yes with an entry number: {len(targets):,}")
 
     ck = load_ckpt()
-    todo = [(e, li) for e, li in targets if e not in ck["done"]]
-    print(f"already fetched: {len(ck['done']):,} | remaining: {len(todo):,}")
+    # Trust the SIDECAR for what is genuinely captured. The checkpoint alone once
+    # marked 1,508 entries "done" whose data had been stripped at publish, so the
+    # work looked complete while nothing had been kept.
+    have: set = set()
+    if SIDECAR.exists():
+        for line in SIDECAR.read_text(encoding="utf-8").splitlines():
+            try:
+                have.add(str(json.loads(line).get("entry_number")))
+            except Exception:  # noqa: BLE001
+                continue
+    print(f"sidecar holds {len(have):,} captured entries")
+    todo = [(e, li) for e, li in targets if e not in have]
+    print(f"remaining to fetch: {len(todo):,}")
     todo = todo[: args.limit]
     if not todo:
         print("nothing to do.")
@@ -215,6 +233,10 @@ async def main() -> int:
                 stats["error"] += 1
                 await asyncio.sleep(args.delay)
                 continue
+
+            # Append BEFORE anything else can drop it.
+            with SIDECAR.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps({"entry_number": entry, **got}, default=str) + "\n")
 
             ck["done"][entry] = got["notice_count"]
             stats["fetched"] += 1
