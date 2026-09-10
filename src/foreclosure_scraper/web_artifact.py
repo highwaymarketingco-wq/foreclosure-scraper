@@ -569,6 +569,90 @@ RAW_KEEP = {
     "sos_dissolution": "*",            # NC SOS LLC dissolution status
     "tax_aging_surfaced": "*",         # surfaced tax aging status for all listings
     "two_year_delinquent": "*",        # 2yr+ delinquent flag for all listings
+
+    # ------------------------------------------------------------------
+    # 2026-09-10 SCRAPER-KEY AUDIT. Measured, not suspected: of 191 distinct raw
+    # keys written by the 219 scrapers, 160 were absent from this allowlist, and a
+    # scan of the live 94,384-row board found ZERO rows carrying ANY key outside it.
+    # The allowlist is total, and it is silent -- _slim_raw drops an unlisted key at
+    # write with no error and no log line.
+    #
+    # So these scrapers were working, their rows were reaching the board, and the
+    # parsed detail behind every one of those rows was being thrown away at publish.
+    # Confirmed at 0 rows each on the live board before this change:
+    #     absentee_owner  heir_estate  nc_ecourts_divorce  upset_bid_deadline
+    #     tax_sale_status  obituary  sc_public_index  mcdowell_probate
+    # That is the absentee-owner signal, the heirship signal, the divorce join, the
+    # upset-bid clock and the probate feed -- the fields this engine is FOR.
+    #
+    # This is the same mechanism that discarded 1,500 harvested owner phones earlier
+    # today via the missing `liensnc_related` key. That was fixed one key at a time;
+    # this is the class.
+    #
+    # tests/test_raw_keep_covers_enrichers.py now asserts scraper keys as well as
+    # enricher keys, so key 192 fails a test instead of vanishing.
+
+    # cross-cutting distress signals
+    "absentee_owner": "*", "bank_name": "*", "case": "*",
+    "cash_buyer_deeds": "*", "court": "*", "document_url": "*",
+    "epa_id": "*", "filing_number": "*", "flc": "*",
+    "geo_missing": "*", "geo_source": "*", "heir_estate": "*",
+    "irs": "*", "irs_treasury": "*", "legacy": "*",
+    "mtg_file": "*", "multiple_owners": "*", "notice_url": "*",
+    "obituary": "*", "onemap_resolved": "*", "owner": "*",
+    "permit_type": "*", "sale_type": "*", "scdot_parcel_resolved": "*",
+    "status": "*", "tax_sale_status": "*", "tms": "*",
+    "upset_bid_deadline": "*", "violation_type": "*", "zombie_property": "*",
+
+    # third-party listing / property identifiers, needed to re-find a lead upstream
+    "fc_listing_id": "*", "govdeals_asset_id": "*", "homesteps_kind": "*",
+    "hud_property_id": "*", "reo_id": "*", "trulia_id": "*",
+    "usda_property_id": "*", "vrm_id": "*", "xome_listing_id": "*",
+    "zpid": "*",
+
+    # per-source provenance: the parsed cells, case numbers and notice URLs behind
+    # each lead, which is what an operator opens a row to check
+    "aiken_delinquent_tax": "*", "anderson_sheriff": "*", "arcgis_distress": "*",
+    "asheville_min_housing": "*", "auction_bank_reo": "*", "auction_dot_com": "*",
+    "bamberg_sheriff": "*", "barnwell_sheriff": "*", "brunswick_legal_notices": "*",
+    "buncombe_tax": "*", "charleston_delinquent_tax": "*", "charleston_mie": "*",
+    "chester_delinquent_tax": "*", "clarendon_tax_auction": "*", "cleveland_tax": "*",
+    "cleveland_tax_foreclosure": "*", "coastland_times": "*", "colleton_tax_sale": "*",
+    "courtlistener_civil": "*", "craigslist": "*", "cumberland_tax_foreclosure": "*",
+    "cws": "*", "daily_courier": "*", "darlington_delinquent_tax": "*",
+    "dillon_sheriff": "*", "edgecombe_tax_foreclosure": "*", "edgefield_delinquent_tax": "*",
+    "epa_frs": "*", "estate_sales": "*", "fairfield_delinquent_tax": "*",
+    "first_citizens_reo": "*", "florence_delinquent_tax": "*", "gaston_gis": "*",
+    "gaston_surplus": "*", "gaston_tax_foreclosures": "*", "georgetown_civicengage": "*",
+    "greenwood_delinquent_tax": "*", "gsa": "*", "haywood_tax_foreclosures": "*",
+    "helene": "*", "henderson_tax": "*", "hendersonville_delinquent_tax": "*",
+    "hendersonville_lightning": "*", "hibid": "*", "homeharvest": "*",
+    "horry_flc": "*", "hubzu": "*", "ingle_firm": "*",
+    "kershaw_flc": "*", "lancaster_delinquent_tax": "*", "landandfarm": "*",
+    "landsofamerica": "*", "landwatch": "*", "laurens_delinquent_tax": "*",
+    "lincoln_vacant": "*", "marlboro_delinquent_tax": "*", "mccormick_flc": "*",
+    "mcdowell_probate": "*", "mcdowell_tax_foreclosure": "*", "meares": "*",
+    "mewborn_deselms": "*", "nc_bankruptcy_sales": "*", "nc_civicplus_tax_sale": "*",
+    "nc_coastal_tax_foreclosure": "*", "nc_deq_dsca": "*", "nc_ecourts_divorce": "*",
+    "nc_ecourts_estates": "*", "nc_govdeals_real_property": "*", "nc_rod": "*",
+    "nchfa_reo": "*", "new_hanover_foreclosures": "*", "newberry_delinquent_tax": "*",
+    "oconee_flc": "*", "oconee_flc_assignment": "*", "oconee_forfeited_land": "*",
+    "oconee_tax_sale": "*", "pickens_tax_sale": "*", "polk_tax": "*",
+    "qpaybill_roll": "*", "realtor": "*", "rutherford_foreclosure": "*",
+    "rutherford_tax": "*", "saluda_delinquent_tax": "*", "sc_coastal_roster": "*",
+    "sc_county_roster": "*", "sc_delinquent_tax": "*", "sc_des_brownfield": "*",
+    "sc_dor_delinquent": "*", "sc_flc": "*", "sc_probate_net": "*",
+    "sc_public_index": "*", "sc_ust_registry": "*", "seeclickfix": "*",
+    "servicelink": "*", "shapiro_ingle_pbi": "*", "shelby_star": "*",
+    "sheriff_sale": "*", "sitemap_walker": "*", "spartanburg_flc": "*",
+    "state_contamination": "*", "stokes_delinquent_tax": "*", "sumter_surplus": "*",
+    "surplus_auction": "*", "swain_tax_foreclosures": "*", "townnews_legal": "*",
+    "transylvania_tax": "*", "transylvania_vacant": "*", "tranzon": "*",
+    "treasury_seized": "*", "tryon_bulletin": "*", "union_delinquent_tax": "*",
+    "usda_rd": "*", "usmarshals": "*", "wake_tax_foreclosure": "*",
+    "williams": "*", "wnc_rod": "*", "wnc_tax_foreclosures": "*",
+    "york_delinquent_tax": "*",
+
 }
 
 

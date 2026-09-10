@@ -113,3 +113,84 @@ def test_the_two_keys_that_were_actually_lost_are_now_covered():
     """Direct regression pin for the 2026-09-10 loss."""
     assert "liensnc_related" in RAW_KEEP
     assert "fullmer" in RAW_KEEP
+
+
+# ===========================================================================
+# SCRAPER raw keys. The tests above cover ENRICHERS only, and that blind spot is
+# exactly what let this through: on 2026-09-10 they all passed while 160 of the
+# 191 raw keys written by the 219 scrapers were absent from RAW_KEEP, and a scan
+# of the live 94,384-row board found ZERO rows carrying ANY key outside the
+# allowlist. _slim_raw drops an unlisted key at write with no error and no log,
+# so the symptom was "the source runs, the row is there, the detail is empty".
+#
+# Confirmed at 0 rows each on the live board before the fix: absentee_owner,
+# heir_estate, nc_ecourts_divorce, upset_bid_deadline, tax_sale_status, obituary,
+# sc_public_index, mcdowell_probate.
+# ===========================================================================
+
+import re as _re
+from pathlib import Path as _Path
+
+_SCRAPER_DIR = _Path(__file__).resolve().parent.parent / "src" / "foreclosure_scraper" / "scrapers"
+
+#: Keys a scraper writes that are deliberately NOT published, each with its reason.
+#: Add here only with a reason -- an entry without one is how a real signal gets
+#: quietly reclassified as noise.
+SCRAPER_KEYS_INTENTIONALLY_INTERNAL = {
+    "source_url": "duplicates the Listing.source_url column; a raw copy shadowing a "
+                  "real field invites the two disagreeing",
+    "documents": "generic bag already carried by the document_links / doc_ocr keys",
+}
+
+
+def _scraper_raw_keys() -> dict[str, set[str]]:
+    """Every key any scraper writes into Listing.raw, mapped to the modules doing it."""
+    out: dict[str, set[str]] = {}
+    for f in sorted(_SCRAPER_DIR.rglob("*.py")):
+        t = f.read_text()
+        keys = set(_re.findall(r'raw\s*=\s*\{\s*["\']([A-Za-z0-9_]+)["\']', t))
+        keys |= set(_re.findall(r'\braw\[\s*["\']([A-Za-z0-9_]+)["\']\s*\]\s*=', t))
+        keys |= set(_re.findall(r'\braw\.setdefault\(\s*["\']([A-Za-z0-9_]+)["\']', t))
+        for k in keys:
+            out.setdefault(k, set()).add(f.stem)
+    return out
+
+
+def test_the_audit_actually_finds_scraper_keys():
+    """Guards the guard. If the regexes stop matching -- someone builds raw a new
+    way -- this test would pass vacuously and stop protecting anything."""
+    keys = _scraper_raw_keys()
+    assert len(keys) > 150, f"only found {len(keys)} scraper raw keys; the scan broke"
+    assert "liensnc" in keys
+
+
+def test_every_scraper_raw_key_survives_publish():
+    """THE test. A scraper that writes a key RAW_KEeP does not name is doing work
+    that is discarded at publish, and nothing anywhere reports it."""
+    from foreclosure_scraper.web_artifact import RAW_KEEP
+    keys = _scraper_raw_keys()
+    missing = {k: sorted(v) for k, v in sorted(keys.items())
+               if k not in RAW_KEEP and k not in SCRAPER_KEYS_INTENTIONALLY_INTERNAL}
+    assert not missing, (
+        f"{len(missing)} scraper raw key(s) are dropped at publish with no error:\n"
+        + "\n".join(f"    {k!r:<34} written by {', '.join(v[:3])}"
+                    for k, v in list(missing.items())[:25])
+        + "\n\nAdd each to RAW_KEEP in web_artifact.py, or to "
+          "SCRAPER_KEYS_INTENTIONALLY_INTERNAL above WITH A REASON."
+    )
+
+
+def test_the_internal_list_states_a_reason_for_every_entry():
+    for key, reason in SCRAPER_KEYS_INTENTIONALLY_INTERNAL.items():
+        assert reason and len(reason) > 20, (
+            f"{key!r} is excluded from publish without a real reason. An unexplained "
+            f"exclusion is how a working signal gets reclassified as noise."
+        )
+
+
+def test_the_new_qpaybill_roll_key_is_published():
+    """Pins the specific key this audit was triggered by."""
+    from foreclosure_scraper.web_artifact import RAW_KEEP, _slim_raw
+    assert "qpaybill_roll" in RAW_KEEP
+    kept = _slim_raw({"qpaybill_roll": {"balance_owed": 130.55, "is_two_year_plus": True}})
+    assert kept["qpaybill_roll"]["balance_owed"] == 130.55

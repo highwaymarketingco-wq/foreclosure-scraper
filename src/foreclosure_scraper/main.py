@@ -529,6 +529,11 @@ DATELESS_OK_SOURCES = {
     # with sale_date=None, so _active_only discarded the entire source. These are the
     # only free SC leads that carry a named, mail-reachable decision-maker.
     "counties_sc.sc_probate_notices",
+    # A delinquent tax BALANCE is a standing condition with no sale date -- SC runs
+    # an administrative sale, so there is no docket date to carry. Without this entry
+    # _active_only() deletes every row this source produces, which is how
+    # pickens_tax_sale lost 160 rows and sc_probate_notices lost 880.
+    "counties_sc.qpaybill_delinquent_roll",
     # Spartanburg City Master Condemnation List — a condemnation is a standing condition.
     "counties_sc.spartanburg_city_condemned",
     # Hendersonville vacant/condemned structures register — same, standing condition.
