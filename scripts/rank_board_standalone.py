@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stamp raw['fullmer'] on the live board without a full pipeline run.
+"""Stamp raw['owner_name_signal'] and raw['fullmer'] on the live board without a full run.
 
 WHY THIS EXISTS
     `rank_board` runs inside main.run(), so the rank only lands when a full scrape
@@ -35,6 +35,7 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
+    from foreclosure_scraper.enrichment_owner_name_signal import enrich_owner_name_signal
     from foreclosure_scraper.fullmer_rank import rank_board
     from foreclosure_scraper.web_artifact import board_lock, load_board, write_artifact
     from foreclosure_scraper.config import ALL_COUNTIES
@@ -47,6 +48,18 @@ def main() -> int:
         listings = load_board(REPO / "docs")
         before = len(listings)
         print(f"board rows: {before:,}")
+
+        # OWNER-NAME SIGNAL FIRST, because rank_board reads it.
+        #
+        # Measured 2026-09-10: raw["owner_name_signal"] was present on ZERO board rows
+        # while fullmer_rank.score() reads it for a 12-point owner_name_death factor.
+        # Not because the enricher is broken -- because it only runs inside main.run(),
+        # and no full scrape has landed since it was wired. Exactly the situation
+        # raw["fullmer"] was in, which is why this script exists. It is pure string
+        # classification over owner names already on the board: no network, no cost.
+        ons = enrich_owner_name_signal(listings)
+        assert len(listings) == before, "owner-name signal must not change the row count"
+        print(f"owner_name_signal: {ons}")
 
         stats = rank_board(listings)
         assert len(listings) == before, "ranking must not change the row count"
@@ -87,7 +100,7 @@ def main() -> int:
 
         write_artifact(listings, {
             "total": len(listings),
-            "notes": (f"fullmer rank stamped on {stats['ranked']:,} rows "
+            "notes": (f"owner-name signal + fullmer rank on {stats['ranked']:,} rows "
                       f"(A {stats['buckets']['A (70+)']:,} / "
                       f"B {stats['buckets']['B (50-69)']:,} / "
                       f"C {stats['buckets']['C (30-49)']:,} / "
