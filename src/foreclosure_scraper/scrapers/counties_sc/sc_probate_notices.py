@@ -360,10 +360,26 @@ class SCProbateNotices(BaseScraper):
         guard = LayerHarvest(self.slug, [p.host for p in PAPERS], attempts=2,
                              tolerate=("www.gaffneyledger.com",
                                        "www.laurenscountyadvertiser.net"))
+        # CONCURRENT, not sequential. Measured 2026-09-10: Pickens 520 rows in 4.5s,
+        # Laurens 135 in 2.3s, but the Gaffney Ledger takes 222.9s on its own because
+        # it is read one article page at a time. Run in series that is ~230s against a
+        # 180s soft timeout, so the source timed out and reported ALARM every run.
+        # Run concurrently, the two fast papers land in seconds and are banked in
+        # self.partial, so even if Gaffney is still going when the timeout fires,
+        # base_scraper ships 655 rows instead of nothing. Gaffney is already in the
+        # guard's `tolerate` set, so its slowness cannot fail the source either.
         async with client(timeout=60.0) as c:
             with guard:
-                for paper in PAPERS:
-                    out.extend(await guard.harvest(paper.host, self._one(c, paper)))
+                harvested = await asyncio.gather(
+                    *(guard.harvest(paper.host, self._one(c, paper)) for paper in PAPERS),
+                    return_exceptions=True,
+                )
+        for res in harvested:
+            if isinstance(res, BaseException):
+                # The guard already logged and classified it; a tolerated host that
+                # blew up must not take the other two papers' rows down with it.
+                continue
+            out.extend(res)
         return out
 
     @staticmethod

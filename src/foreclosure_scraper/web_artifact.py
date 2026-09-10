@@ -495,6 +495,13 @@ RAW_KEEP = {
     "fullmer": "*",
     # --- keys the 2026-09-10 RAW_KEEP audit found were being silently dropped ---
     # tests/test_raw_keep_covers_enrichers.py now fails if a new enricher joins them.
+    # SC probate Notice-to-Creditors: decedent, case number, date of death, and the
+    # PERSONAL REPRESENTATIVE plus their mailing address. That PR is a named,
+    # mail-reachable human who controls the property -- and SC is mail-only
+    # (measured phone coverage 8-18% across all seven SC counties), so this is the
+    # SC contact lane. Dropping it discarded exactly the field the source exists for.
+    "sc_probate_notice": "*",
+    "life_event": "*",                  # death / divorce marker the resolver keys off
     "estimated_monthly_rent_acs": "*",  # ACS $/sqft rent estimate — the rental-exit number
     "land_use_commercial_hint": "*",    # commercial land-use signal (warehouse/retail/MF)
     "environmental_risk": "*",          # contamination / UST / brownfield proximity

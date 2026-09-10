@@ -485,6 +485,12 @@ DATELESS_OK_SOURCES = {
     # Without this entry _active_only discarded the whole source, which is why a healthy
     # scraper reported OK(160) and contributed 0 board rows.
     "counties_sc.pickens_tax_sale",
+    # SC probate Notice to Creditors. An estate has no sale date -- SC Probate Code
+    # 62-3-801 requires the notice, the notice is the event. Measured 2026-09-10 the
+    # source returns 880 rows (Pickens 520, Cherokee 225, Laurens 135), every one
+    # with sale_date=None, so _active_only discarded the entire source. These are the
+    # only free SC leads that carry a named, mail-reachable decision-maker.
+    "counties_sc.sc_probate_notices",
     # Spartanburg City Master Condemnation List — a condemnation is a standing condition.
     "counties_sc.spartanburg_city_condemned",
     # Hendersonville vacant/condemned structures register — same, standing condition.
