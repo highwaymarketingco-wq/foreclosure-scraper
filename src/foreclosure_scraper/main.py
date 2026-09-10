@@ -2782,6 +2782,15 @@ async def run() -> int:
     except Exception:
         log.error("derived_signals.failed", traceback=traceback.format_exc())
 
+    # Death / fractured-ownership signal straight off the owner name. Runs before the
+    # Fullmer rank so the rank can see it, and needs no network at all.
+    try:
+        from .enrichment_owner_name_signal import enrich_owner_name_signal
+        s = enrich_owner_name_signal(enriched)
+        if s: enrichment_stats["owner_name_signal"] = s
+    except Exception:
+        log.error("owner_name_signal.failed", traceback=traceback.format_exc())
+
     # Fullmer deal-economics rank — the buy box from Distressed Property Secrets and
     # the Dirty Deeds interviews, expressed as POINTS. Runs after derived_signals
     # because it reads calc.est_gross_margin, distress_stack.absentee, deed_chain and

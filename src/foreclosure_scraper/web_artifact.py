@@ -500,6 +500,13 @@ RAW_KEEP = {
     # mail-reachable human who controls the property -- and SC is mail-only
     # (measured phone coverage 8-18% across all seven SC counties), so this is the
     # SC contact lane. Dropping it discarded exactly the field the source exists for.
+    # Graded death / fractured-ownership signal read out of the owner name itself.
+    # A county only rewrites the owner of record when a survivor rings the tax office,
+    # so "HEIRS OF" / "ESTATE OF" / "ET AL" implies a death AND an engaged, reachable
+    # survivor. Measured 2026-09-10: 2,414 rows carry a token and are NOT on any
+    # probate or obituary source (1,352 in-footprint) against 358 the dedicated
+    # scrapers surface -- roughly 7x, for a regex over a column already stored.
+    "owner_name_signal": "*",
     "sc_probate_notice": "*",
     "life_event": "*",                  # death / divorce marker the resolver keys off
     "estimated_monthly_rent_acs": "*",  # ACS $/sqft rent estimate — the rental-exit number

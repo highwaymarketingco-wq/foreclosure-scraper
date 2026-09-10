@@ -282,6 +282,22 @@ def score(li: Listing, msa_tier: dict | None = None) -> dict:
         # "Heirship ... this is where 70% of our deals live."
         add("probate_heirs", 16, "probate_or_heirs")
 
+    # Owner-name token signal, graded. A county only rewrites the owner of record
+    # when a survivor rings the tax office, so "HEIRS OF" / "ESTATE OF" implies a
+    # death AND an engaged, reachable survivor -- warmer than a raw obituary match.
+    # Graded because the tokens are not equal: a living TRUST is ordinary estate
+    # planning, a solvent owner with a lawyer, which is the opposite of the profile.
+    ons = raw.get("owner_name_signal") if isinstance(raw.get("owner_name_signal"), dict) else {}
+    _g = ons.get("grade")
+    if _g == "strong" and not blob_probate:
+        # Only when no probate source already covers it -- otherwise this
+        # double-counts the same death against probate_heirs above.
+        add("owner_name_death", 12, f"owner_name_{ons.get('primary_token')}")
+    elif _g == "medium":
+        add("owner_name_fracture", 5, f"owner_name_{ons.get('primary_token')}")
+    elif _g == "weak":
+        flags.append(f"owner_name_{ons.get('primary_token')}_weak")
+
     dc = raw.get("deed_chain") if isinstance(raw.get("deed_chain"), dict) else {}
     summ = dc.get("summary") if isinstance(dc.get("summary"), dict) else {}
     if _num(summ.get("chain_breaks")):
