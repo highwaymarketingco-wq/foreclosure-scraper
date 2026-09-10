@@ -60,6 +60,24 @@ WHAT IS NOT DONE HERE
     reads the public search grid only. Nothing in this module opens the cart, the
     payment flow, or any authenticated path.
 
+    THE DETAIL PAGE IS A DEAD END, checked 2026-09-10 -- do not re-chase it. The
+    grid's View link (TaxesDetailsType4.aspx?receiptNo=...&recID=...) was the obvious
+    place to look for the owner's MAILING address, which is the field SC leads are
+    short of (SC phone/mail coverage runs 8-18% against NC's 50-89%). It returns a
+    5,713-byte page whose body is the single word ERROR, both on a cold GET and when
+    fetched inside the same session immediately after the search that produced the
+    link, with a Referer set. The mailing address is not available through this
+    portal. The realistic route to SC owner mailing addresses is the county
+    ASSESSOR card keyed by the TMS this source now supplies.
+
+WHAT THIS SOURCE DOES AND DOES NOT GIVE
+    gives    parcel/TMS, owner name (100%), situs address (~57%), balance owed,
+             years unpaid, two-year-plus flag, statuses, notice numbers
+    does NOT give   owner phone, owner mailing address
+    So it closes the SIGNAL and IDENTITY layers for these counties and leaves the
+    CONTACT layer where it was. Said plainly rather than implied, because a source
+    that fills three layers of five is easy to mistake for coverage.
+
 COUNTIES: 19, all verified live 2026-09-10 to return parseable Unpaid RealEstate
 rows with dollar amounts. Subdomain naming is inconsistent (three patterns), so the
 map is explicit rather than derived. Five were already known to
