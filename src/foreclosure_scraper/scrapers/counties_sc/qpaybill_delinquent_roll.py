@@ -60,15 +60,40 @@ WHAT IS NOT DONE HERE
     reads the public search grid only. Nothing in this module opens the cart, the
     payment flow, or any authenticated path.
 
-    THE DETAIL PAGE IS A DEAD END, checked 2026-09-10 -- do not re-chase it. The
-    grid's View link (TaxesDetailsType4.aspx?receiptNo=...&recID=...) was the obvious
-    place to look for the owner's MAILING address, which is the field SC leads are
-    short of (SC phone/mail coverage runs 8-18% against NC's 50-89%). It returns a
-    5,713-byte page whose body is the single word ERROR, both on a cold GET and when
-    fetched inside the same session immediately after the search that produced the
-    link, with a Referer set. The mailing address is not available through this
-    portal. The realistic route to SC owner mailing addresses is the county
-    ASSESSOR card keyed by the TMS this source now supplies.
+    THE DETAIL PAGE IS NOT A DEAD END. An earlier version of this docstring said it was,
+    and committed that claim. It was wrong, and the way it was wrong is worth keeping:
+
+        the grid's link is  href="TaxesDetailsType4.aspx?receiptNo=...&recID=..."
+        which is RELATIVE TO /Taxes/ -- the search page lives at /Taxes/TaxesDefaultType4.aspx.
+        It was joined to the HOST ROOT instead, producing /TaxesDetailsType4.aspx, which the
+        server answers with a 5,713-byte page whose body is the single word ERROR. That was
+        read as "the portal refuses detail requests" rather than "I asked for the wrong URL".
+        Opening the real link in a browser worked instantly.
+
+    A wrong URL join wrote off a whole data layer for 19 counties. Resolve links against the
+    PAGE's URL, never the host root.
+
+    WHAT THE DETAIL PAGE CARRIES (verified live on 4 Barnwell records, 2026-09-10):
+        Total Appraisal       the county's own 100%-basis value -- the CAD number the entire
+                              buy-box rests on. The county coverage matrix has VALUE at 1% in
+                              Oconee, 3% Union, 22% Laurens, 32% Anderson; this fills it.
+        Assessment Ratio      4% = owner-occupied legal residence, 6% = everything else. SC law
+                              sets these, so the ratio is an AUTHORITATIVE owner-occupancy flag
+                              -- i.e. a free absentee-owner signal on every parcel. Verified to
+                              vary in the real data: 3 of 4 sampled were 6%, one was 4% and
+                              carried a $26.11 residential exemption to match.
+        Total Assessed, Land Appraisal, Building Appraisal, Acres, Buildings count
+        Description           the FULL legal/mobile-home description; the grid truncates it
+                              ("PROP OF HORACE AB...") and the detail page does not
+        Property Address, plus the tax breakdown: County Tax, City Tax, Fees, Residential and
+        Homestead Exemptions, Local Option Credit, Penalty, Cost, Total
+
+    STILL NOT THERE: the owner's MAILING address. That part of the old note holds. The route to
+    SC owner mailing remains the county assessor card keyed by the TMS this source supplies.
+
+    COST: one request per parcel. That is why detail is a SECOND, OPT-IN pass
+    (QPAYBILL_ROLL_DETAIL=1, or QPAYBILL_ROLL_DETAIL_MAX to bound it) rather than part of the
+    sweep -- roughly 15,000 parcels across 19 counties would otherwise double the run.
 
 WHAT THIS SOURCE DOES AND DOES NOT GIVE
     gives    parcel/TMS, owner name (100%), situs address (~57%), balance owed,
@@ -119,6 +144,8 @@ from typing import Iterable
 
 import httpx
 import structlog
+
+from html import unescape as html_unescape
 
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
@@ -186,6 +213,11 @@ REQUEST_BUDGET_PER_COUNTY = int(os.getenv("QPAYBILL_ROLL_BUDGET", "2500"))
 
 _PER_HOST_CONCURRENCY = 3
 
+#: Second, opt-in pass: fetch each parcel's detail page for the county appraised value and the
+#: 4%/6% owner-occupancy ratio. One request PER PARCEL, so it is off by default and bounded.
+DETAIL_ENABLED = os.getenv("QPAYBILL_ROLL_DETAIL", "") not in ("", "0", "false", "False")
+DETAIL_MAX = int(os.getenv("QPAYBILL_ROLL_DETAIL_MAX", "400"))
+
 #: Ceiling across ALL counties at once. Nineteen counties x 3 = 57 simultaneous new
 #: clients, each doing its own DNS lookup, and macOS's resolver started returning
 #: "nodename nor servname provided" -- a transient failure that reads exactly like a
@@ -239,7 +271,11 @@ def parse_grid(html: str) -> list[dict]:
         parts = [p.strip() for p in name_addr.split("\n") if p.strip()]
         owner = parts[0] if parts else None
         address = parts[1] if len(parts) > 1 else None
+        # The row's own detail link, kept on the row so the optional detail pass never has to
+        # reconstruct a URL. Reconstructing it is exactly how it got joined to the wrong base.
+        href_m = re.search(r'href="(TaxesDetailsType4\.aspx\?[^"]+)"', row, re.I)
         out.append({
+            "detail_href": html_unescape(href_m.group(1)) if href_m else None,
             "notice_no": clean(tds[0]) or None,
             "owner": owner,
             "address": address,
@@ -466,6 +502,118 @@ async def sweep_county(client: httpx.AsyncClient, county: str, sub: str,
     return list(sink.values()), stats
 
 
+_DETAIL_HREF_RE = re.compile(r'href="(TaxesDetailsType4\.aspx\?[^"]+)"', re.I)
+
+
+def _detail_url(sub: str, href: str) -> str:
+    """Resolve a grid detail link.
+
+    THE bug this function exists to prevent: the href is relative to /Taxes/, because the search
+    page is /Taxes/TaxesDefaultType4.aspx. Joining it to the host root yields a page whose body is
+    the single word ERROR, which reads exactly like a refusal. Always resolve against the page.
+    """
+    href = html_unescape(href).lstrip("/")
+    if href.lower().startswith("taxes/"):
+        href = href[len("taxes/"):]
+    return f"https://{sub}.qpaybill.com/Taxes/{href}"
+
+
+def parse_detail(text: str) -> dict:
+    """Fields off one detail page. Returns {} when the page is not a real record.
+
+    Parsed from the page's visible text rather than its markup: the layout is a stack of
+    label/value pairs whose surrounding tags differ between counties, but the LABELS are stable.
+    """
+    flat = re.sub(r"(?is)<(script|style).*?</\1>", " ", text)
+    flat = html_unescape(re.sub(r"<[^>]+>", "\n", flat))
+    flat = re.sub(r"[ \t]+", " ", flat)
+    if "Notice #" not in flat and "Balance Due" not in flat:
+        return {}
+
+    def after(label: str) -> str | None:
+        m = re.search(re.escape(label) + r"\s*\n?\s*([^\n]{0,80})", flat)
+        if not m:
+            return None
+        v = m.group(1).strip().strip(":").strip()
+        return v or None
+
+    def money(label: str) -> float | None:
+        v = after(label)
+        m = re.search(r"\$?\s*([\d,]+(?:\.\d{2})?)", v or "")
+        if not m:
+            return None
+        try:
+            return float(m.group(1).replace(",", ""))
+        except ValueError:
+            return None
+
+    # "Assessment Ratio:" sits above a 3-value row: ratio | land appraisal | building appraisal.
+    ratio = None
+    rm = re.search(r"\n\s*(\d{1,2})%\s*\n", flat)
+    if rm:
+        ratio = int(rm.group(1))
+
+    out = {
+        "appraised_value": money("Total Appraisal:"),
+        "assessed_value": money("Total Assessed:"),
+        "assessment_ratio_pct": ratio,
+        # SC: 4% is the owner-occupied legal-residence ratio, 6% is everything else. So a 6%
+        # parcel is NOT the owner's residence -- a free, authoritative absentee signal.
+        "owner_occupied": (ratio == 4) if ratio in (4, 6) else None,
+        "acres": after("Acres:"),
+        "buildings": after("Buildings:"),
+        "record_type": after("Record Type:"),
+        "map_number": after("Map Number:"),
+        "legal_description": after("Description:"),
+        "residential_exemption": money("Residential Exemption:"),
+        "homestead_exemption": money("Homestead Exemption:"),
+        "county_tax": money("County Tax:"),
+        "penalty": money("Penalty:"),
+        "cost": money("Cost:"),
+        "issue_date": after("Issue Date:"),
+    }
+    return {k: v for k, v in out.items() if v not in (None, "")}
+
+
+async def fetch_details(client: httpx.AsyncClient, sub: str, hrefs: list[str],
+                        budget: "_Budget", stats: dict) -> dict[str, dict]:
+    """Fetch detail pages, keyed by receiptNo so they join back to the grid rows."""
+    got: dict[str, dict] = {}
+    sem = asyncio.Semaphore(_PER_HOST_CONCURRENCY)
+
+    async def one(href: str) -> None:
+        if not budget.take():
+            return
+        receipt = ""
+        m = re.search(r"receiptNo=([^&\"]+)", href)
+        if m:
+            receipt = m.group(1)
+        async with sem:
+            try:
+                r = await client.get(_detail_url(sub, href))
+                d = parse_detail(r.text)
+                if d:
+                    got[receipt] = d
+                else:
+                    stats["detail_empty"] = stats.get("detail_empty", 0) + 1
+            except Exception as exc:  # noqa: BLE001
+                stats["detail_errors"] = stats.get("detail_errors", 0) + 1
+                log.warning("qpaybill_roll.detail_fail", receipt=receipt,
+                            error=str(exc)[:120])
+
+    await asyncio.gather(*(one(h) for h in hrefs))
+    return got
+
+
+def _acres(v) -> float | None:
+    """'.83' / '48.40' / '.00' -> float. '.00' means the county records no acreage, not zero land."""
+    try:
+        f = float(str(v).strip())
+    except (TypeError, ValueError):
+        return None
+    return f if f > 0 else None
+
+
 def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
     """One Listing per PARCEL, with the unpaid years aggregated onto it.
 
@@ -488,6 +636,11 @@ def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
         owner = next((g["owner"] for g in group if g.get("owner")), None)
         address = next((g["address"] for g in group if g.get("address")), None)
         prior = next((g["description"] for g in group if g.get("description")), None)
+        det = {}
+        for g in group:
+            if isinstance(g.get("detail"), dict) and g["detail"]:
+                det = g["detail"]
+                break
         out.append(Listing(
             source="counties_sc.qpaybill_delinquent_roll",
             source_url=_url(QPAYBILL_SUBS[county]),
@@ -519,7 +672,14 @@ def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
                 "notice_numbers": [g["notice_no"] for g in group if g.get("notice_no")][:6],
                 "prior_owner_description": prior,
                 "rows": len(group),
+                # Detail-pass fields (empty unless QPAYBILL_ROLL_DETAIL=1). appraised_value is
+                # the county's own 100%-basis number; owner_occupied comes from SC's statutory
+                # 4%-legal-residence vs 6%-everything-else assessment ratio.
+                **({"detail": det} if det else {}),
             }},
+            tax_value=det.get("appraised_value"),
+            acreage=_acres(det.get("acres")),
+            legal_description=det.get("legal_description"),
         ))
     return out
 
@@ -544,6 +704,7 @@ class QPayBillDelinquentRoll(BaseScraper):
 
         out: list[Listing] = []
         per_county: dict[str, int] = {}
+        detail_rows: dict[str, list[dict]] = {}
         async with httpx.AsyncClient(timeout=45.0, follow_redirects=True,
                                      headers={"User-Agent": _UA}) as client:
             results = await asyncio.gather(
@@ -558,6 +719,7 @@ class QPayBillDelinquentRoll(BaseScraper):
                 per_county[county] = 0
                 continue
             rows, stats = res
+            detail_rows[county] = rows
             listings = _to_listings(county, rows)
             per_county[county] = len(listings)
             out.extend(listings)
@@ -570,6 +732,36 @@ class QPayBillDelinquentRoll(BaseScraper):
                             prefixes=sorted(lost),
                             note="owners whose name starts with these were never "
                                  "read; this county's roll is INCOMPLETE")
+
+        # OPT-IN DETAIL PASS. One request per parcel, so it is bounded and it spends its budget
+        # on the LARGEST BALANCES first -- if only 400 of a county's parcels can be detailed, the
+        # $19,000 arrears should be among them and the $12 should not.
+        if DETAIL_ENABLED and detail_rows:
+            async with httpx.AsyncClient(timeout=45.0, follow_redirects=True,
+                                         headers={"User-Agent": _UA}) as dclient:
+                for county, rows in sorted(detail_rows.items()):
+                    with_href = [r for r in rows if r.get("detail_href")]
+                    with_href.sort(key=lambda r: -(r.get("amount") or 0))
+                    picked = with_href[:DETAIL_MAX]
+                    if not picked:
+                        continue
+                    dstats: dict = {}
+                    got = await fetch_details(dclient, QPAYBILL_SUBS[county],
+                                              [r["detail_href"] for r in picked],
+                                              budgets[county], dstats)
+                    for r in rows:
+                        rec = re.search(r"receiptNo=([^&]+)", r.get("detail_href") or "")
+                        if rec and rec.group(1) in got:
+                            r["detail"] = got[rec.group(1)]
+                    filled = sum(1 for r in rows if r.get("detail"))
+                    log.info("qpaybill_roll.detail_done", county=county,
+                             requested=len(picked), parsed=len(got), rows_filled=filled,
+                             skipped_over_cap=max(0, len(with_href) - DETAIL_MAX), **dstats)
+            out = []
+            for county, rows in sorted(detail_rows.items()):
+                got = _to_listings(county, rows)
+                per_county[county] = len(got)
+                out.extend(got)
 
         starved = sorted(c for c, b in budgets.items() if b.left <= 0)
         if starved:

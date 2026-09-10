@@ -212,3 +212,138 @@ def test_the_enricher_and_the_source_agree_on_the_five_shared_counties():
             f"{county}: enricher uses {sub!r}, source uses "
             f"{QPAYBILL_SUBS.get(county)!r} -- one of them is querying the wrong host"
         )
+
+
+# ---------------------------------------------------------------------------
+# THE DETAIL PASS, and the URL-join bug that made an earlier version of this
+# module declare it a dead end in a committed docstring.
+#
+# The grid link is href="TaxesDetailsType4.aspx?..." -- RELATIVE TO /Taxes/,
+# because the search page is /Taxes/TaxesDefaultType4.aspx. Joined to the host
+# root it becomes /TaxesDetailsType4.aspx, which the server answers with a
+# 5,713-byte page whose body is the single word ERROR. That reads exactly like a
+# refusal, and was recorded as one. A whole data layer for 19 counties -- the
+# county appraised value and the owner-occupancy ratio -- was written off by a
+# wrong URL join.
+# ---------------------------------------------------------------------------
+
+from foreclosure_scraper.scrapers.counties_sc.qpaybill_delinquent_roll import (  # noqa: E402
+    _acres, _detail_url, fetch_details, parse_detail,
+)
+
+
+@pytest.mark.parametrize("href", [
+    "TaxesDetailsType4.aspx?receiptNo=000207255&recID=583993116",
+    "/TaxesDetailsType4.aspx?receiptNo=000207255&recID=583993116",
+    "Taxes/TaxesDetailsType4.aspx?receiptNo=000207255&recID=583993116",
+    "/Taxes/TaxesDetailsType4.aspx?receiptNo=000207255&recID=583993116",
+])
+def test_the_detail_link_always_resolves_under_slash_taxes(href):
+    """Every shape of the href must land on /Taxes/, never the host root."""
+    got = _detail_url("barnwelltreasurer", href)
+    assert got == ("https://barnwelltreasurer.qpaybill.com/Taxes/"
+                   "TaxesDetailsType4.aspx?receiptNo=000207255&recID=583993116")
+    assert "/Taxes/Taxes/" not in got
+    assert got.count("/Taxes/") == 1
+
+
+#: Trimmed verbatim from a live Barnwell detail page, 2026-09-10.
+REAL_DETAIL = """
+<div>Notice #: 000207255</div><div>Status: Unpaid</div>
+<div>Issue Date: 12/08/25</div><div>Balance Due:$130.55</div>
+<div>Name:</div><div>ABNER EUGENE JR HEIRS OF</div>
+<div>Tax Year:</div><div>2025</div>
+<div>Total Appraisal:</div><div>690</div>
+<div>Total Assessed:</div><div>40</div>
+<div>Assessment Ratio:</div><div>Land Appraisal:</div><div>Building Appraisal:</div>
+<div>6%</div><div>0</div><div>690</div>
+<div>Record Type:</div><div>Real Estate</div>
+<div>Map Number:</div><div>045-00-00-021.03</div>
+<div>Acres:</div><div>.00</div><div>Buildings:</div><div>1</div>
+<div>Description:</div><div>PROP OF HORACE ABN AD#26-00002 64 10X51 MAGNOLIA S-6-13</div>
+<div>County Tax:</div><div>$19.12</div>
+<div>Residential Exemption:</div><div>$0.00</div>
+<div>Homestead Exemption:</div><div>$0.00</div>
+<div>Penalty:</div><div>$2.68</div><div>Cost:</div><div>$110.00</div>
+"""
+
+
+def test_the_county_appraised_value_is_parsed():
+    """THE field. The coverage matrix has VALUE at 1% in Oconee and 3% in Union;
+    this is the county's own 100%-basis number, free, on every delinquent parcel."""
+    d = parse_detail(REAL_DETAIL)
+    assert d["appraised_value"] == 690.0
+    assert d["assessed_value"] == 40.0
+
+
+def test_the_assessment_ratio_is_an_owner_occupancy_flag():
+    """SC law: 4% is the owner-occupied legal-residence ratio, 6% is everything
+    else. So a 6% parcel is authoritatively NOT the owner's residence -- a free
+    absentee-owner signal, and `absentee_owner` was measured at 0 rows on the
+    live board."""
+    d = parse_detail(REAL_DETAIL)
+    assert d["assessment_ratio_pct"] == 6
+    assert d["owner_occupied"] is False
+    d4 = parse_detail(REAL_DETAIL.replace("<div>6%</div>", "<div>4%</div>"))
+    assert d4["assessment_ratio_pct"] == 4
+    assert d4["owner_occupied"] is True
+
+
+def test_an_unknown_ratio_is_not_guessed_as_absentee():
+    """A missing or odd ratio must be None, never False. False means 'the county
+    says this is not their residence', and inventing that would put a homeowner
+    on an absentee list."""
+    d = parse_detail(REAL_DETAIL.replace("<div>6%</div>", "<div>x</div>"))
+    assert d.get("owner_occupied") is None
+
+
+def test_the_full_description_survives_where_the_grid_truncates_it():
+    """The grid shows 'PROP OF HORACE AB...'; the detail page has all of it."""
+    d = parse_detail(REAL_DETAIL)
+    assert d["legal_description"] == "PROP OF HORACE ABN AD#26-00002 64 10X51 MAGNOLIA S-6-13"
+    assert "..." not in d["legal_description"]
+
+
+def test_acres_and_buildings_are_parsed():
+    d = parse_detail(REAL_DETAIL)
+    assert d["acres"] == ".00"
+    assert d["buildings"] == "1"
+
+
+def test_the_error_page_yields_nothing_rather_than_junk():
+    """The wrong-URL page. It must parse to {} so a bad join can never look like
+    a record with empty fields."""
+    assert parse_detail("<html><body>ERROR</body></html>") == {}
+    assert parse_detail("") == {}
+
+
+@pytest.mark.parametrize("raw,want", [(".00", None), ("0", None), (".83", 0.83),
+                                      ("48.40", 48.4), ("", None), (None, None), ("abc", None)])
+def test_zero_acres_means_unrecorded_not_zero(raw, want):
+    """'.00' is the county recording no acreage. Storing 0.0 would say the parcel
+    has no land, which is false and would fail any acreage filter."""
+    assert _acres(raw) == want
+
+
+def test_the_grid_row_carries_its_own_detail_link():
+    """The link is kept ON the row so the detail pass never reconstructs a URL --
+    reconstructing it is precisely how it got joined to the wrong base."""
+    rows = parse_grid(REAL_ROWS)
+    assert rows[0]["detail_href"] == "TaxesDetailsType4.aspx?receiptNo=000207255"
+
+
+def test_detail_fields_reach_the_listing():
+    r = _row("045-00-00-021.03", "2025", 130.55)
+    r["detail"] = {"appraised_value": 690.0, "acres": ".83", "owner_occupied": False,
+                   "legal_description": "PROP OF HORACE ABN", "assessment_ratio_pct": 6}
+    li = _to_listings("Barnwell", [r])[0]
+    assert li.tax_value == 690.0
+    assert li.acreage == 0.83
+    assert li.legal_description == "PROP OF HORACE ABN"
+    assert li.raw["qpaybill_roll"]["detail"]["owner_occupied"] is False
+
+
+def test_no_detail_leaves_the_listing_clean():
+    li = _to_listings("Barnwell", [_row("045-00-00-021.03", "2025", 130.55)])[0]
+    assert li.tax_value is None and li.acreage is None
+    assert "detail" not in li.raw["qpaybill_roll"]
