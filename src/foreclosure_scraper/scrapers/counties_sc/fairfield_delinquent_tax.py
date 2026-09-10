@@ -19,6 +19,7 @@ import structlog
 from ...base_scraper import BaseScraper
 from ...http_client import get_text
 from ...models import Listing, ListingType, PropertyKind
+from ._sc_tax_table import is_usable_row
 
 log = structlog.get_logger()
 
@@ -75,6 +76,11 @@ class FairfieldDelinquentTax(BaseScraper):
             if not addr and len(clean) > 1:
                 addr = clean[1] if len(clean[1]) > 5 else None
 
+            # Shared junk-row gate: header/office-hours rows and rows with no TMS
+            # never become leads. See _sc_tax_table for why this is here and not
+            # left to _active_only() in main.py.
+            if not is_usable_row(clean, parcel):
+                continue
             out.append(Listing(
                 source="counties_sc.fairfield_delinquent_tax",
                 source_url=PAGE_URL,
