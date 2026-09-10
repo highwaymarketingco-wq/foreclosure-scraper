@@ -179,7 +179,7 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_sc.marlboro_delinquent_tax` | `https://www.marlborocountysc.us/treasurer/delinquent-tax-sale` |
 | `counties_sc.mccormick_flc` | `https://www.mccormickcountysc.org/treasurer/forfeited-land-commission` |
 | `counties_sc.meares_auctions` | `https://www.mpa-sc.com/```<br>`https://maps.google.com/?q=`<br>_+1 more_ |
-| `counties_sc.newberry_delinquent_tax` | `https://www.newberrycounty.net/treasurer/delinquent-tax-sale` |
+| `counties_sc.newberry_delinquent_tax` | `https://www.newberrycounty.gov/delinquent-tax/tax-sales` |
 | `counties_sc.oconee_flc` | `https://www.oconeecounty.com/treasurer/forfeited-land-commission` |
 | `counties_sc.oconee_tax_sale` | `https://docs.google.com/spreadsheets/d/e/{_PUB_ID`<br>`https://oconeesc.com/delinquent-tax/sale-list` |
 | `counties_sc.pickens_tax_sale` | `https://www.co.pickens.sc.us/departments/delinquent_tax/index.php`<br>`https://www.co.pickens.sc.us/` |

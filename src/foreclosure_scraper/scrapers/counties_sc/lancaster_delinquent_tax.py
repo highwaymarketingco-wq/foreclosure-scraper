@@ -1,8 +1,22 @@
 """Lancaster County SC — Delinquent Tax properties.
 
-Lancaster County posts delinquent properties scheduled for tax sale
-at lancastercountysc.gov.  The county actively posts properties with
-sale dates (confirmed: Sept 2026 sale with active postings).
+Lancaster County posts its delinquent tax sale notice, procedures and (closer to
+the sale) the advertised property list on the Delinquent Tax Collection pages at
+lancastercountysc.gov.
+
+URL note (2026-09-10): the old hardcoded target was an AlertCenter alert
+(``AlertCenter.aspx?AID=A-Friendly-Reminder-The-Delinquent-Tax-C-16``) and now
+returns HTTP 404 — CivicPlus alert IDs rotate every time the county re-posts the
+reminder, so an alert URL can never be a durable source. The same notice text
+now lives on the permanent department pages below, which are what the county's
+own procedures page points at: "A list of all delinquent properties will be
+advertised in the local newspaper (The Lancaster News) and on the county website
+under the Delinquent Tax Department."
+
+Cadence: the 2026 sale is Monday November 9, 2026; the county states the updated
+property list posts by November 6, 2026 after 5 pm. So between the March 16
+delinquency date and roughly mid-October these pages carry the notice only and
+this source is legitimately listless.
 
 Free, public, no login.
 Slug: counties_sc.lancaster_delinquent_tax
@@ -23,7 +37,29 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
-PAGE_URL = "https://www.lancastercountysc.gov/AlertCenter.aspx?AID=A-Friendly-Reminder-The-Delinquent-Tax-C-16"
+BASE = "https://www.lancastercountysc.gov"
+# Permanent department pages (verified live 2026-09-10, HTTP 200). The first is
+# the canonical replacement for the dead AlertCenter alert.
+PAGE_URLS = (
+    f"{BASE}/194/Delinquent-Tax-Collection",
+    f"{BASE}/198/Tax-Sale-Procedures",
+)
+PAGE_URL = PAGE_URLS[0]  # back-compat for anything referencing the old name
+
+# The advertised list arrives as a document link, not a table. CivicPlus serves
+# it from /DocumentCenter/View/<id>/..., which need not carry "delinquent" in the
+# path — so match on the href OR the anchor text, and skip the standing
+# procedure/registration/bidder paperwork that is not a property list.
+_DOC_LINK_RE = re.compile(
+    r'<a[^>]+href="([^"]*(?:/DocumentCenter/View/[^"]*|\.pdf[^"]*))"[^>]*>(.*?)</a>',
+    re.I | re.S,
+)
+_LIST_HINT_RE = re.compile(r"delinquent|tax\s*sale", re.I)
+_NOT_A_LIST_RE = re.compile(
+    r"procedure|application|bidder|registration|register|form|faq|instruction|"
+    r"agenda|minutes|receipt|affidavit",
+    re.I,
+)
 
 
 class LancasterDelinquentTax(BaseScraper):
@@ -37,73 +73,88 @@ class LancasterDelinquentTax(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
-        try:
-            html = await get_text(PAGE_URL, impersonate=True, timeout=40.0)
-        except Exception as exc:
-            log.warning("lancaster_tax.fetch_fail", error=str(exc)[:160])
-            return out
+        doc_links: list[tuple[str, str]] = []
 
-        if not html or len(html) < 200:
-            return out
-
-        # Find PDF links to delinquent tax lists
-        pdf_links = re.findall(r'href="([^"]*delinquent[^"]*\.pdf[^"]*)"', html, re.I)
-        # Also look for property listing tables/divs
-        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.I | re.S)
-
-        for row in rows:
-            cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.I | re.S)
-            if len(cells) < 2:
-                continue
-            clean = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
-            if any(h in c.lower() for c in clean[:2] for h in ("owner", "name", "tms", "map", "#", "header")):
+        for page_url in PAGE_URLS:
+            try:
+                html = await get_text(page_url, impersonate=True, timeout=40.0)
+            except Exception as exc:
+                log.warning("lancaster_tax.fetch_fail", url=page_url,
+                            error=str(exc)[:160])
                 continue
 
-            parcel = None
-            for c in clean:
-                m = re.search(r"\b(\d{3}[-\s]?\d{2}[-\s]?\d{2}[-\s]?[\d.]+)\b", c)
-                if m:
-                    parcel = m.group(1)
-                    break
+            if not html or len(html) < 200:
+                continue
 
-            owner = clean[0] if clean else None
-            addr = None
-            for c in clean[1:]:
-                if re.search(r"\d+\s+\w+", c):
-                    addr = c
-                    break
+            # Candidate property-list documents (published ~Oct/Nov each year).
+            for href, anchor in _DOC_LINK_RE.findall(html):
+                text = re.sub(r"<[^>]+>", " ", anchor)
+                text = re.sub(r"\s+", " ", text).strip()
+                blob = f"{href} {text}"
+                if not _LIST_HINT_RE.search(blob) or _NOT_A_LIST_RE.search(blob):
+                    continue
+                url = href if href.startswith("http") else f"{BASE}{href}"
+                if url not in {u for u, _ in doc_links}:
+                    doc_links.append((url, text))
 
-            out.append(Listing(
-                source="counties_sc.lancaster_delinquent_tax",
-                source_url=PAGE_URL,
-                listing_type=ListingType.TAX_SALE,
-                property_kind=PropertyKind.UNKNOWN,
-                state="SC",
-                county="Lancaster",
-                parcel_id=parcel,
-                defendant=owner,
-                street_address=addr,
-                description=" | ".join(clean[:6]) if clean else None,
-                first_seen=datetime.utcnow(),
-                last_seen=datetime.utcnow(),
-                raw={"lancaster_delinquent_tax": {"cells": clean[:10]}},
-            ))
+            # Property rows, when the county renders the list as a table.
+            rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.I | re.S)
+            for row in rows:
+                cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.I | re.S)
+                if len(cells) < 2:
+                    continue
+                clean = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
+                if any(h in c.lower() for c in clean[:2]
+                       for h in ("owner", "name", "tms", "map", "#", "header")):
+                    continue
 
-        # If we found PDF links, record them in raw for follow-up
-        if pdf_links and not out:
-            for pdf_url in pdf_links[:5]:
+                parcel = None
+                for c in clean:
+                    m = re.search(r"\b(\d{3}[-\s]?\d{2}[-\s]?\d{2}[-\s]?[\d.]+)\b", c)
+                    if m:
+                        parcel = m.group(1)
+                        break
+
+                owner = clean[0] if clean else None
+                addr = None
+                for c in clean[1:]:
+                    if re.search(r"\d+\s+\w+", c):
+                        addr = c
+                        break
+
                 out.append(Listing(
                     source="counties_sc.lancaster_delinquent_tax",
-                    source_url=pdf_url if pdf_url.startswith("http") else f"https://www.lancastercountysc.gov{pdf_url}",
+                    source_url=page_url,
                     listing_type=ListingType.TAX_SALE,
                     property_kind=PropertyKind.UNKNOWN,
                     state="SC",
                     county="Lancaster",
-                    description=f"Delinquent tax list PDF: {pdf_url}",
+                    parcel_id=parcel,
+                    defendant=owner,
+                    street_address=addr,
+                    description=" | ".join(clean[:6]) if clean else None,
                     first_seen=datetime.utcnow(),
                     last_seen=datetime.utcnow(),
-                    raw={"lancaster_delinquent_tax": {"pdf_url": pdf_url, "is_pdf_link": True}},
+                    raw={"lancaster_delinquent_tax": {"cells": clean[:10]}},
                 ))
 
-        log.info("lancaster_tax.done", count=len(out))
+        # If we found list documents but no parsed rows, record them for follow-up
+        # (the doc-OCR lane can read the PDF once the county posts it).
+        if doc_links and not out:
+            for url, text in doc_links[:5]:
+                out.append(Listing(
+                    source="counties_sc.lancaster_delinquent_tax",
+                    source_url=url,
+                    listing_type=ListingType.TAX_SALE,
+                    property_kind=PropertyKind.UNKNOWN,
+                    state="SC",
+                    county="Lancaster",
+                    description=f"Delinquent tax list document: {text or url}",
+                    first_seen=datetime.utcnow(),
+                    last_seen=datetime.utcnow(),
+                    raw={"lancaster_delinquent_tax": {
+                        "pdf_url": url, "link_text": text, "is_pdf_link": True}},
+                ))
+
+        log.info("lancaster_tax.done", count=len(out), docs=len(doc_links))
         return out

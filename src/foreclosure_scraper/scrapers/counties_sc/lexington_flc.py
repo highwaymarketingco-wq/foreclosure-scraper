@@ -27,6 +27,13 @@ from ...models import Listing, ListingType, PropertyKind
 log = structlog.get_logger()
 
 FLC_URL = "https://lex-co.sc.gov/treasurer/forfeited-land-commission"
+# The FLC landing page carries NO property data — it is prose plus three links.
+# The actual inventory lives one click deeper on the "Available FLC Properties"
+# page. Scraping only FLC_URL can never yield a row, populated list or not.
+LIST_URL = (
+    "https://lex-co.sc.gov/departments/treasurer/forfeited-land-commission/"
+    "flc-property-list"
+)
 AUCTION_URL = "https://lex-co.sc.gov/central-stores-auction-items"
 BASE = "https://lex-co.sc.gov"
 
@@ -41,47 +48,55 @@ class LexingtonFLC(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
-        try:
-            html = await get_text(FLC_URL, impersonate=True, timeout=30.0)
-        except Exception as exc:
-            log.warning("lex_flc.fetch_fail", error=str(exc)[:160])
+        seen: set[str] = set()
+
+        pages: list[tuple[str, str]] = []
+        for url in (FLC_URL, LIST_URL):
+            try:
+                page = await get_text(url, impersonate=True, timeout=30.0)
+            except Exception as exc:
+                log.warning("lex_flc.fetch_fail", url=url, error=str(exc)[:160])
+                continue
+            if page:
+                pages.append((url, page))
+
+        if not pages:
             return out
 
-        if not html:
-            return out
-
-        # Find PDF links to property lists
-        pdf_links = re.findall(r'href="([^"]*\.pdf[^"]*)"', html, re.I)
-        # Find property entries — Drupal renders as paragraphs or list items
-        # with TMS numbers, addresses, owner names
-        parcels = re.findall(r"(?:TMS|PIN|Parcel)\s*:?\s*([\d\-\.]+)", html, re.I)
-        addresses = re.findall(
-            r"\b(\d+\s+[A-Za-z0-9\s]+(?:St|Ave|Rd|Dr|Ln|Ct|Blvd|Hwy|Way|Cir|Trl|Pkwy|Ter)[A-Za-z\s]*)",
-            html,
-            re.I,
-        )
-
-        # If we found TMS parcels, create listings
-        for i, parcel in enumerate(parcels):
-            addr = addresses[i] if i < len(addresses) else None
-            raw = {
-                "tms": parcel,
-                "source_url": FLC_URL,
-                "flc": True,
-            }
-            out.append(
-                Listing(
-                    source=self.slug,
-                    source_url=FLC_URL,
-                    listing_type=ListingType.TAX_SALE,
-                    street_address=addr.strip() if addr else None,
-                    county="Lexington",
-                    state="SC",
-                    parcel_id=parcel,
-                    property_kind=PropertyKind.UNKNOWN,
-                    raw=raw,
-                )
+        for url, html in pages:
+            # Find property entries — Drupal renders as paragraphs or list items
+            # with TMS numbers, addresses, owner names
+            parcels = re.findall(r"(?:TMS|PIN|Parcel)\s*:?\s*([\d\-\.]+)", html, re.I)
+            addresses = re.findall(
+                r"\b(\d+\s+[A-Za-z0-9\s]+(?:St|Ave|Rd|Dr|Ln|Ct|Blvd|Hwy|Way|Cir|Trl|Pkwy|Ter)[A-Za-z\s]*)",
+                html,
+                re.I,
             )
+
+            # If we found TMS parcels, create listings
+            for i, parcel in enumerate(parcels):
+                if parcel in seen:
+                    continue
+                seen.add(parcel)
+                addr = addresses[i] if i < len(addresses) else None
+                raw = {
+                    "tms": parcel,
+                    "source_url": url,
+                    "flc": True,
+                }
+                out.append(
+                    Listing(
+                        source=self.slug,
+                        source_url=url,
+                        listing_type=ListingType.TAX_SALE,
+                        street_address=addr.strip() if addr else None,
+                        county="Lexington",
+                        state="SC",
+                        parcel_id=parcel,
+                        property_kind=PropertyKind.UNKNOWN,
+                        raw=raw,
+                    )
+                )
 
         # Also check the Central Stores auction page for surplus property
         try:
@@ -91,7 +106,8 @@ class LexingtonFLC(BaseScraper):
                     r"(?:TMS|PIN|Parcel)\s*:?\s*([\d\-\.]+)", html2, re.I
                 )
                 for parcel in auction_parcels:
-                    if parcel not in parcels:
+                    if parcel not in seen:
+                        seen.add(parcel)
                         out.append(
                             Listing(
                                 source=self.slug,

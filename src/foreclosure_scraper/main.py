@@ -415,14 +415,41 @@ DATELESS_OK_SOURCES = {
     "counties_sc.sc_tax_delinquent",            # delinquent property tax / pre-tax-sale
     "counties_sc.sc_flc",                        # SC Forfeited Land Commission inventory (no sale date)
     "counties_nc.nc_county_csv_delinquent_tax",  # NC delinquent-tax CSV rolls (New Hanover); no sale date
+    # A delinquent-tax balance is a STANDING condition, not a scheduled event:
+    # this scraper's Listing() never sets sale_date, so without the whitelist
+    # entry _active_only() deletes every row it ever harvests.
+    "counties_sc.fairfield_delinquent_tax",      # Fairfield SC delinquent tax / FLC (dateless)
+    # Same shape as Fairfield: York's Listing() never sets sale_date (a
+    # delinquent-tax balance is a standing condition, not a scheduled event),
+    # so without this entry _active_only() deletes every row it harvests.
+    "counties_sc.york_delinquent_tax",           # York SC delinquent tax / tax-sale roster (dateless)
+    # Same cookie-cutter scraper as Fairfield above, same dateless Listing(): the
+    # Saluda advertisement carries owner/TMS/description but no per-parcel date,
+    # so without this entry every row it harvests in Nov-Dec is deleted silently.
+    "counties_sc.saluda_delinquent_tax",         # Saluda SC delinquent tax sale (dateless)
     # 2026-06 expansion — new FLC/tax/probate/estate/lien/surplus sources whose
     # rows are long-runway (pre-sale) and routinely carry no sale_date.
     "counties_sc.oconee_forfeited_land",         # Oconee FLC available + assignment lists
     "counties_sc.spartanburg_flc",               # Spartanburg FLC assignable-surplus PDF (dateless)
+    # An FLC holding is a STANDING condition (county owns the parcel until it is
+    # assigned/sold), so this scraper never sets sale_date. Verified 2026-09-10:
+    # _active_only() returned False for a dateless kershaw_flc row and True for an
+    # identically-shaped counties_sc.spartanburg_flc row -- i.e. without this entry
+    # every row this source ever harvests is deleted before dedupe.
+    "counties_sc.kershaw_flc",                   # Kershaw FLC / delinquent-tax holdings (dateless)
+    # An FLC holding is a STANDING condition (county owns it until someone offers),
+    # never a scheduled event: this scraper's Listing() never sets sale_date, so
+    # without the whitelist entry _active_only() deletes every row it harvests.
+    "counties_sc.lexington_flc",                 # Lexington FLC inventory (dateless)
     # counties_sc.horry_flc removed 2026-08-12 — Myrtle Beach/Horry excluded per user direction.
     "counties_sc.georgetown_civicengage",        # Georgetown FLC (dateless) + tax + MIE
     "counties_sc.charleston_delinquent_tax",     # Charleston FLC sealed-bid + delinquent tax
     "counties_sc.colleton_tax_sale",             # Colleton delinquent-tax list
+    # Florence annual delinquent-tax-sale list. Rows normally carry the sale date
+    # parsed off the office page, but if that announcement sentence is reworded the
+    # date goes None and _active_only would delete all ~1,600 rows silently. The
+    # delinquency itself is a standing condition, same as the SC sources above.
+    "counties_sc.florence_delinquent_tax",       # Florence delinquent-tax sale list
     "counties_sc.sc_probate_net",                # southcarolinaprobate.net estate/marriage filings
     "counties_nc.gaston_surplus_properties",     # Gaston county-owned surplus (accepting offers)
     "counties_nc.nc_ecourts_estates",            # NC eCourts estate filings (no sale date)
@@ -485,6 +512,17 @@ DATELESS_OK_SOURCES = {
     # Without this entry _active_only discarded the whole source, which is why a healthy
     # scraper reported OK(160) and contributed 0 board rows.
     "counties_sc.pickens_tax_sale",
+    # Lancaster SC delinquent tax / tax sale. Every Listing() this scraper builds
+    # leaves sale_date unset (it takes owner/parcel/address off the advertised list,
+    # never a per-parcel date), so without this entry _active_only() deletes the
+    # whole source the moment the county posts its list. Added 2026-09-10 alongside
+    # the dead-AlertCenter-URL repair.
+    "counties_sc.lancaster_delinquent_tax",
+    # Newberry SC delinquent tax sale. Same shape as Lancaster: the Listing() this
+    # scraper builds never sets sale_date (it takes owner/parcel/address off the
+    # advertised list, no per-parcel date), so the moment the county posts a list
+    # _active_only() would delete every row. Verified dateless 2026-09-10.
+    "counties_sc.newberry_delinquent_tax",
     # SC probate Notice to Creditors. An estate has no sale date -- SC Probate Code
     # 62-3-801 requires the notice, the notice is the event. Measured 2026-09-10 the
     # source returns 880 rows (Pickens 520, Cherokee 225, Laurens 135), every one
@@ -537,6 +575,7 @@ DATELESS_OK_SOURCES = {
     "counties_nc.nc_county_pdf_delinquent_tax",   # Lincoln/Catawba/McDowell delinquent-tax PDF (dateless)
     "counties_sc.spartanburg_delinquent_tax",     # Spartanburg delinquent-tax-sale list (dateless)
     "counties_sc.cherokee_delinquent_tax",        # Cherokee delinquent-tax list (dateless)
+    "counties_sc.darlington_delinquent_tax",      # Darlington delinquent-tax sale list (dateless)
     "national.gsa_realproperty",                  # GSA real-property disposal (no auction date until scheduled)
     "national.servicelink_auction",               # ServiceLink auction inventory (pre-schedule, dateless)
     "national.hud_reac_inspection",               # HUD REAC failing-inspection multifamily (no sale date)

@@ -86,11 +86,30 @@ class YorkDelinquentTax(BaseScraper):
                 raw={"york_delinquent_tax": {"cells": clean[:10]}},
             ))
 
-        # Look for PDF links to tax sale lists
+        # Look for document links to tax sale lists. York publishes every
+        # document through the CivicPlus DocumentCenter, whose URLs carry NO
+        # ".pdf" extension (/DocumentCenter/View/<id>/<Slug>). The old regex
+        # required a literal ".pdf" in the href, so this fallback could never
+        # match on this page — the scraper returned 0 rows even in season, with
+        # the tax-sale roster sitting right there in the markup.
         if not out:
-            pdf_links = re.findall(r'href="([^"]*(?:tax|delinquent|sale)[^"]*\.pdf[^"]*)"', html, re.I)
-            for pdf_url in pdf_links[:5]:
-                full_url = pdf_url if pdf_url.startswith("http") else f"https://www.yorkcountysc.gov{pdf_url}"
+            candidates = re.findall(
+                r'href="(/DocumentCenter/View/\d+/[^"?#]+|[^"]*\.pdf[^"]*)"',
+                html, re.I)
+            seen: set[str] = set()
+            for doc_url in candidates:
+                label = re.sub(r"[-_]+", " ", doc_url.rsplit("/", 1)[-1]).strip()
+                # Keep actual rosters ("2026 Delinquent Tax Sale List",
+                # "Overage Claim List") and skip the standing procedure sheets,
+                # installment guidelines and bidder forms on the same page.
+                if not re.search(r"\blist\b", label, re.I):
+                    continue
+                if not re.search(r"delinquent|tax|sale|overage", label, re.I):
+                    continue
+                if doc_url in seen:
+                    continue
+                seen.add(doc_url)
+                full_url = doc_url if doc_url.startswith("http") else f"https://www.yorkcountysc.gov{doc_url}"
                 out.append(Listing(
                     source="counties_sc.york_delinquent_tax",
                     source_url=full_url,
@@ -98,11 +117,13 @@ class YorkDelinquentTax(BaseScraper):
                     property_kind=PropertyKind.UNKNOWN,
                     state="SC",
                     county="York",
-                    description=f"Delinquent tax list PDF: {pdf_url}",
+                    description=f"Delinquent tax list document: {label}",
                     first_seen=datetime.utcnow(),
                     last_seen=datetime.utcnow(),
-                    raw={"york_delinquent_tax": {"pdf_url": pdf_url, "is_pdf_link": True}},
+                    raw={"york_delinquent_tax": {"pdf_url": full_url, "is_pdf_link": True}},
                 ))
+                if len(out) >= 5:
+                    break
 
         log.info("york_tax.done", count=len(out))
         return out

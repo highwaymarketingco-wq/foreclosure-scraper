@@ -22,7 +22,10 @@ from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
-PAGE_URL = "https://www.dilloncountysc.org/departments/public_safety/sheriffs_office.php"
+# 2026-09-10: the old host `www.dilloncountysc.org` is NXDOMAIN (only the apex
+# `dilloncountysc.org` resolves) and the old `/departments/public_safety/` path
+# 404s — the Revize site moved Public Safety under /services/. Live path below.
+PAGE_URL = "https://dilloncountysc.org/services/public_safety/sheriffs_office.php"
 
 
 class DillonSheriff(BaseScraper):
