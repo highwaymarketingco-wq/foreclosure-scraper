@@ -124,15 +124,22 @@ Two corrections to assumptions worth recording:
 
 ### Signal families, measured across the 18 footprint counties
 
-    divorce                 0/18   plan lists it; board has none anywhere
-    code_vacancy            2/18
+    code_vacancy            2/18   the real worst gap
+    divorce                 5/18   Buncombe 38, Transylvania 9, Cleveland 4, Henderson 1, McDowell 1
     tax_foreclosure         6/18   the book's sharpest filter
     tax_delinquent         10/18   the book's PRIMARY source, missing from 8 counties
     liens                  15/18
     probate_estate         16/18
     mortgage_foreclosure   17/18
+    lis_pendens            17/18
     bankruptcy             17/18
-    lis_pendens            18/18
+
+CORRECTION: an earlier pass of this section reported divorce at 0/18. That was a
+classifier bug, not missing data. `_family()` is first-match-wins and the
+`lis_pendens` pattern list contained a bare "ecourts", which is checked before
+`divorce` -- so nc_ecourts_divorce (75 board rows, 53 in-footprint) was being
+counted as lis_pendens. NC eCourts serves four distinct dockets (divorce, estates,
+judgments, lis pendens); each now matches on its own noun.
 
 ### "HARD-WALL 0" needs one amendment
 

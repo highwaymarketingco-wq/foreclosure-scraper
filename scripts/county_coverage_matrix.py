@@ -39,13 +39,19 @@ SIGNAL_FAMILIES = {
     "tax_foreclosure": ("tax_foreclos", "kania", "zacchaeus", "upset"),
     "mortgage_foreclosure": ("hutchens", "brock_scott", "shapiro", "substitute_trustee",
                              "foreclosure_sale", "sheriff", "trustee"),
-    "lis_pendens": ("lis_pendens", "public_index", "ecourts"),
+    # NB: no bare "ecourts" here. `_family` is first-match-wins, and NC eCourts
+    # serves several distinct dockets: nc_ecourts_divorce, nc_ecourts_estates,
+    # nc_ecourts_judgments, nc_ecourts_lis_pendens. A bare "ecourts" pattern in this
+    # (earlier-checked) family swallowed all of them, which is how the first run of
+    # this script reported "divorce present in 0/18 counties" while 75 divorce rows
+    # sat on the board, 53 of them in-footprint. Each docket matches on its own noun.
+    "lis_pendens": ("lis_pendens", "public_index"),
     "probate_estate": ("probate", "estate", "obitu", "funeral", "deceased"),
     "code_vacancy": ("code_violation", "condemn", "vacant", "min_housing", "demoli",
                      "zombie", "nuisance"),
     "bankruptcy": ("bankruptcy", "courtlistener"),
-    "divorce": ("divorce", "marriage"),
-    "liens": ("lien", "judgment", "ucc"),
+    "divorce": ("divorce", "marriage", "separation"),
+    "liens": ("lien", "judgment", "ucc", "ecourts_judgment"),
 }
 
 
