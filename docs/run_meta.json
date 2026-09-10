@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-09-09T20:21:16.506540Z",
+  "run_time": "2026-09-09T21:35:42.526684Z",
   "total": 94384,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
@@ -447,7 +447,7 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "repair_fake_parcel_ids: quarantined 1,913 non-parcel parcel_id values (PIN_RE matched 'pin' inside a word); rows unchanged at 94,384",
+  "notes": "liensnc_related_filings: 1500 entries, 2119 notices, 1500 owner phones",
   "detail_count": 94384,
   "detail_digest": "1086459f0a07bb11",
   "board": {
@@ -461,7 +461,7 @@
       "records": 94384
     }
   },
-  "health_carried_from": "2026-09-09T19:45:57.078262Z",
+  "health_carried_from": "2026-09-09T20:21:16.506540Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",

@@ -131,6 +131,12 @@ NEW_SOURCES = {
     "counties_generic.epa_frs_sites",
     "counties_generic.arcgis_distress_layers",
     "national.auction_bank_reo",
+    # net-new (2026-08-30): Rutherford in-office + Kania tax-foreclosure docket.
+    # Same bug class as the 2026-06-30 block above — the scraper was fully
+    # pipeline-wired (main.DATELESS_OK_SOURCES) and returns 20 rows that pass
+    # _in_scope/_active_only, but it was never added HERE, so the partial merge
+    # never LANDED it and the board read 0 for the slug.
+    "counties_nc.rutherford_foreclosure",
 }
 
 

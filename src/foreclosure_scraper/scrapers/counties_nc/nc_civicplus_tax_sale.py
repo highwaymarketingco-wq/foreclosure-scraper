@@ -64,7 +64,7 @@ CIVICPLUS_COUNTIES: dict[str, str] = {
     "Lenoir": "https://www.lenoircountync.gov",
     "Macon": "https://www.maconcountync.gov",
     "Martin": "https://www.martincountync.gov",
-    "Mitchell": "https://www.mitchellcounty.gov",
+    "Mitchell": "https://www.mitchellcountync.gov",
     "Montgomery": "https://www.montgomerycountync.com",
     "Moore": "https://www.moorecountync.gov",
     "Nash": "https://www.nashcountync.gov",
@@ -130,7 +130,7 @@ DATE_RE = re.compile(
 async def _fetch_text(url: str) -> str:
     """Fetch page text via httpx."""
     try:
-        from .http_client import client
+        from ...http_client import client
         async with client(timeout=20.0) as c:
             resp = await c.get(url, headers={
                 "User-Agent": "Mozilla/5.0 (foreclosure-scraper)",

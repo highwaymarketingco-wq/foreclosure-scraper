@@ -73,6 +73,17 @@ def _normalize_parcel(parcel: str | None) -> str:
     if not parcel:
         return ""
     s = re.sub(r"[^a-zA-Z0-9]", "", parcel).lower()
+    # A parcel identifier with NO DIGIT is not a parcel identifier, and trusting one
+    # as a merge key silently deletes properties. Measured 2026-09-09: a PIN regex
+    # matching the letters "pin" inside ordinary words produced parcel_id 'ehurst'
+    # from "Pinehurst" and 'number' from "PIN number:", and because dedupe keyed on
+    # it, 122 distinct Pinehurst properties collapsed into ONE row (also 'eville'
+    # 130, 'number' 247 -- 1,913 rows across the board). Rejecting digitless values
+    # here fixes the whole CLASS at the point of harm, for every source, instead of
+    # per-scraper. Such a row still merges on its address signatures, so genuine
+    # duplicates of it are unaffected; it just can no longer fuse strangers.
+    if not any(c.isdigit() for c in s):
+        return ""
     # County GIS exports pad a base 10-digit PIN with trailing zeros out to 12 or 15 digits
     # (9678774126 -> 967877412600000). When EVERYTHING past the 10th char is zeros, the
     # 10-digit form is canonical, so the padded + bare copies collapse to one dedupe key.

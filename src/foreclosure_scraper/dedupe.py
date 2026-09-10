@@ -48,6 +48,11 @@ def _strong_sigs(li: Listing) -> set:
     if a.startswith(("lis pendens", "property in", "vacant")) or lt == "bankruptcy":
         a = ""
     pn = re.sub(r"[^a-z0-9]", "", (li.parcel_id or "").lower())
+    # Same digitless-parcel rejection as models._normalize_parcel. This signature is
+    # scoped to the STATE, not the county, so a bogus alpha "parcel" fuses strangers
+    # across the whole state -- 'ehurst' linked 122 Pinehurst properties.
+    if pn and not any(c.isdigit() for c in pn):
+        pn = ""
     if pn and len(pn) >= 4 and st:          # guard: whitespace/degenerate parcel -> no sig
         out.add(("p", pn, st))
         # Buncombe (and similar) write the same PIN two ways: a 15-digit zero-padded form

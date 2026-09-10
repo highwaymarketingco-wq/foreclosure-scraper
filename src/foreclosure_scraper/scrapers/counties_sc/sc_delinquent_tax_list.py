@@ -136,7 +136,11 @@ class SCDelinquentTaxList(BaseScraper):
             candidates: list[str] = []
             if cfg.get("page"):
                 try:
-                    html = await get_text(cfg["page"], headers={"User-Agent": "Mozilla/5.0"}, timeout=40.0)
+                    # No UA override: a bare "Mozilla/5.0" is 403-blocked by
+                    # cherokeecountysc.gov. http_client.DEFAULT_HEADERS already
+                    # sends a real pooled desktop-browser UA + Accept headers,
+                    # which answers 200.
+                    html = await get_text(cfg["page"], timeout=40.0)
                     candidates += _discover_pdf(html, cfg["page"], year)
                 except Exception:
                     pass

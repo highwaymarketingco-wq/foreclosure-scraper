@@ -235,6 +235,13 @@ async def main() -> int:
                 if oc.get("name") and not li.owner_name:
                     li.owner_name = oc["name"]
 
+            # Checkpoint INCREMENTALLY, not just at batch end. A 3,000-entry batch
+            # is ~55 minutes; the operator's laptop died mid-run once already, and
+            # losing an hour of polite 1.1s fetches to recover nothing is the wrong
+            # trade for one small write every 50 entries.
+            if stats["fetched"] % 50 == 0:
+                save_ckpt(ck)
+
             print(f"  [{i}/{len(todo)}] entry {entry}: {got['notice_count']} notice(s) "
                   f"| owner={ (oc.get('name') or '?')[:28] } "
                   f"phone={oc.get('phone') or '-'} email={'y' if oc.get('email') else '-'}")

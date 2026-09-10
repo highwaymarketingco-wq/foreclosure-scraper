@@ -477,6 +477,14 @@ DATELESS_OK_SOURCES = {
     # Pickens pre-sale delinquent-tax rolls (2020-2025 GIS layers). A delinquent balance is
     # a standing debt, not a dated sale. Without this the active filter drops all of them.
     "counties_sc.pickens_delinquent_parcels",
+    # Pickens POST-sale redemption roster ("TAX SALE RESULTS FOR WEBSITE.pdf"). Measured
+    # 2026-09-10: the scraper returns 160 rows, all Pickens SC, all in-footprint -- and all
+    # with sale_date=None, because it sets `redemption_deadline` (2026-12-31) instead. The
+    # sale already happened; what is live is the statutory redemption window, during which
+    # the defaulting owner still holds title, can still sell, and is facing a hard deadline.
+    # Without this entry _active_only discarded the whole source, which is why a healthy
+    # scraper reported OK(160) and contributed 0 board rows.
+    "counties_sc.pickens_tax_sale",
     # Spartanburg City Master Condemnation List — a condemnation is a standing condition.
     "counties_sc.spartanburg_city_condemned",
     # Hendersonville vacant/condemned structures register — same, standing condition.

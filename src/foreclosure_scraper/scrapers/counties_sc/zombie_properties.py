@@ -60,7 +60,7 @@ class ZombieProperties(BaseScraper):
         out: list[Listing] = []
 
         try:
-            from ..web_artifact import load_board
+            from ...web_artifact import load_board
             board = load_board()
         except Exception as exc:
             log.warning("zombie_properties.board_load_fail", error=str(exc)[:160])
