@@ -36,6 +36,7 @@ Fills and clears only. Never adds or removes a row, so the count guard is untouc
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -45,6 +46,15 @@ sys.path.insert(0, str(REPO / "src"))
 
 # Official county lists. A "real county" test cannot use the footprint list -- an
 # out-of-footprint but genuine county (Wake, Mecklenburg) must not be treated as junk.
+#
+# COMPLETENESS IS LOAD-BEARING, NOT COSMETIC. An omission here does not fail loudly:
+# a real county missing from this set is judged "not a real county", falls through to
+# fuzzy (which cannot match a name that is not in the pool) and is CLEARED. The first
+# draft of this file omitted "polk" -- a FOOTPRINT county -- and the dry run was about
+# to blank the county on 1,217 rows, Polk NC among them. NC has 100 counties and SC
+# has 46; tests/test_county_typo_repair.py now asserts both counts and asserts every
+# config.ALL_COUNTIES entry appears here, so the next omission fails a test instead of
+# erasing a county.
 NC_ALL = {
     "alamance", "alexander", "alleghany", "anson", "ashe", "avery", "beaufort", "bertie",
     "bladen", "brunswick", "buncombe", "burke", "cabarrus", "caldwell", "camden",
@@ -56,7 +66,7 @@ NC_ALL = {
     "lee", "lenoir", "lincoln", "macon", "madison", "martin", "mcdowell", "mecklenburg",
     "mitchell", "montgomery", "moore", "nash", "new hanover", "northampton", "onslow",
     "orange", "pamlico", "pasquotank", "pender", "perquimans", "person", "pitt",
-    "randolph", "richmond", "robeson", "rockingham", "rowan", "rutherford", "sampson",
+    "polk", "randolph", "richmond", "robeson", "rockingham", "rowan", "rutherford", "sampson",
     "scotland", "stanly", "stokes", "surry", "swain", "transylvania", "tyrrell", "union",
     "vance", "wake", "warren", "washington", "watauga", "wayne", "wilkes", "wilson",
     "yadkin", "yancey",
@@ -91,6 +101,35 @@ TOWN_NOT_COUNTY = {
     "leland",           # town in BRUNSWICK; fuzzy-matches "cleveland" at 80
 }
 
+# AMBIGUOUS VALUES: a name that is BOTH a real town and a plausible misspelling of a
+# DIFFERENT real county. A flat seat lookup misfiles these, which is worse than
+# clearing them. Measured on the live board 2026-09-10: "Stanley" appeared on 43 rows,
+# and 41 of them carried a city in STANLY County (35x Albemarle -- Stanly's own county
+# seat -- and 6x Locust). A bare seat lookup sent all 43 to Gaston.
+#
+# So for these values the row's CITY decides, and if the city is in neither set the
+# value is cleared rather than guessed. `upstate_county_for` cannot arbitrate: it knows
+# Upstate SC and Western NC, and Albemarle/Locust are Charlotte-metro.
+AMBIGUOUS_SEAT: dict[str, dict[str, set[str]]] = {
+    "stanley": {
+        # the TOWN of Stanley, Gaston County
+        "Gaston": {"stanley", "mount holly", "dallas", "high shoals", "gastonia",
+                   "cherryville", "bessemer city", "lowell", "belmont", "kings mountain"},
+        # STANLY County, ~90 miles east -- Albemarle is its seat
+        "Stanly": {"albemarle", "locust", "oakboro", "norwood", "richfield",
+                   "new london", "stanfield", "misenheimer", "aquadale", "badin"},
+    },
+}
+
+# Abbreviations builders actually type. Not fuzzy-reachable: "meck" scores 44 against
+# "mecklenburg", far below any threshold that is safe for real misspellings.
+ABBREV: dict[str, tuple[str, str]] = {
+    "meck": ("Mecklenburg", "NC"),
+    "mecklenberg co": ("Mecklenburg", "NC"),
+    "new hanover co": ("New Hanover", "NC"),
+    "buncombe co": ("Buncombe", "NC"),
+}
+
 # A county seat / town -> its county, for the values the city resolver does not know.
 SEAT_TO_COUNTY: dict[str, tuple[str, str]] = {
     "rutherfordton": ("Rutherford", "NC"),
@@ -113,6 +152,21 @@ SEAT_TO_COUNTY: dict[str, tuple[str, str]] = {
     "tryon": ("Polk", "NC"),
     "marion": ("Mcdowell", "NC"),
     "forest city": ("Rutherford", "NC"),
+    "old fort": ("Mcdowell", "NC"),   # 'Mcdonnell' rows carry city=Old Fort
+    "raleigh": ("Wake", "NC"),
+    "hope mills": ("Cumberland", "NC"),
+    "sanford": ("Lee", "NC"),
+    "charlotte": ("Mecklenburg", "NC"),
+    "concord": ("Cabarrus", "NC"),
+    "winston salem": ("Forsyth", "NC"),
+    "greensboro": ("Guilford", "NC"),
+    "wilmington": ("New Hanover", "NC"),
+    "fayetteville": ("Cumberland", "NC"),
+    # DELIBERATELY ABSENT: "lenior". It looks like a typo of Lenoir, but the CITY of
+    # Lenoir is in CALDWELL County while Lenoir County is 200 miles east, so the value
+    # names two different places and neither can be chosen from the string. It scores
+    # 83 against "lenoir" -- just under the 85 threshold -- so it clears, which is the
+    # correct outcome and is the reason that threshold is not loosened.
     "walhalla": ("Oconee", "SC"),
     "gaffney": ("Cherokee", "SC"),
     "seneca": ("Oconee", "SC"),
@@ -146,19 +200,42 @@ def resolve(name: str, state: str, city: str | None, city_lookup) -> tuple[str |
         got = city_lookup(city)
         if got:
             return got, "city_field"
+        # The project resolver knows Upstate SC and Western NC only, so a row whose
+        # city sits outside that window (Albemarle, Old Fort, Raleigh) fell through to
+        # guessing from the bad county string. The seat table already holds those
+        # towns, so consult it on the CITY too -- the row's own city outranks any
+        # inference from a misspelled county.
+        got2 = SEAT_TO_COUNTY.get((city or "").strip().lower())
+        if got2 and (not st or st == got2[1]):
+            return got2[0], "city_via_seat_table"
 
-    # 2. The bad county value is itself a known town/seat.
+    # 2. An abbreviation the fuzzy pass cannot reach.
+    if low in ABBREV:
+        cty, cst = ABBREV[low]
+        if not st or st == cst:
+            return cty, "abbrev"
+
+    # 3. AMBIGUOUS town/county names -- the row's own city arbitrates, or we clear.
+    #    Deliberately before the plain seat lookup, which would misfile these.
+    if low in AMBIGUOUS_SEAT:
+        city_low = (city or "").strip().lower()
+        for cty, towns in AMBIGUOUS_SEAT[low].items():
+            if city_low in towns:
+                return cty, "ambiguous_city_decided"
+        return None, "cleared_ambiguous"
+
+    # 4. The bad county value is itself a known town/seat.
     if low in SEAT_TO_COUNTY:
         cty, cst = SEAT_TO_COUNTY[low]
         if not st or st == cst:
             return cty, "seat_lookup"
 
-    # 3. The bad value may be a town the city resolver knows.
+    # 5. The bad value may be a town the city resolver knows.
     got = city_lookup(raw)
     if got:
         return got, "town_via_resolver"
 
-    # 4. Fuzzy, LAST and refusing known towns -- see the Stanley/Stanly trap above.
+    # 6. Fuzzy, refusing known towns -- see the Stanley/Stanly trap above.
     if low not in TOWN_NOT_COUNTY:
         pool = sorted(NC_ALL if st == "NC" else SC_ALL if st == "SC" else NC_ALL | SC_ALL)
         try:
@@ -177,7 +254,31 @@ def resolve(name: str, state: str, city: str | None, city_lookup) -> tuple[str |
         if best and best[1] >= 85 and best[0] not in TOWN_NOT_COUNTY:
             return best[0].title(), f"fuzzy_{int(best[1])}"
 
-    # 5. Honest failure: clear it. A countyless row cannot be misfiled.
+    # 7. PARSED LEGAL PROSE. The single largest group of unresolvable values is not
+    #    typos at all -- it is deed/plat language the re-parse captured into `county`,
+    #    with the county name sitting inside it:
+    #        "In The Harnett" (37 rows)   "Parcel In Wake" (15)
+    #        "In The Office Of The Register Of Deeds For Columbus" (15)
+    #        "Which Said Plat Is Now On File In The ... Register Of Deeds Of Durham" (7)
+    #    A whole-word scan recovers these exactly, with two conditions that keep it safe:
+    #      * MULTI-TOKEN ONLY. A bare "Columbus" is genuinely ambiguous (town in Polk vs
+    #        Columbus County) and must keep falling through; embedded in "Register of
+    #        Deeds for Columbus" it unambiguously names the county.
+    #      * EXACTLY ONE distinct county matched. "Deeds for Union recorded in Lee"
+    #        names two and is not resolvable from the string alone.
+    if len(low.split()) > 1:
+        pool = NC_ALL if st == "NC" else SC_ALL if st == "SC" else NC_ALL | SC_ALL
+        # Longest first so "new hanover" wins over a bare "hanover"-style substring.
+        hits = {c for c in sorted(pool, key=len, reverse=True)
+                if re.search(rf"(?<![a-z]){re.escape(c)}(?![a-z])", low)}
+        # Drop names wholly contained in a longer hit ("union" inside nothing here, but
+        # "lee" sits inside "leesville"-style values, which the word boundary already
+        # blocks; this only removes true subset county names).
+        hits = {h for h in hits if not any(h != o and h in o for o in hits)}
+        if len(hits) == 1:
+            return hits.pop().title(), "county_inside_prose"
+
+    # 8. Honest failure: clear it. A countyless row cannot be misfiled.
     return None, "cleared"
 
 
