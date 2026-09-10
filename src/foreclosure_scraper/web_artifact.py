@@ -520,8 +520,14 @@ RAW_KEEP = {
     "rod_lookup": "*",                  # Register of Deeds lookup result
     "assessor_photo": "*",              # which county/endpoint supplied the photo in
                                         # zillow.photo — provenance for image trust
-    "vision_unscored": "*",             # why an image could not be graded (answers the
-                                        # recurring "why isn't this one scored" question)
+    # NOT "vision_unscored". It was in the 2026-09-10 dropped-key audit and I added it
+    # here, which broke test_ungraded_report_never_reaches_the_published_board -- a
+    # guard placed deliberately. An UNGRADED vision report must not ship: on the board
+    # it is indistinguishable from a real grade to anything reading raw['vision*'],
+    # and the dashboard would present a failed model call as a condition assessment.
+    # The diagnostic stays in-process (vision.listing_ungraded logs it). Correctly
+    # excluded, not an oversight -- see INTENTIONALLY_INTERNAL in
+    # tests/test_raw_keep_covers_enrichers.py.
     "builder_distress": "*",          # LiensNC cluster/related-filings = over-leveraged flipper
     "owner_mismatch": "*",            # court lead whose geo-snapped property was stripped (name-only, unverified)
     "resolved_from_name": "*",        # name->property resolver provenance {county, strategy, confidence}

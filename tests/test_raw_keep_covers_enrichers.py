@@ -42,6 +42,14 @@ INTENTIONALLY_INTERNAL = {
     "parcel_from_geo",
     # `property_kind_reclassified` is provenance; `property_kind` is a published field.
     "property_kind_reclassified",
+    # `vision_unscored` is DELIBERATELY unpublished, and this one bit me: I added it
+    # to RAW_KEEP during the 2026-09-10 dropped-key audit and broke
+    # test_ungraded_report_never_reaches_the_published_board. An ungraded vision
+    # report on the board is indistinguishable from a real grade to anything reading
+    # raw['vision*'], so the dashboard would present a failed model call as a
+    # condition assessment. The diagnostic stays in-process via the
+    # vision.listing_ungraded log line.
+    "vision_unscored",
 }
 
 
