@@ -81,6 +81,34 @@ def _norm_addr(s: str | None) -> str:
     return " ".join(s.lower().replace(",", " ").split())
 
 
+def _house_no_of(addr: str | None) -> str:
+    """Leading house number of a street address, '' when there isn't one."""
+    m = re.match(r"\s*(\d+)\b", (addr or "").strip())
+    return m.group(1) if m else ""
+
+
+def _provably_different_property(a: Listing, b: Listing) -> bool:
+    """True when two rows are provably NOT the same property.
+
+    A DIFFERENT HOUSE NUMBER is a different house, essentially always. Measured on the
+    live board 2026-09-11: rows were merging like
+
+        '306 fountain way'           + '346 fountain way'            parcel 9698372180
+        '545 dillingham panoview rd' + '562 dillingham panoview rd'
+
+    -- two separate houses fused because one carries the other's parcel id. A wrong
+    parcel does not fail loudly, it silently deletes a property. This guard cannot repair
+    the bad parcel; it stops the MERGE, which is the half that loses data.
+
+    Deliberately narrow: it fires only when BOTH rows carry a house number and the two
+    differ. Suffix and punctuation variants ('318 fairfax ave' vs '318 fairfax ave.',
+    '11 carefree lane' vs '11 carefree ln') share a house number and still merge -- that
+    is 93% of real merge groups and must not be lost.
+    """
+    ha, hb = _house_no_of(a.street_address), _house_no_of(b.street_address)
+    return bool(ha and hb and ha != hb)
+
+
 def dedupe(listings: list[Listing]) -> list[Listing]:
     """Merge listings that point to the same property.
 
@@ -102,15 +130,29 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
     # Pinehurst properties shared one key and collapsed into a single row. The run
     # logged nothing. Now it does.
     _addrs_per_key: dict[str, set] = {}
+    _blocked_p1 = 0
     for li in listings:
         k = li.dedupe_key()
         a = _norm_addr(li.street_address)
         if a:
             _addrs_per_key.setdefault(k, set()).add(a)
         if k in buckets:
-            buckets[k] = buckets[k].merge(li)
+            if _provably_different_property(buckets[k], li):
+                # Same primary key, different house number -> one of the two keys is
+                # wrong. Keep BOTH rows under a disambiguated key rather than deleting
+                # a real property; pass 1 is where the bulk of merging happens and so
+                # is where this damage was being done.
+                _blocked_p1 += 1
+                buckets[f"{k}#hn{_house_no_of(li.street_address)}"] = li
+            else:
+                buckets[k] = buckets[k].merge(li)
         else:
             buckets[k] = li
+
+    if _blocked_p1:
+        log.info("dedupe.house_number_guard_pass1", blocked_merges=_blocked_p1,
+                 note="rows sharing a primary key but carrying different house numbers; "
+                      "merging would have deleted one of two real properties")
 
     _fused = [(len(v), k) for k, v in _addrs_per_key.items() if len(v) >= 4]
     if _fused:
@@ -122,6 +164,7 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
 
     merged = list(buckets.values())
 
+    _blocked_p2 = 0
     # Pass 2: fuzzy address merge — across listings that have addresses.
     # Original required zip on both sides; now also matches when both have
     # same county+state (catches the 73 cross-source dups where one source
@@ -182,9 +225,25 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
                 continue
             score = fuzz.token_set_ratio(addr_a, _norm_addr(b.street_address))
             if score >= 92:
+                # DIFFERENT HOUSE NUMBER = DIFFERENT HOUSE. Fuzzy scoring is where this
+                # bites hardest: '306 Fountain Way' vs '346 Fountain Way' differ by one
+                # character and score ~97 on token_set_ratio, so this pass was re-merging
+                # exactly the pairs passes 1 and 3 are taught to keep apart.
+                #
+                # The check sits AFTER the score test on purpose. Placed before it, it
+                # counted every candidate pair it skipped -- 99,875,342 of them on one
+                # board -- which is a true number of comparisons and a useless number to
+                # log. Here it counts merges actually prevented.
+                if _provably_different_property(a, b):
+                    _blocked_p2 += 1
+                    continue
                 a = a.merge(b)
                 consumed.add(j)
         final.append(a)
+
+    if _blocked_p2:
+        log.info("dedupe.house_number_guard_pass2", blocked_merges=_blocked_p2,
+                 note="fuzzy address match refused: same street, different house number")
 
     # Pass 3 (2026-06-19): signature union-merge. dedupe_key is parcel>addr>case>
     # url, so the SAME property with a parcel_id on one copy and only a case# on
@@ -197,12 +256,21 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
             x = parent[x]
         return x
     sigmap: dict = {}
+    _blocked = 0
     for i, li in enumerate(final):
         for s in _strong_sigs(li):
             if s in sigmap:
-                parent[_find(sigmap[s])] = _find(i)
+                j = sigmap[s]
+                if _provably_different_property(li, final[j]):
+                    _blocked += 1
+                    continue
+                parent[_find(j)] = _find(i)
             else:
                 sigmap[s] = i
+    if _blocked:
+        log.info("dedupe.house_number_guard", blocked_merges=_blocked,
+                 note="rows sharing a signature but carrying different house numbers; "
+                      "a merge here would delete one of two real properties")
     groups: dict = {}
     for i in range(len(final)):
         groups.setdefault(_find(i), []).append(i)

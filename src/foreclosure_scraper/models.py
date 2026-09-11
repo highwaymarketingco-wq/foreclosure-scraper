@@ -40,20 +40,46 @@ _ADDR_SUFFIX_MAP = {
 # Unit indicators stripped from addresses before comparison — "123 Main
 # St Apt 5" should match "123 Main St" since the unit isn't a separate
 # parcel for foreclosure purposes (the building is foreclosed whole).
+#: Trailing unit/lot designator. CAPTURED, not discarded -- see _normalize_addr.
 _UNIT_RE = re.compile(
-    r"\s+(?:apt|apartment|unit|suite|ste|#|lot)\.?\s*[\w-]+\s*$",
+    r"\s+(?:apt|apartment|unit|suite|ste|#|lot)\.?\s*([\w-]+)\s*$",
     re.IGNORECASE,
 )
 
 
 def _normalize_addr(addr: str | None) -> str:
-    """Canonical lowercase address string for dedupe. Expands suffixes
-    (Street→st), strips unit indicators, collapses whitespace + commas."""
+    """Canonical lowercase address string for dedupe. Expands suffixes (Street->st),
+    NORMALISES the unit/lot designator, collapses whitespace + commas.
+
+    THE UNIT IS PART OF THE IDENTITY, NOT NOISE. This function used to DELETE the
+    trailing unit, which is right for "12 Main St Apt B" vs "12 Main St" -- the same
+    property stated with and without its unit -- and catastrophic in a mobile-home park
+    or a condo, where the lot number IS the property. Measured on the live board
+    2026-09-11:
+
+        '30 Dream Lot 210' .. 'Lot 213'        -> all one key 'addr:30 dream|28081'
+        '505 Tilley Trail, unit 1' .. 'unit 10' -> all one key 'addr:505 tilley trl|27325'
+        '6690 Lot 1' .. 'Lot 5'                 -> all one key 'addr:6690|27519'
+
+    55 address buckets were fusing 4+ DISTINCT street addresses each, ~291 separate
+    properties collapsing into single rows. Same shape as the Pinehurst parcel bug: a
+    degenerate value trusted as an identity key.
+
+    So the unit is now CANONICALISED and kept: "#1", "Unit 1" and "apt 1" all become
+    "unit 1", so the same unit written three ways still merges, while unit 1 and unit 2
+    never do. The cost is that a row carrying a unit no longer merges with a row lacking
+    one -- that leaves a visible duplicate. Losing a real property is worse than carrying
+    a duplicate, and pass 2's fuzzy address match still has a chance at those.
+    """
     if not addr:
         return ""
     s = addr.strip().lower()
-    # Strip trailing unit indicators
-    s = _UNIT_RE.sub("", s)
+    # Capture the trailing unit/lot, canonicalise it, and re-append it below.
+    _unit = ""
+    m = _UNIT_RE.search(s)
+    if m:
+        _unit = re.sub(r"[^a-z0-9]", "", m.group(1))
+        s = s[:m.start()]
     # Strip city/state/zip suffix if present (commas suggest these)
     if "," in s:
         s = s.split(",", 1)[0]
@@ -62,7 +88,10 @@ def _normalize_addr(addr: str | None) -> str:
     for tok in s.split():
         tok_clean = tok.rstrip(".")
         tokens.append(_ADDR_SUFFIX_MAP.get(tok, _ADDR_SUFFIX_MAP.get(tok_clean, tok_clean)))
-    return " ".join(t for t in tokens if t)
+    out = " ".join(t for t in tokens if t)
+    if _unit:
+        out = f"{out} unit {_unit}".strip()
+    return out
 
 
 def _normalize_parcel(parcel: str | None) -> str:

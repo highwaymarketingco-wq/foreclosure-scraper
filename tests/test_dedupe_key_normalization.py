@@ -60,11 +60,46 @@ def test_addr_directional_prefix():
     assert _normalize_addr("456 Northeast Oak Ave") == "456 ne oak ave"
 
 
-def test_addr_strips_unit():
-    assert _normalize_addr("123 Main St Apt 5") == "123 main st"
-    assert _normalize_addr("123 Main St #5") == "123 main st"
-    assert _normalize_addr("123 Main St Unit B") == "123 main st"
-    assert _normalize_addr("123 Main St Suite 200") == "123 main st"
+def test_addr_canonicalises_the_unit_instead_of_deleting_it():
+    """CHANGED 2026-09-11, and the old expectation is worth recording.
+
+    This used to assert the unit was STRIPPED -- "123 Main St Apt 5" -> "123 main st".
+    That is right for one case (the same property reported with and without its unit)
+    and catastrophic for another: in a mobile-home park or a condo the lot number IS
+    the property. Measured on the live 94,384-row board, the strip fused:
+
+        '30 Dream Lot 210' .. 'Lot 213'          -> one key 'addr:30 dream|28081'
+        '505 Tilley Trail, unit 1' .. 'unit 10'  -> one key 'addr:505 tilley trl|27325'
+        '6690 Lot 1' .. 'Lot 5'                  -> one key 'addr:6690|27519'
+
+    55 buckets each fusing 4+ distinct street addresses, roughly 291 separate properties
+    collapsing into single rows -- the same shape as the Pinehurst parcel bug.
+
+    The unit is now canonicalised and KEPT, so the same unit written three ways still
+    merges while two different units never do."""
+    # the same unit, written three ways, still collapses to one form
+    assert _normalize_addr("123 Main St Apt 5") == "123 main st unit 5"
+    assert _normalize_addr("123 Main St #5") == "123 main st unit 5"
+    assert _normalize_addr("123 Main St Unit 5") == "123 main st unit 5"
+    assert _normalize_addr("123 Main St Lot 5") == "123 main st unit 5"
+    # ...and DIFFERENT units no longer collide
+    assert _normalize_addr("123 Main St Unit B") != _normalize_addr("123 Main St Unit C")
+    assert _normalize_addr("123 Main St Suite 200") != _normalize_addr("123 Main St Suite 201")
+
+
+def test_the_real_fusions_this_fixed():
+    """Verbatim from the live board. Each pair MUST NOT share a key."""
+    for a, b in [("30 Dream Lot 210", "30 Dream Lot 211"),
+                 ("505 Tilley Trail, unit 1", "505 Tilley Trail, unit 10"),
+                 ("6690 Lot 3", "6690 Lot 4"),
+                 ("751 South Frazier Lot 35", "751 South Frazier Lot 36")]:
+        assert _normalize_addr(a) != _normalize_addr(b), f"{a!r} still fuses with {b!r}"
+
+
+def test_street_suffix_expansion_still_works():
+    """The change must not cost the merging the normaliser exists for."""
+    assert _normalize_addr("12 Main Street") == _normalize_addr("12 Main St")
+    assert _normalize_addr("4 Austin Avenue") == _normalize_addr("4 Austin Ave")
 
 
 def test_addr_strips_city_state_zip():
