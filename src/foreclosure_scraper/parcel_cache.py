@@ -19,6 +19,7 @@ Design:
 from __future__ import annotations
 
 import json
+from urllib.parse import quote
 import re
 import sqlite3
 import time
@@ -258,10 +259,93 @@ def cached_counties() -> set[str]:
     return {c for c in PARCEL_LAYERS if _db_path(c).exists()}
 
 
+#: NC counties eligible for the statewide OneMap fallback.
+#:
+#: AMBIGUOUS NAMES ARE DELIBERATELY EXCLUDED. The parcel cache is keyed by county NAME
+#: with no state -- lookup(county, parcel_id) and enrichment_gis_attrs both pass only
+#: li.county -- so a name that exists in BOTH states would let an SC lead read NC parcel
+#: data. These 4 are shared and are therefore NOT given an NC fallback:
+#:   Beaufort, Cherokee, Lee, Union
+#: Their SC halves keep whatever dedicated config they have. Fixing the underlying
+#: name-only key is a separate change; silently seeding it with 100 more collisions is not.
+_NC_COUNTY_NAMES = {
+    "Alamance", "Alexander", "Alleghany", "Anson", "Ashe", "Avery",
+    "Bertie", "Bladen", "Brunswick", "Buncombe", "Burke", "Cabarrus",
+    "Caldwell", "Camden", "Carteret", "Caswell", "Catawba", "Chatham",
+    "Chowan", "Clay", "Cleveland", "Columbus", "Craven", "Cumberland",
+    "Currituck", "Dare", "Davidson", "Davie", "Duplin", "Durham",
+    "Edgecombe", "Forsyth", "Franklin", "Gaston", "Gates", "Graham",
+    "Granville", "Greene", "Guilford", "Halifax", "Harnett", "Haywood",
+    "Henderson", "Hertford", "Hoke", "Hyde", "Iredell", "Jackson",
+    "Johnston", "Jones", "Lenoir", "Lincoln", "Macon", "Madison",
+    "Martin", "Mcdowell", "Mecklenburg", "Mitchell", "Montgomery", "Moore",
+    "Nash", "New Hanover", "Northampton", "Onslow", "Orange", "Pamlico",
+    "Pasquotank", "Pender", "Perquimans", "Person", "Pitt", "Polk",
+    "Randolph", "Richmond", "Robeson", "Rockingham", "Rowan", "Rutherford",
+    "Sampson", "Scotland", "Stanly", "Stokes", "Surry", "Swain",
+    "Transylvania", "Tyrrell", "Vance", "Wake", "Warren", "Washington",
+    "Watauga", "Wayne", "Wilkes", "Wilson", "Yadkin", "Yancey",
+}
+
+#: NC OneMap statewide parcels. ONE service, all 100 NC counties, 5,938,900 parcels --
+#: verified live 2026-09-10. It carries the two layers the coverage matrix says are thin:
+#:
+#:   CONTACT   mailadd / munit / mcity / mstate / mzip  = the OWNER MAILING ADDRESS,
+#:             populated at 99.6-100% in every NC footprint county measured:
+#:               Buncombe 134,741/134,741   Gaston 117,252/117,211
+#:               Henderson 75,373/75,373    Rutherford 57,599/57,580
+#:               Cleveland 59,964/59,790    Burke 59,374/59,350
+#:               Lincoln 56,862/56,862      McDowell 33,449/33,449
+#:               Transylvania 31,755/31,755 Polk 18,211/18,063  Mitchell 17,671/17,270
+#:             = 662,251 footprint parcels, essentially all of them contactable.
+#:   VALUE     parval / landval / improvval, plus saledate, structyear and gisacres.
+#:
+#: This matters most for BUNCOMBE, LINCOLN and TRANSYLVANIA: their dedicated county layers
+#: publish NO mailing field at all, so ~223,000 footprint parcels had no owner mailing
+#: available anywhere until this.
+NC_ONEMAP_URL = ("https://services.nconemap.gov/secure/rest/services/"
+                 "NC1Map_Parcels/FeatureServer/1/query")
+
+#: NC counties whose dedicated layer already carries an owner mailing field. For these the
+#: dedicated layer wins -- it is the county's own data and usually richer (heated sqft,
+#: condition codes) than the statewide aggregate.
+_NC_DEDICATED_WITH_MAILING = {"Rutherford", "Henderson", "Burke", "McDowell", "Cleveland",
+                              "Gaston", "Mitchell", "Polk"}
+
+
+def nc_onemap_cfg(county: str) -> dict:
+    """A parcel-cache config for any NC county, served off the statewide layer."""
+    return {
+        "url": NC_ONEMAP_URL,
+        "where": f"cntyname='{county}'",
+        "id_fields": ["parno", "altparno", "nparno"],
+        "map": {"owner": "ownname", "address": "siteadd",
+                "owner_mailing": ["mailadd", "munit", "mcity", "mstate", "mzip"],
+                "market_value": "parval", "tax_value": "landval",
+                "acreage": "gisacres", "land_use": "parusedesc",
+                "sale_price": None, "sale_date": "saledatetx"},
+    }
+
+
+def resolve_layer_cfg(county: str) -> dict | None:
+    """Dedicated county layer first, NC OneMap as the statewide fallback.
+
+    The fallback only applies to counties that have no dedicated config, or whose
+    dedicated config publishes no mailing address -- Buncombe, Lincoln and Transylvania
+    are the three footprint counties in that position.
+    """
+    cfg = PARCEL_LAYERS.get(county)
+    if cfg and (cfg.get("map", {}).get("owner_mailing") or county in _NC_DEDICATED_WITH_MAILING):
+        return cfg
+    if county in _NC_COUNTY_NAMES:
+        return nc_onemap_cfg(county)
+    return cfg
+
+
 async def refresh_county(county: str) -> dict:
     """Bulk-download + verify + replace the cache for one county. Returns a status dict."""
     from .http_client import get_text
-    cfg = PARCEL_LAYERS.get(county)
+    cfg = resolve_layer_cfg(county)
     if not cfg:
         return {"county": county, "ok": False, "error": "no config"}
     base = cfg["url"]
@@ -273,9 +357,14 @@ async def refresh_county(county: str) -> dict:
         elif spec:
             src_fields.add(spec)
     out_fields = ",".join(sorted(src_fields))
+    # A STATEWIDE layer needs a per-county filter. NC OneMap publishes all 5,938,900 NC
+    # parcels in one service, so its config carries where=cntyname='<County>' and the
+    # count check and every page must both use it -- counting 5.9M and paging one county
+    # would never terminate.
+    where_q = quote(cfg.get("where", "1=1"), safe="")
     # expected count first (completeness check)
     try:
-        exp = json.loads(await get_text(f"{base}?where=1=1&returnCountOnly=true&f=json",
+        exp = json.loads(await get_text(f"{base}?where={where_q}&returnCountOnly=true&f=json",
                                         timeout=40, impersonate=True)).get("count")
     except Exception as e:  # noqa: BLE001
         return {"county": county, "ok": False, "error": f"count: {str(e)[:80]}"}
@@ -286,7 +375,7 @@ async def refresh_county(county: str) -> dict:
     # up to 3x on a transient empty/error response instead of ending the loop early (which
     # is what silently truncated Burke @30k / Laurens @22.9k on the first pass).
     while exp is None or len(rows) < exp:
-        url = (f"{base}?where=1=1&outFields={out_fields}&returnGeometry=false"
+        url = (f"{base}?where={where_q}&outFields={out_fields}&returnGeometry=false"
                f"&resultOffset={offset}&resultRecordCount={_PAGE}&f=json")
         try:
             data = json.loads(await get_text(url, timeout=90, impersonate=True))
