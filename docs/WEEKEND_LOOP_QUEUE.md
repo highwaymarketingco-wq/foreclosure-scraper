@@ -33,7 +33,17 @@ Rules for every iteration:
 - [ ] Column legal-notice API — the nested date filter works; ~104 SC foreclosure-sale
       notices per 120 days currently discarded.
 - [ ] NC OneMap statewide: 85 NC counties still have no cache entry beyond the backfill.
-- [ ] Greer SC code enforcement — 2,035 cases WITH owner name (code_vacancy is 2/18).
+- [x] Greer SC code enforcement — EVALUATED AND REJECTED 2026-09-11, do not rebuild.
+      The claim (2,035 cases with owner names, 99% populated) is TRUE and the
+      operational value is still near zero:
+        * the org's only case layers are Q4-2022 and 2023 — there is no 2024/2025/2026
+          layer, so this is a one-off historical export, not a live feed
+        * 1,429 of 1,743 rows (82%) are COMPLIANT CLOSED — already resolved
+        * the genuinely distressed slice is ~200 rows (48 LIEN, 37 CONDEMNATION,
+          117 IN PROGRESS, 9 SUMMONS) and all of it is 2+ years stale
+      Wiring it would put a dead source in SOURCE_REGISTER that LOOKS live. If Greer
+      publishes a current-year layer later, revisit — the schema is good
+      (USER_CASE_NO, USER_OWNER_NAME2, USER_SITE_APN, USER_CaseType, USER_STATUS).
 - [ ] Kofile/Oconee ROD — JSON API found, 501 instruments per 10 days.
 - [ ] AcclaimWeb Pickens — consideration (sale price) is on the DETAIL page, not the grid.
 
