@@ -18,8 +18,11 @@ Rules for every iteration:
       Fills `owner_mailing` + `sale_price`. Log: `logs/cache_build_all.log`.
 
 ## QUEUE — sources to build or fix
-- [ ] BT TaxPayer Portal — 14 NC counties, delinquent balances, one vendor family.
-      Alleghany Anson Carteret Caswell Craven Duplin Graham Jones Person Scotland (+4)
+- [ ] RUN enrichment_bt_appraisal_card over the board (needs a GO from loop_guard)
+- [x] BT TaxPayer Portal — DONE as an appraisal-card enricher, 14 VERIFIED counties.
+      Gives HEATED SQFT + appraised value + beds/baths + recorded sale price.
+      5 proposed tenants were dead stubs; ITSPublicMA was proposed for Martin and
+      actually serves PERSON COUNTY — rejected. Still to do: run it over the board.
 - [ ] Catalis/Sturgis for NC — Caldwell, Carteret, Stanly, Stokes each have their own
       GUID under d1ebsyxxbc7tep.cloudfront.net. Scraper exists; add the county GUIDs.
       PACE 8s — this host 429s hard.

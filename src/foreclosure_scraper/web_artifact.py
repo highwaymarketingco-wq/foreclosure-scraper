@@ -598,6 +598,7 @@ RAW_KEEP = {
     # at publish exactly like the 160 keys before it.
     "catalis_roll": "*",
     "greenville_mie": "*",
+    "bt_appraisal_card": "*",
 
     # cross-cutting distress signals
     "absentee_owner": "*", "bank_name": "*", "case": "*",
