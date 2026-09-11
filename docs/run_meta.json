@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-11T19:50:21.147982Z",
-  "total": 103683,
+  "run_time": "2026-09-11T20:16:38.290299Z",
+  "total": 107071,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -101,11 +101,11 @@
   },
   "by_state": {
     "NC": 68931,
-    "SC": 34752
+    "SC": 38140
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 41266,
-    "counties_sc.qpaybill_delinquent_roll": 18438,
+    "counties_sc.qpaybill_delinquent_roll": 21242,
     "liensnc": 6308,
     "counties_nc.rutherford_tax": 4171,
     "nc_ecourts_judgments": 3776,
@@ -125,6 +125,7 @@
     "counties_nc.nc_heir_estate_parcels": 682,
     "national.courtlistener_bankruptcy": 644,
     "counties_sc.sc_public_index_export": 591,
+    "counties_sc.greenville_mie_adverts": 584,
     "counties_nc.asheville_str_permits": 555,
     "counties_sc.cherokee_delinquent_tax": 528,
     "national.fannie_homepath": 494,
@@ -448,21 +449,21 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "one-time duplicate normalisation: 112,887 -> 103,683 (9,204 cross-source duplicates merged)",
-  "detail_count": 103683,
-  "detail_digest": "5c1ab65f9830a56b",
+  "notes": "owner-name signal + fullmer rank on 107,071 rows (A 812 / B 7,182 / C 9,073 / D 90,004)",
+  "detail_count": 107071,
+  "detail_digest": "c8a20ea9119b2c12",
   "board": {
     "schema": "slim-v1",
-    "count": 103683,
+    "count": 107071,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
-      "count": 104,
-      "records": 103683
+      "count": 108,
+      "records": 107071
     }
   },
-  "health_carried_from": "2026-09-11T19:35:01.350008Z",
+  "health_carried_from": "2026-09-11T20:13:51.606455Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",

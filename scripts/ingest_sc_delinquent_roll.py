@@ -46,6 +46,9 @@ FILES = [
     ("base", REPO / "logs" / "qpaybill_roll_all.json"),
     ("rerun", REPO / "logs" / "qpaybill_roll_top5.json"),   # supersedes its counties
     ("catalis", REPO / "logs" / "catalis_pickens_full.json"),
+    # Greenville Master-in-Equity foreclosure adverts: TMS + the ACTUAL total judgment
+    # debt per case. Different county from all the rolls above, so nothing is superseded.
+    ("greenville_mie", REPO / "logs" / "greenville_mie_full.json"),
 ]
 
 
