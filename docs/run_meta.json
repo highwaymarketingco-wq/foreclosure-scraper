@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-09-10T20:48:43.483678Z",
+  "run_time": "2026-09-11T16:20:27.748876Z",
   "total": 94384,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
@@ -447,7 +447,7 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "owner-name signal + fullmer rank on 94,384 rows (A 101 / B 1,785 / C 11,781 / D 80,717)",
+  "notes": "scheduled land-records refresh",
   "detail_count": 94384,
   "detail_digest": "1086459f0a07bb11",
   "board": {
@@ -461,7 +461,7 @@
       "records": 94384
     }
   },
-  "health_carried_from": "2026-09-10T20:42:29.405919Z",
+  "health_carried_from": "2026-09-10T20:48:43.483678Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
