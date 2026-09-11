@@ -25,9 +25,22 @@ gate() {
   done
 }
 
+#: A marker only counts as DONE if it holds real records. The first version checked
+#: only that the file existed -- and skipped the Catalis job because the 4-byte "[]"
+#: left by the rate-limited run was sitting there. An empty output counting as success
+#: is the same silent-skip class as every other bug found this week.
+MIN_MARKER_BYTES=${MIN_MARKER_BYTES:-2000}
+
 run_job() {           # run_job <name> <marker-file> <command...>
   local name=$1 marker=$2; shift 2
-  [ -f "$marker" ] && { say "skip $name (already have $marker)"; return; }
+  if [ -f "$marker" ]; then
+    local sz; sz=$(wc -c < "$marker" | tr -d ' ')
+    if [ "$sz" -ge "$MIN_MARKER_BYTES" ]; then
+      say "skip $name (have $marker, ${sz}B)"; return
+    fi
+    say "redo $name — $marker exists but is only ${sz}B, that is not a harvest"
+    rm -f "$marker"
+  fi
   gate || return 1
   say "START $name"
   if "$@"; then say "OK    $name"; else say "FAIL  $name (exit $?)"; fi
