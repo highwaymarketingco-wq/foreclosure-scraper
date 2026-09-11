@@ -51,10 +51,12 @@ Statewide SC. Dateless. Free, no login, no bot-detection bypass.
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import datetime
 from typing import Iterable
 
+import httpx
 import structlog
 
 from ...base_scraper import BaseScraper
@@ -68,6 +70,9 @@ SVC_URL = (
     "https://uitax.dew.sc.gov/CoreServices/Lien/"
     "TaxLienRegistry.svc/SearchTaxLienRegistry"
 )
+_UA_DIRECT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+              "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+
 # Static SecurityKey shipped in the public SPA bundle (main.*.js). Public,
 # non-secret — every browser hitting the registry sends it. Not a credential.
 SECURITY_KEY = "LbBr3hPJ2qw9mHvmE+Px7gI8HiDaU+F3fWx68Z39YBw="
@@ -378,6 +383,50 @@ async def _run_queries(
     sweep once `max_rows` is reached. When `active_only`, satisfied/released
     liens are dropped (used on the fallback name sweep, which returns the whole
     registry incl. released rows; the export path is already active-only)."""
+    # DIRECT HTTP FIRST -- the browser is not needed and never was.
+    #
+    # The module docstring says a render is required because the SecurityKey and service
+    # path "sit in the SPA bundle". They do, and the bundle IS readable -- the earlier
+    # probe fetched /main.<hash>.js against the HOST ROOT, got a 404, and concluded the
+    # path was hidden. The bundle lives under the PAGE's directory,
+    # /LienRegistry/main.<hash>.js. Third instance of the same wrong-base URL join on
+    # this project, after the qPayBill detail page and the CCHS ROD landing directory.
+    #
+    # Verified live 2026-09-11: one bare curl POST returned HTTP 200, 17,778,100 bytes,
+    # 29,341 rows in 89 seconds. No browser, no CAPTCHA, no login. The SecurityKey is a
+    # static value every browser hitting the public registry sends -- it is not a
+    # credential and nothing here handles one.
+    #
+    # The render path is KEPT as a fallback rather than deleted: if DEW starts requiring
+    # a real page context, the browser lane is how this keeps working.
+    if os.getenv("DEW_LIEN_FORCE_RENDER", "") not in ("1", "true", "True"):
+        for payload in queries:
+            try:
+                async with httpx.AsyncClient(timeout=180.0) as c:
+                    r = await c.post(SVC_URL, json=payload, headers={
+                        "Content-Type": "application/json",
+                        "SecurityKey": SECURITY_KEY,
+                        "User-Agent": _UA_DIRECT,
+                    })
+                r.raise_for_status()
+                # _decode_rows is tolerant of a truncated body and of the
+                # WCF {d:[...]} wrapper, so reuse it rather than re-implementing.
+                rows = _decode_rows(r.text)
+                if rows:
+                    if active_only:
+                        rows = [x for x in rows if _is_active(x)]
+                    if max_rows:
+                        rows = rows[:max_rows]
+                    log.info("dew_lien.direct_ok", rows=len(rows),
+                             bytes=len(r.content), payload=str(payload)[:80],
+                             note="no browser needed; the bundle is at /LienRegistry/, "
+                                  "not the host root")
+                    return rows
+            except Exception as exc:  # noqa: BLE001
+                log.info("dew_lien.direct_failed", error=str(exc)[:120],
+                         note="falling back to the rendered lane")
+                break
+
     try:
         from scrapling.fetchers import StealthyFetcher
     except ImportError:
@@ -474,7 +523,12 @@ class SCDEWLienRegistry(BaseScraper):
 
     async def fetch(self) -> Iterable[Listing]:
         # 1) Try the single full-registry export first (already active-only).
-        queries: list[dict] = [{"IPAddress": "", "Export_All_Ind": "Y"}]
+        # IPAddress must be a real dotted quad. An EMPTY string is rejected by the
+        # service, which is why the export-all lane had been silently falling through to
+        # the surname sweep and returning ~2,900 rows instead of the full ~29,000.
+        # Verified live 2026-09-11: "127.0.0.1" returns HTTP 200, 17,778,100 bytes,
+        # 29,341 rows.
+        queries: list[dict] = [{"IPAddress": "127.0.0.1", "Export_All_Ind": "Y"}]
         rows = await _run_queries(queries, active_only=False, max_rows=self.max_rows)
 
         # 2) If the export timed out / returned nothing, sweep common surnames
