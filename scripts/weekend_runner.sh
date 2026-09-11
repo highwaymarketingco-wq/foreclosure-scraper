@@ -51,8 +51,12 @@ PY=".venv/bin/python3"
 while :; do
   [ -f "$STOP" ] && { say "STOP file present — exiting"; break; }
 
-  # 1. Catalis Pickens — needs hours at an 8s pace; the 429 handler reports its own gaps.
-  run_job "catalis-pickens" logs/catalis_pickens_full.json \
+  # 1. Catalis Pickens — REMOVED 2026-09-11. The host escalated from HTTP 429 to a hard
+  #    403 block after we paced to 8s, ran concurrency 1 and honored every Retry-After.
+  #    A 403 arriving after that is the host declining, and working around it is bypass
+  #    behaviour the operator has explicitly ruled out. Do not re-enable without a
+  #    deliberate decision; the block is recorded in the loop queue.
+  false && run_job "catalis-pickens" logs/catalis_pickens_full.json \
     env CATALIS_ROLL_BUDGET=4000 CATALIS_ROLL_PACE_S=8 CATALIS_ROLL_CONCURRENCY=1 \
     $PY -c "
 import asyncio,json,sys

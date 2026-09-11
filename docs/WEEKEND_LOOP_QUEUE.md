@@ -23,10 +23,15 @@ Rules for every iteration:
       Gives HEATED SQFT + appraised value + beds/baths + recorded sale price.
       5 proposed tenants were dead stubs; ITSPublicMA was proposed for Martin and
       actually serves PERSON COUNTY — rejected. Still to do: run it over the board.
-- [ ] Catalis/Sturgis for NC — Caldwell, Carteret, Stanly, Stokes each have their own
-      GUID under d1ebsyxxbc7tep.cloudfront.net. Scraper exists; add the county GUIDs.
-      PACE 8s — this host 429s hard.
-- [ ] Catalis Pickens full run — needs ~2 unattended hours at the 8s pace.
+- [!] Catalis/Sturgis for NC — SAME HOST, now 403-blocking. Do not attempt.
+- [!] Catalis Pickens — BLOCKED 2026-09-11, pulled from the runner. DO NOT RETRY without
+      a deliberate decision. The host went 429 -> hard 403 even after we paced to 8s,
+      dropped to concurrency 1 and honored every Retry-After. It serves `Disallow: /`
+      and has now declined in the clearest terms available to it. Evading that is bypass
+      behaviour the operator ruled out. COST: Pickens loses its delinquent-tax lane
+      (qPayBill does not cover Pickens). MITIGATION: the Pickens PARCEL cache is intact
+      and unaffected — 132,782 rows, 132,716 with owner mailing — which was always the
+      more valuable half.
 - [ ] Spartanburg CAMA: 146,582 parcels with heated sqft, 123,678 with sale price.
       This is the sqft->ARV gap (memory: SF sqft 13%, 38% need it).
 - [ ] York SC: 63,288 parcels with recorded sale price AND finished sqft.
