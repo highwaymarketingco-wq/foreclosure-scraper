@@ -47,7 +47,43 @@ Rules for every iteration:
 - [ ] Kofile/Oconee ROD — JSON API found, 501 instruments per 10 days.
 - [ ] AcclaimWeb Pickens — consideration (sale price) is on the DETAIL page, not the grid.
 
+## FINDINGS 2026-09-11 evening — measured on the LIVE board, not assumed
+
+DASHBOARD IS SERVING. First time this was actually checked rather than assumed:
+  index.html 200 · listings.json.gz 200, 53,590,857 B — byte-identical to origin/main
+  listings_slim.json.gz 200 · run_meta.json 200
+
+THE BIG MISS: the parcel caches were built and NEVER JOINED TO THE BOARD.
+  11.5M parcels cached with 10.8M owner mailing addresses, and board mailing is 65%.
+  enrich_gis_attrs has not run since the caches were filled. THIS IS THE NEXT ACTION.
+
+BOARD COVERAGE (107,071 rows)
+  a NAME 98.5% · street_address 81% · zip 71% · owner MAILING 65% · lat/lng 31%
+  parcel_id 49.6% · a VALUE 21.7% · sqft 30.9% · a PHONE 15.2%
+
+IN-FOOTPRINT COUNTIES THAT ARE NOT AT 100% (addr% / mail%)
+  Anderson SC    34 / 25      Cherokee SC  48 /  1      Union SC     58 /  3
+  Laurens SC     54 / 10      Oconee SC    61 / 33      Pickens SC   70 / 77
+  Spartanburg SC 75 / 45      NC counties run 74-96 addr, 64-96 mail (OneMap fed them)
+
+WHY THE SC COUNTIES STARVE — two different causes, both fixable
+  NO CACHE AT ALL : Cherokee SC, Union SC (both excluded from the NC OneMap fallback
+                    because the county NAME exists in both states), Oconee SC
+  CACHE, NO MAIL  : Anderson 208,476 rows / 0 mailing · Spartanburg 364,771 / 0
+                    — their configured layers publish no mailing field
+  WORKING         : Pickens 132,716 mailing · Laurens 89,272 mailing
+
+OCONEE — half the recorded verdict is stale, corrected here
+  parcel_cache.py says arcserver2.oconeesc.com "rejects bulk paginated export" and
+  "carries no situs street field". Tested 2026-09-11 against Parcels_OpenData/MapServer/0:
+    pagination WORKS (resultOffset=1000 returns rows), 63,432 parcels  -> claim FALSE
+    no owner, no mailing, no situs; only TMS_NUMBER, acres, LOTNUMBER, X/Y -> claim TRUE
+  Usable for TMS + acreage + LAT/LNG (board lat/lng is 31%), not for contact.
+
 ## QUEUE — verification and integrity (the "nothing is broken" half)
+- [ ] RUN enrich_gis_attrs over the board to join the 11.5M-parcel cache — biggest win
+- [ ] Find owner-mailing layers for Cherokee SC, Union SC, Anderson SC, Spartanburg SC
+- [ ] Oconee: cache TMS+acres+lat/lng from Parcels_OpenData (needs a lat/lng column)
 - [ ] Re-run the 146-county sweep (221/450 agents cached). LOW concurrency.
 - [ ] Mine the remaining 875 county claims — only the top 25 hosts were looked at.
 - [ ] Audit every scraper that reports rows but lands 0 on the board (the RAW_KEEP class).
