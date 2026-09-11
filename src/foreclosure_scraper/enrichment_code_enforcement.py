@@ -35,20 +35,29 @@ log = structlog.get_logger()
 # City open-data endpoints — public ArcGIS FeatureServer queries.
 # Discovered via each city's open-data portal (data.<city>.gov / ArcGIS Hub).
 #
-# DISABLED: the former "Charlotte" entry pointed at
-#   services5.arcgis.com/86gdKBxZf7GIt2Or/.../Code_Enforcement_Cases
-# which is actually the City of Yucaipa, CA FeatureServer (out of footprint by
-# ~2,000 miles). It has been removed; no in-footprint NC/SC city code-
-# enforcement feed has been verified yet, and we do NOT substitute a fake one.
+# HISTORY, kept because the caution is the right one: a former "Charlotte" entry
+# pointed at services5.arcgis.com/86gdKBxZf7GIt2Or/.../Code_Enforcement_Cases, which
+# is actually the City of YUCAIPA, CALIFORNIA -- out of footprint by ~2,000 miles.
+# Disabling it was correct. Many city-of-* portals rotate FeatureServer URLs, so
+# confirm the host and owning org actually serve the intended city before wiring one.
 #
-# To re-enable: add a confirmed in-footprint city with the same shape, e.g.
-#   "Asheville": {
-#       "url": "<verified FeatureServer .../query URL>",
-#       "addr_fields": (...), "violation_fields": (...),
-#       "status_fields": (...), "date_fields": (...),
-#   }
-# Many city-of-* portals rotate FeatureServer URLs annually, so confirm the
-# host/owner-org actually serves the intended city before wiring it in.
+# 2026-09-10: Charlotte is BACK, on the city's OWN host (gis.charlottenc.gov, the HNS
+# = Housing & Neighborhood Services service), verified live. The old note said "no
+# in-footprint NC/SC city code-enforcement feed has been verified yet" -- that had
+# stopped being true and the sweep found it. code_vacancy was present in only 2 of 18
+# footprint counties on the live board, the worst-covered lane in the engine.
+#
+#   CodeEnforcementNewAndOpenCases   3,966 features, verified 2026-09-10
+#   CodeEnforcementOrderstoDemolish     17 features -- a STANDING ORDER TO DEMOLISH is
+#                                       the strongest single distress signal in this
+#                                       lane, so it is carried as its own entry
+#   Asheville AccelaServicesView     2,738 features
+#
+# Charlotte rows carry ParcelId, which is a direct Mecklenburg parcel join key -- much
+# stronger than the 250ft lat/lng proximity test this enricher falls back on. The two
+# Charlotte layers OVERLAP (the same case number appears in both), so a property under
+# a demolition order will tag twice; that is intended, and the demolish tag is the one
+# that matters.
 CITY_ENDPOINTS: dict[str, dict] = {
     # City of Asheville self-hosted Accela services view (verified live 2026-07-01,
     # HTTP 200, real addressed cases). record_type covers Building/Zoning/Stormwater
@@ -59,6 +68,33 @@ CITY_ENDPOINTS: dict[str, dict] = {
         "violation_fields": ("record_type", "description"),
         "status_fields": ("record_status",),
         "date_fields": ("date_opened",),
+    },
+    # City of Charlotte, Housing & Neighborhood Services. Mecklenburg is outside the
+    # 18-county FORECLOSURE footprint but inside the statewide DISTRESSED scope.
+    "Charlotte": {
+        "url": "https://gis.charlottenc.gov/arcgis/rest/services/HNS/CodeEnforcementNewAndOpenCases/MapServer/0",
+        "addr_fields": ("FullAddress",),
+        "violation_fields": ("CaseType", "DetailedDescription"),
+        "status_fields": ("CaseStatus",),
+        "date_fields": ("DateCreated",),
+        "parcel_field": "ParcelId",
+    },
+}
+
+#: Layers that are not "a violation" but a TERMINAL condition. A standing order to
+#: demolish means the structure is coming down: the owner is about to lose the
+#: improvement and keep the lot, which is the clearest motivated-seller state there is.
+#: Kept separate from CITY_ENDPOINTS so it can carry its own severity rather than being
+#: averaged into an ordinary Housing case.
+SEVERE_ENDPOINTS: dict[str, dict] = {
+    "Charlotte": {
+        "url": "https://gis.charlottenc.gov/arcgis/rest/services/HNS/CodeEnforcementOrderstoDemolish/MapServer/0",
+        "addr_fields": ("FullAddress",),
+        "violation_fields": ("CaseType", "DetailedDescription"),
+        "status_fields": ("CaseStatus",),
+        "date_fields": ("DateCreated",),
+        "parcel_field": "ParcelId",
+        "severity": "order_to_demolish",
     },
 }
 
