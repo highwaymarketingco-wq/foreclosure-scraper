@@ -193,8 +193,13 @@ def test_the_sweep_is_paced_and_low_concurrency_by_default():
     both the courteous and the effective choice -- the burst got us nothing but a 429."""
     import foreclosure_scraper.scrapers.counties_sc.sc_catalis_delinquent_roll as m
     assert m._CONCURRENCY == 1
-    assert m._PACE_S >= 1.0
-    assert m._BACKOFF_S >= 5.0
+    # 2026-09-11: a 1.0s pace was still not enough. Concurrency 1 with a 1.0s pace took
+    # 57 HTTP 429s in 32 minutes, abandoned 11 name prefixes after five attempts each,
+    # and captured zero leads -- the quota from an earlier 600-request burst had not
+    # reset. 8s is ~450 requests/hour, which reads the county unattended without
+    # tripping the limiter. Raise the pace before ever raising concurrency.
+    assert m._PACE_S >= 8.0, "this host 429s at a 1s pace; do not speed it up"
+    assert m._BACKOFF_S >= 30.0
 
 
 def test_a_lost_prefix_is_named_not_just_counted():

@@ -93,9 +93,19 @@ REQUEST_BUDGET = int(os.getenv("CATALIS_ROLL_BUDGET", "600"))
 #: Deliberately gentle. The host's robots asks not to be crawled, and it enforces with
 #: HTTP 429 -- a 600-request burst at concurrency 3 got the sweep rate-limited for minutes
 #: afterwards. Low concurrency plus a pace delay reads the same roll without tripping it.
+#: MEASURED 2026-09-11, the hard way. A 600-request burst at concurrency 3 exhausted
+#: whatever per-IP quota this host enforces. A later run at concurrency 1 with a 1.0s
+#: pace still took 57 HTTP 429s in 32 minutes, abandoned 11 name prefixes after five
+#: attempts each, and never captured a single lead -- the quota had not reset. The host
+#: also serves `Disallow: /`. Both facts point the same way: this source is a SLOW
+#: background job, not something to run on demand.
+#:
+#: 8s between requests is roughly 450/hour, which reads Pickens' ~2,600 delinquent
+#: parcels in a couple of unattended hours without tripping the limiter. Raise the pace
+#: before raising concurrency; concurrency is what got us banned the first time.
 _CONCURRENCY = int(os.getenv("CATALIS_ROLL_CONCURRENCY", "1"))
-_PACE_S = float(os.getenv("CATALIS_ROLL_PACE_S", "1.0"))
-_BACKOFF_S = float(os.getenv("CATALIS_ROLL_BACKOFF_S", "5.0"))
+_PACE_S = float(os.getenv("CATALIS_ROLL_PACE_S", "8.0"))
+_BACKOFF_S = float(os.getenv("CATALIS_ROLL_BACKOFF_S", "30.0"))
 
 
 def _headers(site: str) -> dict:
