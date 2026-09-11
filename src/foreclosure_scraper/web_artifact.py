@@ -597,6 +597,7 @@ RAW_KEEP = {
     # MAILING address -- the field the whole source exists for -- would have been dropped
     # at publish exactly like the 160 keys before it.
     "catalis_roll": "*",
+    "greenville_mie": "*",
 
     # cross-cutting distress signals
     "absentee_owner": "*", "bank_name": "*", "case": "*",
