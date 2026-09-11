@@ -1,4 +1,6 @@
 {
-  "count": 112887,
-  "updated_at": "2026-09-11T18:52:00.075620Z"
+  "count": 103683,
+  "updated_at": "2026-09-11T19:50:21.330874Z",
+  "rebased_from": 112887,
+  "reason": "9,204 off-footprint rows removed"
 }

@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-11T19:35:01.350008Z",
-  "total": 112887,
+  "run_time": "2026-09-11T19:50:21.147982Z",
+  "total": 103683,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -100,15 +100,15 @@
     "courtlistener.recap": 945
   },
   "by_state": {
-    "NC": 77930,
-    "SC": 34957
+    "NC": 68931,
+    "SC": 34752
   },
   "by_source_on_board": {
-    "counties_generic.liensnc": 49992,
-    "counties_sc.qpaybill_delinquent_roll": 18503,
-    "liensnc": 6460,
+    "counties_generic.liensnc": 41266,
+    "counties_sc.qpaybill_delinquent_roll": 18438,
+    "liensnc": 6308,
     "counties_nc.rutherford_tax": 4171,
-    "nc_ecourts_judgments": 3829,
+    "nc_ecourts_judgments": 3776,
     "counties_sc.sc_public_index": 3698,
     "counties_nc.buncombe_elderly": 2988,
     "counties_sc.pickens_delinquent_parcels": 1854,
@@ -120,8 +120,8 @@
     "counties_sc.charleston_delinquent_tax": 1125,
     "counties_sc.spartanburg_condemned": 1071,
     "counties_generic.arcgis_distress.new_hanover_demolition_permits": 1003,
-    "courtlistener.recap": 945,
     "counties_nc.buncombe_delinquent_tax": 938,
+    "courtlistener.recap": 737,
     "counties_nc.nc_heir_estate_parcels": 682,
     "national.courtlistener_bankruptcy": 644,
     "counties_sc.sc_public_index_export": 591,
@@ -448,21 +448,21 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "owner-name signal + fullmer rank on 112,887 rows (A 802 / B 7,177 / C 9,011 / D 95,897)",
-  "detail_count": 112887,
-  "detail_digest": "57d3d38bc790e288",
+  "notes": "one-time duplicate normalisation: 112,887 -> 103,683 (9,204 cross-source duplicates merged)",
+  "detail_count": 103683,
+  "detail_digest": "5c1ab65f9830a56b",
   "board": {
     "schema": "slim-v1",
-    "count": 112887,
+    "count": 103683,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
-      "count": 113,
-      "records": 112887
+      "count": 104,
+      "records": 103683
     }
   },
-  "health_carried_from": "2026-09-11T18:51:59.647322Z",
+  "health_carried_from": "2026-09-11T19:35:01.350008Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
