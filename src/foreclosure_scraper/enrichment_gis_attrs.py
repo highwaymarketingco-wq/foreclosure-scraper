@@ -535,6 +535,30 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
                     li.acreage = pc["acreage"]; stats["filled_acre"] += 1
                 if not (li.street_address or "").strip() and pc.get("address"):
                     li.street_address = pc["address"]
+                # OWNER MAILING + LAST SALE, added 2026-09-10. The cache has carried these
+                # for 10 of its 14 counties since the schema gained the columns, and they
+                # are written to raw["gis"]["mailing"] and raw["gis"]["last_sale"]
+                # DELIBERATELY -- those are the exact keys flags.py already reads to raise
+                # absentee_owner and the equity flags. Writing the value where the existing
+                # consumer looks is the whole fix; inventing a new key is how this data got
+                # lost the first time.
+                #
+                # SC owner contact runs 8-18% against NC's 50-89% and the per-county
+                # coverage matrix names it the binding constraint in every SC county, while
+                # raw["gis"]["mailing"] was populated on 4,060 of 94,384 board rows.
+                if pc.get("owner_mailing"):
+                    g = li.raw.setdefault("gis", {})
+                    if not g.get("mailing"):
+                        g["mailing"] = pc["owner_mailing"]
+                        stats["filled_mailing"] = stats.get("filled_mailing", 0) + 1
+                if pc.get("sale_price") or pc.get("sale_date"):
+                    g = li.raw.setdefault("gis", {})
+                    ls = g.setdefault("last_sale", {})
+                    if pc.get("sale_price") and not ls.get("amount"):
+                        ls["amount"] = pc["sale_price"]
+                        stats["filled_sale_price"] = stats.get("filled_sale_price", 0) + 1
+                    if pc.get("sale_date") and not ls.get("date"):
+                        ls["date"] = pc["sale_date"]
                 # Skip the live GIS query ONLY when we now have a situs address (the main thing
                 # the live point/parcel query resolves). If the cache row had no address, fall
                 # through to the live query to try for one via gis_attrs' own layer — we keep

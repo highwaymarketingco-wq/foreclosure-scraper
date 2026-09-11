@@ -40,7 +40,8 @@ PARCEL_LAYERS: dict[str, dict] = {
         # board ids are the 15-digit PIN (pinnum); index pin (10-digit) too for robustness.
         "id_fields": ["pinnum", "pin"],
         "map": {"owner": "owner", "address": "Address", "market_value": "TotalMarketValue",
-                "tax_value": "TaxValue", "acreage": "Acreage"},
+                "tax_value": "TaxValue", "acreage": "Acreage",
+                "sale_price": "SalePrice"},
     },
     # --- NC core footprint (each id_field + field map VERIFIED against a live sample 2026-08-14) ---
     "Rutherford": {  # board parcel_id = the 6-7 digit internal Parcel_Number (NOT the 10-digit PIN)
@@ -49,40 +50,49 @@ PARCEL_LAYERS: dict[str, dict] = {
         "map": {"owner": "Property_Owner", "address": "Physical_Address",
                 "market_value": "Total_Property_Value", "tax_value": "Total_Land_Value_Assessed",
                 "acreage": "Acreage", "living_sqft": "Heated_Area",  # Heated_Area = vision-gate sqft
-                "land_use": "Land_Class"},
+                "land_use": "Land_Class",
+                "owner_mailing": ["Owner_Mailing_Address_1", "Owner_Mailing_Address_2", "Owner_Mailing_Address_3", "Owner_Mailing_Address_City"],
+                "sale_price": "Sale_Price"},
     },
     "Lincoln": {  # 10-digit PIN; situs is split across STREETNUM + STREETNAME
         "url": "https://arcgisserver.lincolncountync.gov/arcgis/rest/services/Server_TaxParcelViewerSP/MapServer/0/query",
         # leads with addresses carry the 10-digit PIN; address-less leads carry the internal PARCELID
         "id_fields": ["PIN", "PARCELID"],
         "map": {"owner": "NAME1", "address": ["STREETNUM", "STREETNAME"],
-                "market_value": "TOTALVALUE", "acreage": "ACRE", "living_sqft": "MAINAREASQFT"},
+                "market_value": "TOTALVALUE", "acreage": "ACRE", "living_sqft": "MAINAREASQFT",
+                "sale_price": "SALEPRICE"},
     },
     "Henderson": {  # 10-digit PIN
         "url": "https://gisweb.hendersoncountync.gov/arcgis/rest/services/Parcels/FeatureServer/0/query",
         "id_fields": ["PIN", "PARCEL_PK"],   # address-less leads carry the internal PARCEL_PK
         "map": {"owner": "PROPERTY_OWNER", "address": "LOCATION_ADDR",
                 "market_value": "TOTAL_PROP_VALUE", "acreage": "ACREAGE", "living_sqft": "HEATED_AREA",
-                "land_use": "LAND_CLASS"},
+                "land_use": "LAND_CLASS",
+                "owner_mailing": ["OWNER_MAIL_1", "OWNER_MAIL_2", "OWNER_MAIL_3", "OWNER_MAIL_CITY"],
+                "sale_price": "PKG_SALE_PRICE"},
     },
     "Burke": {  # 10-digit PIN
         "url": "https://gis.burkenc.org/arcgis/rest/services/ProdParcelViewFC/MapServer/0/query",
         "id_fields": ["PIN"],
         "map": {"owner": "PROPERTY_OWNER", "address": "LOCATION_ADDR",
                 "market_value": "TOTAL_PROP_VALUE", "acreage": "ACREAGE", "living_sqft": "HEATED_AREA",
-                "land_use": "LAND_CLASS"},
+                "land_use": "LAND_CLASS",
+                "owner_mailing": ["OWNER_MAIL_1", "OWNER_MAIL_2", "OWNER_MAIL_3", "OWNER_MAIL_CITY"],
+                "sale_price": "PKG_SALE_PRICE"},
     },
     "McDowell": {  # 12-digit parno/altparno
         "url": "https://services9.arcgis.com/ETP7IuCigkUz7iI9/arcgis/rest/services/McDowell_Parcels/FeatureServer/0/query",
         "id_fields": ["parno", "altparno"],
         "map": {"owner": "ownname", "address": "siteadd", "market_value": "parval",
-                "tax_value": "landval", "acreage": "gisacres"},
+                "tax_value": "landval", "acreage": "gisacres",
+                "owner_mailing": "mailadd"},
     },
     "Cleveland": {  # internal 5-digit PID appears as COUNTY_PID/GIS_PID/LOCATE_PID
         "url": "https://gis.clevelandcounty.com/arcgis/rest/services/Basemap/Parcels/MapServer/0/query",
         "id_fields": ["COUNTY_PID", "GIS_PID", "LOCATE_PID"],
         "map": {"owner": "COUNTY_OWNER_1", "address": "LOCATE_ADDRESS",
-                "market_value": "COUNTY_TOTAL_VALUE", "acreage": "COUNTY_ACRES"},
+                "market_value": "COUNTY_TOTAL_VALUE", "acreage": "COUNTY_ACRES",
+                "owner_mailing": "COUNTY_MAILING_ADDRESS"},
     },
     # --- SC ---
     "Spartanburg": {  # board 12-digit id = GISParcelNumber (7102-28-3341.88) with punctuation
@@ -96,7 +106,9 @@ PARCEL_LAYERS: dict[str, dict] = {
     "Laurens": {  # TMS (dash format); layer has situs but no value field
         "url": "https://laurenscountygis.org/arcgis/rest/services/Pebble/TaxParcel/MapServer/5/query",
         "id_fields": ["TMS"],
-        "map": {"owner": "Owner", "address": "Property_Address", "acreage": "Acres"},
+        "map": {"owner": "Owner", "address": "Property_Address", "acreage": "Acres",
+                "owner_mailing": ["Mailing_Address", "Mailing_City_State_ZIP"],
+                "sale_price": "Sale_Price"},
     },
     # --- 2026-08-30 backbone additions (field maps probed live, valid certs) ---
     "Pickens": {  # SC dashed PIN e.g. "4037-00-34-5506"; open FeatureServer layer 6 (66k parcels)
@@ -124,7 +136,8 @@ PARCEL_LAYERS: dict[str, dict] = {
         "url": "https://gis.transylvaniacounty.org/server/rest/services/Parcels/MapServer/2/query",
         "id_fields": ["PIN"],
         "map": {"owner": "OWNER_NAME", "market_value": "ASSESSED_V", "acreage": "ACRES",
-                "living_sqft": "HEATED_SQ_"},
+                "living_sqft": "HEATED_SQ_",
+                "sale_price": "SALE_PRICE"},
     },
     # --- 2026-08-18: 4 more counties added (verified live, bulk-exportable) ---
     "Gaston": {  # 117,571 parcels; PIN (dash format) or AKPAR (internal int)
@@ -132,28 +145,35 @@ PARCEL_LAYERS: dict[str, dict] = {
         "id_fields": ["PIN", "AKPAR", "PID"],
         "map": {"owner": "CURR_NAME1", "address": "PHYSSTRADD",
                 "market_value": "FMV_TOTAL", "tax_value": "TOTVAL", "acreage": "CALCAC",
-                "living_sqft": "SQFT", "land_use": "property_use"},
+                "living_sqft": "SQFT", "land_use": "property_use",
+                "owner_mailing": "CURR_ADDR1"},
     },
     "Mitchell": {  # 17,664 parcels; GISPIN (dash format) is the board id
         "url": "https://mapping.mitchellcountync.gov/arcgis/rest/services/WebMapNew/MapServer/12/query",
         "id_fields": ["GISPIN", "PIN", "TaxAcct"],
         "map": {"owner": "Owner1", "address": "LocAddr",
                 "market_value": "Total", "tax_value": "Land", "acreage": "LegalAc",
-                "living_sqft": "Dwelling"},
+                "living_sqft": "Dwelling",
+                "owner_mailing": ["MailAddr", "MailCity", "MailState", "MailZip"]},
     },
     "Polk": {  # 16,878 parcels; TMS (dash format) is the board id
         "url": "https://services1.arcgis.com/23uf7jKvz6SRPFWJ/arcgis/rest/services/TaxParcels/FeatureServer/0/query",
         "id_fields": ["TMS"],
         "map": {"owner": "OWNAM1", "address": "PHYSICAL_STREET_ADDRESS",
                 "market_value": "TOTAL_TAX_VALUE", "acreage": "DEEDED_ACRES",
-                "living_sqft": "BUILDING_VALUE", "land_use": "NEIGHBORHOOD_CODE"},
+                "living_sqft": "BUILDING_VALUE", "land_use": "NEIGHBORHOOD_CODE",
+                "owner_mailing": ["OWCITY", "OWZIPA"]},
     },
     "Pickens": {  # 66,417 parcels; PIN is the board id
         "url": "https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services/Pickens_Open_data/FeatureServer/6/query",
         "id_fields": ["PIN", "ACCTNO"],
+        # market_value was mapped to "CalcAcres" -- an ACREAGE field in a value column.
+        # The layer publishes no appraised value, so the honest mapping is None.
         "map": {"owner": "NAME1", "address": "LOCADD",
-                "market_value": "CalcAcres", "acreage": "ACRES",
-                "land_use": "TAXAREA"},
+                "market_value": None, "acreage": "ACRES",
+                "land_use": "TAXAREA",
+                "owner_mailing": ["ADD1", "CITY", "STATE", "ZIP"],
+                "sale_price": "SALEP"},
     },
     # --- 2026-08-19: Anderson SC (city-of-Anderson ArcGIS, 114,516 parcels) ---
     "Anderson": {  # TMS is the board id; layer has owner+mailing+situs+value+sale
@@ -161,12 +181,21 @@ PARCEL_LAYERS: dict[str, dict] = {
         "id_fields": ["TMS"],
         "map": {"owner": "OWNER", "address": "PHYS_ADDR",
                 "market_value": "MRKT_VALUE", "acreage": None,
-                "living_sqft": None, "land_use": None},
+                "living_sqft": None, "land_use": None,
+                "sale_price": "SALE_PRICE"},
     },
 }
 
 # schema columns of the local `parcels` table, in insert order
-_COLS = ("owner", "address", "market_value", "tax_value", "acreage", "living_sqft", "land_use")
+# OWNER_MAILING IS THE POINT OF THE 2026-09-10 ADDITION. Measured that day: 10 of the 14
+# cached county layers publish an owner MAILING address, and this schema had no column for
+# it, so every one of them was fetched and thrown away. SC owner contact coverage runs
+# 8-18% against NC's 50-89% and the per-county coverage matrix names it the binding
+# constraint in every SC county -- while the mailing address sat in a layer already being
+# downloaded. sale_price/sale_date are added for the same reason: 9 layers carry them and
+# the sold-comp pool has no SC half.
+_COLS = ("owner", "address", "owner_mailing", "market_value", "tax_value", "acreage",
+         "living_sqft", "land_use", "sale_price", "sale_date")
 _NUMERIC = {"market_value", "tax_value", "acreage", "living_sqft"}
 
 
@@ -287,7 +316,8 @@ async def refresh_county(county: str) -> dict:
         tmp.unlink()
     con = sqlite3.connect(tmp)
     con.execute("CREATE TABLE parcels(id TEXT, owner TEXT, address TEXT, "
-                "market_value REAL, tax_value REAL, acreage REAL, living_sqft REAL, land_use TEXT)")
+                "owner_mailing TEXT, market_value REAL, tax_value REAL, acreage REAL, "
+                "living_sqft REAL, land_use TEXT, sale_price REAL, sale_date TEXT)")
     m = cfg["map"]
     recs = []
     for r in rows:
