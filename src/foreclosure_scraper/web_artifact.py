@@ -592,6 +592,12 @@ RAW_KEEP = {
     # tests/test_raw_keep_covers_enrichers.py now asserts scraper keys as well as
     # enricher keys, so key 192 fails a test instead of vanishing.
 
+    # 2026-09-10: caught by test_every_scraper_raw_key_survives_publish on the very next
+    # source written after that test landed. Without this line the Catalis roll's owner
+    # MAILING address -- the field the whole source exists for -- would have been dropped
+    # at publish exactly like the 160 keys before it.
+    "catalis_roll": "*",
+
     # cross-cutting distress signals
     "absentee_owner": "*", "bank_name": "*", "case": "*",
     "cash_buyer_deeds": "*", "court": "*", "document_url": "*",

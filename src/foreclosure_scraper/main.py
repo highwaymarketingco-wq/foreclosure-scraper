@@ -534,6 +534,9 @@ DATELESS_OK_SOURCES = {
     # _active_only() deletes every row this source produces, which is how
     # pickens_tax_sale lost 160 rows and sc_probate_notices lost 880.
     "counties_sc.qpaybill_delinquent_roll",
+    # Same reason: a delinquent tax balance is a standing condition with no sale date, so
+    # _active_only() would delete every row this source produces.
+    "counties_sc.sc_catalis_delinquent_roll",
     # Spartanburg City Master Condemnation List — a condemnation is a standing condition.
     "counties_sc.spartanburg_city_condemned",
     # Hendersonville vacant/condemned structures register — same, standing condition.

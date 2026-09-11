@@ -191,6 +191,7 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_sc.sc_dor_delinquent_taxpayers` | `https://mydorway.dor.sc.gov/?link=delinquentind` |
 | `counties_sc.sc_probate_notices` | `https://{paper.host` |
 | `counties_sc.qpaybill_delinquent_roll` | `https://{sub}.qpaybill.com/Taxes/TaxesDefaultType4.aspx` — 19 counties: abbevilletreasurer, allendaletreasurer, barnwelltreasurer, calhountreasurer, cherokeecountysctax, chesterfieldcountytax, clarendoncountysctax, darlingtontreasurer, lancastersctax, laurenstreasurer, leetreasurer, marlborocountytax, mccormicktreasurer, newberrytreasurer, oconeesctax, orangeburgtreasurer, spartanburgcountytax, uniontreasurer, williamsburgtreasurer |
+| `counties_sc.sc_catalis_delinquent_roll` | `https://d1ebsyxxbc7tep.cloudfront.net/data/{guid}/Records` via `https://pickenscountysctax.us` — Catalis/Sturgis county tax API. Pickens (guid c9ab58ea-c187-4c02-ad9d-b18dd6167431). Returns the owner MAILING address and the 4%/6% assessment ratio. CDN host robots = Disallow: /, operator-approved 2026-09-10 as an open public-records API; paced and 429-aware. |
 | `counties_sc.sc_tax_delinquent` | `https://1543.newstogo.us/editionviewer/default.aspx?Edition=`<br>`https://www.andersoncountysc.org/departments-a-z/treasurer/`<br>_+11 more_ |
 | `counties_sc.sc_ust_registry` | `https://apps.des.sc.gov/USTRegistry/` |
 | `counties_sc.sumter_surplus` | `https://www.sumtercountysc.gov/online_services/property/surplus_sales.php` |
