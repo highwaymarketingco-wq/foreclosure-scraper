@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-13T04:44:31.841230Z",
-  "total": 107071,
+  "run_time": "2026-09-13T05:57:22.388379Z",
+  "total": 115942,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -101,11 +101,12 @@
   },
   "by_state": {
     "NC": 68931,
-    "SC": 38140
+    "SC": 47011
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 41266,
     "counties_sc.qpaybill_delinquent_roll": 21242,
+    "counties_sc.sc_dew_lien_registry": 8871,
     "liensnc": 6308,
     "counties_nc.rutherford_tax": 4171,
     "nc_ecourts_judgments": 3776,
@@ -449,21 +450,21 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "parcel-cache join: 29,606 hits, 10,366 owner mailing, 1,923 situs, 0 sqft",
-  "detail_count": 107071,
-  "detail_digest": "e10acfbef41b7545",
+  "notes": "owner-name signal + fullmer rank on 115,942 rows (A 896 / B 7,512 / C 11,713 / D 95,821)",
+  "detail_count": 115942,
+  "detail_digest": "809464f838eeb953",
   "board": {
     "schema": "slim-v1",
-    "count": 107071,
+    "count": 115942,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
-      "count": 108,
-      "records": 107071
+      "count": 116,
+      "records": 115942
     }
   },
-  "health_carried_from": "2026-09-13T03:35:23.468126Z",
+  "health_carried_from": "2026-09-13T05:55:59.327343Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",

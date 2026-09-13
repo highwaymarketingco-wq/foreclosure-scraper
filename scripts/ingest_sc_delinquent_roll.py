@@ -49,12 +49,29 @@ FILES = [
     # Greenville Master-in-Equity foreclosure adverts: TMS + the ACTUAL total judgment
     # debt per case. Different county from all the rolls above, so nothing is superseded.
     ("greenville_mie", REPO / "logs" / "greenville_mie_full.json"),
+    # SC DEW lien registry: statewide employer tax/benefit liens. No parcel, but every
+    # row carries a street address, a county and the lien amount, so it is routable. A
+    # named SC entity with an unpaid state lien is a real distress signal, and the
+    # address is a reachable mailing address -- the constraint SC has been short of.
+    ("sc_dew", REPO / "logs" / "sc_dew_full.json"),
 ]
 
 
+#: Only these labels supersede each other, and only within this set: the qPayBill re-run
+#: is a MORE COMPLETE read of the same counties from the same portal, so it replaces the
+#: truncated base. Every other file is a DIFFERENT SOURCE and must be ADDITIVE.
+#:
+#: The first version superseded on county alone. Adding sc_dew -- which covers 12 counties
+#: the qPayBill roll also covers -- silently wiped those counties' tax rolls: 31,786 + 770
+#: + 10,500 should be 43,056 and it reported 32,923. About 10,000 rows lost, with nothing
+#: in the output saying so. Caught by checking the arithmetic rather than the log.
+SUPERSEDING_FAMILY = {"base", "rerun"}
+
+
 def load_rows() -> tuple[list[dict], dict]:
-    """Later files win for any county they contain."""
+    """Within the qPayBill family a later file wins per county; other sources are additive."""
     by_county: dict[str, list[dict]] = {}
+    extra: list[dict] = []
     prov: dict[str, str] = {}
     for label, path in FILES:
         if not path.exists():
@@ -68,11 +85,17 @@ def load_rows() -> tuple[list[dict], dict]:
             print(f"  - {path.name}: 0 rows, skipped")
             continue
         counties = {r.get("county") for r in rows if r.get("county")}
-        for c in counties:
-            by_county[c] = [r for r in rows if r.get("county") == c]
-            prov[c] = label
-        print(f"  + {path.name}: {len(rows):,} rows over {len(counties)} counties ({label})")
-    flat = [r for rows in by_county.values() for r in rows]
+        if label in SUPERSEDING_FAMILY:
+            for c in counties:
+                by_county[c] = [r for r in rows if r.get("county") == c]
+                prov[c] = label
+        else:
+            extra.extend(rows)
+            for c in counties:
+                prov.setdefault(c, label)
+        print(f"  + {path.name}: {len(rows):,} rows over {len(counties)} counties "
+              f"({label}{'' if label in SUPERSEDING_FAMILY else ', additive'})")
+    flat = [r for rows in by_county.values() for r in rows] + extra
     return flat, prov
 
 
