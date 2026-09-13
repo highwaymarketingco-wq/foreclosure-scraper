@@ -353,6 +353,9 @@ RAW_KEEP = {
     # tax_value survived only because it is a TOP-LEVEL field. Any new raw key needs
     # RAW_KEEP, _SLIM_RAW and dashboard.js's _LEAN_RAW or it does not exist.
     "lexington_assessment": "*",
+    # Name->parcel resolution provenance (matched owner, parcel, method). THIRD time
+    # today a new enricher's key was dropped here before anyone noticed.
+    "name_resolution": "*",
     "dot_ocr": "*",                     # recorded deed-of-trust principal + estimated balance
     "loan_amount": "*",                 # scalar loan principal from dot_ocr
     "property_category": "*",           # foreclosure | preforeclosure | tax_delinquency | distressed_property

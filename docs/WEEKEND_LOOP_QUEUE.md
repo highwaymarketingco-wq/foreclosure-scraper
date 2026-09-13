@@ -994,3 +994,47 @@ have parcel caches for in 18 counties.
 an address, an owner and a value, which is what makes them rankable. It is also the
 cross-referencing approach that was explicitly asked for, and it is the only route
 to the sale details that the captcha gate blocks.
+
+## 2026-09-13 19:50 — name -> parcel resolver: built, MARGINAL, and my first metric was 4x too generous
+
+21,208 board leads carry a party name but no address. The existing resolver cannot
+touch them: it reads `owner_name` (these carry the name in `defendant`) and has no
+NC endpoints, only five SC layers. But we hold 103 parcel caches and NC owner
+coverage is ~100% (Buncombe 398,939/398,939), so the match runs LOCALLY, offline.
+
+Name shape was the trick: parcel layers write owners last-first ("LEWIS NANCY
+GAIL"), court notices write parties first-last ("NANCY GAIL LEWIS"). Both reduce to
+a sorted TOKEN SET, which is order-free.
+
+### Measured outcome
+    no cache for county              9,899
+    no owner match                   6,563
+    AMBIGUOUS (left alone)           3,386
+    name too thin to match             981
+    RESOLVED                           379  <- first run
+      of which usable address           ~121 across both runs
+      of which vacant-land placeholder  ~258
+
+**I reported 344 addresses and 82 landed.** The dry run counted an address by
+truthiness, but the cache's address for an heirs-owned vacant parcel is
+"0 SHERWOOD PL" — and the board write path strips those (verified: ZERO board rows
+carry an address starting "0 "). The pipeline was right; my metric was wrong. The
+counter now tests what the pipeline will actually keep.
+
+**Verdict: marginal, keep it.** ~121 usable addresses out of 21,208 names is under
+1%. The parcel_ids it does commit are still joinable to value and mailing, so it is
+not worthless — but this is not the lever for the 21k unresolved names.
+
+Two safety properties worth keeping regardless:
+- a bare surname ("SMITH") returns None — one token identifies nobody
+- a name commits ONLY on a UNIQUE county match; the 3,386 ambiguous are refused.
+  Committing one would attach a real person's foreclosure to a stranger's house.
+
+### RAW_KEEP, third occurrence today
+`name_resolution` was dropped at write exactly like `lexington_assessment` and
+`fullmer` before it. Registered. This trap has now cost three separate enrichers in
+one day — the rule is documented in the code, but nothing FAILS when a key is
+missing, which is why documentation alone keeps not working.
+
+**THE REAL BLOCKER for these 21k names: 9,899 are in counties with no parcel cache
+at all.** That is a bigger, more tractable target than tuning the matcher.
