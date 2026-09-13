@@ -657,7 +657,6 @@ async def _query(
             #     NC + "Foreclosure Sale"      -> 7,827
             #     SC + "Foreclosure Sale"      ->   737   (a lane we never had)
             {"state": _STATE_NAME.get((state or "").upper(), state)},
-            {"county": county},
             {"noticetype": noticetype},
             # The server-side date filter is RESTORED. The note that used to sit here said
             # the nested {from,to} "silently matches 0 rows"; it does not. It returned 0
@@ -672,6 +671,11 @@ async def _query(
         "pageSize": PAGE_SIZE,
         "isDemo": False,
     }
+    # county is OPTIONAL: SC foreclosure notices are filed under newspaper coverage
+    # regions ('Orangeburg, Bamberg and Calhoun'), so that lane queries statewide.
+    if county:
+        body["allFilters"].insert(1, {"county": county})
+
     try:
         r = await c.post(
             API_URL,
@@ -698,6 +702,47 @@ async def _query(
     return [it for it in results
             if isinstance(it.get("publishedtimestamp"), (int, float))
             and from_ms <= it["publishedtimestamp"] <= to_ms]
+
+
+#: SC Master-in-Equity case number: 2025-CP-38-01441, also written 2025CP3801109.
+_SC_CASE_RE = re.compile(r"\b(20\d\d)[- ]?CP[- ]?(\d{2})[- ]?(\d{3,6})\b", re.I)
+#: The REAL county, from the notice body. Column's SC `county` field is a newspaper
+#: coverage region ('Orangeburg, Bamberg and Calhoun'), which routes nothing.
+_SC_COUNTY_RE = re.compile(r"COUNTY OF ([A-Z][A-Za-z ]{3,20}?)\s*(?:\n|,|\.|IN THE)", re.I)
+_SC_ADDR_RE = re.compile(
+    r"(?:street address|property address|known as|located at)[:\s]*([^\n]{8,80})", re.I)
+
+
+def _sc_foreclosure_fields(text: str) -> dict:
+    """Case number, county and address pulled from an SC foreclosure notice body.
+
+    Column gives none of these usefully for SC: the case number is not a field at all,
+    and `county` is the newspaper's coverage area rather than the county the property is
+    in. All three are in the text, and all three are needed for the row to be routable.
+    """
+    out: dict = {}
+    m = _SC_CASE_RE.search(text or "")
+    if m:
+        out["case_number"] = f"{m.group(1)}-CP-{m.group(2)}-{m.group(3)}"
+    m = _SC_COUNTY_RE.search(text or "")
+    if m:
+        out["county"] = m.group(1).strip().title()
+    elif out.get("case_number"):
+        # The county CODE inside the case number is a better key than the prose: it is
+        # present whenever the case number is. Measured on this lane, 11 of 37 parsed
+        # rows carried no "COUNTY OF ..." line and every one of them had a case number.
+        from ...sc_case_county import county_from_sc_case
+        got = county_from_sc_case(out["case_number"])
+        if got:
+            out["county"] = got
+    m = _SC_ADDR_RE.search(text or "")
+    if m:
+        addr = " ".join(m.group(1).split()).strip(" .,")
+        # trim boilerplate that runs on after the address
+        addr = re.split(r"\s+(?:TERMS OF|SUBJECT TO|TMS|Tax Map)", addr, 1)[0].strip(" .,")
+        if len(addr) >= 8:
+            out["street_address"] = addr
+    return out
 
 
 class ColumnLegalNotices(BaseScraper):
@@ -753,6 +798,44 @@ class ColumnLegalNotices(BaseScraper):
                     if li is not None:
                         out.append(li)
 
+            # (4) SC FORECLOSURE SALES — STATEWIDE, deliberately without a county filter.
+            #
+            # Column's SC `county` values are NEWSPAPER COVERAGE REGIONS, not counties.
+            # Measured over the last 120 days, all 98 SC foreclosure notices carry one of
+            # only five values:
+            #     'Orangeburg, Bamberg and Calhoun' 58 · 'Florence' 23
+            #     'Darlington' 7 · 'Marion' 6 · 'Richland' 4
+            # So a per-county loop returns zero for every footprint county, which is
+            # exactly what it did: Anderson, Cherokee, Laurens, Oconee, Pickens,
+            # Spartanburg and Union all came back 0 while the statewide query returned 98.
+            # Filtering by county here cannot work; the county is recovered from the
+            # notice text downstream instead.
+            #
+            # HONEST SCOPE NOTE: none of those five regions is in the FORECLOSURE
+            # footprint. This lane serves the statewide SC DISTRESSED scope. It does not
+            # improve footprint foreclosure coverage, and should not be described as if
+            # it does.
+            sc_fc = await _query(c, _SC, None, NC_FORECLOSURE_TYPE, from_ms, now_ms)
+            _sc_kept = 0
+            for it in sc_fc:
+                got = _sc_foreclosure_fields(it.get("text") or "")
+                if not (got.get("case_number") or got.get("street_address")):
+                    continue          # nothing to route or underwrite on
+                li = self._nc_listing(it, got.get("county") or "")
+                if li is None:
+                    continue
+                li.state = "SC"
+                if got.get("county"):
+                    li.county = got["county"]
+                if got.get("case_number"):
+                    li.case_number = got["case_number"]
+                if got.get("street_address") and not li.street_address:
+                    li.street_address = got["street_address"]
+                out.append(li)
+                _sc_kept += 1
+            log.info("column.sc_foreclosure", notices=len(sc_fc), kept=_sc_kept,
+                     note="statewide; SC county values are newspaper regions, not counties")
+
         # Dedup on Column `id`. Every id carries a "-N" publication-run suffix
         # (verified live: the SAME notice reappears as "...-0", "...-1" across
         # publication dates), so we collapse on the BASE id (suffix stripped).
@@ -805,6 +888,7 @@ class ColumnLegalNotices(BaseScraper):
             return datetime.utcfromtimestamp(int(ts) / 1000.0)
         except Exception:
             return datetime.utcnow()
+
 
     def _nc_listing(self, it: dict, county: str) -> Listing | None:
         text = it.get("text") or ""
