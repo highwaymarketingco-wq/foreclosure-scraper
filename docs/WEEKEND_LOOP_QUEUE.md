@@ -1038,3 +1038,31 @@ missing, which is why documentation alone keeps not working.
 
 **THE REAL BLOCKER for these 21k names: 9,899 are in counties with no parcel cache
 at all.** That is a bigger, more tractable target than tuning the matcher.
+
+## 2026-09-13 20:00 — where the 9,071 cache-less leads actually are
+
+    Horry SC 2,463 | Cherokee SC 857 | Williamsburg SC 831 | Darlington SC 760
+    Allendale 518 | Union SC 471 | Marlboro 471 | Barnwell 401 | Clarendon 321
+    Charleston 265 | Georgetown 252 | Kershaw 210 | McCormick 209 | Lee NC 206
+
+All but one are SC. This is the same NC/SC asymmetry as phone (82% vs 3%) and
+mailing (93% vs 25%) — SC counties simply publish less, and every downstream gap
+traces back to it.
+
+### Horry: NO public parcel layer (checked properly, not guessed)
+Horry is the biggest single gap — 2,463 cache-less leads and only 41% addresses on
+its 4,191 board rows. Probed four county GIS hostnames (all dead) and then listed
+its actual ArcGIS org, `services1.arcgis.com/If0JkGr8ABreBTuS`: **114 services, and
+not one is a parcel layer with addresses.**
+- `DelinquentTaxParcels2025` -> 47 rows, no address field
+- `SouthernBoundaryParcels` -> 3 rows, it is boundary CORNERS, not parcels
+- the only Horry parcel layer on the portal is the NCDOT 20,429-row border extract
+  already recorded as partial
+
+So Horry's addresses are not free via GIS. Its leads keep parcel + owner + debt and
+stay unroutable until another route appears. Recorded so this is not re-probed.
+
+### Small real find: Horry Forfeited Land Commission
+`DelinquentTaxParcels2025` is the FLC list — 47 properties with `FLC_Bid_Amount`,
+owner and description. FLC = failed to sell at tax sale and reverted to the county.
+That is genuine, acquirable distress, just a small pool. Not yet ingested.
