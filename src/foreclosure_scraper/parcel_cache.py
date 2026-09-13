@@ -151,10 +151,28 @@ PARCEL_LAYERS: dict[str, dict] = {
         "map": {"owner": "OWNAM1", "address": "PHYSICAL_STREET_ADDRESS",
                 "market_value": "TOTAL_TAX_VALUE", "acreage": "DEEDED_ACRES"},
     },
-    # Oconee (arcserver2.oconeesc.com) is intentionally NOT cached: its ArcGIS server
-    # rejects bulk paginated export (returns 0 rows to resultOffset queries, though a
-    # single-row query works), and the layer carries no situs street field anyway — so
-    # it stays on the live/qPublic path. Revisit if the county exposes a bulk endpoint.
+    "Oconee": {
+        # ADDED 2026-09-13, overturning the note that used to sit here. It said Oconee's
+        # ArcGIS server "rejects bulk paginated export (returns 0 rows to resultOffset
+        # queries)" and that "the layer carries no situs street field anyway".
+        #
+        # Both halves were tested against the wrong service. The CitizenServe layer 5
+        # (GISDATA.DBO.assessordata_Registered) answers resultOffset 0, 5,000 AND 60,000
+        # with rows, so pagination works. It has no situs -- that half stands -- but it
+        # carries the OWNER MAILING ADDRESS on 68,091 of 68,091 parcels, which is the
+        # field Oconee actually needed: the county sat at 33% mailing on 2,682 board rows.
+        #
+        # The join key looked wrong at first glance: some `pin` values are short
+        # ("00022"). But the layer also holds proper TMS pins with trailing whitespace
+        # ("002-00-01-001   "), and three real board parcels were looked up by hand and
+        # all three hit -- 226-00-04-016, 161-00-04-015, 306-02-01-003.
+        "url": "https://arcserver2.oconeesc.com/arcgis/rest/services/CitizenServe/MapServer/5/query",
+        "id_fields": ["pin"],
+        "map": {"owner": "current_owner",
+                "owner_mailing": ["owner_street", "owner_citystate", "owner_zip"],
+                "acreage": "proval_acres", "land_use": "legal_descr",
+                "address": None, "market_value": None},
+    },
     "Transylvania": {  # dash-PIN; ADDRESS_1/3 are owner mailing, so owner+value+acre only
         "url": "https://gis.transylvaniacounty.org/server/rest/services/Parcels/MapServer/2/query",
         "id_fields": ["PIN"],
