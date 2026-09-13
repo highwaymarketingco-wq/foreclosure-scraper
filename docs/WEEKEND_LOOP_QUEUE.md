@@ -780,3 +780,41 @@ free. Same conclusion, better reason — and it matches the standing SCDOT wall.
 
 Still needed: Lexington (2,214 rows), Kershaw (1,727), Colleton (1,480), Bamberg,
 Saluda parcel sources.
+
+## 2026-09-13 16:00 — Lexington enriched; and I walked into the RAW_KEEP trap myself
+
+**New free source.** Lexington has no parcel layer (maps.lex-co.com is a bare
+Apache "It works!" page; SCDOT's statewide parcel service is token-walled), so the
+value comes from the county's own `PropSearchAPI`. Most of it needs a
+reCAPTCHA-issued Bearer token — out of bounds — but two endpoints answer with NO
+token: `/property` and `/assessment`.
+
+**Gotcha worth remembering: the TMS must be UNDASHED.** `004121-01-024` returns
+`[]`, which reads as "no such parcel"; `00412101024` returns 22 records. A source
+that answers 200-with-empty on a format error looks dead when it is not.
+
+**The assessment ratio is a free owner-occupancy signal.** SC assesses an
+owner-occupied legal residence at 4% and everything else at 6%, so
+`assessment / fmv` separates a homeowner from a landlord, second-home owner or LLC
+with no mailing address needed. Deliberately reported as `owner_occupied` and NOT
+as `owner_mailing.absentee`: "not a legal residence" and "mails from elsewhere" are
+different claims. Ratios in neither band (ag, manufacturing) return None.
+
+Result: **1,159 values filled, 0 errors, 755 not owner-occupied, 363 owner-occupied.**
+
+### The trap
+The first run reported 1,159 enriched — and the board showed **0**. Every block was
+silently dropped because `lexington_assessment` was not in `RAW_KEEP`. `tax_value`
+survived only because it is a TOP-LEVEL field, so the run looked partly successful,
+which is what makes this failure so good at hiding. Same allowlist that dropped 160
+scraper keys before; same shape as this morning's `fullmer` bug, which I had
+already fixed today.
+
+**Rule now written into the code:** a new raw key needs `RAW_KEEP`, `_SLIM_RAW` AND
+`dashboard.js`'s `_LEAN_RAW`, or it does not exist. Mirror test passes.
+
+### Honest limits
+- ranks moved modestly: 285 rows D->C, Lexington max rank 59, only 3 at 50+.
+  Value alone does not satisfy the buy-box margin test.
+- **1,053 of Lexington's 2,214 rows carry an ACCOUNT number, not a TMS**, so about
+  half cannot be enriched by this route at all. That is a ceiling, not a bug.
