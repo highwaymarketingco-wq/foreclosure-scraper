@@ -73,7 +73,18 @@ REJECTED_TENANTS = {
 
 MAX_CARDS = int(os.getenv("BT_CARD_MAX", "300"))
 _CONCURRENCY = int(os.getenv("BT_CARD_CONCURRENCY", "3"))
-_TAX_YEAR = os.getenv("BT_CARD_TAX_YEAR", "2027")
+
+#: EACH COUNTY HAS ITS OWN REVAL YEAR and the card only exists under that year. The first
+#: version hardcoded 2027 -- McDowell's year -- and a run over 301 eligible rows fetched
+#: 298 and parsed only 39, with 259 "not_a_card". They were not errors: every non-McDowell
+#: county returned HTTP 200 and a 735-byte HTML stub. Measured on Carteret parcel
+#: 637512950298016: 2023/24/25/27/28 all return the 735-byte stub, 2026 returns a
+#: 27,415-byte PDF.
+#:
+#: So the year is DISCOVERED per county on first use and remembered, rather than guessed.
+_TAX_YEAR = os.getenv("BT_CARD_TAX_YEAR", "")          # override: pin one year for all
+_YEAR_CANDIDATES = ("2027", "2026", "2025", "2028", "2024")
+_YEAR_BY_COUNTY: dict[str, str] = {}
 
 _HEATED_RE = re.compile(r"HEATED AREA\s+([\d,]+)", re.I)
 _APPRAISED_RE = re.compile(r"TOTAL APPRAISED VALUE[^\d]{0,40}([\d,]+)", re.I)
@@ -103,7 +114,7 @@ def _num(s: str | None) -> float | None:
 _TENANTS_CI = {k.lower(): v for k, v in TENANTS.items()}
 
 
-def card_url(county: str, parcel_id: str, tax_year: str = _TAX_YEAR) -> str | None:
+def card_url(county: str, parcel_id: str, tax_year: str | None = None) -> str | None:
     """The card URL, or None when the county is not a verified tenant."""
     code = _TENANTS_CI.get((county or "").strip().lower())
     if not code:
@@ -111,7 +122,38 @@ def card_url(county: str, parcel_id: str, tax_year: str = _TAX_YEAR) -> str | No
     pid = re.sub(r"[^0-9A-Za-z]", "", parcel_id or "")
     if not pid:
         return None
-    return f"{BASE}/ITSPublic{code}/AppraisalCard.aspx?id={pid}%2f{tax_year}"
+    year = (tax_year or _TAX_YEAR
+            or _YEAR_BY_COUNTY.get((county or "").strip().lower())
+            or _YEAR_CANDIDATES[0])
+    return f"{BASE}/ITSPublic{code}/AppraisalCard.aspx?id={pid}%2f{year}"
+
+
+async def discover_tax_year(client, county: str, parcel_id: str) -> str | None:
+    """Find the year whose card actually exists for this county, and remember it.
+
+    A wrong year is NOT an error: the portal answers HTTP 200 with a ~735-byte HTML stub.
+    Only a %PDF body means the card exists, so that is what this tests.
+    """
+    key = (county or "").strip().lower()
+    if key in _YEAR_BY_COUNTY:
+        return _YEAR_BY_COUNTY[key]
+    for year in _YEAR_CANDIDATES:
+        url = card_url(county, parcel_id, tax_year=year)
+        if not url:
+            return None
+        try:
+            r = await client.get(url)
+        except Exception:  # noqa: BLE001
+            continue
+        if r.status_code == 200 and r.content[:4] == b"%PDF":
+            _YEAR_BY_COUNTY[key] = year
+            log.info("bt_card.tax_year_found", county=county, year=year,
+                     bytes=len(r.content))
+            return year
+    log.warning("bt_card.no_tax_year", county=county, parcel=parcel_id,
+                tried=list(_YEAR_CANDIDATES),
+                note="every candidate year returned a non-PDF stub")
+    return None
 
 
 def parse_card(pdf_bytes: bytes) -> dict:
@@ -186,6 +228,23 @@ async def enrich_bt_appraisal_card(listings: Iterable[Listing]) -> dict:
 
     async with httpx.AsyncClient(timeout=45.0, headers={"User-Agent": _UA},
                                  follow_redirects=True) as c:
+        # Resolve each county's reval year ONCE, from its first eligible parcel.
+        for county in sorted({(li.county or "").strip() for li in targets}):
+            # Probe with a parcel that LOOKS like a parcel. The first attempt used
+            # whichever row came first, and for Moore that was the junk value 'es' left
+            # by a loose regex in the liensnc pool -- so every candidate year returned a
+            # stub and the county was written off as having no card, when Moore parcel
+            # 00049504 returns a 20,396-byte PDF under 2027.
+            probe = next((li for li in targets
+                          if (li.county or "").strip() == county
+                          and len(re.sub(r"[^0-9]", "", li.parcel_id or "")) >= 6), None)
+            if probe:
+                await discover_tax_year(c, county, probe.parcel_id)
+            else:
+                log.warning("bt_card.no_probe_parcel", county=county,
+                            note="no row here has a parcel with 6+ digits to probe with")
+        stats["years"] = dict(_YEAR_BY_COUNTY)
+
         async def one(li: Listing) -> None:
             url = card_url(li.county or "", li.parcel_id)
             async with sem:
