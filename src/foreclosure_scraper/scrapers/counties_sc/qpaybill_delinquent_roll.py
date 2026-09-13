@@ -177,6 +177,31 @@ QPAYBILL_SUBS: dict[str, str] = {
     "Newberry": "newberrytreasurer",
     "Orangeburg": "orangeburgtreasurer",
     "Williamsburg": "williamsburgtreasurer",
+    # --- 2026-09-13: qPayBill covers 27 SC counties, not 19 ----------------------
+    # Found by working the "14 SC counties with ZERO board rows" gap, NOT by
+    # guessing: Lexington's own property-search page links out to
+    # lexingtoncountytreasurer.qpaybill.com, which proved the roster was short.
+    # Probing every SC county against the vendor's subdomain patterns turned up
+    # eight more live portals. Each one verified to serve the SAME Type4 search
+    # form this scraper posts to (SearchType / ddlCriteriaList / ddlYearList /
+    # PaidStatus all present), so they need no new parsing code.
+    #
+    # Horry is the prize: Myrtle Beach, one of the largest counties in the state.
+    # Bamberg, Kershaw, Lexington and Saluda were at ZERO rows on the board;
+    # Marion and Sumter had one row each.
+    #
+    # Hampton is DELIBERATELY ABSENT. hamptontreasurer.qpaybill.com answers 200 but
+    # the body is an "Object moved / Error" stub with no form — a portal that exists
+    # in name only. Listing it would have manufactured a county that reports zero
+    # rows forever and looks like a scraper bug.
+    "Bamberg": "bambergcountytreasurer",
+    "Colleton": "colleton",
+    "Horry": "horrycountytreasurer",
+    "Kershaw": "kershawcounty",
+    "Lexington": "lexingtoncountytreasurer",
+    "Marion": "marioncounty",
+    "Saluda": "saludacountytreasurer",
+    "Sumter": "sumtercounty",
 }
 
 #: Counties whose Identification-No. is an ACCOUNT id, not a parcel. Their rows are
@@ -285,7 +310,7 @@ def parse_grid(html: str) -> list[dict]:
 
         parts = [p.strip() for p in name_addr.split("\n") if p.strip()]
         owner = parts[0] if parts else None
-        address = parts[1] if len(parts) > 1 else None
+        address = _clean_situs(parts[1] if len(parts) > 1 else None)
         # The row's own detail link, kept on the row so the optional detail pass never has to
         # reconstruct a URL. Reconstructing it is exactly how it got joined to the wrong base.
         href_m = re.search(r'href="(TaxesDetailsType4\.aspx\?[^"]+)"', row, re.I)
@@ -551,6 +576,43 @@ async def sweep_county(client: httpx.AsyncClient, county: str, sub: str,
 
 
 _DETAIL_HREF_RE = re.compile(r'href="(TaxesDetailsType4\.aspx\?[^"]+)"', re.I)
+
+
+
+_ZERO_TOKEN_RE = re.compile(r"\s+0+$")
+_ALL_ZEROS_RE = re.compile(r"0+")
+
+
+def _clean_situs(addr: str | None) -> str | None:
+    """Drop the zero-padded city/ZIP columns qPayBill appends to the situs line.
+
+    Several of these portals render an absent city and ZIP as literal zeros, so the
+    address cell reads "128 PHOENIX LN 00000 0000" or "9523 HWY 260 0 0000". Stored
+    as-is that is not an address: it fails geocoding, it defeats dedupe (two rows for
+    the same house differ by their padding), and it prints on a call sheet as
+    something a person cannot drive to. 4,327 rows were already on the board this way
+    — 3,060 of them Spartanburg — before this was caught on 2026-09-13.
+
+    Only tokens made ENTIRELY of zeros are removed, and only from the END, so a real
+    house number ("0 MAIN ST", which vacant parcels genuinely use) and a road name
+    carrying digits ("HWY 260", "S-40-0") are both untouched. If nothing survives,
+    return None rather than an empty string, so the row reports having no address
+    instead of appearing to have a blank one.
+    """
+    if not addr:
+        return None
+    out = addr.strip()
+    while True:
+        stripped = _ZERO_TOKEN_RE.sub("", out)
+        if stripped == out:
+            break
+        out = stripped.strip()
+    # A line that was NOTHING but padding ("00000 0000") reduces to a lone "00000"
+    # here, because the regex needs leading whitespace to cut a token. That is not an
+    # address either, so it goes too.
+    if not out or _ALL_ZEROS_RE.fullmatch(out):
+        return None
+    return out
 
 
 def _detail_url(sub: str, href: str) -> str:

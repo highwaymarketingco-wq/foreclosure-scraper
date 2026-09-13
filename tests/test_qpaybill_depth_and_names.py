@@ -51,5 +51,17 @@ def test_every_qpaybill_county_key_is_canonical():
     assert not wrong, f"non-canonical county keys: {wrong}"
 
 
-def test_all_nineteen_counties_still_present():
-    assert len(QPAYBILL_SUBS) == 19
+def test_county_roster_does_not_shrink():
+    # Was 19. On 2026-09-13 probing every SC county against the vendor's subdomain
+    # patterns found EIGHT more live portals (Horry, Lexington, Kershaw, Sumter,
+    # Marion, Bamberg, Saluda, Colleton), so the source covers 27 counties. This is
+    # a floor, not an equality, so finding more never fails the suite — but silently
+    # losing one does.
+    assert len(QPAYBILL_SUBS) >= 27
+
+
+def test_hampton_stays_out():
+    # hamptontreasurer.qpaybill.com answers 200 with an "Object moved / Error" stub
+    # and no search form. Listing it would manufacture a county that reports zero
+    # rows forever and reads like a scraper bug.
+    assert "Hampton" not in QPAYBILL_SUBS

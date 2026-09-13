@@ -307,3 +307,107 @@ ad-hoc as inline `{"Mcdowell": "McDowell", ...}` dicts in four more files —
 ### Confirms the state-aware cache fix was live, not theoretical
 Three qPayBill counties — **Cherokee, Lee, Union** — are names that exist in both NC
 and SC. Their SC rows would have joined against NC caches of the same name.
+
+## 2026-09-13 08:57 — detail harvest landed; fullmer now LIVE in the payload
+
+qPayBill detail re-run (cap 6000) finished clean: 8,541 of 8,543 rows filled,
+`skipped_over_cap=0`, 3,105 of 3,108 parcels carrying a value.
+
+Ingested additive (NOT superseding — it reads fewer parcels than the base roll,
+so superseding would drop the difference, same reasoning as detail4):
+- 915 existing rows gained fields: **+904 tax_value, +770 legal_description, +53 acreage**
+- 0 net-new rows, as expected — these counties were already on the board
+- **Oconee tax_value 1% -> 50%, Cherokee 1% -> 51%**
+- the house-number guard blocked 7,822 bad fuzzy merges on the way in
+
+`write_artifact` regenerated the slim payload, so **raw.fullmer is now on
+115,994 of 115,994 slim rows** (was 0). Slim .gz 14.96 -> 17.16 MB; the shards
+shrank in exchange, since a "*" block is skipped there.
+
+Committed and pushed to main (da28bb1). **Pages had NOT rebuilt at first check** —
+still serving `?v=20260906a` with zero fullmer refs — so a poll is watching for the
+deploy. Do not call this done until the live dashboard.js shows fullmer.
+
+## IN FLIGHT
+- depth-6 re-run, Orangeburg + Spartanburg, budget 30,000/county -> `logs/qpb6.log`,
+  output `logs/qpaybill_depth6.json`. These are the two worst-hit counties (141 and
+  120 unwalked prefixes). Expect a row GAIN; compare against base 14,169 / 12,256.
+- Pages deploy poll.
+
+## NEXT
+1. Ingest the depth-6 output, measure the recovered rows.
+2. Then depth-6 the remaining 17 qPayBill counties, a few at a time.
+3. The 14 zero-row SC counties (Aiken, Lexington, Richland, Dorchester, Kershaw
+   first) — these need a SOURCE, not an enricher.
+
+## 2026-09-13 09:00 — VERIFIED LIVE on the dashboard, end to end
+
+Pages rebuilt ~80s after the push. Verified at every layer, not just the push:
+
+- live `dashboard.js?v=20260913a`, 6 fullmer refs (was 0)
+- live `listings_slim.json.gz` = 17,160,100 bytes, byte-identical to local
+- **live payload: 115,994 of 115,994 rows carry `raw.fullmer.rank`** (was 0)
+- **3,800 rows at rank >= 60** — the call list, now reachable from a phone
+- Buy Box column renders; pills band correctly (fm-hot 81, fm-warm 45/49, fm-cold 37)
+- sort works both directions (asc 3,3,3... / desc 100,100,100,92,92...)
+- tooltip prints the full reasoning, e.g. rank 100 = "cad_mid +20, tax_lawsuit +20,
+  many_owners +14, probate_heirs +16, absentee +8, liquidity_mid +8, margin_strong +15"
+- top-ranked rows are real in-footprint leads with addresses (Buncombe, Lincoln)
+
+The rank-100 profile is exactly the Fullmer thesis: named in a tax LAWSUIT, probate
+or heirs, absentee, margin covers curative 4x.
+
+## 2026-09-13 09:30 — qPayBill covers 27 SC counties, not 19. EIGHT were missing.
+
+Worked the "14 SC counties with ZERO rows" gap and found the source roster was
+short. This was NOT guesswork: Lexington's own property-search SPA links out to
+`lexingtoncountytreasurer.qpaybill.com`, which proved the list was incomplete.
+Probing every SC county against the vendor's subdomain patterns found eight live
+portals we were not reading:
+
+| county | subdomain | board rows before |
+|---|---|---|
+| **Horry** | horrycountytreasurer | (Myrtle Beach — largest of the find) |
+| **Lexington** | lexingtoncountytreasurer | **0** |
+| **Kershaw** | kershawcounty | **0** |
+| **Bamberg** | bambergcountytreasurer | **0** |
+| **Saluda** | saludacountytreasurer | **0** |
+| Sumter | sumtercounty | 1 |
+| Marion | marioncounty | 2 |
+| Colleton | colleton | (had sc_dew only) |
+
+All eight verified to serve the SAME Type4 form this scraper already posts to
+(SearchType / ddlCriteriaList / ddlYearList / PaidStatus all present), so they
+needed no new parsing code — just the roster entry.
+
+**Hampton is deliberately EXCLUDED.** `hamptontreasurer.qpaybill.com` answers 200,
+but the body is an "Object moved / Error" stub with no form. Listing it would
+manufacture a county that reports zero rows forever and reads like a scraper bug.
+A test pins it out.
+
+**Live smoke test, Lexington:** 839 leads in 44 seconds on a deliberately tiny
+120-request budget, carrying parcel/TMS, owner name, situs address and
+`balance_owed` (e.g. $8,150.61). A full-budget run will be far larger. The new
+loud truncation warning fired correctly during it.
+
+### And it immediately exposed an address bug — 4,327 rows already corrupted
+Several of these portals render an absent city and ZIP as literal zero columns, so
+situs cells read `128 PHOENIX LN 00000 0000` / `9523 HWY 260 0 0000`. Stored that
+way it is not an address: it fails geocoding, it defeats dedupe (two rows for the
+same house differ only by padding), and it prints on a call sheet as somewhere
+nobody can drive to. Already on the board: **Spartanburg 3,060, Clarendon 928,
+Abbeville 214, McCormick 98**, 4,327 total.
+
+`_clean_situs()` now strips it at parse time. Only tokens made ENTIRELY of zeros,
+only from the END, so `0 MAIN ST` (vacant parcels really are numbered 0) and
+`123 COUNTY ROAD 40` survive. A line that was nothing but padding returns None —
+"no address" is the truth, and a blank-looking string is worse, because such a row
+is never sent for resolution. Pinned by `tests/test_qpaybill_situs_padding.py`.
+
+`scripts/clean_qpaybill_situs_padding.py` repairs the 4,326 existing rows.
+**BLOCKED: board lock held by run_daily_vision.sh — retry.** (The lock worked.)
+
+Note: the first draft of that script ran over EVERY row, and since `_clean_situs`
+also strips whitespace it silently proposed edits to ~60 NC rows from other
+scrapers whose only issue was surrounding spaces. Scoped to qPayBill rows instead.
+Those ~60 whitespace-padded addresses are a real but SEPARATE finding — not fixed here.
