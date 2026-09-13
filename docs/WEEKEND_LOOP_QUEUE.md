@@ -18,7 +18,15 @@ Rules for every iteration:
       Fills `owner_mailing` + `sale_price`. Log: `logs/cache_build_all.log`.
 
 ## QUEUE — sources to build or fix
-- [ ] RUN enrichment_bt_appraisal_card over the board (needs a GO from loop_guard)
+- [~] BT appraisal cards — PARTIAL, and the remaining blocker is identified.
+      39 rows on the board carry a card; 9 gained living_sqft, 33 a sale price.
+      Tax-year discovery now resolves 9 of 14 counties (Carteret and Anson are 2026,
+      the rest 2027). Still unresolved: Caswell, Duplin, Person, Scotland, Warren.
+      THE REAL LIMIT is not the year — it is the ID FORMAT. The portal keys on the
+      county's own ACCOUNT id and the board often holds a different identifier for the
+      same parcel: Moore 855215723667 (12-digit GIS PIN) returns a stub in every year,
+      Moore 00049504 (8-digit account) returns a 20,397-byte PDF. Closing the rest needs
+      a parcel->account crosswalk per county, which is its own piece of work.
 - [x] BT TaxPayer Portal — DONE as an appraisal-card enricher, 14 VERIFIED counties.
       Gives HEATED SQFT + appraised value + beds/baths + recorded sale price.
       5 proposed tenants were dead stubs; ITSPublicMA was proposed for Martin and

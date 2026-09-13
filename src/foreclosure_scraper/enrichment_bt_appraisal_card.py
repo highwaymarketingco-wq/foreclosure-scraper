@@ -86,6 +86,9 @@ _TAX_YEAR = os.getenv("BT_CARD_TAX_YEAR", "")          # override: pin one year 
 _YEAR_CANDIDATES = ("2027", "2026", "2025", "2028", "2024")
 _YEAR_BY_COUNTY: dict[str, str] = {}
 
+#: Distinct parcel shapes to try per county before giving up on it.
+PROBE_PARCELS = int(os.getenv("BT_CARD_PROBES", "6"))
+
 _HEATED_RE = re.compile(r"HEATED AREA\s+([\d,]+)", re.I)
 _APPRAISED_RE = re.compile(r"TOTAL APPRAISED VALUE[^\d]{0,40}([\d,]+)", re.I)
 _BEDBATH_RE = re.compile(r"Bedrooms/Bathrooms[^\d]{0,40}(\d+)/(\d+)/(\d+)", re.I)
@@ -128,31 +131,46 @@ def card_url(county: str, parcel_id: str, tax_year: str | None = None) -> str | 
     return f"{BASE}/ITSPublic{code}/AppraisalCard.aspx?id={pid}%2f{year}"
 
 
-async def discover_tax_year(client, county: str, parcel_id: str) -> str | None:
-    """Find the year whose card actually exists for this county, and remember it.
+async def discover_tax_year(client, county: str, parcels: list[str]) -> str | None:
+    """Find the year whose card exists for this county, and remember it.
 
-    A wrong year is NOT an error: the portal answers HTTP 200 with a ~735-byte HTML stub.
-    Only a %PDF body means the card exists, so that is what this tests.
+    TWO THINGS VARY PER COUNTY, and both fail the same silent way -- HTTP 200 with a
+    ~735-byte HTML stub, never an error:
+
+      the REVAL YEAR   Carteret's card is under 2026; most others are 2027.
+      the ID FORMAT    the portal keys on the county's own account id, and the board
+                       often holds a different identifier for the same parcel.
+                       Moore 855215723667 (12-digit GIS PIN) -> stub in every year.
+                       Moore 00049504     (8-digit account)  -> 20,397-byte PDF, 2027.
+
+    So a single probe parcel is not enough: one wrong-format value condemns the whole
+    county. Earlier runs wrote off Moore, Anson, Caswell, Duplin, Person, Scotland,
+    Warren and Yadkin on exactly that basis. Several distinct parcels are tried, and only
+    a %PDF body counts as proof.
     """
     key = (county or "").strip().lower()
     if key in _YEAR_BY_COUNTY:
         return _YEAR_BY_COUNTY[key]
-    for year in _YEAR_CANDIDATES:
-        url = card_url(county, parcel_id, tax_year=year)
-        if not url:
-            return None
-        try:
-            r = await client.get(url)
-        except Exception:  # noqa: BLE001
-            continue
-        if r.status_code == 200 and r.content[:4] == b"%PDF":
-            _YEAR_BY_COUNTY[key] = year
-            log.info("bt_card.tax_year_found", county=county, year=year,
-                     bytes=len(r.content))
-            return year
-    log.warning("bt_card.no_tax_year", county=county, parcel=parcel_id,
-                tried=list(_YEAR_CANDIDATES),
-                note="every candidate year returned a non-PDF stub")
+    tried = 0
+    for parcel in parcels[:PROBE_PARCELS]:
+        for year in _YEAR_CANDIDATES:
+            url = card_url(county, parcel, tax_year=year)
+            if not url:
+                return None
+            try:
+                r = await client.get(url)
+            except Exception:  # noqa: BLE001
+                continue
+            tried += 1
+            if r.status_code == 200 and r.content[:4] == b"%PDF":
+                _YEAR_BY_COUNTY[key] = year
+                log.info("bt_card.tax_year_found", county=county, year=year,
+                         parcel=parcel, bytes=len(r.content), probes=tried)
+                return year
+    log.warning("bt_card.no_tax_year", county=county, probes=tried,
+                parcels_tried=parcels[:PROBE_PARCELS], years=list(_YEAR_CANDIDATES),
+                note="every parcel x year combination returned a non-PDF stub; the id "
+                     "format this portal expects may differ from what the board holds")
     return None
 
 
@@ -235,14 +253,29 @@ async def enrich_bt_appraisal_card(listings: Iterable[Listing]) -> dict:
             # by a loose regex in the liensnc pool -- so every candidate year returned a
             # stub and the county was written off as having no card, when Moore parcel
             # 00049504 returns a 20,396-byte PDF under 2027.
-            probe = next((li for li in targets
-                          if (li.county or "").strip() == county
-                          and len(re.sub(r"[^0-9]", "", li.parcel_id or "")) >= 6), None)
-            if probe:
-                await discover_tax_year(c, county, probe.parcel_id)
+            # Collect DISTINCT parcel shapes to probe with: the portal's id format is
+            # county-specific and the board often holds a different identifier for the
+            # same parcel, so variety matters more than count.
+            seen_len: set[int] = set()
+            probes: list[str] = []
+            for li in targets:
+                if (li.county or "").strip() != county:
+                    continue
+                pid = (li.parcel_id or "").strip()
+                digits = len(re.sub(r"[^0-9]", "", pid))
+                if digits < 4:
+                    continue
+                if digits in seen_len and len(probes) >= 2:
+                    continue
+                seen_len.add(digits)
+                probes.append(pid)
+                if len(probes) >= PROBE_PARCELS:
+                    break
+            if probes:
+                await discover_tax_year(c, county, probes)
             else:
                 log.warning("bt_card.no_probe_parcel", county=county,
-                            note="no row here has a parcel with 6+ digits to probe with")
+                            note="no row here has a parcel with 4+ digits to probe with")
         stats["years"] = dict(_YEAR_BY_COUNTY)
 
         async def one(li: Listing) -> None:
