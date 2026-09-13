@@ -140,6 +140,23 @@ PARCEL_LAYERS: dict[str, dict] = {
     # situs-was-really-the-mailing-address bug above. Confirmed on a sample:
     # ParcelID 0300301068 mails to 892 CANIPE RD BLACKSBURG, property is at
     # 2020 KISATCHIE DR, LandUseDesc RESIDENTIAL VACANT -- absentee AND vacant.
+    # --- 2026-09-13. Colleton SC. Situs + owner + MAILING for 34,382 parcels.
+    # No value field on this layer, so it cannot lift the buy-box arithmetic on its
+    # own — but mailing drives the absentee flag, which gates HOT, and Colleton's
+    # sampled rows are exactly the profile: properties in Walterboro whose owners
+    # mail from Lexington KY, Greenbrae CA and Sumter SC.
+    #
+    # PIN is the dashed form and matches the board's Colleton parcel_ids exactly
+    # ("357-09-00-077.000"). The layer space-pads every text column, which is what
+    # prompted the strip fix in _map_val above.
+    "Colleton": {
+        "state": "SC",
+        "url": "https://services1.arcgis.com/m0cnLGKdhwao8WvM/arcgis/rest/services/Public_Data/FeatureServer/2/query",
+        "id_fields": ["PIN"],
+        "map": {"owner": "OwnerName1", "address": "PropertyAddress",
+                "owner_mailing": ["OwnerAddress1", "OwnerCity", "OwnerState", "OwnerZip"],
+                "acreage": "Acreage"},
+    },
     # --- 2026-09-13. Sumter SC. Found while chasing why the 13,609 new qPayBill
     # leads all ranked D: they carry no value and no mailing address, so the buy-box
     # arithmetic cannot score them. This layer fixes both for Sumter's 3,084 rows.
@@ -303,6 +320,13 @@ def _map_val(rec: dict, col: str, spec):
         val = " ".join(parts) or None
     else:
         val = rec.get(spec)
+        # Strip here too. The LIST branch above strips every part, but a single-field
+        # spec did not, so a layer that space-pads its columns stored the padding:
+        # Colleton serves "1809 MITCHELL ST" with 24 trailing spaces. A padded address
+        # is a different dedupe key from the same address unpadded, and it exports and
+        # prints with the padding intact.
+        if isinstance(val, str):
+            val = val.strip() or None
     if col in _NUMERIC and val not in (None, ""):
         try:
             return float(val)
