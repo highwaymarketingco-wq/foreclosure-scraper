@@ -449,3 +449,42 @@ CAUTION on method: my link-scraper re-read a stale temp file when a curl failed,
 and printed Aiken's links under Chester's heading. Chester actually returned
 nothing. Any county above marked "no portal found" should be re-probed with a
 per-county file before being called a dead end.
+
+## 2026-09-13 10:35 — re-probe of the "no portal found" counties (correcting my own artifact)
+
+Re-ran the earlier probe with a SEPARATE file per county, because the first pass
+re-read a stale temp file on curl failure and attributed Aiken's links to Chester.
+Corrected results:
+
+| county | site | tax/treasurer page found |
+|---|---|---|
+| Dillon | dilloncountysc.org | yes — Assessor + Treasurer |
+| Fairfield | fairfieldsc.com | yes — Treasurer |
+| Greenwood | greenwoodcounty-sc.gov | yes — Assessor / Tax Collector / Treasurer |
+| Hampton | hamptoncountysc.org | yes — **/29/Delinquent-Tax** |
+| Chester | both domains fail (000 / 403) | none reachable |
+| Dorchester | 403 to curl | none reachable |
+| Edgefield | 403, body returned but no tax links | none found |
+
+So Chester/Dorchester/Edgefield are BLOCKED-TO-CURL, which is NOT the same as
+"no source" — they need a browser-grade fetch before anyone calls them dead.
+
+### CoreBT / corebtpay.com — a possible SECOND vendor family (UNPROVEN)
+Greenwood's tax collector links to `greenwoodco.corebtpay.com` — the BT TaxPayer
+Portal family this codebase already knows from NC. Its property-tax page exposes
+two search prefixes in its JS validation config:
+`ebillSearch_accountNumFld` and **`ebillSearch_fullNameFld` (Full Name)**.
+
+A name search is exactly what makes qPayBill enumerable, so this is worth real
+work. **But I have NOT proven it enumerates.** The visible form posts by Map
+Number; the name field's markup is not in the page's forms, so the actual request
+has to be captured from a browser session. It is also a PAYMENT portal, so it may
+return a bill only for an exact known account.
+
+Next heavy slot: drive it in the browser, capture the real POST, and check whether
+a one-letter surname returns many rows (enumerable) or demands an exact match
+(dead). If it enumerates, probe corebtpay.com subdomains for every SC/NC county the
+same way the qPayBill sweep found eight.
+
+Hampton's `/29/Delinquent-Tax` page is also unprobed — and Hampton is the county
+whose qPayBill subdomain was a dead stub, so this may be its real route.
