@@ -615,3 +615,32 @@ but a county being read for the FIRST time may behave differently. Colleton is
 reporting 164 unwalked prefixes in the current run, far more than the others.
 If Colleton's final parcel count looks short against its population, re-test depth
 there specifically before trusting the generalisation.
+
+## 2026-09-13 13:00 — ingest path prepared while the lock is held
+
+Wired `logs/qpaybill_new8.json` into `scripts/ingest_sc_delinquent_roll.py` as an
+**additive** entry (it shares no county with the base roll; superseding would at
+best be a no-op and at worst replace a fuller read with a thinner one).
+
+Verified the new counties survive the pipeline before spending a harvest on them:
+all eight are in `validation.SC_COUNTIES` (46 entries), so none gets nulled. And a
+county OUTSIDE that set is nulled rather than the row dropped, so no lead is lost
+either way.
+
+**Ordering trap caught.** The depth-6 harvest ran 08:59-10:54; the situs-padding fix
+landed at ~11:01. So that file was produced by the PRE-FIX parser and carried
+**3,984 padded addresses** ("461 SIBLEY ST 00000 0000"). Ingesting it first would
+have poured freshly-corrupted addresses onto the board.
+
+Cleaned the file itself rather than relying on ingest order — bad data stopped at
+the door beats bad data cleaned up afterwards. 3,984 addresses repaired, 0 cleared,
+0 padded remaining. Original preserved at `logs/qpaybill_depth6.json.prefix-bak`.
+
+The `new8` harvest started 11:00, after the fix, so its output is clean by
+construction.
+
+### Order when the lock frees (~13:36)
+1. ingest `qpaybill_depth6.json` (now clean)
+2. ingest `qpaybill_new8.json` when the harvest lands (clean by construction)
+3. `scripts/clean_qpaybill_situs_padding.py` for the 4,326 rows already on the board
+4. verify, commit, push, confirm live on Pages

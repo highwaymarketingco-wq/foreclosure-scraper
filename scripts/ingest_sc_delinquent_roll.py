@@ -69,6 +69,19 @@ FILES = [
     # ADDITIVE for the same reason detail4 is: it reads FEWER parcels than the base roll
     # (1,397 Cherokee vs 1,421), so superseding would drop the difference.
     ("qpaybill_detail5", REPO / "logs" / "qpaybill_detail5.json"),
+    # 2026-09-13: the EIGHT counties found when the qPayBill roster turned out to be
+    # 27 wide, not 19 — Horry, Lexington, Kershaw, Sumter, Marion, Bamberg, Saluda,
+    # Colleton. Five of them (Lexington, Kershaw, Bamberg, Saluda, plus Horry) had
+    # ZERO rows on the board, so these are NET-NEW leads, not merges.
+    #
+    # ADDITIVE, and it must stay additive: it shares no county with the base roll, so
+    # superseding would be a no-op at best and, if a county name ever overlapped,
+    # would silently replace a fuller read with a thinner one.
+    #
+    # NOTE Horry carries NO situs address (its portal omits the column — verified
+    # 2026-09-13). Those rows have a parcel, so the "no parcel AND no address" drop
+    # keeps them; they need address resolution from Horry GIS afterwards.
+    ("qpaybill_new8", REPO / "logs" / "qpaybill_new8.json"),
 ]
 
 
