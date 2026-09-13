@@ -125,6 +125,21 @@ CONCURRENCY = int(os.environ.get("VISION_CONCURRENCY", "1"))
 INTER_CALL_DELAY = float(os.environ.get("VISION_INTER_CALL_DELAY", "6.0"))
 
 
+
+def _exc_label(exc: BaseException, limit: int) -> str:
+    """Log the exception TYPE alongside its message.
+
+    `str(exc)[:160]` alone produced 143 log lines reading `error=` — completely
+    empty — during the 2026-09-13 daily pass, because several client libraries
+    raise exceptions whose __str__ is blank (bare `APIError()`, timeouts, cancelled
+    tasks). An error line that names no error cannot be acted on, and a 76% miss
+    rate that reports nothing looks like the backend is simply slow instead of
+    failing. The type name is always present, so it always says something.
+    """
+    msg = str(exc).strip()
+    name = type(exc).__name__
+    return f"{name}: {msg[:limit]}" if msg else name
+
 SYSTEM_PROMPT = """You are an experienced real-estate flipper assessing renovation needs from listing photos and aerial views. You make accurate cost-aware judgments grounded in what the photos actually show, not optimistic guesses.
 
 Rehab tiers (Carolina market, 2026 dollars):
@@ -366,7 +381,7 @@ async def _assess_one_anthropic(
             messages=[{"role": "user", "content": content}],
         )
     except Exception as exc:
-        log.warning("vision.api_error", provider="anthropic", source_url=li.source_url, error=str(exc)[:200])
+        log.warning("vision.api_error", provider="anthropic", source_url=li.source_url, error=_exc_label(exc, 200))
         return None
 
     text_chunks = [b.text for b in resp.content if hasattr(b, "text")]
@@ -426,7 +441,7 @@ async def _assess_one_gemini(
             ),
         )
     except Exception as exc:
-        log.warning("vision.api_error", provider="gemini", source_url=li.source_url, error=str(exc)[:200])
+        log.warning("vision.api_error", provider="gemini", source_url=li.source_url, error=_exc_label(exc, 200))
         return None
 
     raw_text = ""
@@ -894,7 +909,7 @@ class _GeminiBackend:
         except Exception as exc:
             if _is_quota_msg(str(exc)):
                 raise QuotaExhausted(self.name)
-            log.warning("vision.api_error", backend=self.name, source_url=li.source_url, error=str(exc)[:160])
+            log.warning("vision.api_error", backend=self.name, source_url=li.source_url, error=_exc_label(exc, 160))
             return None
         text = ""
         try:
@@ -943,7 +958,7 @@ class _OpenAICompatBackend:
                                      headers={"Authorization": f"Bearer {self.key}",
                                               "Content-Type": "application/json"})
         except Exception as exc:
-            log.warning("vision.api_error", backend=self.name, source_url=li.source_url, error=str(exc)[:160])
+            log.warning("vision.api_error", backend=self.name, source_url=li.source_url, error=_exc_label(exc, 160))
             return None
         if r.status_code == 429:
             raise QuotaExhausted(self.name)
@@ -1008,7 +1023,7 @@ class _OllamaBackend:
         try:
             r = await self.http.post(f"{self.host}/api/generate", json=body, timeout=240.0)
         except Exception as exc:
-            log.warning("vision.api_error", backend=self.name, source_url=li.source_url, error=str(exc)[:160])
+            log.warning("vision.api_error", backend=self.name, source_url=li.source_url, error=_exc_label(exc, 160))
             return None
         if r.status_code >= 400:
             log.warning("vision.api_error", backend=self.name, status=r.status_code, error=r.text[:160])
@@ -1051,7 +1066,7 @@ class _AnthropicBackend:
         except Exception as exc:
             if _is_quota_msg(str(exc)):
                 raise QuotaExhausted(self.name)
-            log.warning("vision.api_error", backend=self.name, source_url=li.source_url, error=str(exc)[:160])
+            log.warning("vision.api_error", backend=self.name, source_url=li.source_url, error=_exc_label(exc, 160))
             return None
         text = "\n".join(b.text for b in resp.content if hasattr(b, "text")).strip()
         usage = None

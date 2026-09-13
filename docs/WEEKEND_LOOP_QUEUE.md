@@ -564,3 +564,26 @@ Also: the queue contains at least one non-image URL being retried into an image
 model — Rutherford's `TR-452 Delinquent Bills Report w Parcel Id.xlsx`, 6 attempts.
 A spreadsheet can never be scored by vision; it should never enter the queue. Small,
 but it is pure waste and it is the kind of thing that inflates the miss rate.
+
+## 2026-09-13 11:57 — RETRACTION: no spreadsheet is being fed to the vision model
+
+Last entry claimed the vision queue contained a non-image URL (Rutherford's
+`TR-452 ... .xlsx`) being retried into an image model. **That is wrong.** The log
+field is `source_url=li.source_url` — the LISTING's provenance, printed as a debug
+label. The model receives `payloads`, already-fetched image bytes with mime types.
+The .xlsx is simply where those Rutherford leads came from. Checked before
+"fixing" it; there was nothing to fix.
+
+### The real defect there: the errors were invisible
+`error=str(exc)[:160]` produced 143 lines reading `error=` with nothing after it,
+because several client libraries raise exceptions whose `__str__` is blank (bare
+API errors, timeouts, cancellations). An error line that names no error cannot be
+acted on — a 76% miss rate reporting nothing looks like a slow backend rather than
+a failing one. That is plausibly why `project_vision_pool_repair`'s "already fixed,
+do not re-diagnose" note went unchallenged while errors kept happening at volume.
+
+`_exc_label()` now logs the exception TYPE alongside the message at all 6 vision
+log sites, so the next daily pass says what is actually failing.
+Pinned by `tests/test_vision_error_label.py`.
+
+This does not fix the miss rate — it makes the next run able to explain it.
