@@ -27,10 +27,12 @@ from foreclosure_scraper.scrapers.counties_sc.qpaybill_delinquent_roll import (
 )
 
 
-def test_depth_is_deep_enough_for_the_large_counties():
-    # Depth 4 left 141 unwalked prefixes in Orangeburg. Anything <= 4 reintroduces
-    # the loss for every large county.
-    assert MAX_PREFIX_DEPTH >= 6
+def test_depth_default_stays_at_the_measured_value():
+    # This was briefly raised to 6 on the theory that the dropped frontier was
+    # costing thousands of rows. Measured at the SAME budget, depth 6 vs depth 4 was
+    # Orangeburg -9 parcels and Spartanburg +24, for 2.5x the runtime. The deeper
+    # prefixes re-find parcels already read under their parents. Budget is the lever.
+    assert MAX_PREFIX_DEPTH == 4
 
 
 def test_request_budget_is_the_real_brake():

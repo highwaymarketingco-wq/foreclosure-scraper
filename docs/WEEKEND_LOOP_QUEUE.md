@@ -488,3 +488,44 @@ same way the qPayBill sweep found eight.
 
 Hampton's `/29/Delinquent-Tax` page is also unprobed — and Hampton is the county
 whose qPayBill subdomain was a dead stub, so this may be its real route.
+
+## 2026-09-13 10:55 — CORRECTION: the depth fix was right in code, wrong in magnitude
+
+The depth-6 re-run finished. It does not support what I claimed earlier today, so
+the earlier entry is corrected here rather than left standing.
+
+Measured, depth 6 vs depth 4 **at the same high budget**:
+
+| county | depth 4 (high budget) | depth 6 | delta |
+|---|---|---|---|
+| Orangeburg | 6,669 parcels | 6,660 | **-9** |
+| Spartanburg | 4,789 parcels | 4,813 | **+24** |
+
+6,872 seconds of runtime against 2,727, for nothing.
+
+**Where my reasoning went wrong.** I cited "Spartanburg 10,094 rows at trunc=0 vs
+12,256 at trunc=120" as proof the depth ceiling was costing thousands of rows.
+Those two runs differ in **BUDGET**, not depth — the second is literally the
+`roll_top5` re-run at a raised request budget. I compared two runs that varied in
+two ways and attributed the whole difference to the one I was investigating.
+
+**What is still true:** prefixes left on the frontier at the ceiling really are
+dropped and never walked; that code reading holds, and the warning stays. What is
+false is that they contain much. Both counties still reported unwalked prefixes at
+depth 6 (93 and 68) while parcel counts did not move — the tell that those prefixes
+hold DUPLICATES already read under their parents, since the sweep dedupes by parcel.
+
+**The budget is the real lever**, and the evidence was in the same numbers all along:
+Orangeburg 5,495 -> 6,669 and Spartanburg 4,069 -> 4,789 came from raising the
+budget. Unlike a depth ceiling, `REQUEST_BUDGET_PER_COUNTY` reports when it stops.
+
+Default reverted to 4. Warning reworded to say "raise QPAYBILL_ROLL_BUDGET FIRST".
+Test now pins depth == 4 with the measurement in its comment, so the next person
+tempted to raise it reads the result before spending two hours on it.
+
+## IN FLIGHT
+- **8 new qPayBill counties harvesting** (Horry, Lexington, Kershaw, Sumter, Marion,
+  Bamberg, Saluda, Colleton) at depth 4, budget 10,000/county -> `logs/qpb_new8.log`,
+  output `logs/qpaybill_new8.json`. Writes only to logs/, not the board.
+- board lock still held by run_daily_vision.sh, so BOTH the situs-padding repair and
+  the depth-6 ingest remain queued.

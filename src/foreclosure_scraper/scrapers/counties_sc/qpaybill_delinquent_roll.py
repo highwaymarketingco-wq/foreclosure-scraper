@@ -225,21 +225,29 @@ MAX_PAGES_PER_PREFIX = int(os.getenv("QPAYBILL_ROLL_MAX_PAGES", "200"))
 #: How many characters deep the name prefixes may go. Depth 3 reached 925 of
 #: Barnwell's parcels with 4 prefixes still capped; depth 4 exists for those.
 #:
-#: RAISED 4 -> 6 on 2026-09-13, because depth 4 was SILENTLY LOSING ROWS on every
-#: large county. When the frontier is still non-empty at the ceiling, those prefixes
-#: are never walked and everything under them beyond the parent's first pages is
-#: simply absent from the roll. Measured from the run logs:
-#:     Orangeburg   141 unwalked prefixes    Spartanburg  120
-#:     Oconee        44                      Marlboro      33
-#:     Cherokee      17                      Darlington    16
-#: and the paired runs prove the rows are real, not phantom: Spartanburg read
-#: 10,094 rows with trunc=0 at a shallower setting and 12,256 with trunc=120 when it
-#: went deeper -- 2,162 more rows AND still more beyond. Orangeburg 11,450 -> 14,169.
+#: RAISED to 6 on 2026-09-13 and MEASURED BACK DOWN to 4 the same day. Read this
+#: before raising it again.
 #:
-#: Depth is the WRONG brake: REQUEST_BUDGET_PER_COUNTY below already bounds the crawl
-#: by requests and already warns when a county exhausts it, which is a limit that
-#: reports itself. A depth ceiling just stops early and calls it done.
-MAX_PREFIX_DEPTH = int(os.getenv("QPAYBILL_ROLL_DEPTH", "6"))
+#: The reasoning for raising it was that prefixes still capped at the ceiling are
+#: assigned to `frontier` and then dropped by the `while` condition, never walked.
+#: That code reading is CORRECT and the warning below still matters. The MAGNITUDE
+#: claim attached to it was not: it cited Spartanburg reading 10,094 rows in one run
+#: and 12,256 in another as proof depth was costing thousands of rows. Those two runs
+#: differed in BUDGET, not depth -- the second is the top-5 re-run at a raised
+#: request budget. Two variables, one conclusion, wrong attribution.
+#:
+#: Measured properly, depth 6 against depth 4 at the SAME high budget:
+#:     Orangeburg   6,669 -> 6,660 parcels   (-9)
+#:     Spartanburg  4,789 -> 4,813 parcels   (+24)
+#: for 6,872 seconds of runtime against 2,727. Depth buys nothing here because the
+#: sweep dedupes by parcel and the deeper prefixes re-find parcels already read under
+#: their parents. Both counties STILL reported unwalked prefixes at depth 6 (93 and
+#: 68), which is the tell: those prefixes hold duplicates, not missing rows.
+#:
+#: THE BUDGET IS THE LEVER. roll_all -> the high-budget re-run is where the real gain
+#: was: Orangeburg 5,495 -> 6,669 parcels, Spartanburg 4,069 -> 4,789. And unlike a
+#: depth ceiling, REQUEST_BUDGET_PER_COUNTY says so when it stops early.
+MAX_PREFIX_DEPTH = int(os.getenv("QPAYBILL_ROLL_DEPTH", "4"))
 
 #: Hard request budget PER COUNTY, so a portal that starts returning the cap for
 #: every prefix cannot turn this into an unbounded crawl -- and, because the counties
@@ -568,8 +576,10 @@ async def sweep_county(client: httpx.AsyncClient, county: str, sub: str,
             log.warning("qpaybill_roll.depth_truncated", county=county, depth=depth,
                         unwalked_prefixes=stats["truncated_prefixes"],
                         prefixes=sorted({p[:-1] for p in nxt})[:12],
-                        note="ROWS LOST: these prefixes are never read. The roll for "
-                             "this county is INCOMPLETE. Raise QPAYBILL_ROLL_DEPTH.")
+                        note="these prefixes are never read. Measured 2026-09-13: at "
+                             "the same budget, raising depth recovered ~0 parcels, so "
+                             "these are usually duplicates already read under a parent. "
+                             "If a county looks short, raise QPAYBILL_ROLL_BUDGET FIRST.")
         frontier = nxt
         depth += 1
     return list(sink.values()), stats
