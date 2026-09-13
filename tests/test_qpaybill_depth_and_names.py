@@ -59,7 +59,15 @@ def test_county_roster_does_not_shrink():
     # Marion, Bamberg, Saluda, Colleton), so the source covers 27 counties. This is
     # a floor, not an equality, so finding more never fails the suite — but silently
     # losing one does.
-    assert len(QPAYBILL_SUBS) >= 27
+    assert len(QPAYBILL_SUBS) >= 26
+
+
+def test_marion_stays_out():
+    # marioncounty.qpaybill.com is a working portal with NO DATA: 0 rows for every
+    # prefix, every paid status and all four search types (verified 2026-09-13
+    # through _walk_prefix). A listed county that can never produce a row reads as a
+    # scraper bug forever.
+    assert "Marion" not in QPAYBILL_SUBS
 
 
 def test_hampton_stays_out():

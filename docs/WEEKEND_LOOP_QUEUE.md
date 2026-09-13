@@ -691,3 +691,24 @@ Re-filtered the harvest file (original at `.prefilter-bak`):
 **Marion returned 0 rows on 36 queries** — not yet diagnosed. Its portal answered the
 form probe earlier, so this is either a stub like Hampton's or a different grid.
 Do NOT record Marion as covered until it is checked.
+
+## 2026-09-13 13:30 — Marion diagnosed and REMOVED: a working portal with no data
+
+Marion returned 0 parcels on 36 queries in the harvest. Diagnosed rather than
+assumed:
+
+- its page carries the correct Type4 form and the SAME field names as the working
+  counties (`ctl00$MainContent$txtCriteriaBox` etc.), so it is not a parser mismatch
+- driven through the scraper's own `_walk_prefix`: **0 rows for every prefix** tried
+  (SMITH, A, B) while Sumter returned 59 / 88 / 90 on the identical code path
+- 0 rows for `radUnpaidButton`, `radPaidButton` AND `radAllButton`
+- 0 rows for all four search types: RealEstate, Personal, Vehicle, Watercraft
+
+So marioncounty.qpaybill.com is a fully functional portal that has **no records
+loaded at all**. Removed from the roster, same precedent as Hampton: a listed county
+that can never produce a row is worse than an absent one, because it reads as a
+scraper bug forever and invites someone to "fix" a portal with nothing in it.
+Pinned by a test; re-test before re-adding.
+
+**Working qPayBill roster: 26 counties** (was 19 before today; 8 found, Marion
+removed on evidence). Honest count, not the headline one.

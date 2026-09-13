@@ -199,7 +199,17 @@ QPAYBILL_SUBS: dict[str, str] = {
     "Horry": "horrycountytreasurer",
     "Kershaw": "kershawcounty",
     "Lexington": "lexingtoncountytreasurer",
-    "Marion": "marioncounty",
+    # Marion is DELIBERATELY ABSENT, same reason as Hampton but a different failure.
+    # marioncounty.qpaybill.com is a fully working portal — correct Type4 form, all
+    # the right fields, 200 on every request — that simply has NO DATA. Verified
+    # 2026-09-13 through the scraper's own _walk_prefix: 0 rows for every prefix
+    # tried, for radUnpaid AND radPaid AND radAll, and for all four search types
+    # (RealEstate, Personal, Vehicle, Watercraft). The first harvest spent 36 queries
+    # on it and returned 0 parcels.
+    #
+    # A county that is listed but can never produce a row is worse than an absent
+    # one: it reads as a scraper bug forever and invites someone to "fix" a portal
+    # that has nothing in it. Re-test before re-adding.
     "Saluda": "saludacountytreasurer",
     "Sumter": "sumtercounty",
 }

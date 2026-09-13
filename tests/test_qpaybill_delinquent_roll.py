@@ -205,7 +205,7 @@ def test_every_county_has_a_subdomain_and_the_five_known_ones_are_kept():
     FLOOR now: finding more counties must never fail the suite, but silently losing
     one still does.
     """
-    assert len(QPAYBILL_SUBS) >= 27
+    assert len(QPAYBILL_SUBS) >= 26
     for known in ("Spartanburg", "Oconee", "Laurens", "Union", "Cherokee"):
         assert known in QPAYBILL_SUBS
     assert all(v and "." not in v for v in QPAYBILL_SUBS.values())
