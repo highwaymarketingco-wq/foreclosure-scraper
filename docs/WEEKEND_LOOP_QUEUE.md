@@ -587,3 +587,31 @@ log sites, so the next daily pass says what is actually failing.
 Pinned by `tests/test_vision_error_label.py`.
 
 This does not fix the miss rate — it makes the next run able to explain it.
+
+## 2026-09-13 12:28 — Paystar (Jasper) probed: auth-gated, DEFERRED
+
+`taxes.paystar.io/app/customer/jasper-county-tax` is a Vite SPA. Pulled its bundle
+and mapped the API: the useful routes are
+`/api/business-units/{slug}/invoices/search-configurations/{id}/search` and
+`/suggest`.
+
+- `/api/business-units/jasper-county-tax` -> **401 "You must be logged in to
+  perform this action."**
+- `/api/business-units/jasper-county-tax/invoices/search-configurations` -> 400
+  "The invoice could not be found" (reachable, but needs a searchConfigurationId
+  the SPA obtains at runtime)
+
+Login-gated is out of bounds per the standing constraint. The anonymous public
+search may still work with a config id lifted from a browser session, but Jasper
+is ~30k people — the cost/benefit against Horry and Lexington already landing is
+poor. **Deferred, not dead.** Revisit only if Paystar turns out to host larger
+counties; the slug pattern `{county}-county-tax` would make that cheap to test.
+
+### Caveat on my own depth finding
+The measurement that depth buys ~nothing was taken on Orangeburg and Spartanburg —
+both counties ALREADY harvested several times at high budget. The mechanism
+(deeper prefixes re-find parcels already read under a parent) should generalise,
+but a county being read for the FIRST time may behave differently. Colleton is
+reporting 164 unwalked prefixes in the current run, far more than the others.
+If Colleton's final parcel count looks short against its population, re-test depth
+there specifically before trusting the generalisation.
