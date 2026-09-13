@@ -17,6 +17,39 @@ Rules for every iteration:
 - [~] parcel cache backfill, all NC + footprint counties — running, 42/100 at 17:10 Fri.
       Fills `owner_mailing` + `sale_price`. Log: `logs/cache_build_all.log`.
 
+## PER-COUNTY GAPS, measured 2026-09-14 on the live 115,991-row board
+(this corrected two assumptions — check the table before picking work)
+
+    county            rows   sqft%  value%  parcel%
+    Spartanburg,SC  11,302     55%     58%      74%
+    Buncombe,NC      6,516     83%     82%      83%
+    Rutherford,NC    4,738     93%     90%      88%
+    Pickens,SC       3,034     89%     70%      72%
+    Oconee,SC        2,894     45%      1%      79%
+    Henderson,NC     2,394     68%     68%      69%
+    Laurens,SC       2,356     42%      9%      64%
+    Cherokee,SC      2,156     53%      1%      67%
+    Gaston,NC        1,917     25%     26%      27%
+    McDowell,NC      1,772     87%     87%      89%
+    Anderson,SC      1,716     72%     23%      21%
+    Union,SC         1,183     42%      1%      58%
+    Lincoln,NC       1,101     48%     58%      34%
+    Cleveland,NC       865     24%     35%      31%
+    Burke,NC           657     35%     39%      43%
+    Transylvania,NC    443     47%     44%      46%
+    Polk,NC            339     57%     59%      60%
+    Mitchell,NC        164     75%     76%      76%
+
+TWO CORRECTIONS THIS TABLE FORCED:
+  * VALUE is a worse gap than sqft. Oconee, Cherokee and Union sit at 1% value.
+    The qPayBill DETAIL page carries Total Appraisal for all three — code written on
+    day one and never run for them. Running it now.
+  * Buncombe sqft was ASSUMED to be the gap and is 83% (only 194 of 5,433 parcelled rows
+    lack it). The Buncombe appraisal layer (98,170 buildings with SqFeet) was verified
+    live and NOT wired, because it would serve 194 rows. It also carries MULTIPLE
+    buildings per PIN, so a naive join picks an arbitrary one — note that if it is ever
+    wired for another purpose.
+
 ## QUEUE — sources to build or fix
 - [~] BT appraisal cards — PARTIAL, and the remaining blocker is identified.
       39 rows on the board carry a card; 9 gained living_sqft, 33 a sale price.
