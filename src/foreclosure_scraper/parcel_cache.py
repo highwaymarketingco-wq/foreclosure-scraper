@@ -96,13 +96,35 @@ PARCEL_LAYERS: dict[str, dict] = {
                 "owner_mailing": "COUNTY_MAILING_ADDRESS"},
     },
     # --- SC ---
-    "Spartanburg": {  # board 12-digit id = GISParcelNumber (7102-28-3341.88) with punctuation
-        # stripped; _norm_id strips it on both sides. CAMA layer has clean situs (StreetAddress).
-        # No single total-appraised field (land+bldg are separate) so value stays on the live path.
+    "Spartanburg": {
+        # board 12-digit id = GISParcelNumber (7102-28-3341.88) with punctuation stripped.
+        #
+        # CORRECTED 2026-09-13. The previous mapping had `"address": "StreetAddress"` with
+        # a comment calling StreetAddress "clean situs". It is NOT the situs -- it is the
+        # OWNER'S MAILING ADDRESS. The situs lives in StreetNumber / StreetName /
+        # StreetCommunity / StreetZip.
+        #
+        # They coincide for owner-occupants and diverge for absentees, so the error hid in
+        # the majority case. Measured over a 1,000-parcel sample:
+        #     559 (56%) mailing == situs   owner-occupied, no visible harm
+        #     441 (44%) mailing != situs   the stored "situs" was the mailing address
+        # e.g. 3-22-00-019.04 stored "194 WATERFRONT ROW, PROSPERITY" as the property
+        # address; the property is at 251 NEAL RD, SPARTANBURG. One row stored
+        # "PO BOX 145, INMAN" as a street address.
+        #
+        # The damage was worst exactly where it mattered: a wrong situs breaks routing and
+        # geocoding, and it silently defeats the absentee test, because comparing the
+        # mailing address against itself always reports "not absentee". Spartanburg is the
+        # largest footprint county on the board at 10,054 rows.
         "url": "https://maps.spartanburgcounty.org/server/rest/services/GIS/CAMA_Parcels/FeatureServer/0/query",
-        "id_fields": ["GISParcelNumber", "PARCELNUMBER"],
-        "map": {"owner": "OwnerName", "address": "StreetAddress", "acreage": "Acreage",
-                "land_use": "LandUse"},
+        "id_fields": ["GISParcelNumber", "PARCELNUMBER", "MAPNUMBER"],
+        "map": {"owner": "OwnerName",
+                "address": ["StreetNumber", "StreetName", "StreetCommunity"],
+                "owner_mailing": ["StreetAddress", "City", "State", "Zip"],
+                "market_value": "CurrentAppraisedBuildingValue",
+                "tax_value": "CurrentTaxableBuildingValue",
+                "acreage": "Acreage", "living_sqft": "LivingArea",
+                "land_use": "LandUse", "sale_price": "SaleAmount"},
     },
     "Laurens": {  # TMS (dash format); layer has situs but no value field
         "url": "https://laurenscountygis.org/arcgis/rest/services/Pebble/TaxParcel/MapServer/5/query",
