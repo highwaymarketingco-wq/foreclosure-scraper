@@ -94,6 +94,10 @@ SC_FOOTPRINT = (
 )
 
 NC_FORECLOSURE_TYPE = "Foreclosure Sale"
+
+#: Column stores the FULL state name. Every query filters by state, so a two-letter code
+#: here silently zeroes the entire source -- see the comment in _query().
+_STATE_NAME = {"NC": "North Carolina", "SC": "South Carolina"}
 # SC has no foreclosure type; probate is the actionable lead class. Verified
 # live as the exact string Column uses.
 SC_PROBATE_TYPE = "Estate (Probate) Filings"
@@ -641,12 +645,27 @@ async def _query(
     body = {
         "search": "",
         "allFilters": [
-            {"state": state},
+            # THE STATE FIELD HOLDS THE FULL NAME, NOT THE TWO-LETTER CODE.
+            #
+            # Measured against the live API 2026-09-13. A record's own `state` reads
+            # "New York", not "NY". Filtering on {"state": "NC"} therefore matched
+            # NOTHING -- and since every query this scraper makes filters by state, the
+            # whole source had been returning zero rows for every county, reporting
+            # success each time:
+            #     {"state": "NC"}              -> total_results 0
+            #     {"state": "North Carolina"}  -> total_results 10,000
+            #     NC + "Foreclosure Sale"      -> 7,827
+            #     SC + "Foreclosure Sale"      ->   737   (a lane we never had)
+            {"state": _STATE_NAME.get((state or "").upper(), state)},
             {"county": county},
             {"noticetype": noticetype},
-            # NOTE: the server-side publishedtimestamp range filter was DROPPED — Column changed
-            # its format ~2026-06 so the nested {from,to} now silently matches 0 rows even for
-            # in-window notices. We sort newest-first and filter the page client-side below.
+            # The server-side date filter is RESTORED. The note that used to sit here said
+            # the nested {from,to} "silently matches 0 rows"; it does not. It returned 0
+            # because the state filter above was matching nothing, and the date filter got
+            # the blame. With the correct state name: no date filter 7,827, nested
+            # {from,to} over 120 days 805. Filtering server-side means correct paging
+            # instead of hoping the newest page covers the window.
+            {"publishedtimestamp": {"from": from_ms, "to": to_ms}},
         ],
         "noneFilters": [],
         "sort": [{"publishedtimestamp": "desc"}],
