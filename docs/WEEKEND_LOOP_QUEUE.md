@@ -858,3 +858,56 @@ firms are the source. Probed: substitutetrusteeservices.com and goddardfirm.com 
 not resolve; trusteeservicesofcarolina.com returns a 114-byte stub;
 rogerstownsend.com and sellersayers.com resolve but expose no listing index from
 the homepage. Needs a proper per-firm look rather than homepage link-scraping.
+
+## 2026-09-13 17:00 — FORECLOSURE LANE: the trustee gap, enumerated from our own data
+
+Instead of guessing firm domains, mined the `trustee` field on the board. NC
+foreclosures run through SUBSTITUTE TRUSTEES, so the firms named in our own
+notices ARE the source list. In-footprint volume:
+
+| trustee | rows | scraped? |
+|---|---|---|
+| Shapiro & Ingle, LLP | 70 | YES (PowerBI) |
+| **Bell Carrington Price & Gregg** | **25** | **NO** |
+| **Philip A. Glass** | **19** | **NO** |
+| **Rogers Townsend** | **16** | **NO** |
+| **Wright, Anna Cotten** | **12** | **NO** |
+| Brock & Scott | 9 | YES |
+| **Riley Pope & Laney, LLC** | **9** | **NO** |
+| **Taylor, John W.** | **9** | **NO** |
+| **Raubach, Melanie** | **9** | **NO** |
+| **Foundation Legal Group** | **6** | NO (Hutchens merger — check dup) |
+| **Hayes, Cole** | **6** | **NO** |
+| **RAS (Robertson Anschutz Schneid)** | **4** | **NO** |
+| Hutchens Law Firm | 3 | YES |
+| **Scott & Corley / McCalla** | **3** | **ToS-WALLED, see below** |
+
+**We scrape 3 of ~14 firms.** That is the foreclosure lane's real problem — not a
+parser bug, not a wall. It is unbuilt work, and it explains 99 actionable sales.
+
+### McCalla Raymer (foreclosurehotline.net) — ToS WALL, DO NOT SCRAPE
+Its written terms say users "may not copy, download, store, publish, transmit,
+transfer, sell or otherwise use the data contained in this website, or any portion
+of that data, in any form or by any means", may print "for personal use only", and
+may not use the data "as a component or as a basis for any material offered for
+sale" or to create "mailing or marketing lists". That is precisely our use.
+**Out of bounds under the standing written-ToS rule.** Recorded so nobody re-probes
+it. Note this removes Scott & Corley's volume from reach permanently.
+
+### Bell Carrington — reachable, needs a browser
+`bellcarrington.com/foreclosure-sales/` returned 406 to a plain curl; that was a
+USER-AGENT block, not a wall — it serves 77 KB with browser headers. No restrictive
+ToS language found. But the listings are JS-rendered: no `<table>`, no `<tr>`, and
+the WordPress REST API exposes no custom post type for sales. Needs a rendered
+browser session to capture the real data call, same as CoreBT.
+
+### Dead / unreachable hosts
+substitutetrusteeservices.com, goddardfirm.com, rtt-law.com, rileypopelaney.com,
+nodellglass.com, jwtaylorlaw.com — all fail to resolve. Firm sites move; these need
+a name search rather than a guessed domain.
+
+**NEXT (highest value in the repo right now):** work the untapped firms one at a
+time with a browser, starting with Bell Carrington (25), Philip A. Glass (19) and
+Rogers Townsend (16). Together the unscraped firms represent ~115 in-footprint
+notices already visible in our own data — and that is only what leaked through
+other sources, so the true volume is higher.
