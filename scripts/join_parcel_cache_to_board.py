@@ -22,6 +22,7 @@ SAFETY
 from __future__ import annotations
 
 import argparse
+import re
 import contextlib
 import sys
 from collections import Counter
@@ -35,12 +36,23 @@ sys.path.insert(0, str(REPO / "src"))
 AMBIGUOUS = {"beaufort", "cherokee", "lee", "union"}
 
 
+
+_MAIL_STATE_RE = re.compile(r"\b([A-Z]{2})\b(?:\s+\d{5}(?:-\d{4})?)?\s*$")
+
+
+def _mail_state(mailing: str) -> str | None:
+    """Two-letter state from the tail of a mailing string, e.g.
+    '250 SAWGRASS CT SUMTER SC 29150' -> 'SC'. Returns None rather than guessing."""
+    m = _MAIL_STATE_RE.search((mailing or "").strip().upper())
+    return m.group(1) if m else None
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
     from foreclosure_scraper.parcel_cache import lookup
+    from foreclosure_scraper.enrichment_owner_mailing import _is_absentee
     from foreclosure_scraper.web_artifact import board_lock, load_board, write_artifact
 
     lock = contextlib.nullcontext() if args.dry_run else board_lock(REPO, owner="cache_join")
@@ -78,6 +90,34 @@ def main() -> int:
                 if not g.get("mailing"):
                     g["mailing"] = hit["owner_mailing"]
                     c["filled owner mailing"] += 1
+                # ALSO write the CANONICAL block. raw["gis"]["mailing"] alone is
+                # invisible: the absentee derivation reads
+                # raw["owner_mailing"], fullmer_rank reads owner_mailing.absentee,
+                # and the slim payload's allowlist ships owner_mailing, not gis.mailing.
+                # Sumter proved it — 2,342 rows had gis.mailing and ZERO were flagged
+                # absentee, including 220 SAWGRASS CT whose owner mails from 250
+                # SAWGRASS CT. Fetching a mailing address and never deriving the
+                # signal from it is the same silent loss as not fetching it.
+                # owner_mailing is a STRING on some rows, not a dict. This exact
+                # shape drift crashed the mail spine once before, so it is checked
+                # rather than assumed. A string already carries a mailing address —
+                # leave it alone rather than clobbering real data to fit the schema.
+                om_existing = li.raw.get("owner_mailing")
+                if om_existing is not None and not isinstance(om_existing, dict):
+                    c["owner_mailing was a string — left as is"] += 1
+                    om = None
+                else:
+                    om = li.raw.setdefault("owner_mailing", {})
+                if om is not None and not om.get("mailing"):
+                    om["mailing"] = hit["owner_mailing"]
+                    situs = hit.get("address") or li.street_address
+                    om["absentee"] = _is_absentee(situs, hit["owner_mailing"])
+                    st = _mail_state(hit["owner_mailing"])
+                    if st:
+                        om["mail_state"] = st
+                        om["out_of_state"] = bool(li.state and st != li.state)
+                    if om["absentee"]:
+                        c["flagged absentee"] += 1
             if hit.get("address") and not (li.street_address or "").strip():
                 li.street_address = hit["address"]
                 c["filled situs address"] += 1
