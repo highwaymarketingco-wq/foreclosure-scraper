@@ -712,3 +712,40 @@ Pinned by a test; re-test before re-adding.
 
 **Working qPayBill roster: 26 counties** (was 19 before today; 8 found, Marion
 removed on evidence). Honest count, not the headline one.
+
+## 2026-09-13 14:10 — the new leads landed UNRANKED and UNGRADED (caught, fixed)
+
+Board is live at **127,779** (verified against the live payload, not the push:
+36 SC counties, all seven new ones present, 1 padded address left on purpose).
+
+But `fullmer.rank` was on exactly **115,994** rows — the pre-ingest total. **Every
+one of the 11,785 new leads was on the board and invisible to the call list**:
+Sumter 3,084 unranked, Horry 2,463, Lexington 2,214, Kershaw 1,727. Reporting "new
+counties live" there would have been true and useless.
+
+`scripts/rank_board_standalone.py` exists for exactly this (ranking otherwise waits
+on a 6-10h full run). Ranked all 127,779; row count asserted unchanged.
+
+### And the rank tells us the real gap
+Ranked, the new counties are: **max rank 42, median 12, zero at 60+.**
+All 13,609 rows carry the flag `no_county_value`, and:
+
+    with tax_value  : 0
+    with owner mail : 0
+    with address    : 10,240 / 13,609
+
+So the ranking is not broken — its INPUTS are missing. These counties have no
+parcel cache, so no assessed value and no mailing address, and without a value the
+buy-box arithmetic (margin vs curative cost) cannot score them above D.
+
+Note `grade` is also still on 115,994 — grading needs ARV, which needs value/sqft,
+so it is blocked behind the same gap.
+
+**IN FLIGHT:** qPayBill DETAIL pass for the 7 new counties (`QPAYBILL_ROLL_DETAIL=1`,
+cap 16,000) -> `logs/qpaybill_new_detail.json`. This is the same pass that took
+Oconee and Cherokee from 1% to 50% tax_value. Expect ranks to rise once merged.
+
+### Honest note on my own verification
+My Pages poll reported nothing live because it read a `count` key; run_meta uses
+`total`. The deploy had been fine for minutes. A verification bug looks exactly
+like the failure it is meant to detect — worth remembering.
