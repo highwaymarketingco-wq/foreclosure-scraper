@@ -644,3 +644,50 @@ construction.
 2. ingest `qpaybill_new8.json` when the harvest lands (clean by construction)
 3. `scripts/clean_qpaybill_situs_padding.py` for the 4,326 rows already on the board
 4. verify, commit, push, confirm live on Pages
+
+## 2026-09-13 13:00 — the 8-county harvest landed, and it was 55% FAKE
+
+Harvest finished: **30,563 leads** across 7 counties (Marion returned 0 — see below),
+26,000 with addresses. Before ingesting I asked why Colleton had returned **18,289
+parcels for a county of ~38,000 people** — about 60% of every parcel it owns.
+
+The unpaid filter had held (all rows "Unpaid" or "Sold at Tax Sale"), so the rows
+were real bills. The problem was the tax YEAR:
+
+    years_unpaid across the sweep:  2024: 2,592   2025: 12,929   2026: 18,289
+
+**2026 appeared exactly 18,289 times — Colleton's entire parcel count.** Colleton's
+portal had already loaded the 2026 tax year; every other county reported ~0 for it.
+SC bills a tax year in the autumn and it falls due 15 JANUARY of the following year,
+so in September 2026 a 2026 bill is not late — it is not yet owed. Median balance
+$504: an ordinary annual tax bill.
+
+**16,790 Colleton owners would have been put on a distressed-property board for not
+paying a bill that was not due**, and Colleton would have become the largest
+"distressed" county in the dataset.
+
+Fixed in the scraper: `_delinquent_years()` keeps only tax years the calendar has
+passed. A row with BOTH a real arrear and the current year keeps the arrear and
+drops the not-yet-due year (1,410 rows); a row with nothing but the current year is
+not a lead at all. Conservative at the 1-15 January boundary on purpose: a missed
+delinquency costs a lead, a fabricated one costs a call to someone who owes nothing.
+Pinned by `tests/test_qpaybill_current_year_not_delinquent.py`.
+
+Re-filtered the harvest file (original at `.prefilter-bak`):
+
+| county | raw | real |
+|---|---|---|
+| Colleton | 18,289 | **1,499** |
+| Sumter | 4,028 | 4,028 |
+| Lexington | 2,921 | 2,832 |
+| Horry | 2,463 | 2,463 |
+| Kershaw | 1,815 | 1,815 |
+| Bamberg | 578 | 578 |
+| Saluda | 469 | 469 |
+| **total** | **30,563** | **13,684** |
+
+13,684 genuine net-new delinquent leads; 16,879 false ones stopped at the door.
+
+**Marion returned 0 rows on 36 queries** — not yet diagnosed. Its portal answered the
+form probe earlier, so this is either a stub like Hampton's or a different grid.
+Do NOT record Marion as covered until it is checked.

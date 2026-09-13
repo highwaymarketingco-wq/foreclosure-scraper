@@ -139,7 +139,7 @@ import os
 import re
 import time
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, date
 from typing import Iterable
 
 import httpx
@@ -734,6 +734,40 @@ def _acres(v) -> float | None:
     return f if f > 0 else None
 
 
+
+def _delinquent_years(years: list[str], today: date | None = None) -> list[str]:
+    """Keep only tax years that are actually PAST DUE.
+
+    SC bills a tax year in the autumn and it falls due 15 January of the FOLLOWING
+    year, so an unpaid bill for tax year Y is not a delinquency until Y+1. A portal
+    that has already loaded the current year therefore reports thousands of ordinary
+    owners as "Unpaid" months before they owe anything.
+
+    This is not hypothetical. Colleton's portal had the 2026 year loaded when it was
+    first harvested on 2026-09-13: 18,199 of its 18,289 parcels carried a 2026
+    unpaid year and 16,790 carried NOTHING ELSE, at a median balance of $504 — an
+    ordinary annual tax bill. Every other county in the same sweep reported ~0 rows
+    for 2026. Ingesting that would have put ~16,790 people on a distressed-property
+    board for not having paid a bill that was not yet due, and made Colleton one of
+    the largest "distressed" counties in the dataset.
+
+    Rule: a tax year counts only once the calendar has passed it. In February 2026 a
+    2025 bill IS delinquent (it was due 15 January); in September 2026 a 2026 bill is
+    not. Conservative at the 1 Jan - 15 Jan boundary, which is the right direction to
+    err: a missed real delinquency costs a lead, a fabricated one costs a phone call
+    to someone who owes nothing.
+    """
+    cutoff = (today or date.today()).year
+    out = []
+    for y in years:
+        try:
+            if int(y) < cutoff:
+                out.append(y)
+        except (TypeError, ValueError):
+            continue          # unparseable year — cannot prove it is past due
+    return out
+
+
 def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
     """One Listing per PARCEL, with the unpaid years aggregated onto it.
 
@@ -751,8 +785,13 @@ def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
     account_only = county in ACCOUNT_ID_ONLY
     for ident, group in by_ident.items():
         group.sort(key=lambda g: (g.get("year") or ""))
-        years = sorted({g["year"] for g in group if g.get("year")})
-        total = round(sum(g["amount"] for g in group), 2)
+        all_years = sorted({g["year"] for g in group if g.get("year")})
+        # A CURRENT-YEAR bill is not a delinquency. See _delinquent_years().
+        years = _delinquent_years(all_years)
+        if not years:
+            continue
+        total = round(sum(g["amount"] for g in group
+                          if (g.get("year") or "") in years), 2)
         owner = next((g["owner"] for g in group if g.get("owner")), None)
         address = next((g["address"] for g in group if g.get("address")), None)
         prior = next((g["description"] for g in group if g.get("description")), None)
@@ -786,6 +825,7 @@ def _to_listings(county: str, rows: list[dict]) -> list[Listing]:
                 "property_address": address,
                 "balance_owed": total,
                 "years_unpaid": years,
+                "all_unpaid_years": all_years,   # incl. any not-yet-due current year
                 "years_delinquent": len(years),
                 "is_two_year_plus": len(years) >= 2,
                 "statuses": sorted({g["status"] for g in group if g.get("status")}),
