@@ -54,6 +54,9 @@ FILES = [
     # named SC entity with an unpaid state lien is a real distress signal, and the
     # address is a reachable mailing address -- the constraint SC has been short of.
     ("sc_dew", REPO / "logs" / "sc_dew_full.json"),
+    # Column legal notices: NC + SC foreclosure sales and probate/estate notices.
+    # Additive — a different source from the tax rolls, covering different counties.
+    ("column", REPO / "logs" / "column_full.json"),
 ]
 
 
@@ -185,25 +188,43 @@ def main() -> int:
         # and quietly swallowed both effects at once: +18k new leads hidden behind -23k
         # of collapse. So the fresh rows are deduped among THEMSELVES and matched
         # against the existing keys; existing rows are never re-merged with each other.
-        existing_keys = set()
+        # Index existing rows BY signature so a match can be MERGED, not just counted.
+        #
+        # The first version did `if sigs & existing_keys: continue` -- it dropped every
+        # matched row on the floor. That looked harmless because the count was reported,
+        # but a matched row is not a duplicate to discard: it is the SAME property seen
+        # by a different source, carrying fields the existing row may not have. A Column
+        # foreclosure notice matching a tax-roll row brings a case number, a sale date and
+        # the attorney's contact; the tax row has none of those. 31,607 rows matched on
+        # this ingest and every one of their fields was being thrown away.
+        by_sig: dict = {}
         for li in existing:
-            existing_keys.add(li.dedupe_key())
-            existing_keys.update(_strong_sigs(li))
+            for sig in {li.dedupe_key()} | _strong_sigs(li):
+                by_sig.setdefault(sig, li)
 
         fresh_deduped = dedupe(fresh)          # within the harvest only
-        add, matched = [], 0
+        add, matched, enriched = [], 0, 0
         for li in fresh_deduped:
             sigs = {li.dedupe_key()} | _strong_sigs(li)
-            if sigs & existing_keys:
+            twin = next((by_sig[s] for s in sigs if s in by_sig), None)
+            if twin is not None:
                 matched += 1
+                before_raw = len(twin.raw or {})
+                merged_row = twin.merge(li)     # keeps first-non-null per field
+                if merged_row is not twin:
+                    twin.__dict__.update(merged_row.__dict__)
+                if len(twin.raw or {}) > before_raw:
+                    enriched += 1
                 continue
             add.append(li)
-            existing_keys |= sigs
+            for s in sigs:
+                by_sig.setdefault(s, li)
         merged = existing + add
         after = len(merged)
         net_new = len(add)
         print(f"harvest deduped internally  : {len(fresh):,} -> {len(fresh_deduped):,}")
         print(f"  already on the board      : {matched:,}")
+        print(f"    of those, MERGED new fields into the existing row: {enriched:,}")
         print(f"  NET NEW leads             : {net_new:,}")
         print(f"board after : {after:,}  (existing {before:,} untouched)")
 
