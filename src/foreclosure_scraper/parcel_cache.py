@@ -140,6 +140,28 @@ PARCEL_LAYERS: dict[str, dict] = {
     # situs-was-really-the-mailing-address bug above. Confirmed on a sample:
     # ParcelID 0300301068 mails to 892 CANIPE RD BLACKSBURG, property is at
     # 2020 KISATCHIE DR, LandUseDesc RESIDENTIAL VACANT -- absentee AND vacant.
+    # --- 2026-09-13. Sumter SC. Found while chasing why the 13,609 new qPayBill
+    # leads all ranked D: they carry no value and no mailing address, so the buy-box
+    # arithmetic cannot score them. This layer fixes both for Sumter's 3,084 rows.
+    #
+    # 61,684 parcels, open Query, and it is a FULL record: situs
+    # (parcel_address_one) and the owner's MAILING address in separate fields, plus
+    # market value, acreage and deed book/page. Sampled rows are textbook absentees
+    # — situs 8415 ST JOHNS RD with the owner mailing to COLUMBIA.
+    #
+    # Board parcel_ids for Sumter are the undashed form ("2241103014"), which is
+    # exactly `parid`; `parcel_number` carries the dashed form, so both are indexed.
+    "Sumter": {
+        "state": "SC",
+        "url": "https://gis.sumter-sc.com/server/rest/services/BaseMaps/Sumter_City_County/FeatureServer/7/query",
+        "id_fields": ["parid", "parcel_number"],
+        "map": {"owner": "owner_name", "address": "parcel_address_one",
+                "owner_mailing": ["owner_address_one", "owner_address_two",
+                                  "owner_city", "owner_state", "owner_zip"],
+                "market_value": "market_value_total",
+                "tax_value": "market_value_total",
+                "acreage": "deedacre"},
+    },
     "York": {  # 10-digit TMS, no punctuation (ParcelID == TAXMAPID)
         "state": "SC",
         "url": "https://services1.arcgis.com/2AGLxyiJoNiVHKwq/arcgis/rest/services/Parcels/FeatureServer/0/query",

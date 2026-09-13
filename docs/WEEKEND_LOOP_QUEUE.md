@@ -749,3 +749,34 @@ Oconee and Cherokee from 1% to 50% tax_value. Expect ranks to rise once merged.
 My Pages poll reported nothing live because it read a `count` key; run_meta uses
 `total`. The deploy had been fine for minutes. A verification bug looks exactly
 like the failure it is meant to detect — worth remembering.
+
+## 2026-09-13 14:40 — parcel layers for the new counties (the real fix for their D ranks)
+
+The detail pass gives appraised value only. A GIS parcel layer gives value AND the
+owner's mailing address AND situs — which is what the new counties actually need.
+
+**Sumter: WIRED.** `gis.sumter-sc.com/.../Sumter_City_County/FeatureServer/7` —
+61,684 parcels, open Query, full record: situs `parcel_address_one`, owner, the
+MAILING address in separate fields, `market_value_total`, acreage, deed book/page.
+Board ids for Sumter are the undashed form, which is exactly `parid` (the dashed
+`parcel_number` is indexed too). Unlocks value + absentee for Sumter's 3,084 rows.
+Sampled rows are textbook absentees: situs 8415 ST JOHNS RD, owner mails to COLUMBIA.
+
+**Horry: FOUND BUT PARTIAL — do not treat as coverage.**
+`services.arcgis.com/NuWFvHYDMVmmxMeM/.../HorryCountySCParcels` is open and carries
+PARNO / OWNNAME / PARVAL, but it holds **20,429 parcels against Horry's ~240,000**.
+It is hosted by *NCDOT Photogrammetry*, so it is almost certainly a border-strip
+extract, not the county. Useful as a partial value source; it is NOT a Horry parcel
+layer and must not be logged as one.
+
+**Kershaw: rejected.** `KershawGIS/Parcels_view` carries only FID / PRSNTP_ID /
+acreage — no owner, no value, no address. Nothing we need.
+
+**SCDOT statewide parcels: CONFIRMED TOKEN-WALLED.**
+`smpesri.scdot.org/.../SC_Parcels/MapServer` has per-county layers (31 = Lexington,
+27 = Kershaw) and answers `{"code":499,"message":"Token Required"}`. This REFINES
+the earlier "there is no SC statewide parcel layer" note: one exists, it is just not
+free. Same conclusion, better reason — and it matches the standing SCDOT wall.
+
+Still needed: Lexington (2,214 rows), Kershaw (1,727), Colleton (1,480), Bamberg,
+Saluda parcel sources.
