@@ -529,3 +529,38 @@ tempted to raise it reads the result before spending two hours on it.
   output `logs/qpaybill_new8.json`. Writes only to logs/, not the board.
 - board lock still held by run_daily_vision.sh, so BOTH the situs-padding repair and
   the depth-6 ingest remain queued.
+
+## 2026-09-13 11:27 — the board lock is held by the daily vision pass (BOUNDED, not stuck)
+
+Board writes have been blocked since ~09:30 by `run_daily_vision.sh` ->
+`patch_vision_gemini.py`. Diagnosed rather than assumed:
+
+- it IS progressing (heartbeat every 60s, log written seconds ago)
+- but slowly: **185 scored out of a 4,597 queue in 1h45m**, 761 attempts — a 76%
+  miss rate, 143 of them `vision.api_error backend=nvidia:...` with an EMPTY error
+  string
+- at that rate the queue needs ~40 hours
+
+**I first read that as a 40-hour lock hold. It is not.** `VISION_MAX_SECONDS`
+defaults to 14400 (4h) with a hard `asyncio.wait_for` cap, and on timeout the
+script keeps partial progress and proceeds to write. Started 09:30 -> **lock
+releases ~13:36.** The 40-hour figure was time-to-drain-the-queue, which is a
+different number from the job's actual bound. No intervention needed; killing it
+would have thrown away the scored work for nothing.
+
+The script's own header documents why this matters: on 2026-08-10 a long hold wrote
+back a board loaded 4h earlier and **reverted 1,064 resolved parcels, 343 county
+values and 410 absentee tags, with nothing erroring**. Two consequences for today:
+1. My 08:57 ingest is SAFE — vision loaded the board at 09:33, after it.
+2. The situs repair and depth-6 ingest MUST land after ~13:36, or they would be
+   clobbered by that stale snapshot. The lock enforces this for me.
+
+**Separate finding, not chased today:** a 76% vision miss rate with empty-string API
+errors on the free NIM backend. `project_vision_pool_repair` says the dead-model
+problem was fixed and not to re-diagnose — but errors are clearly still occurring at
+volume, so that note may be stale. Worth a look when the board work is done.
+
+Also: the queue contains at least one non-image URL being retried into an image
+model — Rutherford's `TR-452 Delinquent Bills Report w Parcel Id.xlsx`, 6 attempts.
+A spreadsheet can never be scored by vision; it should never enter the queue. Small,
+but it is pure waste and it is the kind of thing that inflates the miss rate.
