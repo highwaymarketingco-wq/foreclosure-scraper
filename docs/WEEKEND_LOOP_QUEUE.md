@@ -951,3 +951,46 @@ serve the zero-coverage counties (Buncombe, Cleveland, Henderson). Column does n
 carry them; identify which paper runs each county's notices and whether it publishes
 them online. That is a per-county question with a definite answer, unlike domain
 guessing.
+
+## 2026-09-13 19:00 — NC statutory notices: 561 net-new leads, ZERO new actionable sales
+
+Ran the NC press-association county scrape (45-day window, 8 pages). It reached the
+counties Column cannot see, which was the whole point:
+
+    Buncombe 180   Gaston 65   Rutherford 52   Burke 33   McDowell 30
+    Cleveland 28   Henderson 28
+
+787 notices, 310 typed `foreclosure_sale`. Dedupe found only **5 already on the
+board** — these leads were genuinely invisible to us. Board 127,779 -> **128,340**.
+
+### But the actionable count did not move, and that is the headline
+    foreclosure_sale total : 1,189 -> 1,338
+    in footprint           :   520 ->   620
+    FUTURE-dated (usable)  :    99 ->    99   <-- NO CHANGE
+
+Because of what the notices carry:
+
+    with case_number : 225 / 310
+    with defendant   : 141 / 310
+    with address     :  57 / 310
+    with sale_date   :   0 / 310
+    with opening_bid :   0 / 310
+
+`_press_assoc.py` says why, and it was known: the full notice body sits behind an
+"I Agree" + reCAPTCHA gate, so only the ~300-char PREVIEW is parsed. The preview
+carries the caption, case number and party name — **not the sale date, not the bid,
+usually not the address.**
+
+So "the foreclosure lane grew 26%" would be a misleading way to report this. The
+COUNT grew. The number of foreclosures anyone can actually act on is still 99.
+
+### What these 561 leads ARE good for
+A defendant name + an SP case number in a county IS a real pre-foreclosure signal —
+it just is not an auction listing. 141 defendant names and 225 case numbers are
+resolvable to PROPERTIES via owner-name -> parcel lookup, which is a lane we now
+have parcel caches for in 18 counties.
+
+**NEXT: name -> parcel resolution for these defendants.** That converts a name into
+an address, an owner and a value, which is what makes them rankable. It is also the
+cross-referencing approach that was explicitly asked for, and it is the only route
+to the sale details that the captcha gate blocks.
