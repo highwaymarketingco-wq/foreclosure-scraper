@@ -197,8 +197,15 @@ def test_page_cap_matches_the_portals_observed_page_size():
 
 def test_every_county_has_a_subdomain_and_the_five_known_ones_are_kept():
     """The five counties enrichment_qpaybill_tax already used must not be dropped
-    while adding the fourteen new ones."""
-    assert len(QPAYBILL_SUBS) == 19
+    while adding the others.
+
+    Was `== 19`. On 2026-09-13 probing every SC county against the vendor's
+    subdomain patterns found eight more live portals (Horry, Lexington, Kershaw,
+    Sumter, Marion, Bamberg, Saluda, Colleton), so the roster is 27. Asserted as a
+    FLOOR now: finding more counties must never fail the suite, but silently losing
+    one still does.
+    """
+    assert len(QPAYBILL_SUBS) >= 27
     for known in ("Spartanburg", "Oconee", "Laurens", "Union", "Cherokee"):
         assert known in QPAYBILL_SUBS
     assert all(v and "." not in v for v in QPAYBILL_SUBS.values())
