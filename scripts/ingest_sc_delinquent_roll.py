@@ -57,6 +57,12 @@ FILES = [
     # Column legal notices: NC + SC foreclosure sales and probate/estate notices.
     # Additive — a different source from the tax rolls, covering different counties.
     ("column", REPO / "logs" / "column_full.json"),
+    # qPayBill DETAIL pass for the four lowest-value counties (Oconee/Cherokee/Union at
+    # 1% value, Laurens at 9%). ADDITIVE on purpose, not part of the superseding family:
+    # it covers the same counties as the base roll but read 1,397 Cherokee parcels where
+    # the base read 1,421, so superseding would DROP 24. Additive plus the merge path
+    # enriches the existing rows with Total Appraisal instead of replacing them.
+    ("qpaybill_detail", REPO / "logs" / "qpaybill_detail4.json"),
 ]
 
 
@@ -204,17 +210,31 @@ def main() -> int:
 
         fresh_deduped = dedupe(fresh)          # within the harvest only
         add, matched, enriched = [], 0, 0
+        field_gains = Counter()
         for li in fresh_deduped:
             sigs = {li.dedupe_key()} | _strong_sigs(li)
             twin = next((by_sig[s] for s in sigs if s in by_sig), None)
             if twin is not None:
                 matched += 1
-                before_raw = len(twin.raw or {})
+                # Count FIELD changes, not new raw keys. The first version compared
+                # len(raw) before and after, which reported 0 enriched on a run that was
+                # in fact filling tax_value on thousands of rows -- the detail rows carry
+                # the same raw KEY (qpaybill_roll) as their twin, so the key count never
+                # moved. A counter that reads 0 while real work is happening is worse
+                # than no counter: it nearly got a working merge reverted.
+                watch = ("tax_value", "market_value", "living_sqft", "acreage",
+                         "street_address", "owner_name", "case_number", "sale_date",
+                         "zip_code", "city", "judgment_amount", "legal_description")
+                before_vals = {f: getattr(twin, f, None) for f in watch}
                 merged_row = twin.merge(li)     # keeps first-non-null per field
                 if merged_row is not twin:
                     twin.__dict__.update(merged_row.__dict__)
-                if len(twin.raw or {}) > before_raw:
+                gained = [f for f in watch
+                          if before_vals[f] in (None, "") and getattr(twin, f, None) not in (None, "")]
+                if gained:
                     enriched += 1
+                    for f in gained:
+                        field_gains[f] += 1
                 continue
             add.append(li)
             for s in sigs:
@@ -225,6 +245,8 @@ def main() -> int:
         print(f"harvest deduped internally  : {len(fresh):,} -> {len(fresh_deduped):,}")
         print(f"  already on the board      : {matched:,}")
         print(f"    of those, MERGED new fields into the existing row: {enriched:,}")
+        for f, n in field_gains.most_common(8):
+            print(f"        +{n:>6,}  {f}")
         print(f"  NET NEW leads             : {net_new:,}")
         print(f"board after : {after:,}  (existing {before:,} untouched)")
 
