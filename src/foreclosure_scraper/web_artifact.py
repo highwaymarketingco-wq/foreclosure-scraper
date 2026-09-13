@@ -347,6 +347,12 @@ RAW_KEEP = {
     "spartanburg_delinquent_tax": "*",  # SC delinquent tax: balance
     "sc_state_tax_lien": "*",           # SC DeptRev state tax lien: balance
     "deed_chain": "*",                  # synthesized ownership transfer timeline + summary
+    # 2026-09-13. Lexington's assessment ratio (4% owner-occupied vs 6% everything
+    # else) plus fmv. Added the same hour the enricher was written, because the
+    # enricher ran first and all 1,159 of its blocks were silently dropped here —
+    # tax_value survived only because it is a TOP-LEVEL field. Any new raw key needs
+    # RAW_KEEP, _SLIM_RAW and dashboard.js's _LEAN_RAW or it does not exist.
+    "lexington_assessment": "*",
     "dot_ocr": "*",                     # recorded deed-of-trust principal + estimated balance
     "loan_amount": "*",                 # scalar loan principal from dot_ocr
     "property_category": "*",           # foreclosure | preforeclosure | tax_delinquency | distressed_property
@@ -896,6 +902,9 @@ _SLIM_RAW: dict[str, str | tuple[str, ...]] = {
     # rows and no phone could see a rank. Whole-block: rank/why/flags are read
     # together and the block gains keys whenever the buy-box arithmetic changes.
     "fullmer": "*",
+    # Owner-occupancy derived from the SC assessment ratio. Ships because it is a
+    # contact-quality signal the detail panel shows next to absentee.
+    "lexington_assessment": ("assessment_ratio", "owner_occupied", "fmv", "tax_year"),
 }
 
 

@@ -292,6 +292,8 @@ const _LEAN_RAW = {
   // APPENDED LAST. fullmer is the buy-box rank the call list is ordered by; it
   // was in no allowlist, so raw.fullmer reached 0 of 115,994 slim rows.
   fullmer: "*",
+  // Owner-occupancy from the SC assessment ratio (4% legal residence vs 6% else).
+  lexington_assessment: ["assessment_ratio", "owner_occupied", "fmv", "tax_year"],
 };
 const _LEAN_RAW_KEYS = Object.keys(_LEAN_RAW);
 const _LEAN_RAW_SCALARS = [
