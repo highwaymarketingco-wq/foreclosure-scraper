@@ -911,3 +911,43 @@ time with a browser, starting with Bell Carrington (25), Philip A. Glass (19) an
 Rogers Townsend (16). Together the unscraped firms represent ~115 in-footprint
 notices already visible in our own data — and that is only what leaked through
 other sources, so the true volume is higher.
+
+## 2026-09-13 17:30 — Bell Carrington: reachable, but it does not publish the data
+
+Drove `bellcarrington.com/foreclosure-sales/` in a real browser (the earlier 406 was
+a user-agent block, not a wall — it serves fine with browser headers, and its text
+carries no use restriction, only sale-procedure disclaimers).
+
+The page promises exactly what we want: *"listings of all active foreclosure sales
+for the states of Georgia, South Carolina, North Carolina, Alabama, and Tennessee...
+updated in real time."*
+
+**But the listings are not there.** Verified four ways rather than assuming:
+- network log: 47 requests, ALL static assets — no XHR/fetch data call
+- `document.body.innerText` is 2,853 chars, and all of it is disclaimer
+- the only iframe is a 1x1 base64 spacer
+- WP sitemap + `wp-json/wp/v2/pages?search=foreclosure` return exactly ONE page,
+  id 5534, which is the disclaimer page itself
+
+So the "report" the text refers to is not served at any reachable URL. This is a
+DEAD END, not a wall to route around — there is nothing to fetch. Re-check later;
+a firm that says "updated in real time" probably serves it somewhere, but it is not
+on their site today.
+
+### Running tally for the foreclosure lane
+- 3 of ~14 in-footprint trustee firms scraped
+- McCalla Raymer: **ToS-walled, permanently out**
+- Bell Carrington (largest unscraped, 25 rows): **publishes nothing fetchable**
+- rtt-law.com, rileypopelaney.com, nodellglass.com, jwtaylorlaw.com,
+  substitutetrusteeservices.com, goddardfirm.com: **do not resolve**
+
+That is a harder lane than it looked this morning. The firms that DO publish
+machine-readable sales (Shapiro PowerBI, Brock & Scott, Hutchens) are already wired
+— which now reads less like neglect and more like "the easy ones were taken".
+
+**Revised next step:** stop guessing firm domains. NC sale notices are published as
+NEWSPAPER LEGAL NOTICES by statute, so the complete-by-law route is the papers that
+serve the zero-coverage counties (Buncombe, Cleveland, Henderson). Column does not
+carry them; identify which paper runs each county's notices and whether it publishes
+them online. That is a per-county question with a definite answer, unlike domain
+guessing.
