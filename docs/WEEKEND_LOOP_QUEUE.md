@@ -411,3 +411,41 @@ Note: the first draft of that script ran over EVERY row, and since `_clean_situs
 also strips whitespace it silently proposed edits to ~60 NC rows from other
 scrapers whose only issue was surrounding spaces. Scoped to qPayBill rows instead.
 Those ~60 whitespace-padded addresses are a real but SEPARATE finding — not fixed here.
+
+## 2026-09-13 10:05 — new-county verification, and what each one actually gives
+
+Smoke-tested the two biggest finds on tiny budgets (heavy slot was busy):
+
+**Lexington** — 839 leads / 44s / 120 requests. Full record: TMS, owner, situs
+address, balance owed. Good source.
+
+**Horry** — 583 leads / 100 requests, and 206 leads on just 20 requests. Carries
+parcel, owner, balance owed and years delinquent, but **ZERO situs addresses** —
+`property_address` is None on 206/206. Verified this is the PORTAL, not our parser:
+Horry's results grid simply does not publish the address column that Lexington's
+does. So Horry lands as parcel+owner+debt and needs address resolution from Horry
+GIS before those leads are routable. Recording it rather than letting Horry look
+like an address-coverage regression later.
+
+Worth noting what Horry's roll contains: the first row sampled is **11 years
+delinquent (2015-2025)**, $1,072.97 owed. Deep-arrears rows like that are the
+strongest distress signal in the whole dataset.
+
+### The other 10 zero-row SC counties — status after probing
+- **Aiken** — `aikencountysctax.com` is a Wildfire SPA behind reCAPTCHA (out of
+  bounds). Its Delinquent Tax Sale page currently publishes only bidder
+  instructions; the property list appears closer to the November sale. NOT a
+  missing source — not published yet. Re-check in October.
+- **York** — `evolvepublic.yorkcountygov.com` is an open ASP.NET property-CARD
+  search (no captcha). That is enrichment, not distress: it cannot generate leads.
+  York's real gap stays upstream.
+- **Jasper** — `taxes.paystar.io/app/customer/jasper-county-tax` (Paystar vendor,
+  new family). Unprobed — next candidate.
+- **Greenwood** — county-hosted Tax Collector / Treasurer pages, unprobed.
+- **Chester, Dillon, Dorchester, Edgefield, Fairfield, Hampton** — no tax portal
+  found from the county homepage. Dorchester and Edgefield 403 plain curl.
+
+CAUTION on method: my link-scraper re-read a stale temp file when a curl failed,
+and printed Aiken's links under Chester's heading. Chester actually returned
+nothing. Any county above marked "no portal found" should be re-probed with a
+per-county file before being called a dead end.
