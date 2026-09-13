@@ -82,6 +82,17 @@ FILES = [
     # 2026-09-13). Those rows have a parcel, so the "no parcel AND no address" drop
     # keeps them; they need address resolution from Horry GIS afterwards.
     ("qpaybill_new8", REPO / "logs" / "qpaybill_new8.json"),
+    # 2026-09-13 DETAIL pass for the new counties. This is what makes them rankable:
+    # 11,690 of 13,674 rows carry an appraised value, where the plain roll carried
+    # none. Horry 0 -> 2,230, Kershaw 0 -> 1,722, Sumter 3,844, Lexington 2,829.
+    #
+    # ADDITIVE, same precedent as detail4/detail5: it covers the same counties as
+    # new8 and superseding would drop any parcel this pass happened to miss.
+    #
+    # Colleton only got 23 values — it exhausted its request budget and SAID SO
+    # (qpaybill_roll.budget_exhausted). Its roll here is incomplete; re-run Colleton
+    # alone at a higher budget rather than treating 23 as its real coverage.
+    ("qpaybill_new_detail", REPO / "logs" / "qpaybill_new_detail.json"),
 ]
 
 
