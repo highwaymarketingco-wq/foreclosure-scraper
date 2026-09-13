@@ -336,11 +336,38 @@ async def _post(client: httpx.AsyncClient, sub: str, vs: dict, prefix: str,
     if not page:
         data["ctl00$MainContent$btnSearch"] = "Search"
     resp = await client.post(_url(sub), data=data)
+    _require_ok(resp, sub, prefix)
     return parse_grid(resp.text), _vs(resp.text)
+
+
+class QPayBillUnavailable(RuntimeError):
+    """The portal answered, but not with data. Distinct from 'this prefix has no rows'."""
+
+
+def _require_ok(resp, sub: str, prefix: str) -> None:
+    """A non-2xx must NEVER reach parse_grid.
+
+    PROVEN AGAINST A LIVE OUTAGE, 2026-09-13 01:15. All five qPayBill tenants answered
+    HTTP 503 with a 123,600-byte maintenance page. parse_grid() returns 0 rows from it
+    and _vs() still finds __VIEWSTATE tokens in it, so the page looks structurally valid.
+    With no status check the sweep would have logged, for all 19 counties:
+
+        county_done  parcels=0  queries=N  errors=0
+
+    -- a clean bill of health for a run that collected nothing. That is the same silent
+    shape as the Catalis 429 handled in sc_catalis_delinquent_roll, and this sibling was
+    never given the same guard. An outage must surface as an error the caller retries and
+    the log names, not as an empty county.
+    """
+    if resp.status_code >= 400:
+        raise QPayBillUnavailable(
+            f"{sub} returned HTTP {resp.status_code} for prefix {prefix!r} "
+            f"({len(resp.content):,} bytes) — portal unavailable, NOT an empty result")
 
 
 async def _fresh_vs(client: httpx.AsyncClient, sub: str) -> dict:
     r = await client.get(_url(sub))
+    _require_ok(r, sub, "<viewstate>")
     return _vs(r.text)
 
 
