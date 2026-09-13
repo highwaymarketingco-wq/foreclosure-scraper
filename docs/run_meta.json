@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-13T17:43:44.242388Z",
-  "total": 115994,
+  "run_time": "2026-09-13T17:57:15.280992Z",
+  "total": 127779,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -101,11 +101,11 @@
   },
   "by_state": {
     "NC": 68953,
-    "SC": 47041
+    "SC": 58826
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 41266,
-    "counties_sc.qpaybill_delinquent_roll": 21247,
+    "counties_sc.qpaybill_delinquent_roll": 33032,
     "counties_sc.sc_dew_lien_registry": 8871,
     "liensnc": 6308,
     "counties_nc.rutherford_tax": 4171,
@@ -450,21 +450,21 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "daily vision pass: 21962 of 115994 listings have a vision report",
-  "detail_count": 115994,
-  "detail_digest": "465c993fd5d417ac",
+  "notes": "",
+  "detail_count": 127779,
+  "detail_digest": "60a1997d5576379f",
   "board": {
     "schema": "slim-v1",
-    "count": 115994,
+    "count": 127779,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
-      "count": 116,
-      "records": 115994
+      "count": 128,
+      "records": 127779
     }
   },
-  "health_carried_from": "2026-09-13T12:57:31.700848Z",
+  "health_carried_from": "2026-09-13T17:55:45.637535Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
