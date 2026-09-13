@@ -289,6 +289,9 @@ const _LEAN_RAW = {
   // New enrichment fields — keep whole so dashboard can read all sub-keys.
   property_category: "*",
   deed_chain: "*",
+  // APPENDED LAST. fullmer is the buy-box rank the call list is ordered by; it
+  // was in no allowlist, so raw.fullmer reached 0 of 115,994 slim rows.
+  fullmer: "*",
 };
 const _LEAN_RAW_KEYS = Object.keys(_LEAN_RAW);
 const _LEAN_RAW_SCALARS = [
@@ -1101,6 +1104,10 @@ function getSortValue(l, k) {
   if (k === "_rehab") return (getCalc(l) || {}).rehab_expected || 0;
   if (k === "_max_bid") return (getCalc(l) || {}).max_bid_70 || 0;
   if (k === "_roi") return (getCalc(l) || {}).roi_pct;
+  if (k === "_fullmer") {
+    const f = l.raw && l.raw.fullmer;
+    return f && typeof f.rank === "number" ? f.rank : -1;
+  }
   if (k === "_distress") return (getDistress(l) || {}).score || 0;
   if (k === "_intent") return getIntent(l);
   return l[k];
@@ -2720,6 +2727,10 @@ function injectDashStyles() {
   #listings-table td.dq-arv-bad .dq-arv-mark{margin-right:4px;font-weight:700}
   #listings-table td.dq-arv-proxy{color:var(--muted,#6b6257)}
   #listings-table td.dq-dim{opacity:.42}
+  .fm-rank{display:inline-block;min-width:2.1em;padding:1px 4px;border-radius:4px;font-weight:700;font-variant-numeric:tabular-nums}
+  .fm-rank.fm-hot{background:#2f7d32;color:#fff}
+  .fm-rank.fm-warm{background:#c98a1a;color:#fff}
+  .fm-rank.fm-cold{color:var(--muted,#6b6257)}
   #listings-table td.dq-dim .roi-pos,#listings-table td.dq-dim .roi-neg{color:inherit}
   /* WEAK: amber + a dotted rule, no fill. A fill on 16,310 of 38,500 rows would
      be the wallpaper that hid the real warning; colour + the "≈" is a caveat a
@@ -2943,6 +2954,15 @@ function renderTable() {
           ? `<span class="grade-badge F ${at.level === "bad" ? "dq-warn-mark" : "dq-soft-mark"}" style="opacity:.85" title="${_attr("Unrated on purpose — " + arvTrustTitle(at))}">—</span>`
           : gradeBadge(g)
       }${intentBadge(l)}</td>
+      <td class="num">${(() => {
+        const f = l.raw && l.raw.fullmer;
+        if (!f || typeof f.rank !== "number") return "";
+        const why = f.why && typeof f.why === "object"
+          ? Object.entries(f.why).map(([k2, v]) => `${k2} +${v}`).join(", ") : "";
+        const fl = Array.isArray(f.flags) && f.flags.length ? " · " + f.flags.join(", ") : "";
+        const cls = f.rank >= 60 ? "fm-hot" : f.rank >= 40 ? "fm-warm" : "fm-cold";
+        return `<span class="fm-rank ${cls}" title="${_attr("Buy-box rank " + f.rank + (why ? " — " + why : "") + fl)}">${f.rank}</span>`;
+      })()}</td>
       <td>${dateCell}</td>
       <td>${l.state || ""}</td>
       <td>${l.county || ""}</td>

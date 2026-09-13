@@ -31,7 +31,7 @@ def enrich_vacant_landuse(listings: Iterable[Listing]) -> dict:
         county = (li.county or "").strip()
         if not pid or county not in cached:
             continue
-        rec = parcel_cache.lookup(county, pid)
+        rec = parcel_cache.lookup(county, pid, li.state)
         lu = (rec or {}).get("land_use")
         if not lu:
             continue

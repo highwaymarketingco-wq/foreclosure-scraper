@@ -173,7 +173,7 @@ QPAYBILL_SUBS: dict[str, str] = {
     "Lancaster": "lancastersctax",
     "Lee": "leetreasurer",
     "Marlboro": "marlborocountytax",
-    "Mccormick": "mccormicktreasurer",
+    "McCormick": "mccormicktreasurer",   # NOT "Mccormick" — .title() strikes again
     "Newberry": "newberrytreasurer",
     "Orangeburg": "orangeburgtreasurer",
     "Williamsburg": "williamsburgtreasurer",
@@ -199,7 +199,22 @@ MAX_PAGES_PER_PREFIX = int(os.getenv("QPAYBILL_ROLL_MAX_PAGES", "200"))
 
 #: How many characters deep the name prefixes may go. Depth 3 reached 925 of
 #: Barnwell's parcels with 4 prefixes still capped; depth 4 exists for those.
-MAX_PREFIX_DEPTH = int(os.getenv("QPAYBILL_ROLL_DEPTH", "4"))
+#:
+#: RAISED 4 -> 6 on 2026-09-13, because depth 4 was SILENTLY LOSING ROWS on every
+#: large county. When the frontier is still non-empty at the ceiling, those prefixes
+#: are never walked and everything under them beyond the parent's first pages is
+#: simply absent from the roll. Measured from the run logs:
+#:     Orangeburg   141 unwalked prefixes    Spartanburg  120
+#:     Oconee        44                      Marlboro      33
+#:     Cherokee      17                      Darlington    16
+#: and the paired runs prove the rows are real, not phantom: Spartanburg read
+#: 10,094 rows with trunc=0 at a shallower setting and 12,256 with trunc=120 when it
+#: went deeper -- 2,162 more rows AND still more beyond. Orangeburg 11,450 -> 14,169.
+#:
+#: Depth is the WRONG brake: REQUEST_BUDGET_PER_COUNTY below already bounds the crawl
+#: by requests and already warns when a county exhausts it, which is a limit that
+#: reports itself. A depth ceiling just stops early and calls it done.
+MAX_PREFIX_DEPTH = int(os.getenv("QPAYBILL_ROLL_DEPTH", "6"))
 
 #: Hard request budget PER COUNTY, so a portal that starts returning the cap for
 #: every prefix cannot turn this into an unbounded crawl -- and, because the counties
@@ -520,10 +535,16 @@ async def sweep_county(client: httpx.AsyncClient, county: str, sub: str,
         stats["deepened"] += len(nxt)
         if nxt and depth >= MAX_PREFIX_DEPTH:
             stats["truncated_prefixes"] = len({p[:-1] for p in nxt})
+            # These prefixes are NEVER walked -- the `while` condition drops the
+            # frontier on the next turn. Everything under them past the parent's
+            # first pages is missing from the roll, so this is row LOSS, not a
+            # cosmetic cap. Phrased loudly because the old wording ("still filling
+            # pages") read like a tuning note and got ignored for weeks.
             log.warning("qpaybill_roll.depth_truncated", county=county, depth=depth,
+                        unwalked_prefixes=stats["truncated_prefixes"],
                         prefixes=sorted({p[:-1] for p in nxt})[:12],
-                        note="still filling pages at max depth; raise "
-                             "QPAYBILL_ROLL_DEPTH to read further")
+                        note="ROWS LOST: these prefixes are never read. The roll for "
+                             "this county is INCOMPLETE. Raise QPAYBILL_ROLL_DEPTH.")
         frontier = nxt
         depth += 1
     return list(sink.values()), stats

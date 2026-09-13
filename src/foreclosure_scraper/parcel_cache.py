@@ -22,6 +22,7 @@ import json
 from urllib.parse import quote
 import re
 import sqlite3
+from datetime import datetime, timezone
 import time
 from pathlib import Path
 from typing import Optional
@@ -125,6 +126,30 @@ PARCEL_LAYERS: dict[str, dict] = {
                 "tax_value": "CurrentTaxableBuildingValue",
                 "acreage": "Acreage", "living_sqft": "LivingArea",
                 "land_use": "LandUse", "sale_price": "SaleAmount"},
+    },
+    # --- 2026-09-13. York SC. Found by searching the ArcGIS portal for an SC
+    # statewide parcel layer: there ISN'T one (RFA publishes only per-county web
+    # maps, unlike NC OneMap), but the search surfaced York's own open service.
+    # 134,479 parcels, open Query, and it carries the thing the SC counties keep
+    # failing to give us: the OWNER'S MAILING ADDRESS. SC contact coverage is
+    # 8-18% against NC's 50-89%, and that gap is THE binding constraint.
+    #
+    # Verified live: every mapped field populated on sampled rows. Situs is
+    # PropertyAddress and mailing is MailAddr1/City/State/Zip -- they are
+    # SEPARATE fields here, so this layer cannot repeat the Spartanburg
+    # situs-was-really-the-mailing-address bug above. Confirmed on a sample:
+    # ParcelID 0300301068 mails to 892 CANIPE RD BLACKSBURG, property is at
+    # 2020 KISATCHIE DR, LandUseDesc RESIDENTIAL VACANT -- absentee AND vacant.
+    "York": {  # 10-digit TMS, no punctuation (ParcelID == TAXMAPID)
+        "state": "SC",
+        "url": "https://services1.arcgis.com/2AGLxyiJoNiVHKwq/arcgis/rest/services/Parcels/FeatureServer/0/query",
+        "id_fields": ["ParcelID", "TAXMAPID", "AprAccNum"],
+        "map": {"owner": "Owner1", "address": "PropertyAddress",
+                "owner_mailing": ["MailAddr1", "MailCity", "MailState", "MailZip"],
+                "market_value": "AprTotVal", "tax_value": "TaxTotVal",
+                "acreage": "deededacres", "living_sqft": "FinishedSQFT",
+                "land_use": "LandUseDesc", "sale_price": "SalePrice",
+                "sale_date": "DateSold"},
     },
     "Laurens": {  # TMS (dash format); layer has situs but no value field
         "url": "https://laurenscountygis.org/arcgis/rest/services/Pebble/TaxParcel/MapServer/5/query",
@@ -261,7 +286,46 @@ def _map_val(rec: dict, col: str, spec):
             return float(val)
         except (ValueError, TypeError):
             return None
+    if col == "sale_date" and val not in (None, ""):
+        return _iso_date(val)
     return val
+
+
+def _iso_date(val):
+    """ArcGIS esriFieldTypeDate comes back as epoch MILLISECONDS, so York's
+    DateSold would have been stored as the literal string '1747267200000' — a
+    date field holding a 13-digit number, which every consumer would either
+    render raw or silently fail to parse. Text date fields (Anderson's
+    `saledatetx`) pass through untouched.
+
+    Negative values are real: they are pre-1970 sales, which is ordinary for
+    long-held property, so they convert rather than being dropped as bad data.
+    """
+    if isinstance(val, bool):
+        return None
+    n = None
+    if isinstance(val, (int, float)):
+        n = val
+    elif isinstance(val, str) and val.strip().lstrip("-").isdigit():
+        n = int(val.strip())
+    if n is None:
+        return val.strip() if isinstance(val, str) else val   # text date — leave the value, trim padding
+    # Don't gate on magnitude: epoch-ms for a sale in the few years BEFORE 1970 is
+    # a small negative number, and long-held property makes those ordinary. Gate on
+    # whether the RESULT is a plausible sale year instead.
+    if 1850 <= n <= 2100:
+        return None                     # a bare year; Jan 1 of it would be invented
+    # 0 is ArcGIS's universal null-date placeholder and small junk values land on
+    # it too, so anything within ~4 months of the epoch is refused. That forfeits
+    # only sales in late 1969 / early 1970 — vanishingly rare — and in exchange no
+    # row ever gets a fabricated 1970-01-01 sale date.
+    if abs(n) < 10 ** 10:
+        return None
+    try:
+        d = datetime.fromtimestamp(n / 1000, tz=timezone.utc).date()
+    except (OverflowError, OSError, ValueError):
+        return None
+    return d.isoformat() if 1850 <= d.year <= 2100 else None
 
 
 def _norm_id(v) -> str:
@@ -291,12 +355,34 @@ def _id_variants(v) -> set[str]:
     return out
 
 
-def _db_path(county: str) -> Path:
-    return CACHE_DIR / f"{county.lower().replace(' ', '_')}.sqlite"
+#: County names that exist in BOTH NC and SC. A cache keyed on the bare name
+#: would serve NC Cherokee parcels to SC Cherokee listings and vice versa —
+#: wrong owner, wrong address, silently, on a board people bid money off. For
+#: these names the state is part of the filename and lookup() REFUSES to guess.
+DUAL_STATE_COUNTIES = frozenset({"Cherokee", "Union", "Lee", "Beaufort", "Anson", "Chester"})
+
+
+def _db_path(county: str, state: str | None = None) -> Path:
+    stem = county.lower().replace(" ", "_")
+    if county in DUAL_STATE_COUNTIES:
+        st = (state or "").strip().upper()
+        if st not in ("NC", "SC"):
+            raise ValueError(
+                f"{county} exists in both NC and SC — a state ('NC'/'SC') is required "
+                f"to name its cache, got {state!r}")
+        stem = f"{stem}_{st.lower()}"
+    return CACHE_DIR / f"{stem}.sqlite"
 
 
 def cached_counties() -> set[str]:
-    return {c for c in PARCEL_LAYERS if _db_path(c).exists()}
+    out = set()
+    for c in PARCEL_LAYERS:
+        if c in DUAL_STATE_COUNTIES:
+            if any(_db_path(c, st).exists() for st in ("NC", "SC")):
+                out.add(c)
+        elif _db_path(c).exists():
+            out.add(c)
+    return out
 
 
 #: NC counties eligible for the statewide OneMap fallback.
@@ -318,7 +404,12 @@ _NC_COUNTY_NAMES = {
     "Granville", "Greene", "Guilford", "Halifax", "Harnett", "Haywood",
     "Henderson", "Hertford", "Hoke", "Hyde", "Iredell", "Jackson",
     "Johnston", "Jones", "Lenoir", "Lincoln", "Macon", "Madison",
-    "Martin", "Mcdowell", "Mecklenburg", "Mitchell", "Montgomery", "Moore",
+    # "McDowell", NOT "Mcdowell" — this list was built with .title(), which is the
+    # third time that call has silently broken a Mc- county here. The board spells
+    # it McDowell, so the membership test below missed it and the OneMap fallback
+    # never fired for McDowell's 1,772 rows. resolve_layer_cfg now also matches
+    # case-insensitively so a future .title() cannot re-break it.
+    "Martin", "McDowell", "Mecklenburg", "Mitchell", "Montgomery", "Moore",
     "Nash", "New Hanover", "Northampton", "Onslow", "Orange", "Pamlico",
     "Pasquotank", "Pender", "Perquimans", "Person", "Pitt", "Polk",
     "Randolph", "Richmond", "Robeson", "Rockingham", "Rowan", "Rutherford",
@@ -374,12 +465,37 @@ def resolve_layer_cfg(county: str) -> dict | None:
     dedicated config publishes no mailing address -- Buncombe, Lincoln and Transylvania
     are the three footprint counties in that position.
     """
-    cfg = PARCEL_LAYERS.get(county)
+    cfg = PARCEL_LAYERS.get(county) or _layer_cfg_ci(county)
     if cfg and (cfg.get("map", {}).get("owner_mailing") or county in _NC_DEDICATED_WITH_MAILING):
         return cfg
-    if county in _NC_COUNTY_NAMES:
-        return nc_onemap_cfg(county)
+    canon = _nc_name_ci(county)
+    if canon:
+        return nc_onemap_cfg(canon)
     return cfg
+
+
+_NC_NAMES_CI = None
+_LAYERS_CI = None
+
+
+def _nc_name_ci(county: str) -> str | None:
+    """Case-insensitive NC-county match, returning the CANONICAL spelling.
+
+    Exists because "McDowell".title() is "Mcdowell" and that mistake has now been
+    made three separate times in this codebase. Matching on the lowercased name
+    means the next one costs nothing.
+    """
+    global _NC_NAMES_CI
+    if _NC_NAMES_CI is None:
+        _NC_NAMES_CI = {n.lower(): n for n in _NC_COUNTY_NAMES}
+    return _NC_NAMES_CI.get((county or "").strip().lower())
+
+
+def _layer_cfg_ci(county: str) -> dict | None:
+    global _LAYERS_CI
+    if _LAYERS_CI is None:
+        _LAYERS_CI = {k.lower(): v for k, v in PARCEL_LAYERS.items()}
+    return _LAYERS_CI.get((county or "").strip().lower())
 
 
 async def refresh_county(county: str) -> dict:
@@ -440,7 +556,7 @@ async def refresh_county(county: str) -> dict:
                 "error": "incomplete — cache NOT replaced"}
 
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = _db_path(county).with_suffix(".tmp")
+    tmp = _db_path(county, cfg.get("state")).with_suffix(".tmp")
     if tmp.exists():
         tmp.unlink()
     con = sqlite3.connect(tmp)
@@ -460,23 +576,31 @@ async def refresh_county(county: str) -> dict:
     con.executemany("INSERT INTO parcels VALUES(" + ",".join("?" * (1 + len(_COLS))) + ")", recs)
     con.execute("CREATE INDEX idx_id ON parcels(id)")
     con.commit(); con.close()
-    tmp.replace(_db_path(county))   # atomic overwrite-in-place
+    tmp.replace(_db_path(county, cfg.get("state")))   # atomic overwrite-in-place
     return {"county": county, "ok": True, "downloaded": len(rows), "expected": exp,
             "seconds": round(time.time() - t0, 1),
-            "mb": round(_db_path(county).stat().st_size / 1e6, 1)}
+            "mb": round(_db_path(county, cfg.get("state")).stat().st_size / 1e6, 1)}
 
 
 _CONN: dict[str, sqlite3.Connection] = {}
 
 
-def lookup(county: str, parcel_id: str) -> Optional[dict]:
-    """Local join: return {owner,address,market_value,tax_value,acreage,living_sqft} or None."""
-    p = _db_path(county)
+def lookup(county: str, parcel_id: str, state: str | None = None) -> Optional[dict]:
+    """Local join: return {owner,address,market_value,tax_value,acreage,living_sqft} or None.
+
+    `state` is REQUIRED for the county names in DUAL_STATE_COUNTIES. Without it
+    this returns None rather than guessing which state's parcel layer to read.
+    """
+    try:
+        p = _db_path(county, state)
+    except ValueError:
+        return None   # dual-state name, caller had no state — refuse to guess
     if not p.exists() or not (parcel_id or "").strip():
         return None
-    con = _CONN.get(county)
+    ckey = p.name
+    con = _CONN.get(ckey)
     if con is None:
-        con = _CONN[county] = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
+        con = _CONN[ckey] = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
     row = None
     for k in _id_variants(parcel_id):
         try:

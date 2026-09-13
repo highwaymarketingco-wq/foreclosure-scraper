@@ -1085,7 +1085,7 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
         if li.parcel_id and not (li.owner_name and li.market_value):
             try:
                 from .parcel_cache import lookup as _pc_lookup
-                pcr = _pc_lookup(li.county or "", li.parcel_id)
+                pcr = _pc_lookup(li.county or "", li.parcel_id, li.state)
             except Exception:  # noqa: BLE001 — cache is best-effort; never break the phase
                 pcr = None
             if pcr:

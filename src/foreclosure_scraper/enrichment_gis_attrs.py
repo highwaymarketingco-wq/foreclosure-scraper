@@ -519,7 +519,7 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
         # through to the live query below. Proven Buncombe 2026-08-14: 99% hit, 95ms/6.6k leads.
         if li.parcel_id:
             from .parcel_cache import lookup as _pcache_lookup
-            pc = _pcache_lookup(li.county or "", li.parcel_id)
+            pc = _pcache_lookup(li.county or "", li.parcel_id, li.state)
             if pc:
                 if not isinstance(li.raw, dict):
                     li.raw = {}

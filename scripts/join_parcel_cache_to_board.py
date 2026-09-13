@@ -62,7 +62,7 @@ def main() -> int:
                 c["skipped: name exists in both states"] += 1
                 continue
             try:
-                hit = lookup(county, li.parcel_id)
+                hit = lookup(county, li.parcel_id, li.state)
             except Exception:  # noqa: BLE001
                 c["lookup error"] += 1
                 continue

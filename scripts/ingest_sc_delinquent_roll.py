@@ -63,6 +63,12 @@ FILES = [
     # the base read 1,421, so superseding would DROP 24. Additive plus the merge path
     # enriches the existing rows with Total Appraisal instead of replacing them.
     ("qpaybill_detail", REPO / "logs" / "qpaybill_detail4.json"),
+    # 2026-09-13 detail re-run at DETAIL_MAX=6000 (detail4 was capped, so it left the
+    # tail of Oconee/Cherokee without Total Appraisal). This pass filled 8,541 of 8,543
+    # rows with skipped_over_cap=0 -- 3,105 of 3,108 parcels now carry a value.
+    # ADDITIVE for the same reason detail4 is: it reads FEWER parcels than the base roll
+    # (1,397 Cherokee vs 1,421), so superseding would drop the difference.
+    ("qpaybill_detail5", REPO / "logs" / "qpaybill_detail5.json"),
 ]
 
 

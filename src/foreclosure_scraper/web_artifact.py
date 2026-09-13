@@ -890,6 +890,12 @@ _SLIM_RAW: dict[str, str | tuple[str, ...]] = {
     # New enrichment fields — keep whole so dashboard can read all sub-keys.
     "property_category": "*",
     "deed_chain": "*",
+    # APPENDED LAST. fullmer is fullmer_rank.py's output — the buy-box RANK the
+    # call list is ordered by. It was in RAW_KEEP (so it survived to the full
+    # board) but in NEITHER allowlist, so raw.fullmer was on 0 of 115,994 slim
+    # rows and no phone could see a rank. Whole-block: rank/why/flags are read
+    # together and the block gains keys whenever the buy-box arithmetic changes.
+    "fullmer": "*",
 }
 
 

@@ -159,3 +159,151 @@ OCONEE — half the recorded verdict is stale, corrected here
 - Logins, paywalls, CAPTCHA walls, credential entry: OUT.
 - Do NOT modify `scripts/scrape_liensnc.py`.
 - Greenville is pruned from the FORECLOSURE footprint; it stays in SC DISTRESSED scope.
+
+## 2026-09-13 — dashboard never showed the buy-box rank (FIXED)
+
+`raw.fullmer` was on **0 of 115,994** rows of the slim payload the dashboard
+actually fetches, and `fullmer` had **zero** references in `dashboard.js`. It was
+in `RAW_KEEP`, so it survived to the full board — but the SLIM payload has its
+own allowlist (`_SLIM_RAW` / `_LEAN_RAW`, mirrored, asserted equal by
+`tests/test_board_slim.py`) and `fullmer` was in neither. The whole weekend's
+ranking work (in-footprint 60+: 397 -> 3,350) reached nothing a phone could see.
+
+Fixed:
+- `fullmer: "*"` appended to `_SLIM_RAW` (web_artifact.py) and `_LEAN_RAW`
+  (dashboard.js). Whole-block, per the file's own drift rule.
+- New sortable **Buy Box** column (`_fullmer`) in the table, mobile sort option,
+  colour-banded rank pill whose tooltip prints `why` and `flags`.
+- `?v=` bumped to 20260913a (Jekyll/Pages cache).
+- Verified: `_project_slim_record` now carries `fullmer.rank` on 500/500 sampled
+  rows. **Still needs a board republish for the live file to carry it.**
+
+Note: `grade` is on 107,071 rows and the board is 115,994 — that gap is just the
+8,923 rows added since the last publish, not a second allowlist bug.
+
+## 2026-09-13 — parcel cache could not tell NC Cherokee from SC Cherokee (FIXED)
+
+`parcel_cache` keyed its SQLite files on the county NAME only
+(`data/parcel_cache/<county>.sqlite`). Cherokee, Union, Lee, Beaufort, Anson and
+Chester exist in BOTH states. The queue's next item was "build Cherokee SC and
+Union SC caches" — doing that first would have served SC parcels (wrong owner,
+wrong situs) to NC Cherokee/Union listings and vice versa, silently.
+
+Caught BEFORE either cache existed, so nothing on the live board was ever
+mis-joined (verified: no cherokee/union/lee/beaufort file on disk, and the NC
+OneMap county list already excluded all four).
+
+Fixed: `DUAL_STATE_COUNTIES`; `_db_path(county, state)` writes
+`cherokee_sc.sqlite` and raises on a dual-state name with no state;
+`lookup(county, pid, state)` returns None rather than guessing; connection cache
+re-keyed on filename not county; all four call sites now pass `li.state`.
+Unambiguous counties keep their bare filename, so the 100 caches on disk stay
+warm. Pinned by `tests/test_parcel_cache_state_aware.py`.
+
+NEXT: Cherokee SC / Union SC layer configs must now carry `"state": "SC"`.
+
+## 2026-09-13 — York SC parcel layer wired; there is NO SC statewide layer
+
+Searched the ArcGIS portal for an SC equivalent of NC OneMap. **There isn't one** —
+SC RFA publishes only per-county web maps, so SC has to stay county-by-county.
+(Do not re-search this; it is a dead end, recorded as such.)
+
+The search did surface York County SC's own open service:
+`services1.arcgis.com/2AGLxyiJoNiVHKwq/.../Parcels/FeatureServer/0` —
+**134,479 parcels**, open Query, 67 fields, and it carries the OWNER'S MAILING
+ADDRESS as fields separate from situs, so it cannot repeat the Spartanburg
+situs-was-the-mailing-address bug. Wired as `PARCEL_LAYERS["York"]` with
+`"state": "SC"`, mapping owner / situs / mailing / market+tax value / acreage /
+sqft / land use / sale price / sale date.
+
+**Honest caveat: the board has ZERO York SC rows**, so this cache serves nothing
+today. The real York gap is upstream — no source produces York leads at all. Cache
+is ready for when one does; do not count it as coverage yet.
+
+### Two bugs found while wiring it
+
+1. **Epoch-millis sale dates.** York's `DateSold` is an ArcGIS date field = epoch
+   MILLISECONDS, and `sale_date` is not in `_NUMERIC`, so it would have been stored
+   as the literal string `'1747267200000'`. Added `_iso_date()`. Two fabrication
+   traps came out of it, both now pinned: a magnitude floor silently dropped real
+   pre-1970 sales (small NEGATIVE epoch), and `0` — ArcGIS's null-date placeholder
+   — converted into a confident, wrong `1970-01-01`. Text dates (Anderson's
+   `saledatetx`) pass through untouched. `tests/test_parcel_cache_sale_date.py`.
+
+2. **`"McDowell".title() == "Mcdowell"` — STRIKE THREE.** `_NC_COUNTY_NAMES`, the
+   NC OneMap eligibility list, held `"Mcdowell"`. The board spells it `"McDowell"`,
+   so the membership test in `resolve_layer_cfg` missed it and the statewide
+   fallback **never fired for McDowell's 1,772 NC rows**. Corrected the spelling
+   AND made county matching case-insensitive (`_nc_name_ci`, `_layer_cfg_ci`) so a
+   fourth occurrence of this mistake cannot break anything. Guard test asserts no
+   Mc- name in the list looks like `.title()` output; Macon is pinned as the
+   don't-corrupt case.
+
+## 2026-09-13 — statewide SC coverage is 32/46 counties (OPEN, measured)
+
+Distressed is supposed to be ALL of SC. Measured against the 46-county list:
+
+- **14 counties with ZERO rows:** Aiken, Bamberg, Chester, Dillon, Dorchester,
+  Edgefield, Fairfield, Greenwood, Hampton, Jasper, Kershaw, Lexington, Saluda, York
+- **5 effectively empty:** Richland=1, Sumter=1, Berkeley=2, Marion=2, Florence=7.
+  Richland is Columbia — the state capital, 400k+ people. One row is a source
+  failure, not a real absence. Same for Lexington (Columbia metro) at zero.
+- SC total 47,041 rows across 32 counties; NC 68,953 across 100.
+
+This is the concrete statewide-distressed gap and it is UPSTREAM of parcel data —
+these counties need a source, not an enricher. Aiken, Lexington, Richland,
+Dorchester and Kershaw are the population centres and should go first.
+
+## 2026-09-13 — qPayBill depth ceiling was silently losing rows on EVERY large county
+
+Found by reading the run logs rather than the code. `sweep_county` walks name
+prefixes and deepens any prefix that fills its pages. The loop is:
+
+    while frontier and depth <= MAX_PREFIX_DEPTH
+
+so when the frontier is still non-empty at the ceiling those prefixes are assigned
+to `frontier` and then **dropped by the condition — never walked**. Every row under
+them past the parent's first pages is simply absent from the roll.
+
+Unwalked prefixes per county at depth 4:
+
+| county | unwalked | | county | unwalked |
+|---|---|---|---|---|
+| Orangeburg | 141 | | Marlboro | 33 |
+| Spartanburg | 120 | | Cherokee | 17 |
+| Oconee | 44 | | Darlington | 16 |
+| Abbeville | 14 | | Clarendon | 7 |
+
+The paired runs prove the missing rows are real, not phantom:
+
+- Spartanburg **10,094** rows at trunc=0 vs **12,256** at trunc=120 — +2,162, and
+  still more beyond
+- Orangeburg **11,450** vs **14,169** — +2,719
+
+The old log line said "still filling pages at max depth", which reads like a tuning
+note, so it was ignored for weeks.
+
+**Fixed:** `MAX_PREFIX_DEPTH` default 4 -> 6, and the warning now says
+`ROWS LOST ... the roll for this county is INCOMPLETE`. Depth was the wrong brake:
+`REQUEST_BUDGET_PER_COUNTY` already bounds the crawl by requests *and* warns when a
+county exhausts it — a limit that reports itself. Pinned by
+`tests/test_qpaybill_depth_and_names.py`.
+
+**STILL TO DO: re-run all 19 qPayBill counties at depth 6** to actually recover the
+rows. Cherokee/Oconee first (run in flight was depth 4, so it too is short). Expect
+a meaningful row gain in Orangeburg and Spartanburg especially. One county group at
+a time — the 2-county depth-4 sweep cost ~6,000 queries / 20 min.
+
+### Strike FOUR for `.title()`
+`QPAYBILL_SUBS` keyed the county `"Mccormick"`, so every row it produced carried a
+misspelled county that `validation.py` then had to repair downstream. Fixed to
+`"McCormick"`; a test now asserts **every** qPayBill key equals
+`canonical_county()` of itself, so a fifth occurrence fails the suite instead of
+shipping. Note this same mistake now has four confirmed sites (BT appraisal-card
+lookup, board county values, `_NC_COUNTY_NAMES`, `QPAYBILL_SUBS`) and is patched
+ad-hoc as inline `{"Mcdowell": "McDowell", ...}` dicts in four more files —
+`canonical_county()` exists precisely for this and those sites should adopt it.
+
+### Confirms the state-aware cache fix was live, not theoretical
+Three qPayBill counties — **Cherokee, Lee, Union** — are names that exist in both NC
+and SC. Their SC rows would have joined against NC caches of the same name.
