@@ -818,3 +818,43 @@ already fixed today.
   Value alone does not satisfy the buy-box margin test.
 - **1,053 of Lexington's 2,214 rows carry an ACCOUNT number, not a TMS**, so about
   half cannot be enriched by this route at all. That is a ceiling, not a bug.
+
+## 2026-09-13 16:30 — FULLNESS AUDIT, and the foreclosure lane is the real gap
+
+Board 127,779. Measured live, not from memory.
+
+**NC vs SC is still the binding constraint:**
+
+|  | rows | addr | owner | value | mail | phone | absentee | counties |
+|---|---|---|---|---|---|---|---|---|
+| NC | 68,953 | 89% | 94% | 27% | 93% | **82%** | 68% | 100/100 |
+| SC | 58,826 | 75% | 80% | 31% | **25%** | **3%** | 16% | 36/46 |
+
+Cherokee SC (0% mail, 0% absentee) and Union SC (3%, 2%) are the worst footprint
+counties, and both are blocked on the same thing: no state-specific parcel cache.
+
+**THE LANE GAP.** `foreclosure_sale` is **1,189 rows board-wide, 520 in footprint,
+and only 99 with a FUTURE sale date.** Ninety-nine actionable foreclosures is the
+entire live pipeline for the fix-and-flip business line. (My first signal query
+reported 0 — that was my own wrong enum, `foreclosure` vs `foreclosure_sale`, not a
+missing lane. Checked before reporting it.)
+
+Diagnosed why, rather than assuming a bug:
+- Column NC "Foreclosure Sale" returns 250 on statewide page 1 over 120 days
+- per-county: Burke 44, Gaston 15, Rutherford 8 — but **Buncombe 0, Cleveland 0,
+  Henderson 0**
+- Burke returns MORE per-county (44) than it shows on statewide page 1 (22), so the
+  county filter is working correctly
+
+So the zeroes are real COVERAGE, not a parsing loss: those counties' legal notices
+run in papers Column does not carry. Not a bug to fix — a source to add.
+
+Current foreclosure sources: greenville_mie 584 (out of footprint),
+foreclosure.com 75, brock_scott 71, hutchens 70, shapiro_ingle 65, column 62.
+That is three trustee law firms carrying most of the footprint volume.
+
+**NEXT for this lane:** NC foreclosures run through SUBSTITUTE TRUSTEES, so the
+firms are the source. Probed: substitutetrusteeservices.com and goddardfirm.com do
+not resolve; trusteeservicesofcarolina.com returns a 114-byte stub;
+rogerstownsend.com and sellersayers.com resolve but expose no listing index from
+the homepage. Needs a proper per-firm look rather than homepage link-scraping.
