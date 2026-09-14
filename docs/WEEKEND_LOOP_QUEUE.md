@@ -1802,3 +1802,70 @@ Bamberg (486), Saluda (428), McCormick (311), Orangeburg (107). Then back to
 Kershaw/Williamsburg/Chester with more time budgeted for their non-standard
 backends. Then the zero-row county sweep (Aiken, Dillon, Dorchester,
 Edgefield, Fairfield, Greenwood, Hampton, Jasper).
+
+## Per-county SC mailing cache build-out — iteration 2, mostly negative results (2026-09-14)
+
+Continued down the priority list. This pass found NO new wireable mailing
+source (unlike iteration 1's 4-for-4), but every negative result below is a
+confirmed live finding, not a skip — worth keeping so nobody re-burns time
+re-checking the same dead ends.
+
+- **Marlboro, Barnwell** (1,061 / 886 rows) — only the dead GDITAdmin item
+  exists on ArcGIS Online for either. No independent county-hosted layer
+  found.
+- **Newberry** (719 rows) — found "Newberry County, SC (CAMA Integration)"
+  and a sibling "Laurens County, SC (CAMA Integration)" under a GIS
+  contractor account (BPBarberGIS), but both point to a bare IP
+  (`http://68.156.95.35/newberrygis/...`) tagged `typeKeywords: ["Flex"]` —
+  an Adobe Flex app, a technology dead since ~2020. Genuinely unreachable,
+  not a bypass problem.
+- **Chesterfield** (687 rows) — has a live "CivicPlusLayers" FeatureServer,
+  but its only parcel layer is "City Parcels" (layer 3) — the small city of
+  Chesterfield, not the county. Would help few if any of the 687 county rows.
+- **Abbeville, Bamberg, Saluda, McCormick** (632/486/428/311 rows) — zero
+  relevant ArcGIS Online hits of any kind (dead GDITAdmin item only, or not
+  even that).
+- **Greenville** (584 rows, SC's largest county by population) — has its own
+  GIS domain (`gcgis.org`) with a live ArcGIS REST catalog, but the only
+  publicly listed service is a geocoder (`GVL_COMPOSITE_LOC`) — no parcels
+  service exposed at the root. Its property-tax page doesn't link a GIS
+  vendor either. Needs deeper digging (a hidden folder, or a separate
+  assessor portal) — not ruled out, just not found in a first pass.
+- **Calhoun, Lee** (512/504 rows) — AGOL search returns only noise (Florida
+  statewide parcels, Palm Beach County FL layers matching on generic terms).
+  No SC-specific hit.
+- **Orangeburg** (107 rows) — DID find a real, rich layer
+  (`Main_Public_Tax_Parcel_Map_WFL1`, 62,519 parcels, owner1/parcel_id/
+  own_street/own_city/own_state/own_zip) via its own GIS account. NOT wired
+  yet: checked first and **zero of Orangeburg's 107 board rows carry a
+  parcel_id at all** (all address-only), so a parcel-id-keyed join would
+  recover nothing today regardless of cache quality. Worth revisiting once
+  an address-based resolver exists (the fuzzy address->parcel resolver from
+  earlier this session, or a similar pass against this specific layer's
+  own_street/situs-adjacent fields).
+
+**Zero-row county sweep, resumed** — Aiken, Dillon, Dorchester checked:
+- **Aiken**: DOES have a dedicated "Tax Collector Overage Claims" page,
+  unlike most — but unlike York, it is NOT a public list. It's a reCAPTCHA +
+  click-through-disclaimer gated CLAIM FORM ("you must agree to the
+  following... to access Overage Claim Forms"). The disclaimer itself is a
+  plain liability waiver (not a scraping prohibition like notices.com's), so
+  it isn't a ToS wall — but getting past the reCAPTCHA needs CapSolver
+  (still blocked on the unstaged key), AND even then this looks like an
+  intake form for filing a claim, not a roster of names/amounts to build
+  leads from. Real uncertainty here about whether a public list exists at
+  all; not pursued further without the CapSolver key to even test past the
+  gate.
+- **Dillon**: has a Tax Assessor "Documents" library (Revize CMS document
+  center) but only generic exemption/appeal forms surfaced in a static-HTML
+  pass; the Treasurer page's document center loads via a JS widget this pass
+  didn't render. Not ruled out — needs a browser-rendered pass, not just
+  `get_text`.
+- **Dorchester**: checked its delinquent-tax page directly — no mention of
+  "overage," "surplus," or "excess" anywhere on it, no linked document. No
+  overage-claims source found (may simply not publish one).
+
+**Next**: Greenville (deeper GIS-catalog dig), Dillon (browser-rendered
+document center), then Edgefield/Fairfield/Hampton/Jasper (zero-row,
+unstarted) and Chester/Kershaw/Williamsburg (deferred, non-standard
+backends).
