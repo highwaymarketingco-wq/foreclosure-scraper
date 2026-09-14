@@ -1931,3 +1931,44 @@ Verified live: 2,287 net-new Greenville rows (25 merged into existing
 `greenville_mie_adverts` records), 100% carry a normalized `tax_owed`
 balance, York's 119 TAX_SALE_OVERAGE rows still untouched. Greenville
 county total: 584 -> 2,871 rows. Row count math checked at every step.
+
+## Zero-row county sweep, resumed: Edgefield, Hampton, Jasper — no clean win (2026-09-14)
+
+- **Edgefield**: treasurer/tax-collector pages carry only a generic "Welcome
+  Packet" PDF, no delinquent/overage list of any kind.
+- **Hampton**: its Tax-Services page (`/367/Tax-Services`) has no document
+  links at all.
+- **Jasper**: has a Forfeited Land page, but its own PDF is literally named
+  `flc-none-available.pdf` (confirmed: no current FLC inventory) alongside
+  stale 2024 meeting agendas. Its delinquent-tax page cites SC Code 12-51-40
+  directly and states the roster is published via "a paper of general
+  circulation within the county for three consecutive Wednesdays prior to
+  the tax sale" — i.e. Jasper's list lives in a LOCAL NEWSPAPER legal
+  notice, not on the county site. Not yet in `sc_tax_delinquent.py`'s
+  newspaper-outlet config; would need identifying which specific paper
+  serves Jasper and adding it there, not a new standalone scraper.
+
+**Also found while re-checking Fairfield's existing (0-row) scraper**: same
+site-restructure pattern as York/Chester — its `/departments/treasurer` page
+no longer has the delinquent-tax table this scraper was built against, but
+links out to `fairfieldsctax.com/#/`, an AngularJS/ui-bootstrap SPA on the
+SAME vendor platform as Chester's `chestercountysctax.com/#/` (confirmed:
+identical hash-routing, identical CSS bundle shape). This is useful: solving
+ONE of these two SPAs' backend API (same DEW-registry-style "find the
+in-page fetch() the search form fires" investigation) very likely unlocks
+BOTH Chester and Fairfield, and possibly other counties on the same
+platform. Attempted network-request capture on Fairfield without first
+interacting with a search form — nothing useful surfaced (the real API call
+only fires after a user query, which needs actual form automation, not just
+a page load). Genuinely deferred, not abandoned; worth the dedicated time
+next since it's a two-for-one (or more).
+
+**Status after this iteration**: Aiken (reCAPTCHA-gated claim form),
+Dillon (document center needs a working browser-rendered pass — first
+attempt timed out waiting for networkidle), Dorchester (no overage content
+found), Edgefield/Hampton (no document of any kind), Jasper (published via
+newspaper, not the county site), Chester + Fairfield (same vendor SPA,
+needs one real reverse-engineering pass), Kershaw (only a bare geometry
+GIS layer, county site unreachable), Williamsburg (own GIS host but a
+different proprietary "TGIS" engine) all remain open. Greenwood not yet
+checked at all.
