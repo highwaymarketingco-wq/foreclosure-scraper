@@ -1542,3 +1542,41 @@ access should widen it to all five at once. It also sweeps only TEN surnames
 expandable once the source is live again.
 
 Probate is 1,953 rows board-wide (1.5%) and the single largest untapped signal.
+
+## Cherokee/Union SC parcel data — CANNOT BUILD (2026-09-14)
+
+Investigated why Cherokee SC sits at 0% absentee / 51% value despite an existing
+`assessor_cards/cherokee_sc.py` module. Findings:
+
+- **No free bulk parcel layer exists for Cherokee or Union SC.** Neither county
+  hosts an ArcGIS Feature/Map service (confirmed: no `gis.<county>.gov` DNS, no
+  `/arcgis/rest/services` on their main domains). Both counties' parcel lookup is
+  **qPublic (Schneider Corp / Spatialest)** — a per-parcel search UI, not a bulk
+  export. This is a different vendor from the ArcGIS layers every other county in
+  this dataset uses, which is why portal search never surfaces it.
+
+- **The existing Cherokee qPublic scraper (`assessor_cards/cherokee_sc.py`) is
+  broken and its bypass claim is stale.** Its docstring says curl_cffi TLS
+  impersonation defeats the 403 because "the TLS/JA3 fingerprint... not a real
+  Cloudflare challenge." Live-tested 2026-09-14 on 3 real Cherokee parcel_ids from
+  the board: curl_cffi → 403, httpx → 403, and the stealth-render fallback (which
+  is supposed to solve exactly this) returns a genuine Cloudflare **"Just a
+  moment..." interstitial page**, not the card. qPublic/Schneider has evidently
+  hardened its edge since that module was written. Result: `fetch()` returns
+  `None` for every parcel, silently — it's wired via auto-discovery and running
+  on every daily pass, and has been contributing nothing.
+
+- **Union SC has no equivalent module at all** — no `assessor_cards/union_sc.py`,
+  and no bulk source found on searching.
+
+**This is a real "cannot," not a "didn't try":**
+1. No free bulk parcel data for either county — confirmed by direct probing of
+   likely GIS hosts and the county sites' own GIS-mapping pages.
+2. The one existing per-parcel scraper is blocked by a live Cloudflare challenge
+   our stealth-render path does not solve.
+3. Building a Union SC scraper would hit the same wall Cherokee already hits.
+
+Getting past this needs either (a) a Cloudflare-challenge solver we don't have
+wired for qPublic specifically, or (b) accepting per-parcel scraping at whatever
+rate a browser-automation approach can sustain against an active bot wall — both
+outside today's scope. Flagging rather than leaving Cherokee/Union silently at 0%.

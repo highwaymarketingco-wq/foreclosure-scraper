@@ -31,9 +31,20 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
-#: County names that exist in BOTH NC and SC. The cache key carries no state, so these
-#: are skipped rather than risk serving one state's parcels to the other's leads.
-AMBIGUOUS = {"beaufort", "cherokee", "lee", "union"}
+#: This USED to hardcode {"beaufort","cherokee","lee","union"} and skip them
+#: outright -- a second, independent copy of the same "cache key carries no
+#: state" concern parcel_cache.DUAL_STATE_COUNTIES already solves, out of sync
+#: with it (missing anson/chester) and, worse, now WRONG: lookup() has required
+#: and correctly used an explicit state since 2026-09-13, and NC caches for Lee,
+#: Cherokee, Union, Beaufort were built today. This blanket skip was silently
+#: discarding real, correctly-resolvable NC data -- found 2026-09-14 when Lee/
+#: Cherokee/Union/Beaufort NC rows all showed 0% value fill despite live
+#: lookup(county, parcel_id, "NC") returning real market values for the same
+#: parcel_ids. lookup() already refuses to guess when state is missing; this
+#: file no longer needs its own copy of that rule, only a friendlier counter
+#: for the one case lookup() can't explain on its own: no li.state at all.
+from foreclosure_scraper.parcel_cache import DUAL_STATE_COUNTIES  # noqa: E402
+_DUAL_LOWER = {n.lower() for n in DUAL_STATE_COUNTIES}
 
 
 
@@ -70,8 +81,11 @@ def main() -> int:
             if not county:
                 c["no county"] += 1
                 continue
-            if county.lower() in AMBIGUOUS:
-                c["skipped: name exists in both states"] += 1
+            if county.lower() in _DUAL_LOWER and not li.state:
+                # lookup() would return None here too (it refuses to guess), but
+                # naming this case separately from an ordinary cache miss makes
+                # the reason auditable instead of invisible.
+                c["skipped: dual-state name, li.state is empty"] += 1
                 continue
             try:
                 hit = lookup(county, li.parcel_id, li.state)

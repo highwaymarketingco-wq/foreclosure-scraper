@@ -431,17 +431,35 @@ def cached_counties() -> set[str]:
     return out
 
 
-#: NC counties eligible for the statewide OneMap fallback.
+#: NC counties eligible for the statewide OneMap fallback. All 100 real NC
+#: counties, including the four whose name also exists in South Carolina.
 #:
-#: AMBIGUOUS NAMES ARE DELIBERATELY EXCLUDED. The parcel cache is keyed by county NAME
-#: with no state -- lookup(county, parcel_id) and enrichment_gis_attrs both pass only
-#: li.county -- so a name that exists in BOTH states would let an SC lead read NC parcel
-#: data. These 4 are shared and are therefore NOT given an NC fallback:
-#:   Beaufort, Cherokee, Lee, Union
-#: Their SC halves keep whatever dedicated config they have. Fixing the underlying
-#: name-only key is a separate change; silently seeding it with 100 more collisions is not.
+#: THE ORIGINAL VERSION OF THIS COMMENT excluded Beaufort, Cherokee, Lee and
+#: Union outright: the parcel cache used to be keyed by county NAME with no
+#: state, so an NC fallback on a shared name could let an SC lead silently read
+#: NC parcel data. That was the right call at the time.
+#:
+#: FIXED 2026-09-14, and these four added back. _db_path/lookup/nc_onemap_cfg
+#: now all require and thread an explicit state for DUAL_STATE_COUNTIES names --
+#: a lookup with no state raises or returns None rather than guessing (see
+#: test_parcel_cache_state_aware.py) -- and nc_onemap_cfg tags state="NC", so a
+#: refresh writes lee_nc.sqlite, never lee.sqlite. With the collision closed at
+#: the storage layer, excluding real NC counties was pure loss: Anson (already
+#: enabled) had been silently failing to build its cache this whole time,
+#: because nc_onemap_cfg omitted the state tag until this same fix. Lee,
+#: Cherokee, Union, Beaufort are real NC counties too (35K-118K parcels each on
+#: the statewide layer, verified live) and are now enabled on the same basis.
+#: SC's halves of these names keep whatever dedicated config they have,
+#: unaffected -- a lookup for the SC side still requires state="SC" and cannot
+#: reach the NC cache built here.
+#:
+#: Chester is NOT added: NC has no Chester county -- the statewide layer
+#: returns 0 rows for cntyname='Chester', confirmed live. Adding it would build
+#: an empty cache that reads as "checked, found nothing" instead of "not a
+#: county that exists".
 _NC_COUNTY_NAMES = {
     "Alamance", "Alexander", "Alleghany", "Anson", "Ashe", "Avery",
+    "Beaufort", "Cherokee", "Lee", "Union",
     "Bertie", "Bladen", "Brunswick", "Buncombe", "Burke", "Cabarrus",
     "Caldwell", "Camden", "Carteret", "Caswell", "Catawba", "Chatham",
     "Chowan", "Clay", "Cleveland", "Columbus", "Craven", "Cumberland",
@@ -491,9 +509,20 @@ _NC_DEDICATED_WITH_MAILING = {"Rutherford", "Henderson", "Burke", "McDowell", "C
 
 
 def nc_onemap_cfg(county: str) -> dict:
-    """A parcel-cache config for any NC county, served off the statewide layer."""
+    """A parcel-cache config for any NC county, served off the statewide layer.
+
+    MUST tag state="NC". Anson, Lee, Cherokee, Union, Beaufort, Chester exist in
+    BOTH NC and SC (DUAL_STATE_COUNTIES), and _db_path() requires an explicit
+    state for those names to avoid writing a cache neither state can trust.
+    Found broken 2026-09-14: this dict omitted "state" entirely, so
+    refresh_county's _db_path(county, cfg.get("state")) call raised for Anson --
+    the one dual-state county that WAS enabled in _NC_COUNTY_NAMES -- and its
+    cache silently never built. The raise was correct behaviour for the missing
+    tag; the missing tag itself was the bug.
+    """
     return {
         "url": NC_ONEMAP_URL,
+        "state": "NC",
         "where": f"cntyname='{county}'",
         "id_fields": ["parno", "altparno", "nparno"],
         "map": {"owner": "ownname", "address": "siteadd",

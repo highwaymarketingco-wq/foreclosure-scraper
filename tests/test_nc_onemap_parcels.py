@@ -14,10 +14,25 @@ it for all of them, in one statewide service:
         Polk 18,211/18,063        ·  Mitchell 17,671/17,270
     = 662,251 footprint parcels
 
-THE HAZARD THIS FILE GUARDS. The parcel cache is keyed by county NAME with no state --
-lookup(county, parcel_id) and enrichment_gis_attrs both pass only li.county. Four county
-names exist in BOTH Carolinas (Beaufort, Cherokee, Lee, Union), so giving those an NC
-fallback would let an SC lead silently read NC parcel data. They are excluded.
+THE HAZARD THIS FILE USED TO GUARD, AND HOW IT CLOSED. The parcel cache was
+originally keyed by county NAME with no state -- lookup(county, parcel_id) and every
+caller passed only li.county. Four county names exist in BOTH Carolinas (Beaufort,
+Cherokee, Lee, Union; Anson and Chester also collide, Chester has no NC data), so an
+NC fallback on a shared name could silently read NC parcel data for an SC lead. They
+were excluded entirely rather than risk it.
+
+FIXED 2026-09-14. _db_path/lookup/nc_onemap_cfg all now require and thread an explicit
+state for these six names (DUAL_STATE_COUNTIES) -- a lookup with no state RAISES or
+returns None rather than guessing (see test_parcel_cache_state_aware.py), and
+nc_onemap_cfg tags state="NC" so refresh_county writes lee_nc.sqlite, not lee.sqlite.
+With the collision itself closed at the storage layer, excluding these counties from
+NC OneMap was pure loss: Anson was the one of the six already enabled, and because
+nc_onemap_cfg omitted the state tag until this same fix, ANSON'S OWN CACHE HAD BEEN
+SILENTLY FAILING TO BUILD since the state-aware refactor -- refresh_county's
+_db_path(county, cfg.get("state")) raised on every attempt. The four other REAL NC
+counties (Lee, Cherokee, Union, Beaufort -- 35K-118K parcels each, verified live;
+Chester returns 0 rows, NC has no Chester county) are now enabled too. This file's
+job is now to prove the state-threading holds, not that these names are unreachable.
 """
 from __future__ import annotations
 
@@ -28,22 +43,38 @@ from foreclosure_scraper.parcel_cache import (
     resolve_layer_cfg,
 )
 
-SHARED_NAMES = {"Beaufort", "Cherokee", "Lee", "Union"}
+SHARED_NAMES = {"Beaufort", "Cherokee", "Lee", "Union", "Anson"}
 
 
 @pytest.mark.parametrize("name", sorted(SHARED_NAMES))
-def test_names_shared_between_nc_and_sc_get_no_statewide_fallback(name):
-    """THE guard. The cache key carries no state, so an NC fallback on a shared name
-    would let an SC lead read NC parcel data and never know."""
-    assert name not in _NC_COUNTY_NAMES, (
-        f"{name} County exists in BOTH NC and SC. The parcel cache is keyed by name "
-        f"only, so an NC fallback here silently mis-serves SC leads."
+def test_shared_names_get_a_state_tagged_nc_fallback(name):
+    """These names ARE now enabled for NC OneMap -- the guard moved from "excluded
+    entirely" to "state-tagged so the cache path can never collide with SC"."""
+    assert name in _NC_COUNTY_NAMES
+    cfg = resolve_layer_cfg(name)
+    assert cfg is not None
+    assert cfg.get("state") == "NC", (
+        f"{name} exists in both Carolinas; its OneMap config MUST tag state='NC' "
+        f"or _db_path cannot safely name its cache file."
     )
 
 
+@pytest.mark.parametrize("name", sorted(SHARED_NAMES))
+def test_lookup_without_a_state_still_refuses_to_guess(name):
+    """The real safety property: being ENABLED for NC does not mean an SC lead for
+    the same name can ever read this cache by accident. A caller that omits state
+    (the old bug class) gets None, never a wrong-state parcel."""
+    from foreclosure_scraper.parcel_cache import lookup
+    assert lookup(name, "1234567890") is None
+
+
 def test_the_nc_list_covers_the_rest_of_the_state():
-    assert len(_NC_COUNTY_NAMES) == 96      # 100 NC counties minus the 4 shared names
-    for c in ("Buncombe", "Lincoln", "Transylvania", "Wake", "Mecklenburg", "Gaston"):
+    # 100 NC counties minus Chester (0 rows on the statewide layer -- not a real
+    # NC county, so it stays excluded rather than build an always-empty cache).
+    assert len(_NC_COUNTY_NAMES) == 100   # all 100 real NC counties; Chester never was one
+    assert "Chester" not in _NC_COUNTY_NAMES
+    for c in ("Buncombe", "Lincoln", "Transylvania", "Wake", "Mecklenburg", "Gaston",
+              "Lee", "Cherokee", "Union", "Beaufort", "Anson"):
         assert c in _NC_COUNTY_NAMES
 
 

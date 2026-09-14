@@ -272,6 +272,13 @@ def _to_listing(row: dict, slug: str) -> Listing | None:
         zip_code=zipc,
         street_address=street,
         defendant=name,
+        # The DEW registrant IS the property owner being liened -- unlike a
+        # bankruptcy case caption, `name` here is a clean party name, so it is
+        # safe to also populate owner_name (used by downstream absentee/voter
+        # matching, which key off owner_name, not defendant). Found 2026-09-14:
+        # 486 Anderson rows from this source carried a name nowhere but
+        # defendant, invisible to every owner_name-keyed enricher.
+        owner_name=name,
         judgment_amount=balance or lien_amt,
         foreclosure_process="lien",
         first_seen=filed or datetime.utcnow(),
