@@ -1654,3 +1654,88 @@ zero-row sweep and will return to this if time allows.
 
 Remaining zero-row SC counties to check: Aiken, Dillon, Dorchester, Edgefield,
 Greenwood, Hampton, Jasper.
+
+## SC mailing/phone gap — root-caused (2026-09-14)
+
+User asked for the precise county x source x signal picture and a 100% plan.
+Ran a live audit against the board (128,510 rows) rather than relying on
+memory. Real numbers:
+
+    NC: 69,530 rows — address 88.8% / owner 94.1% / mailing 92.6% / phone 81.9%
+    SC: 58,980 rows — address 75.0% / owner 95.8% / mailing 29.6% / phone  3.2%
+
+SC mailing is THE binding constraint, and it is NOT spread evenly — most of it
+is concentrated in ~20 counties with thousands of real board rows sitting at
+literal 0.0% mailing: Charleston 4,843, Horry 4,213, Darlington 2,689,
+Williamsburg 2,391, Lexington 2,214, Kershaw 1,727, Clarendon 1,272,
+Marlboro 1,061, Lancaster 911, Barnwell 886, Newberry 719, Chesterfield 687,
+Abbeville 632, Allendale 590, Greenville 584, Calhoun 512, Lee 504, Bamberg
+486, Saluda 428, McCormick 311, Orangeburg 107. (Only 11 of SC's 46 counties
+have a local parcel_cache built at all: Anderson, Cherokee, Colleton, Laurens,
+Oconee, Pickens, Spartanburg, Sumter, Union, York, + Beaufort partially.)
+
+Diagnosed why, with live probes, not guessing:
+
+1. **SCDOT (`smpesri.scdot.org/.../SC_Parcels`) — confirmed DEAD, not
+   recoverable free.** Designed as the statewide owner+mailing+value fallback
+   for all 46 SC counties, keyed by TMS. Live-probed 2026-09-14: every query
+   returns HTTP 200 + `{"error":{"code":499,"message":"Token Required"}}`, and
+   the service isn't even listed in its own `/GISMapping` folder catalog
+   anymore — a deliberate lock, not a glitch. Already known-walled since
+   2026-08-12 (see `tests/test_scdot_breaker.py`) after it dragged a run to
+   16 hours; three enrichers were patched to short-circuit on it that day.
+
+2. **`enrichment_owner_mailing.py` — the actual mailing enricher — was NEVER
+   one of the three patched modules.** Its own ArcGIS query function
+   (`_query_page`) treated an error body as an empty result set (`{"error":
+   ...}` has no `"features"` key, so `.get("features") or []` silently became
+   `[]`), so it kept spending a full request per SC lead against the dead
+   SCDOT host with zero data gained and zero log line, for over a month,
+   regardless of what any other module's breaker state was. **Fixed**: it now
+   detects the ArcGIS error shape and trips the shared breaker itself.
+
+3. **Charleston (4,843 rows) and Beaufort (875 rows) have their OWN free,
+   live ArcGIS parcel layers — confirmed working, confirmed NO mailing field
+   exists on either.** Charleston's public FeatureServer schema (queried
+   live): `OBJECTID, PID, OWNER, ADDR, Lot_Blk, SUBD, WServiceArea,
+   SServiceArea, Shape__Area, Shape__Length` — no mailing column, full stop.
+   Separately, the code's waterfall (`res is None` gate) meant that once
+   EITHER county's dedicated layer resolved owner+situs, the SCDOT-mailing
+   fallback was never even attempted — so these two counties could never have
+   gotten mailing through this code path even while SCDOT was still alive.
+   **Fixed**: added a mailing-only supplement step (same pattern as the
+   existing NC-OneMap value-supplement), inert until SCDOT (or a future
+   statewide replacement) is reachable again.
+
+4. **Went looking for a free alternative to dead SCDOT — found one, then it
+   died too.** ArcGIS Online hosts a complete, uniformly-named 46-item series
+   "Parcels - SC - <County> County" from publisher account `GDITAdmin` —
+   every single SC county, one consistent schema, exactly the shortcut that
+   would have turned 20 one-off county investigations into one. Queried it
+   live: `{"error":{"code":403,"message":"Subscription is canceled, the item
+   is not accessible"}}` on every item. The publisher's ArcGIS Online org
+   subscription has lapsed — a dead end on THEIR end, not a token/paywall we
+   could work around. Noting this explicitly so nobody re-discovers it and
+   burns time re-verifying the same dead lead.
+
+5. **SC phone (3.2%) is a different, already-near-ceiling problem, not a
+   mailing side-effect.** It comes entirely from `enrichment_sc_voter_xref.py`
+   cross-referencing SC owner NAMES against the free NC voter file (unambiguous
+   name matches only) — SC has no free bulk voter file with phones at all
+   (confirmed prior session). This is name-dependent (SC owner-name coverage
+   is already 95.8%), not address/mailing-dependent, so fixing mailing does
+   NOT cascade into phone. 3.2% is close to the real free-tier ceiling for SC
+   phone; the only way past it is a paid source (already costed in
+   `docs/path_to_100.md`).
+
+**What's left, in priority order**:
+- Build free per-county parcel caches (the proven York/11-county pattern) for
+  the ~20 real-row, 0%-mailing counties, one county at a time — genuinely
+  bespoke work, no shortcut found today. Prioritize by row count: Horry,
+  Darlington, Williamsburg, Lexington, Kershaw, Clarendon next.
+- Continue the zero-row-county sweep (Aiken, Dillon, Dorchester, Edgefield,
+  Fairfield, Greenwood, Hampton, Jasper — Chester deferred, needs SPA reverse
+  engineering) — a SEPARATE problem from the mailing gap (no leads exist yet
+  at all, vs. leads exist but can't be mailed).
+- SC phone stays capped near 3.2% on free sources; no further free lever
+  found today beyond the existing NC-voter name cross-reference.
