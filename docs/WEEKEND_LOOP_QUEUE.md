@@ -1197,3 +1197,34 @@ Ingested: **1,364 Colleton rows gained tax_value**, 50 gained acreage.
 returned ~86% value coverage earlier, which looked good enough that I never
 questioned it — they were competing with the same not-yet-due bills and should now
 approach 99%.
+
+## 2026-09-14 01:10 — the new drop-reporter's first run: 103 keys, and one real problem
+
+Ran `_report_slim_drops` against the live board. **103 raw keys sit on 100+ rows and
+never reach the slim payload.** Most are correctly excluded (images, link_check,
+census_rent, hud_fmr — bulky or analytical). Triage of the notable ones:
+
+**`owner_email` — 79,433 blocks, 275 with an actual email (0.3%).**
+Not lost contact data: the block is written EMPTY (`emails: []`, `best_email: null`)
+on 79,158 rows, each carrying an `extracted_at` timestamp. Excluding it from slim is
+correct. But two real issues:
+1. 79k empty blocks is pure board bloat — the enricher should not write a block when
+   it found nothing.
+2. The sampled hit is `fgreene@alaw.net`, `classification: "attorney"`. That is the
+   FORECLOSING FIRM's address, not the owner's. An "owner_email" that holds
+   opposing counsel is worse than an empty one — anyone reading it as owner contact
+   would be emailing the law firm about their own client's house. The
+   classification field is there, so the data is honest; the KEY NAME is not.
+
+**Judgment calls, NOT actioned unilaterally** (payload is already 17 MB, and adding
+to slim is a size decision that should be deliberate):
+- `condition_tier` 30,993 non-empty (e.g. "cosmetic") — a rehab signal a reader
+  would want on the card.
+- `red_flags` 23,313 — severity/type/description, e.g. eviction_market_high.
+- `amount_owed` 33,147 — but it is an ESTIMATE (`source: estimated_tax_2yr,
+  confidence: low`); the authoritative balance lives in `qpaybill_roll.balance_owed`,
+  which is also not in slim.
+
+This is exactly what the reporter was built for: it turns "something might be
+missing" into a list a human can triage in one sitting. Nothing here is being
+changed on my own judgment at 1am — recorded for a decision.
