@@ -1092,3 +1092,39 @@ of it was pure loss. Future runs should recover substantially more sale dates.
 
 **Re-run the NC notices scrape to benefit** — this fix only helps new harvests; the
 rows already on the board kept their 200-char descriptions.
+
+## 2026-09-13 21:00 — REFUTED: the 200-char cap was NOT the sale-date limiter
+
+I raised `description` 200 -> 400 and predicted "future runs should recover
+substantially more sale dates". **Re-scraped and measured. That is false.**
+
+    OLD (200-char): 310 foreclosure_sale | desc median 200 | Date-of-Sale cue 45
+    NEW (400-char): 310 foreclosure_sale | desc median 291 | Date-of-Sale cue 45
+
+Descriptions really did get ~91 chars longer. The cue count did not move at all.
+The reason: the site's own preview is ~300 chars and ends "... click 'view' to open
+the full text". When a notice shows its sale date it does so EARLY, near the
+caption. The ones that do not show it never do — the date is deeper in the body,
+behind the reCAPTCHA gate. More of a truncated preview is still a truncated preview.
+
+Every parsed field is identical old vs new: street_address 69, case_number 405,
+defendant 551, owner_name 551. The only measurable difference is 6 more
+street-like strings appearing in the text (46 -> 52), which the parser does not
+extract anyway.
+
+**Keeping the 400 cap** — it is harmless, costs nothing, and more source text is
+better for any future parser. But it is NOT a fix, and the sale-date ceiling stands
+at 45 of 310.
+
+### Two extractable fields sitting unparsed in that text
+- `trustee`: **0 of 310** extracted, yet the previews plainly read
+  "Trustee: Philip A. Glass" / "Substitute Trustee: ...". This is the exact field
+  used to enumerate the firm gap earlier today.
+- 6 street-like strings beyond the 69 addresses already parsed.
+
+Neither is large. Logged rather than built, because 6 addresses is not worth a
+parser and the trustee field is analytical rather than callable.
+
+**The honest ceiling for this lane remains: 99 actionable foreclosures + 8
+recovered = 107.** The rest of the sale dates are behind the captcha gate and no
+amount of preview parsing reaches them.
