@@ -1228,3 +1228,36 @@ to slim is a size decision that should be deliberate):
 This is exactly what the reporter was built for: it turns "something might be
 missing" into a list a human can triage in one sitting. Nothing here is being
 changed on my own judgment at 1am — recorded for a decision.
+
+## 2026-09-14 01:40 — owner_email's empty block: the marker does not do its job
+
+Looked at `enrichment_email_extract` before calling those 79,158 empty blocks bloat.
+They are deliberate — the code says so:
+
+    else:
+        # Mark as scanned (empty) so we don't re-scan
+        raw["owner_email"] = {"emails": [], "best_email": None, ...}
+
+**But the idempotence guard does not honour the marker:**
+
+    existing = raw.get("owner_email")
+    if isinstance(existing, dict) and existing.get("emails"):   # [] is falsy
+        ... continue
+
+An empty marker fails `existing.get("emails")`, so the row is re-scanned on every
+run anyway. We pay the storage for a marker AND still do the work it was meant to
+prevent. One of the two is wrong.
+
+**NOT changing it.** The fix is either "honour the marker" (skip any row already
+scanned — but then a row that later gains a source_url or a longer description is
+never re-read) or "stop writing the marker" (accept re-scanning, drop 79k blocks).
+That is a real trade-off between storage and freshness, and it belongs to whoever
+owns the enricher's cadence. I have already twice today changed something on an
+inferred premise and had the data refute me — this one gets recorded, not guessed.
+
+Related, and the sharper issue: `owner_email.best_email` on the sampled hit is
+`fgreene@alaw.net`, `classification: "attorney"` — the FORECLOSING FIRM. The block
+records the classification honestly, so the data is fine; the field NAME is the
+problem. Anything reading `owner_email` as owner contact is reading opposing
+counsel. `campaign_export.py:146` does exactly that: `email = st.get("owner_email")`.
+**That one is worth checking before any email campaign goes out.**
