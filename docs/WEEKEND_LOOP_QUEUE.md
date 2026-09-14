@@ -1326,3 +1326,34 @@ border counties where cross-border ownership is ordinary. Border-only would keep
 
 **DECISION NEEDED** — this is a precision/recall trade-off with third-party
 consequences, not a technical call. Left unrun.
+
+## 2026-09-14 04:20 — the FLC pattern DOES repeat. Anderson's list found (scanned).
+
+Horry's Forfeited Land Commission list was not a one-off. SC counties are required
+to maintain them, and they publish on county SITES, not the ArcGIS portal — which is
+why the earlier portal search found nothing. Probing the footprint counties'
+delinquent-tax pages directly:
+
+- **Anderson — FOUND:** `andersoncountysc.org/wp-content/uploads/2026/09/2025-FLC-RE.pdf`
+  ("FLC RE" = Forfeited Land Commission Real Estate). 3 pages, 201 KB.
+  **SCANNED — pypdf extracts 0 characters.** Needs OCR.
+- **Cherokee — adjacent find:** `cherokeecountysc.gov/.../TAX-SALE-TAB.pdf` (tax sale
+  tabulation — which properties sold and which did not; the unsold ones become FLC)
+  plus TAX-SALE-BIDDERS.pdf.
+- Pickens: delinquent-tax page exists, no documents linked.
+- Spartanburg, Oconee: no delinquent/tax-sale links from the homepage.
+- Laurens: site does not resolve (000).
+
+**Why this matters:** FLC properties are not leads to chase — they are inventory the
+county will sell, which is the buy-cheap/clear-title line. Horry's 46 had a median
+bid of $1,590.
+
+**BUILD-READY, not built.** `enrichment_doc_ocr` is Gemini-first and free, but it is
+shaped to enrich an EXISTING lead from its document, not to parse a PDF TABLE into
+NEW leads. That is a genuinely different parser (multi-row table extraction +
+dedupe against the board), and starting it at 04:20 was not the right call. The URL,
+page count and format are all recorded above so it is a clean start.
+
+**Method note for the next person:** the ArcGIS portal search for "Forfeited Land
+Commission" returns nothing useful. These live as PDFs on county treasurer pages.
+Probe `<county>/delinquent-tax` and `<county>/tax-sale` directly.
