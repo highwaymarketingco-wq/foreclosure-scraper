@@ -27,7 +27,9 @@ import httpx
 import structlog
 
 from .models import Listing, ListingType
-from .enrichment_arcgis import scdot_walled  # SCDOT circuit-breaker
+from .enrichment_arcgis import (  # SCDOT circuit-breaker
+    scdot_walled, mark_host_walled, is_token_error,
+)
 from .http_client import client  # shared throttled transport (per-host rate limit + timeout hardening)
 # Re-export so existing importers keep working; the definition lives in a
 # leaf module so a mid-run edit can never leave it half-loaded.
@@ -320,6 +322,22 @@ async def _query_page(http: httpx.AsyncClient, base: str, where: str, out_fields
         if r.status_code != 200:
             return [], False
         data = r.json()
+        # ArcGIS reports failure as HTTP 200 + an "error" body (e.g. SCDOT's
+        # "Token Required", code 499) -- status alone can't see it, and until
+        # this check existed HERE, every layer this module queries could go
+        # dark with no signal: an error body has no "features" key, so
+        # `.get("features") or []` silently returned an empty list, identical
+        # in shape to a genuine zero-match query. Verified live 2026-09-14:
+        # SCDOT was returning Token Required on every request while
+        # scdot_walled() reported False all run, because nothing in THIS
+        # module's own request path ever called mark_host_walled() -- the
+        # flag only got set when some OTHER enricher (enrichment_parcel_from_geo)
+        # happened to run first in the same process. Marking it here makes
+        # the breaker correct regardless of run order, and turns "silently
+        # resolved to nothing" into a loggable, one-time, visible wall.
+        if is_token_error(data):
+            mark_host_walled(base, reason="ArcGIS token/auth error")
+            return [], False
         rows = [f.get("attributes", {}) for f in (data.get("features") or [])]
         return rows, bool(data.get("exceededTransferLimit"))
     except Exception:
@@ -785,16 +803,38 @@ async def _resolve_one(http: httpx.AsyncClient, li: Listing) -> Optional[dict]:
                     res["_value"] = v
                     res["value_source"] = "nc_onemap"
 
-    if li.state == "SC" and li.county and res is None and not scdot_walled():
-        # 3) SCDOT statewide SC fallback — the contactability path for SC
-        #    counties with no dedicated COUNTY_GIS layer (Anderson, Greenville,
-        #    Beaufort, Cherokee, …) and for covered SC counties the dedicated
-        #    layer didn't resolve. Same owner+mailing+value shape, keyed on TMS.
+    if li.state == "SC" and li.county and not scdot_walled():
         sspec = _scdot_spec(li.county)
         if sspec:
-            attrs = await _match_attrs(http, li, sspec)
-            if attrs:
-                res = _build_result(li, sspec, attrs)
+            if res is None:
+                # 3a) SCDOT statewide SC fallback — the contactability path for
+                #     SC counties with no dedicated COUNTY_GIS layer (Anderson,
+                #     Greenville, Cherokee, …) and for covered SC counties the
+                #     dedicated layer didn't resolve at all. Same owner+
+                #     mailing+value shape, keyed on TMS.
+                attrs = await _match_attrs(http, li, sspec)
+                if attrs:
+                    res = _build_result(li, sspec, attrs)
+            elif not res.get("mailing"):
+                # 3b) the mirror of 2b, for mailing instead of value. Charleston
+                # and Beaufort's own public layers resolve owner+situs but were
+                # never given a mailing field (verified live 2026-09-14:
+                # Charleston's FeatureServer/0 schema is OBJECTID/PID/OWNER/ADDR/
+                # Lot_Blk/SUBD/*ServiceArea — no mailing column exists on it at
+                # all). Before this, `res is None` at the top of this block was
+                # False the instant the dedicated layer found ANYTHING, so
+                # SCDOT's mailing was never even tried for these two counties —
+                # 4,843 Charleston + 875 Beaufort rows stuck at ~0% mailing
+                # despite a statewide source that carries exactly this field.
+                attrs = await _match_attrs(http, li, sspec)
+                if attrs:
+                    supplement = _build_result(li, sspec, attrs)
+                    if supplement and supplement.get("mailing"):
+                        res["mailing"] = supplement["mailing"]
+                        res["mail_state"] = supplement.get("mail_state") or res.get("mail_state")
+                        res["absentee"] = supplement.get("absentee", res.get("absentee"))
+                        res["out_of_state"] = supplement.get("out_of_state", res.get("out_of_state"))
+                        res["mailing_source"] = "scdot_sc"
     return res
 
 
