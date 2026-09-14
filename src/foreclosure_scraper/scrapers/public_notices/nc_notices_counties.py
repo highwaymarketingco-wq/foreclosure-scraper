@@ -347,7 +347,13 @@ def _to_listing(notice: dict, slug: str) -> Listing | None:
         defendant=owner,
         owner_name=owner,
         case_number=(case_m.group(1) if case_m else None),
-        description=text[:200],
+        # 200 -> 400. The site's preview is ~300 chars and the SALE DATE often sits
+        # past char 200: only 45 of 310 notices kept a parseable "Date of Sale" cue
+        # at 200, and a foreclosure with no sale date is not actionable — it cannot
+        # be sorted by urgency and never reaches the future-dated call list. The
+        # preview is all we get (the full body is behind a reCAPTCHA gate), so
+        # throwing away a third of it was pure loss.
+        description=text[:400],
         # first_seen tracks when WE saw the row (sibling-scraper convention);
         # the notice's own publication date rides along in raw.
         first_seen=datetime.utcnow(),

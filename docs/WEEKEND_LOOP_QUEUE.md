@@ -1066,3 +1066,29 @@ stay unroutable until another route appears. Recorded so this is not re-probed.
 `DelinquentTaxParcels2025` is the FLC list — 47 properties with `FLC_Bid_Amount`,
 owner and description. FLC = failed to sell at tax sale and reverted to the county.
 That is genuine, acquirable distress, just a small pool. Not yet ingested.
+
+## 2026-09-13 20:08 — sale dates were sitting in text we already had
+
+The NC notices landed with sale_date EMPTY on 310/310. But the preview often reads
+"NOTICE OF FORECLOSURE SALE **Date of Sale: September 15, 2026**" — the date was in
+text already on the board, unparsed. Without it a foreclosure is not actionable: it
+cannot be sorted by urgency and never reaches the future-dated call list.
+
+**Only the explicit cue is matched.** A notice carries SEVERAL dates — deed of
+trust, recording, sale. 103 of 310 previews contain some date; only 45 label one
+"Date of Sale". Taking any date would stamp deed dates as auction dates, and
+someone would drive to a sale that already happened. The other 58 are reported and
+left alone. Verified the parser ignores "Deed of Trust dated March 3, 2019".
+
+Recovered 27 sale dates on the board (8 future-dated). Fewer than the harvest's 45
+because dedupe merged 566 of 787 notices — checked that it was NOT truncation:
+descriptions are 200 chars in both the file and the board.
+
+### The 200-char cap was the real limiter — raised to 400
+`description=text[:200]` while the site's preview is ~300 chars. "Date of Sale"
+frequently sits past char 200, which is why only 45 of 310 kept a parseable cue.
+The preview is ALL we can get (full body is captcha-gated), so discarding a third
+of it was pure loss. Future runs should recover substantially more sale dates.
+
+**Re-run the NC notices scrape to benefit** — this fix only helps new harvests; the
+rows already on the board kept their 200-char descriptions.
