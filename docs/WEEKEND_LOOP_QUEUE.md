@@ -1128,3 +1128,38 @@ parser and the trustee field is analytical rather than callable.
 **The honest ceiling for this lane remains: 99 actionable foreclosures + 8
 recovered = 107.** The rest of the sale dates are behind the captcha gate and no
 amount of preview parsing reaches them.
+
+## 2026-09-13 22:50 — qPayBill detail was doing 14x the work it needed (FIXED)
+
+Colleton's re-run at a 40,000 budget still came back with value on only **136 of
+1,495 parcels**, and the log said `skipped_over_cap=16895`. The cause is not budget:
+
+`fetch_details` was called once per ROW, and the grid returns a row per unpaid
+YEAR. Colleton is **20,895 rows for 1,495 parcels** — about 14 rows each. The detail
+page yields the APPRAISED VALUE, which is a property attribute, not a per-year one,
+so 13 of every 14 fetches bought a number we already had.
+
+It is worse than plain waste: the pass sorts by arrears descending, and the
+highest-arrears rows are exactly the parcels with the MOST duplicate years. So the
+budget concentrated itself on a few hundred deeply-delinquent properties and never
+reached the rest.
+
+**Fixed:** dedupe by parcel `ident` before applying DETAIL_MAX, keeping the
+highest-amount row per parcel so the sort still decides which parcels are reached
+when the cap bites. The log now reports `rows=` and `parcels=` separately.
+
+**This likely affected every county detailed today.** Sumter, Horry, Kershaw and
+Lexington all returned ~86% value coverage, which looked good enough that I did not
+question it — they may have been leaving parcels unreached for the same reason.
+Colleton only exposed it because its arrears are deep enough to make the duplication
+ratio extreme. Re-detail every county once the fix is confirmed.
+
+## Negative results this tick (recorded so they are not re-probed)
+- **No other SC county publishes an FLC layer** on the ArcGIS portal. Horry's was
+  only visible inside its own org, so this cannot be found by portal search — it
+  needs a per-county org listing.
+- **Colleton's org (113 services)** carries only tax parcel BOUNDARIES, labels and
+  a 2014 snapshot. No delinquent or FLC list.
+- **Sumter's `CodeEnforcement` folder is not violations.** It is a single
+  "Enforcement Zone" layer of 5 rows — officer zone boundaries with headshots. Code
+  enforcement stays at <1% board-wide; this was not the source.
