@@ -1739,3 +1739,66 @@ Diagnosed why, with live probes, not guessing:
   at all, vs. leads exist but can't be mailed).
 - SC phone stays capped near 3.2% on free sources; no further free lever
   found today beyond the existing NC-voter name cross-reference.
+
+## Per-county SC mailing cache build-out — iteration 1 (2026-09-14)
+
+Continuing the priority list from the SCDOT root-cause audit above. Each
+county below: found via live probing (ArcGIS Online item search, county
+website JS bundles, or the county's own GIS account catalog — SCDOT and the
+dead GDITAdmin statewide series are NOT viable, see above), verified schema
++ sample match against real board parcel_ids BEFORE wiring, built with the
+existing completeness-gated `refresh_county()`, joined board-wide via
+`join_parcel_cache_to_board.py` (fills-only), then mailing % measured before
+AND after the write plus a York-overage-rows-still-clean check every time.
+
+**Done, verified, live**:
+- **Horry** (4,213 rows) — own MapServer at `horrycountysc.gov/parcelapp/`
+  (layer 24, 301,323 parcels), found via the rezonings GIS app's JS bundle.
+  No situs field on this layer at all (owner+mailing+value only). Board
+  parcel_id = legacy PIN, matched via the layer's PINtext field.
+  **Mailing: 0.0% -> 35.3%** (1,486/4,213 — the rest have no parcel_id,
+  mostly `sc_dew_lien_registry` which is address-only, a separate follow-up).
+- **Darlington** (2,689 rows) — own FeatureServer, found via its "Parcel
+  Viewer" Web Map's operationalLayers (not exposed on the Web Map item
+  itself). Zip_Code deliberately excluded (malformed ZIP*10000+ZIP4 integer,
+  no transform hook in this module — see the code comment).
+  **Mailing: 0.0% -> 69.7%** (1,875/2,689).
+- **Lexington** (2,214 rows) — own rich CAMA MapServer via the county's
+  ArcGIS Online account ("lexcogis"), a plain Map Service this time (not
+  buried in a Web Map config). Carries split mailing/situs, sqft, sale
+  price/date, both market and taxable value — the richest layer found all
+  session. **Mailing: 0.0% -> 51.7%** (1,144/2,214).
+
+Combined board-wide join also picked up 1,795 new absentee flags and 1,134
+last-sale records as a side effect (Lexington's rich schema feeding fields
+Horry's couldn't). Every write verified: row count unchanged (128,510),
+York's 119 TAX_SALE_OVERAGE rows still carry zero mailing after all three
+writes (the wrong-person guard holds under repeated real board-wide joins).
+
+**Investigated this iteration, not yet resolved** (honest status, not silent
+skips):
+- **Kershaw** (1,727 rows) — the only AGOL item found is a bare 4-field
+  geometry-only boundary layer (`FID, PRSNTP_ID, taxTotalAc, GlobalID` — no
+  owner/mailing/value at all). The county's own site (`kershaw.sc.gov`)
+  timed out on every fetch attempt (30s, no bytes). No usable layer found
+  yet.
+- **Clarendon** (1,272 rows) — checked its Assessor page directly: it links
+  straight to `qpublic.net/sc/clarendon` (Schneider Corp) — the SAME
+  Cloudflare-walled vendor already confirmed blocking Cherokee/Union SC
+  parcel data earlier this session. Not a new investigation; joins that
+  CapSolver-gated list (blocked purely on `CAPSOLVER_API_KEY` being staged).
+- **Williamsburg** (2,391 rows) — DOES have its own live GIS host
+  (`williamsburgsc.wthgis.com`), but it runs a proprietary "TGIS" engine
+  (`tgisServer2.js`, `.ashx` handlers like `tgis/search.ashx?S=`), not
+  standard ArcGIS REST. A real, different integration (protocol reverse-
+  engineering), not a quick win — deferred, same class of work as Chester's
+  AngularJS SPA.
+
+**Next in priority order** (by row count, from the original audit):
+Clarendon (retry — check the Assessor page directly), Marlboro (1,061),
+Lancaster (911), Barnwell (886), Newberry (719), Chesterfield (687),
+Abbeville (632), Allendale (590), Greenville (584), Calhoun (512), Lee (504),
+Bamberg (486), Saluda (428), McCormick (311), Orangeburg (107). Then back to
+Kershaw/Williamsburg/Chester with more time budgeted for their non-standard
+backends. Then the zero-row county sweep (Aiken, Dillon, Dorchester,
+Edgefield, Fairfield, Greenwood, Hampton, Jasper).

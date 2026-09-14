@@ -252,6 +252,22 @@ PARCEL_LAYERS: dict[str, dict] = {
                 "land_use": "PropTypeDesc", "sale_price": "SalePrice",
                 "sale_date": "SaleDate"},
     },
+    # Found 2026-09-14, same audit: Lancaster (911 board rows, 0% mailing).
+    # Own FeatureServer, found via an ArcGIS Online item under a third-party
+    # "layermanager" account (a common pattern for a county that contracts its
+    # GIS hosting out) rather than the county's own name -- worth remembering
+    # for future county searches when a direct county-owner search comes up
+    # empty. PIN matches board parcel_id format exactly (dashed with a
+    # trailing ".00", e.g. "0068J-0H-012.00"), verified live. No market/
+    # assessed value field on this layer (owner+mailing+situs+sale only).
+    "Lancaster": {
+        "state": "SC",
+        "url": "https://services3.arcgis.com/rJcpRneDUBgTeCT3/arcgis/rest/services/LC_Parcels/FeatureServer/0/query",
+        "id_fields": ["PIN", "PIN2"],
+        "map": {"owner": "OWNER_NAME", "address": "PROP_LOCAT",
+                "owner_mailing": ["OWNER_ADDR", "OWNER_CITY", "OWNER_STAT", "OWNER_ZIP"],
+                "acreage": "ACRES", "sale_price": "SALE_PRICE"},
+    },
     "Laurens": {  # TMS (dash format); layer has situs but no value field
         "url": "https://laurenscountygis.org/arcgis/rest/services/Pebble/TaxParcel/MapServer/5/query",
         "id_fields": ["TMS"],

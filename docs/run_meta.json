@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-09-14T21:29:54.406975Z",
+  "run_time": "2026-09-14T21:41:02.711066Z",
   "total": 128510,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
@@ -452,7 +452,7 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "parcel-cache join: 39,777 hits, 3,019 owner mailing, 1,745 situs, 507 sqft",
+  "notes": "parcel-cache join: 40,548 hits, 659 owner mailing, 1,786 situs, 0 sqft",
   "detail_count": 128510,
   "detail_digest": "5edfd1bf0cf84615",
   "board": {
@@ -466,7 +466,7 @@
       "records": 128510
     }
   },
-  "health_carried_from": "2026-09-14T21:21:50.048225Z",
+  "health_carried_from": "2026-09-14T21:29:54.406975Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
