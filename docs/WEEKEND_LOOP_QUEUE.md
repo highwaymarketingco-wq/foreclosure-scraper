@@ -1421,3 +1421,60 @@ both are scanned, and that Groq is the only configured provider.
 **Cheap source-discovery is now exhausted.** Everything remaining is either a build
 (FLC OCR parser), a decision (unguarded SC xref), or a genuine wall (SC parcel data,
 trustee firms that do not publish, captcha-gated sale details).
+
+# ============================================================
+# START HERE — state at 2026-09-14 07:00, end of the weekend run
+# ============================================================
+
+**Board 128,391 rows, live and verified.** Suite 3,935 passed / 0 failed. Tree clean.
+
+    callable (rank 60+, in footprint)   3,715
+    with a phone                       58,810
+    absentee flagged                   57,010
+    with an address                   105,847  (82%)
+    SC counties represented                36  (was 32)
+
+## Do these first — they need YOU, not more scraping
+
+1. **DECIDE: the unguarded SC voter cross-reference.** It offers ~3,700 phones and I
+   showed they are ~99% name coincidences (matches land in Sumter, Lexington,
+   Darlington — the middle of the state, nowhere near NC). The safe 32 with NC
+   mailing corroboration are already taken. My recommendation: leave it unrun.
+2. **CHECK before any email campaign:** `campaign_export.py:146` reads
+   `st.get("owner_email")` directly, and `owner_email.best_email` can be the
+   FORECLOSING ATTORNEY (classification field says so; the field NAME does not).
+3. **DECIDE: three slim-payload candidates** the drop-reporter surfaced —
+   `condition_tier` (30,993), `red_flags` (23,313), `amount_owed` (33,147, an
+   ESTIMATE). Adding to a 17 MB payload is a size call, not a technical one.
+
+## Build next, in value order
+
+4. **FLC PDF table parser.** Anderson `2025-FLC-RE.pdf` (3 pages, scanned) and
+   Cherokee `TAX-SALE-TAB.pdf` (1 page, 18 KB). ONLY `GROQ_API_KEY` is configured —
+   the free-first Gemini/GitHub providers are absent. FLC = county-held inventory
+   you can buy; Horry's 46 had a median bid of $1,590.
+5. **owner_email**: decide whether to honour its scan marker or stop writing it.
+   Today it writes 79,158 EMPTY blocks and re-scans them anyway — the guard tests
+   `existing.get("emails")`, which an empty marker fails.
+6. **Rank the 13 unranked rows** from the last ingest (not worth a 740 MB rewrite
+   alone; fold into the next pass).
+
+## Do NOT re-probe these — verified dead
+
+- **McCalla / foreclosurehotline.net** — written ToS bans copying/marketing use
+- **Bell Carrington** — reachable, no restrictive terms, but publishes NO listings
+  (47 requests, all static; body is 2,853 chars of disclaimer)
+- **SCDOT SC_Parcels** — token-walled (code 499)
+- **Horry parcel layer** — 114 services checked, none carry parcels with addresses
+- **ncnotices/scpublicnotices** — user decided 2026-09-13 to keep both running
+- rtt-law, rileypopelaney, nodellglass, jwtaylorlaw, substitutetrusteeservices,
+  goddardfirm — none resolve
+- Sumter `CodeEnforcement` — 5 rows of officer ZONE boundaries, not violations
+
+## Method notes worth keeping
+- FLC lists are PDFs on county treasurer pages. **ArcGIS portal search does not find
+  them.** Probe `<county>/delinquent-tax` and `/tax-sale` directly.
+- A new raw key needs `RAW_KEEP` **and** `_SLIM_RAW` **and** dashboard.js's
+  `_LEAN_RAW`. Nothing fails when one is missing — that cost four enrichers in a day.
+  Every publish now logs the keys slim leaves behind.
+- Averages hid two bugs today. Check per-county before generalising.
