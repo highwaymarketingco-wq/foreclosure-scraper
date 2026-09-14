@@ -1376,3 +1376,26 @@ scanned PDFs rather than data.
 
 **This vein is now worked out.** Remaining FLC value needs the PDF table parser
 (Anderson, Cherokee), not more probing.
+
+## 2026-09-14 05:25 — the SC phone opportunity was mostly illusory. 32 safe phones taken.
+
+Followed up my own "~3,700 SC phones available, needs a decision" by building the
+SAFE subset instead of waiting: require the SC row's OWNER MAILING ADDRESS to be in
+NC, so the owner demonstrably lives there and a unique-name match against the NC
+voter file is corroboration rather than coincidence.
+
+**The population is 342, not 45,708.** Only 357 SC rows have an NC mailing address at
+all. Match rate 9.4% -> **32 phones**. Taken; tagged
+`corroboration="nc_mailing_address"` so the basis is auditable.
+
+That reframes the decision I flagged: the ~3,700 figure was almost ENTIRELY the
+unsafe majority — SC owners in Sumter, Lexington and Darlington sharing a common
+name with the single NC voter of that name. The defensible slice is ~1% of it.
+
+**So there is no large safe SC phone win here.** SC phone coverage stays ~3% and the
+constraint is real, not a missing enricher. Anyone revisiting this should know the
+ceiling before spending time on it.
+
+The unguarded enricher remains UNRUN and still needs a decision if the recall is
+ever judged worth the precision — but it should now be judged against ~3,700
+mostly-wrong numbers, not ~3,700 leads.
