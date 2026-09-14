@@ -1357,3 +1357,22 @@ page count and format are all recorded above so it is a clean start.
 **Method note for the next person:** the ArcGIS portal search for "Forfeited Land
 Commission" returns nothing useful. These live as PDFs on county treasurer pages.
 Probe `<county>/delinquent-tax` and `<county>/tax-sale` directly.
+
+## 2026-09-14 04:55 — FLC sweep complete. Two counties publish, the rest do not.
+
+| county | result |
+|---|---|
+| **Horry** | FLC layer in its ArcGIS org — 46 properties, INGESTED, median bid $1,590 |
+| **Anderson** | `2025-FLC-RE.pdf` — 3 pages, SCANNED, needs a table parser. BUILD-READY |
+| Cherokee | TAX-SALE-TAB.pdf (tabulation; unsold -> FLC). Adjacent, unparsed |
+| Spartanburg | delinquent-tax page reachable, NO documents, no FLC mention |
+| Oconee | delinquent-tax page reachable, only unrelated PDFs |
+| Pickens | page exists, no documents |
+| Laurens, Darlington, Williamsburg | paths 404 / do not resolve |
+
+Two of ~10 counties publish a usable FLC list. That is the honest yield — the
+pattern repeats, but not widely, and the ones that do publish mostly do it as
+scanned PDFs rather than data.
+
+**This vein is now worked out.** Remaining FLC value needs the PDF table parser
+(Anderson, Cherokee), not more probing.
