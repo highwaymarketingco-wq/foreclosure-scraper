@@ -1291,3 +1291,38 @@ page to fetch. Its ceiling is source coverage, not budget or ordering.
 The fix itself is still correct and worth keeping — it made Colleton possible and it
 makes every future detail pass cheaper (requests now equal surviving parcels, and
 every county logged `skipped_over_cap=0`). But the re-run was avoidable.
+
+## 2026-09-14 03:55 — SC voter cross-reference: ~3,700 phones available, NOT RUN. Needs a decision.
+
+SC phone coverage is 1,850 of 58,861 (3%) — the worst gap on the board — and 45,708
+SC rows have an owner name but no phone. `enrichment_sc_voter_xref` exists to close
+it by matching SC owners against the NC voter file. It has produced ZERO rows so far.
+
+**It works. I am not running it.** Measured on a RANDOM 1,500-row sample: 8.1% match
+rate, which extrapolates to roughly **3,700 phones**. But the match is FIRST + LAST
+NAME ONLY, across state lines, with no middle name and no address:
+
+    owner "ALLISON STEVEN M & PATRICIA A"  ->  NC voter "ALLISON,STEVEN"
+    owner "CAIN ELIZABETH M"               ->  NC voter "CAIN,ELIZABETH"
+    owner "GIBBS DONNA D"                  ->  NC voter "GIBBS,DONNA"
+
+The enricher's safeguard is that the name must be UNIQUE in the NC voter file. That
+is not identity: it means one NC voter has that name, not that the SC owner IS them.
+
+**The geography settles it.** Matches by county: Sumter 14, Lexington 9, Darlington
+9, Williamsburg 6 — only 47 of 121 are in NC-border counties. Sumter and Lexington
+are the middle of the state. A Sumter owner sharing a name with the single NC voter
+of that name is a coincidence, not a lead.
+
+**Consequence of running it:** ~3,700 leads get a stranger's phone number, and
+someone dials an uninvolved person in NC about a property in SC they do not own.
+Wrong contact data is worse than none — it wastes the caller, harasses a third
+party, and the numbers are tagged needs_dnc_scrub but not "needs_identity_check".
+
+**What would make it safe:** require corroboration — an NC mailing address on the SC
+row (absentee owners who genuinely live in NC), or a middle initial, or restrict to
+border counties where cross-border ownership is ordinary. Border-only would keep
+~47 of every 121 matches and drop the implausible majority.
+
+**DECISION NEEDED** — this is a precision/recall trade-off with third-party
+consequences, not a technical call. Left unrun.
