@@ -1507,3 +1507,38 @@ Consequence: full notice bodies (sale date, opening bid, situs) stay out of reac
 The ~107 actionable footprint foreclosures stands, and the 45 notices whose PREVIEW
 carried a "Date of Sale" cue are already captured. That is the ceiling for this
 source, not a to-do.
+
+## 2026-09-14 07:45 — PROBATE: a working source went dark, and we already own the key that fits it
+
+`counties_sc.sc_probate_net` has **265 rows, all Charleston**, with `first_seen`
+stopping at **2026-08-16**. Its own docstring says the site is "NOT bot-walled —
+plain httpx with a real-browser UA gets HTTP 200". That is no longer true:
+
+    GET southcarolinaprobate.net/search/  ->  403
+    server: awselb/2.0     (AWS Elastic Load Balancer, bare 403, no cf-ray)
+
+**It is AWS WAF.** And `enrichment_capsolver.solve_aws_waf` implements exactly
+`AntiAwsWafTaskProxyLess` — built for the Tyler/eCourts wall, the same gate type.
+The solver already exists; it needs `CAPSOLVER_API_KEY` staged (the user reports a
+free monthly pool).
+
+**This is a different case from the notice-detail Turnstile gate I declined an hour
+ago, and the difference matters:** that one required affirmatively clicking an
+agreement that says "I may not engage in ... automated means to collect information
+from the site". This is a silent technical block with no agreement presented —
+the same category as the robots.txt Disallow the user already approved for otherwise
+open public records.
+
+**CAVEAT I cannot resolve while blocked:** I could not read the site's Terms of Use,
+because the 403 covers every page. Before harvesting post-bypass, load the terms and
+check them the way the press-association sites were checked. If they carry a
+no-scraping clause, this stops there.
+
+### Why it is worth it
+The scraper is already configured for FIVE courts — Charleston, Colleton,
+Georgetown, Oconee, Cherokee — and has only ever produced Charleston. Restoring
+access should widen it to all five at once. It also sweeps only TEN surnames
+("Smith, Johnson, Williams...") as a sample of the index; that list is trivially
+expandable once the source is live again.
+
+Probate is 1,953 rows board-wide (1.5%) and the single largest untapped signal.

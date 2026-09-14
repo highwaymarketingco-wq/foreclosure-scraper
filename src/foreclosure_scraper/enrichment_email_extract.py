@@ -199,8 +199,21 @@ def enrich_extract_emails(listings: Sequence[Listing], fetch_pages: bool = False
         stats["listings_scanned"] += 1
         
         # Check if already enriched (idempotent)
+        # HONOUR THE SCAN MARKER.
+        #
+        # The else-branch below writes an EMPTY owner_email block explicitly to
+        # "mark as scanned so we don't re-scan". This guard tested
+        # existing.get("emails"), and [] is falsy — so the marker never stopped
+        # anything. On 2026-09-14 the board carried 79,158 empty markers AND
+        # re-scanned every one of them on every run: we paid the storage for a
+        # marker and still did the work it was meant to prevent.
+        #
+        # Testing for the KEY, not its contents, makes the marker do its job. A row
+        # that later gains a new source_url or a longer description will not be
+        # re-read — acceptable, because the scan reads static notice text that does
+        # not change after filing, and a re-scan can be forced by deleting the key.
         existing = raw.get("owner_email")
-        if isinstance(existing, dict) and existing.get("emails"):
+        if isinstance(existing, dict) and "emails" in existing:
             stats["listings_with_emails"] += 1
             stats["total_emails"] += len(existing.get("emails", []))
             for e in existing.get("emails", []):
