@@ -912,7 +912,30 @@ class QPayBillDelinquentRoll(BaseScraper):
                 for county, rows in sorted(detail_rows.items()):
                     with_href = [r for r in rows if r.get("detail_href")]
                     with_href.sort(key=lambda r: -(r.get("amount") or 0))
-                    picked = with_href[:DETAIL_MAX]
+                    # ONE DETAIL PER PARCEL, not per row.
+                    #
+                    # The grid returns a row per unpaid YEAR, so a parcel 14 years
+                    # behind appears 14 times — and the detail page yields the
+                    # APPRAISED VALUE, which is a property attribute, not a per-year
+                    # one. Fetching it once per row bought the same number 14 times.
+                    #
+                    # Measured on Colleton 2026-09-13: 20,895 rows for 1,495 parcels.
+                    # A 4,000-request detail pass spent itself on the highest-arrears
+                    # rows, which are exactly the parcels with the MOST duplicate
+                    # years, and came back with value on 136 parcels. Deduping first
+                    # covers all 1,495 for ~1,495 requests.
+                    #
+                    # The highest-amount row per parcel is kept, so the sort above
+                    # still decides which parcels are reached when the cap bites.
+                    seen_ident: set[str] = set()
+                    unique_rows = []
+                    for r in with_href:
+                        key = r.get("ident") or r["detail_href"]
+                        if key in seen_ident:
+                            continue
+                        seen_ident.add(key)
+                        unique_rows.append(r)
+                    picked = unique_rows[:DETAIL_MAX]
                     if not picked:
                         continue
                     dstats: dict = {}
@@ -926,7 +949,8 @@ class QPayBillDelinquentRoll(BaseScraper):
                     filled = sum(1 for r in rows if r.get("detail"))
                     log.info("qpaybill_roll.detail_done", county=county,
                              requested=len(picked), parsed=len(got), rows_filled=filled,
-                             skipped_over_cap=max(0, len(with_href) - DETAIL_MAX), **dstats)
+                             skipped_over_cap=max(0, len(unique_rows) - DETAIL_MAX),
+                             rows=len(with_href), parcels=len(unique_rows), **dstats)
             out = []
             for county, rows in sorted(detail_rows.items()):
                 got = _to_listings(county, rows)
