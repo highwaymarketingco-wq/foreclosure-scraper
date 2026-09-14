@@ -1261,3 +1261,33 @@ records the classification honestly, so the data is fine; the field NAME is the
 problem. Anything reading `owner_email` as owner contact is reading opposing
 counsel. `campaign_export.py:146` does exactly that: `email = st.get("owner_email")`.
 **That one is worth checking before any email campaign goes out.**
+
+## 2026-09-14 02:55 — the six-county re-detail was largely UNNECESSARY. My call, wrongly made.
+
+Re-detailed Sumter, Horry, Kershaw, Lexington, Bamberg and Saluda on the theory that
+their "~86% value coverage" was the same ordering bug that crippled Colleton.
+2.5 hours of harvesting. **Result: 13 net-new rows, 52 enriched, 5 tax_values.**
+
+Because they were never at 86%. Board coverage now:
+
+    Sumter    99%   Lexington 99%   Saluda 100%
+    Bamberg   99%   Kershaw   95%   Horry     52%
+
+The "86%" I kept quoting was an AVERAGE across a set that included Colleton at ~2%
+and Horry at 52%. I attributed a low average to every county in it, then spent the
+night acting on that. The five healthy counties had nothing to recover.
+
+**What was actually true:** the ordering bug bit in proportion to how many
+not-yet-due bills a county's portal carries. Colleton is 18,285 raw idents against
+1,494 real delinquents — 92% waste, hence 23 -> 1,492. The others carry few 2026
+bills, so their detail pass was never crowded out. One extreme county is not a
+pattern, and I generalised from it without checking the others' raw-to-filtered
+ratio first — which is one cheap query.
+
+**Horry's 52% is NOT this bug either.** Its 4,213 board rows exceed the 2,450 parcels
+qPayBill exposes; the remainder arrive from sc_dew and other sources with no detail
+page to fetch. Its ceiling is source coverage, not budget or ordering.
+
+The fix itself is still correct and worth keeping — it made Colleton possible and it
+makes every future detail pass cheaper (requests now equal surviving parcels, and
+every county logged `skipped_over_cap=0`). But the re-run was avoidable.
