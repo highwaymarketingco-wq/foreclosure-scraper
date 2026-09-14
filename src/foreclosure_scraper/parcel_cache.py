@@ -190,6 +190,49 @@ PARCEL_LAYERS: dict[str, dict] = {
                 "land_use": "LandUseDesc", "sale_price": "SalePrice",
                 "sale_date": "DateSold"},
     },
+    # Found 2026-09-14 while auditing why Horry (4,213 board rows) sat at 0%
+    # mailing: SCDOT (the intended statewide SC fallback) is confirmed dead
+    # (token-walled since 2026-08-12), but Horry runs its OWN free public
+    # ArcGIS MapServer, independent of SCDOT. Board parcel_id (from qpaybill)
+    # is the 11-digit legacy PIN, NOT this layer's 10-digit TMS -- verified
+    # live it matches the PINtext field (a string mirror of the numeric PIN
+    # field). No situs/property-address field exists on this layer at all
+    # (only the OWNER's mailing address columns) -- "address" left unmapped
+    # on purpose; every board row already carries its own street_address from
+    # its scraper source, and this cache's only job here is mailing.
+    "Horry": {
+        "state": "SC",
+        "url": "https://www.horrycountysc.gov/parcelapp/rest/services/HorryCountyGISApp/MapServer/24/query",
+        "id_fields": ["PINtext", "PIN", "TMS"],
+        "map": {"owner": "OwnerName",
+                "owner_mailing": ["OwnerStreet", "OwnerCity", "OwnerState", "OwnerZip"],
+                "market_value": "MarketProp", "tax_value": "AssessedProp",
+                "acreage": "Acreage", "land_use": "LandUseCode",
+                "sale_date": "SaleDate"},
+    },
+    # Found 2026-09-14, same audit as Horry above: Darlington (2,689 board
+    # rows, 0% mailing) runs its own free public ArcGIS FeatureServer,
+    # discovered via its published "Darlington County Parcel Viewer" Web Map
+    # on ArcGIS Online (the Web Map's operationalLayers list the real
+    # FeatureServer URL; the Item page itself never exposes it for a Web Map
+    # type, only for Feature Service items directly -- Web Map needs its own
+    # /data fetch). MBP/Map_Number carry the SAME dashed TMS board parcel_ids
+    # already use, verified live. Zip_Code is deliberately NOT joined into
+    # owner_mailing: the live field is an odd (ZIP*10000 + ZIP4) integer
+    # encoding (e.g. 293072417 = 29307-2417, 290690000 = 29069 with no +4) that
+    # this module's map framework has no transform hook for -- joining it
+    # verbatim would bake a malformed 9-digit string onto every mailing
+    # address. Address_1 + Address_2_ (street, "City ST") is still a usable,
+    # correctly-formed mailing address without it.
+    "Darlington": {
+        "state": "SC",
+        "url": "https://services5.arcgis.com/8FJikaProY6O3ncx/arcgis/rest/services/PARCELS/FeatureServer/1/query",
+        "id_fields": ["MBP", "Map_Number"],
+        "map": {"owner": ["Name_1", "Name_2_1"], "address": ["E911_STNUM", "E911_STREE"],
+                "owner_mailing": ["Address_1", "Address_2_"],
+                "market_value": "TOT_MARKET", "tax_value": "ASSESSED_V",
+                "acreage": "GIS_ACRES", "land_use": "LANDUSE"},
+    },
     "Laurens": {  # TMS (dash format); layer has situs but no value field
         "url": "https://laurenscountygis.org/arcgis/rest/services/Pebble/TaxParcel/MapServer/5/query",
         "id_fields": ["TMS"],
