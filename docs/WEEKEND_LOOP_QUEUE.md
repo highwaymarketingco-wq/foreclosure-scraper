@@ -1163,3 +1163,37 @@ ratio extreme. Re-detail every county once the fix is confirmed.
 - **Sumter's `CodeEnforcement` folder is not violations.** It is a single
   "Enforcement Zone" layer of 5 rows — officer zone boundaries with headshots. Code
   enforcement stays at <1% board-wide; this was not the source.
+
+## 2026-09-14 00:00 — CONFIRMED: detail was competing with not-yet-due bills. 98 -> 1,492
+
+Colleton, same county, three runs:
+
+| run | budget | detail cap | requests used | parcels with value |
+|---|---|---|---|---|
+| original | 10,000 | 16,000 | capped | **23** |
+| higher budget | 40,000 | 4,000 | 4,000 | **136** |
+| per-parcel dedupe | 40,000 | 3,000 | 3,000 | **98** |
+| **filter-first** | 40,000 | 3,000 | **1,495** | **1,492 (99.8%)** |
+
+`parcels=1495 requested=1495 skipped_over_cap=0`. Half the requests, 15x the result.
+
+**The cause was ORDERING, not budget and not duplication.** The detail pass ran on
+RAW grid rows while `_to_listings` had already dropped every parcel whose only unpaid
+year is the current one. Colleton is 18,285 raw idents against 1,494 real
+delinquents, so ~92% of the budget was spent on bills that are not late yet and get
+discarded moments later.
+
+Two wrong diagnoses on the way, both recorded rather than quietly dropped:
+1. "raise the budget" — 10k -> 40k moved 23 -> 136. Real but marginal.
+2. "the grid returns ~14 rows per parcel, dedupe it" — it returns 1.14
+   (20,876 rows / 18,285 idents). That change bought nothing and coverage went
+   DOWN. I had inferred the ratio from two numbers taken at DIFFERENT pipeline
+   stages — one pre-filter, one post-filter. The instrumentation added in that
+   commit is what exposed the error.
+
+Ingested: **1,364 Colleton rows gained tax_value**, 50 gained acreage.
+
+**Re-detailing Sumter, Horry, Kershaw, Lexington, Bamberg and Saluda now.** All
+returned ~86% value coverage earlier, which looked good enough that I never
+questioned it — they were competing with the same not-yet-due bills and should now
+approach 99%.
