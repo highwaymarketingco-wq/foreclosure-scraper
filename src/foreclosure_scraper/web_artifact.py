@@ -356,6 +356,10 @@ RAW_KEEP = {
     # Name->parcel resolution provenance (matched owner, parcel, method). THIRD time
     # today a new enricher's key was dropped here before anyone noticed.
     "name_resolution": "*",
+    # Horry Forfeited Land Commission — county-held inventory with a standing bid.
+    # Registered BEFORE the first ingest this time; three enrichers were silently
+    # dropped here today by adding the key afterwards.
+    "horry_flc": "*",
     "dot_ocr": "*",                     # recorded deed-of-trust principal + estimated balance
     "loan_amount": "*",                 # scalar loan principal from dot_ocr
     "property_category": "*",           # foreclosure | preforeclosure | tax_delinquency | distressed_property

@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-14T00:08:15.363794Z",
-  "total": 128340,
+  "run_time": "2026-09-14T01:57:21.013420Z",
+  "total": 128378,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -100,8 +100,8 @@
     "courtlistener.recap": 945
   },
   "by_state": {
-    "NC": 69514,
-    "SC": 58826
+    "NC": 69530,
+    "SC": 58848
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 41266,
@@ -124,7 +124,7 @@
     "counties_nc.buncombe_delinquent_tax": 938,
     "courtlistener.recap": 737,
     "counties_nc.nc_heir_estate_parcels": 682,
-    "public_notices.nc_notices_counties": 662,
+    "public_notices.nc_notices_counties": 678,
     "national.courtlistener_bankruptcy": 644,
     "counties_sc.sc_public_index_export": 591,
     "counties_sc.greenville_mie_adverts": 584,
@@ -167,6 +167,7 @@
     "national.cash_buyer_deeds": 23,
     "national.servicelink_auction": 23,
     "public_notices.ncnotices": 23,
+    "counties_sc.horry_flc": 22,
     "national.crexi_multifamily": 21,
     "national.nc_upset_bids": 20,
     "reo.vrm_va_reo": 20,
@@ -451,20 +452,20 @@
     "newspapers.carolina_coast"
   ],
   "notes": "",
-  "detail_count": 128340,
-  "detail_digest": "03e14a9ea63283fc",
+  "detail_count": 128378,
+  "detail_digest": "49e01e19cf39db9c",
   "board": {
     "schema": "slim-v1",
-    "count": 128340,
+    "count": 128378,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
       "count": 129,
-      "records": 128340
+      "records": 128378
     }
   },
-  "health_carried_from": "2026-09-13T23:37:22.182485Z",
+  "health_carried_from": "2026-09-14T01:28:12.345354Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
