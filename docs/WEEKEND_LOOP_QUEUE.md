@@ -1623,3 +1623,34 @@ strictly, cross-reference the parcel cache for context only, guard against
 wrong-person contamination" method to the remaining zero-row SC counties —
 Aiken, Chester, Dillon, Dorchester, Edgefield, Fairfield, Greenwood, Hampton,
 Jasper — and the thin ones (Berkeley 2, Florence 7, Marion 2, Richland 1).
+
+## Chester County SC — investigated, deferred (2026-09-14)
+
+Next zero-row county in the sweep. Findings:
+
+- The existing `chester_delinquent_tax.py` scraper targets a dead URL — the
+  county site was restructured (same class of break as York's delinquent-tax
+  scraper before today's fix): `chestercountysc.gov/treasurer/delinquent-tax-sale`
+  now serves the homepage. Live content moved to
+  `chestercountysc.gov/departments/tax-and-finance-departments/{tax-collector,
+  treasurer}/` — both checked, both are prose-only "what this office does"
+  pages with NO parcel list, PDF, or DocumentCenter link (unlike York).
+- The county's `boards/tax-and-assessment/forfeited-land-commission` page is
+  likewise prose-only, no document — Chester was already correctly excluded
+  from `sc_flc.py`'s curated list, not an oversight.
+- The REAL tax roll lives on a separate domain, `chestercountysctax.com` — a
+  legacy AngularJS 1.x SPA (angular-ui-bootstrap), same shape as the DEW Lien
+  Registry SPA this session already solved by calling the app's own fetch()
+  from inside the rendered page. Confirmed live: plain httpx/curl-impersonation
+  gets an empty loader shell; StealthyFetcher with network_idle + a
+  page_action that waits for networkidle renders real Angular CSS but no data
+  grid yet — the search form needs interaction (a county/parcel/name query)
+  before the backend call fires, and that backend endpoint hasn't been found.
+
+**Deferred, not abandoned**: this needs the same treatment DEW got (find the
+in-page JS call the search form fires, replicate it via page.evaluate()) but
+is a standalone investigation, not a quick win — moving on to the rest of the
+zero-row sweep and will return to this if time allows.
+
+Remaining zero-row SC counties to check: Aiken, Dillon, Dorchester, Edgefield,
+Greenwood, Hampton, Jasper.
