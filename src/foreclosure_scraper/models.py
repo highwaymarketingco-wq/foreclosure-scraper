@@ -190,6 +190,16 @@ class ListingType(str, Enum):
     # exemption (ELD 65+ / DIS totally-disabled / BLD blind / VET disabled-vet).
     # Property-keyed motivated-seller prospect (downsizing / can't maintain / heirs).
     ELDERLY_DISABLED = "elderly_disabled"
+    # TAX_SALE_OVERAGE = the property has ALREADY sold at a delinquent-tax sale
+    # for more than was owed; the FORMER owner is owed the surplus and often has
+    # no idea it exists (SC counties do not proactively notify; claim windows
+    # run years). Not a property-acquisition lead like every other type here --
+    # the property is gone -- but exactly the "recently and involuntarily lost
+    # real estate, verifiably owed money, findable by name" profile the
+    # motivated-seller engine treats as a lead SOURCE: often still local,
+    # financially motivated, and a warm entry point regardless of what they do
+    # with the claim. First source: York County SC, $296-$35,286 per claim.
+    TAX_SALE_OVERAGE = "tax_sale_overage"
     UNKNOWN = "unknown"
 
 

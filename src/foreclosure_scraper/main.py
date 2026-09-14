@@ -423,6 +423,11 @@ DATELESS_OK_SOURCES = {
     # delinquent-tax balance is a standing condition, not a scheduled event),
     # so without this entry _active_only() deletes every row it harvests.
     "counties_sc.york_delinquent_tax",           # York SC delinquent tax / tax-sale roster (dateless)
+    # Overage claims sit unclaimed until someone files -- a standing condition,
+    # not a scheduled event. sale_date is deliberately left unset (see the
+    # scraper's own comment): it would otherwise be the PAST parcel auction
+    # date and _active_only would drop every row as a stale upcoming sale.
+    "counties_sc.york_overage_claims",
     # Same cookie-cutter scraper as Fairfield above, same dateless Listing(): the
     # Saluda advertisement carries owner/TMS/description but no per-parcel date,
     # so without this entry every row it harvests in Nov-Dec is deleted silently.

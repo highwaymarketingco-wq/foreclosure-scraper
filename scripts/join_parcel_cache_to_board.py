@@ -44,6 +44,7 @@ sys.path.insert(0, str(REPO / "src"))
 #: file no longer needs its own copy of that rule, only a friendlier counter
 #: for the one case lookup() can't explain on its own: no li.state at all.
 from foreclosure_scraper.parcel_cache import DUAL_STATE_COUNTIES  # noqa: E402
+from foreclosure_scraper.models import ListingType  # noqa: E402
 _DUAL_LOWER = {n.lower() for n in DUAL_STATE_COUNTIES}
 
 
@@ -74,6 +75,17 @@ def main() -> int:
 
         c = Counter()
         for li in rows:
+            if li.listing_type == ListingType.TAX_SALE_OVERAGE:
+                # The parcel's cache row describes whoever owns it NOW -- a
+                # different person from the overage claimant this listing is
+                # about (the claimant lost the property AT the tax sale this
+                # claim came from). Filling owner_mailing here would silently
+                # attach a stranger's mailing address under the claimant's
+                # name. The scraper already sets situs address + owner_name
+                # (the claimant) directly from the claim document; nothing
+                # else here is safe to join onto this listing_type.
+                c["skipped: tax_sale_overage, owner != cache owner"] += 1
+                continue
             if not li.parcel_id:
                 c["no parcel_id"] += 1
                 continue

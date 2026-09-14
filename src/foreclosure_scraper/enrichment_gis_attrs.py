@@ -128,7 +128,7 @@ def _save_cache() -> None:
         _CACHE_PATH.write_text(json.dumps(_ATTR_CACHE))
     except Exception:  # noqa: BLE001
         pass
-from .models import Listing
+from .models import Listing, ListingType
 
 log = structlog.get_logger()
 
@@ -511,6 +511,13 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
             return
         if not _force and (raw.get("gis") or {}).get("queried"):
             stats["skipped_done"] += 1
+            return
+        # TAX_SALE_OVERAGE: every field this function fills (owner, mailing,
+        # value, sqft, acreage) describes the parcel's CURRENT owner -- a
+        # different person from the overage claimant the listing is about
+        # (the claimant lost the parcel AT the tax sale the claim came from).
+        # Nothing here is safe to backfill onto this listing_type.
+        if li.listing_type == ListingType.TAX_SALE_OVERAGE:
             return
         # PERSISTENT parcel cache — a LOCAL JOIN against the weekly bulk-downloaded county
         # parcel layer (data/parcel_cache). No network: fills owner/value/sqft/acreage/situs

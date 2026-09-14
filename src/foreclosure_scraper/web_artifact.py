@@ -673,6 +673,11 @@ RAW_KEEP = {
     "usda_rd": "*", "usmarshals": "*", "wake_tax_foreclosure": "*",
     "williams": "*", "wnc_rod": "*", "wnc_tax_foreclosures": "*",
     "york_delinquent_tax": "*",
+    # York's Overage Claim List (tax-sale surplus owed BACK to the former
+    # owner). Kept OUT of amount_owed -- that field is read everywhere as a
+    # DEBT (equity/distress math subtracts it), and this is the opposite: a
+    # credit. Own block so downstream math can't confuse the two.
+    "tax_sale_overage": "*",
 
 }
 
@@ -917,6 +922,7 @@ _SLIM_RAW: dict[str, str | tuple[str, ...]] = {
     # the provenance a reader needs to trust the row.
     "horry_flc": ("Item_Number", "FLC_Bid_Amount", "Description"),
     "name_resolution": ("matched_owner", "method"),
+    "tax_sale_overage": ("amount", "tax_sale_date", "map_number"),
 }
 
 

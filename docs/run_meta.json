@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-14T18:01:15.485059Z",
-  "total": 128391,
+  "run_time": "2026-09-14T20:41:10.836362Z",
+  "total": 128510,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -101,7 +101,7 @@
   },
   "by_state": {
     "NC": 69530,
-    "SC": 58861
+    "SC": 58980
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 41266,
@@ -147,6 +147,7 @@
     "counties_nc.henderson_code_violations": 154,
     "counties_sc.sc_public_notices": 150,
     "public_notices.gannett_obituaries": 131,
+    "counties_sc.york_overage_claims": 119,
     "counties_nc.asheville_helene": 115,
     "counties.column_legal_notices": 103,
     "counties_sc.spartanburg_city_condemned": 83,
@@ -451,21 +452,21 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "scheduled NC SOS registered-agent refresh",
-  "detail_count": 128391,
-  "detail_digest": "b2a6525e3af5418f",
+  "notes": "",
+  "detail_count": 128510,
+  "detail_digest": "5edfd1bf0cf84615",
   "board": {
     "schema": "slim-v1",
-    "count": 128391,
+    "count": 128510,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
       "count": 129,
-      "records": 128391
+      "records": 128510
     }
   },
-  "health_carried_from": "2026-09-14T16:35:43.817078Z",
+  "health_carried_from": "2026-09-14T20:21:09.803002Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",

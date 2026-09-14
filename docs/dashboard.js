@@ -296,6 +296,7 @@ const _LEAN_RAW = {
   lexington_assessment: ["assessment_ratio", "owner_occupied", "fmv", "tax_year"],
   horry_flc: ["Item_Number", "FLC_Bid_Amount", "Description"],
   name_resolution: ["matched_owner", "method"],
+  tax_sale_overage: ["amount", "tax_sale_date", "map_number"],
 };
 const _LEAN_RAW_KEYS = Object.keys(_LEAN_RAW);
 const _LEAN_RAW_SCALARS = [

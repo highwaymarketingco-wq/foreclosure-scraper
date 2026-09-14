@@ -21,7 +21,7 @@ import httpx
 import structlog
 
 from .http_client import client
-from .models import Listing, PropertyKind
+from .models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
@@ -1076,6 +1076,12 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
 
     async def one(c: httpx.AsyncClient, li: Listing) -> None:
         if not (li.street_address and li.county and li.state):
+            return
+        # TAX_SALE_OVERAGE: street_address here is the parcel the claimant
+        # LOST at tax sale -- a live GIS query on it resolves whoever owns it
+        # NOW, a different person, and would silently attach that stranger's
+        # mailing address under the claimant's name.
+        if li.listing_type == ListingType.TAX_SALE_OVERAGE:
             return
         # PARCEL-CACHE fast path — this phase's dominant cost is one live address query
         # PER LEAD across ~48k address-having leads (it ran ~6.8h uncapped on 2026-08-14).

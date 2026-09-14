@@ -26,7 +26,7 @@ from typing import Optional
 import httpx
 import structlog
 
-from .models import Listing
+from .models import Listing, ListingType
 from .enrichment_arcgis import scdot_walled  # SCDOT circuit-breaker
 from .http_client import client  # shared throttled transport (per-host rate limit + timeout hardening)
 # Re-export so existing importers keep working; the definition lives in a
@@ -827,7 +827,14 @@ async def enrich_owner_mailing(listings: list[Listing], max_concurrency: int = 1
     targets = [li for li in listings
                if _reachable(li)
                and (li.street_address or li.parcel_id)
-               and not _has_mailing(li)]
+               and not _has_mailing(li)
+               # TAX_SALE_OVERAGE: the GIS record at this parcel_id/address
+               # describes whoever owns the property NOW, a different person
+               # from the overage claimant the listing is about (the claimant
+               # lost the parcel AT the tax sale the claim came from). A live
+               # GIS resolve here would silently attach a stranger's mailing
+               # address under the claimant's name.
+               and li.listing_type != ListingType.TAX_SALE_OVERAGE]
     if not targets:
         return {"queried": 0, "resolved": 0}
     sem = asyncio.Semaphore(max_concurrency)
