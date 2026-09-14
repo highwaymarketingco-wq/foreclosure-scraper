@@ -912,6 +912,11 @@ _SLIM_RAW: dict[str, str | tuple[str, ...]] = {
     # Owner-occupancy derived from the SC assessment ratio. Ships because it is a
     # contact-quality signal the detail panel shows next to absentee.
     "lexington_assessment": ("assessment_ratio", "owner_occupied", "fmv", "tax_year"),
+    # Narrow tuples, not "*": the actionable parts of both blocks are already
+    # TOP-LEVEL fields (opening_bid, street_address, parcel_id). What ships here is
+    # the provenance a reader needs to trust the row.
+    "horry_flc": ("Item_Number", "FLC_Bid_Amount", "Description"),
+    "name_resolution": ("matched_owner", "method"),
 }
 
 
@@ -1121,6 +1126,47 @@ def _slim_payload_bytes(payload: list) -> bytes:
         for rec in payload
     ]
     return b"[" + b",".join(parts) + b"]"
+
+
+def _report_slim_drops(listings) -> None:
+    """Log raw keys that are on the BOARD in volume but absent from _SLIM_RAW.
+
+    THE PROBLEM THIS SOLVES. RAW_KEEP and _SLIM_RAW are two separate gates: the
+    first decides what reaches the full board, the second what reaches the payload
+    phones fetch. Registering one is not registering the other, and NOTHING FAILS
+    when a key is missing from either — the data simply does not arrive.
+
+    On 2026-09-13 that cost four enrichers in a single day: `fullmer` (0 of 115,994
+    slim rows, the whole buy-box rank invisible), `lexington_assessment` (1,159
+    blocks written and dropped), `name_resolution`, and `horry_flc` — the last two
+    registered in RAW_KEEP only, by someone who had just written "registered BEFORE
+    the first ingest this time" in a commit message.
+
+    Documentation did not fix it, because the failure is silent. This makes it loud:
+    every publish now prints what it is leaving out and how many rows carry it.
+    A key on thousands of rows and absent from slim is almost always a mistake; a
+    key on a handful is usually deliberate. The log lets a human tell the difference
+    instead of discovering it weeks later from a zero on a dashboard.
+    """
+    try:
+        counts: dict[str, int] = {}
+        for li in listings:
+            raw = getattr(li, "raw", None)
+            if not isinstance(raw, dict):
+                continue
+            for k in raw:
+                counts[k] = counts.get(k, 0) + 1
+        dropped = sorted(
+            ((k, n) for k, n in counts.items()
+             if k not in _SLIM_RAW and k not in _SLIM_RAW_SCALARS and n >= 100),
+            key=lambda kv: -kv[1])
+        if dropped:
+            log.info("web_artifact.slim_dropped_keys",
+                     note="on the board but NOT in the slim payload — intended?",
+                     keys={k: n for k, n in dropped[:15]},
+                     total_dropped=len(dropped))
+    except Exception:  # noqa: BLE001 — a diagnostic must never break a publish
+        pass
 
 
 def _emit_slim(docs: Path, payload: list) -> int | None:
@@ -1746,6 +1792,7 @@ def write_artifact(
     # disk: nothing below this line can change listings.json's bytes, and a bug
     # in the derivative cannot cost a run its board. See the SLIM-V1 block above.
     del listings_bytes, detail_bytes    # free ~350 MB before projecting (8 GB box)
+    _report_slim_drops(listings)   # loud about what slim leaves behind — see the docstring
     slim_count = _emit_slim(docs, payload)
 
     # DETAIL SHARDS, the mobile detail payload. Same contract as the slim file
