@@ -233,6 +233,25 @@ PARCEL_LAYERS: dict[str, dict] = {
                 "market_value": "TOT_MARKET", "tax_value": "ASSESSED_V",
                 "acreage": "GIS_ACRES", "land_use": "LANDUSE"},
     },
+    # Found 2026-09-14, same audit: Lexington (2,214 board rows, 0% mailing).
+    # Rich CAMA layer -- discovered via the county's own ArcGIS Online GIS
+    # account ("lexcogis") publishing a plain Map Service, not buried in a Web
+    # Map/Experience Builder config this time. TMS matches board parcel_id
+    # format exactly (dashed, e.g. "004121-01-024"), verified live on 3 real
+    # board rows.
+    "Lexington": {
+        "state": "SC",
+        "url": "https://maps.lex-co.com/agstserver/rest/services/Property/MapServer/4/query",
+        "id_fields": ["TMS", "TMS_No_Dash"],
+        "map": {"owner": "Owner",
+                "address": ["PropAddr_Num", "PropAddr_Str", "PropAddr_Suf"],
+                "owner_mailing": ["MailAddr", "MailAddr2", "MailAddr3",
+                                   "MailAddr_City", "MailAddr_State", "MailAddr_Zip"],
+                "market_value": "MktTotal", "tax_value": "TaxableTotal",
+                "acreage": "Acres", "living_sqft": "SqftLA",
+                "land_use": "PropTypeDesc", "sale_price": "SalePrice",
+                "sale_date": "SaleDate"},
+    },
     "Laurens": {  # TMS (dash format); layer has situs but no value field
         "url": "https://laurenscountygis.org/arcgis/rest/services/Pebble/TaxParcel/MapServer/5/query",
         "id_fields": ["TMS"],
