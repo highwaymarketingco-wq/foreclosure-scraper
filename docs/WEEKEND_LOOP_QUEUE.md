@@ -1963,6 +1963,11 @@ only fires after a user query, which needs actual form automation, not just
 a page load). Genuinely deferred, not abandoned; worth the dedicated time
 next since it's a two-for-one (or more).
 
+**Greenwood** checked too: real domain is `greenwoodcounty-sc.gov` (the
+`.gov` bare domain meta-refreshes there). Its tax-collector and treasurer
+pages are large (800K+ chars) but neither mentions "overage," "surplus,"
+"excess," or a delinquent-tax-sale document/link anywhere. No source found.
+
 **Status after this iteration**: Aiken (reCAPTCHA-gated claim form),
 Dillon (document center needs a working browser-rendered pass — first
 attempt timed out waiting for networkidle), Dorchester (no overage content
@@ -1970,5 +1975,5 @@ found), Edgefield/Hampton (no document of any kind), Jasper (published via
 newspaper, not the county site), Chester + Fairfield (same vendor SPA,
 needs one real reverse-engineering pass), Kershaw (only a bare geometry
 GIS layer, county site unreachable), Williamsburg (own GIS host but a
-different proprietary "TGIS" engine) all remain open. Greenwood not yet
-checked at all.
+different proprietary "TGIS" engine), and Greenwood (no source found) all
+remain open.
