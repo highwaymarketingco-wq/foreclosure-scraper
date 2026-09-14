@@ -1478,3 +1478,32 @@ trustee firms that do not publish, captcha-gated sale details).
   `_LEAN_RAW`. Nothing fails when one is missing — that cost four enrichers in a day.
   Every publish now logs the keys slim leaves behind.
 - Averages hid two bugs today. Check per-county before generalising.
+
+## 2026-09-14 07:30 — the notice detail gate is TURNSTILE, and it is a click-through ToS. NOT bypassed.
+
+Corrections first: the gate is **Cloudflare Turnstile** (sitekey `0x4AAAAAA...`,
+`challenges.cloudflare.com`), NOT reCAPTCHA — `_press_assoc.py`'s docstring and my
+own earlier reports both said reCAPTCHA. There is no Google reCAPTCHA script on the
+page. Our `enrichment_capsolver` implements only `AntiAwsWafTaskProxyLess` (AWS WAF,
+for Tyler/eCourts), so it would need a new task type either way.
+
+CapSolver DOES solve Turnstile and there is a free monthly pool, so cost is not the
+blocker. **The agreement text is.** To reach the full notice body you must click:
+
+    "I agree ... that I may not use the content of this site in any database,
+     compilation, archive or cache and that I may not engage in any unauthorized
+     screen scraping, database scraping, or spidering, or ... any other automated
+     means to collect information from the site."
+
+Solving the challenge to pass that gate IS the automated means it prohibits, and
+accepting the agreement programmatically means agreeing to it and breaking it in the
+same request. This is a stronger case than the site's passive Terms of Use page (on
+which the user decided 2026-09-13 to keep reading SEARCH RESULTS) — that decision
+does not extend to affirmatively accepting a no-scraping agreement.
+
+**NOT BYPASSED. Do not revisit with a different solver.**
+
+Consequence: full notice bodies (sale date, opening bid, situs) stay out of reach.
+The ~107 actionable footprint foreclosures stands, and the 45 notices whose PREVIEW
+carried a "Date of Sale" cue are already captured. That is the ceiling for this
+source, not a to-do.
