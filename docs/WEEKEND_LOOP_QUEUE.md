@@ -1580,3 +1580,46 @@ Getting past this needs either (a) a Cloudflare-challenge solver we don't have
 wired for qPublic specifically, or (b) accepting per-parcel scraping at whatever
 rate a browser-automation approach can sustain against an active bot wall — both
 outside today's scope. Flagging rather than leaving Cherokee/Union silently at 0%.
+
+## York County SC — first-ever lead source built (2026-09-14)
+
+York was a zero-row county (its only entry, `york_delinquent_tax`, is gated to
+Oct-Jan and had nothing off-season). Found and built its Overage Claim List:
+when a delinquent parcel sells at tax auction for more than the taxes owed, the
+county owes the surplus back to the FORMER owner — a live-maintained PDF
+(`**UPDATED 8/11/26**`), text-extractable, 119 usable claims / $1.26M total
+across 4 tax-sale years (2021-2024).
+
+Built:
+- New `ListingType.TAX_SALE_OVERAGE` (models.py) — this lead shape doesn't fit
+  any existing type: the property is already GONE, the "lead" is a person owed
+  money, not an acquisition target.
+- `counties_sc.york_overage_claims` — strict NAME/MAP#/$AMOUNT state-machine
+  parser (validates every line's shape, never assumes position), situs pulled
+  from a freshly-built York parcel cache (134,479 parcels) for context only.
+- **Real bug caught before it shipped**: the parcel cache's owner/mailing
+  fields describe whoever owns the property NOW (verified live — claimant
+  ANDREWS MINERVA W ETAL's old parcel 070-09-01-017 is now owned by TORRES
+  JUAN C GARCIA). Four generic enrichers resolve owner/mailing FROM a
+  parcel/address with "fill if blank" logic and would have silently attached
+  the current owner's mailing address under the claimant's name:
+  `join_parcel_cache_to_board.py`, `enrichment_gis_attrs.py`,
+  `enrichment_owner_mailing.py`, `enrichment_arcgis.py`. All four now skip
+  `TAX_SALE_OVERAGE` rows entirely. `sc_parcel_mailing`/`parcel_resolver.py`
+  is scoped to 5 counties, none of which is York — not a live risk today, but
+  flagged here as a watch item if a future overage-claim source targets
+  Spartanburg/Oconee/Anderson/Laurens/Union.
+- 10 parser tests (`test_york_overage_claims.py`), including the section-
+  boundary and blank-line cases actually present in the real PDF, and a
+  malformed-row recovery case (a broken record must not smear into its
+  neighbor's data).
+
+Verified live 2026-09-14 ~16:43: 119 `counties_sc.york_overage_claims` rows on
+the published board, `raw.tax_sale_overage` intact, no owner_mailing /
+market_value / tax_value leakage onto any row. Board: 128,391 → 128,510.
+
+**Next**: apply the same "find a live document/API, verify it's current, parse
+strictly, cross-reference the parcel cache for context only, guard against
+wrong-person contamination" method to the remaining zero-row SC counties —
+Aiken, Chester, Dillon, Dorchester, Edgefield, Fairfield, Greenwood, Hampton,
+Jasper — and the thin ones (Berkeley 2, Florence 7, Marion 2, Richland 1).
