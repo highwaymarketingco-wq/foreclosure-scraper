@@ -678,6 +678,7 @@ RAW_KEEP = {
     # DEBT (equity/distress math subtracts it), and this is the opposite: a
     # credit. Own block so downstream math can't confuse the two.
     "tax_sale_overage": "*",
+    "greenville_delinquent_tax": "*",
 
 }
 

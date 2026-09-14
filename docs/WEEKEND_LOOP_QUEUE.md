@@ -1869,3 +1869,65 @@ re-checking the same dead ends.
 document center), then Edgefield/Fairfield/Hampton/Jasper (zero-row,
 unstarted) and Chester/Kershaw/Williamsburg (deferred, non-standard
 backends).
+
+## Greenville County SC — new delinquent-tax source, 584 -> 2,871 rows (2026-09-14)
+
+While hunting Greenville's GIS layer for the mailing-gap audit (Greenville's
+own `gcgis.org` only exposes a geocoder publicly, no parcels service — still
+open), its property-tax page's disclaimer gate led to
+`greenvillecounty.org/appsAS400/Taxsale/` — an "AS/400" path that sounded
+like a legacy mainframe wall but is actually a plain, clean, uniform HTML
+table: `Item # | Map # | Name | Amount Due`, 2,338 rows, no existing scraper
+covered it at all (SC's LARGEST county had only 584 rows on the whole
+board). Built `counties_sc.greenville_delinquent_tax`.
+
+**Two real bugs caught and fixed before/immediately after shipping** (this
+is exactly the kind of thing "double-check your work" is for):
+
+1. **Parcel-format bug**: Greenville's Map# is usually 13 digits, but 383 of
+   2,112 real-estate rows use an alpha-prefixed condo/mobile-home-park code
+   (e.g. `WG02060100500`). A first-draft digits-only regex silently
+   reclassified all 383 as parcel-less "personal property" rows. Caught by
+   inspecting a specific duplicate-amount cluster (BBJ EQUITIES FL LLC, 12
+   parcels) instead of trusting the aggregate counts. Fixed: any non-empty
+   Map# is a parcel, since blank-vs-populated is the table's only real
+   signal (verified: exactly 226 truly blank, 1,729 pure-digit, 383
+   alpha-prefixed, zero of any other shape).
+2. **Dedupe self-collision bug**: the 226 genuine personal-property/vehicle
+   rows have no parcel_id AND no street_address, so `Listing.dedupe_key()`
+   fell through to `url:{source_url}` — and all 226 share the SAME
+   source_url (one page for the whole county), which would have collapsed
+   them into a SINGLE board row on ingest. Fixed by setting `case_number =
+   Item#` (unique per row in the county's own table) on every row, which
+   dedupe_key() checks before the source_url fallback.
+
+**A third bug found in a SHARED module, not just this scraper**: ingesting
+via the standard `dedupe()` merge (correct here — unlike York's
+TAX_SALE_OVERAGE, a Greenville parcel already on the board from
+`greenville_mie_adverts` matching this new list is the SAME property/person
+seen from a second angle, a corroboration signal, not a wrong-person
+hazard) surfaced that `enrichment_tax_owed.py`'s generic Pass B gated on the
+MERGED row's primary `source` name looking tax-ish -- but `merge()` keeps
+the bucket-holder's original source (the foreclosure lead), so a real
+`raw["greenville_delinquent_tax"]["total_due"]` sitting right there in
+`raw` was invisible to the normalizer. Fixed: the gate now also checks each
+raw sub-block's own NAME for a tax-ish substring, a strict superset of the
+old behavior. Re-running the normalizer board-wide picked up 1,448
+additional rows beyond Greenville alone — a real, pre-existing gap this
+incidentally closed everywhere a tax record has ever merged into a
+differently-named lead.
+
+**Performance note for future large ingests**: a full `dedupe(board +
+new_rows)` over the ~130K-row board hadn't finished after 2m49s of 100% CPU
+on this 8GB Mac — killed it and switched to a SCOPED dedupe (existing
+Greenville rows + new rows only, spliced back into the rest of the
+untouched board). 17 seconds, identical result (every dedupe_key these new
+rows can produce is Greenville-scoped; they carry no zip_code, so pass 2's
+cross-county zip-blocking branch can't reach them either). Worth reusing
+this pattern for any future large single-county ingest rather than a
+full-board dedupe() call.
+
+Verified live: 2,287 net-new Greenville rows (25 merged into existing
+`greenville_mie_adverts` records), 100% carry a normalized `tax_owed`
+balance, York's 119 TAX_SALE_OVERAGE rows still untouched. Greenville
+county total: 584 -> 2,871 rows. Row count math checked at every step.

@@ -428,6 +428,10 @@ DATELESS_OK_SOURCES = {
     # scraper's own comment): it would otherwise be the PAST parcel auction
     # date and _active_only would drop every row as a stale upcoming sale.
     "counties_sc.york_overage_claims",
+    # Greenville's AS/400 tax-sale roster carries no per-row sale_date either
+    # (a standing "who currently owes" list, not a scheduled event) -- same
+    # reasoning as every other county delinquent-tax source in this list.
+    "counties_sc.greenville_delinquent_tax",
     # Same cookie-cutter scraper as Fairfield above, same dateless Listing(): the
     # Saluda advertisement carries owner/TMS/description but no per-parcel date,
     # so without this entry every row it harvests in Nov-Dec is deleted silently.

@@ -62,3 +62,19 @@ def test_zero_amount_not_stamped():
     stats = enrich_tax_owed([li])
     assert stats["stamped"] == 0
     assert "tax_owed" not in li.raw
+
+
+def test_tax_block_merged_into_a_non_taxish_source_is_still_found():
+    """Regression 2026-09-14: dedupe().merge() keeps the BUCKET-HOLDER's
+    source/source_url, so a tax-delinquent record merged into a foreclosure
+    lead ends up with li.source == the foreclosure scraper's slug (no "tax"
+    substring) while still carrying the tax raw block. The old Pass B gate
+    checked only li.source and silently never saw it."""
+    li = _li("counties_sc.greenville_mie_adverts", parcel="0646050100800",
+             county="Greenville", state="SC",
+             raw={"greenville_mie": {"case_number": "2023-CP-23-01209"},
+                  "greenville_delinquent_tax": {"total_due": 6108.13}})
+    stats = enrich_tax_owed([li])
+    assert stats["stamped"] == 1
+    assert li.raw["tax_owed"]["balance"] == 6108.13
+    assert li.raw["tax_owed"]["basis"] == "own_record"

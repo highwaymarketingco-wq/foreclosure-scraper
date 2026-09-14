@@ -124,20 +124,35 @@ def _extract(li: Listing) -> tuple[Optional[float], Optional[str], object]:
                 return bal, kind, year
 
     # --- Pass B: generic scan for any other tax-ish source ---
-    if any(k in src for k in _TAXISH):
-        for blk_name, blk in raw.items():
-            if blk_name == "tax_owed":  # skip pre-existing tax_owed from prior runs
-                continue
-            if isinstance(blk, dict):
-                for gk in _GENERIC_KEYS:
-                    bal = _money(blk.get(gk))
-                    if bal:
-                        year = None
-                        for yk in _YEAR_KEYS:
-                            year = _coerce_year(blk.get(yk))
-                            if year:
-                                break
-                        return bal, "delinquent_tax", year
+    # Gate per-BLOCK, not once on the lead's own `src`: a tax-ish raw sub-block
+    # can arrive on a lead whose PRIMARY source isn't tax-named at all, when
+    # dedupe() merges a tax-delinquent record into a foreclosure/court lead
+    # for the same parcel (merge() keeps the bucket-holder's source/source_url,
+    # per its own docstring). Found 2026-09-14: a Greenville parcel merged from
+    # greenville_mie_adverts (a foreclosure lead) + greenville_delinquent_tax
+    # carried a real raw["greenville_delinquent_tax"]["total_due"] that this
+    # function silently never saw, because the old gate checked only
+    # `li.source` ("greenville_mie_adverts" -- no "tax"/"delinquent"
+    # substring) before ever looking at block names. Checking each block's own
+    # name is a strict superset of the old behavior: every row that used to
+    # match (tax-ish `src`) still does, and non-tax merged-in blocks on an
+    # unrelated lead still don't spuriously match on _GENERIC_KEYS alone.
+    src_is_taxish = any(k in src for k in _TAXISH)
+    for blk_name, blk in raw.items():
+        if blk_name == "tax_owed":  # skip pre-existing tax_owed from prior runs
+            continue
+        if not (src_is_taxish or any(k in blk_name for k in _TAXISH)):
+            continue
+        if isinstance(blk, dict):
+            for gk in _GENERIC_KEYS:
+                bal = _money(blk.get(gk))
+                if bal:
+                    year = None
+                    for yk in _YEAR_KEYS:
+                        year = _coerce_year(blk.get(yk))
+                        if year:
+                            break
+                    return bal, "delinquent_tax", year
 
     # --- Pass C: fallback — pre-existing tax_owed balance with year=None ---
     # On board re-runs, source sub-dicts may be stripped but tax_owed survived.

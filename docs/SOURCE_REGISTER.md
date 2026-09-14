@@ -1,12 +1,12 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-14 20:42 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-14 23:03 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
-- Scrapers in the registry: **222**
-- Producing rows on the board: **92**
+- Scrapers in the registry: **223**
+- Producing rows on the board: **93**
 - Registered but contributing ZERO rows: **130**
 - Confirmed real and not yet built: **9**
-- Board read: `docs/listings.json.gz` (128,510 rows)
+- Board read: `docs/listings.json.gz` (130,797 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
 
@@ -23,6 +23,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_nc.rutherford_tax` | 4,171 | Rutherford NC (4171) | `https://www.rutherfordcountync.gov/`<br>`https://www.rutherfordcountync.gov/departments/` |
 | `counties_sc.sc_public_index` | 3,698 | Anderson SC (673), Spartanburg SC (642), Laurens SC (640) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county` |
 | `counties_nc.buncombe_elderly` | 2,988 | Buncombe NC (2988) | `https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query` |
+| `counties_sc.greenville_delinquent_tax` | 2,287 | Greenville SC (2287) | `https://www.greenvillecounty.org/appsAS400/Taxsale/` |
 | `counties_sc.pickens_delinquent_parcels` | 1,854 | Pickens SC (1854) | `https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services`<br>`https://www.co.pickens.sc.us/departments/delinquent_tax/index.php` |
 | `counties_nc.nc_county_pdf_delinquent_tax` | 1,777 | McDowell NC (1375), Lincoln NC (402) | `https://www.lincolncountync.gov/DocumentCenter/View/25558/2025-TAXESDelinquentAdvertisementNotice`<br>`https://www.catawbacountync.gov/site/assets/files/11653/delinquent_advertisement_list-hdr_2026.pdf`<br>`https://mcdowellnc.gov/departments/tax-collections/tax-lien-advertisement/ADVERTISEMENT-LIST-FINAL-2025.pdf` |
 | `counties_sc.spartanburg_delinquent_tax` | 1,709 | Spartanburg SC (1709) | `https://www.spartanburgcounty.gov/DocumentCenter/View/11161/Real-Property-Tax-Sale-List-PDF`<br>`https://www.spartanburgcounty.gov/DocumentCenter/View/11161/`<br>`https://www.spartanburgcounty.gov/640/2025-Tax-Sale-Info` |

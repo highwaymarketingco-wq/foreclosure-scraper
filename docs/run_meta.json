@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-14T21:41:02.711066Z",
-  "total": 128510,
+  "run_time": "2026-09-14T23:02:21.788878Z",
+  "total": 130797,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -101,7 +101,7 @@
   },
   "by_state": {
     "NC": 69530,
-    "SC": 58980
+    "SC": 61267
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 41266,
@@ -112,6 +112,7 @@
     "nc_ecourts_judgments": 3776,
     "counties_sc.sc_public_index": 3698,
     "counties_nc.buncombe_elderly": 2988,
+    "counties_sc.greenville_delinquent_tax": 2287,
     "counties_sc.pickens_delinquent_parcels": 1854,
     "counties_nc.nc_county_pdf_delinquent_tax": 1777,
     "counties_sc.spartanburg_delinquent_tax": 1709,
@@ -452,21 +453,21 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "parcel-cache join: 40,548 hits, 659 owner mailing, 1,786 situs, 0 sqft",
-  "detail_count": 128510,
-  "detail_digest": "5edfd1bf0cf84615",
+  "notes": "",
+  "detail_count": 130797,
+  "detail_digest": "c53f8ae892f8701c",
   "board": {
     "schema": "slim-v1",
-    "count": 128510,
+    "count": 130797,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
-      "count": 129,
-      "records": 128510
+      "count": 131,
+      "records": 130797
     }
   },
-  "health_carried_from": "2026-09-14T21:29:54.406975Z",
+  "health_carried_from": "2026-09-14T22:59:20.170823Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
