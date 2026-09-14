@@ -1399,3 +1399,25 @@ ceiling before spending time on it.
 The unguarded enricher remains UNRUN and still needs a decision if the recall is
 ever judged worth the precision — but it should now be judged against ~3,700
 mostly-wrong numbers, not ~3,700 leads.
+
+## 2026-09-14 05:55 — FLC PDF route assessed, NOT built. Reasons recorded.
+
+- OCR is POSSIBLE here: `enrichment_doc_ocr` is Gemini -> GitHub Models -> Groq, and
+  **only GROQ_API_KEY has a value** in .env. Gemini/GitHub/NVIDIA are absent, so the
+  free-first providers are unavailable and Groq is the only path.
+- Anderson `2025-FLC-RE.pdf`: 3 pages, **0 extractable chars** — scanned.
+- Cherokee `TAX-SALE-TAB.pdf`: 1 page, **0 extractable chars**, and only 18 KB —
+  almost certainly a notice image, not a property table. Low expected payoff.
+
+**Not building it now, deliberately.** It needs PDF->image conversion, a vision call,
+table extraction, then dedupe into the board. OCR'd property records feeding a lead
+board fail SILENTLY — a mis-read parcel id or owner name looks like data. Today
+already produced four silent-loss bugs found only by checking afterwards; adding an
+un-verifiable OCR path at 06:00 would be the fifth.
+
+What a clean start needs (all recorded): the two URLs, page counts, the fact that
+both are scanned, and that Groq is the only configured provider.
+
+**Cheap source-discovery is now exhausted.** Everything remaining is either a build
+(FLC OCR parser), a decision (unguarded SC xref), or a genuine wall (SC parcel data,
+trustee firms that do not publish, captcha-gated sale details).
