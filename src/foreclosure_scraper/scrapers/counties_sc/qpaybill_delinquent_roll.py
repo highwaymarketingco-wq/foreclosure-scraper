@@ -875,6 +875,7 @@ class QPayBillDelinquentRoll(BaseScraper):
         out: list[Listing] = []
         per_county: dict[str, int] = {}
         detail_rows: dict[str, list[dict]] = {}
+        kept_idents: dict[str, set] = {}
         async with httpx.AsyncClient(timeout=45.0, follow_redirects=True,
                                      headers={"User-Agent": _UA}) as client:
             results = await asyncio.gather(
@@ -893,6 +894,13 @@ class QPayBillDelinquentRoll(BaseScraper):
             listings = _to_listings(county, rows)
             per_county[county] = len(listings)
             out.extend(listings)
+            # Idents that SURVIVED _to_listings. The detail pass below must not spend
+            # its budget on rows this county already discarded — see the note there.
+            kept_idents[county] = {
+                (li.raw.get("qpaybill_roll") or {}).get("identification_no")
+                for li in listings
+                if isinstance(li.raw, dict)
+            } - {None}
             lost = stats.pop("lost_prefixes", [])
             log.info("qpaybill_roll.county_done", county=county,
                      parcels=len(listings), rows=len(rows),
@@ -910,7 +918,22 @@ class QPayBillDelinquentRoll(BaseScraper):
             async with httpx.AsyncClient(timeout=45.0, follow_redirects=True,
                                          headers={"User-Agent": _UA}) as dclient:
                 for county, rows in sorted(detail_rows.items()):
-                    with_href = [r for r in rows if r.get("detail_href")]
+                    # DETAIL ONLY WHAT SURVIVED THE FILTER.
+                    #
+                    # This pass runs on the RAW grid rows, but _to_listings has already
+                    # dropped every parcel whose only unpaid year is the current one
+                    # (an SC bill is not late until 15 January of the following year).
+                    # Colleton 2026-09-13: 18,285 raw idents -> 1,494 real delinquents.
+                    # Detailing the raw set spent a 3,000-request budget almost entirely
+                    # on parcels that were then discarded, and returned value on 98.
+                    #
+                    # An earlier attempt deduped per parcel on the theory that the grid
+                    # returned ~14 rows per parcel. It does not — 20,876 rows over
+                    # 18,285 idents is 1.14 — so that fix bought nothing. The waste was
+                    # never duplication; it was ORDERING.
+                    keep = kept_idents.get(county)
+                    with_href = [r for r in rows if r.get("detail_href")
+                                 and (not keep or r.get("ident") in keep)]
                     with_href.sort(key=lambda r: -(r.get("amount") or 0))
                     # ONE DETAIL PER PARCEL, not per row.
                     #
