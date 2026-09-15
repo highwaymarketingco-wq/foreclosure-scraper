@@ -1,12 +1,12 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 15:23 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-15 15:28 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
 - Scrapers in the registry: **229**
-- Producing rows on the board: **126**
-- Registered but contributing ZERO rows: **103**
+- Producing rows on the board: **127**
+- Registered but contributing ZERO rows: **102**
 - Confirmed real and not yet built: **9**
-- Board read: `docs/listings.json.gz` (171,440 rows)
+- Board read: `docs/listings.json.gz` (171,459 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
 
@@ -106,6 +106,7 @@ Live row counts are what the source actually contributed to the board read above
 | `reo.vrm_va_reo` | 20 | Laurens SC (1) | `https://vrmproperties.com/`<br>`https://vrmproperties.com` |
 | `counties_nc.rutherford_foreclosure` | 19 | Rutherford NC (19) | `https://www.rutherfordcountync.gov/departments/` |
 | `counties_sc.anderson_master_in_equity` | 19 | Anderson SC (19) | `https://www.andersoncountysc.org/departments-a-z/master-in-equity/`<br>`https://www.andersoncountysc.org{href` |
+| `national.fema_disasters` | 19 | Brunswick NC (2), Swain NC (2), Pickens SC (2) | `https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries`<br>`https://www.fema.gov/disaster/{row.get(` |
 | `counties_sc.pickens_master_in_equity` | 18 | Pickens SC (18) | `https://www.co.pickens.sc.us/departments/master_in_equity/sales_rosters.php`<br>`https://www.co.pickens.sc.us/` |
 | `counties_nc.edgecombe_tax_foreclosure` | 17 | Edgecombe NC (17) | `https://www.edgecombecountync.gov/businesses/tax_collector/tax_foreclosure_list.php` |
 | `national.hubzu` | 16 | Spartanburg SC (4), Anderson SC (2), Laurens SC (2) | `https://www.hubzu.com/portal/auctions?state={state`<br>`https://www.hubzu.com/`<br>`https://www.hubzu.com{url` |
@@ -224,7 +225,6 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `national.cws_marketing` | `https://www.cwsmarketing.com/real-estate/`<br>`https://bid` |
 | `national.epa_superfund` | `https://ejscreen.epa.gov/mapper`<br>`https://enviro.epa.gov`<br>_+3 more_ |
 | `national.fdic_failed_banks` | `https://www.fdic.gov/bank-failures/failed-bank-list` |
-| `national.fema_disasters` | `https://www.fema.gov/disaster/declarations` |
 | `national.first_citizens_reo` | `https://www.firstcitizens.com/real-estate` |
 | `national.govdeals` | `https://maestro.lqdt1.com/search/list`<br>`https://www.govdeals.com/index.cfm?fa=Main&searchText=&category=&keyword=`<br>_+4 more_ |
 | `national.gsa_realproperty` | `https://realestatesales.gov` |

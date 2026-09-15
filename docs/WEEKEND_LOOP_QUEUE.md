@@ -3419,3 +3419,27 @@ other national/REO sources).
   dropped).
 
 Board: 171,439 -> 171,440 rows.
+
+## national.fema_disasters rebuilt on OpenFEMA API (2026-09-15)
+
+Rewritten to use FEMA's free OpenFEMA v2 REST API (the old HTML page is
+now Akamai-walled) -- confirmed live earlier this session by the
+background audit agent. Real per-county granularity via `designatedArea`
+(the old page only had statewide-or-nothing). Landed via
+`scripts/ingest_fema_disasters.py`.
+
+**Dedupe consolidation note:** 406 rows cleared the filters (2 years of
+NC/SC disaster declarations across dozens of counties -- fires, floods,
+hurricanes) but only 19 landed as net-new. These area-wide declarations
+have no street address, so dedupe's exact-key bucketing collapses every
+declaration in the same county down to one surviving row -- a county with
+6 separate fire/flood/hurricane declarations over 2 years shows only its
+most-recently-processed one on the board today, not a log of all 6. This
+isn't corruption (the surviving row is real data, correctly scoped) but
+is a real loss of temporal/event granularity for this specific signal
+shape (area-wide, addressless). Not fixed today -- would need a
+deliberate design decision about whether FEMA declarations should get a
+different dedupe key (e.g. keyed on county+fema_id instead of
+county+address) to preserve one row per distinct disaster event.
+
+Board: 171,440 -> 171,459 rows.

@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-15T15:23:16.076618Z",
-  "total": 171440,
+  "run_time": "2026-09-15T15:27:46.948912Z",
+  "total": 171459,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -100,8 +100,8 @@
     "courtlistener.recap": 945
   },
   "by_state": {
-    "NC": 93243,
-    "SC": 78197
+    "NC": 93253,
+    "SC": 78206
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 41264,
@@ -220,6 +220,7 @@
     "reo.vrm_va_reo": 20,
     "counties_nc.rutherford_foreclosure": 19,
     "counties_sc.anderson_master_in_equity": 19,
+    "national.fema_disasters": 19,
     "counties_sc.pickens_master_in_equity": 18,
     "counties_nc.edgecombe_tax_foreclosure": 17,
     "national.hubzu": 16,
@@ -511,20 +512,20 @@
     "newspapers.carolina_coast"
   ],
   "notes": "",
-  "detail_count": 171440,
-  "detail_digest": "3c31c19f206cac40",
+  "detail_count": 171459,
+  "detail_digest": "c02f5678b41f8acf",
   "board": {
     "schema": "slim-v1",
-    "count": 171440,
+    "count": 171459,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
       "count": 172,
-      "records": 171440
+      "records": 171459
     }
   },
-  "health_carried_from": "2026-09-15T15:17:14.895958Z",
+  "health_carried_from": "2026-09-15T15:23:16.076618Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",

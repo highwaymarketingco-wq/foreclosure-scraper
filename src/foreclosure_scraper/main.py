@@ -572,6 +572,7 @@ DATELESS_OK_SOURCES = {
     "national.first_citizens_reo",               # First Citizens bank-owned REO listings
     "national.usda_properties",                  # USDA Rural Development eligible / REO resales (SC); no sale date
     "national.gsa_surplus",                       # GSA accelerated-disposition federal properties; negotiated sale, no auction date
+    "national.fema_disasters",                    # FEMA disaster declarations by county; a declaration event, not a sale
     "counties_sc.sc_rod_acclaim",                # SC ROD (Acclaim vendor) recorded NOD/deed filings
     "counties_sc.sc_rod_cott",                   # SC ROD (Cott vendor) recorded NOD/deed filings
     # 2026-05 expansion — new sources added in this PR. Without these
