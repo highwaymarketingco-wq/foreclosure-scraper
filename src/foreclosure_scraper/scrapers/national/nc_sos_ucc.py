@@ -106,7 +106,7 @@ async def _fetch_ucc_page(days_back: int = 90) -> str:
             # The UCC page has: SearchCriteria (broad text), IndividualsSurname,
             # FirstPersonalName, AdditionalNamesInitials.  Fill SearchCriteria
             # with "a" for a broad wildcard search (the form requires input).
-            el = page.query_selector("input[name='SearchCriteria']")
+            el = await page.query_selector("input[name='SearchCriteria']")
             if el:
                 await el.fill("a")
             else:
@@ -116,7 +116,7 @@ async def _fetch_ucc_page(days_back: int = 90) -> str:
                     "input[name*='debtor']", "input[name*='name']",
                 ):
                     try:
-                        el = page.query_selector(sel)
+                        el = await page.query_selector(sel)
                         if el and not await el.input_value():
                             await el.fill("a")
                             break

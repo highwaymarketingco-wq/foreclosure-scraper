@@ -3348,3 +3348,18 @@ right now).
 `national.*` specifically (heavy `nodriver` automation, not run live --
 also looks like it may be a redundant duplicate of the already-working
 `counties_sc.sc_public_index`, worth checking if it's still needed at all).
+
+## nc_sos_ucc await fix applied, still 0 rows (2026-09-15)
+
+Fixed both confirmed missing-`await` sites in `national/nc_sos_ucc.py`
+(`page.query_selector(...)` at the primary call and its fallback-loop
+copy) per the background agent's finding -- verified live, the
+`RuntimeWarning: coroutine 'Page.query_selector' was never awaited` no
+longer fires. However the scraper still returns 0 rows after the fix
+(`nc_sos_ucc.no_results hint='Cloudflare may have blocked, or search
+form changed'`) -- the missing `await` was real and worth fixing (the
+element lookup could never have worked before), but it was not the
+*only* thing standing between this scraper and real rows. Needs a
+follow-up live session to diagnose whether the search form still isn't
+submitting correctly post-fix, or Cloudflare is still interfering after
+its own turnstile-solve step. Not chased further today.
