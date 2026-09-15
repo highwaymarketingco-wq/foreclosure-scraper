@@ -3738,3 +3738,44 @@ date rather than a literal sale date, next time one is touched.
 Board row count unchanged (in-place field fix, no rows added/removed).
 Real net effect: 3,765 previously-silently-excluded rows now flow
 through as live, active leads.
+
+## Systematic DATELESS_OK_SOURCES date-field audit: no further instances of the bug (2026-09-15)
+
+Given the "date field defeats DATELESS_OK_SOURCES" bug found 3 times in
+this sweep, checked every source already in DATELESS_OK_SOURCES for rows
+with a non-None `sale_date` that still fail `_active_only()` -- 1,692
+more rows across ~29 sources. Investigated carefully rather than
+mechanically clearing every hit, since a non-None sale_date failing the
+window check is *also* exactly what a source correctly holding real,
+simply-outdated sale dates would look like (the intended, correct
+behavior of a rolling active-lead window).
+
+Distinguished the two cases by checking date DIVERSITY: the 3 confirmed
+bugs (greenville_mie_adverts, courtlistener.recap, nc_ecourts_judgments)
+all had the field holding a non-sale date verified directly against raw
+source data. The five 100%-failure sources here
+(`counties_sc.charleston_delinquent_tax` 1,125/1,125,
+`national.cash_buyer_deeds` 23/23, `national.hubzu` 16/16,
+`national.jail_bookings` 6/6, `national.sheriff_sales` 1/1) all have
+genuinely DIVERSE real per-row dates (charleston_delinquent_tax is the
+one exception -- a single uniform date, but confirmed via a live
+re-scrape that the county's own published PDF still shows that exact
+same date today, meaning the source is between publish cycles, not
+field-mislabeled). hubzu/sheriff_sales carry real, distinct auction
+dates now aged past the window -- ordinary staleness that resolves with
+routine re-scraping, not corruption. cash_buyer_deeds/jail_bookings are
+UNKNOWN-typed reference/comp data (recorded deed dates, booking dates),
+inherently point-in-time historical records, not "active sale" signals
+in the first place.
+
+The remaining ~24 sources all show LOW failure percentages (0-15% of
+their total rows, a small handful in the 25-74% range like
+`counties_sc.charleston_mie` and `national.servicelink_auction`) --
+consistent with ordinary leads naturally aging out of a rolling window
+over time, the system working exactly as designed, not a bug signature.
+
+**Conclusion: no further instances of the date-mislabeling bug found.**
+The 3 already fixed this sweep (greenville_mie_adverts,
+courtlistener.recap, nc_ecourts_judgments) were the real ones; the rest
+of the board's `_active_only()` failures are ordinary, expected data
+staleness. No further board changes made.
