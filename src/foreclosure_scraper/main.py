@@ -384,6 +384,15 @@ SCOPE_BYPASS_SOURCES = {
     # this gate before geocoding ever got a chance. Same bug class as
     # CourtListener above.
     "national.craigslist_fsbo",
+    # national.legacy_obituaries was tried here 2026-09-15 and reverted:
+    # confirmed a garbage emitter, not a scope-gate bug. See
+    # legacy_obituaries.py's module docstring.
+    # sc_public_index added 2026-09-15: county is always None (the scraper
+    # never attaches it even though it knows which county it queried) --
+    # same "county arrives late" shape. Real, high-quality SC Common Pleas
+    # case data (9,464 distinct real party names verified live for
+    # Charleston alone), LIS_PENDENS type, distressed-bucket.
+    "national.sc_public_index",
 }
 
 #: Coastal foreclosure sources whose COUNTY is the whole point of the lead. They
@@ -573,6 +582,7 @@ DATELESS_OK_SOURCES = {
     "national.usda_properties",                  # USDA Rural Development eligible / REO resales (SC); no sale date
     "national.gsa_surplus",                       # GSA accelerated-disposition federal properties; negotiated sale, no auction date
     "national.fema_disasters",                    # FEMA disaster declarations by county; a declaration event, not a sale
+    "national.sc_public_index",                   # SC Common Pleas court filings; case filing date, not a sale date
     "counties_sc.sc_rod_acclaim",                # SC ROD (Acclaim vendor) recorded NOD/deed filings
     "counties_sc.sc_rod_cott",                   # SC ROD (Cott vendor) recorded NOD/deed filings
     # 2026-05 expansion — new sources added in this PR. Without these

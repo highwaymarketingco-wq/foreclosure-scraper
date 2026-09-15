@@ -3475,3 +3475,43 @@ Service instead (`frs.frs_program_facility`, `pgm_sys_acrnm=SEMS`), which
 does answer 200. `national.epa_superfund` never contributed anything the
 FRS-based source doesn't already cover -- disabled as a confirmed
 redundant duplicate.
+
+## national.legacy_obituaries: garbage confirmed and disabled; national.sc_public_index: real + non-redundant, Charleston landed (2026-09-15)
+
+Both were flagged "uncertain, needs a dedicated run" by the background
+audit agent. Ran both live.
+
+**legacy_obituaries -- confirmed garbage, disabled.** Tried adding it to
+SCOPE_BYPASS_SOURCES first (same "county arrives late" shape as
+craigslist_fsbo) and landed 684 rows in a dry run, but a manual spot-check
+of the actual obituary text before committing caught it: searching for
+"Asheville" NC obituaries returned real people from Tampa FL, New Britain
+CT, and -- via UK/NZ spelling in the text ("nee Matthews", "Whangarei
+Hospital") -- New Zealand. The `stateId={state.lower()}` search param
+almost certainly expects a numeric ID on legacy.com's backend, not a
+2-letter abbreviation, so the location filter is a no-op. Reverted the
+SCOPE_BYPASS_SOURCES/DATELESS_OK_SOURCES additions and disabled the
+scraper instead (same treatment as seeclickfix/bid4assets/city_websites.search).
+
+**sc_public_index -- confirmed real AND non-redundant, Charleston landed.**
+The agent guessed this might be "a redundant duplicate" of the working
+`counties_sc.sc_public_index` without running it live to check. It's not:
+that source covers only the 7 Upstate core counties; this module's
+Charleston-specific fast path (jcmsweb.charlestoncounty.org via curl-cffi,
+not behind the F5/Varnish WAF the other 45 counties sit behind) is
+genuinely different coverage. Live-verified 17,411 total Charleston
+Common Pleas cases, 9,464 distinct real party names across the full
+alphabet (double-checked after the first several rows looked like
+truncated garbage -- "A, A", "A, A A" -- which turned out to be real
+short/initial-only names once verified against the full alphabetical
+range, not a parsing bug). Landed the 1,509 rows from 2024+ via
+`scripts/ingest_sc_public_index_charleston.py`, which calls the fast
+Charleston helper directly and sets `county="Charleston"` precisely
+(the class's own `_to_listings()` always leaves county=None, which is
+why SCOPE_BYPASS_SOURCES/DATELESS_OK_SOURCES entries were also added for
+the source generally). The other 45 counties' nodriver-based WAF-bypass
+path was NOT run today -- slower, heavier, unverified; left as a genuine
+future expansion, same tier as other WAF-heavy sources already deferred
+this project.
+
+Board: 171,459 -> 172,968 rows.

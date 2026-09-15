@@ -1,16 +1,29 @@
 """Legacy.com obituary search -> probate lead cross-reference.
 
-Legacy.com aggregates obituaries from 1000s of funeral homes and newspapers.
-We search for recent obituaries in our NC/SC footprint, then the enrichment
-pipeline cross-references deceased names against property tax records to find
-probate leads (deceased owner -> heirs likely to sell).
+DISABLED 2026-09-15 (national.* zero-row audit) — confirmed garbage
+emitter. The search URL passes `stateId={state.lower()}` (e.g.
+`stateId=nc`) and `countryId=1`, but live-verified this silently does
+NOT scope the results: a search for "Asheville" obituaries returned real
+obituaries from Tampa FL, New Britain CT, and — via UK/NZ spelling
+conventions in the text ("nee Matthews", "Whangarei Hospital") — New
+Zealand. `stateId` almost certainly expects a numeric database ID on
+legacy.com's real search backend, not a 2-letter state abbreviation, so
+the filter is effectively a no-op; the scraper then tags EVERY result
+`search_city`/`search_state` from the query regardless of the obituary's
+actual location, producing 684 rows/run of fabricated-geography estate
+leads. If `.obituary/.result/.listing-item/article` selectors ever come
+back empty there's also a page-wide "scan for any Title-Case name"
+fallback below, which carries the same risk this project has disabled
+elsewhere (city_websites.search, seeclickfix). Currently harmless (every
+row lacks county/zip and gets dropped at the scope gate) but disabled
+outright rather than left dormant, same reasoning as those two.
 
-This scraper produces ESTATE_LEAD type listings when it finds an obituary
-mentioning a city in our footprint. The enrichment pipeline (enrichment_probate)
-then matches the deceased name against county tax records.
-
-Free, public. Server-rendered HTML. Cloudflare-protected, so we use
-impersonation for the TLS fingerprint.
+Original design intent, for a future real rebuild: Legacy.com aggregates
+obituaries from 1000s of funeral homes and newspapers — a genuinely
+strong probate-lead signal (deceased owner -> heirs likely to sell) IF
+the search can be scoped correctly. A real fix needs to find the actual
+numeric stateId values legacy.com's search expects (or a lat/lng-radius
+param instead), and verify results server-side before trusting them.
 """
 from __future__ import annotations
 
@@ -176,6 +189,11 @@ class LegacyObituariesScraper(BaseScraper):
         return out
 
     async def fetch(self) -> Iterable[Listing]:
+        # Disabled — see module docstring. Confirmed garbage emitter (the
+        # city/state search params don't actually scope the results).
+        return []
+
+    async def _disabled_fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         for city, state in _CITIES:
             city_results = await self._fetch_city(city, state)

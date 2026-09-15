@@ -1,12 +1,12 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 15:42 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-15 16:01 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
 - Scrapers in the registry: **229**
-- Producing rows on the board: **127**
-- Registered but contributing ZERO rows: **102**
+- Producing rows on the board: **128**
+- Registered but contributing ZERO rows: **101**
 - Confirmed real and not yet built: **9**
-- Board read: `docs/listings.json.gz` (171,459 rows)
+- Board read: `docs/listings.json.gz` (172,968 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
 
@@ -33,6 +33,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_sc.pickens_delinquent_parcels` | 1,854 | Pickens SC (1854) | `https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services`<br>`https://www.co.pickens.sc.us/departments/delinquent_tax/index.php` |
 | `counties_nc.nc_county_pdf_delinquent_tax` | 1,773 | McDowell NC (1371), Lincoln NC (402) | `https://www.lincolncountync.gov/DocumentCenter/View/25558/2025-TAXESDelinquentAdvertisementNotice`<br>`https://www.catawbacountync.gov/site/assets/files/11653/delinquent_advertisement_list-hdr_2026.pdf`<br>`https://mcdowellnc.gov/departments/tax-collections/tax-lien-advertisement/ADVERTISEMENT-LIST-FINAL-2025.pdf` |
 | `counties_sc.spartanburg_delinquent_tax` | 1,709 | Spartanburg SC (1709) | `https://www.spartanburgcounty.gov/DocumentCenter/View/11161/Real-Property-Tax-Sale-List-PDF`<br>`https://www.spartanburgcounty.gov/DocumentCenter/View/11161/`<br>`https://www.spartanburgcounty.gov/640/2025-Tax-Sale-Info` |
+| `national.sc_public_index` | 1,509 | Charleston SC (1509) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county`<br>`https://jcmsweb.charlestoncounty.org/PublicIndex/`<br>_+1 more_ |
 | `counties_sc.spartanburg_vacant` | 1,257 | Spartanburg SC (1257) | `https://services9.arcgis.com/HoRra3ATPLGmyjn6/arcgis/rest/services/`<br>`https://services9.arcgis.com/HoRra3ATPLGmyjn6/` |
 | `counties_nc.nc_county_csv_delinquent_tax` | 1,222 | New Hanover NC (1222) | `https://www.nhcgov.com/DocumentCenter/View/11283/Delinquent_Taxpayers_Report_CSV` |
 | `counties_nc.nc_ptscloud_delinquent_tax` | 1,155 | Henderson NC (1122), Hyde NC (33) | `https://bcpwa.ncptscloud.com` |
@@ -238,7 +239,6 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `national.opencorporates` | `https://api.opencorporates.com/v0.4/`<br>`https://api.opencorporates.com/v0.4/companies/search` |
 | `national.probate_foreclosure_leads` | _(no literal URL in module)_ |
 | `national.propwire` | _(no literal URL in module)_ |
-| `national.sc_public_index` | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county`<br>_+2 more_ |
 | `national.sc_sos_entity` | `https://businessfilings.sc.gov/BusinessFiling/Web/Reporting/SearchByName`<br>`https://businessfilings.sc.gov{href` |
 | `national.seeclickfix` | `https://developer.seeclickfix.com/`<br>`https://seeclickfix.com/api/v2/issues` |
 | `national.stealth_handoff` | _(no literal URL in module)_ |

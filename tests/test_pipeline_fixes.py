@@ -119,17 +119,25 @@ def test_zip_prefix_fallback_still_works():
     assert _in_scope(li) is True
 
 
-def test_scope_bypass_set_only_contains_courtlistener_and_craigslist_fsbo():
+def test_scope_bypass_set_deliberately_scoped():
     """The bypass must be tightly scoped. Adding a source here without
     thought would let cross-state listings leak in — each entry must be a
     source that (a) reliably sets `state` at scrape time and (b) only gets
-    `county` filled in later by geocode enrichment, which runs after this
-    gate. craigslist_fsbo added 2026-09-15: same "county arrives late"
-    shape as the CourtListener sources, confirmed via a live regression
-    check (255 real leads/run were being wiped by this gate every time)."""
+    `county` filled in later (geocode enrichment, or simply never attached
+    at all), which happens after this gate runs. All three additions below
+    were confirmed via a live regression/verification check before being
+    added, not assumed:
+      - craigslist_fsbo (2026-09-15): 255 real leads/run wiped every time.
+      - sc_public_index (2026-09-15): the scraper never attaches county
+        even though it knows which one it queried; 9,464 distinct real SC
+        Common Pleas party names verified live for Charleston alone.
+      - legacy_obituaries was tried and DELIBERATELY NOT added — confirmed
+        a garbage emitter (city/state search params don't actually scope
+        results), not a scope-gate bug. See legacy_obituaries.py."""
     assert SCOPE_BYPASS_SOURCES == {
         "national.courtlistener_bankruptcy",
         "national.courtlistener_civil",
         "national.courtlistener_adversary",
         "national.craigslist_fsbo",
+        "national.sc_public_index",
     }
