@@ -377,6 +377,13 @@ SCOPE_BYPASS_SOURCES = {
     # (liensnc bypass removed 2026-08-30: NC liensnc is already handled by the
     # state-guarded early-return above (~L278); the un-guarded set entries let
     # county-less non-NC liensnc rows leak in. Guarded handler preserves NC.)
+    # craigslist_fsbo added 2026-09-15 (national.* zero-row audit): state is
+    # set at scrape time but county is always None until geocode enrichment
+    # runs, and _in_scope() runs on the raw listing before that -- so every
+    # single fetch (255 real current FSBO leads that day) was being wiped at
+    # this gate before geocoding ever got a chance. Same bug class as
+    # CourtListener above.
+    "national.craigslist_fsbo",
 }
 
 #: Coastal foreclosure sources whose COUNTY is the whole point of the lead. They
