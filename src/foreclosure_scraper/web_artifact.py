@@ -651,7 +651,7 @@ RAW_KEEP = {
     "horry_flc": "*", "hubzu": "*", "ingle_firm": "*",
     "kershaw_flc": "*", "lancaster_delinquent_tax": "*", "landandfarm": "*",
     "landsofamerica": "*", "landwatch": "*", "laurens_delinquent_tax": "*",
-    "lincoln_vacant": "*", "marlboro_delinquent_tax": "*", "mccormick_flc": "*",
+    "lincoln_code": "*", "lincoln_vacant": "*", "marlboro_delinquent_tax": "*", "mccormick_flc": "*",
     "mcdowell_probate": "*", "mcdowell_tax_foreclosure": "*", "meares": "*",
     "mewborn_deselms": "*", "nc_bankruptcy_sales": "*", "nc_civicplus_tax_sale": "*",
     "nc_coastal_tax_foreclosure": "*", "nc_deq_dsca": "*", "nc_ecourts_divorce": "*",

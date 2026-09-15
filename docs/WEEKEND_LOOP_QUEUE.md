@@ -2850,3 +2850,38 @@ run without risking silent data pollution, and no longer able to stall
 the orchestrator on one dead host.
 
 Full 4,000-test suite passes.
+
+## lincoln_code_violations.py fixed: TLS + a missing RAW_KEEP gap (2026-09-15)
+
+Last of today's NC bug-list items that was cheap enough to finish in this
+pass. Confirmed live exactly what the audit found: `arcgisserver.
+lincolncountync.gov` serves an incomplete certificate chain (missing
+intermediate CA) -- the leaf cert itself is valid and current, so this is
+a server misconfiguration on the county's own domain, not a reason to
+distrust the endpoint. `verify=True` fails with "unable to get local
+issuer certificate"; `verify=False` against this exact host returns a
+clean 200. Fixed with a LOCAL `httpx.AsyncClient(verify=False)` scoped to
+only this one call, not a change to the shared `http_client.client()`
+every other scraper uses.
+
+Fixing the TLS block surfaced a second, independent gap this scraper had
+apparently never hit before (because it had never successfully run): its
+raw block key, `lincoln_code`, was missing from `web_artifact.py`'s
+`RAW_KEEP` allowlist -- meaning even with TLS fixed, every violation
+detail and county-published contact this scraper carries would have been
+silently stripped on write. Added.
+
+Verified live: 63 real properties (66 open code-violation cases -- junk
+vehicles, RV-as-residence, unpermitted signs, use violations), owner
+names correctly split from contractor/LLC names via the scraper's own
+entity-detection regex. Landed via
+`scripts/ingest_lincoln_code_violations.py` (source-scoped dedupe, 0
+existing rows): board 150,021 -> **150,084**. York's 119
+TAX_SALE_OVERAGE rows still carry zero owner_mailing. Full 4,000-test
+suite passes.
+
+**All 7 confirmed bugs from today's NC audit are now either fixed
+(wake, edgecombe, nc_deq_dsca-disabled, wnc_tax_foreclosures,
+lincoln_code_violations) or precisely documented and deferred
+(cumberland_tax_foreclosure's Sitefinity markup, swain_tax_foreclosures'
+JS-attribute PDF link + scanned-image OCR need).**

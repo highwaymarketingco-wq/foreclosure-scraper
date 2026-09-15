@@ -25,6 +25,21 @@ status shows up as a lead instead of silently vanishing.
 
 Dateless (a violation has no sale date) -> routed via DATELESS_OK_SOURCES.
 Gate with FORECLOSURE_LINCOLN_CODE=0.
+
+TLS NOTE (found 2026-09-15, background triage agent, this codebase's
+zero-row-scraper audit; confirmed live by hand before touching this
+file): `arcgisserver.lincolncountync.gov` serves an INCOMPLETE
+certificate chain -- the leaf cert itself is valid and current (not
+expired, not self-signed, not a spoof), the county's server is just
+missing the intermediate CA in what it presents, so httpx's default
+`verify=True` fails with "unable to get local issuer certificate" while
+a real browser (which caches/fetches intermediates itself) loads it
+fine. Confirmed live: `verify=False` against this exact host returns a
+normal 200 with real data (66 open violations at the time this was
+found). This is a server misconfiguration on the county's own domain,
+not a reason to distrust the endpoint -- fetches here use a LOCAL
+httpx.AsyncClient with verify=False scoped to ONLY this one call, not a
+change to the shared `http_client.client()` every other scraper uses.
 """
 from __future__ import annotations
 
@@ -33,11 +48,11 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
+import httpx
 import structlog
 
 from ... import arcgis_webmap as agw
 from ...base_scraper import BaseScraper
-from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -253,7 +268,9 @@ class LincolnCodeViolations(BaseScraper):
         if os.environ.get(ENV_OFF, "1") == "0":
             log.info("lincoln_code.disabled")
             return []
-        async with client(timeout=45.0) as http:
+        # verify=False: see the module docstring's TLS note. Scoped to this one
+        # host's known-broken (incomplete, not malicious) cert chain.
+        async with httpx.AsyncClient(timeout=45.0, verify=False) as http:
             feats = await agw.query_features(
                 http, LAYER, where=_OPEN_WHERE, out_fields=_OUT_FIELDS,
                 return_geometry=True, out_sr=4326, order_by="OBJECTID ASC",
