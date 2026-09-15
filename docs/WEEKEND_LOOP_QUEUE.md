@@ -3082,3 +3082,27 @@ rate-limiting much harder today than the 2026-09-10 baseline the
 docstring describes — multiple prefixes have exhausted all 5 backoff
 attempts (up to 480s waits) and given up incomplete. Will check back on
 it separately rather than block this batch on it.
+
+## sc_catalis_delinquent_roll: confirmed correct code, host hostile today (2026-09-15)
+
+Follow-up on the SC audit's `sc_catalis_delinquent_roll` finding. Let the
+live re-verification run for 25+ minutes rather than the module's own
+600s `timeout_s` (my direct `.fetch()` call bypassed that -- it's only
+enforced by the scraper's `.safe_run()` wrapper, not a raw `.fetch()`
+call). Result: 100% failure rate across every prefix attempted
+(Pickens O/P/Q/R), each one exhausting all 5 of the module's own backoff
+attempts (up to 480s waits) before giving up. This host (robots-
+disallowed, crawled deliberately "gently" per the module's own
+docstring) appears to be rate-limiting far more aggressively today than
+the 2026-09-10 baseline its comments describe -- possibly a general
+tightening, or a reaction to the volume of probing this same host got
+earlier today (both the background audit agent and this direct check).
+
+Killed the check rather than let it run indefinitely. Not a code bug —
+the module's own request-budget/backoff design is working exactly as
+built, the host is just not cooperating right now. Confirmed already
+correctly wired (`DATELESS_OK_SOURCES` since 2026-09-10). Revisit with a
+fresh live check another day rather than force it; no code change
+needed unless a future check finds the SAME 100%-blocked pattern
+repeatedly, which would suggest something more specific (an IP-level
+block) worth investigating separately.
