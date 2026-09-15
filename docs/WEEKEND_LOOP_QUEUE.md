@@ -2296,3 +2296,35 @@ sub-papers covering counties still thin/zero (Colleton? Georgetown's
 own paper vs. the Post & Courier's Georgetown coverage?) — this pattern
 just produced 3 wins in a row (Aiken, Dorchester, Berkeley) for near-zero
 marginal cost once the shared parser already existed.
+
+## Checked Colleton/Georgetown/Chester for the same TownNews gap — no further wins (2026-09-15)
+
+Followed up on "does the Aiken/Dorchester/Berkeley pattern repeat?":
+
+- **Georgetown**: DOES have its own Post & Courier section
+  (`postandcourier.com/georgetown/classifieds/community/announcements/
+  legal/`), confirmed reachable — but it's genuinely EMPTY right now (0
+  items with no query filter at all, not a query-term mismatch). Georgetown
+  already has 581 board rows from `georgetown_civicengage` anyway, so this
+  was a lower-priority check to begin with; nothing to add today.
+- **Colleton**: its traditional local paper (`press-standard.com`) is now a
+  parked/redirect-to-`/lander` domain, not a live TownNews site. Colleton
+  already has 1,480 rows from other sources — not pursued further.
+- **Chester**: its local paper (`newsandreporter.com`, the Chester News &
+  Reporter) is ALSO a parked `/lander` domain. Chester's other local-media
+  option is the Rock Hill Herald (`heraldonline.com`), which runs on
+  McClatchy's "iPublish AdPortal" platform — the SAME harder, JS-rendered
+  system already deferred for Jasper (see the paystar.io / iPublish note
+  above), not the easy TownNews RSS win. Given Chester's primary real path
+  is the CapSolver-gated `chestercountysctax.com` portal anyway (already
+  documented, blocked only on the unstaged key), the newspaper angle isn't
+  the priority lever for Chester specifically.
+
+**Consolidating the two "solve once, unlock several" platform notes**:
+TownNews/Post & Courier's easy wins are now believed exhausted (Charleston,
+Aiken, Dorchester, Berkeley covered; Georgetown empty; Colleton has no live
+TownNews presence). The REMAINING harder platform, McClatchy's iPublish
+AdPortal, covers at least Jasper + Chester(via Rock Hill Herald) — worth
+its own dedicated investigation pass alongside paystar.io (Berkeley +
+Jasper + Florence) as the two standing "bigger build" projects noted in
+this doc.
