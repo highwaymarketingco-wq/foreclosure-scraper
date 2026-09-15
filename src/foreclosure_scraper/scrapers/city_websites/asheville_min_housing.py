@@ -1,15 +1,24 @@
 """Asheville NC — Minimum Housing / Unsafe Building condemnations.
 
-The City of Asheville publishes minimum housing violation cases and
-condemned/unsafe building notices.  These are properties flagged by
-the city for housing code violations — a strong pre-foreclosure distress
-signal (owners face fines, repair orders, or condemnation).
+DISABLED 2026-09-15 (misc-category zero-row audit follow-up) — confirmed
+dead end, not a code bug. `PAGE_URL` 301-redirects to
+`.../compliance-division/minimum-housing-and-unsafe-buildings/`, which
+`get_text` follows fine, but the live page is PURELY informational: how
+the minimum-housing code works, landlord/tenant responsibilities, how to
+file a complaint, mold FAQ, contact info. There is no table, list, or any
+published case data on it at all -- the module's own premise ("the page
+lists properties with case numbers, addresses, and violation types") was
+never true of this URL. Asheville's minimum-housing process is
+complaint-driven and apparently not published as a public case registry
+anywhere on this page. No fix available without a different data source
+entirely (e.g. a FOIA/records-request relationship, or discovering a
+genuinely different published registry) -- disabled rather than left
+silently returning 0 with no explanation.
 
-Data source: Asheville's open data portal and code enforcement pages
-at ashevillenc.gov.  The page lists properties with case numbers,
-addresses, and violation types.
+Original design intent, for reference: minimum housing violation cases
+and condemned/unsafe building notices are a strong pre-foreclosure
+distress signal (owners face fines, repair orders, or condemnation).
 
-Free, public, no login.
 Slug: city_websites.asheville_min_housing
 Category: code_enforcement
 ListingType: DISTRESSED
@@ -41,6 +50,11 @@ class AshevilleMinHousing(BaseScraper):
     optional = True
 
     async def fetch(self) -> Iterable[Listing]:
+        # Disabled — see module docstring. The page has no case data, just
+        # process/contact info.
+        return []
+
+    async def _disabled_fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         try:
             html = await get_text(PAGE_URL, impersonate=True, timeout=40.0)

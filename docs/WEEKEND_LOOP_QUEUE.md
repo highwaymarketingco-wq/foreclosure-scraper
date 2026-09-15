@@ -3515,3 +3515,24 @@ future expansion, same tier as other WAF-heavy sources already deferred
 this project.
 
 Board: 171,459 -> 172,968 rows.
+
+## Loop continuation: asheville_min_housing disabled, daily_courier + shelby_star confirmed correct (2026-09-15)
+
+- `city_websites.asheville_min_housing` -- confirmed genuine dead end,
+  disabled. The target URL 301-redirects to a live page, but that page is
+  purely informational (how the minimum-housing code works, how to file a
+  complaint, contact info) -- no case table, list, or published registry
+  of any kind. The module's original premise ("the page lists properties
+  with case numbers, addresses, and violation types") was never true of
+  this URL. No replacement source found; Asheville's process appears to
+  be complaint-driven, not published as a public case registry anywhere
+  on this page.
+- `newspapers.daily_courier` -- confirmed correctly working, genuinely 0
+  today. Live-checked: the site's ~9-ad cap (already documented and
+  verified 2026-08-13) is still accurate -- 9 real ad links found, all
+  "notice-to-creditors"/generic legal notices, none foreclosure-related
+  right now. Small-paper volatility, not a bug.
+- `newspapers.shelby_star` -- confirmed correctly working by design. The
+  module's own docstring already explains Shelby Star (Gannett network)
+  doesn't host its own legal-notices section at all; returning empty is
+  the documented, intentional current-state behavior.

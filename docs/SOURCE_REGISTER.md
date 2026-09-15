@@ -1,6 +1,6 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 16:01 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-15 16:39 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
 - Scrapers in the registry: **229**
 - Producing rows on the board: **128**
