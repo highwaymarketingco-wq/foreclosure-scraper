@@ -2177,3 +2177,33 @@ enrichment_tax_owed.py (recovered 1,448+ rows board-wide beyond the sources
 that prompted the fix). Every write verified live, every write checked
 against the York TAX_SALE_OVERAGE wrong-person guard, which has held
 through every single board write since it was built.
+
+
+## Berkeley/Jasper's paystar.io — real API found, needs a qpaybill-scale build (2026-09-14)
+
+Followed up on the paystar.io vendor pattern. Drove Berkeley's portal with
+a real browser and typed into its search box: it calls a genuine, simple,
+unauthenticated GET API —
+
+    https://berkeleycountysc.paystar.io/api/search/suggest?searchTerm=smith
+    -> {"data": ["273 SMITH CREEK LN:Site Address", ...], "hasErrors": false}
+
+— confirmed live, capped at ~5 autocomplete-style suggestions per query, no
+delinquency filter visible at this stage (searches the WHOLE tax roll, not
+just delinquent accounts). Checked its Terms of Use / Notice modal
+specifically before going further, given this session's established
+"a click-through defeating a scraping prohibition is itself prohibited"
+line from the notices.com case: this one is a plain liability disclaimer
+("no warranties... for informational use only"), the SAME shape as Aiken's
+overage-form disclaimer, not a scraping-prohibition clause. No ethical
+wall here.
+
+**Not a quick add.** Getting real bulk delinquent-tax data out of this
+needs the SAME class of effort as `qpaybill_delinquent_roll.py` (one of the
+largest, most sophisticated scrapers in this codebase): systematic
+prefix/name enumeration to discover the full roll despite the ~5-result
+autocomplete cap, then a second per-record detail fetch to get parcel/
+owner/balance and filter to delinquent-only. Worth building deliberately
+as its own project (would cover BOTH Berkeley and Jasper, same vendor, and
+possibly more paystar.io counties not yet found) rather than rushing a
+partial version into this pass.
