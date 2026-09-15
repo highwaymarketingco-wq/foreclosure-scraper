@@ -199,6 +199,17 @@ QPAYBILL_SUBS: dict[str, str] = {
     "Horry": "horrycountytreasurer",
     "Kershaw": "kershawcounty",
     "Lexington": "lexingtoncountytreasurer",
+    # 2026-09-15: found while scoping a paystar.io build for Jasper (which runs
+    # jaspercountysc's CURRENT-year property/vehicle payment portal on a totally
+    # different vendor). Jasper's own site links a SEPARATE "Pay Delinquent Taxes"
+    # button straight to jaspercountydelinquenttax.qpaybill.com -- the delinquent
+    # roll was on THIS vendor all along, just under a subdomain this module's
+    # roster never probed. Verified live: same Type4 form (ddlCriteriaList/
+    # ddlYearList/PaidStatus/SearchType all present), same sweep_county() path,
+    # zero code changes needed. Full-budget sweep (2500): 1,517 parcels, 0 errors,
+    # 5 prefixes depth-truncated (DUPO/HAMI/MILL/RIVE/SCOT) -- per this module's
+    # own measured finding above, deepening those recovers ~0 net-new rows.
+    "Jasper": "jaspercountydelinquenttax",
     # Marion is DELIBERATELY ABSENT, same reason as Hampton but a different failure.
     # marioncounty.qpaybill.com is a fully working portal — correct Type4 form, all
     # the right fields, 200 on every request — that simply has NO DATA. Verified

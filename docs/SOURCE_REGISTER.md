@@ -1,12 +1,12 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 04:03 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-15 08:37 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
-- Scrapers in the registry: **228**
-- Producing rows on the board: **98**
-- Registered but contributing ZERO rows: **130**
+- Scrapers in the registry: **229**
+- Producing rows on the board: **100**
+- Registered but contributing ZERO rows: **129**
 - Confirmed real and not yet built: **9**
-- Board read: `docs/listings.json.gz` (131,717 rows)
+- Board read: `docs/listings.json.gz` (134,977 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
 
@@ -18,11 +18,12 @@ Live row counts are what the source actually contributed to the board read above
 
 | Slug | Rows | Top counties | URLs in the module |
 |---|---:|---|---|
-| `counties_sc.qpaybill_delinquent_roll` | 33,045 | Spartanburg SC (3859), Sumter SC (3095), Darlington SC (2684) | `https://{sub` |
+| `counties_sc.qpaybill_delinquent_roll` | 33,955 | Spartanburg SC (3859), Sumter SC (3095), Darlington SC (2684) | `https://{sub` |
 | `counties_sc.sc_dew_lien_registry` | 8,871 | Charleston SC (3388), Horry SC (1728), Spartanburg SC (1248) | `https://uitax.dew.sc.gov/LienRegistry/`<br>`https://dew.sc.gov/benefit-lien-registry`<br>`https://uitax.dew.sc.gov/CoreServices/Lien/TaxLienRegistry.svc/SearchTaxLienRegistry`<br>_+1 more_ |
 | `counties_nc.rutherford_tax` | 4,171 | Rutherford NC (4171) | `https://www.rutherfordcountync.gov/`<br>`https://www.rutherfordcountync.gov/departments/` |
 | `counties_sc.sc_public_index` | 3,698 | Anderson SC (673), Spartanburg SC (642), Laurens SC (640) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county` |
 | `counties_nc.buncombe_elderly` | 2,988 | Buncombe NC (2988) | `https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query` |
+| `counties_sc.berkeley_paystar_tax` | 2,349 | Berkeley SC (2349) | `https://berkeleycountysc.paystar.io/api/search`<br>`https://berkeleycountysc.paystar.io/api/invoices/{invoiceNumberHash`<br>`https://berkeleycountysc.paystar.io` |
 | `counties_sc.greenville_delinquent_tax` | 2,287 | Greenville SC (2287) | `https://www.greenvillecounty.org/appsAS400/Taxsale/` |
 | `counties_sc.pickens_delinquent_parcels` | 1,854 | Pickens SC (1854) | `https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services`<br>`https://www.co.pickens.sc.us/departments/delinquent_tax/index.php` |
 | `counties_nc.nc_county_pdf_delinquent_tax` | 1,777 | McDowell NC (1375), Lincoln NC (402) | `https://www.lincolncountync.gov/DocumentCenter/View/25558/2025-TAXESDelinquentAdvertisementNotice`<br>`https://www.catawbacountync.gov/site/assets/files/11653/delinquent_advertisement_list-hdr_2026.pdf`<br>`https://mcdowellnc.gov/departments/tax-collections/tax-lien-advertisement/ADVERTISEMENT-LIST-FINAL-2025.pdf` |
@@ -116,6 +117,7 @@ Live row counts are what the source actually contributed to the board read above
 | `national.realtor_foreclosures` | 1 | Spartanburg SC (1) | _(no literal URL in module)_ |
 | `national.sheriff_sales` | 1 | Cleveland NC (1) | `https://www.brunswicksheriff.com`<br>`https://www.charlestoncounty.org`<br>`https://www.sheriffclevelandcounty.com`<br>_+1 more_ |
 | `newspapers.coastland_times` | 1 | Dare NC (1) | `https://www.thecoastlandtimes.com` |
+| `newspapers.index_journal` | 1 | Greenwood SC (1) | `https://www.indexjournal.com/classifieds/community/announcements/legal/?f=rss` |
 
 ## 2. Built but producing zero rows
 
@@ -245,7 +247,6 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `newspapers.carolina_coast` | `https://www.carolinacoastonline.com/classifieds/?f=rss&q=foreclosure`<br>`https://www.carolinacoastonline.com/classifieds/?f=rss&q=substitute+trustee`<br>_+1 more_ |
 | `newspapers.daily_courier` | `https://www.thedigitalcourier.com/classifieds/community/announcements/legal/`<br>`https://www.thedigitalcourier.com` |
 | `newspapers.hendersonville_lightning` | `https://www.hendersonvillelightning.com/legal-ads/130-foreclosures.html` |
-| `newspapers.index_journal` | `https://www.indexjournal.com/classifieds/community/announcements/legal/?f=rss` |
 | `newspapers.post_and_courier` | `https://www.postandcourier.com/classifieds_new/community/announcements/` |
 | `newspapers.shelby_star` | `https://www.shelbystar.com`<br>`https://www.shelbystar.com/`<br>_+4 more_ |
 | `newspapers.tryon_bulletin` | `https://tryondailybulletin.com`<br>`https://tryondailybulletin.com/?s=foreclosure+sale`<br>_+3 more_ |

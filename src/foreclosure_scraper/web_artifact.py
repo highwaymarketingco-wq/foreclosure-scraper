@@ -681,6 +681,7 @@ RAW_KEEP = {
     "greenville_delinquent_tax": "*",
     "richland_flc": "*",
     "dillon_delinquent_tax": "*",
+    "berkeley_paystar_tax": "*",
 
 }
 

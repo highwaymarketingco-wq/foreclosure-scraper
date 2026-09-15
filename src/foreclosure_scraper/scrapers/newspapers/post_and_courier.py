@@ -1,17 +1,32 @@
 """The Post and Courier (Charleston, SC) — foreclosure legal notices.
 
-The Post & Courier is the legal-notice paper of record for the SC Lowcountry
-(Charleston, Berkeley, and Dorchester counties — all in the coastal footprint).
-It runs on TownNews (TNCMS), whose legal-classifieds category exposes a free,
-server-rendered RSS feed. Filtering that feed for `q=foreclosure` returns only
-the foreclosure-related notices: Master-in-Equity sale notices and SC
-mortgage-foreclosure summonses (Court of Common Pleas), published days-to-weeks
-BEFORE the auction — the pre-auction signal we want.
+The Post & Courier is the legal-notice paper of record for Charleston County,
+SC (part of the coastal footprint). It runs on TownNews (TNCMS), whose
+legal-classifieds category exposes a free, server-rendered RSS feed. Filtering
+that feed for `q=foreclosure` returns only the foreclosure-related notices:
+Master-in-Equity sale notices and SC mortgage-foreclosure summonses (Court of
+Common Pleas), published days-to-weeks BEFORE the auction — the pre-auction
+signal we want.
+
+NOTE (2026-09-14): this scraper's FEED_URLS query one generic classifieds
+section that is Charleston-scoped in practice. Berkeley and Dorchester
+counties are NOT reliably covered here even though early samples occasionally
+included stray Berkeley rows — each of those counties' own local paper
+publishes its legal notices under its OWN TownNews section on this same
+postandcourier.com domain, which this scraper never queries. They are covered
+by dedicated sibling scrapers instead: newspapers.berkeley_independent
+(Berkeley) and newspapers.journal_scene (Dorchester). See _townnews.py for the
+shared parser both this file and those two reuse. Do not re-add Berkeley/
+Dorchester coverage here — it already exists elsewhere.
 
 Verified live (2026-06-25): the foreclosure RSS returned 3 current notices
 spanning Charleston + Berkeley counties, each carrying the C/A (case) number,
 county, court, and parties. SC sale addresses are then resolved downstream by
-the existing case-number / Master-in-Equity enrichers.
+the existing case-number / Master-in-Equity enrichers. Any stray non-Charleston
+row that slips through this feed is still correctly county-tagged by
+_townnews.parse_rss_items's _resolve_county() (falls back to this scraper's
+default_county="Charleston" only when no known SC/NC county name is found in
+the text at all).
 
 Free, no login, no WAF, no JS for the data we read (RSS is static XML).
 """

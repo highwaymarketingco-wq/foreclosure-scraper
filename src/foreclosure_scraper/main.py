@@ -440,6 +440,10 @@ DATELESS_OK_SOURCES = {
     # a standing "who currently owes" list, same reasoning as every other
     # SC county delinquent-tax source in this list.
     "counties_sc.dillon_delinquent_tax",
+    # Berkeley's paystar.io delinquent-tax roll carries no per-parcel date
+    # either -- a standing "who currently owes" list, same reasoning as
+    # every other SC county delinquent-tax source in this list.
+    "counties_sc.berkeley_paystar_tax",
     # A freshly-filed foreclosure summons has no sale date yet (the case has
     # only just been filed) -- same reasoning as sc_public_index_lis_pendens
     # above: filed but no sale date yet is a real, valid early-warning signal,

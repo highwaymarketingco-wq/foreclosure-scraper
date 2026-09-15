@@ -2413,3 +2413,87 @@ today's exact count, since future runs will accumulate real rows instead
 of losing every one). York's 119 TAX_SALE_OVERAGE rows still untouched.
 2 new regression tests added (glued-county recovery + unrecognizable-
 candidate fallback). Full 3,986-test suite passes.
+
+## Newspapers/*.py docstring audit, round 2 — one real drift fixed (2026-09-15)
+
+Continued the "does this scraper's docstring promise coverage the code
+doesn't deliver" technique that found the Greenwood bug. Checked every
+remaining `newspapers/*.py` module's docstring against its actual FEED_URLS/
+LISTING_URL scope: carolina_coast.py, index_journal.py, daily_courier.py,
+hendersonville_lightning.py, shelby_star.py, tryon_bulletin.py, and
+column_legal_notices.py all matched their own claims. One real miss:
+`post_and_courier.py`'s docstring still claimed to cover "Charleston,
+Berkeley, and Dorchester counties" as ONE scraper, but Berkeley and
+Dorchester were split into their own dedicated scrapers earlier today
+(`newspapers.berkeley_independent`, `newspapers.journal_scene`) for the
+exact reason that generic section excludes them. No functional bug (the
+gap itself was already fixed by those two files existing) -- purely a
+stale docstring that would have cost a future session time re-diagnosing
+a "gap" that's actually closed elsewhere. Fixed the docstring to name the
+sibling scrapers explicitly and warn against re-adding coverage there.
+
+## Berkeley/Jasper/Florence paystar.io: the "one build covers all three"
+## claim from 2026-09-14 was WRONG — corrected, with real wins (2026-09-15)
+
+Went to build the paystar.io enumeration scraper scoped yesterday as a
+single qpaybill-scale project covering Berkeley + Jasper + Florence.
+Checked each county live BEFORE writing code, per this session's own
+"don't build on an unverified assumption" discipline. The assumption did
+not survive contact:
+
+**Jasper — not a paystar source at all.** Jasper's own site
+(`taxes.paystar.io/app/customer/jasper-county-tax`) has TWO buttons: "Pay
+Property and Vehicle Taxes" (paystar, current-year only) and a SEPARATE
+"Pay Delinquent Taxes" that links straight to
+`jaspercountydelinquenttax.qpaybill.com/Taxes/TaxesDefaultType4.aspx` --
+the SAME vendor as 27 other SC counties in
+`counties_sc.qpaybill_delinquent_roll`, just under a subdomain that
+module's roster never probed. Verified live: identical Type4 form
+(ddlCriteriaList/ddlYearList/PaidStatus/SearchType), zero new code needed.
+Added `"Jasper": "jaspercountydelinquenttax"` to `QPAYBILL_SUBS`. Full
+production-budget sweep (2,500 requests): **1,517 raw rows, 1,047 unique
+delinquent parcels, 0 errors, 5 depth-truncated prefixes** (consistent
+with this module's own measured finding that deepening past 4 chars
+recovers ~0 net-new rows). Ingested via scoped dedupe: existing Jasper
+rows -> 910 net-new (79 correctly blocked by the
+house-number guard as genuine different-property collisions, not lost
+data). Zero marginal build cost — this was a one-line roster fix, not a
+scraper build.
+
+**Berkeley — the real paystar.io win, but simpler than qpaybill-scale.**
+Drove Berkeley's search results page (not just its autocomplete widget)
+with network capture and found the autocomplete's backing endpoint,
+`POST /api/search`, takes an EMPTY searchTerm plus facet filters
+(`PaymentStatus: ["Unpaid"], AssetType: ["Real Property"]`) and returns
+the ENTIRE roll directly — confirmed live via plain httpx (no browser, no
+cookies, no auth): `pageSize` up to at least 5000 in ONE request,
+`totalCount: 3587`. No name enumeration needed at all, unlike every other
+SC tax portal in this codebase. A second per-row call,
+`GET /api/invoices/{hash}`, returns everything a lead needs in one shot:
+balance owed, TMS parcel, the owner's MAILING address (top-level fields),
+AND the property's own SITUS address + deed book/page + appraisal values
+(inside a stringified `assetMetaJson` blob) — the situs/mailing pair lets
+this source compute a first-party absentee-owner flag the same way
+`enrichment_owner_mailing.py`'s `_is_absentee()` already does for every
+other source (imported and reused, not reimplemented, so the two logic
+paths cannot drift). Built `counties_sc.berkeley_paystar_tax` (10 unit
+tests, all passing) and ingested: 2,349 net-new listings, 2,349 (100%)
+with a mailing address, ~2,196 of 3,174 scraped (69%) flagged absentee,
+~328 of 3,174 scraped (10%) out-of-state.
+
+**Florence — genuinely deferred, not a "solve once" county.** Its paystar
+tenant runs an OLDER, DIFFERENT API generation
+(`GET /api/business-units/florence-county-tax/invoices/
+search-configurations/{id}/search`, not the unified `POST /api/search`
+Berkeley uses) that REJECTS an empty searchText (`data: null`) — it would
+need the SAME alphabet/prefix enumeration this whole detour was meant to
+avoid, and a first "Real Property" + name-prefix probe returned zero live
+rows, leaving it unclear real-property delinquency data is even loaded
+into that tenant at all. Left deferred rather than force a partial build
+on an unverified data source.
+
+Net: what looked like one project turned out to be a free one-line fix
+(Jasper), a genuinely novel and simpler-than-expected build (Berkeley),
+and a correctly-deferred non-starter (Florence) — found by checking each
+county live before writing any code, instead of building to the original
+scope and discovering the mismatch mid-build.
