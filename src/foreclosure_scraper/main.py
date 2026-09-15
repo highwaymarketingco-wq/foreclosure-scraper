@@ -546,7 +546,19 @@ DATELESS_OK_SOURCES = {
     "counties_sc.spartanburg_condemned",         # Spartanburg condemned/dilapidated CAMA-condition signal (dateless)
     "counties_nc.asheville_str_permits",         # Asheville lapsed STR/homestay permits (motivated landlord, dateless)
     "counties_nc.lincoln_code_violations",       # Lincoln County open code-enforcement violations (address-keyed, dateless)
-    "counties_generic.arcgis_distress.new_hanover_demolition_permits",  # NH demolition permits (dateless)
+    # Prefix match (main._active_only startswith-checks "base.") -- every
+    # arcgis_distress_layers row ships as "counties_generic.arcgis_distress.<layer
+    # slug>", not the class-level "counties_generic.arcgis_distress_layers" slug.
+    # Was whitelisting only new_hanover_demolition_permits by exact string; that
+    # silently dropped the other 16 live layers (6,973 rows: tax liens, code
+    # violations, storm/flood damage, county-owned surplus -- none carry a sale
+    # date) discovered still-zero-row on the 2026-09-15 audit.
+    "counties_generic.arcgis_distress",           # all county ArcGIS distress layers (dateless)
+    # Both dynamic-slug sources (ships as "<base>.<registry/program slug>",
+    # never the class-level scraper slug) -- confirmed live 2026-09-15 audit,
+    # already correctly wired, simply never run before.
+    "counties_generic.state_contamination",       # NC UST/hazardous/dam registries (dateless)
+    "counties_generic.epa_frs",                   # EPA FRS ACRES/SEMS brownfield+superfund sites (dateless)
     "counties.column_legal_notices",             # Column API SC estate/probate notices (no sale date)
     "law_firms.zacchaeus",                       # ZLS tax foreclosures (status-driven; upset/pending leads outlive sale date)
     "national.first_citizens_reo",               # First Citizens bank-owned REO listings

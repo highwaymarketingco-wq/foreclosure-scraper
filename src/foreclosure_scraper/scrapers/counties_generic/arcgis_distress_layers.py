@@ -471,15 +471,25 @@ class ArcgisDistressLayers(BaseScraper):
         # 4,780 GOOD rows from 15 healthy county layers rather than ship a quiet
         # shortfall. Correct instinct, wrong trade at this ratio.
         #
-        # These three are tolerated: each is under 100 rows, each sits on a
-        # single-city host, and losing one is not worth losing the other fifteen.
-        # LayerHarvest still logs tolerated=True, so the loss stays VISIBLE — it
-        # is an accepted loss, not a silent one. Every county-scale layer stays
-        # hard-fail.
+        # These are tolerated: each is under 100 rows, each sits on a
+        # single-city/county host, and losing one is not worth losing the
+        # rest. LayerHarvest still logs tolerated=True, so the loss stays
+        # VISIBLE — it is an accepted loss, not a silent one. Every
+        # county-scale layer stays hard-fail.
+        #
+        # lincoln_code_violations added 2026-09-15: arcgisserver.lincolncountync.gov
+        # has an incomplete TLS chain (same host the dedicated
+        # lincoln_code_violations.py scraper already works around with a local
+        # verify=False httpx client). This shared harvester uses one client
+        # across all 18 layers, so a per-host verify override isn't practical
+        # here without weakening TLS checks for every other host too -- and
+        # this layer's real signal is tiny anyway (only 66 of 3,465 violations
+        # are OPEN). Tolerating it was discarding all 8,693 rows from the other
+        # 17 healthy layers on every run.
         guard = LayerHarvest(
             self.slug, [lay.slug for lay in LAYERS],
             tolerate=("laurens_county_owned", "pickens_county_owned",
-                      "burke_county_owned"),
+                      "burke_county_owned", "lincoln_code_violations"),
             attempts=3)
         async with client(timeout=45.0) as c:
             with guard:

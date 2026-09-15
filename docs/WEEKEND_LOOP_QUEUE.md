@@ -3201,3 +3201,150 @@ county-source sweep. Live-verified all 12 with direct `.fetch()` calls.
   `expected_min_count = 0` already documents "NC table is often empty
   between sale cycles" so this had been silently masking the real
   regression. Left for a future session; not fixed today.
+
+## national.* zero-row audit (background agent, 2026-09-15) + misc categories
+
+Dispatched a background agent to live-verify all 34 `national.*` zero-row
+scrapers (the largest remaining category) while personally sweeping the
+smaller `counties_generic.*`/`city_websites.*`/`reo.*`/`counties.*`
+categories (9 sources) in parallel. Combined findings below; landed the
+highest-confidence/highest-volume fixes immediately, documented the rest
+for follow-up.
+
+**Landed this batch:**
+
+- `national.stealth_handoff` -- **airtight off-by-one path bug.**
+  `Path(__file__).resolve().parents[3]` resolved to `src/` (one level too
+  shallow) instead of the repo root at `parents[4]`, so the scraper always
+  looked for `src/docs/handoff/stealth_leads.json` (never existed) and
+  silently returned `[]` every run. The real file at
+  `docs/handoff/stealth_leads.json` holds 7,270 real leads pushed by the
+  Mac's residential-IP stealth scrapers across 64 distinct source slugs
+  (sc_public_index, nc_ecourts_lis_pendens, land.com sites,
+  zillow_foreclosures, law-firm sites, etc). Fixed the path; 5,753 of 7,270
+  cleared `_active_only`/`_in_scope`; landed via
+  `scripts/ingest_stealth_handoff.py` (dedupe scoped by the UNION of all 21
+  touched source slugs that had existing board rows, not a single slug --
+  the correct generalization of today's source-scoped-dedupe pattern).
+  **Net +3,426 rows.** File is 14 days stale (generated_at 2026-09-01) --
+  the Mac->VM push pipeline itself is worth checking separately, but stale
+  stealth leads beat none per the scraper's own design.
+- `counties_generic.arcgis_distress_layers` -- real bug, not "never run":
+  the harvester was HARD-FAILING the entire 18-layer batch every time
+  because `arcgisserver.lincolncountync.gov` (the `lincoln_code_violations`
+  layer -- same host `lincoln_code_violations.py` already works around with
+  a local `verify=False` client) has an incomplete TLS chain, and this
+  shared multi-layer harvester can't apply a per-host verify override
+  without weakening TLS for the other 17 hosts. Added
+  `lincoln_code_violations` to the existing `tolerate=(...)` list (the
+  guard already had this exact escape hatch, documented in its own comment,
+  for exactly this "one flaky single-host layer souring the whole batch"
+  scenario) -- its real signal is tiny anyway (66 of 3,465 violations are
+  OPEN). Also found the `DATELESS_OK_SOURCES` whitelist only covered ONE of
+  the 18 layers by exact string (`...arcgis_distress.new_hanover_demolition_permits`)
+  instead of the shared `counties_generic.arcgis_distress` prefix every
+  layer's dynamic per-layer slug actually starts with -- fixed to a prefix
+  entry. **17 of 18 layers now land: 8,693 rows** (tax liens, storm/flood
+  damage assessments, county-owned surplus, demolition permits, code
+  violations -- Spartanburg property-cleanup alone is 2,355 rows, New
+  Hanover demolition permits 1,720).
+- `counties_generic.state_contamination` -- already correctly wired
+  (dynamic `counties_generic.state_contamination.<registry slug>` source),
+  simply missing its `DATELESS_OK_SOURCES` prefix entry. **5,572 rows**
+  (NC UST incidents, inactive hazardous sites, dam safety registry).
+- `counties_generic.epa_frs_sites` -- same pattern, missing the
+  `counties_generic.epa_frs` prefix entry (ships as
+  `counties_generic.epa_frs.<program>`, e.g. `.acres`/`.sems`). **269
+  rows** (EPA FRS brownfield/superfund sites, ACRES + SEMS programs, NC+SC).
+
+Board: 156,177 -> 159,603 after stealth_handoff alone; arcgis/state_contamination/
+epa_frs land in the next batch once their combined dry-run is verified.
+
+**From the background agent's `national.*` audit (not yet landed --
+queued for the next pass, ranked by the agent's own confidence/value):**
+
+1. `national.craigslist_fsbo` -- **HIGH PRIORITY, exact root cause proven.**
+   255 real current FSBO leads/run (matches the "264 confirmed working"
+   memory record) wiped 100% by `main._in_scope()` running BEFORE geocode
+   enrichment ever fills in `county` -- identical bug class to the
+   already-fixed CourtListener case (`SCOPE_BYPASS_SOURCES`).
+   `national.craigslist_fsbo` was simply never added to that bypass set.
+2. `national.usda_properties` -- 336 real, fully-qualifying SC leads clear
+   EVERY known filter (`_in_scope`, `_active_only`, already in
+   `DATELESS_OK_SOURCES`) and still show zero board rows. Downstream cause
+   not yet isolated (geocode/parcel-resolution/dedup/write stage) -- the
+   single highest-value unexplained gap in the whole audit.
+3. `national.hibid_real_estate` (6 rows) / `national.freddie_homesteps`
+   (8 rows) -- same "clears every filter, still zero" signature as
+   usda_properties, smaller scale; likely share one root cause worth
+   tracing once rather than three separate investigations.
+4. `national.homepath_json` -- classic dateless-whitelist gap (10 rows
+   clear `_in_scope`, never sets `sale_date`, not in
+   `DATELESS_OK_SOURCES` -- note a DIFFERENT already-whitelisted scraper,
+   `national.fannie_homepath`, covers similar ground; this looks like a
+   newer/alternate JSON-API implementation that never got the same entry).
+5. `national.auction_bank_reo` -- same dateless-whitelist gap, 1 row.
+6. `national.nc_sos_ucc` -- exact-line bug: `page.query_selector(...)` at
+   lines 109/120 is missing `await` (confirmed live via a
+   `RuntimeWarning: coroutine ... was never awaited`); the coroutine object
+   is always truthy so `if el:` passes, then `.fill()` on a coroutine
+   raises, silently swallowed by a bare `except Exception: pass`. Search
+   form never actually gets filled.
+7. `national.fema_disasters` -- HTML target now Akamai-walled; FEMA's
+   OpenFEMA v2 REST API confirmed live/free/unauthenticated as a direct
+   replacement (`/api/open/v2/DisasterDeclarationsSummaries?$filter=state eq 'NC'`).
+8. `national.liensnc` (the `national.*` one, distinct from the 56K-row
+   construction-lien `liensnc` pipeline elsewhere) -- stale `/Search` path;
+   real site now posts to `/apps/search`.
+9. `national.epa_superfund` -- dead legacy `data.epa.gov/ef/seplan/...`
+   endpoint; modern `data.epa.gov/efservice/...` Envirofacts API confirmed
+   alive at the same domain, exact NPL/SEMS table name still unidentified.
+10. `national.fdic_failed_banks` -- state scraped as a full name
+    ("Pennsylvania") with no abbreviation mapping before the
+    `state.upper()=="NC"/"SC"` scope check -- latent (0 NC/SC bank
+    failures exist right now to expose it) but will silently drop a future
+    one.
+11. `national.gsa_surplus` -- stale URL (`gsa.gov/real-estate/real-estate-listings`
+    404s); live replacement paths found but uncertain whether they carry
+    literal per-property listings vs. policy text.
+
+**GARBAGE-emitting -- flag before any generic scope-gate fix lands:**
+
+- `national.seeclickfix` -- confirmed live: the v2 API's `lat`/`lng`/`radius`
+  geo-filter is silently ignored (a query for Asheville NC returned issues
+  from Tacoma WA, Detroit MI, Salem MA, etc), and the scraper then
+  HARDCODES `city`/`state` from the query params rather than the real
+  returned address -- 1,239 rows of mislabeled out-of-state municipal
+  complaints in one live run. Currently harmless only because every row
+  also lacks `county`/`zip_code` and gets dropped at the same scope gate
+  that's killing craigslist_fsbo -- if that gate ever gets a GENERIC fix
+  (rather than craigslist's source-specific `SCOPE_BYPASS_SOURCES` entry),
+  this starts polluting the board. Needs its own fix (real geo-filter, stop
+  hardcoding city/state) or a disable before that happens.
+- `national.bid4assets` -- confirmed live: the results-page selector
+  matches sitewide navigation links ("Sheriff's Sales", "County Government
+  Sellers") rather than real per-lot auction cards. Same "protected by
+  accident" caveat as seeclickfix.
+
+**Confirmed already-closed (cited from existing memory records, not
+re-investigated):** `national.gsa_realproperty`, `national.irs_judicial_sales`,
+`national.irs_treasury`, `national.usmarshals_realproperty`,
+`national.loopnet`, `national.propwire`, `national.sc_sos_entity`.
+
+**Confirmed genuine dead ends (live-verified, working as designed, nothing
+there today):** `national.courtlistener_civil`, `national.cws_marketing`,
+`national.first_citizens_reo` (real listings, correctly outside footprint),
+`national.govdeals`, `national.opencorporates` (by-design stub),
+`national.probate_foreclosure_leads` (by-design stub, paid actor opted
+out), `national.tranzon` (real listing, correctly outside footprint),
+`national.va_acquired` (both known URLs dead, no working replacement
+found), `national.williams` (site alive, genuinely NC/SC-empty inventory
+right now).
+
+**Uncertain, needs a dedicated longer run:** `national.landsofamerica`
+(harder Akamai challenge than its working land.com siblings),
+`national.legacy_obituaries` (too slow to verify in the time budget --
+19 cities x sequential fetch), `national.sc_public_index` under
+`national.*` specifically (heavy `nodriver` automation, not run live --
+also looks like it may be a redundant duplicate of the already-working
+`counties_sc.sc_public_index`, worth checking if it's still needed at all).

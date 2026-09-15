@@ -31,7 +31,14 @@ log = structlog.get_logger()
 
 # <repo-root>/docs/handoff/stealth_leads.json — resolved relative to this file
 # so it works the same on the Mac and the VM regardless of CWD.
-_HANDOFF = Path(__file__).resolve().parents[3] / "docs" / "handoff" / "stealth_leads.json"
+# parents[4] = repo root: this file is 4 levels under it
+# (scrapers/national/stealth_handoff.py -> scrapers/national -> scrapers ->
+# foreclosure_scraper -> src -> repo root). Was parents[3] (= src/, one level
+# too shallow), so this scraper always looked for src/docs/handoff/... (never
+# existed) and silently returned [] on every run -- found 2026-09-15 via live
+# zero-row audit; the real file at docs/handoff/stealth_leads.json (7,270
+# leads from the Mac's residential-IP stealth scrapers) was never read.
+_HANDOFF = Path(__file__).resolve().parents[4] / "docs" / "handoff" / "stealth_leads.json"
 # Past this age we still ingest (stale stealth leads beat none) but warn loudly.
 _STALE_HOURS = float(os.environ.get("HANDOFF_STALE_HOURS", "72"))
 
