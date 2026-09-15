@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-15T18:02:28.120131Z",
-  "total": 175666,
+  "run_time": "2026-09-15T18:45:43.118723Z",
+  "total": 175518,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -100,8 +100,8 @@
     "courtlistener.recap": 945
   },
   "by_state": {
-    "NC": 96226,
-    "SC": 79440
+    "NC": 96182,
+    "SC": 79336
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 41264,
@@ -136,8 +136,8 @@
     "counties_nc.buncombe_delinquent_tax": 938,
     "counties_sc.dillon_delinquent_tax": 825,
     "counties_generic.arcgis_distress.buncombe_unpaid_bills": 779,
-    "public_notices.nc_notices_counties": 752,
     "courtlistener.recap": 737,
+    "public_notices.nc_notices_counties": 708,
     "counties_sc.sc_public_notices": 698,
     "counties_nc.nc_heir_estate_parcels": 679,
     "counties_nc.nc_ecourts_lis_pendens": 671,
@@ -185,13 +185,13 @@
     "counties_generic.arcgis_distress.lincoln_county_owned": 116,
     "counties_nc.asheville_helene": 115,
     "law_firms.hutchens": 107,
-    "counties.column_legal_notices": 103,
     "counties_generic.arcgis_distress.hendersonville_flood_zone_structures": 101,
     "national.zillow_bulk": 93,
     "counties_generic.arcgis_distress.buncombe_county_owned": 91,
     "counties_generic.epa_frs.sems": 88,
     "counties_sc.spartanburg_city_condemned": 83,
     "counties_sc.sc_state_tax_lien": 81,
+    "counties.column_legal_notices": 78,
     "counties_generic.arcgis_distress.buncombe_unpaid_bills_2024": 78,
     "national.foreclosure_dot_com": 75,
     "counties_sc.sc_flc": 73,
@@ -205,13 +205,10 @@
     "counties_nc.hendersonville_vacant_structures": 45,
     "national.auction_dot_com": 39,
     "national.hud_section8_contracts": 37,
-    "newspapers.aiken_standard": 37,
     "public_notices.ncnotices": 34,
     "law_firms.kania": 31,
-    "newspapers.berkeley_independent": 31,
     "national.estate_sales": 25,
     "national.xome": 24,
-    "newspapers.journal_scene": 24,
     "counties_sc.terry_howe_flc": 23,
     "national.cash_buyer_deeds": 23,
     "national.servicelink_auction": 23,
@@ -234,10 +231,11 @@
     "law_firms.mcmichael_taylor_gray": 13,
     "national.courtlistener_adversary": 13,
     "counties_generic.arcgis_distress.burke_county_owned": 11,
-    "publicnoticesc": 11,
+    "newspapers.aiken_standard": 11,
     "counties_generic.arcgis_distress.pickens_county_owned": 10,
     "counties_sc.sc_county_rosters": 10,
     "national.hud_homestore": 10,
+    "newspapers.berkeley_independent": 9,
     "national.freddie_homesteps": 8,
     "counties_nc.cleveland_tax_foreclosure": 7,
     "counties_nc.cleveland_tax": 6,
@@ -249,6 +247,7 @@
     "national.homepath_json": 5,
     "counties_nc.henderson_foreclosure_parcels": 4,
     "counties_nc.wake_tax_foreclosure": 4,
+    "newspapers.journal_scene": 4,
     "counties_sc.richland_flc": 3,
     "derived.probate_deed": 3,
     "counties_nc.nc_rod_substitute_trustee": 2,
@@ -513,21 +512,21 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "scheduled NC SOS registered-agent refresh",
-  "detail_count": 175666,
-  "detail_digest": "f8c1e3af2cf3dd73",
+  "notes": "",
+  "detail_count": 175518,
+  "detail_digest": "b4865adc01715d78",
   "board": {
     "schema": "slim-v1",
-    "count": 175666,
+    "count": 175518,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
       "count": 176,
-      "records": 175666
+      "records": 175518
     }
   },
-  "health_carried_from": "2026-09-15T17:58:38.700822Z",
+  "health_carried_from": "2026-09-15T18:42:25.077531Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",

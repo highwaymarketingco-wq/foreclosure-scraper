@@ -3622,3 +3622,64 @@ landmine defused.
 
 Board: 175,941 -> 175,666 rows (net -275; 584 policy-violating rows
 replaced by 309 correctly-typed, correctly-filtered ones).
+
+## Board-wide scope-violation sweep: 0 remaining after cleanup (2026-09-15)
+
+Following the greenville_mie_adverts landmine, ran a systematic scan of
+every board row through the REAL `main._in_scope()` (not a sample, not a
+guess) to check for other pre-existing policy violations. Found 885 rows
+failing across 7 sources, in two genuinely different shapes:
+
+**Cluster 1 (148 rows, removed) -- unambiguous flip-scope violations,
+no new policy question.** All FORECLOSURE_SALE type, in counties clearly
+outside the narrow 18-county footprint (New Hanover/Dare/Brunswick/
+Onslow/Carteret NC; Aiken/Orangeburg/Florence/Darlington/Berkeley/
+Dorchester/Beaufort/Williamsburg/Sumter/Marion SC) -- a direct match to
+the long-standing "flip stays narrow" policy already confirmed earlier
+this session, not a new distressed-vs-flip ambiguity like Greenville was.
+Removed via `scripts/purge_scope_violations.py`:
+  public_notices.nc_notices_counties (44), newspapers.aiken_standard
+  (26), counties.column_legal_notices (25), newspapers.
+  berkeley_independent (22), newspapers.journal_scene (20),
+  publicnoticesc (11 -- an orphaned pre-rename slug; the current live
+  scraper `public_notices.publicnoticesc` has 0 board rows and is
+  currently, deliberately Cloudflare-blocked with no free bypass, so
+  there's no live source to re-verify against).
+
+**Cluster 2 (737 rows, kept + fixed) -- genuine valuable data, real bug.**
+`courtlistener.recap`: no live scraper module produces this slug
+anymore -- almost certainly an orphaned pre-rename name for what's now
+`national.courtlistener_bankruptcy` (already scope-bypassed). Only 7 of
+737 case numbers overlap with that live source's current output; 730 are
+real, unique, non-duplicate bankruptcy filings (genuine defendant names
+verified, e.g. "Jamarez Marquese Marsh", not garbage). Root cause: these
+rows carry a structured `sale_date` that's really a bankruptcy filing/
+petition date (bankruptcy cases don't have a real-estate sale date --
+the live `courtlistener_bankruptcy.py` scraper never sets this field at
+all). Added to both SCOPE_BYPASS_SOURCES and DATELESS_OK_SOURCES, then
+fixed via `scripts/fix_courtlistener_recap.py`: cleared the structured
+`sale_date` to None (preserved in `raw.courtlistener_recap.original_sale_date`)
+so the DATELESS_OK_SOURCES exemption actually applies -- same trap as
+greenville_mie_adverts: `_active_only()`'s whitelist check only fires
+when `sale_date is None`, so a non-None-but-stale date silently bypasses
+it regardless of the whitelist entry.
+
+**Investigated and confirmed NOT a bug:** a much larger number of rows
+(62,222) fail `_active_only()`'s date-window check, dominated by
+`counties_generic.liensnc` (41,264) and `liensnc` (6,296). Checked
+`docs/gap_closure_plan_2026-09-06.md`: this is documented, intentional
+architecture -- these rows "entered via the standalone ingest_liensnc
+board-writer and never went through a full main.py enrichment pass," by
+design, as a separate resolver-backfill-pending data class, not active
+foreclosure leads subject to the sale-date-window framing. Left
+untouched; not a landmine, a different (already-planned-for) part of the
+data model. The remaining smaller `_active_only()` counts are ordinary
+leads aging out of the rolling window over time -- expected system
+behavior, not a bug.
+
+**Post-fix verification: 0 rows fail `_in_scope()` anywhere on the
+board today.**
+
+Board: 175,666 -> 175,518 rows (net -148 from the purge; the
+courtlistener.recap fix was an in-place field edit with no row-count
+change).

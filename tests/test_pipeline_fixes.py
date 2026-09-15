@@ -133,11 +133,17 @@ def test_scope_bypass_set_deliberately_scoped():
         Common Pleas party names verified live for Charleston alone.
       - legacy_obituaries was tried and DELIBERATELY NOT added — confirmed
         a garbage emitter (city/state search params don't actually scope
-        results), not a scope-gate bug. See legacy_obituaries.py."""
+        results), not a scope-gate bug. See legacy_obituaries.py.
+      - courtlistener.recap (2026-09-15): found in a board-wide scope-
+        violation sweep. No live scraper produces this slug anymore
+        (orphaned pre-rename name for courtlistener_bankruptcy); 730 of
+        737 rows are unique, non-duplicate real bankruptcy filings, not
+        covered by the live source's current output."""
     assert SCOPE_BYPASS_SOURCES == {
         "national.courtlistener_bankruptcy",
         "national.courtlistener_civil",
         "national.courtlistener_adversary",
         "national.craigslist_fsbo",
         "national.sc_public_index",
+        "courtlistener.recap",
     }

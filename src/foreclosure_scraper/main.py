@@ -393,6 +393,21 @@ SCOPE_BYPASS_SOURCES = {
     # case data (9,464 distinct real party names verified live for
     # Charleston alone), LIS_PENDENS type, distressed-bucket.
     "national.sc_public_index",
+    # courtlistener.recap added 2026-09-15: found in a board-wide scope-
+    # violation sweep (following the greenville_mie_adverts landmine).
+    # 737 rows, no live scraper module produces this slug anymore --
+    # almost certainly an orphaned pre-rename name for what's now
+    # national.courtlistener_bankruptcy (BANKRUPTCY type both places), but
+    # only 7 of 737 case numbers overlap with that live source's current
+    # output -- 730 are real, unique, non-duplicate filings (genuine
+    # defendant names verified, not garbage). county=None on every row
+    # (never attached, same as the live source). See
+    # scripts/fix_courtlistener_recap.py for the paired sale_date fix
+    # (these rows carry a bankruptcy filing/petition date mislabeled as
+    # sale_date; cleared to None to match how the live scraper already
+    # handles this, so this bypass entry isn't fighting the date-window
+    # check the way an unmodified value would).
+    "courtlistener.recap",
 }
 
 #: Coastal foreclosure sources whose COUNTY is the whole point of the lead. They
@@ -475,6 +490,7 @@ DATELESS_OK_SOURCES = {
     "counties_nc.nc_ecourts_lis_pendens",       # NC Tyler portal civil-side filings
     "counties.nod_discovery",                   # ROD-discovered NOD recordings
     "national.courtlistener_bankruptcy",        # Ch 7/11/13 federal bankruptcy filings
+    "courtlistener.recap",                      # orphaned pre-rename slug for the same bankruptcy signal; structured sale_date cleared (was a filing date, not a sale date -- see scripts/fix_courtlistener_recap.py)
     "counties_sc.sc_tax_delinquent",            # delinquent property tax / pre-tax-sale
     "counties_sc.sc_flc",                        # SC Forfeited Land Commission inventory (no sale date)
     "counties_nc.nc_county_csv_delinquent_tax",  # NC delinquent-tax CSV rolls (New Hanover); no sale date
