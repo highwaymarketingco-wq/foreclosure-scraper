@@ -3779,3 +3779,50 @@ The 3 already fixed this sweep (greenville_mie_adverts,
 courtlistener.recap, nc_ecourts_judgments) were the real ones; the rest
 of the board's `_active_only()` failures are ordinary, expected data
 staleness. No further board changes made.
+
+## "Not built yet" candidate list: 6 of 9 were stale (2026-09-15)
+
+Following the Greenville Journal MIE finding (a "not built yet" candidate
+that had actually already been built), audited the other 8 candidates in
+`scripts/gen_source_register.py`'s `NOT_BUILT` list against the actual
+codebase. Found 6 more stale entries:
+
+- **Williams & Williams auctions** -- already built. `national/
+  auction_bank_reo.py`'s own docstring identifies and corrects the exact
+  mistake the candidate note made ("WILLIAMS & WILLIAMS IS NOT
+  williamsauction.com" -- that domain is a Wix marketing shell with no
+  inventory; the real backend is `bid.auctionnetwork.com`, already wired).
+- **Burke parcel-history snapshots** -- already built, exactly as the
+  candidate note itself recommended ("Build as ENRICHMENT, not a lead
+  scraper"). `enrichment_burke_history.py` targets the identical
+  FeatureServer URL and does exactly that.
+- **Cherokee SC wp-json media search** -- already built.
+  `counties_sc/cherokee_delinquent_tax.py`'s `WP_MEDIA_URL` is the exact
+  same endpoint and `search=tax%20sale` query the candidate named.
+- **Regional bank/CU REO (First Bank, Founders FCU, United Community
+  Bank)** -- partially stale. Founders FCU is already built (same
+  `auction_bank_reo.py`). The other two were already individually
+  investigated and closed: United Community Bank 403s at the edge for
+  both robots.txt and the homepage (no free path); First Bank publishes
+  articles about buying bank-owned homes with no actual inventory feed.
+- **RealtyBid** -- already investigated and closed, not merely unbuilt.
+  Its Angular SPA resolves an API base to RFC1918 *private* IP addresses
+  -- genuinely unreachable from the public internet (the site's own
+  search sits on "Searching..." forever).
+- **Bank of America REO** -- already investigated and closed.
+  `realestatecenter.bankofamerica.com`'s robots.txt is a blanket
+  `Disallow: /`.
+
+All six were removed from `NOT_BUILT` and the four genuine investigate-
+and-close findings (RealtyBid, Bank of America, UCBI, First Bank) were
+folded into the existing `CANT` (technically blocked, no free path)
+section instead, so the reasoning stays discoverable rather than
+disappearing. `not-built` count: 9 -> 3 (Greenville MIE's judgment-debt
+half, Senior/disabled exemption beyond Buncombe, Transylvania CAD calls
+for service -- all three genuinely still open, verified this pass).
+
+This is the same "stale bookkeeping, not a real gap" pattern found
+repeatedly in the zero-row audit, just for the planning doc instead of
+the scraper registry -- worth a periodic re-check whenever a "not built"
+item is picked up, since roughly 2/3 of this list turned out to already
+be resolved one way or another.

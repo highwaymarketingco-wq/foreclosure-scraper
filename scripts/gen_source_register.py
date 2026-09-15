@@ -77,34 +77,6 @@ NOT_BUILT = [
      "17 counties returning zero, so this is pointing it at layers that carry "
      "the field, not 15 new scrapers. Caveat: 2,864 of the Buncombe 3,548 are "
      "cold single-signal, so it multiplies weak volume unless stacked."),
-    ("RealtyBid", "https://www.realtybid.com", "NC + SC statewide", "reo / auction",
-     "unstated",
-     "Whole REO/auction lane is thin (311 reo + 69 auction rows). Two "
-     "conflicting build profiles in the docs: one says clean ColdFusion "
-     "pagination, three later probes say SPA with unmapped XHR. Effort M."),
-    ("Williams & Williams auctions", "https://www.williamsauction.com",
-     "NC + SC", "auction", "unstated", "Same thin REO/auction lane."),
-    ("Bank of America REO public JSON", "https://bankofamerica.reo.com",
-     "SC confirmed", "reo (bank-direct)", "low volume",
-     "Bank-direct REO, no equivalent source built."),
-    ("Regional bank / CU REO: First Bank, Founders FCU, United Community Bank",
-     "localfirstbank.com / foundersfcu.com / ucbi.com",
-     "NC + Upstate SC", "reo (owner-lead)", "Founders ~9 properties",
-     "Small but these are owner-direct leads. UCBI currently empty."),
-    ("Burke parcel-history snapshots",
-     "https://gis.burkenc.org/arcgis/rest/services/Hosted/Burke_Parcel_History_v3/FeatureServer",
-     "Burke NC", "ownership-change / structure-loss diffing",
-     "11 annual layers over a 59,433-row CAMA base",
-     "VERIFIED LIVE 2026-08-06: service responds, layers 0-10 are '2025 Parcels' "
-     "through '2015 Parcels'. Build as ENRICHMENT, not a lead scraper. Burke has "
-     "260 leads and its NCPTS delinquent tenant now returns zero blobs. "
-     "NOTE the host is gis.burkenc.org, NOT the services3.arcgis.com URL the "
-     "backlog recorded."),
-    ("Cherokee SC wp-json media search",
-     "https://www.cherokeecountysc.gov/wp-json/wp/v2/media?search=tax%20sale",
-     "Cherokee SC", "tax_sale", "529-parcel 2024 ledger",
-     "Cherokee's tax cell is 1 lead. THIN: the only known ledger is the Nov-2024 "
-     "sale, already past SC's 12-month redemption, so live yield may be 0."),
     ("Transylvania CAD calls for service",
      "ArcGIS CAD_Calls_For_Service_Closed_view (exact URL NOT yet resolved)",
      "Transylvania NC", "distress proxy", "305,856 geocoded calls",
@@ -142,7 +114,22 @@ BLOCKED_SUMMARY = [
       "SCDOT SC_Parcels (now token-walled, returns silent 200 + error)",
       "Transylvania TaxBillSearch (endpoint answers 200 with a ZERO-length body "
       "to every model shape, including bounded single-surname searches)",
-      "PropWire (DataDome), mewborn_deselms (Cloudflare 403)"]),
+      "PropWire (DataDome), mewborn_deselms (Cloudflare 403)",
+      "RealtyBid (its own Angular SPA resolves an API base at "
+      "apiweb.realtybid.com/rest/RBIAPI/ that points to RFC1918 PRIVATE "
+      "addresses -- unreachable from the public internet; site's own search "
+      "sits on 'Searching...' forever -- found 2026-09-15 while auditing the "
+      "NOT_BUILT list, moved here from a stale 'not yet built' entry, see "
+      "national/auction_bank_reo.py's docstring)",
+      "Bank of America REO (realestatecenter.bankofamerica.com robots.txt is "
+      "a blanket 'User-agent: * / Disallow: /' -- moved here 2026-09-15, "
+      "same source as above)",
+      "United Community Bank / UCBI REO (ucbi.com 403s at the edge for both "
+      "robots.txt and the homepage, no free path -- moved here 2026-09-15, "
+      "same source as above)",
+      "First Bank REO (localfirstbank.com publishes articles about buying "
+      "bank-owned homes and no actual inventory feed -- moved here "
+      "2026-09-15, same source as above)"]),
     ("ABSENT", "The data is legally or structurally not published. Nobody, free "
                "or paid, extracts what does not exist.",
      ["SC deed sale price on exempt deeds (SC 12-24-70 states no value)",

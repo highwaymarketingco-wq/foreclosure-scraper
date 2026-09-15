@@ -1,3 +1,7 @@
+# Scratch / generated one-off outputs (not build artifacts, not checked in)
+/scratch/
+scripts/_*.json
+
 # Python
 __pycache__/
 *.py[cod]

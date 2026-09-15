@@ -1,11 +1,11 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 19:33 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-15 20:15 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
 - Scrapers in the registry: **229**
 - Producing rows on the board: **129**
 - Registered but contributing ZERO rows: **100**
-- Confirmed real and not yet built: **9**
+- Confirmed real and not yet built: **3**
 - Board read: `docs/listings.json.gz` (175,518 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
@@ -275,54 +275,6 @@ Each of these survived an adversarial refutation pass whose DEFAULT was "refuted
 - **Estimated volume**: Buncombe alone yields 3,548
 - **Why / caveats**: The elderly_disabled lane is 3,548 rows and 100% ONE county. The generic reader already exists in enrichment_gis_attrs.py and already runs against 17 counties returning zero, so this is pointing it at layers that carry the field, not 15 new scrapers. Caveat: 2,864 of the Buncombe 3,548 are cold single-signal, so it multiplies weak volume unless stacked.
 
-### RealtyBid
-
-- **URL**: `https://www.realtybid.com`
-- **Counties**: NC + SC statewide
-- **Signal**: reo / auction
-- **Estimated volume**: unstated
-- **Why / caveats**: Whole REO/auction lane is thin (311 reo + 69 auction rows). Two conflicting build profiles in the docs: one says clean ColdFusion pagination, three later probes say SPA with unmapped XHR. Effort M.
-
-### Williams & Williams auctions
-
-- **URL**: `https://www.williamsauction.com`
-- **Counties**: NC + SC
-- **Signal**: auction
-- **Estimated volume**: unstated
-- **Why / caveats**: Same thin REO/auction lane.
-
-### Bank of America REO public JSON
-
-- **URL**: `https://bankofamerica.reo.com`
-- **Counties**: SC confirmed
-- **Signal**: reo (bank-direct)
-- **Estimated volume**: low volume
-- **Why / caveats**: Bank-direct REO, no equivalent source built.
-
-### Regional bank / CU REO: First Bank, Founders FCU, United Community Bank
-
-- **URL**: `localfirstbank.com / foundersfcu.com / ucbi.com`
-- **Counties**: NC + Upstate SC
-- **Signal**: reo (owner-lead)
-- **Estimated volume**: Founders ~9 properties
-- **Why / caveats**: Small but these are owner-direct leads. UCBI currently empty.
-
-### Burke parcel-history snapshots
-
-- **URL**: `https://gis.burkenc.org/arcgis/rest/services/Hosted/Burke_Parcel_History_v3/FeatureServer`
-- **Counties**: Burke NC
-- **Signal**: ownership-change / structure-loss diffing
-- **Estimated volume**: 11 annual layers over a 59,433-row CAMA base
-- **Why / caveats**: VERIFIED LIVE 2026-08-06: service responds, layers 0-10 are '2025 Parcels' through '2015 Parcels'. Build as ENRICHMENT, not a lead scraper. Burke has 260 leads and its NCPTS delinquent tenant now returns zero blobs. NOTE the host is gis.burkenc.org, NOT the services3.arcgis.com URL the backlog recorded.
-
-### Cherokee SC wp-json media search
-
-- **URL**: `https://www.cherokeecountysc.gov/wp-json/wp/v2/media?search=tax%20sale`
-- **Counties**: Cherokee SC
-- **Signal**: tax_sale
-- **Estimated volume**: 529-parcel 2024 ledger
-- **Why / caveats**: Cherokee's tax cell is 1 lead. THIN: the only known ledger is the Nov-2024 sale, already past SC's 12-month redemption, so live yield may be 0.
-
 ### Transylvania CAD calls for service
 
 - **URL**: `ArcGIS CAD_Calls_For_Service_Closed_view (exact URL NOT yet resolved)`
@@ -356,6 +308,10 @@ Technical. 403 / dead / SPA with bot-protected backend / challenge-response, no 
 - SCDOT SC_Parcels (now token-walled, returns silent 200 + error)
 - Transylvania TaxBillSearch (endpoint answers 200 with a ZERO-length body to every model shape, including bounded single-surname searches)
 - PropWire (DataDome), mewborn_deselms (Cloudflare 403)
+- RealtyBid (its own Angular SPA resolves an API base at apiweb.realtybid.com/rest/RBIAPI/ that points to RFC1918 PRIVATE addresses -- unreachable from the public internet; site's own search sits on 'Searching...' forever -- found 2026-09-15 while auditing the NOT_BUILT list, moved here from a stale 'not yet built' entry, see national/auction_bank_reo.py's docstring)
+- Bank of America REO (realestatecenter.bankofamerica.com robots.txt is a blanket 'User-agent: * / Disallow: /' -- moved here 2026-09-15, same source as above)
+- United Community Bank / UCBI REO (ucbi.com 403s at the edge for both robots.txt and the homepage, no free path -- moved here 2026-09-15, same source as above)
+- First Bank REO (localfirstbank.com publishes articles about buying bank-owned homes and no actual inventory feed -- moved here 2026-09-15, same source as above)
 
 ### ABSENT
 
