@@ -36,9 +36,18 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9",
 }
 
-FILE_RE = re.compile(r"\b(\d{2}\s*(?:SP|M|CVD)\s*\d{1,5})\b", re.I)
+# Case numbers appear as both "21 SP 34" (2-digit year) and "2016-SP-21"
+# (4-digit year, hyphenated) across older vs newer notices on this page.
+FILE_RE = re.compile(r"\b(\d{2}(?:\d{2})?[\s-]*(?:SP|M|CVD)[\s-]*\d{1,5})\b", re.I)
+# Primary: require the trailing "NC 12345" so the lazy address group can't
+# stop after one character (the previous pattern made the NC/zip suffix
+# optional on a lazy `+?` group, so it matched the shortest possible string —
+# a single letter — every time). Fallback: no zip present, stop at the period.
 ADDR_RE = re.compile(
-    r"Property\s+address:\s*([^.\n<]+?(?:NC\s*\d{5})?)", re.I
+    r"Property\s+address:\s*([^\n<]+?,\s*NC\s*\d{5})", re.I
+)
+ADDR_FALLBACK_RE = re.compile(
+    r"Property\s+address:\s*([^.\n<]+)", re.I
 )
 SALE_DATE_RE = re.compile(
     r"(?:will\s+(?:be\s+)?expose|sale\s+(?:will|on))\s+for\s+sale[^.]+?on\s+"
@@ -110,7 +119,7 @@ class HendersonvilleLightningForeclosures(BaseScraper):
                 continue
             seen.add(key)
 
-            addr_m = ADDR_RE.search(body)
+            addr_m = ADDR_RE.search(body) or ADDR_FALLBACK_RE.search(body)
             address = addr_m.group(1).strip() if addr_m else None
             if address:
                 address = re.sub(r"\s+", " ", address).rstrip(".,").strip()

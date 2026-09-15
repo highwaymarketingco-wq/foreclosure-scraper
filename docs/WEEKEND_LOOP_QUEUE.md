@@ -3106,3 +3106,98 @@ fresh live check another day rather than force it; no code change
 needed unless a future check finds the SAME 100%-blocked pattern
 repeatedly, which would suggest something more specific (an IP-level
 block) worth investigating separately.
+
+## law_firms + newspapers zero-row audit (2026-09-15)
+
+Same "zero-row-scraper triage" technique extended to `law_firms.*` (6
+sources) and `newspapers.*` (6 sources) after finishing the NC/SC
+county-source sweep. Live-verified all 12 with direct `.fetch()` calls.
+
+**Landed (2 batches, net +44 rows: 156,133 -> 156,177):**
+
+- `law_firms.zacchaeus` -- already correctly wired, simply never run.
+  139 scraped, 42 kept after `_active_only`/`_in_scope`
+  (`scripts/ingest_lawfirms_zacchaeus_finkel.py`). Note: the firm's site
+  now 301-redirects `www.zls-nc.com` -> `zls-nc.com` (domain change);
+  scraper already follows redirects fine.
+- `law_firms.finkel` -- confirmed genuinely live (landed 4 real SC PDF
+  rows on the first check of the day: Lexington | 701 Seton Road |
+  2024CP3204157) but BOTH its PDF hosts (finkellaw.com,
+  finkellawcharleston.com) intermittently return 403 -- looks like light
+  rate-limiting, not a permanent block. 0 rows this particular run;
+  included in the same ingest script so it lands opportunistically on
+  future runs without further code changes.
+- `newspapers.carolina_coast` + `newspapers.post_and_courier` -- both
+  already correctly whitelisted in `DATELESS_OK_SOURCES`, simply never
+  run. 1 row each (`scripts/ingest_newspapers_never_run.py`). Same
+  "landed in code, never run" pattern as the NC/SC sources found
+  earlier today.
+
+**Fixed, not yet re-run (net 0 rows today, correct for future runs):**
+
+- `newspapers/hendersonville_lightning.py` -- two real regex bugs found
+  via live diagnosis:
+  1. `FILE_RE` only matched 2-digit-year case numbers ("21 SP 34"), not
+     the 4-digit-year hyphenated format used by older notices
+     ("2016-SP-21"). Fixed: `\d{2}(?:\d{2})?[\s-]*(?:SP|M|CVD)[\s-]*\d{1,5}`.
+  2. `ADDR_RE` had a classic lazy-quantifier-with-optional-suffix bug:
+     `([^.\n<]+?(?:NC\s*\d{5})?)` -- since the trailing zip group is
+     optional, the lazy `+?` was satisfied by matching just ONE
+     character ("L" instead of "Lot 140 Woodhen Way, Horse Shoe, NC
+     28742") every single time. Fixed by requiring the zip suffix in
+     the primary pattern and adding a period-terminated fallback for
+     notices without one.
+  Verified fix live: case number and full address now both parse
+  correctly on the one notice that had complete data. Currently 0 of
+  the page's 5 live notices fall inside the active window (all are
+  either stale re-notices or a different notice type entirely --
+  "NOTICE OF OFFER TO PURCHASE TAX FORECLOSED PROPERTIES", which has no
+  street address by design) so nothing to ingest today; the fix simply
+  makes the parser correct whenever a fresh notice appears.
+
+**Confirmed correct-as-is / not a bug:**
+
+- `law_firms.korn` -- already a documented stub (fetch() returns []
+  intentionally, comment explains why); 0 rows is expected.
+- `law_firms.aldridge_pite` -- REAL regression, deferred (see below).
+- `law_firms.alaw` -- code is 100% correct (verified cell-by-cell against
+  the live SharePoint-embedded workbook: header row literally says
+  "Current Sale Date", data row correctly extracts "8/8/2025" for file
+  25-000950). The underlying data source itself is stale: all 26 rows
+  across both NC and SC pages have sale dates clustered Aug-Sep 2025,
+  over a year old as of today (2026-09-15) -- the firm's embedded Excel
+  workbook has been abandoned/not updated, not a scraper bug.
+  Deliberately NOT ingested (would net 0 rows through `_active_only`
+  anyway, and landing >1yr-stale "current sale date" values would be
+  actively misleading). No code change needed; revisit only if a future
+  spot-check shows the workbook has resumed updating.
+- `newspapers.daily_courier`, `newspapers.shelby_star` -- 0 rows, no
+  errors. Not deep-dived (tiny papers, low ROI); consistent with either
+  a genuinely-empty legal-ads section today or a page-structure mismatch
+  not yet diagnosed.
+- `newspapers.tryon_bulletin` -- confirmed NOT a garbage-emitter: it
+  legitimately crawled several real tryondailybulletin.com articles
+  (BBQ contest recap, veterans-park cleanup, garden tips) and correctly
+  found none matching foreclosure keywords. Working as designed, just
+  nothing to find today.
+
+**Deferred (real bug, not fixed today):**
+
+- `law_firms.aldridge_pite` -- genuine regression. The scraper's own
+  docstring claims "Posts Table Pro renders server-side, no bot-bypass
+  needed" and that was true when the module was written, but the site
+  has since switched the table to `serverSide:false` DataTables loaded
+  via AJAX (`admin-ajax.php`, `action=ptp_load_posts`) with a per-page-
+  load nonce -- the static HTML now ships only an empty `<thead>`, zero
+  `<tbody>` rows. Tried reproducing the AJAX call directly (matching
+  nonce, table_id, and standard DataTables POST params via both a
+  stateless and a cookie-persistent client) and got
+  `Error: posts table could not be loaded.` every time -- the handler
+  wants something not yet identified (possibly the full nested
+  `columns[]` DataTables array, or a `config` param mirroring the
+  table's `data-config` JSON). Needs either a full DataTables-param
+  reverse-engineering pass or a headless-browser render (same tier of
+  effort as `cumberland_tax_foreclosure.py`'s Sitefinity problem).
+  `expected_min_count = 0` already documents "NC table is often empty
+  between sale cycles" so this had been silently masking the real
+  regression. Left for a future session; not fixed today.
