@@ -2328,3 +2328,44 @@ AdPortal, covers at least Jasper + Chester(via Rock Hill Herald) — worth
 its own dedicated investigation pass alongside paystar.io (Berkeley +
 Jasper + Florence) as the two standing "bigger build" projects noted in
 this doc.
+
+## Zero-row-county sweep: essentially complete (2026-09-15)
+
+Comprehensive re-audit: SC zero-row counties down to **6**, from 9 at the
+start of this session's SC mailing/phone root-cause audit. Every one of the
+6 remaining now has a specific, documented reason rather than being an
+open unknown:
+
+  Chester, Fairfield  — CapSolver-gated (chestercountysctax.com /
+                         fairfieldsctax.com, same vendor SPA, confirmed
+                         reCAPTCHA-gated). Blocked purely on the unstaged
+                         CAPSOLVER_API_KEY.
+  Jasper               — needs the paystar.io bulk-enumeration build (a
+                         real, confirmed API, no ToS block, but qpaybill-
+                         scale effort) OR the McClatchy iPublish AdPortal
+                         (Island Packet / Beaufort Gazette) -- a second,
+                         separate harder platform, not yet cracked either.
+  Edgefield, Greenwood,
+  Hampton              — confirmed, live, thoroughly checked (browser-
+                         rendered body text, not just static link-scans):
+                         no delinquent-tax, overage, or FLC document/list
+                         published anywhere the county controls.
+
+SC board total: 58,980 -> 62,187 rows (+3,207) since the mailing audit
+began this session. SC mailing: 29.6% -> 37.2%.
+
+**What's left that's genuinely actionable without new credentials**:
+1. Build the paystar.io enumeration scraper (Berkeley + Jasper + Florence,
+   qpaybill-scale effort, the single highest-leverage remaining item).
+2. Keep applying the "does this county's own scraper docstring already
+   promise coverage it isn't delivering" check to the REST of the
+   newspaper-legal-notice scrapers in the codebase (not just post_and_
+   courier.py) -- this pattern found 3 wins for near-zero cost once
+   discovered; worth a systematic pass across every `newspapers/*.py`
+   file's stated scope vs its actual per-county output.
+3. Continue the SC mailing-gap sweep for the ~15 remaining smaller
+   counties with no cache found yet (Marlboro, Newberry, Chesterfield,
+   Abbeville, Bamberg, Saluda, McCormick, Calhoun, Lee, Allendale,
+   Greenville) -- lower hit rate lately, but not exhausted.
+4. Everything else (Cherokee/Union qPublic, SC probate AWS-WAF) waits on
+   the same unstaged CapSolver key.
