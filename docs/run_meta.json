@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-09-15T17:58:38.700822Z",
+  "run_time": "2026-09-15T18:02:28.120131Z",
   "total": 175666,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
@@ -513,7 +513,7 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "",
+  "notes": "scheduled NC SOS registered-agent refresh",
   "detail_count": 175666,
   "detail_digest": "f8c1e3af2cf3dd73",
   "board": {
@@ -527,7 +527,7 @@
       "records": 175666
     }
   },
-  "health_carried_from": "2026-09-15T16:46:37.608316Z",
+  "health_carried_from": "2026-09-15T17:58:38.700822Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
