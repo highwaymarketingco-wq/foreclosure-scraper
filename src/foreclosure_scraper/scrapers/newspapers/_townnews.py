@@ -35,6 +35,7 @@ from typing import Iterable
 from dateutil import parser as dateparser
 
 from ...models import Listing, ListingType, PropertyKind
+from ...validation import NC_COUNTIES, SC_COUNTIES
 
 # Street suffix alternation, shared by the address matcher.
 _SUFFIX = (
@@ -79,6 +80,59 @@ SALE_DATE_RE = re.compile(
 # "BERKELEY COUNTY", "CARTERET COUNTY").
 COUNTY_OF_RE = re.compile(r"COUNTY\s+OF\s+([A-Z][A-Za-z]+)", re.I)
 COUNTY_SUFFIX_RE = re.compile(r"\b([A-Z][A-Za-z]+)\s+COUNTY\b", re.I)
+
+_COUNTY_NAMES_BY_STATE = {
+    "NC": {c.lower(): c for c in NC_COUNTIES},
+    "SC": {c.lower(): c for c in SC_COUNTIES},
+}
+
+
+def _best_county_match(candidate: str, names: dict[str, str]) -> str | None:
+    cand_lower = candidate.lower()
+    hit = names.get(cand_lower)
+    if hit:
+        return hit
+    # Longest-prefix match, longest name first so a short name doesn't
+    # shadow a longer one that also prefixes the candidate.
+    for name_lower, canonical in sorted(names.items(), key=lambda kv: -len(kv[0])):
+        if cand_lower.startswith(name_lower):
+            return canonical
+    return None
+
+
+def _resolve_county(candidate: str, state: str, default: str | None) -> str | None:
+    """Recover the real county name when the source text collapsed the
+    whitespace after it into the next word.
+
+    Found live 2026-09-15: the Index-Journal's RSS description read "...
+    COUNTY OF GREENWOODIN THE COURT OF COMMON PLEAS..." with no space before
+    "IN" -- COUNTY_OF_RE's `[A-Za-z]+` has no way to know where a real name
+    ends without a delimiter, so it captured "Greenwoodin" whole. That value
+    then failed validation.py's SC_COUNTIES/NC_COUNTIES membership check and
+    got NULLED to None -- Greenwood's own dedicated scraper had been
+    producing usable rows all along, silently losing every one to this.
+
+    Tries an exact match first (case-insensitive), then the longest known
+    county name that PREFIXES the candidate (covers exactly the "name+next-
+    word" glue case) -- scoped to `state`'s own county list first (a few
+    names like "Union"/"Cherokee" exist in both states, but the string is
+    identical either way so this only matters for names that DON'T
+    collide), falling back to the other state's list for the rare case of
+    a paper naming a neighboring state's county, then to `default` (never
+    None) -- a real notice always names SOME county; guessing the paper's
+    own home county is far better than discarding the row's county tag.
+    """
+    primary = _COUNTY_NAMES_BY_STATE.get(state, {})
+    hit = _best_county_match(candidate, primary)
+    if hit:
+        return hit
+    for other_state, names in _COUNTY_NAMES_BY_STATE.items():
+        if other_state == state:
+            continue
+        hit = _best_county_match(candidate, names)
+        if hit:
+            return hit
+    return default
 
 # Substitute-trustee / firm name often appears in the body.
 TRUSTEE_RE = re.compile(
@@ -228,7 +282,7 @@ def parse_rss_items(
             cand = c_m.group(1).strip().title()
             # Guard against grabbing court words.
             if cand.lower() not in {"common", "general", "the", "this"}:
-                county = cand
+                county = _resolve_county(cand, st, default_county)
 
         # Case number: try the full SC C/A form first (so we don't truncate
         # 2025-CP-10-01481 to 2025-CP-10), then the NC SP/CV forms.

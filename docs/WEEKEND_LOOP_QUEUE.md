@@ -2369,3 +2369,47 @@ began this session. SC mailing: 29.6% -> 37.2%.
    Greenville) -- lower hit rate lately, but not exhausted.
 4. Everything else (Cherokee/Union qPublic, SC probate AWS-WAF) waits on
    the same unstaged CapSolver key.
+
+## Real bug found via the "check every newspaper scraper's promised coverage" pass (2026-09-15)
+
+Started item #2 from the checkpoint above (audit every `newspapers/*.py`
+file's stated scope vs its actual output) and found something better than
+another TownNews-section gap: **`newspapers.index_journal.py` already
+existed, was already registered, and was ALREADY covering Greenwood** — but
+had been producing ZERO usable rows because of a real bug in the SHARED
+`_townnews.py` parser, not a missing section.
+
+Its live RSS description read "...COUNTY OF GREENWOODIN THE COURT OF
+COMMON PLEAS..." — no space before "IN". `COUNTY_OF_RE`'s `[A-Za-z]+`
+capture has no delimiter to stop on without whitespace, so it grabbed
+"Greenwoodin" whole. That value then failed `validation.py`'s SC_COUNTIES/
+NC_COUNTIES membership check, which **nulls the county to None** on any
+mismatch (a cross-state-mismatch guard, correct for its own purpose, but
+blind to "recoverable typo" vs "genuinely wrong state") — so every
+Greenwood notice this scraper ever found had its county silently erased
+before reaching the board.
+
+**Fixed at the source**, not by patching the symptom: added
+`_resolve_county()` to `_townnews.py`, which checks the captured candidate
+against the codebase's own canonical `NC_COUNTIES`/`SC_COUNTIES` sets
+(already defined in `validation.py` — reused directly, no new list to
+maintain), first for an exact match, then for the longest known county
+name that PREFIXES the candidate (exactly the "name+glued-word" shape),
+falling back to the paper's own default county (never `None`) if nothing
+matches at all. This benefits every scraper built on `_townnews.py` —
+Aiken Standard, Journal Scene, Berkeley Independent, Post & Courier,
+Carolina Coast — not just Index-Journal, against this exact class of
+formatting artifact whenever it recurs.
+
+Re-checked all 4 of today's other TownNews scrapers against their current
+live feeds: none were actually hit by this bug in today's content (their
+notices happened to have proper spacing), so this was a pure forward-
+looking + Greenwood-specific fix, not a silent data-loss discovery
+affecting rows already shipped today.
+
+Verified live: Greenwood 0 -> 1 (this paper's feed is genuinely quiet right
+now for the other 3 query terms — the fix is what matters here, not
+today's exact count, since future runs will accumulate real rows instead
+of losing every one). York's 119 TAX_SALE_OVERAGE rows still untouched.
+2 new regression tests added (glued-county recovery + unrecognizable-
+candidate fallback). Full 3,986-test suite passes.

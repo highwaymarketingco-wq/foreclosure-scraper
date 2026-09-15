@@ -187,6 +187,47 @@ def test_allowed_state_filter_drops_out_of_state():
     assert rows == [] or all(r.state == "NC" for r in rows)
 
 
+def test_county_name_glued_to_next_word_is_recovered():
+    """Regression 2026-09-15: the Index-Journal's (Greenwood, SC) RSS
+    description read "...COUNTY OF GREENWOODIN THE COURT OF COMMON
+    PLEAS..." with no space before "IN". COUNTY_OF_RE has no delimiter to
+    stop on, so it captured "Greenwoodin" whole -- which then failed
+    validation.py's county-membership check and got silently NULLED,
+    losing the row's county entirely even though the notice clearly names
+    a real one. The parser must recover "Greenwood" itself rather than
+    relying on downstream validation to catch (and only ever discard) it."""
+    xml = """<rss><channel><item>
+<title>STATE OF SOUTH CAROLINA</title>
+<link>https://www.indexjournal.com/classifieds/community/announcements/legal/ad_glued.html</link>
+<description>STATE OF SOUTH CAROLINACOUNTY OF GREENWOODIN THE COURT OF COMMON PLEASC/A NO: 2026CP2400848SUMMONS AND NOTICES(Non-Jury)FORECLOSUREOF REAL ESTATEMORTGAGEROCKET MORTGAGE, LLC, Plaintiff</description>
+<pubDate>Fri, 04 Sep 2026 00:00:00 -0400</pubDate>
+</item></channel></rss>"""
+    rows = list(parse_rss_items(
+        xml, source_slug="newspapers.index_journal",
+        default_state="SC", default_county="Greenwood", allowed_states=("SC",),
+    ))
+    assert len(rows) == 1
+    assert rows[0].county == "Greenwood"
+
+
+def test_county_glue_falls_back_to_default_when_no_known_county_matches():
+    """If the glued text doesn't start with any real county name at all
+    (a garbled or unrecognizable capture), fall back to the paper's own
+    default county rather than a bogus value or None."""
+    xml = """<rss><channel><item>
+<title>Foreclosure notice</title>
+<link>https://x/ad_unknown.html</link>
+<description>STATE OF SOUTH CAROLINA COUNTY OF ZZZNOTAREALCOUNTYXX foreclosure sale by virtue</description>
+<pubDate>Fri, 04 Sep 2026 00:00:00 -0400</pubDate>
+</item></channel></rss>"""
+    rows = list(parse_rss_items(
+        xml, source_slug="x", default_state="SC", default_county="Greenwood",
+        allowed_states=("SC",),
+    ))
+    assert len(rows) == 1
+    assert rows[0].county == "Greenwood"
+
+
 def test_scrapers_registered():
     from foreclosure_scraper.scrapers._registry import all_scrapers
 

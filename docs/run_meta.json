@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-15T04:02:46.191056Z",
-  "total": 131717,
+  "run_time": "2026-09-15T04:45:28.443658Z",
+  "total": 131718,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -101,7 +101,7 @@
   },
   "by_state": {
     "NC": 69530,
-    "SC": 62187
+    "SC": 62188
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 41266,
@@ -210,7 +210,8 @@
     "manual.watchlist": 1,
     "national.realtor_foreclosures": 1,
     "national.sheriff_sales": 1,
-    "newspapers.coastland_times": 1
+    "newspapers.coastland_times": 1,
+    "newspapers.index_journal": 1
   },
   "by_county_top": [
     [
@@ -459,20 +460,20 @@
     "newspapers.carolina_coast"
   ],
   "notes": "",
-  "detail_count": 131717,
-  "detail_digest": "23fae7bdc917c420",
+  "detail_count": 131718,
+  "detail_digest": "4b0d8714a640903b",
   "board": {
     "schema": "slim-v1",
-    "count": 131717,
+    "count": 131718,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
       "count": 132,
-      "records": 131717
+      "records": 131718
     }
   },
-  "health_carried_from": "2026-09-15T03:21:38.080095Z",
+  "health_carried_from": "2026-09-15T04:02:46.191056Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
