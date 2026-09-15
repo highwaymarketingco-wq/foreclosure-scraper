@@ -491,6 +491,7 @@ DATELESS_OK_SOURCES = {
     "counties.nod_discovery",                   # ROD-discovered NOD recordings
     "national.courtlistener_bankruptcy",        # Ch 7/11/13 federal bankruptcy filings
     "courtlistener.recap",                      # orphaned pre-rename slug for the same bankruptcy signal; structured sale_date cleared (was a filing date, not a sale date -- see scripts/fix_courtlistener_recap.py)
+    "nc_ecourts_judgments",                      # NC eCourts lis_pendens/tax_lien judgments; structured sale_date cleared (was the court's judgment/filing date, not a sale date -- see scripts/fix_nc_ecourts_judgments.py). Real counties already set (not a scope-bypass case).
     "counties_sc.sc_tax_delinquent",            # delinquent property tax / pre-tax-sale
     "counties_sc.sc_flc",                        # SC Forfeited Land Commission inventory (no sale date)
     "counties_nc.nc_county_csv_delinquent_tax",  # NC delinquent-tax CSV rolls (New Hanover); no sale date

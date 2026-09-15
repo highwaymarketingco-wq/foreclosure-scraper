@@ -3683,3 +3683,58 @@ board today.**
 Board: 175,666 -> 175,518 rows (net -148 from the purge; the
 courtlistener.recap fix was an in-place field edit with no row-count
 change).
+
+## Board-wide orphan-slug reconciliation finds a 3rd instance of the same bug: nc_ecourts_judgments (2026-09-15)
+
+Extended the scope-violation sweep into a full source/slug reconciliation:
+every distinct board source (161) checked against every live scraper
+class's actual `slug` attribute (229, via real introspection of every
+scraper module, not grep) with prefix-aware matching for known dynamic-
+slug families (arcgis_distress, epa_frs). Found 26 apparent "orphans";
+almost all were false positives from the reconciliation script itself
+(dynamic per-row slugs like `counties_generic.arcgis_distress.<layer>`
+don't textually match their class's own `self.slug =
+"counties_generic.arcgis_distress_layers"` -- already-known-live sources,
+not orphans) or already-understood, already-correctly-configured manual/
+standalone lanes (`counties_sc.sc_public_index_export`, already in
+DATELESS_OK_SOURCES; `counties_generic.liensnc`/`liensnc`, documented
+intentional architecture per the scope sweep above; `derived.probate_deed`
+already passes every gate cleanly; `manual.watchlist`, a single hand-
+curated row, left untouched).
+
+One genuine, high-value finding: **`nc_ecourts_judgments`** (3,765 real
+rows -- lis_pendens 2,978 / tax_lien 787, real counties already set
+across New Hanover/Brunswick/Gaston/Cleveland/Onslow/Henderson/Lincoln/
+Buncombe/Pender/Rutherford and more, 0 scope failures) -- but **all
+3,765 currently fail `_active_only()`**, the exact same bug shape found
+twice already this sweep (greenville_mie_adverts, courtlistener.recap):
+the structured `sale_date` field holds the NC court system's judgment/
+filing date (`raw.nc_ecourts.judgment_date`, sourced from Tyler
+Technologies' `orderedDate`), not a real-estate sale date -- lis pendens
+and tax lien filings don't have one. A prior enrichment pass had already
+half-diagnosed this (every row already carries `raw.sale_date_passed =
+True` / `raw.sale_date_passed_days`) but that flag was never wired into
+the actual `_active_only()` gate, so it kept silently dropping every row
+regardless.
+
+Fixed via `scripts/fix_nc_ecourts_judgments.py`: cleared the structured
+`sale_date` to None (original untouched in `raw.nc_ecourts.judgment_date`,
+no duplication needed) and added `nc_ecourts_judgments` to
+DATELESS_OK_SOURCES in main.py (no SCOPE_BYPASS_SOURCES needed -- real
+counties were already correctly set). Verified: 3,765/3,765 now pass
+both real gates.
+
+This is now a confirmed, recurring bug SHAPE worth watching for
+proactively in any future source: **a legal/court-filing date stored in
+the structured `sale_date` field silently defeats `_active_only()`'s
+`DATELESS_OK_SOURCES` exemption**, because that exemption only fires
+when `sale_date is None` -- a non-None-but-irrelevant date bypasses it
+entirely regardless of the whitelist entry. Found and fixed for
+greenville_mie_adverts, courtlistener.recap, and now nc_ecourts_judgments
+in this one sweep; worth a quick structured check of any other DATELESS_
+OK_SOURCES-eligible source whose `listing_type` implies a filing/notice
+date rather than a literal sale date, next time one is touched.
+
+Board row count unchanged (in-place field fix, no rows added/removed).
+Real net effect: 3,765 previously-silently-excluded rows now flow
+through as live, active leads.
