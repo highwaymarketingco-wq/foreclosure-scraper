@@ -230,9 +230,13 @@ class StateContamination(BaseScraper):
         if os.environ.get("FORECLOSURE_STATE_CONTAMINATION") == "0":
             return []
         out: list[Listing] = []
-        # nc_land_use_restrictions layer intermittently 500s — tolerate its
-        # failure so the other 3 live registries still ship their 5,000+ rows
-        # instead of being discarded by PartialHarvest.
+        # nc_land_use_restrictions layer now returns {'code': 499, 'message':
+        # 'Token Required'} (verified 2026-09-15) -- NC DEQ's ArcGIS server
+        # added an auth requirement this project has no free/public token
+        # for (not the "intermittent 500s" this comment used to describe;
+        # updated to match observed behavior). Tolerate its failure so the
+        # other 3 live registries still ship their 5,000+ rows instead of
+        # being discarded by PartialHarvest.
         guard = LayerHarvest(
             self.slug, [r.slug for r in REGISTRIES],
             tolerate={"nc_land_use_restrictions"}, attempts=3,
