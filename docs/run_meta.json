@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-15T03:21:38.080095Z",
-  "total": 131662,
+  "run_time": "2026-09-15T04:02:46.191056Z",
+  "total": 131717,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -101,7 +101,7 @@
   },
   "by_state": {
     "NC": 69530,
-    "SC": 62132
+    "SC": 62187
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 41266,
@@ -165,8 +165,10 @@
     "national.hud_section8_contracts": 37,
     "newspapers.aiken_standard": 37,
     "law_firms.kania": 31,
+    "newspapers.berkeley_independent": 31,
     "national.zillow_foreclosures": 27,
     "national.estate_sales": 25,
+    "newspapers.journal_scene": 24,
     "counties_sc.terry_howe_flc": 23,
     "national.cash_buyer_deeds": 23,
     "national.servicelink_auction": 23,
@@ -457,20 +459,20 @@
     "newspapers.carolina_coast"
   ],
   "notes": "",
-  "detail_count": 131662,
-  "detail_digest": "c6ef546d6e25bd11",
+  "detail_count": 131717,
+  "detail_digest": "23fae7bdc917c420",
   "board": {
     "schema": "slim-v1",
-    "count": 131662,
+    "count": 131717,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
       "count": 132,
-      "records": 131662
+      "records": 131717
     }
   },
-  "health_carried_from": "2026-09-15T01:43:17.976539Z",
+  "health_carried_from": "2026-09-15T03:21:38.080095Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",

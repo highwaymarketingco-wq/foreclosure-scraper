@@ -2256,3 +2256,43 @@ notice, or genuine amended-notice re-publications — both correctly
 identity-keyed by case_number, not the source_url that varies per article).
 Aiken: 0 -> 37 board rows. York's 119 TAX_SALE_OVERAGE rows still
 untouched. Full 3,983-test suite passes; source register regenerated.
+
+## Dorchester + Berkeley SC — same TownNews pattern, 0->24 and 2->33 (2026-09-15)
+
+Following straight on from Aiken's win: `post_and_courier.py`'s own
+docstring already NAMES Dorchester and Berkeley as counties it's meant to
+cover ("the legal-notice paper of record for the SC Lowcountry (Charleston,
+Berkeley, and Dorchester counties")) — but it only ever queries ONE generic
+TownNews section (`postandcourier.com/classifieds_new/community/
+announcements/legal/`), and neither county's notices live there. Each
+Post & Courier sub-paper publishes under its OWN section:
+
+- Dorchester's local paper, the **Journal Scene** (`journalscene.com`),
+  redirects to `postandcourier.com/journal-scene/classifieds/community/
+  announcements/legal/`.
+- Berkeley's local paper, the **Berkeley Independent** (`berkeleyind.com`),
+  redirects to `postandcourier.com/berkeley-independent/classifieds/
+  community/announcements/legal/`.
+
+Built `newspapers.journal_scene` and `newspapers.berkeley_independent`,
+both thin config wrappers around the same shared, already-tested
+`_townnews.parse_rss_items` parser — identical pattern to
+`aiken_standard.py`, just different sections + default counties. Both
+added to DATELESS_OK_SOURCES for the same "filed but no sale date yet"
+reasoning.
+
+Verified live: Journal Scene 49 scraped / 20 distinct cases, Berkeley
+Independent 51 scraped / 30 distinct cases, zero URL overlap between the
+two. Ingested together (100 scraped, 55 net-new after dedupe correctly
+merged same-case-number duplicates, including one genuine cross-source
+match against Berkeley's pre-existing `publicnoticesc` row for the same
+case number). **Dorchester: 0 -> 24. Berkeley: 2 -> 33.** York's 119
+TAX_SALE_OVERAGE rows still untouched. Full 3,983-test suite passes;
+source register regenerated.
+
+**Worth checking next**: does the SAME "each sub-paper has its own
+un-queried TownNews section" gap exist for any OTHER Post & Courier
+sub-papers covering counties still thin/zero (Colleton? Georgetown's
+own paper vs. the Post & Courier's Georgetown coverage?) — this pattern
+just produced 3 wins in a row (Aiken, Dorchester, Berkeley) for near-zero
+marginal cost once the shared parser already existed.

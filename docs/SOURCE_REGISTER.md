@@ -1,12 +1,12 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 03:21 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-15 04:03 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
-- Scrapers in the registry: **226**
-- Producing rows on the board: **96**
+- Scrapers in the registry: **228**
+- Producing rows on the board: **98**
 - Registered but contributing ZERO rows: **130**
 - Confirmed real and not yet built: **9**
-- Board read: `docs/listings.json.gz` (131,662 rows)
+- Board read: `docs/listings.json.gz` (131,717 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
 
@@ -73,8 +73,10 @@ Live row counts are what the source actually contributed to the board read above
 | `national.hud_section8_contracts` | 37 | Gaston NC (9), Anderson SC (5), Spartanburg SC (5) | `https://www.hud.gov/hud-partners/multifamily-assist-section8-database`<br>`https://www.hud.gov/sites/dfiles/Housing/documents/`<br>`https://www.hud.gov/hud-partners/` |
 | `newspapers.aiken_standard` | 37 | Aiken SC (37) | `https://www.postandcourier.com/aikenstandard/classifieds/search/` |
 | `law_firms.kania` | 31 | Burke NC (11), Lincoln NC (7), Rutherford NC (7) | `https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/`<br>`https://kanialawfirm.com/wp-admin/admin-ajax.php` |
+| `newspapers.berkeley_independent` | 31 | Berkeley SC (31) | `https://www.postandcourier.com/berkeley-independent/classifieds/community/announcements/` |
 | `national.zillow_foreclosures` | 27 | Buncombe NC (5), Spartanburg SC (5), Gaston NC (4) | `https://www.zillow.com/{state.lower(` |
 | `national.estate_sales` | 25 | Cleveland NC (8), Buncombe NC (6), Gaston NC (5) | `https://www.estatesales.net`<br>`https://www.estatesale.com`<br>`https://{host` |
+| `newspapers.journal_scene` | 24 | Dorchester SC (24) | `https://www.postandcourier.com/journal-scene/classifieds/community/announcements/` |
 | `counties_sc.terry_howe_flc` | 23 | Laurens SC (16), Spartanburg SC (7) | `https://terryhowe.com/wp-json/wp/v2/auctions?per_page=100&_fields=id,title,link,content` |
 | `national.cash_buyer_deeds` | 23 | McDowell NC (21), Burke NC (2) | `https://{host` |
 | `national.servicelink_auction` | 23 | Gaston NC (5), Spartanburg SC (5), Buncombe NC (3) | `https://ui.exostechnology.com/api/listingsvc/v1/listings?limit=100&state={ST`<br>`https://ui.exostechnology.com/api/listingsvc/v1/listings`<br>`https://www.servicelinkauction.com`<br>_+1 more_ |

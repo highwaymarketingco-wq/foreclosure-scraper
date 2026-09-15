@@ -445,6 +445,10 @@ DATELESS_OK_SOURCES = {
     # above: filed but no sale date yet is a real, valid early-warning signal,
     # not a data gap.
     "newspapers.aiken_standard",
+    # Same reasoning: freshly-filed summonses from these two sibling
+    # Post & Courier network papers have no sale date yet either.
+    "newspapers.journal_scene",
+    "newspapers.berkeley_independent",
     # Same cookie-cutter scraper as Fairfield above, same dateless Listing(): the
     # Saluda advertisement carries owner/TMS/description but no per-parcel date,
     # so without this entry every row it harvests in Nov-Dec is deleted silently.
