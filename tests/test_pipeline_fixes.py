@@ -119,11 +119,17 @@ def test_zip_prefix_fallback_still_works():
     assert _in_scope(li) is True
 
 
-def test_scope_bypass_set_only_contains_courtlistener():
-    """The bypass must be tightly scoped — only CL sources. Adding other
-    sources here without thought would let cross-state listings leak in."""
+def test_scope_bypass_set_only_contains_courtlistener_and_craigslist_fsbo():
+    """The bypass must be tightly scoped. Adding a source here without
+    thought would let cross-state listings leak in — each entry must be a
+    source that (a) reliably sets `state` at scrape time and (b) only gets
+    `county` filled in later by geocode enrichment, which runs after this
+    gate. craigslist_fsbo added 2026-09-15: same "county arrives late"
+    shape as the CourtListener sources, confirmed via a live regression
+    check (255 real leads/run were being wiped by this gate every time)."""
     assert SCOPE_BYPASS_SOURCES == {
         "national.courtlistener_bankruptcy",
         "national.courtlistener_civil",
         "national.courtlistener_adversary",
+        "national.craigslist_fsbo",
     }

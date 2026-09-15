@@ -80,14 +80,34 @@ def test_arcgis_200_with_an_error_body_is_a_failure(monkeypatch):
 
 
 def test_http_error_on_one_layer_hard_fails(monkeypatch):
+    # services6.arcgis.com carries the county-scale layers (Buncombe et al) --
+    # those stay hard-fail. lincolncountync (single-city, TLS-chain issue) was
+    # moved to the tolerate-list 2026-09-15; see
+    # test_tolerated_single_host_layer_does_not_sink_the_batch below.
     async def get(url, **kw):
-        if "lincolncountync" in url:
+        if "services6.arcgis.com" in url:
             return _resp(503)
         return _resp(200, {"features": []})
 
     monkeypatch.setattr(M, "client", _client(get))
     with pytest.raises(PartialHarvest):
         asyncio.run(M.ArcgisDistressLayers().fetch())
+
+
+def test_tolerated_single_host_layer_does_not_sink_the_batch(monkeypatch):
+    """lincolncountync.gov has an incomplete TLS chain (found 2026-09-15) and
+    was discarding all 18 layers' rows every run because the guard hard-
+    failed the whole batch on this one flaky single-host layer. It's now in
+    the harvester's tolerate-list, same treatment as the three county-owned
+    layers -- a failure here must not raise PartialHarvest."""
+    async def get(url, **kw):
+        if "lincolncountync" in url:
+            raise ConnectionError("certificate verify failed")
+        return _resp(200, {"features": []})
+
+    monkeypatch.setattr(M, "client", _client(get))
+    # Should not raise — the flaky layer is tolerated, the rest still land.
+    asyncio.run(M.ArcgisDistressLayers().fetch())
 
 
 def test_row_without_address_or_parcel_is_dropped():
