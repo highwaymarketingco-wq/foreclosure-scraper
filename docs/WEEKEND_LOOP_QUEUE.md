@@ -3363,3 +3363,24 @@ element lookup could never have worked before), but it was not the
 follow-up live session to diagnose whether the search form still isn't
 submitting correctly post-fix, or Cloudflare is still interfering after
 its own turnstile-solve step. Not chased further today.
+
+## usda_properties/hibid_real_estate/freddie_homesteps "downstream mystery" resolved (2026-09-15)
+
+The background agent flagged these three as clearing every known filter
+(_active_only, _in_scope, already in DATELESS_OK_SOURCES) yet still
+showing zero board rows, and couldn't isolate a downstream cause in the
+time available -- called it "the single highest-value unexplained gap in
+the whole audit."
+
+Tested the simpler hypothesis directly: these aren't broken at all, they
+were just never actually landed. The full orchestrated pipeline (main.py)
+is the only thing that would normally reach `national.*` sources, and per
+project memory it's been dead since late July (57h hang / OOM). Every
+other zero-row source found this entire session turned out to be exactly
+this same "correctly coded, never actually run" pattern once someone ran
+an ad-hoc ingest against it -- these three are no different. Confirmed via
+`scripts/ingest_national_reo_cluster.py`: all three scrape and land
+cleanly, no downstream defect found because there isn't one.
+
+**Net +347 rows** (350 kept, 3 fuzzy-merged into existing board rows from
+other national/REO sources).

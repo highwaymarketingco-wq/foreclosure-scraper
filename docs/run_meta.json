@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-15T15:04:09.636096Z",
-  "total": 171092,
+  "run_time": "2026-09-15T15:17:14.895958Z",
+  "total": 171439,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -100,8 +100,8 @@
     "courtlistener.recap": 945
   },
   "by_state": {
-    "NC": 93232,
-    "SC": 77860
+    "NC": 93243,
+    "SC": 78196
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 41264,
@@ -157,6 +157,7 @@
     "counties_sc.georgetown_civicengage": 365,
     "counties_generic.arcgis_distress.pickens_flood_damage": 363,
     "counties_sc.terry_howe_auctions": 335,
+    "national.usda_properties": 334,
     "national.distressed": 282,
     "counties_sc.sc_probate_net": 265,
     "national.craigslist_fsbo": 255,
@@ -234,12 +235,14 @@
     "counties_generic.arcgis_distress.pickens_county_owned": 10,
     "counties_sc.sc_county_rosters": 10,
     "national.hud_homestore": 10,
+    "national.freddie_homesteps": 8,
     "counties_nc.cleveland_tax_foreclosure": 7,
     "counties_nc.cleveland_tax": 6,
     "counties_sc.spartanburg_flc": 6,
     "national.jail_bookings": 6,
     "counties.nod_discovery": 5,
     "counties_nc.nc_county_tax_foreclosure": 5,
+    "national.hibid_real_estate": 5,
     "national.homepath_json": 5,
     "counties_nc.henderson_foreclosure_parcels": 4,
     "counties_nc.wake_tax_foreclosure": 4,
@@ -507,20 +510,20 @@
     "newspapers.carolina_coast"
   ],
   "notes": "",
-  "detail_count": 171092,
-  "detail_digest": "0ce47dd21132c124",
+  "detail_count": 171439,
+  "detail_digest": "979bfe7523392ebb",
   "board": {
     "schema": "slim-v1",
-    "count": 171092,
+    "count": 171439,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
       "count": 172,
-      "records": 171092
+      "records": 171439
     }
   },
-  "health_carried_from": "2026-09-15T14:59:36.648819Z",
+  "health_carried_from": "2026-09-15T15:04:09.636096Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",

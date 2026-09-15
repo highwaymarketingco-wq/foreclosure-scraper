@@ -1,12 +1,12 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 15:14 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-15 15:17 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
 - Scrapers in the registry: **229**
-- Producing rows on the board: **122**
-- Registered but contributing ZERO rows: **107**
+- Producing rows on the board: **125**
+- Registered but contributing ZERO rows: **104**
 - Confirmed real and not yet built: **9**
-- Board read: `docs/listings.json.gz` (171,092 rows)
+- Board read: `docs/listings.json.gz` (171,439 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
 
@@ -56,6 +56,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_sc.sc_public_index_lis_pendens` | 401 | Anderson SC (176), Spartanburg SC (113), Laurens SC (31) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county` |
 | `counties_sc.georgetown_civicengage` | 365 | Georgetown SC (365) | `https://www.gtcountysc.gov` |
 | `counties_sc.terry_howe_auctions` | 335 | Spartanburg SC (140), Laurens SC (118), Anderson SC (36) | `https://terryhowe.com/wp-json/wp/v2/auctions` |
+| `national.usda_properties` | 334 | Spartanburg SC (48), Anderson SC (48), Pickens SC (48) | `https://usdaproperties.com/property/`<br>`https://www.usdaproperties.com/property/sc/county/`<br>`https://www.usdaproperties.com`<br>_+1 more_ |
 | `national.distressed` | 282 | Gaston NC (46), Spartanburg SC (38), Anderson SC (36) | _(no literal URL in module)_ |
 | `counties_sc.sc_probate_net` | 265 | Charleston SC (265) | `https://www.southcarolinaprobate.net/search/```<br>`https://www.southcarolinaprobate.net/search/` |
 | `national.craigslist_fsbo` | 255 | - | `https://sapi.craigslist.org/web/v8/postings/search/full`<br>`https://{host` |
@@ -117,12 +118,14 @@ Live row counts are what the source actually contributed to the board read above
 | `national.courtlistener_adversary` | 13 | Buncombe NC (5), Cleveland NC (3), Lincoln NC (2) | `https://www.courtlistener.com` |
 | `counties_sc.sc_county_rosters` | 10 | Oconee SC (6), Laurens SC (4) | `https://publicindex.sccourts.org` |
 | `national.hud_homestore` | 10 | Gaston NC (4), Cleveland NC (2), Spartanburg SC (2) | `https://www.hudhomestore.gov/searchresult?handler=GetFilteredResult`<br>`https://www.hudhomestore.gov` |
+| `national.freddie_homesteps` | 8 | - | `https://www.homesteps.com/listing/search?search=NC`<br>`https://www.homesteps.com/listing/search?search=SC`<br>`https://www.homesteps.com/`<br>_+1 more_ |
 | `counties_nc.cleveland_tax_foreclosure` | 7 | Cleveland NC (7) | `https://www.clevelandcounty.com/main/departments/` |
 | `counties_nc.cleveland_tax` | 6 | Cleveland NC (6) | `https://www.clevelandcounty.com/main/departments/` |
 | `counties_sc.spartanburg_flc` | 6 | Spartanburg SC (6) | `https://www.spartanburgcounty.gov/DocumentCenter/View/104130` |
 | `national.jail_bookings` | 6 | Anderson SC (2), Buncombe NC (1), Cherokee SC (1) | `http://mugshots.spartanburgsheriff.org/`<br>`https://buncombecountyso.policetocitizen.com|23`<br>`http://74.218.167.200/p2c`<br>_+8 more_ |
 | `counties.nod_discovery` | 5 | Cleveland NC (4), Buncombe NC (1) | `https://{host`<br>`https://{kofile.KOFILE_COUNTIES[(state`<br>`https://example.invalid/` |
 | `counties_nc.nc_county_tax_foreclosure` | 5 | Rutherford NC (3), Gaston NC (2) | `https://www.gastongov.com/669/Tax-Foreclosure-Sales`<br>`https://www.gastongov.com/671/Previous-Tax-Foreclosure-Sales`<br>`https://mcdowellnc.gov/departments/tax-collections/tax-foreclosures/upcoming-tax-foreclosure-sales`<br>_+1 more_ |
+| `national.hibid_real_estate` | 5 | Pender NC (1), Brunswick NC (1) | `https://hibid.com/graphql```<br>`https://hibid.com/graphql`<br>`https://hibid.com`<br>_+2 more_ |
 | `national.homepath_json` | 5 | Spartanburg SC (2), Rutherford NC (1), Lincoln NC (1) | `https://homepath.fanniemae.com/cfl/property-inventory/search-listings`<br>`https://homepath.fanniemae.com/cfl/property-inventory/search`<br>`https://homepath.fanniemae.com/`<br>_+1 more_ |
 | `counties_nc.henderson_foreclosure_parcels` | 4 | Henderson NC (4) | `https://www.arcgis.com`<br>`https://hendersoncounty.maps.arcgis.com`<br>`https://experience.arcgis.com/experience/` |
 | `counties_nc.wake_tax_foreclosure` | 4 | Wake NC (4) | `https://www.wake.gov/departments-government/tax-administration/real-estate/foreclosures`<br>`https://services.wake.gov/realestate/Account.asp?id={tax_id` |
@@ -222,11 +225,9 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `national.fdic_failed_banks` | `https://www.fdic.gov/bank-failures/failed-bank-list` |
 | `national.fema_disasters` | `https://www.fema.gov/disaster/declarations` |
 | `national.first_citizens_reo` | `https://www.firstcitizens.com/real-estate` |
-| `national.freddie_homesteps` | `https://www.homesteps.com/listing/search?search=NC`<br>`https://www.homesteps.com/listing/search?search=SC`<br>_+2 more_ |
 | `national.govdeals` | `https://maestro.lqdt1.com/search/list`<br>`https://www.govdeals.com/index.cfm?fa=Main&searchText=&category=&keyword=`<br>_+4 more_ |
 | `national.gsa_realproperty` | `https://realestatesales.gov` |
 | `national.gsa_surplus` | `https://www.gsa.gov/about-us/organization/office-of-governmentwide-policy/`<br>`https://www.gsa.gov/real-estate/real-estate-listings`<br>_+1 more_ |
-| `national.hibid_real_estate` | `https://hibid.com/graphql```<br>`https://hibid.com/graphql`<br>_+3 more_ |
 | `national.irs_judicial_sales` | `https://www.irsauctions.gov` |
 | `national.irs_treasury` | `https://www.irsauctions.gov/auction/items`<br>`https://www.irsauctions.gov` |
 | `national.landsofamerica` | `https://www.land.com/{county`<br>`https://www.land.com{url` |
@@ -242,7 +243,6 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `national.seeclickfix` | `https://developer.seeclickfix.com/`<br>`https://seeclickfix.com/api/v2/issues` |
 | `national.stealth_handoff` | _(no literal URL in module)_ |
 | `national.tranzon` | `https://www.tranzon.com/online-real-estate-auctions.aspx` |
-| `national.usda_properties` | `https://usdaproperties.com/property/`<br>`https://www.usdaproperties.com/property/sc/county/`<br>_+2 more_ |
 | `national.usmarshals_realproperty` | `https://www.usmarshals.gov/what-we-do/asset-forfeiture/real-property`<br>`https://www.usmarshals.gov/what-we-do/asset-forfeiture/real-property/`<br>_+1 more_ |
 | `national.va_acquired` | `https://www.va.gov/va-forms/real-property/properties/`<br>`https://www.benefits.va.gov/homeloans/property/property.asp` |
 | `national.williams` | `https://www.williamsauction.com` |
