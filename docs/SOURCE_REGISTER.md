@@ -1,6 +1,6 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 15:28 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-15 15:42 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
 - Scrapers in the registry: **229**
 - Producing rows on the board: **127**
@@ -223,7 +223,7 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `national.bid4assets` | `https://www.bid4assets.com/storefront/index.cfm?searchstate=NC&searchprop=Real+Estate`<br>`https://www.bid4assets.com/storefront/index.cfm?searchstate=SC&searchprop=Real+Estate`<br>_+1 more_ |
 | `national.courtlistener_civil` | `https://www.courtlistener.com` |
 | `national.cws_marketing` | `https://www.cwsmarketing.com/real-estate/`<br>`https://bid` |
-| `national.epa_superfund` | `https://ejscreen.epa.gov/mapper`<br>`https://enviro.epa.gov`<br>_+3 more_ |
+| `national.epa_superfund` | `https://data.epa.gov/ef/seplan/`<br>`https://data.epa.gov/ef/seplan/SEPLAN/ROWS/0:200/JSON?search={state`<br>_+1 more_ |
 | `national.fdic_failed_banks` | `https://www.fdic.gov/bank-failures/failed-bank-list` |
 | `national.first_citizens_reo` | `https://www.firstcitizens.com/real-estate` |
 | `national.govdeals` | `https://maestro.lqdt1.com/search/list`<br>`https://www.govdeals.com/index.cfm?fa=Main&searchText=&category=&keyword=`<br>_+4 more_ |

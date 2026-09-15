@@ -1,19 +1,28 @@
 """EPA Superfund NPL sites — environmental contamination distress signal.
 
-The EPA publishes the National Priorities List (NPL) of Superfund sites.
-Data is available via the EPA's EnviroFacts REST API and the SEPLAN dataset.
+DISABLED 2026-09-15 (national.* zero-row audit) — confirmed dead AND
+redundant. The `data.epa.gov/ef/seplan/SEPLAN/...` endpoint this module
+targets returns 403 `MissingAuthenticationTokenException` (an AWS API
+Gateway "no such route" error, not a real auth requirement — the route
+itself no longer exists). Went looking for the correct modern table name
+under `data.epa.gov/efservice/...` and found something better: this
+project ALREADY has a working Superfund source.
+`counties_generic.epa_frs_sites.py` covers the exact same signal — its
+own docstring documents that the direct SEMS/SEPLAN endpoint 500'd back
+on 2026-08-06 (the same failure family this module is hitting today) and
+was fixed by reading Superfund/CERCLIS data through the Facility Registry
+Service instead (`frs.frs_program_facility`, `pgm_sys_acrnm=SEMS`), which
+DOES answer 200. That source is live and landed 269 rows earlier this
+same audit (`counties_generic.epa_frs.sems` + `.acres`). This module never
+contributed anything the FRS-based one doesn't already cover; disabled as
+a confirmed redundant duplicate rather than chasing a working URL for a
+signal the board already has.
 
-  https://ejscreen.epa.gov/mapper (interactive map)
-  https://enviro.epa.gov (EnviroFacts API)
+Original module intent, for reference: the EPA publishes the National
+Priorities List (NPL) of Superfund sites — a distress signal for
+properties near contamination (environmental stigma, value impact,
+potential buyout).
 
-We query the SEPLAN Superfund NPL dataset via the EnviroFacts API for NC and SC
-sites. Each site includes: site name, address, city, county, state, ZIP, lat/lng,
-EPA ID, NPL status, and contamination type.
-
-This is an enrichment/distress signal — properties near Superfund sites have
-elevated distress risk (environmental stigma, value impact, potential buyout).
-
-Free, public, no key needed for basic queries.
 Slug: national.epa_superfund
 Category: reo
 ListingType: REO
@@ -50,6 +59,12 @@ class EPASuperfund(BaseScraper):
     optional = True
 
     async def fetch(self) -> Iterable[Listing]:
+        # Disabled — see module docstring. Confirmed dead endpoint AND
+        # redundant with counties_generic.epa_frs_sites.py (already live,
+        # covers the same SEMS/Superfund signal via a working path).
+        return []
+
+    async def _disabled_fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         try:
             # Query NC and SC Superfund sites via EnviroFacts

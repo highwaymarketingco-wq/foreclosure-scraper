@@ -3461,3 +3461,17 @@ parser against ArcGIS REST query responses instead of Socrata JSON --
 same tier of effort as the cumberland_tax_foreclosure (Sitefinity) and
 nc_deq_dsca (real Excel source) rebuilds already deferred this project.
 Not fixed today; a real fix, not a quick one.
+
+## national.epa_superfund: confirmed redundant with epa_frs_sites, disabled (2026-09-15)
+
+Went looking for the correct modern EPA Envirofacts table name (the old
+`data.epa.gov/ef/seplan/...` endpoint 403s with a route-not-found error)
+and found this project already has a WORKING Superfund source:
+`counties_generic.epa_frs_sites.py` (landed 269 rows earlier this same
+audit) documents in its own header that it hit the identical dead-endpoint
+problem back on 2026-08-06 for the direct SEMS/SEPLAN path, and fixed it
+by reading the same Superfund/CERCLIS data through the Facility Registry
+Service instead (`frs.frs_program_facility`, `pgm_sys_acrnm=SEMS`), which
+does answer 200. `national.epa_superfund` never contributed anything the
+FRS-based source doesn't already cover -- disabled as a confirmed
+redundant duplicate.
