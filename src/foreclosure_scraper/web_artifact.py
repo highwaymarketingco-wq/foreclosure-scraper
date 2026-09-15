@@ -637,6 +637,7 @@ RAW_KEEP = {
     "asheville_min_housing": "*", "auction_bank_reo": "*", "auction_dot_com": "*",
     "bamberg_sheriff": "*", "barnwell_sheriff": "*", "brunswick_legal_notices": "*",
     "buncombe_tax": "*", "charleston_delinquent_tax": "*", "charleston_mie": "*",
+    "charlotte_code_enforcement": "*",
     "chester_delinquent_tax": "*", "clarendon_tax_auction": "*", "cleveland_tax": "*",
     "cleveland_tax_foreclosure": "*", "coastland_times": "*", "colleton_tax_sale": "*",
     "courtlistener_civil": "*", "craigslist": "*", "cumberland_tax_foreclosure": "*",

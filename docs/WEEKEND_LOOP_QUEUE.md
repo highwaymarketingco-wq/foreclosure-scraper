@@ -3536,3 +3536,38 @@ Board: 171,459 -> 172,968 rows.
   module's own docstring already explains Shelby Star (Gannett network)
   doesn't host its own legal-notices section at all; returning empty is
   the documented, intentional current-state behavior.
+
+## city_websites.charlotte_open_data fully rebuilt on ArcGIS Hub (2026-09-15)
+
+Full rewrite. Old Socrata endpoints (data.charlottenc.gov/resource/*.json)
+all redirect to a dead ArcGIS Hub legacy page -- the city migrated its
+entire open-data portal. Found the live replacement via the ArcGIS Online
+item search API: "Code Enforcement Cases All" (owner CharlotteNC), whose
+real FeatureServer lives at
+`gis.charlottenc.gov/arcgis/rest/services/HNS/CodeEnforcementCasesAll/MapServer/0`.
+Filtered to `CaseStatus='Open'` -- 3,341 real, currently-open housing/
+zoning/code cases, several with multi-year civil-penalty letter histories
+running up to the present (one sample case: FOF Demo Letter in 2019,
+penalty letters continuing monthly through August 2026 -- a genuinely
+live, active distress case).
+
+Real bug caught before landing: `FullAddress` has no delimiter between
+street and city ("2601 ABELWOOD RD CHARLOTTE, NC 28216") -- a first-draft
+lazy regex split grabbed only the house number as "street" and the rest
+as garbage "city". Fixed by anchoring on the known Mecklenburg
+municipality names (Charlotte, Huntersville, Cornelius, Davidson,
+Matthews, Mint Hill, Pineville, Stallings) instead of a generic split.
+6 unit tests lock in the parser, including a check that no inspector
+email/phone leaks into the row (those fields exist on the service but
+were deliberately never requested, matching the privacy discipline
+already established for arcgis_distress_layers.py).
+
+The original module's "building permits / demolition" angle was also
+investigated (Mecklenburg County's "Building Permit Locations" ArcGIS
+service, worktype='Demolish') but both its issuedate and compldate
+fields max out at April 2017 -- stale, dropped rather than land dead
+data. The crime-incidents dataset from the original 3-dataset design was
+also dropped (crime isn't really a property-distress signal, and no
+replacement was investigated).
+
+Board: 172,968 -> 175,941 rows (+2,973 net new).

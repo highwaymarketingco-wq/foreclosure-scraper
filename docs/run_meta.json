@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-15T16:00:46.765515Z",
-  "total": 172968,
+  "run_time": "2026-09-15T16:46:37.608316Z",
+  "total": 175941,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -100,7 +100,7 @@
     "courtlistener.recap": 945
   },
   "by_state": {
-    "NC": 93253,
+    "NC": 96226,
     "SC": 79715
   },
   "by_source_on_board": {
@@ -115,6 +115,7 @@
     "nc_ecourts_judgments": 3765,
     "counties_generic.state_contamination.nc_ust_incidents": 3634,
     "counties_nc.buncombe_elderly": 2988,
+    "city_websites.charlotte_open_data": 2973,
     "counties_sc.sc_ust_registry": 2611,
     "counties_sc.berkeley_paystar_tax": 2349,
     "counties_sc.greenville_delinquent_tax": 2287,
@@ -513,20 +514,20 @@
     "newspapers.carolina_coast"
   ],
   "notes": "",
-  "detail_count": 172968,
-  "detail_digest": "f1a121313dfca338",
+  "detail_count": 175941,
+  "detail_digest": "56053a11cf57cc3c",
   "board": {
     "schema": "slim-v1",
-    "count": 172968,
+    "count": 175941,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
-      "count": 173,
-      "records": 172968
+      "count": 176,
+      "records": 175941
     }
   },
-  "health_carried_from": "2026-09-15T15:36:08.329979Z",
+  "health_carried_from": "2026-09-15T16:00:46.765515Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",

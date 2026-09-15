@@ -583,6 +583,7 @@ DATELESS_OK_SOURCES = {
     "national.gsa_surplus",                       # GSA accelerated-disposition federal properties; negotiated sale, no auction date
     "national.fema_disasters",                    # FEMA disaster declarations by county; a declaration event, not a sale
     "national.sc_public_index",                   # SC Common Pleas court filings; case filing date, not a sale date
+    "city_websites.charlotte_open_data",          # open Charlotte/Mecklenburg code enforcement cases; case creation date, not a sale date
     "counties_sc.sc_rod_acclaim",                # SC ROD (Acclaim vendor) recorded NOD/deed filings
     "counties_sc.sc_rod_cott",                   # SC ROD (Cott vendor) recorded NOD/deed filings
     # 2026-05 expansion — new sources added in this PR. Without these

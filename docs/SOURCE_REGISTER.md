@@ -1,12 +1,12 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 16:39 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-15 16:47 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
 - Scrapers in the registry: **229**
-- Producing rows on the board: **128**
-- Registered but contributing ZERO rows: **101**
+- Producing rows on the board: **129**
+- Registered but contributing ZERO rows: **100**
 - Confirmed real and not yet built: **9**
-- Board read: `docs/listings.json.gz` (172,968 rows)
+- Board read: `docs/listings.json.gz` (175,941 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
 
@@ -25,6 +25,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_sc.sc_public_index` | 5,070 | Spartanburg SC (922), Laurens SC (887), Anderson SC (850) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county` |
 | `counties_nc.rutherford_tax` | 4,171 | Rutherford NC (4171) | `https://www.rutherfordcountync.gov/`<br>`https://www.rutherfordcountync.gov/departments/` |
 | `counties_nc.buncombe_elderly` | 2,988 | Buncombe NC (2988) | `https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query` |
+| `city_websites.charlotte_open_data` | 2,973 | Mecklenburg NC (2973) | `https://gis.charlottenc.gov/arcgis/rest/services/HNS/CodeEnforcementCasesAll/MapServer/0`<br>`https://gis.charlottenc.gov/arcgis/rest/services/HNS/`<br>`https://gis.charlottenc.gov/arcgis/rest/services/HNS/CodeEnforcementCasesAll/MapServer/0/{case_num` |
 | `counties_sc.sc_ust_registry` | 2,611 | Spartanburg SC (926), Anderson SC (623), Pickens SC (313) | `https://apps.des.sc.gov/USTRegistry/` |
 | `counties_sc.berkeley_paystar_tax` | 2,349 | Berkeley SC (2349) | `https://berkeleycountysc.paystar.io/api/search`<br>`https://berkeleycountysc.paystar.io/api/invoices/{invoiceNumberHash`<br>`https://berkeleycountysc.paystar.io` |
 | `counties_sc.greenville_delinquent_tax` | 2,287 | Greenville SC (2287) | `https://www.greenvillecounty.org/appsAS400/Taxsale/` |
@@ -154,7 +155,6 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | Slug | URLs in the module |
 |---|---|
 | `city_websites.asheville_min_housing` | `https://www.ashevillenc.gov/department/development-services/minimum-housing/` |
-| `city_websites.charlotte_open_data` | `https://data.charlottenc.gov/resource/c6er-5c2c.json`<br>`https://data.charlottenc.gov/resource/6jx5-894j.json`<br>_+1 more_ |
 | `city_websites.search` | `https://{domain` |
 | `counties.sitemap_walker` | `https://www.spartanburgcounty.gov`<br>`https://www.cherokeecountysc.gov`<br>_+10 more_ |
 | `counties_generic.arcgis_distress_layers` | `https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services/`<br>`https://www.buncombecounty.org/governing/depts/tax/`<br>_+22 more_ |
