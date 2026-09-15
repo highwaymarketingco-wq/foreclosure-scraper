@@ -203,6 +203,33 @@ class ListingType(str, Enum):
     UNKNOWN = "unknown"
 
 
+#: Auction/case dispositions that mean the matter is CLOSED, not actionable —
+#: a shared constant (moved here 2026-09-15, not left inline in main.py's
+#: _active_only(), specifically so scraper/derived-signal modules can import
+#: it too without creating a scraper -> orchestrator dependency). Originally
+#: single-purpose in main._active_only(); counties_sc.zombie_properties was
+#: found the same day mislabeling every one of its rows as a "stalled
+#: foreclosure" because it only checked for progression to an actual SALE
+#: type, never a terminal court disposition like "dismissed" — a case that
+#: was formally dismissed is RESOLVED, not stuck. Both now check the SAME
+#: list instead of two copies that can drift apart.
+TERMINAL_AUCTION_STATUSES: frozenset[str] = frozenset({
+    "withdrawn",
+    "cancelled",
+    "canceled",
+    "rescinded",
+    "sold",
+    "completed",
+    # Terminal court / lien dispositions — the matter is closed, not actionable.
+    "redeemed",
+    "dismissed",
+    "dismissed/settled",
+    "satisfied",
+    "disposed",
+    "closed",
+})
+
+
 class PropertyKind(str, Enum):
     SINGLE_FAMILY = "single_family"
     CONDO = "condo"

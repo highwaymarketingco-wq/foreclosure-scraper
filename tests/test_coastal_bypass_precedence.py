@@ -30,10 +30,10 @@ from foreclosure_scraper.main import (
 from foreclosure_scraper.models import Listing, ListingType, PropertyKind
 
 
-def _lead(source, county, state="SC", **kw):
+def _lead(source, county, state="SC", listing_type=ListingType.DISTRESSED, **kw):
     return Listing(
         source=source, source_url="https://example.gov/x",
-        listing_type=ListingType.DISTRESSED, property_kind=PropertyKind.UNKNOWN,
+        listing_type=listing_type, property_kind=PropertyKind.UNKNOWN,
         county=county, state=state, raw={}, **kw,
     )
 
@@ -99,6 +99,15 @@ def test_genuine_oceanfront_row_is_still_tagged_oceanfront():
 
 
 def test_non_coastal_county_is_unaffected_by_the_bypass():
-    """A bypass source pointed at a non-coastal denied county must not sneak in."""
-    li = _lead("counties_sc.georgetown_civicengage", "Greenville", parcel_id="1")
+    """A bypass source pointed at a non-coastal denied county must not sneak
+    in via the COASTAL bypass mechanism specifically — tested here with a
+    FLIP-type lead (2026-09-15: the deny list, and therefore this coastal-
+    bypass-must-not-broaden-it concern, only applies to flip-type leads now;
+    see test_scope_deny_counties.py for the full story). A DISTRESSED-type
+    lead in Greenville is legitimately in-scope via a different, unrelated
+    path (in_scope_distressed — any real NC/SC county) regardless of this
+    coastal bypass, so this test would no longer prove anything useful with
+    the DISTRESSED type the other tests in this file use."""
+    li = _lead("counties_sc.georgetown_civicengage", "Greenville", parcel_id="1",
+               listing_type=ListingType.FORECLOSURE_SALE)
     assert _in_scope(li) is False

@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-15T10:56:06.820478Z",
-  "total": 150084,
+  "run_time": "2026-09-15T13:34:46.542797Z",
+  "total": 156133,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -100,8 +100,8 @@
     "courtlistener.recap": 945
   },
   "by_state": {
-    "NC": 84637,
-    "SC": 65447
+    "NC": 84645,
+    "SC": 71488
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 41264,
@@ -114,9 +114,11 @@
     "nc_ecourts_judgments": 3765,
     "counties_sc.sc_public_index": 3698,
     "counties_nc.buncombe_elderly": 2988,
+    "counties_sc.sc_ust_registry": 2611,
     "counties_sc.berkeley_paystar_tax": 2349,
     "counties_sc.greenville_delinquent_tax": 2287,
     "counties_nc.lincoln_vacant": 2199,
+    "counties_sc.florence_delinquent_tax": 2006,
     "counties_sc.pickens_delinquent_parcels": 1854,
     "counties_nc.nc_county_pdf_delinquent_tax": 1773,
     "counties_sc.spartanburg_delinquent_tax": 1709,
@@ -136,24 +138,29 @@
     "counties_sc.greenville_mie_adverts": 584,
     "counties_nc.asheville_str_permits": 555,
     "counties_sc.cherokee_delinquent_tax": 528,
+    "counties_sc.sc_probate_notices.yourpickenscounty": 510,
     "national.fannie_homepath": 494,
     "counties_sc.oconee_flc_assignment": 490,
     "counties.multi_year_delinquent_tax": 458,
     "counties_sc.georgetown_civicengage": 365,
     "counties_sc.sc_public_index_lis_pendens": 348,
+    "counties_sc.terry_howe_auctions": 335,
     "national.distressed": 282,
     "national.landandfarm": 282,
     "counties_sc.sc_probate_net": 265,
     "national.landwatch": 264,
     "counties_nc.nc_ecourts_lis_pendens": 260,
     "counties_nc.transylvania_delinquent_tax": 233,
+    "counties_sc.sc_probate_notices.gaffneyledger": 228,
     "counties_nc.mcdowell_probate": 227,
     "national.hud_reac_inspection": 213,
     "counties_sc.oconee_forfeited_land": 208,
     "counties_sc.spartan_weekly_legals": 188,
     "counties_sc.sc_rod_acclaim": 173,
+    "counties_sc.pickens_tax_sale": 160,
     "counties_nc.henderson_code_violations": 154,
     "counties_sc.sc_public_notices": 150,
+    "counties_sc.sc_probate_notices.laurenscountyadvertiser": 135,
     "public_notices.gannett_obituaries": 131,
     "counties_sc.york_overage_claims": 119,
     "counties_nc.asheville_helene": 115,
@@ -165,6 +172,7 @@
     "law_firms.brock_scott": 71,
     "law_firms.hutchens": 70,
     "law_firms.shapiro_ingle_powerbi": 65,
+    "counties_sc.sc_des_brownfields": 64,
     "national.zillow_bulk": 64,
     "counties_nc.lincoln_code_violations": 63,
     "counties_sc.charleston_mie": 54,
@@ -473,20 +481,20 @@
     "newspapers.carolina_coast"
   ],
   "notes": "",
-  "detail_count": 150084,
-  "detail_digest": "398e9f2f5f9dc331",
+  "detail_count": 156133,
+  "detail_digest": "ede87d318ae6f772",
   "board": {
     "schema": "slim-v1",
-    "count": 150084,
+    "count": 156133,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
-      "count": 151,
-      "records": 150084
+      "count": 157,
+      "records": 156133
     }
   },
-  "health_carried_from": "2026-09-15T10:06:48.882667Z",
+  "health_carried_from": "2026-09-15T10:56:06.820478Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",

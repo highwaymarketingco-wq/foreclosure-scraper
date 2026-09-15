@@ -4,6 +4,29 @@ Clarendon County treasurer posts properties for auction at
 clarendoncountysc.gov.  The county website features an auction hammer
 icon linking to delinquent tax sale properties.
 
+DISABLED 2026-09-15, NOT JUST DORMANT -- found by a background triage
+agent (this codebase's zero-row-scraper audit) and confirmed live by
+hand: the keyword-link-follower ("auction", "tax sale", "delinquent",
+"foreclos", "sheriff", "treasurer", "bid" anywhere in a link's href or
+text) is far too broad for this county's homepage. Live run produced 23
+fake TAX_SALE rows: 20 were rows from the county's UNRELATED procurement/
+RFP portal (clarendoncountyprocurement.sc.gov/solicitations -- e.g.
+`defendant: "ITB 2025-012"`, a road-paving-contract bid notice), and 3
+were random county-council MEETING-AGENDA PDFs mislabeled
+`"Tax auction PDF: ...january-12-2026.pdf"`. Every fake row had
+parcel_id=None. Accidentally not reaching the board only because this
+source was never in `main.py`'s DATELESS_OK_SOURCES and its
+`active_months=(9,10,11,12,1)` gate happens to not yet have started for
+2026 -- neither is a real protection, and a "fix" that just widens the
+gate or adds the whitelist entry would ship this straight onto the
+board the moment September ends.
+
+`fetch()` is disabled (returns []) until this is rewritten with a real
+per-link/per-document validator (e.g. requiring the linked page's own
+URL or title to match a tax-sale pattern, not just nearby anchor text)
+instead of a blanket "follow anything vaguely auction/treasurer/bid-
+shaped."
+
 Free, public, no login.
 Slug: counties_sc.clarendon_tax_auction
 Category: county_tax
@@ -11,16 +34,12 @@ ListingType: TAX_SALE
 """
 from __future__ import annotations
 
-import re
-from datetime import datetime
 from typing import Iterable
-from urllib.parse import urljoin
 
 import structlog
 
 from ...base_scraper import BaseScraper
-from ...http_client import get_text
-from ...models import Listing, ListingType, PropertyKind
+from ...models import Listing
 
 log = structlog.get_logger()
 
@@ -34,94 +53,10 @@ class ClarendonTaxAuction(BaseScraper):
     timeout_s = 120.0
     expected_min_count = 0
     optional = True
-    active_months = (9, 10, 11, 12, 1)
 
     async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
-        try:
-            html = await get_text(PAGE_URL, impersonate=True, timeout=40.0)
-        except Exception as exc:
-            log.warning("clarendon_tax.fetch_fail", error=str(exc)[:160])
-            return out
-
-        if not html or len(html) < 200:
-            return out
-
-        # Find auction/tax sale links
-        links = re.findall(r'<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>', html, re.I | re.S)
-        auction_links: list[tuple[str, str]] = []
-        for href, text in links:
-            low = (href + text).lower()
-            if any(kw in low for kw in ("auction", "tax sale", "delinquent", "foreclos", "sheriff", "treasurer", "bid")):
-                auction_links.append((urljoin(PAGE_URL, href), re.sub(r"<[^>]+>", "", text).strip()))
-
-        # Follow auction links and parse property data
-        for auction_url, link_text in auction_links[:5]:
-            if auction_url == PAGE_URL:
-                continue
-            try:
-                sub_html = await get_text(auction_url, impersonate=True, timeout=40.0)
-            except Exception:
-                continue
-            if not sub_html:
-                continue
-
-            # Parse property listings
-            rows = re.findall(r"<tr[^>]*>(.*?)</tr>", sub_html, re.I | re.S)
-            for row in rows:
-                cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.I | re.S)
-                if len(cells) < 2:
-                    continue
-                clean = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
-                if any(h in c.lower() for c in clean[:2] for h in ("owner", "name", "tms", "map", "parcel", "#")):
-                    continue
-
-                parcel = None
-                for c in clean:
-                    m = re.search(r"\b(\d{3}[-\s]?\d{2}[-\s]?\d{2}[-\s]?[\d.]+)\b", c)
-                    if m:
-                        parcel = m.group(1)
-                        break
-
-                owner = clean[0] if clean else None
-                addr = None
-                for c in clean[1:]:
-                    if re.search(r"\d+\s+\w+", c):
-                        addr = c
-                        break
-
-                out.append(Listing(
-                    source="counties_sc.clarendon_tax_auction",
-                    source_url=auction_url,
-                    listing_type=ListingType.TAX_SALE,
-                    property_kind=PropertyKind.UNKNOWN,
-                    state="SC",
-                    county="Clarendon",
-                    parcel_id=parcel,
-                    defendant=owner,
-                    street_address=addr,
-                    description=" | ".join(clean[:6]) if clean else None,
-                    first_seen=datetime.utcnow(),
-                    last_seen=datetime.utcnow(),
-                    raw={"clarendon_tax_auction": {"cells": clean[:10], "source_link": link_text}},
-                ))
-
-            # Also check for PDF links on auction pages
-            pdf_links = re.findall(r'href="([^"]*\.pdf[^"]*)"', sub_html, re.I)
-            for pdf_url in pdf_links[:3]:
-                full_url = urljoin(auction_url, pdf_url)
-                out.append(Listing(
-                    source="counties_sc.clarendon_tax_auction",
-                    source_url=full_url,
-                    listing_type=ListingType.TAX_SALE,
-                    property_kind=PropertyKind.UNKNOWN,
-                    state="SC",
-                    county="Clarendon",
-                    description=f"Tax auction PDF: {full_url}",
-                    first_seen=datetime.utcnow(),
-                    last_seen=datetime.utcnow(),
-                    raw={"clarendon_tax_auction": {"pdf_url": full_url, "is_pdf_link": True}},
-                ))
-
-        log.info("clarendon_tax.done", count=len(out))
-        return out
+        # Disabled -- see the module docstring. The keyword-link-follower
+        # was grabbing the county's unrelated procurement/RFP portal and
+        # random meeting-agenda PDFs and emitting them as fake tax listings.
+        log.info("clarendon_tax.disabled", note="awaiting a real per-document validator, not a keyword-link follow")
+        return []

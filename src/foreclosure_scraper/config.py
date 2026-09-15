@@ -4,6 +4,12 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+from .validation import (
+    NC_COUNTIES as _ALL_NC_COUNTIES,
+    SC_COUNTIES as _ALL_SC_COUNTIES,
+    normalize_county as _normalize_county_name,
+)
+
 
 @dataclass(frozen=True)
 class County:
@@ -74,6 +80,53 @@ def in_scope(county_name: str | None, state: str | None) -> bool:
         return False
     key = f"{state_u}-{norm}"
     return key in COUNTY_BY_KEY
+
+
+def in_scope_distressed(county_name: str | None, state: str | None) -> bool:
+    """Return True if a (county, state) pair is any real NC or SC county.
+
+    Added 2026-09-15. `in_scope()` above encodes an 18-county "flip"
+    footprint from a 2026-05 decision (Upstate SC / WNC corridor only) --
+    but the standing mission scope, confirmed directly with the user this
+    same day, is narrower than that only for FLIP-type leads (an actual
+    scheduled foreclosure/sheriff/HOA sale or REO -- something you could
+    go bid on or buy today): "if its a flip, its only in the counties we
+    talked about. if its a distressed property its anywhere in nc and
+    sc." Every other listing type (tax delinquency, liens, probate,
+    divorce, bankruptcy, elderly/disabled exemption, tax-sale overage,
+    the generic DISTRESSED type itself, etc.) is a LEAD, not an
+    immediate transaction, and should be admissible in any of the 146
+    real NC+SC counties -- which is the majority of what this project has
+    actually been building for weeks (Greenville, Dillon, Jasper,
+    Berkeley, Wake, Edgecombe, and dozens more, none of them in the
+    18-county footprint `in_scope()` still encodes).
+
+    Deliberately does NOT apply SCOPE_DENY_COUNTIES: those entries encode
+    reasons like "Mecklenburg — out of user's flip target" and "Horry
+    excluded per user direction" that were about the FLIP scope
+    specifically (or predate the distressed-anywhere direction); the
+    user's own words above ("anywhere in nc and sc") carry no carve-outs,
+    so none are applied here. See main.py's `_in_scope()` for how this is
+    actually wired in per-listing-type -- this function only answers "is
+    this a real county name," not which lane a given listing takes.
+    """
+    if not county_name or not state:
+        return False
+    state_u = state.upper()
+    if state_u not in ("NC", "SC"):
+        return False
+    # "Statewide" is a deliberate placeholder some sources use when a lead
+    # genuinely isn't tied to one county (e.g. counties_sc.sc_des_brownfields,
+    # which doesn't extract per-site county detail) -- not a data error, and
+    # not a specific place that could be out-of-scope. Treat it the same way
+    # main._in_scope() already treats a genuinely empty county for
+    # SCOPE_BYPASS_SOURCES: admitted, since the state itself is one we track.
+    if county_name.strip().lower() == "statewide":
+        return True
+    norm = _normalize_county_name(county_name)
+    if state_u == "NC":
+        return norm in _ALL_NC_COUNTIES
+    return norm in _ALL_SC_COUNTIES
 
 
 # Counties where listings should NEVER appear, even when they came from

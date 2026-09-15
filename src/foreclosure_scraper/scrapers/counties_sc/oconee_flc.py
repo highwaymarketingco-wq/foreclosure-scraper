@@ -3,6 +3,28 @@
 Oconee County's FLC page lists available forfeited land commission
 properties - properties the county acquired through tax delinquency.
 
+DISABLED 2026-09-15, NOT JUST DORMANT. First found by a background
+triage agent (this codebase's zero-row-scraper audit): the original
+`(?:TMS|PIN|Parcel)` regex had no word boundary, so "PIN" matched as a
+bare substring inside page CSS like ".spin-button{...}", producing a
+fake parcel_id. Patched that (word boundary + require the capture to
+start with a digit) and re-verified live -- which surfaced a SECOND,
+deeper problem the first fix didn't touch: the `addresses` regex
+(a digit-run followed by street-suffix words like St/Ave/Rd/...) matches ANY address-shaped
+text ANYWHERE on the page, with no way to tell "the county TREASURER
+OFFICE's own street address" (which is printed on essentially every
+county contact page) from a real delinquent property. Confirmed live
+post-fix: still 4 fake rows, all four with street_address literally
+"415 S. Pine St. Walhalla, SC 29691" -- the county office's own address,
+repeated once per contact block on the page (address / hours / phone /
+fax), not four different properties.
+
+`fetch()` is disabled (returns []) until this has a real way to
+distinguish an FLC property listing from the page's own contact
+boilerplate -- e.g. a dedicated FLC inventory page/document, if Oconee
+publishes one, rather than scraping oconeesc.com/treasurer-home's
+free text for address-shaped substrings.
+
 Free, public, no login.
 Slug: counties_sc.oconee_flc
 Category: county_tax
@@ -10,15 +32,12 @@ ListingType: TAX_SALE
 """
 from __future__ import annotations
 
-import re
-from datetime import datetime
 from typing import Iterable
 
 import structlog
 
 from ...base_scraper import BaseScraper
-from ...http_client import get_text
-from ...models import Listing, ListingType, PropertyKind
+from ...models import Listing
 
 log = structlog.get_logger()
 
@@ -34,71 +53,8 @@ class OconeeFLC(BaseScraper):
     optional = True
 
     async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
-        try:
-            html = await get_text(PAGE_URL, impersonate=True, timeout=30.0)
-        except Exception as exc:
-            log.warning("oconee_flc.fetch_fail", error=str(exc)[:160])
-            return out
-
-        if not html:
-            return out
-
-        pdf_links = re.findall(r'href="([^"]*\.pdf[^"]*)"', html, re.I)
-        parcels = re.findall(r"(?:TMS|PIN|Parcel)\s*:?\s*([\d\-\.]+)", html, re.I)
-        addresses = re.findall(
-            r"\b(\d+\s+[A-Za-z0-9\s]+(?:St|Ave|Rd|Dr|Ln|Ct|Blvd|Hwy|Way|Cir|Trl|Pkwy|Ter)[A-Za-z\s]*)",
-            html,
-        )
-
-        if not parcels and not addresses:
-            rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.I | re.S)
-            for row in rows:
-                cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.I | re.S)
-                if len(cells) < 2:
-                    continue
-                clean = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
-                if not any(re.search(r"\d", c) for c in clean):
-                    continue
-                parcel = None
-                for c in clean:
-                    m = re.search(r"\b(\d{3}[-\s]?\d{2}[-\s]?\d{2}[-\s]?[\d.]+)\b", c)
-                    if m:
-                        parcel = m.group(1)
-                        break
-                out.append(Listing(
-                    source="counties_sc.oconee_flc",
-                    source_url=PAGE_URL,
-                    listing_type=ListingType.TAX_SALE,
-                    property_kind=PropertyKind.UNKNOWN,
-                    state="SC",
-                    county="Oconee",
-                    parcel_id=parcel,
-                    defendant=clean[0] if clean else None,
-                    street_address=clean[1] if len(clean) > 1 else None,
-                    description=" | ".join(clean[:6]),
-                    first_seen=datetime.utcnow(),
-                    last_seen=datetime.utcnow(),
-                    raw={"oconee_flc": {"cells": clean[:10], "pdf_links": pdf_links[:3]}},
-                ))
-        else:
-            max_items = max(len(parcels), len(addresses), 1)
-            for i in range(max_items):
-                parcel = parcels[i] if i < len(parcels) else None
-                addr = addresses[i].strip() if i < len(addresses) else None
-                out.append(Listing(
-                    source="counties_sc.oconee_flc",
-                    source_url=PAGE_URL,
-                    listing_type=ListingType.TAX_SALE,
-                    property_kind=PropertyKind.UNKNOWN,
-                    state="SC",
-                    county="Oconee",
-                    parcel_id=parcel,
-                    street_address=addr,
-                    first_seen=datetime.utcnow(),
-                    last_seen=datetime.utcnow(),
-                    raw={"oconee_flc": {"pdf_links": pdf_links[:3]}},
-                ))
-
-        log.info("oconee_flc.done", count=len(out))
-        return out
+        # Disabled -- see the module docstring. The free-text address/parcel
+        # regex approach cannot tell the county office's own contact address
+        # from a real FLC property listing.
+        log.info("oconee_flc.disabled", note="awaiting a real FLC inventory source, not free-text address scraping")
+        return []

@@ -1,12 +1,12 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 10:56 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-15 13:35 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
 - Scrapers in the registry: **229**
-- Producing rows on the board: **112**
-- Registered but contributing ZERO rows: **117**
+- Producing rows on the board: **117**
+- Registered but contributing ZERO rows: **112**
 - Confirmed real and not yet built: **9**
-- Board read: `docs/listings.json.gz` (150,084 rows)
+- Board read: `docs/listings.json.gz` (156,133 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
 
@@ -25,9 +25,11 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_nc.rutherford_tax` | 4,171 | Rutherford NC (4171) | `https://www.rutherfordcountync.gov/`<br>`https://www.rutherfordcountync.gov/departments/` |
 | `counties_sc.sc_public_index` | 3,698 | Anderson SC (673), Spartanburg SC (642), Laurens SC (640) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county` |
 | `counties_nc.buncombe_elderly` | 2,988 | Buncombe NC (2988) | `https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query` |
+| `counties_sc.sc_ust_registry` | 2,611 | Spartanburg SC (926), Anderson SC (623), Pickens SC (313) | `https://apps.des.sc.gov/USTRegistry/` |
 | `counties_sc.berkeley_paystar_tax` | 2,349 | Berkeley SC (2349) | `https://berkeleycountysc.paystar.io/api/search`<br>`https://berkeleycountysc.paystar.io/api/invoices/{invoiceNumberHash`<br>`https://berkeleycountysc.paystar.io` |
 | `counties_sc.greenville_delinquent_tax` | 2,287 | Greenville SC (2287) | `https://www.greenvillecounty.org/appsAS400/Taxsale/` |
 | `counties_nc.lincoln_vacant` | 2,199 | Lincoln NC (2199) | `https://arcgisserver.lincolncounty.org/arcgis/rest/services/ComDevData/MapServer/25/query` |
+| `counties_sc.florence_delinquent_tax` | 2,006 | Florence SC (2006) | `https://www.florenceco.org/offices/delinquent-tax/` |
 | `counties_sc.pickens_delinquent_parcels` | 1,854 | Pickens SC (1854) | `https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services`<br>`https://www.co.pickens.sc.us/departments/delinquent_tax/index.php` |
 | `counties_nc.nc_county_pdf_delinquent_tax` | 1,773 | McDowell NC (1371), Lincoln NC (402) | `https://www.lincolncountync.gov/DocumentCenter/View/25558/2025-TAXESDelinquentAdvertisementNotice`<br>`https://www.catawbacountync.gov/site/assets/files/11653/delinquent_advertisement_list-hdr_2026.pdf`<br>`https://mcdowellnc.gov/departments/tax-collections/tax-lien-advertisement/ADVERTISEMENT-LIST-FINAL-2025.pdf` |
 | `counties_sc.spartanburg_delinquent_tax` | 1,709 | Spartanburg SC (1709) | `https://www.spartanburgcounty.gov/DocumentCenter/View/11161/Real-Property-Tax-Sale-List-PDF`<br>`https://www.spartanburgcounty.gov/DocumentCenter/View/11161/`<br>`https://www.spartanburgcounty.gov/640/2025-Tax-Sale-Info` |
@@ -49,6 +51,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties.multi_year_delinquent_tax` | 458 | Buncombe NC (322), Oconee SC (135), Pickens SC (1) | `https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services`<br>`https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services`<br>`https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services`<br>_+3 more_ |
 | `counties_sc.georgetown_civicengage` | 365 | Georgetown SC (365) | `https://www.gtcountysc.gov` |
 | `counties_sc.sc_public_index_lis_pendens` | 348 | Anderson SC (141), Spartanburg SC (113), Cherokee SC (28) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county` |
+| `counties_sc.terry_howe_auctions` | 335 | Spartanburg SC (140), Laurens SC (118), Anderson SC (36) | `https://terryhowe.com/wp-json/wp/v2/auctions` |
 | `national.distressed` | 282 | Gaston NC (46), Spartanburg SC (38), Anderson SC (36) | _(no literal URL in module)_ |
 | `national.landandfarm` | 282 | Gaston NC (25), Henderson NC (22), Cleveland NC (21) | `https://www.landandfarm.com/search/{state_slug` |
 | `counties_sc.sc_probate_net` | 265 | Charleston SC (265) | `https://www.southcarolinaprobate.net/search/```<br>`https://www.southcarolinaprobate.net/search/` |
@@ -60,6 +63,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_sc.oconee_forfeited_land` | 208 | Oconee SC (208) | `https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services/`<br>`https://oconeesc.com/auditor-home/forfeited-land` |
 | `counties_sc.spartan_weekly_legals` | 188 | Spartanburg SC (188) | `https://www.spartanweeklyonline.com` |
 | `counties_sc.sc_rod_acclaim` | 173 | Pickens SC (173) | _(no literal URL in module)_ |
+| `counties_sc.pickens_tax_sale` | 160 | Pickens SC (160) | `https://www.co.pickens.sc.us/departments/delinquent_tax/index.php`<br>`https://www.co.pickens.sc.us/` |
 | `counties_nc.henderson_code_violations` | 154 | Henderson NC (154) | `https://services1.arcgis.com/ZfV5vUaX5QvLLBi9/arcgis/rest/services/`<br>`https://www.hendersoncountync.gov/planning` |
 | `counties_sc.sc_public_notices` | 150 | Pickens SC (39), Laurens SC (25), Cherokee SC (23) | `https://www.scpublicnotices.com/Search.aspx`<br>`https://www.scpublicnotices.com/Details.aspx?ID={n[` |
 | `public_notices.gannett_obituaries` | 131 | Buncombe NC (56), Spartanburg SC (32), Anderson SC (26) | `https://www.{host` |
@@ -73,6 +77,7 @@ Live row counts are what the source actually contributed to the board read above
 | `law_firms.brock_scott` | 71 | Spartanburg SC (24), Gaston NC (9), Anderson SC (7) | `https://www.brockandscott.com/foreclosure-sales/` |
 | `law_firms.hutchens` | 70 | Spartanburg SC (12), Gaston NC (11), Buncombe NC (8) | `https://sales.hutchenslawfirm.com/NCfcSalesList.aspx`<br>`https://sales.hutchenslawfirm.com/SCfcSalesList.aspx` |
 | `law_firms.shapiro_ingle_powerbi` | 65 | Gaston NC (23), Buncombe NC (15), Cleveland NC (7) | `https://www.logs.com/nc-upcoming-sales-report.html`<br>`https://app.powerbi.com/view?r=`<br>`https://wabi-us-north-central-h-primary-api.analysis.windows.net`<br>_+2 more_ |
+| `counties_sc.sc_des_brownfields` | 64 | Statewide SC (64) | `https://des.sc.gov/programs/bureau-land-waste-management/`<br>`https://des.sc.gov/community/environmental-sites-projects` |
 | `national.zillow_bulk` | 64 | Spartanburg SC (16), Gaston NC (13), Anderson SC (10) | `https://www.zillow.com/{state.lower(` |
 | `counties_nc.lincoln_code_violations` | 63 | Lincoln NC (63) | `https://arcgisserver.lincolncountync.gov/arcgis/rest/services/` |
 | `counties_sc.charleston_mie` | 54 | Charleston SC (54) | `https://charlestoncounty.gov/foreclosure/runninglist.html`<br>`https://charlestoncounty.gov/departments/master-in-equity/rosters/` |
@@ -176,7 +181,6 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_sc.dillon_sheriff` | `https://dilloncountysc.org/services/public_safety/sheriffs_office.php` |
 | `counties_sc.edgefield_delinquent_tax` | `https://edgefieldcounty.sc.gov/treasurer/` |
 | `counties_sc.fairfield_delinquent_tax` | `https://www.fairfieldsc.com/departments/treasurer` |
-| `counties_sc.florence_delinquent_tax` | `https://www.florenceco.org/offices/delinquent-tax/` |
 | `counties_sc.greenville_tax_distress` | `https://www.gcgis.org/arcgis/rest/services/GreenvilleJS/Map_Layers_JS/MapServer`<br>`https://www.greenvillecounty.org/appsAS400/Taxsale/`<br>_+2 more_ |
 | `counties_sc.greenwood_delinquent_tax` | `https://www.greenwoodcounty-sc.gov/treasurer/delinquent-tax-sale` |
 | `counties_sc.kershaw_flc` | `https://www.kershaw.sc.gov/treasurer/forfeited-land-commission` |
@@ -189,18 +193,14 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_sc.newberry_delinquent_tax` | `https://www.newberrycounty.gov/delinquent-tax/tax-sales` |
 | `counties_sc.oconee_flc` | `https://oconeesc.com/treasurer-home` |
 | `counties_sc.oconee_tax_sale` | `https://docs.google.com/spreadsheets/d/e/{_PUB_ID`<br>`https://oconeesc.com/delinquent-tax/sale-list` |
-| `counties_sc.pickens_tax_sale` | `https://www.co.pickens.sc.us/departments/delinquent_tax/index.php`<br>`https://www.co.pickens.sc.us/` |
 | `counties_sc.saluda_delinquent_tax` | `https://saludacounty.sc.gov/departments/tax-collector/delinquent-tax-sale`<br>`https://saludacounty.sc.gov/departments/tax-collector` |
 | `counties_sc.sc_catalis_delinquent_roll` | `https://d1ebsyxxbc7tep.cloudfront.net/data`<br>`https://pickenscountysctax.us` |
 | `counties_sc.sc_coastal_rosters` | _(no literal URL in module)_ |
 | `counties_sc.sc_delinquent_tax_list` | `https://cherokeecountysc.gov/delinquent-tax/tax-sale-bidders/`<br>`https://cherokeecountysc.gov/wp-content/uploads/{year` |
-| `counties_sc.sc_des_brownfields` | `https://des.sc.gov/programs/bureau-land-waste-management/`<br>`https://des.sc.gov/community/environmental-sites-projects` |
 | `counties_sc.sc_dor_delinquent_taxpayers` | `https://mydorway.dor.sc.gov/?link=delinquentind` |
 | `counties_sc.sc_probate_notices` | `https://{paper.host` |
 | `counties_sc.sc_tax_delinquent` | `https://1543.newstogo.us/editionviewer/default.aspx?Edition=`<br>`https://www.andersoncountysc.org/departments-a-z/treasurer/`<br>_+11 more_ |
-| `counties_sc.sc_ust_registry` | `https://apps.des.sc.gov/USTRegistry/` |
 | `counties_sc.sumter_surplus` | `https://www.sumtercountysc.gov/online_services/property/surplus_sales.php` |
-| `counties_sc.terry_howe_auctions` | `https://terryhowe.com/wp-json/wp/v2/auctions` |
 | `counties_sc.union_delinquent_tax` | `https://gearupunionsc.com/officials/treasurer/` |
 | `counties_sc.york_delinquent_tax` | `https://www.yorkcountysc.gov/216/Tax-Collection`<br>`https://www.yorkcountysc.gov{doc_url` |
 | `counties_sc.zombie_properties` | _(no literal URL in module)_ |

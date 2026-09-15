@@ -18,7 +18,26 @@ Logic:
    b. The lis pendens first_seen is >12 months old
    c. NO listing in the group has listing_type in
       (FORECLOSURE_SALE, TAX_SALE, SHERIFF_SALE, AUCTION)
+   d. The lis pendens itself does NOT carry a terminal auction_status
+      (dismissed/satisfied/redeemed/etc.)
 4. Yield those as DISTRESSED with a "zombie_property" flag in raw.
+
+FOUND 2026-09-15 (background triage agent, this codebase's zero-row-
+scraper audit; confirmed live by hand): condition (d) above did not
+exist until now. Every one of this scraper's live rows (14/14, checked
+by hand) carried `auction_status="dismissed"` copied verbatim from the
+underlying lis pendens record -- a case that was formally DISMISSED is
+RESOLVED, not "stalled" (the lender walked away / the case is stuck).
+Checking only for progression to an actual SALE_TYPE misses dismissal
+entirely, so this scraper was mislabeling 100% of resolved cases as
+zombies. main._active_only() (which treats any terminal auction_status
+as a closed matter) was silently catching and dropping every one of
+these regardless -- so the false positives never actually reached the
+board, but the derivation logic itself was still wrong, and would have
+started producing garbage the moment anyone "fixed" the apparent
+zero-row status by only adding a DATELESS_OK_SOURCES entry (which this
+source ALSO needed, since a genuine, non-dismissed zombie property has
+no sale_date either -- but that alone wasn't the real bug).
 
 Slug: counties_sc.zombie_properties
 Category: derived
@@ -32,7 +51,7 @@ from typing import Iterable
 import structlog
 
 from ...base_scraper import BaseScraper
-from ...models import Listing, ListingType, PropertyKind
+from ...models import Listing, ListingType, PropertyKind, TERMINAL_AUCTION_STATUSES
 
 log = structlog.get_logger()
 
@@ -94,6 +113,19 @@ class ZombieProperties(BaseScraper):
             )
             if has_sale:
                 continue  # This property has progressed — not a zombie
+
+            # A lis pendens with a TERMINAL disposition (dismissed/satisfied/
+            # redeemed/etc.) is RESOLVED, not stalled -- the case is over,
+            # whether or not it ever became a sale. Checking _SALE_TYPES
+            # progression alone missed this entirely; found 2026-09-15 after
+            # every single live row this scraper produced turned out to
+            # carry auction_status="dismissed" (see module docstring).
+            has_terminal_status = any(
+                (l.auction_status or "").lower() in TERMINAL_AUCTION_STATUSES
+                for l in listings
+            )
+            if has_terminal_status:
+                continue  # Resolved (e.g. dismissed) — not a zombie
 
             # Check if the oldest lis pendens is >12 months old
             oldest_lp = min(

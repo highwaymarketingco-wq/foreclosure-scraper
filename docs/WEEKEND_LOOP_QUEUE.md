@@ -2920,3 +2920,165 @@ be narrow once actually measured. Worth a manual look at the 6 liensnc
 keys specifically if precision on those particular properties ever
 matters for a downstream use case, but not worth a general-purpose
 Pass-1 guard for this small a footprint today.
+
+## SC zero-row audit + a real scope-policy fix confirmed with the user (2026-09-15)
+
+Dispatched the same background-agent triage technique that found so much
+NC value earlier today, this time against the 41 `counties_sc.*`
+scrapers sitting at zero board rows. The report was even bigger than
+NC's: 4 more garbage-emitting scrapers, and a cluster of sources
+already correctly coded that had simply never been run -- but working
+through the "already coded" cluster surfaced something much bigger than
+expected.
+
+### The scope-policy bug (the single biggest finding of the whole session)
+
+Investigating why `counties_sc.florence_delinquent_tax` (2,006 real,
+verified rows) never reached the board led to `main.py`'s `_in_scope()`
+gate: it hard-allowlists only 18 counties (7 SC + 11 NC) from a **2026-05**
+decision scoping the mission to "Upstate SC / WNC corridor only," with an
+explicit ~30-county DENY list on top (Mecklenburg, Wake, Greenville SC,
+Abbeville SC, Newberry SC, and more) carrying comments quoting real past
+user direction ("Mecklenburg — out of user's flip target"). That config
+was never updated even as the mission expanded to statewide NC+SC
+coverage over the following months -- so it was flatly contradicted by
+huge amounts of REAL, ACTIVELY-AUTHORIZED work: Greenville's own
+delinquent-tax source alone ships 2,287 rows, and Wake/Abbeville were
+both worked on earlier THIS SAME DAY. Nothing had been deleted only
+because every ingest script this whole session (mine included) writes
+directly via `dedupe()` + `write_artifact()`, bypassing `_in_scope()`
+entirely -- but a genuine full pipeline run (main.py's own orchestrator,
+which DOES call `_in_scope()`, including a "POST-ENRICHMENT SCOPE
+RE-PASS" that re-applies it after enrichment) would have silently wiped
+every denied/out-of-footprint county's rows board-wide the next time it
+ran. This was a live, unexploded landmine sitting under months of work.
+
+Given the stakes (a policy question, not a code bug — reconciling
+specific quoted past user direction against actively-authorized current
+work), asked the user directly rather than guess. Answer, verbatim:
+**"if its a flip, its only in the counties we talked about. if its a
+distressed property its anywhere in nc and sc."**
+
+Implemented exactly that, type-aware:
+- `models.ListingType` values split into a `_FLIP_LISTING_TYPES` set
+  (FORECLOSURE_SALE, AUCTION, SHERIFF_SALE, HOA_SALE, REO — something
+  you could go bid on or buy today) and everything else (tax
+  delinquency, liens, probate, divorce, bankruptcy, elderly/disabled
+  exemption, tax-sale overage, the generic DISTRESSED type, UNKNOWN).
+- New `config.in_scope_distressed(county, state)` — any real NC/SC
+  county (146 total, reusing `validation.py`'s already-canonical
+  `NC_COUNTIES`/`SC_COUNTIES` name sets so the two can't drift), no deny
+  list applied (the user's words carried no carve-outs).
+- `main._in_scope()` and the post-enrichment `_denied_now()` re-pass both
+  now branch on `_is_flip(li)`: flip-type leads keep the exact old
+  18-county-footprint + deny-list behavior unchanged; every other type
+  uses the new statewide check instead.
+- `tests/test_scope_deny_counties.py` / `test_coastal_bypass_precedence.py`:
+  the 7 failing tests encoded the OLD blanket-deny behavior with an
+  implicit non-flip default type — updated to explicitly test flip-type
+  leads (still denied, unchanged) and added 5 new tests locking in the
+  distressed-anywhere behavior (including that a fake/garbage county
+  string is still correctly rejected either way).
+
+This is now the standing, user-confirmed policy — not a one-off patch.
+
+### sc_probate_notices: a second "landed in code, never verified end-to-end" bug
+
+A 2026-09-10 commit added `counties_sc.sc_probate_notices` to
+`DATELESS_OK_SOURCES` citing "measured 880 rows" verified live — but the
+scraper actually emits every row under a PER-NEWSPAPER dynamic slug
+(`counties_sc.sc_probate_notices.laurenscountyadvertiser`, `.yourpickenscounty`,
+`.gaffneyledger`), never the bare base slug the whitelist entry checks
+via exact string match. The scraper really did work; the whitelist entry
+simply never matched what it actually emits, so `_active_only()` silently
+dropped 100% of its real output for 5 days. Fixed generically: `main.
+_active_only()` now also prefix-matches DATELESS_OK_SOURCES entries
+(confirmed via repo-wide grep this is currently the ONLY source using a
+`<base>.<suffix>` slug convention, so the change only ever widens
+matching for that one family).
+
+### zombie_properties.py: a real derivation-logic bug, not a config gap
+
+Assumed at first this just needed a `DATELESS_OK_SOURCES` entry (added
+it) — but live-verifying afterward, `_active_only()` still dropped
+100% of its 14 rows. Root cause: every single row carried
+`auction_status="dismissed"`, copied verbatim from the underlying
+lis-pendens record it derives from. A DISMISSED case is RESOLVED, not
+"stalled" — but the derivation logic only checked whether the case
+progressed to an actual sale, never whether it carried a terminal court
+disposition. Fixed the actual bug (added a terminal-status check to the
+derivation logic itself, pulling `TERMINAL_AUCTION_STATUSES` out of
+`main._active_only()` into a shared `models.py` constant so the two
+checks can't drift apart again) rather than just landing the
+false-positive rows. Net result: 0 genuine zombies exist on the board
+right now (all 14 candidates were dismissed, correctly excluded) — an
+honest zero, and the source is now trustworthy for future runs instead
+of quietly wrong.
+
+### sc_des_brownfields.py: fixed twice — a real parsing bug, then a real scope-config gap
+
+First pass: the URL/text keyword filter was too loose (matched "Skip to
+main content" and "Menu" via URL-path leakage from the page's own
+"cleanup-program" URL, and matched "Brownfields Funding & Incentives"
+via link-text containing "brownfield"). Found the real structural
+signal live (`/environmental-sites-projects/<real-slug>`) and matched
+on that specifically instead — eliminated the garbage entirely (64
+clean rows, all real specific site pages). Second pass: those 64 rows
+all carry `county="Statewide"` (the scraper has no per-site county
+extraction), which the new `in_scope_distressed()` correctly-but-
+unhelpfully rejected as "not a real county name." Added a small,
+generic carve-out: "Statewide" is treated as automatically in-scope for
+a tracked state (NC/SC), the same way a genuinely empty county already
+is for SCOPE_BYPASS_SOURCES — not a des_brownfields-specific hack.
+
+### 4 more garbage-emitting scrapers found and fixed (5 total for SC today, matching NC's 2)
+
+- **clarendon_tax_auction.py** — DISABLED. Keyword-link-follower was
+  grabbing the county's unrelated procurement/RFP portal (20 fake rows,
+  e.g. `defendant: "ITB 2025-012"`, a road-paving bid notice) and random
+  council-meeting-agenda PDFs (3 more). No real per-document validator
+  exists to fix this safely; disabled rather than patched.
+- **marlboro_delinquent_tax.py** — DISABLED. Targets a generic
+  meetings/publications page currently showing the county's FY2026-27
+  BUDGET table, not a tax-sale list — emitted budget line items
+  (`defendant: "PROPOSED Total Revenue Operating Budget"`) as fake
+  listings, one even attributing the county courthouse's own address to
+  a fake lead. No dedicated tax-sale page found to point at instead.
+- **oconee_flc.py** — first patched (word-boundary fix for a
+  `"PIN"`-matches-inside-`"spin-button"` CSS false-positive), then
+  DISABLED after re-verification showed a second, deeper problem the
+  first patch didn't touch: the address-matching regex has no way to
+  tell the county TREASURER OFFICE's own printed address from a real
+  delinquent property, and was emitting the office's address 4x (once
+  per contact block on the page) as 4 fake listings.
+  
+- **sumter_surplus.py** — table loop fixed (added the same digit-presence
+  guard already used elsewhere, which alone stopped it grabbing the
+  page's sidebar navigation table); the separate `<li>` fallback was
+  REMOVED after re-verification showed it still matched page
+  JAVASCRIPT (a calendar-widget code snippet) even with a digit+keyword
+  guard — a keyword-plus-digit match on arbitrary page text isn't a
+  safe enough signal. Table loop (which requires a real `<table>` row
+  shape) kept; the fallback wasn't.
+
+### Landed: 7 sources, 156,133 total board rows (+6,049 net new)
+
+`sc_ust_registry` (3,331), `sc_des_brownfields` (64), `sc_probate_notices`
+(873), `pickens_tax_sale` (160), `terry_howe_auctions` (365 -- an
+AUCTION/flip-type source, correctly restricted to the 18-county footprint
+under the new policy, unlike the other six), `florence_delinquent_tax`
+(2,006 -- unblocked entirely by the scope fix), `zombie_properties` (0,
+correctly empty per the derivation-logic fix above). York's 119
+TAX_SALE_OVERAGE rows still carry zero owner_mailing. Full 4,005-test
+suite passes (7 pre-existing tests updated to reflect the new
+user-confirmed policy, 5 new tests added to lock it in).
+
+**Still running in the background, not yet landed:**
+`counties_sc.sc_catalis_delinquent_roll` — already correctly coded and
+already in DATELESS_OK_SOURCES, but a live re-verification pass is
+taking far longer than expected: the host (a robots-disallowed domain
+this module deliberately crawls "gently," per its own docstring) is
+rate-limiting much harder today than the 2026-09-10 baseline the
+docstring describes — multiple prefixes have exhausted all 5 backoff
+attempts (up to 480s waits) and given up incomplete. Will check back on
+it separately rather than block this batch on it.

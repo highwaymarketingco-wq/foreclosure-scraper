@@ -71,13 +71,27 @@ class SCDESBrownfields(BaseScraper):
                 # Only follow links to site pages on des.sc.gov
                 if "des.sc.gov" not in full_url:
                     continue
-                # Filter for environmental site / brownfield links
-                low_url = full_url.lower()
-                low_text = re.sub(r"<[^>]+>", "", link_text).strip().lower()
-                if not any(kw in low_url or kw in low_text for kw in (
-                    "environmental-site", "brownfield", "cleanup",
-                    "site-project", "vcu", "bca",
-                )):
+                # FOUND 2026-09-15 (background triage agent, this codebase's
+                # zero-row-scraper audit): the original filter matched on
+                # keywords in EITHER the resolved URL or the link TEXT, and
+                # both leaked garbage. (1) Text match: section/nav labels
+                # like "Brownfields Funding & Incentives" and "Brownfields
+                # Success Stories" contain "brownfield" without being a real
+                # site page. (2) URL match: PAGE_URL's own path contains
+                # "cleanup-program", so a plain in-page anchor link like
+                # href="#main-content" resolved (via urljoin) to a URL that
+                # STILL contained "cleanup" -- "Skip to main content" and
+                # "Menu" landed on the board as fake sites this way.
+                # Confirmed live: real site links (verified via
+                # "Congaree River Sediment Cleanup", a genuine cleanup site)
+                # all share ONE real structural signal instead --
+                # /environmental-sites-projects/<real-slug>, e.g.
+                # ".../community/environmental-sites-projects/congaree-river-
+                # sediment-cleanup" or ".../community-engagement/
+                # environmental-sites-projects/college-charleston-project-
+                # 205". Match on THAT specific path shape only, not on
+                # loose keywords in the URL or the link text.
+                if not re.search(r"environmental-sites-projects/[a-z0-9][a-z0-9-]+", full_url, re.I):
                     continue
                 if full_url in seen_urls:
                     continue

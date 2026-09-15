@@ -25,6 +25,7 @@ from .config import (
     SCOPE_DENY_COUNTIES_NORMALIZED,
     SCOPE_ZIP_PREFIXES,
     in_scope,
+    in_scope_distressed,
 )
 from .oceanfront import is_oceanfront
 from .dedupe import dedupe
@@ -37,7 +38,7 @@ from .enrichment_geocode import enrich as enrich_geocode
 from .flags import compute_flags
 from . import checkpoint
 from .link_validator import validate
-from .models import Listing, PropertyKind
+from .models import Listing, ListingType, PropertyKind, TERMINAL_AUCTION_STATUSES
 from .scrapers._registry import all_scrapers
 from .sheets import write_listings
 from .valuation import calc as valuation_calc
@@ -223,6 +224,44 @@ def _safe_dedupe_key(li: Listing):
         return None
 
 
+#: "Flip" leads — something you could go bid on or buy TODAY (a scheduled
+#: sale or a bank-held property), as opposed to a distress SIGNAL that needs
+#: outreach before any transaction exists. Confirmed directly with the user
+#: 2026-09-15: "if its a flip, its only in the counties we talked about
+#: [the 18-county footprint in config.SC_COUNTIES/NC_COUNTIES]. if its a
+#: distressed property its anywhere in nc and sc." Everything NOT in this
+#: set (tax delinquency, liens, probate, divorce, bankruptcy, elderly/
+#: disabled exemption, tax-sale overage, the generic DISTRESSED type, and
+#: UNKNOWN) gets the broader in_scope_distressed() check below instead of
+#: the narrow 18-county in_scope(). Found the same day this was fixed: the
+#: narrow footprint had silently been the ONLY scope gate for years, while
+#: weeks of actual source-building (Greenville SC, Wake NC, Jasper SC,
+#: Berkeley SC, dozens more) went to counties outside it — never deleted
+#: only because no full pipeline run had executed against the board since
+#: they were added via scoped ingest scripts that never call this function.
+_FLIP_LISTING_TYPES = frozenset({
+    ListingType.FORECLOSURE_SALE,
+    ListingType.AUCTION,
+    ListingType.SHERIFF_SALE,
+    ListingType.HOA_SALE,
+    ListingType.REO,
+})
+
+
+def _is_flip(li: Listing) -> bool:
+    return li.listing_type in _FLIP_LISTING_TYPES
+
+
+def _county_in_scope(li: Listing) -> bool:
+    """The type-aware replacement for a bare `in_scope(li.county, li.state)`
+    call — flip-type listings keep the narrow 18-county footprint (with its
+    deny list), everything else gets the full-NC+SC distressed scope with
+    no deny list (see _FLIP_LISTING_TYPES and config.in_scope_distressed)."""
+    if _is_flip(li):
+        return in_scope(li.county, li.state)
+    return in_scope_distressed(li.county, li.state)
+
+
 def _in_scope(li: Listing) -> bool:
     # Oceanfront override — runs BEFORE the deny check so the otherwise-
     # denied coastal counties (New Hanover/Brunswick/Onslow + the SC
@@ -285,12 +324,18 @@ def _in_scope(li: Listing) -> bool:
     # being erased by regenerate_dashboard.py's scope re-filter.)
     if li.source in ("counties_generic.liensnc", "liensnc") and (li.state or "").upper() == "NC":
         return True
-    # Deny set takes precedence over EVERY other scope path. Without this,
-    # a listing tagged with a denied county still gets through via the zip-
-    # prefix fallback (288/287/296 cover Haywood NC, Mecklenburg NC,
-    # Abbeville SC etc.) or via SCOPE_BYPASS_SOURCES (CourtListener
-    # bankruptcy/civil/adversary). Explicit deny wins.
-    if li.county and li.state:
+    # Deny set takes precedence over EVERY other scope path -- but ONLY for
+    # FLIP-type leads. See _FLIP_LISTING_TYPES: the user's own words are
+    # "if its a flip, its only in the counties we talked about. if its a
+    # distressed property its anywhere in nc and sc" -- the deny entries
+    # (e.g. "Mecklenburg — out of user's flip target") were about that flip
+    # scope specifically, and carry no carve-out for distressed leads.
+    # Without this deny check, a FLIP listing tagged with a denied county
+    # still gets through via the zip-prefix fallback (288/287/296 cover
+    # Haywood NC, Mecklenburg NC, Abbeville SC etc.) or via
+    # SCOPE_BYPASS_SOURCES (CourtListener bankruptcy/civil/adversary).
+    # Explicit deny wins for flips.
+    if _is_flip(li) and li.county and li.state:
         if (li.county.replace(" County", "").strip().title(),
                 li.state.upper()) in SCOPE_DENY_COUNTIES_NORMALIZED:
             return False
@@ -302,11 +347,12 @@ def _in_scope(li: Listing) -> bool:
                 li.raw = {}
             li.raw["geo_attribution"] = "state-only"
             return True
-        # Has a county — keep ONLY if it's actually in-footprint. A bankruptcy
-        # filing in an out-of-footprint county must NOT leak onto the board.
-        # (LiensNC is handled above, before the deny-set check.)
-        return in_scope(li.county, li.state)
-    if in_scope(li.county, li.state):
+        # Has a county — keep it if it's in-footprint (flip) or anywhere in
+        # NC/SC (distressed, e.g. a bankruptcy filing — the common case for
+        # this source bucket). (LiensNC is handled above, before the deny
+        # check.)
+        return _county_in_scope(li)
+    if _county_in_scope(li):
         return True
     # ZIP-prefix fallback is a LAST resort for listings with NO county only.
     # 2026-06-19: previously this rescued rows that already carried an
@@ -570,6 +616,24 @@ DATELESS_OK_SOURCES = {
     # with sale_date=None, so _active_only discarded the entire source. These are the
     # only free SC leads that carry a named, mail-reachable decision-maker.
     "counties_sc.sc_probate_notices",
+    # SC UST (Underground Storage Tank) registry -- a facility/owner-keyed
+    # environmental-distress signal, no sale date (it's a standing registry
+    # entry, not a scheduled event). Verified live 2026-09-15: 3,331 real
+    # rows across 7 counties (Spartanburg 1,149, Anderson 788, Pickens 409,
+    # Laurens 319, Oconee 315, Cherokee 230, Union 121), including a probate
+    # sub-signal (39 "ESTATE OF..." owner rows). Without this entry
+    # _active_only() silently dropped the entire source.
+    "counties_sc.sc_ust_registry",
+    # Zombie properties (lis-pendens filed >12mo ago, never resolved to a
+    # sale) -- a derived standing-condition signal by definition, no sale
+    # date. Verified live 2026-09-15: 14 real rows. Same missing-whitelist
+    # bug as sc_ust_registry above.
+    "counties_sc.zombie_properties",
+    # SC DES brownfields/cleanup sites -- a standing environmental-
+    # contamination registry entry, no sale date. Verified live 2026-09-15
+    # (after fixing the URL-matching bug that was emitting nav-menu garbage
+    # alongside real sites): 64 clean rows.
+    "counties_sc.sc_des_brownfields",
     # A delinquent tax BALANCE is a standing condition with no sale date -- SC runs
     # an administrative sale, so there is no docket date to carry. Without this entry
     # _active_only() deletes every row this source produces, which is how
@@ -804,26 +868,29 @@ def _active_only(li: Listing, horizon_days: int, *, now: datetime | None = None)
     lead). Run #20 audit: 2 REDEEMED + 24 dismissed court records were shipping.
     Pass ``now`` to pin the reference time in tests; in production it defaults
     to ``datetime.utcnow()``."""
-    if li.auction_status and li.auction_status.lower() in {
-        "withdrawn",
-        "cancelled",
-        "canceled",
-        "rescinded",
-        "sold",
-        "completed",
-        # Terminal court / lien dispositions — the matter is closed, not actionable.
-        "redeemed",
-        "dismissed",
-        "dismissed/settled",
-        "satisfied",
-        "disposed",
-        "closed",
-    }:
+    if li.auction_status and li.auction_status.lower() in TERMINAL_AUCTION_STATUSES:
         return False
     if li.sale_date is None:
         # For court / law-firm / tax / public-notice sources a missing date almost
         # always means we scraped a historic roster; drop it.
-        return li.source in DATELESS_OK_SOURCES
+        #
+        # Prefix match too, not just exact: found 2026-09-15 that
+        # counties_sc.sc_probate_notices emits each row with a PER-PAPER
+        # dynamic slug ("counties_sc.sc_probate_notices.laurenscountyadvertiser",
+        # ".yourpickenscounty", ".gaffneyledger" — one per newspaper host it
+        # covers), never the bare "counties_sc.sc_probate_notices" string a
+        # 2026-09-10 commit added to DATELESS_OK_SOURCES believing it was
+        # enough. The exact-match check silently dropped every real row from
+        # this source for 5 days despite the commit's own message claiming
+        # "measured 880 rows" verified live -- the scraper really did work,
+        # the whitelist entry just never matched what it actually emits.
+        # This is currently the ONLY source using a "<base>.<suffix>" slug
+        # convention (confirmed via a repo-wide grep before adding this), so
+        # the prefix check only ever widens matching for that one family.
+        src = li.source or ""
+        return src in DATELESS_OK_SOURCES or any(
+            src.startswith(f"{base}.") for base in DATELESS_OK_SOURCES
+        )
     # Normalize sale_date to naive UTC (some scrapers return offset-aware
     # datetimes from dateutil parsing; we compare against utcnow() which is naive).
     sale = li.sale_date
@@ -1638,14 +1705,18 @@ async def run() -> int:
         if not (li.county and li.state):
             return False
         key = (li.county.replace(" County", "").strip().title(), li.state.upper())
-        if key in SCOPE_DENY_COUNTIES_NORMALIZED:
+        # Deny list is a FLIP-scope concept (see _FLIP_LISTING_TYPES) — a
+        # distressed-type lead in a denied county is not re-dropped here.
+        if _is_flip(li) and key in SCOPE_DENY_COUNTIES_NORMALIZED:
             return True
         # Coastal counties are an intentional re-admission track — leave them to
         # the oceanfront / coastal-source paths, never drop on footprint alone.
         if key in OCEANFRONT_COASTAL_COUNTIES:
             return False
         # County resolved to something we don't track at all -> off-footprint leak.
-        return not in_scope(li.county, li.state)
+        # Flip leads: narrow 18-county footprint. Distressed leads: anywhere in
+        # NC/SC (see _county_in_scope / _FLIP_LISTING_TYPES).
+        return not _county_in_scope(li)
     _pre_scope = len(enriched)
     enriched = [li for li in enriched if not _safe_pred(_denied_now, li, False)]
     if _pre_scope != len(enriched):
