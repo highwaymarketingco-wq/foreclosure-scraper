@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-15T01:43:17.976539Z",
-  "total": 131625,
+  "run_time": "2026-09-15T03:21:38.080095Z",
+  "total": 131662,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -101,7 +101,7 @@
   },
   "by_state": {
     "NC": 69530,
-    "SC": 62095
+    "SC": 62132
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 41266,
@@ -163,6 +163,7 @@
     "counties_sc.charleston_mie": 54,
     "counties_nc.hendersonville_vacant_structures": 45,
     "national.hud_section8_contracts": 37,
+    "newspapers.aiken_standard": 37,
     "law_firms.kania": 31,
     "national.zillow_foreclosures": 27,
     "national.estate_sales": 25,
@@ -456,20 +457,20 @@
     "newspapers.carolina_coast"
   ],
   "notes": "",
-  "detail_count": 131625,
-  "detail_digest": "aeca0f9932cae4af",
+  "detail_count": 131662,
+  "detail_digest": "c6ef546d6e25bd11",
   "board": {
     "schema": "slim-v1",
-    "count": 131625,
+    "count": 131662,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
       "count": 132,
-      "records": 131625
+      "records": 131662
     }
   },
-  "health_carried_from": "2026-09-15T01:41:55.366531Z",
+  "health_carried_from": "2026-09-15T01:43:17.976539Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",

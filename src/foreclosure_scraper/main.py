@@ -440,6 +440,11 @@ DATELESS_OK_SOURCES = {
     # a standing "who currently owes" list, same reasoning as every other
     # SC county delinquent-tax source in this list.
     "counties_sc.dillon_delinquent_tax",
+    # A freshly-filed foreclosure summons has no sale date yet (the case has
+    # only just been filed) -- same reasoning as sc_public_index_lis_pendens
+    # above: filed but no sale date yet is a real, valid early-warning signal,
+    # not a data gap.
+    "newspapers.aiken_standard",
     # Same cookie-cutter scraper as Fairfield above, same dateless Listing(): the
     # Saluda advertisement carries owner/TMS/description but no per-parcel date,
     # so without this entry every row it harvests in Nov-Dec is deleted silently.

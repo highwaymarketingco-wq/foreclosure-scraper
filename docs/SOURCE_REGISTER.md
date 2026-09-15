@@ -1,12 +1,12 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 01:43 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-15 03:21 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
-- Scrapers in the registry: **225**
-- Producing rows on the board: **95**
+- Scrapers in the registry: **226**
+- Producing rows on the board: **96**
 - Registered but contributing ZERO rows: **130**
 - Confirmed real and not yet built: **9**
-- Board read: `docs/listings.json.gz` (131,625 rows)
+- Board read: `docs/listings.json.gz` (131,662 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
 
@@ -71,6 +71,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_sc.charleston_mie` | 54 | Charleston SC (54) | `https://charlestoncounty.gov/foreclosure/runninglist.html`<br>`https://charlestoncounty.gov/departments/master-in-equity/rosters/` |
 | `counties_nc.hendersonville_vacant_structures` | 45 | Henderson NC (45) | `https://services1.arcgis.com/UTZTmZoX2rsa9yFA/arcgis/rest/services/`<br>`https://www.hvlnc.gov/community-development` |
 | `national.hud_section8_contracts` | 37 | Gaston NC (9), Anderson SC (5), Spartanburg SC (5) | `https://www.hud.gov/hud-partners/multifamily-assist-section8-database`<br>`https://www.hud.gov/sites/dfiles/Housing/documents/`<br>`https://www.hud.gov/hud-partners/` |
+| `newspapers.aiken_standard` | 37 | Aiken SC (37) | `https://www.postandcourier.com/aikenstandard/classifieds/search/` |
 | `law_firms.kania` | 31 | Burke NC (11), Lincoln NC (7), Rutherford NC (7) | `https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/`<br>`https://kanialawfirm.com/wp-admin/admin-ajax.php` |
 | `national.zillow_foreclosures` | 27 | Buncombe NC (5), Spartanburg SC (5), Gaston NC (4) | `https://www.zillow.com/{state.lower(` |
 | `national.estate_sales` | 25 | Cleveland NC (8), Buncombe NC (6), Gaston NC (5) | `https://www.estatesales.net`<br>`https://www.estatesale.com`<br>`https://{host` |

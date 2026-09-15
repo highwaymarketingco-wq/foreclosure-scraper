@@ -2218,3 +2218,41 @@ real government content at all -- Marion appears to have no functioning
 official website right now, which plausibly explains why it's stuck at 2
 board rows regardless of what source-hunting technique is tried. Not
 pursued further; nothing to scrape until the county's site is real again.
+
+## Aiken County SC — first-ever lead source via newspaper legal notices, 0 -> 37 rows (2026-09-14)
+
+Re-checked Aiken's own delinquent-tax-SALE page (not the overage-claims
+form) and confirmed it explicitly states the property list is "advertised
+in the Aiken Standard on three consecutive Fridays" — a newspaper
+publication, not a county-hosted document (same shape as Jasper's answer).
+Followed that thread: `aikenstandard.com` now redirects into the Post &
+Courier network (`postandcourier.com/aikenstandard/`) — the SAME TownNews
+(TNCMS) platform `newspapers.post_and_courier` already scrapes for free via
+static RSS. Verified live: `postandcourier.com/aikenstandard/classifieds/
+search/?f=rss&q=master+in+equity` returns real, current (dated 2026-09-08
+through 2026-09-11) SC mortgage-foreclosure summonses with case numbers.
+
+Built `newspapers.aiken_standard`, a thin config wrapper around the
+existing, already-tested shared parser (`newspapers._townnews.
+parse_rss_items`) — same pattern as `post_and_courier.py` itself, no new
+parsing logic needed. Added to DATELESS_OK_SOURCES for the same reason as
+`sc_public_index_lis_pendens`: a freshly-filed summons has no sale date
+yet, which is a real early-warning signal, not a data gap.
+
+Known limitation (pre-existing in the SHARED parser, not introduced here —
+would affect Charleston/Post & Courier notices with the same caption shape
+too, not investigated further as out of scope for adding this source):
+`defendant`/`owner_name` extraction misses on captions like "Rocket
+Mortgage, LLC, PLAINTIFF, vs. Neal D Nelson..." (only 2 of 81 rows got an
+owner_name), and `plaintiff` sometimes glues in a leftover case-number
+fragment. `case_number` extraction is clean and reliable; downstream
+case-number-based enrichers are the intended path to filling in address/
+parties/sale-date later, same as how post_and_courier.py's Charleston rows
+already work.
+
+Verified live: 81 scraped, 37 net-new after dedupe correctly merged 44
+same-case-number duplicates (multiple search queries catching the same
+notice, or genuine amended-notice re-publications — both correctly
+identity-keyed by case_number, not the source_url that varies per article).
+Aiken: 0 -> 37 board rows. York's 119 TAX_SALE_OVERAGE rows still
+untouched. Full 3,983-test suite passes; source register regenerated.
