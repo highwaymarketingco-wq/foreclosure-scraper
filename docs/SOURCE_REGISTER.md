@@ -1,12 +1,12 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 13:35 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-15 14:34 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
 - Scrapers in the registry: **229**
-- Producing rows on the board: **117**
-- Registered but contributing ZERO rows: **112**
+- Producing rows on the board: **120**
+- Registered but contributing ZERO rows: **109**
 - Confirmed real and not yet built: **9**
-- Board read: `docs/listings.json.gz` (156,133 rows)
+- Board read: `docs/listings.json.gz` (156,177 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
 
@@ -82,6 +82,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_nc.lincoln_code_violations` | 63 | Lincoln NC (63) | `https://arcgisserver.lincolncountync.gov/arcgis/rest/services/` |
 | `counties_sc.charleston_mie` | 54 | Charleston SC (54) | `https://charlestoncounty.gov/foreclosure/runninglist.html`<br>`https://charlestoncounty.gov/departments/master-in-equity/rosters/` |
 | `counties_nc.hendersonville_vacant_structures` | 45 | Henderson NC (45) | `https://services1.arcgis.com/UTZTmZoX2rsa9yFA/arcgis/rest/services/`<br>`https://www.hvlnc.gov/community-development` |
+| `law_firms.zacchaeus` | 42 | Guilford NC (8), Scotland NC (5), Forsyth NC (5) | `https://www.zls-nc.com/listings` |
 | `national.hud_section8_contracts` | 37 | Gaston NC (9), Anderson SC (5), Spartanburg SC (5) | `https://www.hud.gov/hud-partners/multifamily-assist-section8-database`<br>`https://www.hud.gov/sites/dfiles/Housing/documents/`<br>`https://www.hud.gov/hud-partners/` |
 | `newspapers.aiken_standard` | 37 | Aiken SC (37) | `https://www.postandcourier.com/aikenstandard/classifieds/search/` |
 | `law_firms.kania` | 31 | Burke NC (11), Rutherford NC (7), Lincoln NC (7) | `https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/`<br>`https://kanialawfirm.com/wp-admin/admin-ajax.php` |
@@ -133,8 +134,10 @@ Live row counts are what the source actually contributed to the board read above
 | `law_firms.ingle_firm` | 1 | Gaston NC (1) | `https://www.theinglefirm.com/Sales.aspx` |
 | `national.realtor_foreclosures` | 1 | Spartanburg SC (1) | _(no literal URL in module)_ |
 | `national.sheriff_sales` | 1 | Cleveland NC (1) | `https://www.brunswicksheriff.com`<br>`https://www.charlestoncounty.org`<br>`https://www.sheriffclevelandcounty.com`<br>_+1 more_ |
+| `newspapers.carolina_coast` | 1 | Carteret NC (1) | `https://www.carolinacoastonline.com/classifieds/?f=rss&q=foreclosure`<br>`https://www.carolinacoastonline.com/classifieds/?f=rss&q=substitute+trustee`<br>`https://www.carolinacoastonline.com/classifieds/?f=rss&q=trustee+sale` |
 | `newspapers.coastland_times` | 1 | Dare NC (1) | `https://www.thecoastlandtimes.com` |
 | `newspapers.index_journal` | 1 | Greenwood SC (1) | `https://www.indexjournal.com/classifieds/community/announcements/legal/?f=rss` |
+| `newspapers.post_and_courier` | 1 | Charleston SC (1) | `https://www.postandcourier.com/classifieds_new/community/announcements/` |
 
 ## 2. Built but producing zero rows
 
@@ -209,7 +212,6 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `law_firms.finkel` | `https://www.finkellaw.com/images/Webs.pdf`<br>`https://www.finkellawcharleston.com/images/Webs.pdf` |
 | `law_firms.korn` | `https://www.kornlawfirm.com/foreclosure-sales/`<br>`https://www.kornlawfirm.com/sales/` |
 | `law_firms.mewborn_deselms` | `https://www.mewbornlaw.biz` |
-| `law_firms.zacchaeus` | `https://www.zls-nc.com/listings` |
 | `national.auction_bank_reo` | `https://apiweb.realtybid.com/rest/RBIAPI/`<br>`https://bid.auctionnetwork.com/Auctions`<br>_+2 more_ |
 | `national.bid4assets` | `https://www.bid4assets.com/storefront/index.cfm?searchstate=NC&searchprop=Real+Estate`<br>`https://www.bid4assets.com/storefront/index.cfm?searchstate=SC&searchprop=Real+Estate`<br>_+1 more_ |
 | `national.courtlistener_civil` | `https://www.courtlistener.com` |
@@ -244,10 +246,8 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `national.usmarshals_realproperty` | `https://www.usmarshals.gov/what-we-do/asset-forfeiture/real-property`<br>`https://www.usmarshals.gov/what-we-do/asset-forfeiture/real-property/`<br>_+1 more_ |
 | `national.va_acquired` | `https://www.va.gov/va-forms/real-property/properties/`<br>`https://www.benefits.va.gov/homeloans/property/property.asp` |
 | `national.williams` | `https://www.williamsauction.com` |
-| `newspapers.carolina_coast` | `https://www.carolinacoastonline.com/classifieds/?f=rss&q=foreclosure`<br>`https://www.carolinacoastonline.com/classifieds/?f=rss&q=substitute+trustee`<br>_+1 more_ |
 | `newspapers.daily_courier` | `https://www.thedigitalcourier.com/classifieds/community/announcements/legal/`<br>`https://www.thedigitalcourier.com` |
 | `newspapers.hendersonville_lightning` | `https://www.hendersonvillelightning.com/legal-ads/130-foreclosures.html` |
-| `newspapers.post_and_courier` | `https://www.postandcourier.com/classifieds_new/community/announcements/` |
 | `newspapers.shelby_star` | `https://www.shelbystar.com`<br>`https://www.shelbystar.com/`<br>_+4 more_ |
 | `newspapers.tryon_bulletin` | `https://tryondailybulletin.com`<br>`https://tryondailybulletin.com/?s=foreclosure+sale`<br>_+3 more_ |
 | `public_notices.funeral_home_rss` | `https://www.{host` |
