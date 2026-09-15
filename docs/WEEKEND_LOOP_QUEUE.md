@@ -2204,6 +2204,17 @@ largest, most sophisticated scrapers in this codebase): systematic
 prefix/name enumeration to discover the full roll despite the ~5-result
 autocomplete cap, then a second per-record detail fetch to get parcel/
 owner/balance and filter to delinquent-only. Worth building deliberately
-as its own project (would cover BOTH Berkeley and Jasper, same vendor, and
-possibly more paystar.io counties not yet found) rather than rushing a
-partial version into this pass.
+as its own project (would cover Berkeley, Jasper, AND Florence (confirmed live: Florence's
+site links `taxes.paystar.io/florence-county-tax` — a third county on the
+same vendor, found while checking Florence's own thin-count status)
+rather than rushing a partial version into this pass.
+
+Also found while checking the remaining thin counties: **Marion County SC's
+own domain (`marioncountysc.org`) has EXPIRED and is now a squatted/parked
+domain page** (redirects through `ww38.` to an Afternic "domain for sale"
+page). Its apparent replacement, `marioncountygov.com`, resolves but is a
+generic, un-configured GoDaddy Website Builder placeholder site with no
+real government content at all -- Marion appears to have no functioning
+official website right now, which plausibly explains why it's stuck at 2
+board rows regardless of what source-hunting technique is tried. Not
+pursued further; nothing to scrape until the county's site is real again.
