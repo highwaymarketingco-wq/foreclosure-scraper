@@ -2885,3 +2885,38 @@ suite passes.
 lincoln_code_violations) or precisely documented and deferred
 (cumberland_tax_foreclosure's Sitefinity markup, swain_tax_foreclosures'
 JS-attribute PDF link + scanned-image OCR need).**
+
+## Pass-1 poisoned-parcel-key diagnostic: scope is small, not pervasive (2026-09-15)
+
+Followed up on the dedupe() Pass-1 gap flagged during today's NC batch-2
+ingest (exact parcel-key bucketing has no address-plurality guard the
+way Pass 2's fuzzy matching does). Ran a read-only, board-wide diagnostic
+(no writes) grouping every row by its exact `dedupe_key()` and flagging
+any parcel key backing 3+ genuinely distinct street addresses.
+
+**Result: 9 keys, 63 rows total, out of 150,084 (0.04%).** Not the
+pervasive risk the New Hanover find made it look like -- a small,
+contained pattern, not a board-wide crisis:
+
+- **6 of 9 keys are `counties_generic.liensnc`** (New Hanover's Juno Dr/
+  Sidbury Landing case plus 5 more: Wake 15 addresses/1 key, Moore 14/1,
+  Robeson 4/1, Forsyth 4/1 and 3/1). Same root cause each time: a
+  construction-lien-agent filing recorded against a subdivision's PARENT
+  tax parcel before the county split it into individually-addressed
+  lots, so every lot's lien shares one parcel number.
+- **3 of 9 keys are `counties_sc.dillon_delinquent_tax`** (built earlier
+  today) -- but these look like a DIFFERENT, likely NON-bug shape:
+  addresses like "74 FESTIVAL 70X14 MH 6518..." are individually-taxed
+  MOBILE HOME units on one shared land parcel (a mobile home park),
+  which is real county data, not a scraper error -- grouping them under
+  the land parcel's key may be the CORRECT representation, not a fusion
+  bug. Not touched; would need a closer look at Dillon's own record
+  shapes before concluding either way.
+
+Given the tiny confirmed blast radius (63 of 150,084 rows), no Pass-1
+architecture change was made -- the risk this session was worried about
+(a broad scope always deduping had never been run before) turned out to
+be narrow once actually measured. Worth a manual look at the 6 liensnc
+keys specifically if precision on those particular properties ever
+matters for a downstream use case, but not worth a general-purpose
+Pass-1 guard for this small a footprint today.
