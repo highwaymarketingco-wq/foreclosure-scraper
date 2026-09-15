@@ -2813,3 +2813,40 @@ multi-hop page walk), wnc_tax_foreclosures (one dead host stalls the
 whole 5-county sweep, needs a per-host timeout).
 
 Full test suite (4,000 tests) passes after each of these changes.
+
+## wnc_tax_foreclosures.py — timeout fixed, then a SECOND bug found and removed (2026-09-15)
+
+Continuing down the NC bug list. Fixed the flagged timeout-hang issue,
+then immediately caught a worse problem the fix itself exposed.
+
+**Timeout fix confirmed working:** wrapped every fetch in this 5-county
+module in `asyncio.wait_for()` with a 20s outer deadline. Madison
+County's dead link (`lrcpwa.ncptscloud.com`) now fails fast and the
+whole sweep completes in ~37-47s instead of stalling 170+ seconds.
+
+**But fixing the hang surfaced what it had been hiding:** with the
+timeout no longer blocking the sweep, it ran to completion and returned
+282 "listings" -- every one of them GARBAGE. The PDF-following logic
+("any linked .pdf near a tax-ish keyword") grabbed Watauga County's USPS
+delivery-standards manual (linked from an unrelated page that happened
+to also mention "tax" nearby) and emitted its table of contents
+("Finding Your Growth Manager and USPS Online Resources", "Appeal
+Process for Builders and Developers") as fake tax-foreclosure listings,
+with "parcel" and "address" pulled from chapter numbers and stray street
+names in the boilerplate. Same class of harm as nc_deq_dsca's nav-menu
+garbage found earlier today -- and a reminder that a "make it not hang"
+fix can unmask a correctness bug that a hang had been accidentally
+suppressing.
+
+Removed the PDF-following pass entirely rather than tighten its
+heuristic under time pressure (the module docstring explains why and
+what a real fix would need: validating the PDF's OWN filename/title
+against a tax-foreclosure pattern, not just nearby link text). This
+module now only emits rows from an actual HTML `<table>` on a
+tax-labeled page -- a structurally safer signal. Verified live
+post-cleanup: 0 rows, 37.2s, no garbage. Same net board impact as before
+(0 rows either way) but now safe to include in a future full pipeline
+run without risking silent data pollution, and no longer able to stall
+the orchestrator on one dead host.
+
+Full 4,000-test suite passes.
