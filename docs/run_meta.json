@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-15T09:48:40.078484Z",
-  "total": 150000,
+  "run_time": "2026-09-15T10:06:48.882667Z",
+  "total": 150021,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -100,7 +100,7 @@
     "courtlistener.recap": 945
   },
   "by_state": {
-    "NC": 84553,
+    "NC": 84574,
     "SC": 65447
   },
   "by_source_on_board": {
@@ -185,6 +185,7 @@
     "reo.vrm_va_reo": 20,
     "counties_nc.rutherford_foreclosure": 19,
     "counties_sc.anderson_master_in_equity": 19,
+    "counties_nc.edgecombe_tax_foreclosure": 17,
     "national.hubzu": 16,
     "law_firms.rogers_townsend": 15,
     "counties_nc.nc_rod_logan": 14,
@@ -207,6 +208,7 @@
     "counties.nod_discovery": 5,
     "counties_nc.henderson_foreclosure_parcels": 4,
     "counties_nc.nc_county_tax_foreclosure": 4,
+    "counties_nc.wake_tax_foreclosure": 4,
     "counties_sc.richland_flc": 3,
     "derived.probate_deed": 3,
     "national.trulia": 3,
@@ -470,20 +472,20 @@
     "newspapers.carolina_coast"
   ],
   "notes": "",
-  "detail_count": 150000,
-  "detail_digest": "4d65784585fa898b",
+  "detail_count": 150021,
+  "detail_digest": "75813e312c45866a",
   "board": {
     "schema": "slim-v1",
-    "count": 150000,
+    "count": 150021,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
-      "count": 150,
-      "records": 150000
+      "count": 151,
+      "records": 150021
     }
   },
-  "health_carried_from": "2026-09-15T09:35:19.031043Z",
+  "health_carried_from": "2026-09-15T09:48:40.078484Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",

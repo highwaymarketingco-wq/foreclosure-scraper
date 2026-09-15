@@ -2734,3 +2734,82 @@ any reasonable timeout).
 York's 119 TAX_SALE_OVERAGE rows still carry zero owner_mailing (guard
 held through both writes today). Full 4,000-test suite passes (unrelated
 to these two ingests, run beforehand after the gaston_vacant fix).
+
+## Fixed 2 of the 7 confirmed NC bugs: wake + edgecombe tax foreclosures (2026-09-15)
+
+Continuing straight from the NC zero-row audit's bug list. Fixed and
+shipped the two cheapest, highest-confidence ones; investigated a third
+(Cumberland) and a fourth (nc_deq_dsca) enough to make a clear call on
+each without rushing a fragile fix.
+
+**wake_tax_foreclosure.py — full rewrite, verified live.** The original
+parser assumed a plain HTML `<table>`; the real page is an accordion
+(one item per municipality), each populated body holding one `<p>` per
+property in a fixed `Tax ID#: ... Amount due: ... Property Address: ...
+Date of Sale: ...` shape. Rewrote to match that structure directly.
+Removed `active_months=(1..8)` -- live-checked in September (outside the
+old window) and Raleigh's accordion has 4 real properties, one with a
+genuine scheduled sale (September 9, 2026). Added to
+`DATELESS_OK_SOURCES` for the "Date of Sale: To Be Announced" rows (a
+judgment entered, no auction date yet -- same shape as every other
+freshly-filed entry in that list). Verified: 4/4 rows now reach the
+board via `_active_only()`.
+
+**edgecombe_tax_foreclosure.py — full rewrite, verified live.** Same
+wrong-gate bug (removed, added to `DATELESS_OK_SOURCES`), plus the
+original code mislabeled the PROPERTY DESCRIPTION column as `owner` and
+never actually looked at it for an address (the address-search loop only
+scanned columns AFTER the one holding the address). Rewrote against the
+confirmed fixed column order (PROPERTY DESCRIP. | TWN SHP | PARCEL |
+STATUS | FILE NO.). Bonus find while fixing it: the STATUS column
+sometimes carries the real auction date directly ("Sale 9/16/2026")
+instead of a case-progress note -- now parsed into `sale_date` properly.
+Verified live: 17/17 rows reach the board, **3 with a sale date of
+literally tomorrow (Sept 16, 2026)**, one more Oct 14.
+
+Both landed via `scripts/ingest_wake_edgecombe_fixed.py` (source-scoped
+dedupe, both previously at 0 existing rows): board 150,000 -> **150,021**.
+York's 119 TAX_SALE_OVERAGE rows still carry zero owner_mailing.
+
+**cumberland_tax_foreclosure.py — real table found, genuinely harder,
+deferred rather than rushed.** The correct URL
+(`.../tax-group/tax/tax-foreclosure-sales`, not the old
+`.../tax/tax-administration/tax-foreclosures`) does carry a real,
+populated table (Owners Name | Property Location | Parcel Number | Bill
+Number | Sale Date, confirmed live -- e.g. owner "Weeks, John"). But it
+renders through a Sitefinity CMS "dynamic content list view" widget: each
+cell's real value sits inside multiple layers of wrapper divs (hidden
+tooltip templates, per-field ID-suffixed `_read` divs) alongside a lot of
+other markup noise, not a plain `<td>text</td>` -- correctly correlating
+owner/location/parcel/bill/date across MULTIPLE rows needs row-scoped
+extraction keyed off the specific `_read` div ID pattern, not a simple
+strip-all-tags-and-split approach. Confirmed the target and the shape;
+did not attempt the extraction itself today rather than risk shipping a
+parser that silently misaligns columns across rows under time pressure.
+
+**nc_deq_dsca.py — disabled, not fixed, to stop active harm.** Confirmed
+live exactly what the audit found: the page this targeted has no site-
+list table at all (pure program-description prose plus a SIDEBAR
+NAVIGATION table), and the old `<tr>` regex was matching that nav table
+-- "Public Notices", "Contacts", "Statutes/Rules", "Stakeholder Work
+Group" were landing on the board as fake "DSCA contamination site"
+listings with every structured field null. The real data lives on a
+DIFFERENT DEQ page as downloadable Excel files, not HTML at all -- a
+genuinely separate build (same stdlib zip+XML approach as
+richland_flc.py), not a same-day fix. Rather than leave the
+garbage-emitting path live, `fetch()` now returns `[]` unconditionally,
+with the real target URL and the full diagnosis left in the module
+docstring for whoever picks up the Excel-parsing build. Confirmed: 0
+board rows either way (this source was never actually ingested), so
+disabling it costs nothing today and removes the landmine for whenever a
+future full pipeline run would otherwise have picked it up.
+
+**Still open, not touched today:** lincoln_code_violations (TLS chain
+issue on the county's own server -- confirmed 66 real open violations
+sitting behind it once cert verification is relaxed for that specific
+host), swain_tax_foreclosures (real PDF confirmed, needs a
+`data-downloadurl` attribute extraction instead of a plain href, plus a
+multi-hop page walk), wnc_tax_foreclosures (one dead host stalls the
+whole 5-county sweep, needs a per-host timeout).
+
+Full test suite (4,000 tests) passes after each of these changes.

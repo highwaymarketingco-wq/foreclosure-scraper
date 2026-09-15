@@ -6,8 +6,29 @@ These properties have environmental contamination that can affect
 property value and marketability — a distress signal for property
 intelligence.
 
-Data source: deq.nc.gov DSCA site list.  Properties are listed in a
-table with site name, address, and contamination status.
+DISABLED, NOT JUST DORMANT — found 2026-09-15 (background triage agent,
+this codebase's zero-row-scraper audit; confirmed live by hand before
+touching this file). This module was WORSE than a silent zero: run live,
+it returned `count=4` and `outcome=OK`, but all 4 "listings" were GARBAGE
+-- the program-description page this used to target
+(`.../dry-cleaning-solvent-cleanup-act-program`, itself a 301 redirect to
+`.../superfund-section/dry-cleaning-solvent-cleanup-act-program`) has no
+site-list table at all, just prose and a SIDEBAR NAVIGATION table. The
+`<tr>` regex matched that nav table instead, and nothing in the header-
+skip check caught it, so "Public Notices", "Contacts", "Statutes/Rules"
+and "Stakeholder Work Group" (the nav labels) landed on the board as fake
+"DSCA contamination site" listings with every structured field null.
+
+The REAL, current DSCA site data lives on a DIFFERENT DEQ page
+(`.../science-data-and-reports/dsca-site-listsfacility-inventories`) as
+downloadable Excel files ("active-and-inactive-drycleaner-facilities-
+excel-...", "closed-dry-cleaner-facilities-excel-..."), not an HTML table
+at all -- a genuinely different, bigger build (download + parse .xlsx,
+same stdlib zip+XML approach as richland_flc.py) that was out of scope to
+rush alongside the immediate safety fix. `fetch()` is disabled to return
+nothing rather than resurrect the risk of emitting garbage again from a
+page shape it was never built to parse. Re-enable only once rewritten
+against the real Excel source.
 
 Free, public, no login.
 Slug: counties_nc.nc_deq_dsca
@@ -16,20 +37,19 @@ ListingType: DISTRESSED
 """
 from __future__ import annotations
 
-import re
-from datetime import datetime
 from typing import Iterable
-from urllib.parse import urljoin
 
 import structlog
 
 from ...base_scraper import BaseScraper
-from ...http_client import get_text
-from ...models import Listing, ListingType, PropertyKind
+from ...models import Listing
 
 log = structlog.get_logger()
 
-PAGE_URL = "https://www.deq.nc.gov/about/divisions/waste-management/dry-cleaning-solvent-cleanup-act-program"
+#: The real site list -- see the module docstring. Not yet fetched/parsed
+#: (downloadable Excel, not an HTML table); kept here as the documented
+#: next target rather than the old page, which has no real data at all.
+REAL_DATA_PAGE_URL = "https://www.deq.nc.gov/about/divisions/waste-management/science-data-and-reports/dsca-site-listsfacility-inventories"
 
 
 class NCDEQDSCA(BaseScraper):
@@ -41,74 +61,11 @@ class NCDEQDSCA(BaseScraper):
     optional = True
 
     async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
-        try:
-            html = await get_text(PAGE_URL, impersonate=True, timeout=40.0)
-        except Exception as exc:
-            log.warning("nc_deq_dsca.fetch_fail", error=str(exc)[:160])
-            return out
-
-        if not html or len(html) < 200:
-            return out
-
-        rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.I | re.S)
-        for row in rows:
-            cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, re.I | re.S)
-            if len(cells) < 2:
-                continue
-            clean = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
-            if any(h in c.lower() for c in clean[:2] for h in ("site", "name", "address", "city", "county", "status", "#")):
-                continue
-
-            site_name = clean[0] if clean else None
-            addr = None
-            city = None
-            county = None
-            for c in clean[1:]:
-                if re.search(r"\d+\s+\w+", c) and not addr:
-                    addr = c
-                if ", NC" in c and not city:
-                    city = c.split(",")[0].strip()
-                if "county" in c.lower() and not county:
-                    county = re.sub(r"(?i)\s*county\s*", "", c).strip()
-
-            out.append(Listing(
-                source="counties_nc.nc_deq_dsca",
-                source_url=PAGE_URL,
-                listing_type=ListingType.DISTRESSED,
-                property_kind=PropertyKind.UNKNOWN,
-                state="NC",
-                county=county,
-                city=city,
-                street_address=addr,
-                description=f"DSCA contamination site: {site_name}",
-                first_seen=datetime.utcnow(),
-                last_seen=datetime.utcnow(),
-                raw={"nc_deq_dsca": {"site_name": site_name, "cells": clean[:10]}},
-            ))
-
-        # Fallback: list items
-        if not out:
-            items = re.findall(r"<li[^>]*>(.*?)</li>", html, re.I | re.S)
-            for item in items:
-                text = re.sub(r"<[^>]+>", "", item).strip()
-                if len(text) < 15:
-                    continue
-                addr_match = re.search(r"\d+\s+\w+[\w\s,]+(?:NC|N\.C\.)", text, re.I)
-                if not addr_match:
-                    continue
-                out.append(Listing(
-                    source="counties_nc.nc_deq_dsca",
-                    source_url=PAGE_URL,
-                    listing_type=ListingType.DISTRESSED,
-                    property_kind=PropertyKind.UNKNOWN,
-                    state="NC",
-                    street_address=addr_match.group().strip(),
-                    description=text[:300],
-                    first_seen=datetime.utcnow(),
-                    last_seen=datetime.utcnow(),
-                    raw={"nc_deq_dsca": {"text": text[:200]}},
-                ))
-
-        log.info("nc_deq_dsca.done", count=len(out))
-        return out
+        # Disabled -- see the module docstring. The page this used to parse
+        # has no site-list table; its <tr> regex was matching the page's
+        # SIDEBAR NAVIGATION table instead and emitting nav-menu labels as
+        # fake contamination-site listings. Returning nothing is strictly
+        # better than that until this is rewritten against the real
+        # downloadable-Excel source at REAL_DATA_PAGE_URL.
+        log.info("nc_deq_dsca.disabled", note="awaiting rewrite against REAL_DATA_PAGE_URL's Excel files")
+        return []

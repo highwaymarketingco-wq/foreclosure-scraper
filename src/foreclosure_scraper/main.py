@@ -444,6 +444,17 @@ DATELESS_OK_SOURCES = {
     # either -- a standing "who currently owes" list, same reasoning as
     # every other SC county delinquent-tax source in this list.
     "counties_sc.berkeley_paystar_tax",
+    # Most Wake County tax-foreclosure judgments carry "Date of Sale: To Be
+    # Announced" -- a judgment has been entered but no auction date set yet.
+    # Same reasoning as the freshly-filed-summons entries below: filed but
+    # undated is a real early-warning signal, not a data gap.
+    "counties_nc.wake_tax_foreclosure",
+    # Most Edgecombe County rows carry a case-progress STATUS ("Complaint
+    # filed/Settlement pending") with no scheduled sale yet -- same
+    # reasoning as Wake above. A minority of rows DO have a real embedded
+    # sale date ("Sale 9/16/2026" in the status text itself, parsed into
+    # sale_date directly), so this entry only matters for the rest.
+    "counties_nc.edgecombe_tax_foreclosure",
     # A freshly-filed foreclosure summons has no sale date yet (the case has
     # only just been filed) -- same reasoning as sc_public_index_lis_pendens
     # above: filed but no sale date yet is a real, valid early-warning signal,

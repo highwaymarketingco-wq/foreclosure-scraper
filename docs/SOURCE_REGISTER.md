@@ -1,12 +1,12 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 09:49 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-15 10:07 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
 - Scrapers in the registry: **229**
-- Producing rows on the board: **109**
-- Registered but contributing ZERO rows: **120**
+- Producing rows on the board: **111**
+- Registered but contributing ZERO rows: **118**
 - Confirmed real and not yet built: **9**
-- Board read: `docs/listings.json.gz` (150,000 rows)
+- Board read: `docs/listings.json.gz` (150,021 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
 
@@ -93,6 +93,7 @@ Live row counts are what the source actually contributed to the board read above
 | `reo.vrm_va_reo` | 20 | Laurens SC (1) | `https://vrmproperties.com/`<br>`https://vrmproperties.com` |
 | `counties_nc.rutherford_foreclosure` | 19 | Rutherford NC (19) | `https://www.rutherfordcountync.gov/departments/` |
 | `counties_sc.anderson_master_in_equity` | 19 | Anderson SC (19) | `https://www.andersoncountysc.org/departments-a-z/master-in-equity/`<br>`https://www.andersoncountysc.org{href` |
+| `counties_nc.edgecombe_tax_foreclosure` | 17 | Edgecombe NC (17) | `https://www.edgecombecountync.gov/businesses/tax_collector/tax_foreclosure_list.php` |
 | `national.hubzu` | 16 | Spartanburg SC (4), Anderson SC (2), Laurens SC (2) | `https://www.hubzu.com/portal/auctions?state={state`<br>`https://www.hubzu.com/`<br>`https://www.hubzu.com{url` |
 | `law_firms.rogers_townsend` | 15 | Spartanburg SC (9), Anderson SC (3), Laurens SC (1) | `https://rogerstownsend.com/reports/SC_Listings.pdf`<br>`https://rogerstownsend.com/reports/NC_Listings.pdf` |
 | `counties_nc.nc_rod_logan` | 14 | Transylvania NC (12), McDowell NC (2) | _(no literal URL in module)_ |
@@ -114,6 +115,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties.nod_discovery` | 5 | Cleveland NC (4), Buncombe NC (1) | `https://{host`<br>`https://{kofile.KOFILE_COUNTIES[(state`<br>`https://example.invalid/` |
 | `counties_nc.henderson_foreclosure_parcels` | 4 | Henderson NC (4) | `https://www.arcgis.com`<br>`https://hendersoncounty.maps.arcgis.com`<br>`https://experience.arcgis.com/experience/` |
 | `counties_nc.nc_county_tax_foreclosure` | 4 | Rutherford NC (3), Gaston NC (1) | `https://www.gastongov.com/669/Tax-Foreclosure-Sales`<br>`https://www.gastongov.com/671/Previous-Tax-Foreclosure-Sales`<br>`https://mcdowellnc.gov/departments/tax-collections/tax-foreclosures/upcoming-tax-foreclosure-sales`<br>_+1 more_ |
+| `counties_nc.wake_tax_foreclosure` | 4 | Wake NC (4) | `https://www.wake.gov/departments-government/tax-administration/real-estate/foreclosures`<br>`https://services.wake.gov/realestate/Account.asp?id={tax_id` |
 | `counties_sc.richland_flc` | 3 | Richland SC (3) | `https://www.richlandcountysc.gov/Property-Business/Taxes/Delinquent-Taxes/Forfeited-Land-Available`<br>`https://www.richlandcountysc.gov` |
 | `national.trulia` | 3 | Spartanburg SC (3) | `https://www.trulia.com/foreclosures/`<br>`https://www.trulia.com/foreclosures/Charlotte,NC/`<br>`https://www.trulia.com/foreclosures/Raleigh,NC/`<br>_+6 more_ |
 | `counties_nc.nc_rod_substitute_trustee` | 2 | Henderson NC (1), Transylvania NC (1) | `https://buncombe-recordings.permitium.com/```<br>`https://www.nccourts.gov/` |
@@ -144,7 +146,6 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_nc.brunswick_legal_notices` | `https://www.brunswickcountync.gov/912/Legal-Notices`<br>`https://www.brunswickcountync.gov`<br>_+1 more_ |
 | `counties_nc.buncombe_tax_foreclosure` | `https://media.buncombenc.gov/common/tax/foreclosure-listings/fcl.pdf`<br>`https://taxforeclosures.buncombenc.gov/` |
 | `counties_nc.cumberland_tax_foreclosure` | `https://www.co.cumberland.nc.us/departments/tax/tax-administration/tax-foreclosures` |
-| `counties_nc.edgecombe_tax_foreclosure` | `https://www.edgecombecountync.gov/businesses/tax_collector/tax_foreclosure_list.php` |
 | `counties_nc.gaston_surplus_properties` | `https://www.gastongov.com/709/Surplus-Properties`<br>`https://www.gastongov.com`<br>_+1 more_ |
 | `counties_nc.henderson_tax` | `https://www.hendersoncountync.gov/tax/page/tax-foreclosure-sales` |
 | `counties_nc.lincoln_code_violations` | `https://arcgisserver.lincolncountync.gov/arcgis/rest/services/` |
@@ -152,7 +153,7 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_nc.nc_bankruptcy_sales` | `https://www.nceb.uscourts.gov/Public-Sales-Notice`<br>`https://www.ncmb.uscourts.gov/public-sales` |
 | `counties_nc.nc_civicplus_tax_sale` | `https://www.alamance-nc.com`<br>`https://www.alexandercountync.gov`<br>_+65 more_ |
 | `counties_nc.nc_coastal_tax_foreclosure` | `https://www.brunswickcountync.gov/912/Legal-Notices`<br>`https://www.brunswickcountync.gov`<br>_+5 more_ |
-| `counties_nc.nc_deq_dsca` | `https://www.deq.nc.gov/about/divisions/waste-management/dry-cleaning-solvent-cleanup-act-program` |
+| `counties_nc.nc_deq_dsca` | `https://www.deq.nc.gov/about/divisions/waste-management/science-data-and-reports/dsca-site-listsfacility-inventories` |
 | `counties_nc.nc_ecourts_estates` | `https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29`<br>`https://portal-nc.tylertech.cloud/Portal`<br>_+1 more_ |
 | `counties_nc.nchfa_reo` | `https://www.nchfa.com/home-buyers/properties-sale` |
 | `counties_nc.new_hanover_foreclosures` | `https://www.nhcgov.com/345/Foreclosures` |
@@ -160,7 +161,6 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_nc.rutherford_wildfire_tax` | `https://www.rutherfordcountync.gov/tax_search/index.php`<br>`https://d1ebsyxxbc7tep.cloudfront.net`<br>_+1 more_ |
 | `counties_nc.stokes_delinquent_tax` | `https://www.co.stokes.nc.us/departments/foreclosures.php` |
 | `counties_nc.swain_tax_foreclosures` | `https://www.swaincountync.gov/` |
-| `counties_nc.wake_tax_foreclosure` | `https://www.wake.gov/departments-government/tax-administration/real-estate/foreclosures`<br>`https://services` |
 | `counties_nc.wnc_rod_foreclosure_starts` | _(no literal URL in module)_ |
 | `counties_nc.wnc_tax_foreclosures` | `https://www.wataugacounty.org/`<br>`https://www.averycounty.com/`<br>_+3 more_ |
 | `counties_sc.abbeville_delinquent_tax` | `https://abbevillecountysc.com/delinquent-tax-collector/` |
