@@ -2124,3 +2124,24 @@ Verified live: Dillon 0 -> 825 board rows (987 scraped, 162 genuinely
 duplicate parcels within the source's own list correctly merged by
 dedupe()), 100% carry a normalized `tax_owed` balance, York's 119
 TAX_SALE_OVERAGE rows still untouched.
+
+
+## Re-confirmed zero-source counties + new vendor pattern (2026-09-14)
+
+Re-checked Hampton and Edgefield with a full browser render (not just
+static `get_text`) this time, since that method is what found Dillon's
+buried link. Both confirmed genuinely empty: Hampton's dedicated
+Delinquent-Tax page has no PDF/list link and no mention of "advertis-",
+"publish", "newspaper", "tax sale list", "forfeited land", or "overage"
+anywhere in its body text. Edgefield's tax-collector page describes the
+December tax-sale process but links nothing.
+
+**New vendor pattern spotted**: Berkeley County's `taxes.berkeleycountysc.
+gov` redirects to `berkeleycountysc.paystar.io/app/` — the SAME "paystar.io"
+platform Jasper County's tax-payment link pointed to
+(`taxes.paystar.io/app/customer/jasper-county-tax`). This is a modern JS
+SPA payment portal (like Chester/Fairfield's platform, a different vendor)
+-- worth remembering if it recurs for a third county, since cracking its
+public-facing delinquent-list page (if one exists, not yet checked) once
+would likely unlock all paystar.io counties at once, the same "solve once,
+apply to N counties" logic as the Chester/Fairfield finding.
