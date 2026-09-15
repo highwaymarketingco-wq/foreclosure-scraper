@@ -1,17 +1,35 @@
 """Generic city-website foreclosure / tax sale / code enforcement scraper.
 
-Cities across our 18-county footprint don't all have dedicated foreclosure pages,
-but most publish:
-  * Tax sale notices (delinquent property auctions) on the finance / treasurer page
-  * Code enforcement / nuisance abatement / demolition lists
-  * Public notice / legal advertising sections
-  * Surplus property auctions
+DISABLED 2026-09-15 (national/misc zero-row audit) — confirmed garbage
+emitter. `search_one()` grabs EVERY street-address-shaped string anywhere
+on a `/?s=<keyword>` search-results page (up to 20 per page) and ANY
+date-shaped string anywhere on the page as a "date hint" — with no check
+that either actually belongs to a real notice. Live-verified: a search for
+"foreclosure" AND "tax sale" AND "delinquent tax" on cityofspartanburg.org
+all three "found" the exact same "295 E Main Street" (Spartanburg City
+Hall's own address, from the page footer/header) as a distress listing,
+with a "Date hint: April 29, 1961" fabricated from an unrelated date
+string on the page. Same pattern for Woodruff/Landrum/Duncan/Anderson —
+every hit resolves to the city's own civic address, not a real property.
+This is the exact "generic keyword-search grabs page chrome, not content"
+anti-pattern already found and disabled repeatedly this session
+(nc_deq_dsca, clarendon_tax_auction, marlboro_delinquent_tax, oconee_flc,
+etc — see docs/WEEKEND_LOOP_QUEUE.md).
 
-Rather than maintain 50+ custom city parsers, we run the city site's own search
-(/?s=<keyword>) over plain HTTP — falling back to the free stealth-browser
-renderer for JS-rendered CMS sites — and harvest the foreclosure-related links +
-text. Each hit becomes a lightweight Listing pointing at the city URL — these
-get enriched downstream by GIS + court records. (No Apify / paid services.)
+Currently harmless (every row is dateless and city_websites.* was never
+added to DATELESS_OK_SOURCES, so _active_only() drops all 150 rows/run
+today) but disabled outright rather than left dormant, so a future session
+can't accidentally "fix" the zero-row symptom by whitelisting the prefix
+and start landing fake civic-address leads.
+
+Original design intent, for a future real rebuild: cities across our
+18-county footprint don't all have dedicated foreclosure pages, but most
+publish tax sale notices, code enforcement / nuisance abatement /
+demolition lists, public notice sections, or surplus property auctions.
+A real fix would need to anchor each extracted address to the SAME
+result-snippet/block the keyword match came from (not the whole page),
+the way `newspapers/hendersonville_lightning.py`'s per-notice `<h3>`
+chunking does, rather than harvesting page-wide.
 """
 from __future__ import annotations
 
@@ -171,6 +189,13 @@ class CityWebsites(BaseScraper):
     timeout_s = 600.0
 
     async def fetch(self) -> Iterable[Listing]:
+        # Disabled — see module docstring. Confirmed garbage emitter
+        # (harvests page-wide addresses/dates with no anchor to the actual
+        # search-result snippet, so every hit resolves to the city's own
+        # civic address).
+        return []
+
+    async def _disabled_fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         sem = asyncio.Semaphore(4)
 

@@ -1,17 +1,30 @@
 """SeeClickFix municipal issue API v2 — free, keyless bulk data.
 
-SeeClickFix is a citizen-reporting platform used by 100s of US municipalities.
-Issues tagged with categories like "code violation", "abandoned property",
-"blight", "vacant", or "graffiti" are strong distress signals. The API is
-free and requires no key for basic queries (rate-limited ~100 req/min).
+DISABLED 2026-09-15 (national.* zero-row audit) — confirmed garbage
+emitter. SeeClickFix's v2 API silently ignores the `lat`/`lng`/`radius`
+geo-filter params today (a query for Asheville NC returns issues from
+Tacoma WA, Detroit MI, Salem MA, etc — live-verified), and `_fetch_city`
+below then HARDCODES `city=c["city"], state=c["state"]` from the query
+dict rather than the real returned address, so a Salem MA "Illegal
+Dumping" report gets mislabeled `city="Asheville", state="NC"`. Produced
+1,239 rows of fabricated-geography municipal complaints in one live run.
+Currently harmless only because every row also lacks a real
+county/zip_code and gets dropped by the scope gate — this was disabled
+outright rather than left dormant so a future scope-gate fix (e.g. a
+generic county-arrives-late bypass, the same class of fix craigslist_fsbo
+got this same audit) doesn't start landing these on the board.
 
-API docs: https://developer.seeclickfix.com/
-Endpoint: https://seeclickfix.com/api/v2/issues
+A real fix needs the API's actual per-issue lat/lng + address (SeeClickFix
+does return these; they were just never asserted onto city/state) and a
+distance check against the queried point before keeping a row — not a
+loose keyword match.
 
-We query for issues in our NC/SC footprint cities with distress-related
-keywords, paginating through results. Each issue becomes a Listing with
-listing_type=DISTRESS_SIGNAL (not a foreclosure per se, but a motivated-
-seller indicator for properties with active municipal complaints).
+Original design intent, for a future real rebuild: SeeClickFix is a
+citizen-reporting platform used by 100s of US municipalities. Issues
+tagged "code violation"/"abandoned property"/"blight"/"vacant"/"graffiti"
+are real motivated-seller distress signals. API docs:
+https://developer.seeclickfix.com/ — free, no key needed for basic
+queries (rate-limited ~100 req/min).
 """
 from __future__ import annotations
 
@@ -151,6 +164,12 @@ class SeeClickFixScraper(BaseScraper):
         return out
 
     async def fetch(self) -> Iterable[Listing]:
+        # Disabled — see module docstring. Confirmed garbage emitter (the
+        # API's geo-filter is silently ignored and city/state get
+        # hardcoded from the query, not the real result).
+        return []
+
+    async def _disabled_fetch(self) -> Iterable[Listing]:
         tasks = [self._fetch_city(c) for c in _CITIES]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         out: list[Listing] = []

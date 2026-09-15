@@ -1,8 +1,22 @@
 """Bid4Assets — county tax sale auctions via Scrapling stealth (no Apify).
 
-Bid4Assets uses ColdFusion CFM with session cookies. Direct httpx returns
-the empty search shell. Scrapling renders the search page for each state
-and we extract auction cards from the DOM.
+DISABLED 2026-09-15 (national.* zero-row audit) — confirmed garbage
+emitter. Live-verified: the stealth-rendered NC/SC search pages return
+only 2 links each, and both are SITE NAVIGATION, not auction listings —
+"Sheriff's Sales" (/sheriff-sale-government-auctions) and "County
+Government Sellers" (/county-government-auctions). The `a[href*='auction']`
+selector matches sitewide nav chrome, not per-listing cards; either the
+real results page isn't rendering (a ColdFusion session/search-param
+issue) or the selector needs scoping to the actual results container.
+Currently harmless (these get dropped by the scope gate — no
+county/zip) but disabled outright rather than left dormant, same
+reasoning as seeclickfix.py in this same audit.
+
+Original design intent, for a future real rebuild: Bid4Assets uses
+ColdFusion CFM with session cookies; direct httpx returns the empty
+search shell, so a stealth browser render is needed. A real fix needs to
+confirm the actual results DOM (likely behind a session-cookie/search-
+param step this scraper isn't performing) before trusting any selector.
 """
 from __future__ import annotations
 
@@ -107,6 +121,11 @@ class Bid4Assets(BaseScraper):
     timeout_s = 360.0
 
     async def fetch(self) -> Iterable[Listing]:
+        # Disabled — see module docstring. Confirmed garbage emitter (the
+        # selector matches sitewide nav links, not real auction cards).
+        return []
+
+    async def _disabled_fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         for state, url in URLS:
             try:

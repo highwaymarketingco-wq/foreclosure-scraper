@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-15T14:59:36.648819Z",
-  "total": 171087,
+  "run_time": "2026-09-15T15:04:09.636096Z",
+  "total": 171092,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -100,8 +100,8 @@
     "courtlistener.recap": 945
   },
   "by_state": {
-    "NC": 93230,
-    "SC": 77857
+    "NC": 93232,
+    "SC": 77860
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 41264,
@@ -240,6 +240,7 @@
     "national.jail_bookings": 6,
     "counties.nod_discovery": 5,
     "counties_nc.nc_county_tax_foreclosure": 5,
+    "national.homepath_json": 5,
     "counties_nc.henderson_foreclosure_parcels": 4,
     "counties_nc.wake_tax_foreclosure": 4,
     "counties_sc.richland_flc": 3,
@@ -506,20 +507,20 @@
     "newspapers.carolina_coast"
   ],
   "notes": "",
-  "detail_count": 171087,
-  "detail_digest": "de95ce9dca6dde48",
+  "detail_count": 171092,
+  "detail_digest": "0ce47dd21132c124",
   "board": {
     "schema": "slim-v1",
-    "count": 171087,
+    "count": 171092,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
       "count": 172,
-      "records": 171087
+      "records": 171092
     }
   },
-  "health_carried_from": "2026-09-15T14:50:41.788864Z",
+  "health_carried_from": "2026-09-15T14:59:36.648819Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",

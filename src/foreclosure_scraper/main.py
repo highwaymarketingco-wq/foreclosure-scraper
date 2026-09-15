@@ -447,6 +447,7 @@ DATELESS_OK_SOURCES = {
     "counties_nc.mcdowell_probate",
     "national.hud_homestore",
     "national.fannie_homepath",
+    "national.homepath_json",                    # newer Fannie HomePath JSON API (alt to fannie_homepath above); no sale date
     "national.freddie_homesteps",
     "national.auction_dot_com",
     "national.hubzu",
