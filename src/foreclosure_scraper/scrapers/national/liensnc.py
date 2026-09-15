@@ -1,15 +1,25 @@
 """LiensNC.com — NC mechanic's lien / construction lien database.
 
-LiensNC is the official online filing system for North Carolina mechanic's
-liens (NCGS 44A). Construction liens are a strong distress signal: they
-indicate unpaid contractors, which often precede foreclosure or forced sale.
+DISABLED 2026-09-15 (national.* zero-row audit) — confirmed dead end, not
+a code bug. The old `/Search` path this module targeted 404s; the real
+site's project search now lives at `/search-for-filings.html` (confirmed
+live 2026-09-15), and that page states plainly: "Sign Up to use the
+LiensNC system or login with your existing user credentials." This is a
+walled, login-gated search — the "public search portal, no login
+required" premise this module was built on is not true today (if it ever
+was). No amount of URL-swapping fixes a login wall.
 
-The site at liensnc.com provides a public search portal. We search for
-recently-filed liens in our NC footprint counties. The data is server-
-rendered HTML with a search form.
+Also redundant: the project's real, already-working construction-lien
+pipeline is `counties_generic.liensnc` (56K+ rows, a completely different
+mechanism — see project memory "liensnc re-parse + lead class"). This
+`national.liensnc` module never contributed anything to that pipeline; it
+was an independent, separately-broken attempt at the same underlying
+signal.
 
-Free, public, no login required for basic search. Cloudflare-protected,
-so we use impersonate=True for the TLS fingerprint.
+Original module intent, superseded by the above: LiensNC is the official
+online filing system for North Carolina mechanic's liens (NCGS 44A).
+Construction liens are a strong distress signal — unpaid contractors often
+precede foreclosure or forced sale.
 """
 from __future__ import annotations
 
@@ -58,6 +68,12 @@ class LiensNCScraper(BaseScraper):
     timeout_s = 180.0
 
     async def fetch(self) -> Iterable[Listing]:
+        # Disabled — see module docstring. The real search is login-gated;
+        # counties_generic.liensnc is the working 56K-row pipeline for this
+        # signal.
+        return []
+
+    async def _disabled_fetch(self) -> Iterable[Listing]:
         # Try the search page with impersonation (Cloudflare-protected).
         try:
             html = await get_text_impersonate(_SEARCH_URL, timeout=60.0)

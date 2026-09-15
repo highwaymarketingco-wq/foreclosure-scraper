@@ -3384,3 +3384,38 @@ cleanly, no downstream defect found because there isn't one.
 
 **Net +347 rows** (350 kept, 3 fuzzy-merged into existing board rows from
 other national/REO sources).
+
+## Three more national.* fixes: fdic state-mapping, liensnc disabled, gsa_surplus rebuilt (2026-09-15)
+
+- `national.fdic_failed_banks` -- fixed the latent state-name-vs-abbreviation
+  bug the audit agent flagged: the FDIC table's State column is a full name
+  ("Pennsylvania") with no mapping to "PA" before the scope check compares
+  `state.upper() == "NC"/"SC"`. Added a minimal NC/SC-only name->abbreviation
+  map (everything else the project doesn't track passes through unchanged).
+  Still 0 NC/SC rows today (no current in-footprint bank failures) but the
+  bug that would have silently dropped a future one is fixed, with tests.
+- `national.liensnc` -- confirmed genuine dead end, disabled. The old
+  `/Search` path 404s; live-checked the real replacement
+  (`/search-for-filings.html`) and it states plainly "Sign Up to use the
+  LiensNC system or login with your existing user credentials" -- a
+  login-gated search, not the "public search portal, no login required"
+  the module's docstring assumed. Also redundant with the project's real,
+  already-working 56K-row `counties_generic.liensnc` construction-lien
+  pipeline (a completely different mechanism). No URL swap fixes a login
+  wall; disabled rather than left as a silent no-op.
+- `national.gsa_surplus` -- full rewrite. Old target URL 404s and its
+  extraction was the same risky "regex over whatever page blocks matched"
+  shape that produced garbage elsewhere this session. Found the real page
+  (`/real-estate/real-property-disposition/assets-identified-for-accelerated-disposition`)
+  is a clean, server-rendered USWDS card list with a real per-card
+  `data-state` attribute (not inferred from nearby text) plus a structured
+  address/type/area/date-listed block and an explicit SOLD/DISPOSED/UNDER
+  CONTRACT closed-deal tag when applicable. Rewrote with a real selectolax
+  parser anchored to each card; added to DATELESS_OK_SOURCES (these are
+  negotiated dispositions, not scheduled auctions -- no real sale_date
+  concept). **Landed 1 in-footprint row** (G. Ross Anderson Jr. Federal
+  Building and Courthouse, Anderson SC) with 3 unit tests locking in the
+  parser (real card, closed-deal card dropped, out-of-footprint state
+  dropped).
+
+Board: 171,439 -> 171,440 rows.

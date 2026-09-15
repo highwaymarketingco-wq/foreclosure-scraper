@@ -571,6 +571,7 @@ DATELESS_OK_SOURCES = {
     "law_firms.zacchaeus",                       # ZLS tax foreclosures (status-driven; upset/pending leads outlive sale date)
     "national.first_citizens_reo",               # First Citizens bank-owned REO listings
     "national.usda_properties",                  # USDA Rural Development eligible / REO resales (SC); no sale date
+    "national.gsa_surplus",                       # GSA accelerated-disposition federal properties; negotiated sale, no auction date
     "counties_sc.sc_rod_acclaim",                # SC ROD (Acclaim vendor) recorded NOD/deed filings
     "counties_sc.sc_rod_cott",                   # SC ROD (Cott vendor) recorded NOD/deed filings
     # 2026-05 expansion — new sources added in this PR. Without these

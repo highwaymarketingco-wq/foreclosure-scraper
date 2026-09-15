@@ -1,12 +1,12 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 15:17 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-15 15:23 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
 - Scrapers in the registry: **229**
-- Producing rows on the board: **125**
-- Registered but contributing ZERO rows: **104**
+- Producing rows on the board: **126**
+- Registered but contributing ZERO rows: **103**
 - Confirmed real and not yet built: **9**
-- Board read: `docs/listings.json.gz` (171,439 rows)
+- Board read: `docs/listings.json.gz` (171,440 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
 
@@ -137,6 +137,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_nc.nc_govdeals_real_property` | 1 | Anderson SC (1) | `https://maestro.lqdt1.com/search/list`<br>`https://www.transylvaniacounty.org/news`<br>`https://www.govdeals.com/asset/{asset_id`<br>_+2 more_ |
 | `counties_sc.sc_rod_cott` | 1 | Union SC (1) | _(no literal URL in module)_ |
 | `law_firms.ingle_firm` | 1 | Gaston NC (1) | `https://www.theinglefirm.com/Sales.aspx` |
+| `national.gsa_surplus` | 1 | - | `https://www.gsa.gov/real-estate/real-property-disposition/assets-identified-for-accelerated-disposition`<br>`https://www.gsa.gov/real-estate/real-property-disposition/` |
 | `national.realtor_foreclosures` | 1 | Spartanburg SC (1) | _(no literal URL in module)_ |
 | `national.sheriff_sales` | 1 | Cleveland NC (1) | `https://www.brunswicksheriff.com`<br>`https://www.charlestoncounty.org`<br>`https://www.sheriffclevelandcounty.com`<br>_+1 more_ |
 | `newspapers.carolina_coast` | 1 | Carteret NC (1) | `https://www.carolinacoastonline.com/classifieds/?f=rss&q=foreclosure`<br>`https://www.carolinacoastonline.com/classifieds/?f=rss&q=substitute+trustee`<br>`https://www.carolinacoastonline.com/classifieds/?f=rss&q=trustee+sale` |
@@ -227,7 +228,6 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `national.first_citizens_reo` | `https://www.firstcitizens.com/real-estate` |
 | `national.govdeals` | `https://maestro.lqdt1.com/search/list`<br>`https://www.govdeals.com/index.cfm?fa=Main&searchText=&category=&keyword=`<br>_+4 more_ |
 | `national.gsa_realproperty` | `https://realestatesales.gov` |
-| `national.gsa_surplus` | `https://www.gsa.gov/about-us/organization/office-of-governmentwide-policy/`<br>`https://www.gsa.gov/real-estate/real-estate-listings`<br>_+1 more_ |
 | `national.irs_judicial_sales` | `https://www.irsauctions.gov` |
 | `national.irs_treasury` | `https://www.irsauctions.gov/auction/items`<br>`https://www.irsauctions.gov` |
 | `national.landsofamerica` | `https://www.land.com/{county`<br>`https://www.land.com{url` |

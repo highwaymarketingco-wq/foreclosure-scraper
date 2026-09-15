@@ -33,6 +33,21 @@ log = structlog.get_logger()
 
 PAGE_URL = "https://www.fdic.gov/bank-failures/failed-bank-list"
 
+# The FDIC table's State column is a full name ("Pennsylvania"), but every
+# downstream scope check compares state.upper() against "NC"/"SC" -- a full
+# name would never match, silently dropping any in-footprint bank failure.
+# Full US state-name map is overkill here (everything outside NC/SC gets
+# filtered out anyway); only the two states this project tracks matter.
+_STATE_NAME_TO_ABBR = {
+    "NORTH CAROLINA": "NC",
+    "SOUTH CAROLINA": "SC",
+}
+
+
+def _normalize_state(raw: str) -> str:
+    s = (raw or "").strip()
+    return _STATE_NAME_TO_ABBR.get(s.upper(), s)
+
 
 class FDICFailedBanks(BaseScraper):
     slug = "national.fdic_failed_banks"
@@ -62,7 +77,7 @@ class FDICFailedBanks(BaseScraper):
 
             bank_name = clean[0]
             city = clean[1]
-            state = clean[2]
+            state = _normalize_state(clean[2])
             cert_num = clean[3]
             acquiring = clean[4]
             fail_date_str = clean[5]
