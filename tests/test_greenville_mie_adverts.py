@@ -15,8 +15,11 @@ curative test that IS the buy box -- was populated on 1,297 of 94,384 board rows
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
 import pytest
 
+from foreclosure_scraper.models import ListingType
 from foreclosure_scraper.scrapers.counties_sc.greenville_mie_adverts import (
     SITEMAP, parse_advert, parse_sitemap,
 )
@@ -46,7 +49,12 @@ def test_every_field_the_buy_box_needs():
     assert li.judgment_amount == 161897.79
     assert li.street_address == "4002 Fork Shoals Rd Simpsonville"
     assert li.zip_code == "29680"
-    assert li.sale_date is not None and li.sale_date.strftime("%m/%d/%Y") == "08/07/2023"
+    # 08/07/2023 is in the past relative to any reasonable test run date,
+    # so this row types as DISTRESSED (resolved case) and its structured
+    # sale_date is None by design (see test_a_past_sale_date_types_as_...
+    # below) -- the original date string still survives in raw.
+    assert li.sale_date is None
+    assert li.raw["greenville_mie"]["sale_date"] == "08/07/2023"
     assert li.state == "SC" and li.county == "Greenville"
     assert li.raw["greenville_mie"]["total_judgment_debt"] == 161897.79
 
@@ -119,3 +127,55 @@ def test_empty_sitemap_yields_nothing_rather_than_raising():
 
 def test_the_sitemap_url_is_the_advert_post_type():
     assert SITEMAP.endswith("wp-sitemap-posts-advert-1.xml")
+
+
+def test_a_past_sale_date_types_as_distressed_not_foreclosure_sale():
+    """User-confirmed policy (2026-09-15): 'if they are actual foreclosures
+    going to sale, do not grab them [for Greenville]. if they are real
+    distressed etc then grab them.' A sale already in the past is no longer
+    an active auction to bid on -- it's a resolved case whose remaining
+    value is the judgment-debt/party data, a DISTRESSED signal admitted
+    statewide (the fixture's 08/07/2023 date is in the past relative to
+    any reasonable test run date)."""
+    li = parse_advert(URL, REAL)
+    assert li is not None
+    assert li.listing_type == ListingType.DISTRESSED
+
+
+def test_resolved_case_has_no_structured_sale_date_but_keeps_it_in_raw():
+    """The structured sale_date field must be None for a resolved case, not
+    just the listing_type -- main._active_only()'s DATELESS_OK_SOURCES
+    exemption only fires on sale_date is None; a non-None-but-old date
+    still gets window-checked and would silently drop every one of these
+    DISTRESSED rows regardless of the whitelist entry, undoing the entire
+    point of the type split. The original date string must still survive
+    in raw for anyone who wants it."""
+    li = parse_advert(URL, REAL)
+    assert li is not None
+    assert li.sale_date is None
+    assert li.raw["greenville_mie"]["sale_date"] == "08/07/2023"
+
+
+def test_an_upcoming_sale_date_types_as_foreclosure_sale():
+    """A still-upcoming sale IS an active auction -- FORECLOSURE_SALE, a
+    flip lead, correctly denied for Greenville by the scope deny-list."""
+    future = (datetime.utcnow() + timedelta(days=30)).strftime("%m/%d/%Y")
+    html = REAL.replace("08/07/2023", future)
+    li = parse_advert(URL, html)
+    assert li is not None
+    assert li.listing_type == ListingType.FORECLOSURE_SALE
+
+
+def test_no_sale_date_defaults_to_foreclosure_sale_not_distressed():
+    """No date yet is not evidence the sale already happened -- default to
+    the more restrictive (flip, narrow-scope) typing, not the more
+    permissive one."""
+    html = REAL.replace(
+        "<p>BY VIRTUE of a decree heretofore granted, I will sell on "
+        "08/07/2023 at public auction.</p>",
+        "<p>BY VIRTUE of a decree heretofore granted.</p>",
+    )
+    li = parse_advert(URL, html)
+    assert li is not None
+    assert li.sale_date is None
+    assert li.listing_type == ListingType.FORECLOSURE_SALE

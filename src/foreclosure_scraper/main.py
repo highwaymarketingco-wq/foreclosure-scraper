@@ -584,6 +584,7 @@ DATELESS_OK_SOURCES = {
     "national.fema_disasters",                    # FEMA disaster declarations by county; a declaration event, not a sale
     "national.sc_public_index",                   # SC Common Pleas court filings; case filing date, not a sale date
     "city_websites.charlotte_open_data",          # open Charlotte/Mecklenburg code enforcement cases; case creation date, not a sale date
+    "counties_sc.greenville_mie_adverts",         # past-sale rows ship as DISTRESSED (judgment-debt value doesn't go stale); upcoming-sale rows still get denied for Greenville by the SCOPE gate regardless
     "counties_sc.sc_rod_acclaim",                # SC ROD (Acclaim vendor) recorded NOD/deed filings
     "counties_sc.sc_rod_cott",                   # SC ROD (Cott vendor) recorded NOD/deed filings
     # 2026-05 expansion — new sources added in this PR. Without these

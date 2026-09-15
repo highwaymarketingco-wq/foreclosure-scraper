@@ -3571,3 +3571,54 @@ also dropped (crime isn't really a property-distress signal, and no
 replacement was investigated).
 
 Board: 172,968 -> 175,941 rows (+2,973 net new).
+
+## Defused a real scope-policy landmine: greenville_mie_adverts (2026-09-15)
+
+While double-checking the day's work, cross-referenced the "not built
+yet" candidate list in `scripts/gen_source_register.py` against the live
+board and found the "Greenville Journal MIE adverts" candidate had
+ALREADY been built (`counties_sc.greenville_mie_adverts`, 584 board rows)
+-- the NOT_BUILT entry was simply stale, never removed after the source
+landed in an earlier session. Fixed that list entry's text regardless of
+the deeper finding below (corrected the pre-scope-policy-fix framing).
+
+The deeper finding: those 584 rows were blanket-typed FORECLOSURE_SALE
+(a flip lead), and Greenville is explicitly in SCOPE_DENY_COUNTIES for
+flip leads. Verified directly: **all 584 rows failed `_in_scope()`
+under today's real policy** -- they were sitting on the board only
+because they were landed (in an earlier session) via a path that never
+called the real scope gate, and would have been silently wiped whole by
+any actual pipeline scope re-pass. Exactly the "silent unexploded
+landmine" shape flagged earlier this session for the scope-policy
+apparatus generally, just discovered live for one specific pre-existing
+source.
+
+This called for a real decision, not a guess, so asked the user directly.
+Their answer: "if they are actual foreclosures going to sale, do not
+grab them. if they are real distressed etc then grab them." Checked the
+data: 570 of 584 rows (97.6%) had sale dates already in the past (Master-
+in-Equity adverts stay live on the sitemap long after the sale) --
+resolved cases whose only remaining value is the judgment-debt/party
+data, not an active auction. Only 14 had upcoming dates.
+
+Implemented the split in `greenville_mie_adverts.py`'s `parse_advert()`:
+an upcoming (or dateless) sale types as `FORECLOSURE_SALE` (correctly
+denied for Greenville); a sale whose date has passed types as
+`DISTRESSED` (admitted anywhere in NC/SC) AND gets its structured
+`sale_date` field cleared to `None` (kept in `raw` for reference) --
+caught via a real test run that `_active_only()`'s `DATELESS_OK_SOURCES`
+exemption only fires when `sale_date is None`; a non-None-but-old date
+still gets window-checked and would have silently dropped every
+DISTRESSED row anyway, undoing the whole fix. 6 new/updated tests lock
+in both branches plus the sale_date-clearing behavior.
+
+Reconciled via `scripts/reconcile_greenville_mie_adverts.py`, which
+REPLACES (not merges with) the source's existing rows -- verified live:
+400 adverts fetched (379 DISTRESSED / 21 FORECLOSURE_SALE), all 379
+DISTRESSED rows now correctly pass every gate, all 21 FORECLOSURE_SALE
+rows correctly denied, 309 survive after internal dedupe. Post-write
+verification: 0 of the 309 remaining rows fail `_in_scope()` today --
+landmine defused.
+
+Board: 175,941 -> 175,666 rows (net -275; 584 policy-violating rows
+replaced by 309 correctly-typed, correctly-filtered ones).

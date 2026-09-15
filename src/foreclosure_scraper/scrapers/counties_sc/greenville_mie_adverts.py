@@ -27,17 +27,29 @@ THE SITEMAP RETURNS HTTP 404 AND 96KB OF VALID XML
     detail page that was written off for a wrong URL: the status said no, the body said
     yes. So the status is deliberately ignored here and the parse decides.
 
-SCOPE NOTE FOR THE OPERATOR
+SCOPE, RESOLVED 2026-09-15
     Greenville was pruned from the FORECLOSURE footprint by explicit direction
-    (config carries `# 2026-05-14 — pruned Greenville again per user direction`). It
-    remains inside the statewide SC DISTRESSED scope, which is what these rows are
-    emitted as. If foreclosure-lane scope should also exclude them, that is a
-    scope_repass decision, not something this scraper should quietly pre-empt.
+    (config carries `# 2026-05-14 — pruned Greenville again per user direction`).
+    This scraper found 584 board rows already landed under a blanket
+    FORECLOSURE_SALE typing -- which fails `_in_scope()` for Greenville
+    outright and would have been silently wiped by any real scope re-pass.
+    Asked the user directly; their answer: "if they are actual foreclosures
+    going to sale, do not grab them. if they are real distressed etc then
+    grab them." `parse_advert` now types each row on that exact line: a
+    still-upcoming (or dateless) sale IS an active auction -- FORECLOSURE_SALE,
+    correctly denied for Greenville. A sale whose advertised date has already
+    passed is no longer something to bid on -- the judgment-debt/party data
+    is what's left, a DISTRESSED signal, admitted anywhere in NC/SC. On any
+    given day ~97% of this source's rows are past-dated (Master-in-Equity
+    adverts stay live on the sitemap long after the sale), so most of this
+    source's value flows through the DISTRESSED path. Also added to
+    DATELESS_OK_SOURCES in main.py -- a resolved case's judgment-debt value
+    doesn't go stale the way an active listing's sale_date window does.
 
 Free, public, no login.
 Slug: counties_sc.greenville_mie_adverts
 Category: court
-ListingType: FORECLOSURE_SALE
+ListingType: FORECLOSURE_SALE (upcoming sale) or DISTRESSED (sale already passed)
 """
 from __future__ import annotations
 
@@ -130,15 +142,37 @@ def parse_advert(url: str, raw: str) -> Listing | None:
     pl = _PLAINTIFF_RE.search(t)
     df = _DEFENDANT_RE.search(t)
     now = datetime.utcnow()
+    # User-confirmed policy (2026-09-15): "if they are actual foreclosures
+    # going to sale, do not grab them [for Greenville]. if they are real
+    # distressed etc then grab them." A row with no sale date yet, or an
+    # upcoming one, IS an actual sale advertisement -- FORECLOSURE_SALE, a
+    # flip lead, correctly denied for Greenville per SCOPE_DENY_COUNTIES.
+    # A row whose advertised sale date has already passed is no longer an
+    # active sale to bid on -- it's a resolved case whose real remaining
+    # value is the judgment-debt/party-name data, a DISTRESSED signal,
+    # admitted anywhere in NC/SC. (97.6% of this source's rows are past-
+    # dated on any given day -- Master-in-Equity adverts stay live on the
+    # sitemap long after the sale.)
+    is_resolved = sale is not None and sale < now
+    ltype = ListingType.DISTRESSED if is_resolved else ListingType.FORECLOSURE_SALE
+    # For a resolved case, `sale_date` no longer means "when is the
+    # actionable event" -- it's just a historical fact (still preserved
+    # below in raw.greenville_mie.sale_date). Structured sale_date is left
+    # None so _active_only()'s DATELESS_OK_SOURCES exemption actually
+    # applies: that gate only checks the whitelist when sale_date is None
+    # -- a non-None-but-old date still gets window-checked and dropped
+    # regardless of the whitelist, which would silently undo the whole
+    # point of typing these as DISTRESSED in the first place.
+    structured_sale = None if is_resolved else sale
     return Listing(
         source="counties_sc.greenville_mie_adverts",
         source_url=url,
-        listing_type=ListingType.FORECLOSURE_SALE,
+        listing_type=ltype,
         property_kind=PropertyKind.UNKNOWN,
         state="SC", county="Greenville",
         parcel_id=tms, case_number=case,
         street_address=street, city=city, zip_code=zipc,
-        sale_date=sale,
+        sale_date=structured_sale,
         judgment_amount=judgment,
         plaintiff=(pl.group(1).strip() if pl else None),
         defendant=(df.group(1).strip() if df else None),

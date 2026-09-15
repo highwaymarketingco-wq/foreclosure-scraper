@@ -1,12 +1,12 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 16:47 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-15 17:59 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
 - Scrapers in the registry: **229**
 - Producing rows on the board: **129**
 - Registered but contributing ZERO rows: **100**
 - Confirmed real and not yet built: **9**
-- Board read: `docs/listings.json.gz` (175,941 rows)
+- Board read: `docs/listings.json.gz` (175,666 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
 
@@ -47,7 +47,6 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_nc.nc_heir_estate_parcels` | 679 | Rutherford NC (123), Polk NC (87), Laurens SC (76) | _(no literal URL in module)_ |
 | `counties_nc.nc_ecourts_lis_pendens` | 671 | Brunswick NC (129), Onslow NC (66), New Hanover NC (66) | `https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/`<br>`https://portal-nc.tylertech.cloud/app/NCJudgmentSearchService/search`<br>`https://portal-nc.tylertech.cloud` |
 | `national.courtlistener_bankruptcy` | 642 | Anderson SC (105), Buncombe NC (85), Henderson NC (70) | `https://www.courtlistener.com/sign-up/`<br>`https://www.courtlistener.com/profile/api/`<br>`https://www.courtlistener.com/api/rest/v4`<br>_+1 more_ |
-| `counties_sc.greenville_mie_adverts` | 584 | Greenville SC (584) | `https://mie.greenvillejournal.com` |
 | `counties_nc.asheville_str_permits` | 555 | Buncombe NC (555) | `https://gis.ashevillenc.gov/server/rest/services/Permits/`<br>`https://gis.ashevillenc.gov/server/rest/services/Permits/HomestayPermitsView/MapServer/5` |
 | `counties_sc.cherokee_delinquent_tax` | 528 | Cherokee SC (528) | `https://www.cherokeecountysc.gov/wp-json/wp/v2/media` |
 | `national.landwatch` | 502 | Burke NC (47), McDowell NC (34), Dare NC (32) | `https://www.landwatch.com/{state_slug` |
@@ -59,6 +58,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_sc.georgetown_civicengage` | 365 | Georgetown SC (365) | `https://www.gtcountysc.gov` |
 | `counties_sc.terry_howe_auctions` | 335 | Spartanburg SC (140), Laurens SC (118), Anderson SC (36) | `https://terryhowe.com/wp-json/wp/v2/auctions` |
 | `national.usda_properties` | 334 | Spartanburg SC (48), Anderson SC (48), Pickens SC (48) | `https://usdaproperties.com/property/`<br>`https://www.usdaproperties.com/property/sc/county/`<br>`https://www.usdaproperties.com`<br>_+1 more_ |
+| `counties_sc.greenville_mie_adverts` | 309 | Greenville SC (309) | `https://mie.greenvillejournal.com` |
 | `national.distressed` | 282 | Gaston NC (46), Spartanburg SC (38), Anderson SC (36) | _(no literal URL in module)_ |
 | `counties_sc.sc_probate_net` | 265 | Charleston SC (265) | `https://www.southcarolinaprobate.net/search/```<br>`https://www.southcarolinaprobate.net/search/` |
 | `national.craigslist_fsbo` | 255 | - | `https://sapi.craigslist.org/web/v8/postings/search/full`<br>`https://{host` |
@@ -265,7 +265,7 @@ Each of these survived an adversarial refutation pass whose DEFAULT was "refuted
 - **Counties**: Greenville SC
 - **Signal**: foreclosure + JUDGMENT DEBT
 - **Estimated volume**: ~722 notices 2016-2026, ~170/yr
-- **Why / caveats**: The only free source found that carries total judgment debt keyed to a TMS. Only 27 of 47,125 board rows currently have a judgment amount. BLOCKED BY POLICY, NOT TECH: Greenville is in SCOPE_DENY_COUNTIES, so it ships zero leads until the operator widens the footprint.
+- **Why / caveats**: The only free source found that carries total judgment debt keyed to a TMS. Only 27 of 47,125 board rows currently have a judgment amount. UPDATED 2026-09-15: the flat "blocked by policy, Greenville is in SCOPE_DENY_COUNTIES" framing predates that day's scope-policy fix (user-confirmed: flip-type leads stay narrow-footprint-only; DISTRESSED-type leads are admitted anywhere in NC/SC, no deny-list applied). "MIE" = Master In Equity, SC's foreclosure-sale judicial officer -- if this source's rows are genuine sale notices (FORECLOSURE_SALE), the Greenville denial is still correct under the new policy too (flip scope didn't change). If the judgment-debt data can be captured as its own DISTRESSED-type record (a debt/lien signal distinct from the sale itself), that half would now be admittable statewide. Type each row correctly rather than assume the old blanket denial still applies uniformly.
 
 ### Senior / disabled exemption rolls beyond Buncombe
 

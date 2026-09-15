@@ -56,8 +56,18 @@ NOT_BUILT = [
      "~722 notices 2016-2026, ~170/yr",
      "The only free source found that carries total judgment debt keyed to a TMS. "
      "Only 27 of 47,125 board rows currently have a judgment amount. "
-     "BLOCKED BY POLICY, NOT TECH: Greenville is in SCOPE_DENY_COUNTIES, so it "
-     "ships zero leads until the operator widens the footprint."),
+     "UPDATED 2026-09-15: the flat \"blocked by policy, Greenville is in "
+     "SCOPE_DENY_COUNTIES\" framing predates that day's scope-policy fix "
+     "(user-confirmed: flip-type leads stay narrow-footprint-only; "
+     "DISTRESSED-type leads are admitted anywhere in NC/SC, no deny-list "
+     "applied). \"MIE\" = Master In Equity, SC's foreclosure-sale judicial "
+     "officer -- if this source's rows are genuine sale notices "
+     "(FORECLOSURE_SALE), the Greenville denial is still correct under the "
+     "new policy too (flip scope didn't change). If the judgment-debt data "
+     "can be captured as its own DISTRESSED-type record (a debt/lien signal "
+     "distinct from the sale itself), that half would now be admittable "
+     "statewide. Type each row correctly rather than assume the old "
+     "blanket denial still applies uniformly."),
     ("Senior / disabled exemption rolls beyond Buncombe",
      "county ArcGIS parcel layers carrying ELD/DIS/BLD/VET exemption codes",
      "all footprint counties except Buncombe NC", "elderly_disabled",
