@@ -679,6 +679,7 @@ RAW_KEEP = {
     # credit. Own block so downstream math can't confuse the two.
     "tax_sale_overage": "*",
     "greenville_delinquent_tax": "*",
+    "richland_flc": "*",
 
 }
 

@@ -2014,3 +2014,40 @@ qPublic and the SC probate AWS-WAF block — solvable via the already-
 authorized CapSolver integration once `CAPSOLVER_API_KEY` is staged (still
 unset), not a bespoke reverse-engineering task like DEW was. All three
 CapSolver-gated walls should be attempted together whenever the key lands.
+
+## Richland County SC — first real lead source, 1 -> 4 rows (2026-09-14)
+
+Richland (Columbia, the state capital, SC's 2nd-largest county) had exactly
+ONE board row despite a well-organized site with dedicated Tax-Sale,
+Forfeited-Land, and Master-in-Equity-Foreclosure pages. Checked all three:
+
+- **Master-in-Equity Foreclosure Sales**: procedure text only, no roster.
+- **Forfeited-Land-Available**: links a live, current (~5-week-old) `.xlsx`
+  — built `counties_sc.richland_flc` against it. Small (only 3 parcels —
+  FLC inventory is inherently small/rolling, matching every other FLC
+  source in this codebase), but real, free, no CAPTCHA. Had to fetch the
+  file via curl_cffi impersonation directly (`http_client.get_bytes` has no
+  impersonation escalation and gets a flat 403 from this WAF-fronted
+  domain, unlike `get_text` which already escalates). Verified live: 3/3
+  rows parsed correctly, header/title/stray-artifact rows correctly
+  excluded, tested against a synthetic xlsx built the same way the real
+  file is actually encoded (shared strings, confirmed by inspecting the
+  real file's zip contents — worth checking this before hand-building a
+  test fixture, since inline-string vs shared-string xlsx encoding are NOT
+  interchangeable to a hand-rolled parser).
+- **Tax-Sale page**: links `richlandmaps.com/apps/delinquent`, a genuinely
+  promising, NOT-yet-cracked lead for the next pass. It's a Leaflet map app
+  ("RCGeo Tax Sale Parcel Viewer") but unlike Williamsburg's fully
+  proprietary TGIS engine, its JS reveals real, standard-ish backend pieces:
+  a WMS tile layer (`L.tileLayer.wms` — a documented OGC protocol), a
+  `RCGeoSearchData.php?searchTerm=` autocomplete endpoint (confirmed live,
+  returns `{"d":[...]}`), and a "refresh active vector layers by bounding-
+  box polygon" JS function (`AppLayers.RefreshActiveVectorLayers(ewkt,
+  zoom)`) that strongly suggests a queryable-by-bbox data endpoint exists
+  even though this pass didn't find its exact URL. Worth a dedicated follow
+  -up: find the vector-layer refresh endpoint (likely another `.php` file
+  under `apps/api/`) and query it with a bounding box covering the whole
+  county instead of trying to reproduce map-tile panning.
+
+Verified live: Richland 1 -> 4 board rows. Committing next; the FLC scraper
+plus tests are ready, board write pending final full-suite pass.

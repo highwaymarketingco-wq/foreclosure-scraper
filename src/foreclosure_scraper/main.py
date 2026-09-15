@@ -432,6 +432,10 @@ DATELESS_OK_SOURCES = {
     # (a standing "who currently owes" list, not a scheduled event) -- same
     # reasoning as every other county delinquent-tax source in this list.
     "counties_sc.greenville_delinquent_tax",
+    # Richland's FLC list has no per-parcel date either -- rolling
+    # over-the-counter inventory, same reasoning as every other FLC/
+    # delinquent-tax source in this list.
+    "counties_sc.richland_flc",
     # Same cookie-cutter scraper as Fairfield above, same dateless Listing(): the
     # Saluda advertisement carries owner/TMS/description but no per-parcel date,
     # so without this entry every row it harvests in Nov-Dec is deleted silently.

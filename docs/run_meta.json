@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-15T00:10:53.736930Z",
-  "total": 130797,
+  "run_time": "2026-09-15T00:55:23.521503Z",
+  "total": 130800,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -101,7 +101,7 @@
   },
   "by_state": {
     "NC": 69530,
-    "SC": 61267
+    "SC": 61270
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 41266,
@@ -195,6 +195,7 @@
     "counties.nod_discovery": 5,
     "counties_nc.henderson_foreclosure_parcels": 4,
     "counties_nc.nc_county_tax_foreclosure": 4,
+    "counties_sc.richland_flc": 3,
     "derived.probate_deed": 3,
     "national.trulia": 3,
     "counties_nc.nc_rod_substitute_trustee": 2,
@@ -453,21 +454,21 @@
     "counties_generic.state_contamination",
     "newspapers.carolina_coast"
   ],
-  "notes": "parcel-cache join: 41,067 hits, 517 owner mailing, 1,746 situs, 191 sqft",
-  "detail_count": 130797,
-  "detail_digest": "c53f8ae892f8701c",
+  "notes": "",
+  "detail_count": 130800,
+  "detail_digest": "853b36da0c2b311f",
   "board": {
     "schema": "slim-v1",
-    "count": 130797,
+    "count": 130800,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
       "count": 131,
-      "records": 130797
+      "records": 130800
     }
   },
-  "health_carried_from": "2026-09-14T23:02:21.788878Z",
+  "health_carried_from": "2026-09-15T00:10:53.736930Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
