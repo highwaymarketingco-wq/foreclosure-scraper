@@ -3443,3 +3443,21 @@ different dedupe key (e.g. keyed on county+fema_id instead of
 county+address) to preserve one row per distinct disaster event.
 
 Board: 171,440 -> 171,459 rows.
+
+## charlotte_open_data: confirmed real fix needed, deferred (2026-09-15)
+
+Investigated the JSON parse errors flagged in the misc-category audit.
+Root cause: `data.charlottenc.gov`'s old Socrata dataset endpoints
+(`/resource/<id>.json`) all 302-redirect to `hub.arcgis.com/legacy` --
+the city has fully migrated its open-data portal from Socrata to ArcGIS
+Hub. The domain itself is alive (`data.charlottenc.gov` root loads a
+real "City of Charlotte Open Data Portal" page) but it's a client-
+rendered ArcGIS Hub site with a completely different data-access
+mechanism (ArcGIS Online item search + per-dataset FeatureServer URLs,
+not a flat Socrata resource ID). Fixing this needs re-discovering the
+current dataset item IDs/FeatureServer URLs for code violations and
+building permits through the Hub's own search, then rebuilding the
+parser against ArcGIS REST query responses instead of Socrata JSON --
+same tier of effort as the cumberland_tax_foreclosure (Sitefinity) and
+nc_deq_dsca (real Excel source) rebuilds already deferred this project.
+Not fixed today; a real fix, not a quick one.
