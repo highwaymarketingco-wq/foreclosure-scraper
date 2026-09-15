@@ -123,6 +123,7 @@ class GastonVacant(BaseScraper):
                     owner2 = _s(a.get("JAN1_NAME2"))
                     if owner and owner2:
                         owner = f"{owner} & {owner2}"
+                    last_sale_dt = _epoch_ms_to_dt(a.get("SALEDATE"))
                     out.append(Listing(
                         source=self.slug,
                         source_url=(
@@ -146,7 +147,6 @@ class GastonVacant(BaseScraper):
                         living_sqft=_f(a.get("SQFT")),
                         year_built=_i(a.get("YEARBLT")),
                         acreage=_f(a.get("CALCAC")) or _f(a.get("DEEDAC")),
-                        sale_date=_epoch_ms_to_dt(a.get("SALEDATE")),
                         land_use=_s(a.get("property_use")),
                         description=(
                             "Vacant parcel (no improvements on record) per county GIS "
@@ -167,6 +167,17 @@ class GastonVacant(BaseScraper):
                             "FMV_LAND": _f(a.get("FMV_LAND")),
                             "FMV_IMPRV": _f(a.get("FMV_IMPRV")),
                             "SALESAMT": _f(a.get("SALESAMT")),
+                            # NOT the Listing's own sale_date: SALEDATE is the county's last
+                            # recorded TRANSACTION date (when the current owner acquired the
+                            # parcel), not a scheduled foreclosure auction. This source is a
+                            # STANDING vacant-land distress signal with no scheduled event (it's
+                            # in main.py's DATELESS_OK_SOURCES for exactly that reason) -- setting
+                            # it as Listing.sale_date made _active_only() drop every row as a
+                            # "sale more than 14 days in the past" even though the whitelist entry
+                            # existed, since that check only applies when sale_date is None.
+                            # Found 2026-09-15: this bug was why 21,299 real, live rows never
+                            # reached the board despite the scraper working correctly.
+                            "last_sale_date": last_sale_dt.isoformat() if last_sale_dt else None,
                             "owner_mailing": {
                                 "name": _s(a.get("CURR_NAME1")),
                                 "addr": _s(a.get("CURR_ADDR1")),

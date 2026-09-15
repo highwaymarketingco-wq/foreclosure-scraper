@@ -2605,3 +2605,132 @@ counties, up from 19 before this session's mailing-gap work began (5
 earlier today: Horry/Darlington/Lexington/Lancaster/Barnwell; 2 this
 round: Saluda/Calhoun). Full test suite passes (see final commit). York's 119
 TAX_SALE_OVERAGE rows still carry zero owner_mailing.
+
+## McCormick's second GIS vendor (ViewPro): confirmed real reverse-engineering, not a quick win (2026-09-15)
+
+Followed up on the scouting agent's flagged "unexplored angle" for
+McCormick County SC: `map.viewprogis.com/ecp/mccormick-sc`, a second
+parcel viewer distinct from the wthgis.com/TGIS one already confirmed
+non-viable. Drove it with a real browser (not just a static fetch) to see
+past the closed client app the static HTML showed. Confirmed: it IS a
+real, working Esri-based map viewer (address geocoder works, parcels
+render with zoning colors on selection) -- but it is built on Phoenix
+LiveView, and after watching full network traffic through a live parcel
+search + selection, there is NO plain HTTP ArcGIS REST endpoint anywhere
+in the traffic (no `rest/services`, no `FeatureServer`/`MapServer` query
+URL) -- the map data is streamed over a WebSocket channel, not fetched via
+ordinary HTTP. This independently confirms the scouting pass's own
+assessment rather than overturning it: a real target, but genuine
+protocol reverse-engineering (decoding Phoenix channel WebSocket
+messages, or driving a real headless browser as the scraper itself,
+which this project avoids by design for lightweight httpx-based
+scrapers) -- not a quick win. Not pursued further; McCormick's primary
+path remains the standard qPublic/CapSolver wall like Abbeville/Bamberg/
+Lee/Allendale.
+
+## NC zero-row audit: 18 of 31 "dead" scrapers actually work; 3 real bugs found and fixed (2026-09-15)
+
+Dispatched a background triage agent to check all 31 `counties_nc.*`
+scrapers sitting at zero board rows in `docs/SOURCE_REGISTER.md`. Result:
+the register was substantially stale. 18 of the 31 produce real, current
+data when run live today; 7 have confirmed, specific bugs (listed
+separately below for whoever picks them up); 5 are genuine, already-
+correctly-handled dead ends; 2 are uncertain. Full per-county detail is in
+the agent's own report (not reproduced here) -- this entry covers what was
+actually SHIPPED from it today.
+
+**Root cause for why 5 big "working" scrapers never landed a single row,
+despite being correctly pre-wired into `DATELESS_OK_SOURCES` AND
+`RAW_KEEP`:** the triage agent ran each scraper's bare `fetch()`, which
+bypasses `main.py`'s `_active_only()` pipeline filter entirely -- so it
+correctly saw real data, but that doesn't mean the data would have
+survived a real pipeline run. Checked by hand: `counties_nc.gaston_vacant`
+had a REAL, separate bug -- it set `Listing.sale_date` from the county's
+`SALEDATE` field, which is the CURRENT OWNER'S LAST ACQUISITION date, not
+a foreclosure auction date. Every row therefore carried a real, non-None
+sale_date far more than 14 days in the past, and `_active_only()` drops
+those regardless of the `DATELESS_OK_SOURCES` entry (that whitelist only
+applies when `sale_date IS None`). Fixed: moved `SALEDATE` into
+`raw["gaston_gis"]["last_sale_date"]`, matching how `mcdowell_probate.py`
+and `transylvania_vacant.py` already handle their own last-sale fields
+correctly. Verified live post-fix: 21,299/21,299 rows now pass
+`_active_only()`. The other 4 big sources (`lincoln_vacant`,
+`transylvania_vacant`, `transylvania_delinquent_tax`, `mcdowell_probate`)
+never had this bug -- they were simply never run as part of any board-
+writing process.
+
+**Landed, in two batches:**
+
+1. `scripts/ingest_nc_dateless_backlog.py` -- the 5 big standing-condition
+   sources (gaston_vacant, lincoln_vacant, transylvania_vacant,
+   transylvania_delinquent_tax, mcdowell_probate). Scoped dedupe by
+   COUNTY (gaston/lincoln/transylvania/mcdowell). 48,045 scraped, board
+   134,977 -> 149,972 (**+14,995 net new**). No `suspicious_primary_key`
+   warning; house-number guard blocked 13,690 risky fuzzy merges along
+   the way.
+
+2. `scripts/ingest_nc_never_run_batch2.py` -- 10 smaller, REAL-EVENT-DATED
+   (auction) sources. Handled differently from batch 1 on purpose: live-
+   checked each one and found most of what they scrape is HISTORICAL
+   record (county pages that keep a running log of already-closed/
+   redeemed/sold sales alongside the few upcoming ones), so this script
+   applies `_active_only()` itself before landing anything -- of ~130
+   rows scraped across the 10 sources, only 30 are genuinely active right
+   now (cleveland_tax_foreclosure 8, gaston_tax_foreclosures 1,
+   haywood_tax_foreclosures 1, rutherford_foreclosure 20; the other 6
+   contributed 0 today). +28 net new.
+
+**A second, separate, more general finding from getting batch 2 landed
+safely -- worth its own investigation later:** the FIRST attempt at batch
+2 scoped its dedupe by COUNTY (matching batch 1's pattern) and came back
+NET NEGATIVE (-51, then -50 after excluding New Hanover) -- i.e. scoping
+a dedupe pass to "every existing board row in these counties" started
+CONSOLIDATING pre-existing rows, not just adding new ones. Traced one
+instance fully: `counties_generic.liensnc` has 12 GENUINELY DISTINCT New
+Hanover addresses (Juno Dr, Sidbury Landing -- a subdivision) that all
+carry the SAME subdivision-PARENT tax parcel ("R02000-003-015") instead
+of their own lot's parcel. `dedupe()`'s Pass 1 (exact `dedupe_key()`
+bucketing) fused these into ONE row -- and CAN do this silently, because
+Pass 1 runs BEFORE the house-number guard, which only protects Pass 2's
+fuzzy address matching. Excluding New Hanover only recovered 1 of the ~50
+missing rows, meaning smaller, quieter instances of the same collision
+class exist scattered across the other 9 counties too, apparently never
+surfaced before because this broad a scope had never been deduped in one
+pass. Sidestepped rather than fixed: batch 2's final script scopes its
+dedupe by SOURCE SLUG (these 10 sources' own prior rows, which is
+correctly empty) instead of by county, so it adds its 30 rows without
+touching any pre-existing board data at all -- neither fixing nor
+further risking whatever is latent in those counties' existing rows.
+
+**This is a real, codebase-wide gap, not just a liensnc quirk: `dedupe()`
+Pass 1 (exact parcel-key bucketing) has NO poisoned-ID protection,
+only Pass 2 (fuzzy address matching) does.** Any source that assigns a
+non-unique placeholder/parent parcel ID to multiple genuinely distinct
+properties is at risk of silent fusion the next time a dedupe scope
+happens to include all of them together -- which could be a future full
+pipeline run, not just a scoped ingest like today's. Worth a dedicated
+investigation: (a) how many other exact-key collisions like the New
+Hanover one exist board-wide (a diagnostic pass, no writes), and (b)
+whether Pass 1 should get its own address-plurality guard mirroring the
+one Pass 2 already has (reject an exact-key merge when the group's
+addresses don't reasonably agree, the same principle already proven at
+Pass 2). NOT attempted today -- this needs its own careful, dedicated
+pass, not a fix folded into an unrelated ingest.
+
+**7 confirmed bugs found, not yet fixed (left for a dedicated pass):**
+`wake_tax_foreclosure` (wrong seasonal gate + wrong DOM assumption -- a
+real September 2026 sale is sitting on the live page right now),
+`edgecombe_tax_foreclosure` (wrong seasonal gate only),
+`cumberland_tax_foreclosure` (wrong URL entirely + wrong gate),
+`lincoln_code_violations` (county server TLS chain misconfiguration --
+66 real open violations confirmed behind it), `nc_deq_dsca` (wrong URL
+AND actively emits GARBAGE -- sidebar nav-menu text mislabeled as
+contamination sites, worse than a silent zero), `swain_tax_foreclosures`
+(wrong page + a JS `data-downloadurl` attribute, not a plain href, points
+at the real PDF), `wnc_tax_foreclosures` (one dead host, Madison
+County's `lrcpwa.ncptscloud.com`, stalls the whole 5-county sweep past
+any reasonable timeout).
+
+York's 119 TAX_SALE_OVERAGE rows still carry zero owner_mailing (guard
+held through both writes today). Full 4,000-test suite passes (unrelated
+to these two ingests, run beforehand after the gaston_vacant fix).
