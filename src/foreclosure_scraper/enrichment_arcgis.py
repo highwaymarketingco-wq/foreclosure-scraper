@@ -938,9 +938,16 @@ def _apply_attrs(li: Listing, attrs: dict[str, Any]) -> int:
         parcel_id = _pick(attrs, FIELD_ALIASES["parcel_id"])
         if parcel_id:
             pid = str(parcel_id).strip()
-            # Reject obviously-wrong values (single digits, deed-book-style
-            # 4-digit ints, etc.) — real APNs have meaningful structure.
-            if len(pid) >= 5 and not pid.isspace():
+            # Reject only blank/placeholder values -- NOT by length. This used
+            # to also reject anything under 5 chars on the theory that "real
+            # APNs have meaningful structure" (guarding against a fuzzy address
+            # match accidentally picking up a deed-book/page number instead of
+            # a real parcel id). Live-disproven 2026-09-15: Cleveland County
+            # NC's real `parno` field is a bare 4-digit int like '1020' for a
+            # genuine, owned, assessed parcel -- the exact shape this gate was
+            # rejecting. _match_confident already gates this write; length is
+            # not a valid extra confidence signal on top of that.
+            if pid and not pid.isspace() and pid not in ("0", "0.0"):
                 maybe("parcel_id", pid)
 
     if not li.zoning:

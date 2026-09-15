@@ -91,11 +91,23 @@ def _in_box(li: Listing) -> bool:
 
 
 def _clean_parcel(pid: Any) -> str:
-    """Reject obviously-bad parcel ids (the same >=5-char / non-trivial gate the
-    address-match path in enrichment_arcgis applies, so a junk value never gets
-    written into the dedupe key)."""
+    """Reject blank/placeholder parcel ids only -- NOT by length.
+
+    Found 2026-09-15: this used to also reject anything under 5 characters
+    (matching a length gate in enrichment_arcgis.py's address-match path,
+    on the theory that "real APNs have meaningful structure"). That's false --
+    live-verified against Cleveland County NC: NC OneMap's `parno` field
+    returns bare ids like '1020' (4 chars) for real, owned, assessed parcels
+    (confirmed via a direct _point_query() call: full owner name, address and
+    market value came back attached to that exact id). The length floor was
+    silently discarding every short-format parcel id NC OneMap returned,
+    board-wide, for any county using a short numeric parno convention -- not
+    a hypothetical edge case, a confirmed live failure. Parcel-id format
+    varies by county (bare sequential ints vs. long formatted PINs like
+    '6804-28-5537.00'); length is not a valid plausibility signal.
+    """
     s = str(pid or "").strip()
-    if len(s) < 5 or s.isspace() or s in ("0", "0.0"):
+    if not s or s.isspace() or s in ("0", "0.0"):
         return ""
     return s
 
