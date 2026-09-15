@@ -291,6 +291,65 @@ PARCEL_LAYERS: dict[str, dict] = {
                 "acreage": "Tot_Number_Acres", "living_sqft": "SqFt_Total",
                 "land_use": "PT163_Class"},
     },
+    # --- 2026-09-15: SC mailing-gap sweep, found via a scouting pass over the
+    # 10 remaining zero-parcel-cache counties. Both verified live directly
+    # (not just via the scouting pass) before being wired in here.
+    "Saluda": {  # Saluda was 0% mailing on 428 board rows
+        # Own ArcGIS Server at saludacountysc.net, found via the county's
+        # classic ArcGIS JS 3.x "SaludaCountyViewer" app (its js/settings.js
+        # hard-codes this query URL). Layer 4 is a JOIN VIEW of two SDE
+        # tables (Parcels + AssessorData), so every field name below is
+        # fully qualified with its source table -- unusual, but confirmed
+        # live: 15,566 parcels, count verified via returnCountOnly.
+        "state": "SC",
+        "url": "https://saludacountysc.net/arcgis/rest/services/ParcelViewers/PublicWebsite_Pro/MapServer/4/query",
+        "id_fields": ["SDE.DBO.Parcels.TaxMapNumber", "SDE.DBO.AssessorData.Map_Number"],
+        # Situs (Street_Number_E911/Street_Name_E911/PhysicalAddress) came back
+        # NULL on all 5 rows sampled live -- mapped anyway since some parcels
+        # may carry it, but expect near-zero situs coverage from this layer.
+        # Zip_Code is the same malformed ZIP*10000+ZIP4 integer encoding
+        # already documented for Darlington (e.g. 290723914 = 29072-3914);
+        # left OUT of owner_mailing on purpose -- Address_1 + Address_2
+        # ("City ST") is still a usable mailing address without it.
+        "map": {"owner": ["SDE.DBO.AssessorData.Name", "SDE.DBO.AssessorData.Name_2"],
+                "address": ["SDE.DBO.AssessorData.Street_Number_E911", "SDE.DBO.AssessorData.Street_Name_E911"],
+                "owner_mailing": ["SDE.DBO.AssessorData.Address_1", "SDE.DBO.AssessorData.Address_2"],
+                "market_value": "SDE.DBO.AssessorData.Tot_Assesd_Value",
+                "acreage": "SDE.DBO.AssessorData.Tot_Number_Acres"},
+    },
+    "Calhoun": {  # Calhoun was 0% mailing on 512 board rows
+        # AECOM-hosted ArcGIS Server, found via the county's Esri Web
+        # AppBuilder app (gis.aecomonline.net/Calhounparcel) whose
+        # config.json points at a webmap item on the county's own ArcGIS
+        # Online org (calhouncountysc.maps.arcgis.com) -- the webmap's
+        # operationalLayers exposed this real MapServer URL. Confirmed live:
+        # 13,867 parcels, TMS format matches board parcel_id exactly
+        # (dashed, e.g. "168-00-02-027").
+        #
+        # Tot_Market_Appr and Sale_Price are comma-formatted strings
+        # ("15,700"), which is what prompted the comma-strip fix in
+        # _map_val above -- without it this layer's value fields silently
+        # dropped to None on every row. Owner is NULL/empty on every row
+        # sampled live; the real name lives in Name1/Name2.
+        #
+        # sale_date deliberately NOT mapped: Sale_Date here is a STRING
+        # YYYYMMDD ("20180129", or "00000000" for no sale), not the epoch-
+        # millisecond esriFieldTypeDate _iso_date() is built to parse. Fed
+        # through as-is it either gets caught by the null-date guard
+        # (0 -> None, correct by luck) or silently discarded as
+        # implausible (any real 8-digit YYYYMMDD is far too small to be a
+        # real epoch-ms timestamp) -- wrong either way. Fixing _iso_date to
+        # detect this second date shape is out of scope for one county's
+        # sale_date field when owner_mailing is what this cache exists for;
+        # left unmapped rather than silently wrong.
+        "state": "SC",
+        "url": "https://gis.aecomonline.net/arcgis/rest/services/CalhounCO/Parcel/MapServer/2/query",
+        "id_fields": ["TMS"],
+        "map": {"owner": ["Name1", "Name2"], "address": "Property_Address",
+                "owner_mailing": ["Mailing_Address", "Mailing_City_State_ZIP"],
+                "market_value": "Tot_Market_Appr", "acreage": "Acres",
+                "sale_price": "Sale_Price"},
+    },
     "Laurens": {  # TMS (dash format); layer has situs but no value field
         "url": "https://laurenscountygis.org/arcgis/rest/services/Pebble/TaxParcel/MapServer/5/query",
         "id_fields": ["TMS"],
@@ -430,7 +489,14 @@ def _map_val(rec: dict, col: str, spec):
             val = val.strip() or None
     if col in _NUMERIC and val not in (None, ""):
         try:
-            return float(val)
+            # Calhoun (found 2026-09-15) serves Tot_Market_Appr/Sale_Price as
+            # comma-formatted strings ("15,700"), which plain float() rejects
+            # outright -- silently dropping every value field on that layer to
+            # None. Strip thousands-separator commas and a leading currency
+            # sign before parsing; harmless on every other county's plain
+            # numeric strings, which have neither.
+            cleaned = val.replace(",", "").replace("$", "").strip() if isinstance(val, str) else val
+            return float(cleaned)
         except (ValueError, TypeError):
             return None
     if col == "sale_date" and val not in (None, ""):

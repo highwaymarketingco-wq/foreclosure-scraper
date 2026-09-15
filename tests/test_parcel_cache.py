@@ -45,3 +45,14 @@ def test_map_val_numeric_coercion_and_none():
     assert isinstance(_map_val({"parval": "73680"}, "market_value", "parval"), float)
     assert _map_val({}, "market_value", None) is None          # county without a value field
     assert _map_val({"v": "N/A"}, "acreage", "v") is None      # unparseable -> None, no crash
+
+
+def test_map_val_strips_comma_thousands_separator():
+    # Calhoun (found 2026-09-15) serves Tot_Market_Appr/Sale_Price as comma-
+    # formatted strings — plain float() raised ValueError on every one of
+    # them and silently returned None, dropping the whole layer's value data.
+    assert _map_val({"v": "15,700"}, "market_value", "v") == 15700.0
+    assert _map_val({"v": "1,234,567.89"}, "market_value", "v") == 1234567.89
+    assert _map_val({"v": "$15,700"}, "market_value", "v") == 15700.0
+    # a plain numeric string (every other county) is unaffected
+    assert _map_val({"v": "73680"}, "market_value", "v") == 73680.0

@@ -2497,3 +2497,111 @@ Net: what looked like one project turned out to be a free one-line fix
 and a correctly-deferred non-starter (Florence) — found by checking each
 county live before writing any code, instead of building to the original
 scope and discovering the mismatch mid-build.
+
+## Correction: Jasper's iPublish/paystar rationale above is now stale (2026-09-15)
+
+The "Zero-row-county sweep" section above (same date) lists Jasper as
+needing either the paystar.io build or the McClatchy iPublish AdPortal.
+Both are now moot for Jasper specifically: its real delinquent-tax roll
+turned out to live on `jaspercountydelinquenttax.qpaybill.com`, the SAME
+vendor as 27 other SC counties already in
+`counties_sc.qpaybill_delinquent_roll` — see the paystar.io correction
+entry above. Jasper: 0 -> 910 board rows, zero new scraper code.
+
+This also shrinks McClatchy iPublish AdPortal's remaining justification:
+it was scoped as a "solve once, unlock several" platform specifically
+because it looked like the path for BOTH Jasper and Chester. With Jasper
+solved elsewhere, iPublish's only remaining target in this codebase is
+Chester (via the Rock Hill Herald) — and Chester's primary, more direct
+path is already the CapSolver-gated `chestercountysctax.com` tax portal,
+blocked purely on the unstaged `CAPSOLVER_API_KEY`. A JS-rendered,
+harder-to-crack newspaper-notices platform for ONE county that already has
+a simpler path pending on a key the user will eventually stage is a much
+weaker investment than it looked yesterday. Deprioritized accordingly —
+not pursued further this session; revisit only if Chester's CapSolver path
+turns out to be a dead end even once the key is staged, or if iPublish
+turns out to cover additional counties in this footprint not yet checked.
+
+## Abbeville's zero-row delinquent-tax scraper: confirmed CapSolver-gated, not a bug (2026-09-15)
+
+Checked `counties_sc.abbeville_delinquent_tax` (zero board rows) while
+scoping the SC mailing-gap sweep, since Abbeville was on that same list.
+The scraper's own page (`abbevillecountysc.com/delinquent-tax-collector/`)
+carries no table itself -- it's a static WordPress page that says "Abbeville
+County is now providing the ability to search and view delinquent taxes
+online" and links to ONE destination for that search:
+
+    https://qpublic.schneidercorp.com/Application.aspx?AppID=613&LayerID=10508&PageTypeID=2&PageID=4483
+
+Same vendor (qPublic/Schneider) and same wall already documented for
+Cherokee/Union this session -- confirmed live: 403 even through this
+project's impersonation escalation, no Cloudflare bypass without
+CAPSOLVER_API_KEY. The county's separate "Online Pay" page links to the
+exact same qPublic URL, so there is no alternate non-gated vendor to try
+here. `active_months=(10,11,12,1)` gating this scraper to Nov-Jan is
+correct as written but not the actual reason for the zero -- the real
+reason is this Cloudflare wall, which holds year-round. Confirmed dead
+end, not a scraper bug: added Abbeville to the CapSolver-gated bucket
+alongside Cherokee, Union, the SC probate AWS-WAF, and Chester/Fairfield's
+tax SPA. All five need only the one unstaged key to attempt.
+
+## SC mailing-gap sweep, round 2 — Saluda + Calhoun added, comma-value bug fixed (2026-09-15)
+
+Scouted the 10 remaining SC counties with zero parcel-cache coverage
+(Marlboro, Newberry, Chesterfield, Abbeville, Bamberg, Saluda, McCormick,
+Calhoun, Lee, Allendale). Verified every candidate live myself before
+wiring anything in (trust-but-verify on the scouting pass's own report).
+
+**2 new counties wired, both fully cached and joined:**
+- **Saluda** (428 board rows, was 0% mailing): own ArcGIS Server at
+  `saludacountysc.net`, found via the county's classic ArcGIS JS 3.x
+  viewer app. 15,566 parcels, downloaded 100% on the first pass. Now
+  **59% mailing** (253/428). Situs coverage is real too (71% board-wide
+  in the full cache) even though the scouting pass's small 5-row sample
+  showed all-empty situs fields — corrected that here rather than letting
+  the pessimistic sample stand as the record.
+- **Calhoun** (512 board rows, was 0% mailing): AECOM-hosted ArcGIS
+  Server, found by walking the county's Esri Web AppBuilder config to its
+  ArcGIS Online org's webmap. 13,867 parcels, 100% on the first pass. Now
+  **80% mailing** (412/512).
+
+**Real bug fixed, not just two new counties**: Calhoun's `Tot_Market_Appr`/
+`Sale_Price` fields are comma-formatted strings ("15,700"), which
+`parcel_cache.py`'s numeric coercion (`float(val)`) rejected outright,
+silently dropping EVERY value on that layer to `None` — including parcels
+worth up to $46.7M once wired without the fix (verified in the live cache
+after the fix: 27,640 of 27,732 indexed rows now carry a real
+market_value). Fixed `_map_val` to strip thousands-separator commas and a
+leading `$` before parsing; added a regression test
+(`test_map_val_strips_comma_thousands_separator`). Harmless on every
+other county's plain numeric strings. This is a generic fix, not
+Calhoun-specific — any future county layer with comma-formatted currency
+fields is now handled automatically.
+
+**6 confirmed dead ends**, all converging on two already-known vendor
+walls rather than being new information: Marlboro/Chesterfield/McCormick
+run WTH Technology's proprietary TGIS engine (same non-REST platform
+already deferred for Williamsburg); Abbeville/Bamberg/Lee/Allendale have
+no path except qPublic/Schneider, CAPTCHA- or login-walled (Abbeville
+folded into the existing CapSolver-gated bucket alongside Cherokee/Union
+this session — see the separate entry above). One live false-positive
+caught and logged so it doesn't get rediscovered: an AGOL search for
+"Lee County Parcels" surfaces a real, live, well-formed ArcGIS layer that
+is Lee County FLORIDA (schema carries `STRAP`/`DORCODE`, FL State Plane
+SRID), not Lee County SC.
+
+**Newberry — genuine near-miss, not dead**: found the exact right,
+county-hosted endpoint (`map.newberrycounty.net/gis/rest/services/
+PropertyParcel/MapServer`, traced through the county's own ArcGIS Portal
+webmap config) but the service itself returns
+`{"error":{"code":500,"message":"Service PropertyParcel/MapServer not
+started "}}` and is absent from the service catalog root listing —
+confirmed on a same-day retry, not a transient blip. This is an
+administratively-stopped service on the county's own server, nothing to
+reverse-engineer — just revisit later to see if the county restarts it.
+
+Parcel-cache footprint (all SC+NC combined) now stands at 26 configured
+counties, up from 19 before this session's mailing-gap work began (5
+earlier today: Horry/Darlington/Lexington/Lancaster/Barnwell; 2 this
+round: Saluda/Calhoun). Full test suite passes (see final commit). York's 119
+TAX_SALE_OVERAGE rows still carry zero owner_mailing.
