@@ -2145,3 +2145,35 @@ SPA payment portal (like Chester/Fairfield's platform, a different vendor)
 public-facing delinquent-list page (if one exists, not yet checked) once
 would likely unlock all paystar.io counties at once, the same "solve once,
 apply to N counties" logic as the Chester/Fairfield finding.
+
+
+## Session progress checkpoint (2026-09-14, this /loop run)
+
+Full board health re-audit, comparing against the SC mailing/phone
+root-cause audit at the top of today's log:
+
+    SC rows:    58,980 -> 62,095  (+3,115)
+    SC mailing:  29.6% -> 37.2%
+    SC phone:     3.2% ->  3.0%  (unchanged, as expected -- phone is a
+                                  name-based NC-voter cross-reference,
+                                  not affected by any mailing/source work)
+    NC:          unchanged (92.6% mailing / 81.9% phone) -- no NC work done
+                 this session, no regression either.
+
+Zero-row SC counties: down from 9 to 8 (Dillon graduated out with 825 real
+rows). Remaining: Aiken, Chester, Dorchester, Edgefield, Fairfield,
+Greenwood, Hampton, Jasper. Richland moved from zero-row to thin (4 rows).
+Thin (<10) SC counties now: Marion (2), Berkeley (2), Florence (7),
+Richland (4).
+
+New sources built and shipped this session: York overage claims (119),
+Greenville delinquent tax (2,287, SC's largest county), Richland FLC (3),
+Dillon delinquent tax (825, full proprietary-binary-format reverse
+engineering). Parcel caches added for mailing recovery: Horry, Darlington,
+Lexington, Lancaster, Barnwell (5 counties, 0% -> 35-72% mailing each).
+Real bugs fixed: SCDOT-blindness + Charleston/Beaufort waterfall in
+enrichment_owner_mailing.py, cross-source tax_owed visibility in
+enrichment_tax_owed.py (recovered 1,448+ rows board-wide beyond the sources
+that prompted the fix). Every write verified live, every write checked
+against the York TAX_SALE_OVERAGE wrong-person guard, which has held
+through every single board write since it was built.
