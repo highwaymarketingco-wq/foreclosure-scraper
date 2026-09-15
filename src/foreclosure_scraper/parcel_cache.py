@@ -268,6 +268,29 @@ PARCEL_LAYERS: dict[str, dict] = {
                 "owner_mailing": ["OWNER_ADDR", "OWNER_CITY", "OWNER_STAT", "OWNER_ZIP"],
                 "acreage": "ACRES", "sale_price": "SALE_PRICE"},
     },
+    # Found 2026-09-14, same audit: Barnwell (886 board rows, 0% mailing).
+    # Found by guessing an AGOL account-name pattern ("barnwellcountysc")
+    # after generic keyword search returned nothing -- worth trying this
+    # pattern class (<county>countysc, <county>gis, gis<county>, etc.) before
+    # concluding a county has no independent layer. Very rich CAMA export
+    # (110 fields: mailing, situs, sqft, beds/baths, year built,
+    # owner-occupied flag, sale history). TaxPIN matches board parcel_id for
+    # UN-suffixed parcels; board parcel_ids with a trailing ".NN" sub-parcel
+    # suffix (about 2 of 5 sampled) have no exact match on this layer at
+    # all -- it only carries the PARENT parcel. Left as a straight miss
+    # rather than falling back to the parent's data, which could be a
+    # different owner for a split sub-parcel.
+    "Barnwell": {
+        "state": "SC",
+        "url": "https://services8.arcgis.com/qqnlHdXochyJPfSY/arcgis/rest/services/ParcelData_ExportFeatures/FeatureServer/2/query",
+        "id_fields": ["TaxPIN", "Map_Number"],
+        "map": {"owner": ["Name", "Name_2"],
+                "address": ["Street_Number_E911", "Street_Name_E911"],
+                "owner_mailing": ["Address_1", "Address_2"],
+                "market_value": "Tot_Assesd_Value", "tax_value": "Tot_Assesd_Value",
+                "acreage": "Tot_Number_Acres", "living_sqft": "SqFt_Total",
+                "land_use": "PT163_Class"},
+    },
     "Laurens": {  # TMS (dash format); layer has situs but no value field
         "url": "https://laurenscountygis.org/arcgis/rest/services/Pebble/TaxParcel/MapServer/5/query",
         "id_fields": ["TMS"],

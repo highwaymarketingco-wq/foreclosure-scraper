@@ -1948,20 +1948,22 @@ county total: 584 -> 2,871 rows. Row count math checked at every step.
   newspaper-outlet config; would need identifying which specific paper
   serves Jasper and adding it there, not a new standalone scraper.
 
-**Also found while re-checking Fairfield's existing (0-row) scraper**: same
-site-restructure pattern as York/Chester — its `/departments/treasurer` page
-no longer has the delinquent-tax table this scraper was built against, but
-links out to `fairfieldsctax.com/#/`, an AngularJS/ui-bootstrap SPA on the
-SAME vendor platform as Chester's `chestercountysctax.com/#/` (confirmed:
-identical hash-routing, identical CSS bundle shape). This is useful: solving
-ONE of these two SPAs' backend API (same DEW-registry-style "find the
-in-page fetch() the search form fires" investigation) very likely unlocks
-BOTH Chester and Fairfield, and possibly other counties on the same
-platform. Attempted network-request capture on Fairfield without first
-interacting with a search form — nothing useful surfaced (the real API call
-only fires after a user query, which needs actual form automation, not just
-a page load). Genuinely deferred, not abandoned; worth the dedicated time
-next since it's a two-for-one (or more).
+**RESOLVED (reclassified) 2026-09-14: Chester + Fairfield's shared tax SPA
+is CapSolver-gated, not a reverse-engineering problem.** Drove Chester's
+`chestercountysctax.com` into its actual search page (`/taxes.html#/`) with
+a real browser and captured live network requests: the page loads Google
+reCAPTCHA v2 (`size=invisible`, explicit render) immediately, before any
+search form is usable — hosted on a CloudFront-fronted, Azure-App-Insights-
+instrumented SaaS product (likely serving other SC counties too, not just
+these two). This is the SAME class of wall as Cherokee/Union qPublic and the
+SC probate AWS-WAF block: solvable with the already-authorized CapSolver
+integration once `CAPSOLVER_API_KEY` is staged (still unset as of this
+check), NOT a bespoke API-reverse-engineering task like DEW was (DEW had no
+CAPTCHA on its search paths at all). Fairfield's identical hash-routing +
+CSS bundle shape strongly suggests the same platform and the same gate,
+though not independently confirmed live this pass. Filed alongside the other
+two CapSolver-blocked walls so all three get attempted in one pass whenever
+the key lands.
 
 **Greenwood** checked too: real domain is `greenwoodcounty-sc.gov` (the
 `.gov` bare domain meta-refreshes there). Its tax-collector and treasurer
@@ -1977,3 +1979,38 @@ needs one real reverse-engineering pass), Kershaw (only a bare geometry
 GIS layer, county site unreachable), Williamsburg (own GIS host but a
 different proprietary "TGIS" engine), and Greenwood (no source found) all
 remain open.
+
+## Per-county SC mailing cache build-out — iteration 3 (2026-09-14)
+
+**Barnwell (886 rows) — done, verified, live.** Found via an AGOL
+account-name GUESS (`barnwellcountysc`) after generic keyword search
+returned nothing — worth trying the `<county>countysc` pattern class before
+concluding a county has no independent layer (this is the second time it's
+worked, after Lexington/Lancaster's "own account, different search angle"
+pattern). Very rich CAMA export (110 fields — mailing, situs, sqft,
+beds/baths, year built, owner-occupied flag). One real limitation found and
+respected rather than worked around: board parcel_ids with a trailing
+".NN" sub-parcel suffix (about 2 of 5 sampled) have no match at all on this
+layer (it only tracks the PARENT parcel) — left as a miss rather than
+falling back to parent data, which could be a different owner for a split
+sub-parcel. Verified: **mailing 0.0% -> 58.4%** (517/886). York's 119
+TAX_SALE_OVERAGE rows still untouched.
+
+**Tried the same account-name-guessing approach for Abbeville, Bamberg,
+Saluda, McCormick, Lee, Calhoun, Marlboro, Allendale — no parcel layer
+found for any of them.** All eight turned up only a "KIP `<County>` County,
+SC" Web Map from a recurring `evoss_BRPF` account (a boundary/demographic
+map product by its naming and type, not a parcel-data Feature Service —
+didn't chase further) plus assorted irrelevant noise (Florida statewide
+parcels, other states' Lee/Calhoun counties). These eight are genuinely
+the hardest remaining counties for the mailing gap; no lead found today.
+
+**Chester + Fairfield's shared tax SPA — reclassified, not solved.**
+Actually drove the search page with a real browser this time (previous
+passes only loaded the landing page): `chestercountysctax.com/taxes.html#/`
+loads an invisible Google reCAPTCHA v2 the instant the search page opens,
+before any form is usable. This is the SAME wall class as Cherokee/Union
+qPublic and the SC probate AWS-WAF block — solvable via the already-
+authorized CapSolver integration once `CAPSOLVER_API_KEY` is staged (still
+unset), not a bespoke reverse-engineering task like DEW was. All three
+CapSolver-gated walls should be attempted together whenever the key lands.
