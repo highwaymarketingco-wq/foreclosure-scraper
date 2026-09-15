@@ -645,7 +645,7 @@ RAW_KEEP = {
     "epa_frs": "*", "estate_sales": "*", "fairfield_delinquent_tax": "*",
     "first_citizens_reo": "*", "florence_delinquent_tax": "*", "gaston_gis": "*",
     "gaston_surplus": "*", "gaston_tax_foreclosures": "*", "georgetown_civicengage": "*",
-    "greenwood_delinquent_tax": "*", "gsa": "*", "haywood_tax_foreclosures": "*",
+    "greenwood_delinquent_tax": "*", "gsa": "*", "gsa_surplus": "*", "haywood_tax_foreclosures": "*",
     "helene": "*", "henderson_tax": "*", "hendersonville_delinquent_tax": "*",
     "hendersonville_lightning": "*", "hibid": "*", "homeharvest": "*",
     "horry_flc": "*", "hubzu": "*", "ingle_firm": "*",
