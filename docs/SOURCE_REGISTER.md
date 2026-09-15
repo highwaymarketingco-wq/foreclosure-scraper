@@ -1,12 +1,12 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 00:55 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-15 01:43 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
-- Scrapers in the registry: **224**
-- Producing rows on the board: **94**
+- Scrapers in the registry: **225**
+- Producing rows on the board: **95**
 - Registered but contributing ZERO rows: **130**
 - Confirmed real and not yet built: **9**
-- Board read: `docs/listings.json.gz` (130,800 rows)
+- Board read: `docs/listings.json.gz` (131,625 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
 
@@ -33,6 +33,7 @@ Live row counts are what the source actually contributed to the board read above
 | `counties_sc.charleston_delinquent_tax` | 1,125 | Charleston SC (1125) | `https://charlestoncounty.gov/departments/delinquent-tax/`<br>`https://www.charlestoncounty.gov/departments/delinquent-tax/files/RP-Tax-Sale-Listing.pdf`<br>`https://www.charlestoncounty.gov/departments/delinquent-tax/files/MH-Tax-Sale-Listing.pdf` |
 | `counties_sc.spartanburg_condemned` | 1,071 | Spartanburg SC (1071) | `https://maps.spartanburgcounty.org/server/rest/services/` |
 | `counties_nc.buncombe_delinquent_tax` | 938 | Buncombe NC (938) | `https://media.buncombenc.gov/common/tax/buncombe-county-tax-department-advertisement-of-tax-liens.pdf`<br>`https://media.buncombenc.gov/common/tax/` |
+| `counties_sc.dillon_delinquent_tax` | 825 | Dillon SC (825) | `https://www.dilloncountysc.org/departments/treasurer.php`<br>`https://www.dilloncountysc.org/` |
 | `counties_nc.nc_heir_estate_parcels` | 682 | Rutherford NC (123), Polk NC (87), Laurens SC (76) | _(no literal URL in module)_ |
 | `public_notices.nc_notices_counties` | 678 | Buncombe NC (205), Rutherford NC (78), Brunswick NC (66) | `https://www.ncnotices.com/Search.aspx`<br>`https://www.ncnotices.com/Details.aspx?ID={` |
 | `national.courtlistener_bankruptcy` | 644 | Anderson SC (105), Buncombe NC (85), Henderson NC (70) | `https://www.courtlistener.com/sign-up/`<br>`https://www.courtlistener.com/profile/api/`<br>`https://www.courtlistener.com/api/rest/v4`<br>_+1 more_ |

@@ -2048,6 +2048,79 @@ Forfeited-Land, and Master-in-Equity-Foreclosure pages. Checked all three:
   -up: find the vector-layer refresh endpoint (likely another `.php` file
   under `apps/api/`) and query it with a bounding box covering the whole
   county instead of trying to reproduce map-tile panning.
+  **UPDATE 2026-09-14, later same session**: dug further and this is harder
+  than first assessed. The "WMS" reference in the JS is for OTHER base
+  layers, not the parcel data; the actual parcel mechanism is TileStache
+  UTFGrid tiles (`tilestache/rcgeo-parcels-utfgrid/{z}/{x}/{y}.json` — a
+  z/x/y-tiled format, not a single bulk endpoint), and it isn't even clear
+  from the config alone whether "delinquent" is a filtered subset of this
+  same parcels layer or a separate highlighted overlay not yet found. A
+  quick feasibility probe (computed tile x/y for downtown Columbia,
+  standard slippy-map math) got 404 on every subdomain/zoom tried — either
+  the tile scheme uses a non-standard convention (TileStache/TMS y-flip is
+  common) or these tiles simply aren't cached at low zoom. Correcting the
+  earlier "more tractable than Williamsburg" framing: this is realistically
+  the SAME effort class as Williamsburg/Chester's problems (a genuine
+  protocol investigation, likely requiring driving the real map in a
+  browser and reading the actual tile requests it fires rather than
+  guessing tile math), not a quick win. Deferred with the others.
 
 Verified live: Richland 1 -> 4 board rows. Committing next; the FLC scraper
 plus tests are ready, board write pending final full-suite pass.
+
+## Dillon County SC — found the real delinquent list, format not yet safely decoded (2026-09-14)
+
+Found it: Dillon's treasurer page (rendered with a real browser this time —
+the earlier attempt's `get_text` pass missed it) has a "Delinquent Tax Sale
+List" link buried in body prose, pointing to `Documents/Departments/
+Treasurer/PAPER.XLS`.
+
+**This is NOT a real .xls** (confirmed: fails the OLE2/BIFF8 magic-byte
+check the existing `_vendor/xls` reader — the same one `hud_reac_
+inspection.py`/`horry_flc.py` use — requires). It's some OTHER proprietary
+tagged-binary export, mislabeled with an `.xls` extension by whatever
+legacy county software produced it. Byte-level investigation got real,
+promising distance:
+
+- The 16 column headers ARE embedded as plain length-prefixed ASCII
+  strings, in order: Item Number, Owner Name, Owner Name 2, District, Map
+  Number, Description, Acres, Buildings, Lots, New Owner Name, New Owner
+  Name 2, Real/MH (R,M), Notice 01 Number, Comment, Notice 02 Number,
+  Total Tax Due.
+- Real data rows ARE extractable the same way and are exactly the right
+  shape: confirmed real owner names ("ABDULLAH BARBARA"), real Dillon TMS
+  parcel numbers ("104-16-12-018"), real street-ish descriptions ("117
+  LEGARE ST"), and dollar amounts ("1,157.80") sitting right there as
+  plain text.
+- Each string is preceded by an 11-byte metadata block that clearly
+  encodes SOMETHING like a row/column position (header blocks decode
+  cleanly as `04 00 <field-width> 00 00 00 <col-index, 4B LE> 00`, with
+  col-index counting 1..16 in perfect header order) — but the metadata
+  shape for DATA rows looks different enough (row+col packed into 2-byte
+  fields instead of the header's 4-byte col-index, by a first read) that a
+  quick attempt to reuse the same decode logic produced an inconsistent
+  column assignment for the second data value onward.
+
+**RESOLVED, same session, later pass.** Went back and decoded the exact
+11-byte metadata precisely by diffing every token's gap across the whole
+file rather than just two data points: `04 00 <u16 len+8, redundant> <u16
+row_index, 1-based> <u16 col_index, 0-based> 27 00 00`, and — the key fix —
+the gap PRECEDES the token it describes (not follows it, which is what the
+earlier two-sample read got backwards). Verified against all 987 real rows:
+only 2 of ~15,800 field-tokens hit a boundary-detection edge case (self-
+resynchronizing, at most one field lost on one row, never a wrong-row
+attribution). Built `counties_sc.dillon_delinquent_tax` on this, with a
+test suite that verifies the core correctness property directly (a row
+missing "Owner Name 2" must not smear later fields into the wrong column).
+A real, satisfying case with the fully-decoded data: parcel
+`050-15-00-029` has 8 distinct delinquent records under one Map Number — a
+mobile-home park where the LAND (owner CAMPBELL MICHAEL L) and 7 SEPARATE
+mobile homes on it (6 owned by FAULK CARL H JR, 1 by a different owner) are
+each taxed and delinquent independently. The board's existing poisoned-key
+/ house-number-guard dedupe protections (built earlier this session)
+correctly kept all 8 as distinct rows rather than collapsing them.
+
+Verified live: Dillon 0 -> 825 board rows (987 scraped, 162 genuinely
+duplicate parcels within the source's own list correctly merged by
+dedupe()), 100% carry a normalized `tax_owed` balance, York's 119
+TAX_SALE_OVERAGE rows still untouched.

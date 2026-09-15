@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-15T00:55:23.521503Z",
-  "total": 130800,
+  "run_time": "2026-09-15T01:43:17.976539Z",
+  "total": 131625,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -101,7 +101,7 @@
   },
   "by_state": {
     "NC": 69530,
-    "SC": 61270
+    "SC": 62095
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 41266,
@@ -123,6 +123,7 @@
     "counties_sc.spartanburg_condemned": 1071,
     "counties_generic.arcgis_distress.new_hanover_demolition_permits": 1003,
     "counties_nc.buncombe_delinquent_tax": 938,
+    "counties_sc.dillon_delinquent_tax": 825,
     "courtlistener.recap": 737,
     "counties_nc.nc_heir_estate_parcels": 682,
     "public_notices.nc_notices_counties": 678,
@@ -455,20 +456,20 @@
     "newspapers.carolina_coast"
   ],
   "notes": "",
-  "detail_count": 130800,
-  "detail_digest": "853b36da0c2b311f",
+  "detail_count": 131625,
+  "detail_digest": "aeca0f9932cae4af",
   "board": {
     "schema": "slim-v1",
-    "count": 130800,
+    "count": 131625,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
-      "count": 131,
-      "records": 130800
+      "count": 132,
+      "records": 131625
     }
   },
-  "health_carried_from": "2026-09-15T00:10:53.736930Z",
+  "health_carried_from": "2026-09-15T01:41:55.366531Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",

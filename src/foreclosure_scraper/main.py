@@ -436,6 +436,10 @@ DATELESS_OK_SOURCES = {
     # over-the-counter inventory, same reasoning as every other FLC/
     # delinquent-tax source in this list.
     "counties_sc.richland_flc",
+    # Dillon's delinquent-tax export carries no per-parcel date either --
+    # a standing "who currently owes" list, same reasoning as every other
+    # SC county delinquent-tax source in this list.
+    "counties_sc.dillon_delinquent_tax",
     # Same cookie-cutter scraper as Fairfield above, same dateless Listing(): the
     # Saluda advertisement carries owner/TMS/description but no per-parcel date,
     # so without this entry every row it harvests in Nov-Dec is deleted silently.

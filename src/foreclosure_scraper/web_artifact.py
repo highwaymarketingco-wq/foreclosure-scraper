@@ -680,6 +680,7 @@ RAW_KEEP = {
     "tax_sale_overage": "*",
     "greenville_delinquent_tax": "*",
     "richland_flc": "*",
+    "dillon_delinquent_tax": "*",
 
 }
 
