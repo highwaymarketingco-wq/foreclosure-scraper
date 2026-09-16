@@ -74,7 +74,9 @@ def _load_dnc() -> set[str] | None:
 
 def _get_phones(li: Listing) -> list[str]:
     """Extract all phone numbers from a listing (voter_phone + skip_trace + free_phones + sc_voter_xref)."""
-    raw = li.raw if isinstance(li.raw, dict) else {}
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    raw = li.raw
     phones: list[str] = []
     # voter_phone enricher: raw['owner_phone']['phone']
     op = raw.get("owner_phone")
@@ -116,7 +118,9 @@ def enrich_dnc_scrub(listings) -> dict:
     stats = {"total_listings": len(listings), "listings_with_phone": 0, "scrubbed": 0, "registered": 0, "clear": 0, "unverified": 0}
 
     for li in listings:
-        raw = li.raw if isinstance(li.raw, dict) else {}
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        raw = li.raw
         if not raw:
             continue
         phones = _get_phones(li)

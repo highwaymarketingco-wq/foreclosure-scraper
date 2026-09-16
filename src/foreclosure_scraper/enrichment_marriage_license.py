@@ -173,7 +173,9 @@ def enrich_marriage_licenses(listings: List[Listing]) -> dict:
         follow_redirects=True,
     ) as client:
         for li in listings:
-            raw = li.raw if isinstance(li.raw, dict) else {}
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            raw = li.raw
             if not raw:
                 continue
 

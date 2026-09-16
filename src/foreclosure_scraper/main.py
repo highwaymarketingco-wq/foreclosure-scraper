@@ -1703,7 +1703,9 @@ async def run() -> int:
     # them (New Hanover/Brunswick are in SCOPE_DENY but their oceanfront rows are
     # the whole point of the coastal track).
     def _resolve_pending(li: Listing) -> bool:
-        raw = li.raw if isinstance(li.raw, dict) else {}
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        raw = li.raw
         pend_of = raw.pop("oceanfront_pending", None)
         pend_dt = raw.pop("downtown_charleston_pending", None)
         if not (pend_of or pend_dt):

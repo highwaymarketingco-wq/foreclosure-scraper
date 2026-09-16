@@ -364,7 +364,9 @@ def _payoff(li: Listing, arv: float) -> tuple[Optional[float], str, str]:
     TILA/RESPA. `enrich_equity` therefore stamps `payoff_is_estimate` and an
     `amortization` detail block so nothing downstream can mistake it for one.
     """
-    raw = li.raw if isinstance(li.raw, dict) else {}
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    raw = li.raw
     # 1) recorded Deed of Trust -> amortized ESTIMATED current balance
     amt, dt = _recorded_dt(raw)
     if amt and dt:

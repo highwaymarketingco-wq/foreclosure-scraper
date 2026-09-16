@@ -237,7 +237,9 @@ def _safe_int(v) -> int | None:
 
 def _match_listing_to_fmr(li: Listing) -> dict | None:
     """Match a listing to FMR data by county or metro area."""
-    raw = li.raw if isinstance(li.raw, dict) else {}
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    raw = li.raw
 
     # Try county FIPS match first (most precise)
     state = li.state or raw.get("state", "")
@@ -334,7 +336,9 @@ async def enrich_hud_fmr(listings: Sequence[Listing]) -> dict:
 
     for li in listings:
         stats["total"] += 1
-        raw = li.raw if isinstance(li.raw, dict) else {}
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        raw = li.raw
 
         # Skip if already has rent estimate
         if raw.get("hud_fmr") or raw.get("census_rent"):

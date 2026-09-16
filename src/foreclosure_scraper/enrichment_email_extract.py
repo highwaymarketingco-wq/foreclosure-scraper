@@ -195,7 +195,9 @@ def enrich_extract_emails(listings: Sequence[Listing], fetch_pages: bool = False
     }
     
     for li in listings:
-        raw = li.raw if isinstance(li.raw, dict) else {}
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        raw = li.raw
         stats["listings_scanned"] += 1
         
         # Check if already enriched (idempotent)

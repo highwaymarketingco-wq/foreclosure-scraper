@@ -169,7 +169,21 @@ def enrich_surface_contacts(listings: Sequence[Listing]) -> dict:
     
     for li in listings:
         stats["total"] += 1
-        raw = li.raw if isinstance(li.raw, dict) else {}
+        if not isinstance(li.raw, dict):
+            # Found 2026-09-16: `raw = li.raw if isinstance(li.raw, dict) else {}`
+            # built a fresh dict but never assigned it back to li.raw -- every
+            # mutation below (raw["owner_phone"] = ..., raw["owner_email"] = ...)
+            # landed on an orphaned local dict that vanished at the end of this
+            # loop iteration. Live-reproduced running the first-ever board-wide
+            # call: stats correctly counted emails_found=119248 across
+            # new_email_listings=47790, but the board gained exactly 18 new
+            # owner_email entries -- effectively the entire result was computed
+            # and then silently discarded for every row whose raw wasn't
+            # already a dict. Matches the defensive `if not isinstance(li.raw,
+            # dict): li.raw = {}` pattern already used everywhere else in this
+            # codebase that mutates raw.
+            li.raw = {}
+        raw = li.raw
         
         # Surface phones
         existing_phone = (raw.get("owner_phone") or {}).get("phone")
