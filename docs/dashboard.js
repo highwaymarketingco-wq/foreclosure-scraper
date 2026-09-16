@@ -3104,6 +3104,9 @@ const _EV_COVERED = new Set([
   "owner_mismatch","sc_tax_delinquent","liens","sold_confirmed","fema_repetitive_loss",
   "vision","comps","cama","rent_comps","foreclosure_sold_comps","images","outreach","crm",
   "property_category","child_support",
+  // Added 2026-09-16: both now have dedicated rendering in the Deeds, Liens
+  // & Life Events panel (see renderDetail()) instead of the generic dump.
+  "deed_chain","doc_ocr",
 ]);
 // Plumbing, not insight — safe to hide.
 const _EV_NOISE = new Set([
@@ -5038,6 +5041,40 @@ function renderDetail(l, detailState) {
 
   // Deeds, Liens & Life Events (relationship deed / CAMA / liens / permits / …)
   let _deeds = [];
+  // Title/deed chain — built by enrichment_deed_chain.py, was never rendered
+  // anywhere (neither a dedicated section nor in _EV_COVERED, so it only
+  // ever showed as an unstyled generic block in "Everything We Found").
+  // Found 2026-09-16 auditing every enricher this session touched against
+  // the dashboard: this one carries structured prior-owner/prior-sale/
+  // chain-break data that belongs in exactly this panel, not buried.
+  const _dc = (l.raw && l.raw.deed_chain && l.raw.deed_chain.summary) || null;
+  if (_dc) {
+    if (_dc.chain_length) _deeds.push(["Deed chain length", _dc.chain_length]);
+    if (_dc.prior_owner) _deeds.push(["Prior owner", _dc.prior_owner]);
+    if (_dc.prior_sale_date || _dc.prior_sale_price) {
+      _deeds.push(["Prior sale", [fmtDate(_dc.prior_sale_date), fmtMoney(_dc.prior_sale_price)].filter(Boolean).join(" · ")]);
+    }
+    if (_dc.first_recorded_year) _deeds.push(["First recorded deed", _dc.first_recorded_year]);
+    if (Array.isArray(_dc.distress_transfers) && _dc.distress_transfers.length) {
+      _deeds.push(["Distress transfers in chain", _dc.distress_transfers.map((t) =>
+        [fmtDate(t.date), t.doc_type].filter(Boolean).join(" ")).join(" · ")]);
+    }
+    if (Array.isArray(_dc.chain_breaks) && _dc.chain_breaks.length) {
+      _deeds.push(["Chain breaks", _dc.chain_breaks.length]);
+    }
+  }
+  // Document OCR extraction (scanned notice/deed text) — same gap as
+  // deed_chain above: built, populated, never surfaced in a dedicated spot.
+  const _ocr = (l.raw && l.raw.doc_ocr) || null;
+  if (_ocr) {
+    const ocrBits = [];
+    if (_ocr.owner_name) ocrBits.push(_ocr.owner_name);
+    if (_ocr.co_owner_name) ocrBits.push(_ocr.co_owner_name);
+    if (ocrBits.length) _deeds.push(["OCR'd owner (from document)", ocrBits.join(" & ")]);
+    if (_ocr.amount) _deeds.push(["OCR'd amount (from document)", fmtMoney(_ocr.amount)]);
+    if (_ocr.case_number) _deeds.push(["OCR'd case number", _ocr.case_number]);
+    if (_ocr.property_address) _deeds.push(["OCR'd property address", _ocr.property_address]);
+  }
   const _rs = (l.raw && l.raw.relationship_signal) || null;
   if (_rs) _deeds.push([(_rs.kind || "life event") + " signal", _rs.keyword || "Yes"]);
   if (l.raw && l.raw.cama) _deeds = _deeds.concat(flat(l.raw.cama));
