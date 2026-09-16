@@ -40,6 +40,13 @@ dependencies = [
     # avoiding the image-grid escalation we hit with Scrapling stealth.
     "pyscrypt>=1.6.2",
     "cryptography>=42",
+    # Undetected-Chrome driver — the ONLY method that passes SC Public
+    # Index's F5 BIG-IP JS challenge (enrichment_case_detail.py,
+    # scrapers/national/sc_public_index.py). Was installed into the venv
+    # by hand at some point without ever being added here, so a plain
+    # `uv sync` silently uninstalled it as an "extra" package and quietly
+    # disabled the SC Public Index bypass. Keep this declared.
+    "nodriver>=0.50.3",
 ]
 
 [project.scripts]
