@@ -356,6 +356,15 @@ RAW_KEEP = {
     # Name->parcel resolution provenance (matched owner, parcel, method). THIRD time
     # today a new enricher's key was dropped here before anyone noticed.
     "name_resolution": "*",
+    # Point-in-polygon parcel-resolution provenance (source: nc_onemap_point/
+    # scdot_point, lat/lng at resolution time). Found 2026-09-16: this key has
+    # been written by enrichment_parcel_from_geo.py since it was built, but was
+    # never registered here — every write silently dropped it, even though
+    # li.parcel_id itself (a top-level field) always survived fine. Caught only
+    # after actually running the enricher board-wide for the first time via a
+    # standalone backfill; the audit trail for those resolutions is unrecoverable,
+    # but future runs now round-trip it.
+    "parcel_from_geo": "*",
     # Horry Forfeited Land Commission — county-held inventory with a standing bid.
     # Registered BEFORE the first ingest this time; three enrichers were silently
     # dropped here today by adding the key afterwards.

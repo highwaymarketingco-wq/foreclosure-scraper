@@ -38,8 +38,6 @@ INTENTIONALLY_INTERNAL = {
     "living_sqft_estimated",
     # `gis_attrs` is a summary of `gis_attrs_full`, which IS in RAW_KEEP.
     "gis_attrs",
-    # `parcel_from_geo` is provenance for the resolve; `parcel_resolution` IS published.
-    "parcel_from_geo",
     # `property_kind_reclassified` is provenance; `property_kind` is a published field.
     "property_kind_reclassified",
     # `vision_unscored` is DELIBERATELY unpublished, and this one bit me: I added it
