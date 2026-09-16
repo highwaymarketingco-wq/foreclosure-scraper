@@ -3003,6 +3003,16 @@ async def run() -> int:
     except Exception:
         log.error("owner_name_signal.failed", traceback=traceback.format_exc())
 
+    # Same-owner parcel clustering (Dirty Deeds Tier A #2) — one death/owner
+    # touching many parcels is worth more than the same parcels scored alone.
+    # No network; reads owner_name + county/state + parcel_id already on the lead.
+    try:
+        from .enrichment_owner_cluster import enrich_owner_cluster
+        s = enrich_owner_cluster(enriched)
+        if s: enrichment_stats["owner_cluster"] = s
+    except Exception:
+        log.error("owner_cluster.failed", traceback=traceback.format_exc())
+
     # Fullmer deal-economics rank — the buy box from Distressed Property Secrets and
     # the Dirty Deeds interviews, expressed as POINTS. Runs after derived_signals
     # because it reads calc.est_gross_margin, distress_stack.absentee, deed_chain and

@@ -356,6 +356,12 @@ RAW_KEEP = {
     # Name->parcel resolution provenance (matched owner, parcel, method). THIRD time
     # today a new enricher's key was dropped here before anyone noticed.
     "name_resolution": "*",
+    # Same-owner parcel clustering (Dirty Deeds Tier A #2): cluster_id, size,
+    # confidence, total_value, parcel_ids, member_sources. Registered BEFORE
+    # the enricher's first run this time, learning from parcel_from_geo/
+    # owner_cluster's own siblings landing here late three separate times
+    # already today.
+    "owner_cluster": "*",
     # Point-in-polygon parcel-resolution provenance (source: nc_onemap_point/
     # scdot_point, lat/lng at resolution time). Found 2026-09-16: this key has
     # been written by enrichment_parcel_from_geo.py since it was built, but was
