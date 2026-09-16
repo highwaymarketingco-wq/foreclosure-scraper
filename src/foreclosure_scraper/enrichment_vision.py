@@ -711,8 +711,21 @@ GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 # returns a parseable condition JSON with reasoning_effort="none" — hence
 # GROQ_EXTRA_BODY below. Free-tier TPM is 8k and one prompt+photo is ~5.4k, so
 # roughly one call/minute; the delay is paced to match.
-GROQ_MODEL = os.environ.get("GROQ_VISION_MODEL", "qwen/qwen3.6-27b")
-GROQ_EXTRA_BODY = {"reasoning_effort": "none"}
+#
+# Re-verified live 2026-09-16: qwen3.6-27b is ALSO gone (404) -- Groq renamed
+# it to qwen/qwen3.8-27b (confirmed live against GET /openai/v1/models: it is
+# now the only "image"-capable entry, active=true). Live-tested with a real
+# call. That test also surfaced a second, independent issue: a bare call with
+# no max_tokens defaulted to requesting ~1019 output tokens and got a 429
+# ("output tokens per minute (OTPM): Limit 1000") -- this account's Groq org
+# has a 1000 OTPM cap distinct from the 8k *input* TPM this comment already
+# paces for. The shared MAX_TOKENS=4000 every other backend uses blows through
+# it on every call. max_tokens=900 in GROQ_EXTRA_BODY below overrides it via
+# _OpenAICompatBackend's `body.update(self.extra_body)` (extra_body is merged
+# in AFTER the max_tokens=MAX_TOKENS default, so this only affects Groq) --
+# confirmed live: max_tokens=200 returned 200 OK with valid JSON.
+GROQ_MODEL = os.environ.get("GROQ_VISION_MODEL", "qwen/qwen3.8-27b")
+GROQ_EXTRA_BODY = {"reasoning_effort": "none", "max_tokens": 900}
 # Ollama — local, unlimited, free. qwen2.5vl:3b > moondream and still fits 8GB.
 OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
 OLLAMA_MODEL = os.environ.get("OLLAMA_VISION_MODEL", "qwen2.5vl:3b")

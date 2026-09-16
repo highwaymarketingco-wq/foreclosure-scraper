@@ -239,7 +239,7 @@ def test_all_dead_pool_terminates(pool, monkeypatch):
 
 
 def test_groq_backend_sends_reasoning_effort_none(monkeypatch):
-    """Groq's qwen3.6 vision model only emits JSON with reasoning_effort=none;
+    """Groq's qwen3.8 vision model only emits JSON with reasoning_effort=none;
     without it the pool gets a <think> block and zero parseable results."""
     sent = {}
 
@@ -254,7 +254,30 @@ def test_groq_backend_sends_reasoning_effort_none(monkeypatch):
     li = _mk_listing(0)
     asyncio.run(b.assess(li, [(b"\xff\xd8x", "image/jpeg")], ["u"]))
     assert sent.get("reasoning_effort") == "none"
-    assert sent.get("model") == "qwen/qwen3.6-27b"
+    assert sent.get("model") == "qwen/qwen3.8-27b"
+
+
+def test_groq_backend_caps_max_tokens_under_its_otpm_limit(monkeypatch):
+    """Groq's qwen3.6-27b -> qwen3.8-27b rename (2026-09-16) also surfaced a
+    separate org-level cap: 1000 output-tokens-per-minute (OTPM), distinct
+    from the 8k input-TPM this module already paces for. The shared
+    MAX_TOKENS=4000 every other backend uses would 429 every Groq call;
+    GROQ_EXTRA_BODY's max_tokens=900 must override it via
+    body.update(self.extra_body), which runs AFTER max_tokens=MAX_TOKENS."""
+    sent = {}
+
+    class _FakeHTTP:
+        async def post(self, url, json=None, timeout=None, headers=None):
+            sent.update(json or {})
+            raise RuntimeError("stop-after-capture")
+
+    b = ev._OpenAICompatBackend("groq", ev.GROQ_URL, "k", ev.GROQ_MODEL,
+                                _FakeHTTP(), cap=1, delay=0.0,
+                                extra_body=ev.GROQ_EXTRA_BODY)
+    li = _mk_listing(0)
+    asyncio.run(b.assess(li, [(b"\xff\xd8x", "image/jpeg")], ["u"]))
+    assert sent.get("max_tokens") == 900
+    assert sent["max_tokens"] < 1000
 
 
 def test_extra_body_defaults_to_empty_for_other_providers():
