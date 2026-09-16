@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-09-16T16:00:06.816687Z",
+  "run_time": "2026-09-16T16:12:12.878330Z",
   "total": 175518,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
@@ -526,7 +526,7 @@
       "records": 175518
     }
   },
-  "health_carried_from": "2026-09-16T15:58:53.682686Z",
+  "health_carried_from": "2026-09-16T16:00:06.816687Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
