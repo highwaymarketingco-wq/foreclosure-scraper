@@ -306,19 +306,39 @@ def _select_image_urls(li: Listing) -> list[str]:
 
 
 def _parse_json_response(text: str) -> Optional[dict]:
-    """Anthropic models sometimes wrap JSON in fences. Strip + parse."""
+    """Anthropic models sometimes wrap JSON in fences. Strip + parse.
+
+    Found 2026-09-16: a multi-entry document (e.g. a county's whole monthly
+    tax-sale LIST as one PDF, prompted as if it were "ONE document") can make
+    the model return a JSON ARRAY of entries instead of the single object
+    every caller assumes -- json.loads() happily returns that list despite
+    this function's declared -> Optional[dict], and every caller then crashes
+    with "list indices must be integers or slices, not str" the moment it
+    does parsed["field"] or parsed["_source"] = .... Live-reproduced against
+    two Pickens County SC multi-listing sale-list PDFs. Deliberately return
+    None rather than guess and take parsed[0]: a list response means we don't
+    know which entry belongs to THIS lead, and writing the wrong entry's
+    owner/address/amount onto it is worse than writing nothing -- the same
+    reasoning this codebase applies everywhere else a match could be wrong
+    (the TAX_SALE_OVERAGE guard, the ambiguous-envelope rejection in parcel
+    resolution, etc.). Multi-entry documents already have a purpose-built
+    path (_row_backfill_from_aggregate) that matches per lead by name/address
+    search instead of guessing an index.
+    """
     text = text.strip()
     # Strip markdown fences if present
     text = re.sub(r"^```(?:json)?\s*", "", text)
     text = re.sub(r"\s*```$", "", text)
     try:
-        return json.loads(text)
+        parsed = json.loads(text)
+        return parsed if isinstance(parsed, dict) else None
     except json.JSONDecodeError:
         # Try to find first {...} block
         m = re.search(r"\{.*\}", text, re.S)
         if m:
             try:
-                return json.loads(m.group(0))
+                parsed = json.loads(m.group(0))
+                return parsed if isinstance(parsed, dict) else None
             except json.JSONDecodeError:
                 return None
     return None
