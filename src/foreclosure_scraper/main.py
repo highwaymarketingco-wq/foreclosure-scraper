@@ -3026,6 +3026,19 @@ async def run() -> int:
     except Exception:
         log.error("owner_cluster.failed", traceback=traceback.format_exc())
 
+    # Repeat tax/foreclosure-sale loser (Dirty Deeds Tier A #34) — an owner
+    # who lost a DIFFERENT board parcel to a tax deed/sheriff's deed/trustee's
+    # deed/Master in Equity sale and still holds this one is a proven
+    # non-payer. Runs after deed_chain (reads its distress_transfers) and
+    # after owner_cluster so both cross-parcel joins have the same enriched
+    # `enriched` list to work from. No network.
+    try:
+        from .enrichment_repeat_tax_loss import enrich_repeat_tax_loss
+        s = enrich_repeat_tax_loss(enriched)
+        if s and s.get("tagged_rows"): enrichment_stats["repeat_tax_loss"] = s
+    except Exception:
+        log.error("repeat_tax_loss.failed", traceback=traceback.format_exc())
+
     # Fullmer deal-economics rank — the buy box from Distressed Property Secrets and
     # the Dirty Deeds interviews, expressed as POINTS. Runs after derived_signals
     # because it reads calc.est_gross_margin, distress_stack.absentee, deed_chain and

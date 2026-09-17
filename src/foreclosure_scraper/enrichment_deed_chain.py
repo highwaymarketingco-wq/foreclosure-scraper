@@ -42,6 +42,16 @@ _DISTRESS_TYPES = (
     "SURVIVORSHIP",
     "AFFIDAVIT OF HEIR",
     "WARRANTY DEED TO TRUST",
+    # Tax-sale / foreclosure-sale conveyances -- missing until 2026-09-17.
+    # dirty_deeds_synthesis Tier A #34: a grantor who lost a parcel this way
+    # and still holds OTHER board parcels is a proven non-payer, but that
+    # signal only exists if the loss itself shows up as a distress transfer
+    # first. NC tax sales run through the Clerk of Superior Court/sheriff;
+    # NC power-of-sale foreclosures convey via a substitute trustee; SC's
+    # judicial foreclosure sales run through the county Master in Equity.
+    "TAX DEED", "SHERIFF'S DEED", "SHERIFF DEED",
+    "TRUSTEE'S DEED", "TRUSTEE DEED", "SUBSTITUTE TRUSTEE",
+    "MASTER IN EQUITY", "MASTER'S DEED", "CLERK'S DEED", "CLERK DEED",
 )
 # Pattern for extracting year from date strings
 _YEAR_RE = re.compile(r"(20\d{2}|19\d{2})")

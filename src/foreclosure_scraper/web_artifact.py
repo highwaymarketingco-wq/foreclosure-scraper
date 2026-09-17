@@ -362,6 +362,9 @@ RAW_KEEP = {
     # owner_cluster's own siblings landing here late three separate times
     # already today.
     "owner_cluster": "*",
+    # Repeat tax/foreclosure-sale loser (Dirty Deeds Tier A #34): prior_losses,
+    # most_recent_loss_date/doc_type, county, state. Registered before first run.
+    "repeat_tax_loss": "*",
     # Point-in-polygon parcel-resolution provenance (source: nc_onemap_point/
     # scdot_point, lat/lng at resolution time). Found 2026-09-16: this key has
     # been written by enrichment_parcel_from_geo.py since it was built, but was
