@@ -291,3 +291,7 @@ We already run ~110 county/court/tax/probate/REO scrapers + NC voter-phone + qPu
 
 ### Confirmed walls (don't re-chase)
 MLS expireds (no free feed -- agent/partner only); SC Family Court divorce + Rule 610; SC magistrate evictions (seller-side; retry pending); demolition lists; HECM/reverse; VA-REO (near-dead 2026); federal no-login auction feeds (homesales.gov decommissioned, US Marshals/irsauctions 403, GSA login-gated).
+
+**Re-verified 2026-09-17, both now walled (were listed Tier 1 above -- corrected here):**
+- **MERS ServicerID** (Tier 1 #7) -- landing page at mers-servicerid.org/sis/ shows a reCAPTCHA "I'm not a robot" checkbox before the search/logon form even loads. CAPTCHA-gated at the front door; not automatable under the no-CAPTCHA-bypass line. Operator-optional manual lookup only.
+- **State unclaimed property** (Tier 1 #5) -- both unclaimed.nccash.com/app/claim-search (NC) and southcarolina.findyourunclaimedproperty.com/app/claim-search (SC) run the same white-label claim-search platform (identical `/app/claim-search` path, identical flow). Submitting a name search on either hits a "Please wait while we verify your browser..." spinner that escalates to "Please check the box below to continue" -- a bot-verification challenge, same class as reCAPTCHA. Confirmed live on both states, not a one-off. Operator-optional manual lookup only; do not wire into the auto-engine.
