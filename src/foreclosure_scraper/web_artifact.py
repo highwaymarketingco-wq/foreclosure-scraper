@@ -1788,15 +1788,25 @@ def write_artifact(
             log.info("web_artifact.backup_saved", path=str(_backup_dir / f"listings_{_ts}.json"))
         except Exception:  # noqa: BLE001 - backup failure must not block the write
             log.warning("web_artifact.backup_failed", exc_info=True)
-        # --- prune old backups (keep last 10) ---
+        # --- prune old backups (keep last 10 of each) ---
+        # Bug found 2026-09-17: the sibling-cleanup below rsplit() the main
+        # file's stem on "_" to derive a prefix meant to also catch its
+        # listings_detail_<ts>.json(.gz) pair, but "listings_<ts>".rsplit("_",1)[0]
+        # produces "listings_<date>" -- a prefix that never matches
+        # "listings_detail_..." (detail comes right after "listings_", not
+        # after the date). listings_2*.json (main) pruned fine at 10 files;
+        # listings_detail_2*.json never matched ANY prune glob and grew
+        # unbounded -- 214 files / 24GB found live, which drove the disk to
+        # 0 bytes free mid-backfill (tee errors, real corruption risk on the
+        # next atomic write). Prune both patterns independently by their own
+        # recency now, instead of relying on one glob's leftovers to also
+        # catch the other's files.
         try:
-            _old = sorted(_backup_dir.glob("listings_2*.json"),
-                          key=lambda p: p.stat().st_mtime, reverse=True)[10:]
-            for _f in _old:
-                _f.unlink(missing_ok=True)
-                _stem = _f.stem.rsplit("_", 1)[0]  # listings_20260826_123456
-                for _sib in _backup_dir.glob(f"{_stem}_*.json*"):
-                    _sib.unlink(missing_ok=True)
+            for _pattern in ("listings_2*.json", "listings_detail_2*.json*"):
+                _old = sorted(_backup_dir.glob(_pattern),
+                              key=lambda p: p.stat().st_mtime, reverse=True)[10:]
+                for _f in _old:
+                    _f.unlink(missing_ok=True)
         except Exception:  # noqa: BLE001
             pass
     _atomic_write_bytes(listings_path, listings_bytes)
