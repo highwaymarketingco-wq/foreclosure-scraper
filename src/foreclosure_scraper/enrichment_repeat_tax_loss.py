@@ -30,6 +30,22 @@ reacquired via tax deed by the same person who lost it (a redemption/
 buy-back) must not flag as "repeat loser elsewhere" -- excluded by property
 key, not just row identity.
 
+FIRST LIVE RUN 2026-09-17: losses_indexed=0, tagged_rows=0. Traced across
+all 5 of deed_chain's sources (1,069 distress_transfers total): 812 have no
+doc_type at all (flagged purely by a $0/$1/$10/$100 sale price); the
+doc_type values that DO exist are GIS/CAMA sale-VALIDITY codes ("IMPROVED",
+"VACANT", "0: VALID ARMS-LENGTH", "DEED, QUIT CLAIM") from gis.last_sale/
+assessor_card/county_sales, not real ROD deed-instrument classifications;
+and rod_docs (162 rows, source=*_dot_ocr) only covers Deed-of-Trust/
+Mortgage OCR, never sale-conveyance types. None of the board's current
+sources record a TAX DEED / SHERIFF'S DEED / TRUSTEE'S DEED / MASTER IN
+EQUITY / CLERK'S DEED string anywhere. The code above is correct and
+forward-compatible -- it activates automatically the moment any source
+starts carrying real deed-instrument types -- but it is genuinely dormant
+today, not a bug. Making that data exist would need a true ROD deed-index
+scraper (distinct from the existing Deed-of-Trust OCR lane), which is new
+scraping, not the Tier A post-processing this item was rated as.
+
 100% offline. No network calls; pure re-organization of deed_chain +
 owner_name + county + state + parcel_id/street_address, all already on
 the board.
