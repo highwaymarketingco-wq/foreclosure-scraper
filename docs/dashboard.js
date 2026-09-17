@@ -3113,7 +3113,7 @@ const _EV_NOISE = new Set([
   "is_new","link_check","qa_flags","_resolved_deep_enriched","fallback_links",
   "link_may_be_stale","refresh_misses","last_refresh_seen","carryover","pulled_sale",
 ]);
-const _EV_MONEY = /(amount|owed|value|price|bid|balance|tax|debt|rent|cost|due)/i;
+const _EV_MONEY = /(amount|owed|value|price|bid|balance|tax|debt|rent|cost|due|income)/i;
 
 function _evLabel(k) {
   return k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());

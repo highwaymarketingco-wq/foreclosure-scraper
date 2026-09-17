@@ -581,6 +581,10 @@ RAW_KEEP = {
     "fmr_bedrooms": "*",              # HUD FMR bedroom count matched to listing
     "hud_fmr": "*",                   # HUD FMR enricher output block
     "census_rent": "*",               # rent data (sourced from HUD FMR or Census ACS)
+    # ZCTA-level income/home value/owner-occ%/vacancy%/median year built
+    # (Census ACS, same free key as census_rent). Registered BEFORE the
+    # enricher's first run per this session's discipline.
+    "census_demographics": "*",
     "court_bid": "*",                 # court auction bid/upset/sale status
     "rod_name_index": "*",            # ROD name-based lien index provenance
     "usps_vacancy": "*",              # USPS vacancy scan result

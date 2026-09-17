@@ -2380,6 +2380,19 @@ async def run() -> int:
     except Exception:
         log.error("census_rent.failed", traceback=traceback.format_exc())
 
+    # Census ACS demographics — same free/keyless ZCTA pattern as census_rent
+    # above, one extra request's worth of variables: median household income,
+    # median home value, owner-occupied %, vacancy %, median year built.
+    # docs/rei_operator_playbook.md Tier 1 #2 (buy-box + motivation scoring
+    # layer we didn't have).
+    try:
+        from .enrichment_census_demographics import enrich_census_demographics
+        s = enrich_census_demographics(enriched)
+        if s and s.get("filled"):
+            enrichment_stats["census_demographics"] = s
+    except Exception:
+        log.error("census_demographics.failed", traceback=traceback.format_exc())
+
     # Multifamily classifier — promote mislabeled apartment / multi-unit
     # distressed properties to MULTI_FAMILY using precise party/owner/title +
     # description + structure signals. MUST run BEFORE enrich_property_kind:
