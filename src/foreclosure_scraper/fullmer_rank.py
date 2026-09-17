@@ -63,6 +63,22 @@ CAD_WEAK = 50_000.0
 # "at first you lie to yourself. You say you'll catch up next month."
 DELINQ_RIPE_YEARS = 2
 
+# Dirty Deeds synthesis (docs/dirty_deeds_synthesis_2026-09-10.md), numeric
+# rules section: "Delinquency is not a 2-3 year window. Make it ... a
+# monotonic ramp with no upper bound. Year 1 is worthless, 2 is interested,
+# 3 better, 4 plus penalties is peak." Ep 054's own priced example paid
+# just under $80,000 on 17 years unpaid specifically BECAUSE it was that old
+# -- a 2-year and a 17-year lead are not the same lead. Before this, the code
+# below scored both as one flat 22-point "delinquent_2yr_plus" cliff, the
+# exact binary window the synthesis calls out. Ramp from DELINQ_RIPE_YEARS
+# up through the "peak" range the same way cad_mid already ramps linearly
+# between CAD_WEAK and CAD_STRONG a few lines down, then plateau -- still
+# monotonic (never scores more years lower), but bounded so one extreme
+# outlier can't swamp the rest of an additive point system.
+DELINQ_RIPE_PEAK_YEARS = 15.0  # ep 054's own quoted 10-20yr fractured-heirship band
+DELINQ_RIPE_BASE_PTS = 22      # unchanged from the old flat award, at year 2
+DELINQ_RIPE_PEAK_PTS = 40      # above cad_strong's 25 -- ripeness this old is the sharpest signal
+
 # Fixed per-deal curative spend, LOCAL estimate -- not his Texas number. Kept
 # conservative; the ratio matters more than the absolute.
 CURATIVE_COST_BASE = 8_000.0
@@ -185,6 +201,22 @@ def years_delinquent(li: Listing) -> tuple[Optional[float], bool]:
     return yrs, two_plus
 
 
+def delinq_ripeness_points(yrs: Optional[float]) -> int:
+    """Monotonic ramp from DELINQ_RIPE_BASE_PTS at DELINQ_RIPE_YEARS up to
+    DELINQ_RIPE_PEAK_PTS at DELINQ_RIPE_PEAK_YEARS, then flat. No numeric
+    year count (raw.two_year_delinquent said yes but tax_aging_surfaced
+    didn't carry a measured value) falls back to the base award -- the old
+    behavior for that case, since there's nothing to ramp on.
+    """
+    if yrs is None or yrs < DELINQ_RIPE_YEARS:
+        return DELINQ_RIPE_BASE_PTS
+    if yrs >= DELINQ_RIPE_PEAK_YEARS:
+        return DELINQ_RIPE_PEAK_PTS
+    span = DELINQ_RIPE_PEAK_YEARS - DELINQ_RIPE_YEARS
+    frac = (yrs - DELINQ_RIPE_YEARS) / span
+    return int(round(DELINQ_RIPE_BASE_PTS + frac * (DELINQ_RIPE_PEAK_PTS - DELINQ_RIPE_BASE_PTS)))
+
+
 def _owner_count(li: Listing) -> int:
     """How many people we must get to yes.
 
@@ -245,7 +277,7 @@ def score(li: Listing, msa_tier: dict | None = None) -> dict:
     # --- ripeness ---------------------------------------------------------
     yrs, two_plus = years_delinquent(li)
     if two_plus:
-        add("delinq_ripe", 22, "delinquent_2yr_plus")
+        add("delinq_ripe", delinq_ripeness_points(yrs), "delinquent_2yr_plus")
     elif yrs is not None and yrs >= 1:
         add("delinq_early", 6, "delinquent_1yr_early")
 
