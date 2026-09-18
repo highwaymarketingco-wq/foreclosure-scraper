@@ -132,16 +132,38 @@ _CONCURRENCY = int(os.environ.get("FORECLOSURE_SC_DIVORCE_CONCURRENCY", "4"))
 
 # ---------- Owner-name handling (mirrors the ROD + nc_divorce enrichers) ------------
 
+_SUFFIX_TOKENS = {"JR", "SR", "II", "III", "IV", "V"}
+_COUPLE_SPLIT = re.compile(r"\s(?:&|and|\+)\s", re.I)
+
+
 def _name_parts(owner: str) -> tuple[str, str]:
     """('SMITH, JOHN') -> ('SMITH','JOHN'); board 'LAST FIRST &' / 'A;B' fall back.
 
-    The board stores owners as 'LAST FIRST MIDDLE &' (no comma), sometimes with
-    '&', '<br>' or ';' joining couples — we use the FIRST owner for the party
-    query. Strips everything but letters/comma/space, so '&', '<br>' and digits
-    drop out cleanly.
+    Two name conventions live on this board, and reading one as the other
+    searches a person who does not exist:
+      * county-GIS / tax-roll owners are ALL-CAPS SURNAME-FIRST with no comma
+        ('BYRD SANDRA D', 'SMITH JOHN C & MELINDA P') -- the board default;
+      * court-party and probate-notice sources (sc_public_index,
+        sc_probate_notices.*) are Title Case FIRST [MIDDLE] LAST
+        ('Krystal  Henderson', 'Joshua D Smith', 'Susan Lee Meaders').
+    Found 2026-09-18: ~5,000 of those leads were searched as last=KRYSTAL,
+    first=HENDERSON, so their "no divorce" stamps were false negatives (0.3%
+    hit rate vs 20-32% for tax rolls). Mixed case (any lowercase letter) is
+    the reliable tell for the second convention; a comma always wins and
+    means LAST, FIRST.
     """
-    o = re.split(r"[;]|<br\s*/?>", owner or "", maxsplit=1)[0]
-    o = re.sub(r"[^A-Za-z, ]", " ", o).upper()
+    raw = re.split(r"[;]|<br\s*/?>", owner or "", maxsplit=1)[0]
+    if "," not in raw and re.search(r"[a-z]", raw):
+        raw = _COUPLE_SPLIT.split(raw, maxsplit=1)[0]     # first person only
+        toks = [t for t in re.sub(r"[^A-Za-z ]", " ", raw).upper().split()]
+        while len(toks) > 1 and toks[-1] in _SUFFIX_TOKENS:
+            toks.pop()
+        if not toks:
+            return "", ""
+        if len(toks) == 1:
+            return toks[0], ""
+        return toks[-1], toks[0]                          # FIRST ... LAST
+    o = re.sub(r"[^A-Za-z, ]", " ", raw).upper()
     o = re.sub(r"\s+", " ", o).strip()
     if not o:
         return "", ""

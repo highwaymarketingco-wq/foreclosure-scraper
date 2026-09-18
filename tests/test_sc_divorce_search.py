@@ -185,3 +185,56 @@ def test_pending_leads_order_by_source_yield_and_entities_sink(monkeypatch):
     # 0%-yield source's person last of all (below even the entity-discounted
     # unseen prior: 0.10 * 0.2 = 0.02 > 0.0).
     assert order == ["RICHARDSON", "UNSEENSON", "ACME", "POORMAN"], order
+
+
+# ---- name order: GIS SURNAME-FIRST vs court/probate FIRST-LAST ----------------
+
+import pytest as _pytest
+
+
+@_pytest.mark.parametrize("owner,expected", [
+    # county-GIS / tax roll: ALL-CAPS surname-first (unchanged behavior)
+    ("BYRD SANDRA D", ("BYRD", "SANDRA")),
+    ("SMITH JOHN C & MELINDA P", ("SMITH", "JOHN")),
+    ("LOPEZ, JOSE G. SANCHEZ & SULLY L. SANCHEZ", ("LOPEZ", "JOSE")),
+    ("ABBAD MIRIAM ALALI SAMI", ("ABBAD", "MIRIAM")),
+    # court-party / probate notices: Title Case FIRST [MIDDLE] LAST (the bug)
+    ("Krystal  Henderson", ("HENDERSON", "KRYSTAL")),
+    ("Joshua D Smith", ("SMITH", "JOSHUA")),
+    ("Susan Lee Meaders", ("MEADERS", "SUSAN")),
+    ("Rhonda J. Hester Cassell", ("CASSELL", "RHONDA")),
+    ("Rex Allen Chappell Jr", ("CHAPPELL", "REX")),
+    ("Tina Lopez & John Lopez", ("LOPEZ", "TINA")),
+    # a comma always means LAST, FIRST even in mixed case
+    ("Roper, John A., Jr.", ("ROPER", "JOHN")),
+    # degenerate input
+    ("Madonna", ("MADONNA", "")),
+    ("", ("", "")),
+    (None, ("", "")),
+])
+def test_name_parts_reads_both_board_conventions(owner, expected):
+    assert m._name_parts(owner) == expected
+
+
+# ---- reset script: only stamps whose search actually differs -------------------
+
+def test_reset_targets_only_wrong_order_stamps():
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    from reset_divorce_wrong_order import needs_reset
+
+    def stamped(owner, county="Spartanburg", state="SC"):
+        li = _lead(1, owner=owner)
+        li.county, li.state = county, state
+        li.raw = {"divorce": {"fetched_at": "2026-09-01T00:00:00+00:00", "case_count": 0}}
+        return li
+
+    assert needs_reset(stamped("Joshua D Smith")) is True          # was searched as JOSHUA/D
+    assert needs_reset(stamped("BYRD SANDRA D")) is False           # GIS order: unchanged
+    assert needs_reset(stamped("Roper, John A., Jr.")) is False     # comma: unchanged
+    assert needs_reset(stamped("Madonna")) is False                 # single token: unchanged
+    assert needs_reset(stamped("Acme Holdings LLC")) is False       # entity: stamp stands
+    assert needs_reset(stamped("Joshua D Smith", county="Wake", state="NC")) is False   # out of scope
+    unstamped = _lead(2, owner="Joshua D Smith")
+    assert needs_reset(unstamped) is False                          # never searched: nothing to clear
