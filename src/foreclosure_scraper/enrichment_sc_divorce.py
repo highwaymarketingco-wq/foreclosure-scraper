@@ -69,7 +69,7 @@ from datetime import datetime, timezone
 
 import structlog
 
-from .name_normalize import is_entity
+from .name_normalize import first_last_parts, is_entity
 
 try:
     from curl_cffi.requests import AsyncSession
@@ -132,10 +132,6 @@ _CONCURRENCY = int(os.environ.get("FORECLOSURE_SC_DIVORCE_CONCURRENCY", "4"))
 
 # ---------- Owner-name handling (mirrors the ROD + nc_divorce enrichers) ------------
 
-_SUFFIX_TOKENS = {"JR", "SR", "II", "III", "IV", "V"}
-_COUPLE_SPLIT = re.compile(r"\s(?:&|and|\+)\s", re.I)
-
-
 def _name_parts(owner: str) -> tuple[str, str]:
     """('SMITH, JOHN') -> ('SMITH','JOHN'); board 'LAST FIRST &' / 'A;B' fall back.
 
@@ -152,17 +148,10 @@ def _name_parts(owner: str) -> tuple[str, str]:
     the reliable tell for the second convention; a comma always wins and
     means LAST, FIRST.
     """
+    fl = first_last_parts(owner)
+    if fl is not None:
+        return fl
     raw = re.split(r"[;]|<br\s*/?>", owner or "", maxsplit=1)[0]
-    if "," not in raw and re.search(r"[a-z]", raw):
-        raw = _COUPLE_SPLIT.split(raw, maxsplit=1)[0]     # first person only
-        toks = [t for t in re.sub(r"[^A-Za-z ]", " ", raw).upper().split()]
-        while len(toks) > 1 and toks[-1] in _SUFFIX_TOKENS:
-            toks.pop()
-        if not toks:
-            return "", ""
-        if len(toks) == 1:
-            return toks[0], ""
-        return toks[-1], toks[0]                          # FIRST ... LAST
     o = re.sub(r"[^A-Za-z, ]", " ", raw).upper()
     o = re.sub(r"\s+", " ", o).strip()
     if not o:

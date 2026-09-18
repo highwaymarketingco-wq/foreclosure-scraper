@@ -71,6 +71,7 @@ from datetime import datetime, timezone
 import structlog
 
 from .render import fetch_rendered
+from .name_normalize import first_last_parts
 
 log = structlog.get_logger()
 
@@ -134,6 +135,9 @@ def _name_parts(owner: str) -> tuple[str, str]:
     board stores owners as 'LAST FIRST' (no comma) or 'A;B' for couples — we use
     the FIRST owner of a multi-owner string for the party query.
     """
+    fl = first_last_parts(owner)   # Title Case FIRST-LAST court/probate names
+    if fl is not None:
+        return fl
     o = (owner or "").split(";")[0]
     o = re.sub(r"[^A-Za-z, ]", " ", o).upper()
     o = re.sub(r"\s+", " ", o).strip()

@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 
 from .rod import cchs
 from .rod.classify import classify_rod_docs, is_stale, refresh_windows
+from .name_normalize import first_last_parts
 
 _COUNTIES = {"Burke", "Cleveland", "Madison", "Henderson", "Lincoln"}
 # Match on the alpha-only normalized code (D/T -> DT, D OF TR -> DOFTR, TAX_LIEN -> TAXLIEN).
@@ -28,6 +29,9 @@ _ADVERSE_N = {"LIEN", "TAXLIEN", "TAX", "JUDG", "JUDGMENT", "LP", "LISP", "EXECU
 
 
 def _name_parts(owner: str):
+    fl = first_last_parts(owner)   # Title Case FIRST-LAST court/probate names
+    if fl is not None:
+        return fl
     o = re.sub(r"[^A-Za-z, ]", " ", owner or "").upper()
     o = re.sub(r"\s+", " ", o).strip()
     if not o:

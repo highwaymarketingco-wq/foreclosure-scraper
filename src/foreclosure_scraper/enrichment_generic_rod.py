@@ -26,6 +26,7 @@ import structlog
 
 from .models import Listing
 from .rod.classify import classify_rod_docs, is_stale, refresh_windows
+from .name_normalize import first_last_parts
 
 log = structlog.get_logger()
 
@@ -53,6 +54,9 @@ _MAX_PER_COUNTY = int(os.environ.get("GENERIC_ROD_MAX_PER_COUNTY", "150"))
 
 
 def _name_parts(owner: str):
+    fl = first_last_parts(owner)   # Title Case FIRST-LAST court/probate names
+    if fl is not None:
+        return fl
     o = re.sub(r"[^A-Za-z, ]", " ", owner or "").upper()
     o = re.sub(r"\s+", " ", o).strip()
     if not o:

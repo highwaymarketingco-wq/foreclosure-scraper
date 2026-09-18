@@ -15,6 +15,7 @@ import re
 from datetime import datetime, timezone
 
 from .rod.logan_render import search_by_name_render
+from .name_normalize import first_last_parts
 
 _MORTGAGE = re.compile(r"DEED OF TRUST|MORTGAGE|\bMTG\b|SECURITY (DEED|AGREEMENT)|\bD\s*/?\s*T\b", re.I)
 # Documents that REFERENCE a mortgage but are NOT a new mortgage recording.
@@ -30,6 +31,9 @@ _KEEP = re.compile(r"MORTGAGE|DEED|TRUST|\bMTG\b|\bD/?T\b|LIEN|JUDG|\bTAX\b|FORE
 
 
 def _name_parts(owner: str):
+    fl = first_last_parts(owner)   # Title Case FIRST-LAST court/probate names
+    if fl is not None:
+        return fl
     o = re.sub(r"[^A-Za-z, ]", " ", owner or "").upper()
     o = re.sub(r"\s+", " ", o).strip()
     if not o:

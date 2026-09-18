@@ -166,6 +166,36 @@ def primary_party(owner: Optional[str]) -> str:
     return normalize_name(_JOINT_SPLIT_RE.split(raw)[0])
 
 
+_FL_SUFFIXES = {"JR", "SR", "II", "III", "IV", "V"}
+_FL_COUPLE = re.compile(r"\s(?:&|and|\+)\s", re.I)
+
+
+def first_last_parts(owner: Optional[str]) -> Optional[tuple[str, str]]:
+    """(LAST, FIRST) when `owner` is in the Title Case FIRST [MIDDLE] LAST
+    convention used by court-party and probate-notice sources, else None.
+
+    The board holds two conventions: county GIS / tax rolls are ALL-CAPS
+    SURNAME-FIRST ('BYRD SANDRA D'); sc_public_index and sc_probate_notices.*
+    are Title Case FIRST-LAST ('Joshua D Smith'). Any lowercase letter with no
+    comma is the tell (a comma always means LAST, FIRST and is not handled here).
+    Returning None means "not this convention -- use your own surname-first
+    parse". Found 2026-09-18 when ~5,000 such leads were divorce-searched with
+    the two orders swapped.
+    """
+    if not owner:
+        return None
+    raw = re.split(r"[;]|<br\s*/?>", owner, maxsplit=1)[0]
+    if "," in raw or not re.search(r"[a-z]", raw):
+        return None
+    raw = _FL_COUPLE.split(raw, maxsplit=1)[0]
+    toks = re.sub(r"[^A-Za-z ]", " ", raw).upper().split()
+    while len(toks) > 1 and toks[-1] in _FL_SUFFIXES:
+        toks.pop()
+    if len(toks) < 2:
+        return None
+    return toks[-1], toks[0]
+
+
 def person_orderings(name: Optional[str]) -> list[PersonName]:
     """Every plausible (surname, given...) reading of an individual's name.
 

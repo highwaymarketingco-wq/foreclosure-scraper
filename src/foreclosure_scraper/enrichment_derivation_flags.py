@@ -22,8 +22,27 @@ import structlog
 from typing import Optional
 
 from .models import Listing
+from .name_normalize import first_last_parts
 
 log = structlog.get_logger()
+
+
+# ROD enrichers whose owner-name parser read every name surname-first until
+# 2026-09-18. For a Title Case FIRST-LAST owner ('Joshua D Smith') they searched
+# last=JOSHUA, first=D, so the instruments they "found" belonged to somebody else
+# and "no mortgage among them" says nothing about this owner. A stamp fetched
+# before the fix, on such a name, must not produce a free_and_clear claim; a
+# re-fetch with the fixed parser clears the condition on its own (new fetched_at).
+_ROD_SURNAME_FIRST_SOURCES = {"spartanburg_rod_render", "aumentum_rod", "cchs_rod", "generic_rod"}
+_ROD_PARSER_FIX_DATE = "2026-09-18"
+
+
+def _rod_name_order_suspect(li: Listing, rod: dict) -> bool:
+    if rod.get("source") not in _ROD_SURNAME_FIRST_SOURCES:
+        return False
+    if str(rod.get("fetched_at") or "")[:10] >= _ROD_PARSER_FIX_DATE:
+        return False  # fetched with the fixed parser
+    return first_last_parts(li.owner_name) is not None
 
 
 def _free_and_clear(li: Listing) -> Optional[dict]:
@@ -31,6 +50,8 @@ def _free_and_clear(li: Listing) -> Optional[dict]:
     raw = li.raw if isinstance(li.raw, dict) else {}
     rod = raw.get("rod")
     if not isinstance(rod, dict):
+        return None
+    if _rod_name_order_suspect(li, rod):
         return None
     # Need ROD data to make the claim — absence of ROD is NOT absence of mortgage
     if not rod.get("instrument_count"):

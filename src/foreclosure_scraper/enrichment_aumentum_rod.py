@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 
 from .rod import aumentum
 from .rod.classify import classify_rod_docs, is_stale, refresh_windows
+from .name_normalize import first_last_parts
 
 _COUNTIES = {"Buncombe"}
 _MORTGAGE = re.compile(r"DEED OF TRUST|MORTGAGE|SECURITY (DEED|AGREEMENT)|\bD\s*/?\s*T\b", re.I)
@@ -24,6 +25,9 @@ _ADVERSE = re.compile(r"JUDG|\bLIEN\b|\bTAX\b|EXECUTION|FORECLOS|LIS PEND|CLAIM 
 
 
 def _name_parts(owner: str):
+    fl = first_last_parts(owner)   # Title Case FIRST-LAST court/probate names
+    if fl is not None:
+        return fl
     o = re.sub(r"[^A-Za-z, ]", " ", owner or "").upper()
     o = re.sub(r"\s+", " ", o).strip()
     if not o:
