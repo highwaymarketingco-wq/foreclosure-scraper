@@ -173,7 +173,7 @@ def enrich_derivation_flags(listings: list[Listing]) -> dict:
 
     Pure compute over ROD + GIS + court data already on the board.
     """
-    n_fcl = n_tl = n_div = n_any = 0
+    n_fcl = n_tl = n_div = n_any = n_dropped = 0
     for li in listings:
         out: dict = {}
         fcl = _free_and_clear(li)
@@ -193,12 +193,21 @@ def enrich_derivation_flags(listings: list[Listing]) -> dict:
             raw["derivation_flags"] = out
             li.raw = raw
             n_any += 1
+        elif isinstance(li.raw, dict) and "derivation_flags" in li.raw:
+            # Nothing applies now, so an old block is stale: it was written when
+            # the inputs said otherwise (a ROD re-fetch later showed open
+            # mortgages, a divorce stamp was cleared, ...). Before 2026-09-18
+            # these were never removed -- 116 leads sat flagged free_and_clear
+            # with has_mortgage=True and up to 77 instruments on file.
+            del li.raw["derivation_flags"]
+            n_dropped += 1
 
     log.info("derivation_flags.done", free_and_clear=n_fcl, tired_landlord=n_tl,
-             divorce=n_div, any=n_any, total=len(listings))
+             divorce=n_div, any=n_any, dropped_stale=n_dropped, total=len(listings))
     return {
         "free_and_clear": n_fcl,
         "tired_landlord": n_tl,
         "divorce": n_div,
         "rows": n_any,
+        "dropped_stale": n_dropped,
     }
