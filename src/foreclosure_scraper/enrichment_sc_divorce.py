@@ -69,6 +69,8 @@ from datetime import datetime, timezone
 
 import structlog
 
+from .name_normalize import is_entity
+
 try:
     from curl_cffi.requests import AsyncSession
 except Exception:  # pragma: no cover
@@ -255,6 +257,44 @@ def _imminent(li, now: datetime) -> bool:
     return False
 
 
+# Ordering only, never a filter: every lead still gets searched if the budget
+# allows. Measured 2026-09-18 on the board (SC core counties): person-sourced
+# leads (delinquent-tax rolls, condemned/vacant lists, Pickens parcels) hit
+# 13-26%; business-style sources hit ~0% (sc_dew_lien_registry 1 hit in 2,318
+# checked). With ~12K leads still never-checked, the last two run rounds
+# searched 64% then 80% company names and found 96 then 1 case.
+_MIN_SOURCE_SAMPLE = 30
+_UNSEEN_SOURCE_PRIOR = 0.10
+_BUSINESS_NAME_FACTOR = 0.2
+
+
+def _source_hit_rates(listings, now: datetime) -> dict[str, float]:
+    """Observed divorce hit rate per lead source, from leads already searched
+    in this same list. Sources with too few searched leads are omitted (their
+    prior is unknown, not zero)."""
+    seen: dict[str, int] = {}
+    hits: dict[str, int] = {}
+    for li in listings:
+        raw = li.raw if isinstance(li.raw, dict) else None
+        dv = raw.get("divorce") if raw else None
+        if not isinstance(dv, dict) or not dv.get("fetched_at"):
+            continue
+        src = li.source or ""
+        seen[src] = seen.get(src, 0) + 1
+        hits[src] = hits.get(src, 0) + (1 if dv.get("case_count") else 0)
+    return {s: hits[s] / n for s, n in seen.items() if n >= _MIN_SOURCE_SAMPLE}
+
+
+def _yield_prior(li, rates: dict[str, float]) -> float:
+    """Expected chance this lead's owner has a divorce case: the source's
+    observed hit rate when known, a neutral prior otherwise, discounted when
+    the name reads as an entity."""
+    prior = rates.get(li.source or "", _UNSEEN_SOURCE_PRIOR)
+    if is_entity(li.owner_name or ""):
+        prior *= _BUSINESS_NAME_FACTOR
+    return prior
+
+
 def _stale(li, now: datetime) -> bool:
     age = _divorce_age_days(li, now)
     window = _REFRESH_HOT_DAYS if _imminent(li, now) else _REFRESH_DAYS
@@ -375,8 +415,18 @@ async def enrich_sc_divorce(listings, max_lookups: int | None = None) -> dict:
                and li.owner_name
                and _stale(li, now)]
     # Never-fetched first, then stalest first — a cap-trimmed run still progresses.
-    targets.sort(key=lambda li: (_divorce_age_days(li, now) is not None,
-                                 -(_divorce_age_days(li, now) or 1e9)))
+    # Within the never-fetched group, most-likely-a-person first (see
+    # _yield_prior): a company cannot be a divorce party, and the pool that is
+    # left after the person-sourced leads are done is mostly companies.
+    rates = _source_hit_rates(listings, now)
+
+    def _order(li):
+        age = _divorce_age_days(li, now)
+        if age is not None:
+            return (True, -age)
+        return (False, -_yield_prior(li, rates))
+
+    targets.sort(key=_order)
     total_pending = len(targets)
     targets = targets[:cap]
 

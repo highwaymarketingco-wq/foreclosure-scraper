@@ -132,3 +132,56 @@ def test_consecutive_failures_abort_the_run(monkeypatch):
     stats, _ = _run(monkeypatch, leads, lambda p: _Resp(status=500), concurrency=1)
     assert stats.get("aborted_throttled") is True
     assert stats["errors"] == 12          # stops at the 12-failure guard, not all 40
+
+
+# ---- ordering: likely-a-person first, never a filter -------------------------
+
+def _stamped(i, source, hit):
+    li = _lead(i, owner="DOE JANE")
+    li.source = source
+    li.raw = {"divorce": {"fetched_at": "2026-09-01T00:00:00+00:00", "case_count": 1 if hit else 0}}
+    return li
+
+
+def _pending(i, source, owner="DOE JANE"):
+    li = _lead(i, owner=owner)
+    li.source = source
+    return li
+
+
+def test_source_hit_rates_need_a_minimum_sample():
+    rows = [_stamped(i, "big_src", i % 2 == 0) for i in range(40)] + \
+           [_stamped(100 + i, "tiny_src", True) for i in range(5)]
+    rates = m._source_hit_rates(rows, None)
+    assert rates == {"big_src": 0.5}          # tiny_src (5 < 30) is unknown, not 100%
+
+
+def test_pending_leads_order_by_source_yield_and_entities_sink(monkeypatch):
+    rich = [_stamped(i, "tax_roll", i % 4 == 0) for i in range(40)]      # 25% hit rate
+    poor = [_stamped(500 + i, "lien_registry", False) for i in range(40)]  # 0%
+    p_poor = _pending(900, "lien_registry")
+    p_unseen_person = _pending(901, "brand_new_src")
+    p_unseen_entity = _pending(902, "brand_new_src", owner="ACME HOLDINGS LLC")
+    p_rich = _pending(903, "tax_roll")
+    pending = [p_poor, p_unseen_entity, p_unseen_person, p_rich]
+
+    order = []
+    async def fake_search(session, headers, last, first, county_code):
+        order.append(last)
+        return []
+    fake = _FakeSession(lambda p: _Resp(payload=[]))
+    monkeypatch.setattr(m, "AsyncSession", lambda **k: fake)
+    async def _hs(session): return "tok"
+    monkeypatch.setattr(m, "_handshake", _hs)
+    monkeypatch.setattr(m, "_search_one", fake_search)
+    monkeypatch.setattr(m, "_CONCURRENCY", 1)
+    p_poor.owner_name = "POORMAN PAT"
+    p_unseen_person.owner_name = "UNSEENSON URI"
+    p_unseen_entity.owner_name = "ACME HOLDINGS LLC"
+    p_rich.owner_name = "RICHARDSON RAY"
+    stats = asyncio.run(m.enrich_sc_divorce(rich + poor + pending, max_lookups=4))
+    assert stats["searched"] == 4, "ordering must never drop a lead"
+    # rich source first; an unseen source's person before its entity; the
+    # 0%-yield source's person last of all (below even the entity-discounted
+    # unseen prior: 0.10 * 0.2 = 0.02 > 0.0).
+    assert order == ["RICHARDSON", "UNSEENSON", "ACME", "POORMAN"], order

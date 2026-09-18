@@ -38,6 +38,9 @@ from foreclosure_scraper.enrichment_sc_divorce import enrich_sc_divorce  # noqa:
 from foreclosure_scraper.web_artifact import board_lock, load_board, write_artifact  # noqa: E402
 
 PER_CALL_CAP = 3000  # upper bound; the enricher's own 1800s budget governs actual throughput
+LOW_YIELD_MIN_SEARCHED = 300  # a round must search at least this many to count
+LOW_YIELD_RATE = 0.01         # ...and find under 1% hits to count as low-yield
+LOW_YIELD_ROUNDS = 2          # consecutive low-yield rounds before stopping
 MAX_ROUNDS_DEFAULT = 60  # safety backstop; ~34.7K targets / ~500-900 per round
 
 
@@ -61,6 +64,7 @@ def main() -> int:
 
         totals = {"searched": 0, "with_divorce": 0, "cases_found": 0, "errors": 0}
         round_n = 0
+        low_rounds = 0
         while round_n < args.max_rounds:
             round_n += 1
             stats = asyncio.run(enrich_sc_divorce(rows, max_lookups=PER_CALL_CAP))
@@ -73,6 +77,16 @@ def main() -> int:
 
             if stats.get("targets", 0) == 0 or stats.get("pending", 0) == 0:
                 print("no targets left this round — backfill complete.")
+                break
+            # Diminishing returns: targets are ordered most-likely-a-person first,
+            # so once whole rounds of real volume find almost nothing, what is left
+            # is mostly companies. Stop instead of loading the portal for hours.
+            low = stats.get("searched", 0) >= LOW_YIELD_MIN_SEARCHED and \
+                stats.get("with_divorce", 0) / max(1, stats["searched"]) < LOW_YIELD_RATE
+            low_rounds = low_rounds + 1 if low else 0
+            if low_rounds >= LOW_YIELD_ROUNDS:
+                print(f"{low_rounds} consecutive rounds under {LOW_YIELD_RATE:.0%} hit rate "
+                      f"— remaining leads are low-yield, stopping (resumable).")
                 break
             if stats.get("error") == "handshake_failed":
                 print("FCCMS handshake failed — stopping (will resume cleanly next run).")
