@@ -121,6 +121,11 @@ _CALL_TIMEOUT_S = float(os.environ.get("FORECLOSURE_SC_DIVORCE_CALL_TIMEOUT_S", 
 # (it hung ~6h once on a 1,677-lead bulk pass). Unreached leads retry next run via the refresh window.
 _BUDGET_S = float(os.environ.get("FORECLOSURE_SC_DIVORCE_BUDGET_S", "1800"))
 _PER_QUERY_CAP = 25  # max case rows kept per lead
+# Real-surname searches measured 2-7s each even at 0 rows (2026-09-18), so one
+# sequential worker did ~6-13 leads/min. 4 workers keeps at most 4 requests in
+# flight against a public court index (a browser opens 6 per host) and the
+# consecutive-failure abort below still stops the run if the portal pushes back.
+_CONCURRENCY = int(os.environ.get("FORECLOSURE_SC_DIVORCE_CONCURRENCY", "4"))
 
 
 # ---------- Owner-name handling (mirrors the ROD + nc_divorce enrichers) ------------
@@ -292,8 +297,21 @@ async def _handshake(session) -> str | None:
         return None
 
 
+class _IncompleteSearch(Exception):
+    """A category call timed out, returned non-200, or returned unparseable /
+    non-list JSON. The owner was NOT actually searched, so the lead must stay
+    unstamped and be retried -- never recorded as "checked, no divorce"."""
+
+
 async def _search_one(session, headers, last: str, first: str, county_code: int) -> list[dict]:
-    """Search all divorce categories for one owner; return merged, deduped cases."""
+    """Search all divorce categories for one owner; return merged, deduped cases.
+
+    Raises _IncompleteSearch if ANY category call failed. Before 2026-09-18 every
+    failure `continue`d, so a timeout or 5xx read as "no cases" and the lead was
+    stamped as checked (raw['divorce'] with case_count 0, refresh window 30 days)
+    without ever being searched -- a silent false negative, and the reason the
+    run's `errors` counter always read 0.
+    """
     found: list[dict] = []
     seen: set[str] = set()
     for cat_id, label in _DIVORCE_CATEGORIES:
@@ -304,16 +322,18 @@ async def _search_one(session, headers, last: str, first: str, county_code: int)
                              impersonate="chrome", timeout=_CALL_TIMEOUT_S),
                 timeout=_CALL_TIMEOUT_S + 5,
             )
-        except Exception:  # noqa: BLE001
-            continue
+        except Exception as exc:  # noqa: BLE001
+            raise _IncompleteSearch(type(exc).__name__) from exc
         if r.status_code != 200:
-            continue
+            raise _IncompleteSearch(f"http_{r.status_code}")
         try:
             rows = r.json()
-        except Exception:  # noqa: BLE001
-            continue
-        if not isinstance(rows, list) or not rows:
-            continue
+        except Exception as exc:  # noqa: BLE001
+            raise _IncompleteSearch("bad_json") from exc
+        if not isinstance(rows, list):
+            raise _IncompleteSearch("non_list_payload")
+        if not rows:
+            continue  # a definitive empty answer: this category has no cases
         if _is_overcap(rows):
             # Too many namesakes to return without a first name; skip this
             # category rather than emit a bogus hit. (Owners with a first name
@@ -380,30 +400,39 @@ async def enrich_sc_divorce(listings, max_lookups: int | None = None) -> dict:
             "Referer": BASE + "/",
             "Origin": BASE,
         }
-        for li in targets:
-            if _time.monotonic() - _t0 > _BUDGET_S:
-                stats["budget_exhausted"] = True
-                break
-            if consec_err >= 12:
-                stats["aborted_throttled"] = True  # FCCMS is failing every call -> stop, retry later
-                break
-            last, first = _name_parts(li.owner_name)
-            if not last:
-                continue
-            county_code = _COUNTY_CODE[(li.county or "").strip()]
-            try:
-                cases = await _search_one(s, headers, last, first, county_code)
-                consec_err = 0
-            except Exception:  # noqa: BLE001
-                stats["errors"] += 1
-                consec_err += 1
-                continue  # leave unstamped -> retried next run
-            stats["searched"] += 1
-            _apply(li, cases, now)
-            if cases:
-                stats["with_divorce"] += 1
-                stats["cases_found"] += len(cases)
-            await asyncio.sleep(0.2)
+        it = iter(targets)
+
+        async def _worker() -> None:
+            nonlocal consec_err
+            while True:
+                if _time.monotonic() - _t0 > _BUDGET_S:
+                    stats["budget_exhausted"] = True
+                    return
+                if consec_err >= 12:
+                    stats["aborted_throttled"] = True  # FCCMS is failing every call -> stop, retry later
+                    return
+                li = next(it, None)   # single event-loop thread: no race on the shared iterator
+                if li is None:
+                    return
+                last, first = _name_parts(li.owner_name)
+                if not last:
+                    continue
+                county_code = _COUNTY_CODE[(li.county or "").strip()]
+                try:
+                    cases = await _search_one(s, headers, last, first, county_code)
+                    consec_err = 0
+                except Exception:  # noqa: BLE001  (incl. _IncompleteSearch)
+                    stats["errors"] += 1
+                    consec_err += 1
+                    continue  # leave unstamped -> retried next run
+                stats["searched"] += 1
+                _apply(li, cases, now)
+                if cases:
+                    stats["with_divorce"] += 1
+                    stats["cases_found"] += len(cases)
+                await asyncio.sleep(0.2)
+
+        await asyncio.gather(*[_worker() for _ in range(max(1, _CONCURRENCY))])
 
     log.info("sc_divorce.enrich.done", **stats)
     return stats
