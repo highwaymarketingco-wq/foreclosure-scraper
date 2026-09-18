@@ -2393,6 +2393,17 @@ async def run() -> int:
     except Exception:
         log.error("census_demographics.failed", traceback=traceback.format_exc())
 
+    # Land-value share of total appraised value (Dirty Deeds Tier A #11).
+    # Offline; only rows whose county GIS exposes a land vs improvement split
+    # (~5% of the board) get a block. No network.
+    try:
+        from .enrichment_land_ratio import enrich_land_ratio
+        s = enrich_land_ratio(enriched)
+        if s and s.get("tagged"):
+            enrichment_stats["land_ratio"] = s
+    except Exception:
+        log.error("land_ratio.failed", traceback=traceback.format_exc())
+
     # Multifamily classifier — promote mislabeled apartment / multi-unit
     # distressed properties to MULTI_FAMILY using precise party/owner/title +
     # description + structure signals. MUST run BEFORE enrich_property_kind:

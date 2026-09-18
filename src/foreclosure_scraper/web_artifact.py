@@ -588,6 +588,9 @@ RAW_KEEP = {
     # (Census ACS, same free key as census_rent). Registered BEFORE the
     # enricher's first run per this session's discipline.
     "census_demographics": "*",
+    # Land vs improvement value split + land share (Dirty Deeds Tier A #11).
+    # Registered before the first run.
+    "land_ratio": "*",
     "court_bid": "*",                 # court auction bid/upset/sale status
     "rod_name_index": "*",            # ROD name-based lien index provenance
     "usps_vacancy": "*",              # USPS vacancy scan result
