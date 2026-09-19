@@ -38,7 +38,13 @@ from foreclosure_scraper.enrichment_sc_divorce import enrich_sc_divorce  # noqa:
 from foreclosure_scraper.web_artifact import board_lock, load_board, write_artifact  # noqa: E402
 
 PER_CALL_CAP = 3000  # upper bound; the enricher's own 1800s budget governs actual throughput
-LOW_YIELD_MIN_SEARCHED = 300  # a round must search at least this many to count
+# A round must search at least this many leads to count as low-yield. Was 300,
+# sized for full-speed rounds of ~1,000+. With the portal at ~9s per search a
+# 30-minute round tops out around 200, so at 300 the rule could never fire and
+# a run whose good leads were exhausted would keep searching until the
+# supervisor's deadline. 100 searches at <1% is at most one hit; two such
+# rounds in a row is the stop signal.
+LOW_YIELD_MIN_SEARCHED = 100
 LOW_YIELD_RATE = 0.01         # ...and find under 1% hits to count as low-yield
 LOW_YIELD_ROUNDS = 2          # consecutive low-yield rounds before stopping
 MAX_ROUNDS_DEFAULT = 60  # safety backstop; ~34.7K targets / ~500-900 per round

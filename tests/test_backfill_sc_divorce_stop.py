@@ -47,3 +47,18 @@ def test_low_yield_needs_consecutive_rounds():
 def test_tiny_rounds_do_not_count_as_low_yield():
     stop, _, low = stop_decision(_stats(LOW_YIELD_MIN_SEARCHED - 1, 0), LOW_YIELD_ROUNDS - 1)
     assert not stop and low == 0
+
+
+def test_slow_portal_rounds_still_trigger_the_low_yield_stop():
+    # ~200 searches per 30-minute round at the 2026-09-19 portal speed: at the old
+    # minimum of 300 these never counted, so the run could not stop on yield.
+    s = _stats(199, 1)                       # 0.5%
+    stop, _, low = stop_decision(s, 0)
+    assert not stop and low == 1
+    stop, reason, _ = stop_decision(s, low)
+    assert stop and "low-yield" in reason
+
+
+def test_a_good_slow_round_resets_the_streak():
+    stop, _, low = stop_decision(_stats(199, 50), 1)     # round 3's real numbers
+    assert not stop and low == 0
