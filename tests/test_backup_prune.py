@@ -59,5 +59,6 @@ def test_prune_caps_both_main_and_detail_backups(tmp_path):
 
     main_count = len(list(backups.glob("listings_2*.json")))
     detail_count = len(list(backups.glob("listings_detail_2*.json*")))
-    assert main_count <= 10, f"main backups not pruned: {main_count} files"
-    assert detail_count <= 10, f"detail backups not pruned (the real bug): {detail_count} files"
+    from foreclosure_scraper.web_artifact import _BACKUP_KEEP
+    assert main_count <= _BACKUP_KEEP, f"main backups not pruned: {main_count} files"
+    assert detail_count <= _BACKUP_KEEP, f"detail backups not pruned (the real bug): {detail_count} files"

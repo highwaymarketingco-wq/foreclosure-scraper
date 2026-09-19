@@ -1637,6 +1637,14 @@ def _count_by(listings: list[Listing], attr: str) -> dict[str, int]:
     return dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
 
 
+# Rolling pre-write backups kept per pattern (main board + detail sidecar). Each
+# main copy is ~1.04GB, so 10 of them was 12GB of a laptop that needed 50-80GB
+# back (2026-09-19). Every committed board is also in git history and the live
+# board is the newest state; 3 still covers the "a bad write just landed" case
+# the backup exists for. Override with BOARD_BACKUP_KEEP.
+_BACKUP_KEEP = max(1, int(os.environ.get("BOARD_BACKUP_KEEP", "3")))
+
+
 def write_artifact(
     listings: list[Listing],
     summary: dict,
@@ -1798,7 +1806,7 @@ def write_artifact(
             log.info("web_artifact.backup_saved", path=str(_backup_dir / f"listings_{_ts}.json"))
         except Exception:  # noqa: BLE001 - backup failure must not block the write
             log.warning("web_artifact.backup_failed", exc_info=True)
-        # --- prune old backups (keep last 10 of each) ---
+        # --- prune old backups (keep the newest _BACKUP_KEEP of each) ---
         # Bug found 2026-09-17: the sibling-cleanup below rsplit() the main
         # file's stem on "_" to derive a prefix meant to also catch its
         # listings_detail_<ts>.json(.gz) pair, but "listings_<ts>".rsplit("_",1)[0]
@@ -1814,7 +1822,7 @@ def write_artifact(
         try:
             for _pattern in ("listings_2*.json", "listings_detail_2*.json*"):
                 _old = sorted(_backup_dir.glob(_pattern),
-                              key=lambda p: p.stat().st_mtime, reverse=True)[10:]
+                              key=lambda p: p.stat().st_mtime, reverse=True)[_BACKUP_KEEP:]
                 for _f in _old:
                     _f.unlink(missing_ok=True)
         except Exception:  # noqa: BLE001
