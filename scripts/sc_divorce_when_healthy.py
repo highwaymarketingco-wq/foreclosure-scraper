@@ -5,7 +5,7 @@ The portal slows down for hours at a time (2026-09-18: 3s per search at noon,
 10-11s from 15:15 on, with our own load stopped). Pushing a slow portal just
 trips the enricher's failure guard after ~200 leads a round. This probes with
 three real-surname searches every PROBE_EVERY seconds and starts
-backfill_sc_divorce.py only when their mean latency is under HEALTHY_S. The
+backfill_sc_divorce.py only when their mean latency is under HEALTHY_S (15s). The
 backfill still stops itself on a throttle abort or two low-yield rounds; this
 loop then either finishes (done / low-yield) or waits and tries again.
 
@@ -29,7 +29,14 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
 PROBE_EVERY = 600
-HEALTHY_S = 5.0
+# 2026-09-19: every uncached search costs a flat ~9.3s (0-row nonsense names
+# included, any county; a repeat of a cached query is 0.2s) and has for ~26h
+# with our own load stopped -- a server-side per-request delay, not query cost.
+# At ~9s the 4-worker backfill still does ~500 leads/hour, enough to finish the
+# high-value re-queued court/probate people, and its own 12-consecutive-failure
+# guard stops it if the portal starts refusing. Above HEALTHY_S the portal is
+# failing more than slow (probes timing out at 30s), so wait instead.
+HEALTHY_S = 15.0
 PROBE_NAMES = (("SMITH", "JOHN"), ("BROWN", "ROBERT"), ("JOHNSON", "MARY"))
 
 

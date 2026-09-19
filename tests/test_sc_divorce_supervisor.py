@@ -21,6 +21,7 @@ def test_classify_exit_reads_each_backfill_ending():
 def test_health_is_a_latency_ceiling_and_a_failed_probe_is_unhealthy():
     assert is_healthy(HEALTHY_S) is True
     assert is_healthy(3.0) is True
+    assert is_healthy(9.7) is True              # the steady per-request delay since 2026-09-18 15:15
     assert is_healthy(HEALTHY_S + 0.1) is False
-    assert is_healthy(11.1) is False            # 17:10 today
+    assert is_healthy(25.0) is False            # timing out, not merely slow
     assert is_healthy(None) is False
