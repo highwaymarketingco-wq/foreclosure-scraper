@@ -63,7 +63,7 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    from foreclosure_scraper.parcel_cache import lookup
+    from foreclosure_scraper.parcel_cache import lookup, sale_amount
     from foreclosure_scraper.enrichment_owner_mailing import _is_absentee
     from foreclosure_scraper.web_artifact import board_lock, load_board, write_artifact
 
@@ -162,11 +162,12 @@ def main() -> int:
             if hit.get("acreage") and not li.acreage:
                 li.acreage = hit["acreage"]
                 c["filled acreage"] += 1
-            if hit.get("sale_price"):
+            _amt = sale_amount(hit.get("sale_price"))
+            if _amt:
                 g = li.raw.setdefault("gis", {})
                 ls = g.setdefault("last_sale", {})
                 if not ls.get("amount"):
-                    ls["amount"] = hit["sale_price"]
+                    ls["amount"] = _amt
                     c["filled last sale"] += 1
 
         print()

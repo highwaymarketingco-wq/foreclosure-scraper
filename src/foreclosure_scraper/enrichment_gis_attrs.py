@@ -525,7 +525,7 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
         # (walled ones aren't), so this is a fast path, not a replacement — a miss falls
         # through to the live query below. Proven Buncombe 2026-08-14: 99% hit, 95ms/6.6k leads.
         if li.parcel_id:
-            from .parcel_cache import lookup as _pcache_lookup
+            from .parcel_cache import lookup as _pcache_lookup, sale_amount
             pc = _pcache_lookup(li.county or "", li.parcel_id, li.state)
             if pc:
                 if not isinstance(li.raw, dict):
@@ -561,8 +561,9 @@ async def enrich_gis_attrs(listings: list[Listing], concurrency: int = 8) -> dic
                 if pc.get("sale_price") or pc.get("sale_date"):
                     g = li.raw.setdefault("gis", {})
                     ls = g.setdefault("last_sale", {})
-                    if pc.get("sale_price") and not ls.get("amount"):
-                        ls["amount"] = pc["sale_price"]
+                    _amt = sale_amount(pc.get("sale_price"))
+                    if _amt and not ls.get("amount"):
+                        ls["amount"] = _amt
                         stats["filled_sale_price"] = stats.get("filled_sale_price", 0) + 1
                     if pc.get("sale_date") and not ls.get("date"):
                         ls["date"] = pc["sale_date"]

@@ -366,8 +366,14 @@ def enrich_gis_derived(listings: list[Listing]) -> dict:
         # logic below would otherwise preserve a pre-cap corrupt value forever, and the
         # address-less carryover rows have no gis_attrs_full so they'd skip the gate.
         _ls = (raw.get("gis") or {}).get("last_sale")
-        if isinstance(_ls, dict) and _ls.get("amount") and _ls["amount"] > 50_000_000:
-            _ls.pop("amount", None)
+        if isinstance(_ls, dict) and _ls.get("amount"):
+            # Parse before comparing: 588 rows carried the amount as display text
+            # ("330,000"), and 6 as "DOD"; `str > int` crashed the whole pass.
+            _amt = _num(_ls["amount"])
+            if _amt is None or _amt > 50_000_000:
+                _ls.pop("amount", None)
+            elif not isinstance(_ls["amount"], (int, float)):
+                _ls["amount"] = _amt
 
         # --- SALE CONSOLIDATION (runs for EVERY listing, BEFORE the attrs gate) ---
         # The board-wide Gosnell bug: calc.py's ARV floor reads ONLY

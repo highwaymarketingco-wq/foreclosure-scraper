@@ -36,6 +36,26 @@ _PAGE = 2000
 
 # county -> {url: full .../query endpoint, id: source id field, map: {our_field: src_field}}
 # Only counties VERIFIED (count-match + sample join). Extend one line at a time.
+def sale_amount(v) -> "float | None":
+    """A parcel-cache sale price as a positive float, or None.
+
+    Some counties' caches store the price as display text ("330,000", "$1,200") and
+    a few hold a non-number ("DOD"). Writing that text into raw['gis']['last_sale']
+    ['amount'] made 588 board rows carry a string where every consumer (flags.py,
+    calc.py, the gis_derived plausibility cap) does arithmetic, and crashed
+    scripts/recompute_valuation.py (str > int) on 2026-09-20.
+    """
+    if v is None or isinstance(v, bool):
+        return None
+    try:
+        f = float(str(v).replace(",", "").replace("$", "").strip())
+    except (ValueError, TypeError):
+        return None
+    if f != f or f <= 0:
+        return None
+    return f
+
+
 PARCEL_LAYERS: dict[str, dict] = {
     "Buncombe": {
         "url": "https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query",
