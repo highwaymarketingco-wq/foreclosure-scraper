@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date
 from pathlib import Path
 from typing import Optional
 
@@ -96,6 +97,53 @@ _STALE_MOI_MULTIPLIER = 2.0
 # real markdown vs the prior snapshot before it counts as a distress signal.
 _PRICE_CUT_MIN_PCT = 0.04   # >=4% off the prior list price
 _PRICE_CUT_MIN_ABS = 2500.0  # and at least $2.5k absolute
+
+
+# Court-verified divorce: the FCCMS (SC) / eCourts (NC) party-name match stored in
+# raw['divorce']. Until 2026-09-20 nothing read it (only the deed-derived
+# relationship_signal reached the score), so 5,523 collected hits ranked nothing.
+# Measured on those hits: 47% of the newest party cases are >15 years old and
+# only 13% are within 3 years, so a flat weight would score settled decades-old
+# divorces as motivation. A recent filing means marital property is being
+# divided or sold; an old one is history. The match is by name only (no DOB or
+# address), so weights sit below the property-evidenced divorce (15), the same
+# way incarceration (8) is a low-confidence name-only signal. Attorney and
+# guardian-ad-litem rows are the owner's NAME appearing as counsel, not the
+# owner being divorced (45 hits were attorney-only collisions); they never count.
+_DIVORCE_PARTY_ROLES = frozenset({"plaintiff", "defendant", "petitioner", "respondent"})
+_DIVORCE_RECENT_YEARS = 3.0
+_DIVORCE_WINDOW_YEARS = 7.0
+_DIVORCE_W_RECENT = 12
+_DIVORCE_W_WINDOW = 6
+
+
+def _divorce_signal(r: dict, today: Optional[date] = None) -> Optional[tuple[str, str, int]]:
+    """(name, category, weight) from raw['divorce'], or None. A case row with no
+    role is kept (role unknown); a row whose role is not a party role is skipped."""
+    dv = r.get("divorce")
+    if not isinstance(dv, dict) or not dv.get("case_count"):
+        return None
+    newest: Optional[date] = None
+    for c in dv.get("cases") or []:
+        if not isinstance(c, dict):
+            continue
+        role = str(c.get("role") or "").strip().lower()
+        if role and role not in _DIVORCE_PARTY_ROLES:
+            continue
+        try:
+            d = date.fromisoformat(str(c.get("filed_date"))[:10])
+        except (TypeError, ValueError):
+            continue
+        if newest is None or d > newest:
+            newest = d
+    if newest is None:
+        return None
+    age_years = ((today or date.today()) - newest).days / 365.25
+    if age_years <= _DIVORCE_RECENT_YEARS:
+        return ("divorce", "LIFE_EVENT", _DIVORCE_W_RECENT)
+    if age_years <= _DIVORCE_WINDOW_YEARS:
+        return ("divorce", "LIFE_EVENT", _DIVORCE_W_WINDOW)
+    return None
 
 
 def _mls_fields(li: Listing) -> dict:
@@ -238,6 +286,10 @@ def _signals_for(li: Listing, prior_price: Optional[float] = None) -> list[tuple
         elif kind == "partition":
             # forced/judicial sale (usually already sold) — modest SALES signal
             sig.append(("partition", "SALES", 12))
+    # court-verified divorce (party-name match; recency-weighted, see _divorce_signal)
+    dvs = _divorce_signal(r)
+    if dvs:
+        sig.append(dvs)
     # property
     if r.get("code_enforcement") or r.get("condemned"):
         sig.append(("code_enforcement", "PROPERTY", 14))
