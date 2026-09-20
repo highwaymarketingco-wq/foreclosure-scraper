@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-20T11:22:59.017091Z",
-  "total": 170588,
+  "run_time": "2026-09-20T14:02:53.497286Z",
+  "total": 170528,
   "by_source": {
     "counties_sc.cherokee_delinquent_tax": 528,
     "counties.column_legal_notices": 56,
@@ -100,8 +100,8 @@
     "courtlistener.recap": 945
   },
   "by_state": {
-    "NC": 93094,
-    "SC": 77494
+    "NC": 93073,
+    "SC": 77455
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 40909,
@@ -153,15 +153,15 @@
     "counties_generic.arcgis_distress.burke_storm_damage": 397,
     "counties_sc.sc_public_index_lis_pendens": 397,
     "national.landandfarm": 393,
+    "national.distressed": 369,
     "counties_sc.georgetown_civicengage": 365,
-    "national.distressed": 350,
     "national.usda_properties": 317,
     "counties_generic.arcgis_distress.buncombe_landslide_damage": 316,
     "counties_sc.greenville_mie_adverts": 308,
     "counties_sc.terry_howe_auctions": 296,
     "counties_generic.arcgis_distress.pickens_flood_damage": 293,
-    "national.fannie_homepath": 285,
     "counties_sc.sc_probate_net": 265,
+    "national.fannie_homepath": 255,
     "counties_nc.nc_ecourts_divorce": 241,
     "counties_sc.sc_probate_notices.gaffneyledger": 228,
     "counties_nc.mcdowell_probate": 227,
@@ -187,7 +187,6 @@
     "law_firms.hutchens": 78,
     "national.zillow_foreclosures": 74,
     "counties_sc.sc_flc": 73,
-    "national.foreclosure_dot_com": 72,
     "law_firms.brock_scott": 71,
     "counties_generic.arcgis_distress.laurens_county_owned": 68,
     "counties_sc.sc_state_tax_lien": 66,
@@ -209,6 +208,7 @@
     "counties_sc.pickens_tax_sale": 23,
     "counties_sc.terry_howe_flc": 23,
     "national.cash_buyer_deeds": 23,
+    "national.foreclosure_dot_com": 23,
     "national.servicelink_auction": 23,
     "counties_sc.horry_flc": 22,
     "national.crexi_multifamily": 21,
@@ -508,20 +508,20 @@
     "newspapers.carolina_coast"
   ],
   "notes": "",
-  "detail_count": 170588,
-  "detail_digest": "9e8270ba2b743b9f",
+  "detail_count": 170528,
+  "detail_digest": "3e2017bd8bd8475b",
   "board": {
     "schema": "slim-v1",
-    "count": 170588,
+    "count": 170528,
     "detail_shards": {
       "schema": "shard-v1",
       "dir": "detail_shards",
       "size": 1000,
       "count": 171,
-      "records": 170588
+      "records": 170528
     }
   },
-  "health_carried_from": "2026-09-20T10:49:55.828706Z",
+  "health_carried_from": "2026-09-20T11:22:59.017091Z",
   "health_carried_keys": [
     "by_source",
     "by_county_top",
