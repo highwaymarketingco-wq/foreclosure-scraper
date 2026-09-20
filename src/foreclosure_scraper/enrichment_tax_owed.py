@@ -48,9 +48,14 @@ _SOURCES = {
 }
 
 # generic amount keys scanned for any other tax/FLC/lien source subdict
+# `balance_owed` (added 2026-09-20) is the real delinquent balance carried by
+# raw['qpaybill_roll'] (19 SC counties) and raw['transylvania_tax']. Every one of
+# their ~40,000 rows has it, yet only a few hundred reached raw['tax_owed'], so
+# Spartanburg showed 288 of 4,280 rows with a known debt. It goes last so it
+# never outranks a more specific key on a block that carries both.
 _GENERIC_KEYS = (
     "principal_tax_due", "tax_due", "taxes_owed", "amount_owed", "total_due",
-    "balance", "lien_amount", "fll_bid", "flc_bid", "opening_bid",
+    "balance", "lien_amount", "fll_bid", "flc_bid", "opening_bid", "balance_owed",
 )
 _TAXISH = ("tax", "flc", "forfeited", "delinquent", "lien")
 

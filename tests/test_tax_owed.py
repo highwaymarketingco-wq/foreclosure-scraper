@@ -78,3 +78,31 @@ def test_tax_block_merged_into_a_non_taxish_source_is_still_found():
     assert stats["stamped"] == 1
     assert li.raw["tax_owed"]["balance"] == 6108.13
     assert li.raw["tax_owed"]["basis"] == "own_record"
+
+
+def test_qpaybill_roll_balance_owed_is_normalized():
+    # The qPayBill roll (19 SC counties) and Transylvania's scraper store the real
+    # delinquent balance as `balance_owed`. It was missing from _GENERIC_KEYS, so
+    # ~40,000 rows had a known debt that never reached raw['tax_owed'].
+    li = _li("counties_sc.qpaybill_delinquent_roll", county="Cherokee", state="SC",
+             raw={"qpaybill_roll": {"owner": "BYERS DOUGLAS", "balance_owed": 216.75,
+                                    "years_unpaid": ["2025"]}})
+    stats = enrich_tax_owed([li])
+    assert stats["stamped"] == 1
+    assert li.raw["tax_owed"]["balance"] == 216.75
+    assert li.raw["tax_owed"]["kind"] == "delinquent_tax"
+
+
+def test_balance_owed_does_not_outrank_a_more_specific_key():
+    li = _li("counties_sc.qpaybill_delinquent_roll", county="Cherokee", state="SC",
+             raw={"qpaybill_roll": {"total_due": 500.0, "balance_owed": 900.0}})
+    enrich_tax_owed([li])
+    assert li.raw["tax_owed"]["balance"] == 500.0
+
+
+def test_transylvania_tax_balance_owed_is_normalized():
+    li = _li("counties_nc.transylvania_delinquent_tax", county="Transylvania", state="NC",
+             raw={"transylvania_tax": {"tax_year": "2025", "balance_owed": 1234.5}})
+    enrich_tax_owed([li])
+    assert li.raw["tax_owed"]["balance"] == 1234.5
+    assert li.raw["tax_owed"]["year"] == 2025

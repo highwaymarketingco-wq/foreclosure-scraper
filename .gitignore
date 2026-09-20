@@ -86,3 +86,6 @@ docs/listings_slim.json
 
 # 356MB of regenerable, dashboard-served parcel/streetview photos: kept on disk, out of git
 docs/parcel_photos/
+
+# Responsible-disclosure drafts name exposed endpoints; the repo is PUBLIC. Keep local (2026-09-20).
+docs/pii_disclosure_drafts_*.md
