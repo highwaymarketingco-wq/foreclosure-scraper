@@ -482,9 +482,15 @@ async def enrich_sc_divorce(listings, max_lookups: int | None = None) -> dict:
                 try:
                     cases = await _search_one(s, headers, last, first, county_code)
                     consec_err = 0
-                except Exception:  # noqa: BLE001  (incl. _IncompleteSearch)
+                except Exception as exc:  # noqa: BLE001  (incl. _IncompleteSearch)
                     stats["errors"] += 1
                     consec_err += 1
+                    # Tally WHY, so a run's log says whether the portal is throttling
+                    # (http_429/http_503) or our own timeout is too tight for its
+                    # current latency (TimeoutError). Before this, both looked alike.
+                    kind = str(exc) if isinstance(exc, _IncompleteSearch) else type(exc).__name__
+                    kinds = stats.setdefault("error_kinds", {})
+                    kinds[kind] = kinds.get(kind, 0) + 1
                     continue  # leave unstamped -> retried next run
                 stats["searched"] += 1
                 _apply(li, cases, now)

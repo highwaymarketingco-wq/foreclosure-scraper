@@ -238,3 +238,17 @@ def test_reset_targets_only_wrong_order_stamps():
     assert needs_reset(stamped("Joshua D Smith", county="Wake", state="NC")) is False   # out of scope
     unstamped = _lead(2, owner="Joshua D Smith")
     assert needs_reset(unstamped) is False                          # never searched: nothing to clear
+
+
+def test_error_kinds_are_tallied_by_cause(monkeypatch):
+    leads = [_lead(i) for i in range(3)]
+    seq = iter([_Resp(status=503), asyncio.TimeoutError(), _Resp(bad_json=True)] * 12)
+    stats, _ = _run(monkeypatch, leads, lambda p: next(seq), concurrency=1)
+    kinds = stats["error_kinds"]
+    assert stats["errors"] == sum(kinds.values()) == 3
+    assert set(kinds) <= {"http_503", "TimeoutError", "bad_json"}, kinds
+
+
+def test_error_kinds_absent_when_nothing_failed(monkeypatch):
+    stats, _ = _run(monkeypatch, [_lead(1)], lambda p: _Resp(payload=[]))
+    assert "error_kinds" not in stats
