@@ -252,3 +252,11 @@ def test_error_kinds_are_tallied_by_cause(monkeypatch):
 def test_error_kinds_absent_when_nothing_failed(monkeypatch):
     stats, _ = _run(monkeypatch, [_lead(1)], lambda p: _Resp(payload=[]))
     assert "error_kinds" not in stats
+
+
+def test_defaults_match_the_portals_measured_parallel_limit():
+    # 2026-09-19: FCCMS serves ~3 searches in parallel at ~11s; a 4th queues to
+    # ~21s. More workers than that only adds timeouts, and a call timeout under
+    # ~2x the queued latency abandons calls the server still works on.
+    assert m._CONCURRENCY <= 3
+    assert m._CALL_TIMEOUT_S >= 40

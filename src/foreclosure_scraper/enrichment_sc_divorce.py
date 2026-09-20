@@ -118,7 +118,10 @@ _DIVORCE_CATEGORIES = (
 _DEFAULT_CAP = int(os.environ.get("FORECLOSURE_SC_DIVORCE_MAX", "400"))
 _REFRESH_DAYS = float(os.environ.get("FORECLOSURE_SC_DIVORCE_REFRESH_DAYS", "30"))
 _REFRESH_HOT_DAYS = float(os.environ.get("FORECLOSURE_SC_DIVORCE_REFRESH_HOT_DAYS", "7"))
-_CALL_TIMEOUT_S = float(os.environ.get("FORECLOSURE_SC_DIVORCE_CALL_TIMEOUT_S", "20"))
+# 45s, not 20s: in the portal's slow mode (2026-09-19) a call takes ~10s and a
+# call queued behind the portal's parallel limit takes ~21s (see _CONCURRENCY).
+# At 20s the queued call timed out; the run logged 84 errors, every one a Timeout.
+_CALL_TIMEOUT_S = float(os.environ.get("FORECLOSURE_SC_DIVORCE_CALL_TIMEOUT_S", "45"))
 # Wall-clock cap on the whole run so a throttled/hanging FCCMS can't drag it on for hours
 # (it hung ~6h once on a 1,677-lead bulk pass). Unreached leads retry next run via the refresh window.
 _BUDGET_S = float(os.environ.get("FORECLOSURE_SC_DIVORCE_BUDGET_S", "1800"))
@@ -127,7 +130,14 @@ _PER_QUERY_CAP = 25  # max case rows kept per lead
 # sequential worker did ~6-13 leads/min. 4 workers keeps at most 4 requests in
 # flight against a public court index (a browser opens 6 per host) and the
 # consecutive-failure abort below still stops the run if the portal pushes back.
-_CONCURRENCY = int(os.environ.get("FORECLOSURE_SC_DIVORCE_CONCURRENCY", "4"))
+#
+# 3 workers, not 4 (measured 2026-09-19, 18 uncached searches): one call alone
+# takes ~9.7s flat; with 4 in flight three finish together at ~11s and the
+# fourth waits a full cycle and finishes at 16-22s. The portal serves about 3
+# in parallel, so a 4th worker adds latency, not throughput, and its calls
+# tripped the old 20s timeout (a quarter of all calls) until the 12-failure
+# guard stopped the run. 3 matches what the portal actually serves.
+_CONCURRENCY = int(os.environ.get("FORECLOSURE_SC_DIVORCE_CONCURRENCY", "3"))
 
 
 # ---------- Owner-name handling (mirrors the ROD + nc_divorce enrichers) ------------
