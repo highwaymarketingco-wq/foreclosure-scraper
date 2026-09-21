@@ -1,0 +1,12 @@
+{
+  "name": "foreclosure-board-worker",
+  "private": true,
+  "type": "module",
+  "description": "Private dashboard Worker: app shell from static assets, board data from R2, behind Cloudflare Access. No dependencies.",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "build:shell": "node scripts/build_shell.mjs",
+    "check:shell": "node scripts/build_shell.mjs --check",
+    "render": "node scripts/render_config.mjs --print"
+  }
+}
