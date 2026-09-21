@@ -85,3 +85,17 @@ def test_candidates_put_exact_forms_first():
     tiers = [t for _k, t in c]
     assert tiers.index("zero_suffix") < tiers.index("zero_pad")
     assert pc._lookup_candidates("") == []
+
+
+def test_florence_unpadded_tms_resolves_by_left_padding_the_first_segment(tmp_path, monkeypatch):
+    # parcel_from_address doc 8a: the delinquent list prints "47-03-060", the layer holds 00047-03-060
+    _make_cache(tmp_path, monkeypatch, "florence", [("0004703060", "MILLS BENJAMIN T", "12 ELM ST", "PO BOX 1")])
+    hit, tier = pc.lookup_with_tier("Florence", "47-03-060", "SC")
+    assert tier == "zero_prefix" and hit["owner"] == "MILLS BENJAMIN T"
+    # a full 5-digit first segment still hits exactly and keeps its tier
+    assert pc.lookup_with_tier("Florence", "00047-03-060", "SC")[1] == "exact"
+
+
+def test_zero_prefix_padding_is_florence_only(tmp_path, monkeypatch):
+    _make_cache(tmp_path, monkeypatch, "darlington", [("0004703060", "SOMEONE ELSE", "1 A ST", None)])
+    assert pc.lookup_with_tier("Darlington", "47-03-060", "SC") == (None, None)

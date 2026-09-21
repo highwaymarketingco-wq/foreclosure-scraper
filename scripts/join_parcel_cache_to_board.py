@@ -103,7 +103,14 @@ def apply_rows(rows, *, dry_run: bool = False) -> dict:
         if not isinstance(li.raw, dict):
             li.raw = {}
 
-        if hit.get("owner_mailing"):
+        # A parcel resolved from the lead's street address may belong to someone else (a builder, a tenant, a
+        # debtor, or the parcel has a new owner): value, sqft and acreage are property facts and are safe, but the
+        # OWNER's mailing address is not, so it is withheld when the resolver recorded owner_agrees False.
+        _pfa = li.raw.get("parcel_from_address") if isinstance(li.raw, dict) else None
+        _owner_differs = isinstance(_pfa, dict) and _pfa.get("owner_agrees") is False
+        if _owner_differs and hit.get("owner_mailing"):
+            c["mailing withheld: parcel owner differs from the lead's party"] += 1
+        if hit.get("owner_mailing") and not _owner_differs:
             g = li.raw.setdefault("gis", {})
             if not g.get("mailing"):
                 g["mailing"] = hit["owner_mailing"]

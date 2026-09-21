@@ -1270,6 +1270,18 @@ def lookup(county: str, parcel_id: str, state: str | None = None) -> Optional[di
     return lookup_with_tier(county, parcel_id, state)[0]
 
 
+_ZERO_PREFIX_TMS = re.compile(r"\s*(\d{1,4})[-.\s](\d{2})[-.\s](\d{3})\s*")
+
+
+def _zero_prefix_candidates(v) -> list[tuple[str, str]]:
+    """Florence SC: the delinquent list prints the TMS without its leading zeros ("47-03-060") but
+    the county layer holds the 5-2-3 form ("00047-03-060", cached undashed). Left-pad the first
+    segment. Scoped to Florence in lookup_with_tier because another county's numbering could put an
+    unrelated parcel at the padded id (parcel_from_address doc, section 8a)."""
+    m = _ZERO_PREFIX_TMS.fullmatch(str(v or ""))
+    return [(f"{int(m.group(1)):05d}{m.group(2)}{m.group(3)}", "zero_prefix")] if m else []
+
+
 def lookup_with_tier(county: str, parcel_id: str,
                      state: str | None = None) -> tuple[Optional[dict], Optional[str]]:
     """lookup() plus WHICH id form matched: 'exact' (the forms this module has always
@@ -1287,7 +1299,10 @@ def lookup_with_tier(county: str, parcel_id: str,
         con = _CONN[ckey] = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
     sel = "SELECT " + ",".join(_COLS) + " FROM parcels WHERE id=?"
     pad_rows: list[tuple] = []
-    for k, tier in _lookup_candidates(parcel_id):
+    cands = _lookup_candidates(parcel_id)
+    if str(county).strip().lower() == "florence":
+        cands = cands + _zero_prefix_candidates(parcel_id)
+    for k, tier in cands:
         try:
             row = con.execute(sel, (k,)).fetchone()
         except sqlite3.OperationalError:

@@ -36,6 +36,7 @@ STEPS = [
     ("accounts", "map_account_ids_to_parcels", "Laurens account numbers -> TMS; Rutherford PIN -> REID"),
     ("county", "backfill_missing_county", "county for rows with none"),
     ("flip", "quarantine_flip_leaks", "stamp flip-type leads outside the 18 counties"),
+    ("parcel", "resolve_parcel_from_address", "parcel_id for address-only leads, exact unique street match in the county cache"),
     ("address", "fill_address_from_parcel", "street address from the parcel cache"),
     ("join", "join_parcel_cache_to_board", "owner mailing, value, sqft from the parcel cache"),
     ("divorce", None, "stamp raw.divorce.match (middle-initial verdict)"),

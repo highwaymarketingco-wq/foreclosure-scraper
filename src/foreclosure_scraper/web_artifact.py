@@ -1473,7 +1473,8 @@ RAW_KEEP = {
     # apply scripts stamp these; without an entry here write_artifact drops them silently.
     "county_backfill": "*",            # county filled from ZIP / city / parcel evidence {county, evidence, basis}
     "scope": "*",                      # 'flip_outside_footprint': a flip outside the 18 counties, scorer excludes it
-    "resolver_conflict_undone": "*",   # withdrawn name-to-property resolution {action, query_name, matched_owner, removed}
+    "resolver_conflict_undone": "*",
+    "parcel_from_address": "*",        # parcel resolved from the lead's own street address {source, verified, county, state, matched_situs, cache_owner, owner_agrees, id_basis, cache_ids}   # withdrawn name-to-property resolution {action, query_name, matched_owner, removed}
     # Read by the scorer (docs/handoff_scorer_to_others_2026-09-21.md section 2). Without an
     # entry a board reloaded from the published files loses them, so the tax_lien_chronic weight
     # (Pickens, 3+ roll years) and the vacant_structure PROPERTY signal (Hendersonville register)
