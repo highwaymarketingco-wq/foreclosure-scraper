@@ -365,6 +365,13 @@ RAW_KEEP = {
     # Repeat tax/foreclosure-sale loser (Dirty Deeds Tier A #34): prior_losses,
     # most_recent_loss_date/doc_type, county, state. Registered before first run.
     "repeat_tax_loss": "*",
+    # The recorded instruments behind a repeat_tax_loss tag: [{inst_class, date,
+    # book, page, role, county}], newest first, at most 5. Written by the same
+    # enricher. Registered here BEFORE its first run. Deliberately NOT in _SLIM_RAW
+    # or dashboard.js _LEAN_RAW, so it reaches the full board but not the payload
+    # phones fetch (repeat_tax_loss is in the same position). Add it to both gates
+    # if the dashboard should list the deeds.
+    "deed_index": "*",
     # Point-in-polygon parcel-resolution provenance (source: nc_onemap_point/
     # scdot_point, lat/lng at resolution time). Found 2026-09-16: this key has
     # been written by enrichment_parcel_from_geo.py since it was built, but was
@@ -470,6 +477,7 @@ RAW_KEEP = {
     "owner_name_source": "*",         # provenance when owner_name was promoted from tax/GIS
     "notice_contact": "*",            # attributable attorney/trustee email from the legal-notice body
     "incarceration": "*",             # owner matched a state corrections roster (NC DAC) — low-conf stack signal
+    "incarceration_check": "*",       # answered NO-match stamp {checked_at, name, source, result}: lets the enricher rotate past checked leads instead of re-querying the same 150
     "distress_stack": "*",
     "strategy_fit": "*",
     "eviction_market": "*",           # LSC county eviction-pressure market signal (context)
