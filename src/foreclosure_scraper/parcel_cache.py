@@ -588,6 +588,7 @@ PARCEL_LAYERS: dict[str, dict] = {
         # MarketValue_Total 74,000 on the sample) is the capped appraisal, not the 4-6%
         # assessed figure, so it is safe as tax_value. DeedAcres is only ~4% populated.
         "state": "SC",
+        "page": 250,   # the CAMA join answers 502 (backend timeout) above about 250 rows a page with this field set
         "url": "https://www.greenwoodsc.gov/arcgis/rest/services/Operational_Layers/CAMA/MapServer/9/query",
         "id_fields": ["PIN"],
         "map": {"owner": "Owner", "address": "SiteAddress",
@@ -1081,7 +1082,7 @@ def _src_fields(id_fields, spec_map) -> str:
     return ",".join(sorted(src))
 
 
-async def _download_rows(base: str, where: str, out_fields: str):
+async def _download_rows(base: str, where: str, out_fields: str, page: int | None = None):
     """Count-verified bulk download of one ArcGIS layer. Returns (rows, expected).
 
     COUNT-DRIVEN pagination: keep pulling until we've collected `exp` rows. Advance by
@@ -1106,7 +1107,7 @@ async def _download_rows(base: str, where: str, out_fields: str):
     rows, offset, empties = [], 0, 0
     while exp is None or len(rows) < exp:
         url = (f"{base}?where={where_q}&outFields={out_fields}&returnGeometry=false"
-               f"&resultOffset={offset}&resultRecordCount={_PAGE}&f=json")
+               f"&resultOffset={offset}&resultRecordCount={page or _PAGE}&f=json")
         try:
             data = json.loads(await get_text(url, timeout=90, impersonate=True))
             feats = data.get("features") or []
@@ -1192,7 +1193,7 @@ async def refresh_county(county: str) -> dict:
     out_fields = _src_fields(cfg["id_fields"], cfg["map"])
     t0 = time.time()
     try:
-        rows, exp = await _download_rows(base, cfg.get("where", "1=1"), out_fields)
+        rows, exp = await _download_rows(base, cfg.get("where", "1=1"), out_fields, cfg.get("page"))
     except RuntimeError as e:
         return {"county": county, "ok": False, "error": str(e)}
 

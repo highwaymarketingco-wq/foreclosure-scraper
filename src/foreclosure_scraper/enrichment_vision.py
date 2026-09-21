@@ -26,8 +26,10 @@ import asyncio
 import base64
 import json
 import os
+import random
 import re
-from typing import Optional
+import time
+from typing import Callable, Optional
 
 import httpx
 import structlog
@@ -111,6 +113,36 @@ _spend_guard = _SpendGuard()
 GEMINI_VISION_MODEL = os.environ.get(
     "GEMINI_VISION_MODEL", "gemini-2.5-flash"
 )
+# 2026-09-21: THE Gemini yield problem. Free-tier quota is PER PROJECT PER MODEL,
+# and gemini-2.5-flash is capped at 20 requests/day per project (quotaId
+# GenerateRequestsPerDayPerProjectPerModel-FreeTier, limit: 20, measured live).
+# Nine keys on that one model = ~180 calls/day at best, and the daily pass was
+# scoring 63-76 of them. Every other model has its OWN bucket, so the pool now
+# registers one lane per (key, model). Measured live 2026-09-21 with the
+# production prompt on a real listing photo (see docs/vision_repair_2026-09-21.md
+# for the full table); the per-minute limits below are from the 429 bodies.
+#   gemini-3.5-flash-lite  15 RPM  ~1-4s   best lane (gemini-flash-lite-latest is an
+#                                          ALIAS of it and shares the bucket: not registered)
+#   gemini-2.5-flash-lite  10 RPM, 20 RPD  ~2-6s
+#   gemini-3.1-flash-lite  15 RPM  slow and erratic (10-84s)
+#   gemini-2.5-flash       10 RPM, 20 RPD
+#   gemini-3-flash-preview  5 RPM  ~20s (best grader, tiny quota)
+# Rejected: gemma-4-* answer with EMPTY text; gemini-3.5-flash / 3.6 / 3.7 / 3.8
+# return 503 "high demand" or time out at 60s.
+GEMINI_POOL_MODELS = [m.strip() for m in os.environ.get("GEMINI_VISION_MODELS", ",".join([
+    "gemini-3.5-flash-lite",
+    "gemini-2.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-3-flash-preview",
+])).split(",") if m.strip()]
+# Free-tier requests/minute per model, used only to pace each lane (delay =
+# 60/rpm + 0.5s). A model not listed here is paced as 5 RPM (the strictest seen).
+GEMINI_MODEL_RPM = {
+    "gemini-3.5-flash-lite": 15, "gemini-3.1-flash-lite": 15,
+    "gemini-2.5-flash-lite": 10, "gemini-2.5-flash": 10,
+    "gemini-3-flash-preview": 5, "gemini-3.5-flash": 5,
+}
 
 MAX_PHOTOS_PER_LISTING = 7   # up to 5 real + aerial + street
 MAX_REAL_PHOTOS = 5          # how many of the listing photos to send
@@ -123,6 +155,53 @@ MAX_TOKENS = 4000
 # both via env when on a paid tier with higher limits.
 CONCURRENCY = int(os.environ.get("VISION_CONCURRENCY", "1"))
 INTER_CALL_DELAY = float(os.environ.get("VISION_INTER_CALL_DELAY", "6.0"))
+
+# ---------------------------------------------------------------------------
+# Run budget + per-call timeouts (2026-09-21 vision repair)
+# ---------------------------------------------------------------------------
+# The daily pass used to hold the board lock for 4 hours to score 371-759 leads
+# (2026-09-21 ops audit, finding O6), and every one of its ReadTimeouts
+# burned 90 seconds. The wall-clock default is now 90 minutes and a single
+# provider call is cut off at 60 seconds. All three are env-tunable.
+VISION_MAX_SECONDS_DEFAULT = 5400.0        # 90 minutes
+
+
+def vision_max_seconds() -> float:
+    """Wall-clock budget for one vision pass, in seconds.
+
+    VISION_MAX_SECONDS unset or blank -> 5400 (90 min).
+    VISION_MAX_SECONDS=0              -> unlimited (explicit opt-out; the test
+                                         suite and one-off backfills use this).
+    Anything unparseable falls back to the default rather than to unlimited.
+    """
+    raw = (os.environ.get("VISION_MAX_SECONDS") or "").strip()
+    if not raw:
+        return VISION_MAX_SECONDS_DEFAULT
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return VISION_MAX_SECONDS_DEFAULT
+
+
+def _start_stagger() -> float:
+    """Seconds between the opening calls of consecutive lanes/workers, so a pool of
+    nine keys x five models does not fire 45 requests in the same second (rate-limit
+    windows are per model per project, and the first burst is where the 429 storm
+    starts). VISION_START_STAGGER_S=0 disables."""
+    try:
+        return max(0.0, float(os.environ.get("VISION_START_STAGGER_S", "1.5")))
+    except ValueError:
+        return 1.5
+
+
+def _call_timeout() -> float:
+    """Per provider-call HTTP timeout. Healthy lanes measured live on 2026-09-21
+    answered in 1-40s; the 90s this replaced only bought idle waits (30 of the
+    day's ising calls timed out and each held its worker for the full 90s)."""
+    try:
+        return max(5.0, float(os.environ.get("VISION_CALL_TIMEOUT", "60")))
+    except ValueError:
+        return 60.0
 
 
 
@@ -800,19 +879,36 @@ NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 # a REAL non-null condition_tier on >=3 of 4. "Responds with JSON" is NOT enough —
 # see the blindness note below.
 NVIDIA_VISION_MODELS = [m.strip() for m in os.environ.get("NVIDIA_VISION_MODELS", ",".join([
-    # --- 4/4 real tiers, well grounded (cite specifics from the actual photo) ---
-    "nvidia/nemotron-nano-12b-v2-vl",                 # 8/8, ~9.6s. Best NIM lane.
-    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",  # 8/8, ~8.4s. Tied best.
-    # --- net-new, verified this round ---
-    "nvidia/ising-calibration-1.5-31b",               # 4/4, ~7.0s (fastest chat route)
-    "thinkingmachines/inkling",                       # 4/4, ~18.5s. Was wrongly written
-                                                      # off as a timeout; a 300s retry proved
-                                                      # it fine. Pessimism bias (skews 'major').
-    # --- meets the bar but biased; keep at the back of the rotation ---
-    "nvidia/llama-3.1-nemotron-nano-vl-8b-v1",        # 3/4, over-optimistic (move_in_ready)
-    "meta/llama-3.2-90b-vision-instruct",             # 5/8, slow (~20s) but honest: returns
-                                                      # LOW-confidence nulls rather than guessing
+    # RE-VERIFIED 2026-09-21 with the production prompt + parser on two real listing
+    # photos through this module's own _OpenAICompatBackend (and 6 simultaneous calls
+    # per lane: all answered, no 429). Only lanes that returned a REAL tier are kept.
+    "nvidia/ising-calibration-1.5-31b",   # 2/2 real tiers (move_in_ready, major), 9-18s.
+                                          # The lane that carried 340-426 of every day's scores.
+    "google/gemma-4-31b-it",              # NEW: 2/2 real tiers (cosmetic, major), 10-16s.
+                                          # Was a 180s read-timeout on 2026-07-27; healthy now.
+    "meta/muse-glimmer-30b",              # NEW: 2/2 tiers but both "cosmetic" (weak spread),
+                                          # 13-32s. Back of the rotation.
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",  # good grader, but the host intermittently
+                                          # answers 503 "Worker local total request limit reached
+                                          # (16/16)"; the circuit breaker rides that out.
 ])).split(",") if m.strip()]
+# Concurrent workers per NIM lane. NIM is ~40 RPM per model and answers in 7-30s, so a
+# single sequential worker used a fifth of the lane. 6 simultaneous calls per lane all
+# answered on 2026-09-21; 3 leaves headroom. Override: VISION_NIM_WORKERS.
+NVIDIA_DEFAULT_WORKERS = max(1, int(os.environ.get("VISION_NIM_WORKERS", "3")))
+NVIDIA_LANE_WORKERS: dict[str, int] = {
+    "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning": 1,
+    "meta/muse-glimmer-30b": 2,
+}
+# REMOVED 2026-09-21 (HTTP 410 "has reached its end of life" or gone from GET /v1/models):
+#   nvidia/nemotron-nano-12b-v2-vl (EOL 2026-08-26), thinkingmachines/inkling (EOL
+#   2026-08-25), nvidia/llama-3.1-nemotron-nano-vl-8b-v1 (EOL 2026-08-26).
+# REMOVED 2026-09-21 (read timeouts at 60-93s on a single-photo call): meta/llama-3.2-90b-
+#   vision-instruct, moonshotai/kimi-k3, z-ai/glm-5.3-flash. llama-3.2-11b-vision answers
+#   but returns a null tier. Not multimodal on this host (400/500 "multimodal processing is
+#   not enabled"): nvidia/nemotron-3.5-lightning-30b-a3b, poolside/laguna-xs-2.1, z-ai/glm-5.3.
+#   404 "Not found for account" (not entitled): kimi-k2.6, gemma-3-12b-it, cosmos-reason2-8b,
+#   nemotron-nano-3-30b-a3b.
 # DROPPED 2026-07-27, do NOT re-add without re-probing:
 #   mistralai/mistral-medium-3.5-128b — DEAD: 4/4 read timeouts even at 300s (it also
 #     timed out on a 96x96 image). It was configured and silently contributed nothing.
@@ -837,15 +933,86 @@ NVIDIA_VISION_MODELS = [m.strip() for m in os.environ.get("NVIDIA_VISION_MODELS"
 
 
 class QuotaExhausted(Exception):
-    """Raised by a backend when it hits its daily/rate quota (HTTP 429 /
-    RESOURCE_EXHAUSTED). The pool catches this, retires that backend for the
-    rest of the run, and re-queues the listing for another backend."""
+    """Raised by a backend on HTTP 429 / RESOURCE_EXHAUSTED. The pool re-queues
+    the listing (no attempt spent) and backs the lane off.
+
+    retry_after  seconds the provider said to wait (Retry-After header or the
+                 "Please retry in 14.6s" line of a Gemini 429 body), else None.
+    daily        True when the 429 is a DAILY cap (Gemini ...PerDay..., Cloudflare
+                 "daily free allocation of 10,000 neurons"): waiting a minute
+                 cannot fix that, so the pool disables the lane for the run
+                 instead of cooling down and retrying it ten times.
+    Both default so the historical `raise QuotaExhausted(name)` still works.
+    """
+
+    def __init__(self, *args, retry_after: Optional[float] = None, daily: bool = False):
+        super().__init__(*args)
+        self.retry_after = retry_after
+        self.daily = daily
+
+
+class BackendDisabled(Exception):
+    """Raised by a backend on a PERMANENT error: HTTP 401/402/403/404/410 (dead
+    or end-of-life model, unpaid subscription, bad key, model not entitled to this
+    key). Retrying cannot help within a run, so the pool disables the lane for the
+    rest of the run on the FIRST occurrence instead of feeding it five listings."""
+
+    def __init__(self, name: str = "", status: Optional[int] = None, reason: str = ""):
+        super().__init__(name, status, reason)
+        self.name = name
+        self.status = status
+        self.reason = reason
+
+
+#: HTTP statuses that mean "this lane is gone for the run".
+_PERMANENT_STATUSES = frozenset({401, 402, 403, 404, 410})
+
+_DAILY_MARKERS = ("perday", "per day", "daily", "neurons")
 
 
 def _is_quota_msg(msg: str) -> bool:
     msg = msg.lower()
     return ("429" in msg or "resource_exhausted" in msg or "quota" in msg
             or "exceeded" in msg or "rate limit" in msg)
+
+
+def _is_daily_quota(msg: str) -> bool:
+    """True when a 429 body says the DAILY cap is spent (see QuotaExhausted.daily)."""
+    m = (msg or "").lower()
+    return any(k in m for k in _DAILY_MARKERS)
+
+
+def _retry_after_seconds(msg: str = "", header: Optional[str] = None) -> Optional[float]:
+    """Provider's own 'wait this long' hint: the Retry-After header, else the
+    'Please retry in 14.59s' / 'retry in 51.6s' line Gemini appends to a 429."""
+    if header:
+        try:
+            return max(0.0, float(header))
+        except ValueError:
+            pass
+    m = re.search(r"retry in ([\d.]+)\s*s", msg or "", re.I)
+    if m:
+        try:
+            return max(0.0, float(m.group(1)))
+        except ValueError:
+            return None
+    return None
+
+
+def _safe_body(text: str) -> str:
+    """Provider error text with the account identifier NVIDIA echoes on a 404
+    ("Not found for account '<id>'") removed, so a shared log carries no ids."""
+    return re.sub(r"account '[^']*'", "account '<redacted>'", text or "")
+
+
+def _http_status_of(exc: BaseException) -> Optional[int]:
+    """HTTP status carried by an SDK exception (google.genai ClientError/ServerError
+    expose .code), else parsed off the leading '429 RESOURCE_EXHAUSTED.' of its text."""
+    code = getattr(exc, "code", None)
+    if isinstance(code, int):
+        return code
+    m = re.match(r"\s*(\d{3})\b", str(exc))
+    return int(m.group(1)) if m else None
 
 
 CONDITION_TIERS = ("move_in_ready", "cosmetic", "major", "gut")
@@ -919,30 +1086,54 @@ def _finalize(parsed: Optional[dict], provider: str, model: str, n: int,
 
 
 class _GeminiBackend:
-    """One Gemini API key = one backend (one project's free quota)."""
-    def __init__(self, key: str, idx: int):
+    """One (Gemini API key, model) pair = one lane with its OWN free-tier bucket.
+
+    Google meters the free tier per project per model, so a lane is the unit of
+    quota, of pacing and of health. `gate` is an optional asyncio.Semaphore shared
+    by every lane of ONE key: it caps how many calls that key's project has in
+    flight at once, so a key that carries five models is not hit by five
+    simultaneous requests (the "one key hammered" failure).
+    """
+    def __init__(self, key: str, idx: int, model: Optional[str] = None,
+                 gate: Optional[asyncio.Semaphore] = None,
+                 delay: Optional[float] = None, name: Optional[str] = None):
         from google import genai
         self.client = genai.Client(api_key=key)
-        self.name = f"gemini#{idx}"
-        self.model = GEMINI_VISION_MODEL
-        self.delay = INTER_CALL_DELAY
+        self.model = model or GEMINI_VISION_MODEL
+        self.name = name or f"gemini#{idx}"
+        self.delay = INTER_CALL_DELAY if delay is None else delay
         self.cap = MAX_PHOTOS_PER_LISTING
+        self.gate = gate
+        self.workers = 1
+        self.start_delay = 0.0           # set by _build_backends (opening-burst stagger)
 
     async def assess(self, li: Listing, payloads, urls) -> Optional[dict]:
         from google.genai import types as t
         parts = [t.Part.from_bytes(data=d, mime_type=m) for d, m in payloads[:self.cap]]
         prompt = f"{SYSTEM_PROMPT}\n\n{_user_prompt(li)}"
         try:
-            resp = await self.client.aio.models.generate_content(
-                model=self.model, contents=parts + [prompt],
-                config=t.GenerateContentConfig(
-                    max_output_tokens=MAX_TOKENS,
-                    response_mime_type="application/json"),
-            )
+            cfg = t.GenerateContentConfig(
+                max_output_tokens=MAX_TOKENS,
+                response_mime_type="application/json",
+                http_options=t.HttpOptions(timeout=int(_call_timeout() * 1000)))
+            if self.gate is not None:
+                async with self.gate:
+                    resp = await self.client.aio.models.generate_content(
+                        model=self.model, contents=parts + [prompt], config=cfg)
+            else:
+                resp = await self.client.aio.models.generate_content(
+                    model=self.model, contents=parts + [prompt], config=cfg)
         except Exception as exc:
-            if _is_quota_msg(str(exc)):
-                raise QuotaExhausted(self.name)
-            log.warning("vision.api_error", backend=self.name, source_url=li.source_url, error=_exc_label(exc, 160))
+            msg = str(exc)
+            status = _http_status_of(exc)
+            if status == 429 or (status is None and _is_quota_msg(msg)):
+                raise QuotaExhausted(self.name, retry_after=_retry_after_seconds(msg),
+                                     daily=_is_daily_quota(msg))
+            if status in _PERMANENT_STATUSES or (
+                    status == 400 and "api key" in msg.lower()):
+                raise BackendDisabled(self.name, status, _exc_label(exc, 120))
+            log.warning("vision.api_error", backend=self.name, source_url=li.source_url,
+                        status=status, error=_exc_label(exc, 160))
             return None
         text = ""
         try:
@@ -965,7 +1156,7 @@ class _OpenAICompatBackend:
     with base64 data-URL images."""
     def __init__(self, name: str, url: str, key: str, model: str,
                  http: httpx.AsyncClient, cap: int = 4, delay: float = 1.0,
-                 extra_body: Optional[dict] = None):
+                 extra_body: Optional[dict] = None, workers: int = 1):
         self.name = name
         self.url = url
         self.key = key
@@ -973,6 +1164,13 @@ class _OpenAICompatBackend:
         self.http = http
         self.cap = cap
         self.delay = delay
+        # Concurrent worker tasks the pool runs against THIS lane. NIM answers in
+        # 7-30s and rate-limits at ~40 RPM per model, so one sequential worker
+        # (the old shape) left most of the lane's quota unused: measured
+        # 2026-09-21, 6 simultaneous calls per model all succeeded.
+        self.workers = max(1, int(workers))
+        self.start_delay = 0.0           # set by _build_backends (opening-burst stagger)
+        self.worker_stagger = _start_stagger()   # gap between this lane's own workers
         # Provider-specific request fields (e.g. Groq needs reasoning_effort
         # "none" or its qwen3.6 vision model never stops thinking long enough
         # to emit the JSON). Merged into the body verbatim.
@@ -987,16 +1185,27 @@ class _OpenAICompatBackend:
                 "messages": [{"role": "user", "content": content}]}
         body.update(self.extra_body)
         try:
-            r = await self.http.post(self.url, json=body, timeout=90.0,
+            r = await self.http.post(self.url, json=body, timeout=_call_timeout(),
                                      headers={"Authorization": f"Bearer {self.key}",
                                               "Content-Type": "application/json"})
         except Exception as exc:
             log.warning("vision.api_error", backend=self.name, source_url=li.source_url, error=_exc_label(exc, 160))
             return None
         if r.status_code == 429:
-            raise QuotaExhausted(self.name)
+            body_txt = getattr(r, "text", "") or ""
+            hdrs = getattr(r, "headers", None) or {}
+            raise QuotaExhausted(
+                self.name,
+                retry_after=_retry_after_seconds(body_txt, hdrs.get("retry-after")),
+                daily=_is_daily_quota(body_txt))
+        if r.status_code in _PERMANENT_STATUSES:
+            # 410 end-of-life / retired service, 402 unpaid subscription, 401/403
+            # bad key, 404 model not deployed for this key: nothing a retry fixes.
+            body_txt = _safe_body(r.text)
+            log.warning("vision.api_error", backend=self.name, status=r.status_code, error=body_txt[:160])
+            raise BackendDisabled(self.name, r.status_code, body_txt[:120])
         if r.status_code >= 400:
-            log.warning("vision.api_error", backend=self.name, status=r.status_code, error=r.text[:160])
+            log.warning("vision.api_error", backend=self.name, status=r.status_code, error=_safe_body(r.text)[:160])
             return None
         try:
             data = r.json()
@@ -1113,29 +1322,204 @@ class _AnthropicBackend:
                          len(blocks), urls, usage)
 
 
+class _LaneHealth:
+    """Half-open circuit breaker for ONE backend, shared by all of its workers.
+
+    WHY THIS EXISTS. The pool used to retire a backend by letting its worker
+    `return`, forever. Any backend that looked bad for a few minutes (a Gemini
+    per-minute 429 storm, a run of NIM 503s, a network blip) was gone for the rest
+    of the 4-hour run, and nothing ever brought it back. Measured 2026-09-21:
+    live_workers went 20 -> 12 -> 3 -> 1 inside 40 minutes and stayed at 1 for
+    3 hours while the lanes that had only been rate-limited sat retired.
+
+    States
+      closed    healthy; takes work.
+      open      banned until `open_until`; then ONE worker is granted a probe
+                (half-open). A successful probe closes it, a failed one re-opens
+                it for another `reopen_s`.
+      disabled  gone for the run (410/402/401/403/404, daily quota spent). Never
+                probed: a retry cannot help before the quota clock resets.
+
+    reopen_s == 0 restores the legacy behaviour (a tripped lane is disabled, its
+    workers exit); the pre-existing pool tests pin that mode.
+
+    Error handling this class encodes
+      record_permanent()   410/402/... -> disabled immediately.
+      record_quota(daily)  daily cap -> disabled; per-minute 429 -> exponential
+                           back-off with jitter (honouring the provider's own
+                           retry-after), and `strike_limit` consecutive 429s
+                           trip the breaker.
+      record_hard_fail()   timeout / 5xx / unparseable: `hard_limit` consecutive
+                           failures trip the breaker.
+      record_success()     closes the breaker and clears every counter.
+    """
+
+    def __init__(self, name: str, *, hard_limit: int = 5, strike_limit: int = 10,
+                 reopen_s: float = 600.0, cooldown_s: float = 70.0,
+                 max_backoff_s: float = 300.0,
+                 clock: Callable[[], float] = time.monotonic,
+                 rand: Callable[[], float] = random.random):
+        self.name = name
+        self.hard_limit = max(1, hard_limit)
+        self.strike_limit = max(1, strike_limit)
+        self.reopen_s = max(0.0, reopen_s)
+        self.cooldown_s = max(0.0, cooldown_s)
+        self.max_backoff_s = max(self.cooldown_s, max_backoff_s)
+        self._clock = clock
+        self._rand = rand
+        self.state = "closed"
+        self.open_until = 0.0
+        self.probing = False
+        self.hard_fails = 0          # consecutive
+        self.strikes = 0             # consecutive 429s
+        self.reason = ""
+        # lifetime counters, for the end-of-run per-backend table
+        self.attempts = 0
+        self.ok = 0
+        self.errors: dict[str, int] = {}
+        self.trips = 0
+        self.readmissions = 0
+
+    # -- queries ---------------------------------------------------------
+    @property
+    def up(self) -> bool:
+        """Counts toward `live_workers`: closed, or a probe is in flight."""
+        return self.state == "closed" or (self.state == "open" and self.probing)
+
+    def gate(self) -> tuple[str, float]:
+        """What may a worker of this backend do right now?
+        ("go", 0)      take work.
+        ("probe", 0)   take work as the half-open probe (exactly one caller gets it).
+        ("wait", s)    banned; come back in about s seconds.
+        ("off", 0)     disabled: the worker should exit."""
+        if self.state == "closed":
+            return "go", 0.0
+        if self.state == "disabled":
+            return "off", 0.0
+        now = self._clock()
+        if self.probing:
+            return "wait", 1.0               # a peer worker is running the probe
+        if now < self.open_until:
+            return "wait", self.open_until - now
+        self.probing = True
+        self.readmissions += 1
+        return "probe", 0.0
+
+    # -- outcomes --------------------------------------------------------
+    def _note(self, kind: str) -> None:
+        self.errors[kind] = self.errors.get(kind, 0) + 1
+
+    def record_success(self) -> bool:
+        """Returns True when this success re-admitted a banned lane."""
+        self.ok += 1
+        self.attempts += 1
+        self.hard_fails = 0
+        self.strikes = 0
+        self.probing = False
+        if self.state == "open":
+            self.state = "closed"
+            self.reason = ""
+            return True
+        return False
+
+    def _trip(self, reason: str) -> None:
+        if self.state == "disabled":
+            # A permanent disable is final: a late failure reported by a peer worker
+            # that was still in flight must not turn it into a re-admittable ban.
+            return
+        self.probing = False
+        self.reason = reason
+        self.trips += 1
+        if self.reopen_s <= 0:
+            self.state = "disabled"          # legacy: retired for the run
+        else:
+            self.state = "open"
+            self.open_until = self._clock() + self.reopen_s
+
+    def record_permanent(self, status, reason: str = "") -> None:
+        self.attempts += 1
+        self._note(f"http{status}" if status else "permanent")
+        self.probing = False
+        self.state = "disabled"
+        self.reason = f"permanent:{status}" + (f" {reason}" if reason else "")
+
+    def record_hard_fail(self, kind: str = "hard") -> bool:
+        """Returns True when this failure tripped the breaker."""
+        self.attempts += 1
+        self._note(kind)
+        self.hard_fails += 1
+        if self.probing or self.hard_fails >= self.hard_limit:
+            self._trip(f"{self.hard_fails} consecutive failures ({kind})")
+            return True
+        return False
+
+    def record_quota(self, retry_after: Optional[float] = None,
+                     daily: bool = False) -> tuple[float, bool]:
+        """A 429. Returns (seconds the worker should sleep, tripped?).
+        A 429 spends no listing attempt, so it does not bump `attempts`."""
+        self._note("429-daily" if daily else "429")
+        if daily:
+            self.probing = False
+            self.state = "disabled"
+            self.reason = "daily quota spent"
+            return 0.0, True
+        self.strikes += 1
+        if self.probing or self.strikes >= self.strike_limit:
+            self._trip(f"{self.strikes} consecutive 429s")
+            return 0.0, True
+        if retry_after is not None and retry_after > 0:
+            base = retry_after + 1.0
+        else:
+            base = self.cooldown_s * (2 ** (self.strikes - 1))
+        wait = min(self.max_backoff_s, base)
+        return wait * (1.0 + 0.25 * self._rand()), False   # jitter: never a lock-step retry
+
+
 async def _build_backends(http: httpx.AsyncClient) -> list:
     """Assemble every available FREE vision backend (plus paid Anthropic only
     as a last resort). Order doesn't matter — all pull from one shared queue."""
     backends: list = []
 
-    # Gemini — one backend per key (each key = one project's free quota).
+    # Gemini: one lane per (key, model). Each key is one project; Google meters
+    # the free tier per project PER MODEL, so N keys x M models = N*M independent
+    # buckets (gemini-2.5-flash alone is only 20 requests/day/project; see
+    # GEMINI_POOL_MODELS). Two spreading rules keep the keys from being hammered:
+    #   * the model order is ROTATED per key, so the nine keys do not all open on
+    #     the same model at the same second;
+    #   * one semaphore per key (VISION_GEMINI_KEY_CONCURRENCY, default 2) bounds
+    #     that project's in-flight calls across all of its models.
     keys = _parse_gemini_keys()
     if keys:
         try:
             from google import genai  # noqa: F401
+            models = GEMINI_POOL_MODELS or [GEMINI_VISION_MODEL]
+            per_key = max(1, int(os.environ.get("VISION_GEMINI_KEY_CONCURRENCY", "2")))
+            stagger = _start_stagger()
             for i, k in enumerate(keys, 1):
-                try:
-                    backends.append(_GeminiBackend(k, i))
-                except Exception as exc:
-                    log.warning("vision.backend_init_fail", backend=f"gemini#{i}", error=str(exc)[:120])
+                gate = asyncio.Semaphore(per_key)
+                rot = (i - 1) % len(models)
+                for n, m in enumerate(models[rot:] + models[:rot]):
+                    rpm = GEMINI_MODEL_RPM.get(m, 5)
+                    delay = max(INTER_CALL_DELAY, 60.0 / rpm + 0.5)
+                    name = f"gemini#{i}" if len(models) == 1 else f"gemini#{i}:{m.replace('gemini-', '')}"
+                    try:
+                        b = _GeminiBackend(k, i, model=m, gate=gate, delay=delay, name=name)
+                        b.start_delay = ((i - 1) + n * 0.5) * stagger
+                        backends.append(b)
+                    except Exception as exc:
+                        log.warning("vision.backend_init_fail", backend=name, error=str(exc)[:120])
         except ImportError:
             log.warning("vision.sdk_missing", provider="gemini", hint="pip install google-genai")
 
     # GitHub Models — free, uses the gh token if GITHUB_MODELS_TOKEN/GITHUB_TOKEN set.
     # ONE LANE PER MODEL: GitHub rate-limits per model tier, so registering N verified
     # models gives N parallel free lanes instead of one (was a single gpt-4o-mini lane).
+    # GITHUB MODELS WAS FULLY RETIRED ON 2026-07-30 (github.blog changelog
+    # 2026-07-30 "GitHub Models is now retired"): the catalog and inference
+    # endpoints answer 503 HTML / 410 "retirement brownout" for every model.
+    # Verified live 2026-09-21. Off unless VISION_ENABLE_GITHUB=1.
     gh = os.environ.get("GITHUB_MODELS_TOKEN") or os.environ.get("GITHUB_TOKEN")
-    if gh:
+    if gh and os.environ.get("VISION_ENABLE_GITHUB") == "1":
         for m in (GITHUB_VISION_MODELS or [GITHUB_MODELS_MODEL]):
             short = m.split("/")[-1][:28]
             backends.append(_OpenAICompatBackend(f"github:{short}", GITHUB_MODELS_URL, gh,
@@ -1167,8 +1551,11 @@ async def _build_backends(http: httpx.AsyncClient) -> list:
         "mistral-medium-latest": 2.0,   #  50 RPM
         "mistral-large-latest": 16.0,   #   4 RPM
     }
+    # Mistral answers HTTP 402 "Check your subscription" on every model with this
+    # key (verified live 2026-09-21): the free Experiment tier is no longer active
+    # for it. Off unless VISION_ENABLE_MISTRAL=1 (set it after fixing the account).
     mk = os.environ.get("MISTRAL_API_KEY")
-    if mk:
+    if mk and os.environ.get("VISION_ENABLE_MISTRAL") == "1":
         for m in (MISTRAL_VISION_MODELS or [MISTRAL_MODEL]):
             backends.append(_OpenAICompatBackend(f"mistral:{m[:24]}", MISTRAL_URL, mk,
                                                  m, http, cap=2,
@@ -1194,8 +1581,11 @@ async def _build_backends(http: httpx.AsyncClient) -> list:
             # family) reject >1 image ("at most 1 image"); sending just the primary
             # photo makes ALL 13 lanes usable for multi-photo listings + kills the
             # ~500 wasted "at most 1 image" calls seen in the backlog-clear run.
-            backends.append(_OpenAICompatBackend(f"nvidia:{short}", NVIDIA_URL, nv, m,
-                                                 http, cap=1, delay=2.0))
+            nb = _OpenAICompatBackend(
+                f"nvidia:{short}", NVIDIA_URL, nv, m, http, cap=1, delay=2.0,
+                workers=NVIDIA_LANE_WORKERS.get(m, NVIDIA_DEFAULT_WORKERS))
+            nb.start_delay = len(backends) * 0.25 * _start_stagger()
+            backends.append(nb)
 
     # Ollama — local, unlimited. Only if the daemon is reachable + model present.
     if os.environ.get("VISION_USE_OLLAMA", "1") != "0":
@@ -1262,6 +1652,122 @@ def _needs_vision(li: Listing) -> bool:
     return not raw.get("vision")
 
 
+def _distress_tier(li: Listing) -> str:
+    """The stacked-distress tier the operator board shows (HOT/WARM/COLD), or ''.
+    Lives in raw["distress_stack"]["tier"] (see distress_score.py)."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    ds = raw.get("distress_stack")
+    return (ds.get("tier") or "") if isinstance(ds, dict) else ""
+
+
+def _vpri(li: Listing):
+    """Scoring order. Lower sorts first.
+
+    1. PHOTO FIRST. Grading is only possible where an image exists, so a lead with
+       one outranks a lead without one regardless of anything else. (Previously
+       the key led with sale_date, which spent the whole budget on the
+       soonest-selling leads whether or not they had a photo: 26,434 leads had a
+       photo but only 10,250 were ever graded while quota went to basemap-only rows
+       that can only return a null tier.)
+    2. HOT, then WARM, then everything else. The operator works the HOT/WARM board;
+       a condition read on a COLD row is worth far less than one on a HOT row, and a
+       90-minute budget cannot reach all ~5,000 gradable rows. (2026-09-21)
+    3. Soonest sale date, then never-scored before already-scored, then real
+       auctions (opening bid) before the rest.
+    """
+    from datetime import datetime as _dt
+    sd = li.sale_date
+    if sd is not None and hasattr(sd, "tzinfo") and sd.tzinfo is not None:
+        sd = sd.replace(tzinfo=None)
+    has_date = 0 if sd else 1
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    already_scored = 1 if raw.get("vision") else 0
+    no_photo = 0 if _has_real_image(li) else 1
+    tier_rank = {"HOT": 0, "WARM": 1}.get(_distress_tier(li), 2)
+    return (no_photo, tier_rank, has_date, sd or _dt.max, already_scored,
+            0 if li.opening_bid else 1)
+
+
+class _YieldMonitor:
+    """The 'stop burning the board lock on a dead pool' rule (audit O6).
+
+    update() is called once per heartbeat and returns a reason string when the pass
+    should end early, else None. It fires on either of:
+
+      * COLLAPSE: the number of usable backends stayed <= `min_live` for
+        `live_window_s` (default 2 backends for 15 minutes). Disabled when the pool
+        never had more than `min_live` backends to begin with: a deliberately tiny
+        pool did not collapse. (VISION_YIELD_LIVE_MIN / VISION_YIELD_LIVE_S)
+      * LOW YIELD: after a `grace_s` warm-up (default 20 minutes), fewer than
+        `min_rate_per_h` listings were scored per hour over the trailing
+        `rate_window_s` (default 100/hour measured over 15 minutes). Never fires
+        when the queue is empty, because then the run is simply finishing.
+        (VISION_MIN_SCORED_PER_HOUR / VISION_YIELD_WINDOW_S / VISION_YIELD_WARMUP_S)
+
+    VISION_YIELD_STOP=0 turns both rules off.
+
+    A pure class with an injectable clock so the rules are unit-testable.
+    """
+
+    def __init__(self, *, initial_live: int, min_live: int = 2,
+                 live_window_s: float = 900.0, min_rate_per_h: float = 100.0,
+                 rate_window_s: float = 900.0, grace_s: float = 1200.0,
+                 clock: Callable[[], float] = time.monotonic):
+        self.initial_live = initial_live
+        self.min_live = min_live
+        self.live_window_s = live_window_s
+        self.min_rate_per_h = min_rate_per_h
+        self.rate_window_s = rate_window_s
+        self.grace_s = grace_s
+        self._clock = clock
+        self._t0 = clock()
+        self._low_since: Optional[float] = None
+        self._hist: list[tuple[float, int]] = []
+
+    def rate_per_hour(self, now: float, scored: int) -> Optional[float]:
+        """Scored/hour over the trailing window, or None until a full window exists."""
+        base = None
+        for t, n in self._hist:
+            if t <= now - self.rate_window_s:
+                base = (t, n)
+            else:
+                break
+        if base is None:
+            return None
+        dt = now - base[0]
+        return (scored - base[1]) * 3600.0 / dt if dt > 0 else None
+
+    def update(self, live: int, scored: int, queue_left: int) -> Optional[str]:
+        now = self._clock()
+        self._hist.append((now, scored))
+        # keep just enough history for the trailing window
+        cutoff = now - self.rate_window_s * 2
+        while len(self._hist) > 2 and self._hist[1][0] < cutoff:
+            self._hist.pop(0)
+
+        if self.min_live >= 0 and self.initial_live > self.min_live:
+            if live <= self.min_live:
+                if self._low_since is None:
+                    self._low_since = now
+                elif now - self._low_since >= self.live_window_s:
+                    return (f"live_workers<={self.min_live} for "
+                            f"{int(now - self._low_since)}s (started with {self.initial_live})")
+            else:
+                self._low_since = None
+
+        if queue_left > 0 and now - self._t0 >= self.grace_s and self.min_rate_per_h > 0:
+            rate = self.rate_per_hour(now, scored)
+            if rate is not None and rate < self.min_rate_per_h:
+                return (f"scored/hour {rate:.0f} < {self.min_rate_per_h:.0f} over the "
+                        f"last {int(self.rate_window_s)}s")
+        return None
+
+
+#: Summary of the most recent enrich_with_vision() call (stop reason, per-backend
+#: health table). Read by tests and by callers that want to log it; never required.
+_LAST_RUN: dict = {}
+
+
 async def enrich_with_vision(listings: list[Listing], max_listings: int | None = None) -> None:
     """Run vision condition assessment on listings with usable imagery.
     Overrides condition_tier with the photo-derived value when confidence
@@ -1269,47 +1775,33 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
 
     Provider selection via VISION_PROVIDER env:
       - "anthropic" (default): Claude Sonnet 4.5, ~$0.01-0.03/listing
-      - "gemini": Gemini 2.0 Flash, FREE on -exp model up to 1500 req/day
+      - "gemini": the free multi-provider pool (Gemini per-key-per-model lanes,
+        NVIDIA NIM lanes, Groq, Cloudflare; see _build_backends)
     Caller controls budget by max_listings.
 
     Already-scored leads are skipped (idempotent) unless VISION_REGRADE_SCORED=1
-    — see _needs_vision.
+    (see _needs_vision). Rows with no real photo are skipped unless
+    VISION_INCLUDE_NO_PHOTO=1, and the rest are scored HOT, then WARM, first
+    (see _vpri).
+
+    The pass ends when the queue drains, at the VISION_MAX_SECONDS wall clock
+    (default 90 minutes; 0 = unlimited), or when _YieldMonitor decides the pool has
+    collapsed or is scoring under 100/hour.
     """
+    global _LAST_RUN
     targets = [li for li in listings if _needs_vision(li)]
-    # Prioritize the most actionable listings for the (free-quota-bounded)
-    # Vision budget: soonest sale date first, then never-scored leads, then
-    # listings with an opening bid (real auctions), so the cap covers the best
-    # leads — not whatever happened to be first.
-    #
-    # The never-scored key sits BELOW sale date on purpose. Dated leads keep
-    # exact date order (an imminent sale that gained photos since last week
-    # still gets re-read), but the huge date-less tail — where most of the
-    # board lives — spends the cap on leads that have NO condition read yet
-    # instead of re-grading ones that already do. That is what turns a raised
-    # cap into new coverage rather than repeat work.
-    def _vpri(li: Listing):
-        from datetime import datetime as _dt
-        sd = li.sale_date
-        if sd is not None and hasattr(sd, "tzinfo") and sd.tzinfo is not None:
-            sd = sd.replace(tzinfo=None)
-        has_date = 0 if sd else 1
-        raw = li.raw if isinstance(li.raw, dict) else {}
-        already_scored = 1 if raw.get("vision") else 0
-        # PHOTO FIRST. Grading is only possible where an image exists, so a lead
-        # with one must outrank a lead without one regardless of sale date.
-        # Previously the key led with sale_date, which spent the whole budget on
-        # the soonest-selling leads whether or not they had a photo: 26,434 leads
-        # had a photo but only 10,250 were ever graded, leaving 16,184 gradable
-        # leads unreached while quota went to basemap-only rows that can only
-        # return a null tier. Sale date still orders within each group.
-        no_photo = 0 if _has_real_image(li) else 1
-        return (no_photo, has_date, sd or _dt.max, already_scored,
-                0 if li.opening_bid else 1)
+    skipped_no_photo = 0
+    if os.environ.get("VISION_INCLUDE_NO_PHOTO", "0") != "1":
+        n_before = len(targets)
+        targets = [li for li in targets if _has_real_image(li)]
+        skipped_no_photo = n_before - len(targets)
+    # Prioritize the most actionable listings for the (free-quota-bounded) Vision
+    # budget. See _vpri for the order and why.
     targets.sort(key=_vpri)
     if max_listings:
         targets = targets[:max_listings]
     if not targets:
-        log.info("vision.no_targets", provider=VISION_PROVIDER)
+        log.info("vision.no_targets", provider=VISION_PROVIDER, skipped_no_photo=skipped_no_photo)
         return
 
     log.info(
@@ -1317,6 +1809,9 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
         provider=VISION_PROVIDER,
         target_count=len(targets),
         of_total=len(listings),
+        hot=sum(1 for li in targets if _distress_tier(li) == "HOT"),
+        warm=sum(1 for li in targets if _distress_tier(li) == "WARM"),
+        skipped_no_photo=skipped_no_photo,
     )
 
     overrides = 0
@@ -1375,123 +1870,115 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
         li.raw["vision_unscored"] = result
         ungraded += 1
 
+    run_started = time.monotonic()
+    stop = {"reason": None, "at": 0.0}
+
     async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as http:
         backends = await _build_backends(http)
         if not backends:
             log.warning("vision.no_backends",
-                        hint="set GEMINI_API_KEY_n / GITHUB_MODELS_TOKEN / GROQ_API_KEY, or run Ollama")
+                        hint="set GEMINI_API_KEY_n / NVIDIA_API_KEY / GROQ_API_KEY, or run Ollama")
             return
         log.info("vision.pool_built", backends=[b.name for b in backends], count=len(backends))
 
-        # One SHARED queue; one worker per backend. When a backend hits its
-        # quota it retires and re-queues its in-flight listing, so the other
-        # backends pick up the slack — no quota share is wasted.
+        # One SHARED queue; each backend runs `workers` tasks (default 1) pulling
+        # from it, so a slow-but-healthy lane (a NIM model answering in 15s) is not
+        # capped at one call at a time.
         queue: asyncio.Queue = asyncio.Queue()
         for li in targets:
             queue.put_nowait(li)
 
-        # Cooldown/strikes: a 429 is often a PER-MINUTE limit (Groq, GitHub),
-        # not a daily cap. So on 429 we re-queue the listing, sleep a cooldown,
-        # and let the SAME backend rejoin — only retiring it after STRIKES
-        # consecutive 429s with no success in between. A success resets strikes,
-        # so a per-minute-limited backend keeps contributing all run; a truly
-        # daily-exhausted one (e.g. a spent Gemini key) retires after STRIKES.
-        #
-        # 2026-08-07: raised the CODE defaults to match what run_daily_vision.sh
-        # already overrides, because the fragile old defaults (2 strikes / 60s)
-        # were only ever fixed for callers that remembered to set the env vars.
-        # scripts/main.py's own internal vision pass — the single biggest vision
-        # workload, a fresh weekly board full of unscored leads — sets neither
-        # and was inheriting the defaults that this file's own history records
-        # as having "killed the whole 9-key Gemini fleet in ~2 min." A caller
-        # that genuinely wants the old fast-fail behavior can still set these
-        # env vars explicitly; nothing here overrides an explicit override.
+        # ---- error handling knobs (all env-tunable) --------------------------
+        # 429  -> the lane backs off (exponential, jittered, honouring the
+        #         provider's retry-after) and is banned after `max_strikes`
+        #         consecutive 429s. A DAILY-cap 429 disables the lane for the run.
+        # 410/402/401/403/404 -> the lane is disabled for the run on the FIRST hit
+        #         (BackendDisabled). Before, each dead lane ate five listings.
+        # timeout / 5xx / unparseable -> `max_hard_fails` consecutive failures ban it.
+        # A banned lane is NOT gone: after `reopen_s` (default 10 minutes) ONE probe
+        # call is let through (half-open circuit breaker); success re-admits it.
+        # VISION_BACKEND_REOPEN_SECONDS=0 restores the legacy retire-for-the-run.
         cooldown = float(os.environ.get("VISION_BACKEND_COOLDOWN", "70"))
         max_strikes = int(os.environ.get("VISION_BACKEND_STRIKES", "10"))
-        # Per-listing hard timeout — a single stuck network await (hung image
-        # fetch or provider call whose own timeout doesn't fire) must never
-        # freeze a worker. On timeout we drop that listing (re-scored next run)
-        # and move on. Covers fetch(≤15s) + provider POST(≤90s) with margin.
-        item_timeout = float(os.environ.get("VISION_ITEM_TIMEOUT", "150"))
+        reopen_s = float(os.environ.get("VISION_BACKEND_REOPEN_SECONDS", "600"))
+        max_backoff = float(os.environ.get("VISION_BACKEND_MAX_BACKOFF", "300"))
+        # Per-listing hard timeout: covers the image fetch plus the provider call
+        # (itself capped by VISION_CALL_TIMEOUT). A stuck await must never freeze a
+        # worker. 90s (was 150s: a timeout held its worker for 2.5 minutes).
+        item_timeout = float(os.environ.get("VISION_ITEM_TIMEOUT", "90"))
 
         # HARD failures (410 end-of-life, 404 unknown model, unparseable reply,
-        # item timeout) are NOT quota problems, so the cooldown/strike path
-        # above never saw them. Before this block they fell straight through to
-        # _apply2(li, None) and the listing was DROPPED for the whole run — one
-        # dead backend permanently ate one queue slot per failure. The
-        # 2026-07-27 pass lost 1,222 of 1,500 slots that way (only 278 scored)
-        # because 7 retired NIM models + a 404 Groq model kept eating the queue.
+        # item timeout) are NOT quota problems. Before the 2026-07-27 fix they fell
+        # straight through to _apply2(li, None) and the listing was DROPPED for the
+        # whole run: one dead backend permanently ate one queue slot per failure
+        # (1,222 of 1,500 slots that day). Two bounded guards fix it:
+        #   1. Re-queue a hard-failed listing so a HEALTHY backend can still score
+        #      it, bounded by a per-listing attempt budget.
+        #   2. Ban the backend after VISION_BACKEND_HARD_FAILS CONSECUTIVE hard
+        #      failures (a success resets the counter), so a dead lane stops eating
+        #      the queue.
         #
-        # Two bounded guards fix it:
-        #   1. Re-queue a hard-failed listing so a HEALTHY backend can still
-        #      score it — at most VISION_MAX_REQUEUE times, so a fully dead
-        #      pool can never loop forever.
-        #   2. Retire the backend after VISION_BACKEND_HARD_FAILS CONSECUTIVE
-        #      hard failures (a success resets the counter), mirroring the
-        #      quota strike system. This is what stops a 410 model from eating
-        #      the queue at all.
-        #
-        # The budget is PER-BACKEND, not global. A global 1+2 budget was still
-        # losing listings: INTERMITTENT lanes (verified live — mistral-medium-
-        # 3.5-128b answered 1 of 4 real calls, llama-3.2-11b-vision 3 of 4)
-        # never rack up max_hard_fails CONSECUTIVE failures, so they never
-        # retire and keep drawing work; three bounces off flaky lanes burned a
-        # listing's whole budget while a HEALTHY backend sat idle right there
-        # (60-listing stress test scored only 57).
-        #
-        # Rule: each backend may attempt a given listing ONCE, plus
-        # VISION_MAX_REQUEUE extra retries once every live lane has had its
-        # turn. So for every listing
-        #     attempts <= len(backends) + VISION_MAX_REQUEUE
-        # which is finite and independent of how flaky any lane is. A fully
-        # dead pool still terminates twice over, because each backend also
-        # retires after max_hard_fails consecutive hard failures.
+        # The budget is PER-BACKEND, not global: each backend may attempt a given
+        # listing ONCE, plus VISION_MAX_REQUEUE extra retries once every live lane
+        # has had its turn, and never more than VISION_MAX_ATTEMPTS in total. So for
+        # every listing
+        #     attempts <= min(len(backends) + VISION_MAX_REQUEUE, VISION_MAX_ATTEMPTS)
+        # which is finite and independent of how flaky any lane is. (The total cap
+        # is new: with 40+ lanes the old len(backends)+2 let one bad listing walk
+        # 40 slow lanes.)
         max_requeue = int(os.environ.get("VISION_MAX_REQUEUE", "2"))
         max_hard_fails = int(os.environ.get("VISION_BACKEND_HARD_FAILS", "5"))
+        max_attempts = int(os.environ.get("VISION_MAX_ATTEMPTS", "8"))
 
-        # Per-listing state keyed by id(li). id() is the one key that is unique
-        # BY CONSTRUCTION here: `targets` holds a strong reference to every
-        # listing for the whole call, so no id can be recycled mid-run and two
-        # distinct listings can never collide. Do NOT be tempted to key this by
-        # source_url — 652 source_urls are shared by 19,392 board leads (one
-        # ArcGIS URL by 3,293), so a url-keyed budget would let one lead spend
-        # thousands of others' attempts. See test_attempt_budget_key_is_per_object.
+        # Per-listing state keyed by id(li). id() is the one key that is unique BY
+        # CONSTRUCTION here: `targets` holds a strong reference to every listing for
+        # the whole call, so no id can be recycled mid-run. Do NOT key this by
+        # source_url — 652 source_urls are shared by 19,392 board leads. See
+        # test_attempt_budget_key_is_per_object.
         tried: dict[int, set[int]] = {}       # id(li) -> backend indexes that ran it
         tries: dict[int, int] = {}            # id(li) -> attempts spent (the hard cap)
-        attempt_cap = len(backends) + max_requeue
-        # API-backend indexes still able to take work; a retired or finished
-        # worker drops out, so "another lane could serve this listing" never
-        # counts a lane that is already gone. Floor lanes are deliberately NOT
-        # in here: a floor worker sits idle until every API worker has exited,
-        # so counting it as "a lane that will come for this listing" would park
-        # the API lanes waiting for a worker that is itself waiting for them.
-        live_idx: set[int] = {i for i, b in enumerate(backends)
-                              if not getattr(b, "is_floor", False)}
+        attempt_cap = min(len(backends) + max_requeue, max(1, max_attempts))
+
+        is_floor = [bool(getattr(b, "is_floor", False)) for b in backends]
+        healths: list[_LaneHealth] = [
+            _LaneHealth(b.name, hard_limit=max_hard_fails, strike_limit=max_strikes,
+                        reopen_s=reopen_s, cooldown_s=cooldown, max_backoff_s=max_backoff)
+            for b in backends
+        ]
+        # API-backend indexes still able to take work. A floor lane is deliberately
+        # NOT in here: a floor worker sits idle until every API worker has exited, so
+        # counting it as "a lane that will come for this listing" would park the API
+        # lanes waiting for a worker that is itself waiting for them.
+        live_idx: set[int] = {i for i in range(len(backends)) if not is_floor[i]}
+        workers_left = {i: max(1, int(getattr(b, "workers", 1)))
+                        for i, b in enumerate(backends) if not is_floor[i]}
         # Listings the API pool exhausted its attempts on, held for the floor
         # (None when no floor backend is configured, so they are given up on).
-        floor_pending: Optional[list[Listing]] = (
-            [] if any(getattr(b, "is_floor", False) for b in backends) else None)
+        floor_pending: Optional[list[Listing]] = [] if any(is_floor) else None
         attempts = {"n": 0}                   # completed backend calls (watchdog progress)
+        # Rows skipped because no photo could be downloaded, and the current run of
+        # consecutive such rows across the whole pool (see the worker).
+        dropped = {"no_image": 0}
+        fetch_streak = {"n": 0}
+        fetch_pause_after = int(os.environ.get("VISION_FETCH_PAUSE_AFTER", "20"))
+        fetch_pause_s = float(os.environ.get("VISION_FETCH_PAUSE_S", "15"))
+        fetch_stop_after = int(os.environ.get("VISION_FETCH_STOP_AFTER", "100"))
+        max_inflight = max(1, int(os.environ.get("VISION_MAX_INFLIGHT", "24")))
+        inflight_sem = asyncio.Semaphore(max_inflight)   # bounds decoded images in RAM (8GB Mac)
 
         def _requeue(li: Listing, idx: int) -> bool:
             """Put a failed/ungraded listing back on the queue if attempts are
-            left. Returns True if re-queued.
-
-            One flat cap — len(backends) + VISION_MAX_REQUEUE — is what makes
-            the bound provable no matter how the pool hands the listing around:
-            one turn per lane plus a few spares. The pop-side preference below
-            is what keeps the spares from being spent on the same lane twice.
-            """
+            left. Returns True if re-queued."""
             k = id(li)
             if tries.get(k, 0) >= attempt_cap:
                 return False
             queue.put_nowait(li)
             return True
 
-        # ...and on the pop side, PREFER a listing this lane hasn't tried. The
-        # scan is bounded (never walks the whole queue — it can be 19k items),
-        # defers at most scan_limit-1 items to the back, and never drops one,
-        # so it cannot livelock or CPU-spin.
+        # ...and on the pop side, PREFER a listing this lane hasn't tried. The scan is
+        # bounded (never walks the whole queue — it can be 19k items), defers at most
+        # scan_limit-1 items to the back, and never drops one, so it cannot livelock
+        # or CPU-spin.
         scan_limit = max(1, int(os.environ.get("VISION_REQUEUE_SCAN", "8")))
 
         def _take(idx: int, allow_repeat: bool) -> Optional[Listing]:
@@ -1508,8 +1995,8 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
                 deferred.append(li)
             if chosen is None and allow_repeat:
                 # Everything nearby was already tried by THIS lane. Only take a
-                # repeat for a listing no other live lane could serve better —
-                # that lane will pop it on its own next tick.
+                # repeat for a listing no other live lane could serve better — that
+                # lane will pop it on its own next tick.
                 for i, li in enumerate(deferred):
                     seen = tried.get(id(li)) or set()
                     if not any(j not in seen for j in live_idx if j != idx):
@@ -1519,19 +2006,28 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
                 queue.put_nowait(d)
             return chosen
 
-        # An empty queue does NOT mean the run is over: another worker may still
-        # be mid-call (or in its inter-call delay) on a listing that is about to
-        # be re-queued. If the fast HEALTHY lane exits at that moment, the
-        # re-queued listing is left to the flaky lanes only — the exact way work
-        # goes missing. So a worker with nothing to pop idles while any peer is
-        # still holding an item, and only re-attempts a listing it has already
-        # tried once the whole pool has gone idle (i.e. no lane that hasn't
-        # tried it is coming). Terminating: every queued listing still has
-        # attempts left by construction, total attempts are capped, and each
-        # holder finishes within item_timeout — so inflight reaches 0, the queue
-        # drains, and every idler exits. The sleep keeps it off the CPU.
+        # An empty queue does NOT mean the run is over: another worker may still be
+        # mid-call (or in its inter-call delay) on a listing that is about to be
+        # re-queued. So a worker with nothing to pop idles while any peer is still
+        # holding an item, and only re-attempts a listing it has already tried once
+        # the whole pool has gone idle. Terminating: every queued listing still has
+        # attempts left by construction, total attempts are capped, and each holder
+        # finishes within item_timeout — so inflight reaches 0, the queue drains, and
+        # every idler exits. The sleep keeps it off the CPU.
         inflight = {"n": 0}
         idle_tick = float(os.environ.get("VISION_IDLE_TICK", "0.05"))
+
+        # Wall-clock cap so a long run can't overrun into the next scheduled pass
+        # (and, for the daily job, so it stops holding the board lock). Default 90
+        # minutes; VISION_MAX_SECONDS=0 = unlimited.
+        _budget = vision_max_seconds()
+        _deadline = (time.monotonic() + _budget) if _budget > 0 else None
+
+        def _past_deadline() -> bool:
+            return _deadline is not None and time.monotonic() > _deadline
+
+        def _stopping() -> bool:
+            return _past_deadline() or stop["reason"] is not None
 
         async def _next(idx: int) -> Optional[Listing]:
             idle_ticks = 0
@@ -1539,81 +2035,138 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
                 li = _take(idx, allow_repeat=(inflight["n"] <= 0 and idle_ticks >= 2))
                 if li is not None:
                     return li
-                if _past_deadline():
+                if _stopping():
                     return None
                 if queue.empty() and inflight["n"] <= 0:
                     return None
                 await asyncio.sleep(idle_tick)
                 idle_ticks = idle_ticks + 1 if inflight["n"] <= 0 else 0
 
-        # Optional wall-clock cap so a long run (esp. the slow local floor)
-        # can't overrun into the next scheduled pass. 0 = unlimited.
-        import time as _time
-        _budget = float(os.environ.get("VISION_MAX_SECONDS", "0") or 0)
-        _deadline = (_time.monotonic() + _budget) if _budget > 0 else None
+        # Floor backends (Ollama) are low-quality local fallbacks. They must only
+        # score what the API pools COULDN'T this run — otherwise they'd race ahead (no
+        # cooldown) and poison listings with weak scores that block a good provider
+        # from scoring them on a future day. So a floor worker waits until every API
+        # worker has exited, then drains the rest.
+        api_active = {"n": sum(workers_left.values())}
 
-        def _past_deadline() -> bool:
-            return _deadline is not None and _time.monotonic() > _deadline
+        def _lane_event(h: _LaneHealth, backend, event: str, **kw) -> None:
+            log.info(event, backend=backend.name, reason=h.reason, remaining=queue.qsize(), **kw)
 
-        # Floor backends (Ollama) are low-quality local fallbacks. They must
-        # only score what the API pools COULDN'T this run — otherwise they'd
-        # race ahead (no cooldown) and poison listings with weak scores that
-        # block a good provider from scoring them on a future day. So a floor
-        # worker waits until every API backend has retired, then drains the rest.
-        api_active = {"n": sum(1 for b in backends if not getattr(b, "is_floor", False))}
-
-        async def api_worker(backend, idx: int) -> None:
-            strikes = 0
-            hard_fails = 0
+        async def api_worker(backend, idx: int, wnum: int) -> None:
+            health = healths[idx]
             holding = False
             try:
+                # Spread the opening burst: nine keys x five models must not all fire
+                # in the same second. Fakes without these attributes start at once.
+                lead = float(getattr(backend, "start_delay", 0.0) or 0.0) \
+                    + wnum * float(getattr(backend, "worker_stagger", 0.0) or 0.0)
+                if lead > 0:
+                    await asyncio.sleep(lead)
                 while True:
-                    # Release the previous item BEFORE asking for the next one,
-                    # so a worker never counts itself as in-flight while idling.
+                    # Release the previous item BEFORE asking for the next one, so a
+                    # worker never counts itself as in-flight while idling.
                     if holding:
                         inflight["n"] -= 1
                         holding = False
-                    if _past_deadline():
+                    if _stopping():
                         return
+                    verdict, wait_s = health.gate()
+                    if verdict == "off":
+                        live_idx.discard(idx)
+                        return
+                    if verdict == "wait":
+                        # Banned: nothing to do until the half-open probe window. Wake
+                        # every few seconds so a stop/deadline is noticed, and give up
+                        # if there is no work left that a probe could serve.
+                        if queue.empty() and inflight["n"] <= 0:
+                            return
+                        await asyncio.sleep(min(max(wait_s, idle_tick), 5.0))
+                        continue
+                    probing = verdict == "probe"
+                    if probing:
+                        _lane_event(health, backend, "vision.backend_probe")
                     li = await _next(idx)
                     if li is None:
+                        if probing:
+                            health.probing = False   # hand the probe slot back
                         return
                     inflight["n"] += 1
                     holding = True
                     res = None
+                    fail_kind = "none"
                     try:
-                        payloads, urls = await asyncio.wait_for(
-                            _fetch_image_blocks(li, http), timeout=item_timeout)
+                        async with inflight_sem:
+                            payloads, urls = await asyncio.wait_for(
+                                _fetch_image_blocks(li, http),
+                                timeout=min(item_timeout, 30.0))
+                            if payloads:
+                                fetch_streak["n"] = 0
+                                res = await asyncio.wait_for(
+                                    backend.assess(li, payloads, urls), timeout=item_timeout)
                         if not payloads:
+                            # No downloadable photo. Isolated, this is a dead image URL
+                            # and the row is simply skipped for this run. A LONG STREAK
+                            # is the network being down, and the old code then popped
+                            # and dropped the entire queue at ~100 rows a second: the
+                            # 9/20 pass ended with `unscored_remaining=0` after 4,406
+                            # rows vanished in the last 45 seconds (same minute as the
+                            # "Could not resolve host" push failure), and 9/14 drained
+                            # 4,472 targets to 54 scored in 16 minutes the same way.
+                            # So: count it, slow down, and stop the pass if it persists.
+                            if probing:
+                                health.probing = False
+                            dropped["no_image"] += 1
+                            fetch_streak["n"] += 1
+                            if fetch_streak["n"] >= fetch_stop_after:
+                                if stop["reason"] is None:
+                                    stop["reason"] = (
+                                        f"image_fetch_failing: {fetch_streak['n']} rows in a "
+                                        f"row had no downloadable photo (network down?)")
+                                    stop["at"] = time.monotonic()
+                                    log.warning("vision.fetch_failing_stop",
+                                                streak=fetch_streak["n"], queue=queue.qsize())
+                            elif fetch_streak["n"] >= fetch_pause_after:
+                                await asyncio.sleep(fetch_pause_s)
                             continue
-                        res = await asyncio.wait_for(
-                            backend.assess(li, payloads, urls), timeout=item_timeout)
-                        strikes = 0
-                    except QuotaExhausted:
-                        strikes += 1
-                        # Nothing was assessed, so this does NOT spend one of
-                        # the listing's per-backend attempts.
+                        health.strikes = 0
+                    except QuotaExhausted as q:
+                        # Nothing was assessed, so this does NOT spend one of the
+                        # listing's per-backend attempts.
                         queue.put_nowait(li)
-                        if strikes >= max_strikes:
-                            log.info("vision.backend_retired", backend=backend.name,
-                                     strikes=strikes, remaining=queue.qsize())
-                            return
+                        sleep_s, tripped = health.record_quota(q.retry_after, q.daily)
+                        if health.state == "disabled":
+                            _lane_event(health, backend, "vision.backend_retired",
+                                        strikes=health.strikes, daily=q.daily)
+                            continue
+                        if tripped:
+                            _lane_event(health, backend, "vision.backend_banned",
+                                        strikes=health.strikes, reopen_s=reopen_s)
+                            continue
                         log.info("vision.backend_cooldown", backend=backend.name,
-                                 strikes=strikes, cooldown_s=cooldown, remaining=queue.qsize())
-                        await asyncio.sleep(cooldown)
+                                 strikes=health.strikes, cooldown_s=round(sleep_s, 1),
+                                 remaining=queue.qsize())
+                        await asyncio.sleep(sleep_s)
+                        continue
+                    except BackendDisabled as d:
+                        queue.put_nowait(li)          # not the listing's fault
+                        health.record_permanent(d.status, d.reason)
+                        _lane_event(health, backend, "vision.backend_disabled", status=d.status)
                         continue
                     except asyncio.TimeoutError:
+                        fail_kind = "timeout"
                         log.warning("vision.item_timeout", backend=backend.name, remaining=queue.qsize())
                     except Exception as exc:
+                        fail_kind = "error"
                         log.warning("vision.worker_error", backend=backend.name, error=str(exc)[:140])
                     # This lane has now had its turn at this listing.
                     tried.setdefault(id(li), set()).add(idx)
                     tries[id(li)] = tries.get(id(li), 0) + 1
                     attempts["n"] += 1
                     if res is not None:
-                        # The call went through and parsed, so the lane is
-                        # ALIVE even if it declined to grade the property.
-                        hard_fails = 0
+                        # The call went through and parsed, so the lane is ALIVE even
+                        # if it declined to grade the property.
+                        if health.record_success():
+                            _lane_event(health, backend, "vision.backend_readmitted")
                         if _canonical_tier(res):
                             _apply2(li, res)
                         elif not _requeue(li, idx):
@@ -1623,17 +2176,15 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
                                      source_url=li.source_url)
                             _record_ungraded(li, res)
                     else:
-                        # HARD failure (410/404/parse-fail/timeout). Hand the
-                        # listing to another backend instead of dropping it,
-                        # and count a strike against THIS backend.
-                        hard_fails += 1
+                        # HARD failure (parse-fail/5xx/timeout). Hand the listing to
+                        # another backend instead of dropping it, and count a strike
+                        # against THIS backend.
+                        tripped = health.record_hard_fail(fail_kind)
                         if not _requeue(li, idx):
                             if floor_pending is not None:
-                                # The local floor exists precisely to finish what
-                                # the API pool could not. Park it there (once —
-                                # the floor never re-queues) instead of on the
-                                # shared queue, which the API lanes would keep
-                                # popping past their attempt cap.
+                                # The local floor exists precisely to finish what the
+                                # API pool could not. Park it there (once — the floor
+                                # never re-queues) instead of on the shared queue.
                                 floor_pending.append(li)
                             else:
                                 log.info("vision.listing_given_up", backend=backend.name,
@@ -1641,16 +2192,21 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
                                          attempts=tries.get(id(li), 0),
                                          lanes=len(tried.get(id(li)) or ()))
                                 _apply2(li, None)
-                        if hard_fails >= max_hard_fails:
-                            log.info("vision.backend_retired_hard", backend=backend.name,
-                                     hard_fails=hard_fails, remaining=queue.qsize())
-                            return
+                        if tripped:
+                            _lane_event(
+                                health, backend,
+                                "vision.backend_retired_hard" if health.state == "disabled"
+                                else "vision.backend_banned",
+                                hard_fails=health.hard_fails, reopen_s=reopen_s)
+                            continue
                     if getattr(backend, "delay", 0):
                         await asyncio.sleep(backend.delay)
             finally:
                 if holding:
                     inflight["n"] -= 1
-                live_idx.discard(idx)
+                workers_left[idx] -= 1
+                if workers_left[idx] <= 0:
+                    live_idx.discard(idx)
                 api_active["n"] -= 1
 
         async def floor_worker(backend, idx: int) -> None:
@@ -1659,11 +2215,13 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
             while api_active["n"] > 0:
                 if queue.empty() and not floor_pending:
                     return
+                if _stopping():
+                    return
                 await asyncio.sleep(3)
             log.info("vision.floor_active", backend=backend.name,
                      remaining=queue.qsize(), parked=len(floor_pending or ()))
             while True:
-                if _past_deadline():
+                if _stopping():
                     return
                 li = _take(idx, allow_repeat=True)
                 if li is None:
@@ -1691,35 +2249,76 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
                 else:
                     _record_ungraded(li, res)
 
-        worker_tasks = [
-            asyncio.create_task(
-                floor_worker(b, i) if getattr(b, "is_floor", False) else api_worker(b, i))
-            for i, b in enumerate(backends)
-        ]
+        worker_tasks = []
+        for i, b in enumerate(backends):
+            if is_floor[i]:
+                worker_tasks.append(asyncio.create_task(floor_worker(b, i)))
+            else:
+                for w in range(workers_left[i]):
+                    worker_tasks.append(asyncio.create_task(api_worker(b, i, w)))
 
-        # Heartbeat + no-progress watchdog. Even a single wedged worker (sync
-        # block / pool-wait that freezes the loop between item-timeouts) used to
-        # stall the whole run silently. This logs progress every 60s and, if
-        # `scored` hasn't advanced for VISION_STALL_SECONDS, cancels the workers
-        # so the run finishes and publishes whatever it has.
+        # Heartbeat + watchdogs. Every tick it (1) logs progress, (2) evaluates the
+        # yield stop, (3) enforces the wall clock on lanes that ignore the deadline
+        # (a worker asleep in a long back-off), and (4) aborts a pool that has made
+        # no progress at all for VISION_STALL_SECONDS. Even a single wedged worker
+        # (sync block / pool-wait that freezes the loop between item-timeouts) used
+        # to stall the whole run silently.
         stall_limit = float(os.environ.get("VISION_STALL_SECONDS", "360"))
+        hb_s = float(os.environ.get("VISION_HEARTBEAT_SECONDS", "60"))
+        stop_grace = float(os.environ.get("VISION_STOP_GRACE_SECONDS", "30"))
+        api_idx = [i for i in range(len(backends)) if not is_floor[i]]
+        yield_on = os.environ.get("VISION_YIELD_STOP", "1") != "0"
+        ymon = _YieldMonitor(
+            initial_live=len(api_idx),
+            min_live=int(os.environ.get("VISION_YIELD_LIVE_MIN", "2")),
+            live_window_s=float(os.environ.get("VISION_YIELD_LIVE_S", "900")),
+            min_rate_per_h=float(os.environ.get("VISION_MIN_SCORED_PER_HOUR", "100")),
+            rate_window_s=float(os.environ.get("VISION_YIELD_WINDOW_S", "900")),
+            grace_s=float(os.environ.get("VISION_YIELD_WARMUP_S", "1200")),
+        )
+
+        def _live_backends() -> int:
+            return sum(1 for i in api_idx if healths[i].up and workers_left.get(i, 0) > 0)
 
         async def watchdog() -> None:
-            # Progress = completed backend calls, NOT just `scored`. A pass that
-            # is working fine but grading nothing (basemap-only listings answer
+            # Progress = completed backend calls, NOT just `scored`. A pass that is
+            # working fine but grading nothing (basemap-only listings answer
             # condition_tier=null everywhere) must not be mistaken for a wedged
             # worker and aborted.
-            last_seen, last_progress = -1, _time.monotonic()
+            last_seen, last_progress = -1, time.monotonic()
             while any(not t.done() for t in worker_tasks):
-                await asyncio.sleep(60)
+                await asyncio.sleep(hb_s)
+                now = time.monotonic()
+                live = _live_backends()
+                rate = ymon.rate_per_hour(now, scored)
                 log.info("vision.heartbeat", scored=scored, attempts=attempts["n"],
-                         queue=queue.qsize(),
-                         live_workers=sum(1 for t in worker_tasks if not t.done()))
+                         queue=queue.qsize(), live_workers=live,
+                         banned=sum(1 for i in api_idx if healths[i].state == "open"),
+                         disabled=sum(1 for i in api_idx if healths[i].state == "disabled"),
+                         scored_per_hour=(round(rate) if rate is not None else None))
+                if stop["reason"] is None:
+                    why = ymon.update(live, scored, queue.qsize()) if yield_on else None
+                    if why:
+                        stop["reason"], stop["at"] = f"yield: {why}", now
+                        log.warning("vision.yield_stop", reason=why, scored=scored,
+                                    queue=queue.qsize(), live_workers=live)
+                elif now - stop["at"] > stop_grace:
+                    for t in worker_tasks:
+                        t.cancel()
+                    return
+                if _deadline is not None and time.monotonic() > _deadline + stop_grace:
+                    if stop["reason"] is None:
+                        stop["reason"], stop["at"] = "wall_clock", now
+                    log.warning("vision.deadline_abort", scored=scored, queue=queue.qsize())
+                    for t in worker_tasks:
+                        t.cancel()
+                    return
                 if attempts["n"] > last_seen:
-                    last_seen, last_progress = attempts["n"], _time.monotonic()
-                elif _time.monotonic() - last_progress > stall_limit:
+                    last_seen, last_progress = attempts["n"], now
+                elif now - last_progress > stall_limit:
+                    stop["reason"] = stop["reason"] or "stalled"
                     log.warning("vision.stall_abort", scored=scored, queue=queue.qsize(),
-                                idle_s=int(_time.monotonic() - last_progress))
+                                idle_s=int(now - last_progress))
                     for t in worker_tasks:
                         t.cancel()
                     return
@@ -1728,6 +2327,24 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
         await asyncio.gather(*worker_tasks, return_exceptions=True)
         wd.cancel()
         leftover = queue.qsize()
+
+        if stop["reason"] is None and _past_deadline():
+            stop["reason"] = "wall_clock"
+        elapsed = time.monotonic() - run_started
+        table = {}
+        for i, b in enumerate(backends):
+            h = healths[i]
+            if is_floor[i] or (not h.attempts and not h.errors and h.state == "closed"):
+                continue
+            table[b.name] = {"state": h.state, "attempts": h.attempts, "ok": h.ok,
+                             "errors": dict(h.errors), "trips": h.trips,
+                             "readmissions": h.readmissions, "reason": h.reason}
+            log.info("vision.backend_stats", backend=b.name, state=h.state, attempts=h.attempts,
+                     ok=h.ok, errors=dict(h.errors), trips=h.trips,
+                     readmissions=h.readmissions, reason=h.reason)
+        _LAST_RUN = {"stop_reason": stop["reason"], "elapsed_s": round(elapsed, 1),
+                     "scored": scored, "leftover": leftover, "backends": table,
+                     "by_backend": dict(by_backend), "no_image": dropped["no_image"]}
 
     # Mixed-provider cost estimate (free pools = $0).
     cost = 0.0
@@ -1741,6 +2358,9 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
         ungraded=ungraded,          # answered but condition_tier null everywhere
         by_backend=by_backend,
         unscored_remaining=leftover,
+        no_image=dropped["no_image"],       # skipped: no downloadable photo (dead URL or network)
+        stop_reason=stop["reason"],
+        elapsed_s=round(elapsed),
         overrides=overrides,
         input_tokens=total_in,
         output_tokens=total_out,

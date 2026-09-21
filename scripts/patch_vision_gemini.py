@@ -29,12 +29,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from foreclosure_scraper.models import Listing, ListingType, PropertyKind
-from foreclosure_scraper.enrichment_vision import enrich_with_vision
+from foreclosure_scraper.enrichment_vision import (
+    _distress_tier, _has_real_image, enrich_with_vision, vision_max_seconds,
+)
 from foreclosure_scraper.valuation import calc as valuation_calc
 from foreclosure_scraper.valuation import grading as valuation_grading
 from foreclosure_scraper.web_artifact import (
     BoardLockBusy, board_lock, load_board, read_board_records, write_artifact,
 )
+from foreclosure_scraper.publish import manifest_pathspec, push_deferred, push_with_retries
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
 
@@ -82,7 +85,9 @@ def load_board_no_shrink(docs: Path | str = DOCS) -> tuple[list[Listing], int]:
     docs = Path(docs)
     records = read_board_records(docs)
     n_records = len(records)
-    board = load_board(docs)
+    # max_drop_rate=1.0: load_board FAILS above a 0.1% drop rate by default (audit O3), but
+    # this function IS the recovery path for invalid rows, so it must be allowed to see them.
+    board = load_board(docs, max_drop_rate=1.0)
     if len(board) == n_records:
         return board, n_records
     print(f"[{time.strftime('%H:%M:%S')}] load_board dropped "
@@ -120,10 +125,11 @@ def needs_vision(li: Listing) -> bool:
 async def main() -> int:
     # THE LOCK, held across load_board -> vision -> write_artifact -> publish.
     #
-    # This is the longest-held board in the system: VISION_MAX_SECONDS defaults
-    # to 14400 (4h), so a board loaded at 09:33 is still being written back at
-    # 13:36 — straight over the noon lrcpwa pass and the 2pm SOS pass, both of
-    # which had already published. On 2026-08-10 that reverted 1,064 resolved
+    # This was the longest-held board in the system: VISION_MAX_SECONDS used to
+    # default to 14400 (4h; now 90 min, see enrichment_vision.vision_max_seconds),
+    # so a board loaded at 09:33 was still being written back at 13:36 — straight
+    # over the noon lrcpwa pass and the 2pm SOS pass, both of which had already
+    # published. On 2026-08-10 that reverted 1,064 resolved
     # parcels, 343 county values and 410 absentee tags, and nothing errored.
     #
     # Reentrant: run_daily_vision.sh already holds this lock when it invokes
@@ -148,21 +154,42 @@ async def _run() -> int:
     cap = int(os.environ.get("VISION_MAX_LISTINGS", "800"))
     unscored = [li for li in listings if needs_vision(li)]
     already = len(listings) - len(unscored)
+    # Only rows with a real photo can be graded (a basemap-only row can only return a
+    # null tier), and enrich_with_vision scores HOT, then WARM, first (see
+    # enrichment_vision._vpri). Say both in the log so a run's reach is visible.
+    with_photo = [li for li in unscored if _has_real_image(li)]
+    n_hot = sum(1 for li in with_photo if _distress_tier(li) == "HOT")
+    n_warm = sum(1 for li in with_photo if _distress_tier(li) == "WARM")
     print(f"[{time.strftime('%H:%M:%S')}] {already} already vision-scored; "
-          f"{len(unscored)} un-scored. Running {os.environ.get('VISION_PROVIDER','?')} "
-          f"vision (cap {cap}) on the un-scored, prioritized…", flush=True)
+          f"{len(unscored)} un-scored, of which {len(with_photo)} have a photo "
+          f"({n_hot} HOT, {n_warm} WARM). Running {os.environ.get('VISION_PROVIDER','?')} "
+          f"vision (cap {cap}, wall clock {vision_max_seconds():.0f}s) on the photo rows, "
+          f"HOT then WARM first…", flush=True)
     t0 = time.time()
     # Hard wall-clock cap: a single hung worker (stuck network await) must NOT
     # stall the whole run forever. enrich_with_vision applies results to each
     # listing in place as it goes, so on timeout we still keep partial progress
-    # and proceed to write/publish what was scored. Default 4h; +120s grace so
-    # the pool's own internal VISION_MAX_SECONDS deadline fires first when set.
-    hard_cap = float(os.environ.get("VISION_MAX_SECONDS", "14400")) + 120
+    # and proceed to write/publish what was scored. +120s grace so
+    # the pool's own internal VISION_MAX_SECONDS deadline fires first. The default
+    # is now 90 minutes (was 4h: the pass held the board lock for hours to score a
+    # few hundred rows, 2026-09-21 ops audit finding O6); VISION_MAX_SECONDS=0
+    # means unlimited, in which case there is no outer cap either (the old
+    # `0 + 120` armed a 2-minute kill instead).
+    #
+    # YIELD STOP (audit O6) lives inside enrich_with_vision's watchdog, where it can see the
+    # worker pool and stop it gracefully (in-flight calls finish, partial progress is kept):
+    #   * live_workers <= VISION_YIELD_LIVE_MIN (2) for VISION_YIELD_LIVE_S (900 s), or
+    #   * scored/hour < VISION_MIN_SCORED_PER_HOUR (100) over the trailing VISION_YIELD_WINDOW_S
+    #     (900 s), measured after a VISION_YIELD_WARMUP_S (1200 s) warm-up.
+    # VISION_YIELD_STOP=0 turns both off. The wrapper's VISION_MAX_SECONDS (5400) is the same
+    # default as vision_max_seconds(), so the two never disagree.
+    _budget = vision_max_seconds()
+    hard_cap = (_budget + 120) if _budget > 0 else None
     try:
         await asyncio.wait_for(
             enrich_with_vision(unscored, max_listings=cap), timeout=hard_cap)
     except asyncio.TimeoutError:
-        print(f"[{time.strftime('%H:%M:%S')}] vision pass hit hard cap ({hard_cap:.0f}s) "
+        print(f"[{time.strftime('%H:%M:%S')}] vision pass hit hard cap ({(hard_cap or 0):.0f}s) "
               f"— writing partial progress", flush=True)
     print(f"[{time.strftime('%H:%M:%S')}] vision pass done in {int(time.time()-t0)}s", flush=True)
 
@@ -247,17 +274,24 @@ async def _run() -> int:
                     ["git", "ls-files", "--error-unmatch", "docs/detail_shards"],
                     cwd=root, capture_output=True).returncode == 0:
                 pub.append("docs/detail_shards")
+            # the manifest seals the payload set: a commit that carries a new board must carry
+            # the manifest that describes it (a stale one makes a gz-only reader refuse the board)
+            pub += manifest_pathspec(root)
             subprocess.run(["git", "add", *pub], cwd=root, check=False)
             r = subprocess.run(["git", "diff", "--staged", "--quiet"], cwd=root)
             if r.returncode != 0:  # there are changes
                 subprocess.run(["git", "commit", "-q", "-m",
                                 f"daily vision: {scored} listings scored ({time.strftime('%Y-%m-%d')})"],
                                cwd=root, check=False)
-                subprocess.run(["git", "pull", "--rebase", "--autostash", "origin", "main"],
-                               cwd=root, check=False)
-                p = subprocess.run(["git", "push", "origin", "main"], cwd=root)
-                print(f"[{time.strftime('%H:%M:%S')}] "
-                      + ("dashboard published ✓" if p.returncode == 0 else "push failed ⚠"), flush=True)
+                if push_deferred():
+                    # run_daily_vision.sh sets BOARD_PUSH_DEFERRED=1: it releases the board lock
+                    # and pushes (scripts/publish_helper.sh), so a stalled push cannot hold the lock
+                    print(f"[{time.strftime('%H:%M:%S')}] committed; push deferred to the wrapper "
+                          f"(outside the board lock)", flush=True)
+                else:
+                    ok, tail = push_with_retries(root)
+                    print(f"[{time.strftime('%H:%M:%S')}] "
+                          + ("dashboard published ✓" if ok else f"PUBLISH_PUSH_FAILED: {tail}"), flush=True)
         except Exception as exc:
             print(f"publish error: {exc}", flush=True)
     return 0
