@@ -74,6 +74,21 @@ DOC_BUCKETS: dict[str, str] = {
     "DEED UNDER POWER OF SALE": "post_sale_deed",
     "COMMISSIONERS DEED": "post_sale_deed",
     "COMMISSIONER'S DEED": "post_sale_deed",
+    # Other forced-sale conveyances. Without these keys the longest-first match
+    # below reduces "TAX DEED" and "SHERIFF DEED" to the bare key "DEED" (the
+    # shortest key that is a substring), and the loss can no longer be told from
+    # a warranty deed. Vendor short codes (TR/D, COM/D, SHF/D) are NOT keys here:
+    # as substrings they would fire inside unrelated labels, so they classify
+    # through rod.inst_class.classify_instrument instead.
+    "TRUSTEE DEED": "post_sale_deed",
+    "TAX DEED": "post_sale_deed",
+    "SHERIFF'S DEED": "post_sale_deed",
+    "SHERIFFS DEED": "post_sale_deed",
+    "SHERIFF DEED": "post_sale_deed",
+    "MASTER'S DEED": "post_sale_deed",
+    "MASTERS DEED": "post_sale_deed",
+    "CLERK'S DEED": "post_sale_deed",
+    "CLERKS DEED": "post_sale_deed",
     # Liens
     "LIEN": "lien",
     "JUDGMENT": "lien",

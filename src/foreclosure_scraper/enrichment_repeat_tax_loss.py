@@ -14,11 +14,16 @@ CLERK'S DEED) as a distress-type class -- this enricher is the cross-parcel
 JOIN the synthesis says is the only missing piece, not a new scraper.
 
 TWO PASSES, same shape as enrichment_owner_cluster.py:
-  1. Scan every listing's deed_chain distress_transfers for a tax-sale/
-     foreclosure-sale conveyance with a recorded grantor (the party who LOST
-     that parcel). Index those grantor names by (surname, given, county,
-     state), the same scoping owner_cluster.py uses and for the same reason:
-     a bare name match nationwide is noise, county+state keeps it plausible.
+  1. Index the parties who LOST a parcel to a forced sale, by (surname, given,
+     county, state), the same scoping owner_cluster.py uses and for the same
+     reason: a bare name match nationwide is noise, county+state keeps it
+     plausible. Two sources feed the index:
+       a. every listing's deed_chain distress_transfers (a loss on a parcel that
+          is on the board), and
+       b. the deed-index sidecar (data/deed_index.db, built by
+          scripts/backfill_deed_index.py from a county-wide register-of-deeds
+          sweep). This is the source that matters: a county sweep finds losers on
+          parcels that were never board leads, which (a) can never see.
   2. For every CURRENT listing on the board, check whether its owner_name
      matches a name in that loser index (same county/state) on a DIFFERENT
      property than the one they lost. A match means this owner has already
@@ -37,36 +42,45 @@ doc_type values that DO exist are GIS/CAMA sale-VALIDITY codes ("IMPROVED",
 "VACANT", "0: VALID ARMS-LENGTH", "DEED, QUIT CLAIM") from gis.last_sale/
 assessor_card/county_sales, not real ROD deed-instrument classifications;
 and rod_docs (162 rows, source=*_dot_ocr) only covers Deed-of-Trust/
-Mortgage OCR, never sale-conveyance types. None of the board's current
-sources record a TAX DEED / SHERIFF'S DEED / TRUSTEE'S DEED / MASTER IN
-EQUITY / CLERK'S DEED string anywhere. The code above is correct and
-forward-compatible -- it activates automatically the moment any source
-starts carrying real deed-instrument types -- but it is genuinely dormant
-today, not a bug. Making that data exist would need a true ROD deed-index
-scraper (distinct from the existing Deed-of-Trust OCR lane), which is new
-scraping, not the Tier A post-processing this item was rated as.
+Mortgage OCR, never sale-conveyance types. No board source records a forced-
+sale deed, so the signal stayed at 0 until a deed-index sweep exists.
 
-100% offline. No network calls; pure re-organization of deed_chain +
-owner_name + county + state + parcel_id/street_address, all already on
-the board.
+DEFECTS FIXED 2026-09-20 (docs/deed_index_scoping_2026-09-20.md, F1 to F5):
+  * F1, F2: a loss deed is recognized by rod.inst_class.classify_instrument, not
+    by substring lists. The vendor codes TR/D, COM/D and SHF/D, the spelling
+    TRUSTEES DEED (no apostrophe) and COMMISSIONER'S DEED all matched nothing
+    here, and normalize_doc_type had turned TAX DEED into a bare DEED.
+  * F3: the loser's name comes from the transfer itself. The old fallback to
+    summary.prior_owner is gone: it is the grantor of the newest transfer that
+    has one, rarely the person who lost THAT parcel.
+  * F5: pass 1 also reads the deed-index sidecar.
+  * F4 (rod/cchs.py _SOLD_TYPES) is fixed in the adapter, not here.
+
+KNOWN LIMIT. The join is a name string inside one county, and common surnames
+collide. Expect false positives to dominate until a second key (mailing address
+or an adjacent parcel) is added. The self-match guard for a sidecar loss compares
+the parcel key and the deed's book/page against the listing's own chain. The
+vendor's parcel key (CCHS serves values like 1-3405501) has not been mapped to the
+board's parcel_id, so until it is, the book/page test is the one that can decide.
+
+No network. Reads the board rows in hand plus one local SQLite file.
 """
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from typing import Iterable
 
 import structlog
 
+from .deed_index import Party, derive_loss, load_loss_rows
 from .models import Listing
 from .name_normalize import is_entity, person_orderings
+from .rod.inst_class import LOSS_CLASSES, classify_instrument
 
 log = structlog.get_logger()
 
-_LOSS_DOC_TYPES = (
-    "TAX DEED", "SHERIFF'S DEED", "SHERIFF DEED",
-    "TRUSTEE'S DEED", "TRUSTEE DEED", "SUBSTITUTE TRUSTEE",
-    "MASTER IN EQUITY", "MASTER'S DEED", "CLERK'S DEED", "CLERK DEED",
-)
+_EVIDENCE_MAX = 5
 
 
 def _surname_first_reading(owner_name: str):
@@ -95,23 +109,102 @@ def _property_key(li: Listing) -> str:
     return f"src:{li.source_url}"
 
 
-def _is_loss_doc(doc_type: str | None) -> bool:
-    if not doc_type:
-        return False
-    dt = doc_type.upper()
-    return any(k in dt for k in _LOSS_DOC_TYPES)
+def _county_key(county: str) -> str:
+    return county.replace(" County", "").strip().upper()
 
 
-def enrich_repeat_tax_loss(listings: Iterable[Listing]) -> dict:
-    """Stamp raw['repeat_tax_loss'] on any listing whose current owner has a
-    tax-sale/foreclosure-sale loss on a DIFFERENT board property. Never
-    drops a lead; additive only."""
+def _pid_norm(pid) -> str:
+    return re.sub(r"[^A-Z0-9]", "", str(pid or "").upper()).lstrip("0")
+
+
+def _bp_norm(book, page) -> str | None:
+    b, p = str(book or "").strip().lstrip("0"), str(page or "").strip().lstrip("0")
+    return f"{b}/{p}" if b and p else None
+
+
+def _listing_book_pages(li: Listing) -> set[str]:
+    """Book/page of every deed on this listing's own chain. A loss whose book/page
+    is among them is a loss of THIS property, whatever the parcel keys say."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    dc = raw.get("deed_chain")
+    out: set[str] = set()
+    for t in (dc.get("transfers") or []) if isinstance(dc, dict) else []:
+        bp = _bp_norm(t.get("book"), t.get("page")) if isinstance(t, dict) else None
+        if bp:
+            out.add(bp)
+    return out
+
+
+def _same_property(property_key: str, pid: str, book_pages: set[str], loss: dict) -> bool:
+    if loss["lost_property_key"] == property_key:
+        return True
+    if pid and loss.get("lost_pid_norm") and pid == loss["lost_pid_norm"]:
+        return True
+    bp = _bp_norm(loss.get("book"), loss.get("page"))
+    return bool(bp and bp in book_pages)
+
+
+def _loss_identity(loss: dict) -> tuple:
+    bp = _bp_norm(loss.get("book"), loss.get("page"))
+    if bp:
+        return ("bp", loss.get("date"), bp)
+    return ("doc", loss.get("date"), loss.get("doc_type"), loss["lost_property_key"])
+
+
+def count_candidate_owners(board_rows: Iterable[dict], deed_index_rows: list[dict]) -> dict:
+    """Read-only preview for a streamed board (board_stream.iter_board_rows dicts):
+    how many rows carry an owner name that equals an indexed loser in the same
+    county and state. An upper bound, since the self-match guard is not applied.
+    Lets a caller skip the heavy board load when nothing can match."""
+    keys: set[tuple] = set()
+    for row in deed_index_rows:
+        county, state = _county_key(row.get("county") or ""), (row.get("state") or "").upper()
+        for name in row.get("loser_names") or []:
+            k = _name_key(name)
+            if k:
+                keys.add((k[0], k[1], county, state))
+    scanned = candidates = 0
+    for rec in board_rows:
+        scanned += 1
+        if not keys or not rec.get("county") or not rec.get("state"):
+            continue
+        k = _name_key(rec.get("owner_name") or "")
+        if k and (k[0], k[1], _county_key(rec["county"]), rec["state"].upper()) in keys:
+            candidates += 1
+    return {"rows_scanned": scanned, "loser_keys": len(keys), "candidate_rows": candidates}
+
+
+def enrich_repeat_tax_loss(listings: Iterable[Listing],
+                           deed_index_rows: list[dict] | None = None) -> dict:
+    """Stamp raw['repeat_tax_loss'] (and the matched instruments in
+    raw['deed_index']) on any listing whose current owner has a tax-sale or
+    foreclosure-sale loss on a DIFFERENT property. Never drops a lead; additive
+    only.
+
+    deed_index_rows are loss instruments from the sidecar (deed_index.load_loss_rows).
+    None reads the default sidecar, [] means none; a missing sidecar is [], so the
+    enricher behaves as before until the first sweep."""
     listings = list(listings)
-    stats = {"losses_indexed": 0, "tagged_rows": 0}
+    if deed_index_rows is None:
+        deed_index_rows = load_loss_rows()
+    stats = {"losses_indexed": 0, "tagged_rows": 0, "index_rows": len(deed_index_rows)}
 
     # Pass 1: index loser names by (surname, given, county, state) -> the
     # property they lost + when + how.
     losers: dict[tuple[str, str, str, str], list[dict]] = defaultdict(list)
+    seen: set[tuple] = set()
+
+    def add(name: str, county: str, state: str, loss: dict) -> None:
+        key = _name_key(name)
+        if key is None:
+            return
+        ident = (key, county, state, _loss_identity(loss))
+        if ident in seen:                 # the same deed reached us by two routes
+            return
+        seen.add(ident)
+        losers[(key[0], key[1], county, state)].append(loss)
+        stats["losses_indexed"] += 1
+
     for li in listings:
         raw = li.raw if isinstance(li.raw, dict) else {}
         dc = raw.get("deed_chain")
@@ -122,25 +215,51 @@ def enrich_repeat_tax_loss(listings: Iterable[Listing]) -> dict:
             continue
         if not li.county or not li.state:
             continue
-        county = li.county.replace(" County", "").strip().upper()
+        county = _county_key(li.county)
         state = li.state.upper()
         for t in transfers:
-            if not isinstance(t, dict) or not _is_loss_doc(t.get("doc_type")):
+            if not isinstance(t, dict):
                 continue
-            grantor = t.get("grantor") or dc.get("summary", {}).get("prior_owner")
-            if not grantor:
+            inst_class = t.get("inst_class") or classify_instrument(t.get("doc_type"))
+            if inst_class not in LOSS_CLASSES:
                 continue
-            key = _name_key(grantor)
-            if key is None:
-                continue
-            losers[(key[0], key[1], county, state)].append({
-                "date": t.get("date"),
-                "doc_type": t.get("doc_type"),
-                "lost_property_key": _property_key(li),
-                "lost_parcel_id": li.parcel_id,
-                "lost_source": li.source,
+            # Only the transfer's OWN grantors. Falling back to summary.prior_owner
+            # named the grantor of the newest transfer that had one, which is
+            # rarely the person who lost THIS parcel.
+            grantors = t.get("grantors") or ([t["grantor"]] if t.get("grantor") else [])
+            _kind, names = derive_loss(inst_class, [Party(str(g)) for g in grantors],
+                                       str(t.get("description") or ""))
+            for name in names:
+                add(name, county, state, {
+                    "date": t.get("date"),
+                    "doc_type": t.get("doc_type"),
+                    "inst_class": inst_class,
+                    "book": t.get("book"),
+                    "page": t.get("page"),
+                    "lost_property_key": _property_key(li),
+                    "lost_pid_norm": _pid_norm(li.parcel_id),
+                    "lost_parcel_id": li.parcel_id,
+                    "lost_source": li.source,
+                })
+
+    for row in deed_index_rows:
+        if not row.get("county") or not row.get("state"):
+            continue
+        county = _county_key(row["county"])
+        state = row["state"].upper()
+        pid = _pid_norm(row.get("parcel_id"))
+        for name in row.get("loser_names") or []:
+            add(name, county, state, {
+                "date": row.get("recorded_date"),
+                "doc_type": row.get("inst_code") or row.get("inst_class"),
+                "inst_class": row.get("inst_class"),
+                "book": row.get("book"),
+                "page": row.get("page"),
+                "lost_property_key": f"pid:{pid}" if pid else f"doc:{row.get('doc_key')}",
+                "lost_pid_norm": pid,
+                "lost_parcel_id": row.get("parcel_id"),
+                "lost_source": "deed_index",
             })
-            stats["losses_indexed"] += 1
 
     if not losers:
         return stats
@@ -154,13 +273,16 @@ def enrich_repeat_tax_loss(listings: Iterable[Listing]) -> dict:
         key = _name_key(li.owner_name)
         if key is None:
             continue
-        county = li.county.replace(" County", "").strip().upper()
+        county = _county_key(li.county)
         state = li.state.upper()
         candidates = losers.get((key[0], key[1], county, state))
         if not candidates:
             continue
         this_property = _property_key(li)
-        other_losses = [c for c in candidates if c["lost_property_key"] != this_property]
+        this_pid = _pid_norm(li.parcel_id)
+        book_pages = _listing_book_pages(li)
+        other_losses = [c for c in candidates
+                        if not _same_property(this_property, this_pid, book_pages, c)]
         if not other_losses:
             continue
         other_losses.sort(key=lambda c: c.get("date") or "", reverse=True)
@@ -170,9 +292,16 @@ def enrich_repeat_tax_loss(listings: Iterable[Listing]) -> dict:
             "prior_losses": len(other_losses),
             "most_recent_loss_date": other_losses[0]["date"],
             "most_recent_loss_doc_type": other_losses[0]["doc_type"],
+            "most_recent_loss_class": other_losses[0].get("inst_class"),
             "county": county,
             "state": state,
         }
+        # The instruments behind the tag: what a caller checks at the recorder.
+        li.raw["deed_index"] = [
+            {"inst_class": c.get("inst_class"), "date": c.get("date"), "book": c.get("book"),
+             "page": c.get("page"), "role": "grantor", "county": county}
+            for c in other_losses[:_EVIDENCE_MAX]
+        ]
         stats["tagged_rows"] += 1
 
     if stats["tagged_rows"]:

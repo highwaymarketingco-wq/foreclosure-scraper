@@ -243,3 +243,34 @@ def test_listing_types_include_new_values():
     assert ListingType.DIVORCE_NOTICE.value == "divorce_notice"
     assert ListingType.PROBATE_NOTICE.value == "probate_notice"
     assert ListingType.ESTATE_LEAD.value == "estate_lead"
+
+
+# ---- CCHS vendor codes (2026-09-20): the keyword lists match spelled-out labels ----
+
+def test_commissioners_deed_vendor_code_is_tagged_partition():
+    li = _li(raw={"doc_type": "COM/D"})
+    out = enrich_with_relationship_deeds([li])
+    assert out == []                                    # partition is tag-only, never emitted
+    assert li.raw["relationship_signal"]["kind"] == "partition"
+
+
+def test_quitclaim_vendor_code_with_zero_consideration_is_a_divorce_candidate():
+    li = _li(raw={"doc_type": "QCD", "consideration_amount": 0})
+    assert _looks_divorce(li) == "zero_consideration_quitclaim"
+    assert _looks_divorce(_li(raw={"doc_type": "QCD", "consideration_amount": 90_000})) is None
+
+
+def test_separation_vendor_codes_are_a_divorce_signal_on_their_own():
+    for code in ("D/SEP", "M/SEP", "DEED/SEP"):
+        assert _looks_divorce(_li(raw={"doc_type": code})) == "deed_of_separation", code
+
+
+def test_estate_vendor_codes_are_probate():
+    for code in ("ADM-DEED", "EXRX-DEED", "EXR DEED", "GDN DEED"):
+        assert _looks_probate(_li(raw={"doc_type": code})) == "EXECUTOR", code
+
+
+def test_vendor_codes_that_are_not_relationship_deeds_stay_untagged():
+    for code in ("D/T", "TR/D", "DEED", "S/TR"):
+        li = _li(raw={"doc_type": code})
+        assert _looks_probate(li) is None and _looks_divorce(li) is None, code

@@ -11,6 +11,8 @@ import os
 import re
 from datetime import datetime, timezone
 
+from .inst_class import LOSS_CLASSES, classify_instrument
+
 _MORTGAGE = re.compile(r"DEED OF TRUST|MORTGAGE|\bMTG\b|SECURITY (DEED|AGREEMENT)|\bD\s*/?\s*T\b|\bD OF TR\b|DOFTR", re.I)
 # Documents that REFERENCE a mortgage but are NOT a new mortgage recording.
 # Assignments, modifications, satisfactions, releases, corrections, substitutions,
@@ -31,6 +33,9 @@ _HOA_LIEN = re.compile(
 _NOT_REALTY_LIEN = re.compile(r"AIRPLANE|AIRCRAFT|\bUCC\b|VESSEL|\bBOAT\b", re.I)
 _SATISFY = re.compile(r"SATISF|CANCEL|RELEASE|\bSAT\b|\bREL\b", re.I)
 _KEEP = re.compile(r"MORTGAGE|DEED|TRUST|\bMTG\b|\bD/?T\b|LIEN|JUDG|\bTAX\b|FORECLOS|SATISF|CANCEL|RELEASE|ASSIGN|SECURITY|LIS PEND", re.I)
+# A completed tax sale conveyance. normalize_doc_type used to flatten it to "DEED",
+# so it never tripped _ADVERSE; keep it that way now that it keeps its own label.
+_TAX_DEED = re.compile(r"\bTAX DEED\b", re.I)
 
 
 def classify_rod_docs(docs, source: str, detail_cap: int = 40) -> dict:
@@ -45,10 +50,16 @@ def classify_rod_docs(docs, source: str, detail_cap: int = 40) -> dict:
         k = (getattr(d, "doc_type", "") or "").upper().strip()
         if k:
             kinds[k] = kinds.get(k, 0) + 1
+        # The vendor code (raw["ki"], e.g. TR/D, COM/D, SHF/D) matches none of the
+        # keyword lists above, so a forced-sale deed used to be dropped from
+        # `instruments`. Classify it from the code and the label together.
+        draw = getattr(d, "raw", None)
+        inst_class = classify_instrument(k, draw.get("ki") if isinstance(draw, dict) else None)
+        is_loss = inst_class in LOSS_CLASSES
         if _MORTGAGE.search(k) and not _NOT_NEW_MORTGAGE.search(k):
             has_m = True
             mtg += 1
-        if _ADVERSE.search(k) and not _NOT_REALTY_LIEN.search(k):
+        if _ADVERSE.search(k) and not _NOT_REALTY_LIEN.search(k) and not _TAX_DEED.search(k):
             has_a = True
             adv.add(k)
         if _MECHANIC_LIEN.search(k) and not _NOT_REALTY_LIEN.search(k):
@@ -59,16 +70,19 @@ def classify_rod_docs(docs, source: str, detail_cap: int = 40) -> dict:
             hoa_count += 1
         if _SATISFY.search(k):
             sat += 1
-        if _KEEP.search(k) and len(instruments) < detail_cap:
+        if (_KEEP.search(k) or is_loss) and len(instruments) < detail_cap:
             rd = getattr(d, "recorded_date", None)
-            instruments.append({
+            inst = {
                 "date": rd.date().isoformat() if rd else None,
                 "type": getattr(d, "doc_type", None),
                 "grantor": getattr(d, "grantor", None),
                 "grantee": getattr(d, "grantee", None),
                 "book": getattr(d, "book", None),
                 "page": getattr(d, "page", None),
-            })
+            }
+            if is_loss:
+                inst["inst_class"] = inst_class
+            instruments.append(inst)
     return {
         "instrument_count": len(docs), "kinds": kinds,
         "has_mortgage": has_m, "has_adverse_lien": has_a, "adverse_types": sorted(adv),

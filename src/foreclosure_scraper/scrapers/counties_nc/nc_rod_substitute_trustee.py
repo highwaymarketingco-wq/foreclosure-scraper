@@ -52,8 +52,10 @@ from typing import Iterable
 import structlog
 
 from ...base_scraper import BaseScraper
+from ...deed_index import Party, derive_loss
 from ...models import Listing, ListingType, PropertyKind
 from ...rod import aumentum, cchs, cott
+from ...rod.inst_class import classify_instrument
 from ...rod.models import RodDoc
 
 log = structlog.get_logger()
@@ -135,6 +137,18 @@ def _doc_to_listing(doc: RodDoc, vendor_label: str) -> Listing:
     )
 
 
+def _former_owner(doc: RodDoc) -> str | None:
+    """The borrower or taxpayer named on a post-sale deed. CCHS serves one row per
+    party and doc.grantor is the FIRST row's, which on a trustee's deed is often
+    the foreclosing law firm (the sweep now requests TR/D, so this is common).
+    Falls back to doc.grantor when the parties cannot be read as a loss."""
+    raw = doc.raw if isinstance(doc.raw, dict) else {}
+    names = raw.get("grantors") or ([doc.grantor] if doc.grantor else [])
+    cls = classify_instrument(raw.get("ki"), doc.doc_type)
+    _kind, losers = derive_loss(cls, [Party(n) for n in names], doc.notes or "")
+    return losers[0] if losers else doc.grantor
+
+
 def _sold_doc_to_listing(doc: RodDoc, vendor_label: str) -> Listing:
     """Convert a POST-sale recording (Trustee's Deed Upon Sale or
     equivalent) into a FORECLOSURE_SALE Listing with confirmed
@@ -168,7 +182,7 @@ def _sold_doc_to_listing(doc: RodDoc, vendor_label: str) -> Listing:
         parcel_id=doc.parcel_id,
         legal_description=doc.notes,
         case_number=_case_id_from_doc(doc),
-        defendant=doc.grantor,        # Borrower / former owner
+        defendant=_former_owner(doc),  # Borrower / former owner
         plaintiff=doc.grantee,        # Auction winner / lender
         sale_date=doc.recorded_date,  # Recording date ≈ sale date (within days)
         opening_bid=sold_price,       # Surface as opening_bid for grading

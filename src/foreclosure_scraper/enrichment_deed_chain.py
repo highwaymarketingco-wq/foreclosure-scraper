@@ -28,6 +28,7 @@ from typing import Any, Iterable, Optional
 import structlog
 
 from .models import Listing
+from .rod.inst_class import LOSS_CLASSES, classify_instrument, is_deed_class
 
 log = structlog.get_logger()
 
@@ -121,6 +122,10 @@ def _is_distress_sale(price: Optional[float], doc_type: str = "") -> bool:
     dt = doc_type.upper().strip()
     if any(k in dt for k in _DISTRESS_TYPES):
         return True
+    # Vendor short codes (TR/D, COM/D, SHF/D) and spellings the list above misses
+    # ("TRUSTEES DEED" has no apostrophe, so "TRUSTEE'S DEED" never matched it).
+    if classify_instrument(dt) in LOSS_CLASSES:
+        return True
     if price is not None and price in _LOVE_AND_AFFECTION:
         return True
     return False
@@ -182,12 +187,15 @@ def _collect_records(li: Listing) -> list[dict]:
             if not isinstance(d, dict):
                 continue
             dt = str(d.get("doc_type") or "")
+            draw = d.get("raw") if isinstance(d.get("raw"), dict) else {}
+            # The vendor code in raw["ki"] (TR/D, COM/D, SHF/D) says what the
+            # normalized doc_type may have flattened to a bare "DEED".
+            inst_class = classify_instrument(dt, draw.get("ki"))
             # Only include deed-type documents (not mortgages/liens)
-            if any(k in dt.upper() for k in ("DEED", "QUITCLAIM", "WARRANTY",
-                                              "DISTRIBUTION", "COMMISSIONER",
-                                              "SURVIVORSHIP", "EXECUTOR",
-                                              "ADMINISTRATOR")):
-                records.append({
+            if is_deed_class(inst_class) or any(k in dt.upper() for k in (
+                    "DEED", "QUITCLAIM", "WARRANTY", "DISTRIBUTION", "COMMISSIONER",
+                    "SURVIVORSHIP", "EXECUTOR", "ADMINISTRATOR")):
+                rec = {
                     "date": _parse_date(d.get("recorded_date")),
                     "price": _money(d.get("amount")),
                     "book": d.get("book"),
@@ -195,7 +203,18 @@ def _collect_records(li: Listing) -> list[dict]:
                     "doc_type": dt,
                     "county": d.get("county"),
                     "source": "rod_docs",
-                })
+                }
+                # Parties only for a real conveyance. A deed of trust also passes
+                # the keyword test above, and its grantor is the CURRENT owner:
+                # carrying it would make him his own prior_owner.
+                if is_deed_class(inst_class):
+                    rec.update({
+                        "inst_class": inst_class,
+                        "grantor": d.get("grantor"),
+                        "grantee": d.get("grantee"),
+                        "grantors": draw.get("grantors"),
+                    })
+                records.append(rec)
 
     # 5. relationship_signal — probate/divorce deed patterns
     rs = raw.get("relationship_signal")
@@ -268,13 +287,27 @@ def _summarize(chain: list[dict], li: Listing) -> dict:
     for r in chain:
         price = r.get("price")
         doc_type = str(r.get("doc_type") or r.get("reason") or "")
-        if _is_distress_sale(price, doc_type):
-            summary["distress_transfers"].append({
+        # A rod_docs record carries the class read from its vendor code, which can
+        # be stronger than the doc_type an older normalize_doc_type flattened to DEED.
+        inst_class = r.get("inst_class") or classify_instrument(doc_type)
+        if _is_distress_sale(price, doc_type) or inst_class in LOSS_CLASSES:
+            entry = {
                 "date": r.get("date"),
                 "price": price,
                 "doc_type": doc_type or None,
                 "source": r.get("source"),
-            })
+            }
+            # Keep who conveyed and who received, plus the instrument's identity.
+            # repeat_tax_loss needs the loser's own name; without it, it fell back
+            # to summary.prior_owner, which is the grantor of the newest transfer
+            # that HAS one and is rarely the person who lost that parcel.
+            for k, v in (("grantor", r.get("grantor")), ("grantee", r.get("grantee")),
+                         ("grantors", r.get("grantors")), ("book", r.get("book")),
+                         ("page", r.get("page")),
+                         ("inst_class", inst_class if inst_class != "OTHER" else None)):
+                if v:
+                    entry[k] = v
+            summary["distress_transfers"].append(entry)
 
     # Chain breaks: $1 sales, quitclaim, no consideration
     for r in chain:

@@ -30,6 +30,10 @@ from typing import Optional
 import structlog
 
 from .models import Listing, ListingType, PropertyKind
+from .rod.inst_class import (
+    COMMISSIONER_DEED, DEED_OF_SEPARATION, DISTRIBUTION_DEED, EXECUTOR_DEED, QUITCLAIM,
+    classify_instrument,
+)
 
 log = structlog.get_logger()
 
@@ -92,6 +96,15 @@ COUPLE_GRANTOR_RE = re.compile(
 )
 
 
+def _doc_class(li: Listing) -> str:
+    """Canonical class of the recorded document, from the doc-type fields the
+    detectors below already read. The keyword lists match spelled-out labels, so a
+    CCHS vendor code (COM/D, QCD, D/SEP, ADM-DEED, EXRX-DEED) matched nothing."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    rod = raw.get("rod") if isinstance(raw.get("rod"), dict) else {}
+    return classify_instrument(raw.get("doc_type"), rod.get("doc_type"))
+
+
 def _looks_probate(li: Listing) -> Optional[str]:
     """Return the matched keyword if doc-type/text looks probate-driven."""
     raw = li.raw if isinstance(li.raw, dict) else {}
@@ -110,6 +123,11 @@ def _looks_probate(li: Listing) -> Optional[str]:
     for kw in PROBATE_KEYWORDS:
         if kw in blob:
             return kw.strip()
+    cls = _doc_class(li)
+    if cls == EXECUTOR_DEED:
+        return "EXECUTOR"
+    if cls == DISTRIBUTION_DEED:
+        return "DEED OF DISTRIBUTION"
     return None
 
 
@@ -129,10 +147,11 @@ def _looks_divorce(li: Listing) -> Optional[str]:
 
     # Direct marital-instrument match — a deed/memorandum of separation IS the
     # divorce signal on its own; no $0-consideration / couple-name gate needed.
-    if any(kw in doc_type_blob for kw in SEPARATION_KEYWORDS):
+    cls = _doc_class(li)
+    if any(kw in doc_type_blob for kw in SEPARATION_KEYWORDS) or cls == DEED_OF_SEPARATION:
         return "deed_of_separation"
 
-    if not any(kw in doc_type_blob for kw in QUITCLAIM_KEYWORDS):
+    if not any(kw in doc_type_blob for kw in QUITCLAIM_KEYWORDS) and cls != QUITCLAIM:
         return None
 
     consideration = (
@@ -178,6 +197,8 @@ def _looks_partition(li: Listing) -> Optional[str]:
     for kw in PARTITION_KEYWORDS:
         if kw in blob:
             return kw.strip()
+    if _doc_class(li) == COMMISSIONER_DEED:
+        return "COMMISSIONER'S DEED"
     return None
 
 
