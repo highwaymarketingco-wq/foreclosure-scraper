@@ -6,10 +6,16 @@ Regenerate any time: `uv run python scripts/coverage_100_ledger.py`.
 
 ## What "100%" means here
 
-- **Scope is the 18 counties in `config.py`.** NC: Rutherford, Cleveland, Henderson, Polk,
-  Gaston, Buncombe, Transylvania, McDowell, Lincoln, Mitchell, Burke. SC: Spartanburg,
-  Anderson, Pickens, Oconee, Cherokee, Union, Laurens. About 90K other rows sit on the board
-  (Mecklenburg, Wake, Charleston and others) and are out of scope by the owner's direction.
+- **There are two scopes, and this ledger covers only the narrower one.** Flip-type leads
+  (a scheduled foreclosure, sheriff or HOA sale, an auction, REO) are in scope only in the 18
+  `config.py` footprint counties. NC: Rutherford, Cleveland, Henderson, Polk, Gaston,
+  Buncombe, Transylvania, McDowell, Lincoln, Mitchell, Burke. SC: Spartanburg, Anderson,
+  Pickens, Oconee, Cherokee, Union, Laurens. Distressed leads (tax delinquency, liens,
+  probate, divorce, code enforcement and the like) are in scope in all 146 NC and SC
+  counties (`config.in_scope_distressed`, owner direction 2026-09-15). The first version of
+  this ledger called the roughly 90K rows outside the footprint "out of scope by the owner's
+  direction". That was wrong for distressed leads. Their coverage is measured in
+  `docs/AUDIT_2026-09-21.md`; this ledger's per-county layer table stays footprint-only.
 - **Free and public data only.** No paid APIs, no CAPTCHA or WAF bypass, no robot-held logins.
   A cell that needs one of those is WALLED, and is reported as a wall, not a gap.
 - A county is covered only when every layer is present: identity (parcel and situs), value,
