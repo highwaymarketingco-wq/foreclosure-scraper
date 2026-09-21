@@ -87,7 +87,6 @@ the recompute also applied the existing quality downranks to carried-over rows).
 | Laurens qPayBill rows keyed by account number, not parcel (393 leads); Rutherford tax and heir-estate rows (338) | 2 | identity, value | Needs a per-source key map. |
 | Cherokee situs from the ledger row (I-04) | Cherokee | identity | Build-ready, small. |
 | Deed-index sweep for `repeat_tax_loss` | 7 buildable, 11 walled | about 790 loss deeds a year footprint-wide | Code and 179 tests done; the live search is behind a Cloudflare bot challenge. Re-check politely later. Small signal even fully built. |
-| Land ARV guard: 445 Lincoln land leads publish a max bid over 2x assessed on imprecise comps | Lincoln, Gaston, Transylvania | correctness | Owner decision: withhold max bid on land when ARV is over 2x assessed and comps are imprecise. |
 
 Queue items I measured and did not build: D-02 (Cherokee 16-digit IDs: about 28 leads at most),
 I-03 (Pickens EnerGov value: 15% populated, tax year 2027, does not match assessed values),
@@ -104,11 +103,16 @@ refreshing; needs a state-aware refresh API), M-01 (only 363 Transylvania rows).
 - **Live payoff balances, NC power-of-sale debt, SC exempt-deed prices**: the data is not published.
 - **Nine deed-index hosts**: `robots.txt` Disallow. Whether that counts as a wall is an owner decision.
 
-## Decisions only the owner can make
+## Decisions (all settled as of 2026-09-21)
 
-1. The daily court job has failed every run since 8/20 (`uv` not on launchd's PATH). Fixing it would
-   enable a CAPTCHA solver and automated SC Public Index queries, which the hard rules forbid.
-   Unload it, or rewrite it to use only the open lanes.
-2. Whether `robots.txt` Disallow counts as a wall.
-
-Two privacy decisions from this session are recorded outside the repository on purpose.
+1. The daily court job (failing since 8/20, and it would have enabled a CAPTCHA solver and automated SC
+   Public Index queries) was unloaded. To re-enable, rename its plist in `~/Library/LaunchAgents` back.
+2. `robots.txt` Disallow does not count as a wall. CAPTCHA, login, hard 403 or Cloudflare challenges, and
+   click-through terms still do.
+3. Land max bids: no change. On land, an ARV up to 6x the county appraisal is accepted and 20x is withheld
+   (`ARV_ANCHOR_SOFT_MULT_LAND` and `ARV_ANCHOR_HARD_MULT_LAND` in `valuation/calc.py`, calibrated to the
+   board's p90 and p99). The 445 Lincoln land leads with a bid over 2x assessed sit inside that band, carry
+   `geo_imprecise_comps` at MEDIUM or LOW confidence, and are cold tier with no deal verdict. A backtest
+   against recent recorded sales was too thin to justify re-calibrating (54 leads, none in Lincoln, which has
+   no recorded sales for them); it leaned toward inflation in Rutherford and Henderson (about 3x recent
+   sale prices against 1.4x for ordinary land). If a tighter guard is ever wanted, lower the soft multiple.
