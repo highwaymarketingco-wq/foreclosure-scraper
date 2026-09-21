@@ -183,6 +183,33 @@ _LISTING_TYPE_SIGNAL = {
 }
 
 
+# listing_type "distressed" is a catch-all: 31 sources emit it. Most are real evidence that the
+# building or lot is in bad shape (code enforcement, condemned, vacant, storm damage, failing
+# HUD inspection). These are not. Each is a record ABOUT the parcel or a program, not a sign
+# the owner is under pressure, and giving them a PROPERTY category let them complete a stack
+# of two (audit 2026-09-21: 645 of the 1,646 HOT leads were New Hanover demolition permits).
+# They still ship on the board and in the dashboard as context; they just add no score.
+# A parcel with real poor-condition evidence still gets PROPERTY through raw['distressed'].
+_CONTEXT_ONLY_DISTRESSED_SOURCES = frozenset({
+    # a demolition permit is the owner (or a developer) tearing a structure down, not a bad building
+    "new_hanover_demolition_permits",
+    # environmental and dam registries: regulated facilities, mostly commercial, not owner pressure
+    "nc_ust_incidents", "sc_ust_registry", "nc_dam_safety", "nc_inactive_hazardous",
+    "sc_des_brownfields", "sems", "acres",
+    # federal contract and listing records with no condition evidence
+    "hud_section8_contracts", "crexi_multifamily",
+    # hazard-zone and program context
+    "fema_disasters", "hendersonville_flood_zone_structures", "buncombe_hmgp_buyout",
+})
+
+
+def _context_only_distressed(li: Listing) -> bool:
+    """True for a 'distressed'-typed record that says nothing about the owner's distress."""
+    slug = str(li.source or "").rsplit(".", 1)[-1]
+    # county-owned inventory: the owner is the county, there is no one to be motivated
+    return slug in _CONTEXT_ONLY_DISTRESSED_SOURCES or slug.endswith("_county_owned")
+
+
 def _mls_signals(li: Listing, prior_price: Optional[float] = None) -> list[tuple[str, str, int]]:
     """SALES-category signals derived from the MLS lifecycle fields HomeHarvest
     persists (mls_status / days_on_mls / list_price). These turn the raw realtor
@@ -240,7 +267,7 @@ def _signals_for(li: Listing, prior_price: Optional[float] = None) -> list[tuple
     r = li.raw if isinstance(li.raw, dict) else {}
     sig: list[tuple[str, str, int]] = []
     lt = (li.listing_type.value if li.listing_type else "") if hasattr(li.listing_type, "value") else str(li.listing_type or "")
-    if lt in _LISTING_TYPE_SIGNAL:
+    if lt in _LISTING_TYPE_SIGNAL and not (lt == "distressed" and _context_only_distressed(li)):
         cat, w = _LISTING_TYPE_SIGNAL[lt]
         # A Helene placard lead gets a severity-graded signal instead of the
         # flat generic 'distressed' (10).

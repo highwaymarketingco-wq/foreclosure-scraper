@@ -13,8 +13,9 @@ from foreclosure_scraper.models import Listing, ListingType
 
 
 def _lead(ao, lt=ListingType.DISTRESSED):
-    return Listing(source="counties_nc.new_hanover_demolition_permits", source_url="u", listing_type=lt,
-                   state="NC", county="New Hanover", raw={"amount_owed": ao} if ao is not None else {})
+    # gaston_vacant is a source whose generic 'distressed' tag still scores (one PROPERTY category)
+    return Listing(source="counties_nc.gaston_vacant", source_url="u", listing_type=lt,
+                   state="NC", county="Gaston", raw={"amount_owed": ao} if ao is not None else {})
 
 
 def _has_debt_signal(li):
@@ -46,7 +47,7 @@ def test_scorer_ignores_an_estimated_debt():
     est = _lead({"value": 250000, "source": "assessed_value", "is_actual_debt": False})
     assert not _has_debt_signal(est)
     cats = {c for _n, c, _w in _signals_for(est)}
-    assert "FINANCIAL" not in cats                       # a demolition-permit tag alone is one PROPERTY category
+    assert "FINANCIAL" not in cats                       # the vacant-parcel tag alone is one PROPERTY category
 
 
 def test_scorer_counts_a_real_debt():
@@ -54,7 +55,7 @@ def test_scorer_counts_a_real_debt():
     assert _has_debt_signal(real)
 
 
-def test_a_generic_permit_plus_an_estimate_can_no_longer_stack_to_two():
+def test_a_generic_tag_plus_an_estimate_can_no_longer_stack_to_two():
     li = _lead({"value": 250000, "source": "assessed_value", "is_actual_debt": False})
     assert len({c for _n, c, _w in _signals_for(li)}) <= 1
 
