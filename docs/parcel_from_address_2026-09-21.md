@@ -23,10 +23,11 @@ republished 182,388-row board (section 9) gave the same picture.
 | False-match rate when the true parcel is NOT in the cache | 0.22% with this rule, 5.21% with the older one-shared-word rule |
 | Expected lift (after the existing join runs) | NC parcel coverage 55.4% to 72.4%, market value +14.8 pp, acreage +15.3 pp, mailing +2.3 pp; SC parcel 71.4% to 75.9%, mailing +4.4 pp, owner +2.5 pp, market value +3.9 pp |
 | Owner agreement on the 19,277 | agrees 7,349, differs 9,424, unknown 2,504 (recorded, never required) |
+| **Repair of parcels at another address** (sections 11 and 12) | 6,342 disagreeing parcels in 7 repairable sources: **3,644 replaced** (liensnc 3,623), **2,323 withdrawn** (the street resolves to nothing unique: the neighbour's values blanked and the parcel_id cleared), 375 kept by an owner guard; hold-out precision 99.8% |
 
 What blocks or shapes the apply is in section 9. Short list: one RAW_KEEP line for the lead to add, a decision on the join for
 leads whose parcel owner differs from the lead's owner, and a separate finding: about 4,000 liensnc leads already carry a
-parcel that sits at a different address than their own (section 5.5).
+parcel that sits at a different address than their own (section 5.5, repaired in section 11).
 
 ## 2. The rule
 
@@ -317,9 +318,9 @@ gap is consistent with about 10% wrong parcels there, and equally with lots whos
 builder's predecessor, so read it as a ceiling on the error in that group, not an estimate. This is indirect evidence, not a measurement.
 
 Consequence for the board, outside this script: those 4,000 leads currently take mailing, value, sqft and acreage from a neighbour's parcel when `join_parcel_cache_to_board` runs.
-A repair in the shape of `repair_burke_storm_damage_parcels.py` (replace the parcel when the existing parcel's situs disagrees
-with the row's address and the address resolves uniquely, keep the old id in `backups/`) would fix them. It is not done here
-because this script never replaces an existing parcel.
+`resolve_parcel_from_address.py` never replaces an existing parcel. The repair is a separate script,
+`repair_parcel_from_address.py` (section 11), which replaces the parcel when the existing parcel's situs disagrees with the row's address
+and the address resolves uniquely, and keeps the old id in `backups/`.
 
 ### 5.6 Expected precision on the real target
 
@@ -445,20 +446,19 @@ address either, and need the scraper to stop presenting the account number as a 
 
 ## 9. Apply, blockers, follow-ups
 
-1. **RAW_KEEP (blocker, one line).** `web_artifact._slim_raw` drops keys not in `RAW_KEEP`. Add after `"resolver_conflict_undone": "*",`
-   (line 1476 today) in `src/foreclosure_scraper/web_artifact.py`:
+1. **RAW_KEEP (done by the lead, line 1477 today).** `web_artifact._slim_raw` drops keys not in `RAW_KEEP`. The line is:
 
    ```python
        "parcel_from_address": "*",        # parcel resolved from the lead's own street address {source, verified, county, state, matched_situs, cache_owner, owner_agrees, id_basis, cache_ids}
    ```
 
-   Until it is added, `tests/test_required_raw_keys_registered.py::test_every_required_raw_key_is_in_raw_keep[resolve_parcel_from_address.py]`
-   fails on purpose and `apply_rows` refuses a real run. `_SLIM_RAW` and `dashboard.js` `_LEAN_RAW` are needed only if the dashboard should show
-   `owner_agrees`.
+   Without it `tests/test_required_raw_keys_registered.py` fails on purpose and `apply_rows` refuses a real run. `_SLIM_RAW` and `dashboard.js`
+   `_LEAN_RAW` are needed only if the dashboard should show `owner_agrees` or `replaced_parcel`. The repair (section 11) stamps the same key, so it needs no new line.
 2. **Apply.** `python scripts/apply_board_fixes.py --apply` (all steps in one load; `parcel` runs after `county` and `flip`, before `address` and
    `join`). Or `--steps county,parcel,address,join --apply`. Then `recompute_valuation.py` and `rank_board_standalone.py`. Run it as the only board process.
 3. **Decision: the join and `owner_agrees: false`** (section 6): 2,704 of the new mailing fills go under a different party's name.
-4. **Follow-up, separate task: repair the existing liensnc parcels** (section 5.5): about 4,000 rows carry a neighbour's parcel.
+4. **Done: repair of the existing liensnc parcels** (section 11): 3,644 replaced. **Done: withdrawal** of the neighbour's parcel and copied values on 2,323 more (section 12).
+   **Open:** a guard in `enrichment_parcel_from_geo` so a full pipeline run does not re-attach the same parcel from coordinates (section 12.4).
 5. **Follow-up: situs overlays** for the caches with none (Guilford, Cabarrus, Oconee, Orange, Franklin, Hoke, Transylvania, Richmond, Perquimans, Bladen, Avery: 3,199 leads) and
    for Charleston (32%); caches for Beaufort SC, Cherokee SC, Georgetown, Union SC, Orangeburg (1,782 leads); Greenwood is pending.
 6. **Follow-up: Florence** id padding (section 8a) and Horry `99...` ids (section 8b).
@@ -480,5 +480,282 @@ so the county table above is the 15:51 snapshot.
 * `scripts/apply_board_fixes.py`: step `parcel` added (one line); `tests/test_apply_board_fixes.py`: order assertions added.
 * Tests run: `tests/test_dq_resolve_parcel_from_address.py` (46 passed), `tests/test_apply_board_fixes.py` and `tests/test_dq_apply_rows_contract.py` (passed), and the
   raw-key test for this script (fails until section 9.1).
-* Board passes: three full streaming passes of `docs/listings.json.gz` (an extract, a side capture for the Florence and Horry blocks, the final CLI run) and two partial reads; `load_board`
+* Board passes for sections 1 to 9: three full streaming passes of `docs/listings.json.gz` (an extract, a side capture for the Florence and Horry blocks, the final CLI run) and two partial reads; `load_board`
   and `write_artifact` never called, nothing applied, no network, nothing staged or committed.
+* Section 11 adds `scripts/repair_parcel_from_address.py`, `tests/test_dq_repair_parcel_from_address.py` (54 tests), the `parcel_repair` step in `scripts/apply_board_fixes.py` and its order assertions in `tests/test_apply_board_fixes.py`, and a
+  one-line change to `scripts/resolve_parcel_from_address.py` (its hold-out leaves out parcels it wrote). Its board passes: four streaming dry runs, one at a time (each after a code change; the numbers in section 11 are the last) and one early-exit
+  read of a few rows to see the `gis_attrs_full` bag, plus one more streaming dry run for section 12; `load_board` and `write_artifact` never called, `--apply` never run.
+
+## 11. Repair of parcels that sit at another address
+
+`scripts/repair_parcel_from_address.py`, step `parcel_repair` of `scripts/apply_board_fixes.py` (right after `parcel`, before `address` and
+`join`). Function `apply_rows(rows, *, dry_run=False)`, also exported as `repair_rows`. Every count below is a streaming dry run of the live
+board after the resolver was applied (182,388 rows, one pass, 83 s, 709 MB). Nothing was applied and `load_board` was not called.
+
+### 11.1 The rule
+
+A parcel is replaced only when all of these hold; otherwise it is left exactly as it is.
+
+1. **The parcel is not the source's own.** Only sources whose scraper never sets a `parcel_id` are repaired (`REPAIRABLE_SOURCES`, section 11.2).
+   Denied sources, tax-sale overage claims, parcels the name resolver or the address resolver wrote, and streets that were copied from a parcel
+   cache are skipped.
+2. **The existing parcel clearly disagrees.** Its id is in the cache, its situs parses as a numbered street (every part of a multi-address situs
+   does), and it fails all three agreement tests: same number and street name; the resolver's full rule with the town ignored; the older Burke
+   test (same number and one shared word). So a different house number on the same street, or a different street, is a disagreement, and these are
+   not: a different suffix, a unit, a leading zero, a direction, a missing or legal-text situs, an id that is not in the cache, a lead street that is
+   a range or road-only.
+3. **The address resolves uniquely to a different parcel** under the resolver's acceptance rule (full name, suffix, direction, town, unit, ZIP,
+   specific id, exactly one parcel).
+4. **Owner guard.** If the existing parcel's owner agrees with the lead's owner and the new parcel's does not, the address is more likely a typo than the
+   parcel a neighbour's, so the parcel stays. A lead owner that is the old parcel's owner spelled exactly as the cache spells it is treated as copied by
+   the join, not as evidence (both verdicts become unknown).
+
+What a replacement writes: `parcel_id` (the board's own spelling of the new parcel when one is on the board), and `raw['parcel_from_address']`
+as the resolver writes it plus `replaced_parcel`, `replaced_situs`, `replaced_cache_owner`, `replaced_owner_agrees`, `cleared_from_old_parcel` and
+`verified: address_exact_unique_replaced_disagreeing_parcel`. The old parcel id and everything cleared go to the returned `_backup`
+(`backups/repair_parcel_from_address_replaced_<stamp>.json`, keyed by row index, with source_url, old and new parcel, old and new situs and owner, and each
+cleared value).
+
+**What it clears.** The join writes no provenance, so nothing is cleared on suspicion: a field is cleared only when its value equals what the OLD parcel's cache row
+holds, or (for a parcel-layer block) when the block names the old parcel. The next join step refills them from the new parcel.
+
+| Field | Cleared when |
+|---|---|
+| `market_value`, `tax_value`, `living_sqft`, `acreage`, `land_use` | equal to the old cache row's |
+| `owner_name` | exactly the old cache owner string (the join copies it verbatim) |
+| `raw.gis` `mailing`, `owner`, `market_value`, `tax_value`, `acreage`, `living_sqft`, `land_use` | equal to the old cache row's (mailing and owner compared without case or punctuation) |
+| `raw.gis.last_sale` | its amount equals the old cache sale price |
+| `raw.owner_mailing` (whole block) | its `source` is a parcel layer (none, `county_gis`, `nc_onemap`, `scdot_sc`, `sc_assessor_roll`, `county_tax_roll`, `henderson_county_gis`) AND its mailing equals the old cache mailing or it names the old parcel. A filing's own block (`liensnc_filing`) is never cleared |
+| `raw.gis_attrs_full` (NC OneMap bag) | a parcel-number field (`parno`, `pin`, `reid`, ...) is the old parcel, or its `siteadd` and `ownname` are the old cache row's |
+
+Not cleared, because they are derived and the chain recomputes them (`recompute_valuation.py`, `rank_board_standalone.py`): `raw.calc`, `raw.distress_stack`, and the
+scores. A few `raw.gis` keys that do not match the old cache row stay (owner 12, last_sale 5, mailing 4 of the 3,644).
+
+### 11.2 Which sources
+
+A tax roll's `parcel_id` is what the bill is for. When its street differs, the street is the taxpayer's mailing address or a lot description, and the parcel is right.
+Measured on the 2,243 parcel-bearing rows of sources that own their parcel where the situs clearly disagrees with the street (qpaybill 474, charlotte_open_data 420, rutherford_tax 399,
+buncombe_elderly 276, new_hanover_demolition_permits 152, berkeley_paystar_tax 108, spartanburg_delinquent_tax 45, and others): the parcel's owner agrees with the row's owner on
+1,275 (57%). Examples: `36 PIERCY ST` against a parcel at `38 PIERCY ST`, both GOEHRING KITTY; `660 BEE TREE RD` against `662 BEE TREE RD`, both MARINELL LEDFORD. Replacing those
+parcels would break the debt they belong to, so they are never touched.
+
+For the repairable sources the same measure is 2.7% (the old parcel's owner agrees with the lead's on 98 of the 3,644 replaced): the parcel was attached later, and the owner does not match.
+
+`REPAIRABLE_SOURCES` lists the sources whose scraper source contains no `parcel_id`, so any parcel on their rows was attached by an enricher. Each is a source whose street is the
+property or facility site: liensnc, sc_dew_lien_registry, nc_ust_incidents, nc_dam_safety, sc_ust_registry, fannie_homepath, brock_scott.
+`tests/test_dq_repair_parcel_from_address.py::test_every_repairable_source_has_a_scraper_that_never_sets_a_parcel_id` reads the scraper files and fails if one starts setting a parcel id.
+Not included although their scrapers set no parcel id, because their street may not be the property: courtlistener_bankruptcy (the debtor's address; 25 disagreeing rows), hud_section8_contracts (8), hutchens (7),
+estate_sales, crexi_multifamily, zillow_bulk, sc_public_index_lis_pendens (under 5 each).
+
+### 11.3 Results
+
+Parcel-bearing rows of the repairable sources, and how they classed (the other columns of the 6,342 are in the next table):
+
+| Source | Checked | Existing parcel agrees | Disagrees | Situs not comparable | Id not in cache |
+|---|--:|--:|--:|--:|--:|
+| liensnc | 13,626 | 3,445 | 6,212 | 3,490 | 479 |
+| sc_dew_lien_registry | 1,385 | 1,315 | 52 | 13 | 5 |
+| nc_ust_incidents | 350 | 301 | 38 | 9 | 2 |
+| sc_ust_registry | 761 | 732 | 14 | 14 | 1 |
+| nc_dam_safety | 61 | 52 | 4 | 4 | 1 |
+| fannie_homepath | 176 | 153 | 12 | 10 | 1 |
+| brock_scott | 60 | 46 | 10 | 3 | 1 |
+
+(Rows whose parcel the address resolver wrote in the last apply, 16,329 board-wide, are skipped: they agree with their street by construction.)
+
+**6,342 disagreeing parcels. 3,644 replaced** (NC 3,632, SC 12). By source: liensnc 3,623, sc_dew_lien_registry 9, brock_scott 5, nc_ust_incidents 5, fannie_homepath 2.
+The other 2,698 have no unique replacement: the street matches no cache parcel 2,569, its id is a shared placeholder 58, two parcels 30, ZIP conflict 28, owner guard 9, unit 4. Section 12 withdraws 2,323 of them. The 3,644 is below the
+4,000 of section 5.5, which was measured on the resolver's hold-out extract and counted any unique different parcel; the repair also leaves parcels that agree by the Burke test (a suffix-only difference) and applies the owner guard and the eligibility gates.
+
+By county (86 counties; the dry run prints all of them):
+
+| State | County | Replaced | Disagreeing |
+|---|---|--:|--:|
+| NC | Mecklenburg | 469 | 807 |
+| NC | Wake | 459 | 617 |
+| NC | New Hanover | 368 | 701 |
+| NC | Durham | 220 | 279 |
+| NC | Iredell | 160 | 322 |
+| NC | Brunswick | 152 | 225 |
+| NC | Buncombe | 144 | 213 |
+| NC | Henderson | 137 | 209 |
+| NC | Catawba | 126 | 178 |
+| NC | Forsyth | 97 | 168 |
+| NC | Burke | 91 | 147 |
+| NC | Cumberland | 73 | 116 |
+| NC | Moore | 70 | 96 |
+| NC | Union | 59 | 95 |
+| NC | Onslow | 54 | 103 |
+| NC | Johnston | 52 | 103 |
+| NC | Currituck | 43 | 48 |
+| NC | Dare | 41 | 61 |
+| NC | Craven | 40 | 49 |
+| NC | Rowan | 39 | 109 |
+| NC | Alamance | 37 | 73 |
+| NC | Pitt | 37 | 54 |
+| NC | Pasquotank | 35 | 39 |
+| NC | Watauga | 34 | 46 |
+| NC | Chatham | 32 | 56 |
+| | 61 other counties (SC: Spartanburg 5, Pickens 4, Laurens 3) | 575 | 1,326 |
+| | **Total** | **3,644** | **6,240** |
+
+(102 more disagreeing leads sit in counties with no replacement.)
+
+Owner evidence on the replaced (old parcel agrees with the lead's owner, new parcel agrees): (no, no) 2,002; (no, yes) 1,534; (yes, yes) 98 (a builder with adjacent lots, so the
+address decides); unknown 10. The new parcel's owner agrees on 1,633 of 3,644 (44.8%), the old parcel's on 98 (2.7%), the same contrast section 5.5 measured on the extract. The join
+withholds the parcel owner's mailing where `owner_agrees` is false, so for the 2,002 leads whose new owner differs the old mailing is cleared and not replaced; a liensnc lead keeps the
+mailing from its own filing.
+
+Cleared, counts of leads (all 3,644 lose at least one field): `raw.gis.mailing` 3,635, `raw.gis_attrs_full` 3,605, `raw.gis.owner` 3,596, `market_value` 3,503, `acreage` 3,433, `tax_value` 600,
+`living_sqft` 107, `raw.gis.last_sale` 72, `raw.owner_mailing` 18, `owner_name` 7, `land_use` 2.
+
+**The values these leads carried were wrong.** Of the 3,245 replaced leads that held the old parcel's market value, the median was 456,930 and the new parcel's is 305,200; the new value differs from
+the old by more than 20% on 2,142 of them (66%). Those leads' equity and ARV were computed from a neighbour's house.
+
+**Not replaced:** 2,698 disagreeing leads have no unique replacement. Each still carried a parcel at another address and values copied from it (`raw.gis.mailing` 2,682, `market_value` 2,555, `acreage` 2,541,
+`raw.gis_attrs_full` 2,232, `raw.gis.owner` 2,160, `tax_value` 817, `owner_mailing` 110, `living_sqft` 109). Section 12 withdraws them (2,323) or keeps them under the owner guard (375).
+
+### 11.4 Hold-out
+
+**Agreeing parcels are never touched.** Only a lead classed "disagrees" reaches the replacement step. On the hold-out (39,085 leads from any source with a parcel and a street, parcels the resolver wrote
+excluded) 19,506 agree and are never touched, 6,374 disagree, 8,574 are not comparable and 4,631 have an id that is not in the cache. In the dry run, 0 of the 3,644 replaced leads has an existing parcel that agrees with
+the street by the Burke or the name test (the guard check line). Tests cover suffix-only, unit, leading-zero, missing, legal-text and not-in-cache parcels: none is replaced.
+
+**Corrupt and repair.** Each verified hold-out lead (its own parcel is at its address) is given a wrong parcel from the same county, then the production path runs (disagreement test, unique resolution, owner guard) and the
+true parcel is checked:
+
+| Wrong parcel given | Corrupted | Restored | Wrong | Precision | Recall | Not restored |
+|---|--:|--:|--:|--:|--:|---|
+| same street, another house number | 9,500 | 8,774 | 17 | 99.81% | 92.4% | withdrawn 656, kept because the owner agrees with the wrong parcel 19, owner guard on a unique match 34 |
+| another street | 18,691 | 17,471 | 27 | 99.85% | 93.5% | withdrawn 1,182, kept (owner agrees) 1, owner guard on a unique match 10 |
+
+Precision is restored over restored plus wrong. A lead that is not restored is withdrawn (section 12: the wrong parcel is blanked, which is right because it is wrong by construction) or kept by a guard; neither counts as wrong. The wrong ones are the resolver's known kind (section 5.2): the source's own parcel is at `341 ALLEN CT` and the street says `341 Allen St.`;
+`133 LAVERNE AVE` against a unit parcel; `15 MCLEOD ST` against `15 W MCLEOD ST`. That is the resolver's 99.8%, unchanged, because a replacement is the resolver's answer.
+
+What the hold-out cannot show: the wrong parcels in the real data are the ones liensnc attached from coordinates, and the decoys here are random parcels of the same county. The independent evidence for the real data is the owner
+contrast above (44.8% against 2.7%) and the 24-row sample read by eye, which showed the neighbour at the old parcel (`1709 Sunset Dr` carried `1701 SUNSET DR`) and the address's own parcel owned by the lead's owner
+(HERNANDEZ JUAN F).
+
+### 11.5 Applying it
+
+* `python scripts/apply_board_fixes.py --apply` runs it in the chain (`parcel_repair` sits after `parcel`); or `--steps county,parcel,parcel_repair,address,join --apply`. The join must run after it, in the same load or a later one, to refill what was cleared, then
+  `recompute_valuation.py` and `rank_board_standalone.py` for `calc` and the scores. Standalone: `python scripts/repair_parcel_from_address.py --apply`. Run it as the only board process.
+* The step returns `_backup`; the driver writes it under `backups/`. To undo one lead, write `old_parcel_id` back and restore the entries in `cleared`.
+* Idempotent: a replaced lead's parcel now agrees with its street, so a second run touches nothing.
+* The RAW_KEY is the resolver's, already registered.
+* `resolve_parcel_from_address.py` now leaves parcels it wrote out of its own hold-out (`raw.parcel_from_address` counts as derived). On a board where it has been applied those parcels agree with the address by construction, and counting
+  them would inflate the resolver's hold-out; the counts in sections 1 to 9 were taken before the apply and do not change.
+* Residual risks: the repair trusts the lead's street. A filer's mistyped house number that happens to match another real parcel would replace a right parcel with a wrong one; the owner guard catches it only when the owner agrees with the old parcel.
+  Sources outside `REPAIRABLE_SOURCES` keep whatever parcel they have.
+
+* Tests: `tests/test_dq_repair_parcel_from_address.py` (54 tests, offline, synthetic caches): the disagreement test, source and provenance gates, the scraper check on the list, replacement with backup and provenance, each clearing rule and its negative, the owner guard, unique
+  resolution, idempotence, the RAW_KEEP refusal, the driver step and its backup file, the dry-run report, and the corrupt-and-repair hold-out. `tests/test_apply_board_fixes.py` asserts `county < parcel < parcel_repair < address < join`.
+
+## 12. Withdrawal: a neighbour's parcel with no replacement
+
+Decision from the lead: a wrong value or a stranger's mailing is worse than none, because it feeds ARV, equity and outreach. So a lead whose existing parcel clearly disagrees with its own street and whose
+street resolves to no unique parcel loses the parcel and everything copied from it. It lives in the same `parcel_repair` step (`apply_rows(..., withdraw=True)`; the dry run takes `--no-withdraw`).
+Counts are the live dry run of section 11 (182,388 rows, one pass, 72 s, 469 MB).
+
+### 12.1 The rule
+
+A lead is withdrawn when it is in the disagreeing set of section 11.1 (repairable source, existing id in the cache, numbered situs on both sides that clearly disagree) and one of these left it with no replacement:
+no cache parcel has the street (`no_match`), the matching parcel's id is a shared placeholder (`no_specific_id`), two parcels have the street (`ambiguous`), the ZIP conflicts (`zip_conflict`), or the unit is not in the cache
+(`unit_rejected`). Then, exactly as for a replacement, only values equal to the old cache row's are cleared (section 11.1 table), and `parcel_id` is cleared too, because the join needs a parcel_id to copy from.
+
+Left untouched, everything the guards protect: a lead whose owner independently agrees with the old parcel (`left_owner_agrees_with_existing`: the street is more likely the typo, or one builder owns adjacent lots);
+a unique replacement whose owner does not agree while the old one does (`left_owner_favours_existing`); the same parcel; an unreadable cache; an existing id that is not in the cache; a missing, unparseable or
+legal-text situs; a suffix, unit, leading-zero or direction difference; a lead street that is a range or road-only; sources whose scraper sets a real parcel_id; denied sources; overage claims. The street stays on the
+lead. The old parcel id and the cleared values go to `_backup` (`"action": "withdrawn"`), and `raw['parcel_from_address']` becomes
+`{"source": "repair_parcel_from_address", "withdrawn_parcel": <old id>, "reason": "street_disagrees_no_unique_match", "match_status": "left_no_match" | ..., "withdrawn_situs", "withdrawn_cache_owner", "withdrawn_owner_agrees", "cleared_from_old_parcel", "county", "state"}`.
+It has no `owner_agrees`, so the join's withholding rule is not triggered, and the join has nothing to do with it: no parcel_id.
+
+### 12.2 Counts
+
+Of the 6,342 disagreeing parcels: **3,644 replaced, 2,323 withdrawn, 366 kept because the owner agrees with the old parcel, 9 kept because a unique replacement's owner does not** (total 6,342).
+The coordinator's estimate was about 2,600 withdrawals: 2,689 leads have no unique replacement, and the owner guard keeps 366 of them, leaving 2,323.
+
+* Why there is no replacement: no match 2,211, placeholder id 53, ambiguous 28, ZIP conflict 27, unit 4.
+* By source: liensnc 2,222, sc_dew_lien_registry 43, nc_ust_incidents 29, sc_ust_registry 14, fannie_homepath 10, brock_scott 4, nc_dam_safety 1. By state: NC 2,262, SC 61.
+* The old parcel sits on the same street at another house number on 1,033 of them, on another street on 1,290 (`4116 Balsam Drive` carrying `4028 BALSAM DR`; a new-construction lot carrying `100 RALEIGH ST`, owned by the NORTH CAROLINA STATE PORTS AUTHORITY).
+* The lead's owner against the old parcel's: disagrees on 2,286, unknown (blank owner) on 37. None agrees, by construction.
+* Cleared, counts of leads (all 2,323 lose at least one field and the parcel_id): `raw.gis.mailing` 2,310, `market_value` 2,206, `acreage` 2,186, `raw.gis_attrs_full` 2,050, `raw.gis.owner` 1,978, `tax_value` 616, `owner_mailing` 102,
+  `living_sqft` 90, `raw.gis.last_sale` 76, `owner_name` 32, `land_use` 1.
+* Guard check: 0 of the 5,967 replaced or withdrawn leads has an existing parcel that agrees with its street by the Burke or the name test.
+* The 366 kept by the owner guard: 358 liensnc, 4 nc_ust_incidents, 3 nc_dam_safety, 1 brock_scott. In 149 the old parcel is on the same street. They are a holding company or builder that owns the neighbouring lot
+  (Q Edgewater Holdings on Sunrise Valley Pl, Davidson Homes on Well Fleet Dr, TRWG Holdings on Ridge Ave), so the owner and its mailing are right and only the lot's values are approximate. They keep the parcel.
+
+Withdrawn by county (93 counties; the dry run prints all of them):
+
+| State | County | Withdrawn | Disagreeing |
+|---|---|--:|--:|
+| NC | Mecklenburg | 320 | 807 |
+| NC | New Hanover | 314 | 701 |
+| NC | Iredell | 145 | 322 |
+| NC | Wake | 95 | 617 |
+| NC | Rowan | 65 | 109 |
+| NC | Henderson | 64 | 209 |
+| NC | Forsyth | 60 | 168 |
+| NC | Brunswick | 59 | 225 |
+| NC | Harnett | 58 | 95 |
+| NC | Buncombe | 55 | 213 |
+| NC | Burke | 51 | 147 |
+| NC | Onslow | 49 | 103 |
+| NC | Johnston | 47 | 103 |
+| NC | Rutherford | 46 | 50 |
+| NC | Cumberland | 39 | 116 |
+| NC | Durham | 38 | 279 |
+| NC | Polk | 37 | 39 |
+| NC | Catawba | 35 | 178 |
+| NC | Union | 33 | 95 |
+| NC | Alamance | 33 | 73 |
+| NC | Randolph | 32 | 46 |
+| SC | Spartanburg | 31 | 36 |
+| NC | Rockingham | 27 | 52 |
+| NC | Cleveland | 27 | 37 |
+| NC | Davidson | 26 | 61 |
+| | 68 other counties (SC: Laurens 18, Pickens 5, Anderson 5, Colleton 1, Charleston 1) | 537 | 1,460 |
+| | **Total** | **2,323** | **6,341** |
+
+### 12.3 Hold-out
+
+Withdrawal changes what happens to a corrupt-and-repair lead that is not restored (the table in 11.4): the wrong parcel is blanked (656 and 1,182 leads) or kept by the owner guard (19 and 1). Agreeing parcels are never touched:
+19,506 of the 39,085 hold-out leads agree with their own parcel, and neither step reaches them. The false-withdrawal risk is a lead whose existing parcel is RIGHT while its street is wrong, and the owner does not agree; the hold-out
+cannot measure that, the owner test is what covers it, and it found none among the 2,323 (2,286 owners disagree, 37 unknown). Read by eye (20 random withdrawals): every old parcel is at a different address and most are a different property altogether
+(`539 N MAIN ST`, First Citizens Bank, for a lead in a subdivision; `100 RALEIGH ST`, NORTH CAROLINA STATE PORTS AUTHORITY, for D.R. Horton lots).
+
+### 12.4 A hazard outside this script: coordinates
+
+**2,263 of the 2,323 withdrawn leads carry coordinates.** `enrichment_parcel_from_geo` targets every lead with no parcel_id and coordinates in the state's box, and attached these leads' parcels in the first place. On a full pipeline run
+(network) it would attach the same neighbour's parcel again, and the next join would refill the values. The chain in `apply_board_fixes` is offline and does not run it, so nothing is undone by `--apply`. To keep the withdrawal on a full run, add this to
+`src/foreclosure_scraper/enrichment_parcel_from_geo.py` (not my file, not changed):
+
+```python
+def _withdrawn(li) -> bool:
+    pfa = li.raw.get("parcel_from_address") if isinstance(li.raw, dict) else None
+    return isinstance(pfa, dict) and bool(pfa.get("withdrawn_parcel"))
+
+# _resolve_one, after `if li.parcel_id: return`:
+    if _withdrawn(li):
+        return
+# enrich_parcel_from_geo, in the `targets` list comprehension:  ... and not _withdrawn(li)
+```
+
+Other enrichers that can write a parcel_id (`enrichment_county_pin`, `enrichment_ncpts_lrc`, `enrichment_sc_cama`, `enrichment_assessor_card` and the name resolvers) were not reviewed; they work from names, PINs in text or a
+county lookup rather than from the coordinates, and none runs in the chain.
+
+### 12.5 Later runs and reversal
+
+* `join_parcel_cache_to_board.py` skips a lead with no parcel_id, so it cannot refill a withdrawn lead (tested, twice in a row).
+* `resolve_parcel_from_address.py` (step `parcel`) treats a withdrawn lead as any address-only lead. If a cache later gains its street it resolves the lead, and now carries the withdrawal forward in the block
+  (`withdrawn_parcel`, `withdrawn_reason`, `withdrawn_situs`); the repair then skips it. This chain runs `parcel` before `parcel_repair`, so a lead withdrawn in a run is next looked at on the following run.
+* A second run of the repair finds nothing to do (a lead with no parcel_id is not looked at).
+* To restore one lead: write `old_parcel_id` from the `_backup` entry back into `parcel_id` and put each `cleared` value back where its `kind` and `key` say.
+* Derived fields (`raw.calc`, `raw.distress_stack`, scores) still reflect the old values until `recompute_valuation.py` and `rank_board_standalone.py` run; a withdrawn lead then has no value and no equity, where before it had a neighbour's.
+
+### 12.6 Tests
+
+`tests/test_dq_repair_parcel_from_address.py` (54 tests) now also covers: a withdrawal with its backup, block and cleared fields; each reason (no match, ambiguous, unit, ZIP, placeholder id) withdrawing; every guard protecting a lead from
+withdrawal (owner agrees, id not in cache, road-only street, agreeing parcel, suffix-only, source's own parcel, denied source, name-resolved parcel, overage); a copied owner not counting as a guard; the join not refilling a
+withdrawn lead across two runs; the resolver resolving a withdrawn lead once its cache gains the street, with the withdrawal kept on the record and the repair then skipping it; a replacement and a withdrawal in one run and one backup;
+the driver step (repair, address, join) leaving the lead empty and writing the backup; `withdraw=False`; and the dry-run report.

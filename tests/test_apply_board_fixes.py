@@ -29,6 +29,9 @@ def test_order_matches_the_documented_dependencies():
     # the address-to-parcel resolver needs the county (it reads the county's own cache) and must precede the join
     assert keys.index("county") < keys.index("parcel") < keys.index("address") < keys.index("join")
     assert keys.index("resolver") < keys.index("parcel")          # never resolve from a name-only guess withdrawn later
+    # the repair replaces a parcel the join has already been fed, so it runs right after `parcel` and before anything copies from a parcel
+    assert keys.index("parcel") < keys.index("parcel_repair") < keys.index("address") < keys.index("join")
+    assert keys.index("county") < keys.index("parcel_repair")
 
 
 def test_every_step_module_exposes_apply_rows():

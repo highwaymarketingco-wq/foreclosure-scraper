@@ -455,7 +455,7 @@ class Lead(NamedTuple):
     acreage: object
     has_mailing: bool
     addr_from_cache: bool     # the street itself came from a parcel cache or GIS layer (not independent evidence)
-    pid_derived: bool         # the parcel id came from coordinates, a name search or a promotion (not source-native)
+    pid_derived: bool         # the parcel id came from coordinates, a name search, a promotion or this resolver (not source-native)
 
 
 def _has_mailing(raw: dict) -> bool:
@@ -474,7 +474,7 @@ def _lead(ref, source, lt, state, county, pid, street, city, zip_code, owner, mv
     return Lead(ref, str(source or ""), lt, str(state or "").upper(), norm_county(county),
                 str(pid or "").strip(), str(street or "").strip(), str(city or "").strip(),
                 str(zip_code or "").strip(), str(owner or "").strip(), mv, tv, sqft, ac, _has_mailing(raw),
-                bool(sas), bool(raw.get("parcel_from_geo") or raw.get("resolved_from_name")))
+                bool(sas), bool(raw.get("parcel_from_geo") or raw.get("resolved_from_name") or raw.get(RAW_KEY)))
 
 
 def lead_from_dict(ref: int, d: dict) -> Lead:
@@ -680,10 +680,15 @@ def _stamp(li, res: Res, pid: str, basis: str, agrees) -> None:
     if not isinstance(li.raw, dict):
         li.raw = {}
     g = res.group
+    prev = li.raw.get(RAW_KEY)
     li.parcel_id = pid
     li.raw[RAW_KEY] = {"source": SOURCE_TAG, "verified": "address_exact_unique", "county": norm_county(li.county),
                        "state": li.state, "matched_situs": str(g.address or "")[:120], "cache_owner": g.owner,
                        "owner_agrees": agrees, "id_basis": basis, "cache_ids": list(res.ids)[:4]}
+    if isinstance(prev, dict) and prev.get("withdrawn_parcel"):
+        # scripts/repair_parcel_from_address.py withdrew a neighbour's parcel from this lead; keep that on the record
+        li.raw[RAW_KEY].update({"withdrawn_parcel": prev["withdrawn_parcel"], "withdrawn_reason": prev.get("reason"),
+                                "withdrawn_situs": prev.get("withdrawn_situs")})
 
 
 def apply_rows(rows: list, *, dry_run: bool = False, index_factory=None) -> dict:

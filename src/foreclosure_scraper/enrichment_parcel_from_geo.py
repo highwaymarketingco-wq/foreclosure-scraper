@@ -327,8 +327,17 @@ def _clean_nc_situs(attrs: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _withdrawn(li: Listing) -> bool:
+    """True when repair_parcel_from_address withdrew this lead's neighbour-derived parcel (coordinates had
+    attached a parcel next door). Re-attaching it here would let the next join refill the neighbour's values."""
+    pfa = li.raw.get("parcel_from_address") if isinstance(li.raw, dict) else None
+    return isinstance(pfa, dict) and bool(pfa.get("withdrawn_parcel"))
+
+
 async def _resolve_one(c, li: Listing, counts: dict) -> None:
     if li.parcel_id:
+        return
+    if _withdrawn(li):
         return
     if not (li.state and li.county and _in_box(li)):
         return
@@ -364,7 +373,7 @@ async def enrich_parcel_from_geo(listings: list[Listing], concurrency: int = 8) 
     targets = [
         li
         for li in listings
-        if not li.parcel_id and li.state in ("SC", "NC") and li.county and _in_box(li)
+        if not li.parcel_id and li.state in ("SC", "NC") and li.county and _in_box(li) and not _withdrawn(li)
     ]
     if not targets:
         log.info("parcel_from_geo.no_targets")
