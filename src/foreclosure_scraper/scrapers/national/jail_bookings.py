@@ -87,6 +87,15 @@ ROSTERS: list[tuple[str, str, str, str]] = [
     # Verified live: JSON API at /api/portal/inmates/load
     ("SC", "Anderson", "zuercher", "anderson-so-sc"),
 
+    # Laurens SC, Zuercher Portal (build queue J-03, 2026-09-20)
+    # Verified live 2026-09-20: 181 in custody; DOB blank on this tenant.
+    ("SC", "Laurens", "zuercher", "laurens-911-sc"),
+
+    # Oconee SC, Zuercher Portal (build queue J-04, 2026-09-20)
+    # The sheriff's inmate-search page links straight to this tenant.
+    # Verified live 2026-09-20: 183 in custody, DOB on every row.
+    ("SC", "Oconee", "zuercher", "oconee-so-sc"),
+
     # Henderson NC — Southern Software Citizen Connect
     # Verified live 2026-07-31: 182 in custody, full DOB on 182/182.
     ("NC", "Henderson", "citizen_connect", "HendersonCoNC|NC0450000"),
@@ -643,6 +652,10 @@ def _to_listing(rec: dict, state: str, county: str) -> Listing:
         source_url = "https://cherokee-so-sc.zuercherportal.com/"
     elif state == "SC" and county == "Anderson":
         source_url = "https://anderson-so-sc.zuercherportal.com/"
+    elif state == "SC" and county == "Laurens":
+        source_url = "https://laurens-911-sc.zuercherportal.com/"
+    elif state == "SC" and county == "Oconee":
+        source_url = "https://oconee-so-sc.zuercherportal.com/"
     elif state == "NC" and county == "Henderson":
         source_url = (f"{CITIZEN_CONNECT_BASE}/bookingsearch/"
                       "index.php?AgencyID=HendersonCoNC")

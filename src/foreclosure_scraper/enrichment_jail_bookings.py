@@ -16,6 +16,8 @@ Two access shapes:
 
 BULK ROSTERS (fetch the whole current in-custody list once/run, index by name):
   * Zuercher portal  — Cherokee SC (dob+charges), Anderson SC (name+charges, no dob)
+    and, added 2026-09-20, Laurens SC (charges, DOB blank on the tenant) and
+    Oconee SC (dob+charges)
   * CentralSquare P2C jqGrid — Cleveland NC (dob+charges)
   * CentralSquare P2C (modern) — Buncombe NC (name+age+booking date+charge; the
     public roster redacts DOB). This build is the "session/token handshake"
@@ -110,6 +112,15 @@ ROSTERS = [
     # NB the vendor typos its own agency as 'Lncoln County'; there is also a
     # Lincoln County NEBRASKA P2C, so match on the host, never the agency string.
     ("NC", "Lincoln", "p2c_jqgrid", "http://p2c.lincolnsheriff.org"),
+    # Added 2026-09-20 (build queue J-03). Laurens SC is the same Zuercher body the
+    # Cherokee and Anderson tenants take; the DOB field is blank on this tenant.
+    # Verified live through the existing adapter that day: 181 in custody.
+    ("SC", "Laurens", "zuercher", "laurens-911-sc"),
+    # Oconee SC (build queue J-04): the sheriff's own inmate-search page links to
+    # oconee-so-sc.zuercherportal.com/#/inmates, so it is the same Zuercher body.
+    # Verified live through the existing adapter 2026-09-20: 183 in custody, DOB on
+    # every row. No state-prison-only gap left for Oconee once this rides.
+    ("SC", "Oconee", "zuercher", "oconee-so-sc"),
 ]
 
 # (state, county, vendor, target) for the PER-NAME search vendors — no bulk
@@ -443,6 +454,30 @@ def _apply_hit(li: Listing, county: str, first: str, last: str, hit: dict) -> No
     li.raw = raw
 
 
+def match_rosters(listings: list[Listing], rosters: dict) -> list[Listing]:
+    """Flag every listing whose owner is on its county's bulk roster.
+
+    rosters maps (state, county) -> {(last, first): record}, as _load_roster
+    builds it. Returns the listings it flagged. Shared by enrich_jail_bookings and
+    scripts/backfill_jail_rosters.py so the standalone run cannot drift from the
+    pipeline's match rule (name-only, exact last+first, person-owned, one booking
+    per lead)."""
+    matched: list[Listing] = []
+    for li in listings:
+        idx = rosters.get((li.state, _plain_county(li)))
+        if not idx or (li.raw or {}).get("jail_booking"):
+            continue
+        parts = _name_parts(_owner_of(li) or "")
+        if not parts:
+            continue
+        hit = idx.get(_norm_key(*parts))
+        if not hit:
+            continue
+        _apply_hit(li, _plain_county(li), parts[1], parts[0], hit)
+        matched.append(li)
+    return matched
+
+
 async def enrich_jail_bookings(listings: list[Listing],
                                max_searches_per_county: int = 200) -> dict:
     """Match resolved owner names against covered county jail rosters.
@@ -468,18 +503,7 @@ async def enrich_jail_bookings(listings: list[Listing],
                    if any((li.state, _county(li)) == (s, c) for li in listings)]
     rosters = dict(await asyncio.gather(
         *[_load_roster(s, c, v, t) for s, c, v, t in bulk_needed])) if bulk_needed else {}
-    for li in listings:
-        idx = rosters.get((li.state, _county(li)))
-        if not idx or (li.raw or {}).get("jail_booking"):
-            continue
-        parts = _name_parts(_owner_of(li) or "")
-        if not parts:
-            continue
-        hit = idx.get(_norm_key(*parts))
-        if not hit:
-            continue
-        _apply_hit(li, _county(li), parts[1], parts[0], hit)
-        counts["matched"] += 1
+    counts["matched"] += len(match_rosters(listings, rosters))
 
     # Tyler grids omit booking date + charges; pull them for matched rows only.
     counts["hydrated"] = await _hydrate_tyler_hits(listings)
