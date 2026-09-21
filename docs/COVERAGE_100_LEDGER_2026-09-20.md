@@ -20,16 +20,16 @@ Regenerate any time: `uv run python scripts/coverage_100_ledger.py`.
 | County | Rows | Identity | Value | Mail | Phone | Actual debt | Weakest layer |
 |---|--:|---|---|---|--:|---|---|
 | Rutherford NC | 5,005 | 77% | 89% | 91% | 46% | 85% | phone |
-| Cleveland NC | 1,169 | 51% | 51% > **52%** | 53% > **54%** | 39% | 3% | debt |
+| Cleveland NC | 1,169 | 51% > **74%** | 51% > **52%** | 53% > **74%** | 39% | 3% | debt |
 | Henderson NC | 2,773 | 60% > **63%** | 75% | 64% > **80%** | 42% | 52% | phone |
-| Polk NC | 470 | 56% | 56% | 59% | 36% | 9% | debt |
+| Polk NC | 470 | 56% > **66%** | 56% | 59% > **67%** | 36% | 9% | debt |
 | Gaston NC | 9,810 | 81% | 67% | 14% > **86%** | 12% | 1% | debt |
 | Buncombe NC | 8,949 | 71% | 69% > **70%** | 70% > **76%** | 65% | 23% > **25%** | debt |
 | Transylvania NC | 6,204 | 71% | 91% > **92%** | 5% > **92%** | 3% | 1% > **7%** | phone |
 | McDowell NC | 2,147 | 68% | 82% | 79% > **89%** | 44% | 66% > **67%** | phone |
 | Lincoln NC | 3,632 | 73% | 80% > **81%** | 27% > **87%** | 21% | 13% | debt |
-| Mitchell NC | 238 | 60% | 60% | 66% | 29% | 2% | debt |
-| Burke NC | 1,391 | 59% | 31% > **51%** | 41% > **63%** | 32% | 4% | debt |
+| Mitchell NC | 238 | 60% > **68%** | 60% | 66% > **73%** | 29% | 2% | debt |
+| Burke NC | 1,391 | 59% > **70%** | 31% > **51%** | 41% > **74%** | 32% | 4% | debt |
 | Spartanburg SC | 15,311 | 53% > **69%** | 42% > **55%** | 52% > **69%** | 5% | 13% > **38%** | phone |
 | Anderson SC | 2,620 | 15% > **41%** | 16% > **42%** | 11% > **41%** | 9% | 24% | phone |
 | Pickens SC | 4,629 | 47% > **52%** | 46% > **5%** (correction) | 58% > **69%** | 8% | 43% | value |
@@ -72,6 +72,7 @@ public portal, 5,523 have a case. The rest are company names and sources that hi
 | Anderson name resolver had no backend (the offline owner roll had no callers) | 0 leads resolved | 201 of 1,091 resolved (87 ambiguous flagged, not guessed); with the offline mailing pass, identity 15% to 41%, mail 11% to 42% |
 | Incarceration re-queried the same 150 leads every run (no stamp on a miss) | 267 flagged, 6 empty cells | negatives stamped; 412 more leads flagged from 10 county jail rosters (509 total); cross-county control put coincidental matches at roughly 5 to 10% |
 | Burke storm-damage leads stored a record number as parcel_id | 397 leads, no owner, mailing or value | 282 resolved by exact street address against the county cache (coordinates were tried first: 72% landed on the wrong parcel); value 31% to 51%, mail 42% to 63% |
+| Overnight per-lead mailing pass (Burke, Cleveland, Polk, Mitchell, Union; 1,455 leads) | mail 54-74% | +597 mailings, 430 newly absentee; Cleveland identity 51% to 74%, mail 54% to 74%; Burke mail 63% to 74% |
 | Deed-index defects behind the dormant `repeat_tax_loss` | 4 classifier and join defects | fixed with 179 tests; CCHS sweep built but the live search is behind a Cloudflare challenge |
 
 Tiers per lead after all of it: HOT about 1,900, WARM about 70,700, COLD about 94,900 (a mailable owner gates HOT;
@@ -81,7 +82,7 @@ the recompute also applied the existing quality downranks to carried-over rows).
 
 | Item | Counties | Lift | Status |
 |---|---|---|---|
-| Finish the per-lead mailing pass (Burke, Cleveland, Polk, Mitchell leads the 90-minute cap did not reach) | 4 | mail | Build-ready. About 15 leads a minute, polite by design; needs a multi-hour run. |
+| Finish the per-lead mailing pass for the larger counties (Buncombe 1,729, Laurens 785, Gaston 765, Oconee 537, Pickens 534 and others; about 6,000 leads) | 10 | mail | Build-ready. About 15 leads a minute, polite by design; needs several multi-hour runs in a window with no scheduled board writer. |
 | Promote the PTS-cloud `mailing` block into `owner_mailing` (Henderson tax rows carry it, 885 leads) | Henderson | mail, absentee | Build-ready, small. |
 | Laurens qPayBill rows keyed by account number, not parcel (393 leads); Rutherford tax and heir-estate rows (338) | 2 | identity, value | Needs a per-source key map. |
 | Cherokee situs from the ledger row (I-04) | Cherokee | identity | Build-ready, small. |
