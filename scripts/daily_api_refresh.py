@@ -34,6 +34,7 @@ from foreclosure_scraper.valuation import grading as vgrade
 from foreclosure_scraper.distress_score import score_board
 from foreclosure_scraper.enrichment_title_risk import enrich_title_risk
 from foreclosure_scraper.web_artifact import write_artifact, _to_dict, load_board
+from foreclosure_scraper.publish import manifest_pathspec, push_deferred, push_with_retries
 
 try:
     from foreclosure_scraper.new_listings import mark_new_listings
@@ -220,9 +221,11 @@ async def main() -> int:
     # Mirrors the full pipeline's filter so the daily path doesn't reintroduce
     # county-less noise the main run strips.
     _pre = len(merged)
+    _off_fp = 0    # rows removed ON PURPOSE as not in the buy box: the count guard's allowance
     merged = [li for li in merged
               if not ((li.source or "").startswith("national.") and not (li.county or "").strip())]
     if _pre != len(merged):
+        _off_fp += _pre - len(merged)
         print(f"[{time.strftime('%H:%M:%S')}] dropped {_pre - len(merged)} county-less national", flush=True)
 
     # Full footprint re-scope (not just county-less national) — carryover from
@@ -232,6 +235,7 @@ async def main() -> int:
     _pre = len(merged)
     merged = [li for li in merged if _in_scope(li)]
     if _pre != len(merged):
+        _off_fp += _pre - len(merged)
         print(f"[{time.strftime('%H:%M:%S')}] scope re-filter dropped {_pre - len(merged)} out-of-footprint", flush=True)
 
     # Drop dead court records (Canceled/Satisfied/Dismissed NC eCourts liens).
@@ -289,13 +293,23 @@ async def main() -> int:
     # the daily path leaves HOT/WARM/COLD tiers and the title-trap flag stale on
     # carried-over rows (score_board/enrich_title_risk only ever ran on the
     # weekly crawl). title_risk first (HOT gates on it), then score_board.
+    _scoring_failed = False
     try:
         enrich_title_risk(merged)
         _prev = Path(__file__).resolve().parent.parent / "docs" / "listings.json"
         tiers = score_board(merged, previous_path=_prev)
         print(f"[{time.strftime('%H:%M:%S')}] re-scored board: {tiers}", flush=True)
     except Exception as e:  # noqa: BLE001
-        print(f"[{time.strftime('%H:%M:%S')}] title_risk/score_board skipped: {str(e)[:80]}", flush=True)
+        # F17: was a one-line "skipped" that nobody reads while the board shipped with STALE tiers.
+        # The marker below is what run_daily_vision.sh greps; the run still exits non-zero (6).
+        _scoring_failed = True
+        print(f"[{time.strftime('%H:%M:%S')}] SCORE_BOARD_FAILED: tiers on this board are STALE: "
+              f"{type(e).__name__}: {str(e)[:120]}", flush=True)
+        if os.environ.get("SCORE_BOARD_FAIL_SOFT", "").strip().lower() not in ("1", "true", "yes"):
+            # Abort BEFORE the write (scorer handoff, section 6): a ScoreBoardError leaves the
+            # failed groups COLD with score_error, and any other failure leaves the prior run's
+            # tiers. Neither is a board to publish. The board on disk stands.
+            return 6
 
     # Final post-enrich dedupe — mirrors main.py's H1 FIX (main.py ~896). The
     # merge dedupe above ran before this re-grade/equity pass; re-running here,
@@ -312,7 +326,14 @@ async def main() -> int:
         except Exception:
             pass
 
-    write_artifact(merged, summary={"refresh": "daily_api", "sources": sorted(refreshed_slugs)})
+    # source_refreshed = the per-source last-success stamp (audit A2): ONLY the sources that
+    # returned a healthy pull today (>= HEALTHY_MIN rows), so run_meta.source_last_success says
+    # which of the 14 feeds is actually fresh instead of trusting row last_seen.
+    # off_footprint_removed = rows this run removed on purpose (county-less national + scope
+    # re-filter), so the count guard does not read a correct clean-up as a catastrophe.
+    write_artifact(merged, summary={"refresh": "daily_api", "sources": sorted(refreshed_slugs),
+                                    "source_refreshed": sorted(healthy),
+                                    "off_footprint_removed": _off_fp})
     print(f"[{time.strftime('%H:%M:%S')}] wrote docs/listings.json ({len(merged)} listings)", flush=True)
 
     if os.environ.get("REFRESH_PUBLISH", "1") == "1":
@@ -349,17 +370,24 @@ async def main() -> int:
                     ["git", "ls-files", "--error-unmatch", "docs/detail_shards"],
                     cwd=root, capture_output=True).returncode == 0:
                 pub.append("docs/detail_shards")
+            # the manifest seals the payload set: a commit that carries a new board must carry
+            # the manifest that describes it (a stale one makes a gz-only reader refuse the board)
+            pub += manifest_pathspec(root)
             subprocess.run(["git", "add", *pub], cwd=root, check=False)
             if subprocess.run(["git", "diff", "--staged", "--quiet"], cwd=root).returncode != 0:
                 subprocess.run(["git", "commit", "-q", "-m",
                                 f"daily api refresh: {len(merged)} listings ({time.strftime('%Y-%m-%d')})"],
                                cwd=root, check=False)
-                subprocess.run(["git", "pull", "--rebase", "--autostash", "origin", "main"], cwd=root, check=False)
-                p = subprocess.run(["git", "push", "origin", "main"], cwd=root)
-                print("dashboard published ✓" if p.returncode == 0 else "push failed ⚠", flush=True)
+                if push_deferred():
+                    # run_daily_vision.sh sets BOARD_PUSH_DEFERRED=1: it releases the board lock
+                    # and pushes (scripts/publish_helper.sh), so a stalled push cannot hold the lock
+                    print("committed; push deferred to the wrapper (outside the board lock)", flush=True)
+                else:
+                    ok, tail = push_with_retries(root)
+                    print("dashboard published ✓" if ok else f"PUBLISH_PUSH_FAILED: {tail}", flush=True)
         except Exception as exc:
             print(f"publish error: {exc}", flush=True)
-    return 0
+    return 6 if _scoring_failed else 0
 
 
 if __name__ == "__main__":

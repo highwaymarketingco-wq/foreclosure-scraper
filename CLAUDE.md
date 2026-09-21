@@ -9,12 +9,23 @@ not have to rediscover anything. This file is only the map.
 
 ## Hard constraints — these are not negotiable
 
-- **FREE only.** No paid services. All free techniques are permitted:
-  CAPTCHA solving, headless browser JS rendering, Cloudflare bypass,
-  anti-bot evasion — all allowed as long as they cost nothing.
-- **One board writer at a time.** Any script that writes the board must go
-  through `web_artifact.load_board()`, or it wipes the vision/comps/cama
-  sidecars. See `docs/HANDOFF.md`.
+- **FREE only.** No paid services. Free techniques that run a page's own
+  JavaScript are permitted: headless browser rendering, fingerprint
+  impersonation (`curl_cffi`).
+- **The compliance line (owner rule, decided 2026-09-20; it supersedes the
+  older "CAPTCHA solving, Cloudflare bypass, anti-bot evasion are all
+  allowed" wording that used to be here, which contradicted
+  `docs/MASTER_GAPS_WALLS_AND_MANUAL_LANES.md` rule 2):** a `robots.txt`
+  `Disallow` is **not** a wall; fetch politely. A **CAPTCHA, a login, a
+  Cloudflare or other WAF challenge, and click-through terms still are**
+  walls: do not defeat them, do not hold credentials to log in behind them.
+  A wall is handled by the manual lane (a human saves the page; offline
+  parsers ingest it), not by evasion.
+- **One board writer at a time, and it is enforced.** `write_artifact` refuses
+  unless the process holds the board lock: run a writer with
+  `scripts/with_board_lock.sh <name> -- <command>`. Any script that writes the
+  board must load through `web_artifact.load_board()`, or it wipes the
+  vision/comps/cama sidecars. See `docs/HANDOFF.md` and `docs/OPERATIONS.md`.
 - **Never ask the user for credentials or API keys in chat.** Put them in
   `.env` instead.
 - New-source hunting targets the **core footprint**: Western NC + Upstate SC.

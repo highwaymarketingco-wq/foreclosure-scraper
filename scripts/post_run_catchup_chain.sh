@@ -13,13 +13,22 @@ ROOT="/Users/cashhigh/foreclosure-scraper"
 cd "$ROOT"
 SECRETS="$ROOT/.secrets"
 LOG="$ROOT/logs/post-run-catchup-$(date +%Y%m%dT%H%M%S).log"
-UV="$HOME/.local/bin/uv"
+UV="$(command -v uv || echo "$HOME/.local/bin/uv")"
+[ -x "$UV" ] || { echo "uv not found (PATH=$PATH)" >&2; exit 127; }
 
 echo "==> waiting for the live run + any merge to clear $(date)" | tee -a "$LOG"
 while pgrep -f "foreclosure_scraper.__main__|-m foreclosure_scraper|run_local.sh|merge_today_sources.py" >/dev/null; do
   sleep 300
 done
 echo "==> board is clear, starting catchup chain $(date)" | tee -a "$LOG"
+# The steps below write the board and write_artifact now refuses without the board lock
+# (audit O3). Taken AFTER the wait loop above on purpose: holding it while waiting for the
+# live run to finish would block that run's own lock.
+. "$ROOT/scripts/board_lock.sh"
+if ! board_lock_acquire "$ROOT" "post_run_catchup_chain" 43200 50000; then
+  echo "==> $(board_lock_refusal_message 'the catchup chain'); giving up" | tee -a "$LOG"; exit 75
+fi
+trap 'board_lock_release' EXIT INT TERM
 
 load() { [[ -f "$2" ]] && export "$1"="$(cat "$2")"; }
 

@@ -77,18 +77,28 @@ def main() -> int:
     board = load_board(DOCS)   # sidecar-safe
     print(f"loaded {len(board)} leads; running groups={sorted(groups)}", flush=True)
     asyncio.run(_run(board, groups))
+    _score_failed = False
     for label, fn in (("lead_signals", enrich_lead_signals), ("score_board", score_board)):
         try:
             fn(board)
-        except Exception:
+        except Exception as exc:
             print(f"  {label}: ERROR {traceback.format_exc()[:200]}", flush=True)
+            if label == "score_board":
+                # F17 (audit 2026-09-21): this used to print and go on to write a board whose
+                # HOT/WARM/COLD tiers were the PRIOR run's (or, for a ScoreBoardError, COLD with
+                # score_error on the failed groups). Refuse the write; the board on disk stands.
+                # SCORE_BOARD_FAIL_SOFT=1 writes anyway but still exits non-zero.
+                print(f"  !! SCORE_BOARD_FAILED ({type(exc).__name__}): tiers on this board are STALE", flush=True)
+                if os.environ.get("SCORE_BOARD_FAIL_SOFT", "").strip().lower() not in ("1", "true", "yes"):
+                    return 6
+                _score_failed = True
     summary = {
         "by_source": dict(collections.Counter(li.source for li in board if li.source)),
         "notes": f"completion_pass: slow-tier {sorted(groups)} at designed budgets",
     }
     lp, mp = write_artifact(board, summary, docs_dir=DOCS)
     print(f"wrote {lp} ({lp.stat().st_size:,} bytes) + {mp.name} — {len(board)} leads", flush=True)
-    return 0
+    return 6 if _score_failed else 0
 
 
 if __name__ == "__main__":

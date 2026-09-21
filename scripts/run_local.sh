@@ -15,6 +15,12 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
+# A Finder-launched applet (the Desktop "Run Foreclosure Engine" button) and launchd
+# both start with a minimal PATH that lacks ~/.local/bin. dailycourt failed 31 days
+# running with "uv: command not found" (audit O10/O12); fail loud instead of silently.
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"
+command -v uv >/dev/null 2>&1 || { echo "FATAL: uv not found on PATH ($PATH)" >&2; exit 127; }
+
 SECRETS="$ROOT/.secrets"
 mkdir -p "$ROOT/logs"
 STAMP="$(date +%Y%m%dT%H%M%S)"
@@ -29,13 +35,24 @@ LOG="$ROOT/logs/local-run-$STAMP.log"
 # FORECLOSURE_BOARD_LOCK_HELD (so the pipeline's own board writers proceed
 # inside it), and a lock left by a killed run is broken automatically. See
 # scripts/board_lock.sh.
+. "$ROOT/scripts/job_event.sh"
 . "$ROOT/scripts/board_lock.sh"
 . "$ROOT/scripts/board_payload.sh"
-if ! board_lock_acquire "$ROOT" "run_local.sh"; then
-  echo "==> another board writer ($(board_lock_holder)) holds the board; refusing to start." | tee -a "$LOG"
-  exit 0
+. "$ROOT/scripts/publish_helper.sh"
+JOB_EVENT_ROOT="$ROOT"
+job_event_begin full_run
+# One trap: an unreported exit is recorded as failed, then the lock is released.
+trap 'job_event_finalize; board_lock_release' EXIT INT TERM
+# The full run legitimately holds the lock 15 to 57 hours (audit B2), so it declares
+# a 72 hour max runtime; a hung holder past that (+30 min) is treated as stale.
+if ! board_lock_acquire "$ROOT" "run_local.sh" 0 "${FULLRUN_LOCK_MAX_RUNTIME:-259200}"; then
+  echo "==> $(board_lock_refusal_message 'the full run'); refusing to start." | tee -a "$LOG"
+  if [ "$BOARD_LOCK_REFUSAL" = "memory" ]; then job_event_end skipped_memory "" "$BOARD_MEM_REASON"
+  else job_event_end skipped_lock "" "$(board_lock_holder)"; fi
+  # 75 (EX_TEMPFAIL), not 0: gui_run.sh used to announce "Run finished" for a run that
+  # never started (audit O10).
+  exit 75
 fi
-trap 'board_lock_release' EXIT INT TERM
 
 # ---- load secrets from .secrets/ -------------------------------------------
 load() {  # load <ENV_NAME> <file> [required]
@@ -176,7 +193,12 @@ echo "==> foreclosure-scraper local run $STAMP" | tee -a "$LOG"
 echo "==> sheet=${SHEET_ID:0:8}…  vision=$VISION_PROVIDER  log=$LOG" | tee -a "$LOG"
 
 # Ensure deps + the stealth browser are present (idempotent, fast if cached).
-uv sync --frozen >>"$LOG" 2>&1 || uv sync >>"$LOG" 2>&1
+# --inexact: NEVER remove a package the lockfile does not name. Plain `uv sync` is
+# exact, and the 2026-09-08 run opened with "Uninstalled 25 packages" (easyocr, scipy,
+# shapely, opencv-python-headless, openpyxl, pytesseract, networkx, scikit-image,
+# nodriver ...) because they were installed by hand and never declared (audit O12).
+# See docs/ops_fixes_2026-09-21.md for the pyproject patch that declares them.
+uv sync --frozen --inexact >>"$LOG" 2>&1 || uv sync --inexact >>"$LOG" 2>&1
 uv run python -m playwright install chromium >>"$LOG" 2>&1 || true
 uv run scrapling install >>"$LOG" 2>&1 || true
 
@@ -188,8 +210,11 @@ uv run scrapling install >>"$LOG" 2>&1 || true
 # exit code, so RC=$? below stays correct. (A closed lid on battery can still
 # sleep — a plugged-in machine with the lid open is the reliable setup.)
 START=$(date +%s)
-caffeinate -is uv run python -m foreclosure_scraper >>"$LOG" 2>&1
-RC=$?
+# job_run adds a wall-clock backstop (FULLRUN_MAX_SECONDS, default 72 h) and records peak
+# RSS + swap-out delta in logs/job_events.jsonl (audit O9). caffeinate still propagates
+# the pipeline's exit code.
+job_run "${FULLRUN_MAX_SECONDS:-259200}" caffeinate -is uv run python -m foreclosure_scraper >>"$LOG" 2>&1
+RC=$JOB_RUN_RC
 END=$(date +%s)
 
 echo "==> exit=$RC  elapsed=$(( (END-START)/60 ))m  $(date)" | tee -a "$LOG"
@@ -200,12 +225,22 @@ if grep -q "count_drop_alert" "$LOG"; then
   echo "==> ⚠️  COUNT-DROP ALERT fired this run — a source may be broken. See log above." | tee -a "$LOG"
   RC=2
 fi
+# A failed board write (count guard, lock refusal, changed-since-load, integrity error)
+# is logged as web_artifact.failed and main.py now exits 3 for it. The wrapper used to
+# swallow that: on 8/30 and 9/9 it printed a total of 94,384 for runs that wrote
+# NOTHING because it fell back to run_meta.json (audit O4). Abort instead.
+if grep -qE 'web_artifact\.failed' "$LOG"; then
+  echo "==> !! the board write FAILED this run (web_artifact.failed). Aborting: no publish, no total." | tee -a "$LOG"
+  [ "$RC" -eq 0 ] && RC=3
+fi
 # Read the REAL listing count from the artifact-write event (not a stray
 # "total": from some sub-summary — that false-positived a 47 once and blocked
-# a healthy 5073-listing publish). Fall back to run_meta.json if absent.
-TOTAL=$(grep '"event": "web_artifact.written"' "$LOG" | grep -oE '"listings": [0-9]+' | tail -1 | grep -oE '[0-9]+' || echo "")
-if [ -z "$TOTAL" ] && [ -f "$ROOT/docs/run_meta.json" ]; then
-  TOTAL=$(grep -oE '"total": [0-9]+' "$ROOT/docs/run_meta.json" | head -1 | grep -oE '[0-9]+' || echo "")
+# a healthy 5073-listing publish). NO fallback to run_meta.json: a run that never
+# reached web_artifact.written has no total, and run_meta.json describes an OLDER run.
+TOTAL=$(grep -E 'web_artifact\.written' "$LOG" | grep -oE '("listings": |listings=)[0-9]+' | tail -1 | grep -oE '[0-9]+' || echo "")
+if [ -z "$TOTAL" ] && [ "$RC" -eq 0 ]; then
+  echo "==> !! exit 0 but no web_artifact.written event: the board was NOT written this run." | tee -a "$LOG"
+  RC=4
 fi
 if [ -n "$TOTAL" ]; then
   echo "==> total listings this run: $TOTAL" | tee -a "$LOG"
@@ -221,37 +256,42 @@ fi
 # The retired cloud workflow used to push these so GitHub Pages served the
 # live dashboard; now the local run must do it. Only publish on a healthy
 # run so we never overwrite a good dashboard with a broken/empty one.
+PUB=skipped
 if [[ "$RC" -eq 0 && -f "$ROOT/docs/listings.json" ]]; then
   # The payload list — and every "exists OR is already tracked" rule behind it —
-  # lives in ONE place now: scripts/board_payload.sh, sourced above. Five
-  # publishers were each maintaining their own copy of that list and they had
-  # already drifted apart (see D4 in sos_agent_refresh.sh).
+  # lives in ONE place now: scripts/board_payload.sh. Five publishers were each
+  # maintaining their own copy of that list and they had already drifted apart.
   if command -v git >/dev/null 2>&1; then
     cd "$ROOT"
-    # Prove GitHub Pages will actually serve what we are about to push: Jekyll's
-    # exclude/include are PREFIX matches, so `exclude: listings.json` also drops
-    # listings.json.gz. That trap has 404'd this site's data three times, and
-    # until now the script that detects it had no caller anywhere in the repo.
-    # Loud but non-fatal here (the payload is not what is broken when it fires,
-    # docs/_config.yml is); the hard gate is in .github/workflows/pages.yml.
-    board_payload_check "$ROOT" | tee -a "$LOG"
-    board_payload_add "$ROOT"
-    if ! git diff --staged --quiet 2>/dev/null; then
-      git commit -q -m "local run: refresh dashboard data ($(date +%Y-%m-%d))" 2>>"$LOG" || true
-      # Rebase over any remote changes, then push (docs/ doesn't touch
-      # .github/workflows, so the normal token can push it).
-      git pull --rebase --autostash origin main >>"$LOG" 2>&1 || true
-      if git push origin main >>"$LOG" 2>&1; then
-        echo "==> ✓ dashboard published to GitHub (Pages will update in ~1 min)" | tee -a "$LOG"
-      else
-        echo "==> ⚠️  dashboard commit made locally but push failed — see log" | tee -a "$LOG"
-      fi
-    else
-      echo "==> dashboard data unchanged — nothing to publish" | tee -a "$LOG"
-    fi
+    # publish_commit runs board_payload_check (Jekyll's exclude/include are PREFIX
+    # matches, so `exclude: listings.json` also drops listings.json.gz; that trap has
+    # 404'd this site's data three times), stages the payload, and commits INSIDE the
+    # lock. The push happens after the lock is released (audit O7).
+    publish_commit "$ROOT" "local run: refresh dashboard data ($(date +%Y-%m-%d))" any >>"$LOG" 2>&1
+    PC=$?
+    board_lock_release
+    case $PC in
+      0) if publish_push "$ROOT" >>"$LOG" 2>&1; then
+           echo "==> ✓ dashboard published to GitHub (Pages will update in ~1 min)" | tee -a "$LOG"; PUB=pushed
+         else
+           echo "==> ⚠️  dashboard commit made locally but push failed — see log: $PUBLISH_PUSH_OUT" | tee -a "$LOG"; PUB=push_failed
+         fi ;;
+      1) echo "==> dashboard data unchanged — nothing to publish" | tee -a "$LOG"; PUB=unchanged ;;
+      *) echo "==> ⚠️  commit refused (size gate or hook) — see logs/publish_blocked.log" | tee -a "$LOG"; PUB=commit_failed; RC=5 ;;
+    esac
   fi
 else
   echo "==> skipping dashboard publish (run unhealthy: RC=$RC)" | tee -a "$LOG"
+fi
+
+if [[ "$RC" -ne 0 ]]; then
+  job_event_end failed "" "rc=$RC"
+elif [[ "$PUB" == "push_failed" ]]; then
+  job_event_end push_failed "" "total=${TOTAL:-?}"
+elif [[ "$PUB" == "unchanged" ]]; then
+  job_event_end no_change "" "total=${TOTAL:-?}"
+else
+  job_event_end ok "" "total=${TOTAL:-?}"
 fi
 
 # Keep the 12 most recent run logs; prune older.

@@ -46,7 +46,9 @@ def _li(*, source="law_firms.brock_scott", county="Spartanburg",
 # ---- is_sold_pool_candidate ----
 
 def test_recent_law_firm_sale_is_pool_candidate():
-    li = _li(sale_days_ago=10)
+    # 20 days: past the 14 day upset/confirmation window (F8). At 10 days the lead is
+    # still actionable and stays on the active board (tests/test_f8_upset_window.py).
+    li = _li(sale_days_ago=20)
     assert is_sold_pool_candidate(li) is True
 
 

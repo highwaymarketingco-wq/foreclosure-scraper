@@ -17,6 +17,7 @@ import re
 import shutil
 import sys
 import time
+import uuid
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -74,28 +75,84 @@ log = structlog.get_logger()
 #               processes, so `run_daily_vision.sh` (holding the lock) can run
 #               patch_vision_gemini.py (which also asks for it) without
 #               deadlocking. A child that inherits it never releases it.
+#
+# ADDED 2026-09-21 (audit O3, O9, O11):
+#   record    = the pid file now also carries start epoch, heartbeat epoch, the
+#               job's max runtime and a random TOKEN (lines 3 to 6). Old readers
+#               read lines 1 and 2 only and are unaffected.
+#   children  = <lock>/children/<pid>: a Python writer running INSIDE a wrapper's
+#               lock registers itself, so the lock outlives a killed wrapper.
+#   stale     = owner AND every registered child dead, OR a live holder older
+#               than max runtime + 30 min (broken, logged, and the hung holder is
+#               fenced out of write_artifact by the token).
+#   enforce   = write_artifact refuses without the lock (require_board_lock).
+#   gate      = a memory gate (swap / free RAM) runs before the lock is taken.
 # ===========================================================================
 
 BOARD_LOCK_SUBDIR = "logs"
 BOARD_LOCK_DIRNAME = ".board.lock"
 BOARD_LOCK_PID_FILE = "pid"
 BOARD_LOCK_ENV = "FORECLOSURE_BOARD_LOCK_HELD"
+# A per-acquisition random token, exported next to BOARD_LOCK_ENV and stored in
+# the lock. write_artifact compares the two, so a holder whose lock was broken as
+# stale (and re-taken by another job) is fenced OUT of the board even though its
+# inherited BOARD_LOCK_ENV still names the path (audit O11).
+BOARD_LOCK_TOKEN_ENV = "FORECLOSURE_BOARD_LOCK_TOKEN"
+# Explicit escape hatch for tests and one-off tools (audit O3). Never set by a job.
+BOARD_LOCK_BYPASS_ENV = "BOARD_LOCK_BYPASS"
+BOARD_LOCK_CHILDREN_DIR = "children"
 # A lock directory with no readable pid file is either 20 microseconds old (the
 # window between mkdir and the pid write) or wreckage. Re-read once after this
 # long before calling it wreckage.
 BOARD_LOCK_PID_GRACE = 1.0
+# A live holder older than its declared max runtime plus this is treated as hung.
+BOARD_LOCK_STALE_GRACE = 30 * 60
+BOARD_LOCK_DEFAULT_MAX_RUNTIME = 6 * 3600
+BOARD_LOCK_HEARTBEAT_SECONDS = 60.0
+
+# --- the memory gate (audit O9) --------------------------------------------
+# "Refuse or wait when swap used > 3 GB or free + inactive < 1 GB." Mode:
+#   BOARD_MEM_GATE = warn     (DEFAULT) log the pressure as a job event and proceed
+#                    enforce  wait up to BOARD_MEM_GATE_WAIT seconds, then refuse
+#                    off      do not look
+# WHY warn IS THE DEFAULT (both here and in scripts/board_lock.sh): measured
+# 2026-09-21 12:40 on this 8 GB Mac with ONE job running, swap used was 7,015 MB
+# (4,500 to 5,400 MB all morning per the audit). Against a 3,072 MB threshold that
+# is a permanent refusal, so enforcing it by default would skip every scheduled job
+# every day. Run in warn for a week, read the mem_gate lines in logs/job_events.jsonl,
+# pick thresholds this machine can meet, then set BOARD_MEM_GATE=enforce in the
+# launchd plists. A wrapper that already passed the gate holds the lock, and its
+# Python children re-enter it without being gated a second time.
+BOARD_GATE_SWAP_MB = 3072
+BOARD_GATE_FREE_MB = 1024
+
+# run_meta health older than this is nulled (audit O4).
+HEALTH_MAX_AGE_HOURS = 48.0
 
 
 class BoardLockBusy(RuntimeError):
     """Raised when another live board writer holds the lock."""
 
-    def __init__(self, path: Path, pid: int | None, owner: str):
+    def __init__(self, path: Path, pid: int | None, owner: str, detail: str = ""):
         self.path = Path(path)
         self.pid = pid
         self.owner = owner
         super().__init__(
             f"board lock {path} is held by pid {pid} ({owner or 'unknown owner'})"
+            + (f"; {detail}" if detail else "")
         )
+
+
+class BoardLockNotHeld(RuntimeError):
+    """write_artifact refused: the caller does not hold the board lock (audit O3)."""
+
+
+class BoardLockLost(BoardLockNotHeld):
+    """The lock this process inherited was broken as stale and re-taken."""
+
+
+class BoardMemoryPressure(RuntimeError):
+    """The memory gate refused to start a board writer (audit O9)."""
 
 
 def board_lock_dir(root: Path | str | None = None) -> Path:
@@ -106,18 +163,56 @@ def board_lock_dir(root: Path | str | None = None) -> Path:
     return Path(root) / BOARD_LOCK_SUBDIR / BOARD_LOCK_DIRNAME
 
 
-def _bl_owner(d: Path) -> tuple[int | None, str]:
+def _bl_int(s: str | None) -> int | None:
     try:
-        lines = (d / BOARD_LOCK_PID_FILE).read_text().splitlines()
+        return int(str(s).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _bl_info(d: Path) -> dict:
+    """Everything the pid file says. Lines: pid, owner, start epoch, heartbeat
+    epoch, max runtime seconds, token. A legacy lock has only the first two; its
+    start time falls back to the pid file's mtime."""
+    info: dict = {"pid": None, "owner": "", "start": None, "heartbeat": None,
+                  "max_runtime": None, "token": ""}
+    pf = d / BOARD_LOCK_PID_FILE
+    try:
+        lines = pf.read_text().splitlines()
     except OSError:
-        return None, ""
-    if not lines:
-        return None, ""
-    try:
-        pid = int(lines[0].strip())
-    except ValueError:
-        return None, ""
-    return pid, (lines[1].strip() if len(lines) > 1 else "")
+        return info
+    if lines:
+        info["pid"] = _bl_int(lines[0])
+    if len(lines) > 1:
+        info["owner"] = lines[1].strip()
+    if len(lines) > 2:
+        info["start"] = _bl_int(lines[2])
+    if len(lines) > 3:
+        info["heartbeat"] = _bl_int(lines[3])
+    if len(lines) > 4:
+        info["max_runtime"] = _bl_int(lines[4])
+    if len(lines) > 5:
+        info["token"] = lines[5].strip()
+    if info["start"] is None:
+        try:
+            info["start"] = int(pf.stat().st_mtime)
+        except OSError:
+            pass
+    return info
+
+
+def _bl_owner(d: Path) -> tuple[int | None, str]:
+    info = _bl_info(d)
+    return info["pid"], info["owner"]
+
+
+def _bl_write_info(d: Path, pid: int, owner: str, start: int, heartbeat: int,
+                   max_runtime: int, token: str) -> None:
+    """Atomic rewrite (temp + rename) so a reader never sees half a line set."""
+    pf = d / BOARD_LOCK_PID_FILE
+    tmp = d / f"{BOARD_LOCK_PID_FILE}.{os.getpid()}.tmp"
+    tmp.write_text(f"{pid}\n{owner}\n{start}\n{heartbeat}\n{max_runtime}\n{token}\n")
+    os.replace(tmp, pf)
 
 
 def _bl_alive(pid: int | None) -> bool:
@@ -135,8 +230,106 @@ def _bl_alive(pid: int | None) -> bool:
     return True
 
 
-def _bl_break(d: Path, expect_pid: int | None) -> bool:
-    """Remove a stale lock. Exactly one racer can win the rename."""
+def _bl_children(d: Path) -> list[int]:
+    """PIDs registered as running INSIDE this lock (child writers). Dead ones are
+    pruned as a side effect."""
+    out: list[int] = []
+    cd = d / BOARD_LOCK_CHILDREN_DIR
+    try:
+        entries = list(cd.iterdir())
+    except OSError:
+        return out
+    for e in entries:
+        pid = _bl_int(e.name)
+        if pid is None:
+            continue
+        if _bl_alive(pid):
+            out.append(pid)
+        else:
+            try:
+                e.unlink()
+            except OSError:
+                pass
+    return out
+
+
+_CHILD_REGISTERED: set = set()
+
+
+def _bl_register_child(d: Path, label: str = "") -> bool:
+    """Record THIS process as a live holder inside the lock (audit O11).
+
+    The lock's owner is the wrapper's PID. If the wrapper is killed but its Python
+    child survives (pkill of the shell, a closed terminal) the lock looked stale
+    and the next job broke it while the child was still writing the board. A
+    registered child keeps the lock alive for as long as it lives."""
+    try:
+        cd = d / BOARD_LOCK_CHILDREN_DIR
+        if not d.is_dir():
+            return False
+        cd.mkdir(exist_ok=True)
+        (cd / str(os.getpid())).write_text(label or Path(sys.argv[0] or "python").name)
+        if d not in _CHILD_REGISTERED:
+            import atexit
+            _CHILD_REGISTERED.add(d)
+            # A pid file left behind by a finished child could match a RECYCLED pid
+            # and keep a dead lock looking alive, so remove it at exit.
+            atexit.register(_bl_unregister_child, d)
+        return True
+    except OSError:
+        return False
+
+
+def _bl_unregister_child(d: Path) -> None:
+    try:
+        (d / BOARD_LOCK_CHILDREN_DIR / str(os.getpid())).unlink()
+    except OSError:
+        pass
+
+
+def _bl_stale_reason(d: Path, now: float | None = None) -> str | None:
+    """None when the lock is healthy, else why it should be broken:
+
+      dead_owner  the owner PID and every registered child are gone
+      expired     a LIVE holder is older than its max runtime + 30 minutes
+                  (a hung holder with a live PID used to block every other job
+                  forever; a recycled PID made a dead lock look alive)
+      unreadable  no readable pid file
+    """
+    info = _bl_info(d)
+    if info["pid"] is None:
+        return "unreadable"
+    alive = _bl_alive(info["pid"]) or bool(_bl_children(d))
+    if not alive:
+        return "dead_owner"
+    now = now if now is not None else time.time()
+    start = info["start"]
+    if start is not None:
+        limit = (info["max_runtime"] or BOARD_LOCK_DEFAULT_MAX_RUNTIME) + BOARD_LOCK_STALE_GRACE
+        if now - start > limit:
+            return "expired"
+    return None
+
+
+def board_lock_describe(d: Path, now: float | None = None) -> str:
+    info = _bl_info(d)
+    now = now if now is not None else time.time()
+    bits = []
+    if info["start"]:
+        bits.append(f"held {int((now - info['start']) / 60)} min")
+    if info["heartbeat"]:
+        bits.append(f"heartbeat {int(now - info['heartbeat'])}s ago")
+    if info["max_runtime"]:
+        bits.append(f"max runtime {int(info['max_runtime'] / 60)} min")
+    kids = _bl_children(d)
+    if kids:
+        bits.append(f"children {kids}")
+    return ", ".join(bits)
+
+
+def _bl_break(d: Path, expect_pid: int | None, force: bool = False) -> bool:
+    """Remove a stale lock. Exactly one racer can win the rename. `force` is for
+    an EXPIRED lock, whose owner is legitimately still alive."""
     victim = d.with_name(f"{d.name}.stale.{os.getpid()}")
     shutil.rmtree(victim, ignore_errors=True)
     try:
@@ -144,7 +337,7 @@ def _bl_break(d: Path, expect_pid: int | None) -> bool:
     except OSError:
         return False          # somebody else broke it, or it went away
     pid, _owner = _bl_owner(victim)
-    if pid is not None and pid != expect_pid and _bl_alive(pid):
+    if not force and pid is not None and pid != expect_pid and _bl_alive(pid):
         # A live writer claimed the lock in the gap between our staleness
         # verdict and the rename. Put it back and lose the race honestly.
         try:
@@ -156,18 +349,145 @@ def _bl_break(d: Path, expect_pid: int | None) -> bool:
     return True
 
 
-def _bl_try_mkdir(d: Path, owner: str) -> bool:
+def _bl_try_mkdir(d: Path, owner: str, max_runtime: int | None = None,
+                  token: str = "") -> bool:
     try:
         d.mkdir(parents=True)
     except FileExistsError:
         return False
-    (d / BOARD_LOCK_PID_FILE).write_text(f"{os.getpid()}\n{owner}\n")
+    now = int(time.time())
+    _bl_write_info(d, os.getpid(), owner, now, now,
+                   int(max_runtime or BOARD_LOCK_DEFAULT_MAX_RUNTIME), token)
     return True
+
+
+def _bl_event(event: str, root: Path | str | None = None, **fields) -> None:
+    """A lock break, skip or gate wait goes to logs/job_events.jsonl so a watcher
+    can count them. Never raises."""
+    try:
+        from . import job_events
+        job_events.note(event, root=root, **fields)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+class _Heartbeat:
+    """Daemon thread that re-stamps the lock's heartbeat line while we hold it.
+
+    Diagnostic, NOT a staleness criterion: json.loads / json.dumps on a 1.1 GB
+    board hold the GIL for a long time on a thrashing 8 GB Mac, so a quiet
+    heartbeat is not proof of a dead holder and breaking a live writer's lock
+    would put two writers on the board."""
+
+    def __init__(self, d: Path, owner: str, start: int, max_runtime: int, token: str,
+                 interval: float):
+        import threading
+        self._d, self._owner, self._start = d, owner, start
+        self._max, self._token, self._interval = max_runtime, token, interval
+        self._stop = threading.Event()
+        self._t = threading.Thread(target=self._run, name="board-lock-heartbeat", daemon=True)
+
+    def start(self) -> None:
+        self._t.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def _run(self) -> None:
+        while not self._stop.wait(self._interval):
+            try:
+                info = _bl_info(self._d)
+                if info["token"] != self._token or info["pid"] != os.getpid():
+                    return          # we no longer own it
+                _bl_write_info(self._d, os.getpid(), self._owner, self._start,
+                               int(time.time()), self._max, self._token)
+            except Exception:  # noqa: BLE001
+                return
+
+
+def board_memory_state() -> dict:
+    """swap used and free+inactive, in MB, plus whether the gate would pass.
+
+    Test hooks BOARD_GATE_FAKE_SWAP_MB / BOARD_GATE_FAKE_FREE_MB stand in for the
+    machine. Unknown (non-macOS, command failure) reads as healthy."""
+    swap_mb: float | None = None
+    free_mb: float | None = None
+    fs, ff = os.environ.get("BOARD_GATE_FAKE_SWAP_MB"), os.environ.get("BOARD_GATE_FAKE_FREE_MB")
+    if fs is not None or ff is not None:
+        swap_mb = float(fs) if fs not in (None, "") else 0.0
+        free_mb = float(ff) if ff not in (None, "") else 1e9
+    else:
+        import subprocess
+        try:
+            out = subprocess.run(["sysctl", "-n", "vm.swapusage"], capture_output=True,
+                                 text=True, timeout=5).stdout
+            m = re.search(r"used = ([0-9.]+)M", out)
+            swap_mb = float(m.group(1)) if m else None
+        except Exception:  # noqa: BLE001
+            swap_mb = None
+        try:
+            out = subprocess.run(["vm_stat"], capture_output=True, text=True, timeout=5).stdout
+            ps = re.search(r"page size of (\d+) bytes", out)
+            psz = int(ps.group(1)) if ps else 16384
+            pages = 0
+            for label in ("Pages free", "Pages inactive"):
+                mm = re.search(rf"^{label}:\s+(\d+)", out, re.M)
+                pages += int(mm.group(1)) if mm else 0
+            free_mb = pages * psz / (1024 * 1024)
+        except Exception:  # noqa: BLE001
+            free_mb = None
+    max_swap = float(os.environ.get("BOARD_GATE_SWAP_MB", BOARD_GATE_SWAP_MB))
+    min_free = float(os.environ.get("BOARD_GATE_FREE_MB", BOARD_GATE_FREE_MB))
+    reasons = []
+    if swap_mb is not None and swap_mb > max_swap:
+        reasons.append(f"swap_used_mb={swap_mb:.0f}>{max_swap:.0f}")
+    if free_mb is not None and free_mb < min_free:
+        reasons.append(f"free_plus_inactive_mb={free_mb:.0f}<{min_free:.0f}")
+    return {"swap_mb": swap_mb, "free_mb": free_mb, "ok": not reasons,
+            "reason": ",".join(reasons)}
+
+
+def board_memory_gate(owner: str = "", mode: str | None = None,
+                      wait: float | None = None, poll: float = 30.0,
+                      root: Path | str | None = None) -> dict:
+    """Wait or refuse when the machine is thrashing. Raises BoardMemoryPressure in
+    enforce mode once `wait` seconds have passed without the pressure clearing.
+    Every wait, refusal and warn-and-go is written to logs/job_events.jsonl."""
+    mode = (mode or os.environ.get("BOARD_MEM_GATE") or "warn").strip().lower()
+    if mode == "off":
+        return {"ok": True, "mode": "off"}
+    wait_s = float(wait if wait is not None else os.environ.get("BOARD_MEM_GATE_WAIT", 900))
+    t0 = time.monotonic()
+    state = board_memory_state()
+    waited = False
+    while not state["ok"]:
+        if mode == "warn":
+            _bl_event("mem_gate", root=root, owner=owner, mode="warn", action="proceed",
+                      reason=state["reason"])
+            log.warning("board_lock.memory_pressure", owner=owner, reason=state["reason"])
+            return {**state, "mode": mode}
+        if time.monotonic() - t0 >= wait_s:
+            _bl_event("mem_gate", root=root, owner=owner, mode=mode, action="refused",
+                      reason=state["reason"], waited_s=int(time.monotonic() - t0))
+            raise BoardMemoryPressure(
+                f"memory gate refused {owner or 'board writer'}: {state['reason']} "
+                f"after {int(time.monotonic() - t0)}s (BOARD_MEM_GATE=warn overrides)")
+        if not waited:
+            waited = True
+            _bl_event("mem_gate", root=root, owner=owner, mode=mode, action="waiting",
+                      reason=state["reason"])
+        time.sleep(max(0.05, min(poll, wait_s - (time.monotonic() - t0))))
+        state = board_memory_state()
+    if waited:
+        _bl_event("mem_gate", root=root, owner=owner, mode=mode, action="cleared",
+                  waited_s=int(time.monotonic() - t0))
+    return {**state, "mode": mode}
 
 
 @contextmanager
 def board_lock(root: Path | str | None = None, owner: str = "",
-               wait: float = 0.0, poll: float = 5.0):
+               wait: float = 0.0, poll: float = 5.0,
+               max_runtime: float | None = None):
     """Hold the board-writer lock for the WHOLE load -> mutate -> write span.
 
         with board_lock(owner="patch_vision_gemini"):
@@ -175,66 +495,341 @@ def board_lock(root: Path | str | None = None, owner: str = "",
             ...
             write_artifact(listings, summary, docs_dir=DOCS)
 
-    Raises BoardLockBusy when another live writer holds it and `wait` seconds
+    Raises BoardLockBusy when another live writer holds the lock and `wait` seconds
     have elapsed (default: do not wait at all — a scheduled pass that collides
     should skip today, not queue up behind a four-hour vision job).
 
     A lock left behind by a dead process is broken automatically; if it were
-    not, one killed run would stop every scheduled job forever.
+    not, one killed run would stop every scheduled job forever. A lock held by a
+    LIVE process past `max_runtime` + 30 minutes (default 6 h) is broken too and
+    the break is logged: the hung holder is then fenced out of write_artifact by
+    the lock token. Pass a larger `max_runtime` for a job that legitimately runs
+    longer.
     """
     d = board_lock_dir(root)
     if os.environ.get(BOARD_LOCK_ENV) == str(d):
-        yield d               # an ancestor in this process tree already holds it
+        # An ancestor in this process tree already holds it. Register as a live
+        # holder so the lock outlives a killed wrapper, and refuse to proceed if
+        # the lock this process inherited has since been broken and re-taken.
+        tok = os.environ.get(BOARD_LOCK_TOKEN_ENV)
+        if tok and _bl_info(d)["token"] != tok:
+            raise BoardLockLost(
+                f"the board lock {d} this process inherited was broken as stale "
+                f"and is now held by someone else; refusing to proceed")
+        _bl_register_child(d, owner)
+        try:
+            yield d
+        finally:
+            _bl_unregister_child(d)
         return
     owner = owner or Path(sys.argv[0] or "python").name or "python"
     d.parent.mkdir(parents=True, exist_ok=True)
+    _root = d.parent.parent
+    board_memory_gate(owner, root=_root)
     deadline = time.monotonic() + max(0.0, wait)
+    token = uuid.uuid4().hex
+    maxrt = int(max_runtime or os.environ.get("BOARD_LOCK_MAX_RUNTIME")
+                or BOARD_LOCK_DEFAULT_MAX_RUNTIME)
     while True:
-        if _bl_try_mkdir(d, owner):
+        if _bl_try_mkdir(d, owner, maxrt, token):
             break
-        pid, holder = _bl_owner(d)
-        if pid is None:
+        info = _bl_info(d)
+        if info["pid"] is None:
             time.sleep(BOARD_LOCK_PID_GRACE)
-            pid, holder = _bl_owner(d)
-        if not _bl_alive(pid):
-            log.warning("board_lock.stale_break", path=str(d), dead_pid=pid,
-                        prior_owner=holder)
-            if _bl_break(d, pid):
+            info = _bl_info(d)
+        pid, holder = info["pid"], info["owner"]
+        reason = _bl_stale_reason(d)
+        if reason:
+            log.warning("board_lock.stale_break", path=str(d), reason=reason,
+                        dead_pid=pid, prior_owner=holder)
+            _bl_event("lock_break", root=_root, owner=owner, prior_owner=holder, prior_pid=pid,
+                      reason=reason, detail=board_lock_describe(d))
+            if _bl_break(d, pid, force=(reason == "expired")):
                 continue
         if time.monotonic() >= deadline:
-            raise BoardLockBusy(d, pid, holder)
+            _bl_event("lock_skip", root=_root, owner=owner, holder=holder, holder_pid=pid,
+                      detail=board_lock_describe(d))
+            raise BoardLockBusy(d, pid, holder, board_lock_describe(d))
         time.sleep(max(0.1, poll))
     prior = os.environ.get(BOARD_LOCK_ENV)
+    prior_tok = os.environ.get(BOARD_LOCK_TOKEN_ENV)
     os.environ[BOARD_LOCK_ENV] = str(d)
+    os.environ[BOARD_LOCK_TOKEN_ENV] = token
+    hb = _Heartbeat(d, owner, int(time.time()), maxrt, token,
+                    float(os.environ.get("BOARD_LOCK_HEARTBEAT_S", BOARD_LOCK_HEARTBEAT_SECONDS)))
+    hb.start()
     try:
         yield d
     finally:
-        if prior is None:
-            os.environ.pop(BOARD_LOCK_ENV, None)
-        else:
-            os.environ[BOARD_LOCK_ENV] = prior
-        shutil.rmtree(d, ignore_errors=True)
+        hb.stop()
+        for env, was in ((BOARD_LOCK_ENV, prior), (BOARD_LOCK_TOKEN_ENV, prior_tok)):
+            if was is None:
+                os.environ.pop(env, None)
+            else:
+                os.environ[env] = was
+        # Only remove the lock if it is still OURS: an expired lock that another
+        # job broke and re-took must not be deleted out from under it.
+        if _bl_info(d)["token"] == token:
+            shutil.rmtree(d, ignore_errors=True)
+
+
+def _live_docs_dir() -> Path:
+    """The board this repo publishes. Split out so tests can point it at a tmp dir."""
+    return Path(__file__).resolve().parents[2] / "docs"
+
+
+def _repo_lock_dir() -> Path:
+    """This repo's lock directory, derived from the live docs dir (so a test that points
+    _live_docs_dir at a scratch tree moves the lock with it)."""
+    return board_lock_dir(_live_docs_dir().parent)
+
+
+def require_board_lock(docs: Path | str) -> None:
+    """Refuse to write the live board unless the caller holds the board lock
+    (audit O3). The lock was advisory: 54 board-writing modules never took it, and
+    write_artifact() itself never looked. Now it looks.
+
+    Passes when ANY of:
+      * BOARD_LOCK_BYPASS=1 (explicit, for tests and one-off tools; logged)
+      * `docs` is not the live docs directory (a scratch board shares nothing)
+      * FORECLOSURE_BOARD_LOCK_HELD names this repo's lock AND, when the holder
+        exported a token, the lock on disk still carries that token.
+    """
+    if os.environ.get(BOARD_LOCK_BYPASS_ENV, "").strip().lower() in ("1", "true", "yes"):
+        log.warning("web_artifact.lock_bypass", docs=str(docs))
+        return
+    try:
+        if Path(docs).resolve() != _live_docs_dir().resolve():
+            return
+    except OSError:
+        pass
+    d = _repo_lock_dir()
+    if os.environ.get(BOARD_LOCK_ENV) != str(d):
+        raise BoardLockNotHeld(
+            "write_artifact refused: this process does not hold the board lock "
+            f"({d}). A board writer that does not hold it can be silently reverted by, "
+            "or silently revert, the scheduled jobs (the 2026-08-10 incident). "
+            "Run it under the lock:  scripts/with_board_lock.sh <owner> -- <command>  "
+            "or wrap the load_board -> write_artifact span in "
+            "`with board_lock(owner=...)`. Tests and one-off tools may set "
+            "BOARD_LOCK_BYPASS=1."
+        )
+    tok = os.environ.get(BOARD_LOCK_TOKEN_ENV)
+    if tok:
+        on_disk = _bl_info(d)["token"]
+        if on_disk != tok:
+            raise BoardLockLost(
+                "write_artifact refused: the board lock was broken as stale (or "
+                "released) and is no longer this process's. Another job may be writing. "
+                f"lock={d} on_disk_token={'present' if on_disk else 'missing'}"
+            )
+    else:
+        log.warning("web_artifact.lock_legacy_holder", lock=str(d),
+                    note="holder exported no token; ownership not verifiable")
+    _bl_register_child(d)
+
+
+# ===========================================================================
+# THE BOARD MANIFEST + LOAD INTEGRITY (audit O3)
+#
+# write_artifact writes six payload families one after another, each atomically
+# but not as a SET. A kill, a full disk or an OOM between two of them leaves a
+# mixed set (listings.json from write N, listings_detail.json from write N-1)
+# that loads without an error: detail[i] is joined to listing[i] BY INDEX, so
+# every lead carries a neighbour's comps and vision, run_meta looks normal and
+# the count guard passes. The 2026-09-17 disk-full and the unexplained vision
+# deaths are exactly that window.
+#
+# docs/board.manifest.json is written LAST, after every payload file, and names
+# the size, sha256 and record count of each. load_board / read_board_json verify
+# the file they are about to read against it, and REFUSE the "plain .json beats
+# its .gz twin" preference when the plain file disagrees with the manifest.
+#
+# Escape hatches, because a fail-closed reader with no way out is an outage:
+#   BOARD_MANIFEST_SKIP=1   do not verify (one-off recovery only)
+#   scripts/board_manifest.py --rebuild   re-derive the manifest from disk
+# ===========================================================================
+
+MANIFEST_NAME = "board.manifest.json"
+MANIFEST_SCHEMA = "board-manifest-v1"
+
+
+class BoardIntegrityError(RuntimeError):
+    """A board file on disk does not match its manifest (torn or mixed write)."""
+
+
+class BoardLoadDropError(RuntimeError):
+    """load_board dropped more rows than BOARD_LOAD_MAX_DROP_RATE allows."""
+
+
+class BoardChangedSinceLoad(RuntimeError):
+    """write_artifact refused: listings.json changed after this process loaded it."""
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        while True:
+            chunk = fh.read(8 * 1024 * 1024)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def load_manifest(docs: Path | str) -> dict | None:
+    """The parsed manifest, or None when absent/unreadable/unknown schema."""
+    if os.environ.get("BOARD_MANIFEST_SKIP", "").strip().lower() in ("1", "true", "yes"):
+        return None
+    mp = Path(docs) / MANIFEST_NAME
+    try:
+        m = json.loads(mp.read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(m, dict) or m.get("schema") != MANIFEST_SCHEMA:
+        return None
+    if not isinstance(m.get("files"), dict):
+        return None
+    return m
+
+
+# (resolved path, mtime_ns, size, sha) -> True once its sha256 matched the
+# manifest. The same 1.1 GB file is read more than once per process (load, then
+# the prior sidecar read inside write_artifact); hash it once.
+_VERIFIED: dict = {}
+
+
+def _file_matches_manifest(path: Path, entry: dict) -> tuple[bool, str]:
+    try:
+        st = path.stat()
+    except OSError:
+        return False, "missing"
+    if entry.get("bytes") is not None and st.st_size != entry["bytes"]:
+        return False, f"size {st.st_size} != manifest {entry['bytes']}"
+    key = (str(path.resolve()), st.st_mtime_ns, st.st_size, entry.get("sha256"))
+    if key in _VERIFIED:
+        return True, ""
+    want = entry.get("sha256")
+    if want:
+        got = _sha256_file(path)
+        if got != want:
+            return False, f"sha256 {got[:12]} != manifest {want[:12]}"
+    _VERIFIED[key] = True
+    return True, ""
+
+
+def _choose_board_file(p: Path) -> tuple[Path, str]:
+    """Which file to read for `p` (docs/listings.json or its sibling), plus its
+    role. Honors the manifest when it names the file; otherwise the legacy rule
+    (plain if present, else its .gz)."""
+    gz = p.with_name(p.name + ".gz")
+    man = load_manifest(p.parent)
+    entry_plain = man["files"].get(p.name) if man else None
+    if not entry_plain:
+        if p.exists():
+            return p, "plain"
+        if gz.exists():
+            return gz, "gz"
+        raise FileNotFoundError(f"{p} (and {p.name}.gz) not found")
+    entry_gz = man["files"].get(gz.name)
+    plain_ok, plain_why = (False, "missing")
+    if p.exists():
+        plain_ok, plain_why = _file_matches_manifest(p, entry_plain)
+    if plain_ok:
+        return p, "plain"
+    gz_ok, gz_why = (False, "missing")
+    if gz.exists() and entry_gz:
+        gz_ok, gz_why = _file_matches_manifest(gz, entry_gz)
+    if gz_ok:
+        if p.exists():
+            log.error("board.plain_disagrees_with_manifest", file=p.name, why=plain_why,
+                      using=gz.name)
+        return gz, "gz"
+    raise BoardIntegrityError(
+        f"{p.name} does not match {MANIFEST_NAME} (plain: {plain_why}; "
+        f"gz: {gz_why}). The payload set is torn or mixed. Restore a consistent set "
+        f"(scripts/restore_board.sh <commit>) or, if you know the files are right, "
+        f"scripts/board_manifest.py --rebuild. BOARD_MANIFEST_SKIP=1 bypasses this check."
+    )
+
+
+# {resolved listings.json path: (file actually read, st_mtime_ns, st_size)} —
+# what THIS process saw when it loaded the board. write_artifact compares it.
+_LOAD_STAMPS: dict = {}
+
+
+def _stamp_of(path: Path) -> tuple[int, int] | None:
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    return (st.st_mtime_ns, st.st_size)
+
+
+def _remember_load(docs: Path, used: Path) -> None:
+    st = _stamp_of(used)
+    if st is not None:
+        _LOAD_STAMPS[str(docs.resolve() / "listings.json")] = (str(used), st[0], st[1])
+
+
+def _bypass_on() -> bool:
+    return os.environ.get(BOARD_LOCK_BYPASS_ENV, "").strip().lower() in ("1", "true", "yes")
+
+
+def _check_not_changed_since_load(listings_path: Path) -> None:
+    """Abort when listings.json is not the file this process loaded (audit O3).
+
+    Only checked for a process that actually called load_board / read_board_records
+    (a full re-scrape that never loaded has nothing to compare), and only when what it
+    read was the PLAIN listings.json. It is NOT checked when load_board read the .gz twin
+    (a fresh clone, a CI job, a restore, a gz-only rewrite) or when the rows came from a
+    different docs directory: stamps are keyed by the docs dir that was loaded, and a .gz
+    read is exactly the flow whose plain twin the writer is about to (re)create, so there
+    is no "the file I loaded" to compare against. Bypassed by BOARD_LOCK_BYPASS, like the
+    lock check."""
+    if _bypass_on():
+        return
+    stamp = _LOAD_STAMPS.get(str(listings_path.resolve()))
+    if not stamp:
+        return
+    used, mt, size = stamp
+    if str(used).endswith(".gz"):
+        return
+    now = _stamp_of(Path(used))
+    if now != (mt, size):
+        raise BoardChangedSinceLoad(
+            f"write_artifact refused: {used} changed since this process loaded it "
+            f"(loaded mtime_ns={mt} size={size}; now {now}). Another writer replaced the "
+            f"board while this one worked on a stale copy; writing now would silently "
+            f"revert it. Re-run from a fresh load."
+        )
+
+
+def _read_board_json_ex(path: Path | str):
+    p = Path(path)
+    used, role = _choose_board_file(p)
+    if role == "plain":
+        return json.loads(used.read_text()), used
+    import gzip as _gzip
+    return json.loads(_gzip.decompress(used.read_bytes()).decode("utf-8")), used
 
 
 def read_board_json(path: Path | str):
     """Read a board JSON file, transparently falling back to its ``.gz`` twin.
 
-    The uncompressed docs/listings.json (~97MB) is NOT committed to git — it
+    The uncompressed docs/listings.json (~1.1GB now) is NOT committed to git — it
     exceeds GitHub's 100MB/file limit, and the dashboard only ever loads the
     gzipped copy. The local runner regenerates the plain .json every write, so on
     that machine this reads the plain file directly. Everywhere else (a fresh
     clone, a cloud CI/patch job, disaster recovery) only the committed .gz exists,
     so we decompress that instead. Either way the whole system can rebuild the
-    board from just the 6MB .gz — nothing depends on the big file being present.
+    board from just the .gz — nothing depends on the big file being present.
+
+    When docs/board.manifest.json exists it is authoritative: the file is verified
+    against it first, and the plain-over-gz preference is refused when the plain
+    file disagrees (see THE BOARD MANIFEST above).
     """
-    p = Path(path)
-    if p.exists():
-        return json.loads(p.read_text())
-    gz = p.with_name(p.name + ".gz")
-    if gz.exists():
-        import gzip as _gzip
-        return json.loads(_gzip.decompress(gz.read_bytes()).decode("utf-8"))
-    raise FileNotFoundError(f"{p} (and {p.name}.gz) not found")
+    return _read_board_json_ex(path)[0]
 
 
 def _board_file_present(path: Path) -> bool:
@@ -245,6 +840,17 @@ def _board_file_present(path: Path) -> bool:
     """
     p = Path(path)
     return p.exists() or p.with_name(p.name + ".gz").exists()
+
+
+def _register_if_held() -> None:
+    """A process inside a wrapper-held lock registers itself when it starts
+    working on the board (audit O11), not only when it writes."""
+    try:
+        d = _repo_lock_dir()
+        if os.environ.get(BOARD_LOCK_ENV) == str(d):
+            _bl_register_child(d)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def read_board_records(docs_dir: Path | str = "docs") -> list[dict]:
@@ -260,16 +866,30 @@ def read_board_records(docs_dir: Path | str = "docs") -> list[dict]:
 
     Bare read_board_json() is correct only when the caller does not write the
     board back. If it writes, it must come through here or through load_board().
+
+    Records what it read (path, mtime, size) so write_artifact can refuse to
+    overwrite a board that changed after this load.
     """
     docs = Path(docs_dir)
-    records = read_board_json(docs / "listings.json")
+    records, used = _read_board_json_ex(docs / "listings.json")
+    _remember_load(docs, used)
+    _register_if_held()
     detail_path = docs / "listings_detail.json"
+    strict = load_manifest(docs) is not None
     details: list = []
     if _board_file_present(detail_path):
         try:
             details = read_board_json(detail_path)
+        except BoardIntegrityError:
+            raise
         except Exception:  # noqa: BLE001
+            if strict:
+                raise
             details = []
+    if strict and len(details) != len(records):
+        raise BoardIntegrityError(
+            f"listings_detail has {len(details)} rows for {len(records)} listings: "
+            f"the sidecar is index-aligned, so this board is a mixed set")
     for i, rec in enumerate(records):
         if i < len(details) and isinstance(details[i], dict) and details[i]:
             raw = rec.get("raw")
@@ -278,7 +898,13 @@ def read_board_records(docs_dir: Path | str = "docs") -> list[dict]:
     return records
 
 
-def load_board(docs_dir: Path | str = "docs") -> list[Listing]:
+# Rows load_board could not validate on the last call (tests and callers read it).
+LAST_LOAD_STATS: dict = {}
+LOAD_DROP_LOG_LIMIT = 200
+
+
+def load_board(docs_dir: Path | str = "docs", *,
+               max_drop_rate: float | None = None) -> list[Listing]:
     """Load the published board as Listing objects WITH the lazy-detail sidecar
     merged back into each lead's raw.
 
@@ -291,13 +917,58 @@ def load_board(docs_dir: Path | str = "docs") -> list[Listing]:
 
     Reads via read_board_json, so it works from either the plain .json (local
     runner) or the committed .gz (fresh clone / cloud) — see that helper.
+
+    A row that fails validation is DROPPED (the board is rewritten without it), and
+    that used to be `except Exception: pass`: no log line, no count. Now every drop
+    is counted and logged (first LOAD_DROP_LOG_LIMIT to logs/board_load_dropped.jsonl),
+    and the load FAILS when the drop rate exceeds `max_drop_rate` (default: env
+    BOARD_LOAD_MAX_DROP_RATE, else 0.001 = 0.1%). BOARD_LOAD_ALLOW_DROPS=1 loads anyway.
+    A caller with its own recovery for invalid rows (patch_vision_gemini's
+    load_board_no_shrink) passes max_drop_rate=1.0 and re-hydrates the strays itself.
     """
+    recs = read_board_records(docs_dir)
     out: list[Listing] = []
-    for rec in read_board_records(docs_dir):
+    dropped: list[tuple[int, str, str, str]] = []
+    for i, rec in enumerate(recs):
         try:
             out.append(Listing.model_validate(rec))
+        except Exception as exc:  # noqa: BLE001
+            src = str(rec.get("source", "")) if isinstance(rec, dict) else ""
+            url = str(rec.get("source_url", ""))[:120] if isinstance(rec, dict) else ""
+            dropped.append((i, src, url, f"{type(exc).__name__}: {str(exc)[:160]}"))
+    total = len(recs)
+    rate = (len(dropped) / total) if total else 0.0
+    LAST_LOAD_STATS.clear()
+    LAST_LOAD_STATS.update({"total": total, "loaded": len(out), "dropped": len(dropped),
+                            "drop_rate": rate})
+    if dropped:
+        by_src: dict = {}
+        for _, s, _, _ in dropped:
+            by_src[s] = by_src.get(s, 0) + 1
+        log.error("board.load_rows_dropped", dropped=len(dropped), total=total,
+                  rate=round(rate, 6),
+                  by_source=dict(sorted(by_src.items(), key=lambda kv: -kv[1])[:10]),
+                  first=dropped[:5])
+        try:
+            # next to the board that was loaded (repo/logs for the live docs dir)
+            lp = Path(docs_dir).resolve().parent / "logs" / "board_load_dropped.jsonl"
+            lp.parent.mkdir(parents=True, exist_ok=True)
+            with open(lp, "a", encoding="utf-8") as fh:
+                for idx, s, u, e in dropped[:LOAD_DROP_LOG_LIMIT]:
+                    fh.write(json.dumps({"at": datetime.utcnow().isoformat() + "Z",
+                                         "index": idx, "source": s, "source_url": u,
+                                         "error": e}) + "\n")
         except Exception:  # noqa: BLE001
             pass
+        limit = float(max_drop_rate if max_drop_rate is not None
+                      else os.environ.get("BOARD_LOAD_MAX_DROP_RATE", "0.001"))
+        if rate > limit and os.environ.get("BOARD_LOAD_ALLOW_DROPS", "").strip().lower() not in ("1", "true", "yes"):
+            raise BoardLoadDropError(
+                f"load_board dropped {len(dropped):,} of {total:,} rows ({rate:.3%}), over "
+                f"the {limit:.3%} limit. Writing this board back would delete them. "
+                f"See logs/board_load_dropped.jsonl. BOARD_LOAD_ALLOW_DROPS=1 loads anyway; "
+                f"BOARD_LOAD_MAX_DROP_RATE raises the limit."
+            )
     return out
 
 
@@ -460,6 +1131,9 @@ RAW_KEEP = {
     # 2026-08-03 board; forgetting to whitelist this would gather them and
     # throw them away at publish, exactly as happened to court_record.
     "county_sales": "*",
+    "auction_date": "*",              # F8: the TRUE auction date (never the docket's last event)
+    "docket_last_event_date": "*",    # F8: last docket event; NOT a sale date
+    "sale_date_source": "*",          # F8: set to "docket_last_event" when sale_date is only a docket stand-in
     "court_sale_status": "*",         # confirmed / sold_unconfirmed / sale_noticed / judgment
     "sold_confirmed": "*",            # court-confirmed sale → already sold, filter off active board
     "owner_mailing": "*",             # #0 contactability: owner name + mailing addr + absentee/out-of-state flags
@@ -712,10 +1386,27 @@ RAW_KEEP = {
     # DEBT (equity/distress math subtracts it), and this is the opposite: a
     # credit. Own block so downstream math can't confuse the two.
     "tax_sale_overage": "*",
+    # County breadth build 2026-09-21 (docs/new_county_sources_2026-09-21.md): source-specific detail
+    # blocks of the new scrapers, plus Column's own block, which was silently dropped at publish before.
+    "nc_its_public_tax": "*", "horry_delinquent_xlsx": "*", "albemarle_observer_tax_list": "*",
+    "column": "*",
     "greenville_delinquent_tax": "*",
     "richland_flc": "*",
     "dillon_delinquent_tax": "*",
     "berkeley_paystar_tax": "*",
+    # 2026-09-21 data-quality fixes (docs/data_quality_fixes_2026-09-21.md section 1). The
+    # apply scripts stamp these; without an entry here write_artifact drops them silently.
+    "county_backfill": "*",            # county filled from ZIP / city / parcel evidence {county, evidence, basis}
+    "scope": "*",                      # 'flip_outside_footprint': a flip outside the 18 counties, scorer excludes it
+    "resolver_conflict_undone": "*",   # withdrawn name-to-property resolution {action, query_name, matched_owner, removed}
+    # Read by the scorer (docs/handoff_scorer_to_others_2026-09-21.md section 2). Without an
+    # entry a board reloaded from the published files loses them, so the tax_lien_chronic weight
+    # (Pickens, 3+ roll years) and the vacant_structure PROPERTY signal (Hendersonville register)
+    # fire on a full run only. Pickens keeps just what the scorer and the card need (the
+    # `publications` list is the bulky part); the vacancy block is four small keys.
+    "pickens_delinquent": ("chronic", "repeat_delinquent", "cycle_count", "pre_sale",
+                           "first_cycle", "latest_cycle"),
+    "vacancy": "*",
 
 }
 
@@ -903,7 +1594,12 @@ _SLIM_RAW: dict[str, str | tuple[str, ...]] = {
     "signal_stack": ("count",),
     "strategy_fit": ("tags",),
     "owner_mailing": ("mailing", "mail_state", "absentee", "out_of_state"),
-    "owner_phone": ("phone", "source", "needs_dnc_scrub"),
+    # The four keys after needs_dnc_scrub are the SC phone gate's flags (docs/phone_gate_2026-09-21.md):
+    # without them the slim board, which the dashboard list, the "has phone" filter and the CSV export
+    # read, would drop the do-not-dial verdict. Must stay identical to _LEAN_RAW in docs/dashboard.js
+    # (tests/test_board_slim.py parses the JS and asserts equality).
+    "owner_phone": ("phone", "source", "needs_dnc_scrub", "do_not_dial", "do_not_dial_reason",
+                    "identity_check", "role"),
     "free_phones": ("phone", "source", "confidence", "needs_dnc_scrub"),
     "sc_voter_xref": ("phone", "source", "match_type", "needs_dnc_scrub"),
     "sos_agent": ("sosid", "best_contact_name", "best_contact_address"),
@@ -924,7 +1620,11 @@ _SLIM_RAW: dict[str, str | tuple[str, ...]] = {
     "gis": ("owner",),
     "lrcpwa": ("absentee", "mail_state"),
     "tax_owed": ("balance",),
-    "upset_bid": ("in_window", "days_remaining"),
+    # deadline_iso (2026-09-21, scorer handoff): the scorer reads the deadline when present and
+    # falls back to the in_window flag, so a scorer run over slim-only rows treated a frozen
+    # in_window=true as open. With the deadline in slim the read-time check is exact (F15).
+    # Mirrors docs/dashboard.js _LEAN_RAW.upset_bid; tests/test_board_slim.py pins them equal.
+    "upset_bid": ("in_window", "days_remaining", "deadline_iso"),
     # APPENDED, deliberately last. Two things about this entry:
     #
     # It is a LIST, not a dict, so neither projector's "*" branch is what
@@ -961,6 +1661,13 @@ _SLIM_RAW: dict[str, str | tuple[str, ...]] = {
     "horry_flc": ("Item_Number", "FLC_Bid_Amount", "Description"),
     "name_resolution": ("matched_owner", "method"),
     "tax_sale_overage": ("amount", "tax_sale_date", "map_number"),
+    # APPENDED LAST (2026-09-21, lead request): the stored bankruptcy-stay verdict and the
+    # withdrawn/pulled-sale aging counter, so a phone shows a stayed or pulled sale as
+    # stayed or pulled instead of live. Whole blocks (both are a few keys); "*" so
+    # _SHARD_SKIP_RAW skips them in the shards. Mirrors the two matching entries appended
+    # at the end of _LEAN_RAW in docs/dashboard.js (test_board_slim pins them equal).
+    "bankruptcy_stay": "*",
+    "pulled_sale": "*",
 }
 
 
@@ -1531,6 +2238,10 @@ def _load_prior_details_by_key(docs: Path) -> dict:
     try:
         recs = read_board_json(lp)
         dets = read_board_json(dp)
+    except BoardIntegrityError:
+        # NOT swallowed: an empty prior map would let this write publish
+        # details[i] = {} for every lead it did not re-enrich, on top of a torn set.
+        raise
     except Exception:  # noqa: BLE001
         return {}
     unique = _unique_key_map(recs)
@@ -1645,6 +2356,98 @@ def _count_by(listings: list[Listing], attr: str) -> dict[str, int]:
     return dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
 
 
+def _manifest_entry(path: Path, records: int | None = None) -> dict:
+    ent = {"bytes": path.stat().st_size, "sha256": _sha256_file(path)}
+    if records is not None:
+        ent["records"] = records
+    return ent
+
+
+def build_manifest(docs: Path | str, precomputed: dict | None = None,
+                   meta: dict | None = None, slim_count: int | None = None,
+                   shard_meta: dict | None = None) -> dict:
+    """Manifest for whatever payload files are on disk right now.
+
+    `precomputed` maps a file name to an entry already known (write_artifact hashes
+    the two 1.1 GB files from memory instead of re-reading them). Everything else
+    is hashed from disk. run_meta.json is included, so a tool that edits it must go
+    through write_manifest again (scripts/board_manifest.py --rebuild does)."""
+    docs = Path(docs)
+    pre = precomputed or {}
+    files: dict = {}
+    for name in ("listings.json", "listings_detail.json", "listings.json.gz",
+                 "listings_detail.json.gz", "listings_slim.json", "listings_slim.json.gz",
+                 "run_meta.json"):
+        if name in pre:
+            files[name] = pre[name]
+            continue
+        fp = docs / name
+        if not fp.is_file():
+            continue
+        recs = slim_count if name.startswith("listings_slim") else None
+        files[name] = _manifest_entry(fp, recs)
+    sd = docs / DETAIL_SHARD_DIR
+    if sd.is_dir():
+        for fp in sorted(sd.iterdir()):
+            if fp.is_file() and not fp.name.endswith(".tmp"):
+                files[f"{DETAIL_SHARD_DIR}/{fp.name}"] = _manifest_entry(fp)
+    count = (files.get("listings.json") or files.get("listings.json.gz") or {}).get("records")
+    return {
+        "schema": MANIFEST_SCHEMA,
+        "written_at": datetime.utcnow().isoformat() + "Z",
+        "run_time": (meta or {}).get("run_time"),
+        "count": count,
+        "detail_count": (files.get("listings_detail.json") or {}).get("records"),
+        "slim_count": slim_count,
+        "shards": shard_meta,
+        "files": files,
+    }
+
+
+def write_manifest(docs: Path | str, precomputed: dict | None = None,
+                   meta: dict | None = None, slim_count: int | None = None,
+                   shard_meta: dict | None = None) -> Path:
+    docs = Path(docs)
+    man = build_manifest(docs, precomputed, meta, slim_count, shard_meta)
+    mp = docs / MANIFEST_NAME
+    _atomic_write_bytes(mp, json.dumps(man, indent=1, sort_keys=False).encode("utf-8"))
+    return mp
+
+
+def verify_manifest(docs: Path | str, full: bool = True) -> dict:
+    """Check every file the manifest names. Returns {"ok", "checked", "problems"}.
+    `full` hashes each file; otherwise only size is compared. Used by
+    scripts/board_manifest.py --verify and the restore script; never raises."""
+    docs = Path(docs)
+    mp = docs / MANIFEST_NAME
+    try:
+        man = json.loads(mp.read_text())
+    except (OSError, ValueError) as exc:
+        return {"ok": False, "checked": 0, "problems": [f"manifest unreadable: {exc}"]}
+    problems: list[str] = []
+    checked = 0
+    for name, ent in (man.get("files") or {}).items():
+        fp = docs / name
+        if not fp.is_file():
+            # The plain twins are gitignored: a fresh clone legitimately lacks them.
+            if name in ("listings.json", "listings_detail.json", "listings_slim.json"):
+                continue
+            problems.append(f"{name}: missing")
+            continue
+        checked += 1
+        try:
+            size = fp.stat().st_size
+            if ent.get("bytes") is not None and size != ent["bytes"]:
+                problems.append(f"{name}: size {size} != manifest {ent['bytes']}")
+                continue
+            if full and ent.get("sha256") and _sha256_file(fp) != ent["sha256"]:
+                problems.append(f"{name}: sha256 mismatch")
+        except OSError as exc:
+            problems.append(f"{name}: {exc}")
+    return {"ok": not problems, "checked": checked, "problems": problems,
+            "count": man.get("count"), "written_at": man.get("written_at")}
+
+
 # Rolling pre-write backups kept per pattern (main board + detail sidecar). Each
 # main copy is ~1.04GB, so 10 of them was 12GB of a laptop that needed 50-80GB
 # back (2026-09-19). Every committed board is also in git history and the live
@@ -1658,11 +2461,21 @@ def write_artifact(
     summary: dict,
     docs_dir: Path | str = "docs",
 ) -> tuple[Path, Path]:
+    """Write the whole payload set, then the manifest that seals it.
+
+    Refuses (BoardLockNotHeld) unless the caller holds the board lock, and
+    (BoardChangedSinceLoad) if listings.json is not the file this process loaded
+    — see require_board_lock / _check_not_changed_since_load and audit O3.
+    """
     docs = Path(docs_dir)
     docs.mkdir(parents=True, exist_ok=True)
 
     listings_path = docs / "listings.json"
     meta_path = docs / "run_meta.json"
+
+    # FIRST, before any expensive work and before a single byte is touched.
+    require_board_lock(docs)
+    _check_not_changed_since_load(listings_path)
 
     payload = [_to_dict(li) for li in listings]
 
@@ -1835,13 +2648,31 @@ def write_artifact(
                     _f.unlink(missing_ok=True)
         except Exception:  # noqa: BLE001
             pass
+    # The manifest (written LAST) needs each big file's size and sha256. Take them
+    # from the bytes already in memory rather than re-reading 1.1 GB from disk.
+    _manifest_pre: dict = {
+        "listings.json": {"bytes": len(listings_bytes),
+                          "sha256": hashlib.sha256(listings_bytes).hexdigest(),
+                          "records": len(payload)},
+        "listings_detail.json": {"bytes": len(detail_bytes),
+                                 "sha256": hashlib.sha256(detail_bytes).hexdigest(),
+                                 "records": len(details)},
+    }
     _atomic_write_bytes(listings_path, listings_bytes)
     _atomic_write_bytes(detail_path, detail_bytes)
     # Also emit gzipped copies the dashboard fetches (16x smaller). The .json
     # files remain the local source-of-truth + a fallback. mtime=0 keeps the gzip
     # header deterministic so identical data produces identical bytes (no git churn).
-    _atomic_write_bytes(docs / "listings.json.gz", gzip.compress(listings_bytes, compresslevel=9, mtime=0))
+    listings_gz = gzip.compress(listings_bytes, compresslevel=9, mtime=0)
+    _manifest_pre["listings.json.gz"] = {"bytes": len(listings_gz),
+                                         "sha256": hashlib.sha256(listings_gz).hexdigest(),
+                                         "records": len(payload)}
+    _atomic_write_bytes(docs / "listings.json.gz", listings_gz)
+    del listings_gz
     detail_gz = gzip.compress(detail_bytes, compresslevel=9, mtime=0)
+    _manifest_pre["listings_detail.json.gz"] = {"bytes": len(detail_gz),
+                                                "sha256": hashlib.sha256(detail_gz).hexdigest(),
+                                                "records": len(details)}
     _atomic_write_bytes(docs / "listings_detail.json.gz", detail_gz)
     # Identity of the sidecar THIS call wrote — see the detail_count/
     # detail_digest note where run_meta is assembled. Deterministic (sha256 of
@@ -1866,8 +2697,10 @@ def write_artifact(
     shard_meta = _emit_detail_shards(docs, payload, details,
                                      slim_ok=slim_count is not None)
 
+    _now = datetime.utcnow()
+    _now_iso = _now.isoformat() + "Z"
     meta = {
-        "run_time": datetime.utcnow().isoformat() + "Z",
+        "run_time": _now_iso,
         "total": len(listings),
         "by_source": summary.get("by_source", {}),
         # by_state is DERIVED from the board being written, never taken from the
@@ -1956,20 +2789,76 @@ def write_artifact(
     #
     # by_state is NOT in this list: it is derived above from the board being
     # written, so there is never a stale value to carry.
+    #
+    # AUDIT O4 (2026-09-21): health_carried_from used to be the PRIOR WRITE's
+    # run_time, so it always looked minutes old while the per-source status it
+    # labelled was 23 days old (the last full run to compute it landed 8/29).
+    # Now:
+    #   health_as_of         when THIS status was computed: stamped when the writer
+    #                        computed its own source_status, otherwise carried
+    #                        forward UNCHANGED from the first write that computed it
+    #   health_carried_from  same instant (kept for existing readers)
+    #   health_age_hours     now - health_as_of, so nobody has to do the subtraction
+    #   health_stale         True when the age exceeds HEALTH_MAX_AGE_HOURS (48) or
+    #                        the origin is unknown
+    # and once stale, source_status and errors are NULLED so a consumer sees
+    # "unknown" instead of a frozen green board. by_source and by_county_top keep
+    # being carried (they are counts, labelled by health_as_of).
     _carried: list[str] = []
+    prior_meta: dict = {}
     if meta_path.exists():
         try:
             prior_meta = json.loads(meta_path.read_text())
         except Exception:  # noqa: BLE001 - a corrupt prior file must not block the write
             prior_meta = {}
-        for key in ("by_source", "by_county_top", "source_status",
-                    "regressions", "errors"):
-            if not meta.get(key) and prior_meta.get(key):
-                meta[key] = prior_meta[key]
-                _carried.append(key)
-        if _carried:
-            meta["health_carried_from"] = prior_meta.get("run_time")
-            meta["health_carried_keys"] = _carried
+        if not isinstance(prior_meta, dict):
+            prior_meta = {}
+    _own_health = bool(summary.get("source_status"))
+    for key in ("by_source", "by_county_top", "source_status",
+                "regressions", "errors"):
+        if not meta.get(key) and prior_meta.get(key):
+            meta[key] = prior_meta[key]
+            _carried.append(key)
+    if _own_health:
+        health_as_of = _now_iso
+    else:
+        health_as_of = prior_meta.get("health_as_of") or os.environ.get("BOARD_HEALTH_AS_OF") or None
+    if _carried:
+        meta["health_carried_from"] = health_as_of
+        meta["health_carried_keys"] = _carried
+    meta["health_as_of"] = health_as_of
+    age_h = None
+    if health_as_of:
+        try:
+            _t = datetime.fromisoformat(str(health_as_of).replace("Z", "+00:00")).replace(tzinfo=None)
+            age_h = round(max(0.0, (_now - _t).total_seconds() / 3600.0), 2)
+        except ValueError:
+            age_h = None
+    meta["health_age_hours"] = age_h
+    _max_age = float(os.environ.get("HEALTH_MAX_AGE_HOURS", HEALTH_MAX_AGE_HOURS))
+    meta["health_stale"] = bool(age_h is None or age_h > _max_age)
+    if meta["health_stale"] and (meta.get("source_status") or meta.get("errors")):
+        # Unknown origin counts as stale: on the live file this is what stops a
+        # status frozen at 8/29 from posing as current at the first new write.
+        meta["source_status"] = None
+        meta["errors"] = None
+        meta["health_nulled"] = ["source_status", "errors"]
+    # Per-source last-success stamps (audit A2): freshness measured per SOURCE,
+    # not by row last_seen (which a merge or an enrichment pass bumps).
+    _ls = dict(prior_meta.get("source_last_success") or {})
+    if _own_health:
+        for slug, status in (summary.get("source_status") or {}).items():
+            if isinstance(status, str) and status.startswith("OK"):
+                _ls[slug] = _now_iso
+    _refreshed = summary.get("source_refreshed")
+    if isinstance(_refreshed, dict):
+        for slug, when in _refreshed.items():
+            _ls[slug] = when if isinstance(when, str) and when else _now_iso
+    elif isinstance(_refreshed, (list, tuple, set)):
+        for slug in _refreshed:
+            _ls[str(slug)] = _now_iso
+    if _ls:
+        meta["source_last_success"] = dict(sorted(_ls.items()))
     _atomic_write_bytes(meta_path, json.dumps(meta, ensure_ascii=False, default=str, indent=2).encode("utf-8"))
 
     # --- update high-water mark ---
@@ -2007,6 +2896,25 @@ def write_artifact(
                         off_footprint_removed=_accepted_intentional)
     except Exception:  # noqa: BLE001
         pass
+
+    # THE MANIFEST, last. Everything above is on disk; this seals the set. A kill
+    # before this line leaves a stale manifest that DISAGREES with the new files,
+    # which is exactly the signal the next reader needs (BoardIntegrityError).
+    try:
+        write_manifest(docs, _manifest_pre, meta, slim_count=slim_count, shard_meta=shard_meta)
+    except Exception:  # noqa: BLE001
+        # A manifest we could not write must not pass for a current one.
+        try:
+            (docs / MANIFEST_NAME).unlink(missing_ok=True)
+        except OSError:
+            pass
+        log.error("web_artifact.manifest_failed", exc_info=True)
+    # The board on disk is now the one THIS process wrote: refresh the load stamp so
+    # a second write in the same process is not mistaken for someone else's.
+    # Only when this process had loaded before: a full re-scrape that never loaded has no
+    # stamp, and inventing one would just add a check nobody asked for.
+    if str(listings_path.resolve()) in _LOAD_STAMPS:
+        _remember_load(docs, listings_path)
 
     log.info("web_artifact.written", listings=len(listings), bytes=listings_path.stat().st_size)
     return listings_path, meta_path

@@ -533,3 +533,9 @@ The following hosts burn significant run time and are documented here so the cos
 - `portal-nc.tylertech.cloud` — NC eCourts judgment search, free but slow (multi-request per case)
 - `publicindex.sccourts.org` — SC public index, free but slow (per-county per-case)
 - `fastpeoplesearch.com` — free people search, extremely slow per-request, used for phone/email enrichment
+### County breadth build, 2026-09-21 (docs/new_county_sources_2026-09-21.md)
+- `counties_sc.sc_catalis_delinquent_roll`: extended to Chester, Hampton, Fairfield, Aiken. API `https://d1ebsyxxbc7tep.cloudfront.net/data/<GUID>/Records`; sites `chestercountysctax.com`, `hamptoncountytax.org`, `fairfieldsctax.com`, `aikencountysctax.com`.
+- `counties_nc.nc_its_public_tax`: Onslow `https://tax.onslowcountync.gov/ITSPublicON/TaxBillSearch`, Graham `https://www.bttaxpayerportal.com/ITSPublicGR2.0/TaxBillSearch`. Unpaid property tax, no login.
+- `counties_sc.charleston_tax_sale_xlsx`: `https://www.charlestoncounty.gov/departments/delinquent-tax/files/tax_sale/RP-Tax-Sale-Listing.xlsx` and `MH-Tax-Sale-Listing.xlsx`.
+- `counties_sc.horry_delinquent_xlsx`: link discovered on `https://www.horrycountysc.gov/departments/treasurer/delinquent-tax/` (dated `delinquent-list-on-website-MMDDYY.xlsx`).
+- `counties_nc.albemarle_observer_tax_lists`: `https://albemarleobserver.news/wp-json/wp/v2/posts` (WordPress REST, delinquent-tax list posts for Tyrrell, Washington, Plymouth, Gates, Bertie).

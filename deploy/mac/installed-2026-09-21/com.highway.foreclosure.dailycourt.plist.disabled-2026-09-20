@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.highway.foreclosure.dailycourt</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/cashhigh/foreclosure-scraper/scripts/run_daily_court.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/Users/cashhigh/foreclosure-scraper</string>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>2</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/cashhigh/foreclosure-scraper/logs/dailycourt-stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/cashhigh/foreclosure-scraper/logs/dailycourt-stderr.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/cashhigh/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <key>HOME</key>
+        <string>/Users/cashhigh</string>
+    </dict>
+</dict>
+</plist>

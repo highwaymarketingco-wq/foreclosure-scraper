@@ -88,6 +88,12 @@ class Layer(NamedTuple):
     detail: Optional[str] = None       # violation description / bill id
     process: Optional[str] = None
     source_page: Optional[str] = None  # human-facing page for source_url
+    #: Field holding the AMOUNT OWED (a tax bill, a lien). Stored as
+    #: raw["arcgis_distress"]["amount_owed"], the key enrichment_tax_owed's generic scan
+    #: already reads, so the balance reaches raw["tax_owed"] and the debt-aware ranking.
+    #: Without it a delinquent-roll layer carries its bill only under a source-specific
+    #: column name (Greenville's is TOTTAX) that nothing downstream knows.
+    amount: Optional[str] = None
 
 
 LAYERS: tuple[Layer, ...] = (
@@ -308,6 +314,69 @@ LAYERS: tuple[Layer, ...] = (
         process="storm_damage",
         source_page="https://www.spartanburgcounty.org/",
     ),
+    # ------------------------------------------------------------------
+    # 2026-09-21 COUNTY-BREADTH ADDITIONS (docs/county_breadth_research_2026-09-21.md).
+    # Verified live the same day: count, field list, one real row, and the
+    # value distribution of the filtered column.
+    # ------------------------------------------------------------------
+    # City of Columbia (Richland County) property code cases, 8,590 back to 2006.
+    # Richland had 9 leads on the whole board and no code, vacancy or demolition
+    # signal at all. Only the rows that describe a STRUCTURE the city has already
+    # judged vacant, boarded or slated for demolition are admitted (1,064 of 8,590
+    # on 2026-09-21): a yard-parking or roll-cart case is not a distressed property.
+    # CaseStatus is limited to the two OPEN states ("In Violation", "Open"); the
+    # 5,000+ other rows are resolved, no-violation or referred-out cases.
+    #
+    # CAVEATS, both measured: (1) the feed's newest OpenedDate is 2026-01-15, so it
+    # has not been refreshed for about eight months and a case still "In Violation"
+    # may have been cured since; (2) there is NO owner, parcel or value field, only
+    # ADDRESS, so a lead here is an address the resolver must turn into an owner
+    # (Richland has no parcel cache yet). The layer also carries Neighborhood and
+    # CouncilDistrict, deliberately not requested.
+    Layer(
+        slug="columbia_code_vacant_boarded",
+        state="SC", county="Richland",
+        url=("https://services1.arcgis.com/Mnt8FoJcogKtoVBs/arcgis/rest/services/"
+             "CodeViolationProperty/FeatureServer/0"),
+        listing_type=ListingType.DISTRESSED,
+        where=("CaseStatus IN ('In Violation','Open') AND "
+               "(Problem LIKE '%Boarded Building%' OR Problem LIKE '%Demolition%' "
+               "OR Problem LIKE 'Vacant Building%')"),
+        fields=("CaseNum", "OpenedDate", "Problem", "CaseStatus", "ADDRESS"),
+        situs="ADDRESS", detail="Problem", process="code_enforcement",
+        source_page="https://www.columbiasc.gov/",
+    ),
+    # Greenville County parcels whose tax bill is still unpaid. TOTTAX > 0 with a NULL
+    # PAIDDATE is the county's own "billed and not paid" state; on 2026-09-21 that was
+    # 2,855 parcels, and 1,926 of the first 2,000 sampled carry a 2025 bill (ACCTNO
+    # starts with the tax year), i.e. unpaid since the January 2026 due date, so these
+    # are delinquent and not merely un-billed. Median bill about $825, first-2,000 sum
+    # $4.3M. The layer is the county's replacement for the GreenvilleJS/Map_Layers_JS
+    # service (removed between 2026-08-03 and 2026-09-21: "Service ... not found").
+    #
+    # Fields requested are property/assessment facts only: owner of record, situs
+    # parts, tax value, the bill. STREET/CITY/STATE/ZIP5 on this layer are the OWNER'S
+    # MAILING address, not the property's, so `city` and `zip_` are deliberately NOT
+    # mapped (a mailing city stamped on the property would be wrong for every absentee);
+    # the parcel cache (PARCEL_LAYERS["Greenville"]) supplies the mailing block by PIN.
+    # DESCR is a legal description ("PH2", "UNIT B"), never a street.
+    #
+    # Tolerated: gcgis.org is a single county-run host that has already moved this
+    # service once, and losing it must not discard the other layers' rows (see fetch()).
+    Layer(
+        slug="greenville_unpaid_tax_parcels",
+        state="SC", county="Greenville",
+        url=("https://www.gcgis.org/arcgis3/rest/services/GreenvilleNJ/"
+             "QueryLayers/MapServer/0"),
+        listing_type=ListingType.TAX_LIEN,
+        where="TOTTAX > 0 AND PAIDDATE IS NULL",
+        fields=("PIN", "OWNAM1", "OWNAM2", "STRNUM", "STRPRE", "LOCATE", "STRTYP",
+                "STRSUF", "TAXMKTVAL", "TOTTAX", "ACCTNO", "PROPTYPE"),
+        parcel="PIN", owner_last="OWNAM1",
+        situs_parts=("STRNUM", "STRPRE", "LOCATE", "STRTYP", "STRSUF"),
+        value="TAXMKTVAL", detail="ACCTNO", process="tax", amount="TOTTAX",
+        source_page="https://www.greenvillecounty.org/TaxCollector/OnlineTax.aspx",
+    ),
 ) + tuple(
     # ---------------------------------------------------------------------
     # COUNTY-OWNED / SURPLUS inventory.
@@ -392,6 +461,17 @@ def _owner(a: dict, lay: Layer) -> Optional[str]:
     return last or first
 
 
+def _raw_block(a: dict, lay: Layer) -> dict:
+    """The raw["arcgis_distress"] sub-dict: every non-blank requested attribute, plus a
+    normalised `amount_owed` when the layer declares an amount field."""
+    blk = {"layer": lay.slug, **{k: v for k, v in a.items() if v not in (None, "")}}
+    if lay.amount:
+        amt = _num(a.get(lay.amount))
+        if amt:
+            blk["amount_owed"] = amt
+    return blk
+
+
 def _to_listing(a: dict, lay: Layer) -> Optional[Listing]:
     situs = _clean(a.get(lay.situs)) if lay.situs else None
     if not situs and lay.situs_parts:
@@ -419,8 +499,7 @@ def _to_listing(a: dict, lay: Layer) -> Optional[Listing]:
         foreclosure_process=lay.process,
         description=f"{lay.county} {lay.state} — {' | '.join(bits)}"[:300],
         first_seen=now, last_seen=now,
-        raw={"arcgis_distress": {"layer": lay.slug, **{k: v for k, v in a.items()
-                                                       if v not in (None, "")}}},
+        raw={"arcgis_distress": _raw_block(a, lay)},
     )
 
 
@@ -489,7 +568,8 @@ class ArcgisDistressLayers(BaseScraper):
         guard = LayerHarvest(
             self.slug, [lay.slug for lay in LAYERS],
             tolerate=("laurens_county_owned", "pickens_county_owned",
-                      "burke_county_owned", "lincoln_code_violations"),
+                      "burke_county_owned", "lincoln_code_violations",
+                      "greenville_unpaid_tax_parcels"),
             attempts=3)
         async with client(timeout=45.0) as c:
             with guard:

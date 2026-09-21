@@ -39,13 +39,11 @@ def _by_pin():
 
 
 # ------------------------------------------------------------ the flag ------
-def test_scraper_is_dormant_without_the_flag(monkeypatch):
+def test_scraper_is_armed_by_default(monkeypatch):
+    # CHANGED 2026-09-21: was dormant without the flag. The owner's 2026-09-15 rule puts distressed
+    # leads in all 146 counties, so Greenville is on unless FORECLOSURE_INCLUDE_GREENVILLE=0.
     monkeypatch.delenv(gv.ENV_ON, raising=False)
-    s = GreenvilleHardDistress()
-    assert s.disabled is True
-    assert gv.ENV_ON in s.disabled_reason
-    rows = asyncio.run(s.safe_run())
-    assert rows == [] and s.last_outcome == "DORMANT"
+    assert GreenvilleHardDistress().disabled is False
 
 
 def test_flag_off_reports_dormant_not_a_suspicious_zero(monkeypatch):
@@ -53,6 +51,7 @@ def test_flag_off_reports_dormant_not_a_suspicious_zero(monkeypatch):
     in the run report."""
     monkeypatch.setenv(gv.ENV_ON, "0")
     s = GreenvilleHardDistress()
+    assert s.disabled is True and gv.ENV_ON in s.disabled_reason
     asyncio.run(s.safe_run())
     assert s.last_outcome == "DORMANT"
 
@@ -62,8 +61,8 @@ def test_flag_on_arms_the_scraper(monkeypatch):
     assert GreenvilleHardDistress().disabled is False
 
 
-def test_fetch_returns_nothing_when_the_flag_is_unset(monkeypatch):
-    monkeypatch.delenv(gv.ENV_ON, raising=False)
+def test_fetch_returns_nothing_when_the_flag_is_off(monkeypatch):
+    monkeypatch.setenv(gv.ENV_ON, "0")
     s = GreenvilleHardDistress()
     s.disabled = False                     # bypass the base-class short-circuit
     assert list(asyncio.run(s.fetch())) == []

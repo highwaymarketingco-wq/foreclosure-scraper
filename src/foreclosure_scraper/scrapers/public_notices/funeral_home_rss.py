@@ -31,6 +31,20 @@ listing pages; these are individual FUNERAL-HOME CMS RSS feeds — a different,
 non-overlapping source class. To scale, probe more core-county homes with the same
 two URL shapes and add them to the host map below.
 
+WHY 50 ROWS PER RUN NEVER LANDED (diagnosed 2026-09-21; the reconciliation's "no county"
+reading is wrong). Every row DOES carry county and state (set from the host map above: Buncombe
+NC, Cleveland NC, Anderson SC, 10 + 20 + 20 rows live today) and all 50 pass ``main._in_scope``
+(PROBATE_NOTICE is a distress type, so the any-NC/SC rule applies). What drops them is
+``main._active_only``: an obituary has no sale date, and ``public_notices.funeral_home_rss`` is
+NOT in ``main.DATELESS_OK_SOURCES`` (its sibling ``public_notices.gannett_obituaries`` is), so
+0 of 50 survive. The fix is one line in main.py, written out in
+docs/scraper_revival_2026-09-21.md; nothing a scraper can set on a row changes
+``_active_only`` for a dateless lead. All 50 already resolve as name-resolver targets
+(``enrichment_resolve_name_to_property._is_target``: name, state NC/SC, no address/parcel, core
+county), and the record owner is now also written to ``owner_name`` (the resolver reads
+owner_name first, then defendant) and ``raw.dateless=True`` marks the row as intentionally
+dateless.
+
 Free, public, plain-HTTP. Gate off with FORECLOSURE_FUNERAL_RSS=0.
 """
 from __future__ import annotations
@@ -246,12 +260,14 @@ class FuneralHomeRss(BaseScraper):
                         property_kind=PropertyKind.UNKNOWN,
                         state=state, county=county,
                         defendant=name,  # decedent -> resolver pins parcel by owner-name
+                        owner_name=name,  # the resolver reads owner_name first, then defendant
                         description=f"Obituary (death) — {name}, {county} County {state} "
                                     f"— pre-probate heir/estate signal (funeral-home feed)",
                         first_seen=now, last_seen=now,
                         raw={
                             "obituary": obituary,
                             "life_event": "death",
+                            "dateless": True,   # a death has no sale date; needs DATELESS_OK_SOURCES
                             "relationship_signal": {"kind": "probate",
                                                     "keyword": "obituary"},
                         },

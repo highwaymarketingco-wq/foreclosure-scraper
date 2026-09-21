@@ -16,14 +16,21 @@ def _l(lat, lon, city="Charleston", county="Charleston"):
 
 
 def test_downtown_peninsula_admitted():
+    """The peninsula test itself, and admission of DISTRESS-type leads. (2026-09-21: a FLIP
+    on the peninsula, e.g. Fannie REO, is no longer admitted by it. The owner's 2026-09-15
+    rule, "if its a flip, its only in the counties we talked about", supersedes the
+    2026-06-22 downtown carve-out for flips; see tests/test_flip_scope.py.)"""
     for name, lat, lon in [("City Hall", 32.7765, -79.9311),
                            ("College of Charleston", 32.7840, -79.9370),
                            ("The Battery", 32.7700, -79.9310),
                            ("Hampton Park", 32.7980, -79.9530)]:
         li = _l(lat, lon)
         assert _is_downtown_charleston(li) is True, name
-        assert _in_scope(li) is True, name
         assert li.raw.get("downtown_charleston") is True
+        distress = _l(lat, lon)
+        distress.listing_type = ListingType.TAX_LIEN
+        assert _in_scope(distress) is True, name
+        assert _in_scope(_l(lat, lon)) is False, f"{name}: a flip outside the 18 counties"
 
 
 def test_north_charleston_and_summerville_excluded():

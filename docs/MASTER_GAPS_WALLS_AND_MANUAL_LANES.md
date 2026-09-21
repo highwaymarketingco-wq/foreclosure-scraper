@@ -6,10 +6,35 @@
 
 ---
 
+## CORRECTIONS, 2026-09-21 (the original text below is kept as written; where they disagree, this block wins)
+
+This document was built on 2026-08-18 against a 40,702-lead board and has not been re-probed since. The operations audit (`docs/audit_operations_2026-09-21.md`, appendix C1) found these statements now false or misleading. Nothing below was deleted; each is superseded here.
+
+| Original statement | Correct as of 2026-09-21 |
+|---|---|
+| "Built against the live committed board (`data/checkpoint/board.json.gz`, 40,702 leads)" | `data/` is gitignored, so that file is not committed; it is a 65 MB checkpoint dated 9/9. The live board is 170,066 rows (`docs/run_meta.json`) |
+| "Board = 40,702 leads. NC 22,872 / SC 17,830" | 170,066 rows; NC 93,030, SC 77,036 |
+| Fill rates: owner_mailing 74.5%, owner_phone 21.4%, parcel 72.5%, real CAMA 32%, equity 30.2%, vision 32.7% | Measured on the 40.7k board and not re-measured board-wide. Vision alone is about 13% of 170k rows (22,326). The SC phone gate (`docs/phone_gate_2026-09-21.md`) changed the meaning of "owner_phone" |
+| "The footprint is exactly 18 counties ... eastern/coastal NC (New Hanover) DENIED ... Every in-scope county has coverage" | The 18 counties are the **flip** footprint. Distressed-type leads are in scope anywhere in NC and SC (owner rule 2026-09-15; `config.in_scope_distressed`), and the board holds New Hanover (2,230) and Charleston (1,455) rows. Flip-type leads outside the 18 counties are now excluded on every admission path, including the coastal ones (`main._flip_outside_footprint`, 2026-09-21) |
+| "Board-writer mutex prevents an ingest colliding with a full run" | Was true only for the writers that used the lock. Since 2026-09-21 `write_artifact` itself refuses without the lock, so it is true of every writer that goes through it (`docs/ops_fixes_2026-09-21.md`, section 2) |
+| Rule 2 below: defeating a CAPTCHA, login wall or WAF bot-check "is NOT permitted ... even when directed to" | Still the rule, and now the only rule: `CLAUDE.md` used to say the opposite (CAPTCHA solving and Cloudflare bypass allowed if free). See the reconciliation directly below |
+| Currency note: dates "true when probed" | Nothing here was re-probed after 8/18 while the source set changed by more than 15,000 rows in September. Re-verify before relying on a DEAD or CANT entry (rule 4) |
+
+### The compliance line: one rule, stated by the owner (decided 2026-09-20)
+
+**A `robots.txt` Disallow is not a wall. A CAPTCHA, a login, a Cloudflare (or other WAF) challenge and click-through terms still are.**
+
+- Fetch politely (rate limits, honest identification where the site expects it) from pages that only a `robots.txt` Disallow forbids. Being disallowed there is not, by itself, a reason to skip a free public source.
+- Do not defeat a CAPTCHA, do not log in behind a wall or hold credentials to sustain automation, do not defeat a Cloudflare or WAF challenge, and do not click through terms that prohibit automated access. This is a code-plus-policy line, not a horsepower one.
+- Stealth that only runs the page's own JavaScript (fingerprint impersonation such as `curl_cffi`, a real headless browser) remains permitted; that is not defeating a challenge.
+- Consequences applied on 2026-09-21: `CLAUDE.md` now states this rule; `scripts/run_daily_court.sh` defaults `TYLER_USE_WAF_SOLVER` to 0 (the WAF solver defeats a bot-check; the job is disabled anyway); The Kofile module already dropped its robots gate (`tests/test_kofile_robots_guard.py`); its docstring there also repeats the older "all free techniques including anti-bot evasion" wording, which this reconciliation supersedes for CAPTCHAs, logins, Cloudflare or WAF challenges and click-through terms. Code that still treats a `Disallow` as a wall is a separate change, not made here.
+
+---
+
 ## 0. THE HARD RULES (never break, no matter who asks)
 
 1. **FREE and PUBLIC only.** Everything the robots pull is free public data reached through ordinary public search. No paid APIs, no paid unblockers (Bright Data, residential proxies), no paid CAPTCHA solvers, no paid skip-trace, no paid broker data (PropStream, ATTOM, OpenCorporates, NCOALink, Trepp, UniCourt, Trellis). If it costs money to get, it is out of scope for the automated engine. The operator may buy data as a business decision, but the engine does not.
-2. **The compliance line.** Fingerprinting stealth that runs the page's own JS (curl_cffi impersonate, StealthyFetcher / patchright) is permitted. Defeating a CAPTCHA, a login wall, a WAF bot-check, or a ToS scraper-prohibition is NOT, even when directed to. A smarter model does not change this. The wall is code plus policy, not horsepower.
+2. **The compliance line (see the 2026-09-21 reconciliation above: a robots.txt Disallow is not a wall).** Fingerprinting stealth that runs the page's own JS (curl_cffi impersonate, StealthyFetcher / patchright) is permitted. Defeating a CAPTCHA, a login wall, a WAF bot-check, or a ToS scraper-prohibition is NOT, even when directed to. A smarter model does not change this. The wall is code plus policy, not horsepower.
 3. **No logins the robot holds.** The engine does not log in behind a wall or store credentials to sustain automation. The human operator, as the account holder, may log in and save pages by hand (the manual lane, Section 5). The robot only parses what the human saved.
 4. **DEAD means "dead the day it was probed," not "dead forever."** Re-verify every DEAD / CANT source live before believing it. This session alone, two sources on the dead list (irsauctions.gov, Meares) turned out live. Do not let a July stamp stop a re-probe.
 

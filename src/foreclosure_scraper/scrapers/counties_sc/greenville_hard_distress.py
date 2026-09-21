@@ -25,7 +25,9 @@ WHAT "HARD DISTRESS" MEANS HERE
 SOURCES (every one verified open 2026-08-03: anonymous, no key, no login, no
 CAPTCHA/WAF, and not disallowed by the host's robots.txt)
 
-  1. Parcels + tax  gcgis.org .../Map_Layers_JS/MapServer/52   (243,750 parcels)
+  1. Parcels + tax  gcgis.org .../arcgis3/.../GreenvilleNJ/QueryLayers/MapServer/0
+                    (was .../GreenvilleJS/Map_Layers_JS/MapServer/52, removed; see GIS below)
+                    (243,750 parcels on 2026-08-03)
      ``TOTTAX > 0 AND PAIDDATE IS NULL`` = **5,014** unpaid-tax parcels, carrying
      $13,024,627.12 of owed tax (median bill $1,031.11). 5,014/5,014 have an
      owner of record, 5,012 a mailing address, 4,890 a situs, 5,014 a polygon.
@@ -107,14 +109,31 @@ from ...models import Listing, ListingType, PropertyKind, _normalize_parcel
 
 log = structlog.get_logger()
 
-#: Master switch. Default OFF — the operator has not decided to expand.
+#: Master switch. Default ON since 2026-09-21: the owner's 2026-09-15 rule puts DISTRESSED leads in all 146
+#: NC/SC counties (only flips are limited to the 18), and every row this scraper emits is a distressed lead
+#: (unpaid tax, code, condemned). Set FORECLOSURE_INCLUDE_GREENVILLE=0 to turn it off.
 ENV_ON = "FORECLOSURE_INCLUDE_GREENVILLE"
+
+
+def _enabled() -> bool:
+    return os.environ.get(ENV_ON, "1") != "0"
 #: Second switch for the ~1,700-request probate name pass. Off even when ENV_ON.
 ENV_PROBATE = "FORECLOSURE_GREENVILLE_PROBATE"
 
-GIS = "https://www.gcgis.org/arcgis/rest/services/GreenvilleJS/Map_Layers_JS/MapServer"
-PARCEL_LAYER = f"{GIS}/52"
-SALES_LAYER = f"{GIS}/5"
+#: REPLACED 2026-09-21. The county removed the old GreenvilleJS service: `.../arcgis/rest/
+#: services/GreenvilleJS/Map_Layers_JS/MapServer/52` now answers HTTP 200 with
+#: {"error": {"code": 500, "message": "Service GreenvilleJS/Map_Layers_JS/MapServer not found"}}
+#: (a 200, so nothing here noticed). The successor is the GreenvilleNJ service on the
+#: `arcgis3` server. Verified live the same day:
+#:   layer 0 "datashed.gtz.CAD_PARCEL_MP_VW", maxRecordCount 2000, all 26 PARCEL_FIELDS present,
+#:   `TOTTAX > 0 AND PAIDDATE IS NULL` = 2,855 parcels (the old layer read 5,014),
+#:   resultOffset + orderByFields OBJECTID paging and outSR 4326 geometry both work.
+#: The service has ONE layer. The old sales layer (5, 361,562 sales with PURNAME/SELLNAME/
+#: TRUESALE) is gone, so SALES_LAYER is None and the sale join degrades to the parcel
+#: layer's own last sale (SLPRICE, DEEDDATE).
+GIS = "https://www.gcgis.org/arcgis3/rest/services/GreenvilleNJ/QueryLayers/MapServer"
+PARCEL_LAYER = f"{GIS}/0"
+SALES_LAYER: str | None = None
 
 TAXSALE_URL = "https://www.greenvillecounty.org/appsAS400/Taxsale/"
 PROBATE_BASE = "https://www.greenvillecounty.org/appsAS400/Probate/"
@@ -124,7 +143,7 @@ PAGE_URL = "https://www.greenvillecounty.org/RealPropertyServices/"
 
 #: Explicit field lists — never '*'.
 PARCEL_FIELDS = (
-    "OBJECTID,PIN,OWNAM1,OWNAM2,STREET,CITY,STATE,ZIP5,STRNUM,LOCATE,DESCR,"
+    "OBJECTID,PIN,OWNAM1,OWNAM2,STREET,CITY,STATE,ZIP5,STRNUM,STRPRE,LOCATE,STRTYP,STRSUF,DESCR,"
     "SUBDIV,LANDUSE,PROPTYPE,IMPROVED,TOTTAX,PAIDDATE,SLPRICE,DEEDDATE,"
     "FAIRMKTVAL,TAXMKTVAL,TACRES,SQFEET,BEDROOMS,BATHRMS,HALFBATH"
 )
@@ -229,18 +248,21 @@ def _centroid(geom: dict[str, Any] | None) -> tuple[float, float] | None:
     return (sum(p[1] for p in pts) / len(pts), sum(p[0] for p in pts) / len(pts))
 
 
-def _situs(strnum: Any, locate: Any, strtyp: Any = None) -> str | None:
-    """Layer 52 splits the situs into house number + street NAME with no street
-    type; layer 5 supplies the type. '00000' is the county's vacant-lot filler
-    and must not become a house number."""
+def _situs(strnum: Any, locate: Any, strtyp: Any = None,
+           strpre: Any = None, strsuf: Any = None) -> str | None:
+    """House number + [direction] + street NAME + type + [direction suffix].
+
+    The old layer 52 carried only number and name and layer 5 supplied the type. The
+    replacement parcel layer (GreenvilleNJ) carries all five parts itself ("209 W PARK AVE"
+    = STRNUM 209, STRPRE W, LOCATE PARK, STRTYP AVE), so `strtyp` may now come from either.
+    '00000' is the county's vacant-lot filler and must not become a house number."""
     num = _clean(strnum)
     if num and set(num) <= {"0"}:
         num = None
     name = _clean(locate)
     if not name:
         return None
-    typ = _clean(strtyp)
-    return " ".join(x for x in (num, name, typ) if x)
+    return " ".join(x for x in (num, _clean(strpre), name, _clean(strtyp), _clean(strsuf)) if x)
 
 
 def _is_absentee(mail_street: str | None, mail_state: str | None,
@@ -406,7 +428,8 @@ def build_listing(pin: str, attrs: dict, geom: dict | None,
         return None            # neither lane fired -> not hard distress
 
     situs = _situs(attrs.get("STRNUM"), attrs.get("LOCATE"),
-                   (sale or {}).get("STRTYP"))
+                   attrs.get("STRTYP") or (sale or {}).get("STRTYP"),
+                   attrs.get("STRPRE"), attrs.get("STRSUF"))
     mail_street = _clean(attrs.get("STREET"))
     mail_state = _clean(attrs.get("STATE"))
     lat = lng = None
@@ -558,8 +581,11 @@ async def fetch_parcels_by_pin(http, pins: list[str]) -> list[dict]:
 async def fetch_sales_by_pin(http, pins: list[str]) -> dict[str, dict]:
     """Latest ARMS-LENGTH sale per PIN, from layer 5. Best-effort: the join only
     adds context (street type + last true sale), so a failed chunk is logged and
-    skipped rather than failing the scrape."""
+    skipped rather than failing the scrape. With SALES_LAYER None (the layer no longer
+    exists, see GIS above) there is nothing to join and it returns {}."""
     best: dict[str, dict] = {}
+    if not SALES_LAYER:
+        return best
     for i in range(0, len(pins), _PIN_CHUNK):
         chunk = [p for p in pins[i:i + _PIN_CHUNK] if re.fullmatch(r"[A-Za-z0-9]+", p)]
         if not chunk:
@@ -669,16 +695,14 @@ class GreenvilleHardDistress(BaseScraper):
         # nothing). The run report must not show an out-of-scope county as a
         # suspicious zero every week.
         super().__init__()
-        if os.environ.get(ENV_ON) != "1":
+        if not _enabled():
             self.disabled = True
             self.disabled_reason = (
-                f"{ENV_ON} not set — Greenville SC is out of scope by operator "
-                "direction (config.SCOPE_DENY_COUNTIES)")
+                f"{ENV_ON}=0 — Greenville SC switched off by the operator")
 
     async def fetch(self) -> Iterable[Listing]:
-        if os.environ.get(ENV_ON) != "1":
-            log.info("greenville.disabled",
-                     reason=f"{ENV_ON} not set; county is out of scope by operator direction")
+        if not _enabled():
+            log.info("greenville.disabled", reason=f"{ENV_ON}=0; switched off by the operator")
             return []
 
         now = datetime.utcnow()

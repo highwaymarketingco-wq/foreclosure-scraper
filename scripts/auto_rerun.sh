@@ -4,6 +4,11 @@
 # Kills after N runs or when dot_ocr coverage is sufficient.
 
 cd /Users/cashhigh/foreclosure-scraper
+# enrich_board.py writes the board; write_artifact refuses without the board lock (audit O3).
+# Re-exec ONCE under it (five back-to-back runs, so a generous max runtime).
+if [ -z "${FORECLOSURE_BOARD_LOCK_HELD:-}" ]; then
+  exec /Users/cashhigh/foreclosure-scraper/scripts/with_board_lock.sh auto_rerun --max-runtime 43200 -- bash /Users/cashhigh/foreclosure-scraper/scripts/auto_rerun.sh "$@"
+fi
 export PATH="$HOME/bin:$PATH"
 export PYTHONPATH=~/foreclosure-scraper/src:~/foreclosure-scraper/.venv/lib/python3.12/site-packages:$PYTHONPATH
 

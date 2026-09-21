@@ -51,11 +51,33 @@ delinquent list. The text-fallback extraction (PARCEL_SC_RE + ADDR_RE)
 will pick up any TMS-tagged property the moment a real delinquent PDF is
 linked, even if the column layout differs from expected.
 
+REVIVAL 2026-09-21 -- WHY 1,334 ROWS NEVER REACHED THE BOARD
+  Live run the same day: still 1,334 rows, and every one is Pickens. 1,177 came from the
+  2015-2019 "DelSaleListing" PDFs and another 115 from the 2021-2024 results PDFs: sales
+  that closed 2 to 12 years ago, whose SC 12-month redemption window ended long ago (the
+  owner has lost title), 65 of 1,334 rows with an address. Only the 2025 results PDF (sale
+  Nov 2025, redemption open to about Nov 2026, 42 rows here) is a live lead, and
+  ``counties_sc.pickens_tax_sale`` already parses that same PDF far better (160 rows).
+  The rows did pass ``main._in_scope`` and ``main._active_only`` (the slug is in
+  DATELESS_OK_SOURCES); they never landed because the 8/28 run timed out on this scraper
+  and no run since has written the board. Landing them would have put ~1,290 dead rows
+  on the board.
+
+  Now: a post-sale RESULTS PDF is emitted only while its redemption window is open (sale
+  year + 1, to Dec 31, the same convention ``pickens_tax_sale`` uses), and rows carry
+  ``redemption_deadline``. Older results are skipped BEFORE downloading (label/file name
+  year), which also removes 7 of 9 Pickens PDF fetches per run. A genuinely current
+  pre-sale list (no "results" marker) is unchanged. ``SC_TAX_DELINQUENT_INCLUDE_HISTORICAL=1``
+  restores the old behaviour. Expected yield until the counties publish their 2026 lists
+  (Spartanburg, Anderson, Cherokee, Oconee, Union, Laurens: all 0 on 2026-09-21, lists
+  appear Oct to Nov): the ~42 Pickens rows, duplicates of ``pickens_tax_sale`` by parcel.
+
 Free, pure HTTP (no Apify, no spend).
 """
 from __future__ import annotations
 
 import io
+import os
 import re
 from datetime import datetime
 from typing import Iterable
@@ -163,6 +185,55 @@ def _is_post_sale_text(text: str) -> bool:
     return any(m in t for m in _POST_SALE_TEXT_MARKERS)
 
 
+_YEAR_RE = re.compile(r"(?<!\d)(20[12]\d)(?!\d)")
+_T_PARAM_RE = re.compile(r"[?&]t=(20[12]\d)\d{6,}")
+
+
+def _include_historical() -> bool:
+    return os.environ.get("SC_TAX_DELINQUENT_INCLUDE_HISTORICAL", "").strip().lower() in ("1", "true", "yes")
+
+
+def _sale_year(label: str = "", url: str = "", text: str = "") -> int | None:
+    """Year of the sale a results PDF reports: the link label first ("2025 delinquent tax
+    sale results"), then the file name ("2017DelSaleListing.pdf", "2024 Tax Sale Results for
+    Web.pdf"), then the ``?t=`` upload stamp, then the PDF's own first page."""
+    m = _YEAR_RE.search(label or "")
+    if m:
+        return int(m.group(1))
+    path = (url or "").split("?", 1)[0].rsplit("/", 1)[-1]
+    m = _YEAR_RE.search(path)
+    if m:
+        return int(m.group(1))
+    m = _T_PARAM_RE.search(url or "")
+    if m:
+        return int(m.group(1))
+    m = _YEAR_RE.search(text or "")
+    return int(m.group(1)) if m else None
+
+
+def _redemption_deadline(sale_year: int) -> datetime:
+    """SC gives the owner 12 months from the (Oct/Nov) sale to redeem. Dec 31 of the next
+    year is the same generous bound ``pickens_tax_sale`` uses, so the two agree."""
+    return datetime(sale_year + 1, 12, 31)
+
+
+def _redemption_open(sale_year: int | None, today: datetime | None = None) -> bool | None:
+    """True/False once the sale year is known, None when it is not."""
+    if sale_year is None:
+        return None
+    return _redemption_deadline(sale_year) >= (today or datetime.utcnow())
+
+
+def _mark_post_sale(listings: list["Listing"], sale_year: int | None) -> None:
+    for li in listings:
+        if sale_year is not None:
+            li.redemption_deadline = _redemption_deadline(sale_year)
+        blob = li.raw.setdefault("sc_tax_delinquent", {})
+        blob["post_sale"] = True
+        blob["sale_year"] = sale_year
+        blob["disposition"] = "post_sale_redemption_open" if sale_year is not None else "post_sale"
+
+
 def _extract_from_text(text: str, county: str, source_url: str) -> list["Listing"]:
     """Fallback when table-based PDF extraction fails: scan the raw page text
     for SC TMS parcel numbers + nearby addresses. One Listing per parcel.
@@ -205,7 +276,7 @@ def _classify_lines(text: str) -> ListingType:
     return ListingType.TAX_SALE  # default — scraper is delinquent-tax-focused
 
 
-async def _scrape_pdf(c, url: str, county: str) -> list[Listing]:
+async def _scrape_pdf(c, url: str, county: str, label: str = "") -> list[Listing]:
     """Pull tax-delinquent rows from a PDF. Returns parsed listings."""
     try:
         r = await c.get(url, follow_redirects=True, timeout=30.0)
@@ -233,6 +304,16 @@ async def _scrape_pdf(c, url: str, county: str) -> list[Listing]:
             if is_post_sale:
                 log.info("sc_tax_delinquent.post_sale_text",
                          county=county, url=url)
+            # A results PDF whose redemption window has closed is history, not a lead.
+            # (The link-level check in _scrape_html already skipped the ones whose label or
+            # file name carries the year; this catches the rest by the PDF's own text.)
+            if (is_post_sale or _is_post_sale_filename(url) or _is_post_sale_filename(label)) \
+                    and not _include_historical():
+                sy = _sale_year(label, url, first_text or "")
+                if _redemption_open(sy) is False:
+                    log.info("sc_tax_delinquent.past_redemption_skipped", county=county,
+                             url=url[:160], sale_year=sy)
+                    return []
             for page in pdf.pages:
                 # Collect text for fallback extraction
                 try:
@@ -306,6 +387,8 @@ async def _scrape_pdf(c, url: str, county: str) -> list[Listing]:
         if not out and text_pages:
             full_text = "\n".join(text_pages)
             out.extend(_extract_from_text(full_text, county, url))
+        if out and (is_post_sale or _is_post_sale_filename(url) or _is_post_sale_filename(label)):
+            _mark_post_sale(out, _sale_year(label, url, first_text or ""))
         return out
     except Exception as exc:
         log.debug("sc_tax_delinquent.pdf_fail", county=county, url=url, error=str(exc)[:200])
@@ -436,8 +519,14 @@ async def _scrape_html(c, url: str, county: str) -> list[Listing]:
         if is_post_sale:
             log.info("sc_tax_delinquent.post_sale_pdf",
                      county=county, href=href[:160], label=text[:80])
+            sy = _sale_year(text, href)
+            if not _include_historical() and _redemption_open(sy) is False:
+                # No request at all: a sale this old cannot be a live lead.
+                log.info("sc_tax_delinquent.past_redemption_skipped", county=county,
+                         href=href[:160], sale_year=sy, fetched=False)
+                continue
         href = urljoin(join_base, href)
-        pdf_listings = await _scrape_pdf(c, href, county)
+        pdf_listings = await _scrape_pdf(c, href, county, label=text)
         out.extend(pdf_listings)
 
     return out

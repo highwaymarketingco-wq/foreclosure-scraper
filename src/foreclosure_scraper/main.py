@@ -31,6 +31,11 @@ from .oceanfront import is_oceanfront
 from .dedupe import dedupe
 from .email_sender import send_digest
 from .enrichment import enrich
+from .enrichment_foreclosure_sold_comps import (
+    in_upset_window,
+    sc_tax_redemption_open,
+    state_upset_window_days,
+)
 from .enrichment_arcgis import enrich as enrich_gis
 from .enrichment_owner_mailing import enrich_owner_mailing
 from .enrichment_courts import discover_lis_pendens, enrich_with_court_records
@@ -262,7 +267,28 @@ def _county_in_scope(li: Listing) -> bool:
     return in_scope_distressed(li.county, li.state)
 
 
+def _flip_outside_footprint(li: Listing) -> bool:
+    """A flip whose county is KNOWN and is not one of the 18 footprint counties.
+
+    The owner's rule of 2026-09-15 ("if its a flip, its only in the counties we talked
+    about. if its a distressed property its anywhere in nc and sc") is enforced here for
+    EVERY admission path. It used to be wired into only two places (_county_in_scope and the
+    deny check further down), while everything that admits a coastal row ran before both and
+    never asked whether the row was a flip: the oceanfront override, the coastal-source
+    bypass, downtown Charleston and their provisional variants, and then _denied_now
+    exempted the same rows a second time in the post-enrichment re-pass. Measured on the
+    2026-09-21 board: 102 flip rows outside the 18 counties (Charleston 33, Pender 24,
+    Georgetown 15, Dare 11, Onslow 7, Carteret 6 ...), about 56 through the oceanfront
+    override and 41 through the coastal-source bypass. Distressed types are unaffected."""
+    return (_is_flip(li) and bool((li.county or "").strip()) and bool(li.state)
+            and not in_scope(li.county, li.state))
+
+
 def _in_scope(li: Listing) -> bool:
+    # FIRST, before every coastal carve-out below: a flip outside the footprint is out,
+    # however it got its coastal credentials (see _flip_outside_footprint).
+    if _flip_outside_footprint(li):
+        return False
     # Oceanfront override — runs BEFORE the deny check so the otherwise-
     # denied coastal counties (New Hanover/Brunswick/Onslow + the SC
     # coast) can re-enter when a listing passes the strict 2-of-3
@@ -445,6 +471,8 @@ COASTAL_COUNTY_BYPASS_SOURCES = {
 
 
 def _coastal_county_source(li: Listing) -> bool:
+    if _is_flip(li):
+        return False    # the coastal bypass is for distress signals; flips stay in the footprint
     if li.source not in COASTAL_COUNTY_BYPASS_SOURCES:
         return False
     if not (li.county and li.state):
@@ -693,6 +721,11 @@ DATELESS_OK_SOURCES = {
     # Same reason: a delinquent tax balance is a standing condition with no sale date, so
     # _active_only() would delete every row this source produces.
     "counties_sc.sc_catalis_delinquent_roll",
+    "counties_nc.nc_its_public_tax",            # Onslow/Graham standing roll, no sale date
+    "counties_sc.horry_delinquent_xlsx",        # Horry delinquent list, pay-by deadline not a sale
+    "counties_nc.albemarle_observer_tax_lists", # NC annual delinquent lists, no sale date
+    "public_notices.funeral_home_rss",          # name-only estate leads, no sale date (resolver attaches the parcel)
+    "counties_sc.greenville_tax_distress",      # unpaid-tax parcels, standing condition
     # Spartanburg City Master Condemnation List — a condemnation is a standing condition.
     "counties_sc.spartanburg_city_condemned",
     # Hendersonville vacant/condemned structures register — same, standing condition.
@@ -954,10 +987,19 @@ def _active_only(li: Listing, horizon_days: int, *, now: datetime | None = None)
     # Without this grace, we strand the strongest actionable signal an
     # investor can chase. Default 2-day grace for other states; SC also
     # gets 14 (its §29-3-680 confirmation window is even longer).
-    past_grace_days = 14 if li.state in ("NC", "SC") else 2
+    #
+    # The window comes from enrichment_foreclosure_sold_comps.state_upset_window_days, the
+    # SAME table the sold-pool partition uses (F8): a lead is active while
+    # now - sale <= window and sold-pool material strictly after it, so a lead can never
+    # fall in the gap between the two.
+    past_grace_days = state_upset_window_days(li.state)
     ref = now or datetime.utcnow()
     cutoff_past = ref - timedelta(days=past_grace_days)
     cutoff_future = ref + timedelta(days=horizon_days)
+    # F8: an SC tax sale is not over on sale day. It conveys a certificate, the owner keeps
+    # title for ~12 months and can redeem, so it stays active while that clock runs.
+    if sale <= cutoff_future and sc_tax_redemption_open(li, ref):
+        return True
     return cutoff_past <= sale <= cutoff_future
 
 
@@ -976,6 +1018,51 @@ def _safe_pred(fn, li, default: bool) -> bool:
         return default
 
 
+def _denied_now(li: Listing) -> bool:
+    """POST-ENRICHMENT scope re-pass predicate: True = drop this lead.
+
+    Module level (it was a closure inside run()) so it can be tested. The flip rule comes
+    FIRST: a flip outside the 18 counties is dropped whatever coastal tag it carries, and a
+    flip that still has no county after enrichment is dropped too (it cannot be routed to the
+    footprint; 21 REO rows with no county on the 2026-09-21 board). Only then do the
+    oceanfront / downtown-Charleston / coastal-source carve-outs apply, and they now shelter
+    DISTRESS-type leads only."""
+    if _flip_outside_footprint(li):
+        return True
+    if _is_flip(li) and not (li.county or "").strip():
+        return True
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    if raw.get("oceanfront") or raw.get("downtown_charleston") or raw.get("coastal_county"):
+        return False
+    if not (li.county and li.state):
+        return False
+    key = (li.county.replace(" County", "").strip().title(), li.state.upper())
+    # Deny list is a FLIP-scope concept (see _FLIP_LISTING_TYPES) — a
+    # distressed-type lead in a denied county is not re-dropped here.
+    if _is_flip(li) and key in SCOPE_DENY_COUNTIES_NORMALIZED:
+        return True
+    # Coastal counties are an intentional re-admission track for distress leads — leave
+    # them to the oceanfront / coastal-source paths, never drop on footprint alone.
+    if key in OCEANFRONT_COASTAL_COUNTIES:
+        return False
+    # County resolved to something we don't track at all -> off-footprint leak.
+    # Flip leads: narrow 18-county footprint. Distressed leads: anywhere in
+    # NC/SC (see _county_in_scope / _FLIP_LISTING_TYPES).
+    return not _county_in_scope(li)
+
+
+class ScoreBoardFailed(RuntimeError):
+    """score_board raised and SCORE_BOARD_FAIL_SOFT is not set (audit F17)."""
+
+
+# Process exit codes. run_local.sh keys off these; before 2026-09-21 a failed board
+# write returned 0 and still exported the Sheet and sent the digest email (audit O4).
+EXIT_OK = 0
+EXIT_SCORE_FAILED = 6       # score_board raised (or ran fail-soft)
+EXIT_WRITE_FAILED = 3       # write_artifact raised: nothing was published
+EXIT_LOCK_BUSY = 75         # EX_TEMPFAIL: another board writer holds the lock
+
+
 async def run() -> int:
     _setup_logging()
     cfg = RuntimeConfig.from_env()
@@ -984,6 +1071,8 @@ async def run() -> int:
     # hit UnboundLocalError (which the surrounding try/except silently swallowed,
     # losing those stats + logging a false "failed"). One dict for the whole run.
     enrichment_stats: dict[str, dict] = {}
+    # Set when score_board raised (F17). Declared here for the same reason as the dict above.
+    _scoring_failed: str | None = None
 
     scrapers = all_scrapers()
     # FORECLOSURE_ONLY_SOURCES=substr,substr — restrict to matching slugs (for a scoped
@@ -1751,25 +1840,6 @@ async def run() -> int:
     # let it ship. The OCEANFRONT_COASTAL_COUNTIES carve-out below keeps the
     # legitimate coastal track (Brunswick / Onslow / Georgetown / Charleston ...)
     # untouched — only genuinely off-footprint counties are dropped.
-    def _denied_now(li: Listing) -> bool:
-        raw = li.raw if isinstance(li.raw, dict) else {}
-        if raw.get("oceanfront") or raw.get("downtown_charleston") or raw.get("coastal_county"):
-            return False
-        if not (li.county and li.state):
-            return False
-        key = (li.county.replace(" County", "").strip().title(), li.state.upper())
-        # Deny list is a FLIP-scope concept (see _FLIP_LISTING_TYPES) — a
-        # distressed-type lead in a denied county is not re-dropped here.
-        if _is_flip(li) and key in SCOPE_DENY_COUNTIES_NORMALIZED:
-            return True
-        # Coastal counties are an intentional re-admission track — leave them to
-        # the oceanfront / coastal-source paths, never drop on footprint alone.
-        if key in OCEANFRONT_COASTAL_COUNTIES:
-            return False
-        # County resolved to something we don't track at all -> off-footprint leak.
-        # Flip leads: narrow 18-county footprint. Distressed leads: anywhere in
-        # NC/SC (see _county_in_scope / _FLIP_LISTING_TYPES).
-        return not _county_in_scope(li)
     _pre_scope = len(enriched)
     enriched = [li for li in enriched if not _safe_pred(_denied_now, li, False)]
     if _pre_scope != len(enriched):
@@ -2249,8 +2319,11 @@ async def run() -> int:
         kept_enriched = []
         for li in enriched:
             raw = li.raw if isinstance(li.raw, dict) else {}
+            # F8: a hammer price inside the upset window is not a final sale yet (the
+            # court status can read "upset_bid"); the lead stays actionable until it closes.
             if isinstance(raw.get("actual_sold_price"), (int, float)) \
-                    and raw.get("nc_case_status", {}).get("promoted_to_sold_comp"):
+                    and raw.get("nc_case_status", {}).get("promoted_to_sold_comp") \
+                    and not in_upset_window(li):
                 promoted.append(li)
             else:
                 kept_enriched.append(li)
@@ -2996,8 +3069,31 @@ async def run() -> int:
 
     # Stacked-distress score (HOT/WARM/COLD operator board) — runs last so it
     # can stack every signal + equity + contactability gathered above.
+    def _score_failed(kind: str, detail: str, hist: dict | None = None,
+                      extra: dict | None = None) -> None:
+        """F17 (audit 2026-09-21): a scorer failure used to be log.error and carry on, so the
+        run published a board whose HOT/WARM/COLD tiers were whatever the PRIOR run left on
+        each row (or nothing, for fresh rows): tiers that look current and are not.
+        Record it in the health alarms, then FAIL LOUDLY: everything up to here is
+        checkpointed, so refusing the write costs only the tail of the run, and the board on
+        disk is left untouched. SCORE_BOARD_FAIL_SOFT=1 keeps the publish-anyway behaviour, but
+        the failure stays in run_health/summary errors and the run still exits non-zero."""
+        nonlocal _scoring_failed
+        _scoring_failed = f"{kind}: {detail}"[:240]
+        enrichment_stats["distress_stack"] = hist if hist else {"error": detail[:200], "stale_tiers": True}
+        enrichment_stats["distress_stack_failed"] = {"kind": kind, "detail": detail[:200], **(extra or {})}
+        errors.append(f"score_board FAILED: HOT/WARM/COLD tiers on this board are STALE ({_scoring_failed})")
+        if os.environ.get("SCORE_BOARD_FAIL_SOFT", "").strip().lower() not in ("1", "true", "yes"):
+            try:
+                checkpoint.save(enriched, "score_failed")
+            except Exception:
+                log.error("checkpoint.save_failed_after_score_failure", traceback=traceback.format_exc())
+            raise ScoreBoardFailed(
+                f"score_board failed ({_scoring_failed}); refusing to write a board with stale tiers "
+                f"(SCORE_BOARD_FAIL_SOFT=1 overrides)")
+
     try:
-        from .distress_score import score_board
+        from .distress_score import score_board, ScoreBoardError, LAST_STATS
         # Explicit absolute path to the PRIOR run's listings.json snapshot. At
         # this point web_artifact (line ~1698) has not yet overwritten it, so it
         # still holds the previous run — correct for the price_cut cross-run diff.
@@ -3005,9 +3101,23 @@ async def run() -> int:
         # default) keeps the comparison working regardless of invocation CWD.
         _prev_listings = Path(__file__).resolve().parent.parent.parent / "docs" / "listings.json"
         enrichment_stats["distress_stack"] = score_board(enriched, previous_path=_prev_listings)
-        log.info("orchestrator.distress_scored", tiers=enrichment_stats["distress_stack"])
-    except Exception:
+        enrichment_stats["distress_stack_detail"] = dict(LAST_STATS)   # lane, stale-capped, stay-capped, errors
+        log.info("orchestrator.distress_scored", tiers=enrichment_stats["distress_stack"],
+                 **{k: v for k, v in LAST_STATS.items() if k != "tiers"})
+        if LAST_STATS.get("price_index_error"):
+            # the prior-run price snapshot could not be read, so price_cut is OFF for this run
+            errors.append(f"score_board price_index_error: price_cut signal is off ({LAST_STATS['price_index_error']})")
+            log.error("distress_score.price_index_error", error=LAST_STATS["price_index_error"])
+    except ScoreBoardError as exc:
+        # Every group that could be scored was; the failed ones are COLD with score_error.
+        log.error("distress_score.failed", groups=exc.failed, first=exc.failures[:3])
+        _score_failed("ScoreBoardError", f"{exc.failed} group(s) failed", hist=exc.hist,
+                      extra={"groups": exc.failed, "first": exc.failures[:3]})
+    except ScoreBoardFailed:
+        raise
+    except Exception as _score_exc:
         log.error("distress_score.failed", traceback=traceback.format_exc())
+        _score_failed(type(_score_exc).__name__, str(_score_exc))
 
     # Derived investor signals (LTV, ppsf-vs-comp, equity band, etc.) — consumes equity +
     # GIS value + distress, so runs LAST among the signal enrichers.
@@ -3458,13 +3568,26 @@ async def run() -> int:
 
     # Web artifact — always write, even when Sheets/Email secrets are missing.
     # GitHub Actions then commits docs/ back to the repo, GitHub Pages serves it.
+    _write_ok = False
     try:
         write_artifact(enriched, summary)
         # Published successfully — drop the checkpoint so the next run
         # starts clean instead of resuming onto a board that shipped.
         checkpoint.clear()
+        _write_ok = True
     except Exception:
         log.error("web_artifact.failed", traceback=traceback.format_exc())
+
+    if not _write_ok:
+        # AUDIT O4: this used to log and carry on. On 2026-09-09 a COUNT-GUARD refusal
+        # still wrote run_health.json (describing a board that was never written, and
+        # committed 12 days stale beside the real one), still exported the Google Sheet,
+        # still emailed Greg and Cash a digest, and still returned 0, so run_local.sh
+        # called it a run. None of that is true of a run that published nothing.
+        # The checkpoint is kept so the run can resume; the board on disk is untouched.
+        log.error("orchestrator.aborted_board_not_written",
+                  note="skipping sold pool, run_health, Sheet export and digest email; exit 3")
+        return EXIT_WRITE_FAILED
 
     # Sold-comp pool — separate file so the dashboard's main grid never
     # shows past-sale "listings". The card popout still reads
@@ -3538,12 +3661,34 @@ async def run() -> int:
     else:
         log.warning("email.skipped_no_secret")
 
+    if _scoring_failed:
+        log.error("orchestrator.done_with_stale_tiers", scoring_failed=_scoring_failed)
+        return EXIT_SCORE_FAILED
     log.info("orchestrator.done")
-    return 0
+    return EXIT_OK
 
 
 def cli() -> None:
-    sys.exit(asyncio.run(run()))
+    """Entry point for `python -m foreclosure_scraper`.
+
+    Takes the board lock for the whole run (reentrant: run_local.sh already holds it),
+    because write_artifact now refuses without it (audit O3) and a multi-hour scrape
+    that is refused at the very end is the worst place to find that out."""
+    from .web_artifact import BoardLockBusy, BoardMemoryPressure, board_lock
+    try:
+        with board_lock(owner="foreclosure_scraper.main",
+                        max_runtime=int(os.environ.get("FULLRUN_LOCK_MAX_RUNTIME", "259200"))):
+            rc = asyncio.run(run())
+    except BoardLockBusy as exc:
+        print(f"foreclosure_scraper: not started: {exc}", file=sys.stderr)
+        sys.exit(EXIT_LOCK_BUSY)
+    except BoardMemoryPressure as exc:
+        print(f"foreclosure_scraper: not started: {exc}", file=sys.stderr)
+        sys.exit(EXIT_LOCK_BUSY)
+    except ScoreBoardFailed as exc:
+        print(f"foreclosure_scraper: {exc}", file=sys.stderr)
+        sys.exit(EXIT_SCORE_FAILED)
+    sys.exit(rc)
 
 
 if __name__ == "__main__":

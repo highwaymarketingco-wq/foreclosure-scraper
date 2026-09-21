@@ -3,6 +3,10 @@
 # Each batch loads the board, fetches, writes, and exits, so a crash costs one batch
 # and the logs/ checkpoint resumes. Batches are large to amortise the 600MB board write.
 cd "$(dirname "$0")/.." || exit 1
+# launchd and Finder-launched applets start with a minimal PATH that lacks ~/.local/bin;
+# dailycourt failed 31 days in a row on "uv: command not found" (audit O10/O12).
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"
+command -v uv >/dev/null 2>&1 || { echo "uv not found on PATH ($PATH)" >&2; exit 127; }
 for i in $(seq 1 12); do
   echo "=== batch $i  $(date) ==="
   # SIDECAR ONLY -- no --write-board. The 2026-09-10 run died at batch 5 after ~3h

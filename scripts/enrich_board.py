@@ -86,6 +86,7 @@ async def main():
         print(f"      {k:40s} {n:6d}  {pct:5.1f}%")
 
     stats = {}
+    _score_failures: list = []      # names of scorer steps that raised (F17)
 
     # 2. OFFLINE enrichers (no network needed, seconds)
     print("\n[2] OFFLINE enrichers (no network needed)...")
@@ -113,6 +114,12 @@ async def main():
         except Exception as e:
             stats[name] = f"ERR: {e}"
             print(f"ERR: {e}")
+            if name.startswith("distress"):
+                # F17 (audit 2026-09-21): a scorer failure is not "just another ERR". The failed
+                # groups are COLD with score_error (ScoreBoardError) or keep the PRIOR tiers, and
+                # the pass goes on to write the board. Say so loudly and fail the job at the end.
+                _score_failures.append(name)
+                print(f"  !! SCORE_BOARD_FAILED in {name}: tiers on this board are STALE", flush=True)
 
     async def _run_async(name, func, timeout_s=300, *args, **kwargs):
         print(f"  [{name}]... ", end="", flush=True)
@@ -1220,6 +1227,10 @@ async def main():
 
     print(f"\n[7] Writing board: {len(board)} listings...")
     write_artifact(board, summary, docs_dir)
+    if _score_failures:
+        print(f"\n!! SCORE_BOARD_FAILED ({', '.join(_score_failures)}): the board was written, but its "
+              f"HOT/WARM/COLD tiers are STALE. Exiting non-zero.", flush=True)
+        raise SystemExit(6)
     elapsed = time.time() - t0
     print(f"\n{'=' * 70}")
     print(f"COMPLETE: {len(board)} listings enriched in {elapsed:.0f}s")

@@ -3,8 +3,11 @@
 let LISTINGS = [];
 let META = {};
 let filtered = [];
-let sortKey = "_grade";
-let sortDir = "desc";  // best grades first
+// Deadline first: a live legal clock (soonest first), then tier, then grade;
+// leads that are presumed withdrawn or past their sale date sink. Grade sort is
+// still one click away (th[data-sort="_grade"] or the Sort menu). See leadClock().
+let sortKey = "_deadline";
+let sortDir = "desc";  // best first: the soonest live deadline, then the hottest tier
 let map = null;
 let mapMarkers = null;
 let detailMap = null;
@@ -61,6 +64,202 @@ const LEAN = (() => {
 // Escape hatch: a broken streaming deploy is recoverable from Safari's URL bar
 // without waiting on a Pages rebuild + the 10-minute cache TTL.
 const NOSTREAM = _QS.get("nostream") === "1";
+
+// ---- BEGIN IO-GUARD -------------------------------------------------------
+// Two things a move to a private host (Cloudflare Access in front of a Worker)
+// needs from the page, as pure helpers the node harness in
+// tests/js/io_guard.test.mjs slices out of this file and runs under vm:
+//   (a) noticing that a data fetch was answered by a login page instead of data,
+//       so the page can say so and reload once, instead of "network error";
+//   (b) moving CRM notes between origins. localStorage belongs to one origin and
+//       the iPhone home-screen app has its own, so a new URL starts with empty
+//       notes: export a JSON file, import it on the other side, merge by lead.
+// No DOM, no fetch, no globals beyond what is defined here.
+const SESSION_RELOAD_KEY = "fc_session_reload_v1";
+const CRM_EXPORT_FORMAT = "fc-crm-export";
+const CRM_IMPORT_MAX_BYTES = 5 * 1024 * 1024;
+const CRM_NOTES_MAX = 20000;
+
+/** A same-origin data file this page fetches: the board, run_meta, shards... */
+function isDataUrl(url, origin) {
+  const u = String(url || "");
+  if (/^[a-z][a-z0-9+.-]*:/i.test(u) || u.slice(0, 2) === "//") {
+    if (!origin || u.indexOf(origin + "/") !== 0) return false;    // a third party is not our data
+  }
+  return /\.json(\.gz)?$/i.test(u.split("#")[0].split("?")[0]);
+}
+
+/**
+ * Was this response a login page rather than data? Returns the reason, or "".
+ * 401/403, an opaque redirect, a redirect to another origin, or a 200 that is a
+ * web page. A 404 is NOT one (a missing optional file is normal, and GitHub
+ * Pages answers it with an HTML 404 page).
+ */
+function sessionProblem(res, origin) {
+  if (!res) return "";
+  if (res.type === "opaqueredirect") return "the server sent a login redirect";
+  if (res.status === 401 || res.status === 403) return `the server answered HTTP ${res.status}`;
+  if (res.redirected && res.url && origin) {
+    let o = "";
+    try { o = new URL(res.url).origin; } catch (e) { o = ""; }
+    if (o && o !== origin) return "the request was redirected to another site, which is a sign-in page";
+  }
+  if (res.ok) {
+    let ct = "";
+    try { ct = String((res.headers && res.headers.get && res.headers.get("content-type")) || "").toLowerCase(); } catch (e) { ct = ""; }
+    if (ct.indexOf("text/html") >= 0) return "the server returned a web page instead of data";
+  }
+  return "";
+}
+
+/**
+ * One automatic reload per problem, never a loop. Records the attempt in
+ * sessionStorage BEFORE reloading; if it cannot record (private mode), it holds,
+ * because a reload it cannot count is a reload it cannot stop.
+ */
+function sessionReloadDecision(store) {
+  try {
+    if (store.getItem(SESSION_RELOAD_KEY) === "1") return "hold";
+    store.setItem(SESSION_RELOAD_KEY, "1");
+    return "reload";
+  } catch (e) { return "hold"; }
+}
+/** Called after a load succeeds, so a LATER expiry can reload once again. */
+function sessionReloadClear(store) {
+  try { store.removeItem(SESSION_RELOAD_KEY); } catch (e) { /* nothing to clear */ }
+}
+
+function _crmTs(rec) {
+  const v = rec && (rec.updated || rec.updated_at);
+  const t = Date.parse(v);
+  return isNaN(t) ? 0 : t;
+}
+
+/** Keep only what the CRM stores, capped; null when nothing usable is left. */
+function crmCleanRecord(rec) {
+  if (!rec || typeof rec !== "object" || Array.isArray(rec)) return null;
+  const out = {};
+  if (typeof rec.status === "string" && rec.status.length <= 40) out.status = rec.status;
+  if (typeof rec.notes === "string") out.notes = rec.notes.slice(0, CRM_NOTES_MAX);
+  if (typeof rec.next_action === "string" && /^(\d{4}-\d{2}-\d{2})?$/.test(rec.next_action)) out.next_action = rec.next_action;
+  const ts = rec.updated || rec.updated_at;
+  if (typeof ts === "string" && !isNaN(Date.parse(ts))) out.updated = ts;
+  return Object.keys(out).length ? out : null;
+}
+
+const _CRM_BAD_KEYS = { "__proto__": 1, "constructor": 1, "prototype": 1 };
+
+/**
+ * Merge an imported CRM into the local one, by lead key. The newer `updated`
+ * wins (a tie keeps local), and nothing is ever deleted: every local lead
+ * survives, and a newer record overlays the older one field by field, so a note
+ * the newer record does not mention is not lost. `updated_at` is accepted as a
+ * synonym for `updated` on the way in.
+ */
+function crmMerge(local, incoming) {
+  const merged = {};
+  const stats = { added: 0, updated: 0, kept: 0, skipped: 0 };
+  const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const L = local && typeof local === "object" && !Array.isArray(local) ? local : {};
+  Object.keys(L).forEach((k) => { if (!_CRM_BAD_KEYS[k]) merged[k] = L[k]; });
+  const I = incoming && typeof incoming === "object" && !Array.isArray(incoming) ? incoming : {};
+  Object.keys(I).forEach((k) => {
+    if (!k || _CRM_BAD_KEYS[k]) { stats.skipped++; return; }
+    const rec = crmCleanRecord(I[k]);
+    if (!rec) { stats.skipped++; return; }
+    if (!has(merged, k)) { merged[k] = rec; stats.added++; return; }
+    if (_crmTs(rec) > _crmTs(merged[k])) { merged[k] = Object.assign({}, merged[k], rec); stats.updated++; }
+    else stats.kept++;
+  });
+  return { merged, stats };
+}
+
+/** Parse an imported file: the export wrapper, or the bare localStorage value. */
+function crmParseImport(text) {
+  if (typeof text !== "string" || !text.trim()) return { ok: false, error: "The file is empty." };
+  if (text.length > CRM_IMPORT_MAX_BYTES) return { ok: false, error: "The file is over 5 MB, which is not a CRM export." };
+  let doc;
+  try { doc = JSON.parse(text); } catch (e) { return { ok: false, error: "The file is not valid JSON." }; }
+  if (!doc || typeof doc !== "object" || Array.isArray(doc)) return { ok: false, error: "This is not a CRM export." };
+  if (doc.format === CRM_EXPORT_FORMAT) {
+    if (!doc.records || typeof doc.records !== "object" || Array.isArray(doc.records)) return { ok: false, error: "The export has no records." };
+    return { ok: true, records: doc.records };
+  }
+  if ("format" in doc) return { ok: false, error: "This file is a different kind of export." };
+  return { ok: true, records: doc };
+}
+
+/** The export document. Records are copied as stored; the reader cleans them. */
+function crmExportDoc(all, nowIso, origin) {
+  const records = {};
+  const src = all && typeof all === "object" && !Array.isArray(all) ? all : {};
+  Object.keys(src).forEach((k) => {
+    if (_CRM_BAD_KEYS[k]) return;
+    const r = src[k];
+    if (r && typeof r === "object" && !Array.isArray(r)) records[k] = r;
+  });
+  return { format: CRM_EXPORT_FORMAT, version: 1, exported_at: nowIso, origin: origin || "", count: Object.keys(records).length, records };
+}
+// ---- END IO-GUARD ---------------------------------------------------------
+
+let _SESSION_SHOWN = false;
+/**
+ * Say so, and reload once. `network` is a fetch that threw (offline, or a login
+ * redirect the browser blocked); otherwise the server answered with a login.
+ */
+function sessionExpired(reason, network) {
+  if (typeof document === "undefined" || !document.body) return;
+  if (!_SESSION_SHOWN) {
+    _SESSION_SHOWN = true;
+    const msg = network
+      ? "Could not load the data. If your sign-in expired, reload to sign in."
+      : "Session expired, reload to sign in.";
+    document.body.insertAdjacentHTML("afterbegin",
+      '<div id="session-banner" role="alert" style="position:fixed;left:0;right:0;top:0;z-index:10000;'
+      + 'background:#b3261e;color:#fff;padding:10px 14px;text-align:center;font:600 13px/1.4 '
+      + "system-ui,-apple-system,'Segoe UI',sans-serif\">" + msg
+      + ' <button type="button" id="session-reload" style="margin-left:8px;padding:3px 10px;border-radius:6px;'
+      + 'border:1px solid #fff;background:transparent;color:#fff;font:inherit;cursor:pointer">Reload</button>'
+      + ' <span style="font-weight:400;opacity:.85">(' + _txt(reason) + ")</span></div>");
+    const b = document.getElementById("session-reload");
+    if (b) b.addEventListener("click", () => location.reload());
+  }
+  let store = null;
+  try { store = window.sessionStorage; } catch (e) { store = null; }
+  if (store && sessionReloadDecision(store) === "reload") setTimeout(() => location.reload(), 900);
+}
+
+// Wrap fetch ONCE, before anything is fetched, so EVERY data file (board, shards,
+// run_meta, multifamily, land_buyers, detail) is checked in one place instead of
+// at nine call sites.
+(function installSessionGuard() {
+  if (typeof window === "undefined" || typeof window.fetch !== "function" || window.__fcSessionGuard) return;
+  window.__fcSessionGuard = true;
+  const orig = window.fetch.bind(window);
+  window.fetch = async function (input, init) {
+    const url = typeof input === "string" ? input : (input && input.url) || "";
+    const data = isDataUrl(url, location.origin);
+    let res;
+    try { res = await orig(input, init); }
+    catch (e) {
+      // run_meta.json is the first fetch the page makes. When THAT one cannot be
+      // reached, the likely cause behind Access is a lapsed session whose login
+      // redirect the browser refused to follow across origins.
+      if (data && /run_meta\.json$/i.test(url.split("?")[0]) && e instanceof TypeError) sessionExpired(String(e.message || e), true);
+      throw e;
+    }
+    if (data) {
+      const why = sessionProblem(res, location.origin);
+      if (why) sessionExpired(why, false);
+    }
+    return res;
+  };
+})();
+
+/** Loads succeeded, so a later lapse may reload once again. */
+function sessionOk() {
+  try { sessionReloadClear(window.sessionStorage); } catch (e) { /* no storage */ }
+}
 
 // ------------- Load data -----------------------------------------------------
 // Fetch JSON, preferring a gzipped copy (~16x smaller). Robust to both GitHub
@@ -254,7 +453,7 @@ const _LEAN_RAW = {
   signal_stack: ["count"],
   strategy_fit: ["tags"],
   owner_mailing: ["mailing", "mail_state", "absentee", "out_of_state"],
-  owner_phone: ["phone", "source", "needs_dnc_scrub"],
+  owner_phone: ["phone", "source", "needs_dnc_scrub", "do_not_dial", "do_not_dial_reason", "identity_check", "role"],
   free_phones: ["phone", "source", "confidence", "needs_dnc_scrub"],
   sc_voter_xref: ["phone", "source", "match_type", "needs_dnc_scrub"],
   sos_agent: ["sosid", "best_contact_name", "best_contact_address"],
@@ -270,7 +469,7 @@ const _LEAN_RAW = {
   gis: ["owner"],
   lrcpwa: ["absentee", "mail_state"],
   tax_owed: ["balance"],
-  upset_bid: ["in_window", "days_remaining"],
+  upset_bid: ["in_window", "days_remaining", "deadline_iso"],
   // APPENDED LAST, on purpose: this is a NEW entry, and the key order of this
   // object is the key order of every record in the slim file, so a new key goes
   // where it moves nothing else.
@@ -297,6 +496,8 @@ const _LEAN_RAW = {
   horry_flc: ["Item_Number", "FLC_Bid_Amount", "Description"],
   name_resolution: ["matched_owner", "method"],
   tax_sale_overage: ["amount", "tax_sale_date", "map_number"],
+  bankruptcy_stay: "*",
+  pulled_sale: "*",
 };
 const _LEAN_RAW_KEYS = Object.keys(_LEAN_RAW);
 const _LEAN_RAW_SCALARS = [
@@ -741,6 +942,7 @@ async function loadDataset(name) {
       boardProgress(null);
     }
     DS_CACHE[name] = { listings: LISTINGS, meta: META };
+    sessionOk();
   } catch (e) {
     LISTINGS = [];
     META = {};
@@ -870,6 +1072,38 @@ function fillStats() {
     ? `Updated ${new Date(META.run_time).toLocaleString()}`
     : "Updated recently";
   $("run-source-count").textContent = String(sources.size);
+  paintFreshness();
+}
+
+/**
+ * Data-freshness banner from run_meta.json (META). Reads health_as_of /
+ * health_age_hours when the build writes them, falls back to health_carried_from,
+ * and says "age not reported" rather than nothing when all are absent. "Data may
+ * be stale" past 48 hours on either the source health or the board itself. The
+ * ages are recomputed from the clock on every paint, so a tab left open ages.
+ */
+function paintFreshness() {
+  const el = $("freshness-banner");
+  if (!el) return;
+  const now = Date.now();
+  const f = dataFreshness(META, now);
+  const at = (ms) => new Date(ms).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const bits = [];
+  if (f.board) bits.push(`board built ${at(f.board.atMs)} (${fmtAgeHours(f.board.ageHours)} ago)`);
+  if (f.health) {
+    bits.push(`source health as of ${at(f.health.atMs)} (${fmtAgeHours(f.health.ageHours)} ago${f.health.source === "health_carried_from" ? ", carried forward from an earlier run" : ""})`);
+  } else if (f.board) {
+    bits.push("source health age not reported");
+  }
+  el.hidden = false;
+  el.classList.toggle("stale", f.stale);
+  if (!f.known) {
+    el.textContent = "Data age unknown: run_meta.json carries no timestamps.";
+  } else if (f.stale) {
+    el.innerHTML = `<strong>Data may be stale</strong> (over ${FRESHNESS_STALE_HOURS}h): ${_txt(f.reasons.join("; "))}. ${_txt(_cap(bits.join(" · ")))}.`;
+  } else {
+    el.textContent = _cap(bits.join(" · "));
+  }
 }
 
 // ------------- Filter init ---------------------------------------------------
@@ -971,7 +1205,7 @@ function initFilters() {
       if (sortKey === k) sortDir = sortDir === "asc" ? "desc" : "asc";
       else {
         sortKey = k;
-        sortDir = "asc";
+        sortDir = k === "_deadline" ? "desc" : "asc";
       }
       document.querySelectorAll("th[data-sort]").forEach((t) => t.classList.remove("sort-asc", "sort-desc"));
       th.classList.add(sortDir === "asc" ? "sort-asc" : "sort-desc");
@@ -1032,7 +1266,7 @@ function initMobileShell() {
   // per key. The th handler defaults every new key to "asc" (:753), which is
   // right for an address and wrong for every quality/money column.
   const SORT_DESC_FIRST = {
-    _grade: 1, _roi: 1, _arv: 1, _max_bid: 1, _rehab: 1,
+    _deadline: 1, _grade: 1, _roi: 1, _arv: 1, _max_bid: 1, _rehab: 1,
     opening_bid: 1, living_sqft: 1, year_built: 1, bedrooms: 1, bathrooms: 1,
   };
   const sortSel = $("sort-mobile");
@@ -1044,6 +1278,14 @@ function initMobileShell() {
       const k = sortSel.value.replace(/"/g, "");
       const th = document.querySelector(`th[data-sort="${k}"]`);
       if (th) th.click();
+      else {
+        // _deadline is a composite key with no column of its own, so there is no
+        // th to click. Do what the th handler does.
+        sortKey = k;
+        sortDir = SORT_DESC_FIRST[k] ? "desc" : "asc";
+        document.querySelectorAll("th[data-sort]").forEach((t) => t.classList.remove("sort-asc", "sort-desc"));
+        applyFilters();
+      }
       // th.click() has just set sortDir="asc" for the newly-picked key. Override
       // it for the columns where "best first" is the only sane opening state.
       if (SORT_DESC_FIRST[k] && sortDir === "asc") { sortDir = "desc"; applyFilters(); }
@@ -1106,6 +1348,15 @@ function getSortValue(l, k) {
       || !(g && g.overall);
     return _memo(l, "_sv_arv", unrated ? -1 : arv);
   }
+  if (k === "_deadline") {
+    // Same one-minute memo as the clock it reads: `days` is relative to now.
+    const now = Date.now();
+    const m = l._sv_dl;
+    if (m && now - m.at < _DL_TTL_MS) return m.v;
+    const v = deadlineSortValue(clockOf(l), (getDistress(l) || {}).tier, Math.max(0, getSortValue(l, "_grade")));
+    _memo(l, "_sv_dl", { at: now, v });
+    return v;
+  }
   if (k === "_rehab") return (getCalc(l) || {}).rehab_expected || 0;
   if (k === "_max_bid") return (getCalc(l) || {}).max_bid_70 || 0;
   if (k === "_roi") return (getCalc(l) || {}).roi_pct;
@@ -1126,6 +1377,686 @@ const STAGE_REO = /hud_homestore|fannie|freddie|homepath|homesteps|hubzu|xome|au
 const STAGE_PREFORE = /substitute_trustee|nod_discovery|lis_pendens|rod_acclaim|rod_cott|rod_logan|nc_rod|sc_rod/;
 let STAGE = "";
 
+// ---- BEGIN PHONE-GATE -----------------------------------------------------
+// Mirrors enrichment_sc_phone.owner_phone_block_reason (see docs/phone_gate_2026-09-21.md):
+// why a phone must not be offered as the OWNER's number. The gate stamps
+// do_not_dial / do_not_dial_reason / identity_check / role on raw.owner_phone; this
+// also works on an unstamped legacy block, reading the lane from source, and an
+// SC voter cross-reference phone with no corroborated identity_check fails closed.
+// tests/js/phone_gate.test.mjs pins it to the Python test of the same cases.
+const _PG_XREF_SRC = ["ncsbe_voter_xref", "sc_voter_xref"];
+const _PG_WALLED_SRC = ["free_people_search", "enrichment_free_phones", "free_phones"];
+const _PG_AGENT_SRC = ["homeharvest_agent", "homeharvest_office", "notice_contact_attorney", "ocr_legal_notice"];
+const _PG_AGENT_MATCH = ["attorney", "attorney_in_notice", "trustee", "listing_agent"];
+
+/** null when the phone may be offered as the owner's; otherwise the reason. */
+function ownerPhoneBlock(op) {
+  if (!op || typeof op !== "object" || Array.isArray(op) || !op.phone) return "no_phone";
+  if (op.do_not_dial) return String(op.do_not_dial_reason || "do_not_dial");
+  const src = String(op.source || "");
+  if (src !== "liensnc_filing") {                      // the owner's own number is never demoted
+    const low = src.toLowerCase();
+    if (_PG_WALLED_SRC.indexOf(low) >= 0 || /people_?search|truepeople|fastpeople/.test(low)) return "people_search_walled";
+    if (op.role === "agent" || _PG_AGENT_SRC.indexOf(src) >= 0 || src.indexOf("raw.") === 0
+        || _PG_AGENT_MATCH.indexOf(String(op.match || "").toLowerCase()) >= 0) return "agent_contact";
+  }
+  if (_PG_XREF_SRC.indexOf(src) >= 0 && op.identity_check !== "corroborated") {
+    return "sc_xref_identity_" + (op.identity_check || "unchecked");
+  }
+  return null;
+}
+
+/** The reason in words, for the "DO NOT DIAL" badge. */
+function phoneBlockText(reason) {
+  const r = String(reason || "");
+  if (r === "agent_contact") return "Listing agent / attorney line, not the owner";
+  if (r === "people_search_walled") return "people-search number, an unverified source";
+  if (r.indexOf("sc_xref_identity_") === 0) {
+    const v = r.slice("sc_xref_identity_".length);
+    return v === "contradicted" ? "voter-file match contradicts this owner"
+      : `voter-file match not corroborated as this owner (${v})`;
+  }
+  if (r === "do_not_dial") return "flagged do not dial";
+  return r.replace(/_/g, " ");
+}
+// ---- END PHONE-GATE -------------------------------------------------------
+
+// ---- BEGIN LEAD-STATE -----------------------------------------------------
+// Pure lead-lifecycle logic. No DOM, no fetch, no module globals beyond what is
+// defined here, and nothing that calls arvTrust()/getGrade(). tests/js/
+// lead_state.test.mjs slices this exact region out of this file and runs it
+// under node's vm, so the code under test IS the code that ships. Keep it that
+// way: do not reference document / window / LEAN in here.
+//
+// docs/audit_signal_logic_2026-09-21.md is the spec:
+//   F15  in_window, days_remaining and sale_date_passed_days are frozen the
+//        moment a script runs, and several board writers never re-run them. Every
+//        clock below is recomputed at READ time from the dates against today.
+//   F2   raw.upset_bid is a dict, and a closed window is still a non-empty dict.
+//        A dict is an open window only when in_window === true, and even then
+//        only until its deadline passes.
+//   F3   a bankruptcy stay pauses the sale; it must not read as a priority.
+//   F13  "N signals" has to count distinct CATEGORIES, not facet synonyms.
+//   F19  equity is shown with its basis, and only when the ARV trust gate allows.
+//
+// Dates on the board are naive "YYYY-MM-DDTHH:MM:SS". A date is a CALENDAR DAY
+// here (its first ten characters), compared with today's local calendar day, so
+// a 00:00 UTC sale date cannot flip a day early or late depending on the
+// viewer's timezone.
+const MS_DAY = 86400000;
+// Mirrors enrichment_upset_bid.UPSET_BID_WINDOW_DAYS. Only used when a window is
+// tagged open and no deadline was published. NCGS 45-21.27 gives 10 days from
+// the report of sale and each upset bid restarts the clock; the engine assumes 14.
+const UPSET_BID_EST_DAYS = 14;
+// The "Closing Soon" horizon. A live deadline inside it leads the default sort;
+// a redemption date 300 days out does not outrank a HOT lead with no date.
+const CLOCK_SORT_HORIZON_DAYS = 45;
+const FRESHNESS_STALE_HOURS = 48;
+// Mirrors signal_freshness.BK_TTL_DAYS_CH7 / BK_TTL_DAYS_OTHER: how long after filing a
+// bankruptcy match, and the stay it created, is treated as still in force.
+const BK_TTL_DAYS_CH7 = 270;
+const BK_TTL_DAYS_OTHER = 1095;
+// Mirrors enrichment_bankruptcy_stay._FORECLOSURE_TYPES.
+const STAY_LISTING_TYPES = ["foreclosure_sale", "lis_pendens", "sheriff_sale", "tax_sale", "distressed"];
+// Signals the scorer counts as a full category on a name match alone.
+const NAME_ONLY_SIGNALS = ["incarceration", "bankruptcy"];
+// Mirrors distress_score._signals_for. Fallback only: distress_stack.categories
+// is authoritative and is what is read whenever it is there.
+const SIGNAL_CATEGORY = {
+  foreclosure_sale: "FINANCIAL", lis_pendens: "FINANCIAL", tax_sale: "FINANCIAL",
+  tax_lien: "FINANCIAL", court_sale: "FINANCIAL", upset_bid: "FINANCIAL",
+  recorded_debt: "FINANCIAL", str_permit_lapsed: "FINANCIAL", deferral_rollback: "FINANCIAL",
+  sheriff_sale: "SALES", auction: "SALES", reo: "SALES", mls_withdrawn_expired: "SALES",
+  stale_on_market: "SALES", price_cut: "SALES", partition: "SALES",
+  bankruptcy: "LEGAL", incarceration: "LEGAL",
+  probate_notice: "LIFE_EVENT", probate: "LIFE_EVENT", probate_deed: "LIFE_EVENT",
+  divorce: "LIFE_EVENT", senior_exemption: "LIFE_EVENT",
+  distressed: "PROPERTY", distressed_condition: "PROPERTY", code_enforcement: "PROPERTY",
+  condemned: "PROPERTY", helene_restricted: "PROPERTY", helene_unsafe: "PROPERTY",
+  helene_destroyed: "PROPERTY",
+};
+
+function _obj(v) { return v && typeof v === "object" && !Array.isArray(v) ? v : null; }
+function _rawOf(l) { return (l && _obj(l.raw)) || {}; }
+function _plural(n, w) { return `${n} ${w}${n === 1 ? "" : "s"}`; }
+
+function _ymdToDay(y, mo, d) {
+  if (!(mo >= 1 && mo <= 12 && d >= 1 && d <= 31)) return null;
+  return Math.floor(Date.UTC(y, mo - 1, d) / MS_DAY);
+}
+
+/** Calendar-day number (days since 1970-01-01) of a date-ish value, or null. */
+function _dayNum(v) {
+  if (v == null || v === "") return null;
+  const s = String(v).trim();
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (m) return _ymdToDay(+m[1], +m[2], +m[3]);
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})\b/.exec(s);   // NC eCourts style
+  if (m) { let y = +m[3]; if (y < 100) y += 2000; return _ymdToDay(y, +m[1], +m[2]); }
+  const t = Date.parse(s);
+  return isNaN(t) ? null : Math.floor(t / MS_DAY);
+}
+
+/** Today's LOCAL calendar day, as the same day number _dayNum() returns. */
+function _todayNum(nowMs) {
+  const d = new Date(nowMs);
+  return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / MS_DAY);
+}
+
+/** Day number back to a local-parsed "YYYY-MM-DDT00:00:00" (date-only ISO would parse as UTC). */
+function _dayIso(n) { return new Date(n * MS_DAY).toISOString().slice(0, 10) + "T00:00:00"; }
+
+/** "Sep 30", or "Sep 30, 2027" when the year is not this year's. */
+function _dayLabel(n, todayN) {
+  if (n == null) return "";
+  const d = new Date(n * MS_DAY);
+  const sameYear = todayN != null && d.getUTCFullYear() === new Date(todayN * MS_DAY).getUTCFullYear();
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: sameYear ? undefined : "numeric", timeZone: "UTC" });
+}
+
+/** ISO timestamps carry microseconds ("...32.810745Z"), which Safari rejects. */
+function _parseTs(v) {
+  if (v == null || v === "") return NaN;
+  return Date.parse(String(v).replace(/(\.\d{3})\d+/, "$1"));
+}
+
+/** Dropped from its source's roster: the sale was probably pulled or settled. */
+function presumedWithdrawn(l) {
+  const raw = _rawOf(l);
+  const ps = _obj(raw.pulled_sale);
+  return !!((ps && ps.presumed_withdrawn === true)
+    || String((l && l.auction_status) || "").toLowerCase() === "presumed_withdrawn"
+    || raw.stale_case === true);
+}
+
+/** Sale date against today. `passed` is computed here, never read from raw.sale_date_passed. */
+// Sources whose sale_date is really a FILING date (ingest_all maps filing_date -> sale_date so the
+// row survives the dateless filter). It is not an auction: never count it as a sale that passed.
+const FILING_DATE_SOURCES = new Set(["liensnc", "nc_sos_ucc"]);
+function saleClock(l, nowMs) {
+  const srcSlug = String((l && l.source) || "").split(".").pop();
+  if (FILING_DATE_SOURCES.has(srcSlug)) return { has: false, day: null, days: null, passed: false, passedDays: 0 };
+  const d = _dayNum(l && l.sale_date);
+  if (d == null) return { has: false, day: null, days: null, passed: false, passedDays: 0 };
+  const days = d - _todayNum(nowMs);
+  return { has: true, day: d, days, passed: days < 0, passedDays: days < 0 ? -days : 0 };
+}
+
+/** SC redemption clock. */
+function redemptionState(l, nowMs) {
+  const d = _dayNum(l && l.redemption_deadline);
+  if (d == null) return { has: false, day: null, days: null, ended: false, endedDays: 0 };
+  const days = d - _todayNum(nowMs);
+  return { has: true, day: d, days, ended: days < 0, endedDays: days < 0 ? -days : 0 };
+}
+
+/**
+ * Upset-bid window, decided from dates at read time.
+ *
+ * raw.upset_bid may only ever CLOSE a window (F2): a block whose in_window is not
+ * exactly true is closed, whatever its deadline says. It never keeps one open on
+ * its own, because in_window and days_remaining are frozen when the enricher
+ * ran. The deadline (upset_bid_deadline, else sale date + 14 d) decides the rest.
+ *
+ *   tagged        raw.upset_bid exists
+ *   open          tagged (or carrying a published deadline) and the deadline is today or later
+ *   closed        the enricher closed it, or the deadline is behind us
+ *   pending       the enricher has not opened it yet (the sale is still ahead)
+ *   estimatedOpen NOT tagged, NC, sold within the last 14 days: an estimate only
+ *   unverified    tagged open but no date to check it against
+ */
+function upsetBidState(l, nowMs) {
+  const today = _todayNum(nowMs);
+  const ub = _obj(_rawOf(l).upset_bid);
+  const explicit = _dayNum(l && l.upset_bid_deadline);
+  const saleDay = _dayNum(l && l.sale_date);
+  const st = { tagged: !!ub, has: !!ub || explicit != null, open: false, closed: false, pending: false,
+    estimatedOpen: false, unverified: false, deadlineDay: null, days: null, basis: "" };
+  let dl = explicit;
+  if (explicit != null) st.basis = "deadline";
+  else if (ub && saleDay != null) { dl = saleDay + UPSET_BID_EST_DAYS; st.basis = "sale_date"; }
+  st.deadlineDay = dl;
+  if (dl != null) st.days = dl - today;
+
+  if (ub) {
+    if (ub.in_window !== true) {                       // closed (or not opened) by the enricher
+      if (saleDay != null && saleDay > today) st.pending = true; else st.closed = true;
+      return st;
+    }
+    if (dl == null) { st.open = true; st.unverified = true; return st; }
+    if (st.days >= 0) st.open = true; else st.closed = true;
+    return st;
+  }
+  if (explicit != null) {                              // a published deadline with no block
+    if (st.days >= 0) st.open = true; else st.closed = true;
+    return st;
+  }
+  if (l && l.state === "NC" && saleDay != null && saleDay <= today && today - saleDay <= UPSET_BID_EST_DAYS) {
+    st.estimatedOpen = true; st.has = true; st.basis = "sale_date";
+    st.deadlineDay = saleDay + UPSET_BID_EST_DAYS; st.days = st.deadlineDay - today;
+  }
+  return st;
+}
+
+/**
+ * True when a bankruptcy match is old enough that the case, and the stay it
+ * created, are over. Mirrors signal_freshness.bankruptcy_lapsed; an unparseable
+ * or missing filing date is NOT lapsed (nothing to measure).
+ */
+function bankruptcyLapsed(bk, nowMs) {
+  const b = _obj(bk);
+  const fd = b ? _dayNum(b.date_filed) : null;
+  if (fd == null) return false;
+  const ttl = String(b.chapter == null ? "" : b.chapter).trim() === "7" ? BK_TTL_DAYS_CH7 : BK_TTL_DAYS_OTHER;
+  return _todayNum(nowMs) > fd + ttl;
+}
+
+/**
+ * The bankruptcy stay on a foreclosure-type lead, or null. Null also when the
+ * stay has LAPSED (a chapter 7 stay is gone after 270 days, any other after
+ * 1,095), so a lapsed stay shows no "sale stayed" banner and does not demote.
+ *
+ * Sources, in order: raw.bankruptcy_stay with status "stayed" (desktop, or the
+ * detail shard); distress_stack.stay, the scorer's own in-force stay, which slim
+ * DOES carry; and, on boards scored before that field existed, the same
+ * predicate enrichment_bankruptcy_stay uses, applied to raw.bankruptcy (slim
+ * carries it), labelled derived. Either way the match itself is a name match.
+ * Age and resume risk are recomputed from date_filed against today (F15).
+ */
+function bankruptcyStay(l, nowMs) {
+  if (!l || l.source === "national.courtlistener_bankruptcy") return null;
+  const raw = _rawOf(l);
+  const st = _obj(raw.bankruptcy_stay);
+  const bk = _obj(raw.bankruptcy);
+  const ds = _obj(raw.distress_stack);
+  const dst = ds ? _obj(ds.stay) : null;
+  const type = String(l.listing_type || "").toLowerCase();
+  let chapter, filed, source = "derived", note = "", storedRisk = "", storedMonths = null;
+  if (st && String(st.status || "").toLowerCase() === "stayed") {
+    source = "stay_block"; chapter = st.chapter; filed = st.date_filed || (bk && bk.date_filed);
+    note = st.note || ""; storedRisk = st.resume_risk || ""; storedMonths = st.months_since_filing;
+  } else if (dst && String(dst.status || "stayed").toLowerCase() === "stayed") {
+    source = "scorer"; chapter = dst.chapter; filed = bk && bk.date_filed;
+    storedRisk = dst.resume_risk || "";
+  } else if (bk && STAY_LISTING_TYPES.indexOf(type) >= 0) {
+    chapter = bk.chapter; filed = bk.date_filed;
+  } else {
+    return null;
+  }
+  chapter = String(chapter == null ? "" : chapter).trim();
+  if (chapter === "?") chapter = "";
+  if (bankruptcyLapsed({ date_filed: filed, chapter }, nowMs)) return null;
+  const fd = _dayNum(filed);
+  const months = fd != null ? (_todayNum(nowMs) - fd) / 30.44
+    : (typeof storedMonths === "number" ? storedMonths : null);
+  // Mirrors enrichment_bankruptcy_stay: ch.13 turns elevated at 9 months, ch.7 is high.
+  let risk = storedRisk || "unknown";
+  if (chapter === "13") risk = months != null && months >= 9 ? "elevated" : "moderate";
+  else if (chapter === "7") risk = "high";
+  return {
+    status: "stayed", chapter, filed: filed || null, filedDay: fd, months, resumeRisk: risk,
+    fromStored: source !== "derived", source, note, nameMatch: true,
+    label: `SALE STAYED (bankruptcy ${chapter ? "chapter " + chapter : "chapter unknown"})`,
+  };
+}
+
+/** The stay, in plain sentences built from the stored fields. */
+function stayLines(stay, nowMs) {
+  if (!stay) return [];
+  const out = ["The filing triggers an automatic stay (11 U.S.C. 362) that halts the sale while the case is open."];
+  if (stay.chapter === "13") out.push("Chapter 13: the owner is curing arrears over a 3 to 5 year plan. The sale resumes if the plan defaults or the case is dismissed.");
+  else if (stay.chapter === "7") out.push("Chapter 7 is a liquidation. The stay is short: the lender files a motion for relief and the sale usually resumes soon.");
+  else out.push("The chapter is not recorded, so the stay length cannot be judged.");
+  if (stay.filed) {
+    const age = stay.months != null ? `, ${Math.round(stay.months * 10) / 10} months ago` : "";
+    out.push(`Filed ${_dayLabel(stay.filedDay, nowMs == null ? null : _todayNum(nowMs)) || stay.filed}${age}.`);
+  }
+  out.push(`Resume risk: ${stay.resumeRisk}.`);
+  out.push("Basis: a name match between the defendant and a federal bankruptcy filing in the last 180 days. The engine does not re-check the docket for dismissal or discharge, so confirm the case is still open before you travel or bid.");
+  if (stay.source === "scorer") out.push("The stay is the scorer's own: it is in force until the filing is older than the stay window (270 days for chapter 7, 1,095 otherwise).");
+  if (!stay.fromStored) out.push("Derived from the bankruptcy match on this lead; the stay record itself has not loaded.");
+  return out;
+}
+
+/**
+ * The scorer's own event clock for a FORECLOSURE-LANE lead: distress_stack.lane,
+ * days_to_event (fullmer carries the same two fields). days_to_event is counted
+ * from the day the board was scored, so it is aged by the whole days since then
+ * (scoredAtMs, run_meta.run_time) and dropped once it reaches the past. It reads
+ * event kinds the dashboard's own dates may not carry, such as an upset-bid close
+ * date the slim board does not ship. Null when the lead is not in the lane.
+ */
+function scoredEvent(l, nowMs, scoredAtMs) {
+  const raw = _rawOf(l);
+  const ds = _obj(raw.distress_stack) || {};
+  const fm = _obj(raw.fullmer) || {};
+  const lane = ds.lane === "foreclosure" || fm.lane === "foreclosure";
+  if (!lane) return null;
+  const pick = [ds.days_to_event, fm.days_to_event].find((v) => typeof v === "number" && isFinite(v));
+  if (pick === undefined) return null;
+  const elapsed = scoredAtMs != null && isFinite(scoredAtMs) ? Math.max(0, _todayNum(nowMs) - _todayNum(scoredAtMs)) : 0;
+  const days = pick - elapsed;
+  return { base: pick, elapsed, days: days < 0 ? null : days };
+}
+
+/**
+ * Everything the UI needs about a lead's clock, decided from dates.
+ *
+ * `live` is the soonest deadline that has not passed and is not withdrawn. A
+ * presumed-withdrawn lead has no live deadline: its stale sale date must not be
+ * shown as one. A foreclosure-lane lead also gets the scorer's aged
+ * days_to_event as a candidate (kind "event"), so one whose dates the slim board
+ * does not carry still sorts by its deadline. `group` drives the default sort:
+ *   3  a live deadline inside the horizon, and no stay on the sale
+ *   2  everything else that is still current
+ *   1  demoted: presumed withdrawn, or the sale date passed with nothing left to act on
+ */
+function leadClock(l, nowMs, scoredAtMs) {
+  const sale = saleClock(l, nowMs);
+  const upset = upsetBidState(l, nowMs);
+  const redemption = redemptionState(l, nowMs);
+  const withdrawn = presumedWithdrawn(l);
+  const stay = bankruptcyStay(l, nowMs);
+  const event = scoredEvent(l, nowMs, scoredAtMs);
+  let live = null;
+  if (!withdrawn) {
+    const cands = [];
+    if (upset.open && upset.days != null) cands.push({ kind: "upset", field: "upset_bid_deadline", label: "upset bid closes", days: upset.days, day: upset.deadlineDay });
+    if (sale.has && !sale.passed) cands.push({ kind: "sale", field: "sale_date", label: "sale", days: sale.days, day: sale.day });
+    if (redemption.has && !redemption.ended) cands.push({ kind: "redemption", field: "redemption_deadline", label: "redemption ends", days: redemption.days, day: redemption.day });
+    if (event && event.days != null) cands.push({ kind: "event", field: null, label: "sale event", days: event.days, day: _todayNum(nowMs) + event.days, scored: true });
+    for (const c of cands) if (!live || c.days < live.days) live = c;
+    if (live) { live.ts = live.day * MS_DAY; live.date = _dayIso(live.day); }
+  }
+  const salePassed = sale.has && sale.passed;
+  let group = 2;
+  if (withdrawn) group = 1;
+  else if (live && !stay && live.days <= CLOCK_SORT_HORIZON_DAYS) group = 3;
+  else if (salePassed && !live) group = 1;
+  return { sale, upset, redemption, withdrawn, stay, live, event, salePassed, passedDays: sale.passedDays, group };
+}
+
+/**
+ * Deadline-first sort key, bigger = earlier in a descending sort. Live deadline
+ * soonest first, then tier (HOT, WARM, other), then grade. Demoted leads sit at
+ * the bottom whatever their tier.
+ */
+function deadlineSortValue(clock, tier, gradeScore) {
+  const tierRank = tier === "HOT" ? 2 : tier === "WARM" ? 1 : 0;
+  const g = Math.min(999, Math.max(0, Number(gradeScore) || 0));
+  let v = clock.group * 1e10 + tierRank * 1000 + g;
+  if (clock.group === 3) v += (9999 - Math.min(9999, Math.max(0, clock.live.days))) * 1e5;
+  return v;
+}
+
+/** Pill for the days-to-go number, or null. `strip` is the loud card/panel text. */
+function clockPill(live) {
+  if (!live) return null;
+  const d = live.days;
+  const kind = live.label.toUpperCase();
+  return {
+    cls: d === 0 ? "dl-today" : d <= 7 ? "dl-week" : "dl-soon",
+    txt: d === 0 ? "TODAY" : `${d}d`,
+    kind: live.label,
+    strip: d === 0 ? `${kind} TODAY` : `${kind} IN ${_plural(d, "DAY").toUpperCase()}`,
+  };
+}
+
+/**
+ * State flags as text, built from the clock. Order is loudest first. `tone` is
+ * bad | warn | hot | muted; the renderers map it onto their own classes.
+ */
+function clockBadges(l, clock, nowMs) {
+  const today = _todayNum(nowMs);
+  const out = [];
+  const { sale, upset, redemption, stay } = clock;
+  if (stay) out.push({ kind: "stay", tone: "bad", text: stay.label, title: stayLines(stay, nowMs).join(" ") });
+  if (clock.withdrawn) {
+    out.push({ kind: "withdrawn", tone: "bad", text: "presumed withdrawn",
+      title: "This lead dropped off its source roster, so the sale was probably pulled, postponed or settled. Its old dates are not treated as live deadlines." });
+  }
+  if (sale.passed) {
+    out.push({ kind: "sale_passed", tone: upset.open ? "warn" : "bad",
+      text: `sale date passed ${_plural(sale.passedDays, "day")} ago`,
+      title: `The sale date (${_dayLabel(sale.day, today)}) is behind us. Verify the outcome before acting: it may be sold, continued or in an upset-bid period.` });
+  }
+  if (upset.open) {
+    const when = upset.days === 0 ? "closes today" : `closes ${_dayLabel(upset.deadlineDay, today)}, ${_plural(upset.days, "day")} left`;
+    out.push({ kind: "upset_open", tone: "hot", text: `upset-bid window open, ${when}`,
+      title: upset.basis === "sale_date" ? "Estimated from the sale date; no close date was published." : "Close date from the source." });
+  } else if (upset.unverified) {
+    out.push({ kind: "upset_open", tone: "warn", text: "upset-bid window flagged open, no close date to check",
+      title: "The engine flagged this window open but stored no deadline, so it cannot be confirmed today." });
+  } else if (upset.estimatedOpen) {
+    out.push({ kind: "upset_est", tone: "warn", text: `upset-bid window probably open, about ${_plural(Math.max(0, upset.days), "day")} left`,
+      title: "Estimated from a sale date in the last 14 days. NC allows 10 days from the report of sale, restarted by each upset bid. Confirm at the clerk." });
+  } else if (upset.closed && upset.has) {
+    out.push({ kind: "upset_closed", tone: "muted",
+      text: upset.deadlineDay != null ? `window closed ${_dayLabel(upset.deadlineDay, today)}` : "window closed",
+      title: "The upset-bid window has closed. Nothing is left to bid on unless the sale reopens." });
+  }
+  if (redemption.has) {
+    out.push(redemption.ended
+      ? { kind: "redemption_ended", tone: "muted", text: `redemption ended ${_dayLabel(redemption.day, today)}`, title: "The redemption period has ended." }
+      : { kind: "redemption", tone: redemption.days <= 30 ? "warn" : "muted",
+          text: `redemption ends ${_dayLabel(redemption.day, today)}`, title: `${_plural(redemption.days, "day")} left in the redemption period.` });
+  }
+  return out;
+}
+
+/** One short phrase for the CSV and any place a single string is wanted. */
+function clockSummary(l, clock) {
+  const bits = [];
+  if (clock.stay) bits.push(clock.stay.label);
+  if (clock.withdrawn) bits.push("presumed withdrawn");
+  if (clock.live) bits.push(clockPill(clock.live).strip.toLowerCase());
+  if (clock.salePassed) bits.push(`sale date passed ${_plural(clock.passedDays, "day")} ago`);
+  if (clock.upset.closed && clock.upset.has) bits.push("window closed");
+  return bits.join("; ");
+}
+
+/**
+ * Distinct distress CATEGORIES from raw.distress_stack (F13). `signal_stack.count`
+ * counts facet synonyms (one tax delinquency reads as three signals); this counts
+ * what the scorer counts. `categories` wins; `stack` is the scorer's own tally;
+ * failing both, signal names are folded onto their categories.
+ */
+function distressCategories(l) {
+  const ds = _obj(_rawOf(l).distress_stack);
+  if (!ds) return { n: 0, cats: [] };
+  const seen = [];
+  const add = (c) => { const k = String(c); if (k && seen.indexOf(k) < 0) seen.push(k); };
+  if (Array.isArray(ds.categories)) ds.categories.forEach(add);
+  if (!seen.length && Array.isArray(ds.signals)) {
+    ds.signals.forEach((s) => {
+      const name = Array.isArray(s) ? s[0] : (s && typeof s === "object" ? (s.name || s.signal) : s);
+      const cat = Array.isArray(s) && s[1] ? s[1] : (s && typeof s === "object" && s.category) || SIGNAL_CATEGORY[name];
+      if (cat) add(cat);
+    });
+  }
+  const n = seen.length || (typeof ds.stack === "number" && isFinite(ds.stack) ? ds.stack : 0);
+  return { n, cats: seen };
+}
+
+const _EVIDENCE_KEYS = ["evidence", "evidence_class", "evidence_type", "evidence_kind"];
+// distress_stack.evidence lists NON-record signals only; an absent entry means record.
+// A name-joined record is still a match made on the owner's name, so it reads as one.
+const EVIDENCE_TEXT = {
+  record: "record", name_joined: "name match",
+  name_only: "name match", inferred: "inferred",
+};
+function _evidenceKind(v) {
+  const s = String(v == null ? "" : v).toLowerCase().replace(/[\s-]+/g, "_");
+  if (!s) return "";
+  if (/name_?only|name_?match/.test(s)) return "name_only";
+  if (/name_?join/.test(s)) return "name_joined";
+  if (/infer|heuristic|estimate/.test(s)) return "inferred";
+  if (/record|court|filing|document|registry/.test(s)) return "record";
+  return s;
+}
+
+/**
+ * distress_stack.signals as [{name, label, kind, carried}]. Today the scorer
+ * writes bare strings; a signal may also arrive as [name, category, weight] or as
+ * an object carrying an evidence class (evidence | evidence_class | ...), and the
+ * stack may carry an {evidence: {signal: class}} map. `carried` is true only when
+ * the record itself supplied the class. A name-only signal (incarceration,
+ * bankruptcy, court divorce) is labelled either way, because those are name
+ * matches whatever the record says.
+ */
+function stackSignals(ds, raw) {
+  const d = _obj(ds);
+  const arr = d && Array.isArray(d.signals) ? d.signals : [];
+  const emap = d ? (_obj(d.evidence) || _obj(d.signal_evidence)) : null;
+  const rr = _obj(raw) || {};
+  const out = [];
+  arr.forEach((s) => {
+    let name, kind = "", category = "", weight = null;
+    if (Array.isArray(s)) { name = s[0]; category = s[1] || ""; weight = s[2] == null ? null : s[2]; }
+    else if (s && typeof s === "object") {
+      name = s.name || s.signal || s.key; category = s.category || s.cat || ""; weight = s.weight == null ? null : s.weight;
+      for (const k of _EVIDENCE_KEYS) if (s[k]) { kind = _evidenceKind(s[k]); break; }
+    } else name = s;
+    name = String(name == null ? "" : name);
+    if (!name) return;
+    if (!kind && emap && emap[name] != null) {
+      const e = emap[name];
+      kind = _evidenceKind(_obj(e) ? (e.evidence || e.class || e.kind) : e);
+    }
+    const carried = !!kind;
+    if (!kind && NAME_ONLY_SIGNALS.indexOf(name) >= 0) kind = "name_only";
+    if (!kind && name === "divorce" && _obj(rr.divorce) && rr.divorce.case_count) kind = "name_only";
+    if (!kind) kind = "record";           // the scorer stores only the exceptions
+    out.push({ name, label: name.replace(/_/g, " "), category, weight, kind, carried });
+  });
+  return out;
+}
+
+/** "foreclosure sale (record), incarceration (name match)" for a tooltip. */
+function signalTipText(sigs) {
+  return sigs.map((s) => {
+    const ev = s.kind ? EVIDENCE_TEXT[s.kind] || s.kind : "";
+    return ev ? `${s.label} (${ev})` : s.label;
+  }).join(", ");
+}
+
+const TITLE_STATUS_TEXT = {
+  clean: "title: the foreclosing lien is senior, so junior liens are wiped",
+  junior_risk: "title: junior-lien risk, a senior lien may survive the sale",
+  unknown: "title: risk unknown (unrecognised foreclosing party)",
+  missing: "title: not checked (no title-risk data on file)",
+};
+
+/**
+ * The tier badge tooltip, from distress_stack (fields the scorer added 2026-09-21).
+ *   signals       each with its evidence class: an absent evidence entry means
+ *                 record; name_only and name_joined read "name match"; inferred
+ *                 reads "inferred"
+ *   stale_reason  "event ended: ..."
+ *   stay          "foreclosure stayed by Chapter N bankruptcy"
+ *   lane          "foreclosure lane: sale in N days", days_to_event aged to today
+ *   title_status  shown when the lead is a bidder lead
+ *   equity_evidenced === false   "equity estimated"
+ *   uncounted_categories         "not counted toward the stack"
+ * One fact per line. Empty string when the lead has no stack.
+ */
+function stackTooltip(l, nowMs, scoredAtMs) {
+  const raw = _rawOf(l);
+  const ds = _obj(raw.distress_stack);
+  if (!ds) return "";
+  const lines = [];
+  const sigs = signalTipText(stackSignals(ds, raw));
+  lines.push(`${sigs || "single signal"}; score ${ds.score == null ? "?" : ds.score}`);
+  if (ds.stale_reason) lines.push(`event ended: ${ds.stale_reason}`);
+  const st = _obj(ds.stay);
+  if (st) {
+    const ch = String(st.chapter == null ? "" : st.chapter).trim();
+    lines.push(`foreclosure stayed by ${ch && ch !== "?" ? "Chapter " + ch + " " : "a "}bankruptcy`
+      + (st.resume_risk ? `, resume risk ${st.resume_risk}` : ""));
+  }
+  const ev = scoredEvent(l, nowMs, scoredAtMs);
+  if (ev && ev.days != null) {
+    lines.push(`foreclosure lane: ${ev.days === 0 ? "sale today" : "sale in " + _plural(ev.days, "day")}`);
+  } else if (!ev && typeof ds.days_to_event === "number" && isFinite(ds.days_to_event)) {
+    const elapsed = scoredAtMs != null && isFinite(scoredAtMs) ? Math.max(0, _todayNum(nowMs) - _todayNum(scoredAtMs)) : 0;
+    const d = ds.days_to_event - elapsed;
+    if (d >= 0) lines.push(d === 0 ? "next event today" : `next event in ${_plural(d, "day")}`);
+  }
+  if (ds.bidder && ds.title_status) lines.push(TITLE_STATUS_TEXT[ds.title_status] || `title: ${ds.title_status}`);
+  if (ds.equity_evidenced === false) lines.push("equity estimated");
+  if (Array.isArray(ds.uncounted_categories) && ds.uncounted_categories.length) {
+    lines.push(`${ds.uncounted_categories.map((c) => String(c).toLowerCase().replace(/_/g, "-")).join(", ")} not counted toward the stack`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Every place this lead leans on a name match: incarceration, bankruptcy, court
+ * divorce, and a property found by searching the owner's name. Slim carries
+ * raw.bankruptcy, raw.name_resolution and the stack's signal names; the other
+ * blocks arrive with the detail shard, so each test also accepts the stack.
+ */
+function nameMatchList(l) {
+  const raw = _rawOf(l);
+  const names = stackSignals(_obj(raw.distress_stack), raw).map((s) => s.name);
+  const out = [];
+  if (raw.incarceration || names.indexOf("incarceration") >= 0) {
+    out.push({ key: "incarceration", short: "incarcerated · name match",
+      detail: "The owner's name matches a prison or jail roster. No date of birth or address was compared, so it may be a different person." });
+  }
+  if ((raw.bankruptcy && l.source !== "national.courtlistener_bankruptcy") || names.indexOf("bankruptcy") >= 0) {
+    out.push({ key: "bankruptcy", short: "bankruptcy · name match",
+      detail: "The defendant's name matches a federal bankruptcy debtor filed in the last 180 days. No second identifier was compared, so a common name can match the wrong person." });
+  }
+  const dv = _obj(raw.divorce);
+  if (dv && dv.case_count) {
+    out.push({ key: "divorce", short: "court divorce · name match",
+      detail: "The owner's name matches a party in a court divorce case. No date of birth or address was compared" + (dv.match ? ` (middle-initial check: ${dv.match}).` : ".") });
+  }
+  // Any other signal the scorer marks name_only / name_joined (probate found by owner name...).
+  stackSignals(_obj(raw.distress_stack), raw).forEach((sg) => {
+    if ((sg.kind === "name_only" || sg.kind === "name_joined") && sg.carried
+        && ["incarceration", "bankruptcy", "divorce"].indexOf(sg.name) < 0) {
+      out.push({ key: "signal:" + sg.name, short: sg.label + " · name match",
+        detail: "The scorer marks this signal as matched on the owner's name, not on a record about this property, so it does not complete a stack on its own." });
+    }
+  });
+  if (_obj(raw.name_resolution) || _obj(raw.resolved_from_name)) {
+    out.push({ key: "name_resolved", short: "found by owner name",
+      detail: "This lead had no parcel. The property was found by searching the owner's name, so confirm it is the right owner before mailing." });
+  }
+  return out;
+}
+
+/**
+ * Equity as it may be shown. `trust` is arvTrust(l), passed in so this stays
+ * pure. Hidden when the block is withheld or the ARV trust gate refuses; when
+ * shown it carries its basis, because 60% of assessed value is not a mortgage.
+ */
+function equityView(l, trust) {
+  const eq = _obj(_rawOf(l).equity);
+  const out = { shown: false, why: "", reason: "" };
+  if (!eq) return out;
+  if (eq.withheld || eq.value == null) { out.why = "withheld"; out.reason = eq.withheld_reason || ""; return out; }
+  const tl = trust && trust.level, ta = trust && trust.absent;
+  if (tl === "bad" || ta === "withheld" || ta === "refused") { out.why = "arv_trust"; return out; }
+  const src = String(eq.payoff_source || "");
+  const conf = String(eq.confidence || "").toLowerCase();
+  const recorded = src === "recorded_deed_of_trust" || src.indexOf("amount_owed:") === 0;
+  out.shown = true;
+  out.value = eq.value; out.pct = eq.pct; out.underwater = !!eq.is_underwater;
+  out.source = src; out.confidence = conf; out.basis = recorded ? "recorded" : "estimated";
+  out.basisText = recorded ? "from recorded debt" : "estimated";
+  out.label = out.basisText + (conf && conf !== "none" ? `, ${conf} confidence` : "");
+  return out;
+}
+
+/** Property address: where the house is. Says so plainly when there is none. */
+function propertyAddress(l) {
+  const street = String((l && l.street_address) || "").trim();
+  const parts = [l && l.street_address, l && l.city, l && l.state, l && l.zip_code].filter(Boolean);
+  if (street) return { has: true, text: parts.join(", "), fallback: "" };
+  const fb = [l && l.county ? `${l.county} County` : "", l && l.state, l && l.parcel_id ? `parcel ${l.parcel_id}` : ""].filter(Boolean).join(" · ");
+  return { has: false, text: "no property address", fallback: fb };
+}
+
+function fmtAgeHours(h) {
+  if (h == null || !isFinite(h)) return "unknown age";
+  if (h < 1) return "under 1h";
+  if (h < 48) return `${Math.round(h)}h`;
+  return `${(h / 24).toFixed(1)} days`;
+}
+
+/**
+ * run_meta.json freshness. health_as_of and health_age_hours are being added to
+ * that file; both may be absent, in which case health_carried_from (already
+ * there) is the same statement, and failing all three the age is "unknown".
+ * health_age_hours is frozen at the moment run_meta was written, so the time
+ * since run_time is added to it. Stale means either clock is over 48 hours.
+ */
+function dataFreshness(meta, nowMs) {
+  const m = _obj(meta) || {};
+  const hrs = (ms) => Math.max(0, (nowMs - ms) / 3600000);
+  const runMs = _parseTs(m.run_time);
+  const board = isNaN(runMs) ? null : { atMs: runMs, ageHours: hrs(runMs) };
+  let health = null;
+  const asOf = _parseTs(m.health_as_of);
+  if (!isNaN(asOf)) {
+    health = { atMs: asOf, ageHours: hrs(asOf), source: "health_as_of" };
+  } else if (typeof m.health_age_hours === "number" && isFinite(m.health_age_hours)) {
+    const age = m.health_age_hours + (board ? board.ageHours : 0);
+    health = { atMs: nowMs - age * 3600000, ageHours: age, source: "health_age_hours" };
+  } else {
+    const cf = _parseTs(m.health_carried_from);
+    if (!isNaN(cf)) health = { atMs: cf, ageHours: hrs(cf), source: "health_carried_from" };
+  }
+  const reasons = [];
+  if (health && health.ageHours > FRESHNESS_STALE_HOURS) reasons.push(`source health is ${fmtAgeHours(health.ageHours)} old`);
+  if (board && board.ageHours > FRESHNESS_STALE_HOURS) reasons.push(`the board was built ${fmtAgeHours(board.ageHours)} ago`);
+  return { known: !!(board || health), board, health, stale: reasons.length > 0, reasons };
+}
+// ---- END LEAD-STATE -------------------------------------------------------
+
 // ---------------------------------------------------------------------------
 // DEADLINES.
 //
@@ -1133,16 +2064,16 @@ let STAGE = "";
 // tax sale you find the day after is worth nothing. These dates were already on
 // every listing, but they sat as one column among seventeen, so the 141 leads
 // with a deadline inside 45 days were invisible among 25,552 rows.
+//
+// The clock itself (open or closed, days left, sale date passed, presumed
+// withdrawn, stayed) is leadClock() in the LEAD-STATE region above. It reads
+// dates against today and ignores the counters the enrichers stored, because
+// those were frozen when a script ran (audit F15).
 // ---------------------------------------------------------------------------
-const DEADLINE_WINDOW_DAYS = 45;
-const DEADLINE_FIELDS = [
-  ["upset_bid_deadline", "upset bid closes"],
-  ["sale_date", "sale"],
-  ["redemption_deadline", "redemption ends"],
-];
+const DEADLINE_WINDOW_DAYS = CLOCK_SORT_HORIZON_DAYS;
 
 // Short-lived memo. The deadline comparator calls this twice per comparison and
-// each call does up to three Date.parse, so a 38 K sort was ~460 K date parses;
+// the clock does several date operations, so a 38 K sort was ~460 K of them;
 // updateStageCounts adds another 115 K on every dataset switch. The result is
 // NOT cached for the session — `days` is relative to now, and this board is the
 // reason someone drives to a courthouse — so it expires after a minute, which
@@ -1150,23 +2081,26 @@ const DEADLINE_FIELDS = [
 // than the value changing.
 const _DL_TTL_MS = 60000;
 
-/** Soonest un-expired deadline on a listing, or null. */
-function deadlineInfo(l) {
+/** leadClock() for one listing, memoised for a minute. */
+function clockOf(l) {
   const now = Date.now();
-  const m = l._dl;
+  const m = l._clk;
   if (m && now - m.at < _DL_TTL_MS) return m.v;
-  let best = null;
-  for (const [f, label] of DEADLINE_FIELDS) {
-    const v = l[f];
-    if (!v) continue;
-    const t = Date.parse(v);
-    if (isNaN(t)) continue;
-    const days = Math.floor((t - now) / 86400000);
-    if (days < 0) continue;                     // already gone
-    if (!best || days < best.days) best = { days, label, field: f, ts: t };
-  }
-  _memo(l, "_dl", { at: now, v: best });
-  return best;
+  const v = leadClock(l, now, _scoredAtMs());
+  _memo(l, "_clk", { at: now, v });
+  return v;
+}
+
+/** When the board was scored, for aging distress_stack.days_to_event: run_meta.run_time. */
+function _scoredAtMs() {
+  if (typeof META === "undefined" || !META) return null;
+  const t = _parseTs(META.run_time);
+  return isNaN(t) ? null : t;
+}
+
+/** Soonest un-expired deadline on a listing, or null. `{days, label, field, ts, kind}`. */
+function deadlineInfo(l) {
+  return clockOf(l).live;
 }
 
 /** True when the lead cannot be acted on yet — no way to reach the owner. */
@@ -1179,8 +2113,14 @@ function stageOf(l) {
   const src = (l.source || "").toLowerCase();
   if (STAGE_REO.test(src) || t === "reo" || t === "auction") return "reo";
   const sd = l.sale_date ? Date.parse(l.sale_date) : NaN;
-  const hasSale = !isNaN(sd) && sd >= Date.now() - 14 * 86400000; // sale ~2wk-ago..future
-  if (hasSale || t === "foreclosure_sale" || (l.raw && l.raw.upset_bid)) return "foreclosure";
+  // liensnc and nc_sos_ucc carry a FILING date in sale_date, not an auction (FILING_DATE_SOURCES).
+  const hasSale = !isNaN(sd) && sd >= Date.now() - 14 * 86400000 // sale ~2wk-ago..future
+    && !FILING_DATE_SOURCES.has(src.split(".").pop());
+  // F2: raw.upset_bid is a dict and a closed window is still a non-empty dict,
+  // so "is there a block" is not "is the window open". Open means in_window is
+  // exactly true AND its deadline has not passed, decided from the dates today.
+  const ub = l.raw && l.raw.upset_bid;
+  if (hasSale || t === "foreclosure_sale" || (ub && upsetBidState(l, Date.now()).open)) return "foreclosure";
   if (t === "lis_pendens" || t === "bankruptcy" || STAGE_PREFORE.test(src)) return "prefore";
   return "outbound"; // probate/obituary/elderly/divorce/tax-delinquent/vacant/distressed
 }
@@ -1633,9 +2573,11 @@ function applyFilters() {
       const r = l.raw || {};
       const om = r.owner_mailing || {};
       const sac = (r.sos_agent && r.sos_agent.best_contact_address) || (r.sos_agent && r.sos_agent.best_contact_name);
-      if (contact === "phone" && !r.owner_phone) return false;
+      // A blocked phone (agent line, walled people-search, uncorroborated voter
+      // cross-reference, or flagged do-not-dial) is not "has phone": ownerPhoneBlock().
+      if (contact === "phone" && ownerPhoneBlock(r.owner_phone)) return false;
       if (contact === "mailing" && !om.mailing) return false;
-      if (contact === "contactable" && !(r.owner_phone || om.mailing || sac)) return false;
+      if (contact === "contactable" && !(!ownerPhoneBlock(r.owner_phone) || om.mailing || sac)) return false;
       if (contact === "sos_entity" && !(r.sos_agent && r.sos_agent.best_contact_name)) return false;
       if (contact === "helene" && l.source !== "counties_nc.asheville_helene") return false;
       if (contact === "helene_severe") { const h = heleneInfo(l); if (!h || h.placard !== "Unsafe") return false; }
@@ -1646,7 +2588,7 @@ function applyFilters() {
       // one / the LEAN projection — `.length` alone would silently empty this
       // filter on mobile.
       if (contact === "estate_elderly" && !_lifeEventCount(r.life_events)) return false;
-      if (contact === "hide_stale" && r.stale_case) return false;
+      if (contact === "hide_stale" && presumedWithdrawn(l)) return false;
     }
     if (win && l.sale_date) {
       const d = Date.parse(l.sale_date);
@@ -1738,25 +2680,28 @@ function getDistress(l) { return (l.raw && l.raw.distress_stack) || null; }
 
 // ---- Lead signals: list-stacking + intent score (enrichment_lead_signals) ---
 function getSignalStack(l) { return (l.raw && l.raw.signal_stack) || null; }
+// F13: this used to read signal_stack.count, which counts facet synonyms: one
+// tax delinquency reads as three signals (tax_lien, tax_delinquent,
+// recorded_debt), one probate notice as four, so nearly every tax-delinquent
+// lead advertised a "stack". The number that means something is the scorer's own
+// tally of distinct CATEGORIES, from raw.distress_stack. distressCategories().
 function getSignalCount(l) {
-  const ss = getSignalStack(l);
-  if (ss && typeof ss.count === "number") return ss.count;
-  // Fallback for pre-enricher snapshots: read the distress-stack signal list.
-  const ds = getDistress(l);
-  return ds && Array.isArray(ds.signals) ? ds.signals.length : 0;
+  return distressCategories(l).n;
 }
 function getIntent(l) {
   const v = l.raw && l.raw.intent_score;
   return typeof v === "number" ? v : 0;
 }
-// "🔥 N signals" chip — mirrors the distress-chip look; tooltip lists them.
+// "🔥 N distress categories" chip, mirrors the distress-chip look; tooltip lists the
+// categories and the signals under them, with the evidence class where the
+// record carries one. Prints nothing below 2 categories: one category is not a stack.
 function signalStackChip(l) {
-  const n = getSignalCount(l);
-  if (n < 2) return "";  // only worth surfacing a real STACK
-  const ss = getSignalStack(l);
-  const list = ss && Array.isArray(ss.signals) ? ss.signals : [];
-  const tip = list.map((s) => String(s).replace(/_/g, " ")).join(", ");
-  return `<span class="distress-chip signal-stack" title="${n} distinct distress signals: ${tip}">🔥 ${n} signals</span>`;
+  const dc = distressCategories(l);
+  if (dc.n < 2) return "";
+  const cats = dc.cats.map((c) => (catLabel[c] || String(c).toLowerCase().replace(/_/g, " "))).join(", ");
+  const sigs = signalTipText(stackSignals(getDistress(l), l.raw));
+  const tip = `${dc.n} distinct distress categories${cats ? ": " + cats : ""}${sigs ? ". Signals: " + sigs : ""}`;
+  return `<span class="distress-chip signal-stack" title="${_attr(tip)}">🔥 ${dc.n} distress categories</span>`;
 }
 // Small intent-score badge (0-100 headline), colored by band.
 function intentBadge(l) {
@@ -1790,12 +2735,16 @@ const catLabel = {
   FINANCIAL: "💰 financial", SALES: "🏷 sale", LEGAL: "⚖ legal",
   LIFE_EVENT: "👤 life-event", PROPERTY: "🏚 property",
 };
-function distressBadge(ds) {
+function stackTipText(l) { return stackTooltip(l, Date.now(), _scoredAtMs()); }
+function distressBadge(ds, l) {
   if (!ds || !distressLabel[ds.tier]) return "";
   const d = distressLabel[ds.tier];
   const stk = ds.stack >= 2 ? ` ·${ds.stack}×` : "";
-  const tip = `${(ds.signals || []).join(", ") || "single signal"} — score ${ds.score}`;
-  return `<span class="distress-badge ${d.cls}" title="${tip}">${d.emoji} ${d.txt}${stk}</span>`;
+  // Names the evidence where the stack carries it, and always says "name match"
+  // for the signals that are one (incarceration, bankruptcy, court divorce): a
+  // tier resting on a name collision must not look like one resting on a record.
+  const tip = stackTipText(l || { raw: { distress_stack: ds } }) || `single signal; score ${ds.score}`;
+  return `<span class="distress-badge ${d.cls}" title="${_attr(tip)}">${d.emoji} ${d.txt}${stk}</span>`;
 }
 function distressChips(ds) {
   if (!ds || !ds.categories || !ds.categories.length || ds.tier === "COLD") return "";
@@ -2881,11 +3830,106 @@ function injectDashStyles() {
   .skiptrace-row a{font-weight:600;text-decoration:none;color:var(--accent-2,#2563eb)}
   .skiptrace-row a:hover{text-decoration:underline}
   .skiptrace-why{margin-top:3px;font-size:11px;line-height:1.4;color:var(--dq-soft)}
+  /* ---- Lead clock, state flags, addresses, freshness (audit F2/F3/F8/F15) ----
+     Same vocabulary as the ARV caveats above: --dq-warn is "do not act on this",
+     --dq-soft is "a caveat", muted is "history". Green is the one live
+     opportunity (an open upset-bid window). Class names here MUST be the ones
+     lifeFlagsHtml() / clockStripHtml() / clockPanelHtml() emit. */
+  .lf{display:inline-block;margin:2px 4px 0 0;padding:1px 6px;border-radius:999px;font-size:10px;
+    font-weight:700;line-height:1.5;white-space:normal;border:1px solid transparent}
+  #listings-table td .lf{display:block;width:max-content;max-width:210px;margin-right:0}
+  .lf-bad{color:var(--dq-warn);background:var(--dq-warn-bg);border-color:rgba(217,45,32,.35)}
+  .lf-warn{color:var(--dq-soft);background:var(--dq-soft-bg);border-color:var(--dq-soft-line)}
+  .lf-hot{color:#fff;background:#1f7a3d;border-color:#1f7a3d}
+  .lf-muted{color:var(--muted,#6b6257);background:rgba(127,127,127,.12);border-color:rgba(127,127,127,.3)}
+  .lf-date{font-size:11px;margin-top:2px;opacity:.85}
+  .lf-row{display:flex;flex-wrap:wrap;margin-top:6px}
+  .clock-strip{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin:0 0 8px;
+    padding:6px 10px;border-radius:8px;font-variant-numeric:tabular-nums}
+  .clock-strip b{font-size:13px;letter-spacing:.03em}
+  .clock-strip span{font-size:12px;opacity:.92}
+  .clock-strip.dl-today{background:#b3261e;color:#fff}
+  .clock-strip.dl-week{background:#9a6700;color:#fff}
+  .clock-strip.dl-soon{background:rgba(128,128,128,.16);color:inherit}
+  .clock-strip .stay-tag{flex-basis:100%;font-style:normal;font-size:11px;font-weight:800;
+    padding:2px 6px;border-radius:4px;background:rgba(0,0,0,.32);color:#fff}
+  .clock-strip.dl-soon .stay-tag{background:var(--dq-warn);color:#fff}
+  .clock-strip.is-stayed{outline:2px dashed var(--dq-warn);outline-offset:-2px}
+  .clock-panel{margin-top:10px}
+  .clock-line{margin:0 0 6px;padding:6px 10px;border-radius:8px;border:1px solid transparent;
+    font-size:12px;line-height:1.4}
+  .clock-line b{display:block}
+  .clock-line span{opacity:.88}
+  .stay-note{margin:0 0 6px;padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.45;
+    color:var(--dq-warn);background:var(--dq-warn-bg);border:1px solid rgba(217,45,32,.35)}
+  .stay-note strong{display:block;margin-bottom:3px}
+  .stay-note div{margin-top:3px}
+  .no-addr{font-style:italic;font-weight:600;color:var(--dq-soft)}
+  .addr-label{display:inline-block;margin-right:6px;font-size:10px;font-weight:700;
+    letter-spacing:.04em;text-transform:uppercase;opacity:.65}
+  .addr-fallback{font-size:12px;opacity:.75}
+  .lbl-sub{display:block;font-size:10px;font-weight:400;letter-spacing:0;text-transform:none;opacity:.7}
+  .distress-chip.nm-chip{color:var(--dq-soft);background:var(--dq-soft-bg);border-color:var(--dq-soft-line)}
+  .freshness{margin:0;padding:7px 22px;font-size:12px;line-height:1.4;color:var(--muted,#6b6257);
+    background:rgba(127,127,127,.08);border-bottom:1px solid rgba(127,127,127,.2)}
+  .stack-notes{margin:8px 0 0;padding-left:18px;font-size:12px;line-height:1.5}
+  .phone-blocked s{opacity:.65}
+  .dnd-badge{display:inline-block;margin-left:4px;padding:1px 8px;border-radius:999px;font-size:10.5px;
+    font-weight:800;line-height:1.5;color:#fff;background:#b3261e;text-decoration:none}
+  .crm-io{margin-top:10px;font-size:12px}
+  .crm-io button,.crm-hint-io button{font-size:11.5px;padding:3px 9px;margin-right:6px;cursor:pointer}
+  .crm-io-msg{margin-left:4px;font-size:12px}
+  .freshness[hidden]{display:none}
+  .freshness.stale{color:#fff;background:#b3261e;border-bottom-color:#b3261e}
+  @media (max-width:720px){.freshness{padding:6px 12px;font-size:11px}}
   `;
   const el = document.createElement("style");
   el.id = "dash-inline-styles";
   el.textContent = css;
   document.head.appendChild(el);
+}
+
+// ------------- Lead clock, rendered ------------------------------------------
+// Everything here reads clockOf()/leadClock(), which recompute from the dates.
+const NO_ADDR_TITLE = "This record has no street address for the property. A mailing address, where one is shown, is where the owner gets mail, not where the house is.";
+const NO_ADDR_HTML = `<span class="no-addr" title="${NO_ADDR_TITLE}">no property address</span>`;
+
+/** Short state flags (stay, withdrawn, sale passed, window, redemption) as pills. */
+function lifeFlagsHtml(l, ck) {
+  return clockBadges(l, ck, Date.now())
+    .map((b) => `<span class="lf lf-${b.tone}" title="${_attr(b.title)}">${_txt(b.text)}</span>`).join("");
+}
+
+/**
+ * The loud days-to-go strip: card top and detail panel. Beside the sale date it
+ * says SALE STAYED when a bankruptcy stay is on the record (audit F3): a stayed
+ * sale is not a sale you can attend, however few days are left on it.
+ */
+function clockStripHtml(l, ck) {
+  const pill = clockPill(ck.live);
+  if (!pill) return "";
+  const when = fmtDate(ck.live.date) + (ck.live.kind === "sale" && l.sale_time ? " · " + _txt(l.sale_time) : "");
+  return `<div class="clock-strip ${pill.cls}${ck.stay ? " is-stayed" : ""}" title="${_attr(pill.kind + " " + fmtDate(ck.live.date) + (ck.live.scored ? " (the scorer's foreclosure-lane event, aged to today)" : ""))}">`
+    + `<b>${pill.strip}</b><span>${when}</span>`
+    + (ck.stay ? `<em class="stay-tag" title="${_attr(stayLines(ck.stay, Date.now()).join(" "))}">${_txt(ck.stay.label)}${ck.stay.resumeRisk && ck.stay.resumeRisk !== "unknown" ? _txt(" · resume risk " + ck.stay.resumeRisk) : ""}</em>` : "")
+    + `</div>`;
+}
+
+/** Detail-panel clock block: the strip, then one line per state flag, the stay in full. */
+function clockPanelHtml(l, ck) {
+  const now = Date.now();
+  const out = [];
+  const strip = clockStripHtml(l, ck);
+  if (strip) out.push(strip);
+  clockBadges(l, ck, now).forEach((b) => {
+    if (b.kind === "stay") {
+      out.push(`<div class="stay-note"><strong>${_txt(b.text)}</strong>`
+        + stayLines(ck.stay, now).map((x) => `<div>${_txt(x)}</div>`).join("") + `</div>`);
+    } else {
+      out.push(`<div class="clock-line lf-${b.tone}"><b>${_txt(b.text)}</b><span>${_txt(b.title)}</span></div>`);
+    }
+  });
+  return out.join("");
 }
 
 // ------------- Table render --------------------------------------------------
@@ -2935,22 +3979,28 @@ function renderTable() {
           : "";
       const addrCell = isBkSource
         ? `${arvMark}🏛 ${cl.chapter && cl.chapter !== "?" ? `Ch.${cl.chapter} ` : ""}${(l.defendant || "Bankruptcy filing").slice(0, 60)}`
-        : `${arvMark}${bkXref ? "🏛 " : ""}${l.street_address || ""}`;
+        : `${arvMark}${bkXref ? "🏛 " : ""}${l.street_address ? _txt(l.street_address) : NO_ADDR_HTML}`;
       let dateCell = isBkSource && cl && cl.date_filed ? cl.date_filed : fmtDate(l.sale_date);
-      // In the deadline track the clock IS the point, so it replaces the date.
-      if (STAGE === "deadline") {
-        const d = deadlineInfo(l);
-        if (d) {
-          const cls = d.days === 0 ? "dl-today" : d.days <= 7 ? "dl-week" : "dl-soon";
-          const txt = d.days === 0 ? "TODAY" : `${d.days}d`;
-          dateCell = `<span class="dl-pill ${cls}" title="${d.label} — ${fmtDate(l[d.field])}">${txt}</span>` +
-                     `<span class="dl-kind">${d.label}</span>` +
-                     (deadlineBlocked(l) ? `<span class="dl-blocked" title="No owner name or street address — cannot act on this yet">⚠</span>` : "");
+      // Days to go, in a pill, in every view: the clock is the point of a
+      // foreclosure lead, not one column of seventeen. State flags (stayed,
+      // withdrawn, sale date passed, window closed) sit under it.
+      if (!isBkSource) {
+        const ck = clockOf(l);
+        const pill = clockPill(ck.live);
+        // The scorer's aged event has its own date; the row's sale_date may be another event.
+        if (pill && ck.live.scored) dateCell = fmtDate(ck.live.date);
+        dateCell = (pill
+          ? `<span class="dl-pill ${pill.cls}" title="${_attr(pill.kind + " — " + fmtDate(ck.live.date))}">${pill.txt}</span>` +
+            `<span class="dl-kind">${pill.kind}</span>` +
+            (dateCell ? `<div class="lf-date">${dateCell}</div>` : "")
+          : dateCell) + lifeFlagsHtml(l, ck);
+        if (STAGE === "deadline" && pill && deadlineBlocked(l)) {
+          dateCell += `<span class="dl-blocked" title="No owner name or street address — cannot act on this yet">⚠</span>`;
         }
       }
       return `
     <tr class="${rowClass}" data-id="${i}">
-      <td>${(() => { const ds = getDistress(l); return ds && distressLabel[ds.tier] ? `<span class="tier-dot ${distressLabel[ds.tier].cls}" title="${ds.tier} · ${(ds.signals || []).join(', ')}"></span>` : ""; })()}${
+      <td>${(() => { const ds = getDistress(l); return ds && distressLabel[ds.tier] ? `<span class="tier-dot ${distressLabel[ds.tier].cls}" title="${_attr(ds.tier + "\n" + stackTipText(l))}"></span>` : ""; })()}${
         // A WITHHELD grade and a MISSING grade both render as the same dim "—",
         // which reads as "not scored yet". When the ARV is flagged the grade is
         // absent on purpose, so colour it and say so in the tooltip. The loud
@@ -3107,11 +4157,17 @@ const _EV_COVERED = new Set([
   // Added 2026-09-16: both now have dedicated rendering in the Deeds, Liens
   // & Life Events panel (see renderDetail()) instead of the generic dump.
   "deed_chain","doc_ocr",
+  // Rendered in the detail panel's clock block (SALE STAYED, resume risk).
+  "bankruptcy_stay",
 ]);
 // Plumbing, not insight — safe to hide.
 const _EV_NOISE = new Set([
   "is_new","link_check","qa_flags","_resolved_deep_enriched","fallback_links",
   "link_may_be_stale","refresh_misses","last_refresh_seen","carryover","pulled_sale",
+  // Frozen counters (audit F15). The clock block computes "sale date passed N
+  // days ago" from sale_date against today; printing the stored day count here
+  // beside it would show two numbers for one fact.
+  "sale_date_passed","sale_date_passed_days",
 ]);
 const _EV_MONEY = /(amount|owed|value|price|bid|balance|tax|debt|rent|cost|due|income)/i;
 
@@ -3424,11 +4480,13 @@ function renderCards() {
       // Bankruptcy listings: show debtor + chapter as the "address"
       const cardAddr = isBkSource
         ? `🏛 ${cl && cl.chapter && cl.chapter !== "?" ? `Ch.${cl.chapter}` : "Bankruptcy"} · ${(l.defendant || "filing").slice(0, 50)}`
-        : `${bkXref ? "🏛 " : ""}${l.street_address || "(address pending)"}`;
+        : `${bkXref ? "🏛 " : ""}${l.street_address ? _txt(l.street_address) : NO_ADDR_HTML}`;
       const cardLoc = isBkSource
         ? `${cl && cl.court ? cl.court.toUpperCase() : ""} · ${l.state || ""} · Filed ${cl && cl.date_filed || "?"}`
         : `${l.city || ""}${l.city ? ", " : ""}${l.county || "?"} County, ${l.state || ""}`;
       const ds = getDistress(l);
+      const ck = clockOf(l);
+      const ckFlags = isBkSource ? "" : lifeFlagsHtml(l, ck);
       // High-value signal chips the cards used to hide. Rendered on EVERY card
       // (independent of distress tier) so a COLD lead still surfaces equity,
       // absentee status, and a senior-lien-survives bidding trap.
@@ -3437,6 +4495,12 @@ function renderCards() {
       //     this property (enrichment_lead_signals). The single loudest lead tell.
       const sscChip = signalStackChip(l);
       if (sscChip) signalChips.push(sscChip);
+      // (0a) Name matches, labelled as such wherever they show: incarceration,
+      //      bankruptcy, court divorce and a property found by owner name all
+      //      rest on a name and nothing else (audit F6).
+      nameMatchList(l).forEach((m) => {
+        signalChips.push(`<span class="distress-chip nm-chip" title="${_attr(m.detail)}">${_txt(m.short)}</span>`);
+      });
       // (0b) Flagged valuation — first chip after the signal stack, because
       //      every money figure on this card descends from it.
       if (badArv) {
@@ -3457,15 +4521,19 @@ function renderCards() {
       if (_csc.inCluster && !_csc.arvDerivedFromStamp) {
         signalChips.push(`<span class="arv-weak-chip" title="${_attr(STAMP_CLUSTER_NOTE)}">🧬 county value stamped across parcels</span>`);
       }
-      // (1) Equity — mirror the detail panel's value/pct + underwater colouring.
-      const eq = (l.raw && l.raw.equity) || null;
-      if (eq && eq.value != null) {
-        const eqColor = eq.is_underwater ? "var(--danger)" : "var(--success)";
-        const eqPct = eq.pct != null ? ` (${Math.round(eq.pct * 100)}%)` : "";
-        const eqLabel = eq.is_underwater
-          ? `Underwater ${fmtMoney(eq.value)}${eqPct}`
-          : `Equity ${fmtMoney(eq.value)}${eqPct}`;
-        signalChips.push(`<span class="distress-chip" style="color:${eqColor};border-color:${eqColor}">${eqLabel}</span>`);
+      // (1) Equity: mirror the detail panel's value/pct + underwater colouring,
+      //     and say what the payoff rests on. equityView() applies the ARV trust
+      //     gate; an "estimated" figure is a payoff guessed from assessed value or
+      //     the last sale, not a mortgage of record (audit F4/F19), so it is drawn
+      //     in the caveat colour rather than success green.
+      const eqv = equityView(l, at);
+      if (eqv.shown) {
+        const eqColor = eqv.underwater ? "var(--danger)" : eqv.basis === "recorded" ? "var(--success)" : "var(--dq-soft)";
+        const eqPct = eqv.pct != null ? ` (${Math.round(eqv.pct * 100)}%)` : "";
+        const eqLabel = `${eqv.underwater ? "Underwater" : "Equity"} ${fmtMoney(eqv.value)}${eqPct} · ${eqv.label}`;
+        const eqTip = `Equity is the ARV minus an estimated payoff. Payoff basis: ${String(eqv.source || "unknown").replace(/[_:]/g, " ")}. `
+          + (eqv.basis === "recorded" ? "Built from a debt figure on record." : "No mortgage of record was used; the payoff is a statistical guess.");
+        signalChips.push(`<span class="distress-chip" style="color:${eqColor};border-color:${eqColor}" title="${_attr(eqTip)}">${_txt(eqLabel)}</span>`);
       }
       // (2) Absentee / out-of-state — standalone signals, shown on COLD cards too.
       //     distressChips() suppresses these for COLD tier, so emit from here using
@@ -3512,11 +4580,13 @@ function renderCards() {
       return `
       <div class="card" data-id="${i}">
         ${g ? `<div class="card-grade-corner">${gradeBadge(g)}${intentBadge(l)}</div>` : (getIntent(l) ? `<div class="card-grade-corner">${intentBadge(l)}</div>` : "")}
-        ${ds && distressLabel[ds.tier] ? `<div class="card-distress-corner">${distressBadge(ds)}</div>` : ""}
+        ${ds && distressLabel[ds.tier] ? `<div class="card-distress-corner">${distressBadge(ds, l)}</div>` : ""}
         ${photo}
         <div class="card-body">
+          ${isBkSource ? "" : clockStripHtml(l, ck)}
           <div class="card-addr">${cardAddr}</div>
           <div class="card-loc">${cardLoc}</div>
+          ${ckFlags ? `<div class="lf-row">${ckFlags}</div>` : ""}
           ${distressChips(ds)}
           ${signalChipsHtml}
           ${strategyBuyerChips(l)}
@@ -3558,7 +4628,7 @@ const MAP_CAP = LEAN ? 1500 : Infinity;
 function markerTip(l) {
   const g = getGrade(l) || {};
   const c = getCalc(l) || {};
-  return `<strong>${g.overall || "—"}</strong> · ${l.street_address || ""}<br>` +
+  return `<strong>${g.overall || "—"}</strong> · ${l.street_address ? _txt(l.street_address) : "no property address"}<br>` +
     `Bid: ${fmtMoney(l.opening_bid) || "(no bid)"}<br>` +
     `${c.roi_pct != null ? `ROI: ${c.roi_pct.toFixed(1)}%` : ""}`;
 }
@@ -4100,7 +5170,15 @@ function renderDetail(l, detailState) {
   if (cs && cs.flag) extraFlags += ' <span class="cs-flag" style="background:#c0392b;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">CHILD SUPPORT</span>';
   if (hoa) extraFlags += ' <span class="hoa-flag" style="background:#8e44ad;color:#fff;padding:1px 6px;border-radius:3px;font-size:10px;">HOA LIEN</span>';
   $("d-title").innerHTML = (l.listing_type || "listing").replace(/_/g, " ")+" — "+(l.county || "")+" County"+catBadge+extraFlags;
-  $("d-address").textContent = [l.street_address, l.city, l.state, l.zip_code].filter(Boolean).join(", ");
+  // Property address = where the house is. Labelled as such, and said plainly
+  // when the record has none; the Owner & Contact block below labels the owner's
+  // mailing address, which is where the owner gets mail and is often elsewhere.
+  const _pa = propertyAddress(l);
+  $("d-address").innerHTML = `<span class="addr-label">Property address</span> `
+    + (_pa.has
+      ? _txt(_pa.text)
+      : `<span class="no-addr" title="${_attr(NO_ADDR_TITLE)}">${_txt(_pa.text)}</span>`
+        + (_pa.fallback ? ` <span class="addr-fallback">(${_txt(_pa.fallback)})</span>` : ""));
 
   // Grade block
   if (g && g.overall) {
@@ -4273,11 +5351,21 @@ function renderDetail(l, detailState) {
       rows.push(`<div class="calc-row"><div class="lbl">Cash-on-Cash</div>${_derived(c.cash_on_cash_pct.toFixed(1) + "%", cls)}</div>`);
     }
     const _eq = _nonEmpty(l.raw && l.raw.equity) ? l.raw.equity : null;
-    if (_eq && _eq.value != null) {
-      const ec = _eq.is_underwater ? "neg" : ((_eq.pct || 0) >= 0.4 ? "pos" : "");
-      rows.push(`<div class="calc-row"><div class="lbl">Owner Equity</div><div class="val big ${ec}">${fmtMoney(_eq.value)} <span class="muted">(${Math.round((_eq.pct || 0) * 100)}%)</span></div></div>`);
+    // equityView() is the trust gate plus the basis: "from recorded debt" (a
+    // deed of trust, judgment or opening bid) or "estimated" (60% of assessed
+    // value, an amortised last sale). Only the first can look like a strong
+    // number; an estimate is drawn plainly and says so (audit F4/F19).
+    const _evw = equityView(l, _at);
+    if (_eq && _eq.value != null && _evw.shown) {
+      const ec = _eq.is_underwater ? "neg" : (_evw.basis === "recorded" && (_eq.pct || 0) >= 0.4 ? "pos" : "");
+      rows.push(`<div class="calc-row"><div class="lbl">Owner Equity</div><div class="val big ${ec}">${fmtMoney(_eq.value)} <span class="muted">(${Math.round((_eq.pct || 0) * 100)}%) · ${_txt(_evw.label)}</span></div></div>`);
       rows.push(`<div class="calc-row"><div class="lbl">Est. Payoff</div><div class="val">${fmtMoney(_eq.payoff_estimate)} <span class="muted">${String(_eq.payoff_source || "").replace(/_/g, " ")} · ${_eq.confidence || ""}</span></div></div>`);
       if (_eq.senior_liens) rows.push(`<div class="calc-row"><div class="lbl">Senior Liens</div><div class="val neg">${fmtMoney(_eq.senior_liens)}</div></div>`);
+    } else if (_eq && _eq.value != null && _evw.why === "arv_trust") {
+      rows.push(`<div class="calc-row"><div class="lbl">Owner Equity</div><div>`
+        + `<div class="val big dq-warn-mark">not shown</div>`
+        + `<div class="arv-flag-note"><strong>Equity is hidden because the ARV is flagged.</strong> Equity is the ARV minus an estimated payoff, so it inherits the doubt.</div>`
+        + `</div></div>`);
     } else if (_eq && _eq.withheld_reason) {
       // THE EQUITY GATE'S OWN REASON, FINALLY ON A SCREEN.
       //
@@ -4678,7 +5766,7 @@ function renderDetail(l, detailState) {
     // name came from; the canonical name and the disagreement are rendered in
     // Owner & Contact below.
     if (gis.owner) rows.push(`<div><strong>Owner on the county parcel record:</strong> ${_txt(gis.owner)}</div>`);
-    if (gis.mailing) rows.push(`<div><strong>Mailing:</strong> ${_txt(gis.mailing)}</div>`);
+    if (gis.mailing) rows.push(`<div><strong>Owner's mailing address (county record, where the owner gets mail):</strong> ${_txt(gis.mailing)}</div>`);
     if (gis.last_sale) {
       const ls = gis.last_sale;
       const parts = [];
@@ -4831,16 +5919,20 @@ function renderDetail(l, detailState) {
     badges.push(`<span class="qbadge neg">⚠ Flood zone ${flood.zone || "AE"}</span>`);
   }
 
-  // NC Upset bid window — sale already happened in last 10 days but no
-  // confirmation yet. Anyone can submit a 5%+ upset bid until window closes.
-  // Computed: NC + sale_date in last 10 days.
-  if (l.state === "NC" && l.sale_date) {
-    const sd = Date.parse(l.sale_date);
-    const now = Date.now();
-    const tenDaysAgo = now - 10 * 86400000;
-    if (!isNaN(sd) && sd > tenDaysAgo && sd <= now) {
-      const daysLeft = Math.max(0, 10 - Math.floor((now - sd) / 86400000));
-      badges.push(`<span class="qbadge warn" title="NC 10-day upset bid window. Anyone can submit a 5%+ higher bid at the courthouse until the deadline.">⏱ Upset bid period (${daysLeft}d left)</span>`);
+  // The NC upset-bid badge that lived here tested a hard-coded 10 days from the
+  // sale date and ignored raw.upset_bid entirely, so it disagreed with the stage
+  // filter and the deadline column. Open or closed, days left, sale date passed,
+  // presumed withdrawn and a bankruptcy stay are now ONE decision, leadClock(),
+  // recomputed from the dates each time this panel opens, and rendered in the
+  // clock panel under the badges. It is not memoised: the detail shard that
+  // carries bankruptcy_stay and pulled_sale may have merged in a moment ago.
+  const _ck = leadClock(l, Date.now());
+  {
+    const cp = $("d-clock");
+    if (cp) {
+      const html = clockPanelHtml(l, _ck);
+      cp.innerHTML = html;
+      cp.style.display = html ? "block" : "none";
     }
   }
 
@@ -4852,16 +5944,27 @@ function renderDetail(l, detailState) {
     badges.push(`<span class="qbadge warn" title="Only flagged by a single MLS/aggregator — not confirmed by any court/authoritative filing">⚠️ Single-source · ${l.source}</span>`);
   }
 
-  // Bankruptcy cross-reference — HIGH-PRIORITY signal: defendant on this
-  // foreclosure also has a recent NC/SC bankruptcy filing. Ch.13 = trying to
-  // stop the sale via automatic stay. Ch.7 = liquidation, property gets sold.
+  // Bankruptcy cross-reference: the defendant on this foreclosure matches a
+  // recent NC/SC bankruptcy debtor BY NAME. On a foreclosure-type lead that is
+  // not a buying signal, it is a STAY: the automatic stay halts the sale, so the
+  // clock panel above says "SALE STAYED" and this badge is informational, not
+  // red. (It was drawn red for chapter 13 and its comment called it
+  // "HIGH-PRIORITY", which is the wrong way round; audit F3.)
   const bk = (l.raw && l.raw.bankruptcy) || null;
   if (bk) {
     const ch = bk.chapter && bk.chapter !== "?" ? `Ch.${bk.chapter} ` : "";
     const dt = bk.date_filed ? ` ${bk.date_filed}` : "";
-    const cls = bk.chapter === "13" ? "neg" : bk.chapter === "7" ? "warn" : "warn-light";
-    const tip = `${(bk.case_name || '').replace(/"/g, '')} | ${(bk.docket_number || '').replace(/"/g, '')} | ${(bk.court || '').toUpperCase()}`;
-    badges.push(`<span class="qbadge ${cls}" title="${tip}">🏛 ${ch}BANKRUPTCY${dt}</span>`);
+    // In force: "sale stayed" with the resume risk. Lapsed (a chapter 7 filing is
+    // over after 270 days, any other after 1,095): the stay is assumed over, so
+    // the sale-stayed banner is not shown and the badge is history, not a warning.
+    // bankruptcyStay() returns null for a lapsed stay, and bankruptcyLapsed() says why.
+    const lapsed = !_ck.stay && bankruptcyLapsed(bk, Date.now());
+    const cls = _ck.stay ? "warn-light" : lapsed ? "info" : bk.chapter === "13" ? "neg" : bk.chapter === "7" ? "warn" : "warn-light";
+    const tip = `${(bk.case_name || '').replace(/"/g, '')} | ${(bk.docket_number || '').replace(/"/g, '')} | ${(bk.court || '').toUpperCase()} | name match, no second identifier compared`;
+    const tail = _ck.stay
+      ? ` · sale stayed${_ck.stay.resumeRisk && _ck.stay.resumeRisk !== "unknown" ? ", resume risk " + _ck.stay.resumeRisk : ""}`
+      : lapsed ? " · stay lapsed" : "";
+    badges.push(`<span class="qbadge ${cls}" title="${_attr(tip)}">🏛 ${ch}BANKRUPTCY${dt} · name match${tail}</span>`);
   }
 
   // Bankruptcy source listing (discovery — debtor name only, no address)
@@ -4872,8 +5975,16 @@ function renderDetail(l, detailState) {
     badges.push(`<span class="qbadge ${cls}">🏛 ${ch}Bankruptcy filing</span>`);
   }
 
-  // Property flags as colored chips
-  flags.forEach((f) => {
+  // Property flags as colored chips.
+  // F19: `high_equity` is the LEGACY flag (flags.py: Zestimate or 1.25 x tax value
+  // minus last sale or judgment). It is computed outside the ARV trust gate, so
+  // it drew a green "high equity" chip on leads whose ARV this page prints in
+  // red, and on leads whose equity is only assessed value x 0.4. It shows only
+  // when the vetted equity block is there, the trust gate allows it and the
+  // payoff is a recorded debt figure. Otherwise the equity row says what it can.
+  const _evGate = equityView(l, _bat);
+  const _flagsShown = flags.filter((f) => f !== "high_equity" || (_evGate.shown && _evGate.basis === "recorded"));
+  _flagsShown.forEach((f) => {
     const cls =
       /vacant|fire|tear|condemned|hoarder|gutted|foundation|structural|negative_equity/.test(f) ? "neg" :
       /renovated|updated|move-in|turnkey|new |high_equity/.test(f) ? "pos" : "warn-light";
@@ -4888,9 +5999,9 @@ function renderDetail(l, detailState) {
   $("d-quick-badges").innerHTML = badges.join("");
 
   // Keep the bottom flags section in sync (legacy — for users who scroll)
-  if (flags.length) {
+  if (_flagsShown.length) {
     $("d-flags-section").style.display = "block";
-    $("d-flags").innerHTML = flags
+    $("d-flags").innerHTML = _flagsShown
       .map((f) => {
         const cls =
           /vacant|fire|tear|condemned|hoarder|gutted|foundation|structural|negative_equity/.test(f) ? "neg" :
@@ -4944,6 +6055,17 @@ function renderDetail(l, detailState) {
     ? `${_op.phone} (${_op.source || "unknown source"}${_op.line_type && _op.line_type !== "unknown" ? ", " + _op.line_type : ""}${_op.needs_dnc_scrub ? " — DNC scrub required" : ""})`
     : _st.phone;
   const _alts = (_op.alternates || []).map((a) => a && a.phone ? `${a.phone} (${a.source || "?"})` : null).filter(Boolean);
+  // A phone the gate blocks is shown struck through under a DO NOT DIAL badge with
+  // the reason, never in the plain "call this" style (docs/phone_gate_2026-09-21.md).
+  // Its alternates come from the same block, so they are struck too. A separate
+  // skip-trace number is a different record and still shows.
+  const _pblock = _op.phone ? ownerPhoneBlock(_op) : null;
+  const _phoneBlockedRows = _pblock
+    ? `<div class="lbl">Phone</div><div class="val phone-blocked"><s>${_txt(_phone)}</s> `
+      + `<span class="dnd-badge" title="${_attr("This number is not offered as the owner's. Reason code: " + _pblock)}">DO NOT DIAL: ${_txt(phoneBlockText(_pblock))}</span></div>`
+      + (_alts.length ? `<div class="lbl">Other numbers</div><div class="val phone-blocked"><s>${_txt(_alts.join(" · "))}</s></div>` : "")
+      + (_st.phone ? `<div class="lbl">Phone (skip trace)</div><div class="val">${_txt(_st.phone)}</div>` : "")
+    : "";
   // ONE OWNER NAME, NAMED, AND IT IS THE ONE THE BUTTON SEARCHES.
   //
   // This row used to print raw.owner_mailing.owner. The CSV column and the
@@ -4993,10 +6115,19 @@ function renderDetail(l, detailState) {
   // property, behind a live link. It happened to be inside a display:none
   // section that time, which is luck, not a design. Rendering the whole block
   // here means the previous lead's identity cannot survive into the next one.
-  const _contactRows = kv([
-    ["Mailing address", _om.mailing],
+  // TWO ADDRESSES, LABELLED. The property address is where the house is; the
+  // mailing address is where the owner gets mail, and on an absentee lead they
+  // are different places. Both were on screen (one in the header, one in this
+  // block) under labels that did not say which was which. They sit together
+  // here now, each says what it is, and an empty one says so.
+  const _addrRows =
+    `<div class="lbl">Property address<span class="lbl-sub">where the house is</span></div>`
+    + `<div class="val">${_pa.has ? _txt(_pa.text) : `<span class="no-addr" title="${_attr(NO_ADDR_TITLE)}">${_txt(_pa.text)}</span>`}</div>`
+    + `<div class="lbl">Owner's mailing address<span class="lbl-sub">where the owner gets mail</span></div>`
+    + `<div class="val">${_om.mailing ? _txt(_om.mailing) : `<span class="muted">none on file</span>`}</div>`;
+  const _contactRows = _addrRows + _phoneBlockedRows + kv([
     ["Absentee owner", _om.absentee], ["Out of state", _om.out_of_state],
-    ["Phone", _phone], ["Other numbers", _alts.join(" · ")], ["Email", _st.email],
+    ["Phone", _pblock ? "" : _phone], ["Other numbers", _pblock ? "" : _alts.join(" · ")], ["Email", _st.email],
   ].concat(_saRows));
   // The people-search was a CSV column only — a link nobody can click from a
   // phone, pointed at a query built from `city` even when `city` holds a COUNTY
@@ -5009,7 +6140,7 @@ function renderDetail(l, detailState) {
       + (_place.trusted ? "" : `<div class="skiptrace-why">Searching ${_txt(_place.label)} because ${_txt(_place.why)}.</div>`)
       + `</div>`
     : "";
-  const _gridHtml = _ownerRows.join("") + _contactRows;
+  const _gridHtml = _contactRows.slice(0, _addrRows.length) + _ownerRows.join("") + _contactRows.slice(_addrRows.length);
   if (_gridHtml || _tpsHtml) {
     $("d-contact").innerHTML = (_gridHtml ? `<div class="detail-grid">${_gridHtml}</div>` : "") + _tpsHtml;
     $("d-contact-section").style.display = "block";
@@ -5021,11 +6152,28 @@ function renderDetail(l, detailState) {
   // Distress Stack — full breakdown (only the tier badge was shown before)
   const _ds = getDistress(l);
   if (_ds && (_ds.score != null || (_ds.signals || []).length)) {
-    const sigs = (_ds.signals || []).map((s) => Array.isArray(s)
-      ? `<span class="qbadge warn-light">${E(String(s[0]).replace(/_/g, " "))} +${E(s[2])}</span>` : "").join(" ");
+    // The signals are bare strings today, and this used to draw a chip only for
+    // array-shaped entries, so it drew none. Each signal is drawn with its
+    // evidence class where the stack carries one, and a name match is labelled
+    // as one and drawn in the caveat colour: a stack resting on a name
+    // collision must not read like one resting on a record (audit F6).
+    const sigs = stackSignals(_ds, l.raw).map((sg) => {
+      const ev = sg.kind ? (EVIDENCE_TEXT[sg.kind] || sg.kind) : "";
+      const nm = sg.kind === "name_only" || sg.kind === "name_joined";
+      return `<span class="qbadge ${nm ? "warn" : "warn-light"}"${ev ? ` title="${_attr("Evidence: " + ev)}"` : ""}>`
+        + `${E(sg.label)}${sg.weight != null ? " +" + E(sg.weight) : ""}${ev ? " · " + E(ev) : ""}</span>`;
+    }).join(" ");
+    const _dc2 = distressCategories(l);
+    const _cats = _dc2.cats.map((c) => (catLabel[c] || String(c).toLowerCase().replace(/_/g, " "))).join(", ");
+    const _eb = _ds.equity_band
+      ? _ds.equity_band + (_evGate.shown && _evGate.basis === "estimated" ? " (estimated payoff)" : "") : _ds.equity_band;
+    // The same facts as the tier badge tooltip, for the phone that has no hover:
+    // event ended, stayed, lane and days, title, equity estimated, uncounted.
+    const _notes = stackTooltip(l, Date.now(), _scoredAtMs()).split("\n").slice(1);
     $("d-distress").innerHTML =
-      `<div class="detail-grid">${kv([["Tier", _ds.tier], ["Score", _ds.score], ["Categories stacked", _ds.stack], ["Equity band", _ds.equity_band], ["Absentee", _ds.absentee]])}</div>` +
-      (sigs ? `<div style="margin-top:8px">${sigs}</div>` : "");
+      `<div class="detail-grid">${kv([["Tier", _ds.tier], ["Score", _ds.score], ["Categories stacked", _dc2.n ? _dc2.n + (_cats ? " (" + _cats + ")" : "") : _ds.stack], ["Equity band", _eb], ["Absentee", _ds.absentee]])}</div>` +
+      (sigs ? `<div style="margin-top:8px">${sigs}</div>` : "") +
+      (_notes.length ? `<ul class="stack-notes">${_notes.map((n) => `<li>${E(_cap(n))}</li>`).join("")}</ul>` : "");
     $("d-distress-section").style.display = "block";
   } else { $("d-distress-section").style.display = "none"; }
 
@@ -5078,10 +6226,28 @@ function renderDetail(l, detailState) {
   const _rs = (l.raw && l.raw.relationship_signal) || null;
   if (_rs) _deeds.push([(_rs.kind || "life event") + " signal", _rs.keyword || "Yes"]);
   if (l.raw && l.raw.cama) _deeds = _deeds.concat(flat(l.raw.cama));
-  const _up = (l.raw && l.raw.upset_bid) || null;
-  if (_up) _deeds.push(["Upset-bid window", (_up.in_window ? "OPEN" : "closed") + (_up.days_remaining != null ? ` (${_up.days_remaining}d left)` : "")]);
+  // Upset-bid window, decided from the dates now. raw.upset_bid.in_window and
+  // days_remaining were frozen when the enricher ran (audit F15); the row used
+  // to print "OPEN (8d left)" for a window whose deadline was 19 days behind us.
+  const _upb = clockBadges(l, _ck, Date.now()).find((b) => /^upset/.test(b.kind));
+  if (_upb) _deeds.push(["Upset-bid window", _upb.text]);
   if (l.raw && l.raw.sc_tax_delinquent) _deeds.push(["SC tax delinquent", "Yes"]);
+  // Name matches, each labelled as one. Incarceration was the only one labelled.
   if (l.raw && l.raw.incarceration) _deeds.push(["Owner incarcerated (name match)", "Yes"]);
+  if (bk && l.source !== "national.courtlistener_bankruptcy") {
+    _deeds.push(["Bankruptcy filing (name match)",
+      [bk.chapter && bk.chapter !== "?" ? "chapter " + bk.chapter : "chapter unknown", bk.date_filed ? "filed " + bk.date_filed : "", (bk.court || "").toUpperCase()].filter(Boolean).join(", ")]);
+  }
+  const _dvc = l.raw && _obj(l.raw.divorce);
+  if (_dvc && _dvc.case_count) {
+    _deeds.push(["Court divorce filing (name match)",
+      `${_dvc.case_count} case${_dvc.case_count === 1 ? "" : "s"}${_dvc.match ? ", middle-initial check: " + _dvc.match : ""}`]);
+  }
+  const _nr = l.raw && (_obj(l.raw.name_resolution) || _obj(l.raw.resolved_from_name));
+  if (_nr) {
+    _deeds.push(["Property found by owner name (name match)",
+      [_nr.matched_owner ? "matched " + _nr.matched_owner : "", _nr.method || _nr.strategy || "", _nr.confidence ? _nr.confidence + " confidence" : ""].filter(Boolean).join(" · ") || "Yes"]);
+  }
   if (l.raw && l.raw.sos_status) _deeds = _deeds.concat(flat(l.raw.sos_status));
   if (l.foreclosure_process) _deeds.push(["Foreclosure process", String(l.foreclosure_process).replace(/_/g, " ")]);
   if (l.redemption_deadline) _deeds.push(["SC redemption deadline", fmtDate(l.redemption_deadline)]);
@@ -5193,6 +6359,64 @@ function initCrm() {
   }
 }
 
+// ------------- CRM export / import -------------------------------------------
+// The CRM lives in localStorage, which belongs to ONE origin. Moving the board to
+// a new address (or opening it as the iPhone home-screen app, which has its own
+// storage) starts with empty notes. Export writes them to a JSON file; import on
+// the other side merges them by lead key, the newer `updated` winning, and never
+// deletes a lead. The merge itself is crmMerge() in the IO-GUARD region.
+function crmIoMessage(text, isErr) {
+  document.querySelectorAll(".crm-io-msg").forEach((el) => {
+    el.textContent = text;
+    el.style.color = isErr ? "var(--dq-warn)" : "";
+  });
+}
+function crmDoExport() {
+  const all = crmLoadAll();
+  const doc = crmExportDoc(all, new Date().toISOString(), location.origin);
+  const blob = new Blob([JSON.stringify(doc, null, 1)], { type: "application/json" });
+  const a = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  a.href = url;
+  a.download = `foreclosure-crm-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+  crmIoMessage(doc.count ? `Exported ${doc.count} lead${doc.count === 1 ? "" : "s"}.` : "Nothing to export yet: no lead has a status, note or date.", !doc.count);
+}
+async function crmDoImport(file) {
+  if (!file) return;
+  if (file.size > CRM_IMPORT_MAX_BYTES) { crmIoMessage("The file is over 5 MB, which is not a CRM export.", true); return; }
+  let text = "";
+  try { text = await file.text(); } catch (e) { crmIoMessage("Could not read the file.", true); return; }
+  const parsed = crmParseImport(text);
+  if (!parsed.ok) { crmIoMessage(parsed.error, true); return; }
+  const { merged, stats } = crmMerge(crmLoadAll(), parsed.records);
+  if (!crmSaveAll(merged)) {
+    crmIoMessage("Could not save: this browser refused to store the merged CRM (storage full or blocked). Nothing was changed.", true);
+    return;
+  }
+  crmIoMessage(`Imported: ${stats.added} new, ${stats.updated} updated, ${stats.kept} kept (this browser's copy was as new or newer)`
+    + (stats.skipped ? `, ${stats.skipped} skipped as unreadable` : "") + ". Nothing was deleted.");
+  // Reflect the merge in the open panel, if any.
+  if (_crmKey) {
+    const rec = crmGet(_crmKey) || {};
+    document.querySelectorAll("#d-crm-status .crm-status-btn").forEach((b) => b.classList.toggle("active", b.dataset.status === rec.status));
+    const dateEl = $("d-crm-date"); if (dateEl) dateEl.value = rec.next_action || "";
+    const notesEl = $("d-crm-notes"); if (notesEl) notesEl.value = rec.notes || "";
+    crmShowSaved(rec.updated);
+  }
+}
+function initCrmIo() {
+  const fileEl = $("crm-import-file");
+  document.addEventListener("click", (e) => {
+    const b = e.target && e.target.closest ? e.target.closest("[data-crm-io]") : null;
+    if (!b) return;
+    if (b.dataset.crmIo === "export") crmDoExport();
+    else if (b.dataset.crmIo === "import" && fileEl) { fileEl.value = ""; fileEl.click(); }
+  });
+  if (fileEl) fileEl.addEventListener("change", () => crmDoImport(fileEl.files && fileEl.files[0]));
+}
+
 // ------------- CSV export -----------------------------------------------------
 function exportCsv() {
   const cols = [
@@ -5218,6 +6442,15 @@ function exportCsv() {
     //   rehab_deducted     whether max_bid_70 subtracted a rehab cost
     "truepeoplesearch_url", "skiptrace_locale", "city_may_be_county",
     "owner_name_conflict", "rehab_deducted",
+    // APPENDED (audit F2/F3/F15): the clock as the screen shows it, computed from
+    // the dates at export time: stayed, presumed withdrawn, sale date passed,
+    // window closed, or the live deadline. days_to_auction is now a calendar-day
+    // count from sale_date so it agrees with the pill on the card.
+    "clock_status",
+    // APPENDED (phone gate, docs/phone_gate_2026-09-21.md): owner_phone is written
+    // blank when the gate blocks the number, and this says why, so a flagged number
+    // is not silently lost. Blank when the phone is usable or absent.
+    "phone_block_reason",
   ];
   const rows = [cols.join(",")];
   filtered.forEach((l) => {
@@ -5230,7 +6463,8 @@ function exportCsv() {
     const op = r.owner_phone || {};
     const ds = r.distress_stack || {};
     const rod = r.rod || {};
-    const dta = l.sale_date ? Math.round((new Date(l.sale_date) - new Date()) / 86400000) : "";
+    const _sck = saleClock(l, Date.now());
+    const dta = _sck.has ? _sck.days : "";
     // Was `citystatezip=${l.city} ${l.state}`, which searched a COUNTY on the
     // 4,347 leads where `city` holds the county name — every one of the 3,309
     // spartanburg_vacant rows among them. skipTraceUrl() prefers the ZIP
@@ -5255,11 +6489,13 @@ function exportCsv() {
       contactable: ds.contactable ? "yes" : "",
       owner_mailing: om.mailing || "", mail_state: om.mail_state || "",
       absentee: om.absentee ? "yes" : "", out_of_state: om.out_of_state ? "yes" : "",
-      owner_phone: op.phone || "", phone_source: op.source || "",
+      owner_phone: ownerPhoneBlock(op) ? "" : (op.phone || ""), phone_source: op.source || "",
       phone_needs_dnc: op.needs_dnc_scrub ? "yes" : "",
       rod_mortgage: rod.has_mortgage ? "yes" : "", rod_adverse: rod.has_adverse_lien ? "yes" : "",
       equity_band: ds.equity_band || "", senior_debt_risk: ds.surviving_senior_debt_risk ? "yes" : "",
       days_to_auction: dta, stale_case: r.stale_case ? "yes" : "",
+      clock_status: clockSummary(l, clockOf(l)),
+      phone_block_reason: (() => { const b = ownerPhoneBlock(op); return b && b !== "no_phone" ? b : ""; })(),
       geo_quality: r.geo_imprecise || "verified",
       truepeoplesearch_url: tps,
       address_quality: dqf.includes("synthetic_address") ? "placeholder"
@@ -5310,4 +6546,8 @@ function exportCsv() {
 // ------------- Boot ----------------------------------------------------------
 injectDashStyles();  // classes this file owns: flagged-ARV treatment + shard spinner
 initCrm();  // wire the CRM-lite controls once (static DOM, survives dataset swaps)
+initCrmIo();  // CRM Export / Import buttons (footer and the CRM block)
 loadData();
+// The banner's ages are relative to now; repaint so a tab left open does not
+// keep saying "3h ago" for a day.
+setInterval(paintFreshness, 5 * 60000);

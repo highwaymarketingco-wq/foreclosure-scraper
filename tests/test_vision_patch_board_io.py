@@ -72,7 +72,12 @@ def test_ollama_only_lead_is_rescored(tmp_path):
     assert mod.needs_vision(board[0]) is True, "ollama-only vision must be re-scored"
 
 
-def test_board_never_shrinks_on_invalid_record(tmp_path):
+def test_board_never_shrinks_on_invalid_record(tmp_path, monkeypatch):
+    # The plain file is hand-edited below, which the board manifest would (correctly)
+    # refuse; and load_board now FAILS above a 0.1% drop rate. This test is about the
+    # recovery path, so it opts out of both (audit O3).
+    monkeypatch.setenv("BOARD_MANIFEST_SKIP", "1")
+    monkeypatch.setenv("BOARD_LOAD_ALLOW_DROPS", "1")
     write_artifact([_lead(0), _lead(1)], {"notes": "t"}, docs_dir=tmp_path)
     recs = json.loads((tmp_path / "listings.json").read_text())
     # Poison one record so strict Listing.model_validate rejects it.

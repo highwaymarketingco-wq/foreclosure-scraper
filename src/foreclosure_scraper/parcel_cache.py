@@ -68,7 +68,7 @@ PARCEL_LAYERS: dict[str, dict] = {
     # --- NC core footprint (each id_field + field map VERIFIED against a live sample 2026-08-14) ---
     "Rutherford": {  # board parcel_id = the 6-7 digit internal Parcel_Number (NOT the 10-digit PIN)
         "url": "https://gis.rutherfordcountync.gov/arcgis/rest/services/TaxParcels/MapServer/0/query",
-        "id_fields": ["Parcel_Number"],
+        "id_fields": ["Parcel_Number", "PIN"],   # PIN added 2026-09-21: 367 board rows carry the 10-digit PIN (data-quality audit)
         "map": {"owner": "Property_Owner", "address": "Physical_Address",
                 "market_value": "Total_Property_Value", "tax_value": "Total_Land_Value_Assessed",
                 "acreage": "Acreage", "living_sqft": "Heated_Area",  # Heated_Area = vision-gate sqft
@@ -226,9 +226,24 @@ PARCEL_LAYERS: dict[str, dict] = {
         "id_fields": ["PINtext", "PIN", "TMS"],
         "map": {"owner": "OwnerName",
                 "owner_mailing": ["OwnerStreet", "OwnerCity", "OwnerState", "OwnerZip"],
-                "market_value": "MarketProp", "tax_value": "AssessedProp",
+                # AssessedProp is the ~4% SC ratio assessment, not a value: mapping it to tax_value made the
+                # tax_value*1.25 ARV fallback price Horry parcels at a fraction of worth (audit 2026-09-21)
+                "market_value": "MarketProp",
                 "acreage": "Acreage", "land_use": "LandUseCode",
                 "sale_date": "SaleDate"},
+        # 2026-09-21: the parcel layer above has NO situs field, so horry.sqlite (765,736
+        # index rows) held zero addresses and Horry leads sat at 41% address. Layer 22
+        # "Addresses" on the SAME service is one point per unit (242,675 points; PIN is a
+        # float such as 29612040003.0, TMS a 10-digit text; ADDRESS is the street line
+        # "3936 HWY 472", UNIT is separate). VERIFIED LIVE 2026-09-21, maxRecordCount 2000.
+        # build_address_overlay keys it by both PIN and TMS and keeps one address per
+        # parcel, preferring the row with no UNIT / the lowest UNIT.
+        "address_overlay": {
+            "url": "https://www.horrycountysc.gov/parcelapp/rest/services/HorryCountyGISApp/MapServer/22/query",
+            "id_fields": ["PIN", "TMS"],
+            "address": "ADDRESS",
+            "unit": "UNIT",
+        },
     },
     # Found 2026-09-14, same audit as Horry above: Darlington (2,689 board
     # rows, 0% mailing) runs its own free public ArcGIS FeatureServer,
@@ -469,6 +484,183 @@ PARCEL_LAYERS: dict[str, dict] = {
                 "living_sqft": None, "land_use": None,
                 "sale_price": "SALE_PRICE"},
     },
+    # =====================================================================
+    # 2026-09-21 COUNTY-BREADTH ENTRIES  (docs/county_breadth_research_2026-09-21.md)
+    #
+    # These eight SC counties had NO parcel cache, which is why their leads carry 0%
+    # mailing, value and address. Each entry was fetched LIVE the same day: the count is
+    # the server's returnCountOnly, the field map was checked against one real row, and
+    # field population was measured on a 200-row sample spread across the layer. The
+    # weekly refresh (scripts/refresh_parcel_cache.py) still re-verifies completeness
+    # (downloaded == returnCountOnly) before a cache file is ever replaced.
+    #
+    # NOT ADDED, and why (all in the research doc): Richland (custom Leaflet/PHP viewer,
+    # no ArcGIS REST), Kershaw (open Parcels_view is geometry + acres only), Marion /
+    # Williamsburg / Clarendon / Marlboro (WTH "tgis" viewer, no REST), Edgefield /
+    # Fairfield (qPublic behind a Cloudflare challenge), Dorchester (open, but see the
+    # research doc: verified and held back).
+    # =====================================================================
+    "Florence": {
+        # 70,098 parcels. TMS is the dashed 5-2-3 form ("00001-04-001") and TMSNODASH the
+        # same digits; both are indexed. OWNERNAME is the owner. ADD2 is the mailing
+        # street line and ADD3 the city/state/zip line ("LYNCHBURG            SC29080",
+        # state glued to the ZIP -- _tidy_mailing splits it). ADD1 (27% populated) is a
+        # second name or "C/O ..." line, NOT address, and is left out on purpose: the
+        # first live dry-run stored "CRANFORD RANDY A 4001 BYRNES BLVD FLORENCE SC 29506"
+        # with it in. ADDR_SITE is the situs, populated on ~74% of
+        # parcels. TOTBDGVAL is the BUILDING value only (land is not published on this
+        # layer), so it is deliberately NOT mapped to market_value or tax_value: a
+        # building-only figure would understate every improved parcel's ARV.
+        "state": "SC",
+        "url": "https://services1.arcgis.com/40L6yX6OtdCifNez/arcgis/rest/services/County_Tax_Parcel/FeatureServer/0/query",
+        "id_fields": ["TMS", "TMSNODASH"],
+        "map": {"owner": "OWNERNAME", "address": "ADDR_SITE",
+                "owner_mailing": ["ADD2", "ADD3"],
+                "acreage": "CALCULATED_ACREAGE"},
+    },
+    "Charleston": {
+        # 197,677 parcels on the county's ENERGOV self-service map service (open, no
+        # token; maxRecordCount 1000, resultOffset paging verified). PID is the 10-digit
+        # parcel id ("5830600047"). OWNER1/OWNER2 are the owners, MAIL_* the split mailing
+        # block, APPRAISAL = LAND_APPR + IMP_APPR = total appraised market value (checked:
+        # 285,200 + 819,900 = 1,105,100). The parcel layer has NO situs; the county's
+        # address points (70,072 of them, same service, keyed by PID, one per unit with
+        # a UNIT column) fill it for the ~35% of parcels that have a structure address.
+        "state": "SC",
+        "url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/ENERGOV/energov_css/MapServer/4/query",
+        "id_fields": ["PID"],
+        "map": {"owner": ["OWNER1", "OWNER2"],
+                "owner_mailing": ["MAIL_ST_NO", "MAIL_ST_NAME", "MAIL_ST_TYPE",
+                                  "MAIL_2ND_ADDR", "MAIL_2ND_ADDT", "MAIL_CITY",
+                                  "MAIL_STATE", "MAIL_ZIP"],
+                "market_value": "APPRAISAL", "acreage": "ACREAGE",
+                "land_use": "CLASS_CODE", "sale_price": "SALE_PRICE",
+                "sale_date": "DOC_DATE"},
+        "address_overlay": {
+            "url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/ENERGOV/energov_css/MapServer/0/query",
+            "id_fields": ["PID"],
+            "address": "WHOLE_ADDRESS",
+            "unit": "UNIT",
+        },
+    },
+    "Berkeley": {
+        # 123,050 parcels on the county's public "internet" map service, layer 4 (layers
+        # 4 and 5 are the same polygons drawn yellow and black). O_TMS is the 10-digit
+        # TMS. OwnerName plus StreetAddress1/2, City, StateProvince, Zip are the MAILING
+        # block; GIS_Address is the situs (82% over an 800-row sample spread across the
+        # layer, but only 49% in one window, so it varies by area). TotalTaxValue tracks recent
+        # sale prices at about 1.0x (8 Limetree Ln / Scarlet Oak Ct rows checked:
+        # 323,035 vs a 220,000 sale in 2016, 427,110 vs 425,000 in 2021) so it is a market
+        # figure, not a 4% assessed one. Berkeley's PayStar rows already carry mail; this
+        # adds the VALUE (0% today) and the situs.
+        "state": "SC",
+        "url": "https://gis.berkeleycountysc.gov/arcgis/rest/services/internet/MapServer/4/query",
+        "id_fields": ["O_TMS"],
+        "map": {"owner": "OwnerName", "address": "GIS_Address",
+                "owner_mailing": ["StreetAddress1", "StreetAddress2", "City",
+                                  "StateProvince", "Zip"],
+                "market_value": "TotalTaxValue", "acreage": "TotalAcres",
+                "sale_price": "SalePrice", "sale_date": "SaleDate"},
+    },
+    "Aiken": {
+        # 103,207 parcels for the WHOLE COUNTY (TaxDistrict values run from
+        # "UNINCORPORATED" to "NORTH AUGUSTA CITY"), served by the City of Aiken's
+        # ArcGIS Server PublicGIS service, layer 13. The county itself sells its GIS data
+        # and hides the assessor map behind qPublic, so this city-hosted layer is the
+        # only open bulk source; if it disappears the county has none. PARCEL_ASR is the
+        # dashed county TMS ("108-14-04-009"), PARC_NO an older spaced form. AssessedValue
+        # is a 4-6% ratio figure and is deliberately NOT mapped.
+        "state": "SC",
+        "url": "https://gis.cityofaikensc.gov/arcgis/rest/services/PublicGIS/MapServer/13/query",
+        "id_fields": ["PARCEL_ASR", "PARC_NO"],
+        "map": {"owner": "OwnerName", "address": "LocationAddress",
+                "owner_mailing": ["OwnerMailingAddress", "OwnerMailingCity",
+                                  "OwnerMailingState", "OwnerMailingZip"],
+                "market_value": "TotalMarketValue", "acreage": "Acres",
+                "land_use": "PropertyClassType", "sale_price": "SalePrice",
+                "sale_date": "SaleDate"},
+    },
+    "Greenwood": {
+        # 39,553 parcels on the county's own ArcGIS Server, CAMA layer 9: a full CAMA
+        # record with situs, owner, mailing, market and tax value and building sqft.
+        # PIN is dashed ("6913-674-230"). MailAddress is the street line and
+        # MailCityState "GREENWOOD, SC 29648-0000". TaxValue_Total (65,600 vs
+        # MarketValue_Total 74,000 on the sample) is the capped appraisal, not the 4-6%
+        # assessed figure, so it is safe as tax_value. DeedAcres is only ~4% populated.
+        "state": "SC",
+        "url": "https://www.greenwoodsc.gov/arcgis/rest/services/Operational_Layers/CAMA/MapServer/9/query",
+        "id_fields": ["PIN"],
+        "map": {"owner": "Owner", "address": "SiteAddress",
+                "owner_mailing": ["MailAddress", "MailCityState"],
+                "market_value": "MarketValue_Total", "tax_value": "TaxValue_Total",
+                "acreage": "DeedAcres", "living_sqft": "SqFt", "land_use": "PropType",
+                "sale_date": "PurchaseDate"},
+    },
+    "Hampton": {
+        # 14,871 parcels, published by the county's own ArcGIS Online account
+        # (hamptoncountyscgis), layer 1. Same CAMA export shape as Saluda, Barnwell and
+        # Calhoun. Tot_Market_Appr / Tot_Number_Acres are comma-formatted strings
+        # ("4,229,310") that _map_val parses. Address1/Address2/ZIP_Code are the OWNER
+        # MAILING block (ZIP_Code is a clean 5-digit string here, unlike Saluda's
+        # ZIP*10000+ZIP4 integer). Street_Number_E911 is only ~52% populated, so situs is
+        # often just a street name. Instrmnt_Dt is a bare YYYYMMDD string and is not
+        # mapped (see Calhoun). Board parcel_ids: Hampton has ZERO rows today, so the
+        # board's format is unknown; the layer's TMS carries a trailing dot
+        # ("009-00-00-001.") which normalisation strips to the 10-digit form.
+        "state": "SC",
+        "url": "https://services8.arcgis.com/6eabNhFouHU5vuYk/arcgis/rest/services/Parcels_Published_view/FeatureServer/1/query",
+        "id_fields": ["Map_Number", "Parcel_polygons_TMS"],
+        "map": {"owner": ["Name1", "Name2"],
+                "address": ["Street_Number_E911", "Street_Name_E911"],
+                "owner_mailing": ["Address1", "Address2", "ZIP_Code"],
+                "market_value": "Tot_Market_Appr", "acreage": "Tot_Number_Acres",
+                "sale_price": "Consideration"},
+    },
+    "Chester": {
+        # 22,300 parcels (the county holds more; treat as partial until a delinquent list
+        # proves otherwise) on the county's ArcGIS Online org (rjackson_ChesCnty),
+        # Parcels_10_7_24. "Chester" is in DUAL_STATE_COUNTIES, so state="SC" is what
+        # keeps this from ever sharing a file with an NC lookup. Name / Map_Number are the
+        # dashed TMS WITH its trailing sub-parcel suffix ("047-00-00-066-000").
+        # Name_1/Name_2 are owners; Mailing_Ad, Mailing__1 ("CHESTER      SC") and
+        # Zip_Code are the mailing block. Land and building appraisals are separate
+        # fields (Appraised_ = land, Appraised1 = building; verified on a row with
+        # buildings: 84,200 + 58,400), so market_value is their {"sum": ...}. There is NO
+        # situs on this layer, and the county's address points carry no parcel key.
+        "state": "SC",
+        "url": "https://services8.arcgis.com/7uCc8YS9s04rg0sr/arcgis/rest/services/Parcels_10_7_24/FeatureServer/0/query",
+        "id_fields": ["Map_Number", "Name"],
+        "map": {"owner": ["Name_1", "Name_2"],
+                "owner_mailing": ["Mailing_Ad", "Mailing__1", "Zip_Code"],
+                "market_value": {"sum": ["Appraised_", "Appraised1"]},
+                "acreage": "DEED_ACRES"},
+    },
+    "Greenville": {
+        # 244,178 parcels. The county MOVED this data: the GreenvilleJS/Map_Layers_JS
+        # service that greenville_hard_distress.py reads (243,750 parcels, verified
+        # 2026-08-03) now answers HTTP 500 "Service ... not found" and the server root
+        # lists only a geocoder. Its replacement is arcgis3/.../GreenvilleNJ/QueryLayers
+        # (open, no token, maxRecordCount 2000), found by the Midlands research pass and
+        # re-verified here 2026-09-21. PIN is the 13-digit id ("0001000100100"), the same
+        # form as the county's tax-sale roster.
+        #
+        # Field semantics checked against sale prices: FAIRMKTVAL is the full current
+        # market value; TAXMKTVAL is the CAPPED taxable value (a 1998 purchase at 185,000
+        # shows TAXMKTVAL 533,790 against FAIRMKTVAL 1,156,060; a 2025 purchase at
+        # 3,600,000 shows both at 3,596,450), so they map to market_value and tax_value.
+        # STREET/CITY/STATE/ZIP5 are the owner MAILING block; the SITUS is STRNUM + STRPRE
+        # + LOCATE (street name) + STRTYP + STRSUF. DESCR is a legal description, NOT a
+        # street ("PH2", "UNIT B"), so it is never used for the address.
+        "state": "SC",
+        "url": "https://www.gcgis.org/arcgis3/rest/services/GreenvilleNJ/QueryLayers/MapServer/0/query",
+        "id_fields": ["PIN"],
+        "map": {"owner": ["OWNAM1", "OWNAM2"],
+                "address": ["STRNUM", "STRPRE", "LOCATE", "STRTYP", "STRSUF"],
+                "owner_mailing": ["STREET", "CITY", "STATE", "ZIP5"],
+                "market_value": "FAIRMKTVAL", "tax_value": "TAXMKTVAL",
+                "acreage": "TACRES", "living_sqft": "SQFEET", "land_use": "PROPTYPE",
+                "sale_price": "SLPRICE", "sale_date": "DEEDDATE"},
+    },
 }
 
 # schema columns of the local `parcels` table, in insert order
@@ -484,12 +676,59 @@ _COLS = ("owner", "address", "owner_mailing", "market_value", "tax_value", "acre
 _NUMERIC = {"market_value", "tax_value", "acreage", "living_sqft"}
 
 
+_US_STATE_CODES = frozenset(
+    "AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT "
+    "NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY".split())
+_STATE_ZIP_GLUE = re.compile(r"(?<![A-Za-z0-9])([A-Z]{2})(\d{5}(?:-?\d{4})?)$")
+
+
+def _squash(s: str) -> str:
+    """Collapse runs of whitespace. Several county layers space-pad fixed-width
+    columns INSIDE the value ("CHESTER               SC", "LN      "), and a padded
+    address is a different dedupe key from the same address unpadded."""
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _tidy_mailing(s: str) -> str:
+    """Florence serves the city/state/zip line as "LYNCHBURG            SC29080" (state
+    glued to the ZIP). Insert the missing space, but only when the glued token is a
+    real two-letter US state code at the very end of the string."""
+    m = _STATE_ZIP_GLUE.search(s)
+    if m and m.group(1) in _US_STATE_CODES:
+        return s[:m.start()] + f"{m.group(1)} {m.group(2)}"
+    return s
+
+
+def _num(val) -> "float | None":
+    """A source cell as a float, tolerating comma thousands separators and a leading
+    currency sign (Calhoun/Hampton serve "4,229,310"). None when it is not a number."""
+    if val is None or isinstance(val, bool):
+        return None
+    try:
+        cleaned = val.replace(",", "").replace("$", "").strip() if isinstance(val, str) else val
+        f = float(cleaned)
+    except (ValueError, TypeError):
+        return None
+    return None if f != f else f
+
+
 def _map_val(rec: dict, col: str, spec):
     """Resolve one schema column from a source row. `spec` is a source field name,
     or a LIST of fields joined with spaces (for split situs like STREETNUM+STREETNAME),
-    or None (column not available for this county). Numeric columns are coerced to float."""
+    or a dict {"sum": [f1, f2]} for a NUMERIC column the county publishes as two parts
+    (Chester serves land and building appraisals in separate fields), or None (column
+    not available for this county). Numeric columns are coerced to float."""
     if spec is None:
         return None
+    if isinstance(spec, dict):
+        if col not in _NUMERIC:
+            return None                # a sum is only meaningful for a number column
+        total = None
+        for f in spec.get("sum") or ():
+            n = _num(rec.get(f))
+            if n is not None:
+                total = (total or 0.0) + n
+        return total if total and total > 0 else None
     if isinstance(spec, list):
         parts = []
         for f in spec:
@@ -497,7 +736,9 @@ def _map_val(rec: dict, col: str, spec):
             s = "" if v is None else str(v).strip()
             if s and s not in ("0", "0.0"):
                 parts.append(s)
-        val = " ".join(parts) or None
+        val = _squash(" ".join(parts)) or None
+        if val and col == "owner_mailing":
+            val = _tidy_mailing(val)
     else:
         val = rec.get(spec)
         # Strip here too. The LIST branch above strips every part, but a single-field
@@ -506,7 +747,7 @@ def _map_val(rec: dict, col: str, spec):
         # is a different dedupe key from the same address unpadded, and it exports and
         # prints with the padding intact.
         if isinstance(val, str):
-            val = val.strip() or None
+            val = _squash(val) or None
     if col in _NUMERIC and val not in (None, ""):
         try:
             # Calhoun (found 2026-09-15) serves Tot_Market_Appr/Sale_Price as
@@ -585,6 +826,71 @@ def _id_variants(v) -> set[str]:
         out.add(n[:10])                 # 963470749800000 -> 9634707498
     elif len(n) == 10 and n.isdigit():
         out.add(n + "00000")            # 9634707498 -> 963470749800000
+    return out
+
+
+# --- lookup-side id tolerance (2026-09-21) -------------------------------------------------
+# _id_variants above is ALSO what refresh_county indexes a cache with, so it must stay
+# exactly as built. The two forms below are applied ONLY when reading, in lookup(), and only
+# after every exact form has missed, so they can add hits but never change an existing one.
+#
+#   zero_suffix  a delimited all-zero tail is the "no sub-parcel" marker, i.e. the SAME
+#                parcel as the bare id: Darlington "052-00-02-212.000", Anderson
+#                "151-06-01-006-000", Forsyth "6844-24-1309.000". The cache holds the bare
+#                10-digit form, the board id normalises to 13 digits, so it never matched.
+#   zero_pad     a 10+ digit all-numeric PIN written with a different count of trailing
+#                zeros than the layer uses: Harnett/Watauga/Transylvania "0546-74-1638" vs
+#                "0546741638000", Pender 13 vs 14 digits, Lee 10 vs 12. Bounded to 6 zeros,
+#                to ids of 10+ digits (variable-length 5-7 digit internal ids such as
+#                Rutherford's Parcel_Number are excluded: "616146" and "6161460" are two
+#                different parcels there), and to an UNAMBIGUOUS answer (every candidate row
+#                must be the same owner + address + mailing, else no hit).
+#
+# A sub-parcel with a NON-zero suffix (".01", " 001", "A") is deliberately NOT resolved to its
+# parent: the parent's owner and situs can belong to a different lot.
+_ZERO_TAIL_RE = re.compile(r"^(.*\d)[.\-\s]+0+$")
+_ZERO_PAD_MAX = 6
+_ZERO_PAD_MIN_LEN = 10
+
+
+def _lookup_candidates(v) -> list[tuple[str, str]]:
+    """Ordered (normalized id, tier) pairs to try when reading a cache. Tier is 'exact'
+    (what _id_variants always produced), 'zero_suffix' or 'zero_pad'."""
+    out: list[tuple[str, str]] = []
+    seen: set[str] = set()
+
+    def add(k: str, tier: str) -> None:
+        if k and k not in seen:
+            seen.add(k)
+            out.append((k, tier))
+
+    n = _norm_id(v)
+    if not n:
+        return out
+    add(n, "exact")
+    for k in sorted(_id_variants(v)):
+        add(k, "exact")
+
+    bases: list[str] = []
+    s = str(int(v) if isinstance(v, float) and v.is_integer() else (v or "")).strip()
+    while True:
+        m = _ZERO_TAIL_RE.match(s)
+        if not m:
+            break
+        s = m.group(1)
+        base = _norm_id(s)
+        if len(base) >= 9 and len(base) >= len(n) - 4:
+            bases.append(base)
+            for k in sorted(_id_variants(base)):
+                add(k, "zero_suffix")
+
+    for base in [n] + bases:
+        if len(base) < _ZERO_PAD_MIN_LEN or not base.isdigit():
+            continue
+        for z in range(1, _ZERO_PAD_MAX + 1):
+            add(base + "0" * z, "zero_pad")
+            if base.endswith("0" * z) and len(base) - z >= _ZERO_PAD_MIN_LEN:
+                add(base[:-z], "zero_pad")
     return out
 
 
@@ -760,38 +1066,44 @@ def _layer_cfg_ci(county: str) -> dict | None:
     return _LAYERS_CI.get((county or "").strip().lower())
 
 
-async def refresh_county(county: str) -> dict:
-    """Bulk-download + verify + replace the cache for one county. Returns a status dict."""
-    from .http_client import get_text
-    cfg = resolve_layer_cfg(county)
-    if not cfg:
-        return {"county": county, "ok": False, "error": "no config"}
-    base = cfg["url"]
-    # a map value may be a single field or a list of fields (split situs) — flatten for outFields
-    src_fields: set[str] = set(cfg["id_fields"])
-    for spec in cfg["map"].values():
-        if isinstance(spec, list):
-            src_fields.update(spec)
+def _src_fields(id_fields, spec_map) -> str:
+    """Comma-joined outFields for a layer: its id fields plus every field any map spec
+    names. A spec is a field name, a LIST of fields (split situs), or a {"sum": [...]}
+    dict (numeric column published in parts)."""
+    src: set[str] = set(id_fields)
+    for spec in spec_map.values():
+        if isinstance(spec, dict):
+            src.update(spec.get("sum") or ())
+        elif isinstance(spec, list):
+            src.update(spec)
         elif spec:
-            src_fields.add(spec)
-    out_fields = ",".join(sorted(src_fields))
+            src.add(spec)
+    return ",".join(sorted(src))
+
+
+async def _download_rows(base: str, where: str, out_fields: str):
+    """Count-verified bulk download of one ArcGIS layer. Returns (rows, expected).
+
+    COUNT-DRIVEN pagination: keep pulling until we've collected `exp` rows. Advance by
+    the actual number returned (some servers return < _PAGE per page), and retry a page
+    up to 3x on a transient empty/error response instead of ending the loop early (which
+    is what silently truncated Burke @30k / Laurens @22.9k on the first pass).
+    Raises RuntimeError("count: ...") when the expected count cannot be read.
+    """
+    from .http_client import get_text
     # A STATEWIDE layer needs a per-county filter. NC OneMap publishes all 5,938,900 NC
     # parcels in one service, so its config carries where=cntyname='<County>' and the
     # count check and every page must both use it -- counting 5.9M and paging one county
     # would never terminate.
-    where_q = quote(cfg.get("where", "1=1"), safe="")
+    where_q = quote(where, safe="")
     # expected count first (completeness check)
     try:
         exp = json.loads(await get_text(f"{base}?where={where_q}&returnCountOnly=true&f=json",
                                         timeout=40, impersonate=True)).get("count")
     except Exception as e:  # noqa: BLE001
-        return {"county": county, "ok": False, "error": f"count: {str(e)[:80]}"}
+        raise RuntimeError(f"count: {str(e)[:80]}") from e
 
-    rows, offset, t0, empties = [], 0, time.time(), 0
-    # COUNT-DRIVEN pagination: keep pulling until we've collected `exp` rows. Advance by
-    # the actual number returned (some servers return < _PAGE per page), and retry a page
-    # up to 3x on a transient empty/error response instead of ending the loop early (which
-    # is what silently truncated Burke @30k / Laurens @22.9k on the first pass).
+    rows, offset, empties = [], 0, 0
     while exp is None or len(rows) < exp:
         url = (f"{base}?where={where_q}&outFields={out_fields}&returnGeometry=false"
                f"&resultOffset={offset}&resultRecordCount={_PAGE}&f=json")
@@ -810,12 +1122,102 @@ async def refresh_county(county: str) -> dict:
         offset += len(feats)     # advance by what we actually got, not a fixed page size
         if offset > 3_000_000:
             break
+    return rows, exp
 
-    # COMPLETENESS GATE — never replace the cache with a short download
-    ok = exp is not None and abs(len(rows) - exp) <= max(2, int(exp * 0.001))
-    if not ok:
+
+def _complete(rows, exp) -> bool:
+    """COMPLETENESS GATE: never replace the cache with a short download."""
+    return exp is not None and abs(len(rows) - exp) <= max(2, int(exp * 0.001))
+
+
+def _unit_key(unit) -> tuple:
+    """Sort key that puts a parcel's own street address ahead of an apartment row.
+
+    "No unit" sorts first; otherwise the lowest unit wins, compared naturally so unit
+    "2" precedes "10". Horry publishes one address point per unit (242,675 points), and
+    a parcel-level situs must be the building's address, not "APT 4118"'s.
+    """
+    u = "" if unit is None else str(unit).strip()
+    if u.lower() in ("", "0", "none", "null", "nan"):
+        return (0, ())
+    parts = re.split(r"(\d+)", u.lower())
+    return (1, tuple((0, int(p), "") if p.isdigit() else (1, 0, p) for p in parts if p))
+
+
+def build_address_overlay(rows, ocfg: dict) -> dict[str, tuple]:
+    """Index a SITUS-ADDRESS layer by every normalized id variant of its parcel key.
+
+    Some counties publish the parcel polygon and the situs on DIFFERENT layers, keyed
+    by the same PIN/TMS: Horry's parcel layer (MapServer/24) has no address field at all
+    while layer 22 carries 242,675 address points keyed by PIN and TMS, and Charleston's
+    parcel layer has none while its address points carry PID. The primary parcel layer
+    was cached and its situs thrown away, leaving those counties' leads without one.
+
+    Returns {id_variant: (unit_key, address)}. When several points share a parcel the
+    smallest (unit_key, address) wins, so the choice is deterministic and prefers the
+    row with no unit / the lowest unit.
+    """
+    spec = ocfg["address"]
+    ufield = ocfg.get("unit")
+    idx: dict[str, tuple] = {}
+    for r in rows:
+        addr = _map_val(r, "address", spec)
+        if not addr:
+            continue
+        cand = (_unit_key(r.get(ufield)) if ufield else (0, ()), addr)
+        for f in ocfg["id_fields"]:
+            for k in _id_variants(r.get(f)):
+                cur = idx.get(k)
+                if cur is None or cand < cur:
+                    idx[k] = cand
+    return idx
+
+
+def overlay_address(keys, overlay) -> "str | None":
+    """Best overlay address for a parcel known under `keys` (any id variant), or None."""
+    best = None
+    for k in keys:
+        cand = overlay.get(k)
+        if cand is not None and (best is None or cand < best):
+            best = cand
+    return best[1] if best else None
+
+
+async def refresh_county(county: str) -> dict:
+    """Bulk-download + verify + replace the cache for one county. Returns a status dict."""
+    cfg = resolve_layer_cfg(county)
+    if not cfg:
+        return {"county": county, "ok": False, "error": "no config"}
+    base = cfg["url"]
+    out_fields = _src_fields(cfg["id_fields"], cfg["map"])
+    t0 = time.time()
+    try:
+        rows, exp = await _download_rows(base, cfg.get("where", "1=1"), out_fields)
+    except RuntimeError as e:
+        return {"county": county, "ok": False, "error": str(e)}
+
+    if not _complete(rows, exp):
         return {"county": county, "ok": False, "downloaded": len(rows), "expected": exp,
                 "error": "incomplete — cache NOT replaced"}
+
+    # OPTIONAL SITUS OVERLAY (see build_address_overlay). Held to the same completeness
+    # gate as the primary layer: a short overlay would silently REGRESS a cache that had
+    # addresses last week, so an incomplete one leaves the existing cache in place.
+    overlay: dict[str, tuple] = {}
+    ocfg = cfg.get("address_overlay")
+    if ocfg:
+        o_fields = _src_fields(ocfg["id_fields"], {"address": ocfg["address"],
+                                                   "unit": ocfg.get("unit")})
+        try:
+            o_rows, o_exp = await _download_rows(ocfg["url"], ocfg.get("where", "1=1"), o_fields)
+        except RuntimeError as e:
+            return {"county": county, "ok": False, "error": f"address overlay {e}"}
+        if not _complete(o_rows, o_exp):
+            return {"county": county, "ok": False, "downloaded": len(rows), "expected": exp,
+                    "overlay_downloaded": len(o_rows), "overlay_expected": o_exp,
+                    "error": "address overlay incomplete, cache NOT replaced"}
+        overlay = build_address_overlay(o_rows, ocfg)
+        del o_rows
 
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     tmp = _db_path(county, cfg.get("state")).with_suffix(".tmp")
@@ -827,21 +1229,32 @@ async def refresh_county(county: str) -> dict:
                 "living_sqft REAL, land_use TEXT, sale_price REAL, sale_date TEXT)")
     m = cfg["map"]
     recs = []
+    addr_i = _COLS.index("address")
+    overlay_filled = 0
     for r in rows:
         keys: set[str] = set()
         for f in cfg["id_fields"]:
             keys |= _id_variants(r.get(f))
         if not keys:
             continue
-        vals = tuple(_map_val(r, c, m.get(c)) for c in _COLS)
+        vals = [_map_val(r, c, m.get(c)) for c in _COLS]
+        if overlay and not vals[addr_i]:
+            oa = overlay_address(keys, overlay)
+            if oa:
+                vals[addr_i] = oa
+                overlay_filled += 1
+        vals = tuple(vals)
         recs.extend((k, *vals) for k in keys)   # index the parcel under each id variant
     con.executemany("INSERT INTO parcels VALUES(" + ",".join("?" * (1 + len(_COLS))) + ")", recs)
     con.execute("CREATE INDEX idx_id ON parcels(id)")
     con.commit(); con.close()
     tmp.replace(_db_path(county, cfg.get("state")))   # atomic overwrite-in-place
-    return {"county": county, "ok": True, "downloaded": len(rows), "expected": exp,
-            "seconds": round(time.time() - t0, 1),
-            "mb": round(_db_path(county, cfg.get("state")).stat().st_size / 1e6, 1)}
+    status = {"county": county, "ok": True, "downloaded": len(rows), "expected": exp,
+              "seconds": round(time.time() - t0, 1),
+              "mb": round(_db_path(county, cfg.get("state")).stat().st_size / 1e6, 1)}
+    if ocfg:
+        status["overlay_addresses"] = overlay_filled
+    return status
 
 
 _CONN: dict[str, sqlite3.Connection] = {}
@@ -853,25 +1266,39 @@ def lookup(county: str, parcel_id: str, state: str | None = None) -> Optional[di
     `state` is REQUIRED for the county names in DUAL_STATE_COUNTIES. Without it
     this returns None rather than guessing which state's parcel layer to read.
     """
+    return lookup_with_tier(county, parcel_id, state)[0]
+
+
+def lookup_with_tier(county: str, parcel_id: str,
+                     state: str | None = None) -> tuple[Optional[dict], Optional[str]]:
+    """lookup() plus WHICH id form matched: 'exact' (the forms this module has always
+    tried), 'zero_suffix' or 'zero_pad' (see _lookup_candidates), or None on a miss.
+    Scripts use the tier to report how many hits the tolerance added."""
     try:
         p = _db_path(county, state)
     except ValueError:
-        return None   # dual-state name, caller had no state — refuse to guess
+        return None, None   # dual-state name, caller had no state — refuse to guess
     if not p.exists() or not (parcel_id or "").strip():
-        return None
+        return None, None
     ckey = p.name
     con = _CONN.get(ckey)
     if con is None:
         con = _CONN[ckey] = sqlite3.connect(f"file:{p}?mode=ro", uri=True)
-    row = None
-    for k in _id_variants(parcel_id):
+    sel = "SELECT " + ",".join(_COLS) + " FROM parcels WHERE id=?"
+    pad_rows: list[tuple] = []
+    for k, tier in _lookup_candidates(parcel_id):
         try:
-            row = con.execute(
-                "SELECT " + ",".join(_COLS) + " FROM parcels WHERE id=?", (k,)).fetchone()
+            row = con.execute(sel, (k,)).fetchone()
         except sqlite3.OperationalError:
-            return None   # stale-schema cache (pre-land_use column) — weekly refresh rebuilds it
-        if row:
-            break
-    if not row:
-        return None
-    return {k: v for k, v in zip(_COLS, row) if v not in (None, "")}
+            return None, None   # stale-schema cache (pre-land_use column) — weekly refresh rebuilds it
+        if not row:
+            continue
+        if tier == "zero_pad":
+            pad_rows.append(row)     # never take the first: prove there is only one parcel
+            continue
+        return {c: v for c, v in zip(_COLS, row) if v not in (None, "")}, tier
+    if pad_rows:
+        ident = {(r[0], r[1], r[2]) for r in pad_rows}   # owner, address, owner_mailing
+        if len(ident) == 1:
+            return {c: v for c, v in zip(_COLS, pad_rows[0]) if v not in (None, "")}, "zero_pad"
+    return None, None

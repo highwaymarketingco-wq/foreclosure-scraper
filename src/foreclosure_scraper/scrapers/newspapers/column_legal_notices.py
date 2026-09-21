@@ -28,13 +28,27 @@ notice classes:
       address-less OK (the owner-to-GIS enricher backfills the property address
       downstream from the decedent name).
 
-  (3) SC "Estate (Probate) Filings" notices — SC has NO foreclosure notice
-      type on Column (verified live 2026-06-26: the only SC notice types in
-      footprint are '', 'Notice of Application', 'Summons', 'Notice of Sale',
-      'Estate (Probate) Filings', 'Parental Action', etc.). Probate "Notice to
+  (3) SC "Estate (Probate) Filings" notices: Probate "Notice to
       Creditors" filings are emitted as PROBATE_NOTICE leads: owner_name =
       decedent (from "Estate:"), address-less is OK (the owner-to-GIS enricher
       backfills the property address downstream from the decedent name).
+      (The 2026-06-26 note that SC has no foreclosure notice type was wrong: SC
+      carries "Foreclosure Sale" too, ~98 notices in 120 days, read by the
+      statewide lane in fetch() step 4.)
+
+  (4) NC TAX foreclosure sales in counties OUTSIDE the 18-county flip footprint
+      (added 2026-09-21: Washington, Hertford, Bertie, Gates, Martin). The owner rule is
+      "flips only in the 18 counties, distressed anywhere in NC and SC", and a
+      mortgage foreclosure sale is a flip while a county TAX foreclosure is not. So for
+      these counties a "Foreclosure Sale" notice is kept ONLY when it is a tax
+      foreclosure ("NOTICE OF TAX FORECLOSURE SALE ... COUNTY OF X vs. <owner>"), and is
+      emitted as TAX_SALE (a real sale date) with the case number, parcel id and
+      plaintiff. Mortgage foreclosures there are counted and dropped, never emitted as
+      FORECLOSURE_SALE. Column tags a notice by newspaper coverage, not property county
+      (the "Hertford" tag carries most Northampton notices), so the county is read from
+      "District Court of X County" in the body. Their estate notices ride the existing
+      NC estate lane, and the SC Pee Dee counties (Florence, Marion, Marlboro) ride the
+      SC probate lane.
 
 Endpoint behavior (verified live 2026-06-26):
   - POST https://us-central1-enotice-production.cloudfunctions.net/api/search/public-notices
@@ -92,6 +106,18 @@ SC_FOOTPRINT = (
     # coastal
     "Charleston", "Horry", "Beaufort", "Georgetown", "Colleton",
 )
+
+#: Counties OUTSIDE the 18-county flip footprint whose Column notices are worth reading for
+#: DISTRESSED leads only (verified live 2026-09-21: Washington 16 foreclosure notices in a
+#: year, Hertford 14, Martin 16, Gates 8, Bertie 4). Foreclosure lane: tax foreclosures only.
+#: Estate lane: all estates. See _is_tax_foreclosure and the module docstring, item (4).
+NC_DISTRESSED_ONLY = ("Washington", "Hertford", "Bertie", "Gates", "Martin")
+
+#: SC Pee Dee counties, probate lane only (Florence 31 estate notices in 120 days, Marion 94,
+#: Marlboro 111, verified live 2026-09-21). SC's foreclosure lane is statewide (step 4 of
+#: fetch()) and its mortgage foreclosures in non-footprint counties are flips, dropped by
+#: the scope gate; SC tax sales are not court foreclosures and do not appear there.
+SC_DISTRESSED_ONLY = ("Florence", "Marion", "Marlboro")
 
 NC_FORECLOSURE_TYPE = "Foreclosure Sale"
 
@@ -497,7 +523,7 @@ _DOD = re.compile(
 # SC probate case number, e.g. "2026-ES-26-00984" — OCR often inserts a space
 # after the year ("2026- ES-26-00984"), so tolerate whitespace around dashes.
 _SC_CASE = re.compile(
-    r"Case Number[:\s]*([0-9]{4}\s*-\s*ES\s*-\s*[0-9][0-9\s\-]*[0-9])", re.I
+    r"Case Number[:\s]*([0-9]{4}\s*-?\s*ES\s*-?\s*[0-9][0-9\s\-]*[0-9])", re.I
 )
 _PERSONAL_REP = re.compile(
     r"Personal\s+Representative[:\s]*([A-Z][A-Za-z.,'\- ]{3,60}?)"
@@ -636,6 +662,116 @@ def _parse_nc_estate(text: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# NC TAX-foreclosure notice parsing  (counties outside the flip footprint)
+# --------------------------------------------------------------------------- #
+# A county or town tax foreclosure is a civil action (CV / CVD), not a special proceeding,
+# and its notice reads (verified live 2026-09-21, Washington / Gates / Martin / Northampton):
+#   "NOTICE OF TAX FORECLOSURE SALE Under and by virtue of an order of the District Court of
+#    Washington County, North Carolina, made and entered in the action entitled COUNTY OF
+#    WASHINGTON & TOWN OF PLYMOUTH vs. <OWNER> and <OWNER>'S SPOUSE, if any, and all possible
+#    heirs ... et al, 25CV000168-930, the undersigned Commissioner will on the 23rd day of
+#    July, 2026, offer for sale ... Parcel Identification Number: 6767.12-85-4828 ..."
+# OCR hyphenates across line wraps ("FORECLO- SURE", "enti- tled"), which _norm heals for
+# lower-case continuations only, so the classifier tolerates the upper-case break itself.
+_TAX_FC = re.compile(r"TAX\s+FORE-?\s*CLO-?\s*SURE", re.I)
+_TAX_PLAINTIFF = re.compile(
+    r"action\s+entitled\s+"
+    r"((?:COUNTY|TOWN|CITY|VILLAGE)\s+OF\s+[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?"
+    r"(?:\s*&\s*(?:COUNTY|TOWN|CITY|VILLAGE)\s+OF\s+[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?)?)"
+    r"\s+vs?\.?\s+",
+    re.I,
+)
+_TAX_CASE = re.compile(r"\b(\d{2}\s?CVD?\s?\d{3,6}\s?-\s?\d{2,3})\b", re.I)
+_TAX_SALE_DATE = re.compile(
+    r"on\s+the\s+(\d{1,2})(?:st|nd|rd|th)?\s+day\s+of\s+([A-Za-z]+),?\s+(\d{4})", re.I)
+_TAX_SALE_TIME = re.compile(r"at\s+(\d{1,2}(?::\d{2})?)\s*o.?clock,?\s*(noon|a\.?m\.?|p\.?m\.?)?", re.I)
+_TAX_PARCEL = re.compile(
+    r"Parcel\s+Identification\s+Number(?:s)?[:\s]*([0-9][0-9A-Za-z.\-]{3,})", re.I)
+_TAX_FC_PID = re.compile(r"FC\s*/\s*PID\s*[:\s]*([0-9][0-9A-Za-z.\-]{3,})", re.I)
+_TAX_COURT_COUNTY = re.compile(
+    r"District\s+Court\s+of\s+([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?)\s+County", re.I)
+#: Where the first named defendant ends. Owners are followed by their spouse, "et al",
+#: heirs and assigns, or an "a/k/a".
+_DEF_CUT = re.compile(
+    r"\s+and\s+(?:[A-Z][A-Za-z.' \-]{0,40}?)?\s*spouse\b|,\s*and\s|\s+and\s+all\s+possible"
+    r"|,?\s+et\s+al\b|\s+a/k/a\b|,\s*if\s+any\b|,\s+or\s+any\b|,\s*the\s+undersigned",
+    re.I)
+_MONTHS_NUM = {m: i for i, m in enumerate(
+    ["january", "february", "march", "april", "may", "june", "july", "august",
+     "september", "october", "november", "december"], 1)}
+
+
+def is_tax_foreclosure(text: str) -> bool:
+    """True for a county / town TAX foreclosure sale notice, False for a mortgage
+    (deed-of-trust) foreclosure. The mortgage form never says "TAX FORECLOSURE"."""
+    return bool(_TAX_FC.search(text or ""))
+
+
+def _parse_nc_tax_foreclosure(text: str) -> dict:
+    """Fields from an NC tax foreclosure sale notice. Every field is optional."""
+    t = _norm(text)
+    out: dict = {}
+    m = _TAX_PLAINTIFF.search(t)
+    if m:
+        out["plaintiff"] = _clean_name(m.group(1))
+        rest = t[m.end():m.end() + 260]
+        cut = _DEF_CUT.search(rest)
+        owner = rest[:cut.start()] if cut else rest.split(",", 1)[0]
+        owner = _clean_name(owner)
+        if owner:
+            out["owner_name"] = owner[:120]
+    m = _TAX_CASE.search(t)
+    if m:
+        out["case_number"] = re.sub(r"\s+", "", m.group(1)).upper()
+    m = _TAX_SALE_DATE.search(t)
+    if m:
+        mon = _MONTHS_NUM.get(m.group(2).lower())
+        if mon:
+            try:
+                out["sale_date"] = datetime(int(m.group(3)), mon, int(m.group(1)))
+                out["sale_date_raw"] = m.group(0)
+            except ValueError:
+                pass
+    if "sale_date" not in out:
+        m = _SALE_DATE_FALLBACK.search(t)
+        if m:
+            dt = _parse_dt(m.group(1))
+            if dt is not None:
+                out["sale_date"], out["sale_date_raw"] = dt, m.group(1)
+    m = _TAX_SALE_TIME.search(t)
+    if m:
+        out["sale_time"] = (m.group(1) + (" " + m.group(2) if m.group(2) else "")).strip()
+    parcels = [x.rstrip(".") for x in _TAX_PARCEL.findall(t)]
+    if not parcels:
+        parcels = [x.rstrip(".") for x in _TAX_FC_PID.findall(t)]
+    if parcels:
+        out["parcel_id"] = parcels[0]
+        out["parcel_ids"] = list(dict.fromkeys(parcels))
+    m = _TAX_COURT_COUNTY.search(t)
+    if m:
+        out["county"] = m.group(1).title()
+    elif out.get("plaintiff"):
+        # The "Hertford" newspaper tag carries Northampton notices; when OCR loses the court
+        # line, the plaintiff still names the county ("COUNTY OF NORTHAMPTON vs.").
+        pm = re.match(r"COUNTY\s+OF\s+([A-Za-z]+(?:\s+[A-Za-z]+)?)", out["plaintiff"], re.I)
+        if pm:
+            out["county"] = pm.group(1).split(" & ")[0].title()
+    return out
+
+
+#: "NORTH CAROLINA, NORTHAMPTON COUNTY File No ..." -- the property county of an estate
+#: notice, which can differ from Column's newspaper tag (Hertford carries Northampton).
+_NC_ESTATE_COUNTY = re.compile(
+    r"NORTH\s+CAROLINA,?\s+([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?)\s+COUNTY\b")
+
+
+def estate_county(text: str, tag_county: str) -> str:
+    """County for an NC estate notice: the body's own county when it names one, else the tag."""
+    m = _NC_ESTATE_COUNTY.search(_norm(text or ""))
+    return m.group(1).title() if m else tag_county
+
+
+# --------------------------------------------------------------------------- #
 # API call
 # --------------------------------------------------------------------------- #
 async def _query(
@@ -747,7 +883,7 @@ def _sc_foreclosure_fields(text: str) -> dict:
 
 class ColumnLegalNotices(BaseScraper):
     slug = "counties.column_legal_notices"
-    name = "Column Unified Legal Notices (NC foreclosure + SC probate)"
+    name = "Column Unified Legal Notices (NC foreclosure + tax foreclosure, NC/SC probate)"
     category = "newspaper_legal"
     requires_apify = False
     # Legal-notice volume swings week-to-week; some weeks a small county runs 0
@@ -756,16 +892,24 @@ class ColumnLegalNotices(BaseScraper):
     expected_min_count = 0
     timeout_s = 240.0
 
+    #: True reads ONLY the counties added 2026-09-21 (NC_DISTRESSED_ONLY / SC_DISTRESSED_ONLY)
+    #: and skips the footprint lanes and the statewide SC foreclosure query. Used by
+    #: scripts/ingest_new_county_sources.py so a one-off landing of the new counties does not
+    #: re-read (and re-emit) every existing lane.
+    only_new_counties: bool = False
+
     async def fetch(self) -> Iterable[Listing]:
         now_ms = int(time.time() * 1000)
         from_ms = now_ms - WINDOW_DAYS * 24 * 3600 * 1000
+        nc_fp = () if self.only_new_counties else NC_FOOTPRINT
+        sc_fp = () if self.only_new_counties else SC_FOOTPRINT
 
         out: list[Listing] = []
         seen_ids: set[str] = set()
 
         async with client(timeout=60.0) as c:
             # (1) NC foreclosure sales across the NC footprint.
-            for county in NC_FOOTPRINT:
+            for county in nc_fp:
                 items = await _query(
                     c, _NC, county, NC_FORECLOSURE_TYPE, from_ms, now_ms
                 )
@@ -781,15 +925,39 @@ class ColumnLegalNotices(BaseScraper):
             # per county. Emitted as PROBATE_NOTICE leads (decedent = owner_name,
             # address-less OK). Base-id dedup below collapses any overlap between
             # the two noticetypes / publication runs.
-            for county in NC_FOOTPRINT:
+            for county in nc_fp + NC_DISTRESSED_ONLY:
                 for ntype in NC_ESTATE_TYPES:
                     items = await _query(c, _NC, county, ntype, from_ms, now_ms)
                     for it in items:
                         li = self._nc_estate_listing(it, county)
                         if li is not None:
+                            if county in NC_DISTRESSED_ONLY:
+                                li.county = estate_county(it.get("text") or "", county)
                             out.append(li)
+            # (1b) NC TAX foreclosures in counties outside the flip footprint. A mortgage
+            # foreclosure there is a flip and is dropped; a county tax foreclosure is a
+            # distressed lead and is kept (module docstring, item 4).
+            _tax_seen: set = set()
+            _tax_kept = _mortgage_dropped = 0
+            for county in NC_DISTRESSED_ONLY:
+                for it in await _query(c, _NC, county, NC_FORECLOSURE_TYPE, from_ms, now_ms):
+                    if not is_tax_foreclosure(it.get("text") or ""):
+                        _mortgage_dropped += 1
+                        continue
+                    li = self._nc_tax_listing(it, county)
+                    if li is None:
+                        continue
+                    k = (li.county, li.case_number, li.parcel_id or li.owner_name)
+                    if k in _tax_seen:
+                        continue
+                    _tax_seen.add(k)
+                    out.append(li)
+                    _tax_kept += 1
+            log.info("column.nc_tax_foreclosure", kept=_tax_kept,
+                     mortgage_foreclosures_dropped=_mortgage_dropped,
+                     counties=len(NC_DISTRESSED_ONLY))
             # (3) SC estate/probate filings across the SC footprint.
-            for county in SC_FOOTPRINT:
+            for county in sc_fp + SC_DISTRESSED_ONLY:
                 items = await _query(
                     c, _SC, county, SC_PROBATE_TYPE, from_ms, now_ms
                 )
@@ -815,7 +983,8 @@ class ColumnLegalNotices(BaseScraper):
             # footprint. This lane serves the statewide SC DISTRESSED scope. It does not
             # improve footprint foreclosure coverage, and should not be described as if
             # it does.
-            sc_fc = await _query(c, _SC, None, NC_FORECLOSURE_TYPE, from_ms, now_ms)
+            sc_fc = ([] if self.only_new_counties else
+                     await _query(c, _SC, None, NC_FORECLOSURE_TYPE, from_ms, now_ms))
             _sc_kept = 0
             for it in sc_fc:
                 got = _sc_foreclosure_fields(it.get("text") or "")
@@ -854,7 +1023,7 @@ class ColumnLegalNotices(BaseScraper):
         log.info(
             "column.done",
             total=len(out), deduped=len(deduped),
-            nc_counties=len(NC_FOOTPRINT), sc_counties=len(SC_FOOTPRINT),
+            nc_counties=len(nc_fp), sc_counties=len(sc_fp),
         )
         return deduped
 
@@ -923,6 +1092,53 @@ class ColumnLegalNotices(BaseScraper):
             trustee=parsed.get("trustee"),
             case_number=parsed.get("case_number"),
             sale_date=parsed.get("sale_date"),
+            sale_time=parsed.get("sale_time"),
+            description=_norm(text)[:500],
+            first_seen=published,
+            last_seen=datetime.utcnow(),
+            raw=raw,
+        )
+
+    def _nc_tax_listing(self, it: dict, tag_county: str) -> Listing | None:
+        """NC county/town TAX foreclosure sale notice -> TAX_SALE lead.
+
+        Only called for counties outside the 18-county flip footprint, where a mortgage
+        foreclosure is out of scope but a tax foreclosure is a distressed lead. Needs an
+        owner or a parcel; a notice OCR reduced to a case number alone is not routable.
+        """
+        text = it.get("text") or ""
+        if not text.strip():
+            return None
+        parsed = _parse_nc_tax_foreclosure(text)
+        if not (parsed.get("owner_name") or parsed.get("parcel_id")):
+            return None
+        county = parsed.get("county") or tag_county
+        raw = self._common_raw(it)
+        raw["column"]["snippet"] = _norm(text)[:800]
+        raw["column"]["tax_foreclosure"] = {
+            "plaintiff": parsed.get("plaintiff"),
+            "parcel_ids": parsed.get("parcel_ids"),
+            "column_county_tag": tag_county,
+            "sale_date_raw": parsed.get("sale_date_raw"),
+        }
+        src_url = it.get("pdfurl") or f"{API_URL}#{it.get('id') or ''}"
+        published = self._published_dt(it)
+        sale = parsed.get("sale_date")
+        return Listing(
+            source=self.slug,
+            source_url=src_url,
+            # A real sale date makes it a TAX_SALE; without one it is only a standing lien.
+            listing_type=ListingType.TAX_SALE if sale else ListingType.TAX_LIEN,
+            property_kind=PropertyKind.UNKNOWN,
+            foreclosure_process="tax",
+            state="NC",
+            county=county,
+            parcel_id=parsed.get("parcel_id"),
+            owner_name=parsed.get("owner_name"),
+            defendant=parsed.get("owner_name"),
+            plaintiff=parsed.get("plaintiff"),
+            case_number=parsed.get("case_number"),
+            sale_date=sale,
             sale_time=parsed.get("sale_time"),
             description=_norm(text)[:500],
             first_seen=published,

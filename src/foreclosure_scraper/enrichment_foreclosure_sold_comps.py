@@ -56,7 +56,7 @@ from typing import Optional
 
 import structlog
 
-from .models import Listing, PropertyKind
+from .models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
 
@@ -139,35 +139,116 @@ FORECLOSURE_SALE_SOURCES = frozenset({
 })
 
 
+# F8 (audit 2026-09-21): how long after the sale a lead is still ACTIONABLE, by state.
+# NC: the 10-day upset-bid window after the report of sale (NCGS 45-21.27), operationally
+# 14 days from the sale date. SC: main._active_only has always granted 14 (its
+# confirmation window is longer). Anything else keeps the 2 day grace _active_only gives.
+# main._active_only reads THIS table, so the sold-pool partition and the active filter can
+# never disagree about where "actionable" ends: a lead is active while
+# `now - sale <= window` and sold-pool material strictly after it.
+UPSET_WINDOW_DAYS: dict[str, int] = {"NC": 14, "SC": 14}
+DEFAULT_UPSET_WINDOW_DAYS = 2
+# SC tax sale: the sale conveys only a certificate; the owner keeps title and can redeem
+# for ~12 months (SC Code 12-51-90). Same figure enrichment_process_timing uses.
+SC_TAX_REDEMPTION_DAYS = 365
+
+
+def state_upset_window_days(state: str | None) -> int:
+    return UPSET_WINDOW_DAYS.get((state or "").upper(), DEFAULT_UPSET_WINDOW_DAYS)
+
+
+def auction_datetime(li: Listing) -> datetime | None:
+    """The TRUE auction date. ``raw.auction_date`` when a court-docket enricher stored one
+    (it is never overwritten by a docket event), otherwise ``sale_date``. Naive UTC."""
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    ad = raw.get("auction_date")
+    if isinstance(ad, str) and ad:
+        try:
+            return _naive_utc(datetime.fromisoformat(ad.replace("Z", "+00:00")))
+        except ValueError:
+            pass
+    elif isinstance(ad, datetime):
+        return _naive_utc(ad)
+    return _naive_utc(li.sale_date)
+
+
+def sc_tax_redemption_open(li: Listing, now: datetime | None = None) -> bool:
+    """True for an SC tax sale whose redemption clock is still running. Such a lead is a
+    motivated-seller lead (the owner still holds title), NOT a finished sale, so it must
+    stay on the active board however long ago the sale was."""
+    if (li.state or "").upper() != "SC":
+        return False
+    if li.listing_type != ListingType.TAX_SALE and li.redemption_deadline is None:
+        return False
+    if now is None:
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+    deadline = _naive_utc(li.redemption_deadline)
+    if deadline is None:
+        sd = auction_datetime(li)
+        if sd is None:
+            return False
+        deadline = sd + timedelta(days=SC_TAX_REDEMPTION_DAYS)
+    return deadline >= now
+
+
+def in_upset_window(li: Listing, now: datetime | None = None) -> bool:
+    """True while the sale has happened but the state's upset/confirmation window (or an SC
+    tax sale's redemption clock) is still open, i.e. the lead is still actionable."""
+    if now is None:
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if sc_tax_redemption_open(li, now):
+        return True
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    ub = raw.get("upset_bid")
+    if isinstance(ub, dict) and ub.get("in_window") and ub.get("source") == "published":
+        # A source that PRINTS the close date beats a derived one: stacked upsets restart
+        # the clock, so the published deadline routinely sits past sale + 14.
+        try:
+            dl = _naive_utc(datetime.fromisoformat(str(ub.get("deadline_iso")).replace("Z", "+00:00")))
+            if dl is not None and dl >= now:
+                return True
+        except ValueError:
+            pass
+    sd = auction_datetime(li)
+    if sd is None or sd > now:
+        return False
+    return (now - sd) <= timedelta(days=state_upset_window_days(li.state))
+
+
 def is_sold_pool_candidate(li: Listing,
                            now: datetime | None = None) -> bool:
     """True if this listing should join the sold-comp pool. Two paths:
 
     1. Strong signal: ``raw.actual_sold_price`` is set — the scraper has
        confirmed an actual hammer price (Pickens / Anderson / Spartanburg
-       results PDFs, NC ROD Trustee's Deed Upon Sale recordings). These
-       qualify regardless of sale_date timing because the price-set event
-       has already happened — the only nuance is whether the legal sale
-       has been finalized (post upset-bid window).
+       results PDFs, NC ROD Trustee's Deed Upon Sale recordings).
 
-    2. Heuristic signal: sale_date is in the past 0-180 days AND the
-       source is a real foreclosure-sale source (law-firm trustee, county
-       MIE, county tax-foreclosure, auction.com). The opening_bid is
-       used as a sold-price proxy.
+    2. Heuristic signal: the sale is more than the state's upset window in the past
+       and no more than 180 days, AND the source is a real foreclosure-sale source
+       (law-firm trustee, county MIE, county tax-foreclosure, auction.com). The
+       opening_bid is used as a sold-price proxy.
+
+    F8: BOTH paths now require the actionable window to be OVER. This used to divert a
+    lead the day after its sale (``0 <= days_since``), before the NC 14-day upset-bid
+    window closed, so the strongest actionable signal an investor can chase left the
+    active board on sale day. An SC tax sale stays active for its whole redemption
+    clock. Pass ``now`` to pin the reference time in tests.
     """
     if li.source not in FORECLOSURE_SALE_SOURCES:
         return False
-    raw = li.raw if isinstance(li.raw, dict) else {}
-    if isinstance(raw.get("actual_sold_price"), (int, float)):
-        # Confirmed hammer price — accept regardless of sale_date timing.
-        return True
-    sd = _naive_utc(li.sale_date)
-    if sd is None:
-        return False
     if now is None:
         now = datetime.now(timezone.utc).replace(tzinfo=None)
-    days_since = (now - sd).days
-    return 0 <= days_since <= LOOKBACK_DAYS
+    if in_upset_window(li, now):
+        return False
+    raw = li.raw if isinstance(li.raw, dict) else {}
+    if isinstance(raw.get("actual_sold_price"), (int, float)):
+        # Confirmed hammer price, and the window (if the date is known) is over.
+        return True
+    sd = auction_datetime(li)
+    if sd is None:
+        return False
+    elapsed = now - sd
+    return timedelta(days=state_upset_window_days(li.state)) < elapsed <= timedelta(days=LOOKBACK_DAYS)
 
 
 def _county_key(li: Listing) -> Optional[tuple[str, str]]:

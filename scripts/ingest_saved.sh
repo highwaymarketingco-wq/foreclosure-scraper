@@ -10,14 +10,16 @@
 # It scans the Desktop drop folder + the repo root + ~/Downloads, so wherever you
 # saved the pages, they get picked up.
 set -uo pipefail
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"   # Finder gives an applet a minimal PATH (audit O12)
 REPO="$HOME/foreclosure-scraper"
 DROP="$HOME/Desktop/Court Pages (drop here)"
 DL="$HOME/Downloads"
-UV="$HOME/.local/bin/uv"
+UV="$(command -v uv || echo "$HOME/.local/bin/uv")"
 notify(){ osascript -e "display notification \"$1\" with title \"Court Pages\"" >/dev/null 2>&1; }
 
 cd "$REPO" 2>/dev/null || { osascript -e 'display alert "Court Pages" message "Could not find ~/foreclosure-scraper."' >/dev/null 2>&1; exit 1; }
 mkdir -p "$DROP" logs
+[ -x "$UV" ] || { notify "uv not found on PATH - court pages NOT ingested."; exit 127; }
 
 # NEVER write the board while ANY other board writer holds it — and never run
 # two ingests at once. One lock now does both jobs.
@@ -29,8 +31,8 @@ mkdir -p "$DROP" logs
 # hours and would silently revert whatever this ingest added. The private lock
 # only ever excluded another copy of this same script. See scripts/board_lock.sh.
 . "$REPO/scripts/board_lock.sh"
-if ! board_lock_acquire "$REPO" "ingest_saved.sh"; then
-  notify "Another board job ($(board_lock_holder)) is running — I won't touch the board now. Try again after it finishes."
+if ! board_lock_acquire "$REPO" "ingest_saved.sh" 0 "${INGEST_MAX_RUNTIME:-7200}"; then
+  notify "$(board_lock_refusal_message 'the ingest') Try again after it finishes."
   exit 0
 fi
 trap 'board_lock_release' EXIT INT TERM

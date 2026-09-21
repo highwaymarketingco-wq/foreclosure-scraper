@@ -25,6 +25,27 @@ each field by its label.  The active page is frequently empty (off-season) —
 that is expected and simply yields 0 rows from /669 while /671 still returns
 history.
 
+WHAT LANDS, MEASURED LIVE 2026-09-21 (revival pass)
+  * /669 (active) was empty; /671 (previous sales) returned all 81 rows, dated 2016 to 2026.
+  * Every one of the 81 is a CLOSED sale (sold 65 / cancelled 13 / redeemed 3) and the
+    newest, 2026-09-02, is a cancelled sale. Run through the
+    orchestrator's own ``_active_only`` all 81 fail (76 are past the 14 day upset grace,
+    5 have no sale date). That is the whole answer to "81 rows scraped, 0 landed": there is
+    no live Gaston tax sale on either page right now, and the scraper was reporting the
+    closed history as "OK 81". A live sale flows normally (dated, TAX_SALE, in scope,
+    inside the 120 day horizon); no whitelist entry is needed for a dated row.
+  * Bug fixed: "August 4th, 2021" style dates (ordinal suffix) did not parse, so 5 rows
+    were dateless, and the slug is not in ``main.DATELESS_OK_SOURCES``.
+  * Closed sales now carry a normalised terminal ``auction_status`` (sold / cancelled /
+    redeemed) and a sold row carries ``raw.actual_sold_price`` (the final bid), so they are
+    recognisable as history and are usable as sold-price comps if
+    ``counties_nc.gaston_tax_foreclosures`` is ever added to
+    ``enrichment_foreclosure_sold_comps.FORECLOSURE_SALE_SOURCES`` (documented in
+    docs/scraper_revival_2026-09-21.md; not done here, that module is not this scraper's).
+  * A printed "Last Day to Upset" that is still in the future is published as
+    ``raw.upset_bid`` (``in_window`` / ``deadline_iso`` / ``source=published``), the shape
+    ``in_upset_window`` already reads.
+
 Free, public, no login.
 Slug: counties_nc.gaston_tax_foreclosures
 Category: county_tax
@@ -57,7 +78,8 @@ _MONTHS = (
     "November|December"
 )
 _DATE_RE = re.compile(
-    rf"((?:{_MONTHS})\s+\d{{1,2}},?\s+\d{{4}})", re.I
+    # "August 4th, 2021" and "May 28th, 2019" carry an ordinal suffix; "March 16, 2026" does not.
+    rf"((?:{_MONTHS})\s+\d{{1,2}}(?:st|nd|rd|th)?,?\s+\d{{4}})", re.I
 )
 
 
@@ -79,7 +101,7 @@ def _parse_date(text: str | None) -> datetime | None:
     m = _DATE_RE.search(text)
     if not m:
         return None
-    raw = m.group(1).replace(",", "").strip()
+    raw = re.sub(r"(\d)(?:st|nd|rd|th)\b", r"\1", m.group(1).replace(",", "")).strip()
     for fmt in ("%B %d %Y", "%b %d %Y"):
         try:
             return datetime.strptime(raw, fmt)
@@ -156,6 +178,25 @@ def _status_line(block: str) -> str | None:
     return None
 
 
+def _status_class(status: str | None) -> str | None:
+    """Map the county's free-text status onto a terminal token, or None if it is not final.
+
+    "Settled, Sale Cancelled" and "Sale Cancelled" -> cancelled (owner paid or the county
+    withdrew it); "Settled- Property Redeemed" -> redeemed; "Sale Closed-Property Sold" ->
+    sold. Cancelled is tested first because "Settled, Sale Cancelled" also says "settled".
+    All three tokens are in ``models.TERMINAL_AUCTION_STATUSES``."""
+    s = (status or "").lower()
+    if not s:
+        return None
+    if "cancel" in s:
+        return "cancelled"
+    if "redeem" in s:
+        return "redeemed"
+    if "sold" in s or "sale closed" in s:
+        return "sold"
+    return None
+
+
 def _parse_block(block: str, source_url: str) -> Listing | None:
     owner = _label(block, "Owner")
     parcel = _label(block, "Parcel")
@@ -198,6 +239,16 @@ def _parse_block(block: str, source_url: str) -> Listing | None:
         status,
     ) if b]
 
+    status_class = _status_class(status)
+    now = datetime.utcnow()
+    raw_extra: dict = {}
+    if status_class == "sold" and opening_bid:
+        # The final bid on a closed sale is the price it sold at.
+        raw_extra["actual_sold_price"] = opening_bid
+    if (status_class is None and upset_deadline is not None and upset_deadline >= now):
+        raw_extra["upset_bid"] = {"in_window": True, "source": "published",
+                                  "deadline_iso": upset_deadline.isoformat()}
+
     return Listing(
         source="counties_nc.gaston_tax_foreclosures",
         source_url=source_url,
@@ -214,7 +265,7 @@ def _parse_block(block: str, source_url: str) -> Listing | None:
         opening_bid=opening_bid,
         sale_date=sale_date,
         upset_bid_deadline=upset_deadline,
-        auction_status=status,
+        auction_status=status_class or status,
         case_number=file_number,
         description=" | ".join(desc_bits) if desc_bits else None,
         first_seen=datetime.utcnow(),
@@ -230,7 +281,8 @@ def _parse_block(block: str, source_url: str) -> Listing | None:
             "last_day_to_upset": last_upset_raw,
             "file_number": file_number,
             "status": status,
-        }},
+            "status_class": status_class,
+        }, **raw_extra},
     )
 
 

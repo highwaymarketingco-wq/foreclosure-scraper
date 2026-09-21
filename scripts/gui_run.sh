@@ -2,6 +2,7 @@
 # One-click GUI runner for the full foreclosure engine (no terminal needed).
 # Safe to press twice: if a run is already going it just tells you and leaves it
 # alone — it NEVER starts a second run. Notifies on start + finish.
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"   # Finder gives an applet a minimal PATH (audit O12)
 REPO="$HOME/foreclosure-scraper"
 cd "$REPO" 2>/dev/null || { osascript -e 'display alert "Foreclosure Engine" message "Could not find ~/foreclosure-scraper."'; exit 1; }
 
@@ -26,6 +27,10 @@ nohup bash -c '
   rc=$?
   if [ "$rc" -eq 0 ]; then
     osascript -e "display notification \"Run finished — dashboard updated.\" with title \"Foreclosure Engine done\"" 2>/dev/null
+  elif [ "$rc" -eq 75 ]; then
+    osascript -e "display notification \"Did NOT start: another board job (or the memory gate) holds the board. Try again later.\" with title \"Foreclosure Engine\"" 2>/dev/null
+  elif [ "$rc" -eq 127 ]; then
+    osascript -e "display notification \"Did NOT start: uv was not found on PATH. See logs/gui-run.log.\" with title \"Foreclosure Engine\"" 2>/dev/null
   else
     osascript -e "display notification \"Run ended (code $rc). It may just be a low-count guard; check the dashboard.\" with title \"Foreclosure Engine\"" 2>/dev/null
   fi

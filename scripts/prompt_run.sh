@@ -6,12 +6,30 @@
 #
 #   Step 1 — the manual court sources (SC PublicIndex / NC eCourts you save by hand)
 #   Step 2 — the full engine run
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"
 REPO="$HOME/foreclosure-scraper"
 DROP="$HOME/Desktop/Court Pages (drop here)"
 GUIDE="$DROP/_READ ME — how to refresh court sources.txt"
 
+# This popup used to leave NO trace: no log line, always `exit 0`, so nobody could tell
+# whether it appeared, was answered, or was ignored while the "weekly" full run stopped
+# landing (audit O2/O10). It now writes one log line per decision and one job event.
+mkdir -p "$REPO/logs"
+PLOG="$REPO/logs/prompt_run.log"
+plog() { printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$PLOG"; }
+ROOT="$REPO"
+. "$REPO/scripts/job_event.sh"
+JOB_EVENT_ROOT="$REPO"
+job_event_begin prompt_run
+trap 'job_event_finalize' EXIT
+plog "popup fired ($(date +%a))"
+
 # If a run is already going (e.g. you pressed the Desktop button), don't nag.
-if pgrep -f "run_local.sh|-m foreclosure_scraper" >/dev/null 2>&1; then exit 0; fi
+if pgrep -f "run_local.sh|-m foreclosure_scraper" >/dev/null 2>&1; then
+  plog "run already active - popup not shown"
+  job_event_end no_change "" "run_already_active"
+  exit 0
+fi
 mkdir -p "$DROP"
 
 # ---- Step 1: the manual court sources ----
@@ -34,8 +52,10 @@ OSA
   fi
   break
 done
+plog "step 1 answer: '${s1:-<no answer within 7200s>}'"
 if [ "$s1" = "Ingest what I saved" ]; then
   bash "$REPO/scripts/ingest_saved.sh"   # runs now, before the full run; refuses if a run is active
+  plog "step 1 ingest finished rc=$?"
 fi
 
 # ---- Step 2: the full run ----
@@ -48,7 +68,14 @@ It takes several hours; you'll get a notification when it's done and you can kee
 end try
 OSA
 )
+plog "step 2 answer: '${s2:-<no answer within 7200s>}'"
 if [ "$s2" = "Run now" ]; then
   bash "$REPO/scripts/gui_run.sh"
+  plog "step 2: full run launched via gui_run.sh rc=$?"
+  job_event_end ok "" "full_run_started"
+elif [ -z "$s2" ]; then
+  job_event_end no_change "" "popup_unanswered"
+else
+  job_event_end no_change "" "declined"
 fi
 exit 0

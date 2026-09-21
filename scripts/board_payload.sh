@@ -49,6 +49,7 @@ board_payload_paths() {
       docs/listings_detail.json.gz \
       docs/listings_slim.json.gz \
       docs/detail_shards \
+      docs/board.manifest.json \
       docs/run_meta.json \
       docs/run_health.json \
       docs/foreclosure_sold_pool.json \
@@ -73,10 +74,13 @@ board_payload_add() {
 # board_payload_changed <repo-root> — 0 when something in the payload actually
 # moved, 1 when nothing did.
 #
-# run_meta.json is deliberately EXCLUDED: its run_time changes on every write, so
-# a gate that watched it would fire every run and could never do its job, which
-# is to stop a rate-limited / walled pass from creating an empty commit. Every
-# OTHER staged path is watched. sos_agent_refresh.sh used to watch only
+# run_meta.json and board.manifest.json are deliberately EXCLUDED: run_meta's run_time
+# and the manifest's written_at/run_time change on every write, so a gate that watched
+# them would fire every run and could never do its job, which is to stop a
+# rate-limited / walled pass from creating an empty commit. (The manifest still
+# travels: it is in the payload list, so any commit that carries a changed board
+# carries the manifest that describes it. A restore from that commit then verifies.)
+# Every OTHER staged path is watched. sos_agent_refresh.sh used to watch only
 # board/detail/shards while its else-branch `git reset -q` threw away everything
 # staged — so a run whose only effect was on docs/listings_slim.json.gz (the
 # payload phones fetch) staged the fresh slim, was told "no change", reset it,
@@ -85,7 +89,7 @@ board_payload_changed() {
   # `for x in $(cmd)` splits on IFS in sh, bash AND zsh (zsh's no-split rule
   # covers $var, not $(cmd) — verified). None of these paths contains a space.
   _bpc=1
-  for _bpp in $(board_payload_paths "$1" | grep -v '^docs/run_meta\.json$'); do
+  for _bpp in $(board_payload_paths "$1" | grep -v -e '^docs/run_meta\.json$' -e '^docs/board\.manifest\.json$'); do
     if ! git -C "$1" diff --cached --quiet -- "$_bpp" 2>/dev/null; then
       _bpc=0
     fi

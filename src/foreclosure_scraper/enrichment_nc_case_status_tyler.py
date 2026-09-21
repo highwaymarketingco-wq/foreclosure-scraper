@@ -1142,10 +1142,24 @@ async def enrich_with_nc_case_status_authenticated(
             if last_date:
                 for fmt in ("%m/%d/%Y", "%m/%d/%y"):
                     try:
-                        li.sale_date = datetime.strptime(last_date, fmt)
-                        break
+                        _docket_dt = datetime.strptime(last_date, fmt)
                     except ValueError:
                         continue
+                    # F8 (audit 2026-09-21): last_event_date is the DOCKET's last event (a
+                    # report of sale, an order confirming sale, a later filing), NOT the
+                    # auction. This used to overwrite li.sale_date with it, so the upset-bid
+                    # window was measured from the wrong day and the true auction date was
+                    # lost. Keep the two apart: raw.auction_date is the auction,
+                    # raw.docket_last_event_date is the docket, sale_date is left alone.
+                    if li.sale_date is not None and not li.raw.get("auction_date"):
+                        li.raw["auction_date"] = li.sale_date.isoformat()
+                    li.raw["docket_last_event_date"] = _docket_dt.isoformat()
+                    if li.sale_date is None:
+                        # Nothing else knows a date: keep the docket date as a stand-in so
+                        # the sold comp still carries one, and say so.
+                        li.sale_date = _docket_dt
+                        li.raw["sale_date_source"] = "docket_last_event"
+                    break
 
     log.info("nc_ecourts.auth.done", tagged=tagged, of=len(targets))
     LAST_RUN_STATUS.update({

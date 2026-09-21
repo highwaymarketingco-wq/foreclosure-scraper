@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- NC eCourts judgment family merge (audit O2). Daily 03:00.
+     TEMPLATE: the two double-underscore placeholders in the paths are filled in by scripts/install_launchd.sh. Nothing here
+     is installed or loaded until that script is run with its apply option. -->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.highway.foreclosure.family-nc-ecourts</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/zsh</string>
+		<string>__ROOT__/scripts/run_family_nc_ecourts.sh</string>
+	</array>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<key>PATH</key>
+		<string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+		<key>BOARD_MEM_GATE</key>
+		<string>warn</string>
+	</dict>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>3</integer>
+		<key>Minute</key>
+		<integer>0</integer>
+	</dict>
+	<key>RunAtLoad</key>
+	<false/>
+	<key>StandardOutPath</key>
+	<string>__ROOT__/logs/family-nc-ecourts.launchd.log</string>
+	<key>StandardErrorPath</key>
+	<string>__ROOT__/logs/family-nc-ecourts.launchd.log</string>
+	<key>WorkingDirectory</key>
+	<string>__ROOT__</string>
+</dict>
+</plist>

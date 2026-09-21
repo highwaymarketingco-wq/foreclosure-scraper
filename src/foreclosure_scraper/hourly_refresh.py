@@ -107,7 +107,17 @@ async def hourly_refresh(docs_dir: str = "docs") -> dict:
 
 
 def main():
-    result = asyncio.run(hourly_refresh())
+    # write_artifact refuses without the board lock (audit O3). Take it for the whole
+    # load -> enrich -> write span; a scheduled pass that collides should skip, not queue.
+    import sys
+
+    from .web_artifact import BoardLockBusy, BoardMemoryPressure, board_lock
+    try:
+        with board_lock(owner="hourly_refresh", max_runtime=3600):
+            result = asyncio.run(hourly_refresh())
+    except (BoardLockBusy, BoardMemoryPressure) as exc:
+        print(f"hourly refresh skipped: {exc}", file=sys.stderr)
+        sys.exit(75)
     print(f"Hourly refresh complete in {result['elapsed_seconds']:.0f}s")
     print(f"  Board: {result['before_count']} -> {result['after_count']} leads")
     for name, status in result["enrichers"].items():

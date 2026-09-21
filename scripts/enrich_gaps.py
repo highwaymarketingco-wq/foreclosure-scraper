@@ -96,6 +96,11 @@ async def run_step(step_idx):
     except Exception as e:
         print(f"  {name} ERR: {e}", flush=True)
         traceback.print_exc()
+        if func_name == "score_board":
+            # F17 (audit 2026-09-21): do not save a board whose tiers are stale as if it were fine.
+            print("  !! SCORE_BOARD_FAILED: tiers are STALE; not saving. (SCORE_BOARD_FAIL_SOFT=1 saves anyway)", flush=True)
+            if os.environ.get("SCORE_BOARD_FAIL_SOFT", "").strip().lower() not in ("1", "true", "yes"):
+                sys.exit(6)
 
     gc.collect()
 

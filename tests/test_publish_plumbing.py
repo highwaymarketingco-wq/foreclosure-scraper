@@ -151,9 +151,13 @@ def test_a_lock_held_by_a_dead_pid_is_broken_automatically(tmp_path):
     assert not _pid_alive(99998), "fixture PID is somehow running"
 
     with board_lock(tmp_path, owner="survivor"):
-        pid, owner = (d / "pid").read_text().splitlines()
+        # lines 1 and 2 are the legacy contract (pid, owner); since 2026-09-21 the
+        # file also carries start, heartbeat, max runtime and a token (lines 3 to 6)
+        lines = (d / "pid").read_text().splitlines()
+        pid, owner = lines[0], lines[1]
         assert int(pid) == os.getpid()
         assert owner == "survivor"
+        assert len(lines) == 6
 
 
 def test_a_lock_directory_with_no_pid_file_is_broken(tmp_path):
@@ -498,10 +502,13 @@ def test_pages_check_is_wired_into_the_publish_paths():
     for rel, why in callers.items():
         text = (REPO / rel).read_text()
         assert "check_pages_publish" in text, f"{rel} ({why}) stopped calling it"
-    # and the local wrappers must call board_payload_check
+    # and the local wrappers must reach board_payload_check, directly or through
+    # publish_commit (scripts/publish_helper.sh runs it before every commit)
+    assert "board_payload_check" in (REPO / "scripts/publish_helper.sh").read_text()
     for rel in ("scripts/run_local.sh", "scripts/lrcpwa_refresh.sh",
                 "scripts/sos_agent_refresh.sh"):
-        assert "board_payload_check" in (REPO / rel).read_text(), rel
+        text = (REPO / rel).read_text()
+        assert "board_payload_check" in text or "publish_commit" in text, rel
 
 
 # ===========================================================================

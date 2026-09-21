@@ -102,6 +102,10 @@ def pool(monkeypatch):
     monkeypatch.setenv("VISION_USE_OLLAMA", "0")
     monkeypatch.setenv("VISION_MAX_SECONDS", "0")
     monkeypatch.setenv("VISION_BACKEND_COOLDOWN", "0")
+    # These tests pin the LEGACY retire-for-the-run rule; the half-open circuit
+    # breaker (re-admission after 10 min) has its own tests in
+    # tests/test_vision_pool_repair.py.
+    monkeypatch.setenv("VISION_BACKEND_REOPEN_SECONDS", "0")
     # Pure timing knob: the idle poll a worker uses while peers are still
     # holding items. Shortened so these tests aren't dominated by sleeps.
     monkeypatch.setenv("VISION_IDLE_TICK", "0.01")

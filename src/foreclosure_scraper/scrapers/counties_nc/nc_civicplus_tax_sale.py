@@ -26,6 +26,8 @@ log = structlog.get_logger()
 
 # CivicPlus county sites in NC that we haven't built dedicated scrapers for.
 # Each entry: county -> base URL. We walk /sitemap.aspx or /departments pages.
+# 2026-09-21: four entries pointed at hosts that no longer resolve (curl exit 6) and were
+# repaired, each replacement fetched once and answering HTTP 200 with the county's own title.
 CIVICPLUS_COUNTIES: dict[str, str] = {
     "Alamance": "https://www.alamance-nc.com",
     "Alexander": "https://www.alexandercountync.gov",
@@ -48,7 +50,7 @@ CIVICPLUS_COUNTIES: dict[str, str] = {
     "Duplin": "https://www.duplincountync.com",
     "Franklin": "https://www.franklincountync.us",
     "Gates": "https://www.gatescountync.gov",
-    "Graham": "https://www.grahamcounty.gov",
+    "Graham": "https://grahamcounty.org",              # was www.grahamcounty.gov (DNS dead); www.grahamcounty.org does not resolve either
     "Granville": "https://www.granvillecounty.org",
     "Greene": "https://www.greenecountync.gov",
     "Guilford": "https://www.guilfordcountync.gov",
@@ -69,7 +71,7 @@ CIVICPLUS_COUNTIES: dict[str, str] = {
     "Moore": "https://www.moorecountync.gov",
     "Nash": "https://www.nashcountync.gov",
     "New Hanover": "https://www.nhcgov.com",
-    "Northampton": "https://www.northamptonnc.gov",
+    "Northampton": "https://www.northamptonnc.com",    # was northamptonnc.gov (DNS dead)
     "Onslow": "https://www.onslowcountync.gov",
     "Pamlico": "https://www.pamlicocountync.gov",
     "Pasquotank": "https://www.pasquotankcountync.gov",
@@ -83,11 +85,11 @@ CIVICPLUS_COUNTIES: dict[str, str] = {
     "Scotland": "https://www.scotlandcounty.org",
     "Stanly": "https://www.stanlycountync.gov",
     "Surry": "https://www.surrycounty.gov",
-    "Tyrrell": "https://www.tyrrellcountync.gov",
+    "Tyrrell": "http://tyrrellcounty.org",             # was tyrrellcountync.gov (DNS dead); http only, redirects to /en/
     "Union": "https://www.unioncountync.gov",
     "Vance": "https://www.vancecounty.org",
     "Warren": "https://www.warren-county.com",
-    "Washington": "https://www.washingtoncountync.gov",
+    "Washington": "https://washconc.org",              # was washingtoncountync.gov (DNS dead)
     "Watauga": "https://www.wataugacounty.org",
     "Wayne": "https://www.waynegov.com",
     "Wilkes": "https://www.wilkescounty.us",

@@ -380,7 +380,16 @@ def main() -> int:
     _safe("vacant_landuse", lambda: enrich_vacant_landuse(merged))
     from foreclosure_scraper.enrichment_bankruptcy_stay import enrich_bankruptcy_stay
     _safe("bankruptcy_stay", lambda: enrich_bankruptcy_stay(merged))
-    _safe("distress score_board", lambda: score_board(merged))
+    # F17 (audit 2026-09-21): this went through _safe(), which prints the error and carries on to
+    # write_artifact, so a scorer failure published the PRIOR tiers as current. It is also what
+    # every scripts/run_family_*.sh job runs. Refuse the write instead; SCORE_BOARD_FAIL_SOFT=1
+    # keeps the old behaviour.
+    try:
+        print("distress score_board:", score_board(merged))
+    except Exception as e:  # noqa: BLE001
+        print(f"distress score_board: SCORE_BOARD_FAILED {type(e).__name__}: {str(e)[:160]}")
+        if os.environ.get("SCORE_BOARD_FAIL_SOFT", "").strip().lower() not in ("1", "true", "yes"):
+            raise SystemExit(6)
     _safe("strategy_fit", lambda: enrich_strategy_fit(merged))
     _safe("buyer_match", lambda: enrich_buyer_match(merged))
     _safe("enrich_multifamily_class", lambda: enrich_multifamily_class(merged))

@@ -679,24 +679,33 @@ select:focus-visible, [tabindex]:focus-visible {
     margin-left: 2px;
   }
   #listings-table tbody td:nth-child(1) .intent-badge { margin-left: 0; }
-  #listings-table tbody td:nth-child(2)  { grid-area: date; font-size: 12px; color: var(--muted); }
-  #listings-table tbody td:nth-child(5)  { grid-area: addr; font-size: 15px; font-weight: 600; color: var(--text); }
-  #listings-table tbody td:nth-child(6)  { grid-area: city; color: var(--muted); }
-  #listings-table tbody td:nth-child(8)  { grid-area: bid;  text-align: right; color: var(--text-2); white-space: nowrap; }
-  #listings-table tbody td:nth-child(12) { grid-area: roi;  text-align: right; font-size: 15px; font-weight: 700; white-space: nowrap; }
-  /* St, County, Type, Est. ARV, Est. Rehab, Max Bid, Bd, Ba, SqFt, Year,
-     Case # — all still in the detail panel and the CSV */
-  #listings-table tbody td:nth-child(3),
+  /* Column numbers below are the CURRENT table: 1 Grade, 2 Buy Box, 3 Sale
+     Date, 4 St, 5 County, 6 Address, 7 City, 8 Type, 9 Bid, 10 Est. ARV,
+     11 Est. Rehab, 12 Max Bid, 13 ROI, 14 Bd, 15 Ba, 16 SqFt, 17 Year, 18 Case #.
+     They were one short of that for as long as Buy Box has been column 2 (the
+     rules still named the old 17-column table): a phone card titled itself with
+     the COUNTY, printed the address as its muted subtitle, showed the Type where
+     the bid goes and the Max Bid where ROI goes, and hid the Sale Date, so the
+     days-to-sale pill never reached a phone. */
+  #listings-table tbody td:nth-child(3)  { grid-area: date; font-size: 12px; color: var(--muted); }
+  #listings-table tbody td:nth-child(6)  { grid-area: addr; font-size: 15px; font-weight: 600; color: var(--text); }
+  #listings-table tbody td:nth-child(7)  { grid-area: city; color: var(--muted); }
+  #listings-table tbody td:nth-child(9)  { grid-area: bid;  text-align: right; color: var(--text-2); white-space: nowrap; }
+  #listings-table tbody td:nth-child(13) { grid-area: roi;  text-align: right; font-size: 15px; font-weight: 700; white-space: nowrap; }
+  /* Buy Box, St, County, Type, Est. ARV, Est. Rehab, Max Bid, Bd, Ba, SqFt,
+     Year, Case # — all still in the detail panel and the CSV */
+  #listings-table tbody td:nth-child(2),
   #listings-table tbody td:nth-child(4),
-  #listings-table tbody td:nth-child(7),
-  #listings-table tbody td:nth-child(9),
+  #listings-table tbody td:nth-child(5),
+  #listings-table tbody td:nth-child(8),
   #listings-table tbody td:nth-child(10),
   #listings-table tbody td:nth-child(11),
-  #listings-table tbody td:nth-child(13),
+  #listings-table tbody td:nth-child(12),
   #listings-table tbody td:nth-child(14),
   #listings-table tbody td:nth-child(15),
   #listings-table tbody td:nth-child(16),
-  #listings-table tbody td:nth-child(17) { display: none; }
+  #listings-table tbody td:nth-child(17),
+  #listings-table tbody td:nth-child(18) { display: none; }
 
   /* --- map ---------------------------------------------------------------- */
   /* premium.css:325 gives #view-map a 22px side margin inside main's own

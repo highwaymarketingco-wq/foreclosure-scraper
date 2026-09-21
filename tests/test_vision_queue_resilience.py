@@ -72,6 +72,10 @@ def pool(monkeypatch):
     monkeypatch.setenv("VISION_USE_OLLAMA", "0")
     monkeypatch.setenv("VISION_MAX_SECONDS", "0")
     monkeypatch.setenv("VISION_BACKEND_COOLDOWN", "0")
+    # These tests pin the LEGACY retire-for-the-run rule; the half-open circuit
+    # breaker (re-admission after 10 min) has its own tests in
+    # tests/test_vision_pool_repair.py.
+    monkeypatch.setenv("VISION_BACKEND_REOPEN_SECONDS", "0")
 
     def _install(backends):
         async def _fake_build(http):

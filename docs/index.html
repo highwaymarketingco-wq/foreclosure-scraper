@@ -9,10 +9,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
 
-  <!-- Installable app. Served from a GitHub Pages PROJECT subpath, so the
-       manifest's start_url/scope must carry /foreclosure-scraper/ — the account
-       root hosts other project sites. -->
-  <link rel="manifest" href="manifest.json">
+  <!-- Installable app. manifest.json uses RELATIVE id / start_url / scope ("./"), so
+       it installs from wherever the site lives: the GitHub Pages project subpath
+       today, the root of a private host tomorrow. crossorigin="use-credentials"
+       makes the browser send its cookies when it fetches the manifest. Without
+       it a login gate (Cloudflare Access) answers the manifest request with the
+       sign-in page, and the app stops being installable. -->
+  <link rel="manifest" href="manifest.json" crossorigin="use-credentials">
 
   <!-- iOS home-screen app. Without apple-mobile-web-app-capable the home-screen
        icon just opens Safari. status-bar-style is "black" deliberately, NOT
@@ -43,9 +46,27 @@
        layout owner can restyle both freely. Desktop is untouched: these two
        elements are new and nothing else targets them. -->
   <style>
-    #filter-sheet-toggle, #sort-mobile, #sort-dir { display: none; }
+    #filter-sheet-toggle, #sort-mobile, #sort-dir, .sort-label { display: none; }
     @media (max-width: 720px) {
       #filter-sheet-toggle, #sort-mobile, #sort-dir { display: block; }
+    }
+    /* The sort menu was phone-only because the table header does the job on a
+       desktop. The new default sort, Deadline first, is a composite (live
+       deadline, then tier, then grade) with no column of its own, so the menu is
+       shown on desktop too. Scoped to 721px+ so the phone layout in premium.css
+       is not touched. */
+    @media (min-width: 721px) {
+      #sort-mobile, #sort-dir { display: inline-block; }
+      /* .result-bar is a space-between flex row: the auto left margin sends the
+         sort group and the export button to the right, the count stays left. */
+      .sort-label { display: inline-block; margin: 0 6px 0 auto; font-size: 12px; opacity: .75; }
+      #sort-dir { margin-right: 6px; }
+      #export-csv { margin-left: 12px; }
+      #sort-mobile, #sort-dir {
+        font: inherit; font-size: 12.5px; padding: 6px 10px; border-radius: 9px;
+        border: 1px solid var(--border); background: var(--surface); color: var(--text);
+      }
+      #sort-dir { cursor: pointer; }
     }
   </style>
 
@@ -55,8 +76,8 @@
        the location/owner/rehab gates. A stale ?v on the CSS with a fresh one on
        the JS ships new markup against old rules, which is how a caveat renders
        as unstyled body text. -->
-  <link rel="stylesheet" href="style.css?v=20260811c">
-  <link rel="stylesheet" href="premium.css?v=20260811c">
+  <link rel="stylesheet" href="style.css?v=20260921a">
+  <link rel="stylesheet" href="premium.css?v=20260921a">
   <script>
     // Set theme before paint — avoids flash of wrong theme.
     (function () {
@@ -113,6 +134,10 @@
     </button>
   </div>
 </header>
+
+<!-- Data freshness, from run_meta.json (dashboard.js paintFreshness). Hidden until
+     it has something to say; turns red past 48 hours. -->
+<div id="freshness-banner" class="freshness" role="status" aria-live="polite" hidden></div>
 
 <section class="stats">
   <div class="stat"><div class="stat-num" id="stat-total">—</div><div class="stat-lbl">total listings</div></div>
@@ -226,13 +251,13 @@
     </select>
   </div>
   <div class="filter-group">
-    <label>Min signals 🔥</label>
+    <label title="Distinct signal categories from the distress stack (financial, sale, legal, life-event, property), not the number of signal names">Min distress categories 🔥</label>
     <select id="filter-signals">
       <option value="">Any</option>
-      <option value="2">2+ stacked</option>
-      <option value="3">3+ stacked</option>
-      <option value="4">4+ stacked</option>
-      <option value="5">5+ stacked</option>
+      <option value="2">2+ categories</option>
+      <option value="3">3+ categories</option>
+      <option value="4">4+ categories</option>
+      <option value="5">5+ categories</option>
     </select>
   </div>
   <div class="filter-group">
@@ -288,8 +313,10 @@
            th[data-sort] click targets with it; dashboard.js dispatches a click
            on the matching th so the existing sort path is reused unchanged.
            Every option value matches a th[data-sort] value below. -->
+      <label for="sort-mobile" class="sort-label">Sort</label>
       <button id="sort-dir" type="button" aria-label="Reverse sort order" title="Reverse sort order">↓</button>
       <select id="sort-mobile" aria-label="Sort listings by">
+        <option value="_deadline">Deadline first</option>
         <option value="_grade">Grade</option>
         <option value="_fullmer">Buy Box</option>
         <option value="sale_date">Sale Date</option>
@@ -316,7 +343,7 @@
         <thead><tr>
           <th data-sort="_grade">Grade</th>
           <th data-sort="_fullmer" class="num" title="Fullmer buy-box rank (0-100)">Buy Box</th>
-          <th data-sort="sale_date">Sale Date</th>
+          <th data-sort="sale_date" title="Days to go (from the dates, today), then the sale date. For deadline-first order use the Sort menu.">Sale Date</th>
           <th data-sort="state">St</th>
           <th data-sort="county">County</th>
           <th data-sort="street_address">Address</th>
@@ -357,11 +384,19 @@
     <div class="address-line" id="d-address">—</div>
     <!-- Top-of-panel quick badges: condition tier + flags + flood + key metrics -->
     <div class="quick-badges" id="d-quick-badges"></div>
+    <!-- Days to go, upset-bid window, sale date passed, presumed withdrawn, bankruptcy
+         stay: one decision, leadClock() in dashboard.js, computed from the dates. -->
+    <div class="clock-panel" id="d-clock" style="display:none"></div>
   </div>
   <div class="detail-body">
     <!-- CRM-lite: per-lead status + notes + next action (browser localStorage) -->
     <div class="detail-section crm-block" id="d-crm-section">
       <h3>📋 Lead CRM <span class="crm-hint">saved in this browser</span></h3>
+      <div class="crm-hint-io">
+        <button type="button" class="btn-link" data-crm-io="export" title="Download every lead's status, notes and next action as a JSON file">Export CRM</button>
+        <button type="button" class="btn-link" data-crm-io="import" title="Merge a CRM export into this browser: newer notes win, nothing is deleted">Import CRM</button>
+        <span class="crm-io-msg" role="status"></span>
+      </div>
       <div class="crm-status-row" id="d-crm-status">
         <button class="crm-status-btn" data-status="New">New</button>
         <button class="crm-status-btn" data-status="Contacted">Contacted</button>
@@ -507,10 +542,19 @@
   <!-- No inline color here: #999 measured 2.85:1 in light theme. Inheriting the
        footer's var(--muted) measures 4.76:1. -->
   <div style="margin-top:8px;font-style:italic">Grades are computed from heuristics + public data; not investment advice. Always verify before bidding.</div>
+  <!-- CRM notes live in this browser's localStorage, which belongs to one address.
+       Export before the board moves, import on the other side. -->
+  <div class="crm-io">
+    CRM notes are stored in this browser only.
+    <button type="button" class="btn-link" data-crm-io="export">Export CRM</button>
+    <button type="button" class="btn-link" data-crm-io="import">Import CRM</button>
+    <input type="file" id="crm-import-file" accept="application/json,.json" hidden>
+    <span class="crm-io-msg" role="status"></span>
+  </div>
 </footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="dashboard.js?v=20260913a"></script>
+<script src="dashboard.js?v=20260921a"></script>
 <script>
   // Theme toggle wiring (kept separate from dashboard.js so data/render logic stays untouched)
   (function () {
