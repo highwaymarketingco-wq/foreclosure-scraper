@@ -52,14 +52,26 @@ _publish_timeout() {   # <seconds> <command...>
 #            `git reset -q` otherwise (sos_agent: a walled run rewrites the board
 #            byte-identically and must not create an empty commit)
 # Returns 0 committed, 1 nothing to commit, 2 the commit failed (a pre-commit hook,
-# e.g. the 95 MiB size gate, refused it). PUBLISH_COMMIT_RESULT names which.
+# e.g. the 95 MiB size gate, refused it) or the staged board was not a consistent part set
+# (stage_failed, parts_inconsistent). PUBLISH_COMMIT_RESULT names which.
 publish_commit() {
   PUBLISH_ROOT="$1"
   _pc_msg="$2"
   _pc_mode="${3:-any}"
   publish_git_config "$PUBLISH_ROOT"
   board_payload_check "$PUBLISH_ROOT" || true   # loud, non-fatal: see board_payload.sh
-  board_payload_add "$PUBLISH_ROOT"
+  if ! board_payload_add "$PUBLISH_ROOT"; then
+    # the board parts could not all be staged: the whole board payload was unstaged
+    git -C "$PUBLISH_ROOT" reset -q
+    PUBLISH_COMMIT_RESULT="stage_failed"
+    return 2
+  fi
+  if ! board_payload_verify_staged "$PUBLISH_ROOT"; then
+    # staged parts are not the set the staged manifest lists (audit O1): never commit that
+    git -C "$PUBLISH_ROOT" reset -q
+    PUBLISH_COMMIT_RESULT="parts_inconsistent"
+    return 2
+  fi
   _pc_has=1
   if [ "$_pc_mode" = "payload" ]; then
     board_payload_changed "$PUBLISH_ROOT" && _pc_has=0

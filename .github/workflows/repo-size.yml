@@ -98,7 +98,8 @@ jobs:
           # Payload paths, most-expensive-first. Reported individually because
           # WHICH file is growing decides which remediation applies.
           PAYLOADS = [
-              "docs/listings.json.gz",
+              "docs/listings.json.gz",            # the single file, until its history stops growing
+              "docs/listings_part_*.json.gz",     # the board since the payload split (audit O1)
               "docs/parcel_photos",
               "docs/detail_shards",
               "docs/listings_detail.json.gz",

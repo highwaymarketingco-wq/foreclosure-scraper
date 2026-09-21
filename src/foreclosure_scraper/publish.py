@@ -23,6 +23,7 @@ point of moving the push out of the lock.
 """
 from __future__ import annotations
 
+import fnmatch
 import os
 import subprocess
 import time
@@ -100,3 +101,39 @@ def manifest_pathspec(root: str | Path) -> list[str]:
         return [rel] if r.returncode == 0 else []
     except Exception:  # noqa: BLE001
         return []
+
+
+PARTS_GLOB = "docs/listings_part_*.json.gz"
+
+
+def _tracked(root: Path, spec: str) -> list[str]:
+    """Paths under `spec` (a pathspec or glob) that git tracks, INCLUDING ones deleted from the
+    working tree (git ls-files reads the index): a deletion has to be stageable."""
+    try:
+        r = subprocess.run(["git", "-C", str(root), "ls-files", "--", spec],
+                           capture_output=True, text=True, timeout=30)
+        return [ln for ln in r.stdout.splitlines() if ln.strip()] if r.returncode == 0 else []
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def parts_pathspec(root: str | Path) -> list[str]:
+    """Every board part that exists on disk OR is tracked (audit O1), as repo-relative paths,
+    in name order. The published board is docs/listings_part_NNN.json.gz; the single
+    docs/listings.json.gz is no longer part of a publish.
+
+    Pass the WHOLE list to ONE `git add` (that is what "stage all parts or none" means: a
+    pathspec that fails makes git stage nothing at all, never half the set), together with the
+    manifest (board_seal_pathspec). The pre-commit hook (scripts/check_staged_parts.py) refuses a
+    commit whose staged parts are not exactly the set the staged manifest lists."""
+    root = Path(root)
+    names = {p.name for p in (root / "docs").glob("listings_part_*.json.gz") if p.is_file()}
+    for rel in _tracked(root, PARTS_GLOB):
+        if fnmatch.fnmatch(rel, PARTS_GLOB):
+            names.add(Path(rel).name)
+    return ["docs/" + n for n in sorted(names)]
+
+
+def board_seal_pathspec(root: str | Path) -> list[str]:
+    """The board parts plus the manifest that lists them: the pair that must travel together."""
+    return parts_pathspec(root) + manifest_pathspec(root)

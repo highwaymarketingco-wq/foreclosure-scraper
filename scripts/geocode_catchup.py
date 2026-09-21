@@ -223,13 +223,17 @@ def main():
     docs_dir = Path(__file__).parent.parent / "docs"
     board_path = docs_dir / "listings.json.gz"
 
-    if not board_path.exists():
-        print(f"Board not found: {board_path}")
+    # The published board is docs/listings_part_NNN.json.gz now (audit O1); board_stream reads the
+    # parts beside board_path in order (or board_path itself when the directory has none).
+    sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+    from foreclosure_scraper import board_parts as _bparts
+    from foreclosure_scraper.board_stream import iter_board_rows
+    if not (board_path.exists() or _bparts.has_parts(docs_dir)):
+        print(f"Board not found: {board_path} (or its listings_part_NNN.json.gz parts)")
         sys.exit(1)
 
     print(f"Loading board from {board_path}...")
-    with gzip.open(board_path, "rt") as f:
-        listings = json.load(f)
+    listings = list(iter_board_rows(board_path))
     print(f"Loaded {len(listings)} listings")
 
     # Find listings with no lat/lon
@@ -329,16 +333,15 @@ def main():
         print("\n[DRY RUN] Not writing back.")
         return
 
-    # Write back
-    print(f"\nWriting back to {board_path}...")
-    with gzip.open(board_path, "wt") as f:
-        json.dump(listings, f)
-    print("Done.")
-
-    # Also write uncompressed
+    # Write back: the plain working copy, then re-cut the published parts from it and reseal
+    # run_meta.board_parts and the manifest (run under scripts/with_board_lock.sh).
     print(f"Writing uncompressed to {docs_dir / 'listings.json'}...")
     with open(docs_dir / "listings.json", "w") as f:
         json.dump(listings, f)
+    print("Done.")
+    from foreclosure_scraper.web_artifact import reseal_board
+    print("Re-cutting the board parts...")
+    reseal_board(docs_dir, resplit=True)
     print("Done.")
 
 

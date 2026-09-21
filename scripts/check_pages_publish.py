@@ -53,6 +53,36 @@ def _shard_dir_name() -> str:
 
 DETAIL_SHARD_DIR = _shard_dir_name()
 
+# THE BOARD IS listings_part_NNN.json.gz (audit O1), not listings.json.gz.
+#
+# The name is chosen against this script's own rule: Jekyll's exclude/include are PREFIX
+# matches, `listings.json`, `listings_detail.json` and `listings_slim.json` are in `exclude`,
+# and none of them is a prefix of `listings_part_...`, so the parts publish with no `include`
+# line at all (docs/_config.yml still carries `- listings_part_` as belt and braces, and this
+# check proves the outcome either way). Every part on disk is required, plus the first one
+# simulated: on a checkout where no publish has run yet the check must still ask the question
+# instead of passing vacuously.
+PART_PREFIX = "listings_part_"
+PART_SUFFIX = ".json.gz"
+FIRST_PART = f"{PART_PREFIX}000{PART_SUFFIX}"
+
+
+def _parts_on_disk() -> list:
+    """Names of every board part in docs/ (any number of them; the count grows with the board)."""
+    try:
+        return sorted(p.name for p in DOCS.glob(f"{PART_PREFIX}*{PART_SUFFIX}") if p.is_file())
+    except OSError:
+        return []
+
+
+# The pre-split single board file. REQUIRED (and simulated) until the rollback path is retired:
+# a rollback to the pre-split dashboard.js fetches it, so it must keep surviving the Jekyll build
+# (`exclude: listings.json` prefix-matches it, and `include: listings.json.gz` is what rescues it).
+# When the file is retired (git rm docs/listings.json.gz, docs/payload_split_2026-09-21.md), delete
+# this line, its SIMULATED entry and the include in docs/_config.yml in the same commit.
+LEGACY_SINGLE_GZ = "listings.json.gz"
+
+
 # Files the dashboard fetches at runtime. If any of these is dropped from the
 # Pages deploy, the board 404s. Keep in sync with docs/dashboard.js fetches and
 # docs/index.html <link>/<script> tags.
@@ -61,7 +91,9 @@ REQUIRED = [
     "dashboard.js",
     "style.css",
     "premium.css",
-    "listings.json.gz",
+    FIRST_PART,
+    *[n for n in _parts_on_disk() if n != FIRST_PART],
+    LEGACY_SINGLE_GZ,
     "listings_detail.json.gz",
     "listings_slim.json.gz",
     # The mobile detail payload. It was NOT listed here, and that hole was
@@ -85,6 +117,7 @@ REQUIRED = [
 SIMULATED = [
     "listings.json",
     "listings.json.gz",
+    FIRST_PART,
     "listings_detail.json",
     "listings_detail.json.gz",
     "listings_slim.json",

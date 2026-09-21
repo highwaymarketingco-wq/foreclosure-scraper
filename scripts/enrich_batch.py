@@ -73,25 +73,12 @@ def stream_save_board(board: list[Listing], docs_dir: Path = DOCS):
         # Phase 2: Atomically replace listings.json
         os.replace(tmp_path, str(listings_path))
 
-        # Phase 3: Stream-gzip the JSON file (read file → gzip → write .gz)
-        #           This holds only the gzip buffer, not the full content.
-        tmp_gz_fd, tmp_gz_path = tempfile.mkstemp(suffix=".gz", dir=str(docs))
-        try:
-            os.close(tmp_gz_fd)
-            with open(listings_path, "rb") as src, \
-                 gzip.GzipFile(filename=str(tmp_gz_path), mode="wb", compresslevel=9, mtime=0) as dst:
-                while True:
-                    block = src.read(65536)
-                    if not block:
-                        break
-                    dst.write(block)
-            os.replace(tmp_gz_path, str(gz_path))
-        except Exception:
-            if os.path.exists(tmp_gz_path):
-                os.unlink(tmp_gz_path)
-            raise
-
-        print(f"  [stream_save] GZ written: {os.path.getsize(gz_path)//1024}KB")
+        # Phase 3: the published board is docs/listings_part_NNN.json.gz now (audit O1), not one
+        #          listings.json.gz. Re-cut the parts from the plain file just written (streaming,
+        #          no load_board) and reseal run_meta.board_parts and the manifest.
+        from foreclosure_scraper.web_artifact import reseal_board
+        reseal_board(docs, resplit=True)
+        print("  [stream_save] board parts resealed")
         print(f"  [stream_save] Done — board saved atomically")
 
     except Exception:

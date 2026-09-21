@@ -551,8 +551,9 @@ async def _run() -> int:
     listings_path = ROOT / "docs" / "listings.json"
     sold_pool_path = ROOT / "docs" / "foreclosure_sold_pool.json"
     run_health_path = ROOT / "docs" / "run_health.json"
-    from foreclosure_scraper.web_artifact import read_board_records, write_artifact
-    if not (listings_path.exists() or listings_path.with_name("listings.json.gz").exists()):
+    from foreclosure_scraper.web_artifact import _board_file_present, read_board_records, write_artifact
+    # plain listings.json, its old .gz twin, or the parts (audit O1)
+    if not _board_file_present(listings_path):
         log.error("patch_run.no_listings_file", path=str(listings_path))
         return 1
 

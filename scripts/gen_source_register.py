@@ -186,7 +186,13 @@ def module_urls(cls) -> list[str]:
 
 
 def load_board(path: Path):
+    from foreclosure_scraper import board_parts
+    from foreclosure_scraper.board_stream import iter_board_rows
     for p in (path, FALLBACK_BOARD):
+        # the published board is docs/listings_part_NNN.json.gz now (audit O1): for the
+        # docs/listings.json.gz path, iter_board_rows reads the parts beside it in order
+        if p and p.name == "listings.json.gz" and (p.exists() or board_parts.has_parts(p.parent)):
+            return list(iter_board_rows(p)), p
         if p and p.exists():
             with gzip.open(p, "rt") as fh:
                 return json.load(fh), p

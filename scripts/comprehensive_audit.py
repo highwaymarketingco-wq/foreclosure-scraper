@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Comprehensive audit: county breakdown, source/avenue breakdown, distressed signal gaps."""
-import json, gzip
+import json, sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
 DOCS = Path(__file__).resolve().parent.parent / "docs"
+sys.path.insert(0, str(DOCS.parent / "src"))
+from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
 
-with gzip.open(DOCS / "listings.json.gz", "rt") as f:
-    data = json.load(f)
+# the board is docs/listings_part_NNN.json.gz now (audit O1); iter_board_rows reads the parts beside
+# this path in order, or the path itself when the directory has none
+data = list(iter_board_rows(DOCS / "listings.json.gz"))
 
 n = len(data)
 print(f"TOTAL LISTINGS: {n:,}\n")

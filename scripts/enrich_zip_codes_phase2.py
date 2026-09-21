@@ -40,16 +40,13 @@ def stream_save(listings):
         f.write(']')
     print(f"  [save] JSON: {os.path.getsize(tmp)//1024}KB")
     os.replace(tmp, str(BOARD))
-    tmp_gz = str(GZ) + ".tmp"
-    with open(str(BOARD), 'rb') as src, open(tmp_gz, 'wb') as dst:
-        with gzip.GzipFile(fileobj=dst, mode='wb', compresslevel=6) as gz:
-            while True:
-                chunk = src.read(1024 * 1024)
-                if not chunk:
-                    break
-                gz.write(chunk)
-    os.replace(tmp_gz, str(GZ))
-    print(f"  [save] GZ: {os.path.getsize(str(GZ))//1024}KB ({time.time()-t0:.1f}s)")
+    # The published board is docs/listings_part_NNN.json.gz now (audit O1), not one
+    # listings.json.gz: re-cut the parts from the plain file just written (streaming, no
+    # load_board) and reseal run_meta.board_parts and the manifest. Run this script under
+    # scripts/with_board_lock.sh, like every board writer.
+    from foreclosure_scraper.web_artifact import reseal_board
+    reseal_board(BOARD.parent, resplit=True)
+    print(f"  [save] board parts resealed ({time.time()-t0:.1f}s)")
 
 
 def forward_geocode_batch(targets):

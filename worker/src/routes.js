@@ -5,6 +5,7 @@
 //
 // Default is DENY. A path is served only if it matches one of:
 //   - a fixed name in RELEASE_FILES or SHELL_FILES,
+//   - listings_part_NNN.json.gz (the board, cut into parts; see PART_RE),
 //   - detail_shards/NNNNN.json.gz,
 //   - icons/<name>.(png|svg|ico),
 //   - parcel_photos/[<one folder>/]<name>.(jpg|jpeg|png|webp),
@@ -19,6 +20,10 @@ const GZIP = "application/gzip"; // no Content-Encoding: see worker/README.md
 
 /** Files that live inside releases/<id>/ in the bucket. Value = content type. */
 export const RELEASE_FILES = new Map([
+  // Legacy single-file board. Since the payload split (audit O1) the board is the numbered
+  // parts matched by PART_RE below; this entry stays only so a rollback to the pre-split
+  // dashboard.js keeps working against a release that still carries the file. Drop it, and the
+  // matching line in scripts/publish_private.sh, when the rollback path is retired.
   ["/listings.json.gz", GZIP],
   ["/listings_slim.json.gz", GZIP],
   ["/listings_detail.json.gz", GZIP],
@@ -63,6 +68,12 @@ const DENY_UNCOMPRESSED_LISTINGS = /^\/listings[^/]*\.json$/i;
 const DENY_NAME = /(?:crm|outreach|maillist|skiptrace|porsche|secret|credential|password|passwd)/i;
 
 const SHARD_RE = /^\/detail_shards\/\d{5}\.json\.gz$/;
+// The board, cut into independently gzipped JSON-array parts (audit O1): /listings_part_000.json.gz,
+// /listings_part_001.json.gz, ... Each is under 24 MiB, so each fits Cloudflare's 25 MiB per-asset
+// cap. Exactly three digits (the writer pads to 3 and only grows to 4 past part 999), nothing
+// else: not the plain .json (DENY_UNCOMPRESSED_LISTINGS above denies that), not a suffix, not a
+// directory. The list of parts and their checksums is in run_meta.json (board_parts).
+const PART_RE = /^\/listings_part_\d{3,4}\.json\.gz$/;
 const ICON_RE = /^\/icons\/[A-Za-z0-9_-]+\.(png|svg|ico)$/i;
 const PHOTO_RE = /^\/parcel_photos\/(?:[A-Za-z0-9_-]+\/)?[A-Za-z0-9_][A-Za-z0-9_.-]*\.(jpe?g|png|webp)$/i;
 
@@ -105,7 +116,7 @@ export function classify(pathname) {
       volatile: VOLATILE_RELEASE_FILES.has(pathname),
     };
   }
-  if (SHARD_RE.test(pathname)) {
+  if (SHARD_RE.test(pathname) || PART_RE.test(pathname)) {
     return { kind: "release", name: pathname, contentType: GZIP, volatile: false };
   }
 

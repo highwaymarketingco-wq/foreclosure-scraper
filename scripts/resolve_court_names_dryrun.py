@@ -56,9 +56,13 @@ def _read_board(docs: Path) -> list[dict[str, Any]]:
     if p.exists():
         return json.loads(p.read_text())
     gz = docs / "listings.json.gz"
-    if gz.exists():
-        return json.loads(gzip.decompress(gz.read_bytes()).decode("utf-8"))
-    raise SystemExit(f"no board at {p} or {gz}")
+    # the published board is docs/listings_part_NNN.json.gz now (audit O1); board_stream reads the
+    # parts beside `gz` in order, or `gz` itself when the directory has none
+    from foreclosure_scraper import board_parts
+    from foreclosure_scraper.board_stream import iter_board_rows
+    if gz.exists() or board_parts.has_parts(docs):
+        return list(iter_board_rows(gz))
+    raise SystemExit(f"no board at {p}, {gz} or docs/listings_part_NNN.json.gz")
 
 
 def _pick_leads(

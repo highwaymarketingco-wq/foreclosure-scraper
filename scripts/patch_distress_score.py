@@ -69,9 +69,12 @@ def _run() -> int:
     hot = sum(1 for x in data if (x.get("raw") or {}).get("distress_stack", {}).get("tier") == "HOT")
     warm = sum(1 for x in data if (x.get("raw") or {}).get("distress_stack", {}).get("tier") == "WARM")
     print(f"[{time.strftime('%H:%M:%S')}] wrote — {hot} HOT, {warm} WARM", flush=True)
-    import gzip as _gz  # regen the .gz the dashboard fetches (listings.json is gitignored)
+    # the published board is docs/listings_part_NNN.json.gz now (audit O1), not one
+    # listings.json.gz: re-cut the parts from the plain file just written (streaming) and reseal
+    # run_meta.board_parts and the manifest (listings.json itself is gitignored)
+    from foreclosure_scraper.web_artifact import reseal_board
     _p = Path("docs/listings.json")
-    (_p.parent / "listings.json.gz").write_bytes(_gz.compress(_p.read_bytes(), compresslevel=9, mtime=0))
+    reseal_board(_p.parent, resplit=True)
 
     # THIS SCRIPT DOES NOT PUBLISH. Unconditionally, by design, always.
     #

@@ -55,8 +55,10 @@ def main() -> int:
     from foreclosure_scraper.config import in_scope
 
     src = DOCS / "listings.json.gz"
-    with gzip.open(src, "rt", encoding="utf-8") as f:
-        board = json.load(f)
+    # the board is docs/listings_part_NNN.json.gz now (audit O1); iter_board_rows reads the parts
+    # beside `src` in order, or `src` itself when the directory has none
+    from foreclosure_scraper.board_stream import iter_board_rows
+    board = list(iter_board_rows(src))
 
     keep, construction, distress = [], [], []
     stats = collections.Counter()

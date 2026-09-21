@@ -141,7 +141,7 @@ def test_manifest_is_written_last_and_describes_every_payload_file(tmp_path):
     man = json.loads((docs / wa.MANIFEST_NAME).read_text())
     assert man["schema"] == wa.MANIFEST_SCHEMA and man["count"] == 7 and man["detail_count"] == 7
     files = man["files"]
-    for name in ("listings.json", "listings_detail.json", "listings.json.gz",
+    for name in ("listings.json", "listings_detail.json", "listings_part_000.json.gz",
                  "listings_detail.json.gz", "listings_slim.json", "listings_slim.json.gz",
                  "run_meta.json"):
         assert name in files, name
@@ -214,9 +214,9 @@ def test_the_manifest_skip_escape_hatch(tmp_path, monkeypatch):
 def test_verify_manifest_names_the_bad_file(tmp_path):
     docs = tmp_path / "d"
     wa.write_artifact([_lead(0)], {"notes": "t"}, docs_dir=docs)
-    (docs / "listings.json.gz").write_bytes(b"corrupt")
+    (docs / "listings_part_000.json.gz").write_bytes(b"corrupt")
     res = wa.verify_manifest(docs)
-    assert not res["ok"] and any("listings.json.gz" in p for p in res["problems"])
+    assert not res["ok"] and any("listings_part_000.json.gz" in p for p in res["problems"])
 
 
 def test_a_manifest_that_could_not_be_written_is_removed_not_left_stale(tmp_path, monkeypatch):

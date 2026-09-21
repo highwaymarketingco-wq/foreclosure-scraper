@@ -9,10 +9,13 @@
 #   1. REFUSES (exit 75) while any job holds the board lock; otherwise takes the lock itself
 #      and holds it for the whole restore, so a scheduled job cannot start halfway through.
 #   2. Moves the current PLAIN twins (docs/listings.json, listings_detail.json,
-#      listings_slim.json) and the shard directory into backups/pre-restore-<stamp>/ (a rename,
-#      not a delete). The plain .json MUST go first: read_board_json prefers it over the .gz,
-#      so leaving a newer plain file beside an older .gz restores nothing.
-#   3. Restores every payload file from THAT ONE COMMIT: the three .gz twins, the whole
+#      listings_slim.json), the board PARTS (docs/listings_part_NNN.json.gz) and the shard
+#      directory into backups/pre-restore-<stamp>/ (a rename, not a delete). The plain .json MUST
+#      go first: read_board_json prefers it over the .gz, so leaving a newer plain file beside an
+#      older .gz restores nothing. The parts MUST go too: a commit with four parts restored over a
+#      tree holding six would leave two strays the manifest does not list.
+#   3. Restores every payload file from THAT ONE COMMIT: the board parts (or, for a commit from
+#      before the payload split, the single listings.json.gz), the two other .gz twins, the whole
 #      docs/detail_shards/ directory (index i is the join across all of them, so a mix of
 #      commits is a mis-joined board: one property's comps under another's address), run_meta,
 #      run_health and board.manifest.json.
@@ -30,17 +33,25 @@ export PATH="$HOME/.local/bin:/opt/homebrew/bin:$PATH"
 ROOT="${FORECLOSURE_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$ROOT" || exit 1
 
-PAYLOAD_FILES=(docs/listings.json.gz docs/listings_detail.json.gz docs/listings_slim.json.gz \
+PAYLOAD_FILES=(docs/listings_detail.json.gz docs/listings_slim.json.gz \
                docs/run_meta.json docs/run_health.json docs/board.manifest.json)
 PAYLOAD_DIR=docs/detail_shards
 PLAIN_FILES=(docs/listings.json docs/listings_detail.json docs/listings_slim.json)
 
+# the board files a commit holds: the parts (listings_part_NNN.json.gz) and, before the payload
+# split, the single listings.json.gz. Direct children of docs/ only (git ls-tree, not -r: the
+# photo directory has thousands of files).
+board_names_in() {   # <commit> -> one docs/<name> per line
+  git ls-tree --name-only "$1" docs/ 2>/dev/null | grep -E '^docs/(listings_part_[0-9]+\.json\.gz|listings\.json\.gz)$'
+}
+
 if [ "${1:-}" = "--list" ]; then
   N="${2:-15}"
-  echo "last $N commits touching docs/listings.json.gz (sha, date, listings.json.gz size, subject):"
-  git log -n "$N" --format='%h %ad %s' --date=short -- docs/listings.json.gz | while read -r sha rest; do
-    sz=$(git cat-file -s "$sha:docs/listings.json.gz" 2>/dev/null)
-    printf '  %s  %6s MiB  %s\n' "$sha" "$(awk -v s="${sz:-0}" 'BEGIN { printf "%.1f", s/1048576 }')" "$rest"
+  echo "last $N commits touching the board (sha, date, board size in all its files, subject):"
+  git log -n "$N" --format='%h %ad %s' --date=short -- docs/listings.json.gz 'docs/listings_part_*.json.gz' | while read -r sha rest; do
+    sz=$(git ls-tree -l "$sha" docs/ 2>/dev/null | awk '$NF ~ /(listings_part_[0-9]+\.json\.gz|\/listings\.json\.gz)$/ {s += $4} END {print s + 0}')
+    np=$(git ls-tree --name-only "$sha" docs/ 2>/dev/null | grep -cE '^docs/listings_part_[0-9]+\.json\.gz$')
+    printf '  %s  %6s MiB  %s%s\n' "$sha" "$(awk -v s="${sz:-0}" 'BEGIN { printf "%.1f", s/1048576 }')" "$rest" "$([ "${np:-0}" -gt 0 ] && echo "  [${np} parts]")"
   done
   exit 0
 fi
@@ -68,16 +79,18 @@ fi
 # which payload paths does the commit actually contain?
 have() { git cat-file -e "$FULL:$1" 2>/dev/null; }
 RESTORE=()
+BOARD_IN_COMMIT=$(board_names_in "$FULL")
+[ -n "$BOARD_IN_COMMIT" ] || { echo "$SHORT has no docs/listings_part_NNN.json.gz and no docs/listings.json.gz: not a board commit" >&2; job_event_end failed "" "not_a_board_commit"; exit 2; }
+for f in $BOARD_IN_COMMIT; do RESTORE+=("$f"); done
 for f in "${PAYLOAD_FILES[@]}"; do have "$f" && RESTORE+=("$f") || echo "note: $SHORT has no $f"; done
 have "$PAYLOAD_DIR" && RESTORE+=("$PAYLOAD_DIR") || echo "note: $SHORT has no $PAYLOAD_DIR (mobile detail will fall back to desktop-only)"
-have docs/listings.json.gz || { echo "$SHORT has no docs/listings.json.gz: not a board commit" >&2; job_event_end failed "" "not_a_board_commit"; exit 2; }
 
 echo "About to restore the board to commit $SHORT ($(git log -1 --format='%ad %s' --date=short "$FULL"))"
 for f in "${RESTORE[@]}"; do
   sz=$(git cat-file -s "$FULL:$f" 2>/dev/null); [ "$f" = "$PAYLOAD_DIR" ] && sz=$(git ls-tree -r -l "$FULL" -- "$PAYLOAD_DIR" | awk '{s+=$4} END {print s}')
   printf '  %-34s %8s MiB\n' "$f" "$(awk -v s="${sz:-0}" 'BEGIN { printf "%.1f", s/1048576 }')"
 done
-echo "The current plain .json twins and shards will be MOVED to backups/pre-restore-<stamp>/ first."
+echo "The current plain .json twins, board parts and shards will be MOVED to backups/pre-restore-<stamp>/ first."
 if [ "$YES" -ne 1 ]; then
   [ -t 0 ] || { echo "not a terminal: pass --yes to confirm" >&2; job_event_end failed "" "needs_yes"; exit 2; }
   printf 'Type RESTORE to continue: '; read -r ans
@@ -90,6 +103,9 @@ KEEPDIR="$ROOT/backups/pre-restore-$STAMP"
 mkdir -p "$KEEPDIR"
 for f in "${PLAIN_FILES[@]}"; do [ -e "$f" ] && mv "$f" "$KEEPDIR/"; done
 [ -d "$PAYLOAD_DIR" ] && mv "$PAYLOAD_DIR" "$KEEPDIR/"
+# every current board part goes (moved, not copied): the commit being restored may hold fewer
+# parts than the tree, and a stray part the restored manifest does not list is a torn set
+for f in docs/listings_part_[0-9]*.json.gz; do [ -e "$f" ] && mv "$f" "$KEEPDIR/"; done
 for f in docs/listings.json.gz docs/listings_detail.json.gz docs/listings_slim.json.gz docs/board.manifest.json; do
   [ -e "$f" ] && cp -p "$f" "$KEEPDIR/" 2>/dev/null
 done
@@ -105,7 +121,7 @@ have docs/board.manifest.json || { [ -e docs/board.manifest.json ] && mv docs/bo
 
 # 4. digests, and the manifest check
 echo "restored files (sha256):"
-for f in docs/listings.json.gz docs/listings_detail.json.gz docs/listings_slim.json.gz docs/run_meta.json; do
+for f in docs/listings_part_[0-9]*.json.gz docs/listings.json.gz docs/listings_detail.json.gz docs/listings_slim.json.gz docs/run_meta.json; do
   [ -f "$f" ] && printf '  %s  %s\n' "$(shasum -a 256 "$f" | cut -c1-16)" "$f"
 done
 if [ -d "$PAYLOAD_DIR" ]; then
@@ -120,7 +136,10 @@ bad = []
 for name, ent in m.get("files", {}).items():
     p = os.path.join("docs", name)
     if not os.path.isfile(p):
-        continue                       # plain twins are gitignored; a fresh restore lacks them
+        if name in ("listings.json", "listings_detail.json", "listings_slim.json"):
+            continue                   # plain twins are gitignored; a fresh restore lacks them
+        bad.append(name + " (missing)")        # a part or .gz the manifest names must be there
+        continue
     if os.path.getsize(p) != ent.get("bytes"):
         bad.append(name + " (size)"); continue
     h = hashlib.sha256()

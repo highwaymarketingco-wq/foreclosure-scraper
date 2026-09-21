@@ -170,7 +170,10 @@ jobs:
           board_payload_stash "$PWD" /tmp/published/payload.tar
           git reset --hard "origin/${{ github.ref_name }}"
           board_payload_unstash "$PWD" /tmp/published/payload.tar
-          board_payload_add "$PWD"
+          board_payload_add "$PWD" || { echo "::error::could not stage every board part (docs/listings_part_NNN.json.gz)"; exit 1; }
+          # a mixed part set (parts from two writes, or a part the manifest does not list) is
+          # a mis-joined board: never commit one (audit O1)
+          board_payload_verify_staged "$PWD" || { echo "::error::the staged board parts are not one consistent set"; exit 1; }
           if git diff --cached --quiet; then
             echo "No payload changes vs latest origin — skipping commit"
             exit 0
@@ -191,7 +194,10 @@ jobs:
             git fetch origin "${{ github.ref_name }}"
             git reset --hard "origin/${{ github.ref_name }}"
             board_payload_unstash "$PWD" /tmp/published/payload.tar
-            board_payload_add "$PWD"
+            board_payload_add "$PWD" || { echo "::error::could not stage every board part (docs/listings_part_NNN.json.gz)"; exit 1; }
+            # a mixed part set (parts from two writes, or a part the manifest does not list) is
+            # a mis-joined board: never commit one (audit O1)
+            board_payload_verify_staged "$PWD" || { echo "::error::the staged board parts are not one consistent set"; exit 1; }
             if git diff --cached --quiet; then
               echo "After re-sync: no diff vs latest origin (someone else published) — done"
               exit 0

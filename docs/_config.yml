@@ -2,8 +2,8 @@
 # well under the 10-minute deploy timeout. These files stay in git (CI + local
 # scripts still read them); they're just excluded from what Pages publishes:
 #   - listings.json / listings_detail.json / listings_slim.json -> the dashboard
-#     fetches the .gz copies (listings.json.gz / listings_detail.json.gz /
-#     listings_slim.json.gz), which are re-included below.
+#     fetches the .gz copies (listings_part_NNN.json.gz for the board since the payload
+#     split, listings_detail.json.gz, listings_slim.json.gz), which are re-included below.
 #
 # MEASURED DEPLOY SIZE (2026-08-11, tracked files only, which is what CI checks
 # out — a local `du` over docs/ is bigger because it also sees gitignored
@@ -95,6 +95,16 @@ exclude:
   # entries whose `.gz` twin the dashboard fetches, and nothing fetches this.
   - OPERATIONS.md
 include:
+  # The board is listings_part_NNN.json.gz (audit O1: the single listings.json.gz was days
+  # from GitHub's 100 MiB file limit). No `exclude` entry above is a prefix of `listings_part_`
+  # (`listings.json`, `listings_detail.json` and `listings_slim.json` all differ at the 9th
+  # character or earlier), so the parts publish without this line. It is here so that a future
+  # exclude like `listings_p` or `listings_` cannot 404 the board silently: `include` overrides
+  # `exclude` in Jekyll. It is a PREFIX, on purpose, because the part count grows with the board.
+  - listings_part_
+  # Legacy single-file board. Kept until the dashboard's rollback path is retired (a rollback to
+  # the pre-split dashboard.js fetches it). Remove together with the file (git rm), see
+  # docs/payload_split_2026-09-21.md.
   - listings.json.gz
   - listings_detail.json.gz
   - listings_slim.json.gz

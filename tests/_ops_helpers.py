@@ -25,7 +25,11 @@ for a in "$@"; do
 done
 mode="${STUB_UV_MODE:-change}"
 if [ -n "$phase" ]; then eval "pm=\${STUB_UV_MODE_PHASE_$phase:-}"; [ -n "$pm" ] && mode="$pm"; fi
-touch_board() { printf 'x%s' "$(date +%s%N 2>/dev/null || date +%s)" >> "$FORECLOSURE_ROOT/docs/listings.json.gz"; }
+# "a board change" in these wrapper tests is a change to a payload file that is NOT a board part: the
+# board itself is docs/listings_part_NNN.json.gz now (audit O1), and the publish gate refuses staged
+# parts that disagree with the manifest, which is not what these tests are about (see
+# tests/test_payload_split.py for the parts-aware publish tests).
+touch_board() { printf 'x%s' "$(date +%s%N 2>/dev/null || date +%s)" >> "$FORECLOSURE_ROOT/docs/listings_detail.json.gz"; }
 case "$mode" in
   change)   touch_board ;;
   meta)     printf ' ' >> "$FORECLOSURE_ROOT/docs/run_meta.json" ;;

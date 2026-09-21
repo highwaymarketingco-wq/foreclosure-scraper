@@ -680,9 +680,49 @@ function projectRecord(rec, lean) {
 // the single failure this gate exists to prevent, and a fallback that fires
 // only when listings.json.gz is missing would fire precisely when nobody is
 // watching.
+// ---- BEGIN BOARD-LOADER ---------------------------------------------------
+// The board loader and the pure helpers it needs, sliced out and run under node by
+// tests/js/board_parts.test.mjs (together with the PORTABLE region above), so the code
+// under test is the code that ships. Nothing here may run at load time.
 const BOARD_SLIM_FILE = "listings_slim.json.gz";
+// The pre-split single-file board. Since the payload split (audit O1) the full board is
+// docs/listings_part_NNN.json.gz, listed in run_meta.json's "board_parts" block; this name is
+// only fetched when run_meta lists no parts (a publish from before the split, or a rollback).
 const BOARD_FAT_FILE = "listings.json.gz";
-const BOARD_FILES = LEAN ? [BOARD_SLIM_FILE, BOARD_FAT_FILE] : [BOARD_FAT_FILE];
+const BOARD_PARTS_SCHEMA = "board-parts-v1";
+
+/**
+ * run_meta.json's "board_parts" block, validated, as {files:[{name,start,end,records,sha256}],
+ * records}, or null when there is none we can trust (then the caller loads the single file).
+ *
+ * The block is the build side's statement of how the board was cut: N independently gzipped JSON
+ * arrays that concatenate, in name order, into the board (index i is the join across the board,
+ * the detail sidecar, slim and shards, so ORDER is the contract). It is checked the way the
+ * Python side checks it: names are exactly listings_part_000, 001, ... in order, row ranges
+ * start at 0 and are contiguous, records === end - start, and the declared totals agree. A block
+ * that fails any of that is ignored rather than half-believed.
+ */
+function boardPartsFromMeta(meta) {
+  const bp = meta && typeof meta === "object" ? meta.board_parts : null;
+  if (!bp || typeof bp !== "object" || Array.isArray(bp)) return null;
+  if (bp.schema !== BOARD_PARTS_SCHEMA || !Array.isArray(bp.files) || bp.files.length === 0) return null;
+  const files = [];
+  let expectStart = 0;
+  for (let i = 0; i < bp.files.length; i++) {
+    const e = bp.files[i];
+    if (!e || typeof e !== "object") return null;
+    if (e.name !== "listings_part_" + String(i).padStart(3, "0") + ".json.gz") return null;
+    const ok = (n) => typeof n === "number" && isFinite(n) && Math.floor(n) === n && n >= 0;
+    if (!ok(e.start) || !ok(e.end) || !ok(e.records)) return null;
+    if (e.start !== expectStart || e.end < e.start || e.records !== e.end - e.start) return null;
+    expectStart = e.end;
+    files.push({ name: e.name, start: e.start, end: e.end, records: e.records,
+                 sha256: typeof e.sha256 === "string" ? e.sha256 : "" });
+  }
+  if (typeof bp.records === "number" && bp.records !== expectStart) return null;
+  if (typeof bp.count === "number" && bp.count !== files.length) return null;
+  return { files, records: expectStart };
+}
 
 // run_meta.json carries a "board" block — {"schema":"slim-v1","count":N} —
 // written by the same write_artifact() call that writes the payload, so its
@@ -735,19 +775,140 @@ function boardProgress(msg) {
  * Stream the board, one record at a time. Returns the projected array.
  * `onProgress(count)` is called per chunk; throttle in the callback.
  * `board` is run_meta.json's "board" block, or null when it has none.
+ * `parts` is boardPartsFromMeta(META), or null: when set, the FULL board is the listed parts
+ * (fetched in parallel, consumed in order, concatenated) instead of the single fat file.
  */
-async function loadBoardStreaming(bust, onProgress, board) {
+async function loadBoardStreaming(bust, onProgress, board, parts) {
   const ac = new AbortController();
   const q = `?t=${encodeURIComponent(bust)}`;
-  let res = null;
-  let usedName = "";
-  for (const name of BOARD_FILES) {
-    let r = null;
-    try { r = await fetch(name + q, { signal: ac.signal }); } catch (e) { r = null; }
-    if (r && r.ok && r.body) { res = r; usedName = name; break; }
-  }
-  if (!res) throw new Error("board payload missing");
+  const state = { lastByteAt: Date.now() };
 
+  // What to fetch, in order of preference. The phone asks for the slim file first. The full
+  // board is the numbered parts run_meta lists, or the single fat file when it lists none.
+  const sources = [];
+  if (LEAN) sources.push({ names: [BOARD_SLIM_FILE], parts: null });
+  if (parts && parts.files && parts.files.length) sources.push({ names: parts.files.map((f) => f.name), parts });
+  else sources.push({ names: [BOARD_FAT_FILE], parts: null });
+
+  // Parts are fetched in parallel: every request is issued up front on the desktop, so the
+  // downloads overlap while the first part is being parsed. A phone (LEAN, only here as the
+  // fallback for a missing slim file) keeps two in flight so it never buffers the whole board.
+  const depth = LEAN ? 2 : Infinity;
+  let responses = null;
+  let usedName = "";
+  let used = null;
+  for (const src of sources) {
+    const started = [];
+    const start = (i) => {
+      if (started[i]) return;
+      started[i] = fetch(src.names[i] + q, { signal: ac.signal }).catch(() => null);
+    };
+    for (let i = 0; i < src.names.length && i < depth; i++) start(i);
+    // The first response decides whether this source exists at all (a 404 on the slim file
+    // must fall through to the fat board exactly as it always did).
+    const first = await started[0];
+    if (!(first && first.ok && first.body)) {
+      for (let i = 1; i < started.length; i++) if (started[i]) started[i].then((r) => { try { r && r.body && r.body.cancel(); } catch (e) { /* gone */ } });
+      continue;
+    }
+    responses = { src, start, started, first };
+    usedName = src.names[0];
+    used = src;
+    break;
+  }
+  if (!responses) throw new Error("board payload missing");
+
+  const watchdog = setInterval(() => {
+    if (Date.now() - state.lastByteAt > BOARD_STALL_MS) { try { ac.abort(); } catch (e) { /* noop */ } }
+  }, 5000);
+
+  try {
+    const out = [];
+    let project = LEAN;
+    let onElement;
+    // Do not re-derive what the build side already derived.
+    //
+    // The projector is a proven fixed point on a SLIM-V1 record — 945 real
+    // stratified board records rebuilt as slim by an independent Python
+    // implementation of the contract, across six plausible build-side
+    // serialisation choices, every one an exact structural fixed point
+    // (scratchpad/p3/test_idempotent.mjs). So running it over the slim file
+    // cannot change a single value; it can only rebuild 38,500 objects for
+    // nothing, on the device with the least memory to spare.
+    //
+    // But skip it only on a POSITIVE handshake: we fetched the slim file AND
+    // run_meta declares schema "slim-v1". Absent block, unknown schema, or a
+    // fallback to the fat file all mean project — the projector is also what
+    // re-derives kw_vacant / acres / lrcpwa.mail_state / life_events when the
+    // payload drifts from the contract, and that self-healing is worth more
+    // than the CPU whenever we are not certain what we are holding.
+    if (project && usedName === BOARD_SLIM_FILE && boardExpectedCount(board) !== null) {
+      project = false;
+    }
+    if (project) {
+      onElement = (s) => { out.push(projectRecord(JSON.parse(s), true)); };
+    } else if (!LEAN) {
+      onElement = (s) => { out.push(JSON.parse(s)); };   // FULL: identity, as before
+    } else {
+      // One conformance check, on record 0 only. A payload still carrying
+      // `description` or `raw.images` is not SLIM-V1 whatever run_meta says —
+      // the realistic cause is run_meta.json publishing ahead of the payload —
+      // and handing a phone unprojected fat records is the exact crash this
+      // whole change exists to prevent. Cost: two `in` tests, once.
+      let verified = false;
+      onElement = (s) => {
+        const rec = JSON.parse(s);
+        if (!verified) {
+          verified = true;
+          if (rec && typeof rec === "object" && !Array.isArray(rec)
+              && ("description" in rec || (rec.raw && typeof rec.raw === "object" && "images" in rec.raw))) {
+            project = true;
+          }
+        }
+        out.push(project ? projectRecord(rec, true) : rec);
+      };
+    }
+
+    const n = used.names.length;
+    for (let i = 0; i < n; i++) {
+      // keep the prefetch window full, then take this part's response
+      for (let k = i; k < n && k < i + depth; k++) responses.start(k);
+      const res = i === 0 ? responses.first : await responses.started[i];
+      if (!(res && res.ok && res.body)) throw new Error(n > 1 ? `board part missing: ${used.names[i]}` : "board payload missing");
+      await consumeBoardResponse(res, ac, state, out, onElement, onProgress);
+      // A part is one complete JSON array. If run_meta says how many rows it must hold and it
+      // held another number, this is a part from a different publish (or a torn one): refuse it
+      // with the same message a short board gets, because a partial board renders beautifully and
+      // silently omits leads.
+      if (used.parts) {
+        const want = used.parts.files[i].end;
+        if (out.length !== want) throw new Error(`BOARD_COUNT:${out.length}:${used.parts.records}`);
+      }
+    }
+    // Same reasoning, one level up. The document can be perfectly well-formed
+    // and still be SHORT — Pages serving a payload from one publish alongside a
+    // run_meta.json from another is the ordinary way that happens. A short board
+    // is the dangerous shape precisely because it renders beautifully: it just
+    // quietly omits leads, and the omitted lead is the one with the sale on
+    // Thursday. Enforced only when the build side declares a count under a
+    // schema we recognise; see boardExpectedCount.
+    const want = boardExpectedCount(board);
+    // the parts' own total AND the slim count when there is one: both describe one write
+    if (used.parts && out.length !== used.parts.records) throw new Error(`BOARD_COUNT:${out.length}:${used.parts.records}`);
+    if (want !== null && out.length !== want) throw new Error(`BOARD_COUNT:${out.length}:${want}`);
+    return out;
+  } finally {
+    clearInterval(watchdog);
+    // release any prefetched response that was never consumed (an early throw)
+    try { ac.abort(); } catch (e) { /* noop */ }
+  }
+}
+
+/**
+ * Read ONE gzipped JSON-array response to its end, feeding every element to onElement.
+ * Each call has its own scanner state: a part is a complete array of its own.
+ */
+async function consumeBoardResponse(res, ac, state, out, onElement, onProgress) {
   // Peek the first two bytes before deciding to inflate. The code this replaces
   // sniffed the gzip magic (:35) for a reason: this file has been served
   // already-inflated (Content-Encoding: gzip) before, and an unconditional
@@ -776,98 +937,56 @@ async function loadBoardStreaming(bust, onProgress, board) {
     throw new Error("NO_DECOMPRESSION");
   }
 
-  let lastByteAt = Date.now();
-  const watchdog = setInterval(() => {
-    if (Date.now() - lastByteAt > BOARD_STALL_MS) { try { ac.abort(); } catch (e) { /* noop */ } }
-  }, 5000);
+  state.lastByteAt = Date.now();
+  const src = new ReadableStream({
+    start(c) { if (head.length) c.enqueue(head); if (exhausted) c.close(); },
+    async pull(c) {
+      const r = await reader.read();
+      state.lastByteAt = Date.now();
+      if (r.done) c.close(); else c.enqueue(r.value);
+    },
+    cancel(reason) { try { reader.cancel(reason); } catch (e) { /* noop */ } },
+  });
+  let bytes = src;
+  if (isGzip) bytes = bytes.pipeThrough(new DecompressionStream("gzip"));
+  const text = bytes.pipeThrough(new TextDecoderStream()).getReader();
 
-  try {
-    const src = new ReadableStream({
-      start(c) { if (head.length) c.enqueue(head); if (exhausted) c.close(); },
-      async pull(c) {
-        const r = await reader.read();
-        lastByteAt = Date.now();
-        if (r.done) c.close(); else c.enqueue(r.value);
-      },
-      cancel(reason) { try { reader.cancel(reason); } catch (e) { /* noop */ } },
-    });
-    let bytes = src;
-    if (isGzip) bytes = bytes.pipeThrough(new DecompressionStream("gzip"));
-    const text = bytes.pipeThrough(new TextDecoderStream()).getReader();
-
-    const out = [];
-    const st = boardScanState();
-
-    // Do not re-derive what the build side already derived.
-    //
-    // The projector is a proven fixed point on a SLIM-V1 record — 945 real
-    // stratified board records rebuilt as slim by an independent Python
-    // implementation of the contract, across six plausible build-side
-    // serialisation choices, every one an exact structural fixed point
-    // (scratchpad/p3/test_idempotent.mjs). So running it over the slim file
-    // cannot change a single value; it can only rebuild 38,500 objects for
-    // nothing, on the device with the least memory to spare.
-    //
-    // But skip it only on a POSITIVE handshake: we fetched the slim file AND
-    // run_meta declares schema "slim-v1". Absent block, unknown schema, or a
-    // fallback to the fat file all mean project — the projector is also what
-    // re-derives kw_vacant / acres / lrcpwa.mail_state / life_events when the
-    // payload drifts from the contract, and that self-healing is worth more
-    // than the CPU whenever we are not certain what we are holding.
-    let project = LEAN;
-    if (project && usedName === BOARD_SLIM_FILE && boardExpectedCount(board) !== null) {
-      project = false;
-    }
-    let onElement;
-    if (project) {
-      onElement = (s) => { out.push(projectRecord(JSON.parse(s), true)); };
-    } else if (!LEAN) {
-      onElement = (s) => { out.push(JSON.parse(s)); };   // FULL: identity, as before
-    } else {
-      // One conformance check, on record 0 only. A payload still carrying
-      // `description` or `raw.images` is not SLIM-V1 whatever run_meta says —
-      // the realistic cause is run_meta.json publishing ahead of the payload —
-      // and handing a phone unprojected fat records is the exact crash this
-      // whole change exists to prevent. Cost: two `in` tests, once.
-      let verified = false;
-      onElement = (s) => {
-        const rec = JSON.parse(s);
-        if (!verified) {
-          verified = true;
-          if (rec && typeof rec === "object" && !Array.isArray(rec)
-              && ("description" in rec || (rec.raw && typeof rec.raw === "object" && "images" in rec.raw))) {
-            project = true;
-          }
-        }
-        out.push(project ? projectRecord(rec, true) : rec);
-      };
-    }
-
-    for (;;) {
-      const r = await text.read();
-      if (r.done) break;
-      lastByteAt = Date.now();
-      boardScanChunk(st, r.value, onElement);
-      if (onProgress) onProgress(out.length);
-    }
-    boardScanChunk(st, "", onElement);   // flush a trailing bare scalar, if any
-    // A truncated download would otherwise render a silently partial board —
-    // and this board carries sale dates and bid deadlines. Fail loudly instead.
-    if (!st.ended) throw new Error("board payload truncated");
-    // Same reasoning, one level up. The document can be perfectly well-formed
-    // and still be SHORT — Pages serving a payload from one publish alongside a
-    // run_meta.json from another is the ordinary way that happens. A short board
-    // is the dangerous shape precisely because it renders beautifully: it just
-    // quietly omits leads, and the omitted lead is the one with the sale on
-    // Thursday. Enforced only when the build side declares a count under a
-    // schema we recognise; see boardExpectedCount.
-    const want = boardExpectedCount(board);
-    if (want !== null && out.length !== want) throw new Error(`BOARD_COUNT:${out.length}:${want}`);
-    return out;
-  } finally {
-    clearInterval(watchdog);
+  const st = boardScanState();
+  for (;;) {
+    const r = await text.read();
+    if (r.done) break;
+    state.lastByteAt = Date.now();
+    boardScanChunk(st, r.value, onElement);
+    if (onProgress) onProgress(out.length);
   }
+  boardScanChunk(st, "", onElement);   // flush a trailing bare scalar, if any
+  // A truncated download would otherwise render a silently partial board —
+  // and this board carries sale dates and bid deadlines. Fail loudly instead.
+  if (!st.ended) throw new Error("board payload truncated");
 }
+
+/**
+ * The desktop fallback for a failed stream: fetch the whole board with the old
+ * fetch-inflate-parse path. With parts, every part is fetched in parallel through the same
+ * helper and the arrays are concatenated in order, then held to the same counts.
+ */
+async function fetchFullBoardFallback(bust, parts, board) {
+  if (!parts || !parts.files || !parts.files.length) return await fetchJsonMaybeGz("listings.json", bust);
+  const arrays = await Promise.all(parts.files.map((f) => fetchJsonMaybeGz(f.name.replace(/\.gz$/, ""), bust)));
+  const all = [];
+  arrays.forEach((a, i) => {
+    if (!Array.isArray(a) || a.length !== parts.files[i].records) {
+      throw new Error(`BOARD_COUNT:${all.length + (Array.isArray(a) ? a.length : 0)}:${parts.records}`);
+    }
+    for (const rec of a) all.push(rec);
+  });
+  const want = boardExpectedCount(board);
+  if (all.length !== parts.records || (want !== null && all.length !== want)) {
+    throw new Error(`BOARD_COUNT:${all.length}:${want !== null ? want : parts.records}`);
+  }
+  return all;
+}
+// ---- END BOARD-LOADER -----------------------------------------------------
 
 async function loadDataset(name) {
   // Already loaded — restore from cache
@@ -911,8 +1030,10 @@ async function loadDataset(name) {
       // of which rewrite listings.json.gz without going through write_artifact.
       // Everything downstream treats it as optional.
       const board = (META && META.board) || null;
+      // The board as parts (audit O1), or null for a publish from before the split.
+      const parts = boardPartsFromMeta(META);
       const declared = boardExpectedCount(board);
-      const total = declared || Number(META.total) || 0;
+      const total = declared || (parts && parts.records) || Number(META.total) || 0;
       let painted = 0;
       boardProgress("Loading listings…");
       const onProgress = (n) => {
@@ -923,7 +1044,7 @@ async function loadDataset(name) {
       };
       try {
         if (NOSTREAM) throw new Error("NOSTREAM");
-        LISTINGS = await loadBoardStreaming(bust, onProgress, board);
+        LISTINGS = await loadBoardStreaming(bust, onProgress, board, parts);
       } catch (streamErr) {
         const em = String(streamErr && streamErr.message);
         // A machine with the headroom for the old path should show a board
@@ -937,7 +1058,7 @@ async function loadDataset(name) {
         // is the exact outcome the count gate was added to make impossible.
         if (LEAN || em === "NO_DECOMPRESSION" || em.indexOf("BOARD_COUNT:") === 0) throw streamErr;
         boardProgress("Loading listings (fallback)…");
-        LISTINGS = await fetchJsonMaybeGz("listings.json", bust);
+        LISTINGS = await fetchFullBoardFallback(bust, parts, board);
       }
       boardProgress(null);
     }

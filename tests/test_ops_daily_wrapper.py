@@ -33,7 +33,7 @@ pytestmark = [
 STUB = r'''#!/bin/sh
 echo "uv $*" >> "$STUB_UV_LOG"
 commit_board() {
-  printf 'x%s' "$(date +%s%N 2>/dev/null || date +%s)" >> "$FORECLOSURE_ROOT/docs/listings.json.gz"
+  printf 'x%s' "$(date +%s%N 2>/dev/null || date +%s)" >> "$FORECLOSURE_ROOT/docs/listings_detail.json.gz"
   git -C "$FORECLOSURE_ROOT" add docs >/dev/null 2>&1
   git -C "$FORECLOSURE_ROOT" commit -q -m "$1" >/dev/null 2>&1
 }

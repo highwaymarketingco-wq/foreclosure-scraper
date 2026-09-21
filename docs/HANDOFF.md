@@ -11,7 +11,7 @@ Keep this file current. It exists so a fresh session costs one file read instead
 Source: `docs/run_meta.json` (written 10:11 EDT), `docs/AUDIT_2026-09-21.md`, `docs/audit_operations_2026-09-21.md`.
 
 - **170,066 leads** (NC 93,030, SC 77,036) from **156 sources**. High-water mark 175,941 (9/15).
-- Files: `docs/listings.json` about 1.1 GB (gitignored), `listings.json.gz` 84.0 MiB (GitHub's hard limit is 100 MiB; it was 34 MiB on 8/26), a 171-file shard set, a slim phone payload, and since 2026-09-21 `docs/board.manifest.json` once the first write by the new code seals it.
+- Files: `docs/listings.json` about 1.1 GB (gitignored), `listings.json.gz` 84.0 MiB (GitHub's hard limit is 100 MiB; it was 34 MiB on 8/26; **being replaced by `docs/listings_part_NNN.json.gz`, parts of at most 24 MiB each, see `docs/payload_split_2026-09-21.md`**), a 171-file shard set, a slim phone payload, and since 2026-09-21 `docs/board.manifest.json` once the first write by the new code seals it.
 - Largest sources on the board: liensnc 40,909 (plus 6,080 under the bare `liensnc` slug; all construction lien-agent filings, not distress), `qpaybill_delinquent_roll` 33,527, `sc_dew_lien_registry` 8,810, `gaston_vacant` 7,035, `transylvania_vacant` 5,332, `sc_public_index` 5,050, `rutherford_tax` 4,164.
 - **Freshness is not what `last_seen` says.** About 2,200 rows (1.3%) come from the 14 sources a scheduler refreshes daily. The last full run to land on the board was 2026-08-28 to 8/29. Nineteen sources with 100+ rows have 80% or more of their leads last seen over 30 days ago. `run_meta.source_last_success` (new) measures freshness per source.
 - Tiering: HOT 1,646, WARM at least 71,010 (43% of leads with a county) before the 9/21 rescore, which the scorer changes will reduce sharply. See `docs/AUDIT_2026-09-21.md` and `docs/scoring_fixes_2026-09-21.md`.
@@ -60,7 +60,7 @@ Four files a running job owns are shipped as patches, not applied: `run_daily_vi
 2. Preview and install the schedule: `scripts/install_launchd.sh` (dry run), then `--apply`. Create the backup passphrase in the keychain first (`docs/RESTORE.md`, section 3).
 3. Run each family job once by hand and read `logs/family_<name>.log` before scheduling it. None has run against the real board.
 4. Watch `mem_gate` lines in `logs/job_events.jsonl` for a week, then choose `BOARD_MEM_GATE=enforce` thresholds.
-5. The payload split (audit O1): `listings.json.gz` is 16 MiB from GitHub's limit and the 95 MiB commit gate. Decide the split or the trim.
+5. The payload split (audit O1): built on branch `payload-split` (`docs/payload_split_2026-09-21.md`): merge it in ONE commit, then `scripts/migrate_board_to_parts.py` (dry run first), then `git rm docs/listings.json.gz`. Until then `listings.json.gz` is 16 MiB from GitHub's limit and the 95 MiB commit gate.
 6. Owner decisions still open: public repo and owner PII (audit O8); the memory gate mode; whether the vision backends are replaced or retired (only about 13% of rows have a vision score; the pool collapses from 21 workers to 1 in 40 minutes).
 7. Route the scripts that write `docs/listings.json` directly (listed in `docs/ops_fixes_2026-09-21.md`, section 2) through `write_artifact`.
 8. The first full run on a 170k board is a supervised test (plugged in, other apps closed). It has never completed since the count-guard fix.

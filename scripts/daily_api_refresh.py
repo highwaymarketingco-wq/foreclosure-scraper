@@ -34,7 +34,9 @@ from foreclosure_scraper.valuation import grading as vgrade
 from foreclosure_scraper.distress_score import score_board
 from foreclosure_scraper.enrichment_title_risk import enrich_title_risk
 from foreclosure_scraper.web_artifact import write_artifact, _to_dict, load_board
-from foreclosure_scraper.publish import manifest_pathspec, push_deferred, push_with_retries
+from foreclosure_scraper.publish import (
+    manifest_pathspec, parts_pathspec, push_deferred, push_with_retries,
+)
 
 try:
     from foreclosure_scraper.new_listings import mark_new_listings
@@ -344,12 +346,16 @@ async def main() -> int:
             # listings.json/.detail.json are gitignored — over GitHub's 100MB
             # limit, excluded from Pages; load_board rebuilds from the .gz. A
             # gitignored path in git add fails the whole command, so keep it out.
+            # The BOARD is docs/listings_part_NNN.json.gz (audit O1: the single
+            # 84 MiB listings.json.gz was days from GitHub's 100 MiB limit). Every
+            # part goes into this one `git add` together with the manifest below, so
+            # a publish is all parts or none.
             # listings_slim.json.gz is the mobile payload write_artifact() emits.
             # Appended ONLY IF IT EXISTS: a pathspec matching no file makes
             # `git add` exit 128 and stage NOTHING AT ALL, which would silently
             # stop publishing the dashboard on a checkout where the slim emitter
             # has not run yet.
-            pub = ["docs/listings.json.gz", "docs/listings_detail.json.gz",
+            pub = [*parts_pathspec(root), "docs/listings_detail.json.gz",
                    "docs/run_meta.json"]
             # "exists" alone is the wrong gate once it IS tracked: the emitter
             # deletes both slim files if projection fails, and that DELETION has

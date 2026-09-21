@@ -335,6 +335,10 @@ def test_git_add_of_an_absent_untracked_path_stages_nothing_at_all(tmp_path):
     )
 
 
+def _part_names(root: Path) -> list[str]:
+    return sorted(p.name for p in (root / "docs").glob("listings_part_*.json.gz"))
+
+
 def _payload_paths(root: Path) -> list[str]:
     r = subprocess.run(
         ["/bin/sh", "-c", f'. "{PAYLOAD_SH}"; board_payload_paths "$1"', "sh", str(root)],
@@ -352,7 +356,8 @@ def test_payload_list_never_names_a_gitignored_board_file(tmp_path):
     for name in ("docs/listings.json", "docs/listings_detail.json",
                  "docs/listings_slim.json"):
         assert name not in paths, f"{name} is gitignored; naming it voids the add"
-    assert "docs/listings.json.gz" in paths
+    assert "docs/listings.json.gz" not in paths, (
+        "the single listings.json.gz is no longer part of a publish (audit O1): the board is the parts")
     assert "docs/listings_slim.json.gz" in paths
 
 
@@ -382,10 +387,11 @@ def test_payload_add_stages_the_whole_payload(tmp_path):
         capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     staged = set(_git(root, "diff", "--cached", "--name-only").stdout.split())
-    for required in ("docs/listings.json.gz", "docs/listings_detail.json.gz",
+    for required in ("docs/listings_part_000.json.gz", "docs/listings_detail.json.gz",
                      "docs/listings_slim.json.gz", "docs/run_meta.json",
-                     "docs/run_health.json"):
+                     "docs/board.manifest.json", "docs/run_health.json"):
         assert required in staged, f"{required} was not staged"
+    assert "docs/listings.json.gz" not in staged
     assert any(p.startswith(f"docs/{DETAIL_SHARD_DIR}/") for p in staged), (
         "the detail shards are the payload phones fetch to open a lead"
     )
@@ -403,7 +409,7 @@ def test_payload_stash_survives_a_hard_reset(tmp_path, monkeypatch):
                     f'. "{PAYLOAD_SH}"; board_payload_add "$1"', "sh", str(root)],
                    check=True)
     _git(root, "commit", "-qm", "seed")
-    before = (root / "docs" / "listings.json.gz").read_bytes()
+    before = (root / "docs" / "listings_part_000.json.gz").read_bytes()
     n_shards = len(list((root / "docs" / DETAIL_SHARD_DIR).iterdir()))
 
     tar = tmp_path / "payload.tar"
@@ -416,12 +422,12 @@ def test_payload_stash_survives_a_hard_reset(tmp_path, monkeypatch):
     monkeypatch.setenv("BOARD_ALLOW_SHRINK", "1")
     write_artifact([_lead(0)], {"notes": "clobbered"}, docs_dir=root / "docs")
     monkeypatch.delenv("BOARD_ALLOW_SHRINK", raising=False)
-    assert (root / "docs" / "listings.json.gz").read_bytes() != before
+    assert (root / "docs" / "listings_part_000.json.gz").read_bytes() != before
     subprocess.run(["/bin/sh", "-c",
                     f'. "{PAYLOAD_SH}"; board_payload_unstash "$1" "$2"',
                     "sh", str(root), str(tar)], check=True)
 
-    assert (root / "docs" / "listings.json.gz").read_bytes() == before
+    assert (root / "docs" / "listings_part_000.json.gz").read_bytes() == before
     assert len(list((root / "docs" / DETAIL_SHARD_DIR).iterdir())) == n_shards, (
         "the shard DIRECTORY must come back too — cp could not do that"
     )
@@ -464,7 +470,7 @@ def test_pages_check_reads_the_shard_dir_name_from_the_source():
 
 
 @pytest.mark.parametrize("excluded", ["detail_shards", "listings.json",
-                                      "listings_slim.json"])
+                                      "listings_slim.json", "listings_part_", "listings_p"])
 def test_pages_check_fails_when_a_payload_would_be_dropped(tmp_path, excluded):
     """Adding `- detail_shards` to exclude turned tests/test_detail_shards.py
     red and left this script at exit 0. It must now be the script that says so.

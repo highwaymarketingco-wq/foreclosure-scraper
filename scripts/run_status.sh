@@ -34,7 +34,8 @@ ${HEALTH}
 It takes several hours and has no window on purpose, so you can close things and keep working. You'll get a notification when it finishes."
   BTN='{"Show log", "OK"}'
 else
-  BOARD=$(ls -l docs/listings.json.gz 2>/dev/null | awk '{print $6, $7, $8}')
+  # the published board is docs/listings_part_NNN.json.gz now (audit O1); newest one wins
+  BOARD=$(ls -lt $(find docs -maxdepth 1 \( -name 'listings_part_*.json.gz' -o -name 'listings.json.gz' \) 2>/dev/null) 2>/dev/null | head -1 | awk '{print $6, $7, $8}')
   TOTAL=$(python3 -c "import json;print(f\"{json.load(open('docs/run_meta.json'))['total']:,}\")" 2>/dev/null || echo "unknown")
   if [ -n "$LOG" ]; then
     FIN=$(grep -aq "web_artifact.written" "$LOG" 2>/dev/null && echo yes || echo no)
