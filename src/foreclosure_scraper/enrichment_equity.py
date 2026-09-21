@@ -156,6 +156,25 @@ _NC_AMOUNT_ONLY = {"Buncombe", "Lincoln", "Transylvania"}
 _ASSUMED_NOTE_AGE_YEARS = 3   # recent -> conservative (high payoff, low equity)
 
 
+
+#: amount_owed sources that ARE the debt being foreclosed, even when the field flags the bid a
+#: proxy: a foreclosure judgment, or the auction opening bid (the lender opens at ~the payoff).
+_FORECLOSURE_DEBT_SRC = frozenset({"judgment", "opening_bid"})
+
+
+def is_countable_debt(amount_owed) -> bool:
+    """True when raw['amount_owed'] is a REAL debt, not a magnitude hint.
+
+    enrichment_amount_owed fills the field from a waterfall whose last resorts are
+    `assessed_value` ("Tax-assessed value (not debt)") and an assumed two years of tax; those
+    carry is_actual_debt=False and must never be read as a debt. Equity has always followed
+    this. distress_score did not (audit 2026-09-21): 16,142 of 33,259 recorded_debt signals
+    (49%) rested on such an estimate, and for 4,839 leads the second category that made the
+    stack came from nothing else. One predicate, so the two readers cannot disagree again."""
+    ao = amount_owed if isinstance(amount_owed, dict) else {}
+    return bool(ao.get("value")) and bool(ao.get("is_actual_debt") or ao.get("source") in _FORECLOSURE_DEBT_SRC)
+
+
 def _assumed_note_date() -> date:
     """A deliberately recent assumed origination date for amount-only counties.
     Recent = less paydown = higher estimated balance = we never overstate equity."""
@@ -382,8 +401,7 @@ def _payoff(li: Listing, arv: float) -> tuple[Optional[float], str, str]:
     #    otherwise NC leads (which carry an opening_bid, not a parsed judgment)
     #    never reach a payoff and the engine yields 0 equity for the whole state.
     ao = raw.get("amount_owed") or {}
-    _FORECLOSURE_DEBT_SRC = {"judgment", "opening_bid"}
-    if ao.get("value") and (ao.get("is_actual_debt") or ao.get("source") in _FORECLOSURE_DEBT_SRC):
+    if is_countable_debt(ao):
         try:
             return float(ao["value"]), f"amount_owed:{ao.get('source', '?')}", ao.get("confidence", "medium")
         except (ValueError, TypeError):

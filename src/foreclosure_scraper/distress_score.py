@@ -31,7 +31,7 @@ from typing import Optional
 
 from .models import Listing
 from .name_normalize import party_middle_conflict
-from .enrichment_equity import valuation_ran_without_arv
+from .enrichment_equity import is_countable_debt, valuation_ran_without_arv
 from .valuation.grading import ARV_TRUST_BLOCKS_DERIVED, arv_trust
 
 # ATC-45 Helene placard severity -> honest PROPERTY-signal weight. Calibrated
@@ -253,7 +253,14 @@ def _signals_for(li: Listing, prior_price: Optional[float] = None) -> list[tuple
         sig.append(("court_sale", "FINANCIAL", 25))
     if r.get("upset_bid"):
         sig.append(("upset_bid", "FINANCIAL", 22))
-    if (r.get("amount_owed") or {}).get("value"):
+    _to = r.get("tax_owed")
+    _real_tax = isinstance(_to, dict) and isinstance(_to.get("balance"), (int, float)) and _to["balance"] > 0
+    if is_countable_debt(r.get("amount_owed")) or _real_tax:
+        # A REAL debt only: an actual judgment / opening bid, or a real delinquent-tax balance
+        # (raw['tax_owed']). An estimate (assessed value, an assumed two years of tax) is a
+        # magnitude hint the amount_owed module itself labels "not debt". The waterfall can
+        # pick an estimate over a real balance sitting beside it (645 New Hanover leads), so
+        # the real balance is credited directly.
         sig.append(("recorded_debt", "FINANCIAL", 12))
     if r.get("str_permit_lapsed"):
         # revoked/expired short-term-rental permit = lost rental income, a
