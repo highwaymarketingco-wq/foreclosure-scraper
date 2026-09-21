@@ -196,6 +196,64 @@ def first_last_parts(owner: Optional[str]) -> Optional[tuple[str, str]]:
     return toks[-1], toks[0]
 
 
+def owner_last_first_middle(owner: Optional[str]) -> Optional[tuple[str, str, str]]:
+    """(LAST, FIRST, MIDDLE-INITIAL or '') for the FIRST person named in `owner`, or None.
+
+    Handles the board's two conventions (Title Case FIRST [MIDDLE] LAST for court and
+    probate sources, ALL-CAPS or comma SURNAME-FIRST for county rolls) and cuts a joint
+    owner at the first '&', 'and', '+', ';' so a co-owner's name is never read as this
+    person's middle name."""
+    if not owner:
+        return None
+    raw = re.split(r"[;]|<br\s*/?>", str(owner), maxsplit=1)[0]
+    raw = _FL_COUPLE.split(raw, maxsplit=1)[0]
+    if "," in raw:
+        last_part, _, rest = raw.partition(",")
+        last = re.sub(r"[^A-Za-z]", "", last_part).upper()
+        toks = [t for t in re.sub(r"[^A-Za-z ]", " ", rest).upper().split() if t not in _FL_SUFFIXES]
+        if not last or not toks:
+            return None
+        return last, toks[0], (toks[1][0] if len(toks) > 1 else "")
+    toks = [t for t in re.sub(r"[^A-Za-z ]", " ", raw).upper().split() if t not in _FL_SUFFIXES]
+    if len(toks) < 2:
+        return None
+    if re.search(r"[a-z]", raw):                          # FIRST [MIDDLE] LAST
+        return toks[-1], toks[0], (toks[1][0] if len(toks) > 2 else "")
+    return toks[0], toks[1], (toks[2][0] if len(toks) > 2 else "")   # SURNAME FIRST [MIDDLE]
+
+
+def party_middle_verdict(owner: Optional[str], party_strings) -> str:
+    """'agrees' | 'conflict' | 'unverified' for a court match on `owner`.
+
+    conflict: a party shares the owner's FIRST and LAST name, every such party carries a middle
+    initial, and none matches the owner's. That is a different person with the same name
+    (measured 2026-09-21: 41% of comparable SC divorce hits).
+    agrees: a matching party carries the same middle initial as the owner.
+    unverified: no middle initial on one side, so nothing says the match is wrong OR right."""
+    parts = owner_last_first_middle(owner)
+    if not parts or not parts[2]:
+        return "unverified"
+    last, first, mid = parts
+    matched = agreed = 0
+    for ps in party_strings or ():
+        for side in re.split(r"\s+vs\.?\s+", str(ps or ""), flags=re.I):
+            toks = [t for t in re.sub(r"[^A-Za-z ]", " ", side).upper().split() if t not in _FL_SUFFIXES]
+            if len(toks) >= 2 and toks[-1] == last and toks[0] == first:
+                if len(toks) > 2:
+                    matched += 1
+                    agreed += toks[1][0] == mid
+                else:
+                    return "unverified"                   # a party with no middle: cannot rule it out
+    if matched == 0:
+        return "unverified"
+    return "agrees" if agreed else "conflict"
+
+
+def party_middle_conflict(owner: Optional[str], party_strings) -> bool:
+    """True only on a proven middle-initial conflict; see party_middle_verdict."""
+    return party_middle_verdict(owner, party_strings) == "conflict"
+
+
 def person_orderings(name: Optional[str]) -> list[PersonName]:
     """Every plausible (surname, given...) reading of an individual's name.
 

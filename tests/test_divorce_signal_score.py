@@ -65,3 +65,60 @@ def test_signal_reaches_signals_for_and_adds_a_life_event_category():
     sigs = _signals_for(li)
     assert ("divorce", "LIFE_EVENT", 12) in sigs
     assert {c for _, c, _ in sigs} >= {"FINANCIAL", "LIFE_EVENT"}   # stacks with the tax lien
+
+
+# ---- same first+last name, different middle initial = a different person ----------------
+from foreclosure_scraper.name_normalize import owner_last_first_middle, party_middle_conflict
+
+
+def test_owner_parts_for_both_board_conventions_and_joint_owners():
+    assert owner_last_first_middle("BYRD SANDRA D") == ("BYRD", "SANDRA", "D")
+    assert owner_last_first_middle("Joshua D Smith") == ("SMITH", "JOSHUA", "D")
+    assert owner_last_first_middle("Roper, John A., Jr.") == ("ROPER", "JOHN", "A")
+    assert owner_last_first_middle("SMITH JOHN & MELINDA") == ("SMITH", "JOHN", "")     # co-owner is not a middle name
+    assert owner_last_first_middle("SMITH JOHN C & MELINDA P") == ("SMITH", "JOHN", "C")
+    assert owner_last_first_middle("Madonna") is None
+
+
+def test_a_different_middle_initial_is_a_conflict():
+    parties = ["SANDRA LEE BYRD vs. ROBERT BYRD"]
+    assert party_middle_conflict("BYRD SANDRA D", parties) is True        # D versus L
+
+
+def test_matching_middle_initial_is_not_a_conflict():
+    assert party_middle_conflict("BYRD SANDRA L", ["SANDRA LEE BYRD vs. ROBERT BYRD"]) is False
+
+
+def test_no_middle_initial_on_either_side_is_never_a_conflict():
+    assert party_middle_conflict("BYRD SANDRA", ["SANDRA LEE BYRD vs. ROBERT BYRD"]) is False   # owner has none
+    assert party_middle_conflict("BYRD SANDRA D", ["SANDRA BYRD vs. ROBERT BYRD"]) is False     # party has none
+
+
+def test_one_agreeing_party_among_several_saves_the_match():
+    parties = ["SANDRA LEE BYRD vs. ROBERT BYRD", "SANDRA DAWN BYRD vs. TOM BYRD"]
+    assert party_middle_conflict("BYRD SANDRA D", parties) is False
+
+
+def test_a_different_first_name_is_not_this_test():
+    assert party_middle_conflict("BYRD SANDRA D", ["LINDA LEE BYRD vs. ROBERT BYRD"]) is False
+
+
+def test_score_skips_the_divorce_signal_on_a_middle_initial_conflict():
+    d = {"divorce": {"case_count": 1, "cases": [{"filed_date": "2025-06-01", "role": "Defendant",
+                                                  "parties": "SANDRA LEE BYRD vs. ROBERT BYRD"}]}}
+    assert _divorce_signal(d, TODAY, owner_name="BYRD SANDRA D") is None
+    assert _divorce_signal(d, TODAY, owner_name="BYRD SANDRA L") == ("divorce", "LIFE_EVENT", 12)
+    assert _divorce_signal(d, TODAY, owner_name="BYRD SANDRA") == ("divorce", "LIFE_EVENT", 12)   # unknown: kept
+    assert _divorce_signal(d, TODAY) == ("divorce", "LIFE_EVENT", 12)                              # no owner passed: unchanged
+
+
+from foreclosure_scraper.name_normalize import party_middle_verdict  # noqa: E402
+
+
+def test_verdict_has_three_outcomes():
+    p = ["SANDRA LEE BYRD vs. ROBERT BYRD"]
+    assert party_middle_verdict("BYRD SANDRA L", p) == "agrees"
+    assert party_middle_verdict("BYRD SANDRA D", p) == "conflict"
+    assert party_middle_verdict("BYRD SANDRA", p) == "unverified"
+    assert party_middle_verdict("BYRD SANDRA D", []) == "unverified"
+    assert party_middle_verdict(None, p) == "unverified"

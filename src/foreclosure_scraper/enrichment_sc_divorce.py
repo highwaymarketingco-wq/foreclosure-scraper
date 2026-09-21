@@ -69,7 +69,7 @@ from datetime import datetime, timezone
 
 import structlog
 
-from .name_normalize import first_last_parts, is_entity
+from .name_normalize import first_last_parts, is_entity, party_middle_verdict
 
 try:
     from curl_cffi.requests import AsyncSession
@@ -336,6 +336,8 @@ def _apply(li, cases: list[dict], now: datetime) -> None:
         "source": "sc_fccms",
         "fetched_at": now.isoformat(),
     }
+    if cases:
+        li.raw["divorce"]["match"] = party_middle_verdict(li.owner_name, [c.get("parties") for c in cases])
     if cases:
         ds = li.raw.get("distress_stack")
         if isinstance(ds, dict):

@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Optional
 
 from .models import Listing
+from .name_normalize import party_middle_conflict
 from .enrichment_equity import valuation_ran_without_arv
 from .valuation.grading import ARV_TRUST_BLOCKS_DERIVED, arv_trust
 
@@ -117,11 +118,16 @@ _DIVORCE_W_RECENT = 12
 _DIVORCE_W_WINDOW = 6
 
 
-def _divorce_signal(r: dict, today: Optional[date] = None) -> Optional[tuple[str, str, int]]:
+def _divorce_signal(r: dict, today: Optional[date] = None, owner_name: Optional[str] = None) -> Optional[tuple[str, str, int]]:
     """(name, category, weight) from raw['divorce'], or None. A case row with no
     role is kept (role unknown); a row whose role is not a party role is skipped."""
     dv = r.get("divorce")
     if not isinstance(dv, dict) or not dv.get("case_count"):
+        return None
+    if owner_name and party_middle_conflict(
+            owner_name, [c.get("parties") for c in (dv.get("cases") or []) if isinstance(c, dict)]):
+        # Same first and last name as the court party but a DIFFERENT middle initial:
+        # another person. 41% of comparable hits were like this (audit 2026-09-21).
         return None
     newest: Optional[date] = None
     for c in dv.get("cases") or []:
@@ -287,7 +293,7 @@ def _signals_for(li: Listing, prior_price: Optional[float] = None) -> list[tuple
             # forced/judicial sale (usually already sold) — modest SALES signal
             sig.append(("partition", "SALES", 12))
     # court-verified divorce (party-name match; recency-weighted, see _divorce_signal)
-    dvs = _divorce_signal(r)
+    dvs = _divorce_signal(r, owner_name=li.owner_name)
     if dvs:
         sig.append(dvs)
     # property
