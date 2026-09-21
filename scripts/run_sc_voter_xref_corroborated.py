@@ -77,7 +77,10 @@ def main() -> int:
         got = [li for li in targets
                if (li.raw.get("owner_phone") or {}).get("source") == "ncsbe_voter_xref"]
         for li in got:
-            li.raw["owner_phone"]["corroboration"] = "nc_mailing_address"
+            # the identity gate (enrichment_sc_phone) is the authority now: its street-level rule is
+            # stricter than "any NC mailing address", so only tag phones the gate did not block
+            if not li.raw["owner_phone"].get("do_not_dial"):
+                li.raw["owner_phone"]["corroboration"] = "nc_mailing_address"
         print(f"  MATCHED: {len(got):,}  ({100*len(got)/max(len(targets),1):.1f}%)")
         for li in got[:6]:
             print(f"    {str(li.county)[:12]:14}{str(li.owner_name)[:28]:30}"

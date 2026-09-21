@@ -28,6 +28,7 @@ from typing import Any
 
 import structlog
 
+from .enrichment_sc_phone import is_owner_phone_usable
 from .models import Listing
 
 log = structlog.get_logger()
@@ -110,9 +111,11 @@ def _check_trigger(li: Listing, trigger: dict) -> bool:
         if (li.county or "").lower() != trigger["county"].lower():
             return False
 
-    # Has phone
+    # Has phone. An owner_phone that must not be dialed (do_not_dial, an uncorroborated
+    # NC-voter-xref match, a people-search phone, an agent or attorney) does not trigger a call rule.
     if trigger.get("has_phone"):
-        has = (raw.get("owner_phone") or {}).get("phone") or (raw.get("skip_trace") or {}).get("phone_numbers")
+        op = raw.get("owner_phone")
+        has = (op.get("phone") if is_owner_phone_usable(op) else None) or (raw.get("skip_trace") or {}).get("phone_numbers")
         if not has:
             return False
 

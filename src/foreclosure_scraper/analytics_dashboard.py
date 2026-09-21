@@ -23,6 +23,7 @@ from typing import Sequence
 
 import structlog
 
+from .enrichment_sc_phone import is_owner_phone_usable
 from .models import Listing
 from .web_artifact import load_board
 
@@ -65,7 +66,9 @@ def _get_max_bid(li: Listing) -> float:
 
 def _has_phone(li: Listing) -> bool:
     raw = li.raw if isinstance(li.raw, dict) else {}
-    return bool((raw.get("owner_phone") or {}).get("phone") or (raw.get("skip_trace") or {}).get("phone_numbers"))
+    # An owner_phone that must not be dialed (do_not_dial, uncorroborated NC-voter-xref, people-search,
+    # agent or attorney) is not owner contact coverage.
+    return bool(is_owner_phone_usable(raw.get("owner_phone")) or (raw.get("skip_trace") or {}).get("phone_numbers"))
 
 
 def _has_mailing(li: Listing) -> bool:

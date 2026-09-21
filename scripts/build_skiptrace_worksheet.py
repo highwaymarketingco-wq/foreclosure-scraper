@@ -4,10 +4,12 @@ have (mailing address, absentee flag, the 160 free voter phones) + click-ready s
 (TruePeopleSearch / FastPeopleSearch) so a HUMAN can rapidly look up phone/email. We generate
 links only — no scraping. Output: docs/skiptrace_worksheet.csv (open in Google Sheets/Excel).
 """
-import csv, json, re
+import csv, json, re, sys
 from pathlib import Path
 from urllib.parse import quote
 DOCS = Path(__file__).resolve().parent.parent / "docs"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+from foreclosure_scraper.enrichment_sc_phone import usable_owner_phone
 
 def first_last(owner):
     o = re.sub(r"[^A-Za-z ]", " ", owner or "").strip()
@@ -26,7 +28,9 @@ def main():
         raw = x.get("raw") or {}
         fl = first_last(on)
         city = x.get("city") or ""; st = x.get("state") or ""
-        op = (raw.get("owner_phone") or {}).get("phone", "")
+        # Only a phone that may be offered as the OWNER's number counts as "already have": a
+        # do_not_dial, uncorroborated NC-voter-xref, people-search or agent phone is not one.
+        op = usable_owner_phone(raw)
         om = raw.get("owner_mailing") or {}
         mail = om.get("mailing_address") or om.get("address") or ""
         tps = f"https://www.truepeoplesearch.com/results?name={quote(fl)}&citystatezip={quote(city+', '+st)}" if city else f"https://www.truepeoplesearch.com/results?name={quote(fl)}"

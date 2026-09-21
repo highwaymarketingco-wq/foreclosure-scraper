@@ -20,6 +20,8 @@ import re
 
 from curl_cffi.requests import AsyncSession
 
+from .enrichment_sc_phone import owner_phone_block_reason
+
 # Cache survives the process so repeated runs (main + regenerate) don't re-hit the same prefixes.
 _LERG_CACHE: dict[str, dict] = {}
 _TYPE_MAP = {
@@ -66,7 +68,10 @@ async def enrich_line_type(listings, concurrency: int = 6) -> dict:
         return {"skipped": "disabled (FORECLOSURE_LINE_TYPE=0)"}
     targets = [li for li in listings
                if isinstance(li.raw, dict) and isinstance(li.raw.get("owner_phone"), dict)
-               and li.raw["owner_phone"].get("line_type", "unknown") == "unknown"]
+               and li.raw["owner_phone"].get("line_type", "unknown") == "unknown"
+               # a do-not-dial phone (unverified voter match, agent line, people-search) must never
+               # be classed as a landline for the "compliant call lane" (audit 2026-09-21)
+               and owner_phone_block_reason(li.raw["owner_phone"]) is None]
     stats = {"targets": len(targets), "landline": 0, "wireless": 0, "clec": 0, "unknown": 0}
     if not targets:
         return stats

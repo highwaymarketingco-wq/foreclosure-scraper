@@ -29,6 +29,7 @@ from typing import Sequence
 
 import structlog
 
+from .enrichment_sc_phone import is_owner_phone_usable, owner_phone_block_reason
 from .models import Listing
 from .web_artifact import load_board
 
@@ -65,6 +66,18 @@ def _listing_to_dict(li: Listing) -> dict:
         for k in _KEEP_RAW_KEYS:
             if k in li.raw:
                 raw_out[k] = li.raw[k]
+    # Mark, on a COPY, an owner phone that must not be dialed as the owner's number (do_not_dial,
+    # an uncorroborated NC-voter-xref match, a people-search phone, an agent or attorney), so a
+    # client that reads only owner_phone.phone still sees the flag. The Listing is not mutated.
+    op = raw_out.get("owner_phone")
+    if isinstance(op, dict) and op.get("phone"):
+        reason = owner_phone_block_reason(op)
+        marked = {**op, "dialable": reason is None}
+        if reason:
+            marked["block_reason"] = reason
+            if reason != "agent_contact":
+                marked["do_not_dial"] = True
+        raw_out["owner_phone"] = marked
     return {
         "dedupe_key": li.dedupe_key(),
         "owner_name": li.owner_name,
@@ -122,7 +135,8 @@ def _filter_leads(
                 continue
         if "has_phone" in filters and filters["has_phone"]:
             raw = li.raw if isinstance(li.raw, dict) else {}
-            phones = (raw.get("owner_phone") or {}).get("phone") or \
+            op = raw.get("owner_phone")
+            phones = (op.get("phone") if is_owner_phone_usable(op) else None) or \
                      (raw.get("skip_trace") or {}).get("phone_numbers")
             if not phones:
                 continue

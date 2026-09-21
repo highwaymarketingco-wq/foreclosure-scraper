@@ -757,12 +757,18 @@ async def main():
     except ImportError:
         print("  [sc_voter_xref] SKIP - module not found")
 
-    # 3ag-ter. Free people-search phones (TruePeopleSearch/FastPeopleSearch — covers SC gaps)
-    try:
-        from foreclosure_scraper.enrichment_free_phones import enrich_free_phones
-        await _run_async("free_phones", enrich_free_phones, 900)
-    except ImportError:
-        print("  [free_phones] SKIP - module not found")
+    # 3ag-ter. Free people-search phones (TruePeopleSearch/FastPeopleSearch). OFF by default:
+    # TruePeopleSearch serves a captcha 403 and FastPeopleSearch's terms bar bots, so this is a
+    # wall by the owner's rule (audit 2026-09-21, docs/sc_phone_research_2026-09-21.md). The module
+    # stays in the tree; set ENABLE_FREE_PHONES=1 to run it deliberately.
+    if os.environ.get("ENABLE_FREE_PHONES") == "1":
+        try:
+            from foreclosure_scraper.enrichment_free_phones import enrich_free_phones
+            await _run_async("free_phones", enrich_free_phones, 900)
+        except ImportError:
+            print("  [free_phones] SKIP - module not found")
+    else:
+        print("  [free_phones] OFF (people-search sites are walled; ENABLE_FREE_PHONES=1 to force)")
 
     # 3ah. Owner mailing (free county GIS owner+mailing address)
     try:

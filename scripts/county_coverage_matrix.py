@@ -26,6 +26,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
+from foreclosure_scraper.enrichment_sc_phone import usable_owner_phone  # noqa: E402
 
 from foreclosure_scraper.config import NC_COUNTIES, SC_COUNTIES  # noqa: E402
 
@@ -145,7 +146,7 @@ def main() -> int:
         # its provider is 100% "tax_records_only", so it is a MAIL source, never a
         # phone source. Only owner_phone / outreach.phones / the LiensNC report
         # actually yield a number.
-        phone = op.get("phone") or (out_.get("phones") or None) or oc.get("phone")
+        phone = usable_owner_phone(raw) or (out_.get("phones") or None) or oc.get("phone")
         if has_name and (mailing or phone):
             contact[k] += 1
         if has_name and mailing:

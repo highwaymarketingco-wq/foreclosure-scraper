@@ -29,6 +29,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
+from foreclosure_scraper.enrichment_sc_phone import usable_owner_phone  # noqa: E402
 
 from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
 from foreclosure_scraper.config import NC_COUNTIES, SC_COUNTIES  # noqa: E402
@@ -103,7 +104,8 @@ def main() -> int:
         if has_name and (st_.get("owner_mailing_address") or out_.get("mailing_address")
                          or oc.get("mailing") or om.get("mailing")):
             c["mail"] += 1
-        if op.get("phone") or out_.get("phones") or oc.get("phone"):
+        # usable_owner_phone drops do-not-dial xref matches, agent/attorney lines and people-search phones
+        if usable_owner_phone(raw) or out_.get("phones") or oc.get("phone"):
             c["phone"] += 1
         # ACTUAL debt only: raw['tax_owed'].balance is a real delinquent balance;
         # raw['amount_owed'] is often an estimate (is_actual_debt False).

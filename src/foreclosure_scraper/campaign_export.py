@@ -22,6 +22,7 @@ from typing import Sequence
 
 import structlog
 
+from .enrichment_sc_phone import is_owner_phone_usable
 from .models import Listing
 from .outreach import letter_text, email_text, sms_text, _first_name, _owner, _money
 
@@ -66,9 +67,12 @@ def _apply_filters(
         if ltype and (li.listing_type.value if li.listing_type else "") != ltype:
             continue
 
-        # Has phone filter
+        # Has phone filter. An owner_phone that must not be dialed (do_not_dial, an uncorroborated
+        # NC-voter-xref match, a people-search phone, an agent or attorney) does not count.
         if filters.get("has_phone"):
-            phones = (raw.get("skip_trace") or {}).get("phone_numbers") or (raw.get("owner_phone") or {}).get("phone")
+            op = raw.get("owner_phone")
+            phones = (raw.get("skip_trace") or {}).get("phone_numbers") or (
+                op.get("phone") if is_owner_phone_usable(op) else None)
             if not phones:
                 continue
 
@@ -97,16 +101,25 @@ def _apply_filters(
 def _export_sms(
     listings: Sequence[Listing], output_path: Path
 ) -> tuple[Path, int]:
-    """Write SMS campaign CSV — one row per phone number."""
+    """Write SMS campaign CSV, one row per phone number.
+
+    An owner_phone that is do_not_dial, an NC-voter-xref match whose identity is not
+    corroborated, a people-search phone, or an agent/attorney number is SKIPPED (never texted
+    as the owner). Skip-trace numbers are unaffected.
+    """
     rows = []
+    skipped_blocked = 0
     for li in listings:
         raw = li.raw or {}
         st = raw.get("skip_trace") or {}
-        phones = st.get("phone_numbers") or []
+        phones = list(st.get("phone_numbers") or [])
         # Also check voter_phone enricher
         vp = raw.get("owner_phone") or {}
         if vp.get("phone") and vp["phone"] not in phones:
-            phones = phones + [vp["phone"]]
+            if is_owner_phone_usable(vp):
+                phones = phones + [vp["phone"]]
+            else:
+                skipped_blocked += 1
 
         if not phones:
             continue
@@ -127,7 +140,8 @@ def _export_sms(
             })
 
     _write_csv(output_path, rows)
-    log.info("campaign_export.sms_done", path=str(output_path), rows=len(rows))
+    log.info("campaign_export.sms_done", path=str(output_path), rows=len(rows),
+             skipped_do_not_dial=skipped_blocked)
     return output_path, len(rows)
 
 
