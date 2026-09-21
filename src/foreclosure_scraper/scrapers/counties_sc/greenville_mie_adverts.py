@@ -154,7 +154,12 @@ def parse_advert(url: str, raw: str) -> Listing | None:
     # dated on any given day -- Master-in-Equity adverts stay live on the
     # sitemap long after the sale.)
     is_resolved = sale is not None and sale < now
-    ltype = ListingType.DISTRESSED if is_resolved else ListingType.FORECLOSURE_SALE
+    # A resolved advert is a foreclosure record with a judgment, so it types LIS_PENDENS (FINANCIAL
+    # 28 in the scorer), not DISTRESSED (PROPERTY 10; audit 2026-09-21, F10). LIS_PENDENS is not a
+    # flip type (main._FLIP_LISTING_TYPES), so it keeps the policy above: admitted anywhere in
+    # NC/SC, never denied for Greenville. The scorer reads the advert's own sale date from
+    # raw['greenville_mie']['sale_date'], so a past-dated advert scores nothing.
+    ltype = ListingType.LIS_PENDENS if is_resolved else ListingType.FORECLOSURE_SALE
     # For a resolved case, `sale_date` no longer means "when is the
     # actionable event" -- it's just a historical fact (still preserved
     # below in raw.greenville_mie.sale_date). Structured sale_date is left

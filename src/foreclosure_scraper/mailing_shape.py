@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from typing import Any
 
-__all__ = ["mailing_dict"]
+__all__ = ["mailing_dict", "mailing_of"]
 
 
 def mailing_dict(obj: Any) -> dict:
@@ -47,3 +47,21 @@ def mailing_dict(obj: Any) -> dict:
     if isinstance(om, str) and om.strip():
         return {"mailing": om.strip()}
     return {}
+
+
+def mailing_of(obj: Any) -> dict:
+    """The owner-mailing dict OF a lead: strict about which key it reads.
+
+    `mailing_dict` accepts either a raw dict or the owner_mailing value itself, so given a
+    raw dict with no 'owner_mailing' key it returns the WHOLE raw dict as though it were the
+    mailing block, and a caller then reads raw['absentee'] or raw['mailing'] off the wrong
+    object. This reads only raw['owner_mailing'] and returns {} when that key is absent, so
+    the scorer and the lead-signals enricher cannot be handed a lead's other data by
+    mistake. Bare-string mailing addresses (the Spartanburg sources) still normalise to
+    {"mailing": text}; audit 2026-09-21 F14: the scorer ignored them and 5,098 leads could
+    never be HOT.
+    """
+    raw = getattr(obj, "raw", obj)
+    if not isinstance(raw, dict):
+        return {}
+    return mailing_dict(raw.get("owner_mailing"))

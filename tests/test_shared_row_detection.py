@@ -405,7 +405,11 @@ def test_retract_equity_rank_does_not_clobber_a_sibling_listing():
 # ---------------------------------------------------------------------------
 
 def _past_sale(days: int, status: str) -> Listing:
-    return _lead(parcel_id="P1", owner_name="O",
+    # CHANGED 2026-09-21: a sale date is only an EVENT date on a sale-type lead (foreclosure_sale,
+    # auction, sheriff_sale, tax_sale, hoa_sale, lis_pendens), and never on a source whose sale_date is
+    # a lien filing date (LiensNC, nc_sos_ucc; distress_score.sale_date_is_event). The fixture used
+    # the default TAX_LIEN type, so it now says what it always meant: an auction lead.
+    return _lead(parcel_id="P1", owner_name="O", listing_type=ListingType.FORECLOSURE_SALE,
                  sale_date=datetime.now() - timedelta(days=days),
                  auction_status=status,
                  raw={"calc": {"arv_expected": 250000.0, "max_bid_70": 170000.0,

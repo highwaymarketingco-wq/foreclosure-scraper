@@ -34,29 +34,39 @@ def _li(*, raw: dict | None = None, source: str = "test",
 
 # ---- _facet_signals: cross-cutting distress folded in from other raw keys ----
 
-def test_facet_tax_delinquent_from_balance():
+# CHANGED 2026-09-21 (audit F13): facet names are the scorer's own signal names, so one fact
+# reads once. A real tax balance is `recorded_debt` (it used to read `tax_delinquent` AND
+# `recorded_debt` AND the listing's own `tax_lien`), an open code case or a condemnation is
+# `code_enforcement`, a confirmed vacant structure is `vacant_structure`.
+def test_facet_tax_balance_is_recorded_debt():
     li = _li(raw={"tax_owed": {"balance": 4200}})
-    assert "tax_delinquent" in _facet_signals(li)
-
-
-def test_facet_tax_delinquent_ignores_zero_balance():
-    li = _li(raw={"tax_owed": {"balance": 0}})
+    assert "recorded_debt" in _facet_signals(li)
     assert "tax_delinquent" not in _facet_signals(li)
 
 
+def test_facet_tax_balance_ignores_zero_balance():
+    li = _li(raw={"tax_owed": {"balance": 0}})
+    assert "recorded_debt" not in _facet_signals(li)
+
+
 def test_facet_code_enforcement_condemned_vacant():
-    li = _li(raw={"code_enforcement": True, "condemned": True, "vacant": True})
+    li = _li(raw={"code_enforcement": True, "condemned": True,
+                  "vacancy": {"vacant": True, "boarded_up": False}})
     f = _facet_signals(li)
-    assert {"code_enforcement", "condemned", "vacant"} <= f
+    assert {"code_enforcement", "vacant_structure"} <= f
+    assert not ({"condemned", "vacant"} & f)          # synonyms are gone
 
 
 def test_facet_liens_and_recorded_debt():
+    # an actual judgment counts; an assessed-value placeholder in amount_owed does not (F1)
     li = _li(raw={
         "liens": [{"type": "state_tax", "amount": 900}],
-        "amount_owed": {"value": 150000},
+        "amount_owed": {"value": 150000, "source": "judgment", "is_actual_debt": True},
     })
     f = _facet_signals(li)
     assert "lien" in f and "recorded_debt" in f
+    est = _li(raw={"amount_owed": {"value": 150000, "source": "assessed_value", "is_actual_debt": False}})
+    assert "recorded_debt" not in _facet_signals(est)
 
 
 def test_facet_absentee_and_out_of_state():
@@ -87,9 +97,12 @@ def test_signal_stack_is_superset_of_distress_signals():
     ss = _signal_stack(li)
     # base foreclosure signal + 2 folded facets
     assert "foreclosure_sale" in ss["signals"]
-    assert "tax_delinquent" in ss["signals"]
+    assert "recorded_debt" in ss["signals"]
     assert "code_enforcement" in ss["signals"]
-    assert ss["count"] == 3
+    # CHANGED 2026-09-21 (F13): `count` is the number of distinct CATEGORIES. The foreclosure and
+    # the tax balance are both FINANCIAL, so this reads 2, not 3.
+    assert ss["count"] == 2
+    assert ss["categories"] == ["FINANCIAL", "PROPERTY"]
 
 
 def test_signal_stack_dedupes_overlap():
@@ -106,7 +119,7 @@ def test_signal_stack_dedupes_overlap():
 
 def test_signal_stack_empty_when_no_signals():
     ss = _signal_stack(_li(raw={}))
-    assert ss == {"count": 0, "signals": []}
+    assert ss == {"count": 0, "signals": [], "categories": []}
 
 
 # ---- _intent_score: 0-100 normalized ----
@@ -175,7 +188,7 @@ def test_enrich_attaches_fields_and_stats():
     stats = enrich_lead_signals([hot, cold])
 
     assert hot.raw["signal_stack"]["count"] >= 3
-    assert "tax_delinquent" in hot.raw["signal_stack"]["signals"]
+    assert "recorded_debt" in hot.raw["signal_stack"]["signals"]      # F13: was tax_delinquent
     assert hot.raw["intent_score"] >= 70
     assert hot.raw["intent_band"] == "hot"
 

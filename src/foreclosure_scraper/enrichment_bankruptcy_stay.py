@@ -15,35 +15,46 @@ correctly:
   - Chapter 7 = liquidation. Sale stayed only briefly; the lender files a Motion for Relief and
     the property proceeds to sale. Short-fuse, high resume likelihood.
 
+Reading it: `distress_score` (F3, audit 2026-09-21) does NOT count a bankruptcy as a second
+distress category on a lead whose stay is in force, caps that lead at WARM, and shows the stay
+beside the sale. A stayed foreclosure is not an imminent sale. The stay has an end date the
+match never had: a Chapter 7 stay is over in months and a Chapter 13 plan in three to five
+years (`signal_freshness.bankruptcy_lapsed`), so a match older than that is stamped
+`status: "lapsed"` instead of "stayed" and stops capping the lead. Full relief-from-stay /
+dismissal docket tracking is still a follow-on.
+
 Pure-local (reads the tag `enrichment_bankruptcy` already set — no network), idempotent.
 Full relief-from-stay / dismissal DOCKET tracking is a follow-on (needs per-case CourtListener
 re-checks); this ships the status + an age-based resume-risk heuristic now.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Iterable
 
 import structlog
 
 from .models import Listing
+from .signal_freshness import bankruptcy_lapsed, to_date
 
 log = structlog.get_logger(__name__)
 
-# listing types that represent an actual/pending foreclosure a bankruptcy would STAY
-_FORECLOSURE_TYPES = {"foreclosure_sale", "lis_pendens", "sheriff_sale", "tax_sale", "distressed"}
+# listing types that represent an actual/pending foreclosure a bankruptcy would STAY.
+# 'distressed' was in this set and is not a foreclosure: it is the catch-all type for code
+# violations, vacancy, permits and registry records (F3 audit), so a bankruptcy name match on
+# one of those is not "a paused foreclosure". Auctions and HOA sales are.
+_FORECLOSURE_TYPES = {"foreclosure_sale", "lis_pendens", "sheriff_sale", "tax_sale", "auction", "hoa_sale"}
 
 
-def _months_since(date_filed) -> float | None:
-    try:
-        d = datetime.fromisoformat(str(date_filed)[:10]).replace(tzinfo=timezone.utc)
-        return (datetime.now(timezone.utc) - d).days / 30.44
-    except (ValueError, TypeError):
+def _months_since(date_filed, today: date | None = None) -> float | None:
+    d = to_date(date_filed)
+    if d is None:
         return None
+    return ((today or datetime.now(timezone.utc).date()) - d).days / 30.44
 
 
-def enrich_bankruptcy_stay(listings: Iterable[Listing]) -> dict:
-    stats = {"stayed": 0, "ch13": 0, "ch7": 0, "elevated_resume_risk": 0}
+def enrich_bankruptcy_stay(listings: Iterable[Listing], today: date | None = None) -> dict:
+    stats = {"stayed": 0, "ch13": 0, "ch7": 0, "elevated_resume_risk": 0, "lapsed": 0}
     for li in listings:
         raw = li.raw if isinstance(li.raw, dict) else {}
         bk = raw.get("bankruptcy")
@@ -54,7 +65,19 @@ def enrich_bankruptcy_stay(listings: Iterable[Listing]) -> dict:
                 not in _FORECLOSURE_TYPES:
             continue
         chapter = str(bk.get("chapter") or "").strip()
-        age = _months_since(bk.get("date_filed"))
+        age = _months_since(bk.get("date_filed"), today)
+        if bankruptcy_lapsed(bk, today):
+            # the case is over (or the plan long since failed or completed): no stay to speak of
+            if not isinstance(li.raw, dict):
+                li.raw = {}
+            li.raw["bankruptcy_stay"] = {
+                "status": "lapsed", "chapter": chapter or None,
+                "date_filed": bk.get("date_filed"),
+                "months_since_filing": round(age, 1) if age is not None else None,
+                "note": "Bankruptcy match is old enough that the automatic stay has ended.",
+            }
+            stats["lapsed"] += 1
+            continue
         if chapter == "13":
             # Ch13 plans run 36-60 months; dismissal risk climbs the longer it drags unresolved.
             risk = "elevated" if (age is not None and age >= 9) else "moderate"

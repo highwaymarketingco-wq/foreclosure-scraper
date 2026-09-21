@@ -415,9 +415,12 @@ def build_listing(pin: str, rows: list[Row], now: datetime | None = None) -> Lis
         }
         if _is_absentee(mail_city, mail_state, mail_addr, situs):
             raw["absentee_owner"] = True
-    if len(cycles) >= 3:
-        # Three or more separate delinquency publications is not an oversight.
-        raw["distressed"] = True
+    # Three or more separate delinquency publications is not an oversight, and that is already
+    # recorded as raw['pickens_delinquent']['chronic']. It used to ALSO set raw['distressed'] =
+    # True, which the scorer read as PROPERTY (physical) distress, so one delinquency record made
+    # FINANCIAL + PROPERTY = stack 2 (audit 2026-09-21, F5). The scorer now raises the tax
+    # category's weight for a chronic roll instead; raw['distressed'] here is left to the
+    # assessor's condition code (enrichment_cama_condition), which is real condition evidence.
 
     desc = (
         f"Delinquent property tax, Pickens County SC — parcel {pin}"

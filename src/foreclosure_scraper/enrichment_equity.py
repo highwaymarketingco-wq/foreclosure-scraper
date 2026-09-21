@@ -175,6 +175,40 @@ def is_countable_debt(amount_owed) -> bool:
     return bool(ao.get("value")) and bool(ao.get("is_actual_debt") or ao.get("source") in _FORECLOSURE_DEBT_SRC)
 
 
+# ---------------------------------------------------------------------------
+# EVIDENCED VS ARITHMETIC EQUITY (audit 2026-09-21, F4)
+#
+# `equity = ARV - payoff - liens` is always a number, but the PAYOFF is not always a fact.
+# With no recorded deed of trust, no judgment and no opening bid, `_payoff` assumes the
+# balance is 60% of the assessed value (70% with tax aging), so equity is exactly 40% for
+# every such lead ("high" on the tier's band) whatever the property is. The tier's HOT gate
+# read that band and never the confidence, so the gate was met by construction.
+#
+# The figure is still published (the owner wants the numbers). What changes is what the
+# tier may do with it: an EVIDENCED equity can open HOT, an estimated one can only help a
+# lead reach WARM. Evidenced means the payoff came from a recorded deed of trust, a
+# foreclosure judgment or the auction opening bid, or the engine itself rated the payoff
+# medium or better. A delinquent-TAX balance used as the payoff is NOT evidence of the
+# mortgage (equity net of a tax bill only says "the mortgage is unknown"), so it is
+# excluded even though amount_owed rates it medium.
+# ---------------------------------------------------------------------------
+_EVIDENCED_PAYOFF_SOURCES = ("recorded_deed_of_trust", "amount_owed:judgment",
+                             "amount_owed:opening_bid", "foreclosure_proxy:")
+_NON_MORTGAGE_PAYOFF_SOURCES = ("amount_owed:tax_owed", "amount_owed:estimated_tax")
+
+
+def equity_is_evidenced(eq) -> bool:
+    """True when raw['equity'] rests on a fact about the debt, not on an assumed payoff."""
+    if not isinstance(eq, dict) or eq.get("pct") is None:
+        return False
+    src = str(eq.get("payoff_source") or "")
+    if src.startswith(_NON_MORTGAGE_PAYOFF_SOURCES):
+        return False
+    if src.startswith(_EVIDENCED_PAYOFF_SOURCES):
+        return True
+    return str(eq.get("confidence") or "").strip().lower() in ("medium", "high")
+
+
 def _assumed_note_date() -> date:
     """A deliberately recent assumed origination date for amount-only counties.
     Recent = less paydown = higher estimated balance = we never overstate equity."""
@@ -617,6 +651,9 @@ def enrich_equity(listings: list[Listing]) -> dict:
                 "and includes escrow, arrears and fees we cannot see"),
             "amortization": amort,
         }
+        # F4: lets the tier tell a payoff taken from a recorded fact from one assumed off
+        # the assessed value. The figure is published either way.
+        raw["equity"]["evidenced"] = equity_is_evidenced(raw["equity"])
         if amort:
             amortized += 1
         li.raw = raw

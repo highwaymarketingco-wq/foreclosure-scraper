@@ -273,12 +273,20 @@ def test_amount_owed_is_normalized_by_enrichment_tax_owed():
         assert li.raw["tax_owed"]["kind"] == "delinquent_tax"
 
 
-def test_chronic_delinquency_sets_the_distressed_property_signal():
+def test_chronic_delinquency_raises_the_tax_weight_and_is_not_a_property_signal():
+    # CHANGED 2026-09-21 (audit F5): this used to assert raw['distressed'] is True and that the
+    # scorer then read it as PROPERTY "distressed_condition" (8). One delinquency record therefore
+    # made FINANCIAL 20 + PROPERTY 8 = stack 2. Three roll years is a tax fact: it stays as
+    # raw['pickens_delinquent']['chronic'] and now raises the FINANCIAL weight (tax_lien_chronic).
     from foreclosure_scraper.distress_score import _signals_for
     li = next(li for li in _run()
               if li.raw["pickens_delinquent"]["cycle_count"] >= 3)
-    assert li.raw["distressed"] is True
-    assert "distressed_condition" in [n for n, _b, _w in _signals_for(li)]
+    assert li.raw["pickens_delinquent"]["chronic"] is True
+    assert "distressed" not in li.raw
+    sigs = _signals_for(li)
+    assert "distressed_condition" not in [n for n, _c, _w in sigs]
+    assert ("tax_lien_chronic", "FINANCIAL", 24) in sigs
+    assert {c for _n, c, _w in sigs} == {"FINANCIAL"}
 
 
 def test_a_single_cycle_parcel_is_not_flagged_chronic():

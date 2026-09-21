@@ -966,8 +966,18 @@ def test_a_contradicted_lead_cannot_reach_hot_but_its_records_still_rank():
     def _stacked(flags):
         return _li(state="NC", county="Gaston", parcel_id=f"P{abs(hash(str(flags))) % 9999}",
                    raw={"calc": {"arv_expected": 500_000, "arv_flags": flags},
-                        "equity": {"pct": 0.80, "value": 400_000},
+                        # CHANGED 2026-09-21 (audit F4): HOT now needs EVIDENCED equity, so this
+                        # figure carries the provenance a real equity block always has (a payoff
+                        # from a recorded deed of trust). Without payoff_source/confidence it is
+                        # an unexplained number and can only help a lead reach WARM.
+                        "equity": {"pct": 0.80, "value": 400_000,
+                                   "payoff_source": "recorded_deed_of_trust", "confidence": "high"},
                         "probate": True, "code_enforcement": True,
+                        # CHANGED 2026-09-21 (audit F18): the fixture is a foreclosure_sale, and a
+                        # foreclosure with no title_risk block (party unknown) is no longer
+                        # HOT-eligible; a KNOWN-clean senior-lien foreclosure still is.
+                        "title_risk": {"kind": "senior_lien_foreclosure",
+                                       "surviving_senior_debt": False},
                         "owner_mailing": {"mailing": "1 Main St", "absentee": False}})
 
     clean, bad = _stacked(None), _stacked(["bid_proxy_arv"])

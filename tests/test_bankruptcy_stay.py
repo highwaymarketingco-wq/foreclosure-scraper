@@ -21,7 +21,12 @@ def test_ch13_foreclosure_is_stayed_moderate_when_recent():
 
 
 def test_ch13_old_case_is_elevated_resume_risk():
-    li = _li(ListingType.LIS_PENDENS, {"chapter": "13", "date_filed": "2024-01-01",
+    # CHANGED 2026-09-21: the filing date was the fixed string "2024-01-01". A Chapter 13 match now
+    # lapses after three years (signal_freshness.BK_TTL_DAYS_OTHER), so a fixed date would turn this
+    # into a "lapsed" case on 2027-01-01. Use a date relative to today: ~14 months old, still in force.
+    from datetime import date, timedelta
+    li = _li(ListingType.LIS_PENDENS, {"chapter": "13",
+                                       "date_filed": (date.today() - timedelta(days=430)).isoformat(),
                                        "case_name": "Old Case"})
     enrich_bankruptcy_stay([li])
     assert li.raw["bankruptcy_stay"]["resume_risk"] == "elevated"   # >9 months

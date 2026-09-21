@@ -36,12 +36,23 @@ def test_context_only_sources_add_no_property_signal(slug):
 @pytest.mark.parametrize("slug", [
     "gaston_vacant", "charlotte_open_data", "spartanburg_property_cleanup", "spartanburg_infill_eligible",
     "burke_storm_damage", "pickens_flood_damage", "buncombe_landslide_damage", "asheville_helene",
-    "transylvania_damage_assessment", "hud_reac_inspection", "distressed", "mcdowell_probate",
+    "transylvania_damage_assessment", "hud_reac_inspection", "distressed",
 ])
 def test_real_condition_and_enforcement_sources_still_score(slug):
     li = _lead(f"counties_nc.{slug}")
     assert not _context_only_distressed(li)
     assert "PROPERTY" in _cats(li)
+
+
+def test_mcdowell_probate_scores_as_a_life_event_not_a_property_signal():
+    # CHANGED 2026-09-21 (audit F10 / A3 follow-up): mcdowell_probate was in the list above,
+    # asserting PROPERTY. Its rows are a GIS owner-of-record flagged DECEASED, a probate lead, and
+    # typing them DISTRESSED gave PROPERTY 10 instead of LIFE_EVENT 20. Rows already on the board
+    # keep the DISTRESSED type until re-scraped, so the scorer overrides by source.
+    li = _lead("counties_nc.mcdowell_probate", county="McDowell")
+    assert not _context_only_distressed(li)
+    assert _cats(li) == {"LIFE_EVENT"}
+    assert [(n, w) for n, _c, w in _signals_for(li)] == [("estate_lead", 20)]
 
 
 def test_a_demolition_permit_plus_a_real_tax_balance_is_no_longer_stack_two():

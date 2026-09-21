@@ -42,11 +42,19 @@ This applies to the DISTRESSED lane (buy cheap, clear title, resell as-is).
 It deliberately does not judge the foreclosure / fix-and-flip lane, which has
 different economics -- Fullmer does no rehab at all ("we don't paint, we don't
 replace the carpet, we don't even patch holes in the drywall").
+
+`rank_board` still stamps every lead (it never drops one), so a foreclosure-lane lead
+(distress_stack.lane == "foreclosure": a sale within 30 days or an open upset-bid window) gets a
+rank that answers the wrong question. It is now MARKED, not hidden: the breakdown carries
+`lane` and `days_to_event`, and a `foreclosure_lane_not_judged` flag, so an ordering that
+wants the deadline first (audit 2026-09-21, F7) can sort on `days_to_event` and treat this rank
+as advisory for those rows.
 """
 from __future__ import annotations
 
 from typing import Optional
 
+from .mailing_shape import mailing_of
 from .models import Listing
 
 # ---------------------------------------------------------------- thresholds
@@ -339,7 +347,7 @@ def score(li: Listing, msa_tier: dict | None = None) -> dict:
 
     # --- contactability: a hot lead you can't reach isn't one -------------
     ds = raw.get("distress_stack") if isinstance(raw.get("distress_stack"), dict) else {}
-    om = raw.get("owner_mailing") if isinstance(raw.get("owner_mailing"), dict) else {}
+    om = mailing_of(raw)     # a bare-string owner_mailing (Spartanburg sources) normalises to {"mailing": ...}
     # THE THIRD KEY IS WHERE THE SIGNAL ACTUALLY LIVES. Measured on the live board
     # 2026-09-10: raw["owner_mailing"]["absentee"] is True on 56,091 rows, while the
     # two keys this scorer originally read (distress_stack.absentee, raw.absentee)
@@ -382,8 +390,13 @@ def score(li: Listing, msa_tier: dict | None = None) -> dict:
         else:
             flags.append("margin_thin_vs_curative")
 
+    lane = ds.get("lane") or "distressed"
+    if lane == "foreclosure":
+        flags.append("foreclosure_lane_not_judged")
     return {
         "rank": min(100, pts),
+        "lane": lane,
+        "days_to_event": ds.get("days_to_event"),
         "why": why,
         "flags": flags,
         "cad_value": cad,

@@ -129,17 +129,23 @@ def test_the_sitemap_url_is_the_advert_post_type():
     assert SITEMAP.endswith("wp-sitemap-posts-advert-1.xml")
 
 
-def test_a_past_sale_date_types_as_distressed_not_foreclosure_sale():
+def test_a_past_sale_date_types_as_lis_pendens_not_foreclosure_sale():
     """User-confirmed policy (2026-09-15): 'if they are actual foreclosures
     going to sale, do not grab them [for Greenville]. if they are real
     distressed etc then grab them.' A sale already in the past is no longer
     an active auction to bid on -- it's a resolved case whose remaining
-    value is the judgment-debt/party data, a DISTRESSED signal admitted
-    statewide (the fixture's 08/07/2023 date is in the past relative to
-    any reasonable test run date)."""
+    value is the judgment-debt/party data, admitted statewide (the fixture's
+    08/07/2023 date is in the past relative to any reasonable test run date).
+
+    CHANGED 2026-09-21 (audit F10): the type was DISTRESSED, which scored it PROPERTY 10 as
+    if it were a bad building. It is a foreclosure record with a judgment, so it types
+    LIS_PENDENS (FINANCIAL 28). LIS_PENDENS is not in main._FLIP_LISTING_TYPES, so the scope
+    policy above is unchanged: it is still admitted anywhere and never denied for Greenville."""
+    from foreclosure_scraper.main import _FLIP_LISTING_TYPES
     li = parse_advert(URL, REAL)
     assert li is not None
-    assert li.listing_type == ListingType.DISTRESSED
+    assert li.listing_type == ListingType.LIS_PENDENS
+    assert li.listing_type not in _FLIP_LISTING_TYPES
 
 
 def test_resolved_case_has_no_structured_sale_date_but_keeps_it_in_raw():

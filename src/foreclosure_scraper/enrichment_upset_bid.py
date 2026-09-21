@@ -49,6 +49,13 @@ What this enrichment does NOT do:
     leave sold listings up; occasionally postpone sales without updating).
     raw.upset_bid.confidence reflects that ambiguity.
 
+A CLOSED window is recorded by rewriting the block with `in_window: False`, which is still a
+non-empty dict. Readers must test `in_window is True`, never the truthiness of the dict; the
+scorer used to (audit 2026-09-21, F2) and kept crediting a window that closed 60 days earlier.
+The block also carries `as_of` (the date it was computed), because `in_window` and
+`days_remaining` are frozen at build time (F15): anything reading them later should re-derive
+openness from `deadline_iso`.
+
 Pure-Python, no I/O, idempotent.
 """
 from __future__ import annotations
@@ -58,6 +65,7 @@ from typing import Any
 
 import structlog
 
+from .distress_score import sale_date_is_event
 from .models import Listing
 
 log = structlog.get_logger()
@@ -94,13 +102,13 @@ def _confidence_for(li: Listing) -> str:
     return "LOW"
 
 
-def enrich_upset_bid(listings: list[Listing]) -> dict[str, Any]:
+def enrich_upset_bid(listings: list[Listing], now: datetime | None = None) -> dict[str, Any]:
     """Tag NC listings inside the 10-day upset-bid window. Idempotent.
 
     Returns stats dict for the run summary. Existing listings whose
     raw.upset_bid is already set (from the NC eCourts scraper's per-
     listing tagging) are re-evaluated — if their sale_date is now
-    outside the window, we clear the flag.
+    outside the window, we clear the flag. `now` (naive UTC) is injectable for tests.
     """
     stats = {
         "scanned": 0,
@@ -109,8 +117,10 @@ def enrich_upset_bid(listings: list[Listing]) -> dict[str, Any]:
         "no_sale_date": 0,
         "non_nc": 0,
         "published_skipped": 0,
+        "not_a_sale_date": 0,
     }
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = _naive_utc(now) if now is not None else datetime.now(timezone.utc).replace(tzinfo=None)
+    as_of = now.date().isoformat()
 
     for li in listings:
         stats["scanned"] += 1
@@ -127,6 +137,18 @@ def enrich_upset_bid(listings: list[Listing]) -> dict[str, Any]:
         sd = _naive_utc(li.sale_date)
         if sd is None:
             stats["no_sale_date"] += 1
+            continue
+        if not sale_date_is_event(li):
+            # A LiensNC or nc_sos_ucc `sale_date` is a lien FILING date, and only a sale-type lead
+            # has an auction date. A filing made last week must not open an "upset-bid window";
+            # a window an earlier run derived from one is removed.
+            stats["not_a_sale_date"] += 1
+            existing = li.raw.get("upset_bid") if isinstance(li.raw, dict) else None
+            if (isinstance(existing, dict) and existing.get("source") != "published"
+                    and existing.get("source_signal") is not None):
+                li.raw.pop("upset_bid", None)
+                li.upset_bid_deadline = None
+                stats["tag_cleared_outside_window"] += 1
             continue
 
         days_since_sale = (now - sd).days
@@ -148,6 +170,7 @@ def enrich_upset_bid(listings: list[Listing]) -> dict[str, Any]:
                 "statute": "NCGS §45-21.27",
                 "confidence": _confidence_for(li),
                 "source_signal": li.source,
+                "as_of": as_of,
             }
             stats["tagged_in_window"] += 1
         else:
@@ -162,6 +185,7 @@ def enrich_upset_bid(listings: list[Listing]) -> dict[str, Any]:
                     "in_window": False,
                     "days_remaining": 0,
                     "days_since_sale": days_since_sale,
+                    "as_of": as_of,
                     "stale_reason": (
                         "outside 10-day window now"
                         if days_since_sale > UPSET_BID_WINDOW_DAYS

@@ -15,7 +15,8 @@ import re
 
 _PATTERNS = [
     ("life_estate", re.compile(r"\bLIFE\s*EST", re.I)),                       # elderly owner, life estate
-    ("estate_probate", re.compile(r"\bHEIRS?\b|\bEST(?:ATE)?\s+OF\b|\bESTATE\b", re.I)),  # inherited / probate
+    # A bare "ESTATE" matched "ACME REAL ESTATE HOLDINGS LLC" (audit 2026-09-21, F13): only a death-shaped phrase counts.
+    ("estate_probate", re.compile(r"\bHEIRS?\b|\bEST(?:ATE)?\s+OF\b", re.I)),  # inherited / probate
     ("multiple_heirs", re.compile(r"\bET\s*AL\b", re.I)),                     # fractional owners
     ("trust", re.compile(r"\bTRUST\b|TRUSTEE", re.I)),                       # trust-held
 ]
@@ -39,11 +40,8 @@ def enrich_life_events(listings) -> dict:
         li.raw["life_events"] = flags
         for f in flags:
             stats[f] = stats.get(f, 0) + 1
-        # surface in the distress stack so it's filterable alongside other signals
-        ds = li.raw.get("distress_stack")
-        if isinstance(ds, dict):
-            cats = ds.setdefault("categories", [])
-            if isinstance(cats, list) and "estate_elderly" not in cats:
-                cats.append("estate_elderly")
+        # (Removed 2026-09-21: this used to append "estate_elderly" to distress_stack.categories, but the
+        # enricher runs BEFORE score_board builds the stack, so the append landed on a prior-run dict that
+        # was then overwritten. The scorer reads raw['life_events'] / raw['gis_exempt'] itself.)
     stats["tagged"] = sum(1 for li in listings if isinstance(li.raw, dict) and li.raw.get("life_events"))
     return stats

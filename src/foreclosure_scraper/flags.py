@@ -2,7 +2,14 @@
 
 Each flag is a simple boolean we can show in the Sheet. Sources:
   * absentee_owner — parcel address ≠ owner mailing address (county GIS)
-  * high_equity / low_equity / negative_equity — Zestimate vs recorded mortgage
+  * high_equity / low_equity / negative_equity: read from raw['equity'], the equity engine's
+    figure, which has already passed the ARV trust gate. NOT computed here any more: the
+    legacy version subtracted the LAST SALE PRICE from a Zestimate (or tax_value x 1.25) and
+    called the difference equity, which ignores years of paydown, sits outside the ARV trust
+    gate, and rendered as a green chip on a card whose equity the board had withheld (audit
+    2026-09-21, F19). `high_equity` is only stamped when the payoff behind the figure is a
+    recorded fact (`equity.evidenced`); an equity assumed off the assessed value does not
+    earn the chip.
   * vacant — keyword scan + (future) USPS vacancy API
   * fixer / as-is / fire / etc. — keyword scan of description
   * preforeclosure / auction / reo — listing_type
@@ -26,6 +33,9 @@ POSITIVE_KEYWORDS = (
     "new roof", "new hvac", "new kitchen", "granite", "hardwood",
     "well maintained", "pristine",
 )
+
+
+_EQUITY_FLAGS = ("high_equity", "low_equity", "negative_equity")
 
 
 def _norm_addr(a: str | None) -> str:
@@ -57,19 +67,18 @@ def _flag_one(li: Listing) -> list[str]:
         if owner_mail and prop_addr and prop_addr.split()[0:2] != owner_mail.split()[0:2]:
             flags.append("absentee_owner")
 
-    # Equity flags: zestimate (or tax_value × 1.25 fallback) vs recorded sale_amount
-    zest = (li.raw.get("zillow") or {}).get("zestimate") if isinstance(li.raw, dict) else None
-    arv_proxy = zest or (li.tax_value * 1.25 if li.tax_value else None) or li.market_value
-    last_sale = (gis or {}).get("last_sale", {}) if isinstance(gis, dict) else {}
-    last_sale_amount = last_sale.get("amount") or li.judgment_amount
-
-    if arv_proxy and last_sale_amount:
-        equity_pct = (arv_proxy - last_sale_amount) / arv_proxy
-        if equity_pct >= 0.50:
-            flags.append("high_equity")
-        elif equity_pct <= 0:
+    # Equity flags come from the equity engine, never from a re-derivation here. A withheld
+    # or missing figure (no `pct`) earns no flag. Legacy flags that were stamped by an older run
+    # and are still in raw['flags'] are dropped, so a stale `high_equity` cannot survive.
+    flags = [f for f in flags if f not in _EQUITY_FLAGS]
+    eq = li.raw.get("equity") if isinstance(li.raw, dict) else None
+    pct = eq.get("pct") if isinstance(eq, dict) else None
+    if isinstance(pct, (int, float)):
+        if eq.get("is_underwater") or pct <= 0:
             flags.append("negative_equity")
-        elif equity_pct < 0.20:
+        elif pct >= 0.50 and eq.get("evidenced") is True:
+            flags.append("high_equity")
+        elif pct < 0.20:
             flags.append("low_equity")
 
     # Vacant / fire / fixer keywords from description

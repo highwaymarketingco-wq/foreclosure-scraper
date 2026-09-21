@@ -16,6 +16,13 @@ intact so a verified in-footprint endpoint can be slotted into
 is a graceful no-op.
 
 Free, ArcGIS REST endpoints, no auth.
+
+LIFECYCLE (audit 2026-09-21, F12). The block is written even when every violation is closed
+(`has_open` False), and used to be left in place forever once the feed stopped returning the
+case, so a resolved case scored as an open one. Now: the scorer counts the block only while
+`has_open` is true (`signal_freshness.code_enforcement_open`); each write is stamped
+(`stamped_at`, `stale_after`, `source`); and a lookup that ANSWERED with no matching case
+clears a block this enricher wrote earlier. A lookup that errored clears nothing.
 """
 from __future__ import annotations
 
@@ -28,8 +35,15 @@ import structlog
 
 from .http_client import client
 from .models import Listing
+from .signal_freshness import stamp
 
 log = structlog.get_logger()
+
+#: Marker on blocks this enricher wrote, so it only ever clears its own.
+_SOURCE_TAG = "city_open_data"
+#: A stamped block stops meaning anything this long after it was written unless a later run
+#: re-confirms it.
+_TTL_DAYS = 120
 
 
 # City open-data endpoints — public ArcGIS FeatureServer queries.
@@ -136,14 +150,19 @@ def _pick(attrs: dict, fields: tuple) -> Optional[str]:
 
 async def _fetch_violations_for_listing(
     c, li: Listing, cfg: dict
-) -> list[dict]:
-    """Query the city ArcGIS for violations matching this listing's address."""
+) -> list[dict] | None:
+    """Query the city ArcGIS for violations matching this listing's address.
+
+    Returns the matching features; `[]` when the service ANSWERED and had none; `None` when
+    it could not be asked (no address, or every attempt errored), so a caller never mistakes
+    an outage for "the case is gone"."""
     if not li.street_address:
-        return []
+        return None
     keyword = _street_keywords(li.street_address)
     if not keyword:
-        return []
+        return None
 
+    answered = False
     # Try each address-field name
     for addr_field in cfg["addr_fields"]:
         try:
@@ -161,12 +180,22 @@ async def _fetch_violations_for_listing(
             data = r.json()
             if "error" in data:
                 continue
+            answered = True
             feats = data.get("features", [])
             if feats:
                 return feats
         except Exception:
             continue
-    return []
+    return [] if answered else None
+
+
+def _clear_stale_block(li: Listing, counts: dict) -> None:
+    """The city answered and has no case at this address. Drop a block THIS enricher wrote on
+    an earlier run; leave one a county scraper or another enricher wrote (different source)."""
+    ce = li.raw.get("code_enforcement") if isinstance(li.raw, dict) else None
+    if isinstance(ce, dict) and ce.get("source") == _SOURCE_TAG:
+        li.raw.pop("code_enforcement", None)
+        counts["cleared"] = counts.get("cleared", 0) + 1
 
 
 async def enrich_with_code_enforcement(listings: list[Listing]) -> None:
@@ -196,7 +225,10 @@ async def enrich_with_code_enforcement(listings: list[Listing]) -> None:
         async with sem:
             feats = await _fetch_violations_for_listing(c, li, cfg)
             counts["queried"] += 1
+            if feats is None:
+                return                       # could not ask: leave whatever is there
             if not feats:
+                _clear_stale_block(li, counts)
                 return
             # Verify by lat/lng proximity if listing has coords
             real_hits: list[dict] = []
@@ -214,6 +246,7 @@ async def enrich_with_code_enforcement(listings: list[Listing]) -> None:
                 real_hits = feats
 
             if not real_hits:
+                _clear_stale_block(li, counts)
                 return
 
             counts["violations_found"] += len(real_hits)
@@ -236,14 +269,16 @@ async def enrich_with_code_enforcement(listings: list[Listing]) -> None:
 
             if not isinstance(li.raw, dict):
                 li.raw = {}
-            li.raw["code_enforcement"] = {
+            block = {
                 "city": li.city,
                 "open_violations": len([v for v in violations
                                         if v["status"].lower() not in ("closed", "resolved")]),
                 "total_violations": len(real_hits),
                 "violations": violations,
                 "has_open": any(s not in ("closed", "resolved") for s in statuses),
+                "source": _SOURCE_TAG,
             }
+            li.raw["code_enforcement"] = stamp(block, ttl_days=_TTL_DAYS)
 
     async with client(timeout=20.0) as c:
         for city, lis in targets_by_city.items():

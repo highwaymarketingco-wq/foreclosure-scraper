@@ -107,7 +107,11 @@ class McDowellProbate(BaseScraper):
                         source=self.slug,
                         source_url=(f"{QUERY_URL}?where=parno%3D%27{parcel}%27"
                                     "&outFields=*&f=html"),
-                        listing_type=ListingType.DISTRESSED,
+                        # ESTATE_LEAD, not DISTRESSED: this row is an owner-of-record flagged
+                        # deceased (a probate / heir lead). Typed DISTRESSED it scored PROPERTY 10
+                        # instead of LIFE_EVENT 20 (audit 2026-09-21, F10). ESTATE_LEAD keeps the
+                        # same scope (distressed scope, not flip) and the DATELESS_OK entry.
+                        listing_type=ListingType.ESTATE_LEAD,
                         property_kind=pk,
                         owner_name=owner or owner2 or None,
                         street_address=site,

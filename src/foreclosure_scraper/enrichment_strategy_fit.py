@@ -10,6 +10,14 @@ raw['strategy_fit'] = {"tags": [...], "reasons": {...}}. Tags:
   LAND            vacant land parcel — buyable land (not a wholesale assignment play).
 
 Heuristic + transparent; every tag carries a one-line reason. Gate STRATEGY_FIT=0.
+
+AUDIT 2026-09-21 (F1/F13). "Distressed" here used to mean ANY signal on the distress stack, so a
+vacant parcel with nothing but an assessed-value placeholder read as `LAND_WHOLESALE: vacant land
++ distress signal`. It now means the lead reached WARM or HOT, which the scorer only grants on
+evidence. And a lead counts as probate only on a probate listing type, a probate flag, or an
+owner name that says HEIRS / ESTATE OF: `raw['life_events']` also carries `trust`,
+`multiple_heirs` and a bare `estate` (an LLC named "... REAL ESTATE ..."), none of which is a
+death.
 """
 from __future__ import annotations
 
@@ -17,11 +25,21 @@ import os
 from typing import Iterable
 
 from .models import Listing
+from .signal_freshness import owner_names_a_death
 
 _ENABLED = os.environ.get("STRATEGY_FIT") != "0"
 
 _LAND_KINDS = {"land", "vacant_land", "vacant", "lot", "acreage"}
 _ROUGH_CONDITION = {"major", "gut"}
+
+
+def _is_probate(li: Listing, lt: str, raw: dict) -> bool:
+    if "probate" in lt or lt in ("estate_lead",) or raw.get("probate") or raw.get("estate"):
+        return True
+    tags = raw.get("life_events")
+    # only the estate_probate tag, and only when the owner name really names a death
+    return (isinstance(tags, (list, tuple, set)) and "estate_probate" in tags
+            and owner_names_a_death(li.owner_name))
 
 
 def _f(v):
@@ -56,11 +74,11 @@ def enrich_strategy_fit(listings: Iterable[Listing]) -> dict:
         raw = li.raw if isinstance(li.raw, dict) else {}
         lt = (li.listing_type.value if hasattr(li.listing_type, "value") else str(li.listing_type or "")).lower()
         ds = raw.get("distress_stack") or {}
-        has_distress = bool(ds.get("tier") in ("HOT", "WARM")) or bool(ds.get("signals"))
+        has_distress = ds.get("tier") in ("HOT", "WARM")
         tax_owed = bool((raw.get("tax_owed") or {}).get("balance"))
         tenure = raw.get("tenure") or {}
         long_tenure = bool(tenure.get("long_tenure"))
-        probate = "probate" in lt or lt in ("estate_lead",) or bool(raw.get("life_events"))
+        probate = _is_probate(li, lt, raw)
         eq = _equity_pct(raw)
         cond = (raw.get("condition_tier") or "").lower()
         is_land = _is_land(li)

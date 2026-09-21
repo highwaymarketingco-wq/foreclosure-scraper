@@ -11,6 +11,11 @@ Fixes verified 2026-06-30 against the live board:
     in the lis-pendens feed = likely resolved/withdrawn. Flag raw['stale_case'] and down-rank a
     stale HOT to WARM so the operator's HOT queue isn't dominated by dead leads (non-destructive —
     the lead stays on the board, just not prioritized).
+  * a lead the source stopped listing (`pulled_sale.presumed_withdrawn`) or whose sale date is
+    well past (`sale_date_passed`, outside the upset-bid window) is downranked HOT -> WARM on
+    EITHER signal, not only on the exact status string `presumed_withdrawn` (audit 2026-09-21,
+    F2). The downrank copies the distress stack first: `score_board` used to hand every listing
+    on a parcel the SAME dict, so an in-place edit re-tiered its siblings (F9).
   * sales that already happened, still advertised as upcoming (2026-08-11): 258 leads carry a
     sale_date in the PAST. 32 still say auction_status 'active' (plus 5 'status: active', 2
     'status: active - outbid period', 1 'upset_bid_period', 2 'reopen') and 23 still publish a
@@ -22,8 +27,10 @@ Fixes verified 2026-06-30 against the live board:
 from __future__ import annotations
 
 import collections
+import copy
 from datetime import date, datetime
 
+from .distress_score import sale_date_is_event
 from .valuation.grading import ARV_VERDICT_FIELDS
 
 # NC + SC bounding box (generous): lat 32.0–36.8, lon −84.5 to −75.3.
@@ -105,9 +112,47 @@ def _as_date(v) -> "date | None":
         return None
 
 
-def enrich_board_quality(listings) -> dict:
+def _upset_window_open(raw: dict, today: date) -> bool:
+    """An upset-bid window that is still open: the flag is True AND the deadline (when the
+    block carries one) has not passed."""
+    ub = raw.get("upset_bid")
+    if not isinstance(ub, dict) or ub.get("in_window") is not True:
+        return False
+    dl = _as_date(ub.get("deadline_iso"))
+    return dl is None or dl >= today
+
+
+def _stale_reason(li, raw: dict, today: date) -> "tuple[str, bool] | None":
+    """(reason, is_stale_case) when this lead's HOT tier should not stand, else None.
+
+    Three independent facts, any one of which is enough. The first two mean the SOURCE stopped
+    listing the case (the meaning `stale_case` has always had), so they also set that flag.
+    The third is a sale date that passed with nothing left to act on; that is already flagged
+    as `sale_date_passed`, so it downranks a HOT lead without adding `stale_case` to the
+    thousands of rows whose sale date is simply old (a tax roll row, a redemption period):
+      * the status says it is presumed withdrawn;
+      * the pulled-sales pass marked it presumed withdrawn (its last status may still read 'active');
+      * its sale date is past the grace, no upset-bid window is open, and no SC redemption
+        period is running (the same test the scorer applies, so the two cannot disagree).
+    """
+    if (getattr(li, "auction_status", None) or "") == "presumed_withdrawn":
+        return "presumed_withdrawn", True
+    ps = raw.get("pulled_sale")
+    if isinstance(ps, dict) and ps.get("presumed_withdrawn"):
+        return "pulled_sale_presumed_withdrawn", True
+    if raw.get("sale_date_passed") and (raw.get("sale_date_passed_days") or 0) > _SALE_PASSED_GRACE_DAYS \
+            and not _upset_window_open(raw, today):
+        from .distress_score import _redemption_open   # lazy: keeps this module import-light
+        sd = _as_date(getattr(li, "sale_date", None))
+        lt = getattr(getattr(li, "listing_type", None), "value", getattr(li, "listing_type", None))
+        if not (lt == "tax_sale" and _redemption_open(li, raw, sd, today)):
+            return "sale_date_passed", False
+    return None
+
+
+def enrich_board_quality(listings, today: "date | None" = None) -> dict:
     stats: collections.Counter = collections.Counter()
-    today = date.today()
+    today = today or date.today()
 
     # Pre-pass: find centroid-collision coordinates (shared by many leads).
     coord = collections.Counter(
@@ -148,6 +193,14 @@ def enrich_board_quality(listings) -> dict:
 
         # 2b. the sale already happened — see the block at the top of this file.
         sd = _as_date(getattr(li, "sale_date", None))
+        if sd and not sale_date_is_event(li):
+            # LiensNC and nc_sos_ucc carry a lien FILING date in sale_date, and only a sale-type
+            # lead has an auction date at all. Nothing here (the passed flag, the verdict, the
+            # status) applies, and a stamp left by an earlier run is removed.
+            if raw.pop("sale_date_passed", None) is not None:
+                stats["sale_date_passed_cleared"] += 1
+            raw.pop("sale_date_passed_days", None)
+            sd = None
         if sd and sd < today:
             elapsed = (today - sd).days
             raw["sale_date_passed"] = True
@@ -177,14 +230,23 @@ def enrich_board_quality(listings) -> dict:
                 li.auction_status = "sale_date_passed"
                 stats["past_sale_status_normalized"] += 1
 
-        # 3. stale presumed-withdrawn cases — flag + down-rank a stale HOT.
-        if (getattr(li, "auction_status", None) or "") == "presumed_withdrawn":
-            raw["stale_case"] = True
-            stats["stale_flagged"] += 1
+        # 3. stale cases: flag + down-rank a stale HOT. Presumed-withdrawn by status, by the
+        #    pulled-sales marker, or a past sale date outside the upset window (F2).
+        found = _stale_reason(li, raw, today)
+        if found:
+            why, is_stale_case = found
+            if is_stale_case:
+                raw["stale_case"] = True
+                stats["stale_flagged"] += 1
             ds = raw.get("distress_stack")
             if isinstance(ds, dict) and ds.get("tier") == "HOT":
+                # copy, never edit in place: a stack shared with a sibling listing on the same
+                # parcel would re-tier the sibling too (F9)
+                ds = copy.deepcopy(ds)
                 ds["tier"] = "WARM"
                 ds["downranked_stale"] = True
+                ds["downranked_reason"] = why
+                raw["distress_stack"] = ds
                 stats["hot_downranked"] += 1
 
     return dict(stats)
