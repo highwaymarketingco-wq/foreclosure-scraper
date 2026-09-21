@@ -158,14 +158,20 @@ SC_OWNER_LAYERS: dict[str, dict[str, Any]] = {
     },
 }
 
-# WALL: no free owner-name search exists for these two, so their leads are not
+# WALL: no free owner-name search exists for Cherokee, so its leads are not
 # targeted at all rather than burning budget on a guaranteed miss.
-#   Anderson  — propertyviewer.andersoncountysc.org MapServer/5 is public but has
-#               NO owner column at all (TAXOWNSTR holds tax-district codes like
-#               '100'); ACPASS is login-walled.
 #   Cherokee  — qPublic/Schneider only: parcel-keyed ASP.NET viewstate postback,
 #               no address/owner GET surface.
-SC_NO_FREE_OWNER_SEARCH = {"Anderson", "Cherokee"}
+SC_NO_FREE_OWNER_SEARCH = {"Cherokee"}
+
+# Anderson was a wall until 2026-09-20: propertyviewer.andersoncountysc.org
+# MapServer/5 has NO owner column (TAXOWNSTR holds tax-district codes like '100'),
+# ACPASS is login-walled, and the live County_Parcels layer stopped publishing owner
+# names. But the 2026-08-03 bulk assessor roll (data/sc_parcel_mailing.db, 113,406
+# Anderson owners) is on disk, and sc_parcel_mailing.lookup_by_owner searches it
+# offline with the project's strict matcher. It had no callers. Counties listed here
+# are served from that roll, and only while the roll is actually present.
+SC_OFFLINE_OWNER_ROLL = {"Anderson"}
 
 
 # ---------------------------------------------------------------------------
@@ -515,6 +521,51 @@ def _nc_onemap_cfg(li: Listing) -> dict[str, Any]:
     }
 
 
+def _offline_roll_cfg(county: str) -> Optional[dict[str, Any]]:
+    """Backend plan for a county served from the bulk assessor roll on disk, or None
+    when the roll is absent or does not cover the county (then it stays a wall).
+
+    The row keys are the county layer's own field names (OWNER, PHYS_ADDR, TMS,
+    MRKT_VALUE), so _safe_attrs, _populate_from_attrs and apply_gis_attrs treat a
+    roll hit exactly like a pinned GIS layer row. No mailing column is requested."""
+    try:
+        from . import sc_parcel_mailing as pm
+        if ("SC", county) not in pm.covered_counties():
+            return None
+    except Exception:  # noqa: BLE001 - roll missing or unreadable: it is a wall again
+        return None
+    return {
+        "kind": "offline_roll", "base": f"offline:sc_parcel_mailing:{county}",
+        "owner_field": "OWNER", "situs_field": "PHYS_ADDR", "parcel_field": "TMS",
+        "mail_fields": (), "pinned": True, "county": county,
+        "label": f"sc_offline_roll_{county.lower()}",
+    }
+
+
+def _offline_roll_rows(cfg: dict[str, Any], party: str) -> list[dict[str, Any]]:
+    """Candidate GENERATOR for the offline roll: rows shaped like the county layer.
+
+    Like the Buncombe backend this decides nothing. lookup_by_owner already keeps
+    only exact/strong name matches, and the shared _strict_matches and ambiguity
+    rule in the caller still adjudicate every row."""
+    from . import sc_parcel_mailing as pm
+    rows: list[dict[str, Any]] = []
+    for rec in pm.lookup_by_owner("SC", cfg["county"], party, limit=8):
+        row: dict[str, Any] = {
+            "OWNER": rec.get("owner") or rec.get("taxpayer"),
+            "PHYS_ADDR": rec.get("situs") or rec.get("situs_street"),
+            "TMS": rec.get("parcel_raw") or rec.get("parcel_key"),
+        }
+        for key, val in (("MRKT_VALUE", rec.get("market_value")),
+                         ("Heated_Sqf", rec.get("living_sqft")),
+                         ("YearBuilt", rec.get("year_built")),
+                         ("Acreage", rec.get("acreage"))):
+            if val:
+                row[key] = val
+        rows.append(row)
+    return rows
+
+
 def _endpoint_cfg(li: Listing) -> Optional[dict[str, Any]]:
     """Endpoint + field plan for a lead's county, or None when nothing is wired.
 
@@ -525,6 +576,8 @@ def _endpoint_cfg(li: Listing) -> Optional[dict[str, Any]]:
     """
     county = _county_clean(li)
     if li.state == "SC":
+        if county in SC_OFFLINE_OWNER_ROLL:
+            return _offline_roll_cfg(county)
         if county in SC_NO_FREE_OWNER_SEARCH:
             return None
         pinned = SC_OWNER_LAYERS.get(county)
@@ -1016,6 +1069,8 @@ def _backend_stat_key(label: str) -> str:
         return _BACKEND_STAT[label]
     if label.startswith("sc_pinned_"):
         return "resolved_sc_pinned"
+    if label.startswith("sc_offline_roll"):
+        return "resolved_sc_offline_roll"
     return "resolved_other"
 
 
@@ -1025,6 +1080,8 @@ async def _candidate_rows(
     """Dispatch one backend in the plan to its rows."""
     if cfg.get("kind") == "owner_index":
         return await _query_buncombe_owner_index(c, cfg, party)
+    if cfg.get("kind") == "offline_roll":
+        return _offline_roll_rows(cfg, party)
     return await _query_owner_scoped(c, cfg, patterns)
 
 
@@ -1046,7 +1103,7 @@ async def enrich_resolve_name_to_property(
         "budget_hit": 0, "cap_hit": 0, "no_backend_county": 0,
         # Which backend in the chain actually produced each resolution, so the
         # next measurement can tell a real gain from a reshuffle.
-        "resolved_buncombe_index": 0, "resolved_nc_onemap": 0,
+        "resolved_buncombe_index": 0, "resolved_nc_onemap": 0, "resolved_sc_offline_roll": 0,
         "resolved_county_layer": 0, "resolved_sc_pinned": 0, "resolved_other": 0,
     }
     if not _ENABLED:
@@ -1148,7 +1205,7 @@ async def enrich_resolve_name_to_property(
         for cfg in plan:
             base = cfg["base"]
 
-            dead = await _health(c, base)
+            dead = None if cfg.get("kind") == "offline_roll" else await _health(c, base)
             if dead:
                 stats["endpoint_dead"] += 1
                 last_env = ("endpoint_dead", {"endpoint": base, "reason": dead})

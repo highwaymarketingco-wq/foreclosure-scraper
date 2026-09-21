@@ -186,8 +186,9 @@ def test_targets_the_five_wired_sc_counties():
 
 
 def test_skips_counties_with_no_free_owner_search():
-    """Anderson + Cherokee have no free owner-name endpoint at all — do not
-    burn budget on a guaranteed miss."""
+    """Cherokee has no free owner-name endpoint at all — do not burn budget on a
+    guaranteed miss. (Anderson left this set 2026-09-20: it is served offline from
+    the bulk assessor roll; see tests/test_resolve_offline_roll_anderson.py.)"""
     for county in SC_NO_FREE_OWNER_SEARCH:
         assert _endpoint_cfg(_lead(county=county)) is None
         assert _is_target(_lead(county=county)) is False

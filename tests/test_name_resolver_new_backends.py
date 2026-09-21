@@ -180,11 +180,14 @@ def test_unwired_nc_counties_stop_being_no_endpoint():
         assert "nc_onemap" in labels, county
 
 
-def test_sc_plans_are_untouched_by_the_nc_work():
+def test_sc_plans_are_untouched_by_the_nc_work(monkeypatch):
     for county in ("Spartanburg", "Pickens", "Laurens", "Oconee", "Union"):
         plan = _endpoint_plan(_lead(state="SC", county=county))
         assert plan and all(c["base"] != NC_ONEMAP_URL for c in plan), county
-    # The two SC walls stay walls.
+    # Cherokee stays a wall. Anderson is served from the offline roll, and is a wall
+    # again whenever that roll is not on disk (covered_counties() empty).
+    import foreclosure_scraper.sc_parcel_mailing as pm
+    monkeypatch.setattr(pm, "covered_counties", lambda: set())
     for county in ("Anderson", "Cherokee"):
         assert _endpoint_plan(_lead(state="SC", county=county)) == []
 

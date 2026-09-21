@@ -101,6 +101,9 @@ def test_county_without_a_backend_is_marked_not_silently_dropped(monkeypatch):
     leads nothing has looked at yet, which is what made 1,187 of them read as
     'never attempted' and cost real time to re-diagnose more than once."""
     import asyncio
+    # Anderson is only a wall while the offline assessor roll is absent; pin that case.
+    import foreclosure_scraper.sc_parcel_mailing as pm
+    monkeypatch.setattr(pm, "covered_counties", lambda: set())
     m = _reload(monkeypatch, FORECLOSURE_NAME_RESOLVE_BUDGET_S="0.01")
     leads = [_named_leadless("Anderson"), _named_leadless("Cherokee")]
     stats = asyncio.run(m.enrich_resolve_name_to_property(leads))
