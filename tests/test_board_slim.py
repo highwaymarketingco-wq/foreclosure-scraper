@@ -199,7 +199,8 @@ def test_slim_emission_does_not_change_listings_or_detail_bytes(tmp_path, monkey
     write_artifact(leads, {"notes": "t"}, docs_dir=on)
     assert (on / "listings_slim.json").exists()
 
-    for name in ("listings.json", "listings.json.gz",
+    # the board's published form is the parts (audit O1), no longer one listings.json.gz
+    for name in ("listings.json", "listings_part_000.json.gz",
                  "listings_detail.json", "listings_detail.json.gz"):
         assert (off / name).read_bytes() == (on / name).read_bytes(), name
 
@@ -386,7 +387,8 @@ def _gz_only(docs: Path) -> None:
     and docs/listings_detail.json are gitignored, so only the .gz twins exist."""
     (docs / "listings.json").unlink()
     (docs / "listings_detail.json").unlink()
-    assert (docs / "listings.json.gz").exists() and (docs / "listings_detail.json.gz").exists()
+    assert (docs / "listings_part_000.json.gz").exists() and (docs / "listings_detail.json.gz").exists()
+    assert not (docs / "listings.json.gz").exists(), "the single listings.json.gz is no longer written"
 
 
 def test_prior_details_are_found_from_the_gz_twins_alone(tmp_path):
@@ -407,7 +409,8 @@ def test_gz_only_rewrite_does_not_wipe_the_sidecar(tmp_path):
     _gz_only(tmp_path)
 
     # a naive pass: read the board back with no sidecar merge at all, rewrite
-    recs = json.loads(gzip.decompress((tmp_path / "listings.json.gz").read_bytes()))
+    from foreclosure_scraper import board_parts
+    recs = board_parts.read_rows(tmp_path)         # the board is listings_part_NNN.json.gz now
     naive = [Listing.model_validate(d) for d in recs]
     assert not any(k in (naive[0].raw or {}) for k in LAZY_DETAIL_KEYS)
     write_artifact(naive, {"notes": "gz-only pass"}, docs_dir=tmp_path)

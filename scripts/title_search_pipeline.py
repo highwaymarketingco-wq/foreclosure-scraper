@@ -52,16 +52,13 @@ def stream_save(board):
         f.write("]")
     os.replace(tmp, str(DOCS / "listings.json"))
     print(f"  [save] JSON: {os.path.getsize(str(DOCS/'listings.json'))//1024}KB")
-    tmp_gz = str(DOCS / "listings.json.gz") + ".tmp"
-    with open(str(DOCS / "listings.json"), "rb") as src, \
-         gzip.GzipFile(filename=tmp_gz, mode="wb", compresslevel=9, mtime=0) as dst:
-        while True:
-            block = src.read(65536)
-            if not block:
-                break
-            dst.write(block)
-    os.replace(tmp_gz, str(DOCS / "listings.json.gz"))
-    print(f"  [save] GZ: {os.path.getsize(str(DOCS/'listings.json.gz'))//1024}KB ({time.time()-t0:.1f}s)")
+    # The published board is docs/listings_part_NNN.json.gz now (audit O1), not one
+    # listings.json.gz: re-cut the parts from the plain file just written (streaming, no
+    # load_board) and reseal run_meta.board_parts and the manifest. Run this script under
+    # scripts/with_board_lock.sh, like every board writer.
+    from foreclosure_scraper.web_artifact import reseal_board
+    reseal_board(DOCS, resplit=True)
+    print(f"  [save] board parts resealed ({time.time()-t0:.1f}s)")
 
 
 # ─── TITLE SEARCH & RED FLAG STEPS ─────────────────────────────────────

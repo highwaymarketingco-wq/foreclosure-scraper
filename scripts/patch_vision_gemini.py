@@ -32,6 +32,7 @@ from foreclosure_scraper.models import Listing, ListingType, PropertyKind
 from foreclosure_scraper.enrichment_vision import enrich_with_vision
 from foreclosure_scraper.valuation import calc as valuation_calc
 from foreclosure_scraper.valuation import grading as valuation_grading
+from foreclosure_scraper.publish import board_seal_pathspec
 from foreclosure_scraper.web_artifact import (
     BoardLockBusy, board_lock, load_board, read_board_records, write_artifact,
 )
@@ -226,7 +227,8 @@ async def _run() -> int:
             # `git add` exit 128 and stage NOTHING AT ALL, which would silently
             # stop publishing the dashboard entirely on a checkout where the slim
             # emitter has not run yet.
-            pub = ["docs/listings.json.gz", "docs/listings_detail.json.gz",
+            # the board = every listings_part_NNN.json.gz + the manifest that lists them
+            pub = [*board_seal_pathspec(root), "docs/listings_detail.json.gz",
                    "docs/run_meta.json"]
             # ...but "exists" alone is the wrong gate once it IS tracked: the
             # emitter deletes both slim files if projection fails, and that

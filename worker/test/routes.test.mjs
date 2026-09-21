@@ -11,6 +11,13 @@ test("allowlisted release, shell, photo and special paths classify correctly", (
   for (const name of RELEASE_FILES.keys()) assert.equal(classify(name).kind, "release", name);
   assert.equal(classify("/detail_shards/00000.json.gz").kind, "release");
   assert.equal(classify("/detail_shards/00170.json.gz").kind, "release");
+  // the board, cut into parts (audit O1): served from the pinned release like every payload file
+  for (const p of ["/listings_part_000.json.gz", "/listings_part_007.json.gz", "/listings_part_123.json.gz", "/listings_part_1000.json.gz"]) {
+    const c = classify(p);
+    assert.equal(c.kind, "release", p);
+    assert.equal(c.contentType, "application/gzip", p);
+    assert.equal(c.volatile, false, p);
+  }
   assert.equal(classify("/run_meta.json").volatile, true);
   assert.equal(classify("/listings_slim.json.gz").volatile, false);
   assert.equal(classify("/").kind, "shell");
@@ -54,6 +61,15 @@ test("everything not on the allowlist is denied", () => {
     "/source_health.json",
     "/wall_status.json",
     "/detail_shards/00000.json",
+    "/listings_part_000.json",        // the plain twin of a part does not exist and is never served
+    "/listings_part_00.json.gz",      // two digits
+    "/listings_part_10000.json.gz",   // five digits
+    "/listings_part_abc.json.gz",
+    "/listings_part_000.json.gz/extra",
+    "/listings_part_000.json.gz.bak",
+    "/listings_part_.json.gz",
+    "/x/listings_part_000.json.gz",
+    "/releases/20260921T141132Z/listings_part_000.json.gz",
     "/detail_shards/0.json.gz",
     "/detail_shards/abcde.json.gz",
     "/detail_shards/00000.json.gz/extra",
@@ -130,4 +146,26 @@ test("RELEASE_FILES covers every file scripts/publish_private.sh uploads", () =>
   for (const f of [...grab("REQUIRED_FILES"), ...grab("OPTIONAL_FILES")]) {
     assert.ok(RELEASE_FILES.has("/" + f), `publish_private.sh uploads ${f} but the Worker would not serve it`);
   }
+});
+
+test("every board part name the writer can produce is served, and nothing else in that shape is", () => {
+  // src/foreclosure_scraper/board_parts.py part_name(): listings_part_%03d.json.gz (grows to 4 digits past 999)
+  const py = fs.readFileSync(path.resolve(here, "../../src/foreclosure_scraper/board_parts.py"), "utf8");
+  assert.match(py, /PART_PREFIX = "listings_part_"/);
+  assert.match(py, /PART_SUFFIX = "\.json\.gz"/);
+  assert.match(py, /"%s%03d%s" % \(PART_PREFIX, i, PART_SUFFIX\)/);
+  for (let i = 0; i < 1200; i++) {
+    const name = "/listings_part_" + String(i).padStart(3, "0") + ".json.gz";
+    assert.equal(classify(name).kind, "release", name);
+  }
+  for (const bad of ["/listings_part_0.json.gz", "/listings_part_00.json.gz", "/listings_part_00000.json.gz", "/listings_parts_000.json.gz"]) {
+    assert.equal(classify(bad).kind, "denied", bad);
+  }
+});
+
+test("publish_private.sh releases the parts named in run_meta and no longer requires the single gz", () => {
+  const script = fs.readFileSync(path.resolve(here, "../../scripts/publish_private.sh"), "utf8");
+  const req = /^REQUIRED_FILES="([^"]+)"/m.exec(script)[1].split(/\s+/);
+  assert.ok(!req.includes("listings.json.gz"), "the single listings.json.gz must not be REQUIRED any more");
+  assert.match(script, /listings_part_/);
 });

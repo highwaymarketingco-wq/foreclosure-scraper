@@ -134,18 +134,21 @@ Job logs live in `logs/` (the audit found `lrcpwa`, `sosagent` and `parcelcache`
 `scripts/board_payload.sh` is the single definition. Every path is staged in its own `git add`, so one bad pathspec cannot void the whole publish.
 
 ```
-docs/listings.json.gz          docs/board.manifest.json
-docs/listings_detail.json.gz   docs/run_meta.json
-docs/listings_slim.json.gz     docs/run_health.json
-docs/detail_shards/            docs/foreclosure_sold_pool.json
-docs/parcel_photos/            docs/multifamily.json
+docs/listings_part_NNN.json.gz  (the board, N parts, see below)
+docs/listings_detail.json.gz   docs/board.manifest.json
+docs/listings_slim.json.gz     docs/run_meta.json
+docs/detail_shards/            docs/run_health.json
+docs/parcel_photos/            docs/foreclosure_sold_pool.json
+docs/multifamily.json
 ```
 
-**The join across the payloads is BY ARRAY INDEX**, and only holds within one `write_artifact` call. Index `i` of `listings.json` is index `i` of `listings_detail.json` is record `i % 1000` of `detail_shards/{i//1000:05d}`. Publishing a fresh board beside a stale slim file or stale shards hands one lead's comps, vision and CAMA to another lead's address on every phone while desktop looks perfect.
+**The board is published as parts** (audit O1, `docs/payload_split_2026-09-21.md`): `docs/listings_part_000.json.gz`, `001`, ... are contiguous slices of the same JSON array, each its own gzip and each under 24 MiB (`src/foreclosure_scraper/board_parts.py`, `PART_MAX_BYTES`). Concatenated in name order they are exactly the array the single `listings.json.gz` used to hold; **row order is the contract** (the join below is by index). The list of parts, with row range, size and sha256 per part, is in `board.manifest.json` (`parts`) and in `run_meta.json` (`board_parts`, what the dashboard reads). **A publish carries ALL parts or none**: `board_payload_add` stages them in one `git add` and unstages the whole board payload if that fails, and the pre-commit hook (`scripts/check_staged_parts.py`) refuses a commit whose staged parts are not exactly the set the staged manifest lists. `docs/listings.json.gz` no longer exists as a publish artifact; a copy left in the tree is ignored by every reader once the manifest lists parts and should be `git rm`'d.
 
-**The manifest seals the set.** `write_artifact` writes `docs/board.manifest.json` last: size, sha256 and record count of every payload file. `load_board` and `read_board_json` verify the file they read against it, refuse the plain-over-gz preference when the plain file disagrees, and raise `BoardIntegrityError` when neither twin matches (a torn or mixed set). A publisher that stages the payload without the manifest leaves a stale one committed; stage with `board_payload_add`, or add `docs/board.manifest.json`. Check with `scripts/board_manifest.py --verify`; re-seal after checking with `--rebuild`. `BOARD_MANIFEST_SKIP=1` loads without checking.
+**The join across the payloads is BY ARRAY INDEX**, and only holds within one `write_artifact` call. Index `i` of `listings.json` (the concatenated parts) is index `i` of `listings_detail.json` is record `i % 1000` of `detail_shards/{i//1000:05d}`. Publishing a fresh board beside a stale slim file or stale shards hands one lead's comps, vision and CAMA to another lead's address on every phone while desktop looks perfect.
 
-`docs/listings.json`, `listings_detail.json` and `listings_slim.json` are **gitignored** (over GitHub's 100 MB limit). Only the `.gz` twins are committed.
+**The manifest seals the set.** `write_artifact` writes `docs/board.manifest.json` last: size, sha256 and record count of every payload file. `load_board` and `read_board_json` verify the file they read against it, refuse the plain-over-gz preference when the plain file disagrees, and raise `BoardIntegrityError` when neither twin matches (a torn or mixed set). For the board that means every part: an interrupted write (part 2 rewritten, the manifest still the old one's) fails the sha256 check and is never read as a board. Part files are read only through a listing (the manifest, else `run_meta.board_parts`); part files nobody lists are refused (`BOARD_PARTS_ALLOW_UNLISTED=1` reads them unverified). A publisher that stages the payload without the manifest leaves a stale one committed; stage with `board_payload_add`, or add `docs/board.manifest.json`. Check with `scripts/board_manifest.py --verify`; re-seal after checking with `--rebuild`. `BOARD_MANIFEST_SKIP=1` loads without checking.
+
+`docs/listings.json`, `listings_detail.json` and `listings_slim.json` are **gitignored** (over GitHub's 100 MB limit). Only the `.gz` twins (for the board, the parts) are committed.
 
 ### Pushing
 
@@ -153,11 +156,11 @@ The lock protects the write and the commit, not the network. Publishers commit i
 
 ### Size gate
 
-`listings.json.gz` was 34 MiB on 8/26 and **84.0 MiB on 9/21** (GitHub's hard limit is 100 MiB, warning at 50). `scripts/git_size_gate.sh` (a pre-commit hook) blocks a commit at 95 MiB; `scripts/check_payload_size.py` reports every payload file against the limits, and the hourly watcher alerts above 80 MiB. The payload split is still open.
+`listings.json.gz` was 34 MiB on 8/26 and **84.0 MiB on 9/21** (GitHub's hard limit is 100 MiB, warning at 50), growing 2 to 4 MiB a day. That is why the board is now parts (above): no single file approaches the limit, and growth adds parts instead of enlarging one. `scripts/git_size_gate.sh` (a pre-commit hook) still blocks any file over 95 MiB and now also refuses a mixed part set; `scripts/check_payload_size.py` reports every file against the limits, checks every part against the 24 MiB part cap (`OVER_PART`) and the part set against the manifest, and prints the board's total; the hourly watcher alerts on an oversized part, a torn set, or any file above 80 MiB. If a part is ever over the cap the writer did not cut the board: run `scripts/board_manifest.py --rebuild --resplit`.
 
 ### The Jekyll prefix trap
 
-Jekyll's `exclude`/`include` are **prefix** matches, so `exclude: listings.json` also drops `listings.json.gz`. This 404'd the live data **three times**. Every `- <name>.json` added to `exclude` in `docs/_config.yml` needs `- <name>.json.gz` in `include` in the same edit. `scripts/check_pages_publish.py` reimplements Jekyll's decision and runs first in `pages.yml` on bare `python3`. Run it after any `_config.yml` edit.
+Jekyll's `exclude`/`include` are **prefix** matches, so `exclude: listings.json` also drops `listings.json.gz`. This 404'd the live data **three times**. The board parts are named `listings_part_NNN.json.gz` on purpose: none of the excluded names (`listings.json`, `listings_detail.json`, `listings_slim.json`) is a prefix of it, and `include: listings_part_` in `docs/_config.yml` is belt and braces. `check_pages_publish.py` requires every part on disk. Every `- <name>.json` added to `exclude` in `docs/_config.yml` needs `- <name>.json.gz` in `include` in the same edit. `scripts/check_pages_publish.py` reimplements Jekyll's decision and runs first in `pages.yml` on bare `python3`. Run it after any `_config.yml` edit.
 
 ---
 
@@ -230,7 +233,7 @@ The popup now logs every decision to `logs/prompt_run.log` and writes a `prompt_
 
 ## 8. Repo size
 
-Measured 2026-09-21 by the audit (`gh api`): **12.7 GiB** on GitHub against the watchdog's 5 GB soft limit, up from 889 MB on 2026-08-11. Issue #131 (opened 9/14 at 7,115 MB, growth 249.9 MB/day) has no comment; growth since is about 800 MiB a day. The local `.git` is 18 GB, 13.7 GB of it loose objects (`git gc` repacks it; it touches no history). One publish of the current board adds **118 to 172 MiB** of new objects (listings.json.gz 84 MiB, slim 31 MiB, about 100 changed shards 54 MiB), and there were 9 to 24 board commits a day on 9/13 to 9/20.
+Measured 2026-09-21 by the audit (`gh api`): **12.7 GiB** on GitHub against the watchdog's 5 GB soft limit, up from 889 MB on 2026-08-11. Issue #131 (opened 9/14 at 7,115 MB, growth 249.9 MB/day) has no comment; growth since is about 800 MiB a day. The local `.git` is 18 GB, 13.7 GB of it loose objects (`git gc` repacks it; it touches no history). One publish of the current board adds **118 to 172 MiB** of new objects (listings.json.gz 84 MiB, since split into parts of at most 24 MiB that keep their row boundaries between writes, so a change confined to some rows rewrites only the parts holding them; slim 31 MiB, about 100 changed shards 54 MiB), and there were 9 to 24 board commits a day on 9/13 to 9/20.
 
 Why it grows: the `.gz` payloads are incompressible and every publish rewrites them; history retains every one. The 8/11 analysis still holds in shape (the `.gz` files and JPEGs are the repository; 7 GB of plain-JSON history compresses to almost nothing), but not in scale.
 

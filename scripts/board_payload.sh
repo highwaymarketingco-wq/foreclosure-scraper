@@ -33,6 +33,16 @@
 #    128; tracked, `git add docs/detail_shards` stages additions, modifications
 #    AND deletions inside it.
 #
+#  * THE BOARD IS docs/listings_part_NNN.json.gz (audit O1), NOT docs/listings.json.gz.
+#    The single gz was 84 MiB against GitHub's 100 MiB limit; the board is now N gzipped
+#    slices of the same array, each under 24 MiB, listed in docs/board.manifest.json and
+#    docs/run_meta.json. board_payload_part_paths enumerates them (files on disk PLUS tracked
+#    ones, so a part that a shorter board dropped has its deletion staged), and
+#    board_payload_add stages ALL of them in ONE `git add` (a failing pathspec stages nothing)
+#    and, if that fails, unstages the whole board payload: a partial part set beside a new
+#    slim/detail/shard set is a mis-joined board. board_payload_verify_staged is the second
+#    lock on the same door (scripts/check_staged_parts.py, also run by the pre-commit hook).
+#
 #  * ONE PUBLISH, ALL SIX FILES. index i is the join across listings.json,
 #    listings_detail.json, listings_slim.json and detail_shards/, and that
 #    alignment only holds within a single write_artifact() call. Staging some
@@ -41,11 +51,21 @@
 #    when the fat board was committed without the fresh slim file — desktop
 #    looked perfect the whole time.
 
+# board_payload_part_paths <repo-root>: every board part that exists on disk or is tracked,
+# one per line, sorted. `find` (not a shell glob): an unmatched glob is a hard error in zsh.
+board_payload_part_paths() {
+  {
+    find "$1/docs" -maxdepth 1 -type f -name 'listings_part_*.json.gz' 2>/dev/null \
+      | while IFS= read -r _bpf; do printf 'docs/%s\n' "${_bpf##*/}"; done
+    git -C "$1" ls-files -- 'docs/listings_part_*.json.gz' 2>/dev/null
+  } | sort -u
+}
+
 # board_payload_paths <repo-root> — newline-separated, safe to hand to `git add`.
 board_payload_paths() {
   _bproot="$1"
+  board_payload_part_paths "$_bproot"
   for _bp in \
-      docs/listings.json.gz \
       docs/listings_detail.json.gz \
       docs/listings_slim.json.gz \
       docs/detail_shards \
@@ -64,11 +84,38 @@ board_payload_paths() {
 }
 
 # board_payload_add <repo-root> — stage every payload path that is safe to stage.
+# The board parts go in ONE `git add` (all or none). If that fails, the whole board payload is
+# UNSTAGED and 1 is returned: staging the rest without the parts would ship a mis-joined board
+# (slim, detail and shards from write N beside parts from write N-1). Everything else keeps the
+# per-path rule (one bad pathspec must not void the publish).
 board_payload_add() {
+  _bpparts="$(board_payload_part_paths "$1")"
+  if [ -n "$_bpparts" ]; then
+    if ! printf '%s\n' "$_bpparts" | ( cd "$1" && xargs git add -- ) >/dev/null 2>&1; then
+      echo "==> !! PARTS_STAGE_FAILED: could not stage every docs/listings_part_NNN.json.gz;" \
+           "unstaging the whole board payload (a partial part set ships a mis-joined board)" >&2
+      board_payload_paths "$1" | while IFS= read -r _bpp; do
+        [ -n "$_bpp" ] && git -C "$1" reset -q -- "$_bpp" >/dev/null 2>&1
+      done
+      return 1
+    fi
+  fi
   board_payload_paths "$1" | while IFS= read -r _bpp; do
+    case "$_bpp" in docs/listings_part_*) continue ;; esac
     [ -n "$_bpp" ] && git -C "$1" add "$_bpp" 2>/dev/null
   done
   return 0
+}
+
+# board_payload_verify_staged <repo-root>: 0 when what is staged is a consistent board: the
+# staged parts are exactly the parts the staged manifest lists, with matching sizes and sha256,
+# and run_meta.json's board_parts is the same list. Reads the INDEX, not the working tree.
+# Non-zero means: do not commit. (The pre-commit hook runs the same check; a workflow runner or a
+# fresh clone may not have the hook installed, so publishers call this too.)
+board_payload_verify_staged() {
+  _bvroot="$1"
+  [ -f "$_bvroot/scripts/check_staged_parts.py" ] || return 0
+  python3 "$_bvroot/scripts/check_staged_parts.py" --root "$_bvroot"
 }
 
 # board_payload_changed <repo-root> — 0 when something in the payload actually
@@ -119,6 +166,17 @@ board_payload_unstash() {
   _buroot="$1"; _butar="$2"
   [ -f "$_butar" ] || return 0
   ( cd "$_buroot" && tar -xf "$_butar" ) || true
+  # After `git reset --hard origin/main` the tree holds the PARTS of whatever origin published
+  # while this run was working. If our board has fewer parts than origin's, the extra origin
+  # parts would survive the extract and ride along into our commit as strays the manifest does
+  # not list. Remove every part file the stash did not carry (only when it carried parts at all);
+  # the deletion is staged by board_payload_add because tracked parts stay in the payload list.
+  if tar -tf "$_butar" 2>/dev/null | grep -q 'docs/listings_part_'; then
+    ( cd "$_buroot" && find docs -maxdepth 1 -type f -name 'listings_part_*.json.gz' 2>/dev/null ) \
+      | while IFS= read -r _bup; do
+          tar -tf "$_butar" 2>/dev/null | grep -qx "$_bup" || rm -f "$_buroot/$_bup"
+        done
+  fi
 }
 
 # board_payload_check <repo-root> — prove GitHub Pages will actually serve what

@@ -37,6 +37,7 @@ def _isolate_board_ops(monkeypatch, tmp_path_factory):
     monkeypatch.setenv("JOB_EVENTS_FILE",
                        str(tmp_path_factory.mktemp("job_events") / "job_events.jsonl"))
     for var in ("BOARD_LOCK_BYPASS", "BOARD_MANIFEST_SKIP", "BOARD_LOAD_ALLOW_DROPS",
-                "BOARD_GATE_FAKE_SWAP_MB", "BOARD_GATE_FAKE_FREE_MB"):
+                "BOARD_GATE_FAKE_SWAP_MB", "BOARD_GATE_FAKE_FREE_MB",
+                "BOARD_PARTS_ALLOW_UNLISTED", "BOARD_PART_MAX_BYTES"):
         monkeypatch.delenv(var, raising=False)
     yield

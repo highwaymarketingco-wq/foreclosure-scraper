@@ -45,37 +45,12 @@ _JUNK_ADDR = re.compile(
 
 
 def _stream(path: Path):
-    dec = json.JSONDecoder()
-    buf, started = "", False
-    with gzip.open(path, "rt", encoding="utf-8") as f:
-        while True:
-            chunk = f.read(1 << 20)
-            if chunk:
-                buf += chunk
-            if not started:
-                i = buf.find("[")
-                if i == -1:
-                    if not chunk:
-                        return
-                    continue
-                buf, started = buf[i + 1:], True
-            while True:
-                j = 0
-                while j < len(buf) and buf[j] in " \t\r\n,":
-                    j += 1
-                buf = buf[j:]
-                if not buf:
-                    break
-                if buf[0] == "]":
-                    return
-                try:
-                    obj, end = dec.raw_decode(buf)
-                except ValueError:
-                    break
-                buf = buf[end:]
-                yield obj
-            if not chunk:
-                return
+    """Rows of the board at `path` (docs/listings.json.gz), one at a time. The board is now
+    published as parts (docs/listings_part_NNN.json.gz, audit O1): board_stream.iter_board_rows reads
+    the parts beside `path` in order (checked against docs/board.manifest.json), and reads `path`
+    itself as one gzipped array when there are none."""
+    from foreclosure_scraper.board_stream import iter_board_rows
+    yield from iter_board_rows(path)
 
 
 def _kind(rec):

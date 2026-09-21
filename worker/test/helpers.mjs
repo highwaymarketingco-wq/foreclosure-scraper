@@ -190,6 +190,8 @@ export function makeBucket() {
   ]) {
     r2.put(`releases/${rel}/listings_slim.json.gz`, gzBytes(1000, seed));
     r2.put(`releases/${rel}/listings.json.gz`, gzBytes(2000, seed));
+    // the board as parts (audit O1): three, each with its own seed so a mixed read is visible
+    for (let i = 0; i < 3; i++) r2.put(`releases/${rel}/listings_part_${String(i).padStart(3, "0")}.json.gz`, gzBytes(700 + i, seed * 10 + i));
     r2.put(`releases/${rel}/listings_detail.json.gz`, gzBytes(500, seed));
     r2.put(`releases/${rel}/detail_shards/00000.json.gz`, gzBytes(200, seed));
     r2.put(`releases/${rel}/detail_shards/00003.json.gz`, gzBytes(300, seed));

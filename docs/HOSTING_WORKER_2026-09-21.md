@@ -56,7 +56,7 @@ assets without running any Worker code, and the second gate would not apply to t
 | `/manifest.json` | assets | `private, no-cache` | `application/manifest+json` |
 | `/icons/<name>` with a png, svg or ico extension | assets | `private, max-age=86400` | |
 | `/run_meta.json` | R2, the **current** release | `no-store` | always current, ignores `?t=` |
-| `/listings.json.gz`, `/listings_slim.json.gz`, `/listings_detail.json.gz`, `/detail_shards/NNNNN.json.gz`, `/multifamily.json`, `/land_buyers.json`, `/foreclosure_sold_pool.json`, `/run_health.json` | R2 `releases/<id>/...` | with a valid `?t=<run_time>`: `private, max-age=31536000, immutable`; otherwise `private, no-cache` | see "release pinning" |
+| `/listings_part_NNN.json.gz` (the board since the payload split, audit O1; each under 24 MiB), `/listings.json.gz` (legacy single file, kept for a rollback), `/listings_slim.json.gz`, `/listings_detail.json.gz`, `/detail_shards/NNNNN.json.gz`, `/multifamily.json`, `/land_buyers.json`, `/foreclosure_sold_pool.json`, `/run_health.json` | R2 `releases/<id>/...` | with a valid `?t=<run_time>`: `private, max-age=31536000, immutable`; otherwise `private, no-cache` | see "release pinning" |
 | `/parcel_photos/[<folder>/]<name>` with a jpg, jpeg, png or webp extension | R2 `parcel_photos/...` | `private, max-age=86400` | flat or one folder deep (`streetview/`), as on disk |
 | `/current.json` | R2 | `no-store` | the pointer; useful with curl to see what is live |
 | `/healthz` | pointer (cached 30 s) | `no-store` | `{"ok":true,"release":"...","published_at":...,"board_count":...,"auth":"jwt"}`; 503 before the first publish |
@@ -82,7 +82,7 @@ uncompressed `listings*.json`, and the extensions `.md .env .csv .py .sh .sqlite
 
 ### Gzip files: no Content-Encoding
 
-`dashboard.js` fetches `listings_slim.json.gz`, `listings.json.gz`, `listings_detail.json.gz` and
+`dashboard.js` fetches `listings_slim.json.gz`, the board parts `listings_part_NNN.json.gz` (`listings.json.gz` on a pre-split publish), `listings_detail.json.gz` and
 `detail_shards/NNNNN.json.gz` by their `.gz` names, reads the first two bytes, and if they are
 `1f 8b` inflates the body itself with `DecompressionStream` (`loadBoardStreaming`,
 `fetchJsonMaybeGz`). It also copes with a server that already inflated it. GitHub Pages serves

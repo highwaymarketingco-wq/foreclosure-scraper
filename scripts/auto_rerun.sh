@@ -25,14 +25,14 @@ while [ $RUN -le $MAX_RUNS ]; do
     echo "=== RUN $RUN exited with code $EXIT at $(date) ===" | tee -a "$LOG"
     
     # Check if we should continue — count dot_ocr coverage
-    OCR_DONE=$(python3.12 -c "
-import json, gzip
+    # the published board is docs/listings_part_NNN.json.gz now (audit O1); iter_board_rows reads
+    # the parts beside docs/listings.json.gz in order (or that file itself when there are none)
+    OCR_DONE=$(PYTHONPATH=src python3.12 -c "
+from foreclosure_scraper.board_stream import iter_board_rows
 try:
-    with gzip.open('docs/listings.json.gz','rt') as f:
-        data = json.load(f)
-    n = sum(1 for li in data if li.get('raw',{}).get('doc_ocr') is not None)
+    n = sum(1 for li in iter_board_rows('docs/listings.json.gz') if li.get('raw',{}).get('doc_ocr') is not None)
     print(n)
-except: print(0)
+except Exception: print(0)
 " 2>/dev/null)
     echo "dot_ocr coverage: $OCR_DONE listings" | tee -a "$LOG"
     

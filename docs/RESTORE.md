@@ -9,8 +9,8 @@ Two separate things can need restoring:
 
 ## 0. Rules that make a restore safe
 
-- **A board is six files that only make sense together.** Index `i` is the join across `listings.json`, `listings_detail.json`, `listings_slim.json` and `detail_shards/`. Restoring some of them from one commit and some from another hands one property's comps and vision to another property's address, with no error. Always restore all of them from ONE commit.
-- **The plain `docs/listings.json` beats its `.gz` twin** in `read_board_json` unless the manifest says otherwise. It is gitignored, so `git checkout <commit> -- docs/` does not replace it. Leaving a newer plain file beside an older `.gz` restores nothing. The restore script moves the plain twins away first.
+- **A board is a set of files that only make sense together.** Index `i` is the join across the board (the parts `docs/listings_part_NNN.json.gz`, formerly one `listings.json.gz`), `listings_detail.json`, `listings_slim.json` and `detail_shards/`. Restoring some of them from one commit and some from another hands one property's comps and vision to another property's address, with no error. Always restore all of them from ONE commit.
+- **The plain `docs/listings.json` beats its `.gz` twin (the parts)** in `read_board_json` unless the manifest says otherwise. It is gitignored, so `git checkout <commit> -- docs/` does not replace it. Leaving a newer plain file beside older parts restores nothing. The restore script moves the plain twins away first, and the current board parts too (a commit with four parts restored over a tree with six would leave two strays the manifest does not list).
 - **Nothing may hold the board lock.** `restore_board.sh` refuses (exit 75) while a job holds it and takes the lock itself for the duration. If a job is running, wait for it; do not remove the lock by hand unless the holder is dead (`cat logs/.board.lock/pid`, `ps -p <pid>`).
 - **Restore first, publish later.** The script changes the working tree only. It stages, commits and pushes nothing.
 
@@ -23,13 +23,13 @@ scripts/restore_board.sh <commit>           # asks you to type RESTORE
 scripts/restore_board.sh <commit> --yes     # no prompt (for scripts)
 ```
 
-Pick the newest commit **before** the bad write. The `--list` output shows each commit's subject (`daily vision: 635 listings scored`, `Scheduled SOS pass`, and so on) and the size of `listings.json.gz`; a sudden drop in size or row count is the tell.
+Pick the newest commit **before** the bad write. The `--list` output shows each commit's subject (`daily vision: 635 listings scored`, `Scheduled SOS pass`, and so on) and the size of the board files (the sum of the parts, with the part count, or the single `listings.json.gz` for a commit from before the payload split); a sudden drop in size or row count is the tell. A commit from before the split restores the single file and removes the parts; a commit after it restores exactly that commit's parts.
 
 What the script does, in order:
 
 1. Refuses while any board writer holds the lock; otherwise holds it for the whole restore.
-2. Moves `docs/listings.json`, `listings_detail.json`, `listings_slim.json` and `docs/detail_shards/` into `backups/pre-restore-<stamp>/` (a rename, not a delete) and copies the current `.gz` twins and manifest there too.
-3. Restores from that one commit: the three `.gz` twins, the whole `detail_shards/` directory, `run_meta.json`, `run_health.json` and `board.manifest.json` (when the commit has them).
+2. Moves `docs/listings.json`, `listings_detail.json`, `listings_slim.json`, every `docs/listings_part_NNN.json.gz` and `docs/detail_shards/` into `backups/pre-restore-<stamp>/` (a rename, not a delete) and copies the current `.gz` twins and manifest there too.
+3. Restores from that one commit: the board parts (or the single `listings.json.gz` for a pre-split commit), the two other `.gz` twins, the whole `detail_shards/` directory, `run_meta.json`, `run_health.json` and `board.manifest.json` (when the commit has them).
 4. Prints the sha256 of each restored file and checks the manifest that came with the commit: `MATCHES`, `MISMATCH`, or `no manifest in this commit` (commits before 2026-09-21 have none).
 5. Warns if the restored board is more than 10% below `docs/board_highwater.json`.
 

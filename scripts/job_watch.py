@@ -24,7 +24,9 @@ An alarm is raised when
   2. the last three outcomes of a job are all failed or push_failed (a job that runs and
      fails every time, which a 48 hour window would take two days to notice).
   3. a payload file is over the warn line (scripts/check_payload_size.py, default 80 MiB)
-     or the deployed site nears the Pages limit. GitHub rejects a push over 100 MiB.
+     or the deployed site nears the Pages limit. GitHub rejects a push over 100 MiB. Since the
+     payload split (audit O1) the board is docs/listings_part_NNN.json.gz, each under 24 MiB; a
+     part over that cap, or a part set that disagrees with docs/board.manifest.json, also alarms.
 
 A job that has NEVER reported (no line at all) is only alarmed once the watcher has itself
 been running longer than that job's window, so installing this before every wrapper is
@@ -165,6 +167,15 @@ def payload_alarms(root: Path) -> list:
             out.append({"key": "payload:" + f["path"],
                         "msg": "%s is %.1f MiB (%.0f%% of GitHub's 100 MiB push limit)" % (
                             f["path"], f["mib"], f["pct_of_github_limit"])})
+        elif f.get("status") == "OVER_PART":
+            # a board part over its own cap (24 MiB): far from GitHub's wall, but it means the
+            # writer did not cut the board (audit O1), and the next growth spurt would not be caught
+            out.append({"key": "payload:" + f["path"],
+                        "msg": "%s is %.1f MiB, over the %.0f MiB board-part cap (the payload split did not "
+                               "run or a part was written by hand)" % (
+                                   f["path"], f["mib"], (data.get("board_parts") or {}).get("part_max_mib", 24))})
+    for i, msg in enumerate((data.get("parts_problems") or []) + (data.get("parts_warnings") or [])):
+        out.append({"key": "payload:parts:%d" % i, "msg": "board parts: " + msg})
     site = data.get("site") or {}
     if site.get("status") in ("WARN", "FAIL"):
         out.append({"key": "payload:site", "msg": "deployed site is %.0f MB (Pages warns at %d, fails at %d)" % (

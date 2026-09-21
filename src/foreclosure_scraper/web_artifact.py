@@ -1,12 +1,19 @@
 """Generate the static-site JSON files consumed by docs/index.html (the live dashboard).
 
-Writes (every one of these, plus a .gz twin for the four payloads, in ONE call —
+Writes (every one of these, plus a .gz twin for the sidecar and slim payloads, in ONE call;
 a publish that stages some and not others ships a mis-joined board):
-  docs/listings.json        — array of sanitized listings (Pydantic-dumped, raw kept slim)
+  docs/listings.json        : array of sanitized listings (Pydantic-dumped, raw kept slim);
+                              gitignored local working copy
+  docs/listings_part_NNN.json.gz : the SAME array cut into contiguous, independently gzipped
+                              parts of at most board_parts.PART_MAX_BYTES each (audit O1: the
+                              single 84 MiB listings.json.gz was days from GitHub's 100 MiB
+                              limit). The committed, published form of the board.
   docs/listings_detail.json — index-aligned sidecar: the heavy comps/vision keys
   docs/listings_slim.json   — SLIM-V1, the board payload phones fetch
   docs/detail_shards/*.json.gz — index-aligned detail, cut so a phone can fetch one lead
-  docs/run_meta.json        — run timestamp, source_status, totals, sources contributing
+  docs/run_meta.json        : run timestamp, source_status, totals, sources contributing,
+                              and the list of board parts (board_parts)
+  docs/board.manifest.json  : written LAST: size + sha256 + rows of every file above
 """
 from __future__ import annotations
 
@@ -24,6 +31,8 @@ from pathlib import Path
 
 import structlog
 
+from . import board_parts as _bp
+from .board_parts import BoardIntegrityError  # noqa: F401  (one class: re-exported here)
 from .models import Listing
 from .stale_link_fallback import annotate_stale_links
 
@@ -654,10 +663,6 @@ MANIFEST_NAME = "board.manifest.json"
 MANIFEST_SCHEMA = "board-manifest-v1"
 
 
-class BoardIntegrityError(RuntimeError):
-    """A board file on disk does not match its manifest (torn or mixed write)."""
-
-
 class BoardLoadDropError(RuntimeError):
     """load_board dropped more rows than BOARD_LOAD_MAX_DROP_RATE allows."""
 
@@ -718,25 +723,80 @@ def _file_matches_manifest(path: Path, entry: dict) -> tuple[bool, str]:
     return True, ""
 
 
-def _choose_board_file(p: Path) -> tuple[Path, str]:
-    """Which file to read for `p` (docs/listings.json or its sibling), plus its
-    role. Honors the manifest when it names the file; otherwise the legacy rule
-    (plain if present, else its .gz)."""
+def _choose_listings_source(p: Path):
+    """Source selection for docs/listings.json specifically, now that the published board is
+    a set of PARTS (audit O1). Returns (path, role, resolution) or None to fall through to the
+    legacy single-gz rules.
+
+      manifest with a parts block   the plain file when it matches the manifest, else the parts
+                                    (every part verified against the manifest; any mismatch is a
+                                    BoardIntegrityError, an interrupted write is never read)
+      manifest WITHOUT a parts block  legacy: None (the single .gz rules apply)
+      no manifest                   plain if present, else the parts found on disk (contiguous
+                                    from 000, unverified), else None
+    """
+    docs = p.parent
+    man = load_manifest(docs)
+    if man is not None:
+        if _bp.manifest_parts_block(man) is None:
+            return None
+        entry_plain = man["files"].get(p.name)
+        plain_why = "missing"
+        if p.exists():
+            plain_why = "not named by the manifest"
+            if entry_plain:
+                plain_ok, plain_why = _file_matches_manifest(p, entry_plain)
+                if plain_ok:
+                    return p, "plain", None
+        try:
+            res = _bp.resolve(docs, man=man)
+        except BoardIntegrityError as exc:
+            raise BoardIntegrityError(
+                f"{p.name} does not match {MANIFEST_NAME} (plain: {plain_why}). {exc}") from exc
+        if p.exists():
+            log.error("board.plain_disagrees_with_manifest", file=p.name, why=plain_why,
+                      using=res.paths[0].name + " (+ %d more parts)" % (len(res.paths) - 1))
+        return res.paths[0], "parts", res
+    if p.exists():
+        return p, "plain", None
+    try:
+        res = _bp.resolve(docs)
+    except _bp.UnlistedPartsError:
+        # part files nobody lists (an interrupted first write, a migration mid-flight): the
+        # single listings.json.gz, when there is one, is still a complete board. Otherwise refuse.
+        if p.with_name(p.name + ".gz").exists():
+            return None
+        raise
+    if res is not None:
+        return res.paths[0], "parts", res
+    return None
+
+
+def _choose_board_source(p: Path):
+    """(path, role, resolution) for `p` (docs/listings.json or a sibling). role is "plain",
+    "gz" or "parts"; resolution is set only for "parts". Honors the manifest when it names the
+    file; otherwise the legacy rule (plain if present, else its .gz)."""
+    if p.name == "listings.json":
+        got = _choose_listings_source(p)
+        if got is not None:
+            return got
     gz = p.with_name(p.name + ".gz")
     man = load_manifest(p.parent)
     entry_plain = man["files"].get(p.name) if man else None
     if not entry_plain:
         if p.exists():
-            return p, "plain"
+            return p, "plain", None
         if gz.exists():
-            return gz, "gz"
-        raise FileNotFoundError(f"{p} (and {p.name}.gz) not found")
+            return gz, "gz", None
+        raise FileNotFoundError(f"{p} (and {p.name}.gz"
+                                + (" or its listings_part_NNN.json.gz parts" if p.name == "listings.json" else "")
+                                + ") not found")
     entry_gz = man["files"].get(gz.name)
     plain_ok, plain_why = (False, "missing")
     if p.exists():
         plain_ok, plain_why = _file_matches_manifest(p, entry_plain)
     if plain_ok:
-        return p, "plain"
+        return p, "plain", None
     gz_ok, gz_why = (False, "missing")
     if gz.exists() and entry_gz:
         gz_ok, gz_why = _file_matches_manifest(gz, entry_gz)
@@ -744,13 +804,19 @@ def _choose_board_file(p: Path) -> tuple[Path, str]:
         if p.exists():
             log.error("board.plain_disagrees_with_manifest", file=p.name, why=plain_why,
                       using=gz.name)
-        return gz, "gz"
+        return gz, "gz", None
     raise BoardIntegrityError(
         f"{p.name} does not match {MANIFEST_NAME} (plain: {plain_why}; "
         f"gz: {gz_why}). The payload set is torn or mixed. Restore a consistent set "
         f"(scripts/restore_board.sh <commit>) or, if you know the files are right, "
         f"scripts/board_manifest.py --rebuild. BOARD_MANIFEST_SKIP=1 bypasses this check."
     )
+
+
+def _choose_board_file(p: Path) -> tuple[Path, str]:
+    """Which file to read for `p`, plus its role (kept for callers that predate the parts)."""
+    used, role, _ = _choose_board_source(p)
+    return used, role
 
 
 # {resolved listings.json path: (file actually read, st_mtime_ns, st_size)} —
@@ -807,9 +873,12 @@ def _check_not_changed_since_load(listings_path: Path) -> None:
 
 def _read_board_json_ex(path: Path | str):
     p = Path(path)
-    used, role = _choose_board_file(p)
+    used, role, res = _choose_board_source(p)
     if role == "plain":
         return json.loads(used.read_text()), used
+    if role == "parts":
+        # concatenated in name order; every part already verified against the manifest
+        return _bp.read_rows(p.parent, res=res), used
     import gzip as _gzip
     return json.loads(_gzip.decompress(used.read_bytes()).decode("utf-8")), used
 
@@ -825,6 +894,10 @@ def read_board_json(path: Path | str):
     so we decompress that instead. Either way the whole system can rebuild the
     board from just the .gz — nothing depends on the big file being present.
 
+    For listings.json the "twin" is the PARTS board (docs/listings_part_NNN.json.gz, audit
+    O1): the parts are verified against the manifest, concatenated in order, and returned as
+    the same list the single file used to hold. See board_parts.py.
+
     When docs/board.manifest.json exists it is authoritative: the file is verified
     against it first, and the plain-over-gz preference is refused when the plain
     file disagrees (see THE BOARD MANIFEST above).
@@ -839,7 +912,9 @@ def _board_file_present(path: Path) -> bool:
     the wrong question anywhere the uncompressed twin is gitignored.
     """
     p = Path(path)
-    return p.exists() or p.with_name(p.name + ".gz").exists()
+    if p.exists() or p.with_name(p.name + ".gz").exists():
+        return True
+    return p.name == "listings.json" and _bp.has_parts(p.parent)
 
 
 def _register_if_held() -> None:
@@ -2363,21 +2438,64 @@ def _manifest_entry(path: Path, records: int | None = None) -> dict:
     return ent
 
 
+def _derive_parts_block(docs: Path, meta: dict | None) -> dict | None:
+    """The parts block for whatever listings_part_NNN.json.gz files are on disk, or None when
+    there are none (a legacy single-gz board). Sizes and sha256 come from the files themselves;
+    each part's ROW COUNT comes from run_meta's board_parts when it names the same bytes and
+    sha256, and is otherwise counted by streaming the part (a rebuild of a set nobody recorded)."""
+    names = _bp.list_part_files(docs)
+    if not names:
+        return None
+    known: dict = {}
+    try:
+        for e in _bp.normalize_entries((meta or {}).get("board_parts") or {}):
+            known[e["name"]] = e
+    except BoardIntegrityError:
+        known = {}
+    entries = []
+    row = 0
+    for i, fp in enumerate(names):
+        if _bp.part_index(fp.name) != i:
+            raise BoardIntegrityError(f"board parts are not contiguous: expected {_bp.part_name(i)}, "
+                                      f"found {fp.name}")
+        size = fp.stat().st_size
+        sha = _sha256_file(fp)
+        k = known.get(fp.name)
+        if k and k["bytes"] == size and k["sha256"] == sha:
+            n = k["records"]
+        else:
+            n = sum(1 for _ in _bp.iter_gz_rows(fp))
+        entries.append({"name": fp.name, "start": row, "end": row + n, "records": n,
+                        "bytes": size, "sha256": sha})
+        row += n
+    rpp = ((meta or {}).get("board_parts") or {}).get("rows_per_part")
+    return _bp.make_block(entries, rows_per_part=rpp)
+
+
 def build_manifest(docs: Path | str, precomputed: dict | None = None,
                    meta: dict | None = None, slim_count: int | None = None,
-                   shard_meta: dict | None = None) -> dict:
+                   shard_meta: dict | None = None, parts_block: dict | None = None) -> dict:
     """Manifest for whatever payload files are on disk right now.
 
     `precomputed` maps a file name to an entry already known (write_artifact hashes
-    the two 1.1 GB files from memory instead of re-reading them). Everything else
-    is hashed from disk. run_meta.json is included, so a tool that edits it must go
-    through write_manifest again (scripts/board_manifest.py --rebuild does)."""
+    the big files from memory instead of re-reading them). Everything else is hashed from
+    disk. run_meta.json is included, so a tool that edits it must go through write_manifest
+    again (scripts/board_manifest.py --rebuild does).
+
+    The board itself is described by the "parts" block (audit O1): one entry per
+    listings_part_NNN.json.gz with size, sha256 and its row range, mirrored under "files" so
+    every file the manifest names is checked the same way. A board with no part files on disk
+    (the legacy single-gz layout) lists listings.json.gz instead."""
     docs = Path(docs)
     pre = precomputed or {}
     files: dict = {}
-    for name in ("listings.json", "listings_detail.json", "listings.json.gz",
-                 "listings_detail.json.gz", "listings_slim.json", "listings_slim.json.gz",
-                 "run_meta.json"):
+    if parts_block is None:
+        parts_block = _derive_parts_block(docs, meta)
+    names = ["listings.json", "listings_detail.json", "listings_detail.json.gz",
+             "listings_slim.json", "listings_slim.json.gz", "run_meta.json"]
+    if parts_block is None:
+        names.insert(2, "listings.json.gz")
+    for name in names:
         if name in pre:
             files[name] = pre[name]
             continue
@@ -2386,13 +2504,19 @@ def build_manifest(docs: Path | str, precomputed: dict | None = None,
             continue
         recs = slim_count if name.startswith("listings_slim") else None
         files[name] = _manifest_entry(fp, recs)
+    if parts_block is not None:
+        for e in parts_block["files"]:
+            files[e["name"]] = {"bytes": e["bytes"], "sha256": e["sha256"], "records": e["records"],
+                                "start": e["start"], "end": e["end"]}
     sd = docs / DETAIL_SHARD_DIR
     if sd.is_dir():
         for fp in sorted(sd.iterdir()):
             if fp.is_file() and not fp.name.endswith(".tmp"):
                 files[f"{DETAIL_SHARD_DIR}/{fp.name}"] = _manifest_entry(fp)
     count = (files.get("listings.json") or files.get("listings.json.gz") or {}).get("records")
-    return {
+    if count is None and parts_block is not None:
+        count = parts_block["records"]
+    man = {
         "schema": MANIFEST_SCHEMA,
         "written_at": datetime.utcnow().isoformat() + "Z",
         "run_time": (meta or {}).get("run_time"),
@@ -2402,13 +2526,16 @@ def build_manifest(docs: Path | str, precomputed: dict | None = None,
         "shards": shard_meta,
         "files": files,
     }
+    if parts_block is not None:
+        man["parts"] = parts_block
+    return man
 
 
 def write_manifest(docs: Path | str, precomputed: dict | None = None,
                    meta: dict | None = None, slim_count: int | None = None,
-                   shard_meta: dict | None = None) -> Path:
+                   shard_meta: dict | None = None, parts_block: dict | None = None) -> Path:
     docs = Path(docs)
-    man = build_manifest(docs, precomputed, meta, slim_count, shard_meta)
+    man = build_manifest(docs, precomputed, meta, slim_count, shard_meta, parts_block)
     mp = docs / MANIFEST_NAME
     _atomic_write_bytes(mp, json.dumps(man, indent=1, sort_keys=False).encode("utf-8"))
     return mp
@@ -2417,7 +2544,11 @@ def write_manifest(docs: Path | str, precomputed: dict | None = None,
 def verify_manifest(docs: Path | str, full: bool = True) -> dict:
     """Check every file the manifest names. Returns {"ok", "checked", "problems"}.
     `full` hashes each file; otherwise only size is compared. Used by
-    scripts/board_manifest.py --verify and the restore script; never raises."""
+    scripts/board_manifest.py --verify and the restore script; never raises.
+
+    For a parts board it also reports part files the manifest does not list (a stale
+    higher-numbered part) and a parts total that disagrees with the manifest's count, and it
+    checks that run_meta.json's board_parts is the same list as the manifest's."""
     docs = Path(docs)
     mp = docs / MANIFEST_NAME
     try:
@@ -2444,8 +2575,127 @@ def verify_manifest(docs: Path | str, full: bool = True) -> dict:
                 problems.append(f"{name}: sha256 mismatch")
         except OSError as exc:
             problems.append(f"{name}: {exc}")
+    blk = _bp.manifest_parts_block(man)
+    if blk is not None:
+        try:
+            entries = _bp.normalize_entries(blk)
+        except BoardIntegrityError as exc:
+            problems.append(f"parts block: {exc}")
+            entries = []
+        extra = _bp.stray_parts(docs, entries)
+        if extra:
+            problems.append("part file(s) on disk that the manifest does not list: " + ", ".join(extra[:4]))
+        if entries and man.get("count") is not None and man["count"] != entries[-1]["end"]:
+            problems.append(f"manifest count {man['count']} != parts total {entries[-1]['end']}")
+        try:
+            rm = json.loads((docs / "run_meta.json").read_text())
+            rb = rm.get("board_parts") if isinstance(rm, dict) else None
+        except (OSError, ValueError):
+            rb = None
+        if entries and rb is not None:
+            try:
+                same = [(e["name"], e["bytes"], e["sha256"]) for e in _bp.normalize_entries(rb)] == \
+                       [(e["name"], e["bytes"], e["sha256"]) for e in entries]
+            except BoardIntegrityError:
+                same = False
+            if not same:
+                problems.append("run_meta.json board_parts is not the manifest's part list "
+                                "(the dashboard would read a different set than the loaders)")
     return {"ok": not problems, "checked": checked, "problems": problems,
             "count": man.get("count"), "written_at": man.get("written_at")}
+
+
+def _write_plain_array(path: Path, blobs: list) -> dict:
+    """Write `[blob0, blob1, ...]` (the same bytes json.dumps of the list produces) to `path`
+    atomically, hashing as it goes. Returns {"bytes", "sha256"}. Streams the rows to a temp
+    file instead of joining them, so the 1.1 GB document is never one bytes object."""
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    h = hashlib.sha256()
+    n = 0
+    try:
+        with open(tmp, "wb") as fh:
+            def put(b: bytes) -> None:
+                nonlocal n
+                fh.write(b)
+                h.update(b)
+                n += len(b)
+            put(b"[")
+            for i, b in enumerate(blobs):
+                if i:
+                    put(b", ")
+                put(b)
+            put(b"]")
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
+    return {"bytes": n, "sha256": h.hexdigest()}
+
+
+def _seal_precompute(docs: Path, meta: dict, block: dict | None) -> dict:
+    """Manifest entries for the big files that are hashed from disk: the plain twins, the detail
+    sidecar and (legacy layout only) the single listings.json.gz. Slow (1.1 GB of sha256), so
+    callers that must keep the window between "parts in place" and "manifest written" short
+    (scripts/migrate_board_to_parts.py) compute it FIRST and pass it to reseal_board."""
+    total = block["records"] if block is not None else meta.get("total")
+    dcount = meta.get("detail_count", total)
+    pre: dict = {}
+    for name, recs in (("listings.json", total), ("listings_detail.json", dcount),
+                       ("listings_detail.json.gz", dcount)) + \
+                      ((("listings.json.gz", total),) if block is None else ()):
+        fp = docs / name
+        if fp.is_file():
+            pre[name] = {"bytes": fp.stat().st_size, "sha256": _sha256_file(fp), "records": recs}
+    return pre
+
+
+def reseal_board(docs_dir: Path | str = "docs", *, resplit: bool = False,
+                 source: Path | str | None = None, precomputed: dict | None = None) -> dict:
+    """Bring run_meta.json's board_parts and the manifest into line with the board files on
+    disk, WITHOUT load_board and without validating or rewriting any row.
+
+    resplit=False   the parts on disk are right (restored by hand, a manifest that went stale):
+                    hash them, take their row counts from run_meta.board_parts when it names the
+                    same bytes (else count by streaming), and reseal.
+    resplit=True    re-cut the parts from `source` (default docs/listings.json, the local working
+                    copy a direct writer just rewrote), streaming it row by row, then reseal. This
+                    is what the one-shot scripts that write listings.json themselves
+                    (enrich_zip_codes.py, flood_zone_batch.py, ...) call instead of gzipping the
+                    old single listings.json.gz, and what scripts/migrate_board_to_parts.py calls
+                    with source=docs/listings.json.gz.
+
+    Does not take the board lock: the caller owns the load -> mutate -> write span (run it under
+    scripts/with_board_lock.sh). Returns the parts block."""
+    docs = Path(docs_dir)
+    meta_path = docs / "run_meta.json"
+    try:
+        meta = json.loads(meta_path.read_text())
+    except (OSError, ValueError):
+        meta = {}
+    if not isinstance(meta, dict):
+        meta = {}
+    plain = docs / "listings.json"
+    if resplit:
+        src = Path(source) if source is not None else plain
+        if not src.is_file():
+            raise FileNotFoundError(f"cannot re-cut the board parts: {src} does not exist")
+        hint = ((_bp.manifest_parts_block(_bp.read_manifest(docs)) or meta.get("board_parts") or {})
+                .get("rows_per_part"))
+        res = _bp.write_parts(docs, _bp.iter_row_texts(src), hint_rows=hint)
+        block = _bp.make_block(res["entries"], rows_per_part=res["rows_per_part"], cap=res["cap"])
+    else:
+        block = _derive_parts_block(docs, meta)
+    if block is not None and meta.get("board_parts") != block:
+        meta["board_parts"] = block
+        _atomic_write_bytes(meta_path, json.dumps(meta, ensure_ascii=False, default=str, indent=2).encode("utf-8"))
+    pre = precomputed if precomputed is not None else _seal_precompute(docs, meta, block)
+    board = meta.get("board") or {}
+    write_manifest(docs, pre, meta, slim_count=board.get("count"),
+                   shard_meta=board.get("detail_shards"), parts_block=block)
+    return block or {}
 
 
 # Rolling pre-write backups kept per pattern (main board + detail sidecar). Each
@@ -2516,7 +2766,13 @@ def write_artifact(
                         d[k] = pri[k]
         details.append(d)
     import gzip
-    listings_bytes = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
+    # One bytes object per row, in board order. json.dumps over the whole list is exactly
+    # "[" + ", ".join(rows) + "]" (same encoder, same default separators), so the plain
+    # listings.json below is byte-identical to what the single dumps used to produce, but the
+    # 1.1 GB document is never one string and never held twice (audit O1: the parts cut the
+    # same rows, and need per-row bytes to land on a row boundary).
+    _row_enc = json.JSONEncoder(ensure_ascii=False, default=str)
+    listing_blobs = [_row_enc.encode(rec).encode("utf-8") for rec in payload]
     detail_path = docs / "listings_detail.json"
     detail_bytes = json.dumps(details, ensure_ascii=False, default=str).encode("utf-8")
     # Atomic writes (temp + os.replace) so a kill mid-write can never leave a
@@ -2651,24 +2907,26 @@ def write_artifact(
     # The manifest (written LAST) needs each big file's size and sha256. Take them
     # from the bytes already in memory rather than re-reading 1.1 GB from disk.
     _manifest_pre: dict = {
-        "listings.json": {"bytes": len(listings_bytes),
-                          "sha256": hashlib.sha256(listings_bytes).hexdigest(),
-                          "records": len(payload)},
+        "listings.json": {**_write_plain_array(listings_path, listing_blobs), "records": len(payload)},
         "listings_detail.json": {"bytes": len(detail_bytes),
                                  "sha256": hashlib.sha256(detail_bytes).hexdigest(),
                                  "records": len(details)},
     }
-    _atomic_write_bytes(listings_path, listings_bytes)
     _atomic_write_bytes(detail_path, detail_bytes)
-    # Also emit gzipped copies the dashboard fetches (16x smaller). The .json
-    # files remain the local source-of-truth + a fallback. mtime=0 keeps the gzip
-    # header deterministic so identical data produces identical bytes (no git churn).
-    listings_gz = gzip.compress(listings_bytes, compresslevel=9, mtime=0)
-    _manifest_pre["listings.json.gz"] = {"bytes": len(listings_gz),
-                                         "sha256": hashlib.sha256(listings_gz).hexdigest(),
-                                         "records": len(payload)}
-    _atomic_write_bytes(docs / "listings.json.gz", listings_gz)
-    del listings_gz
+    # The PUBLISHED form of the board: contiguous, independently gzipped parts, each under
+    # board_parts.PART_MAX_BYTES (audit O1). The single docs/listings.json.gz is no longer
+    # written: it was 84 MiB against GitHub's 100 MiB limit. A stale copy left by an older
+    # version is not touched here and is ignored by every reader once the manifest lists parts.
+    # mtime=0 keeps the gzip deterministic so identical rows produce identical bytes (no git
+    # churn), and the row-per-part count is kept from write to write so a change confined to
+    # some rows rewrites only the parts that hold them.
+    _prior_parts = _bp.manifest_parts_block(_bp.read_manifest(docs)) or {}
+    _parts = _bp.write_parts(docs, listing_blobs, hint_rows=_prior_parts.get("rows_per_part"))
+    _parts_block = _bp.make_block(_parts["entries"], rows_per_part=_parts["rows_per_part"],
+                                  cap=_parts["cap"])
+    del listing_blobs
+    # Also emit a gzipped copy of the sidecar the dashboard fetches (16x smaller). The .json
+    # files remain the local source-of-truth + a fallback. mtime=0 as above.
     detail_gz = gzip.compress(detail_bytes, compresslevel=9, mtime=0)
     _manifest_pre["listings_detail.json.gz"] = {"bytes": len(detail_gz),
                                                 "sha256": hashlib.sha256(detail_gz).hexdigest(),
@@ -2684,7 +2942,7 @@ def write_artifact(
     # deliberately emitted only after the two authoritative files are already on
     # disk: nothing below this line can change listings.json's bytes, and a bug
     # in the derivative cannot cost a run its board. See the SLIM-V1 block above.
-    del listings_bytes, detail_bytes    # free ~350 MB before projecting (8 GB box)
+    del detail_bytes    # free the sidecar bytes before projecting (8 GB box)
     _report_slim_drops(listings)   # loud about what slim leaves behind — see the docstring
     slim_count = _emit_slim(docs, payload)
 
@@ -2746,6 +3004,12 @@ def write_artifact(
         # the desktop sidecar is written unconditionally.
         "detail_count": len(details),
         "detail_digest": detail_digest,
+        # THE BOARD, AS PARTS (audit O1). The dashboard reads this list (same ?t=<run_time>
+        # cache key as every payload file), fetches the parts in parallel and concatenates them
+        # in order; each entry carries its row range, size and sha256. Top level for the same
+        # reason as detail_count: the "board" block's key set is pinned by tests and describes
+        # the slim payload only. Always describes the parts THIS call wrote.
+        "board_parts": _parts_block,
     }
     # Board block: how the dashboard learns the slim payload exists and how many
     # records it must contain. run_meta.json is already in every publish list, so
@@ -2901,7 +3165,8 @@ def write_artifact(
     # before this line leaves a stale manifest that DISAGREES with the new files,
     # which is exactly the signal the next reader needs (BoardIntegrityError).
     try:
-        write_manifest(docs, _manifest_pre, meta, slim_count=slim_count, shard_meta=shard_meta)
+        write_manifest(docs, _manifest_pre, meta, slim_count=slim_count, shard_meta=shard_meta,
+                       parts_block=_parts_block)
     except Exception:  # noqa: BLE001
         # A manifest we could not write must not pass for a current one.
         try:

@@ -59,15 +59,18 @@ jobs:
       - name: Run patch
         run: uv run python scripts/patch_listings.py
 
-      # The .gz is what the dashboard fetches AND the only board file git will
-      # ever commit — docs/listings.json is gitignored (>100MB). Asserting the
-      # uncompressed twin proved the patch ran; it did not prove anything
+      # The gzipped PARTS are what the dashboard fetches AND the only board files git will
+      # ever commit: docs/listings.json is gitignored (>100MB). Since the payload split
+      # (audit O1) the board is docs/listings_part_NNN.json.gz, no longer one listings.json.gz.
+      # Asserting the uncompressed twin proved the patch ran; it did not prove anything
       # publishable came out of it.
       - name: Verify patch produced a publishable artifact
         run: |
-          test -f docs/listings.json.gz || { echo "::error::docs/listings.json.gz missing after patch"; exit 1; }
+          ls docs/listings_part_*.json.gz >/dev/null 2>&1 || { echo "::error::no docs/listings_part_NNN.json.gz after patch"; exit 1; }
           test -f docs/run_meta.json    || { echo "::error::docs/run_meta.json missing after patch"; exit 1; }
-          echo "Patched board: $(wc -c < docs/listings.json.gz) bytes gzipped"
+          test -f docs/board.manifest.json || { echo "::error::docs/board.manifest.json missing after patch"; exit 1; }
+          echo "Patched board: $(ls docs/listings_part_*.json.gz | wc -l | tr -d ' ') parts, $(cat docs/listings_part_*.json.gz | wc -c | tr -d ' ') bytes gzipped"
+          python3 src/foreclosure_scraper/board_parts.py verify docs
 
       # THIS STEP PUBLISHED NOTHING FOR MONTHS.
       #
@@ -105,7 +108,10 @@ jobs:
           python3 scripts/check_pages_publish.py
           git config user.name "foreclosure-scraper-bot"
           git config user.email "actions@github.com"
-          board_payload_add "$PWD"
+          board_payload_add "$PWD" || { echo "::error::could not stage every board part (docs/listings_part_NNN.json.gz)"; exit 1; }
+          # a mixed part set (parts from two writes, or a part the manifest does not list) is
+          # a mis-joined board: never commit one (audit O1)
+          board_payload_verify_staged "$PWD" || { echo "::error::the staged board parts are not one consistent set"; exit 1; }
           if git diff --cached --quiet; then
             echo "No payload changes — patch had no effect"
             exit 0

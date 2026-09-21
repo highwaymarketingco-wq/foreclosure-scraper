@@ -97,8 +97,10 @@ async def _query_parcel_situs(
 
 async def main(dry_run: bool = False, limit: int | None = None):
     print("Loading board...")
-    with gzip.open(BOARD_PATH, "rt") as f:
-        raw_listings = json.load(f)
+    # the published board is docs/listings_part_NNN.json.gz now (audit O1): iter_board_rows reads the
+    # parts beside BOARD_PATH in order, or BOARD_PATH itself when the directory has none
+    from foreclosure_scraper.board_stream import iter_board_rows
+    raw_listings = list(iter_board_rows(BOARD_PATH))
     print(f"  {len(raw_listings)} listings loaded")
 
     # Find targets: have parcel_id, no street_address
@@ -215,10 +217,11 @@ async def main(dry_run: bool = False, limit: int | None = None):
             json.dump(raw_listings, f)
         print(f"  Written {len(raw_listings)} listings")
 
-        # Also write gzipped
-        with gzip.open(BOARD_PATH, "wt") as f:
-            json.dump(raw_listings, f)
-        print(f"  Written gzipped")
+        # The published board is the parts now (audit O1), not one listings.json.gz: re-cut them from
+        # the plain file just written (streaming) and reseal run_meta.board_parts and the manifest.
+        from foreclosure_scraper.web_artifact import reseal_board
+        reseal_board(os.path.dirname(OUTPUT_PATH), resplit=True)
+        print("  Board parts resealed")
 
     print("\nDone.")
 

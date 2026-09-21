@@ -39,7 +39,7 @@ from foreclosure_scraper.web_artifact import (
 
 # Payload files whose bytes may never move because a shard emit happened.
 _AUTHORITATIVE = (
-    "listings.json", "listings.json.gz",
+    "listings.json", "listings_part_000.json.gz",       # the board is parts since audit O1
     "listings_detail.json", "listings_detail.json.gz",
     "listings_slim.json", "listings_slim.json.gz",
 )

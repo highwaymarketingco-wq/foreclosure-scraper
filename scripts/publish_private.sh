@@ -82,7 +82,13 @@ DOCS="$ROOT/docs"
 [ -d "$DOCS" ] || die "no docs/ directory under $ROOT"
 
 # The explicit allowlist. Anything not named here is never uploaded.
-REQUIRED_FILES="listings.json.gz listings_slim.json.gz listings_detail.json.gz run_meta.json"
+#
+# THE BOARD is not in this list: since the payload split (audit O1) it is
+# listings_part_NNN.json.gz, as many as run_meta.json's board_parts names (each under 24 MiB, so
+# each fits Cloudflare's 25 MiB per-asset cap), added to the release below after every one is
+# checked against run_meta (present, right size, right sha256, none extra). A release built from
+# a pre-split run_meta (no board_parts) falls back to the single listings.json.gz.
+REQUIRED_FILES="listings_slim.json.gz listings_detail.json.gz run_meta.json"
 OPTIONAL_FILES="run_health.json multifamily.json land_buyers.json foreclosure_sold_pool.json"
 SHARD_DIR="detail_shards"
 PHOTO_DIR="parcel_photos"
@@ -119,6 +125,69 @@ for s in "$DOCS/$SHARD_DIR"/[0-9][0-9][0-9][0-9][0-9].json.gz; do
   SHARDS_ACTUAL=$((SHARDS_ACTUAL + 1))
 done
 
+# ---- 1b. the board parts named by run_meta.json ---------------------------------
+PARTS_INFO="$(python3 - "$DOCS" <<'PY'
+import hashlib, json, os, re, sys
+docs = sys.argv[1]
+CAP = 25 * 1024 * 1024          # Cloudflare's per-asset cap; the writer's own cap is 24 MiB
+try:
+    m = json.load(open(os.path.join(docs, "run_meta.json")))
+except Exception as e:
+    print("ERR|run_meta.json unreadable: %s" % e); sys.exit(0)
+bp = m.get("board_parts")
+if not isinstance(bp, dict) or not isinstance(bp.get("files"), list) or not bp["files"]:
+    if os.path.isfile(os.path.join(docs, "listings.json.gz")):
+        print("LEGACY|listings.json.gz"); sys.exit(0)
+    print("ERR|run_meta.json has no board_parts and there is no docs/listings.json.gz: no board to publish")
+    sys.exit(0)
+names, total, expect = [], 0, 0
+for i, e in enumerate(bp["files"]):
+    n = e.get("name") if isinstance(e, dict) else None
+    if n != "listings_part_%03d.json.gz" % i:
+        print("ERR|board_parts entry %d is %r, expected listings_part_%03d.json.gz" % (i, n, i)); sys.exit(0)
+    p = os.path.join(docs, n)
+    if not os.path.isfile(p):
+        print("ERR|board part missing: docs/%s" % n); sys.exit(0)
+    size = os.path.getsize(p)
+    if size != e.get("bytes"):
+        print("ERR|docs/%s is %d bytes, run_meta.json says %s (a torn or mixed part set)" % (n, size, e.get("bytes"))); sys.exit(0)
+    if size > CAP:
+        print("ERR|docs/%s is %d bytes, over Cloudflare's 25 MiB per-asset cap (the split did not run?)" % (n, size)); sys.exit(0)
+    h = hashlib.sha256()
+    with open(p, "rb") as fh:
+        for c in iter(lambda: fh.read(8 << 20), b""):
+            h.update(c)
+    if h.hexdigest() != e.get("sha256"):
+        print("ERR|docs/%s does not match its sha256 in run_meta.json (a torn or mixed part set)" % n); sys.exit(0)
+    if e.get("start") != expect:
+        print("ERR|docs/%s starts at row %s, expected %d" % (n, e.get("start"), expect)); sys.exit(0)
+    expect = e.get("end")
+    total += e.get("records", 0)
+    names.append(n)
+extra = sorted(f for f in os.listdir(docs) if re.match(r"^listings_part_\d{3,}\.json\.gz$", f) and f not in names)
+if extra:
+    print("ERR|part file(s) on disk that run_meta.json does not list: %s" % ", ".join(extra[:4])); sys.exit(0)
+print("OK|%d|%d|%s" % (len(names), total, ",".join(names)))
+PY
+)"
+PARTS_N=0; PARTS_ROWS=""
+case "$PARTS_INFO" in
+  OK\|*)
+    _old_ifs="$IFS"; IFS='|'
+    set -- $PARTS_INFO
+    IFS="$_old_ifs"
+    PARTS_N="$2"; PARTS_ROWS="$3"
+    _old_ifs="$IFS"; IFS=','
+    for _pn in $4; do printf '%s\n' "$_pn" >> "$LIST"; done
+    IFS="$_old_ifs"
+    ;;
+  LEGACY\|*)
+    printf '%s\n' "listings.json.gz" >> "$LIST"
+    echo "note: run_meta.json has no board_parts; releasing the single listings.json.gz (pre-split layout)" >&2 ;;
+  ERR\|*) die "${PARTS_INFO#ERR|}" ;;
+  *) die "could not check the board parts" ;;
+esac
+
 while IFS= read -r rel; do
   if is_denied "$rel"; then die "allowlist entry looks sensitive, not uploading: $rel"; fi
 done < "$LIST"
@@ -149,6 +218,9 @@ $META
 EOF
 [ -n "$REL" ] || die "empty release id"
 [ -n "$BCOUNT" ] || die "run_meta.json has no board.count, so the board/shard pairing cannot be proven"
+if [ "${PARTS_N:-0}" -gt 0 ]; then
+  [ "$PARTS_ROWS" = "$BCOUNT" ] || die "the $PARTS_N board parts hold $PARTS_ROWS rows but run_meta.json declares board.count $BCOUNT (the slim payload and the parts are from different writes)"
+fi
 [ "$SHARDS_ACTUAL" -eq "$SCOUNT" ] || die "run_meta declares $SCOUNT detail shards but docs/$SHARD_DIR holds $SHARDS_ACTUAL (a mis-joined board would ship)"
 # contiguous names 00000..N-1
 i=0
@@ -189,6 +261,11 @@ echo "repo root          : $ROOT"
 echo "target             : ${TARGET:-(not configured)}"
 echo "release id         : $REL   (from run_meta.json run_time)"
 echo "board              : $BCOUNT records; $SCOUNT detail shards (size ${SSIZE:-?}, records ${SRECORDS:-?}) declared and verified"
+if [ "${PARTS_N:-0}" -gt 0 ]; then
+  echo "board parts        : $PARTS_N parts, $PARTS_ROWS rows, each size and sha256 checked against run_meta.json"
+else
+  echo "board parts        : none (pre-split layout: single listings.json.gz)"
+fi
 echo "gzip integrity     : all $((FILES)) release files checked"
 echo
 echo "1) release files -> releases/$REL/   ($FILES files, $(human "$TOTAL"))"
@@ -207,6 +284,7 @@ else
 fi
 echo
 echo "Never uploaded: crm.json, outreach_maillist.csv, skiptrace_worksheet.csv, porsche.*, *.md, uncompressed listings*.json, anything in .secrets/ or .env"
+echo "A release carries ALL board parts and never a subset: one release is one publish."
 echo "App shell (index.html, dashboard.js, css, manifest, icons) is deployed separately with wrangler."
 
 if [ "$APPLY" -ne 1 ]; then

@@ -4,16 +4,22 @@
     .venv/bin/python scripts/board_manifest.py --verify            # default: hash every file
     .venv/bin/python scripts/board_manifest.py --verify --quick    # sizes only
     .venv/bin/python scripts/board_manifest.py --rebuild           # re-derive the manifest from disk
+    .venv/bin/python scripts/board_manifest.py --rebuild --resplit # ...after re-cutting the parts from listings.json
     .venv/bin/python scripts/board_manifest.py --validate-rows     # count rows load_board would drop
 
 WHY. write_artifact writes the payload files one after another and seals the set by writing
 this manifest last (audit O3); load_board and read_board_json refuse a file that disagrees
-with it. That fail-closed reader needs a way out, and this is it:
+with it. The board itself is docs/listings_part_NNN.json.gz (audit O1), listed with size, sha256
+and row range in the manifest's "parts" block and in run_meta.json's "board_parts". That
+fail-closed reader needs a way out, and this is it:
 
   --verify         read-only. Exit 0 = every file matches, 1 = a mismatch (lists them).
   --rebuild        you have checked the files and they are right (restored by hand, or the
                    manifest went stale because a publisher staged the payload without it):
-                   re-derive size + sha256 for every file on disk and write a fresh manifest.
+                   re-derive size + sha256 for every file on disk (the parts included: their row
+                   counts come from run_meta.board_parts, else from streaming them) and write a
+                   fresh manifest and run_meta.board_parts. --resplit first re-cuts the parts from
+                   docs/listings.json (streaming; use it when the plain file is the truth).
                    Takes the board lock (or set FORECLOSURE_BOARD_LOCK_HELD via
                    scripts/with_board_lock.sh) because it rewrites a payload file.
   --validate-rows  read-only. Loads the board's records WITHOUT writing and reports how many
@@ -45,29 +51,14 @@ def cmd_verify(docs: Path, quick: bool) -> int:
     return 0 if res["ok"] else 1
 
 
-def cmd_rebuild(docs: Path) -> int:
-    meta = {}
-    try:
-        meta = json.loads((docs / "run_meta.json").read_text())
-    except (OSError, ValueError):
-        pass
-    total = meta.get("total")
-    pre = {}
-    # records per file come from run_meta (parsing 1.1 GB just to count would defeat the point)
-    if total is not None:
-        for name in ("listings.json", "listings.json.gz"):
-            fp = docs / name
-            if fp.is_file():
-                pre[name] = {"bytes": fp.stat().st_size, "sha256": wa._sha256_file(fp), "records": total}
-        dc = meta.get("detail_count", total)
-        for name in ("listings_detail.json", "listings_detail.json.gz"):
-            fp = docs / name
-            if fp.is_file():
-                pre[name] = {"bytes": fp.stat().st_size, "sha256": wa._sha256_file(fp), "records": dc}
-    board = meta.get("board") or {}
-    mp = wa.write_manifest(docs, pre, meta, slim_count=board.get("count"),
-                           shard_meta=board.get("detail_shards"))
-    print(f"wrote {mp}")
+def cmd_rebuild(docs: Path, resplit: bool = False) -> int:
+    """Re-derive run_meta.board_parts and the manifest from the files on disk. With --resplit the
+    parts themselves are re-cut first, streaming docs/listings.json row by row (for a board whose
+    plain file is the truth: a direct writer just rewrote it)."""
+    block = wa.reseal_board(docs, resplit=resplit)
+    if block:
+        print(f"parts: {block['count']} part(s), {block['records']:,} rows, rows_per_part={block.get('rows_per_part')}")
+    print(f"wrote {docs / wa.MANIFEST_NAME}")
     return cmd_verify(docs, quick=False)
 
 
@@ -101,12 +92,14 @@ def main(argv=None) -> int:
     g.add_argument("--rebuild", action="store_true")
     g.add_argument("--validate-rows", action="store_true")
     ap.add_argument("--quick", action="store_true", help="--verify: compare sizes only")
+    ap.add_argument("--resplit", action="store_true",
+                    help="--rebuild: re-cut the board parts from docs/listings.json first (streams it)")
     args = ap.parse_args(argv)
     docs = Path(args.docs)
     if args.rebuild:
         # rewriting a payload file is a board write: hold the lock
         with wa.board_lock(docs.resolve().parent, owner="board_manifest.rebuild", max_runtime=1800):
-            return cmd_rebuild(docs)
+            return cmd_rebuild(docs, resplit=args.resplit)
     if args.validate_rows:
         return cmd_validate_rows(docs)
     return cmd_verify(docs, args.quick)

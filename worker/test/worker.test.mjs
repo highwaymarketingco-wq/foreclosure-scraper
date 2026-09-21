@@ -28,7 +28,7 @@ test("gate: every path is refused without the Access header, and nothing leaks",
   const env = makeEnv();
   const paths = [
     "/", "/index.html", "/dashboard.js", "/robots.txt", "/healthz", "/current.json", "/run_meta.json",
-    "/listings_slim.json.gz", "/listings.json.gz", "/detail_shards/00003.json.gz",
+    "/listings_slim.json.gz", "/listings.json.gz", "/listings_part_000.json.gz", "/detail_shards/00003.json.gz",
     "/parcel_photos/buncombe_0605781823.jpg", "/nothing", "/.env",
   ];
   for (const p of paths) {
@@ -268,6 +268,27 @@ test("gzip payloads are served as opaque application/gzip with NO Content-Encodi
     assert.ok(res.headers.get("etag"), p);
     assert.ok(isGzipMagic(await bodyBytes(res)), `${p}: bytes are passed through untouched`);
   }
+});
+
+test("board parts are served from the pinned release, with their own bytes, immutable when pinned", async () => {
+  const env = makeEnv();
+  for (let i = 0; i < 3; i++) {
+    const name = `/listings_part_${String(i).padStart(3, "0")}.json.gz`;
+    // pinned to the OLDER release: the part comes from that release, not from "current"
+    const old = await get(env, `${name}?t=${RUN_TIME_OLD}`);
+    assert.equal(old.status, 200, name);
+    assert.equal(old.headers.get("x-release"), REL_OLD, name);
+    assert.equal(old.headers.get("content-type"), "application/gzip", name);
+    assert.equal(old.headers.get("content-encoding"), null, name);
+    assert.equal(old.headers.get("cache-control"), "private, max-age=31536000, immutable", name);
+    assert.deepEqual(await bodyBytes(old), gzBytes(700 + i, 1 * 10 + i), `${name} (old release bytes)`);
+    const cur = await get(env, `${name}?t=${RUN_TIME_NEW}`);
+    assert.equal(cur.headers.get("x-release"), REL_NEW, name);
+    assert.deepEqual(await bodyBytes(cur), gzBytes(700 + i, 2 * 10 + i), `${name} (new release bytes)`);
+  }
+  // a part the release does not have is a 404, never another release's file
+  const missing = await get(env, `/listings_part_009.json.gz?t=${RUN_TIME_NEW}`);
+  assert.equal(missing.status, 404);
 });
 
 test("json and photo content types", async () => {
