@@ -65,6 +65,13 @@ def apply_rows(rows, *, dry_run: bool = False) -> dict:
     Extracted 2026-09-21 so scripts/apply_board_fixes.py can run it in the same single load."""
     from foreclosure_scraper.parcel_cache import lookup, sale_amount
     from foreclosure_scraper.enrichment_owner_mailing import _is_absentee
+    from foreclosure_scraper.dedupe import suspicious_parcel_keys
+    # A parcel id shared by many distinct addresses (a lien-agent filing batch citing a
+    # subdivision's master-tract PIN for every lot) is one cache lookup that would copy one
+    # property's owner, mailing and value onto every other address that cites the same id
+    # (audit 2026-09-22: Pender County 3208-90-5620-0000 covered 216 addresses). Refuse the
+    # lookup for any of them rather than trust it.
+    suspicious = suspicious_parcel_keys(rows)
     c = Counter()
     for li in rows:
         if li.listing_type == ListingType.TAX_SALE_OVERAGE:
@@ -90,6 +97,9 @@ def apply_rows(rows, *, dry_run: bool = False) -> dict:
             # naming this case separately from an ordinary cache miss makes
             # the reason auditable instead of invisible.
             c["skipped: dual-state name, li.state is empty"] += 1
+            continue
+        if li.dedupe_key() in suspicious:
+            c["skipped: parcel id shared by many distinct addresses"] += 1
             continue
         try:
             hit = lookup(county, li.parcel_id, li.state)

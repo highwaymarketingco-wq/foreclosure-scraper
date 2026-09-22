@@ -996,11 +996,22 @@ def _equity_band(li: Listing) -> Optional[str]:
 _PARCEL_JUNK = re.compile(r"[^A-Za-z0-9]")
 
 
-def _parcel_key(li: Listing) -> str:
+def _parcel_key(li: Listing, suspicious_keys: frozenset = frozenset()) -> str:
     """Group key: state + county + parcel. The old key was state + parcel, so the same
     number in two counties fused unrelated properties, and so did every placeholder ("N/A",
     "0", "TBD", "UNKNOWN": one key per state). An id with no digit, under four characters
-    after stripping, or all zeros is not a parcel number and ungroups (F9)."""
+    after stripping, or all zeros is not a parcel number and ungroups (F9).
+
+    suspicious_keys (audit 2026-09-22): dedupe.suspicious_parcel_keys(listings) computed once
+    per score_board call, a set of Listing.dedupe_key() strings. A parcel id can look real (14
+    digits, passes every check above) and still not describe one property -- a lien-agent
+    filing batch citing a subdivision's master-tract PIN for every lot before the county
+    splits it (Pender County 3208-90-5620-0000 covered 216 distinct addresses in one run).
+    Grouping by it would stack 216 unrelated properties' distress signals into one. Checked via
+    li.dedupe_key() itself (not a reconstruction of this function's own "p:..." format, which
+    differs cosmetically) so the two can never drift out of sync."""
+    if suspicious_keys and li.dedupe_key() in suspicious_keys:
+        return f"id:{id(li)}"  # a real-looking id shared by too many real addresses: ungroup
     pid = _PARCEL_JUNK.sub("", (li.parcel_id or "")).lower()
     if len(pid) >= 4 and any(ch.isdigit() for ch in pid) and set(pid) != {"0"}:
         county = re.sub(r"\s+county$", "", (li.county or "").strip(), flags=re.I).lower() or "?"
@@ -1290,10 +1301,15 @@ def score_board(listings: list[Listing], previous_path: Optional[Path] = None,
     Raises ScoreBoardError when any group could not be scored (after scoring the rest)."""
     today = _as_today(today)
     LAST_STATS.clear()
-    # group by parcel
+    # group by parcel. A parcel id shared by many distinct addresses (a subdivision's lots all
+    # citing one pre-split tract PIN in a lien-agent filing batch) is not a real grouping key
+    # and is ungrouped by _parcel_key (audit 2026-09-22, Pender County 3208-90-5620-0000).
+    from .dedupe import suspicious_parcel_keys
+    suspicious = suspicious_parcel_keys(listings)
+    LAST_STATS["suspicious_parcel_ids"] = len(suspicious)
     groups: dict[str, list[Listing]] = {}
     for li in listings:
-        groups.setdefault(_parcel_key(li), []).append(li)
+        groups.setdefault(_parcel_key(li, suspicious), []).append(li)
 
     # price_cut is gated to MLS listings, so the (expensive) prior-run read is skipped when none exist
     prior_prices = _prior_price_index(previous_path) if any(_mls_fields(li) for li in listings) else {}

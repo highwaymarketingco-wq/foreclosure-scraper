@@ -109,6 +109,40 @@ def _provably_different_property(a: Listing, b: Listing) -> bool:
     return bool(ha and hb and ha != hb)
 
 
+def addresses_per_dedupe_key(listings) -> dict[str, set]:
+    """dedupe_key() -> the set of distinct normalized street addresses that key covers.
+
+    Pulled out of dedupe() (2026-09-22) so the same "how many real properties does this
+    key actually cover" computation used to detect a fused parcel id is available to
+    callers that never run dedupe() itself -- the scorer's parcel grouping and the
+    parcel-cache join both trust dedupe_key()'s parcel branch the same way dedupe() does,
+    and both need to know when it is lying before they act on it."""
+    out: dict[str, set] = {}
+    for li in listings:
+        a = _norm_addr(li.street_address)
+        if a:
+            out.setdefault(li.dedupe_key(), set()).add(a)
+    return out
+
+
+def suspicious_parcel_keys(listings, min_addresses: int = 4) -> frozenset[str]:
+    """dedupe_key()s whose PARCEL branch is shared by min_addresses or more distinct real
+    addresses -- the same threshold and computation dedupe.suspicious_primary_key logs.
+
+    A key this broad is not describing one property. The liensnc lien-agent-appointment
+    source is the repeat offender: a subdivision's lots share one master-tract PIN until
+    the county assigns individual PINs, so a filing batch can cite the SAME PIN for
+    dozens to hundreds of different houses (audit 2026-09-22: Pender County parcel
+    3208-90-5620-0000 covered 216 distinct addresses in one run). dedupe()'s
+    house_number_guard already stops that from deleting rows during a MERGE; this lets
+    the scorer's per-parcel grouping and the parcel-cache join refuse to trust the key
+    too, instead of silently stacking 216 unrelated properties' signals together or
+    copying one property's owner and value onto the other 215."""
+    per_key = addresses_per_dedupe_key(listings)
+    return frozenset(k for k, addrs in per_key.items()
+                      if k.startswith("parcel:") and len(addrs) >= min_addresses)
+
+
 def dedupe(listings: list[Listing]) -> list[Listing]:
     """Merge listings that point to the same property.
 
@@ -129,13 +163,10 @@ def dedupe(listings: list[Listing]) -> list[Listing]:
     # 'ehurst' from "Pinehurst" and 'number' from "PIN number:", so 122 distinct
     # Pinehurst properties shared one key and collapsed into a single row. The run
     # logged nothing. Now it does.
-    _addrs_per_key: dict[str, set] = {}
+    _addrs_per_key = addresses_per_dedupe_key(listings)
     _blocked_p1 = 0
     for li in listings:
         k = li.dedupe_key()
-        a = _norm_addr(li.street_address)
-        if a:
-            _addrs_per_key.setdefault(k, set()).add(a)
         if k in buckets:
             if _provably_different_property(buckets[k], li):
                 # Same primary key, different house number -> one of the two keys is
