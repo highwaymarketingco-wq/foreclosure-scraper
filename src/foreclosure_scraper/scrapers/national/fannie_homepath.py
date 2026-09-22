@@ -177,7 +177,14 @@ class FannieHomePath(BaseScraper):
     expected_min_count = 0
     requires_apify = False
     requires_render = False
-    timeout_s = 60.0
+    # 2026-09-22: measured 53s to complete a full NC+SC bbox sweep when run ALONE (the
+    # enrichment_reo_freshness.prune_stale_reo call, 09:42:06-09:42:59, 8,277 rows). The
+    # SAME sweep inside scripts/daily_api_refresh.py's 14-way asyncio.gather timed out at
+    # 60s every day (network/event-loop contention from the other 13 scrapers running at
+    # once), so this source read 0 and was carried over daily -- defeating the refresh's
+    # stated purpose of clearing sold REO 404s (audit 2026-09-21, O6). 150s gives headroom
+    # under contention without meaningfully extending the API-refresh phase's 5400s budget.
+    timeout_s = 150.0
 
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
