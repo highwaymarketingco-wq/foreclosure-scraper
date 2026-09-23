@@ -36,6 +36,7 @@ import httpx
 import structlog
 from selectolax.parser import HTMLParser
 
+from ..._upstate_city_to_county import upstate_county_for
 from ...base_scraper import BaseScraper
 from ...models import Listing, ListingType, PropertyKind
 
@@ -190,6 +191,18 @@ def _saleevent_to_listing(node: dict, source_url: str, city: str, state: str,
     if not street and not name:
         return None
 
+    # estatesales.net's zip search returns events within a wide radius, not
+    # just the searched city -- a Shelby (Cleveland Co.) search page's own
+    # JSON-LD includes real sales in Hickory (Catawba), Gastonia (Gaston),
+    # Starr (Anderson SC), etc. Stamping the search county onto every event
+    # fused unrelated counties' leads onto one shared address (verified
+    # 2026-09-23: the same Hickory/Conover address recurred under Cleveland,
+    # Gaston, Greenville, Mecklenburg AND Spartanburg on the board). Resolve
+    # the event's own county from its actual city; only fall back to the
+    # search county when the event has no place (VirtualLocation) or its
+    # city isn't in the gazetteer.
+    event_county = upstate_county_for(ev_city, ev_state) or county
+
     return Listing(
         source="national.estate_sales",
         source_url=url,
@@ -199,7 +212,7 @@ def _saleevent_to_listing(node: dict, source_url: str, city: str, state: str,
         city=ev_city,
         state=ev_state,
         zip_code=ev_zip,
-        county=county,
+        county=event_county,
         sale_date=sale_date,
         trustee=org_name,  # company/organizer name stored in trustee field
         description=(f"{name} | {description}"[:500] if description else name[:500]) or None,
@@ -305,16 +318,27 @@ def _parse_estatesales_net(html: str, source_url: str,
         except (json.JSONDecodeError, ValueError, TypeError):
             pass
 
-    # HTML card parsing
-    # estatesales.net uses .sale-row__details for listing cards (Angular SPA)
-    for card in tree.css(
-        "div.sale-row__details, div.sale-card, div.event-card, div.listing-item, "
-        "article.sale, li.sale-item, div.es-item, "
-        "div[data-sale-id], div[class*='sale']"
-    ):
-        li = _parse_estatesales_net_card(card, source_url, city, state, county)
-        if li:
-            out.append(li)
+    # HTML card parsing -- only when the JSON sources above found nothing.
+    # MEASURED 2026-09-23 on a live Shelby-zip search page: JSON-LD alone
+    # matched the page's 20 real sale cards 1:1 (div.sale-row__details also
+    # matches exactly 20). But the broad selector list below additionally
+    # matches a "sales near you" widget -- div[class*='sale'] catches its
+    # promo cards too -- yielding 81 elements, 61 of them "<city>, ST ZIP NN
+    # milesaway" widget noise mis-parsed as street addresses/cities. JSON-LD
+    # already carries richer, correctly-scoped data (organizer phone, clean
+    # dates, structured address) for every real card, so running this path
+    # unconditionally only added duplicate, lower-quality, sometimes-garbage
+    # rows on top. Keep it as a genuine last-resort fallback, matching the
+    # text-block fallback pattern right below it.
+    if not out:
+        for card in tree.css(
+            "div.sale-row__details, div.sale-card, div.event-card, div.listing-item, "
+            "article.sale, li.sale-item, div.es-item, "
+            "div[data-sale-id], div[class*='sale']"
+        ):
+            li = _parse_estatesales_net_card(card, source_url, city, state, county)
+            if li:
+                out.append(li)
 
     # Fallback: look for any div/article with address-like content
     if not out:
@@ -399,6 +423,8 @@ def _estatesales_net_json_to_listing(
     if not address and not title:
         return None
 
+    event_county = upstate_county_for(ev_city, ev_state) or county
+
     return Listing(
         source="national.estate_sales",
         source_url=url,
@@ -408,7 +434,7 @@ def _estatesales_net_json_to_listing(
         city=ev_city,
         state=ev_state,
         zip_code=ev_zip,
-        county=county,
+        county=event_county,
         sale_date=sale_date,
         trustee=company or None,  # company name stored in trustee field
         description=f"{title} | {description}"[:500] if description else title[:500],
@@ -524,84 +550,90 @@ def _parse_estatesale_com(html: str, source_url: str,
     out.extend(_parse_jsonld_sale_events(
         html, source_url, city, state, county, "estatesale.com"))
 
-    for card in tree.css(
-        "div.sale-listing, div.listing, div.event, "
-        "article.sale, li.sale-item, div.card, "
-        "div[class*='sale'], div[class*='listing']"
-    ):
-        a = card.css_first("a[href]")
-        title = ""
-        url = source_url
-        if a is not None:
-            href = a.attributes.get("href", "")
-            if href:
-                url = urljoin(ESTATESALE_COM_BASE, href)
-            title = a.text(strip=True) or a.attributes.get("title", "")
+    # Card parsing -- only when JSON-LD found nothing. Same estatesales.net
+    # bug pattern applies here (div.card / div[class*='sale'] are broad
+    # enough to catch a "nearby sales" widget's cards, not just real search
+    # results), so treat this as a fallback rather than an unconditional
+    # supplement to the JSON-LD listings above.
+    if not out:
+        for card in tree.css(
+            "div.sale-listing, div.listing, div.event, "
+            "article.sale, li.sale-item, div.card, "
+            "div[class*='sale'], div[class*='listing']"
+        ):
+            a = card.css_first("a[href]")
+            title = ""
+            url = source_url
+            if a is not None:
+                href = a.attributes.get("href", "")
+                if href:
+                    url = urljoin(ESTATESALE_COM_BASE, href)
+                title = a.text(strip=True) or a.attributes.get("title", "")
 
-        if not title:
-            for sel in ("h2", "h3", "h4", ".title", ".sale-title", ".name"):
+            if not title:
+                for sel in ("h2", "h3", "h4", ".title", ".sale-title", ".name"):
+                    n = card.css_first(sel)
+                    if n is not None:
+                        title = n.text(strip=True)
+                        break
+
+            address = None
+            for sel in (".address", ".location", ".addr", "[class*='address']"):
                 n = card.css_first(sel)
                 if n is not None:
-                    title = n.text(strip=True)
-                    break
+                    address = n.text(strip=True)
+                    if address:
+                        break
+            if not address:
+                blob = card.text()
+                m = ADDR_RE.search(blob)
+                if m:
+                    address = m.group().strip()
 
-        address = None
-        for sel in (".address", ".location", ".addr", "[class*='address']"):
-            n = card.css_first(sel)
-            if n is not None:
-                address = n.text(strip=True)
-                if address:
-                    break
-        if not address:
-            blob = card.text()
-            m = ADDR_RE.search(blob)
-            if m:
-                address = m.group().strip()
+            date_text = None
+            for sel in (".dates", ".date", ".when", "[class*='date']"):
+                n = card.css_first(sel)
+                if n is not None:
+                    date_text = n.text(strip=True)
+                    if date_text:
+                        break
 
-        date_text = None
-        for sel in (".dates", ".date", ".when", "[class*='date']"):
-            n = card.css_first(sel)
-            if n is not None:
-                date_text = n.text(strip=True)
-                if date_text:
-                    break
+            company = None
+            for sel in (".company", ".company-name", ".organizer", "[class*='company']"):
+                n = card.css_first(sel)
+                if n is not None:
+                    company = n.text(strip=True)
+                    if company:
+                        break
 
-        company = None
-        for sel in (".company", ".company-name", ".organizer", "[class*='company']"):
-            n = card.css_first(sel)
-            if n is not None:
-                company = n.text(strip=True)
-                if company:
-                    break
+            if not title and not address:
+                continue
 
-        if not title and not address:
-            continue
+            sale_date = _parse_date(date_text)
 
-        sale_date = _parse_date(date_text)
-
-        out.append(Listing(
-            source="national.estate_sales",
-            source_url=url,
-            listing_type=ListingType.ESTATE_LEAD,
-            property_kind=PropertyKind.UNKNOWN,
-            street_address=address,
-            city=city,
-            state=state,
-            county=county,
-            sale_date=sale_date,
-            trustee=company,
-            description=f"{title} | {date_text or ''}".strip(" |")[:500] or None,
-            first_seen=datetime.utcnow(),
-            last_seen=datetime.utcnow(),
-            raw={
-                "estate_sales": {
-                    "source_site": "estatesale.com",
-                    "title": title,
-                    "company": company,
-                    "dates_raw": date_text,
+            out.append(Listing(
+                source="national.estate_sales",
+                source_url=url,
+                listing_type=ListingType.ESTATE_LEAD,
+                property_kind=PropertyKind.UNKNOWN,
+                street_address=address,
+                city=city,
+                state=state,
+                county=county,
+                sale_date=sale_date,
+                trustee=company,
+                description=f"{title} | {date_text or ''}".strip(" |")[:500] or None,
+                first_seen=datetime.utcnow(),
+                last_seen=datetime.utcnow(),
+                raw={
+                    "estate_sales": {
+                        "source_site": "estatesale.com",
+                        "title": title,
+                        "company": company,
+                        "dates_raw": date_text,
+                    },
                 },
-            },
-        ))
+            ))
 
     # Fallback: scan all text blocks
     if not out:
