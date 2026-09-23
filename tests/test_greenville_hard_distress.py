@@ -69,14 +69,36 @@ def test_fetch_returns_nothing_when_the_flag_is_off(monkeypatch):
 
 
 def test_greenville_is_not_added_to_the_scope_config():
-    """The operator has not decided to expand. Building the source must not
-    quietly widen the footprint."""
+    """The operator has not decided to expand the narrow FLIP footprint.
+    Building the source must not quietly widen THAT list."""
     from foreclosure_scraper.config import (
         SC_COUNTIES, SCOPE_DENY_COUNTIES_NORMALIZED, in_scope,
     )
     assert not any(c.name == "Greenville" for c in SC_COUNTIES)
     assert ("Greenville", "SC") in SCOPE_DENY_COUNTIES_NORMALIZED
     assert in_scope("Greenville", "SC") is False
+
+
+def test_but_the_distressed_scope_gate_admits_it_and_that_is_the_real_gate():
+    """This module's own ListingType.TAX_LIEN is not a flip type, so the
+    narrow ``config.in_scope`` test above is NOT what actually gates its rows
+    in production — ``main._county_in_scope`` routes non-flip listing types
+    through ``config.in_scope_distressed`` instead, which has no deny list
+    (see that function's docstring: "if its a distressed property its
+    anywhere in nc and sc"). Both facts are true at once and this test exists
+    so nobody "fixes" the scope config believing the module above proves this
+    source is blocked -- verified live 2026-09-23 that it is not (see the
+    module's ZERO-NET-NEW AUDIT docstring for the real cause)."""
+    from foreclosure_scraper import main as m
+    from foreclosure_scraper.config import in_scope_distressed
+
+    assert in_scope_distressed("Greenville", "SC") is True
+
+    f = _by_pin()[PIN_BOTH]
+    li = build_listing(_normalize_parcel(PIN_BOTH), f["attributes"], f["geometry"])
+    assert m._is_flip(li) is False
+    assert m._county_in_scope(li) is True
+    assert m._in_scope(li) is True
 
 
 # ---------------------------------------------------------- tax sale --------
@@ -379,3 +401,96 @@ def test_pin_chunks_are_validated_before_going_into_a_where_clause():
     import re as _re
     assert _re.fullmatch(r"[A-Za-z0-9]+", "0032000200610")
     assert not _re.fullmatch(r"[A-Za-z0-9]+", "0032' OR '1'='1")
+
+
+# ------------------------- ZERO-NET-NEW AUDIT (2026-09-23) ------------------
+# See the module's own docstring, "ZERO-NET-NEW AUDIT", for the full writeup.
+# This module reports 2,600-2,700 successful rows every run and lands ~0 of
+# them under its own slug on the published board -- confirmed NOT a scope bug
+# (test_but_the_distressed_scope_gate_admits_it_and_that_is_the_real_gate
+# above) and NOT a self-collision bug (isolated-fetch dedupe test below).
+# The two tests here pin down the two OTHER sources this module's rows
+# collide with, so a future change that breaks the (currently intentional)
+# shared-feed relationship is caught instead of silently changing who wins
+# the merge.
+def test_isolated_fetch_keeps_its_own_slug_when_nothing_competes():
+    """Proves the ~0-net-new outcome is a CROSS-source dedupe effect, not
+    something wrong with this module's own parcel_id/dedupe_key generation.
+    Uses the same fixture parcels this file already trusts elsewhere."""
+    from foreclosure_scraper.dedupe import dedupe
+
+    parcels = _parcels()
+    listings = []
+    for f in parcels:
+        li = build_listing(_normalize_parcel(f["attributes"].get("PIN") or ""),
+                           f["attributes"], f.get("geometry"))
+        if li:
+            listings.append(li)
+    assert listings, "fixture must contain at least one buildable lead"
+    out = dedupe(listings)
+    assert out
+    assert all(li.source == GreenvilleHardDistress.slug for li in out)
+
+
+def test_delinquent_tax_lane_shares_the_exact_gis_feed_with_arcgis_distress_layers():
+    """counties_generic.arcgis_distress_layers has an independently-added
+    ``greenville_unpaid_tax_parcels`` Layer entry querying the SAME endpoint
+    with the SAME where-clause off the SAME PIN field as this module's own
+    delinquent-tax lane. That is WHY this lane's rows collide in
+    Listing.dedupe_key() and (per the module docstring) almost always lose
+    the merge race to that simpler/faster scraper instead of landing as
+    their own board rows. If this test ever fails, the coverage
+    relationship documented in the module docstring has silently changed and
+    that section needs re-auditing, not just updating."""
+    from foreclosure_scraper.scrapers.counties_generic.arcgis_distress_layers import LAYERS
+
+    layer = next((lay for lay in LAYERS if lay.slug == "greenville_unpaid_tax_parcels"), None)
+    assert layer is not None, "arcgis_distress_layers no longer has a Greenville layer"
+    assert layer.url == gv.PARCEL_LAYER
+    assert layer.where == gv.DELINQUENT_WHERE
+    assert layer.parcel == "PIN"
+    assert (layer.state, layer.county) == ("SC", "Greenville")
+
+
+def test_tax_sale_lane_shares_the_exact_roster_url_with_greenville_delinquent_tax():
+    """counties_sc.greenville_delinquent_tax scrapes this exact same tax-sale
+    roster page and keys its rows off the same Map# column this module reads
+    as PIN -- the second collision source in the ZERO-NET-NEW AUDIT."""
+    from foreclosure_scraper.scrapers.counties_sc import greenville_delinquent_tax as gdt
+
+    assert gv.TAXSALE_URL == gdt.PAGE_URL
+
+
+def test_raw_payload_survives_publish_to_the_board():
+    """CONFIRMED BUG (2026-09-23), fix belongs in web_artifact.py, NOT here.
+
+    web_artifact.RAW_KEEP (the publish-time raw-payload whitelist) has
+    entries for sibling keys "greenville_mie" and "greenville_delinquent_tax"
+    but none for "greenville_distress" -- the one raw sub-key
+    build_listing() writes this module's ENTIRE payload into (lanes,
+    tax_sale echo, probate match, situs/absentee provenance). Verified by
+    grepping the full 2026-09-23 04:43 published board (docs/listings.json +
+    docs/listings_detail.json.gz + every docs/listings_part_*.json.gz): zero
+    occurrences of the string "greenville_distress" anywhere, even on rows
+    that carry this module in raw["also_seen_in"]. This means even a merge
+    this module WINS currently ships none of its value.
+
+    Marked xfail (not a hard failure) because the one-line fix -- adding
+    `"greenville_distress": "*",` next to the neighboring Greenville entries
+    in RAW_KEEP -- is a shared-module change out of this scraper's scope.
+    Once that line lands, this test should start passing; if it doesn't,
+    the RAW_KEEP audit needs to be redone."""
+    import pytest
+    from foreclosure_scraper import web_artifact
+
+    if "greenville_distress" not in web_artifact.RAW_KEEP:
+        pytest.xfail(
+            "web_artifact.RAW_KEEP is missing a 'greenville_distress' entry -- "
+            "add `\"greenville_distress\": \"*\",` there (see this module's "
+            "ZERO-NET-NEW AUDIT docstring, point 4)"
+        )
+    f = _by_pin()[PIN_BOTH]
+    li = build_listing(_normalize_parcel(PIN_BOTH), f["attributes"], f["geometry"])
+    published = web_artifact._to_dict(li)
+    assert "greenville_distress" in published["raw"]
+    assert published["raw"]["greenville_distress"]["amount_owed"] == 5567.69

@@ -1,19 +1,25 @@
-"""Greenville County SC hard-distress parcels — BUILT BUT NOT TURNED ON.
+"""Greenville County SC hard-distress parcels — ARMED, and here is why it still
+nets ~0 rows under ITS OWN slug on the published board (audited 2026-09-23;
+see "ZERO-NET-NEW AUDIT" below before re-investigating this from scratch).
 
-STATUS: **behind a flag, default OFF.** Greenville is not in ``config.SC_COUNTIES``
-and is in ``config.SCOPE_DENY_COUNTIES`` (pruned 2026-05-14 by operator
-direction). Nothing here changes that. This module exists so that IF the operator
-later decides to expand, the county is a switch-flip rather than a build. It
-self-gates on::
+STATUS: **armed by default since 2026-09-21.** ``config.SC_COUNTIES`` (the
+narrow 18-county FLIP footprint) still excludes Greenville and
+``config.SCOPE_DENY_COUNTIES`` still lists it — neither of those changed, and
+``config.in_scope("Greenville", "SC")`` is still correctly False. But this
+scraper's own ``ListingType.TAX_LIEN`` is NOT a flip type (see
+``main._FLIP_LISTING_TYPES``), so its rows never go through that narrow gate
+at all. They go through ``main._county_in_scope`` -> ``config.in_scope_distressed``,
+added 2026-09-15 specifically so a real distress signal (as opposed to a
+buy-today flip) is admissible anywhere in NC/SC. Self-gates on::
 
-    FORECLOSURE_INCLUDE_GREENVILLE=1
+    FORECLOSURE_INCLUDE_GREENVILLE=1   (defaults to "1" — see ENV_ON below)
 
-With the flag unset the scraper returns [] and reports DORMANT.
-
-  !! WIRING NOTE FOR WHOEVER TURNS THIS ON: the flag alone is not enough.
-     ``main._in_scope`` drops every Greenville row at its SCOPE_DENY_COUNTIES
-     check before anything else can see it. Turning the county on needs a
-     matching flag-gated bypass there. That edit is deliberately NOT made here.
+With the flag explicitly set to "0" the scraper returns [] and reports
+DORMANT. Verified live 2026-09-23: with the flag on, 2,637-2,709 rows/run
+ALL pass ``main._in_scope`` (2637/2637 in one live check) and ALL pass the
+DATELESS_OK_SOURCES gate (this slug is listed at main.py's
+DATELESS_OK_SOURCES). Scope is not, and was never, the reason this source
+nets ~0 — see below for the reason that actually is.
 
 WHAT "HARD DISTRESS" MEANS HERE
     Only signals that mean the owner has an unpaid obligation or a court event
@@ -86,6 +92,84 @@ EMISSION MODEL
     only fires for slugs matching tax/flc/forfeited/delinquent/lien, and without
     it ``raw['greenville_distress']['amount_owed']`` would never be normalized
     into ``raw['tax_owed']`` and every lead would ship with no balance.
+
+ZERO-NET-NEW AUDIT (2026-09-23) — why 2,709 successful scrapes land 0 rows
+under ``counties_sc.greenville_tax_distress`` on the published board.
+
+    This was investigated end-to-end (scope, dedupe_key compatibility, and a
+    grep of the actual 2026-09-23 04:43 published board: docs/listings.json,
+    docs/listings_detail.json.gz, every docs/listings_part_*.json.gz). It is
+    NOT the scope gate (see STATUS above — every row passes). It is NOT a
+    self-collision bug in this module (fetched-in-isolation, this module's
+    2,637 rows dedupe to 2,208 unique parcels and ALL of them keep
+    source="counties_sc.greenville_tax_distress" — verified live). The real
+    cause is two OTHER sources independently covering the same parcels, plus
+    a real (separate, out-of-this-file) publish-time bug that makes even a
+    successful merge worthless right now:
+
+    1. delinquent-tax lane vs. ``counties_generic.arcgis_distress_layers``.
+       That module's ``greenville_unpaid_tax_parcels`` Layer entry queries
+       the IDENTICAL endpoint (``GIS``/``PARCEL_LAYER`` above) with the
+       IDENTICAL where-clause (``DELINQUENT_WHERE`` above, ``TOTTAX > 0 AND
+       PAIDDATE IS NULL``) off the same ``PIN`` field — added independently,
+       apparently without either module's author checking it against the
+       other (that module's own docstring claims every layer is "checked for
+       NET-NEW value against the published board before it is added"; this
+       one was not, or was and the finding was lost). Same GIS query -> same
+       PINs -> same ``Listing.dedupe_key()`` ("parcel:SC:greenville:<pin>")
+       -> the two scrapers' rows for the same parcel collide in
+       ``dedupe.dedupe()``. That module's single flat ArcGIS query has far
+       less work to do than this one (which also fetches the tax-sale
+       roster, backfills missing PINs, and joins sales), so it reliably wins
+       the completion race and keeps its own ``source``/``source_url``
+       (``Listing.merge()`` never overwrites the winner's source — see
+       models.py). This module's matching rows still land, just as
+       ``also_seen_in`` entries on the OTHER slug's rows, not as their own
+       board rows.
+    2. tax-sale-roster lane vs. ``counties_sc.greenville_delinquent_tax``.
+       That module scrapes this SAME ``TAXSALE_URL`` page (its own
+       ``PAGE_URL`` constant is byte-identical) and uses the same Map#
+       column as its ``parcel_id`` (unnormalized, but ``dedupe_key()``
+       applies the same ``_normalize_parcel()`` to any parcel_id, so the
+       keys still collide). Measured live 2026-09-23: of this module's 2,637
+       rows, 1,638 (62%) share a ``parcel:`` dedupe key with a same-day live
+       scrape of ``greenville_delinquent_tax`` alone; the persisted board
+       accumulates that source's static roster across many weekly runs, so
+       its effective historical coverage is broader than any single day's
+       comparison shows.
+    3. Board evidence for both of the above (2026-09-23 04:43 run): 0 rows
+       carry ``"source": "counties_sc.greenville_tax_distress"``; 2,189 rows
+       carry it inside ``raw["also_seen_in"]``. Of a ~3,222-row sample of
+       Greenville board rows, primary-source counts were
+       ``counties_generic.arcgis_distress.greenville_unpaid_tax_parcels``
+       2,249, ``counties_sc.greenville_delinquent_tax`` 627,
+       ``counties_sc.greenville_mie_adverts`` 283, everything else 63.
+    4. SEPARATE CONFIRMED BUG, NOT fixable in this file — belongs in
+       ``src/foreclosure_scraper/web_artifact.py``: its ``RAW_KEEP``
+       publish-time whitelist has entries for ``"greenville_mie"`` and
+       ``"greenville_delinquent_tax"`` but NONE for ``"greenville_distress"``
+       — the one raw sub-key this module's ``build_listing()`` writes every
+       fact into (lanes, tax_sale echo, probate match, situs/absentee
+       provenance). Confirmed by grepping the ENTIRE published board for the
+       literal string ``"greenville_distress"``: zero hits, anywhere,
+       including the rows that DO carry this module in ``also_seen_in``.
+       This is the exact bug class RAW_KEEP's own inline comments already
+       document repeatedly (court_record, county_sales, parcel_from_geo,
+       horry_flc, ...) — "measured N rows, ZERO on the published board."
+       The one-line fix is adding ``"greenville_distress": "*",`` next to
+       the neighboring Greenville entries in that file's ``RAW_KEEP`` dict.
+       Until that lands, even a merge this module WINS (see point 5) ships
+       none of its actual payload.
+    5. What is still genuinely net-new, not duplicated by either source
+       above: the tax-sale-roster PINs that ``fetch_parcels_by_pin`` backfills
+       because the live GIS delinquent query no longer flags them (the
+       ``missing`` list in ``fetch()``, ~60-90 parcels/run). Point (1)'s
+       ``arcgis_distress_layers`` never sees these (they fail its
+       ``DELINQUENT_WHERE``) and point (2)'s ``greenville_delinquent_tax``
+       emits them with NO property attributes at all (bare parcel + name +
+       amount). This module is the only source that gives those specific
+       parcels a situs, market/tax value, coordinates, or acreage — real
+       value, currently unpublishable only because of point (4).
 
 PRIVACY: fields are enumerated explicitly — never ``outFields=*``. Everything
 taken from the GIS is a property/assessment record field (owner of record, owner
