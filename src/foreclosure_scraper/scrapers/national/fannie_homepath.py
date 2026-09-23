@@ -170,6 +170,19 @@ async def _fetch_bbox(state: str, sw_lat: float, sw_lng: float, ne_lat: float, n
     return out
 
 
+async def _fetch_bbox_indexed(
+    i: int, state: str, cell: tuple[float, float, float, float], slug: str
+) -> tuple[int, list[Listing] | Exception]:
+    """Wrap `_fetch_bbox` so `asyncio.as_completed` results can still be
+    attributed to a cell index for logging, and so one cell's exception
+    doesn't cancel its siblings (mirrors the old gather(return_exceptions=True)
+    behavior, but per-cell instead of per-state -- see fetch()'s docstring)."""
+    try:
+        return i, await _fetch_bbox(state, cell[0], cell[1], cell[2], cell[3], slug)
+    except Exception as exc:  # noqa: BLE001
+        return i, exc
+
+
 class FannieHomePath(BaseScraper):
     slug = "national.fannie_homepath"
     name = "Fannie Mae HomePath (REO, JSON API)"
@@ -187,16 +200,46 @@ class FannieHomePath(BaseScraper):
     timeout_s = 150.0
 
     async def fetch(self) -> Iterable[Listing]:
-        out: list[Listing] = []
-        seen: set[str] = set()
+        # Bank rows into self.partial PER CELL, as each of the 32 bbox fetches
+        # completes -- not only after a whole state's asyncio.gather returns.
+        #
+        # MEASURED 2026-09-22/23 (logs/local-run-20260922T111425.log, lines
+        # 41-224; docs/full_run_execution_audit_2026-09-23.md section "fannie_
+        # homepath fix -- did it behave as expected?"): the 09/22 main-scrape-
+        # phase run of this scraper started 15:14:34.475753Z and did NOT hit its
+        # own timeout_s=150 deadline on schedule -- it fired at 15:23:19.851313Z,
+        # 8m45s later. In that same window, exactly ONE other event source
+        # (national.foreclosure_dot_com, which ran back-to-back per-city fetches
+        # for ~8 minutes straight) logged anything at all; every other in-flight
+        # scraper, and this one's own remaining SC bbox cells, produced NO log
+        # output until foreclosure_dot_com finished -- at which point FOUR
+        # scrapers' timeouts (this one included) and several scraper.start events
+        # all fired within the same ~50ms. That is event-loop starvation by a
+        # sibling scraper, not this scraper needing more time: by 15:15:01 (27s
+        # in) it had already cleanly fetched all 16 NC cells (~6,000+ rows) plus
+        # the first SC cell -- comfortably inside even the OLD 60s budget -- and
+        # then simply never got scheduled again until it was cancelled.
+        #
+        # Raising timeout_s further would not fix starvation (the deadline itself
+        # fires late, however large it is) -- see test_fannie_homepath_timeout.py,
+        # which pins the existing 150s floor/ceiling and is intentionally NOT
+        # touched here for lack of evidence a bigger number would help. What WAS
+        # a real, fixable bug: `fetch()` only returned data at the very end, so
+        # the eventual cancellation discarded the entire NC pull it had already
+        # collected. Appending to self.partial as each cell resolves means a
+        # future timeout -- from genuine slowness OR another starvation episode --
+        # ships whatever was already fetched (base_scraper's existing
+        # OUTCOME_PARTIAL salvage path in safe_run()) instead of 0 rows.
+        out = self.partial
+        seen: set[str] = {li.case_number for li in out if li.case_number}
         for state, sw_lat, sw_lng, ne_lat, ne_lng in BBOXES:
             cells = _subdivide(sw_lat, sw_lng, ne_lat, ne_lng)
             tasks = [
-                _fetch_bbox(state, c[0], c[1], c[2], c[3], self.slug)
-                for c in cells
+                _fetch_bbox_indexed(i, state, c, self.slug)
+                for i, c in enumerate(cells)
             ]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            for i, result in enumerate(results):
+            for coro in asyncio.as_completed(tasks):
+                i, result = await coro
                 if isinstance(result, Exception):
                     log.warning("fannie_homepath.cell_failed", state=state,
                                 cell=i, error=str(result)[:200])
