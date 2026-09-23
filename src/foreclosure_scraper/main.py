@@ -2681,7 +2681,14 @@ async def run() -> int:
     # real payoff basis. HOT/WARM-first, capped, idempotent, budget-bailed.
     try:
         from .enrichment_dot_ocr import enrich_dot_ocr
-        s = await _await_capped(enrich_dot_ocr(enriched), "dot_ocr")
+        # 2026-09-23: _await_capped's own default (900s) is HALF of enrich_dot_ocr's own
+        # internal budget (FORECLOSURE_DOT_OCR_BUDGET_S, default 1800s), so the outer wait_for
+        # always cancelled it before its own graceful-stop logic could run or log a single
+        # stat -- every full run has been silently getting zero visibility into this
+        # enricher. Read the same env var so the outer cap tracks the inner one, plus the
+        # same +120s grace the vision job uses so the inner deadline fires first.
+        _dot_budget_s = float(os.environ.get("FORECLOSURE_DOT_OCR_BUDGET_S", "1800")) + 120
+        s = await _await_capped(enrich_dot_ocr(enriched), "dot_ocr", default_s=_dot_budget_s)
         if s and "skipped" not in s: enrichment_stats["dot_ocr"] = s
         checkpoint.save(enriched, "dot_ocr")
     except Exception:
