@@ -294,6 +294,27 @@ DETAIL_MAX = int(os.getenv("QPAYBILL_ROLL_DETAIL_MAX", "400"))
 _GLOBAL_CONCURRENCY = int(os.getenv("QPAYBILL_ROLL_CONCURRENCY", "12"))
 _GLOBAL_SEM: "asyncio.Semaphore | None" = None
 
+#: Per-COUNTY wall-clock bound, independent of REQUEST_BUDGET_PER_COUNTY (which counts
+#: requests, not seconds, and caps at 2,500 regardless of how long each one takes).
+#:
+#: PROVEN AGAINST A LIVE FAILURE, full run 2026-09-23: the scraper hit its OWN
+#: timeout_s=900.0 (TIMEOUT after exactly 901s) and captured ZERO fresh rows across
+#: ALL 19 counties -- not "the stuck county got 0", every county did, including ones
+#: that almost certainly finished in the first minute. Williamsburg has repeatedly hit
+#: GenericErrorPage.aspx in production logs, which is consistent with a portal that
+#: answers on every request (so _require_ok never raises) but never satisfies
+#: _all_match / never drains its own retry loop -- a county that can occupy its worker
+#: for the entire scraper timeout without ever raising an exception the old code could
+#: catch. Nothing upstream of this constant bounded a single county's WALL-CLOCK time;
+#: only its request COUNT was bounded, and a slow-but-answering host can spend all
+#: 2,500 requests at any latency at all.
+#:
+#: Set comfortably under timeout_s so a hung county is skipped well before the
+#: scraper-level cutoff, leaving the other counties' already-collected rows to be
+#: reported (see QPayBillDelinquentRoll.fetch, which now salvages per county as each
+#: one finishes rather than only after every county has finished).
+COUNTY_TIMEOUT_S = float(os.getenv("QPAYBILL_ROLL_COUNTY_TIMEOUT", "480"))
+
 
 def _global_sem() -> "asyncio.Semaphore":
     global _GLOBAL_SEM
@@ -881,46 +902,93 @@ class QPayBillDelinquentRoll(BaseScraper):
         t0 = time.monotonic()
         log.info("qpaybill_roll.start", counties=len(targets),
                  budget_per_county=REQUEST_BUDGET_PER_COUNTY,
-                 max_pages=MAX_PAGES_PER_PREFIX, max_depth=MAX_PREFIX_DEPTH)
+                 max_pages=MAX_PAGES_PER_PREFIX, max_depth=MAX_PREFIX_DEPTH,
+                 county_timeout_s=COUNTY_TIMEOUT_S)
 
         out: list[Listing] = []
         per_county: dict[str, int] = {}
         detail_rows: dict[str, list[dict]] = {}
         kept_idents: dict[str, set] = {}
+
+        _EMPTY_STATS = {"queries": 0, "errors": 1, "page_capped_prefixes": 0,
+                        "pager_stalled": 0, "drifted": 0, "deepened": 0,
+                        "truncated_prefixes": 0, "lost_prefixes": []}
+
+        async def run_county(client: httpx.AsyncClient, county: str, sub: str
+                             ) -> tuple[str, list[dict], dict]:
+            """One county's sweep, individually bounded to COUNTY_TIMEOUT_S.
+
+            This is half of the fix for the 2026-09-23 all-19-counties-return-zero
+            failure (see COUNTY_TIMEOUT_S's docstring above for the measured root
+            cause). REQUEST_BUDGET_PER_COUNTY bounds how many requests a county can
+            spend, not how long it can take doing it -- a portal that answers slowly
+            but never errors (Williamsburg's GenericErrorPage.aspx pattern) could
+            occupy a worker for the scraper's entire soft timeout on its own. This
+            wraps that county's sweep so it can never do that: it either finishes, or
+            it is abandoned at COUNTY_TIMEOUT_S and reported as failed, but either way
+            it releases control back to fetch() so the OTHER counties are never held
+            hostage to it.
+            """
+            try:
+                rows, stats = await asyncio.wait_for(
+                    sweep_county(client, county, sub, budgets[county]),
+                    timeout=COUNTY_TIMEOUT_S)
+                return county, rows, stats
+            except asyncio.TimeoutError:
+                log.warning("qpaybill_roll.county_timeout", county=county,
+                            timeout_s=COUNTY_TIMEOUT_S,
+                            note="this county alone exceeded its bounded per-county "
+                                 "timeout and was skipped for this run; it must never "
+                                 "be allowed to hold every OTHER county's already-"
+                                 "collected rows hostage to the scraper's soft timeout")
+                return county, [], dict(_EMPTY_STATS, county_timed_out=True)
+            except Exception as exc:  # noqa: BLE001
+                log.warning("qpaybill_roll.county_failed", county=county,
+                            error=str(exc)[:140])
+                return county, [], dict(_EMPTY_STATS)
+
         async with httpx.AsyncClient(timeout=45.0, follow_redirects=True,
                                      headers={"User-Agent": _UA}) as client:
-            results = await asyncio.gather(
-                *(sweep_county(client, county, sub, budgets[county])
-                  for county, sub in sorted(targets.items())),
-                return_exceptions=True,
-            )
-        for (county, _sub), res in zip(sorted(targets.items()), results):
-            if isinstance(res, BaseException):
-                log.warning("qpaybill_roll.county_failed", county=county,
-                            error=str(res)[:140])
-                per_county[county] = 0
-                continue
-            rows, stats = res
-            detail_rows[county] = rows
-            listings = _to_listings(county, rows)
-            per_county[county] = len(listings)
-            out.extend(listings)
-            # Idents that SURVIVED _to_listings. The detail pass below must not spend
-            # its budget on rows this county already discarded — see the note there.
-            kept_idents[county] = {
-                (li.raw.get("qpaybill_roll") or {}).get("identification_no")
-                for li in listings
-                if isinstance(li.raw, dict)
-            } - {None}
-            lost = stats.pop("lost_prefixes", [])
-            log.info("qpaybill_roll.county_done", county=county,
-                     parcels=len(listings), rows=len(rows),
-                     lost_prefixes=len(lost), **stats)
-            if lost:
-                log.warning("qpaybill_roll.county_incomplete", county=county,
-                            prefixes=sorted(lost),
-                            note="owners whose name starts with these were never "
-                                 "read; this county's roll is INCOMPLETE")
+            tasks = [asyncio.ensure_future(run_county(client, county, sub))
+                     for county, sub in sorted(targets.items())]
+            # SALVAGE AS EACH COUNTY COMPLETES, not only after every county has.
+            #
+            # The old shape was `results = await asyncio.gather(*(sweep_county(...) for
+            # ...))` followed by a loop that built `out` from `results` -- so nothing
+            # was collected until ALL 19 counties' coroutines had resolved. base_scraper
+            # .safe_run() wraps the whole fetch() in asyncio.wait_for(..., timeout=
+            # self.timeout_s); when that fired mid-gather it cancelled fetch() before
+            # the loop ever ran, so the 18 counties that HAD already finished were
+            # thrown away with the one that had not. fetch() also never touched
+            # self.partial, so safe_run()'s own timeout-salvage path (see its
+            # docstring: "A scraper that appends here as it goes will have that work
+            # SHIPPED") had nothing to ship. asyncio.as_completed fixes the first half
+            # by processing each county's result the moment it is ready; appending to
+            # self.partial here fixes the second half, so even if a pathological case
+            # still runs past timeout_s, whatever finished by then is not lost.
+            for finished in asyncio.as_completed(tasks):
+                county, rows, stats = await finished
+                detail_rows[county] = rows
+                listings = _to_listings(county, rows)
+                per_county[county] = len(listings)
+                out.extend(listings)
+                self.partial.extend(listings)
+                # Idents that SURVIVED _to_listings. The detail pass below must not spend
+                # its budget on rows this county already discarded — see the note there.
+                kept_idents[county] = {
+                    (li.raw.get("qpaybill_roll") or {}).get("identification_no")
+                    for li in listings
+                    if isinstance(li.raw, dict)
+                } - {None}
+                lost = stats.pop("lost_prefixes", [])
+                log.info("qpaybill_roll.county_done", county=county,
+                         parcels=len(listings), rows=len(rows),
+                         lost_prefixes=len(lost), **stats)
+                if lost:
+                    log.warning("qpaybill_roll.county_incomplete", county=county,
+                                prefixes=sorted(lost),
+                                note="owners whose name starts with these were never "
+                                     "read; this county's roll is INCOMPLETE")
 
         # OPT-IN DETAIL PASS. One request per parcel, so it is bounded and it spends its budget
         # on the LARGEST BALANCES first -- if only 400 of a county's parcels can be detailed, the
