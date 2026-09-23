@@ -32,10 +32,43 @@ Parsing strategy:
 Free public .gov PDF; plain HTTP + pypdf. No login, no CAPTCHA, no paywall.
 Live-verified 2026-06-30: PDF fetches (70 pages, ~1.25 MB), 2,172 parcel rows
 parse, 2,165 with extracted situs.
+
+2026-09-23 BLOCKED incident: the 2026-09-23 full run logged outcome=BLOCKED
+(0 rows) at 15:33:33Z -- classified by base_scraper from a 401/403/406/429/5xx
+status or connection-refused signal recorded by http_client's shared
+_ThrottledTransport (see base_scraper.OUTCOME_BLOCKED). The host is
+www.spartanburgcounty.gov (CivicPlus DocumentCenter, fronted by Cloudflare --
+confirmed via the `Server: cloudflare` / `CF-RAY` response headers).
+spartanburg_master_in_equity.py hits the SAME host (different DocumentCenter
+doc id) and was ALSO newly BLOCKED in the same second (15:33:32Z), while the
+4 other Spartanburg scrapers hitting different hosts/services succeeded in
+the same window -- confirming a shared, host-specific (not blanket-network)
+cause: something tripped a Cloudflare-side rate-limit/WAF rule for
+spartanburgcounty.gov specifically.
+
+Live re-verification the same day (2026-09-23, ~1h after the block) with the
+UNCHANGED request -- both plain curl and this project's own get_bytes() /
+client() code paths -- got a clean HTTP 200 + valid PDF immediately, with no
+header or UA changes. That rules out a durable new WAF rule, a UA/header
+requirement, or a URL change: the block was a TRANSIENT trip (e.g. a
+short-lived Cloudflare rate-limit/managed-challenge window) that had already
+cleared. http_client.get_bytes() already retries 401/403/406/429/5xx via
+tenacity (stop_after_attempt(3), ~1-10s exponential backoff), but that
+~10-20s window evidently didn't outlast whatever this trip's duration was.
+fetch() below adds a SCRAPER-LOCAL outer retry with a longer, jittered
+cooldown (tens of seconds) between waves so a block that outlasts
+http_client's fast internal retry still gets a second and third chance
+within this scraper's own soft timeout, before being reported BLOCKED for
+real. This is ordinary backoff politeness, not a WAF/CAPTCHA bypass -- if a
+future incident turns out to be a genuine login/CAPTCHA wall instead of a
+rate-limit, do not extend this pattern to defeat it; flag it instead per
+project policy.
 """
 from __future__ import annotations
 
+import asyncio
 import io
+import random
 import re
 from datetime import datetime
 from typing import Iterable
@@ -177,22 +210,64 @@ def parse_list(text: str, url: str) -> list[Listing]:
     return out
 
 
+# Outer retry: rides out a transient host-level block (Cloudflare rate-limit/
+# WAF trip) that outlasts http_client.get_bytes()'s own fast internal retry
+# (~3 attempts / ~10-20s). Backoff is deliberately much longer and jittered so
+# repeated waves don't look like a hammering loop. Not a CAPTCHA/WAF bypass --
+# just spacing out ordinary polite re-fetches of a free public PDF.
+_MAX_FETCH_ATTEMPTS = 3
+_BACKOFF_BASE_S = 20.0
+_BACKOFF_STEP_S = 15.0
+_BACKOFF_JITTER_S = 10.0
+
+
 class SpartanburgDelinquentTax(BaseScraper):
     slug = "counties_sc.spartanburg_delinquent_tax"
     name = "Spartanburg County (SC) Delinquent Real-Property Tax Sale List (PDF)"
     category = "county_tax"
-    timeout_s = 120.0
+    # Bumped 120 -> 180 (matches spartanburg_condemned/spartanburg_vacant) to
+    # give the outer retry/backoff below genuine room within the soft timeout;
+    # safe_run's asyncio.wait_for still hard-bounds this source regardless, so
+    # it cannot hang the rest of a run even in a worst-case full timeout.
+    timeout_s = 180.0
     expected_min_count = 1
 
     async def fetch(self) -> Iterable[Listing]:
-        try:
-            data = await get_bytes(PDF_URL, timeout=90.0)
-        except Exception as exc:  # noqa: BLE001
-            log.warning("spartanburg_delinquent.fetch_fail", error=str(exc)[:160])
-            return []
-        if not (data and data[:4] == b"%PDF"):
-            log.info("spartanburg_delinquent.not_pdf")
-            return []
-        rows = parse_list(_pdf_text(data), PDF_URL)
-        log.info("spartanburg_delinquent.done", count=len(rows))
-        return rows
+        last_exc: Exception | None = None
+        for attempt in range(1, _MAX_FETCH_ATTEMPTS + 1):
+            last_exc = None
+            try:
+                data = await get_bytes(PDF_URL, timeout=60.0)
+            except Exception as exc:  # noqa: BLE001
+                last_exc = exc
+            else:
+                if data and data[:4] == b"%PDF":
+                    rows = parse_list(_pdf_text(data), PDF_URL)
+                    log.info(
+                        "spartanburg_delinquent.done", count=len(rows), attempt=attempt
+                    )
+                    return rows
+                # 200 OK but not a PDF (e.g. an HTML challenge/error page some
+                # WAFs return with a 2xx status) -- treat like a transient miss
+                # and retry rather than silently reporting a clean zero.
+                log.info("spartanburg_delinquent.not_pdf", attempt=attempt)
+
+            if attempt < _MAX_FETCH_ATTEMPTS:
+                backoff = (
+                    _BACKOFF_BASE_S
+                    + _BACKOFF_STEP_S * (attempt - 1)
+                    + random.uniform(0, _BACKOFF_JITTER_S)
+                )
+                log.warning(
+                    "spartanburg_delinquent.fetch_retry",
+                    attempt=attempt,
+                    error=str(last_exc)[:160] if last_exc else "not_pdf",
+                    backoff_s=round(backoff, 1),
+                )
+                await asyncio.sleep(backoff)
+
+        if last_exc is not None:
+            log.warning("spartanburg_delinquent.fetch_fail", error=str(last_exc)[:160])
+        else:
+            log.info("spartanburg_delinquent.fetch_fail_not_pdf")
+        return []
