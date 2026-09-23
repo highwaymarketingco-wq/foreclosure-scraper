@@ -26,8 +26,50 @@ ADDR_RE = re.compile(
     r'(\d{1,5}\s+[A-Z][\w\s\.\'-]+?(?:Street|St\.?|Avenue|Ave\.?|Road|Rd\.?|Drive|Dr\.?|Lane|Ln\.?|Boulevard|Blvd\.?|Way|Place|Pl\.?|Court|Ct\.?|Highway|Hwy\.?))',
     re.MULTILINE
 )
+# Line-anchored variant of ADDR_RE. The "Project Property" cell commonly opens with a
+# lot/subdivision label before the real site address, e.g.:
+#     Lot 3 Watkins St Subdivision
+#     pin 1714359804
+#     1900 Watkins St Raleigh
+#     Raleigh, NC 27604
+# ADDR_RE.search() over the whole cell is UNANCHORED, so it matches the leftmost
+# digit+suffix substring anywhere in the text -- including inside a label like "Lot 3
+# Watkins St Subdivision", which reads as "3 Watkins St" and is wrong (the real site is
+# "1900 Watkins St Raleigh", further down). Anchoring at the start of each line (after
+# stripping) only matches a line that IS a street address, never a fragment of a longer
+# label, so it skips straight past "Lot 3 Watkins St Subdivision" and "pin 1714359804"
+# to "1900 Watkins St Raleigh". See _extract_address().
+_ADDR_LINE_RE = re.compile(
+    r'^(\d{1,5}\s+[A-Z][\w\s\.\'-]+?(?:Street|St\.?|Avenue|Ave\.?|Road|Rd\.?|Drive|Dr\.?|Lane|Ln\.?|Boulevard|Blvd\.?|Way|Place|Pl\.?|Court|Ct\.?|Highway|Hwy\.?))',
+    re.IGNORECASE
+)
 CITY_STATE_RE = re.compile(r'([A-Z][\w\s]+?),\s*(?:[A-Z]{2})?\s*(\d{5})?')
 PIN_RE = re.compile(r'(?:pin|tms|parcel|tax\s*map)\s*#?\s*:?\s*([\w\-]+)', re.IGNORECASE)
+
+
+def _extract_address(property_text: str) -> str:
+    """Pull the numbered site address out of a LiensNC 'Project Property' cell.
+
+    Prefers a line that, on its own (after stripping), IS a street address (digit
+    at the very start of the line) over ADDR_RE's unanchored whole-text search --
+    see the comment on _ADDR_LINE_RE for why the unanchored search is wrong when a
+    lot/subdivision label precedes the real address. When more than one line
+    qualifies, the LAST one wins: the real site address is listed closest to the
+    city/state/zip line, while a lot/subdivision label with an embedded
+    street-suffix-shaped name (if it matches at all) comes first. Falls back to the
+    old unanchored substring search when no line matches, so cells that don't put
+    the address on its own line still extract something.
+    """
+    candidates = [
+        m.group(1).strip()
+        for line in (property_text or "").split("\n")
+        for m in [_ADDR_LINE_RE.match(line.strip())]
+        if m
+    ]
+    if candidates:
+        return candidates[-1]
+    m = ADDR_RE.search(property_text or "")
+    return m.group(1).strip() if m else ""
 
 
 def parse_results(html_text):
@@ -68,8 +110,7 @@ def parse_results(html_text):
         related = cells[4].text(strip=True)
         
         # Extract address from property text
-        addr_match = ADDR_RE.search(property_text)
-        address = addr_match.group(1).strip() if addr_match else ''
+        address = _extract_address(property_text)
         
         # Extract PIN/TMS
         pin_match = PIN_RE.search(property_text)
