@@ -206,6 +206,58 @@ def test_real_buncombe_row_is_located_and_safely_yields_no_address():
     assert li.street_address is None
 
 
+# Verbatim line, fetched 2026-09-23 from the same Buncombe PDF (full-document
+# read, page ~5): NIX, WILLIAM L JR's own parcel 978416519600000 is on this
+# line, but the very next words on the SAME line -- "PAGANO, RAYMOND J 1 CREST
+# AVE" -- are a DIFFERENT taxpayer's name and address (Pagano's own line is a
+# few rows away). Before the column-merge guard existed, the "search after the
+# identifier" rule alone stamped Pagano's "1 CREST AVE" onto Nix -- his real
+# address (board-confirmed, correctly parsed by the scraper itself from the
+# same document) is "20 HOUSTON RD".
+_BUNCOMBE_REAL_CONTAMINATED_LINE = (
+    "968849046600000 -- 978416519600000 PAGANO, RAYMOND J 1 CREST AVE JANEL "
+    "PRESLEY, PEGGY S PULLEASE, REBECCA"
+)
+
+# Verbatim line, same document: FRANK W MORRIS JR ETAL's parcel
+# 961388939100000 sits between TWO other properties' fragments including a
+# second long PIN (963483432700000) and an unrelated address, "17 SILENT PL",
+# that belongs to whichever property 963483432700000 is. Morris's own
+# board-confirmed address is "311 BOUNDARY TREE PASS" -- nowhere on this line.
+_BUNCOMBE_REAL_CONTAMINATED_LINE_2 = (
+    "75 BUCHANAN AVE 960545728200000 36 HOLLY ACRES LN 961388939100000 "
+    "963483432700000 $152.03 99999 QUEEN RD 17 SILENT PL"
+)
+
+
+def test_real_buncombe_contaminated_line_does_not_stamp_a_neighbours_address():
+    """The failure this guard was added for. Confirmed live 2026-09-23: without
+    the column-merge guard, this exact real line gave NIX, WILLIAM L JR
+    (parcel 978416519600000) a stranger's "1 CREST AVE" instead of his own
+    board-confirmed "20 HOUSTON RD" (2 wrong fills out of an 11-lead real
+    sample from this document -- see the fix doc)."""
+    li = _li(parcel_id="978416519600000", owner_name="NIX, WILLIAM L JR",
+             defendant="NIX, WILLIAM L JR", street_address=None)
+    filled = dm._row_backfill_from_aggregate(li, _BUNCOMBE_REAL_CONTAMINATED_LINE)
+    assert filled == []
+    assert li.street_address is None, (
+        "regression: a neighbour's address (Pagano's '1 CREST AVE') was stamped onto Nix")
+
+
+def test_real_buncombe_second_contaminated_line_does_not_stamp_a_neighbours_address():
+    li = _li(parcel_id="961388939100000", owner_name="FRANK W MORRIS JR ETAL",
+             defendant="FRANK W MORRIS JR ETAL", street_address=None)
+    filled = dm._row_backfill_from_aggregate(li, _BUNCOMBE_REAL_CONTAMINATED_LINE_2)
+    assert filled == []
+    assert li.street_address is None
+
+
+def test_long_id_run_regex_matches_buncombe_pins_not_amounts_or_house_numbers():
+    assert dm._LONG_ID_RUN.search("978416519600000")
+    assert dm._LONG_ID_RUN.search("$79,723.60".replace(",", "").replace(".", "")) is None
+    assert dm._LONG_ID_RUN.search("264") is None
+
+
 # --- the column-merge contamination guard -------------------------------------
 def test_address_before_a_merged_lines_identifier_is_not_stamped():
     """Synthetic, but modeled directly on the real Buncombe merge pattern above

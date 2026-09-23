@@ -554,6 +554,12 @@ _ADDR_IN_ROW = re.compile(
     r"BLVD|WAY|HWY|HIGHWAY|PL|PLACE|TRL|TRAIL|PKWY|TER|LOOP)\b\.?",
     re.I)
 
+# A bare run of 8+ consecutive digits reads as a parcel PIN or account number
+# (Buncombe County NC's PINs are 15 digits; a house number in _ADDR_IN_ROW is
+# capped at 6, and these rosters' dollar amounts do not reach 8 digits), never
+# a street address or a small dollar figure. See the column-merge guard below.
+_LONG_ID_RUN = re.compile(r"\d{8,}")
+
 
 def _lead_identifiers(li: Listing) -> list[str]:
     """Tokens that should appear on THIS lead's own row of a shared roster."""
@@ -590,18 +596,36 @@ def _row_backfill_from_aggregate(li: Listing, text: str) -> list[str]:
     # property's address — verified by test: parcel ...456.00 was given the
     # ...123.00 row's street. Only the line carrying the identifier may be read.
     row = ""
-    ident_end = 0
+    ident_start = ident_end = 0
     for ident in idents:
         needle = ident.lower()
         for line in text.splitlines():
             pos = line.lower().find(needle)
             if pos != -1:
                 row = line
-                ident_end = pos + len(needle)
+                ident_start, ident_end = pos, pos + len(needle)
                 break
         if row:
             break
     if not row:
+        return []
+    # Column-merge guard. A physical text line carrying a SECOND long
+    # (8+ digit) parcel/account-number-shaped run, distinct from this lead's
+    # own matched identifier, is almost certainly TWO OR MORE unrelated
+    # properties' fields concatenated onto one line -- pdfplumber's
+    # extract_text() groups words into a "line" by y-position only, blind to
+    # the page's column bands, and a dense multi-column roster (Buncombe
+    # County NC's tax-lien PDF, verified live 2026-09-23) can weave 3-4
+    # properties' name/parcel/amount/address fragments into one output line.
+    # This is not theoretical: on an 11-lead real sample from that document,
+    # this exact shape stamped a NEIGHBOUR's street onto 2 of 11 leads (NIX,
+    # WILLIAM L JR got PAGANO, RAYMOND J's "1 CREST AVE"; FRANK W MORRIS JR
+    # ETAL got a stranger's "17 SILENT PL") before this guard existed --
+    # docs/doc_ocr_aggregate_match_fix_2026-09-23.md. Refusing to guess which
+    # fragment on a contaminated line is this lead's own is strictly safer
+    # than the alternative: no write beats a wrong write.
+    if any(m.end() <= ident_start or m.start() >= ident_end
+           for m in _LONG_ID_RUN.finditer(row)):
         return []
     filled: list[str] = []
     if not (getattr(li, "street_address", None) or "").strip():
