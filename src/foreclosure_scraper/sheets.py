@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime
 from typing import Iterable
 
@@ -12,6 +13,23 @@ from google.oauth2.service_account import Credentials
 from .models import Listing
 
 log = structlog.get_logger()
+
+# 2026-09-23: a single `ws.update()` call with all 192,805 leads (32 cols, ~6.2M cells) hit
+# gspread.exceptions.APIError: [500] Internal error -- the payload (one JSON body with every
+# row) is too large for one values.update call. Writing 5,000 rows a call keeps each request
+# small and lets one bad chunk retry without redoing the whole sheet.
+SHEET_CHUNK_ROWS = 5000
+# A spreadsheet (all its tabs combined) is capped at 10,000,000 cells by Google. The Listings
+# tab is 32 columns, so today's 192,805 leads is already 6.17M cells -- most of that budget.
+# 9,500,000 leaves room for the Run Log tab (tiny: 500 x 6) and about 104,000 more rows of
+# growth (to ~296,875 total) before truncation would trigger, while not capping so low that a
+# normal-sized board gets truncated for no reason -- the first version of this fix picked
+# 4,000,000 and would have silently dropped 67,806 of today's real leads. Above the cap, write
+# only the top rows (already sorted deadline-first, so the leads that matter today survive) and
+# say plainly what was cut. The board itself hit this exact shape of bug once already (the git
+# payload size limit, audit O1); this is the same trap in a different product, so revisit this
+# constant, not just raise it again, once the board is within a run or two of it.
+SHEET_CELL_CAP = 9_500_000
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -122,7 +140,44 @@ def write_listings(
     for li in listings_list:
         rows.append([_to_cell(li, attr) for _, attr in COLUMNS])
 
-    ws.update(values=rows, range_name="A1", value_input_option="USER_ENTERED")
+    n_cols = len(COLUMNS)
+    max_rows = max(1, SHEET_CELL_CAP // n_cols)
+    truncated = 0
+    if len(rows) > max_rows:
+        truncated = len(rows) - max_rows
+        rows = rows[:max_rows]
+        log.warning("sheets.truncated", kept=len(rows) - 1, dropped=truncated,
+                    note="over the cell cap; kept the header + earliest-deadline rows")
+
+    # gspread auto-expands the grid on write, but resizing up front makes the row count
+    # deterministic and lets a SHRINK (fewer leads than last run) drop the old trailing
+    # rows too -- ws.clear() above only blanks cell content, it does not shrink the grid.
+    ws.resize(rows=len(rows), cols=n_cols)
+
+    for start in range(0, len(rows), SHEET_CHUNK_ROWS):
+        chunk = rows[start:start + SHEET_CHUNK_ROWS]
+        for attempt in (1, 2):
+            try:
+                ws.update(values=chunk, range_name=f"A{start + 1}", value_input_option="USER_ENTERED")
+                break
+            except gspread.exceptions.APIError:
+                if attempt == 2:
+                    raise
+                log.warning("sheets.chunk_retry", start_row=start + 1, rows=len(chunk))
+                time.sleep(5)
+        if start + SHEET_CHUNK_ROWS < len(rows):
+            time.sleep(1.1)  # stay comfortably under the Sheets API's per-minute write quota
+    log.info("sheets.written", rows=len(rows) - 1, chunks=-(-len(rows) // SHEET_CHUNK_ROWS), truncated=truncated)
+
+    if truncated:
+        # A blank row plus a one-cell note just past the data makes a silent truncation
+        # visible to whoever opens the sheet, not just to the log.
+        try:
+            ws.update(values=[[f"... {truncated:,} more leads not shown (cell cap). "
+                                f"See the published dashboard for the full board."]],
+                      range_name=f"A{len(rows) + 2}", value_input_option="USER_ENTERED")
+        except gspread.exceptions.APIError:
+            pass
 
     # Format header + freeze
     sheet_meta = sh.fetch_sheet_metadata()
