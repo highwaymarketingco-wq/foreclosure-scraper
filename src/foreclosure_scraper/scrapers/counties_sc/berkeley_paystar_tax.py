@@ -108,6 +108,24 @@ _DETAIL_URL = f"{_HOST}/api/invoices/{{hash}}"
 _UI_URL = f"{_HOST}/app/invoices/{{hash}}"
 
 _PAGE_SIZE = 1000
+# MEASURED live 2026-09-23 (uncached httpx, no browser, no CAPTCHA/WAF hit at any point):
+# the Unpaid Real Property roll is 3,426 rows (grown from the 2,310 seen in the 2026-09-23
+# full run that TIMED OUT at exactly 300s with 0 rows shipped). This vendor is per-request
+# latency-bound around ~1s/invoice, NOT a single stuck request the way qpaybill's
+# Williamsburg county hung -- every request in >5,000 live detail calls during this
+# investigation eventually returned (0 real errors), it is just genuinely too slow to
+# finish the whole roll inside 300s:
+#   concurrency=10: 2,200/3,426 details in 270.6s (8.1 req/s sustained; extrapolates to
+#     ~420s for the full roll)
+#   concurrency=20: 3,000/3,426 details in 330.3s (9.1 req/s sustained -- barely better
+#     despite 2x the concurrency) and the LAST 300 of those slowed to 3.9 req/s, well below
+#     concurrency=10's pace at a comparable cumulative request count -- consistent with
+#     server-side backpressure/soft rate-limiting kicking in under higher sustained load,
+#     not a client-side bottleneck.
+# Net: doubling concurrency did not reliably buy throughput and risked provoking harsher
+# throttling from a small county vendor, so concurrency is left UNCHANGED at 10. The real
+# fix is the timeout (below) plus incremental self.partial salvage in fetch() -- see
+# tests/test_berkeley_paystar_tax_timeout.py for the pinned numbers.
 _DETAIL_CONCURRENCY = 10
 
 
@@ -139,15 +157,19 @@ async def _list_all(client: httpx.AsyncClient) -> list[dict]:
     return out
 
 
-async def _fetch_detail(client: httpx.AsyncClient, sem: asyncio.Semaphore, invoice_hash: str) -> dict | None:
+async def _fetch_detail(client: httpx.AsyncClient, sem: asyncio.Semaphore, invoice_hash: str) -> tuple[str, dict | None]:
+    """Returns (invoice_hash, detail) so callers can consume results as they land
+    (asyncio.as_completed) instead of needing one big all-or-nothing gather() to know
+    which hash a result belongs to.
+    """
     async with sem:
         try:
             r = await client.get(_DETAIL_URL.format(hash=invoice_hash))
             r.raise_for_status()
-            return (r.json() or {}).get("data") or None
+            return invoice_hash, (r.json() or {}).get("data") or None
         except Exception as exc:
             log.warning("berkeley_paystar.detail_fail", invoice_hash=invoice_hash, error=str(exc)[:140])
-            return None
+            return invoice_hash, None
 
 
 def _meta(detail: dict) -> dict[str, Any]:
@@ -253,7 +275,22 @@ class BerkeleyPaystarTax(BaseScraper):
     slug = "counties_sc.berkeley_paystar_tax"
     name = "Berkeley County SC Delinquent Real Property Tax (paystar.io)"
     category = "county_tax"
-    timeout_s = 300.0
+    # MEASURED live 2026-09-23 (see _DETAIL_CONCURRENCY comment above for the full data):
+    # sustained throughput was 8.1-9.1 req/s and DEGRADING over a long run (not a single
+    # stuck request) -- list <1s, details alone extrapolate to ~420-450s+ for the full
+    # 3,426-row roll at this vendor's pace, and the roll only grows over the season. 300s
+    # was never enough, and because the old fetch() held every parsed Listing in a purely-
+    # local `out` list, a wait_for() cancellation at 300s discarded ALL of it -- hence the
+    # 2026-09-23 full run's 0-row TIMEOUT despite real (if slow) progress underneath.
+    # Raised to 600s: comfortable margin over the ~420-450s measured/extrapolated full-roll
+    # time, still well inside the 900s ceiling already used by the heaviest county_tax
+    # source in this same directory (greenville_hard_distress.py) and the per-scraper
+    # Semaphore(parallel_scrapers) scheduling in main.py that lets one slow scraper run
+    # long without blocking others (main.py deliberately avoids a global wait_for(gather())
+    # that would cancel every scraper together). Paired with the self.partial salvage below
+    # so that even if the vendor degrades further and 600s still isn't enough, the run
+    # ships whatever it collected instead of repeating the 0-row TIMEOUT.
+    timeout_s = 600.0
     expected_min_count = 500
     optional = True
 
@@ -268,22 +305,35 @@ class BerkeleyPaystarTax(BaseScraper):
             if not rows:
                 return out
 
+            hashes = [r["invoiceNumberHash"] for r in rows if r.get("invoiceNumberHash")]
             sem = asyncio.Semaphore(_DETAIL_CONCURRENCY)
-            details = await asyncio.gather(*(
-                _fetch_detail(client, sem, r["invoiceNumberHash"])
-                for r in rows if r.get("invoiceNumberHash")
-            ))
+            skipped = 0
 
-        skipped = 0
-        for r, detail in zip((r for r in rows if r.get("invoiceNumberHash")), details):
-            if not detail:
-                skipped += 1
-                continue
-            li = _detail_to_listing(detail, r["invoiceNumberHash"])
-            if li is None:
-                skipped += 1
-                continue
-            out.append(li)
+            # Consume detail fetches AS THEY COMPLETE (asyncio.as_completed) and append
+            # each parsed Listing to self.partial immediately, instead of one big
+            # asyncio.gather() that only becomes visible after EVERY request finishes.
+            # safe_run()'s soft-timeout handler ships self.partial on asyncio.TimeoutError
+            # -- so if the roll grows past what timeout_s covers, or the vendor slows down,
+            # this run still ships whatever it managed instead of the old all-or-nothing
+            # behavior that turned a merely-slow run into a silent 0-row TIMEOUT (see class
+            # docstring above and tests/test_berkeley_paystar_tax_timeout.py).
+            tasks = [asyncio.ensure_future(_fetch_detail(client, sem, h)) for h in hashes]
+            try:
+                for coro in asyncio.as_completed(tasks):
+                    invoice_hash, detail = await coro
+                    if not detail:
+                        skipped += 1
+                        continue
+                    li = _detail_to_listing(detail, invoice_hash)
+                    if li is None:
+                        skipped += 1
+                        continue
+                    out.append(li)
+                    self.partial.append(li)
+            finally:
+                for t in tasks:
+                    if not t.done():
+                        t.cancel()
 
         log.info("berkeley_paystar.done", listed=len(rows), skipped=skipped, total=len(out))
         return out
