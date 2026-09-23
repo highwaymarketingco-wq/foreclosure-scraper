@@ -1393,6 +1393,17 @@ RAW_KEEP = {
     # at publish exactly like the 160 keys before it.
     "catalis_roll": "*",
     "greenville_mie": "*",
+    # 2026-09-23: caught by the greenville_tax_distress zero-net-new audit
+    # (see that scraper's own docstring, "ZERO-NET-NEW AUDIT"). This module
+    # writes every fact -- lanes, tax_sale echo, probate match, situs/
+    # absentee provenance -- into raw["greenville_distress"], and without
+    # this line it was dropped at publish exactly like the 160+ keys this
+    # dict already documents above. Confirmed by grepping the entire
+    # published board for the literal string "greenville_distress": zero
+    # hits anywhere, including on rows that carry this source only via
+    # raw["also_seen_in"] (i.e. even a merge this scraper WINS shipped none
+    # of its payload before this line existed).
+    "greenville_distress": "*",
     "bt_appraisal_card": "*",
 
     # cross-cutting distress signals
