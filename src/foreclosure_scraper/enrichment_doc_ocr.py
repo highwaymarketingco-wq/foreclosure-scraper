@@ -112,6 +112,22 @@ DOC_OCR_MAX_SHARE = int(os.environ.get("DOC_OCR_MAX_SHARE", "3"))
 DOC_OCR_MODEL = os.environ.get("DOC_OCR_MODEL", GEMINI_VISION_MODEL)
 _MAX_DOC_BYTES = 12 * 1024 * 1024   # notices/deeds are small; cap defensively
 _MAX_PDF_TEXT_CHARS = 20000
+# The aggregate-roster reader (see _row_backfill_from_aggregate / the aggregate
+# pass in enrich_doc_ocr) pays no OCR/vision cost -- pdfplumber text extraction
+# is local and free, and it runs ONCE per unique document, not per lead -- so it
+# can afford to read the WHOLE roster instead of the 3-page/20K-char budget
+# that exists to bound COST on the per-lead vision/text-parse path below.
+# Confirmed 2026-09-23 against the live board: Catawba County NC's delinquent-
+# tax roster (counties_nc.nc_county_pdf_delinquent_tax, 3,958 leads) is 161
+# pages, alphabetical by taxpayer name, ~25 rows/page; the old 3-page cap made
+# every row past roughly "ACEVEDO ELIAS NOE" (98% of the document) structurally
+# invisible to _row_backfill_from_aggregate. Buncombe County's roster (845
+# leads) is 12 pages, so the same cap hid ~75% of it. This is THE dominant
+# explanation for agg_backfilled=2 of agg_leads=8955 in the 2026-09-22 run.
+# DOC_OCR_AGG_MAX_PAGES=0 (the default) means "no page limit" -- the char
+# budget below is what actually bounds a pathological input.
+DOC_OCR_AGG_MAX_PAGES = int(os.environ.get("DOC_OCR_AGG_MAX_PAGES", "0")) or None
+DOC_OCR_AGG_MAX_CHARS = int(os.environ.get("DOC_OCR_AGG_MAX_CHARS", "2000000"))
 
 _DOC_EXT = (".pdf", ".tif", ".tiff", ".jpg", ".jpeg", ".png", ".gif", ".bmp")
 # raw[] fields a scraper might stash a document/notice image or PDF under.
@@ -183,20 +199,31 @@ async def _fetch_doc(c: httpx.AsyncClient, url: str) -> Optional[tuple[bytes, st
         return None
 
 
-def _pdf_text(data: bytes) -> Optional[str]:
-    """Lift the text layer from a PDF (first 3 pages). Returns None if the PDF
-    is scanned (no meaningful text) or unreadable — caller then OCRs it."""
+def _pdf_text(data: bytes, max_pages: Optional[int] = 3,
+              max_chars: int = _MAX_PDF_TEXT_CHARS) -> Optional[str]:
+    """Lift the text layer from a PDF. Returns None if the PDF is scanned (no
+    meaningful text) or unreadable — caller then OCRs it.
+
+    `max_pages` defaults to 3 (the per-lead notice/deed case: bounding a paid
+    vision/text call). Pass `max_pages=None` to read every page — the
+    aggregate-roster reader needs the whole document; see DOC_OCR_AGG_MAX_PAGES
+    above for why."""
     try:
         import io
         import pdfplumber
         chunks: list[str] = []
+        total = 0
         with pdfplumber.open(io.BytesIO(data)) as pdf:
-            for page in pdf.pages[:3]:
+            pages = pdf.pages if max_pages is None else pdf.pages[:max_pages]
+            for page in pages:
                 t = page.extract_text() or ""
                 if t:
                     chunks.append(t)
+                    total += len(t)
+                if max_chars and total >= max_chars:
+                    break
         text = "\n".join(chunks).strip()
-        return text[:_MAX_PDF_TEXT_CHARS] if len(text) >= 200 else None
+        return text[:max_chars] if len(text) >= 200 else None
     except Exception:
         return None
 
@@ -563,11 +590,14 @@ def _row_backfill_from_aggregate(li: Listing, text: str) -> list[str]:
     # property's address — verified by test: parcel ...456.00 was given the
     # ...123.00 row's street. Only the line carrying the identifier may be read.
     row = ""
+    ident_end = 0
     for ident in idents:
         needle = ident.lower()
         for line in text.splitlines():
-            if needle in line.lower():
+            pos = line.lower().find(needle)
+            if pos != -1:
                 row = line
+                ident_end = pos + len(needle)
                 break
         if row:
             break
@@ -575,11 +605,26 @@ def _row_backfill_from_aggregate(li: Listing, text: str) -> list[str]:
         return []
     filled: list[str] = []
     if not (getattr(li, "street_address", None) or "").strip():
-        # Take the LAST plausible address on the row, and never start one inside
-        # a parcel/account number: "6-21-00-456.00  DOE JANE  264 WEEPING OAK DR"
-        # otherwise matches from the ".00" tail and swallows the owner name.
+        # Search only the text AFTER this lead's own identifier, not the whole
+        # row. Every clean single-column roster this was checked against
+        # (county tax-ad PDFs printing one property per line) lists
+        # identifier-then-address in that reading order, so this costs
+        # nothing there. A multi-column roster (verified live 2026-09-23
+        # against Buncombe County NC's tax-lien PDF) can merge TWO OR MORE
+        # unrelated properties' fields onto one physical text line --
+        # pdfplumber's extract_text() groups words into a line by y-position
+        # only, blind to the page's column bands -- so an address belonging
+        # to a DIFFERENT property can sit earlier on that same merged line
+        # than this lead's own identifier. Searching the whole row (the old
+        # behaviour) could pick that up and stamp a neighbour's street onto
+        # this lead -- exactly the failure this function exists to prevent.
+        # This trades a theoretical loss of recall (a layout that prints the
+        # address BEFORE the identifier would no longer match) for closing
+        # that real, demonstrated contamination path; no such
+        # address-before-identifier layout was observed in the live rosters
+        # checked. See tests/test_doc_ocr_aggregate_match.py.
         best = None
-        for m in _ADDR_IN_ROW.finditer(row):
+        for m in _ADDR_IN_ROW.finditer(row, ident_end):
             best = m
         if best:
             li.street_address = re.sub(r"\s+", " ", best.group(0)).strip()[:70]
@@ -667,7 +712,10 @@ async def enrich_doc_ocr(listings: Iterable[Listing],
             data, mime = fetched
             if not (mime == "application/pdf" or data[:4] == b"%PDF"):
                 continue
-            text = _pdf_text(data)
+            # Full document, not the 3-page per-lead default -- see
+            # DOC_OCR_AGG_MAX_PAGES.
+            text = _pdf_text(data, max_pages=DOC_OCR_AGG_MAX_PAGES,
+                             max_chars=DOC_OCR_AGG_MAX_CHARS)
             if not text:
                 continue
             stats["agg_docs_read"] += 1
