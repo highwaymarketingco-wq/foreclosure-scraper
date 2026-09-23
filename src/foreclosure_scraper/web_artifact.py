@@ -1079,6 +1079,18 @@ RAW_KEEP = {
     "condition_tier": "*",            # move_in_ready / cosmetic / major / gut
     "condition_source": "*",          # "vision-HIGH" / "vision-MEDIUM" / regex/age default
     "vision": "*",                    # full Claude Vision condition report
+    # Sticky "image download failed" marker {urls, attempts, at} (2026-09-23).
+    # enrichment_vision._needs_vision() reads this so a listing whose photo
+    # URL(s) could not be fetched isn't re-selected to the front of the vision
+    # queue on EVERY subsequent run -- confirmed live 2026-09-23 across 3
+    # consecutive scripts/backfill_vision_haiku.py runs, each hitting the
+    # identical image_fetch_failing circuit-breaker while `scored` roughly
+    # halved (299 -> 150 -> 77) because the same dead-image leads got re-tried
+    # from scratch every day. Must be registered here (per this dict's own
+    # 2026-09-13 comment) or it never round-trips through a persist and the
+    # sticky behavior silently stops working across runs. Cleared automatically
+    # once the listing is actually scored (see enrichment_vision._apply).
+    "vision_fetch_failed": "*",
     "doc_ocr": "*",                   # OCR of scanned legal-notice/deed docs: owner+address+debt$
     "dot_ocr": "*",                   # recorded Deed-of-Trust ORIGINAL principal + labelled
                                       # ESTIMATED current balance (never a payoff) + provenance

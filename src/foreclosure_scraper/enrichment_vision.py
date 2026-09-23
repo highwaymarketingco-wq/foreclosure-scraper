@@ -157,6 +157,53 @@ CONCURRENCY = int(os.environ.get("VISION_CONCURRENCY", "1"))
 INTER_CALL_DELAY = float(os.environ.get("VISION_INTER_CALL_DELAY", "6.0"))
 
 # ---------------------------------------------------------------------------
+# Sticky image-fetch-failure retry/TTL (2026-09-23).
+#
+# CONFIRMED LIVE 2026-09-23 across 3 consecutive runs of
+# scripts/backfill_vision_haiku.py: every run hit the identical circuit-breaker
+# stop_reason ("image_fetch_failing: 100 rows in a row had no downloadable
+# photo (network down?)") while the run's `scored` count roughly HALVED each
+# time (299 -> 150 -> 77) despite the candidate pool barely shrinking
+# (5311 -> 5012 -> 4862). A real network outage would not reproduce identically
+# 3 times with different candidate sets in between -- the actual mechanism: a
+# listing whose image URL(s) fail to download is popped off the queue and
+# simply skipped for THAT run (see the "no downloadable photo" branch in
+# enrich_with_vision's api_worker) without ever being marked in raw["vision"]
+# (or anywhere else), so _needs_vision() finds it exactly as eligible on the
+# NEXT invocation and it sorts right back to the front of the _vpri queue --
+# burning through the same ~100-650 dead-image leads again before any new
+# lead gets a turn.
+#
+# _mark_fetch_failed / _fetch_recently_failed make a fetch failure STICKY
+# (persisted via web_artifact.RAW_KEEP so it survives to the next run) without
+# hiding a lead forever:
+#   * VISION_FETCH_FAIL_RETRIES consecutive failures against the SAME url set
+#     are required before _needs_vision starts skipping it -- a transient
+#     blip gets a couple more chances, only a persistently-dead URL gets
+#     deprioritized. This sits BEHIND the existing fetch_stop_after
+#     pass-level circuit breaker, which is unchanged: that breaker still
+#     protects against a real "network is down" incident (see its own
+#     comments about the 2026-09-14 and 2026-09-20 incidents).
+#   * If a re-scrape backfills a DIFFERENT photo URL, the marker no longer
+#     matches _select_image_urls(li) and the lead is immediately eligible
+#     again -- no waiting on attempts or TTL.
+#   * VISION_FETCH_FAIL_TTL_DAYS bounds how long a maxed-out marker sticks:
+#     after that many days it is treated as expired and the lead gets a fresh
+#     set of attempts, in case a dead CDN/host comes back without the URL
+#     itself changing. 0 = never expires.
+#
+# Both knobs are read fresh from the environment on every call (like
+# VISION_REGRADE_SCORED in _needs_vision below), not cached at import time —
+# so a test (or a future caller) can flip them with monkeypatch.setenv and
+# have _fetch_recently_failed see the change immediately.
+def _fetch_fail_retries() -> int:
+    return int(os.environ.get("VISION_FETCH_FAIL_RETRIES", "2"))
+
+
+def _fetch_fail_ttl_days() -> float:
+    return float(os.environ.get("VISION_FETCH_FAIL_TTL_DAYS", "14"))
+
+# ---------------------------------------------------------------------------
 # Run budget + per-call timeouts (2026-09-21 vision repair)
 # ---------------------------------------------------------------------------
 # The daily pass used to hold the board lock for 4 hours to score 371-759 leads
@@ -1633,6 +1680,46 @@ _PROVIDER_PRICING = {
 }
 
 
+def _mark_fetch_failed(li: Listing, urls: list[str]) -> None:
+    """Stamp a sticky, RAW_KEEP-persisted marker recording that `urls` (this
+    listing's CURRENT _select_image_urls()) could not be downloaded this pass.
+
+    See the VISION_FETCH_FAIL_RETRIES/TTL module comment above for the incident
+    this closes. `attempts` only accumulates across runs that saw the SAME url
+    set — if the urls differ from the previous marker (a fresh scrape backfilled
+    a new photo, or this is the first failure), the counter restarts at 1 rather
+    than carrying over a stale count for URLs that are no longer even in play.
+    """
+    if not isinstance(li.raw, dict):
+        li.raw = {}
+    prev = li.raw.get("vision_fetch_failed")
+    same_urls = isinstance(prev, dict) and prev.get("urls") == urls
+    attempts = (int(prev.get("attempts", 0) or 0) + 1) if same_urls else 1
+    li.raw["vision_fetch_failed"] = {"urls": list(urls), "attempts": attempts, "at": time.time()}
+
+
+def _fetch_recently_failed(raw: dict, urls: list[str]) -> bool:
+    """True when `urls` matches a vision_fetch_failed marker (see
+    _mark_fetch_failed) that has used up its retries and not yet expired.
+
+    False (eligible) whenever: there is no marker, the urls no longer match it
+    (a fresh photo makes the lead eligible again immediately, no waiting), the
+    marker hasn't hit VISION_FETCH_FAIL_RETRIES yet, or the marker is older
+    than VISION_FETCH_FAIL_TTL_DAYS (0 = never expires).
+    """
+    fail = raw.get("vision_fetch_failed")
+    if not isinstance(fail, dict) or fail.get("urls") != urls:
+        return False
+    if int(fail.get("attempts", 0) or 0) < _fetch_fail_retries():
+        return False
+    ttl_days = _fetch_fail_ttl_days()
+    if ttl_days > 0:
+        age_s = time.time() - float(fail.get("at", 0) or 0)
+        if age_s >= ttl_days * 86400.0:
+            return False
+    return True
+
+
 def _needs_vision(li: Listing) -> bool:
     """A listing needs a vision pass if it has usable imagery AND is not already
     scored. Skipping already-scored leads makes the pass IDEMPOTENT — the
@@ -1640,16 +1727,25 @@ def _needs_vision(li: Listing) -> bool:
     onto the fresh Listing, and this gate then keeps the (free-tier-bounded)
     vision budget from re-grading work already done.
 
+    Also skips a listing whose current image urls match a maxed-out, unexpired
+    vision_fetch_failed marker (see _mark_fetch_failed / _fetch_recently_failed)
+    — otherwise a dead image URL gets re-selected to the front of the _vpri
+    queue and re-burned through on every subsequent run (confirmed live
+    2026-09-23, see the module comment above VISION_FETCH_FAIL_RETRIES).
+
     Escape hatch: VISION_REGRADE_SCORED=1 restores the old behavior (re-read
     already-scored leads too — e.g. an imminent sale that gained fresh photos),
     letting the _vpri sort decide order instead of skipping outright.
     """
-    if not _select_image_urls(li):
+    urls = _select_image_urls(li)
+    if not urls:
         return False
     if os.environ.get("VISION_REGRADE_SCORED", "0") == "1":
         return True
     raw = li.raw if isinstance(li.raw, dict) else {}
-    return not raw.get("vision")
+    if raw.get("vision"):
+        return False
+    return not _fetch_recently_failed(raw, urls)
 
 
 def _distress_tier(li: Listing) -> str:
@@ -1825,6 +1921,12 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
             li.raw = {}
         ct = _canonical_tier(result)
         li.raw["vision"] = result
+        # This listing is now scored — a stale fetch-failure marker (from an
+        # OLDER url set that has since resolved, e.g. after a re-scrape) is
+        # moot; _needs_vision already short-circuits on raw["vision"] before
+        # ever consulting it, but drop it too so the raw payload doesn't carry
+        # dead bookkeeping forward.
+        li.raw.pop("vision_fetch_failed", None)
         usage = result.pop("_usage", None) or {}
         total_in += usage.get("input_tokens", 0) or 0
         total_out += usage.get("output_tokens", 0) or 0
@@ -2117,6 +2219,13 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
                                 health.probing = False
                             dropped["no_image"] += 1
                             fetch_streak["n"] += 1
+                            # Sticky-mark the failure so a FUTURE run's _needs_vision()
+                            # can deprioritize this exact url set once it has failed
+                            # VISION_FETCH_FAIL_RETRIES times — otherwise this listing
+                            # is untouched by raw["vision"] and gets re-selected to the
+                            # front of the _vpri queue again next run (see the
+                            # VISION_FETCH_FAIL_RETRIES module comment).
+                            _mark_fetch_failed(li, urls)
                             if fetch_streak["n"] >= fetch_stop_after:
                                 if stop["reason"] is None:
                                     stop["reason"] = (
@@ -2231,6 +2340,11 @@ async def enrich_with_vision(listings: list[Listing], max_listings: int | None =
                         return
                 payloads, urls = await _fetch_image_blocks(li, http)
                 if not payloads:
+                    # Same sticky bookkeeping as api_worker's no-payloads branch —
+                    # the floor is the last resort in the pool, so a dead image URL
+                    # reaching here and going unmarked is exactly as re-selectable
+                    # next run as one the API lanes saw.
+                    _mark_fetch_failed(li, urls)
                     continue
                 try:
                     res = await backend.assess(li, payloads, urls)
