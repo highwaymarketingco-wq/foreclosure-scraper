@@ -45,6 +45,7 @@ ListingType: DISTRESSED
 """
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta
 from typing import Iterable
 
@@ -76,6 +77,29 @@ class ZombieProperties(BaseScraper):
     optional = True
 
     async def fetch(self) -> Iterable[Listing]:
+        # 2026-09-24: this scraper is the only one in the codebase that calls
+        # load_board() from inside fetch() -- a fully synchronous, no-await
+        # operation (gzip decompression + json.loads of docs/listings.json,
+        # ~1.1GB, plus Listing.model_validate() on all ~193K rows, plus the
+        # synchronous grouping/analysis loop below). A coroutine with zero
+        # await points cannot be preempted by asyncio.wait_for -- Task
+        # cancellation only takes effect at an await -- so this ran to
+        # completion regardless of its own timeout_s=120.0 and froze the
+        # ENTIRE event loop for its whole duration. CONFIRMED live 2026-09-23/24:
+        # this scraper ran 23:55:53Z-00:37:43Z (41m50s) with ZERO log lines from
+        # ANY other scraper anywhere in the run, then 10+ sibling scrapers'
+        # timeouts (including counties_sc.qpaybill_delinquent_roll, itself
+        # freshly fixed today to salvage partial progress on a real timeout)
+        # all fired within an 800ms window the instant this one finally
+        # returned -- because none of them ever got scheduler time to make
+        # progress while this coroutine held the loop. Running the whole body
+        # in a worker thread via asyncio.to_thread lets safe_run's timeout
+        # actually apply (the thread keeps running past a timeout, but the
+        # EVENT LOOP is freed immediately so every sibling scraper keeps
+        # working) and stops this scraper from starving every other one.
+        return await asyncio.to_thread(self._compute_zombies)
+
+    def _compute_zombies(self) -> list[Listing]:
         out: list[Listing] = []
 
         try:
