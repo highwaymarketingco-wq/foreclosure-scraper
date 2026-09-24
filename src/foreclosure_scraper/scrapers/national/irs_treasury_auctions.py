@@ -8,6 +8,7 @@ dynamically when they appear.
 """
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import datetime
 from typing import Iterable
@@ -74,7 +75,23 @@ def _extract_city(text: str, state: str) -> str | None:
     return None
 
 
-async def _fetch_irs() -> list[Listing]:
+def _fetch_irs_sync() -> list[Listing]:
+    """Fully synchronous by design (curl_cffi's `cf.get` blocks) -- called via
+    asyncio.to_thread from IRSTreasuryAuctions.fetch(), never awaited directly.
+
+    2026-09-24: this used to be declared `async def` with zero actual `await`
+    points despite looping `cf.get(...)` once per /ad/ link with NO rate-limit
+    sleep between iterations at all (unlike national.foreclosure_dot_com's
+    similarly-blocking loop, which at least paces itself with time.sleep). A
+    coroutine with no await points can't be preempted by asyncio.wait_for, so
+    if the ad count ever grows past the ~18 seen 2026-08-20 or the site slows
+    down, this would freeze the ENTIRE event loop -- not just this scraper's
+    own timeout_s=60 -- for as long as the loop takes, exactly like the bug
+    just found and fixed in counties_sc.zombie_properties (confirmed live:
+    that one froze every sibling scraper for 41m50s). Moving the whole
+    synchronous body to a worker thread keeps the event loop free for every
+    other concurrent scraper regardless of how many ads show up or how slow
+    irsauctions.gov gets."""
     out: list[Listing] = []
     try:
         r = cf.get(ITEMS_URL, impersonate="chrome", timeout=15, headers=HEADERS)
@@ -176,4 +193,4 @@ class IRSTreasuryAuctions(BaseScraper):
     timeout_s = 60.0
 
     async def fetch(self) -> Iterable[Listing]:
-        return await _fetch_irs()
+        return await asyncio.to_thread(_fetch_irs_sync)
