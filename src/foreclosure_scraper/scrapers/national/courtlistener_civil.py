@@ -156,9 +156,11 @@ class CourtListenerCivil(BaseScraper):
                             continue
                         seen_keys.add(key)
 
-                    state_match, county_match = _county_from_text(case_name)
-                    state = state_match or state_default
-                    county = county_match
+                    # State is authoritative from the court (see
+                    # courtlistener_bankruptcy._county_from_text's docstring for
+                    # why a city keyword must not override it).
+                    state = state_default
+                    county = _county_from_text(case_name, state)
 
                     nos = (d.get("nature_of_suit") or "").strip()
                     cause = (d.get("cause") or "").strip()

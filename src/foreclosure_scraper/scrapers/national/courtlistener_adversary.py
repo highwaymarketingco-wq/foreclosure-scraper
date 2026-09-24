@@ -282,7 +282,10 @@ class CourtListenerAdversary(BaseScraper):
                         continue
 
                     state_default = COURT_STATE.get(court, "NC")
-                    state_match, county_match = _county_from_text(case_name)
+                    # State is authoritative from the court (see
+                    # courtlistener_bankruptcy._county_from_text's docstring for
+                    # why a city keyword must not override it).
+                    county_match = _county_from_text(case_name, state_default)
 
                     chapter = res.get("chapter")
                     date_filed = res.get("dateFiled")
@@ -321,7 +324,7 @@ class CourtListenerAdversary(BaseScraper):
                         source_url=source_url,
                         listing_type=ListingType.LIS_PENDENS,
                         property_kind=PropertyKind.UNKNOWN,
-                        state=state_match or state_default,
+                        state=state_default,
                         county=county_match,
                         case_number=docket_no or None,
                         defendant=case_name[:200] or None,

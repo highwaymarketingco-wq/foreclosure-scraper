@@ -14,11 +14,19 @@ are pre-foreclosure leads with even more lead time than NOD recordings.
 
 Emission strategy: bankruptcy dockets do NOT carry debtor addresses (verified
 via direct API probe — bankruptcy_information has chapter but no address).
-So we emit every filing from these 3 courts as a state-level lead with the
+So we emit every filing from these 4 courts as a state-level lead with the
 debtor name as `defendant`. Best-effort county tag from city keywords in
-case name when present. The cross-reference enrichment in
-`enrichment_bankruptcy.py` then matches these debtor names to existing
-foreclosure-listing defendants for the BIG-signal join.
+case name when present (rare — see `_county_from_text`'s docstring). The
+cross-reference enrichment in `enrichment_bankruptcy.py` then matches these
+debtor names to existing foreclosure-listing defendants for the BIG-signal
+join.
+
+2026-09-23 (docs/coverage_gap_build_plan_2026-09-23.md item 3): county
+attribution now covers all 146 NC+SC counties via
+`_bankruptcy_city_to_county.py`, up from a hardcoded 21-county/~28-town
+dict. All 4 federal bankruptcy districts already partition the entirety of
+both states — every county's dockets were always being fetched — so this
+is a pure attribution-gazetteer fix, zero new scraping or API calls.
 
 Auth: FREE and ANONYMOUS-capable. The v4 /search/ endpoint answers without a
 token; a token (free account) is sent when present purely to raise the rate
@@ -58,6 +66,7 @@ from typing import Iterable
 
 import structlog
 
+from ..._bankruptcy_city_to_county import KNOWN_CITIES, bankruptcy_county_for
 from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
@@ -97,52 +106,35 @@ def _load_token() -> str | None:
     return None
 
 
-# Best-effort city → county map for our 21-county footprint. When a city
-# keyword appears in the case_name (rare but happens — joint filings sometimes
-# include city) we tag the listing with the county. Otherwise we leave county
-# as the court's default region.
-CITY_TO_COUNTY = {
-    "CHARLOTTE": ("NC", "Mecklenburg"),
-    "ASHEVILLE": ("NC", "Buncombe"),
-    "HENDERSONVILLE": ("NC", "Henderson"),
-    "GASTONIA": ("NC", "Gaston"),
-    "SHELBY": ("NC", "Cleveland"),
-    "RUTHERFORDTON": ("NC", "Rutherford"),
-    "FOREST CITY": ("NC", "Rutherford"),
-    "MORGANTON": ("NC", "Burke"),
-    "MARION": ("NC", "McDowell"),
-    "LINCOLNTON": ("NC", "Lincoln"),
-    "BREVARD": ("NC", "Transylvania"),
-    "BURNSVILLE": ("NC", "Yancey"),
-    "BAKERSVILLE": ("NC", "Mitchell"),
-    "MARSHALL": ("NC", "Madison"),
-    "COLUMBUS": ("NC", "Polk"),
-    "TRYON": ("NC", "Polk"),
-    "SPARTANBURG": ("SC", "Spartanburg"),
-    "ANDERSON": ("SC", "Anderson"),
-    "PICKENS": ("SC", "Pickens"),
-    "EASLEY": ("SC", "Pickens"),
-    "WALHALLA": ("SC", "Oconee"),
-    "SENECA": ("SC", "Oconee"),
-    "GAFFNEY": ("SC", "Cherokee"),
-    "UNION": ("SC", "Union"),
-    "LAURENS": ("SC", "Laurens"),
-    "CLINTON": ("SC", "Laurens"),
-}
-
-# Court → default state (so listings always carry at least state). County is
-# only set when we can recover it from the case name.
+# Court → default state (so listings always carry at least state). Every
+# docket's state is authoritative from the court it was filed in (a debtor
+# files in the district covering where they live), so a city keyword found
+# in the case name is used ONLY to recover the COUNTY within that state --
+# never to override the state itself. (This also fixes a latent bug: the
+# old CITY_TO_COUNTY dict returned its own hardcoded state per keyword,
+# which for a shared name like "Clinton" -- a real town in BOTH Sampson
+# County NC and Laurens County SC -- meant an ncwb/ncmb/nceb docket
+# mentioning "Clinton" could have had its state silently flipped to SC.)
 COURT_STATE = {"ncwb": "NC", "ncmb": "NC", "nceb": "NC", "scb": "SC"}
 
 
-def _county_from_text(text: str) -> tuple[str | None, str | None]:
+def _county_from_text(text: str, state: str) -> str | None:
+    """Best-effort county recovery from a city keyword in the case name,
+    scoped to the docket's ALREADY-KNOWN state (from COURT_STATE) so a
+    same-named town in the other state never gets consulted. Covers all
+    146 NC+SC counties via _bankruptcy_city_to_county.py — see that
+    module's docstring for why this replaced a 21-county/~28-town dict
+    and how it handles cross-state/cross-county name collisions
+    (Camden, Columbia, Greenville, Henderson, Clinton, etc.)."""
     if not text:
-        return (None, None)
+        return None
     upper = text.upper()
-    for kw, (state, county) in CITY_TO_COUNTY.items():
-        if kw in upper:
-            return (state, county)
-    return (None, None)
+    for city in KNOWN_CITIES:
+        if city.upper() in upper:
+            county = bankruptcy_county_for(city, state)
+            if county:
+                return county
+    return None
 
 
 def _chapter_from_text(*texts: str) -> str:
@@ -320,10 +312,11 @@ class CourtListenerBankruptcy(BaseScraper):
                             continue
                         seen_keys.add(key)
 
-                    # Try to recover state+county from case name (rare hit; mostly None)
-                    state_match, county_match = _county_from_text(case_name)
-                    state = state_match or state_default
-                    county = county_match  # may be None — that's fine, downstream tolerates
+                    # State is authoritative from the court (a debtor files where
+                    # they live); a city keyword in the case name only ever
+                    # recovers the COUNTY within that state (rare hit; mostly None).
+                    state = state_default
+                    county = _county_from_text(case_name, state)
 
                     # Chapter detection. /search/ hands it to us inline, which is
                     # the whole point of the endpoint switch — Ch.13 = trying to
