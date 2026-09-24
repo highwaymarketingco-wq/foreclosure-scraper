@@ -47,16 +47,18 @@ import structlog
 from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
+from ...validation import NC_COUNTIES as _ALL_NC_COUNTIES
 
 log = structlog.get_logger()
 
 SERVICE_URL = "https://portal-nc.tylertech.cloud/app/NCJudgmentSearchService/search"
 APP_BASE = "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/"
 
-# Target counties for the eCourts judgment search. Must mirror the
-# in-scope NC counties (config.NC_COUNTIES minus SCOPE_DENY_COUNTIES) —
-# Tyler indexes them as "<County> District Court" / "<County> Superior
-# Court". Iteration history:
+# Target counties for the eCourts judgment search. Tyler indexes them as
+# "<County> District Court" / "<County> Superior Court" — one batched query
+# with a facet bucket pair per county, not a per-county round trip.
+#
+# Iteration history (pre-2026-09-23, narrow WNC/coastal footprint):
 #   2026-05-07a — pruned 11 eastern-NC counties (Wake/Forsyth/etc).
 #   2026-05-07b — pruned 3 more (Mecklenburg/Madison/Yancey) per user
 #     scope rollback. Mecklenburg = Charlotte; user out of that market.
@@ -64,34 +66,49 @@ APP_BASE = "https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/"
 #     2026-05-15 ("anything east of Charlotte") and are in
 #     SCOPE_DENY_COUNTIES, so querying them just scraped rows that the
 #     scope filter then discarded.
-TARGET_COUNTIES = [
-    # WNC mountains + foothills — the 11 in-scope NC counties
-    "Rutherford", "Cleveland", "Henderson", "Polk", "Gaston",
-    "Buncombe", "Transylvania", "McDowell", "Lincoln",
-    "Mitchell", "Burke",
-    # 2026-06-25 — COASTAL NC track. The user explicitly wants Brunswick,
-    # Pender, Onslow, Carteret, and Dare coastal foreclosure coverage. These
-    # five are in SCOPE_DENY (east of Charlotte) but are re-admitted via the
-    # oceanfront gate in main._in_scope (OCEANFRONT_COASTAL_COUNTIES) once a
-    # row carries an address/parcel and geocodes near the beach. NC mortgage
-    # (deed-of-trust) foreclosures resolve through the Clerk of Superior Court
-    # as SP cases; Tyler indexes their lis-pendens / lien judgments here, so
-    # querying these county facets surfaces the coastal foreclosure-precursor
-    # signals. Inland coastal-county rows are dropped by the post-geocode
-    # oceanfront re-pass — exactly the "on the beach / within 2-3 blocks" rule.
-    "Brunswick", "Pender", "Onslow", "Carteret", "Dare",
-    # 2026-08-12 — remaining coastal NC counties brought fully into scope.
-    # Same oceanfront-lane admission (OCEANFRONT_COASTAL_COUNTIES) as the five
-    # above; querying their facets surfaces coastal foreclosure/lis-pendens +
-    # (via nc_ecourts_divorce reusing this list) divorce signals.
-    "Currituck", "Hyde", "New Hanover",
-    # 2026-08-19 — remaining NC coastal counties with zero leads because
-    # their eCourts facets were never queried. Beaufort (county seat:
-    # Washington, NC — Outer Banks area), Craven (New Bern — Pamlico Sound,
-    # home to MCAS Cherry Point), Pamlico (Oriental — sound-side county).
-    # Same oceanfront-lane admission as the counties above.
-    "Beaufort", "Craven", "Pamlico",
-]
+#   2026-06-25 through 2026-08-19 — 11 coastal counties added piecemeal
+#     (Brunswick/Pender/Onslow/Carteret/Dare/Currituck/Hyde/New Hanover/
+#     Beaufort/Craven/Pamlico), re-admitted via the OCEANFRONT_COASTAL_
+#     COUNTIES gate in main._in_scope rather than the (then-only) narrow
+#     footprint allow-list.
+#
+# 2026-09-23 — WIDENED FROM 22 TO ALL 100 NC COUNTIES. This was a historical
+# footprint artifact, not a technical ceiling: the 22-county cap mirrored
+# config.NC_COUNTIES (the narrow 11-county WNC "flip" footprint) plus the
+# 11 coastal add-ons, but this scraper's listing types (LIS_PENDENS,
+# TAX_LIEN, and now DIVORCE_NOTICE below) are NOT in main._FLIP_LISTING_TYPES
+# — they route through config.in_scope_distressed(), which admits ANY real
+# NC county with no deny list (confirmed by reading main._county_in_scope
+# and config.in_scope_distressed's docstring: "if its a distressed property
+# its anywhere in nc and sc"). SCOPE_DENY_COUNTIES (Mecklenburg/Wake/Forsyth/
+# etc.) only gates FLIP-type leads, so it never applied to this source.
+#
+# Live-verified 2026-09-23 before widening (see
+# tests/test_nc_ecourts_statewide_widen.py for the MEASURED assertions):
+#   - Queried all 10 of Wake/Mecklenburg/Forsyth/Guilford/Durham/Cumberland/
+#     New Hanover/Alamance/Chatham/Person individually: every one returned
+#     real, non-zero totalHits (230-11,949) under BOTH "<County> District
+#     Court" and "<County> Superior Court" facet names.
+#   - Queried 20 small/rural counties flagged as at-risk for the "shares a
+#     Clerk of Court office with a neighbor" caveat (Tyrrell, Camden, Gates,
+#     Hyde, Jones, Bertie, Warren, Hertford, Alleghany, Avery, Graham, Clay,
+#     Pamlico, Washington, Perquimans, Chowan, Swain, Yancey, Madison,
+#     Mecklenburg): every one returned real, non-zero totalHits (46-11,949)
+#     under its own county name — no shared/consolidated-clerk naming
+#     collisions found.
+#   - Queried all 100 NC counties in ONE batched request (as production
+#     runs it): totalHits=78,663 in a 90-day window. The response's
+#     "facets" display list truncates to a subset of buckets (an artifact
+#     of Tyler's facet-aggregation size cap, not a real limit — confirmed by
+#     re-querying with ONLY the "missing" 26 counties, which returned
+#     totalHits=2,814, and by paging the actual hits[] of the full-100
+#     query and finding real rows from 22 of those 26 counties in the
+#     first 3,000 hits sampled). The scraper below reads hits[]/location
+#     per-row, never the facets display list, so this display artifact
+#     does not affect what gets scraped.
+# Sourced from validation.NC_COUNTIES (the canonical 100-county set already
+# used by the scope gate) rather than a fourth hand-maintained county list.
+TARGET_COUNTIES = sorted(_ALL_NC_COUNTIES)
 
 
 # NC Upset Bid window: NCGS §45-21.27 gives 10 days from filing of the
@@ -128,6 +145,37 @@ FORECLOSURE_CAUSES = {
     "CV - NC Certificate of Tax Liability",  # NC DOR state tax lien (NCGS 105-242)
     "CV - Condemnation",                      # government taking; forced seller
 }
+
+# 2026-09-23 — divorce judgments, spiked per docs/gap_ledger.md (line ~119)
+# and docs/coverage_gap_build_plan_2026-09-23.md item 2. Live-verified this
+# same day (tests/test_nc_ecourts_statewide_widen.py): querying Buncombe/
+# Henderson/Rutherford/Wake/Mecklenburg over a 90-day window returned 281
+# "FAM - Divorce" / caseCategoryKey=="FAM" hits (5th most common cause of
+# the 3,000 sampled) with both spouses structured as debtors[]/creditors[]
+# the same way lien debtors/creditors are — the gap ledger's finding holds
+# up live, unchanged. This is a GRANTED divorce judgment (further down the
+# NCGS 50-20 equitable-distribution timeline than a raw CVD filing — the
+# raw filings live only in the WAF-walled Smart Search nc_ecourts_divorce.py
+# already drives), not a duplicate of that source.
+DIVORCE_CAUSES = {
+    "FAM - Divorce",
+}
+
+# Hard safety exclusion mirroring enrichment_nc_divorce.py's _DV50B_RE: a 50B
+# domestic-violence protective order is a safety matter, never a lead, and
+# must never surface even if it somehow carried a divorce-adjacent cause or
+# party-name text. causeOfActionDesc alone already can't produce this (a 50B
+# case has its own distinct cause label, not "FAM - Divorce" — confirmed
+# live: a 100-county, 90-day, 4,000-row sample of this exact endpoint turned
+# up FAM - Arrears/Child Support/Divorce/Equitable Distribution/Other Filing/
+# Qualified Domestic Relations Order/Registration of a Foreign Order, and
+# zero DV/50B/protective-order-named causes), but this regex is a defense-
+# in-depth second layer against the free-text fields (case description /
+# party names) in case a future taxonomy change ever blurs that line. Kept
+# as a local copy rather than an import: enrichment_nc_divorce.py pulls in
+# the Playwright/stealth-render stack (`.render.fetch_rendered`) for its own
+# WAF-bypass path, which this pure-JSON scraper has no other reason to load.
+_DV50B_RE = re.compile(r"\b50\s?-?\s?B\b|domestic\s+violence|\bDVPO\b|protective\s+order", re.I)
 
 # AngularJS app expects a Tyler-style header set. Use Title-case keys to
 # OVERRIDE http_client.DEFAULT_HEADERS — IIS rejects requests that contain
@@ -196,7 +244,8 @@ def _build_search_object(
 def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
     """Convert a Tyler search hit to our Listing schema."""
     cause = hit.get("causeOfActionDesc") or ""
-    if cause not in FORECLOSURE_CAUSES:
+    is_divorce = cause in DIVORCE_CAUSES
+    if cause not in FORECLOSURE_CAUSES and not is_divorce:
         return None
 
     # Skip terminal/dead dispositions — a Canceled/Satisfied/Dismissed/Vacated lien
@@ -222,6 +271,17 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
     defendant = "; ".join(d.get("name", "") for d in debtors if d.get("name"))[:300] or None
     plaintiff = "; ".join(c.get("name", "") for c in creditors if c.get("name"))[:300] or None
 
+    # Defense-in-depth safety exclusion (see _DV50B_RE docstring above): drop
+    # anything DV/50B-adjacent regardless of which allowlisted cause it
+    # otherwise matched. causeOfActionDesc alone already can't produce a 50B
+    # hit here (live-verified — see DIVORCE_CAUSES comment), but this also
+    # scans judgmentType and both parties' names as a second layer.
+    _dv_check_blob = " ".join(filter(None, [
+        cause, hit.get("judgmentType") or "", defendant or "", plaintiff or "",
+    ]))
+    if _DV50B_RE.search(_dv_check_blob):
+        return None
+
     ordered_date = None
     od = hit.get("orderedDate")
     if od:
@@ -232,9 +292,10 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
 
     # Upset-bid window detection (NCGS §45-21.27 — 10 calendar days from
     # the date of sale). When ordered_date is recent we tag the listing
-    # so the investor can prioritize cases still actionable.
+    # so the investor can prioritize cases still actionable. Meaningless for
+    # a divorce judgment (no foreclosure sale involved), so skipped there.
     in_upset_bid_window = False
-    if ordered_date is not None:
+    if ordered_date is not None and not is_divorce:
         # Normalize to naive UTC for comparison with utcnow()
         od_naive = ordered_date.replace(tzinfo=None) if ordered_date.tzinfo else ordered_date
         days_since = (datetime.utcnow() - od_naive).days
@@ -246,7 +307,9 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
             # matters (handled by the clerk of court).
 
     # Pick listing type based on the cause.
-    if "Lis Pendens" in cause:
+    if is_divorce:
+        listing_type = ListingType.DIVORCE_NOTICE
+    elif "Lis Pendens" in cause:
         listing_type = ListingType.LIS_PENDENS
     elif "Tax" in cause or "Tax Liability" in cause:
         listing_type = ListingType.TAX_LIEN
@@ -258,6 +321,21 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
         listing_type = ListingType.LIS_PENDENS
     else:
         listing_type = ListingType.LIS_PENDENS
+
+    # For a divorce judgment, the plaintiff/petitioner is the filing spouse —
+    # set owner_name from them so downstream GIS/name-to-property resolution
+    # can find the marital home, same convention as nc_ecourts_divorce.py
+    # ("owner_name=plaintiff # filing spouse -> GIS resolves marital home").
+    # Not set for other cause types: FORECLOSURE_CAUSES rows already resolve
+    # by defendant/property, not by a filing-party name.
+    owner_name = plaintiff if is_divorce else None
+
+    description = (
+        f"NC divorce judgment ({location}): {case_number} — "
+        f"{plaintiff or '?'} v. {defendant or '?'}"
+        if is_divorce else
+        f"{cause} judgment in {location}: {case_number}"
+    )
 
     # Source URL: SPA detail view is state-driven, so link to the search app —
     # users can paste case# into the search box. Encoding the case# as fragment
@@ -286,11 +364,12 @@ def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
         state="NC",
         county=county,
         case_number=case_number,
+        owner_name=owner_name,
         plaintiff=plaintiff,
         defendant=defendant,
         sale_date=None,
         upset_bid_deadline=(deadline if in_upset_bid_window else None),
-        description=f"{cause} judgment in {location}: {case_number}",
+        description=description,
         first_seen=datetime.utcnow(),
         last_seen=datetime.utcnow(),
         raw={
@@ -323,7 +402,14 @@ class NCECourtsLisPendens(BaseScraper):
     name = "NC eCourts Lis Pendens (Tyler Odyssey Judgment Search)"
     category = "county_court"
     expected_min_count = 3
-    timeout_s = 600.0
+    # 2026-09-23: bumped 600 -> 900 alongside the MAX_PAGES increase below.
+    # Widening TARGET_COUNTIES to all 100 NC counties raised the 90-day
+    # corpus from a 22-county subset to totalHits=78,663 (live-measured
+    # 2026-09-23). MEASURED: 5 sequential live page fetches against the
+    # full-100-county query averaged 1.15s/page; 900s leaves headroom over
+    # the ~453s a full 394-page pull takes at that rate, plus the template
+    # fetch + per-hit processing. See tests/test_nc_ecourts_statewide_widen.py.
+    timeout_s = 900.0
     requires_apify = False
     optional = True
 
@@ -334,8 +420,15 @@ class NCECourtsLisPendens(BaseScraper):
     LOOKBACK_DAYS = 90
     # Page size on each request
     PAGE_SIZE = 200
-    # Cap total pages we'll pull across a run (safety against runaway pagination)
-    MAX_PAGES = 25
+    # Cap total pages we'll pull across a run (safety against runaway pagination).
+    # 2026-09-23: bumped 25 -> 450. At 25 pages (5,000 hits) the old cap covered
+    # only ~6% of the live-measured 78,663-hit, 100-county, 90-day corpus —
+    # widening TARGET_COUNTIES without also raising this would have silently
+    # capped the county-breadth win this change exists to deliver. 450 pages
+    # (90,000 hits) covers today's corpus with room for growth; at the
+    # measured ~1.15s/page it's a ~450-517s pull, inside the 900s timeout_s
+    # above with margin for the template fetch and per-hit processing.
+    MAX_PAGES = 450
 
     async def fetch(self) -> Iterable[Listing]:
         end = datetime.now()

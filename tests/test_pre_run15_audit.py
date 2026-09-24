@@ -10,20 +10,18 @@
 """
 from __future__ import annotations
 
-from foreclosure_scraper.main import DATELESS_OK_SOURCES, OCEANFRONT_COASTAL_COUNTIES
-from foreclosure_scraper.config import NC_COUNTIES, in_scope
+from foreclosure_scraper.main import DATELESS_OK_SOURCES
+from foreclosure_scraper.config import in_scope, in_scope_distressed
+from foreclosure_scraper.validation import NC_COUNTIES as ALL_NC_COUNTIES
 from foreclosure_scraper.scrapers.counties_nc.nc_ecourts_lis_pendens import (
     TARGET_COUNTIES as NC_ECOURTS_TARGETS,
 )
 
-# 2026-06-25 — COASTAL NC track. These five eCourts targets are deliberately
-# NOT in config.NC_COUNTIES: they re-enter scope through the oceanfront gate in
-# main._in_scope (OCEANFRONT_COASTAL_COUNTIES) rather than the footprint allow-
-# list, per explicit user direction to cover the coast. Querying their Tyler
-# facets is intentional; the WNC footprint targets must still all be in scope.
-NC_ECOURTS_COASTAL = {"Brunswick", "Pender", "Onslow", "Carteret", "Dare",
-                      "Currituck", "Hyde", "New Hanover",
-                      "Beaufort", "Craven", "Pamlico"}
+# 2026-09-23: the coastal-vs-footprint distinction this test file used to
+# track (a coastal-target exemption set) no longer applies -- TARGET_COUNTIES
+# is now all 100 NC counties, all admitted via config.in_scope_distressed()
+# rather than a mix of the footprint allow-list and the oceanfront gate. See
+# test_nc_ecourts_targets_all_in_scope below.
 
 
 # Sources that emit listings which typically lack sale_date — these must
@@ -52,23 +50,28 @@ def test_all_new_sources_in_dateless_ok():
 
 
 def test_nc_ecourts_targets_all_in_scope():
-    """Every WNC-footprint county the NC eCourts scraper queries must be in
-    config.NC_COUNTIES — otherwise its listings fail _in_scope and get dropped
-    before any enrichment can save them. The five coastal targets are exempt:
-    they re-enter via the oceanfront gate, not the footprint allow-list."""
-    nc_county_names = {c.name for c in NC_COUNTIES}
-    footprint_targets = set(NC_ECOURTS_TARGETS) - NC_ECOURTS_COASTAL
-    out_of_scope = footprint_targets - nc_county_names
+    """Every county the NC eCourts scraper queries must actually pass this
+    source's real scope gate — otherwise its listings get dropped before any
+    enrichment can save them.
+
+    2026-09-23: TARGET_COUNTIES widened from a 22-county WNC+coastal
+    footprint to all 100 NC counties (docs/coverage_gap_build_plan_
+    2026-09-23.md item 1). This source's listing types (LIS_PENDENS,
+    TAX_LIEN, DIVORCE_NOTICE) are not in main._FLIP_LISTING_TYPES, so
+    main._county_in_scope() routes them through config.in_scope_distressed()
+    — which admits ANY real NC county, not the narrow config.NC_COUNTIES
+    flip footprint this test used to check against. Checking against the
+    old narrow list would now fail for 78 legitimately-added counties even
+    though they pass the gate this source's rows actually go through."""
+    out_of_scope = [c for c in NC_ECOURTS_TARGETS if not in_scope_distressed(c, "NC")]
     assert not out_of_scope, (
-        f"NC eCourts queries these WNC counties but they're NOT in "
-        f"config.NC_COUNTIES — listings will be dropped: {sorted(out_of_scope)}"
+        f"NC eCourts queries these counties but they fail "
+        f"config.in_scope_distressed() — listings will be dropped: {sorted(out_of_scope)}"
     )
-    # The coastal exception set must all be recognized oceanfront counties.
-    for c in NC_ECOURTS_COASTAL:
-        assert (c, "NC") in OCEANFRONT_COASTAL_COUNTIES, (
-            f"coastal eCourts target {c} is neither in NC_COUNTIES nor an "
-            f"OCEANFRONT_COASTAL_COUNTIES entry — it would be silently dropped"
-        )
+    # Every target must also be a real, canonical NC county name.
+    nc_all_names = set(ALL_NC_COUNTIES)
+    unknown = [c for c in NC_ECOURTS_TARGETS if c not in nc_all_names]
+    assert not unknown, f"TARGET_COUNTIES has non-canonical county names: {unknown}"
 
 
 def test_in_scope_works_for_kept_counties():
@@ -102,11 +105,18 @@ def test_dropped_counties_no_longer_in_scope():
 
 
 def test_county_count_matches_ecourts_target_count():
-    """NC_COUNTIES should be a SUPERSET of the WNC-footprint eCourts targets
-    (coastal targets excepted — they ride the oceanfront gate). If a new
-    footprint county is queried but not added to config, this catches it."""
-    nc_county_names = {c.name for c in NC_COUNTIES}
-    for ec in set(NC_ECOURTS_TARGETS) - NC_ECOURTS_COASTAL:
-        assert ec in nc_county_names, (
-            f"NC eCourts footprint target '{ec}' not present in config.NC_COUNTIES"
+    """validation.NC_COUNTIES (the canonical 100-county set TARGET_COUNTIES is
+    sourced from, see nc_ecourts_lis_pendens.py) should be a SUPERSET of every
+    eCourts target. If a typo'd or non-canonical county name is ever added to
+    TARGET_COUNTIES directly (bypassing the `sorted(_ALL_NC_COUNTIES)` source),
+    this catches it."""
+    nc_all_names = set(ALL_NC_COUNTIES)
+    for ec in NC_ECOURTS_TARGETS:
+        assert ec in nc_all_names, (
+            f"NC eCourts target '{ec}' not present in validation.NC_COUNTIES"
         )
+    assert set(NC_ECOURTS_TARGETS) == nc_all_names, (
+        "TARGET_COUNTIES should now equal the full validation.NC_COUNTIES set "
+        "(2026-09-23 statewide widening) -- diff: "
+        f"{nc_all_names.symmetric_difference(NC_ECOURTS_TARGETS)}"
+    )

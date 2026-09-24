@@ -46,29 +46,34 @@ def test_upset_bid_window_constant():
 
 
 def test_target_counties_match_user_territory():
-    """Scope: the 11 in-scope WNC mountains/foothills counties PLUS the five
-    coastal counties added 2026-06-25 (Brunswick/Pender/Onslow/Carteret/Dare)
-    per explicit user direction — those ride the oceanfront gate in
-    main._in_scope rather than the footprint allow-list. Eastern NC + Charlotte
-    (Mecklenburg) + Madison/Yancey remain pruned 2026-05-07."""
-    # In-scope WNC counties:
+    """Scope: 2026-09-23 widened TARGET_COUNTIES from the narrow 22-county
+    WNC+coastal footprint to all 100 NC counties (docs/coverage_gap_build_plan_
+    2026-09-23.md item 1). This is not a scope-policy change — LIS_PENDENS/
+    TAX_LIEN/DIVORCE_NOTICE are not in main._FLIP_LISTING_TYPES, so they were
+    already routed through config.in_scope_distressed() (admits any real NC
+    county, no deny list) rather than the narrow flip footprint's SCOPE_DENY_
+    COUNTIES. The old assertion that Wake/Forsyth/Guilford/Durham/Cumberland/
+    Mecklenburg/Madison/Yancey must NOT be queried encoded a historical
+    footprint artifact, not an actual scope rule for this listing type — live-
+    verified 2026-09-23 (see tests/test_nc_ecourts_statewide_widen.py) that
+    Tyler's Judgment Search indexes all of them under their own county name."""
+    # Former WNC footprint + coastal add-ons must still be present:
     for c in ("Buncombe", "Henderson", "Gaston", "Cleveland",
               "Rutherford", "Polk", "Transylvania",
-              "McDowell", "Lincoln", "Mitchell", "Burke"):
-        assert c in TARGET_COUNTIES, f"{c} missing from TARGET_COUNTIES"
-    # Coastal counties — intentionally queried (oceanfront gate re-admits the
-    # near-beach rows). 2026-08-12: Currituck/Hyde/New Hanover added per explicit
-    # user direction ("dare, wilmington ... literally on the coast").
-    for c in ("Brunswick", "Pender", "Onslow", "Carteret", "Dare",
+              "McDowell", "Lincoln", "Mitchell", "Burke",
+              "Brunswick", "Pender", "Onslow", "Carteret", "Dare",
               "Currituck", "Hyde", "New Hanover"):
-        assert c in TARGET_COUNTIES, f"coastal {c} missing from TARGET_COUNTIES"
-    # Counties still out of scope (eastern NC + Charlotte). New Hanover moved
-    # INTO scope 2026-08-12 (user named "wilmington").
+        assert c in TARGET_COUNTIES, f"{c} missing from TARGET_COUNTIES"
+    # Formerly-pruned counties are now intentionally included too — this
+    # listing type has no deny list (see config.in_scope_distressed).
     for c in ("Wake", "Forsyth", "Guilford", "Durham", "Cumberland",
               "Mecklenburg", "Madison", "Yancey"):
-        assert c not in TARGET_COUNTIES, (
-            f"{c} should NOT be in TARGET_COUNTIES"
+        assert c in TARGET_COUNTIES, (
+            f"{c} should now be in TARGET_COUNTIES post-2026-09-23 widening"
         )
+    assert len(TARGET_COUNTIES) == 100, (
+        "TARGET_COUNTIES should be all 100 NC counties post-widening"
+    )
 
 
 def test_recent_sale_flagged_in_upset_bid_window():
