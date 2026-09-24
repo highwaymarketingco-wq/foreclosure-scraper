@@ -28,6 +28,36 @@ Bodies with no TaxID table fall back to a street-address harvest so an older
 non-tabular FLC post still surfaces its parcels.
 
 Free, plain HTTP (httpx), no Apify / proxy / render / stealth.
+
+2026-09-23 SCOPE-GATE BUG FOUND AND FIXED (docs/coverage_gap_build_plan_2026-09-23.md
+item 7). `_SC_COUNTIES` was built from `config.ALL_COUNTIES`, which is the narrow
+18-county FLIP footprint's 7-county SC subset (Spartanburg/Anderson/Pickens/Oconee/
+Cherokee/Union/Laurens) -- NOT "all SC counties" despite the name and despite this
+module's own docstring above claiming any in-footprint SC county auction is picked
+up. Every auction for a real SC county outside those 7 was silently dropped by
+`_county_of()` before the FLC-marker check or `parse_flc_rows` ever ran.
+
+This is the exact same footprint-artifact class of bug the plan doc's item #1 found
+and fixed in nc_ecourts_lis_pendens.TARGET_COUNTIES: TAX_SALE (this scraper's
+listing_type) is NOT in main._FLIP_LISTING_TYPES, so it routes through
+config.in_scope_distressed(), which admits any real NC/SC county with no deny list
+-- the narrow 7-county gate here was never required downstream, only self-imposed.
+
+LIVE-VERIFIED before fixing (GET the API above, 2026-09-23): two auctions for
+counties OUTSIDE the old 7-county set were live and real:
+  "Fairfield County, SC – 6 Properties for Fairfield County Forfeited Land
+   Commission" -- FLC marker present ("delinquent tax sale deed", "Forfeited Land
+   Commission"), parse_flc_rows() returns 6 real parcel rows, e.g. TMS
+   088-00-00-068-000, "Off Chester Rd", Winnsboro.
+  "Chester County, SC – 25 Properties" -- FLC marker present in the body
+   ("delinquent tax sale deed") even though not in the title, parse_flc_rows()
+   returns 25 real parcel rows, e.g. TMS 095-00-00-047-000, "3641 Songbird Ln",
+   Chester.
+Both were silently dropped pre-fix because `_county_of("Fairfield County, SC...")`
+returned None: "fairfield" is a real SC county but was not in the old 7-county
+`_SC_COUNTIES`. Widening to the full 46-county SC gazetteer (validation.SC_COUNTIES,
+the same canonical set config.in_scope_distressed() already checks against) admits
+both with zero other code changes -- see tests/test_sc_flc_statewide_widen.py.
 """
 from __future__ import annotations
 
@@ -38,14 +68,17 @@ from typing import Iterable
 import structlog
 
 from ...base_scraper import BaseScraper
-from ...config import ALL_COUNTIES
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
+from ...validation import SC_COUNTIES as _ALL_SC_COUNTIES
 
 log = structlog.get_logger()
 
 API = "https://terryhowe.com/wp-json/wp/v2/auctions?per_page=100&_fields=id,title,link,content"
-_SC_COUNTIES = {c.name.lower() for c in ALL_COUNTIES if c.state == "SC"}
+# Sourced from validation.SC_COUNTIES (the canonical 46-county set the scope gate
+# itself uses) rather than the narrow config.ALL_COUNTIES flip-footprint list --
+# see the module docstring's 2026-09-23 note for why that footprint was wrong here.
+_SC_COUNTIES = {c.lower() for c in _ALL_SC_COUNTIES}
 
 _TITLE_COUNTY = re.compile(r"([A-Za-z][A-Za-z ]+?)\s+County,\s*SC", re.I)
 _FLC_MARK = re.compile(r"forfeited\s+land|FLC|delinquent\s+tax", re.I)

@@ -9,9 +9,17 @@ def test_county_of_keeps_in_footprint_sc():
     assert th._county_of("Laurens County, SC – 6 Properties") == "Laurens"
 
 
-def test_county_of_drops_out_of_footprint():
-    # Fairfield is not in the SC footprint; a city-only title has no county.
-    assert th._county_of("Fairfield County, SC – 6 Properties") is None
+def test_county_of_covers_full_46_county_sc_gazetteer():
+    # 2026-09-23 fix (docs/coverage_gap_build_plan_2026-09-23.md item 7):
+    # _SC_COUNTIES used to be sourced from config.ALL_COUNTIES, the narrow
+    # 7-county SC "flip" footprint, so a real SC county outside it (Fairfield,
+    # Chester, ...) was silently dropped here before parse_flc_rows ever ran --
+    # even though both had genuine, live FLC auctions on this exact API the
+    # same day. See tests/test_terry_howe_flc_statewide_widen.py for the full
+    # live-captured evidence. A title with no county name at all still yields
+    # None -- that part of the old test still holds.
+    assert th._county_of("Fairfield County, SC – 6 Properties") == "Fairfield"
+    assert th._county_of("Chester County, SC – 25 Properties") == "Chester"
     assert th._county_of("Rock Hill, SC – 4 BR home") is None
 
 
