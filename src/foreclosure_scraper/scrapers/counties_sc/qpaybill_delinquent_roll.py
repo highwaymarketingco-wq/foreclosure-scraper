@@ -103,11 +103,21 @@ WHAT THIS SOURCE DOES AND DOES NOT GIVE
     CONTACT layer where it was. Said plainly rather than implied, because a source
     that fills three layers of five is easy to mistake for coverage.
 
-COUNTIES: 19, all verified live 2026-09-10 to return parseable Unpaid RealEstate
-rows with dollar amounts. Subdomain naming is inconsistent (three patterns), so the
-map is explicit rather than derived. Five were already known to
-enrichment_qpaybill_tax; the other fourteen were found by probing all 46 counties
-against the observed patterns.
+COUNTIES: started at 19, all verified live 2026-09-10 to return parseable Unpaid
+RealEstate rows with dollar amounts; grown since (2026-09-13/15, 2026-09-23) as
+more counties were found on the same vendor -- see QPAYBILL_SUBS itself for the
+per-addition dates/evidence rather than trusting this count to stay current.
+Subdomain naming is inconsistent (several patterns), so the map is explicit
+rather than derived. Five were already known to enrichment_qpaybill_tax; the
+rest were found by probing SC counties against the observed subdomain patterns
+or by reading each county's own treasurer page for its "pay taxes online" link.
+
+2026-09-23: Greenwood was probed for this item (docs/coverage_gap_build_plan_
+2026-09-23.md item 6) and is a CONFIRMED MISS, not an unexplored gap -- its tax
+payment/search system is entirely on corebtpay.com (a different vendor, Core's
+egov.com platform: greenwoodco.corebtpay.com/egov/apps/...), with no qPayBill or
+Catalis subdomain found anywhere on greenwoodcounty-sc.gov's own tax-collector
+and pay-online pages. Do not re-probe qPayBill subdomain guesses for Greenwood.
 
     Identification-No. FORMAT VARIES BY COUNTY and is deliberately NOT normalised
     here. This module is a lead SOURCE: it emits the portal's own id as parcel_id
@@ -223,6 +233,32 @@ QPAYBILL_SUBS: dict[str, str] = {
     # that has nothing in it. Re-test before re-adding.
     "Saluda": "saludacountytreasurer",
     "Sumter": "sumtercounty",
+    # 2026-09-23: probed the 17 counties docs/completeness_audit_2026-09-23.md
+    # section 3 flags as missing the "tax delinquent" family
+    # (docs/coverage_gap_build_plan_2026-09-23.md item 6). 11 of the 17 were
+    # already in this dict (Abbeville/Allendale/Barnwell/Calhoun/Chesterfield/
+    # Darlington/Lee/Marlboro/McCormick/Williamsburg/Bamberg) and 2 more
+    # (Chester/Fairfield) are covered by counties_sc.sc_catalis_delinquent_roll
+    # instead -- see that module's CATALIS_COUNTIES. Of the remaining 4
+    # (Dillon, Dorchester, Edgefield, Greenwood), only these two were confirmed
+    # LIVE qPayBill Type4 tenants; found via each county's own official
+    # treasurer/tax-collector page (not guessed), then verified with a real
+    # search + parse using this module's own parse_grid():
+    #   Dillon     dilloncountysc.org/departments/treasurer.php links
+    #              "https://dilloncountysctaxes.qpaybill.com/Taxes/
+    #              TaxesDefaultType4.aspx" directly. prefix "S": 25 rows incl.
+    #              notice 016962253-style Unpaid RealEstate; prefix "A": 23
+    #              rows, e.g. ABRAHAM HARRY W, ident 138-00-00-047.001, a 2018
+    #              (not just current-year) unpaid balance of $173.81.
+    #   Edgefield  edgefieldcounty.sc.gov's own directory links "Online Tax
+    #              Payment Center" -> "https://edgefieldcountysc.qpaybill.com/".
+    #              prefix "A": 25 rows, e.g. ABNEY ANNIE T, ident
+    #              185-00-01-031-000, $134.02 unpaid 2025.
+    # Dorchester and Greenwood are NOT added here -- see sc_catalis_delinquent_
+    # roll.py's CATALIS_COUNTIES comment (Dorchester) and this module's own
+    # docstring update (Greenwood) for why.
+    "Dillon": "dilloncountysctaxes",
+    "Edgefield": "edgefieldcountysc",
 }
 
 #: Counties whose Identification-No. is an ACCOUNT id, not a parcel. Their rows are
