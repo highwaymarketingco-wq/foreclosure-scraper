@@ -8,6 +8,7 @@ catch them if they show up.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from datetime import datetime
@@ -85,7 +86,18 @@ def _parse_address_from_title(title: str) -> tuple[str | None, str | None, str |
     return None, None, None, None
 
 
-async def _fetch_williams() -> list[Listing]:
+def _fetch_williams_sync() -> list[Listing]:
+    """Fully synchronous by design (curl_cffi's `cf.get` blocks) -- called via
+    asyncio.to_thread from WilliamsAuctions.fetch(), never awaited directly.
+
+    2026-09-24: part of the same event-loop-starvation sweep that found and
+    fixed counties_sc.zombie_properties (confirmed live: froze every sibling
+    scraper for 41m50s) and national.irs_treasury_auctions (an unbounded
+    blocking loop). This one is bounded to 2 sequential cf.get() calls
+    (~<=30s worst case), lower risk than those two, but still freezes the
+    whole event loop for every other concurrent scraper for however long
+    williamsauction.com takes to answer -- moved to a worker thread as
+    defense-in-depth for the same reason."""
     out: list[Listing] = []
     try:
         r = cf.get(BASE_URL + "/", impersonate="chrome", timeout=15, headers=HEADERS)
@@ -193,4 +205,4 @@ class WilliamsAuctions(BaseScraper):
     timeout_s = 30.0
 
     async def fetch(self) -> Iterable[Listing]:
-        return await _fetch_williams()
+        return await asyncio.to_thread(_fetch_williams_sync)

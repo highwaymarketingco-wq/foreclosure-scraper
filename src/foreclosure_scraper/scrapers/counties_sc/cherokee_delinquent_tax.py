@@ -19,13 +19,12 @@ from __future__ import annotations
 import io
 import json
 import re
-import urllib.request
 from typing import Iterable
 
 import structlog
 
 from ...base_scraper import BaseScraper, OUTCOME_OK, OUTCOME_ZERO
-from ...http_client import get_bytes
+from ...http_client import get_bytes, get_text
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -98,19 +97,25 @@ class CherokeeDelinquentTaxScraper(BaseScraper):
     expected_min_count = 0  # annual list, may be empty off-season
 
     async def fetch(self) -> Iterable[Listing]:
-        # Step 1: Fetch the wp-json media listing (sync urllib, free, no auth)
-        req = urllib.request.Request(
-            WP_MEDIA_URL,
-            headers={
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                              "AppleWebKit/537.36 (KHTML, like Gecko) "
-                              "Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "application/json",
-            },
-        )
+        # Step 1: Fetch the wp-json media listing.
+        #
+        # 2026-09-24: this used to be a synchronous urllib.request.urlopen()
+        # call -- part of the same event-loop-starvation sweep that found and
+        # fixed counties_sc.zombie_properties (confirmed live: froze every
+        # sibling scraper for 41m50s) and national.irs_treasury_auctions (an
+        # unbounded blocking loop). A single bounded 20s call is much lower
+        # risk than those two, but still froze the whole event loop for every
+        # other concurrent scraper for as long as this WordPress site took to
+        # answer. Switched to http_client.get_text(), which is genuinely
+        # async (this file's own get_bytes() calls below already use the same
+        # module) and adds retry-on-transient-error for free.
         try:
-            with urllib.request.urlopen(req, timeout=20) as resp:
-                media_items = json.loads(resp.read().decode("utf-8"))
+            text = await get_text(
+                WP_MEDIA_URL,
+                timeout=20,
+                headers={"Accept": "application/json"},
+            )
+            media_items = json.loads(text)
         except Exception as e:
             log.error("cherokee_delinquent_tax.media_fetch_error", error=str(e)[:120])
             self.last_outcome = OUTCOME_ZERO

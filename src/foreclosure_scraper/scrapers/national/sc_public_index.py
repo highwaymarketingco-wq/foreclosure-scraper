@@ -220,7 +220,25 @@ async def _nodriver_search_county(county: str) -> list[dict[str, str]]:
 
 
 async def _curl_search_county(county: str) -> list[dict[str, str]]:
-    """Search Charleston county using curl-cffi (not behind F5/Varnish)."""
+    """Search Charleston county using curl-cffi (not behind F5/Varnish).
+
+    2026-09-24: session.get()/session.post() (curl_cffi) are fully
+    synchronous/blocking -- part of the same event-loop-starvation sweep
+    that found and fixed counties_sc.zombie_properties (confirmed live:
+    froze every sibling scraper for 41m50s). This function already yields
+    between search-prefix iterations via `await asyncio.sleep(REQUEST_DELAY)`
+    below, so it was never a total, unbounded freeze like that one -- but
+    each individual blocking call (up to 30s on the search POST) still froze
+    the whole event loop for every other concurrent scraper while it ran.
+    Each call is now wrapped in asyncio.to_thread so the loop stays free even
+    during a single slow request; curl_cffi can't be swapped for the async
+    httpx client here (this file's own docstring: Charleston works via
+    curl-cffi specifically because it's the one county NOT behind the F5/
+    Varnish WAF the other counties need nodriver for -- a different fetch
+    tier, not interchangeable). Reusing the same `session` object across
+    sequential awaited to_thread calls is safe: only one call is in flight
+    on the worker pool at a time, exactly as when it ran on the main thread.
+    """
     from curl_cffi import requests as cf
 
     base_url = "https://jcmsweb.charlestoncounty.org/PublicIndex/"
@@ -231,7 +249,7 @@ async def _curl_search_county(county: str) -> list[dict[str, str]]:
         session = cf.Session()
 
         # Step 1: GET disclaimer page
-        r1 = session.get(base_url, impersonate="chrome", timeout=15)
+        r1 = await asyncio.to_thread(session.get, base_url, impersonate="chrome", timeout=15)
         if r1.status_code != 200:
             return []
 
@@ -239,8 +257,9 @@ async def _curl_search_county(county: str) -> list[dict[str, str]]:
         hidden["ctl00$ContentPlaceHolder1$ButtonAccept"] = "Accept"
 
         # Step 2: POST accept
-        r2 = session.post(base_url, data=hidden, impersonate="chrome",
-                          timeout=15, allow_redirects=True)
+        r2 = await asyncio.to_thread(
+            session.post, base_url, data=hidden, impersonate="chrome",
+            timeout=15, allow_redirects=True)
         if r2.status_code != 200:
             return []
 
@@ -256,8 +275,9 @@ async def _curl_search_county(county: str) -> list[dict[str, str]]:
             search_data["ctl00$ContentPlaceHolder1$IndexGroup"] = "rbIndexGroup1"
 
             try:
-                r3 = session.post(search_url, data=search_data,
-                                  impersonate="chrome", timeout=30)
+                r3 = await asyncio.to_thread(
+                    session.post, search_url, data=search_data,
+                    impersonate="chrome", timeout=30)
                 if r3.status_code != 200:
                     continue
 
