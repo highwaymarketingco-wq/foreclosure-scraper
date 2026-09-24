@@ -14,10 +14,23 @@ prints owner names and dollar amounts with spurious intra-token spaces (a PDF
 text-layer artifact — "A C E V EDO" / "$ 6 81.63"); `_despace_name` /
 `_clean_money` repair these.
 
-The FLC sealed-bid sale draws from this same unsold inventory — the county's
-"FLC Sealed Bid" PDF is a blank submittal FORM (no parcels), so we discover/record
-its URL + the sealed-bid deadline but parse parcels from the RP/MH listings, which
-ARE the FLC/tax-sale parcel list.
+The FLC sealed-bid sale draws from this same unsold inventory. Two of the county's
+FLC-labeled PDFs really are blank submittal FORMS (no parcel rows) — "FLC-Sealed-
+Bid-Form.pdf" and "FLC-Sealed-Bid-Submittal-Form-....pdf" — so those are discovered
+and recorded as `flc_sealed_bid_form` metadata only, not parsed for rows.
+
+2026-09-23 fix (docs/coverage_gap_build_plan_2026-09-23.md item 7): a THIRD FLC
+document on the same page, "FLC-Properties-for-Sealed-Bid-TS2025.pdf", is NOT a
+blank form — it is the actual current properties-for-sealed-bid list (own
+pdfplumber table, columns "OWNER NAME | TMS | SITUS | FLC BID AMT"), and was being
+silently skipped by the old two-way form/list split (it matched neither "tax-sale-
+listing" nor "form"/"submittal"). `_discover_pdfs` now also matches "sealed-bid" +
+"properties" into the parsed-list bucket, and `_HDR_PIN`/`_HDR_DUE`/`_is_header_row`
+accept its "TMS"/"FLC BID AMT" column labels alongside the RP/MH listings' "pin"/
+"Totaldue" — see `_discover_pdfs`'s own docstring for the live-verified row shape.
+These parcels already went through the annual tax sale unsold, so they are
+genuinely different (smaller, further-along) inventory from the pre-sale RP/MH
+listings, not a duplicate of them.
 
 Distress: every row is a property whose owner owes back taxes and is headed to the
 Dec tax sale (then a ~12mo SC redemption per §12-51-90, then FLC sealed-bid if
@@ -74,7 +87,7 @@ _KIND_BY_CLASS = (
 
 # Header tokens we map columns from. Lowercased substring match so minor header
 # wording drift still binds the right column.
-_HDR_PIN = ("pin",)
+_HDR_PIN = ("pin", "tms")
 _HDR_OWNER1 = ("owner1", "owner")
 _HDR_OWNER2 = ("owner2",)
 _HDR_SITUS = ("situsaddr", "situs", "address")
@@ -83,7 +96,7 @@ _HDR_CLASS = ("classcd", "class")
 _HDR_APPR = ("appraisal", "appraised")
 _HDR_ASSESS = ("totalassessed", "assessed")
 _HDR_ACRE = ("acerage", "acreage")
-_HDR_DUE = ("totaldue", "due", "amount")
+_HDR_DUE = ("totaldue", "due", "amount", "bid amt")
 _HDR_DESC = ("description", "descript")
 
 _RP_PIN_RE = re.compile(r"^\d{8,12}$")
@@ -199,7 +212,10 @@ def _col_map(header: list[str]) -> dict[str, int]:
 
 def _is_header_row(row: list) -> bool:
     cells = [str(c or "").strip().lower() for c in row]
-    return "pin" in cells and any("owner" in c for c in cells)
+    # "pin" on the RP/MH tax-sale listings; "tms" on the FLC-Properties-for-
+    # Sealed-Bid list (same TMS number, different column label -- see
+    # _discover_pdfs's "flc properties" branch).
+    return any(h in cells for h in ("pin", "tms")) and any("owner" in c for c in cells)
 
 
 def _parse_sale_date(text: str) -> datetime | None:
@@ -333,7 +349,33 @@ def parse_listing_pdf(data: bytes, source_url: str) -> list[Listing]:
 
 
 def _discover_pdfs(html: str) -> tuple[list[str], str | None]:
-    """Return (tax-sale-list PDF urls, FLC-sealed-bid form url) from the landing page."""
+    """Return (tax-sale-list + FLC-properties-list PDF urls, FLC-sealed-bid form url)
+    from the landing page.
+
+    2026-09-23 (docs/coverage_gap_build_plan_2026-09-23.md item 7): this module's
+    original two-way split (a "tax-sale-listing" data file vs. a "sealed-bid" +
+    "form"/"submittal" blank FORM) silently ignored a THIRD, real document:
+    "FLC-Properties-for-Sealed-Bid-TS2025.pdf", linked from the same landing page.
+    Live-verified 2026-09-23: 1 page, a real pdfplumber table (header "OWNER NAME |
+    TMS | SITUS | FLC BID AMT"), 4 rows, e.g. PIN 3400000040, situs "714
+    RIVERLAND", $2,112.63 owed -- these are unsold-at-auction parcels the FLC is
+    now offering by sealed bid, i.e. genuinely new/different inventory from the
+    pre-sale RP/MH listings this module already reads (those parcels haven't been
+    through a tax sale yet; these already have and went unsold). It matches
+    neither the "tax-sale-listing"/"/(rp|mh)tax" pattern (different filename
+    shape) nor the form/submittal pattern (it has real data rows, not blank
+    fields), so it fell through both branches and was never fetched. Matched here
+    on "sealed-bid" + "properties" (present in this filename, absent from both the
+    blank Sealed-Bid-Form and the blank Sealed-Bid-Submittal-Form filenames) and
+    routed into `lists` since parse_listing_pdf's header-driven column mapping
+    (extended with "tms"/"bid amt" aliases) already reads it correctly with no
+    other code change -- see tests/test_charleston_flc_properties_list.py.
+
+    NOT wired: the county's separate "Sealed-Bid-list.xlsx"/".pdf" (found on the
+    same page) carries a "2022 TAX SALE SEALED BID SALE" title cell -- 4 years
+    stale relative to this run -- so it is left alone rather than risking a
+    speculative re-ingest of old inventory as if it were current.
+    """
     hrefs = re.findall(r'href=["\']([^"\']+\.pdf[^"\']*)["\']', html, re.I)
     lists: list[str] = []
     flc_form: str | None = None
@@ -341,6 +383,11 @@ def _discover_pdfs(html: str) -> tuple[list[str], str | None]:
         u = urljoin(LANDING, h)
         low = u.lower()
         if "tax-sale-listing" in low or re.search(r"/(rp|mh)[-_]?tax", low):
+            if u not in lists:
+                lists.append(u)
+        elif "sealed-bid" in low and "properties" in low:
+            # The FLC's own current properties-for-sealed-bid list (real parcel
+            # rows) -- NOT the blank submittal form matched below.
             if u not in lists:
                 lists.append(u)
         elif "sealed-bid" in low and ("form" in low or "submittal" in low):
