@@ -327,8 +327,94 @@ DETAIL_MAX = int(os.getenv("QPAYBILL_ROLL_DETAIL_MAX", "400"))
 #: clients, each doing its own DNS lookup, and macOS's resolver started returning
 #: "nodename nor servname provided" -- a transient failure that reads exactly like a
 #: dead host. Capping the total keeps the sweep inside what the resolver will take.
-_GLOBAL_CONCURRENCY = int(os.getenv("QPAYBILL_ROLL_CONCURRENCY", "12"))
+#:
+#: RAISED 12 -> 24 on 2026-09-25 alongside MAX_CONCURRENT_COUNTIES below -- read that
+#: constant's docstring first, this one only covers why 24 and not something larger.
+#: MEASURED live against the real vendor same day: a burst of 24 concurrent GETs
+#: spread over 8 different county subdomains returned 24/24 HTTP 200 in 1.57s wall
+#: clock, and a second burst of 15 concurrent GETs against ONE busy subdomain
+#: (spartanburgcountytax) returned 15/15 HTTP 200 in 1.54s -- no 429/403, no elevated
+#: per-request latency versus a single request (~0.6-1.5s solo). 24 was kept even after
+#: MAX_CONCURRENT_COUNTIES was tuned down to 4 (see that constant's docstring for why
+#: an exact match left stragglers and headroom fixed it): 4 x _PER_HOST_CONCURRENCY (3)
+#: = 12 of these 24 slots, so an active county now has room to spare rather than being
+#: sized to the ragged edge. Nothing here was pushed past what was actually measured;
+#: raise it further only after measuring a bigger burst the same way.
+_GLOBAL_CONCURRENCY = int(os.getenv("QPAYBILL_ROLL_CONCURRENCY", "24"))
 _GLOBAL_SEM: "asyncio.Semaphore | None" = None
+
+#: How many counties may be ACTIVELY sweeping at once. This is the actual fix for the
+#: 2026-09-25 incident: all 29 configured counties reported qpaybill_roll.county_timeout
+#: in the SAME run, each logging errors=1 queries=0 -- not one slow county blocking the
+#: rest (the 2026-09-23 bug this module already fixed), but EVERY county, including
+#: ones that alone take well under a minute, making literally zero progress.
+#:
+#: MEASURED, same day, against the live vendor with the real (unmocked) sweep_county() --
+#: three passes, because the first two fixes were each verified against the live site
+#: before the next was applied, not assumed:
+#:
+#:   PASS 0 (diagnosis). Lee ALONE (no other county running): 46.3s wall clock, 225
+#:     queries, 0 errors -- comfortably under COUNTY_TIMEOUT_S=480s, and its own
+#:     throughput (225/46.3 = 4.86 req/s) is within noise of the historical 19-county
+#:     CONCURRENT run's aggregate rate (26,750 requests / 5,581s = 4.79 req/s,
+#:     logs/qpaybill_roll_all.log, 2026-09-10) -- adding 18 more counties on top of one,
+#:     under the OLD fetch()-launches-everyone-at-once shape, bought almost no extra
+#:     aggregate throughput. 8 small/medium counties launched CONCURRENTLY under that
+#:     old shape (_GLOBAL_CONCURRENCY=12, no per-county gate): 3+ minutes wall clock
+#:     with ZERO of the 8 complete -- not slower, STARVED.
+#:
+#:   PASS 1 (this gate alone, MAX_CONCURRENT_COUNTIES=8, matching the raised
+#:     _GLOBAL_CONCURRENCY=24 exactly: 8 x 3 = 24). Re-testing the SAME 8 counties: a
+#:     real, large improvement over pass 0 (4 of 8 now completed with real rows: Lee
+#:     313.9s/225q, Union 324.9s/288q, Calhoun 413.7s/363q, Allendale 418.3s/389q, all
+#:     0 errors) -- but the other 4 (Newberry, McCormick, Barnwell, Chesterfield) STILL
+#:     had not finished at the 500s mark. Tracing why surfaced a SECOND bug (see
+#:     guarded()'s docstring in sweep_county: the global semaphore was acquired before
+#:     the per-host one, so one county's own 36-prefix depth-1 burst could hold up to
+#:     36 global slots while only 3 could do anything, wasting the exact capacity this
+#:     gate was sized against). Fixing that ordering and re-testing the SAME 8 counties
+#:     at the SAME 8/24 sizing still left stragglers, because fetch()'s semaphore is a
+#:     ROLLING window: the instant one of the first 8 finishes, a 9th queued county
+#:     (there are 29 in production) fills the freed slot immediately, so a straggler
+#:     from the first batch never actually gets relief -- exact-match sizing (demand ==
+#:     capacity) leaves no slack for that.
+#:
+#:   PASS 2 (this gate lowered to 4, keeping _GLOBAL_CONCURRENCY=24 -- 2x headroom,
+#:     4 x 3 = 12 of 24 slots): the SAME two counties re-measured, same live vendor,
+#:     same session: Lee 175.7s (was 313.9s), Union 188.3s (was 324.9s) -- roughly 1.8x
+#:     faster with headroom than with an exact-match cap, both comfortably clear of
+#:     COUNTY_TIMEOUT_S=480s. (Absolute times are noisier than pass-to-pass RATIOS here:
+#:     a concurrent, must-not-touch board-apply process on this machine was measured
+#:     using anywhere from ~0% to 63% CPU across these passes, so none of these numbers
+#:     should be read as a precise vendor throughput figure -- the direction, gate
+#:     narrower than capacity beats gate matching capacity exactly, held consistently.)
+#:
+#: THE FIX: cap how many counties may be inside sweep_county() at once, so an ACTIVE
+#: county's own _PER_HOST_CONCURRENCY (3) slots aren't diluted by every OTHER county's
+#: prefix walks too, WITH SLACK rather than an exact match, because the rolling window
+#: means a straggler never gets the relief exact-match sizing implicitly assumes. The
+#: semaphore is acquired BEFORE run_county()'s own asyncio.wait_for(..., COUNTY_TIMEOUT_S)
+#: starts its clock, so a county queued behind others is not charged for the wait --
+#: only its own active sweep time counts against the per-county bound. Counties still
+#: queue up (29 counties / 4 lanes = a little over 7 rounds through the whole roster),
+#: which is MORE wall clock than the old all-at-once launch, but every county now has a
+#: real chance to finish inside COUNTY_TIMEOUT_S instead of every county guaranteed to
+#: starve past it -- this is deliberately the "reduce how many counties launch
+#: concurrently, trade wall clock for actually finishing some of them" direction, not a
+#: raised timeout papering over a genuine hang.
+#:
+#: Must NOT be raised back toward "launch everyone" (or even back to an exact 8 x 3 == 24
+#: match) without re-measuring: that is exactly what reproduced the 2026-09-25
+#: all-29-timeout failure and, at pass 1's sizing, half of an 8-county re-test.
+MAX_CONCURRENT_COUNTIES = int(os.getenv("QPAYBILL_ROLL_COUNTY_CONCURRENCY", "4"))
+_COUNTY_SEM: "asyncio.Semaphore | None" = None
+
+
+def _county_sem() -> "asyncio.Semaphore":
+    global _COUNTY_SEM
+    if _COUNTY_SEM is None:
+        _COUNTY_SEM = asyncio.Semaphore(MAX_CONCURRENT_COUNTIES)
+    return _COUNTY_SEM
 
 #: Per-COUNTY wall-clock bound, independent of REQUEST_BUDGET_PER_COUNTY (which counts
 #: requests, not seconds, and caps at 2,500 regardless of how long each one takes).
@@ -631,7 +717,23 @@ async def sweep_county(client: httpx.AsyncClient, county: str, sub: str,
     sem = asyncio.Semaphore(_PER_HOST_CONCURRENCY)
 
     async def guarded(prefix: str) -> tuple[str, bool, set]:
-        async with _global_sem(), sem:
+        # PER-HOST FIRST, THEN GLOBAL -- the order used to be reversed
+        # (``async with _global_sem(), sem:``), and that ordering compounded the
+        # 2026-09-25 starvation this module now guards against with
+        # MAX_CONCURRENT_COUNTIES (see that constant's docstring above sweep_county
+        # for the full incident). A county's depth-1 frontier submits up to 36
+        # `guarded()` calls to asyncio.gather() AT ONCE; with the global semaphore
+        # acquired first, all 36 raced to grab a GLOBAL slot immediately, but only
+        # `_PER_HOST_CONCURRENCY` (3) of them could ever do anything useful once they
+        # had one -- the rest sat there HOLDING a scarce global slot while blocked on
+        # this county's OWN per-host cap, which is pure waste: MAX_CONCURRENT_COUNTIES
+        # x _PER_HOST_CONCURRENCY == _GLOBAL_CONCURRENCY only holds as a real bound on
+        # simultaneous global-slot demand if a county can never have more than
+        # _PER_HOST_CONCURRENCY coroutines contending for a global slot at once.
+        # Acquiring the free, per-county `sem` FIRST enforces exactly that: at most 3
+        # of a county's own prefix walks are ever waiting on _global_sem() at a time,
+        # so an active county's real global-slot demand matches what it was sized for.
+        async with sem, _global_sem():
             async with httpx.AsyncClient(timeout=45.0, follow_redirects=True,
                                          headers={"User-Agent": _UA}) as own:
                 deeper, chars = await _walk_prefix(own, sub, prefix, budget,
@@ -939,7 +1041,9 @@ class QPayBillDelinquentRoll(BaseScraper):
         log.info("qpaybill_roll.start", counties=len(targets),
                  budget_per_county=REQUEST_BUDGET_PER_COUNTY,
                  max_pages=MAX_PAGES_PER_PREFIX, max_depth=MAX_PREFIX_DEPTH,
-                 county_timeout_s=COUNTY_TIMEOUT_S)
+                 county_timeout_s=COUNTY_TIMEOUT_S,
+                 max_concurrent_counties=MAX_CONCURRENT_COUNTIES,
+                 global_concurrency=_GLOBAL_CONCURRENCY)
 
         out: list[Listing] = []
         per_county: dict[str, int] = {}
@@ -952,36 +1056,49 @@ class QPayBillDelinquentRoll(BaseScraper):
 
         async def run_county(client: httpx.AsyncClient, county: str, sub: str
                              ) -> tuple[str, list[dict], dict]:
-            """One county's sweep, individually bounded to COUNTY_TIMEOUT_S.
+            """One county's sweep, gated by MAX_CONCURRENT_COUNTIES and individually
+            bounded to COUNTY_TIMEOUT_S once it actually starts.
 
-            This is half of the fix for the 2026-09-23 all-19-counties-return-zero
-            failure (see COUNTY_TIMEOUT_S's docstring above for the measured root
-            cause). REQUEST_BUDGET_PER_COUNTY bounds how many requests a county can
-            spend, not how long it can take doing it -- a portal that answers slowly
-            but never errors (Williamsburg's GenericErrorPage.aspx pattern) could
-            occupy a worker for the scraper's entire soft timeout on its own. This
-            wraps that county's sweep so it can never do that: it either finishes, or
-            it is abandoned at COUNTY_TIMEOUT_S and reported as failed, but either way
-            it releases control back to fetch() so the OTHER counties are never held
-            hostage to it.
+            This is now TWO fixes stacked, for two different failures:
+
+              2026-09-23 (all-19-counties-return-zero): REQUEST_BUDGET_PER_COUNTY
+              bounds how many requests a county can spend, not how long it can take
+              doing it -- a portal that answers slowly but never errors (Williamsburg's
+              GenericErrorPage.aspx pattern) could occupy a worker for the scraper's
+              entire soft timeout on its own. COUNTY_TIMEOUT_S wraps that county's
+              sweep so it can never do that: it either finishes, or it is abandoned and
+              reported as failed, releasing control back to fetch() so other counties
+              are never held hostage to ONE stuck one.
+
+              2026-09-25 (all-29-counties-time-out): fixing the above did not fix a
+              DIFFERENT failure -- every county launched via asyncio.ensure_future at
+              once, competing for the same 12-slot _GLOBAL_SEM, so NO county (not even
+              ones that finish in under a minute alone) made meaningful progress before
+              COUNTY_TIMEOUT_S fired on all of them. See MAX_CONCURRENT_COUNTIES's
+              docstring for the measurements. The `async with _county_sem():` below
+              gates entry so at most MAX_CONCURRENT_COUNTIES counties are ever inside
+              sweep_county() together; it is acquired BEFORE the wait_for below starts
+              its clock, so a county queued behind others is not charged timeout budget
+              for time spent waiting its turn -- only its own active sweep counts.
             """
-            try:
-                rows, stats = await asyncio.wait_for(
-                    sweep_county(client, county, sub, budgets[county]),
-                    timeout=COUNTY_TIMEOUT_S)
-                return county, rows, stats
-            except asyncio.TimeoutError:
-                log.warning("qpaybill_roll.county_timeout", county=county,
-                            timeout_s=COUNTY_TIMEOUT_S,
-                            note="this county alone exceeded its bounded per-county "
-                                 "timeout and was skipped for this run; it must never "
-                                 "be allowed to hold every OTHER county's already-"
-                                 "collected rows hostage to the scraper's soft timeout")
-                return county, [], dict(_EMPTY_STATS, county_timed_out=True)
-            except Exception as exc:  # noqa: BLE001
-                log.warning("qpaybill_roll.county_failed", county=county,
-                            error=str(exc)[:140])
-                return county, [], dict(_EMPTY_STATS)
+            async with _county_sem():
+                try:
+                    rows, stats = await asyncio.wait_for(
+                        sweep_county(client, county, sub, budgets[county]),
+                        timeout=COUNTY_TIMEOUT_S)
+                    return county, rows, stats
+                except asyncio.TimeoutError:
+                    log.warning("qpaybill_roll.county_timeout", county=county,
+                                timeout_s=COUNTY_TIMEOUT_S,
+                                note="this county alone exceeded its bounded per-county "
+                                     "timeout and was skipped for this run; it must never "
+                                     "be allowed to hold every OTHER county's already-"
+                                     "collected rows hostage to the scraper's soft timeout")
+                    return county, [], dict(_EMPTY_STATS, county_timed_out=True)
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("qpaybill_roll.county_failed", county=county,
+                                error=str(exc)[:140])
+                    return county, [], dict(_EMPTY_STATS)
 
         async with httpx.AsyncClient(timeout=45.0, follow_redirects=True,
                                      headers={"User-Agent": _UA}) as client:
