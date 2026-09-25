@@ -125,88 +125,109 @@ async def _nodriver_search_county(county: str) -> list[dict[str, str]]:
 
     nodriver passes the F5 BIG-IP JS challenge, accepts the disclaimer,
     and submits the ASP.NET search form with NoBot extender.
+
+    MEASURED (2026-09-25 incident): a live run logged scraper.timeout for
+    this scraper (safe_run()'s asyncio.wait_for firing on timeout_s) at
+    05:05:33 UTC -- a clean ~3min run -- but its uc_* Chrome child process
+    kept running, pegged at high CPU, for hours afterward until manually
+    killed; killing it unstuck the pipeline. Root cause: asyncio.CancelledError
+    (raised inside this function's try block by the outer timeout, e.g. while
+    awaiting asyncio.sleep(12)/page.find()/page.evaluate()) is a BaseException,
+    not an Exception, so the old `except Exception:` handler never caught it
+    and neither of the old inline `browser.stop()` calls ever ran -- the
+    process leaked every time this function got cancelled mid-flight, not
+    just on a genuine internal error. Every exit path -- normal completion,
+    an ordinary exception, or cancellation -- now shares one try/finally so
+    browser.stop() (a sync call that terminates/kills the underlying OS
+    process; safe to run from a finally block, including one unwinding a
+    CancelledError) always runs. CancelledError itself is never swallowed --
+    it re-raises after cleanup, per asyncio best practice.
     """
     import nodriver as uc
 
     base_url = f"https://publicindex.sccourts.org/{county}/publicindex/"
 
     all_results: list[dict[str, str]] = []
+    browser = None
 
     try:
-        # Try headless first (8GB-safe). If F5 blocks it, fall back.
         try:
-            browser = await uc.start(headless=True)
-        except Exception:
-            browser = await uc.start(headless=False)
-        page = await browser.get(base_url)
-        # Wait for F5 JS challenge to resolve
-        await asyncio.sleep(12)
+            # Try headless first (8GB-safe). If F5 blocks it, fall back.
+            try:
+                browser = await uc.start(headless=True)
+            except Exception:
+                browser = await uc.start(headless=False)
+            page = await browser.get(base_url)
+            # Wait for F5 JS challenge to resolve
+            await asyncio.sleep(12)
 
-        # Accept disclaimer — click first button found
-        btn = await page.find("button", best_match=True)
-        if not btn:
-            # Try finding by text
-            btn = await page.find("Accept", best_match=True)
-        if btn:
-            await btn.click()
-            await asyncio.sleep(8)
-        else:
-            # Maybe already past disclaimer, check if form is present
+            # Accept disclaimer — click first button found
+            btn = await page.find("button", best_match=True)
+            if not btn:
+                # Try finding by text
+                btn = await page.find("Accept", best_match=True)
+            if btn:
+                await btn.click()
+                await asyncio.sleep(8)
+            else:
+                # Maybe already past disclaimer, check if form is present
+                html = await page.get_content()
+                if "TextBoxlastName" not in html and "ContentPlaceHolder1_TextBoxlastName" not in html:
+                    log.warning("sc_public_index.no_disclaimer_button", county=county)
+                    return []
+
+            # Verify we're on the search page
             html = await page.get_content()
-            if "TextBoxlastName" not in html and "ContentPlaceHolder1_TextBoxlastName" not in html:
-                log.warning("sc_public_index.no_disclaimer_button", county=county)
-                browser.stop()
+            if "ContentPlaceHolder1_TextBoxlastName" not in html:
+                log.warning("sc_public_index.no_form", county=county, page_size=len(html))
                 return []
 
-        # Verify we're on the search page
-        html = await page.get_content()
-        if "ContentPlaceHolder1_TextBoxlastName" not in html:
-            log.warning("sc_public_index.no_form", county=county, page_size=len(html))
-            browser.stop()
+            # Search each prefix
+            for prefix in SEARCH_PREFIXES:
+                # Fill last name field via JS
+                await page.evaluate(f"""
+                    var el = document.getElementById('ContentPlaceHolder1_TextBoxlastName');
+                    if (el) {{ el.value = '{prefix}'; }}
+                """)
+                await asyncio.sleep(0.5)
+
+                # Blur to trigger NoBot state calculation
+                await page.evaluate(
+                    "document.getElementById('ContentPlaceHolder1_TextBoxlastName').blur();"
+                )
+                await asyncio.sleep(2)
+
+                # Click search button via JS
+                await page.evaluate("""
+                    var btn = document.querySelector('input[name="ctl00$ContentPlaceHolder1$ButtonSearch"]');
+                    if (btn) { btn.click(); }
+                """)
+                await asyncio.sleep(8)
+
+                # Parse results
+                html2 = await page.get_content()
+                page_results = _parse_search_results(html2)
+                all_results.extend(page_results)
+
+                log.info("sc_public_index.prefix_done", county=county,
+                         prefix=prefix, cases=len(page_results))
+
+                await asyncio.sleep(REQUEST_DELAY)
+
+        except asyncio.CancelledError:
+            log.warning("sc_public_index.nodriver_cancelled", county=county)
+            raise
+        except Exception as exc:
+            log.error("sc_public_index.nodriver_error",
+                      county=county, error=str(exc)[:200])
             return []
-
-        # Search each prefix
-        for prefix in SEARCH_PREFIXES:
-            # Fill last name field via JS
-            await page.evaluate(f"""
-                var el = document.getElementById('ContentPlaceHolder1_TextBoxlastName');
-                if (el) {{ el.value = '{prefix}'; }}
-            """)
-            await asyncio.sleep(0.5)
-
-            # Blur to trigger NoBot state calculation
-            await page.evaluate(
-                "document.getElementById('ContentPlaceHolder1_TextBoxlastName').blur();"
-            )
-            await asyncio.sleep(2)
-
-            # Click search button via JS
-            await page.evaluate("""
-                var btn = document.querySelector('input[name="ctl00$ContentPlaceHolder1$ButtonSearch"]');
-                if (btn) { btn.click(); }
-            """)
-            await asyncio.sleep(8)
-
-            # Parse results
-            html2 = await page.get_content()
-            page_results = _parse_search_results(html2)
-            all_results.extend(page_results)
-
-            log.info("sc_public_index.prefix_done", county=county,
-                     prefix=prefix, cases=len(page_results))
-
-            await asyncio.sleep(REQUEST_DELAY)
-
-        browser.stop()
-
-    except Exception as exc:
-        log.error("sc_public_index.nodriver_error",
-                  county=county, error=str(exc)[:200])
-        try:
-            browser.stop()
-        except Exception:
-            pass
-        return []
+    finally:
+        if browser is not None:
+            try:
+                browser.stop()
+            except Exception as exc:
+                log.warning("sc_public_index.browser_stop_fail",
+                            county=county, error=str(exc)[:160])
 
     # Deduplicate by case number
     seen = set()

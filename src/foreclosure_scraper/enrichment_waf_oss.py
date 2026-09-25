@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import time
 from typing import Optional
 
 import httpx
@@ -36,6 +37,31 @@ log = structlog.get_logger()
 # describes property condition still uses the full 2.5-flash for quality.
 GEMINI_MODEL = os.environ.get("WAF_GEMINI_MODEL", "gemini-2.5-flash-lite")
 GEMINI_TIMEOUT_S = 30.0
+
+# MEASURED (2026-09-25 incident): a patchright-launched "Chrome for Testing"
+# renderer (Scrapling's StealthyFetcher, which drives this module's
+# solve_waf_via_browser via its page_action hook) was found pegged at 100%
+# CPU for 2.7 hours straight, a direct child of the still-running scraper
+# process; killing it immediately unstuck the whole pipeline. Root cause:
+# every individual wait below (canvas selector, canvas-render poll, one
+# Gemini HTTP call, Confirm click, networkidle) IS already bounded, but they
+# compound: MAX_PUZZLES (20) puzzles x up to 11 rotated Gemini keys x
+# GEMINI_TIMEOUT_S (30s) is ~110 minutes worst case (e.g. every key
+# rate-limited), which dwarfs every caller's own outer timeout_s (180-600s,
+# see base_scraper.safe_run) and Scrapling's own `timeout=240000`ms fetch
+# param (that only bounds individual page ops it drives itself -- it does
+# NOT bound the total runtime of a page_action callback like this one). In
+# practice, the only thing that ever stopped a run this long was the
+# caller's outer asyncio.wait_for cancelling deep inside this coroutine
+# while it sits mid-await on the browser/HTTP call -- an unsafe cancellation
+# point for Playwright/patchright's async bindings that is the likely
+# leak vector. MAX_TOTAL_SOLVE_SECONDS gives this function its own tight,
+# self-imposed wall-clock budget so it returns False on its own -- well
+# inside every caller's outer timeout -- instead of relying on being
+# force-cancelled mid-browser-op. This does NOT weaken the bypass itself:
+# a real puzzle solve finishes in seconds, so the budget only cuts short
+# the pathological "stuck in an unresolvable retry loop" case.
+MAX_TOTAL_SOLVE_SECONDS = float(os.environ.get("WAF_SOLVE_MAX_SECONDS", "90"))
 
 
 def _gemini_keys() -> list[str]:
@@ -52,11 +78,18 @@ def _gemini_keys() -> list[str]:
     return keys
 
 
-async def _identify_tiles(canvas_jpeg_b64: str, target_object: str) -> Optional[list[int]]:
+async def _identify_tiles(
+    canvas_jpeg_b64: str, target_object: str, deadline: Optional[float] = None
+) -> Optional[list[int]]:
     """Ask Gemini which tiles (1-9) in the 3x3 grid contain `target_object`.
 
     Returns list of 1-based tile numbers, or None on failure. Rotates
     Gemini keys on 429.
+
+    `deadline` is a `time.monotonic()` cutoff (see MAX_TOTAL_SOLVE_SECONDS):
+    stop rotating keys once it has passed rather than burning the full
+    GEMINI_TIMEOUT_S on every remaining key when the puzzle is already
+    over budget.
     """
     keys = _gemini_keys()
     if not keys:
@@ -82,6 +115,9 @@ async def _identify_tiles(canvas_jpeg_b64: str, target_object: str) -> Optional[
 
     async with httpx.AsyncClient(timeout=GEMINI_TIMEOUT_S) as client:
         for idx, key in enumerate(keys):
+            if deadline is not None and time.monotonic() >= deadline:
+                log.warning("waf.gemini.deadline_exceeded", key_idx=idx, keys_left=len(keys) - idx)
+                break
             url = (
                 f"https://generativelanguage.googleapis.com/v1beta/"
                 f"models/{GEMINI_MODEL}:generateContent?key={key}"
@@ -134,6 +170,13 @@ async def solve_waf_via_browser(page) -> bool:
     # exhausting the 4-min StealthyFetcher timeout (20 × ~4s = 80s).
     MAX_PUZZLES = 20
 
+    # Self-imposed wall-clock budget (see MAX_TOTAL_SOLVE_SECONDS docstring
+    # above this module's imports) so a run of bad luck (rate-limited keys,
+    # a puzzle that never settles) can't compound past every caller's own
+    # outer timeout and get force-cancelled mid-browser-op instead of
+    # returning False cleanly on its own.
+    deadline = time.monotonic() + MAX_TOTAL_SOLVE_SECONDS
+
     # Click "Begin" if visible
     try:
         begin = page.locator('button:has-text("Begin"), a:has-text("Begin")').first
@@ -148,6 +191,11 @@ async def solve_waf_via_browser(page) -> bool:
         log.info("waf.begin.skip", reason=str(exc)[:120])
 
     for attempt in range(1, MAX_PUZZLES + 1):
+        if time.monotonic() >= deadline:
+            log.warning("waf.deadline_exceeded", attempt=attempt,
+                        budget_s=MAX_TOTAL_SOLVE_SECONDS)
+            return False
+
         # Wait for the canvas (3x3 puzzle grid) to render
         try:
             await page.wait_for_selector("canvas", timeout=20000)
@@ -196,7 +244,7 @@ async def solve_waf_via_browser(page) -> bool:
             return False
 
         # Ask Gemini which 1-9 tiles match
-        solution = await _identify_tiles(canvas_info["b64"], target_word)
+        solution = await _identify_tiles(canvas_info["b64"], target_word, deadline=deadline)
         if solution is None:
             log.warning("waf.gemini.failed", attempt=attempt)
             return False
