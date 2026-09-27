@@ -9,7 +9,10 @@ Two paths:
   Charleston: uses jcmsweb.charlestoncounty.org — NOT behind F5/Varnish, curl-cffi works.
   All other counties: behind F5 BIG-IP JS challenge + Varnish WAF. curl-cffi and
     Playwright both fail. nodriver (undetected Chrome) passes the F5 challenge,
-    accepts the disclaimer, and successfully submits the ASP.NET search form.
+    accepts the disclaimer, and successfully submits the ASP.NET search form --
+    but ONLY in headed (headless=False) mode. See _nodriver_search_county's
+    docstring: headless nodriver gets HTTP 406'd by the WAF (MEASURED
+    2026-09-27), which is a big part of why this scraper produced zero rows.
 
 Flow for non-Charleston:
 1. nodriver opens the disclaimer page (F5 JS challenge auto-solved by real Chrome)
@@ -17,6 +20,14 @@ Flow for non-Charleston:
 3. Fill last name field via JS, blur to trigger NoBot state
 4. Click search button via document.querySelector
 5. Parse GridView results table for CP cases
+
+RUN BUDGET (MEASURED 2026-09-27, live): one county's full 26-prefix sweep in
+WORKING (headed) mode takes ~353s wall-clock (Spartanburg: 1,233 deduped real
+CP cases). 44 non-Charleston counties x ~353s is ~4.3 hours -- no realistic
+timeout_s covers all of them in a single invocation, so fetch() runs
+Charleston (fast, curl, every run) plus a bounded, day-rotating BATCH of the
+other 44 (see BATCH_SIZE / _select_county_batch), landing real rows for a few
+counties every run instead of chasing full coverage and getting none.
 
 Counties in our SC footprint:
   Spartanburg, Greenville, Pickens, Oconee, Anderson, Cherokee, Laurens,
@@ -31,9 +42,11 @@ Counties in our SC footprint:
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import time
 import structlog
+from datetime import datetime
 from typing import Any
 
 from selectolax.parser import HTMLParser
@@ -68,6 +81,50 @@ REQUEST_DELAY = 2.0
 
 # Max results per county search (the site caps at ~2500)
 MAX_RESULTS_PER_SEARCH = 2500
+
+# Charleston uses the fast curl-cffi path (not behind F5/Varnish) and is
+# always run every invocation; the rest need the slow headed-nodriver flow
+# and are batched below.
+_NODRIVER_COUNTIES = [c for c in SC_COUNTIES if c != "charleston"]
+
+#: How many of the 44 non-Charleston counties ONE fetch() call sweeps.
+#:
+#: MEASURED 2026-09-27 (live): one WORKING county sweep (headed nodriver,
+#: after the headless-WAF-block fix below) takes ~353s wall-clock
+#: (Spartanburg, 1,233 deduped real CP cases). BATCH_SIZE=2 x COUNTY_TIMEOUT_S
+#: (480s each, see below) = 960s, comfortably inside timeout_s=1200 with
+#: Charleston's curl pass (seconds) folded into the remaining margin.
+#: All 44 counties are still covered -- just spread across
+#: ceil(44/BATCH_SIZE) runs by the rotation below, instead of every run
+#: attempting (and never finishing) all 44.
+BATCH_SIZE = int(os.environ.get("SC_PUBLIC_INDEX_BATCH_SIZE", "2"))
+
+#: Per-COUNTY wall-clock bound, independent of the 26-prefix script's own
+#: sleeps. Mirrors counties_sc.qpaybill_delinquent_roll.COUNTY_TIMEOUT_S
+#: (also 480s by default, also sized this same week from a live measurement)
+#: so ONE slow/hung county (real network latency, WAF hiccup, a challenge
+#: that takes longer than the scripted 12s to clear) can't eat this run's
+#: whole timeout_s and take the other BATCHED counties' already-collectible
+#: rows down with it.
+COUNTY_TIMEOUT_S = float(os.environ.get("SC_PUBLIC_INDEX_COUNTY_TIMEOUT", "480"))
+
+
+def _select_county_batch(counties: list[str], batch_size: int) -> list[str]:
+    """Pick a bounded, rotating slice of ``counties`` for THIS run.
+
+    Deterministic, stateless day-of-year rotation -- no cursor file to
+    create, corrupt, or coordinate under board_lock. Repeated runs on the
+    same UTC day hit the same batch (stable for re-runs/testing); the batch
+    advances on its own as calendar days pass, cycling through every county
+    once every ``ceil(len(counties) / batch_size)`` days.
+    """
+    if batch_size <= 0 or not counties:
+        return []
+    n_batches = -(-len(counties) // batch_size)  # ceil division
+    day = datetime.utcnow().timetuple().tm_yday
+    idx = day % n_batches
+    start = idx * batch_size
+    return counties[start:start + batch_size]
 
 
 def _parse_search_results(html: str) -> list[dict[str, str]]:
@@ -124,7 +181,8 @@ async def _nodriver_search_county(county: str) -> list[dict[str, str]]:
     """Search one non-Charleston county using nodriver (undetected Chrome).
 
     nodriver passes the F5 BIG-IP JS challenge, accepts the disclaimer,
-    and submits the ASP.NET search form with NoBot extender.
+    and submits the ASP.NET search form with NoBot extender -- but ONLY in
+    headed (headless=False) mode. See the headless-vs-headed block below.
 
     MEASURED (2026-09-25 incident): a live run logged scraper.timeout for
     this scraper (safe_run()'s asyncio.wait_for firing on timeout_s) at
@@ -142,6 +200,29 @@ async def _nodriver_search_county(county: str) -> list[dict[str, str]]:
     process; safe to run from a finally block, including one unwinding a
     CancelledError) always runs. CancelledError itself is never swallowed --
     it re-raises after cleanup, per asyncio best practice.
+
+    MEASURED 2026-09-27 (live, real network, THIS investigation): the reason
+    this scraper returned zero rows was upstream of the 26-prefix timing --
+    `uc.start(headless=True)` never raises for this site, so the old
+    `except Exception: browser = await uc.start(headless=False)` fallback
+    never fired. What actually happens: headless Chrome's first navigation to
+    publicindex.sccourts.org gets HTTP 406 from the WAF, which Chrome renders
+    as its own chrome-error://chromewebdata interstitial (confirmed via
+    `location.href` and the body text "This page isn't working ... HTTP ERROR
+    406"). That "succeeds" (no exception) at loading a WAF block page, so the
+    disclaimer-button click below grabbed Chrome's own "Reload" button
+    instead, and the code ran out its clock finding no search form -- for
+    EVERY county, every run, regardless of the prefix-sweep arithmetic.
+    Headed (headless=False) navigation to the SAME URL, same run, got the
+    real Spartanburg County disclaimer page every time tested. This matches
+    enrichment_case_detail.py's own docstring for this exact site: "nodriver
+    (headless=False) — the ONLY method that works for SC Public Index." Fixed
+    by detecting the block from PAGE CONTENT (chrome-error:// on the current
+    URL) and restarting headed, instead of an exception handler nothing ever
+    throws into. Once headed mode actually reaches the site, the WAF-bypass
+    flow works exactly as originally documented: a live Spartanburg sweep
+    (all 26 prefixes) took 353.0s wall-clock and returned 1,233 deduped real
+    CP cases.
     """
     import nodriver as uc
 
@@ -152,14 +233,32 @@ async def _nodriver_search_county(county: str) -> list[dict[str, str]]:
 
     try:
         try:
-            # Try headless first (8GB-safe). If F5 blocks it, fall back.
-            try:
-                browser = await uc.start(headless=True)
-            except Exception:
-                browser = await uc.start(headless=False)
+            # Try headless first (8GB-safe headline case). Do NOT gate the
+            # headed fallback on an exception here -- uc.start(headless=True)
+            # succeeds every time for this site; the block is detected from
+            # the resulting PAGE, below.
+            browser = await uc.start(headless=True)
             page = await browser.get(base_url)
-            # Wait for F5 JS challenge to resolve
+            # Wait for F5 JS challenge to resolve (also long enough for a
+            # WAF chrome-error interstitial, if any, to settle before we
+            # check for it below).
             await asyncio.sleep(12)
+
+            cur_url = await page.evaluate("location.href")
+            if isinstance(cur_url, str) and cur_url.startswith("chrome-error:"):
+                # Headless got WAF-blocked (HTTP 406 -> Chrome's own network
+                # interstitial, not a Python exception -- see this function's
+                # docstring). Restart headed for just this county.
+                log.warning("sc_public_index.headless_blocked", county=county,
+                            url=base_url)
+                try:
+                    browser.stop()
+                except Exception as exc:
+                    log.warning("sc_public_index.browser_stop_fail",
+                                county=county, error=str(exc)[:160])
+                browser = await uc.start(headless=False)
+                page = await browser.get(base_url)
+                await asyncio.sleep(12)
 
             # Accept disclaimer — click first button found
             btn = await page.find("button", best_match=True)
@@ -327,31 +426,76 @@ async def _curl_search_county(county: str) -> list[dict[str, str]]:
 class SCPublicIndexScraper(BaseScraper):
     """Scrapes SC county public index for foreclosure (Common Pleas) cases.
 
-    Uses nodriver (undetected Chrome) for non-Charleston counties that are
-    behind F5 BIG-IP + Varnish WAF. Uses curl-cffi for Charleston which has
-    its own subdomain not behind F5.
+    Uses nodriver (undetected Chrome, headed -- see _nodriver_search_county)
+    for non-Charleston counties that are behind F5 BIG-IP + Varnish WAF. Uses
+    curl-cffi for Charleston which has its own subdomain not behind F5.
     """
 
     slug = "national.sc_public_index"
     requires_render = False
+
+    # MEASURED 2026-09-27 (live): BaseScraper's default timeout_s=180 could
+    # never have been enough even in the best case -- one WORKING county
+    # sweep alone takes ~353s. Sized for BATCH_SIZE counties (COUNTY_TIMEOUT_S
+    # each, see module docstring) + Charleston's fast curl pass + margin;
+    # matches this file's sibling counties_sc.sc_public_notices (also a
+    # multi-minute, multi-step WAF-flow scraper) rather than inventing a new
+    # outlier value.
+    timeout_s = 1200.0
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._counties = SC_COUNTIES
 
     async def fetch(self) -> list[Listing]:
-        """Search all SC counties for CP (foreclosure) cases."""
+        """Search Charleston (every run) plus a bounded, rotating BATCH of
+        the other 44 counties (see module docstring for the measured
+        per-county budget and why full 45-county coverage can't fit in one
+        invocation)."""
         all_results: list[dict[str, str]] = []
         county_counts: dict[str, int] = {}
 
-        for county in self._counties:
-            if county == "charleston":
-                county_results = await _curl_search_county(county)
-            else:
-                county_results = await _nodriver_search_county(county)
-
+        def _salvage(county: str, county_results: list[dict[str, str]]) -> None:
             county_counts[county] = len(county_results)
             all_results.extend(county_results)
+            # Populate self.partial AS EACH COUNTY FINISHES so
+            # base_scraper.safe_run()'s timeout-salvage path has real rows to
+            # ship if this run's own timeout_s fires mid-batch. fetch() used
+            # to only ever return at the very end, so a scraper-level
+            # timeout discarded every county already collected, not just
+            # whichever one was in flight.
+            self.partial.extend(self._to_listings(county_results))
+
+        counties = list(self._counties)
+
+        if "charleston" in counties:
+            charleston_results = await _curl_search_county("charleston")
+            _salvage("charleston", charleston_results)
+            log.info("sc_public_index.county_done", county="charleston",
+                     cp_cases=len(charleston_results))
+
+        nodriver_counties = [c for c in counties if c != "charleston"]
+        batch = _select_county_batch(nodriver_counties, BATCH_SIZE)
+        log.info("sc_public_index.batch_selected", batch=batch,
+                 batch_size=BATCH_SIZE, total_counties=len(nodriver_counties))
+
+        for county in batch:
+            try:
+                county_results = await asyncio.wait_for(
+                    _nodriver_search_county(county), timeout=COUNTY_TIMEOUT_S)
+            except asyncio.TimeoutError:
+                # Bound ONE county's wall-clock so a hung/slow county can't
+                # burn this run's whole timeout_s and take the other
+                # batched counties' already-collected rows with it (same
+                # failure shape counties_sc.qpaybill_delinquent_roll's
+                # COUNTY_TIMEOUT_S fixed 2026-09-23). _nodriver_search_county
+                # already cleans up its own browser via try/finally on
+                # cancellation, so this wait_for firing is safe.
+                log.warning("sc_public_index.county_timeout", county=county,
+                            timeout_s=COUNTY_TIMEOUT_S)
+                county_results = []
+
+            _salvage(county, county_results)
             log.info("sc_public_index.county_done", county=county,
                      cp_cases=len(county_results))
 
