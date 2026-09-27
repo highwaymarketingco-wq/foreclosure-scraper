@@ -457,6 +457,22 @@ class SCPublicIndexScraper(BaseScraper):
 
         def _salvage(county: str, county_results: list[dict[str, str]]) -> None:
             county_counts[county] = len(county_results)
+            # Stamp each case with its OWN county before it joins the
+            # flattened all_results list below -- _to_listings() used to
+            # receive the merged list with no way to tell which county any
+            # individual case came from (see its own docstring/comment,
+            # "we don't track which county each case came from separately"),
+            # so every Listing got county=None. Combined with every Listing
+            # also sharing one hardcoded source_url, dedupe_key() fell all
+            # the way through the parcel/address/case+county branches to the
+            # url: fallback -- identical for every row -- and collapsed
+            # nearly the whole batch into one survivor (confirmed live
+            # 2026-09-27: 1,632 real cases scraped, 1 survived in-batch
+            # dedupe). Tagging here, one dict key, fixes it: _to_listings()
+            # reads "_county" below and dedupe_key()'s case+county branch is
+            # then reachable and unique per real case.
+            for case in county_results:
+                case["_county"] = county
             all_results.extend(county_results)
             # Populate self.partial AS EACH COUNTY FINISHES so
             # base_scraper.safe_run()'s timeout-salvage path has real rows to
@@ -536,6 +552,14 @@ class SCPublicIndexScraper(BaseScraper):
             role = case.get("role", "")
             date_filed = case.get("date_filed", "")
             status = case.get("status", "")
+            # See _salvage()'s comment in fetch() for why this must be read
+            # per-case, not passed in as a separate county_counts summary --
+            # county=None here is what let dedupe_key() collapse nearly the
+            # whole batch into one survivor. SC_COUNTIES entries are
+            # lowercase ("charleston"); title-case to match how county names
+            # are stored everywhere else on the board.
+            county_raw = case.get("_county")
+            county = county_raw.strip().title() if county_raw else None
 
             li = Listing(
                 source=self.slug,
@@ -543,7 +567,7 @@ class SCPublicIndexScraper(BaseScraper):
                 listing_type=ListingType.LIS_PENDENS,
                 property_kind=PropertyKind.UNKNOWN,
                 state="SC",
-                county=None,
+                county=county,
                 case_number=case_num,
                 raw={
                     "sc_public_index": {
