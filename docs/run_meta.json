@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-09-27T14:34:38.781790Z",
+  "run_time": "2026-09-27T18:19:39.407973Z",
   "total": 212671,
   "by_source": {
     "national.nc_upset_bids": 38,
@@ -394,7 +394,7 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "daily vision pass: 21768 of 212671 listings have a vision report",
+  "notes": "scheduled NC SOS registered-agent refresh",
   "detail_count": 212671,
   "detail_digest": "85d9a1ab41b7520e",
   "board_parts": {
@@ -449,8 +449,8 @@
         "start": 65000,
         "end": 78000,
         "records": 13000,
-        "bytes": 13274969,
-        "sha256": "2589f4a5688b8ab64da65c2a169c94e91e54d111b47891a1627f0d34a9145360"
+        "bytes": 13274978,
+        "sha256": "2a2f8f88cbb161e47486a104b9782db77d8a74e7d9d3acb44fb4ca74bd1bd54a"
       },
       {
         "name": "listings_part_006.json.gz",
@@ -559,7 +559,7 @@
     "by_county_top"
   ],
   "health_as_of": "2026-09-23T08:47:09.374753Z",
-  "health_age_hours": 101.79,
+  "health_age_hours": 105.54,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-09-23T08:47:09.374753Z",
