@@ -1,8 +1,35 @@
 """NC eCourts (Tyler Odyssey) DIVORCE track — absolute-divorce / equitable-
 distribution leads.
 
-Source
-------
+STATUS (current, verified 2026-09-27) — read this before the rest of the
+docstring below, which describes the OLD, now-DORMANT code path and is kept
+only because ``_drive_divorce_search`` is retained per the keep-bypass-code
+policy. The ACTIVE path since 2026-07-01 (commit 8719158, "Revive NC eCourts
+divorce") is ``NCECourtsDivorce.fetch()`` at the bottom of this file: it hits
+the SAME public, unauthenticated NC Judgment Search JSON endpoint that
+nc_ecourts_lis_pendens.py drives (POST .../NCJudgmentSearchService/search) —
+no browser, no AWS-WAF, no CAPTCHA — and filters ``causeOfActionDesc`` for
+"FAM - Divorce" / "FAM - Equitable Distribution". It reads
+``nc_ecourts_lis_pendens.TARGET_COUNTIES`` (the module attribute, not a copy),
+so when that list was widened from 22 to all 100 NC counties on 2026-09-23
+(commit 97afaed) this scraper's footprint widened too, automatically, with
+zero code change and zero marginal WAF cost — the county count below and the
+"Footprint" section are stale artifacts of the dormant path, not what
+``fetch()`` actually queries. See the ``NCECourtsDivorce`` class docstring for
+the current pagination sizing (2026-09-27 measurement).
+
+NOTE: nc_ecourts_lis_pendens.py's own ``_hit_to_listing`` ALSO independently
+extracts "FAM - Divorce" (not "FAM - Equitable Distribution") from the same
+endpoint into ``ListingType.DIVORCE_NOTICE`` rows, at a wider MAX_PAGES (450
+vs this scraper's pagination) but a narrower LOOKBACK_DAYS (90 vs this
+scraper's 120). The two scrapers overlap on "FAM - Divorce" judgments within
+the last 90 days; the pipeline's dedupe (case_number + county) collapses the
+resulting duplicate hits, but both scrapers still separately re-fetch and
+re-page the same public corpus every run. Not fixed here (out of scope for a
+coverage-widening pass; flagged for a follow-up consolidation).
+
+Source (dormant path only)
+---------------------------
 NC AOC's public **Smart Search** portal at
   https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29
 
@@ -29,13 +56,13 @@ still in or controlling the home), with both spouses preserved in raw; the
 owner -> GIS pass resolves the marital-home address downstream. DATELESS — a
 divorce filing has no sale date, so these route through DATELESS_OK_SOURCES.
 
-Footprint
----------
+Footprint (dormant path only — see STATUS above for the real, active one)
+---------------------------------------------------------------------------
 NC footprint counties only (mirrors nc_ecourts_lis_pendens.TARGET_COUNTIES):
 the 11 WNC/foothills counties plus the 5 coastal counties.
 
-WAF note
---------
+WAF note (dormant path only)
+------------------------------
 If the WAF image-grid solve fails (e.g. GEMINI_API_KEY_* unset — the local-dev
 case), the run returns 0 and the block reason is recorded via the shared block
 signal; the parser is still exercised on whatever HTML was fetched.
@@ -61,7 +88,12 @@ PORTAL_BASE = "https://portal-nc.tylertech.cloud/Portal"
 SEARCH_URL = f"{PORTAL_BASE}/Home/Dashboard/29"
 ROOT = "https://portal-nc.tylertech.cloud"
 
-# NC footprint counties — mirrors nc_ecourts_lis_pendens.TARGET_COUNTIES.
+# DORMANT — only referenced by _drive_divorce_search (the retained-but-unused
+# WAF/browser path, kept per keep-bypass-code policy). NCECourtsDivorce.fetch()
+# below reads nc_ecourts_lis_pendens.TARGET_COUNTIES directly (currently all
+# 100 NC counties), NOT this list. Left un-widened intentionally: widening it
+# would have zero effect on the active scraper and would only mislead a future
+# reader into thinking it's load-bearing. See the module STATUS note above.
 TARGET_COUNTIES = [
     "Rutherford", "Cleveland", "Henderson", "Polk", "Gaston",
     "Buncombe", "Transylvania", "McDowell", "Lincoln",
@@ -516,16 +548,40 @@ class NCECourtsDivorce(BaseScraper):
     # and the judgment date — everything needed for an address-less motivated-seller
     # lead. The old WAF-walled Smart Search browser flow below (_drive_divorce_search)
     # is retained per the keep-bypass-code policy but is no longer used.
+    #
+    # MEASURED 2026-09-27: docs/coverage_gap_build_plan_2026-09-23.md sec 2.2
+    # frames this scraper as still on the per-county WAF path; reading fetch()
+    # below shows that's stale -- it moved to this free batched endpoint on
+    # 2026-07-01 (commit 8719158) and inherited the 2026-09-23 22->100-county
+    # widening automatically (it reads nc_ecourts_lis_pendens.TARGET_COUNTIES
+    # live, not a copy). What WAS still broken: the query is unfiltered
+    # server-side (same shape as nc_ecourts_lis_pendens's own query, just a
+    # wider 120-day window) and only gets cause-filtered client-side per hit,
+    # so JUDGMENT_MAX_PAGES caps the RAW corpus scanned, not the divorce-cause
+    # count. Live-probed the actual 100-county/120-day query: totalHits=
+    # 104,687 (page-1 density: 35/200 FAM - Divorce hits -- not rare, just
+    # unreached). At PAGE_SIZE=200 that needs 524 pages; the old MAX_PAGES=25
+    # (5,000 raw hits) covered ~4.8% of it -- the same "artificially capped"
+    # pattern nc_ecourts_lis_pendens.py fixed 2026-09-23 (see its own
+    # MAX_PAGES/timeout_s comment), not carried over to this sibling at the
+    # time. A live run at the OLD cap returned 362 divorce/equitable-
+    # distribution listings across only 62/100 counties in 27.8s (26 requests,
+    # ~1.07s/request) -- consistent with truncation, not a small corpus.
+    # MAX_PAGES 25->600 (524 needed + ~15% headroom, same margin ratio
+    # nc_ecourts_lis_pendens used: 450/394=1.14 there, 600/524=1.15 here).
+    # timeout_s 600->1200: 600 pages * ~1.07s/page = ~640s network time;
+    # 1200s leaves ~1.9x headroom for the template fetch + per-hit processing,
+    # similar margin to nc_ecourts_lis_pendens's own 900s/~517s (~1.7x).
     category = "county_court"
     expected_min_count = 5
-    timeout_s = 600.0
+    timeout_s = 1200.0
     requires_apify = False
     optional = True
 
     # Judgment-search pagination (mirrors nc_ecourts_lis_pendens).
     JUDGMENT_LOOKBACK_DAYS = 120
     JUDGMENT_PAGE_SIZE = 200
-    JUDGMENT_MAX_PAGES = 25
+    JUDGMENT_MAX_PAGES = 600
 
     # Family causes that indicate a divorce or property-division judgment.
     # Absolute-divorce and equitable-distribution variants both can force a

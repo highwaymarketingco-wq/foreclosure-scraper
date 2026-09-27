@@ -605,8 +605,39 @@ class NCECourtsEstates(BaseScraper):
     # image-CAPTCHA that does NOT clear even with the Gemini solver; it burns vision
     # quota and logs errors for 0 results every run. NC estate/decedent notices are
     # covered compliantly via counties.column_legal_notices. Re-enable if the WAF drops.
+    #
+    # RE-MEASURED 2026-09-27, kept disabled. Unlike what a per-county-cost model
+    # would predict, the WAF is solved ONCE per run (before the county loop in
+    # _drive_estate_search below, not once per county) -- so county-count was
+    # never actually the cost driver for THIS scraper; a solved session can
+    # sweep any number of configured counties almost for free. The real
+    # variable is whether the solve ever clears at all. Live-tested 3 fresh
+    # runs against 5 never-before-tried Western NC counties (Madison/Haywood/
+    # Watauga/Jackson/Cherokee), with this week's fixes in place (MAX_PUZZLES
+    # 20, WAF_SOLVE_MAX_SECONDS=90 self-deadline, browser-leak fix): Gemini's
+    # own tile recognition was 100% correct every puzzle it saw (verified via
+    # waf.gemini.solved on every attempt, zero waf.gemini.failed), but AWS WAF
+    # kept escalating puzzles past the point of usefulness on 2 of 3 runs (16
+    # and 17 puzzles solved correctly back to back, then the 90s self-deadline
+    # cut it off cleanly -- no hang, no leaked browser, confirmed via `ps aux
+    # | grep -E "uc_|patchright"` before/after all 3 runs). The 3rd run cleared
+    # on its very first puzzle and returned 11 real probate/estate leads
+    # across the 5 counties (decedent + executor names, real case numbers) --
+    # so the pipeline genuinely works end-to-end when AWS lets it through, it
+    # just doesn't let it through reliably. Net: 1/3 live success, each
+    # attempt costing ~80-100s regardless of outcome. That's a small sample
+    # (repeated automated hits from one IP in a short window may itself have
+    # worsened AWS's suspicion for the later attempts, so true reliability
+    # could be somewhat better on spaced-out runs) but it reconfirms rather
+    # than overturns the 2026-06-27 conclusion, and 1/3 is not reliable enough
+    # to justify re-enabling as a scheduled/default source. Left disabled and
+    # TARGET_COUNTIES unwidened (still 22): widening the list would not change
+    # this economics either way (cost is per-run, not per-county) and there's
+    # no evidence yet that it's worth turning on. Re-enable only if someone
+    # wants to opportunistically try it (optional=True, expected_min_count=0
+    # already make a 0-row run harmless) or if AWS's escalation eases.
     disabled = True
-    disabled_reason = "NC eCourts AWS-WAF CAPTCHA unsolvable; NC estate covered via Column"
+    disabled_reason = "NC eCourts AWS-WAF CAPTCHA unreliable (1/3 live success 2026-09-27); NC estate covered via Column"
     category = "county_court"
     # Estate filings are common; but the WAF gate means a run can legitimately
     # come back empty when the image-grid solve fails. Keep min 0 so a blocked
