@@ -20,6 +20,50 @@ Confirmed hosts (Western NC + Upstate SC core):
   cecilmburtonfuneralhome.com -> Cleveland (Shelby)  NC    [Frazer]
   sullivanking.com            -> Anderson            SC    [Frazer]
 
+Confirmed hosts, round 2 (2026-09-27 probate/estate coverage sweep, see
+docs/coverage_gap_build_plan_2026-09-23.md #2.4): all found via a
+"meaningfulfunerals.net" web search per gap county (that domain is the
+underlying Frazer/CFML obituary backend most Frazer clients proxy at their
+own HOST/feed), then verified live against the funeral home's own domain --
+not the WNC/Upstate-SC core, but the wider 141-of-146-county probate/estate
+gap the docstring above calls out as the scaling target:
+  lambfh.com                   -> Cabarrus    NC   [Frazer]
+  edwardscares.com              -> Wilson      NC   [Frazer]
+  willoughbyfuneralhomes.com    -> Edgecombe   NC   [Frazer]
+  caseyfh.com                   -> Johnston    NC   [Frazer] (physical address
+                                    is Princeton NC, which sits in Johnston Co.)
+  dukesharleyfuneralhome.com    -> Orangeburg  SC   [Frazer]
+  nesmithpinckneyfuneralhome.com-> Williamsburg SC  [Frazer]
+  dychesfuneralhome.com         -> Barnwell    SC   [Frazer-shaped: this one is
+                                    a plain WordPress site whose default
+                                    HOST/feed happens to be all-"Obituaries"-
+                                    category posts with bare-name titles (no
+                                    Frazer backend, no ltobits plugin) -- kept
+                                    under kind="frazer" because that is the
+                                    URL shape that fetches it and the title
+                                    has no pipe for _name_from_title to split
+                                    on, so parsing is a no-op pass-through.
+
+A ~90-candidate sweep across roughly 48 gap counties (see
+docs/coverage_gap_build_plan_2026-09-23.md #2.4 revision notes / the commit
+that added this) found these 7 to be the live, current hits. The large
+majority of candidates tried in Western NC's deep mountain counties (Madison,
+Haywood, Jackson, Macon, Swain, Graham, Cherokee, Clay, Yancey, Watauga, Ashe,
+Avery, Wilkes, Caldwell, Alexander, Alleghany, Surry, Stokes) and several
+Piedmont/Upstate counties immediately outside the core footprint (Iredell,
+Rowan, Catawba, York, Chester, Newberry, Greenwood) came up empty: those
+funeral homes run on other CMS platforms entirely (a shared vendor whose
+generated markup starts with `<!doctype html ><html ... class="ios-preview-
+native-scroll">` and a base64 `SiteType` -- decodes to "DUDAONE", i.e. the
+Duda site builder -- is especially common there, and returns HTTP 200 with
+plain HTML for both probe URLs, never RSS), or sit behind a Cloudflare
+challenge page ("Just a moment...") on every path including /feed. One
+additional live Frazer hit, abbevillewhitemortuary.com (Abbeville Co. SC),
+was found and verified but is NOT wired here: its feed's newest item is dated
+04/14/2025, so it has posted nothing in the ~17 months before this sweep --
+wiring a feed that is not actively publishing would not add any real forward
+coverage, so it is recorded here rather than added to HOMES.
+
 One name-only lead per <item> (decedent -> Listing.defendant). The name->property
 resolver then pins the decedent's parcel via the county GIS owner-name index (same
 path as the Gannett obituaries + Spartan Weekly probate notices); decedents who
@@ -74,6 +118,15 @@ HOMES = {
     "grocefuneralhome.com": ("Buncombe", "NC", "ltobits"),
     "cecilmburtonfuneralhome.com": ("Cleveland", "NC", "frazer"),
     "sullivanking.com": ("Anderson", "SC", "frazer"),
+    # Round 2 (2026-09-27 gap sweep, see module docstring above for how these
+    # were found and the ~90 misses that didn't make it in).
+    "lambfh.com": ("Cabarrus", "NC", "frazer"),
+    "edwardscares.com": ("Wilson", "NC", "frazer"),
+    "willoughbyfuneralhomes.com": ("Edgecombe", "NC", "frazer"),
+    "caseyfh.com": ("Johnston", "NC", "frazer"),
+    "dukesharleyfuneralhome.com": ("Orangeburg", "SC", "frazer"),
+    "nesmithpinckneyfuneralhome.com": ("Williamsburg", "SC", "frazer"),
+    "dychesfuneralhome.com": ("Barnwell", "SC", "frazer"),
 }
 
 # per-item HTML entities that survive when we fall back to stdlib XML parsing
