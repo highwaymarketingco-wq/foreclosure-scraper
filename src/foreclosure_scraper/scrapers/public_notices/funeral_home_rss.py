@@ -64,6 +64,45 @@ was found and verified but is NOT wired here: its feed's newest item is dated
 wiring a feed that is not actively publishing would not add any real forward
 coverage, so it is recorded here rather than added to HOMES.
 
+Confirmed host, round 3 (2026-09-28 sweep of 15 populous NC+SC counties with
+zero funeral_home_rss coverage -- Mecklenburg, Wake, Guilford, Forsyth,
+Cumberland, Durham, Gaston, New Hanover, Greenville, Charleston, Richland,
+Horry, Spartanburg, Lexington, Berkeley -- ~55 candidate domains tried, both
+URL shapes each):
+  dial-murrayfuneralhome.com   -> Berkeley    SC   [Frazer] (Moncks Corner;
+                                   verified live, newest item 09/19/2026)
+
+Round 3's 1-of-15-counties hit rate (vs round 2's 7-of-~48) is a genuine
+finding, not an under-search: independent/family-run homes on Frazer or
+WordPress+ltobits are a *rural and small-town* phenomenon. The 14 counties
+that came up empty are exactly the state's biggest metros, where funeral
+homes cluster on three other patterns instead: (1) large corporate rollups
+(Dignity Memorial/SCI, "memorialplanning.com" network sites like
+siskbutler.com) whose obituary pages live on the parent's own domain/CMS,
+not the local site; (2) funeral-vertical SaaS platforms with no RSS at all
+-- Tukios (`tukios_fhid` in page markup, e.g. alexanderfunerals.com) and
+custom-PHP obituary modules (`allobituaries.php`, e.g.
+moseleyfuneralservice.com / kornegayandmoseley.com) both return HTTP 200
+plain HTML, never XML, for both probe shapes; (3) a real minority sit behind
+bot-protection that 403s every path including /feed (aegriersonsfcc.com,
+houseofrosadalecharlotte.com, fergusonfs.com, carltonlgrayfuneral.com,
+salemfh.com, hmcolvin.com, clementsfuneralservice.com, hollowaymemorial.com,
+wilmingtoncares.com, andrewsmortuary.com, robinsonfuneralhomes.com,
+wmsmithmcnealfuneralhome.com, aadicksfuneralhome.com, mcleanfuneral.com,
+hardwickfh.com, goldfinchfuneralhome.com, costnerfuneralhome.com) -- a real
+wall under the repo's own compliance policy (CAPTCHA/login/WAF-challenge is
+a wall; a plain robots.txt Disallow is not), so these were left alone rather
+than bypassed. A handful of WordPress sites (rfhr.com, jhenrystuhr.com)
+returned RSS_TAG=1 on both shapes but were confirmed-by-fetch false
+positives: the ltobits plugin isn't installed, so `?post_type=ltobits`
+silently falls back to the site's ordinary BLOG feed (WordPress ignores an
+unknown post_type rather than erroring) -- same failure mode the module
+docstring already warns about for the plain /feed shape, just one query
+param later. leevy.com and seawright-funeralhome.com returned a genuine,
+structurally valid, but completely empty RSS channel on both shapes (no
+posts of any type), and siskbutler.com's feed is a memorialplanning.com
+rollup echo (also empty). None of these five are usable hits.
+
 One name-only lead per <item> (decedent -> Listing.defendant). The name->property
 resolver then pins the decedent's parcel via the county GIS owner-name index (same
 path as the Gannett obituaries + Spartan Weekly probate notices); decedents who
@@ -127,6 +166,9 @@ HOMES = {
     "dukesharleyfuneralhome.com": ("Orangeburg", "SC", "frazer"),
     "nesmithpinckneyfuneralhome.com": ("Williamsburg", "SC", "frazer"),
     "dychesfuneralhome.com": ("Barnwell", "SC", "frazer"),
+    # Round 3 (2026-09-28 15-county populous-metro sweep, see module docstring
+    # above -- 1 confirmed hit out of ~55 candidate domains tried).
+    "dial-murrayfuneralhome.com": ("Berkeley", "SC", "frazer"),
 }
 
 # per-item HTML entities that survive when we fall back to stdlib XML parsing

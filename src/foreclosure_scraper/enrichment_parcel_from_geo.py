@@ -42,7 +42,9 @@ import asyncio
 import json
 from typing import Any, Optional
 
+import httpx
 import structlog
+from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
 
 from .enrichment_arcgis import (
     SCDOT_BASE, SC_LAYER,
@@ -154,30 +156,55 @@ def _clean_parcel(pid: Any) -> str:
 _ENVELOPE_HALF_DEG = 5e-5
 
 
+class _ArcHardError(Exception):
+    """A non-200 ArcGIS response, retried the same as a transport error before
+    counting toward the host breaker (see _arc_query)."""
+
+
 async def _arc_query(c, layer_query_url: str, params: dict) -> Optional[list]:
     """GET an ArcGIS /query and return its feature list (None on any failure).
     ArcGIS reports failure as HTTP 200 + an `error` key, so status alone is not
-    enough — a token-required response looks exactly like an empty result set."""
+    enough — a token-required response looks exactly like an empty result set.
+
+    Retries up to 3 times (short exponential-jitter backoff) on a transport
+    error or a non-200 status before counting it toward the host breaker.
+    Diagnosed 2026-09-28: NC OneMap tripped its 8-consecutive-failures breaker
+    mid-run despite answering ~1,766 leads cleanly just before (55% hit rate)
+    and probing healthy again minutes later — the signature of a short-lived
+    blip, not a dead host, and this call had zero retry cushioning unlike
+    get_text() elsewhere in this codebase. A genuine token/auth wall (SCDOT-
+    class) still trips the host on its FIRST occurrence, unaffected by this
+    retry (that branch never raises, so AsyncRetrying never sees it)."""
     # Generic per-host breaker: skip a host that's already been tripped (token
     # wall or repeated timeouts) instead of re-hitting it for every lead.
     if host_walled(layer_query_url):
         return None
     try:
-        r = await c.get(layer_query_url, params=params, timeout=25.0)
-        if r.status_code != 200:
-            note_host_hard_failure(layer_query_url)
-            return None
-        data = r.json()
-        if "error" in data:
-            # A token/auth wall (SCDOT-class) trips the host immediately so no
-            # later lead re-hits it; an ordinary query error (bad where clause)
-            # does not — it's per-request, not a dead host.
-            if is_token_error(data):
-                mark_host_walled(layer_query_url, reason="token/auth error")
-            return None
-        note_host_ok(layer_query_url)
-        return data.get("features") or []
-    except Exception:  # noqa: BLE001  (timeout / connection — a HARD failure)
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(3),
+            wait=wait_exponential_jitter(initial=1, max=8),
+            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, _ArcHardError)),
+            reraise=True,
+        ):
+            with attempt:
+                r = await c.get(layer_query_url, params=params, timeout=25.0)
+                if r.status_code != 200:
+                    raise _ArcHardError(f"HTTP {r.status_code}")
+                data = r.json()
+                if "error" in data:
+                    # A token/auth wall (SCDOT-class) trips the host immediately so
+                    # no later lead re-hits it; an ordinary query error (bad where
+                    # clause) does not, and neither raises for retry — it's a clean
+                    # per-request answer, not a transient failure.
+                    if is_token_error(data):
+                        mark_host_walled(layer_query_url, reason="token/auth error")
+                    return None
+                note_host_ok(layer_query_url)
+                return data.get("features") or []
+    except (_ArcHardError, httpx.TransportError, httpx.TimeoutException):
+        note_host_hard_failure(layer_query_url)
+        return None
+    except Exception:  # noqa: BLE001  (anything else — still a HARD failure)
         note_host_hard_failure(layer_query_url)
         return None
 
