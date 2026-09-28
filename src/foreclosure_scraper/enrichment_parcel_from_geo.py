@@ -26,8 +26,17 @@ a simple point query for every in-scope county:
     ``ParcelID`` …) — handled by the existing ``_scdot_parcel`` priority list.
   * NC: NC OneMap ``NC1Map_Parcels`` FeatureServer/1, statewide, parcel field
     ``parno`` (resolves Gaston/Buncombe/Henderson/Forsyth/McDowell/Polk/Lincoln/
-    Guilford/Rutherford …; Cleveland parcels are absent from this statewide
-    layer and fall through, which is fine).
+    Guilford/Rutherford/Cleveland …). CORRECTION 2026-09-28: the line that used
+    to stand here ("Cleveland parcels are absent from this statewide layer") was
+    stale — a live re-check (10/10 real Cleveland lat/lng pairs, immediate point
+    query + envelope retry) resolved every one with a correct ``cntyname:
+    'Cleveland'`` and real ``parno``. Cleveland's low identity rate on the board
+    traces to this session's parcel_from_geo runs getting cut short by NC
+    OneMap's own circuit breaker / token-wall interruptions before reaching most
+    of Cleveland's rows, not to a coverage gap. Don't build a native-NC fallback
+    for Cleveland on the strength of the old note; re-run the resolver instead
+    (``scripts/resolver_backfill_parcel.py``, chunked/checkpointed to survive an
+    interruption).
 
 This module is point-in-polygon FIRST (lat/lng -> parcel), with an
 address->parcel fallback (geocode the street to a point via the same county
