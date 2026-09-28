@@ -377,6 +377,101 @@ LAYERS: tuple[Layer, ...] = (
         value="TAXMKTVAL", detail="ACCTNO", process="tax", amount="TOTTAX",
         source_page="https://www.greenvillecounty.org/TaxCollector/OnlineTax.aspx",
     ),
+    # ------------------------------------------------------------------
+    # 2026-09-28 non-footprint code/vacant discovery pass (docs/coverage_gap_build_plan_2026-09-23.md
+    # §2.5: this family has no statewide shortcut, each county needs its own check). Ran the check
+    # against Mecklenburg, Wake, Guilford, Forsyth, Durham, Cumberland, Union, Cabarrus, Iredell NC
+    # and York, Lexington, Horry SC. Mecklenburg was already genuinely covered by
+    # city_websites/charlotte_open_data.py (not this module) so skipped here. The other 9 of these
+    # 12 (Wake, Forsyth, Cumberland, Union, Cabarrus, Iredell NC; Lexington, Horry SC) turned up
+    # nothing live and free after a real per-county search -- see that search's notes for what was
+    # checked and why each was rejected (stale one-time snapshots, boundary-only layers with no case
+    # data, thin non-property nuisance complaints, or an outright login/token wall). Only Guilford,
+    # Durham (NC) and York (SC) had a real, live, case-level hit.
+    # ------------------------------------------------------------------
+    # Greensboro (Guilford County) code compliance cases, CaseStatus='A' (active) filters the
+    # 98,696-row full case history down to 1,511 currently-open cases; CaseType='Housing' (665 of
+    # those) isolates minimum-housing/structural violations from the weaker Nuisances/Vehicle/
+    # Zoning/Front-Yard-Parking/Graffiti categories on the same layer -- several rows are absentee
+    # LLC landlords (e.g. "Trail Llc", "Place Holdings Llc") with an out-of-state or out-of-county
+    # mailing address, a real distressed-landlord signal. CaseNotes carries tenant name/phone
+    # (confirmed live, e.g. "Tenant Andicca Clarke 336-42-6399") and is deliberately NOT requested,
+    # same privacy discipline as the rest of this module.
+    Layer(
+        slug="greensboro_code_housing",
+        state="NC", county="Guilford",
+        url=("https://gis.greensboro-nc.gov/arcgis/rest/services/"
+             "OpenGateCity/OpenData_CC_DS/MapServer/1"),
+        listing_type=ListingType.DISTRESSED,
+        where="CaseStatus='A' AND CaseType='Housing'",
+        fields=("CaseNumber", "CaseType", "FullAddress", "City", "State",
+                "OwnerName", "OwnerName2", "OwnerMailAddr", "OwnerMailCity",
+                "OwnerMailState", "OwnerMailZip", "EntryDate", "CaseStatus"),
+        situs="FullAddress", city="City", owner_last="OwnerName",
+        process="code_enforcement",
+        source_page=("https://www.greensboro-nc.gov/departments/"
+                      "neighborhood-development/code-compliance"),
+    ),
+    # City of Durham's own "Open Landuse Code Violation Cases" dataset (its name, not a filter this
+    # module applies) -- 1,110 rows, case numbers running "26-xxxx" confirming it is a live current
+    # feed, not a stale export. No owner/parcel field, only situs (AddressNum + Street), so the
+    # resolver supplies the owner the same way it does for Richland's columbia_code_vacant_boarded.
+    # Topic breaks down as Repair Only (<50%) 734, Weedy/Junked Lot 225, Repair or Demolish (>50%)
+    # 50, Unsafe Building 45, Vehicle 32, Weedy Chronic Violator 17, B/C Abatement 5 -- kept as one
+    # unfiltered layer (unlike Greensboro) because "Repair or Demolish" and "Unsafe Building" alone
+    # would be too thin and the dataset's own name says these are already the open ones.
+    Layer(
+        slug="durham_open_code_violations",
+        state="NC", county="Durham",
+        url=("https://webgis2.durhamnc.gov/server/rest/services/"
+             "ProjectServices/NIS_LUCodeViolations/MapServer/0"),
+        listing_type=ListingType.DISTRESSED,
+        fields=("CaseNum", "PropertyStatus", "Topic", "AddressNum", "Street",
+                "AptSuite", "PropertyCity", "PropertyState", "PropertyZip"),
+        situs_parts=("AddressNum", "Street"), city="PropertyCity", zip_="PropertyZip",
+        detail="Topic", process="code_enforcement",
+        source_page="https://www.durhamnc.gov/1303/Custom-Maps-and-Data-Layers",
+    ),
+    # City of Rock Hill (York County) "Open Cases" code-enforcement service -- a MapServer split
+    # into ~15 per-category sub-layers sharing one schema (CaseNumber/Type/Status/AddressText/
+    # CreatedDateTime/ClosedDateTime, all NULL ClosedDateTime confirmed live). Verified counts across
+    # every sub-layer 2026-09-28: Housing 18, Demolition 15, Exterior Structure-Major 15, Exterior
+    # Structure-Minor 42, Overgrown 94, Accessory Usage 8, Junk Vehicle 9, Accessory Structure 1,
+    # Zoning 1, Short Term Rentals/Board/Exterior Property/Graffiti/Yard Debris/Unsecured Property 0.
+    # Only the three genuinely structure-distress categories are admitted here -- Overgrown/Junk
+    # Vehicle/Yard Debris/Accessory Usage are yard-nuisance complaints on otherwise-normal occupied
+    # homes (same call already made for Greensboro's Nuisances and rejected for Pickens/Anderson
+    # elsewhere in this file), not a distress signal. No owner field; case numbers run "CN-2026xxxx".
+    Layer(
+        slug="rockhill_code_housing",
+        state="SC", county="York",
+        url=("https://rockhillgis.cityofrockhill.com/arcgis/rest/services/"
+             "OpenCodeEnforcementCases/Open_Cases/MapServer/1"),
+        listing_type=ListingType.DISTRESSED,
+        fields=("CaseNumber", "Type", "Status", "AddressText", "CreatedDateTime"),
+        situs="AddressText", detail="Status", process="code_enforcement",
+        source_page="https://www.cityofrockhill.com/departments/neighborhood-services",
+    ),
+    Layer(
+        slug="rockhill_code_demolition",
+        state="SC", county="York",
+        url=("https://rockhillgis.cityofrockhill.com/arcgis/rest/services/"
+             "OpenCodeEnforcementCases/Open_Cases/MapServer/5"),
+        listing_type=ListingType.DISTRESSED,
+        fields=("CaseNumber", "Type", "Status", "AddressText", "CreatedDateTime"),
+        situs="AddressText", detail="Status", process="demolition_permit",
+        source_page="https://www.cityofrockhill.com/departments/neighborhood-services",
+    ),
+    Layer(
+        slug="rockhill_code_exterior_major",
+        state="SC", county="York",
+        url=("https://rockhillgis.cityofrockhill.com/arcgis/rest/services/"
+             "OpenCodeEnforcementCases/Open_Cases/MapServer/7"),
+        listing_type=ListingType.DISTRESSED,
+        fields=("CaseNumber", "Type", "Status", "AddressText", "CreatedDateTime"),
+        situs="AddressText", detail="Status", process="code_enforcement",
+        source_page="https://www.cityofrockhill.com/departments/neighborhood-services",
+    ),
 ) + tuple(
     # ---------------------------------------------------------------------
     # COUNTY-OWNED / SURPLUS inventory.
@@ -565,11 +660,22 @@ class ArcgisDistressLayers(BaseScraper):
         # this layer's real signal is tiny anyway (only 66 of 3,465 violations
         # are OPEN). Tolerating it was discarding all 8,693 rows from the other
         # 17 healthy layers on every run.
+        #
+        # The five 2026-09-28 additions (greensboro_code_housing,
+        # durham_open_code_violations, rockhill_code_housing/_demolition/
+        # _exterior_major) are each a brand-new, unproven single-city host
+        # this module has zero operational track record with. Tolerating
+        # them up front is the same trade already made for Greenville and
+        # Lincoln above: a first-week flake on any one of them must not
+        # discard every other county's rows the way Clinton's did.
         guard = LayerHarvest(
             self.slug, [lay.slug for lay in LAYERS],
             tolerate=("laurens_county_owned", "pickens_county_owned",
                       "burke_county_owned", "lincoln_code_violations",
-                      "greenville_unpaid_tax_parcels"),
+                      "greenville_unpaid_tax_parcels",
+                      "greensboro_code_housing", "durham_open_code_violations",
+                      "rockhill_code_housing", "rockhill_code_demolition",
+                      "rockhill_code_exterior_major"),
             attempts=3)
         async with client(timeout=45.0) as c:
             with guard:

@@ -52,9 +52,43 @@ from .enrichment_arcgis import (
 )
 from .http_client import client
 from .models import Listing
+from .parcel_cache import PARCEL_LAYERS
 from .parcel_inventory import _scdot_parcel
 
 log = structlog.get_logger()
+
+# Counties whose OWN county-hosted ArcGIS layer (already verified for
+# parcel_cache.py's offline bulk cache -- PARCEL_LAYERS[county]) has been
+# LIVE-CONFIRMED to also answer a geometry (point-in-polygon) query, not just
+# an attribute query. This is what lets a lat/lng-bearing lead resolve a
+# parcel_id when SCDOT is token-walled (2026-08-12, still dead 2026-09-28:
+# every query returns HTTP 200 + {"error":{"code":499,"message":"Token
+# Required"}}) -- SCDOT was the ONLY point-parcel source in this module before
+# this addition (see the module docstring's I-09 gap: "geometry availability
+# per layer is unverified").
+#
+# Anderson verified live 2026-09-28: `gis.cityofandersonsc.com`'s
+# `WaterUtilities/County_Parcels/FeatureServer/0` (the exact URL
+# PARCEL_LAYERS["Anderson"]["url"] already points at) answers
+# geometryType=esriGeometryPoint with a real TMS -- confirmed by deriving a
+# parcel's own centroid from its returned polygon and querying that point back
+# (round-trip match). Point-in-polygon needs no address field at all, so it
+# resolves leads whose PHYS_ADDR the layer never populated (that field is only
+# ~39% numbered on this layer -- a real data gap, not a query-capability one).
+# Tested against the 150 Anderson SC board leads with no parcel_id from the
+# three national feeds that caused the 36%->28% flip-lane regression
+# (fannie_homepath, usda_properties, terry_howe_auctions): 92 of 150 (61%)
+# newly resolve a parcel_id (48 by address match, 44 more by point-in-polygon
+# on leads whose only coordinate was a real geocode, not the Anderson
+# county-seat centroid fallback (34.504, -82.650) that ~30 of the 150 carry
+# instead of a real per-property point -- those are correctly left
+# unresolved here rather than silently attached to a random neighbour's
+# parcel).
+#
+# Only add a county here after live-verifying ITS OWN layer answers a
+# geometry query the same way -- do not assume it from the attribute-query
+# entry in PARCEL_LAYERS alone.
+NATIVE_SC_POINT_CAPABLE: frozenset[str] = frozenset({"Anderson"})
 
 # NC statewide parcel layer (same service already used by enrichment_owner_mailing
 # / enrichment_bankruptcy_property). One consistent schema across all 100 NC
@@ -197,27 +231,45 @@ async def _point_query(
     return dict(feats[0].get("attributes") or {})
 
 
-async def _parcel_from_point_sc(c, li: Listing) -> str:
-    # SCDOT is the only SC point-parcel source here; once the token wall is tripped
-    # every subsequent SC lead would just re-hit it, so short-circuit immediately.
-    if scdot_walled():
-        return ""
-    layer = SC_LAYER.get(_norm_county(li.county))
-    if layer is None:
-        return ""
-    attrs = await _point_query(c, f"{SCDOT_BASE}/{layer}/query", li.latitude, li.longitude)
-    if not attrs:
-        return ""
-    # _scdot_parcel walks the per-county field-name priority list (TAXPIN, TMS,
-    # TMS_NUMBER, PIN via fallback, ParcelID, …) and returns the unique id.
-    pid = _scdot_parcel(attrs)
-    if not pid:
-        # Some county layers only expose PIN (Greenville/Beaufort/Pickens).
-        for f in ("PIN", "PARNO", "PARID", "Parcel_ID", "PARCEL_ID"):
-            if attrs.get(f):
-                pid = str(attrs[f]).strip()
-                break
-    return _clean_parcel(pid)
+async def _parcel_from_point_sc(c, li: Listing) -> tuple[str, str]:
+    """Returns (parcel_id, source_tag). source_tag is 'scdot_point' or, for a
+    county resolved via its own layer instead, 'native_point:<County>'."""
+    county = _norm_county(li.county)
+    pid = ""
+    source = "scdot_point"
+
+    # SCDOT first (statewide, one shared host). Once its token wall is tripped,
+    # host_walled() short-circuits every subsequent SC lead — no re-hit.
+    if not scdot_walled():
+        layer = SC_LAYER.get(county)
+        if layer is not None:
+            attrs = await _point_query(c, f"{SCDOT_BASE}/{layer}/query", li.latitude, li.longitude)
+            if attrs:
+                # _scdot_parcel walks the per-county field-name priority list (TAXPIN,
+                # TMS, TMS_NUMBER, PIN via fallback, ParcelID, …) for the unique id.
+                pid = _scdot_parcel(attrs)
+                if not pid:
+                    # Some county layers only expose PIN (Greenville/Beaufort/Pickens).
+                    for f in ("PIN", "PARNO", "PARID", "Parcel_ID", "PARCEL_ID"):
+                        if attrs.get(f):
+                            pid = str(attrs[f]).strip()
+                            break
+
+    if not pid and county in NATIVE_SC_POINT_CAPABLE:
+        # SCDOT is walled (or answered with nothing) — fall back to the county's
+        # OWN ArcGIS layer, on its own host, so it isn't caught by SCDOT's breaker.
+        # This is the same PARCEL_LAYERS entry parcel_cache.py already trusts for
+        # its offline bulk cache; only counties live-verified to also answer a
+        # geometry query are listed in NATIVE_SC_POINT_CAPABLE.
+        native = PARCEL_LAYERS.get(county)
+        id_field = (native.get("id_fields") or [None])[0] if native else None
+        if native and id_field and not host_walled(native["url"]):
+            attrs = await _point_query(c, native["url"], li.latitude, li.longitude, out_fields=id_field)
+            if attrs and attrs.get(id_field):
+                pid = str(attrs[id_field]).strip()
+                source = f"native_point:{county}"
+
+    return _clean_parcel(pid), source
 
 
 # The matched OneMap record already carries the SITUS address, city and ZIP —
@@ -348,16 +400,17 @@ async def _resolve_one(c, li: Listing, counts: dict) -> None:
     if not isinstance(li.raw, dict):
         li.raw = {}
     if li.state == "SC":
-        pid = await _parcel_from_point_sc(c, li)
+        pid, source = await _parcel_from_point_sc(c, li)
     elif li.state == "NC":
         pid = await _parcel_from_point_nc(c, li)
+        source = "nc_onemap_point"
     else:
         return
     if not pid:
         return
     li.parcel_id = pid
     li.raw["parcel_from_geo"] = {
-        "source": "scdot_point" if li.state == "SC" else "nc_onemap_point",
+        "source": source,
         "lat": li.latitude,
         "lng": li.longitude,
     }

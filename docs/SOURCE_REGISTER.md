@@ -1,12 +1,12 @@
 # MASTER SOURCE REGISTER
 
-Generated 2026-09-15 20:15 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
+Generated 2026-09-28 09:05 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
-- Scrapers in the registry: **229**
-- Producing rows on the board: **129**
-- Registered but contributing ZERO rows: **100**
+- Scrapers in the registry: **234**
+- Producing rows on the board: **128**
+- Registered but contributing ZERO rows: **106**
 - Confirmed real and not yet built: **3**
-- Board read: `docs/listings.json.gz` (175,518 rows)
+- Board read: `data/checkpoint/board.json.gz` (197,890 rows)
 
 Sections: [1 Built and producing](#1-built-and-producing) · [2 Built but zero rows](#2-built-but-producing-zero-rows) · [3 Not built yet](#3-not-built-yet) · [4 Will not / cannot build](#4-will-not-build-cannot-build-not-published) · [5 Checked and rejected](#5-checked-and-rejected-not-a-distress-signal)
 
@@ -18,135 +18,134 @@ Live row counts are what the source actually contributed to the board read above
 
 | Slug | Rows | Top counties | URLs in the module |
 |---|---:|---|---|
-| `counties_sc.qpaybill_delinquent_roll` | 33,955 | Spartanburg SC (3859), Sumter SC (3095), Darlington SC (2684) | `https://{sub` |
-| `counties_sc.sc_dew_lien_registry` | 8,871 | Charleston SC (3388), Horry SC (1728), Spartanburg SC (1248) | `https://uitax.dew.sc.gov/LienRegistry/`<br>`https://dew.sc.gov/benefit-lien-registry`<br>`https://uitax.dew.sc.gov/CoreServices/Lien/TaxLienRegistry.svc/SearchTaxLienRegistry`<br>_+1 more_ |
-| `counties_nc.gaston_vacant` | 7,044 | Gaston NC (7044) | `https://gis.gastoncountync.gov/publicgis/rest/services/` |
-| `counties_nc.transylvania_vacant` | 5,333 | Transylvania NC (5333) | `https://gis.transylvaniacounty.org/server/rest/services/Parcels/FeatureServer/2/query` |
-| `counties_sc.sc_public_index` | 5,070 | Spartanburg SC (922), Laurens SC (887), Anderson SC (850) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county` |
-| `counties_nc.rutherford_tax` | 4,171 | Rutherford NC (4171) | `https://www.rutherfordcountync.gov/`<br>`https://www.rutherfordcountync.gov/departments/` |
-| `counties_nc.buncombe_elderly` | 2,988 | Buncombe NC (2988) | `https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query` |
-| `city_websites.charlotte_open_data` | 2,973 | Mecklenburg NC (2973) | `https://gis.charlottenc.gov/arcgis/rest/services/HNS/CodeEnforcementCasesAll/MapServer/0`<br>`https://gis.charlottenc.gov/arcgis/rest/services/HNS/`<br>`https://gis.charlottenc.gov/arcgis/rest/services/HNS/CodeEnforcementCasesAll/MapServer/0/{case_num` |
-| `counties_sc.sc_ust_registry` | 2,611 | Spartanburg SC (926), Anderson SC (623), Pickens SC (313) | `https://apps.des.sc.gov/USTRegistry/` |
-| `counties_sc.berkeley_paystar_tax` | 2,349 | Berkeley SC (2349) | `https://berkeleycountysc.paystar.io/api/search`<br>`https://berkeleycountysc.paystar.io/api/invoices/{invoiceNumberHash`<br>`https://berkeleycountysc.paystar.io` |
-| `counties_sc.greenville_delinquent_tax` | 2,287 | Greenville SC (2287) | `https://www.greenvillecounty.org/appsAS400/Taxsale/` |
-| `counties_nc.lincoln_vacant` | 2,199 | Lincoln NC (2199) | `https://arcgisserver.lincolncounty.org/arcgis/rest/services/ComDevData/MapServer/25/query` |
-| `counties_sc.florence_delinquent_tax` | 2,006 | Florence SC (2006) | `https://www.florenceco.org/offices/delinquent-tax/` |
-| `counties_sc.pickens_delinquent_parcels` | 1,854 | Pickens SC (1854) | `https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services`<br>`https://www.co.pickens.sc.us/departments/delinquent_tax/index.php` |
-| `counties_nc.nc_county_pdf_delinquent_tax` | 1,773 | McDowell NC (1371), Lincoln NC (402) | `https://www.lincolncountync.gov/DocumentCenter/View/25558/2025-TAXESDelinquentAdvertisementNotice`<br>`https://www.catawbacountync.gov/site/assets/files/11653/delinquent_advertisement_list-hdr_2026.pdf`<br>`https://mcdowellnc.gov/departments/tax-collections/tax-lien-advertisement/ADVERTISEMENT-LIST-FINAL-2025.pdf` |
-| `counties_sc.spartanburg_delinquent_tax` | 1,709 | Spartanburg SC (1709) | `https://www.spartanburgcounty.gov/DocumentCenter/View/11161/Real-Property-Tax-Sale-List-PDF`<br>`https://www.spartanburgcounty.gov/DocumentCenter/View/11161/`<br>`https://www.spartanburgcounty.gov/640/2025-Tax-Sale-Info` |
-| `national.sc_public_index` | 1,509 | Charleston SC (1509) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county`<br>`https://jcmsweb.charlestoncounty.org/PublicIndex/`<br>_+1 more_ |
-| `counties_sc.spartanburg_vacant` | 1,257 | Spartanburg SC (1257) | `https://services9.arcgis.com/HoRra3ATPLGmyjn6/arcgis/rest/services/`<br>`https://services9.arcgis.com/HoRra3ATPLGmyjn6/` |
-| `counties_nc.nc_county_csv_delinquent_tax` | 1,222 | New Hanover NC (1222) | `https://www.nhcgov.com/DocumentCenter/View/11283/Delinquent_Taxpayers_Report_CSV` |
-| `counties_nc.nc_ptscloud_delinquent_tax` | 1,155 | Henderson NC (1122), Hyde NC (33) | `https://bcpwa.ncptscloud.com` |
-| `counties_sc.charleston_delinquent_tax` | 1,125 | Charleston SC (1125) | `https://charlestoncounty.gov/departments/delinquent-tax/`<br>`https://www.charlestoncounty.gov/departments/delinquent-tax/files/RP-Tax-Sale-Listing.pdf`<br>`https://www.charlestoncounty.gov/departments/delinquent-tax/files/MH-Tax-Sale-Listing.pdf` |
-| `counties_sc.spartanburg_condemned` | 1,071 | Spartanburg SC (1071) | `https://maps.spartanburgcounty.org/server/rest/services/` |
-| `counties_nc.buncombe_delinquent_tax` | 938 | Buncombe NC (938) | `https://media.buncombenc.gov/common/tax/buncombe-county-tax-department-advertisement-of-tax-liens.pdf`<br>`https://media.buncombenc.gov/common/tax/` |
-| `counties_sc.dillon_delinquent_tax` | 825 | Dillon SC (825) | `https://www.dilloncountysc.org/departments/treasurer.php`<br>`https://www.dilloncountysc.org/` |
-| `public_notices.nc_notices_counties` | 708 | Buncombe NC (211), Gaston NC (89), Rutherford NC (75) | `https://www.ncnotices.com/Search.aspx`<br>`https://www.ncnotices.com/Details.aspx?ID={` |
-| `counties_sc.sc_public_notices` | 698 | Cherokee SC (133), Charleston SC (106), Pickens SC (96) | `https://www.scpublicnotices.com/Search.aspx`<br>`https://www.scpublicnotices.com/Details.aspx?ID={n[` |
-| `counties_nc.nc_heir_estate_parcels` | 679 | Rutherford NC (123), Polk NC (87), Laurens SC (76) | _(no literal URL in module)_ |
-| `counties_nc.nc_ecourts_lis_pendens` | 671 | Brunswick NC (129), Onslow NC (66), New Hanover NC (66) | `https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/`<br>`https://portal-nc.tylertech.cloud/app/NCJudgmentSearchService/search`<br>`https://portal-nc.tylertech.cloud` |
-| `national.courtlistener_bankruptcy` | 642 | Anderson SC (105), Buncombe NC (85), Henderson NC (70) | `https://www.courtlistener.com/sign-up/`<br>`https://www.courtlistener.com/profile/api/`<br>`https://www.courtlistener.com/api/rest/v4`<br>_+1 more_ |
-| `counties_nc.asheville_str_permits` | 555 | Buncombe NC (555) | `https://gis.ashevillenc.gov/server/rest/services/Permits/`<br>`https://gis.ashevillenc.gov/server/rest/services/Permits/HomestayPermitsView/MapServer/5` |
+| `counties_sc.qpaybill_delinquent_roll` | 30,329 | Spartanburg SC (3209), Sumter SC (3074), Darlington SC (2505) | `https://dilloncountysctaxes.qpaybill.com/Taxes/`<br>`https://edgefieldcountysc.qpaybill.com/`<br>`https://{sub` |
+| `counties_sc.sc_dew_lien_registry` | 8,475 | Charleston SC (3328), Horry SC (1688), Spartanburg SC (1106) | `https://uitax.dew.sc.gov/LienRegistry/`<br>`https://dew.sc.gov/benefit-lien-registry`<br>`https://uitax.dew.sc.gov/CoreServices/Lien/TaxLienRegistry.svc/SearchTaxLienRegistry`<br>_+1 more_ |
+| `counties_nc.nc_ptscloud_delinquent_tax` | 7,604 | Forsyth NC (4655), Orange NC (1231), Henderson NC (1180) | `https://bcpwa.ncptscloud.com` |
+| `counties_nc.gaston_vacant` | 7,142 | Gaston NC (7142) | `https://gis.gastoncountync.gov/publicgis/rest/services/` |
+| `counties_nc.rutherford_tax` | 6,725 | Rutherford NC (6725) | `https://www.rutherfordcountync.gov/`<br>`https://www.rutherfordcountync.gov/departments/` |
+| `counties_nc.transylvania_vacant` | 5,319 | Transylvania NC (5319) | `https://gis.transylvaniacounty.org/server/rest/services/Parcels/FeatureServer/2/query` |
+| `counties_sc.horry_delinquent_xlsx` | 4,949 | Horry SC (4949) | `https://www.horrycountysc.gov/media/b5af14ce/delinquent-list-on-website-081926.xlsx`<br>`https://www.horrycountysc.gov/departments/treasurer/delinquent-tax/` |
+| `counties_sc.sc_public_index` | 4,896 | Spartanburg SC (1008), Anderson SC (888), Laurens SC (816) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county` |
+| `national.courtlistener_bankruptcy` | 4,717 | Buncombe NC (60), Henderson NC (47), Anderson SC (36) | `https://www.courtlistener.com/sign-up/`<br>`https://www.courtlistener.com/profile/api/`<br>`https://www.courtlistener.com/api/rest/v4`<br>_+1 more_ |
+| `counties_nc.buncombe_elderly` | 3,894 | Buncombe NC (3894) | `https://gis.buncombecounty.org/arcgis/rest/services/property_bc_dis/MapServer/1/query` |
+| `city_websites.charlotte_open_data` | 3,521 | Mecklenburg NC (3521) | `https://gis.charlottenc.gov/arcgis/rest/services/HNS/CodeEnforcementCasesAll/MapServer/0`<br>`https://gis.charlottenc.gov/arcgis/rest/services/HNS/`<br>`https://gis.charlottenc.gov/arcgis/rest/services/HNS/CodeEnforcementCasesAll/MapServer/0/{case_num` |
+| `counties_sc.spartanburg_vacant` | 3,479 | Spartanburg SC (3479) | `https://services9.arcgis.com/HoRra3ATPLGmyjn6/arcgis/rest/services/`<br>`https://services9.arcgis.com/HoRra3ATPLGmyjn6/` |
+| `counties_sc.sc_ust_registry` | 2,774 | Spartanburg SC (971), Anderson SC (660), Pickens SC (332) | `https://apps.des.sc.gov/USTRegistry/` |
+| `counties_nc.nc_county_pdf_delinquent_tax` | 2,450 | McDowell NC (1763), Lincoln NC (455), Catawba NC (228) | `https://www.lincolncountync.gov/DocumentCenter/View/25558/2025-TAXESDelinquentAdvertisementNotice`<br>`https://www.catawbacountync.gov/site/assets/files/11653/delinquent_advertisement_list-hdr_2026.pdf`<br>`https://mcdowellnc.gov/departments/tax-collections/tax-lien-advertisement/ADVERTISEMENT-LIST-FINAL-2025.pdf` |
+| `counties_sc.berkeley_paystar_tax` | 2,336 | Berkeley SC (2336) | `https://berkeleycountysc.paystar.io/api/search`<br>`https://berkeleycountysc.paystar.io/api/invoices/{invoiceNumberHash`<br>`https://berkeleycountysc.paystar.io` |
+| `counties_sc.charleston_tax_sale_xlsx` | 2,210 | Charleston SC (2210) | `https://www.charlestoncounty.gov/departments/delinquent-tax/files/tax_sale/RP-Tax-Sale-Listing.xlsx`<br>`https://www.charlestoncounty.gov/departments/delinquent-tax/files/tax_sale/MH-Tax-Sale-Listing.xlsx`<br>`https://www.charlestoncounty.gov/departments/delinquent-tax/` |
+| `counties_nc.lincoln_vacant` | 2,118 | Lincoln NC (2117), Cleveland NC (1) | `https://arcgisserver.lincolncounty.org/arcgis/rest/services/ComDevData/MapServer/25/query` |
+| `counties_sc.greenville_delinquent_tax` | 2,108 | Greenville SC (2108) | `https://www.greenvillecounty.org/appsAS400/Taxsale/` |
+| `counties_sc.pickens_delinquent_parcels` | 2,070 | Pickens SC (2070) | `https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services`<br>`https://www.co.pickens.sc.us/departments/delinquent_tax/index.php` |
+| `counties_sc.florence_delinquent_tax` | 1,988 | Florence SC (1988) | `https://www.florenceco.org/offices/delinquent-tax/` |
+| `counties_sc.spartanburg_delinquent_tax` | 1,986 | Spartanburg SC (1986) | `https://www.spartanburgcounty.gov/DocumentCenter/View/11161/Real-Property-Tax-Sale-List-PDF`<br>`https://www.spartanburgcounty.gov/DocumentCenter/View/11161/`<br>`https://www.spartanburgcounty.gov/640/2025-Tax-Sale-Info` |
+| `counties_sc.spartanburg_condemned` | 1,768 | Spartanburg SC (1768) | `https://maps.spartanburgcounty.org/server/rest/services/` |
+| `counties_nc.albemarle_observer_tax_lists` | 1,756 | Bertie NC (1076), Gates NC (409), Tyrrell NC (270) | `https://albemarleobserver.news/wp-json/wp/v2/posts?search=delinquent&per_page=50`<br>`https://albemarleobserver.news/wp-json/wp/v2/posts/`<br>`https://albemarleobserver.news/wp-json/wp/v2/posts` |
+| `counties_nc.nc_county_csv_delinquent_tax` | 1,321 | New Hanover NC (1321) | `https://www.nhcgov.com/DocumentCenter/View/11283/Delinquent_Taxpayers_Report_CSV` |
+| `national.hud_reac_inspection` | 1,260 | Mecklenburg NC (134), Richland SC (83), Wake NC (82) | `https://www.hud.gov/sites/default/files/Housing/documents/MF-Inspection-Report.xls```<br>`https://www.hud.gov/sites/default/files/Housing/documents/`<br>`https://www.hud.gov/stat/mfh/inspection-scores` |
+| `counties_sc.charleston_delinquent_tax` | 1,217 | Charleston SC (1217) | `https://charlestoncounty.gov/departments/delinquent-tax/`<br>`https://www.charlestoncounty.gov/departments/delinquent-tax/files/RP-Tax-Sale-Listing.pdf`<br>`https://www.charlestoncounty.gov/departments/delinquent-tax/files/MH-Tax-Sale-Listing.pdf` |
+| `public_notices.nc_notices_counties` | 925 | Buncombe NC (242), Gaston NC (121), Brunswick NC (83) | `https://www.ncnotices.com/Search.aspx`<br>`https://www.ncnotices.com/Details.aspx?ID={` |
+| `national.fannie_homepath` | 874 | Spartanburg SC (343), Laurens SC (122), Anderson SC (100) | `https://homepath.fanniemae.com/cfl/property-inventory/search`<br>`https://homepath.fanniemae.com/`<br>`https://homepath.fanniemae.com/property/{uuid` |
+| `counties_nc.buncombe_delinquent_tax` | 828 | Buncombe NC (828) | `https://media.buncombenc.gov/common/tax/buncombe-county-tax-department-advertisement-of-tax-liens.pdf`<br>`https://media.buncombenc.gov/common/tax/` |
+| `counties_sc.sc_public_notices` | 824 | Cherokee SC (142), Charleston SC (135), Pickens SC (128) | `https://www.scpublicnotices.com/Search.aspx`<br>`https://www.scpublicnotices.com/Details.aspx?ID={n[` |
+| `counties_sc.dillon_delinquent_tax` | 822 | Dillon SC (822) | `https://www.dilloncountysc.org/departments/treasurer.php`<br>`https://www.dilloncountysc.org/` |
+| `counties_sc.greenville_tax_distress` | 766 | Greenville SC (766) | `https://www.gcgis.org/arcgis3/rest/services/GreenvilleNJ/QueryLayers/MapServer`<br>`https://www.greenvillecounty.org/appsAS400/Taxsale/`<br>`https://www.greenvillecounty.org/appsAS400/Probate/`<br>_+1 more_ |
+| `counties_nc.nc_ecourts_lis_pendens` | 757 | Brunswick NC (145), New Hanover NC (89), Onslow NC (84) | `https://portal-nc.tylertech.cloud/app/NCJudgmentSearch/`<br>`https://portal-nc.tylertech.cloud/app/NCJudgmentSearchService/search`<br>`https://portal-nc.tylertech.cloud` |
+| `counties_nc.nc_heir_estate_parcels` | 672 | Rutherford NC (146), Polk NC (93), Laurens SC (66) | _(no literal URL in module)_ |
+| `national.usda_properties` | 662 | Anderson SC (118), Laurens SC (113), Pickens SC (110) | `https://usdaproperties.com/property/`<br>`https://www.usdaproperties.com/property/sc/county/`<br>`https://www.usdaproperties.com`<br>_+1 more_ |
+| `counties_sc.oconee_flc_assignment` | 585 | Oconee SC (585) | `https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services/`<br>`https://oconeesc.com/auditor-home/forfeited-land` |
+| `counties_nc.asheville_str_permits` | 583 | Buncombe NC (583) | `https://gis.ashevillenc.gov/server/rest/services/Permits/`<br>`https://gis.ashevillenc.gov/server/rest/services/Permits/HomestayPermitsView/MapServer/5` |
+| `national.landandfarm` | 562 | Polk NC (44), Henderson NC (43), Gaston NC (41) | `https://www.landandfarm.com/search/{state_slug` |
+| `counties_nc.nc_its_public_tax` | 530 | Graham NC (511), Onslow NC (19) | `https://tax.onslowcountync.gov/ITSPublicON/TaxBillSearch`<br>`https://www.bttaxpayerportal.com/ITSPublicGR2.0/TaxBillSearch`<br>`https://tax.onslowcountync.gov/ITSPublicON`<br>_+1 more_ |
 | `counties_sc.cherokee_delinquent_tax` | 528 | Cherokee SC (528) | `https://www.cherokeecountysc.gov/wp-json/wp/v2/media` |
-| `national.landwatch` | 502 | Burke NC (47), McDowell NC (34), Dare NC (32) | `https://www.landwatch.com/{state_slug` |
-| `national.fannie_homepath` | 494 | Spartanburg SC (204), Laurens SC (69), Pender NC (30) | `https://homepath.fanniemae.com/cfl/property-inventory/search`<br>`https://homepath.fanniemae.com/`<br>`https://homepath.fanniemae.com/property/{uuid` |
-| `counties_sc.oconee_flc_assignment` | 490 | Oconee SC (490) | `https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services/`<br>`https://oconeesc.com/auditor-home/forfeited-land` |
-| `national.landandfarm` | 470 | Cleveland NC (33), Polk NC (33), Gaston NC (33) | `https://www.landandfarm.com/search/{state_slug` |
-| `counties.multi_year_delinquent_tax` | 458 | Buncombe NC (322), Oconee SC (135), Pickens SC (1) | `https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services`<br>`https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services`<br>`https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services`<br>_+3 more_ |
-| `counties_sc.sc_public_index_lis_pendens` | 401 | Anderson SC (176), Spartanburg SC (113), Laurens SC (31) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county` |
-| `counties_sc.georgetown_civicengage` | 365 | Georgetown SC (365) | `https://www.gtcountysc.gov` |
-| `counties_sc.terry_howe_auctions` | 335 | Spartanburg SC (140), Laurens SC (118), Anderson SC (36) | `https://terryhowe.com/wp-json/wp/v2/auctions` |
-| `national.usda_properties` | 334 | Spartanburg SC (48), Anderson SC (48), Pickens SC (48) | `https://usdaproperties.com/property/`<br>`https://www.usdaproperties.com/property/sc/county/`<br>`https://www.usdaproperties.com`<br>_+1 more_ |
-| `counties_sc.greenville_mie_adverts` | 309 | Greenville SC (309) | `https://mie.greenvillejournal.com` |
-| `national.distressed` | 282 | Gaston NC (46), Spartanburg SC (38), Anderson SC (36) | _(no literal URL in module)_ |
-| `counties_sc.sc_probate_net` | 265 | Charleston SC (265) | `https://www.southcarolinaprobate.net/search/```<br>`https://www.southcarolinaprobate.net/search/` |
-| `national.craigslist_fsbo` | 255 | - | `https://sapi.craigslist.org/web/v8/postings/search/full`<br>`https://{host` |
-| `counties_nc.nc_ecourts_divorce` | 241 | Buncombe NC (44), New Hanover NC (38), Gaston NC (32) | `https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29`<br>`https://portal-nc.tylertech.cloud/Portal`<br>`https://portal-nc.tylertech.cloud` |
-| `counties_nc.transylvania_delinquent_tax` | 233 | Transylvania NC (233) | `https://tax.transylvaniacounty.org/TaxBillSearch`<br>`https://tax.transylvaniacounty.org` |
-| `counties_nc.mcdowell_probate` | 227 | McDowell NC (227) | `https://services9.arcgis.com/ETP7IuCigkUz7iI9/arcgis/rest/services/` |
-| `national.hud_reac_inspection` | 213 | Spartanburg SC (42), Gaston NC (24), Anderson SC (23) | `https://www.hud.gov/sites/default/files/Housing/documents/MF-Inspection-Report.xls```<br>`https://www.hud.gov/sites/default/files/Housing/documents/`<br>`https://www.hud.gov/stat/mfh/inspection-scores` |
-| `counties_sc.oconee_forfeited_land` | 208 | Oconee SC (208) | `https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services/`<br>`https://oconeesc.com/auditor-home/forfeited-land` |
-| `counties_sc.spartan_weekly_legals` | 188 | Spartanburg SC (188) | `https://www.spartanweeklyonline.com` |
-| `counties_sc.sc_rod_acclaim` | 173 | Pickens SC (173) | _(no literal URL in module)_ |
-| `counties_sc.pickens_tax_sale` | 160 | Pickens SC (160) | `https://www.co.pickens.sc.us/departments/delinquent_tax/index.php`<br>`https://www.co.pickens.sc.us/` |
-| `national.zillow_foreclosures` | 159 | Onslow NC (13), Horry SC (9), Craven NC (7) | `https://www.zillow.com/{state.lower(` |
-| `counties_nc.henderson_code_violations` | 154 | Henderson NC (154) | `https://services1.arcgis.com/ZfV5vUaX5QvLLBi9/arcgis/rest/services/`<br>`https://www.hendersoncountync.gov/planning` |
-| `public_notices.gannett_obituaries` | 131 | Buncombe NC (56), Spartanburg SC (32), Anderson SC (26) | `https://www.{host` |
-| `counties_sc.york_overage_claims` | 119 | York SC (119) | `https://www.yorkcountysc.gov/DocumentCenter/View/2828/OVERAGE-CLAIM-LIST` |
-| `counties_nc.asheville_helene` | 115 | Buncombe NC (115) | `https://services.arcgis.com/aJ16ENn1AaqdFlqx/arcgis/rest/services/` |
-| `law_firms.hutchens` | 107 | Spartanburg SC (15), Gaston NC (12), Buncombe NC (8) | `https://sales.hutchenslawfirm.com/NCfcSalesList.aspx`<br>`https://sales.hutchenslawfirm.com/SCfcSalesList.aspx` |
-| `national.zillow_bulk` | 93 | Spartanburg SC (16), Gaston NC (13), Anderson SC (10) | `https://www.zillow.com/{state.lower(` |
-| `counties_sc.spartanburg_city_condemned` | 83 | Spartanburg SC (83) | `https://www.cityofspartanburg.org/robots.txt`<br>`https://www.cityofspartanburg.org/DocumentCenter/View/1901/`<br>`https://www.cityofspartanburg.org/` |
-| `counties_sc.sc_state_tax_lien` | 81 | Horry SC (14), Berkeley SC (9), Lexington SC (7) | `https://mydorway.dor.sc.gov/?link=delinquentind`<br>`https://dor.sc.gov/delinquent-taxpayers` |
-| `counties.column_legal_notices` | 78 | Burke NC (20), McDowell NC (20), Gaston NC (13) | `https://us-central1-enotice-production.cloudfunctions.net/api/search/public-notices`<br>`https://us-central1-enotice-production.cloudfunctions.net` |
-| `national.foreclosure_dot_com` | 75 | Gaston NC (19), Anderson SC (17), Cleveland NC (7) | `https://www.foreclosure.com/listing/search?q=North%20Carolina&pa=100000&view=list`<br>`https://www.foreclosure.com/listing/search?q=South%20Carolina&pa=100000&view=list`<br>`https://www.foreclosure.com/listings/charlotte-nc/`<br>_+35 more_ |
-| `counties_sc.sc_flc` | 73 | Anderson SC (73) | `https://www.spartanburgcounty.gov/216/Tax-Collector`<br>`https://www.andersoncountysc.org/departments-a-z/treasurer/`<br>`https://www.pickenscountysc.gov/treasurer/tax-sale`<br>_+5 more_ |
-| `law_firms.brock_scott` | 71 | Spartanburg SC (24), Gaston NC (9), Anderson SC (7) | `https://www.brockandscott.com/foreclosure-sales/` |
-| `law_firms.shapiro_ingle_powerbi` | 65 | Gaston NC (23), Buncombe NC (15), Cleveland NC (7) | `https://www.logs.com/nc-upcoming-sales-report.html`<br>`https://app.powerbi.com/view?r=`<br>`https://wabi-us-north-central-h-primary-api.analysis.windows.net`<br>_+2 more_ |
+| `national.landwatch` | 488 | Burke NC (46), Brunswick NC (37), Pender NC (35) | `https://www.landwatch.com/{state_slug` |
+| `counties_sc.oconee_forfeited_land` | 451 | Oconee SC (451) | `https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services/`<br>`https://oconeesc.com/auditor-home/forfeited-land` |
+| `counties.multi_year_delinquent_tax` | 418 | Buncombe NC (366), Oconee SC (49), Pickens SC (3) | `https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services`<br>`https://services1.arcgis.com/UOvRn2Rvzysthh3i/arcgis/rest/services`<br>`https://services1.arcgis.com/59960rq18IxUcAVI/arcgis/rest/services`<br>_+3 more_ |
+| `counties_sc.georgetown_civicengage` | 397 | Georgetown SC (397) | `https://www.gtcountysc.gov` |
+| `counties_nc.rutherford_wildfire_tax` | 367 | Rutherford NC (367) | `https://www.rutherfordcountync.gov/tax_search/index.php`<br>`https://d1ebsyxxbc7tep.cloudfront.net`<br>`https://{m.group(1` |
+| `counties_nc.transylvania_delinquent_tax` | 336 | Transylvania NC (335), Henderson NC (1) | `https://tax.transylvaniacounty.org/TaxBillSearch`<br>`https://tax.transylvaniacounty.org` |
+| `counties_sc.sc_public_index_lis_pendens` | 325 | Anderson SC (126), Spartanburg SC (95), Laurens SC (27) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county` |
+| `counties_nc.nc_ecourts_divorce` | 304 | Buncombe NC (48), New Hanover NC (43), Gaston NC (40) | `https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29`<br>`https://portal-nc.tylertech.cloud/Portal`<br>`https://portal-nc.tylertech.cloud` |
+| `counties_nc.mcdowell_probate` | 297 | McDowell NC (297) | `https://services9.arcgis.com/ETP7IuCigkUz7iI9/arcgis/rest/services/` |
+| `counties_sc.terry_howe_auctions` | 293 | Laurens SC (118), Spartanburg SC (109), Anderson SC (34) | `https://terryhowe.com/wp-json/wp/v2/auctions` |
+| `counties_sc.greenville_mie_adverts` | 285 | Greenville SC (285) | `https://mie.greenvillejournal.com` |
+| `national.distressed` | 283 | Gaston NC (41), Anderson SC (34), Henderson NC (33) | _(no literal URL in module)_ |
+| `counties_sc.sc_probate_net` | 280 | Charleston SC (280) | `https://www.southcarolinaprobate.net/search/```<br>`https://www.southcarolinaprobate.net/search/` |
+| `national.craigslist_fsbo` | 261 | - | `https://sapi.craigslist.org/web/v8/postings/search/full`<br>`https://{host` |
+| `national.courtlistener_adversary` | 255 | Macon NC (1), Wilson NC (1), Catawba NC (1) | `https://www.courtlistener.com` |
+| `national.hud_section8_contracts` | 244 | Gaston NC (26), Spartanburg SC (26), Charleston SC (19) | `https://www.hud.gov/hud-partners/multifamily-assist-section8-database`<br>`https://www.hud.gov/sites/dfiles/Housing/documents/`<br>`https://www.hud.gov/hud-partners/` |
+| `public_notices.gannett_obituaries` | 226 | Buncombe NC (47), Spartanburg SC (45), Anderson SC (38) | `https://www.{host` |
+| `counties_sc.sc_rod_acclaim` | 192 | Pickens SC (192) | _(no literal URL in module)_ |
+| `national.zillow_foreclosures` | 186 | Onslow NC (19), Horry SC (14), Gaston NC (8) | `https://www.zillow.com/{state.lower(` |
+| `counties_nc.henderson_code_violations` | 182 | Henderson NC (182) | `https://services1.arcgis.com/ZfV5vUaX5QvLLBi9/arcgis/rest/services/`<br>`https://www.hendersoncountync.gov/planning` |
+| `national.foreclosure_dot_com` | 170 | Buncombe NC (66), Anderson SC (48), Spartanburg SC (18) | `https://www.foreclosure.com/listing/search?q=North%20Carolina&pa=100000&view=list`<br>`https://www.foreclosure.com/listing/search?q=South%20Carolina&pa=100000&view=list`<br>`https://www.foreclosure.com/listings/charlotte-nc/`<br>_+35 more_ |
+| `counties.column_legal_notices` | 140 | Marlboro SC (39), Marion SC (32), McDowell NC (25) | `https://us-central1-enotice-production.cloudfunctions.net/api/search/public-notices`<br>`https://us-central1-enotice-production.cloudfunctions.net` |
+| `counties_sc.spartan_weekly_legals` | 112 | Spartanburg SC (112) | `https://www.spartanweeklyonline.com` |
+| `counties_sc.york_overage_claims` | 107 | York SC (107) | `https://www.yorkcountysc.gov/DocumentCenter/View/2828/OVERAGE-CLAIM-LIST` |
+| `counties_nc.asheville_helene` | 102 | Buncombe NC (102) | `https://services.arcgis.com/aJ16ENn1AaqdFlqx/arcgis/rest/services/` |
+| `counties_sc.spartanburg_city_condemned` | 91 | Spartanburg SC (91) | `https://www.cityofspartanburg.org/robots.txt`<br>`https://www.cityofspartanburg.org/DocumentCenter/View/1901/`<br>`https://www.cityofspartanburg.org/` |
+| `counties_sc.sc_state_tax_lien` | 82 | Horry SC (15), Berkeley SC (9), Lexington SC (8) | `https://mydorway.dor.sc.gov/?link=delinquentind`<br>`https://dor.sc.gov/delinquent-taxpayers` |
+| `law_firms.shapiro_ingle_powerbi` | 74 | Gaston NC (23), Buncombe NC (17), Cleveland NC (11) | `https://www.logs.com/nc-upcoming-sales-report.html`<br>`https://app.powerbi.com/view?r=`<br>`https://wabi-us-north-central-h-primary-api.analysis.windows.net`<br>_+2 more_ |
+| `counties_sc.sc_flc` | 73 | Anderson SC (73) | `https://www.spartanburgcounty.gov/216/Tax-Collector`<br>`https://www.andersoncountysc.org/departments-a-z/treasurer/`<br>`https://www.pickenscountysc.gov/treasurer/tax-sale`<br>_+6 more_ |
 | `counties_sc.sc_des_brownfields` | 64 | Statewide SC (64) | `https://des.sc.gov/programs/bureau-land-waste-management/`<br>`https://des.sc.gov/community/environmental-sites-projects` |
-| `counties_nc.lincoln_code_violations` | 63 | Lincoln NC (63) | `https://arcgisserver.lincolncountync.gov/arcgis/rest/services/` |
-| `law_firms.zacchaeus` | 55 | Guilford NC (10), Cabarrus NC (6), Richmond NC (6) | `https://www.zls-nc.com/listings` |
-| `counties_sc.charleston_mie` | 54 | Charleston SC (54) | `https://charlestoncounty.gov/foreclosure/runninglist.html`<br>`https://charlestoncounty.gov/departments/master-in-equity/rosters/` |
-| `counties_nc.hendersonville_vacant_structures` | 45 | Henderson NC (45) | `https://services1.arcgis.com/UTZTmZoX2rsa9yFA/arcgis/rest/services/`<br>`https://www.hvlnc.gov/community-development` |
-| `national.auction_dot_com` | 39 | Spartanburg SC (3), Cherokee SC (2), Lincoln NC (2) | `https://www.auction.com/residential/nc/`<br>`https://www.auction.com/residential/sc/`<br>`https://www.auction.com/details/{slug` |
-| `national.hud_section8_contracts` | 37 | Gaston NC (9), Anderson SC (5), Spartanburg SC (5) | `https://www.hud.gov/hud-partners/multifamily-assist-section8-database`<br>`https://www.hud.gov/sites/dfiles/Housing/documents/`<br>`https://www.hud.gov/hud-partners/` |
-| `public_notices.ncnotices` | 34 | Buncombe NC (23), Polk NC (4), Burke NC (2) | `https://www.ncnotices.com/`<br>`https://www.ncnotices.com{raw_href` |
-| `law_firms.kania` | 31 | Burke NC (11), Rutherford NC (7), Lincoln NC (7) | `https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/`<br>`https://kanialawfirm.com/wp-admin/admin-ajax.php` |
-| `national.estate_sales` | 25 | Cleveland NC (8), Buncombe NC (6), Gaston NC (5) | `https://www.estatesales.net`<br>`https://www.estatesale.com`<br>`https://{host` |
-| `national.xome` | 24 | Anderson SC (3), Cleveland NC (2), Spartanburg SC (1) | `https://www.xome.com/auctions/bank-owned`<br>`https://www.xome.com/auctions/foreclosure-homes`<br>`https://www.xome.com/auctions/foreclosuresales`<br>_+1 more_ |
-| `counties_sc.terry_howe_flc` | 23 | Laurens SC (16), Spartanburg SC (7) | `https://terryhowe.com/wp-json/wp/v2/auctions?per_page=100&_fields=id,title,link,content` |
-| `national.cash_buyer_deeds` | 23 | McDowell NC (21), Burke NC (2) | `https://{host` |
-| `national.servicelink_auction` | 23 | Spartanburg SC (5), Gaston NC (5), Buncombe NC (3) | `https://ui.exostechnology.com/api/listingsvc/v1/listings?limit=100&state={ST`<br>`https://ui.exostechnology.com/api/listingsvc/v1/listings`<br>`https://www.servicelinkauction.com`<br>_+1 more_ |
-| `counties_sc.horry_flc` | 22 | Horry SC (22) | `https://www.horrycountysc.gov/boards-and-commissions/`<br>`https://www.horrycountysc.gov/media/om1d2bwo/2025-flc-list-42126.xlsx`<br>`https://www.horrycountysc.gov` |
-| `national.trulia` | 22 | Spartanburg SC (3) | `https://www.trulia.com/foreclosures/`<br>`https://www.trulia.com/foreclosures/Charlotte,NC/`<br>`https://www.trulia.com/foreclosures/Raleigh,NC/`<br>_+6 more_ |
-| `national.crexi_multifamily` | 21 | Polk NC (2), Pickens SC (2), Oconee SC (2) | `https://www.crexi.com` |
-| `national.nc_upset_bids` | 20 | Rutherford NC (17), Cleveland NC (2), Burke NC (1) | `https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/`<br>`https://kanialawfirm.com/wp-admin/admin-ajax.php`<br>`https://www.rutherfordcountync.gov/departments/` |
-| `reo.vrm_va_reo` | 20 | Laurens SC (1) | `https://vrmproperties.com/`<br>`https://vrmproperties.com` |
-| `counties_nc.rutherford_foreclosure` | 19 | Rutherford NC (19) | `https://www.rutherfordcountync.gov/departments/` |
-| `counties_sc.anderson_master_in_equity` | 19 | Anderson SC (19) | `https://www.andersoncountysc.org/departments-a-z/master-in-equity/`<br>`https://www.andersoncountysc.org{href` |
-| `national.fema_disasters` | 19 | Brunswick NC (2), Swain NC (2), Pickens SC (2) | `https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries`<br>`https://www.fema.gov/disaster/{row.get(` |
-| `counties_sc.pickens_master_in_equity` | 18 | Pickens SC (18) | `https://www.co.pickens.sc.us/departments/master_in_equity/sales_rosters.php`<br>`https://www.co.pickens.sc.us/` |
+| `law_firms.hutchens` | 59 | Spartanburg SC (14), Gaston NC (6), Cherokee SC (6) | `https://sales.hutchenslawfirm.com/NCfcSalesList.aspx`<br>`https://sales.hutchenslawfirm.com/SCfcSalesList.aspx` |
+| `law_firms.zacchaeus` | 59 | Guilford NC (8), Cabarrus NC (8), Robeson NC (7) | `https://www.zls-nc.com/listings` |
+| `national.auction_dot_com` | 57 | Anderson SC (7), Spartanburg SC (6), McDowell NC (2) | `https://www.auction.com/residential/nc/`<br>`https://www.auction.com/residential/sc/`<br>`https://www.auction.com/details/{slug` |
+| `national.estate_sales` | 57 | Cleveland NC (11), Buncombe NC (8), Mecklenburg NC (8) | `https://www.estatesales.net`<br>`https://www.estatesale.com`<br>`https://{host` |
+| `national.zillow_bulk` | 55 | Spartanburg SC (2), Gaston NC (1), Greenville SC (1) | `https://www.zillow.com/{state.lower(` |
+| `public_notices.funeral_home_rss` | 54 | Anderson SC (21), Cleveland NC (20), Buncombe NC (13) | `https://www.{host` |
+| `counties_nc.hendersonville_vacant_structures` | 47 | Henderson NC (47) | `https://services1.arcgis.com/UTZTmZoX2rsa9yFA/arcgis/rest/services/`<br>`https://www.hvlnc.gov/community-development` |
+| `counties_sc.terry_howe_flc` | 44 | Chester SC (18), Laurens SC (14), Spartanburg SC (6) | `https://terryhowe.com/wp-json/wp/v2/auctions?per_page=100&_fields=id,title,link,content` |
+| `law_firms.kania` | 44 | Burke NC (19), Rutherford NC (11), Cleveland NC (8) | `https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/`<br>`https://kanialawfirm.com/wp-admin/admin-ajax.php` |
+| `counties_sc.sc_tax_delinquent` | 42 | Pickens SC (42) | `https://1543.newstogo.us/editionviewer/default.aspx?Edition=`<br>`https://www.andersoncountysc.org/departments-a-z/treasurer/`<br>`https://www.spartanburgcounty.gov/640/2025-Tax-Sale-Info`<br>_+10 more_ |
+| `national.cash_buyer_deeds` | 42 | McDowell NC (40), Burke NC (2) | `https://{host` |
+| `public_notices.ncnotices` | 41 | Buncombe NC (28), Polk NC (5), Mecklenburg NC (4) | `https://www.ncnotices.com/`<br>`https://www.ncnotices.com{raw_href` |
+| `national.sc_public_index` | 37 | Charleston SC (37) | `https://publicindex.sccourts.org/`<br>`https://publicindex.sccourts.org/{county`<br>`https://jcmsweb.charlestoncounty.org/PublicIndex/`<br>_+1 more_ |
+| `national.servicelink_auction` | 28 | Spartanburg SC (6), Anderson SC (5), Buncombe NC (4) | `https://ui.exostechnology.com/api/listingsvc/v1/listings?limit=100&state={ST`<br>`https://ui.exostechnology.com/api/listingsvc/v1/listings`<br>`https://www.servicelinkauction.com`<br>_+1 more_ |
+| `counties_sc.charleston_mie` | 27 | Charleston SC (27) | `https://charlestoncounty.gov/foreclosure/runninglist.html`<br>`https://charlestoncounty.gov/departments/master-in-equity/rosters/` |
+| `law_firms.brock_scott` | 27 | Spartanburg SC (15), Oconee SC (2), Pickens SC (2) | `https://www.brockandscott.com/foreclosure-sales/` |
+| `counties_nc.buncombe_tax` | 21 | Buncombe NC (21) | `https://www.trumba.com/calendars/tax-foreclosures-all.json`<br>`https://taxforeclosures.buncombenc.gov/` |
+| `national.nc_upset_bids` | 21 | Rutherford NC (21) | `https://kanialawfirm.com/tax-foreclosures/foreclosure-listings/`<br>`https://kanialawfirm.com/wp-admin/admin-ajax.php`<br>`https://www.rutherfordcountync.gov/departments/` |
+| `national.fema_disasters` | 20 | Brunswick NC (2), Swain NC (2), Transylvania NC (2) | `https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries`<br>`https://www.fema.gov/disaster/{row.get(` |
+| `national.xome` | 18 | Anderson SC (3), Laurens SC (2), Spartanburg SC (2) | `https://www.xome.com/auctions/bank-owned`<br>`https://www.xome.com/auctions/foreclosure-homes`<br>`https://www.xome.com/auctions/foreclosuresales`<br>_+1 more_ |
 | `counties_nc.edgecombe_tax_foreclosure` | 17 | Edgecombe NC (17) | `https://www.edgecombecountync.gov/businesses/tax_collector/tax_foreclosure_list.php` |
-| `national.hubzu` | 16 | Spartanburg SC (4), Anderson SC (2), Laurens SC (2) | `https://www.hubzu.com/portal/auctions?state={state`<br>`https://www.hubzu.com/`<br>`https://www.hubzu.com{url` |
-| `law_firms.rogers_townsend` | 15 | Spartanburg SC (9), Anderson SC (3), Laurens SC (1) | `https://rogerstownsend.com/reports/SC_Listings.pdf`<br>`https://rogerstownsend.com/reports/NC_Listings.pdf` |
-| `counties_nc.nc_rod_logan` | 14 | Transylvania NC (12), McDowell NC (2) | _(no literal URL in module)_ |
-| `law_firms.bell_carrington` | 14 | Spartanburg SC (7), Pickens SC (2), Anderson SC (2) | `https://docs.google.com/spreadsheets/d/e/`<br>`https://bellcarrington.com/foreclosure-sales/` |
-| `national.homeharvest` | 14 | Anderson SC (5), Spartanburg SC (3), Burke NC (3) | `https://github.com/ZacharyHampton/HomeHarvest` |
-| `counties_nc.buncombe_tax` | 13 | Buncombe NC (13) | `https://www.trumba.com/calendars/tax-foreclosures-all.json`<br>`https://taxforeclosures.buncombenc.gov/` |
-| `law_firms.mcmichael_taylor_gray` | 13 | Anderson SC (3), Spartanburg SC (2), New Hanover NC (2) | `https://app.powerbi.com/view?r=eyJrIjoiOTQwOTdiYWYtOGQwMy00OGUzLWI4MjktOTczNDc0ODE2ZGY1IiwidCI6IjEzZDFlNzhjLTgyNDgtNGVlYS04OWY3LWQzNGIzZWJkOGM3OSIsImMiOjN9`<br>`https://app.powerbi.com/view?r=eyJrIjoiOTQwOTdiYWYtOGQwMy00OGUzLWI4MjktOTczNDc0ODE2ZGY1Ii` |
-| `national.courtlistener_adversary` | 13 | Buncombe NC (5), Cleveland NC (3), Lincoln NC (2) | `https://www.courtlistener.com` |
+| `national.trulia` | 17 | Spartanburg SC (10) | `https://www.trulia.com/foreclosures/`<br>`https://www.trulia.com/foreclosures/Charlotte,NC/`<br>`https://www.trulia.com/foreclosures/Raleigh,NC/`<br>_+6 more_ |
+| `counties_sc.pickens_master_in_equity` | 16 | Pickens SC (16) | `https://www.co.pickens.sc.us/departments/master_in_equity/sales_rosters.php`<br>`https://www.co.pickens.sc.us/` |
+| `counties_sc.anderson_master_in_equity` | 14 | Anderson SC (14) | `https://www.andersoncountysc.org/departments-a-z/master-in-equity/`<br>`https://www.andersoncountysc.org{href` |
+| `national.hubzu` | 14 | Spartanburg SC (5), Laurens SC (2), Transylvania NC (1) | `https://www.hubzu.com/portal/auctions?state={state`<br>`https://www.hubzu.com/`<br>`https://www.hubzu.com{url` |
+| `law_firms.bell_carrington` | 11 | Spartanburg SC (6), Pickens SC (3), Cherokee SC (1) | `https://docs.google.com/spreadsheets/d/e/`<br>`https://bellcarrington.com/foreclosure-sales/` |
 | `newspapers.aiken_standard` | 11 | Aiken SC (11) | `https://www.postandcourier.com/aikenstandard/classifieds/search/` |
-| `counties_sc.sc_county_rosters` | 10 | Oconee SC (6), Laurens SC (4) | `https://publicindex.sccourts.org` |
-| `national.hud_homestore` | 10 | Gaston NC (4), Cleveland NC (2), Spartanburg SC (2) | `https://www.hudhomestore.gov/searchresult?handler=GetFilteredResult`<br>`https://www.hudhomestore.gov` |
+| `counties_nc.henderson_foreclosure_parcels` | 10 | Henderson NC (10) | `https://www.arcgis.com`<br>`https://hendersoncounty.maps.arcgis.com`<br>`https://experience.arcgis.com/experience/` |
+| `national.jail_bookings` | 10 | Anderson SC (2), Buncombe NC (1), Cleveland NC (1) | `http://mugshots.spartanburgsheriff.org/`<br>`https://buncombecountyso.policetocitizen.com|23`<br>`http://74.218.167.200/p2c`<br>_+10 more_ |
 | `newspapers.berkeley_independent` | 9 | Berkeley SC (9) | `https://www.postandcourier.com/berkeley-independent/classifieds/community/announcements/` |
-| `national.freddie_homesteps` | 8 | - | `https://www.homesteps.com/listing/search?search=NC`<br>`https://www.homesteps.com/listing/search?search=SC`<br>`https://www.homesteps.com/`<br>_+1 more_ |
-| `counties_nc.cleveland_tax_foreclosure` | 7 | Cleveland NC (7) | `https://www.clevelandcounty.com/main/departments/` |
-| `counties_nc.cleveland_tax` | 6 | Cleveland NC (6) | `https://www.clevelandcounty.com/main/departments/` |
-| `counties_sc.spartanburg_flc` | 6 | Spartanburg SC (6) | `https://www.spartanburgcounty.gov/DocumentCenter/View/104130` |
-| `national.jail_bookings` | 6 | Anderson SC (2), Buncombe NC (1), Cherokee SC (1) | `http://mugshots.spartanburgsheriff.org/`<br>`https://buncombecountyso.policetocitizen.com|23`<br>`http://74.218.167.200/p2c`<br>_+8 more_ |
-| `counties.nod_discovery` | 5 | Cleveland NC (4), Buncombe NC (1) | `https://{host`<br>`https://{kofile.KOFILE_COUNTIES[(state`<br>`https://example.invalid/` |
+| `law_firms.mcmichael_taylor_gray` | 6 | Spartanburg SC (2), Gaston NC (1), Cherokee SC (1) | `https://app.powerbi.com/view?r=eyJrIjoiOTQwOTdiYWYtOGQwMy00OGUzLWI4MjktOTczNDc0ODE2ZGY1IiwidCI6IjEzZDFlNzhjLTgyNDgtNGVlYS04OWY3LWQzNGIzZWJkOGM3OSIsImMiOjN9`<br>`https://app.powerbi.com/view?r=eyJrIjoiOTQwOTdiYWYtOGQwMy00OGUzLWI4MjktOTczNDc0ODE2ZGY1Ii` |
+| `law_firms.rogers_townsend` | 6 | Spartanburg SC (4), Oconee SC (1), Anderson SC (1) | `https://rogerstownsend.com/reports/SC_Listings.pdf`<br>`https://rogerstownsend.com/reports/NC_Listings.pdf` |
 | `counties_nc.nc_county_tax_foreclosure` | 5 | Rutherford NC (3), Gaston NC (2) | `https://www.gastongov.com/669/Tax-Foreclosure-Sales`<br>`https://www.gastongov.com/671/Previous-Tax-Foreclosure-Sales`<br>`https://mcdowellnc.gov/departments/tax-collections/tax-foreclosures/upcoming-tax-foreclosure-sales`<br>_+1 more_ |
-| `national.hibid_real_estate` | 5 | Pender NC (1), Brunswick NC (1) | `https://hibid.com/graphql```<br>`https://hibid.com/graphql`<br>`https://hibid.com`<br>_+2 more_ |
-| `national.homepath_json` | 5 | Spartanburg SC (2), Rutherford NC (1), Lincoln NC (1) | `https://homepath.fanniemae.com/cfl/property-inventory/search-listings`<br>`https://homepath.fanniemae.com/cfl/property-inventory/search`<br>`https://homepath.fanniemae.com/`<br>_+1 more_ |
-| `counties_nc.henderson_foreclosure_parcels` | 4 | Henderson NC (4) | `https://www.arcgis.com`<br>`https://hendersoncounty.maps.arcgis.com`<br>`https://experience.arcgis.com/experience/` |
-| `counties_nc.wake_tax_foreclosure` | 4 | Wake NC (4) | `https://www.wake.gov/departments-government/tax-administration/real-estate/foreclosures`<br>`https://services.wake.gov/realestate/Account.asp?id={tax_id` |
+| `national.homeharvest` | 5 | Burke NC (3), Anderson SC (2) | `https://github.com/ZacharyHampton/HomeHarvest` |
+| `national.realtor_foreclosures` | 5 | Spartanburg SC (3), Buncombe NC (1), Catawba NC (1) | _(no literal URL in module)_ |
+| `reo.vrm_va_reo` | 5 | Spartanburg SC (2), Gaston NC (1), Laurens SC (1) | `https://vrmproperties.com/`<br>`https://vrmproperties.com` |
+| `counties_nc.nc_coastal_tax_foreclosure` | 4 | Brunswick NC (4) | `https://www.brunswickcountync.gov/912/Legal-Notices`<br>`https://www.brunswickcountync.gov`<br>`https://www.onslowcountync.gov/DocumentCenter/View/6521/FORECLOSURE-SALES`<br>_+4 more_ |
+| `counties_nc.nc_rod_logan` | 4 | Transylvania NC (3), McDowell NC (1) | _(no literal URL in module)_ |
+| `counties_sc.spartanburg_flc` | 4 | Spartanburg SC (4) | `https://www.spartanburgcounty.gov/DocumentCenter/View/104130` |
+| `national.hud_homestore` | 4 | Gaston NC (2), Lincoln NC (1), Oconee SC (1) | `https://www.hudhomestore.gov/searchresult?handler=GetFilteredResult`<br>`https://www.hudhomestore.gov` |
 | `newspapers.journal_scene` | 4 | Dorchester SC (4) | `https://www.postandcourier.com/journal-scene/classifieds/community/announcements/` |
+| `counties.nod_discovery` | 3 | Cleveland NC (2), Buncombe NC (1) | `https://{host`<br>`https://{kofile.KOFILE_COUNTIES[(state`<br>`https://example.invalid/` |
+| `counties_nc.cleveland_tax` | 3 | Cleveland NC (3) | `https://www.clevelandcounty.com/main/departments/` |
+| `counties_nc.wake_tax_foreclosure` | 3 | Wake NC (3) | `https://www.wake.gov/departments-government/tax-administration/real-estate/foreclosures`<br>`https://services.wake.gov/realestate/Account.asp?id={tax_id` |
+| `counties_sc.horry_flc` | 3 | Horry SC (3) | `https://www.horrycountysc.gov/boards-and-commissions/`<br>`https://www.horrycountysc.gov/media/om1d2bwo/2025-flc-list-42126.xlsx`<br>`https://www.horrycountysc.gov` |
 | `counties_sc.richland_flc` | 3 | Richland SC (3) | `https://www.richlandcountysc.gov/Property-Business/Taxes/Delinquent-Taxes/Forfeited-Land-Available`<br>`https://www.richlandcountysc.gov` |
-| `counties_nc.nc_rod_substitute_trustee` | 2 | Henderson NC (1), Transylvania NC (1) | `https://buncombe-recordings.permitium.com/```<br>`https://www.nccourts.gov/` |
-| `counties_sc.spartanburg_master_in_equity` | 2 | Spartanburg SC (2) | `https://www.spartanburgcounty.gov/DocumentCenter/View/3392/Sale-Results`<br>`https://www.spartanburgcounty.gov/DocumentCenter/View/11824/Deficiency-Sale` |
-| `counties_nc.gaston_tax_foreclosures` | 1 | Gaston NC (1) | `https://www.gastongov.com/669`<br>`https://www.gastongov.com/671` |
+| `counties_sc.sc_county_rosters` | 3 | Oconee SC (2), Laurens SC (1) | `https://publicindex.sccourts.org` |
+| `national.freddie_homesteps` | 3 | - | `https://www.homesteps.com/listing/search?search=NC`<br>`https://www.homesteps.com/listing/search?search=SC`<br>`https://www.homesteps.com/`<br>_+1 more_ |
+| `national.courtlistener_civil` | 2 | - | `https://www.courtlistener.com` |
+| `national.hibid_real_estate` | 2 | Lincoln NC (1) | `https://hibid.com/graphql```<br>`https://hibid.com/graphql`<br>`https://hibid.com`<br>_+2 more_ |
+| `national.sheriff_sales` | 2 | Cleveland NC (2) | `https://www.brunswicksheriff.com`<br>`https://www.charlestoncounty.org`<br>`https://www.sheriffclevelandcounty.com`<br>_+1 more_ |
 | `counties_nc.haywood_tax_foreclosures` | 1 | Haywood NC (1) | `https://www.haywoodcountync.gov/337/Tax-Foreclosures`<br>`https://www.haywoodcountync.gov/Bids.aspx` |
-| `counties_nc.nc_govdeals_real_property` | 1 | Anderson SC (1) | `https://maestro.lqdt1.com/search/list`<br>`https://www.transylvaniacounty.org/news`<br>`https://www.govdeals.com/asset/{asset_id`<br>_+2 more_ |
 | `counties_sc.sc_rod_cott` | 1 | Union SC (1) | _(no literal URL in module)_ |
+| `counties_sc.spartanburg_master_in_equity` | 1 | Spartanburg SC (1) | `https://www.spartanburgcounty.gov/DocumentCenter/View/3392/Sale-Results`<br>`https://www.spartanburgcounty.gov/DocumentCenter/View/11824/Deficiency-Sale` |
 | `law_firms.ingle_firm` | 1 | Gaston NC (1) | `https://www.theinglefirm.com/Sales.aspx` |
 | `national.gsa_surplus` | 1 | - | `https://www.gsa.gov/real-estate/real-property-disposition/assets-identified-for-accelerated-disposition`<br>`https://www.gsa.gov/real-estate/real-property-disposition/` |
-| `national.realtor_foreclosures` | 1 | Spartanburg SC (1) | _(no literal URL in module)_ |
-| `national.sheriff_sales` | 1 | Cleveland NC (1) | `https://www.brunswicksheriff.com`<br>`https://www.charlestoncounty.org`<br>`https://www.sheriffclevelandcounty.com`<br>_+1 more_ |
-| `newspapers.carolina_coast` | 1 | Carteret NC (1) | `https://www.carolinacoastonline.com/classifieds/?f=rss&q=foreclosure`<br>`https://www.carolinacoastonline.com/classifieds/?f=rss&q=substitute+trustee`<br>`https://www.carolinacoastonline.com/classifieds/?f=rss&q=trustee+sale` |
-| `newspapers.coastland_times` | 1 | Dare NC (1) | `https://www.thecoastlandtimes.com` |
+| `newspapers.daily_courier` | 1 | Rutherford NC (1) | `https://www.thedigitalcourier.com/classifieds/community/announcements/legal/`<br>`https://www.thedigitalcourier.com` |
 | `newspapers.index_journal` | 1 | Greenwood SC (1) | `https://www.indexjournal.com/classifieds/community/announcements/legal/?f=rss` |
-| `newspapers.post_and_courier` | 1 | Charleston SC (1) | `https://www.postandcourier.com/classifieds_new/community/announcements/` |
 
 ## 2. Built but producing zero rows
 
@@ -157,24 +156,28 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `city_websites.asheville_min_housing` | `https://www.ashevillenc.gov/department/development-services/minimum-housing/` |
 | `city_websites.search` | `https://{domain` |
 | `counties.sitemap_walker` | `https://www.spartanburgcounty.gov`<br>`https://www.cherokeecountysc.gov`<br>_+10 more_ |
-| `counties_generic.arcgis_distress_layers` | `https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services/`<br>`https://www.buncombecounty.org/governing/depts/tax/`<br>_+22 more_ |
+| `counties_generic.arcgis_distress_layers` | `https://services6.arcgis.com/VLA0ImJ33zhtGEaP/arcgis/rest/services/`<br>`https://www.buncombecounty.org/governing/depts/tax/`<br>_+32 more_ |
 | `counties_generic.epa_frs_sites` | `https://data.epa.gov/dmapservice/frs.frs_program_facility`<br>`https://www.epa.gov/frs` |
 | `counties_generic.state_contamination` | `https://services2.arcgis.com/kCu40SDxsCGcuUWO/arcgis/rest/services`<br>`https://www.deq.nc.gov/about/divisions/waste-management/underground-storage-tanks`<br>_+2 more_ |
 | `counties_nc.brunswick_legal_notices` | `https://www.brunswickcountync.gov/912/Legal-Notices`<br>`https://www.brunswickcountync.gov`<br>_+1 more_ |
 | `counties_nc.buncombe_tax_foreclosure` | `https://media.buncombenc.gov/common/tax/foreclosure-listings/fcl.pdf`<br>`https://taxforeclosures.buncombenc.gov/` |
+| `counties_nc.cleveland_tax_foreclosure` | `https://www.clevelandcounty.com/main/departments/` |
 | `counties_nc.cumberland_tax_foreclosure` | `https://www.co.cumberland.nc.us/departments/tax/tax-administration/tax-foreclosures` |
 | `counties_nc.gaston_surplus_properties` | `https://www.gastongov.com/709/Surplus-Properties`<br>`https://www.gastongov.com`<br>_+1 more_ |
+| `counties_nc.gaston_tax_foreclosures` | `https://www.gastongov.com/669`<br>`https://www.gastongov.com/671` |
 | `counties_nc.henderson_tax` | `https://www.hendersoncountync.gov/tax/page/tax-foreclosure-sales` |
+| `counties_nc.lincoln_code_violations` | `https://arcgisserver.lincolncountync.gov/arcgis/rest/services/` |
 | `counties_nc.mcdowell_tax_foreclosure` | `https://mcdowellnc.gov/departments/tax-collections/` |
 | `counties_nc.nc_bankruptcy_sales` | `https://www.nceb.uscourts.gov/Public-Sales-Notice`<br>`https://www.ncmb.uscourts.gov/public-sales` |
 | `counties_nc.nc_civicplus_tax_sale` | `https://www.alamance-nc.com`<br>`https://www.alexandercountync.gov`<br>_+65 more_ |
-| `counties_nc.nc_coastal_tax_foreclosure` | `https://www.brunswickcountync.gov/912/Legal-Notices`<br>`https://www.brunswickcountync.gov`<br>_+5 more_ |
 | `counties_nc.nc_deq_dsca` | `https://www.deq.nc.gov/about/divisions/waste-management/science-data-and-reports/dsca-site-listsfacility-inventories` |
 | `counties_nc.nc_ecourts_estates` | `https://portal-nc.tylertech.cloud/Portal/Home/Dashboard/29`<br>`https://portal-nc.tylertech.cloud/Portal`<br>_+1 more_ |
+| `counties_nc.nc_govdeals_real_property` | `https://maestro.lqdt1.com/search/list`<br>`https://www.transylvaniacounty.org/news`<br>_+3 more_ |
+| `counties_nc.nc_rod_substitute_trustee` | `https://buncombe-recordings.permitium.com/```<br>`https://www.nccourts.gov/` |
 | `counties_nc.nchfa_reo` | `https://www.nchfa.com/home-buyers/properties-sale` |
 | `counties_nc.new_hanover_foreclosures` | `https://www.nhcgov.com/345/Foreclosures` |
 | `counties_nc.polk_tax` | `https://www.polknc.gov/upcoming_auction.php` |
-| `counties_nc.rutherford_wildfire_tax` | `https://www.rutherfordcountync.gov/tax_search/index.php`<br>`https://d1ebsyxxbc7tep.cloudfront.net`<br>_+1 more_ |
+| `counties_nc.rutherford_foreclosure` | `https://www.rutherfordcountync.gov/departments/` |
 | `counties_nc.stokes_delinquent_tax` | `https://www.co.stokes.nc.us/departments/foreclosures.php` |
 | `counties_nc.swain_tax_foreclosures` | `https://www.swaincountync.gov/` |
 | `counties_nc.wnc_rod_foreclosure_starts` | _(no literal URL in module)_ |
@@ -184,6 +187,7 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_sc.anderson_sheriff` | `https://www.andersonsheriff.com/sheriff-sales` |
 | `counties_sc.bamberg_sheriff` | `https://www.bambergcounty.sc.gov/public-safety/sheriffs-office` |
 | `counties_sc.barnwell_sheriff` | `https://www.barnwellcounty.com/sheriff/sheriff-sales` |
+| `counties_sc.beaufort_flc` | `https://www.proxibid.com/Meares-Property-Advisors-Inc/` |
 | `counties_sc.cherokee_rod` | `https://www.sclandrecords.com` |
 | `counties_sc.chester_delinquent_tax` | `https://www.chestercountysc.gov/treasurer/delinquent-tax-sale` |
 | `counties_sc.clarendon_tax_auction` | `https://www.clarendoncountysc.gov/` |
@@ -192,7 +196,6 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_sc.dillon_sheriff` | `https://dilloncountysc.org/services/public_safety/sheriffs_office.php` |
 | `counties_sc.edgefield_delinquent_tax` | `https://edgefieldcounty.sc.gov/treasurer/` |
 | `counties_sc.fairfield_delinquent_tax` | `https://www.fairfieldsc.com/departments/treasurer` |
-| `counties_sc.greenville_tax_distress` | `https://www.gcgis.org/arcgis/rest/services/GreenvilleJS/Map_Layers_JS/MapServer`<br>`https://www.greenvillecounty.org/appsAS400/Taxsale/`<br>_+2 more_ |
 | `counties_sc.greenwood_delinquent_tax` | `https://www.greenwoodcounty-sc.gov/treasurer/delinquent-tax-sale` |
 | `counties_sc.kershaw_flc` | `https://www.kershaw.sc.gov/treasurer/forfeited-land-commission` |
 | `counties_sc.lancaster_delinquent_tax` | `https://www.lancastercountysc.gov` |
@@ -204,13 +207,13 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_sc.newberry_delinquent_tax` | `https://www.newberrycounty.gov/delinquent-tax/tax-sales` |
 | `counties_sc.oconee_flc` | `https://oconeesc.com/treasurer-home` |
 | `counties_sc.oconee_tax_sale` | `https://docs.google.com/spreadsheets/d/e/{_PUB_ID`<br>`https://oconeesc.com/delinquent-tax/sale-list` |
+| `counties_sc.pickens_tax_sale` | `https://www.co.pickens.sc.us/departments/delinquent_tax/index.php`<br>`https://www.co.pickens.sc.us/` |
 | `counties_sc.saluda_delinquent_tax` | `https://saludacounty.sc.gov/departments/tax-collector/delinquent-tax-sale`<br>`https://saludacounty.sc.gov/departments/tax-collector` |
-| `counties_sc.sc_catalis_delinquent_roll` | `https://d1ebsyxxbc7tep.cloudfront.net/data`<br>`https://pickenscountysctax.us` |
+| `counties_sc.sc_catalis_delinquent_roll` | `https://d1ebsyxxbc7tep.cloudfront.net/data`<br>`https://pickenscountysctax.us`<br>_+4 more_ |
 | `counties_sc.sc_coastal_rosters` | _(no literal URL in module)_ |
 | `counties_sc.sc_delinquent_tax_list` | `https://cherokeecountysc.gov/delinquent-tax/tax-sale-bidders/`<br>`https://cherokeecountysc.gov/wp-content/uploads/{year` |
 | `counties_sc.sc_dor_delinquent_taxpayers` | `https://mydorway.dor.sc.gov/?link=delinquentind` |
 | `counties_sc.sc_probate_notices` | `https://{paper.host` |
-| `counties_sc.sc_tax_delinquent` | `https://1543.newstogo.us/editionviewer/default.aspx?Edition=`<br>`https://www.andersoncountysc.org/departments-a-z/treasurer/`<br>_+11 more_ |
 | `counties_sc.sumter_surplus` | `https://www.sumtercountysc.gov/online_services/property/surplus_sales.php` |
 | `counties_sc.union_delinquent_tax` | `https://gearupunionsc.com/officials/treasurer/` |
 | `counties_sc.york_delinquent_tax` | `https://www.yorkcountysc.gov/216/Tax-Collection`<br>`https://www.yorkcountysc.gov{doc_url` |
@@ -222,13 +225,14 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `law_firms.mewborn_deselms` | `https://www.mewbornlaw.biz` |
 | `national.auction_bank_reo` | `https://apiweb.realtybid.com/rest/RBIAPI/`<br>`https://bid.auctionnetwork.com/Auctions`<br>_+2 more_ |
 | `national.bid4assets` | `https://www.bid4assets.com/storefront/index.cfm?searchstate=NC&searchprop=Real+Estate`<br>`https://www.bid4assets.com/storefront/index.cfm?searchstate=SC&searchprop=Real+Estate`<br>_+1 more_ |
-| `national.courtlistener_civil` | `https://www.courtlistener.com` |
+| `national.crexi_multifamily` | `https://www.crexi.com` |
 | `national.cws_marketing` | `https://www.cwsmarketing.com/real-estate/`<br>`https://bid` |
 | `national.epa_superfund` | `https://data.epa.gov/ef/seplan/`<br>`https://data.epa.gov/ef/seplan/SEPLAN/ROWS/0:200/JSON?search={state`<br>_+1 more_ |
 | `national.fdic_failed_banks` | `https://www.fdic.gov/bank-failures/failed-bank-list` |
 | `national.first_citizens_reo` | `https://www.firstcitizens.com/real-estate` |
 | `national.govdeals` | `https://maestro.lqdt1.com/search/list`<br>`https://www.govdeals.com/index.cfm?fa=Main&searchText=&category=&keyword=`<br>_+4 more_ |
 | `national.gsa_realproperty` | `https://realestatesales.gov` |
+| `national.homepath_json` | `https://homepath.fanniemae.com/cfl/property-inventory/search-listings`<br>`https://homepath.fanniemae.com/cfl/property-inventory/search`<br>_+2 more_ |
 | `national.irs_judicial_sales` | `https://www.irsauctions.gov` |
 | `national.irs_treasury` | `https://www.irsauctions.gov/auction/items`<br>`https://www.irsauctions.gov` |
 | `national.landsofamerica` | `https://www.land.com/{county`<br>`https://www.land.com{url` |
@@ -246,11 +250,12 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `national.usmarshals_realproperty` | `https://www.usmarshals.gov/what-we-do/asset-forfeiture/real-property`<br>`https://www.usmarshals.gov/what-we-do/asset-forfeiture/real-property/`<br>_+1 more_ |
 | `national.va_acquired` | `https://www.va.gov/va-forms/real-property/properties/`<br>`https://www.benefits.va.gov/homeloans/property/property.asp` |
 | `national.williams` | `https://www.williamsauction.com` |
-| `newspapers.daily_courier` | `https://www.thedigitalcourier.com/classifieds/community/announcements/legal/`<br>`https://www.thedigitalcourier.com` |
+| `newspapers.carolina_coast` | `https://www.carolinacoastonline.com/classifieds/?f=rss&q=foreclosure`<br>`https://www.carolinacoastonline.com/classifieds/?f=rss&q=substitute+trustee`<br>_+1 more_ |
+| `newspapers.coastland_times` | `https://www.thecoastlandtimes.com` |
 | `newspapers.hendersonville_lightning` | `https://www.hendersonvillelightning.com/legal-ads/130-foreclosures.html` |
+| `newspapers.post_and_courier` | `https://www.postandcourier.com/classifieds_new/community/announcements/` |
 | `newspapers.shelby_star` | `https://www.shelbystar.com`<br>`https://www.shelbystar.com/`<br>_+4 more_ |
 | `newspapers.tryon_bulletin` | `https://tryondailybulletin.com`<br>`https://tryondailybulletin.com/?s=foreclosure+sale`<br>_+3 more_ |
-| `public_notices.funeral_home_rss` | `https://www.{host` |
 | `public_notices.publicnoticesc` | _(no literal URL in module)_ |
 | `reo.treasury_seized` | `https://www.treasury.gov/auctions/treasury/rp/realprop.shtml` |
 | `reo.usda_rd` | `https://www.resales.usda.gov/resales/public`<br>`https://www.resales.usda.gov` |

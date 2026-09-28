@@ -71,7 +71,87 @@ def test_parcel_from_geo_short_circuits_when_walled():
         # prove no HTTP call happens (a network call would AttributeError on None).
         return await G._parcel_from_point_sc(None, li)
 
-    assert asyncio.run(_run()) == ""
+    pid, source = asyncio.run(_run())
+    assert pid == ""
+    assert source == "scdot_point"
+
+
+class _FakeResp:
+    def __init__(self, payload):
+        self.status_code = 200
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+class _FakeClient:
+    """Records each query's target URL and replays a scripted response list."""
+
+    def __init__(self, payloads):
+        self._payloads = list(payloads)
+        self.seen: list[str] = []
+
+    async def get(self, url, params=None, timeout=None):
+        self.seen.append(url)
+        return _FakeResp(self._payloads.pop(0))
+
+
+def test_native_fallback_used_when_scdot_walled_for_a_capable_county():
+    """Anderson is the one county live-verified (2026-09-28) to answer a geometry
+    query on its OWN layer (PARCEL_LAYERS["Anderson"]), a different host from
+    SCDOT. When SCDOT is walled, this must be tried instead of giving up."""
+    A.mark_scdot_walled()
+    li = Listing(source="t", source_url="https://x", state="SC", county="Anderson",
+                 latitude=34.523, longitude=-82.723,
+                 property_kind=PropertyKind.SINGLE_FAMILY,
+                 listing_type=ListingType.FORECLOSURE_SALE)
+    from foreclosure_scraper.parcel_cache import PARCEL_LAYERS
+    native_url = PARCEL_LAYERS["Anderson"]["url"]
+    c = _FakeClient([{"features": [{"attributes": {"TMS": "950706014"}}]}])
+
+    pid, source = asyncio.run(G._parcel_from_point_sc(c, li))
+
+    assert pid == "950706014"
+    assert source == "native_point:Anderson"
+    assert c.seen == [native_url]   # SCDOT was never touched (walled + short-circuited)
+
+
+def test_native_fallback_not_tried_for_a_non_capable_county():
+    """Spartanburg has no live-verified geometry capability recorded, so a walled
+    SCDOT must still return empty with zero HTTP calls — no guessing at a layer
+    nobody has confirmed answers a spatial query."""
+    A.mark_scdot_walled()
+    li = Listing(source="t", source_url="https://x", state="SC", county="Spartanburg",
+                 latitude=34.949, longitude=-81.932,
+                 property_kind=PropertyKind.SINGLE_FAMILY,
+                 listing_type=ListingType.FORECLOSURE_SALE)
+
+    async def _run():
+        return await G._parcel_from_point_sc(None, li)
+
+    pid, source = asyncio.run(_run())
+    assert pid == ""
+
+
+def test_native_fallback_host_breaker_is_independent_of_scdot():
+    """The native layer sits on its own host, so tripping ITS breaker must not
+    require (or be satisfied by) SCDOT's breaker state, and once tripped it
+    short-circuits without a further HTTP call."""
+    from foreclosure_scraper.parcel_cache import PARCEL_LAYERS
+    A.mark_scdot_walled()
+    native_url = PARCEL_LAYERS["Anderson"]["url"]
+    A.mark_host_walled(native_url, reason="test")
+    li = Listing(source="t", source_url="https://x", state="SC", county="Anderson",
+                 latitude=34.523, longitude=-82.723,
+                 property_kind=PropertyKind.SINGLE_FAMILY,
+                 listing_type=ListingType.FORECLOSURE_SALE)
+
+    async def _run():
+        return await G._parcel_from_point_sc(None, li)  # no client -> proves no HTTP call
+
+    pid, source = asyncio.run(_run())
+    assert pid == ""
 
 
 def test_footprint_ring_short_circuits_when_walled():
