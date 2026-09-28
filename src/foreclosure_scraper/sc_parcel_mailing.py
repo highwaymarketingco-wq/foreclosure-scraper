@@ -256,7 +256,75 @@ def _blank() -> dict:
     return r
 
 
+def _owner_rate(rows) -> float:
+    """Share of rows carrying a real owner name. `rows` is either the `best`
+    dict's values (a fresh fetch) or DB rows already zipped to dicts."""
+    rows = list(rows)
+    if not rows:
+        return 0.0
+    filled = sum(1 for r in rows if str(r.get("owner") or "").strip())
+    return filled / len(rows)
+
+
+def _stored_owner_rate(state: str, county: str) -> Optional[tuple[float, int]]:
+    """(owner-fill rate, row count) for what's currently on disk, or None if
+    nothing is stored yet."""
+    if not DB_PATH.exists():
+        return None
+    con = _connect()
+    try:
+        total = con.execute(
+            "SELECT COUNT(*) FROM sc_parcel_mailing WHERE state=? AND county=?",
+            (state, county)).fetchone()[0]
+        if not total:
+            return None
+        filled = con.execute(
+            "SELECT COUNT(*) FROM sc_parcel_mailing WHERE state=? AND county=? "
+            "AND owner IS NOT NULL AND TRIM(owner) <> ''", (state, county)).fetchone()[0]
+        return filled / total, total
+    finally:
+        con.close()
+
+
+class OwnerRegressionRefused(Exception):
+    """Raised when a fresh fetch would replace good owner data with mostly-blank
+    data — almost always a silent upstream schema change (a field renamed or
+    dropped on the source), not a real drop in coverage. See docs/build_queue_
+    2026-09-20.md item X-01: this guard exists because Anderson's live GIS layer
+    lost its OWNER field sometime between 2026-08-03 and 2026-09-20 with no
+    warning, and the unforced next refresh would otherwise have silently deleted
+    a 113k-row, 99%-owner-populated snapshot and replaced it with ~0% populated
+    rows (confirmed live 2026-09-28: TAXOWNSTR, whatever now backs the "owner"
+    mapping, is 99.56% null and never a name on the remaining rows)."""
+
+
+# A refresh may always improve or hold steady; it may never make owner coverage
+# catastrophically worse for a county that already had decent data. Tuned loose
+# (real day-to-day coverage does drift) but tight enough to catch "the field is
+# just gone now": a genuine schema break drops fill rate to near-zero, not to
+# 60% of what it was.
+_OWNER_REGRESSION_FLOOR = 0.5   # refuse if new rate is below floor * old rate
+_OWNER_REGRESSION_MIN_OLD = 0.3  # only guard counties whose existing data is good
+
+
 def _store(state: str, county: str, best: dict[str, dict], meta: dict) -> int:
+    prior = _stored_owner_rate(state, county)
+    if prior is not None:
+        old_rate, old_rows = prior
+        if old_rate >= _OWNER_REGRESSION_MIN_OLD:
+            new_rate = _owner_rate(best.values())
+            if new_rate < old_rate * _OWNER_REGRESSION_FLOOR:
+                log.error(
+                    "sc_parcel_mailing.owner_regression_refused", county=county,
+                    old_owner_rate=round(old_rate, 3), old_rows=old_rows,
+                    new_owner_rate=round(new_rate, 3), new_rows=len(best),
+                )
+                raise OwnerRegressionRefused(
+                    f"{state}:{county}: refusing to overwrite {old_rows} rows at "
+                    f"{old_rate:.0%} owner coverage with a fresh fetch at only "
+                    f"{new_rate:.0%} ({len(best)} rows) — this looks like the source "
+                    f"silently dropped its owner field, not a real data change. "
+                    f"Investigate before forcing (see OwnerRegressionRefused docstring).")
     ts = datetime.utcnow().isoformat()
     con = _connect()
     try:

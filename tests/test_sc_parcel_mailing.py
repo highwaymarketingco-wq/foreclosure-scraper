@@ -366,3 +366,40 @@ def test_poor_condition_codes_still_flag():
     assert pm._condition_flag("GD") == 0
     assert pm._condition_flag("AV") == 0
     assert pm._condition_flag("") == 0
+
+
+# ---- owner-regression guard (2026-09-28: Anderson's live layer lost OWNER) ------
+
+def test_store_refuses_a_fetch_that_wipes_good_owner_data(roll_db):
+    # roll_db already seeded Anderson at 100% owner coverage via the real fixture.
+    before = pm.lookup("SC", "Anderson", parcel_id=_anderson_rows()[0]["TMS"])
+    assert before is not None and before["owner"]
+
+    blank_fetch = {
+        f"TMS{i}": {c: None for c in pm._COLS} | {"parcel_key": f"tms{i}", "owner": None}
+        for i in range(25)
+    }
+    with pytest.raises(pm.OwnerRegressionRefused):
+        pm._store("SC", "Anderson", blank_fetch, {"url": "y", "etag": '"broken"'})
+
+    # The refusal must not have touched the existing good data.
+    after = pm.lookup("SC", "Anderson", parcel_id=_anderson_rows()[0]["TMS"])
+    assert after == before
+
+
+def test_store_allows_a_fetch_that_keeps_owner_coverage_healthy(roll_db):
+    # A same-quality (or better) refresh is not a regression and must go through.
+    best2: dict = {}
+    for row in _anderson_rows():
+        pm._keep(best2, pm._anderson_record(row))
+    n = pm._store("SC", "Anderson", pm._strip_scratch(best2), {"url": "y", "etag": '"e2"'})
+    assert n == len(best2)
+
+
+def test_store_allows_the_first_ever_fetch_for_a_county(tmp_path, monkeypatch):
+    # No prior data at all -> nothing to regress against, must not raise.
+    monkeypatch.setattr(pm, "DB_PATH", tmp_path / "fresh.db")
+    assert pm._stored_owner_rate("SC", "Greenville") is None
+    n = pm._store("SC", "Greenville", {"x": {c: None for c in pm._COLS} | {"parcel_key": "x"}},
+                  {"url": "z", "etag": None})
+    assert n == 1
