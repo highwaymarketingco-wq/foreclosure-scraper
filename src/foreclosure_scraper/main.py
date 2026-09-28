@@ -637,6 +637,12 @@ DATELESS_OK_SOURCES = {
     # is missing (which is most of the time for monthly/annual cadence).
     "counties_nc.nc_rod_substitute_trustee",      # ROD substitute-trustee deed filings
     "counties_sc.terry_howe_flc",                 # current FLC auction catalog (no sale dates)
+    # An FLC holding is a STANDING condition (the FLC owns the parcel until someone
+    # bids), same reasoning as terry_howe_flc/sc_flc above -- this scraper never sets
+    # sale_date either. 2026-09-28 gap sweep (docs/coverage_gap_build_plan_2026-09-23.md
+    # item 7): Beaufort's FLC runs through Meares Property Advisors on Proxibid, a
+    # second multi-county FLC-auctioneer vendor alongside Terry Howe.
+    "counties_sc.beaufort_flc",                   # Beaufort FLC via Meares/Proxibid (dateless)
     "counties_sc.terry_howe_auctions",            # broad real-estate auction catalog; older/overflow posts dateless
     "counties_sc.spartan_weekly_legals",          # current Spartanburg legal notices (sale_date best-effort)
     "counties_nc.nc_rod_logan",                   # recent NOD recordings (date-range limited, current)

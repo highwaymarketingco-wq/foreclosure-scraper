@@ -41,6 +41,7 @@ from typing import Iterable
 import structlog
 
 from ...base_scraper import BaseScraper
+from ...county_name import canonical_county
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
 
@@ -136,7 +137,7 @@ def _to_listing(p: dict, slug: str) -> Listing | None:
             (p.get("propertyType") or "").strip(), PropertyKind.UNKNOWN
         ),
         state=state,
-        county=(p.get("county") or "").replace(" COUNTY", "").title() or None,
+        county=canonical_county((p.get("county") or "").replace(" COUNTY", "")) or None,
         city=(p.get("city") or "").title() or None,
         zip_code=(p.get("zipCode") or "").strip() or None,
         street_address=addr,

@@ -13,6 +13,31 @@ No dollar amounts in the PDF rows. The TMS (Map Number) is the parcel_id.
 
 FREE, no login, no CAPTCHA. Endpoint verified live 2026-08-18:
   12 tax sale PDFs found (2021-2025).
+
+2026-09-28 re-verification: cherokeecountysc.gov/delinquent-tax/ (the page a
+MASTER_GAPS re-probe pointed at) is NOT Cloudflare-403'd -- clean HTTP 200,
+271KB, no challenge. That doc's "Cherokee SC delinquent tax: Cloudflare 403"
+entry is stale (the block cleared before 2026-08-18, when this scraper was
+already switched to the wp-json media API below). The delinquent-tax/ page
+itself carries no table -- it just links out to the SAME PDFs this scraper's
+wp-json search already discovers (confirmed: its "TAX-SALE-TAB.pdf" link is
+byte-identical in URL to the 2026/08 media item below), so no URL change is
+needed here.
+
+Isolated fetch() re-test 2026-09-28: 14 media items found, 528 unique-TMS
+Listings returned (OK). BUT the two most recent parseable years found were
+2024 (639 raw rows each of "Tax-Sale-List-2024[-1].pdf", deduped to 528) --
+every 2025 PDF ("2025-tax-sale.pdf", "Delinquent-Tax-Sale-2025[-1].pdf") is
+just a 1-2 page sale-date/bidder-registration NOTICE with no parcel table
+(0 rows, correctly), and the CURRENT 2026 list, "TAX-SALE-TAB.pdf" (linked
+from the delinquent-tax/ page as the live list), is a SCANNED-IMAGE PDF --
+pypdf and pdfplumber both extract 0 chars / 0 tables from it (verified: 5
+raster images, no text layer). So this scraper is silently running a year
+stale (2024 data) versus the current 2026 tab, not because of a wall, but
+because the county switched the current-year PDF to an image scan. Closing
+that gap needs OCR (see project_doc_ocr.md's Gemini-first scanned-PDF
+enricher), which is out of scope for a URL/parser fix -- flagged separately
+rather than bolted on here.
 """
 from __future__ import annotations
 

@@ -20,15 +20,20 @@ from foreclosure_scraper.scrapers.counties_nc.nc_rod_substitute_trustee import (
 def test_sources_cover_in_scope_nc_counties():
     """In-scope NC counties with a WIRED ROD vendor must appear.
 
-    Lincoln is intentionally absent: its CCHS install is the ASP.NET-MVC variant
-    (us4/LincolnNC2) whose ExecuteSearch needs a captured antiforgery payload —
-    not yet wired (returns 500 on a blind POST). Lincoln foreclosures still flow
-    via nc_ecourts_lis_pendens + the law-firm scrapers, so it's not lead-blind;
-    only the ROD substitute-trustee layer is pending. Re-add when MVC is wired.
+    Lincoln and Henderson were previously believed to need an unwired
+    ASP.NET-MVC install (us4/LincolnNC2) — that was wrong even at the time
+    (rod/cchs.py's CCHS_COUNTIES has run BOTH on the SAME live classic-ASP
+    SearchService.asp flow as Burke/Cleveland since 2026-06-30/07-27; see that
+    module's docstring). This SOURCES list just never got updated after cchs.py
+    grew them, so two working counties silently returned 0 leads. Re-verified
+    live 2026-09-28: SearchService.asp is Cloudflare-fronted and needs the
+    curl-cffi Chrome-fingerprint tier (rod/cchs.py now uses
+    http_client.get_text_impersonate for it), not a captured antiforgery token.
     """
     counties = {county for county, _, _ in SOURCES}
     assert counties == {
         "Buncombe", "Gaston", "Polk", "Rutherford", "Burke", "Cleveland",
+        "Lincoln", "Henderson",
     }
 
 

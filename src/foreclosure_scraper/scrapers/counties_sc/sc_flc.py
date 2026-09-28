@@ -61,9 +61,9 @@ import structlog
 from selectolax.parser import HTMLParser
 
 from ...base_scraper import BaseScraper
-from ...config import SC_COUNTIES
 from ...http_client import get_bytes, get_text
 from ...models import Listing, ListingType, PropertyKind
+from ...validation import SC_COUNTIES as _ALL_SC_COUNTIES
 
 log = structlog.get_logger()
 
@@ -90,6 +90,15 @@ COUNTY_TAX_URLS: dict[str, tuple[str, ...]] = {
     # resolves (DNS). Repointed to the live tax-collector domains.
     "Union": ("https://www.unioncountytc.com/",),
     "Laurens": ("https://www.laurenscountysc.gov/departments/treasurer/",),
+    # 2026-09-28 gap sweep (docs/coverage_gap_build_plan_2026-09-23.md item 7): this
+    # page's own "2024 Available Properties" Document Center section reads "No
+    # documents" today, but it is server-rendered HTML (plain <a href=".../*.pdf">
+    # anchors elsewhere on the same Revize-CMS page -- confirmed live 2026-09-28,
+    # e.g. the "Marion County FLC Bid Form" PDF already matches `_wanted_doc` on
+    # `\bflc\b`), so hub-page discovery will pick up a newly-posted FLC list here
+    # with zero further code, same as every other entry in this dict.
+    "Marion": ("https://www.marionsc.org/departments/assessor/"
+               "forfeited_land_commissions/forfeited_land_available.php",),
 }
 
 #: Direct FLC / tax-sale-assignment documents, live-verified 2026-08-02.
@@ -176,7 +185,25 @@ def _is_nav_or_contact(line: str) -> bool:
 
 
 def _wanted_doc(label: str, href: str) -> bool:
-    blob = f"{label} {href}".lower()
+    """A document link is an FLC/tax-sale LIST if its label or FILENAME says so.
+
+    2026-09-28 gap sweep: was `f"{label} {href}".lower()` -- the full absolute
+    href, not just its filename. That silently matched on the hub PAGE's own
+    directory path, not the document: Marion's FLC hub page lives at
+    ".../forfeited_land_commissions/forfeited_land_available.php", so urljoin()
+    resolves every OTHER unrelated relative link on that page (Beautification
+    Commission forms, Magistrate's Office forms, a Capital Project Sales Tax
+    questionnaire...) into a URL that still contains "forfeited_land_commissions"
+    -- which matches the "forfeited land" pattern regardless of what the file actually is.
+    Live-verified 2026-09-28: this made every one of ~19 unrelated PDFs on that
+    page look "wanted", each costing a real fetch attempt (and, on this host,
+    a ~6s timeout) before the run could finish. Scoping the href side of the
+    check to the basename only (the actual filename) fixes Marion without
+    changing the outcome for any other county already in COUNTY_TAX_URLS --
+    Cherokee's real hit ("TAX-SALE-TAB.pdf") still matches on its filename.
+    """
+    basename = href.rsplit("/", 1)[-1] if href else ""
+    blob = f"{label} {basename}".lower()
     if any(k in blob for k in _DOC_UNWANTED):
         return False
     return bool(_DOC_WANTED_RE.search(blob))
@@ -418,7 +445,16 @@ class SCForfeitedLand(BaseScraper):
     async def fetch(self) -> Iterable[Listing]:
         out: list[Listing] = []
         seen: set[tuple[str, str]] = set()
-        counties = {c.name for c in SC_COUNTIES}
+        # 2026-09-28 gap sweep: was `{c.name for c in config.SC_COUNTIES}`, the
+        # narrow 7-county flip-footprint list -- the SAME footprint-artifact bug
+        # already found and fixed in terry_howe_flc.py's `_SC_COUNTIES` on
+        # 2026-09-23 (docs/coverage_gap_build_plan_2026-09-23.md item 7). It
+        # silently dropped Marion (added to COUNTY_TAX_URLS below this same sweep)
+        # and would drop any other non-footprint county added here too, even
+        # though config.in_scope_distressed() -- the real scope gate downstream
+        # -- admits any real SC county for this listing_type. Switched to the
+        # canonical 46-county set.
+        counties = set(_ALL_SC_COUNTIES)
         quota_out = 0
         pool_dead = False
         no_key = False

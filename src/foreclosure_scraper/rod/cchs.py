@@ -20,7 +20,19 @@ getall returns instead of trusting either, and bisects any window that reaches
 the row cap. It STOPS the host at the first 403, challenge, CAPTCHA or login
 page and never retries it (CchsWall). 2026-09-20: us4 and us5 both answered the
 search with a Cloudflare "Just a moment..." 403 after three normal 200
-bootstrap pages, so the sweep has not been run live yet.
+bootstrap pages, so the sweep had not been run live at that point.
+
+2026-09-28 RE-VERIFIED LIVE, all 5 counties (Burke/Cleveland/Lincoln/Madison/
+Henderson): the three bootstrap pages (root, application.asp,
+realestatesearch.asp) were never the problem — those always 200'd with plain
+httpx. Only SearchService.asp itself sits behind Cloudflare and answers plain
+httpx's TLS fingerprint with the "Just a moment..." 403; a real Chrome JA3/TLS
+fingerprint (http_client.get_text_impersonate — curl-cffi impersonation, NOT a
+CAPTCHA/WAF solve, no cookies/session needed) clears it and returns the real
+<SearchResponse> / <r> XML every time. _cchs_fetch() and search_by_name() now
+use that tier for the two SearchService.asp calls. sweep_loss_instruments()
+still uses plain httpx for those calls (see _sweep_window) and will hit the
+same 403 — same fix applies there, just not yet ported.
 """
 from __future__ import annotations
 
@@ -33,7 +45,7 @@ from urllib.parse import urlencode
 from dateutil import parser as dateparser
 
 from ..deed_index import DeedInstrument, Party, derive_loss
-from ..http_client import client
+from ..http_client import client, get_text_impersonate
 from ..name_normalize import normalize_name
 from . import deed_stamp
 from .inst_class import LOSS_CLASSES, classify_instrument
@@ -169,26 +181,32 @@ async def _cchs_fetch(state: str, county: str, instrument_types: str, from_date:
     xhr = {**_UA, "X-Requested-With": "XMLHttpRequest", "Referer": f"{base}/realestatesearch.asp"}
     try:
         async with client(timeout=40.0, headers=_UA) as c:
-            # 1) session bootstrap (cookies persist on the client)
+            # 1) session bootstrap — plain httpx is fine here, these always 200.
             for u in (f"https://{host}.courthousecomputersystems.com/{root}/",
                       f"{base}/application.asp?resize=true", f"{base}/realestatesearch.asp"):
                 await c.get(u, follow_redirects=True)
-            # 2) search
-            q = {"cmd": "search", "last": "", "given": "", "searchtype": 3, "indextype": 3,
-                 "codetype": 3, "fromdate": from_date.strftime("%m/%d/%Y"),
-                 "todate": today.strftime("%m/%d/%Y"), "instrumenttypes": instrument_types,
-                 "description": "", "docnumber": "", "booknumber": "", "pagenumber": "",
-                 "resultstype": 1, "maxrecordcount": max_docs, "sortorder": 1,
-                 "sortfield": "docno", "rangetype": "doc"}
-            r = await c.get(f"{base}/SearchService.asp?{urlencode(q)}", headers=xhr)
-            m = re.search(r"<recordcount>(\d+)</recordcount>", r.text, re.I)
-            count = int(m.group(1)) if m else 0
-            if count <= 0:
-                return []
-            # 3) getall
-            r2 = await c.get(f"{base}/SearchService.asp?cmd=getall&start=0&offset={min(count, max_docs)}",
-                             headers=xhr)
-            return _parse_rows(r2.text, state, county, sold=sold)
+        # 2) search — SearchService.asp is Cloudflare-fronted and 403s plain httpx
+        # ("Just a moment...") even though the bootstrap pages above 200 fine; a
+        # real Chrome TLS/JA3 fingerprint clears it with no cookies/session needed
+        # (verified live 2026-09-28, all 5 counties). Not a CAPTCHA/WAF defeat —
+        # see http_client.py's tier docstring.
+        q = {"cmd": "search", "last": "", "given": "", "searchtype": 3, "indextype": 3,
+             "codetype": 3, "fromdate": from_date.strftime("%m/%d/%Y"),
+             "todate": today.strftime("%m/%d/%Y"), "instrumenttypes": instrument_types,
+             "description": "", "docnumber": "", "booknumber": "", "pagenumber": "",
+             "resultstype": 1, "maxrecordcount": max_docs, "sortorder": 1,
+             "sortfield": "docno", "rangetype": "doc"}
+        search_text = await get_text_impersonate(
+            f"{base}/SearchService.asp?{urlencode(q)}", headers=xhr, timeout=40.0)
+        m = re.search(r"<recordcount>(\d+)</recordcount>", search_text, re.I)
+        count = int(m.group(1)) if m else 0
+        if count <= 0:
+            return []
+        # 3) getall
+        getall_text = await get_text_impersonate(
+            f"{base}/SearchService.asp?cmd=getall&start=0&offset={min(count, max_docs)}",
+            headers=xhr, timeout=40.0)
+        return _parse_rows(getall_text, state, county, sold=sold)
     except Exception:
         return []
 
@@ -227,18 +245,21 @@ async def search_by_name(state: str, county: str, name: str, max_docs: int = 50)
             for u in (f"https://{host}.courthousecomputersystems.com/{root}/",
                       f"{base}/application.asp?resize=true", f"{base}/realestatesearch.asp"):
                 await c.get(u, follow_redirects=True)
-            q = {"cmd": "search", "last": last, "given": "", "searchtype": 1, "indextype": 1,
-                 "codetype": 0, "fromdate": "", "todate": "", "instrumenttypes": "",
-                 "resultstype": 1, "maxrecordcount": max_docs, "sortorder": 1,
-                 "sortfield": "docno", "rangetype": "name"}
-            r = await c.get(f"{base}/SearchService.asp?{urlencode(q)}", headers=xhr)
-            m = re.search(r"<recordcount>(\d+)</recordcount>", r.text, re.I)
-            count = int(m.group(1)) if m else 0
-            if count <= 0:
-                return []
-            r2 = await c.get(f"{base}/SearchService.asp?cmd=getall&start=0&offset={min(count, max_docs)}",
-                             headers=xhr)
-            return _parse_rows(r2.text, state, county, sold=False)[:max_docs]
+        q = {"cmd": "search", "last": last, "given": "", "searchtype": 1, "indextype": 1,
+             "codetype": 0, "fromdate": "", "todate": "", "instrumenttypes": "",
+             "resultstype": 1, "maxrecordcount": max_docs, "sortorder": 1,
+             "sortfield": "docno", "rangetype": "name"}
+        # See _cchs_fetch: SearchService.asp needs the Chrome-fingerprint tier.
+        search_text = await get_text_impersonate(
+            f"{base}/SearchService.asp?{urlencode(q)}", headers=xhr, timeout=40.0)
+        m = re.search(r"<recordcount>(\d+)</recordcount>", search_text, re.I)
+        count = int(m.group(1)) if m else 0
+        if count <= 0:
+            return []
+        getall_text = await get_text_impersonate(
+            f"{base}/SearchService.asp?cmd=getall&start=0&offset={min(count, max_docs)}",
+            headers=xhr, timeout=40.0)
+        return _parse_rows(getall_text, state, county, sold=False)[:max_docs]
     except Exception:
         return []
 

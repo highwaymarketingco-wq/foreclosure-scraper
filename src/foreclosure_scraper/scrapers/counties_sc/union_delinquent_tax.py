@@ -7,6 +7,36 @@ Free, public, no login.
 Slug: counties_sc.union_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
+
+2026-09-28 re-verification (MASTER_GAPS had this flagged "DNS failure"):
+PAGE_URL (gearupunionsc.com, the county's current WordPress site) resolves
+and returns HTTP 200 fine -- the DNS-failure entry is stale. But like
+Laurens, this page (and its sibling
+gearupunionsc.com/departments/delinquent-tax-office/) carries NO HTML
+table (0 <table> tags on either) -- both just link out to
+uniontreasurer.qpaybill.com/Taxes/TaxesDefaultType4.aspx. So the 0-row
+result below is a correct read of an empty page.
+
+Separately probed the county's OLD pre-migration domain
+(countyofunion.org, the classic-ASP "cpage.asp" site turned up by search --
+this is likely what MASTER_GAPS's "DNS failure" / IIS-8.5 note was tracking
+before this re-check): it now resolves and 301-redirects cleanly (both
+HTTP and HTTPS, no connection resets in this test) straight to
+gearupunionsc.com/, with the old cpage.asp deep links 404ing on the far
+side. So that legacy host has been fully retired into the WordPress site
+above, not merely broken -- no separate free path was found or is needed
+there. A short probe of a few other plausible legacy hostnames
+(co.union.sc.us, unioncountysc.gov, unioncounty.sc.gov, sc-union.us, and
+www variants) found none resolving.
+
+None of this matters for real coverage, though: Union's actual per-parcel
+delinquent-tax roll -- owner, address, TMS, amount owed, tax year -- is
+already live via `counties_sc.qpaybill_delinquent_roll`
+(COUNTIES["Union"] = "uniontreasurer", verified live 2026-09-10).
+Re-confirmed live again 2026-09-28 with a single-prefix smoke test ("S")
+returning 25 real 2025 rows with dollar amounts (e.g. SAILORS JERRI (LE),
+045-00-00-069 000, $5,561.72 unpaid). Do not duplicate that sweep here --
+this module is kept only in case the county ever republishes a table.
 """
 from __future__ import annotations
 

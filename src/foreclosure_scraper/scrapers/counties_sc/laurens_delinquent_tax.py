@@ -7,6 +7,28 @@ Free, public, no login.
 Slug: counties_sc.laurens_delinquent_tax
 Category: county_tax
 ListingType: TAX_SALE
+
+2026-09-28 re-verification (MASTER_GAPS had this flagged 404/CMS-migration):
+PAGE_URL below is live -- clean HTTP 200, ~84KB, matches the URL a re-probe
+pass pointed at. BUT the page (Revize CMS) no longer carries an HTML table
+of parcels at all (0 <table> tags). Its own in-page "Current FLC List" and
+"Tax Sale Overage List" links are BROKEN (point at .../error.html on the
+county's own site). The one working document link, "Delinquent Tax Notice
+of Properties," goes to a newstogo.us scanned-newspaper page-flip viewer
+(JS "booklet" reader over raster images) -- not text-parseable without OCR
+and a headless browser, so there is nothing this HTML-table parser can
+recover here; the 0-row result below is a correct read of an empty page,
+not a parser bug.
+
+The REAL per-parcel Laurens delinquent-tax roll -- owner, address, TMS,
+amount owed, tax year -- is already live elsewhere: this same page's
+"Pay Taxes Online" flow points at laurenstreasurer.qpaybill.com, which
+`counties_sc.qpaybill_delinquent_roll` already covers (COUNTIES["Laurens"]
+= "laurenstreasurer", verified live 2026-09-10). Re-confirmed live again
+2026-09-28 with a single-prefix smoke test ("S") returning 25 real 2025
+rows with dollar amounts (e.g. SAAYU INVESTMENT LLC, 906-16-01-070,
+$1,719.49 unpaid). Do not duplicate that sweep here -- this module is kept
+only in case the county ever republishes a table on this page.
 """
 from __future__ import annotations
 

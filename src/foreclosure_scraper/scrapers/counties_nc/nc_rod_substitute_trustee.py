@@ -13,14 +13,24 @@ Coverage (in-scope NC counties only after the 2026-05-07 scope rollback):
              Gaston   (deeds.gastongov.com)
   Cott:      Polk     (cotthosting.com/ncpolkexternal)
              Rutherford (cotthosting.com/NCRUTHERFORDEXTERNAL)
-  CCHS:      Burke    (us5.courthousecomputersystems.com/burkenc)
-             Lincoln  (us5.courthousecomputersystems.com/lincolnnc)
+  CCHS:      Burke     (us5.courthousecomputersystems.com/burkenc)
              Cleveland (us5.courthousecomputersystems.com/clevelandnc)
+             Lincoln   (us4.courthousecomputersystems.com/lincolnnc)
+             Henderson (us4.courthousecomputersystems.com/hendersonnc)
+
+2026-09-28: Lincoln and Henderson were dropped below as "not wired" / "not
+yet covered", but rod/cchs.py's CCHS_COUNTIES has run BOTH of them on the
+same live classic-ASP SearchService.asp flow as Burke/Cleveland since
+2026-06-30 (Henderson) and 2026-07-27 (Lincoln) — this list just never got
+updated after that. Re-verified live 2026-09-28 (see rod/cchs.py docstring):
+added both back rather than leaving two already-working counties silently
+uncovered.
 
 NOT YET COVERED (no ROD vendor mapped):
-  Henderson, Mitchell, McDowell, Transylvania, New Hanover, Brunswick,
-  Onslow, Lincoln (verify), Madison/Yancey/Haywood (these were
-  intentionally dropped from scope per 2026-05-07b rollback).
+  Mitchell, McDowell, Transylvania, New Hanover, Brunswick, Onslow,
+  Madison/Yancey/Haywood (these were intentionally dropped from scope per
+  2026-05-07b rollback; Madison IS in CCHS_COUNTIES but stays out of SOURCES
+  per that rollback — re-add if Madison comes back in scope).
 
 Output: each RodDoc is converted into a Listing with:
   - listing_type = LIS_PENDENS (these are PRE-foreclosure leads — the
@@ -71,8 +81,12 @@ SOURCES: list[tuple[str, object, str]] = [
     ("Rutherford", cott,   "cott"),
     ("Burke",     cchs,    "cchs"),
     ("Cleveland", cchs,    "cchs"),
-    # Lincoln uses a different ASP.NET-MVC CCHS install (us4/LincolnNC2) — its
-    # flow isn't wired yet, so it's omitted here rather than silently returning 0.
+    # Lincoln and Henderson run the SAME classic-ASP CCHS SearchService.asp flow
+    # as Burke/Cleveland (rod/cchs.py CCHS_COUNTIES has both, verified live
+    # 2026-07-27 and 2026-06-30 respectively, re-verified 2026-09-28) — they were
+    # missing here only because this list wasn't updated after cchs.py grew them.
+    ("Lincoln",    cchs,   "cchs"),
+    ("Henderson",  cchs,   "cchs"),
 ]
 
 LOOKBACK_DAYS = 60                    # PRE-sale (NOD/NOS) sweep window
@@ -197,7 +211,7 @@ class NCRodSubstituteTrustee(BaseScraper):
     rod/aumentum + rod/cott + rod/cchs."""
 
     slug = "counties_nc.nc_rod_substitute_trustee"
-    name = "NC ROD pre-foreclosure recordings (7 in-scope counties)"
+    name = "NC ROD pre-foreclosure recordings (8 in-scope counties)"
     category = "register_of_deeds"
     expected_min_count = 0
     requires_apify = False

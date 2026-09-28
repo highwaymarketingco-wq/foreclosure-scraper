@@ -139,9 +139,10 @@ These have a working bypass or a checkout button. We decline. The operator can p
 | Source | Blocker | Your step |
 |---|---|---|
 | NC eCourts Smart Search estates + divorce | AWS-WAF escalating image-grid CAPTCHA (vision solver clears 2, WAF issues more) | Manual save, or skip estates (permanent) |
-| Cherokee SC delinquent tax | Cloudflare 403 | Re-probe each cycle |
-| Spartanburg / Laurens delinquent-tax URLs | 404 (CivicEngage CMS migration) | Re-probe; find new URL |
-| Union SC delinquent tax | DNS failure | Re-probe |
+| ~~Cherokee SC delinquent tax~~ | ~~Cloudflare 403~~ RESOLVED 2026-09-28: no wall, wp-json media discovery already live since 2026-08-18 (528 rows). Real gap now: the CURRENT-year PDF (TAX-SALE-TAB.pdf) is a scanned image, no text layer -- needs OCR, see `project_doc_ocr.md` | none (OCR backfill is the remaining lift) |
+| ~~Spartanburg delinquent-tax URL~~ | ~~404 (CMS migration)~~ RESOLVED: never actually moved -- DocumentCenter/View/11161 fetched clean, 2,171 rows, 2026-09-28 | none |
+| ~~Laurens delinquent-tax URL~~ | ~~404 (CMS migration)~~ PARTIALLY RESOLVED 2026-09-28: page is live (200) but has no table anymore (own FLC/Overage list links are broken to error.html); real per-parcel roll w/ $ amounts already covered by `counties_sc.qpaybill_delinquent_roll` (laurenstreasurer subdomain) | none (qpaybill roll is authoritative) |
+| ~~Union SC delinquent tax~~ | ~~DNS failure~~ RESOLVED 2026-09-28: gearupunionsc.com (current site) resolves fine, no table on it either, links to qpaybill; old classic-ASP domain (countyofunion.org) now cleanly redirects into the WordPress site, fully retired not broken; real per-parcel roll w/ $ amounts already covered by `counties_sc.qpaybill_delinquent_roll` (uniontreasurer subdomain) | none (qpaybill roll is authoritative) |
 | Anderson tax balance (ACPASS) | 403 auth-gated | Per-parcel by hand |
 | **SCDOT SC_Parcels** | now token-walled, silent 200 + error | Situs resolver degraded; parcel-cache (`project_parcel_cache`) is the workaround |
 | CCHS ROD (Burke/Lincoln/Cleveland/Henderson) | DECOMMISSIONED, IIS-404 | Find county's new provider |

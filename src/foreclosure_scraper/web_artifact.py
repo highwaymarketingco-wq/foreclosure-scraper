@@ -1507,6 +1507,19 @@ RAW_KEEP = {
                            "first_cycle", "latest_cycle"),
     "vacancy": "*",
 
+    # docs/extraction_gaps.md verification pass (2026-09-28): these scrapers were fixed
+    # on 2026-08-14 to stop dropping fetched fields, and the data DOES reach Listing.raw
+    # (confirmed by reading the scrapers), but the keys were never added here — so
+    # _slim_raw/_to_dict silently stripped them again at publish, one hop downstream of
+    # the bug the original audit checked for. Same recurring pattern this file's own
+    # comment trail warns about ("any new raw key needs RAW_KEEP ... or it does not exist").
+    "cama_specs": "*",           # spartanburg_vacant/_condemned: beds/baths/sqft/year_built/land_use/last_sale
+    "vacant": "*",               # spartanburg_vacant: {source, condition} from the city vacant-property registry
+    "public_notice": "*",        # spartan_weekly_legals: raw notice body text backing the parsed sale fields
+    "ncnotices": "*",            # ncpublicnotices: named_party + notice metadata (case_number/sale_date/plaintiff
+                                  # are already first-class Listing fields; this is the supporting raw)
+    "nc_county_tax_foreclosure": "*",  # county tag alongside the first-class tax_sale_status/upset_bid_deadline
+
 }
 
 

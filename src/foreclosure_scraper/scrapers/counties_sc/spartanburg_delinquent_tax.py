@@ -63,6 +63,15 @@ real. This is ordinary backoff politeness, not a WAF/CAPTCHA bypass -- if a
 future incident turns out to be a genuine login/CAPTCHA wall instead of a
 rate-limit, do not extend this pattern to defeat it; flag it instead per
 project policy.
+
+2026-09-28 re-check (MASTER_GAPS had this flagged 404/CMS-migration, stale):
+PDF_URL fetched clean on the FIRST attempt, no retry needed -- 2,171 real
+rows (owner/TMS/situs), e.g. "7-16-09-062.00 | MEADOWS ALFRED ... | 512
+CRESCENT AVE". INFO_URL below (spartanburgcounty.gov/640/2025-Tax-Sale-Info,
+the URL a re-probe pass suggested) is also live (200, ~104KB) but does not
+expose a plain-HTML link to the DocumentCenter PDF (likely a JS-rendered
+CivicPlus widget) -- PDF_URL's fixed DocumentCenter doc id remains the
+right target; no URL change needed.
 """
 from __future__ import annotations
 
