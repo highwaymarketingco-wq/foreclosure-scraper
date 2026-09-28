@@ -472,6 +472,70 @@ LAYERS: tuple[Layer, ...] = (
         situs="AddressText", detail="Status", process="code_enforcement",
         source_page="https://www.cityofrockhill.com/departments/neighborhood-services",
     ),
+    # ------------------------------------------------------------------
+    # 2026-09-28 non-footprint code/vacant discovery pass, ROUND 2 (same day, second batch,
+    # 12 more counties beyond the first 12 documented above). Every one came up NOT FOUND after a
+    # real per-county search -- recorded here so a future session doesn't re-run this exact work.
+    # No Layer entries resulted; this comment IS the deliverable of that research.
+    #
+    # Rowan (Salisbury): gis.rowancountync.gov Energov folder checked (Zoningcases = stale rezoning
+    #   approvals back to 2004; MHPcases = mobile-home-park permits, no violation data). Salisbury's
+    #   open-data hub (42 datasets) has none. Salisbury's "/311" CrowdsourceReporter app is titled
+    #   "Salisbury311 (retired)" -- dead.
+    # Davidson (Lexington/Thomasville): webgis.co.davidson.nc.us Lexington/OpenGov folders checked --
+    #   OpenGov's layers (OpenGovParcelFlags, PlanningWarningLayer) are parcel/assessment master data
+    #   (owner, sale history, zoning, tax code), no case number or violation-status field anywhere.
+    #   A promising "Code Enforcement Service Requests" AGOL app is owned by gis_lfucg -- that's
+    #   Lexington-Fayette, KENTUCKY, a name collision, not Lexington NC (also org-private).
+    # Randolph (Asheboro): gis.randolphcountync.gov Planning/LandUseCases is a public-comment layer
+    #   for rezoning cases, not violations. OpenData_PW's "Structures" layer is address/footprint
+    #   only (house#, complex name, unit count), no status/case field. Code Enforcement is a
+    #   2-officer, zoning-only office with no public case list.
+    # Alamance (Burlington/Graham): the ReGIS regional platform (Burlington/Graham/Elon/county,
+    #   shared Esri Portal) has two real code-enforcement layers -- BurlCodeEnforcement and
+    #   SmartGov_Map layer 6 ("Code Enforcement Zones") -- but both are boundary-only
+    #   enforcement-officer zone polygons (fields: Zone_ID/Enf_Officer only), same rejection class as
+    #   Anderson/Gaston's boundary-only layers elsewhere in this file. Burlington's SeeClickFix Open311
+    #   API can't be scoped to the city (jurisdiction_id/lat/lng params both return an unfiltered
+    #   global feed). navburl-burlington.opendata.arcgis.com is Burlington, ONTARIO -- false positive.
+    # Orange (Chapel Hill/Carrboro/Hillsborough): gis.orangecountync.gov's EnerGov "Planning" layer
+    #   only carries Name/Description/CreatedDate (sampled record was a rezoning case, not a
+    #   violation). Chapel Hill's ArcGIS Hub has SeeClickFix requests and a permit tool, no violation
+    #   dataset. Carrboro's old GIS host is dead (NXDOMAIN). A "Hillsborough" dashboard that surfaces
+    #   in search is Hillsborough County, FLORIDA -- false positive.
+    # Pitt (Greenville NC): gis.pittcountync.gov and Greenville's own gisonline.greenvillenc.gov both
+    #   fully enumerated. Greenville's EnerGov MapServer DOES have layers named "Code Enforcement
+    #   Zones" and "CodeEnforcement_6Zones" -- both are enforcement-district boundary polygons, not
+    #   case records (same rejection class as Alamance above). City's Code Enforcement page only
+    #   links a write-only PublicStuff complaint-filing widget.
+    # Berkeley SC (Moncks Corner/Goose Creek): county's ArcGIS Server "energov" and "internal" folders
+    #   return 403 Forbidden; Goose Creek's own EnerGov/OpenGov folders return "499 Token Required" --
+    #   explicit login/token walls. Everything actually public (a 77-layer composite map, a "custom"
+    #   folder) is zoning/parcel/flood/school/voting boundary data only.
+    # Kershaw SC (Camden): county's ArcGIS Hub (17 datasets) is parcels/zoning/boundary only. A
+    #   "Camden Code Enforcement Viewer Dashboard" is explicitly titled "(Internal)" and its AGOL item
+    #   lookup confirms "Item does not exist or is inaccessible" -- private/login-walled. Camden does
+    #   have a real vacant-building registry ordinance (125-day trigger) but it's an
+    #   administrative/paper process with no public map/list/API.
+    # Williamsburg SC (Kingstree): county GIS runs on WTH Technology's "ThinkGIS" -- a proprietary
+    #   parcel viewer with no REST/JSON API, not Esri/ArcGIS (this vendor also serves Clarendon and
+    #   Marlboro below, which is why none of these three show up in ArcGIS org/REST searches the way
+    #   Guilford/Durham/York did). Kingstree's Code Enforcement page is contact-only.
+    # Colleton SC (Walterboro): the one shape-matching hit on the county's AGOL org --
+    #   CitizenProblemReports FeatureServer, with layers literally named "Blight Problems" and
+    #   "Building Problems" -- is confirmed EMPTY (all 13 sub-layers return count:0), an unconfigured
+    #   "ArcGIS for Local Government" template ("allows you to use an existing service to publish an
+    #   empty feature layer" per its own description). Same pattern as Gaston's already-rejected
+    #   "Blight Problems, live, 0 rows" case elsewhere in this file. Real system is Accela Citizen
+    #   Access (a stateful ASP.NET WebForms app, no plain-GET/JSON endpoint) -- an acceptable non-hit,
+    #   not forced as a match.
+    # Clarendon SC (Manning): same WTH ThinkGIS proprietary viewer as Williamsburg -- no code-case
+    #   layer, no ArcGIS Hub exists for this county.
+    # Marlboro SC (Bennettsville): same WTH ThinkGIS proprietary viewer. County's real code-enforcement
+    #   system is on sc.accessgov.com/marlboro, a JS single-page app that's primarily a building-permit
+    #   application portal; probed common REST paths (api/publicsearch, api/search,
+    #   api/PublicRecords/Search, api/CodeEnforcement, etc.) -- all 404, no open query endpoint.
+    # ------------------------------------------------------------------
 ) + tuple(
     # ---------------------------------------------------------------------
     # COUNTY-OWNED / SURPLUS inventory.
