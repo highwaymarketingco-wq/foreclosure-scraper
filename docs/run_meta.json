@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-09-28T19:53:45.520903Z",
+  "run_time": "2026-09-28T20:34:06.476709Z",
   "total": 217773,
   "by_source": {
     "national.nc_upset_bids": 38,
@@ -406,7 +406,7 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "",
+  "notes": "valuation recompute: 121,534 ARVs, 92,127 max bids, 429 verdicts",
   "detail_count": 217773,
   "detail_digest": "03365c416fd60be7",
   "board_parts": {
@@ -421,32 +421,32 @@
         "start": 0,
         "end": 13000,
         "records": 13000,
-        "bytes": 17286709,
-        "sha256": "46de33919da407a4ba832ff3d913876411e2e334399fbaf5e75f5cc7fa370c87"
+        "bytes": 17288183,
+        "sha256": "f3a46ebb47ec34df0c739a26dacedb24b373c5265325273c8b3a3318d328988d"
       },
       {
         "name": "listings_part_001.json.gz",
         "start": 13000,
         "end": 26000,
         "records": 13000,
-        "bytes": 10578263,
-        "sha256": "13699f68bbc2f1af366811dd05f36b5a3b2579b43afc3834c7420cff787bb2bf"
+        "bytes": 10616428,
+        "sha256": "e0b5346e388fc6dfc55d3012d40966ca1be20033c35ac481d76315a15051fb8f"
       },
       {
         "name": "listings_part_002.json.gz",
         "start": 26000,
         "end": 39000,
         "records": 13000,
-        "bytes": 8815033,
-        "sha256": "5857ae883774670134218587a19445919dfe9b1c5b1d9669bfc1231db8c7b232"
+        "bytes": 8818969,
+        "sha256": "8456058f7201ce9bdfe6d36ea9bea6bbd6764f76380f7a81e6338a57d7fe89ab"
       },
       {
         "name": "listings_part_003.json.gz",
         "start": 39000,
         "end": 52000,
         "records": 13000,
-        "bytes": 9442368,
-        "sha256": "f370ccd90cee103de7c8b1c7f5557a1826b205b2c06a40ec35f43869e31ecfd5"
+        "bytes": 9442366,
+        "sha256": "ea8ae935681f122a94d0ae5f7ce00e7743486dd5c0e9b50a1d76ccf56e833e3d"
       },
       {
         "name": "listings_part_004.json.gz",
@@ -461,8 +461,8 @@
         "start": 65000,
         "end": 78000,
         "records": 13000,
-        "bytes": 13281720,
-        "sha256": "3e7ce9239b9ac2fd8e21d7b10b4c314447a3421b8ccb8ffb11ac0a7341be6ab6"
+        "bytes": 13281716,
+        "sha256": "cff9db25fdc17e52fc449814083c4ab4ace0cf50078f309f7723cdba8e4eae41"
       },
       {
         "name": "listings_part_006.json.gz",
@@ -477,8 +477,8 @@
         "start": 91000,
         "end": 104000,
         "records": 13000,
-        "bytes": 18411075,
-        "sha256": "24e83be53b4a24e722cae0d32fbd23e6682516ccddfcbaba7bf6f7b0c2044ee1"
+        "bytes": 18411157,
+        "sha256": "b8351d705725016d4c0ac66306e20b77b4a76dc4983e6e959422d87a186d9aaf"
       },
       {
         "name": "listings_part_008.json.gz",
@@ -517,24 +517,24 @@
         "start": 156000,
         "end": 169000,
         "records": 13000,
-        "bytes": 6963026,
-        "sha256": "9cce8c01f42f2f2ec426d87dbf9c3c4d8e1b182e11ff7bac2e4dd52764cf65c2"
+        "bytes": 6963283,
+        "sha256": "d202a17d328c4507e83fd4e1def4f7340f7e176c702ddc5788eb63a7a45a96d9"
       },
       {
         "name": "listings_part_013.json.gz",
         "start": 169000,
         "end": 182000,
         "records": 13000,
-        "bytes": 7270005,
-        "sha256": "34323ec3536af8653ac2fcb7aacdb17d376b4428ee451034c924807b84d61ac4"
+        "bytes": 7270158,
+        "sha256": "77f033774aea4c0d37ca665f9206c01ca75416273a8bf48157800facc0b30e62"
       },
       {
         "name": "listings_part_014.json.gz",
         "start": 182000,
         "end": 195000,
         "records": 13000,
-        "bytes": 6979484,
-        "sha256": "b7a15ce28ba514d9c143b3c697611f09ffb199f89e12bdae949fd96b7ddb6d0b"
+        "bytes": 6979513,
+        "sha256": "e2a2820e7c12436bf61b823be163347dd5d144d4d215b0f724d71f5f0ea5382a"
       },
       {
         "name": "listings_part_015.json.gz",
@@ -571,7 +571,7 @@
     "by_county_top"
   ],
   "health_as_of": "2026-09-23T08:47:09.374753Z",
-  "health_age_hours": 131.11,
+  "health_age_hours": 131.78,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-09-23T08:47:09.374753Z",
