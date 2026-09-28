@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-09-28T20:34:06.476709Z",
+  "run_time": "2026-09-28T21:09:42.945424Z",
   "total": 217773,
   "by_source": {
     "national.nc_upset_bids": 38,
@@ -406,7 +406,7 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "valuation recompute: 121,534 ARVs, 92,127 max bids, 429 verdicts",
+  "notes": "owner-name signal + fullmer rank on 217,773 rows (A 3,895 / B 39,832 / C 38,713 / D 135,333)",
   "detail_count": 217773,
   "detail_digest": "03365c416fd60be7",
   "board_parts": {
@@ -421,24 +421,24 @@
         "start": 0,
         "end": 13000,
         "records": 13000,
-        "bytes": 17288183,
-        "sha256": "f3a46ebb47ec34df0c739a26dacedb24b373c5265325273c8b3a3318d328988d"
+        "bytes": 17288129,
+        "sha256": "536d005c6e11dc6f81ea3dec03535c931d95034852351331f2386f6de3266195"
       },
       {
         "name": "listings_part_001.json.gz",
         "start": 13000,
         "end": 26000,
         "records": 13000,
-        "bytes": 10616428,
-        "sha256": "e0b5346e388fc6dfc55d3012d40966ca1be20033c35ac481d76315a15051fb8f"
+        "bytes": 10620205,
+        "sha256": "21645e534376be2981df21c4c1b4d9c5781401712cf994101811b85dca994828"
       },
       {
         "name": "listings_part_002.json.gz",
         "start": 26000,
         "end": 39000,
         "records": 13000,
-        "bytes": 8818969,
-        "sha256": "8456058f7201ce9bdfe6d36ea9bea6bbd6764f76380f7a81e6338a57d7fe89ab"
+        "bytes": 8820069,
+        "sha256": "a2da8c6a4663ee428ab5665654ed4a6bdd2e89cec15252b100eccd2dd7126479"
       },
       {
         "name": "listings_part_003.json.gz",
@@ -477,8 +477,8 @@
         "start": 91000,
         "end": 104000,
         "records": 13000,
-        "bytes": 18411157,
-        "sha256": "b8351d705725016d4c0ac66306e20b77b4a76dc4983e6e959422d87a186d9aaf"
+        "bytes": 18411165,
+        "sha256": "08c7da4cf491125ae3ca6f799a0cc70a0e64425304871f9c39de9a7f5fb87047"
       },
       {
         "name": "listings_part_008.json.gz",
@@ -571,7 +571,7 @@
     "by_county_top"
   ],
   "health_as_of": "2026-09-23T08:47:09.374753Z",
-  "health_age_hours": 131.78,
+  "health_age_hours": 132.38,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-09-23T08:47:09.374753Z",
