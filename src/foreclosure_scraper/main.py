@@ -586,6 +586,10 @@ DATELESS_OK_SOURCES = {
     # identically-shaped counties_sc.spartanburg_flc row -- i.e. without this entry
     # every row this source ever harvests is deleted before dedupe.
     "counties_sc.kershaw_flc",                   # Kershaw FLC / delinquent-tax holdings (dateless)
+    # An FLC holding is a STANDING condition (county owns the parcel until it is
+    # assigned/sold), never a scheduled event: this scraper's Listing() never sets
+    # sale_date, so without this entry _active_only() deletes every row it harvests.
+    "counties_sc.mccormick_flc",                  # McCormick FLC inventory (dateless)
     # An FLC holding is a STANDING condition (county owns it until someone offers),
     # never a scheduled event: this scraper's Listing() never sets sale_date, so
     # without the whitelist entry _active_only() deletes every row it harvests.

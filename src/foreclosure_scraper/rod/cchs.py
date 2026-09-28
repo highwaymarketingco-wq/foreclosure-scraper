@@ -30,9 +30,12 @@ httpx's TLS fingerprint with the "Just a moment..." 403; a real Chrome JA3/TLS
 fingerprint (http_client.get_text_impersonate — curl-cffi impersonation, NOT a
 CAPTCHA/WAF solve, no cookies/session needed) clears it and returns the real
 <SearchResponse> / <r> XML every time. _cchs_fetch() and search_by_name() now
-use that tier for the two SearchService.asp calls. sweep_loss_instruments()
-still uses plain httpx for those calls (see _sweep_window) and will hit the
-same 403 — same fix applies there, just not yet ported.
+use that tier for the two SearchService.asp calls. sweep_loss_instruments()'s
+own bootstrap-page fetches stay on plain httpx (those always 200), but its
+recursive _sweep_window helper now goes through the same get_text_impersonate
+tier for search/getall via the _get_search_text() wrapper, which translates
+get_text_impersonate's RuntimeError-on-bad-status into the sweep's CchsWall so
+the existing wall-stops-the-host contract is unchanged.
 """
 from __future__ import annotations
 
@@ -300,6 +303,30 @@ def _check_wall(resp, host: str, what: str) -> None:
         raise CchsWall(f"{host} {what}: {reason}")
 
 
+_IMPERSONATE_STATUS_RE = re.compile(r"impersonate got (\d+)")
+
+
+async def _get_search_text(host: str, url: str, xhr: dict, what: str) -> str:
+    """SearchService.asp needs the Chrome-fingerprint tier (see _cchs_fetch's
+    docstring): get_text_impersonate, not the plain-httpx `client()`. Unlike an
+    httpx response, it has no `.status_code`/`.text` for `_check_wall` — it
+    raises RuntimeError on a bad status and returns plain text on success — so
+    this wrapper adapts it to the same CchsWall contract the sweep already
+    relies on: a bad status becomes CchsWall, and a 200 still gets the
+    WALL_TITLE/WALL_MARKER check in case Cloudflare ever serves a soft
+    challenge with a 200 status."""
+    try:
+        text = await get_text_impersonate(url, headers=xhr, timeout=40.0)
+    except RuntimeError as exc:
+        m = _IMPERSONATE_STATUS_RE.search(str(exc))
+        reason = f"HTTP {m.group(1)}" if m else str(exc)
+        raise CchsWall(f"{host} {what}: {reason}") from exc
+    reason = _wall_reason(200, text)
+    if reason:
+        raise CchsWall(f"{host} {what}: {reason}")
+    return text
+
+
 def parse_doctypes(page_html: str) -> list[tuple[str, str, str]]:
     """(book_type, kind, name) for every instrument kind on a realestatesearch.asp
     page. The dictionary is inline JavaScript: `doctype.name = '...'; doctype.kind =
@@ -422,21 +449,24 @@ def _search_params(kinds: tuple[str, ...], a: date, b: date, max_rows: int) -> d
             "sortorder": 1, "sortfield": "docno", "rangetype": "doc"}
 
 
-async def _sweep_window(c, host: str, base: str, xhr: dict, res: SweepResult,
+async def _sweep_window(host: str, base: str, xhr: dict, res: SweepResult,
                         a: date, b: date, max_rows: int) -> None:
     label = f"{a.isoformat()}..{b.isoformat()}"
     span = (b - a).days
 
     async def halves() -> None:
         mid = a + timedelta(days=span // 2)
-        await _sweep_window(c, host, base, xhr, res, a, mid, max_rows)
-        await _sweep_window(c, host, base, xhr, res, mid + timedelta(days=1), b, max_rows)
+        await _sweep_window(host, base, xhr, res, a, mid, max_rows)
+        await _sweep_window(host, base, xhr, res, mid + timedelta(days=1), b, max_rows)
 
-    r = await c.get(f"{base}/SearchService.asp?{urlencode(_search_params(res.kinds, a, b, max_rows))}",
-                    headers=xhr)
+    # SearchService.asp is Cloudflare-fronted (see _cchs_fetch); go through the
+    # Chrome-fingerprint tier via _get_search_text, which raises CchsWall the
+    # same way _check_wall does for the plain-httpx bootstrap calls.
     res.requests += 1
-    _check_wall(r, host, f"search {label}")
-    m = re.search(r"<recordcount>(\d+)</recordcount>", r.text, re.I)
+    search_text = await _get_search_text(
+        host, f"{base}/SearchService.asp?{urlencode(_search_params(res.kinds, a, b, max_rows))}",
+        xhr, f"search {label}")
+    m = re.search(r"<recordcount>(\d+)</recordcount>", search_text, re.I)
     if not m:
         res.problems.append(f"{label}: search reply has no <recordcount>, not read as 'no records'")
         return
@@ -446,10 +476,10 @@ async def _sweep_window(c, host: str, base: str, xhr: dict, res: SweepResult,
     if n >= max_rows and span >= 1:
         await halves()               # at the cap: the reply may be the head of a longer list
         return
-    r2 = await c.get(f"{base}/SearchService.asp?cmd=getall&start=0&offset={n}", headers=xhr)
     res.requests += 1
-    _check_wall(r2, host, f"getall {label}")
-    got = len(re.findall(r"<r>", r2.text))
+    getall_text = await _get_search_text(
+        host, f"{base}/SearchService.asp?cmd=getall&start=0&offset={n}", xhr, f"getall {label}")
+    got = len(re.findall(r"<r>", getall_text))
     if got < n and span >= 1:
         await halves()               # a short page: narrow the window until it fits
         return
@@ -457,8 +487,8 @@ async def _sweep_window(c, host: str, base: str, xhr: dict, res: SweepResult,
         res.problems.append(f"{label}: <recordcount> {n} but getall returned {got} rows")
     if n >= max_rows:
         res.truncated.append(label)
-    docs = collapse_documents(r2.text, res.state, res.county)
-    dm = re.search(r"<doccount>(\d+)</doccount>", r.text, re.I)
+    docs = collapse_documents(getall_text, res.state, res.county)
+    dm = re.search(r"<doccount>(\d+)</doccount>", search_text, re.I)
     if dm and int(dm.group(1)) != len(docs):
         res.problems.append(f"{label}: <doccount> {dm.group(1)} but {len(docs)} documents collapsed")
     loss = [d for d in docs if d.inst_class in LOSS_CLASSES]
@@ -504,7 +534,7 @@ async def sweep_loss_instruments(state: str, county: str, from_date: date, to_da
                 res.kinds, res.kinds_source = loss_kinds(state, county), "static"
                 res.problems.append("no kind dictionary on realestatesearch.asp; used the static loss kinds")
             for a, b in _year_windows(from_date, to_date):
-                await _sweep_window(c, hostname, base, xhr, res, a, b, max_rows)
+                await _sweep_window(hostname, base, xhr, res, a, b, max_rows)
     except CchsWall as w:
         res.walled = str(w)
     except Exception as exc:  # noqa: BLE001

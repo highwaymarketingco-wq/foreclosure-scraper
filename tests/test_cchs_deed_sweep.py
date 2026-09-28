@@ -7,7 +7,13 @@ why cchs_loss_deed_rows_synthetic.xml is SYNTHETIC (real tag layout, placeholder
 names). The multi-party row layout it assumes is verified by the parser being
 indifferent to it (see test_party_layout_does_not_change_the_result).
 
-No network: the shared client is replaced by a fake that records every URL.
+No network: bootstrap pages go through a fake replacing `cchs.client` (plain
+httpx) and SearchService.asp search/getall calls go through a fake replacing
+`cchs.get_text_impersonate` (the Chrome-fingerprint tier _sweep_window now
+uses — see cchs.py's module docstring). Both fakes share one `_FakeClient`
+instance and the same routing function, so a test only writes one `route(url)`
+and `_install` wires it to both call sites; `fake.calls`/`.searches`/`.getalls`
+record every request regardless of which tier made it.
 """
 from __future__ import annotations
 
@@ -56,6 +62,12 @@ class _FakeClient:
 
 
 def _install(monkeypatch, router) -> _FakeClient:
+    """Wire `router` to BOTH network tiers _sweep_window can hit: the plain-httpx
+    `cchs.client` (bootstrap pages) and `cchs.get_text_impersonate` (search/getall,
+    which raises RuntimeError on a bad status and returns plain text on success —
+    see http_client.get_text_impersonate). Both record onto the same `fake.calls`,
+    so `fake.searches`/`fake.getalls` see every request no matter which tier made
+    it, matching what `cchs._get_search_text` adapts back into CchsWall."""
     fake = _FakeClient(router)
 
     @contextlib.asynccontextmanager
@@ -63,6 +75,15 @@ def _install(monkeypatch, router) -> _FakeClient:
         yield fake
 
     monkeypatch.setattr(cchs, "client", factory)
+
+    async def fake_impersonate(url, **kw):
+        fake.calls.append(url)
+        resp = router(url)
+        if resp.status_code >= 400:
+            raise RuntimeError(f"impersonate got {resp.status_code} for {url}")
+        return resp.text
+
+    monkeypatch.setattr(cchs, "get_text_impersonate", fake_impersonate)
     return fake
 
 
@@ -325,6 +346,43 @@ def test_the_normal_bootstrap_pages_are_not_mistaken_for_a_wall():
     assert cchs._wall_reason(200, "<title>Burke County, NC</title>") is None
     assert cchs._wall_reason(200, "<title>Please Log In</title>") == "challenge, CAPTCHA or login page"
     assert cchs._wall_reason(200, '<div class="g-recaptcha" data-sitekey="x"></div>')
+
+
+# --- _get_search_text: adapting get_text_impersonate's RuntimeError contract into CchsWall ------
+def test_get_search_text_turns_a_runtime_error_status_into_a_wall_with_the_status(monkeypatch):
+    async def boom(url, **kw):
+        raise RuntimeError(f"impersonate got 403 for {url}")
+
+    monkeypatch.setattr(cchs, "get_text_impersonate", boom)
+    with pytest.raises(cchs.CchsWall, match=r"us5\.courthousecomputersystems\.com search x: HTTP 403"):
+        asyncio.run(cchs._get_search_text("us5.courthousecomputersystems.com", "https://x", {}, "search x"))
+
+
+def test_get_search_text_keeps_the_message_when_it_has_no_status(monkeypatch):
+    async def boom(url, **kw):
+        raise RuntimeError("connection reset")
+
+    monkeypatch.setattr(cchs, "get_text_impersonate", boom)
+    with pytest.raises(cchs.CchsWall, match="connection reset"):
+        asyncio.run(cchs._get_search_text("us5.courthousecomputersystems.com", "https://x", {}, "search x"))
+
+
+def test_get_search_text_still_walls_a_soft_challenge_served_with_200(monkeypatch):
+    async def soft_challenge(url, **kw):
+        return CLOUDFLARE_403        # the real page: <title>Just a moment...</title>, status 200 here
+
+    monkeypatch.setattr(cchs, "get_text_impersonate", soft_challenge)
+    with pytest.raises(cchs.CchsWall, match="challenge"):
+        asyncio.run(cchs._get_search_text("us5.courthousecomputersystems.com", "https://x", {}, "search x"))
+
+
+def test_get_search_text_returns_the_body_on_a_clean_200(monkeypatch):
+    async def ok(url, **kw):
+        return "<SearchResponse><recordcount>3</recordcount></SearchResponse>"
+
+    monkeypatch.setattr(cchs, "get_text_impersonate", ok)
+    text = asyncio.run(cchs._get_search_text("us5.courthousecomputersystems.com", "https://x", {}, "search x"))
+    assert "<recordcount>3</recordcount>" in text
 
 
 def _one_row_xml() -> str:
