@@ -87,14 +87,57 @@ DELINQ_RIPE_PEAK_YEARS = 15.0  # ep 054's own quoted 10-20yr fractured-heirship 
 DELINQ_RIPE_BASE_PTS = 22      # unchanged from the old flat award, at year 2
 DELINQ_RIPE_PEAK_PTS = 40      # above cad_strong's 25 -- ripeness this old is the sharpest signal
 
-# Fixed per-deal curative spend, LOCAL estimate -- not his Texas number. Kept
-# conservative; the ratio matters more than the absolute.
-CURATIVE_COST_BASE = 8_000.0
+# The synthesis also asks for DELINQ_RIPE_YEARS/PEAK_YEARS to be "a per-state
+# parameter equal to statutory time-to-auction minus about a year" rather than
+# one flat pair of constants for both states. We deliberately do NOT hardcode
+# a specific NC or SC figure here: NC counties foreclose on their own schedule
+# with no fixed forced-sale year (which is WHY the 10-20yr fractured-heirship
+# band above exists at all), and the synthesis's own "still not known" section
+# says the SC administrative-sale timeline is not yet verified against a named
+# statute. Guessing a number we cannot cite would be exactly the kind of
+# speculative change this pass is supposed to avoid. What IS safe and useful
+# now is the STRUCTURE: an optional per-state override, keyed "NC"/"SC", empty
+# by default so today's scores are byte-for-byte unchanged until real figures
+# come back from counsel.
+DELINQ_RIPE_YEARS_BY_STATE: dict[str, float] = {}
+DELINQ_RIPE_PEAK_YEARS_BY_STATE: dict[str, float] = {}
+
+# "the production dollar filter that actually gets worked: $10,000+ delinquent
+# AND zero payments in the last 24 months" (ep 034). Was $5,000.
+ARREARS_PRODUCTION_FILTER = 10_000.0
+
+# Curative cost, LOCAL estimate -- not his Texas number. Synthesis numeric-rules
+# section: "Curative cost is at least three tiers, not a fixed $10-30k." Tier 1
+# sub-$1,000 (simple release/affidavit: ~$500 dissolved-LLC affidavit, ~$800
+# non-litigated fractional close). Tier 2 low thousands, usually paid on the
+# HUD at closing rather than out of pocket ("$3,250 per probate ... up to ~$15k
+# for three probates"). Tier 3 the ~20% with judicial involvement, where the
+# old $10-30k figure actually belongs (mediation is the cost cliff). This
+# replaces the single flat CURATIVE_COST_BASE the module used to add owner/
+# chain-break increments onto -- that flat number could never reach Tier 3 (its
+# ceiling was $18,000 for the messiest lead it could describe) and never
+# dropped into Tier 1 for a clean one-owner, no-litigation lead either.
+CURATIVE_TIER1_SIMPLE = 800.0          # sub-$1,000: release / affidavit, no probate, no litigation signal
+CURATIVE_TIER2_PER_PROBATE = 3_250.0   # "$3,250 per probate typical"
+CURATIVE_TIER2_CAP = 15_000.0          # "up to ~$15k for three probates"
+CURATIVE_TIER3_JUDICIAL = 18_000.0     # judicial-track floor -- LOCAL/conservative, not the $30k Texas ceiling
 # "margins need to be no lower than 50 grand" against a $10-30k legal budget is
 # 2-5x coverage. We score the RATIO so a cheap-to-cure deal is not punished for
 # being small.
 MARGIN_COVERAGE_GOOD = 4.0
 MARGIN_COVERAGE_MIN = 2.0
+
+# Owner-count value-conditional structure (synthesis numeric-rules section):
+# "four or less is the target, 1-5 the buy box, degrade sharply past 6-7 unless
+# value exceeds roughly $500k, hard pass at 10+ except at $1M-$2.5M value with
+# taxes under $100-200k." This module never hard-passes (it ranks, never
+# filters -- see the module docstring), so "hard pass" becomes "no bonus."
+OWNER_COUNT_DEGRADE_AT = 6
+OWNER_COUNT_HARD_PASS_AT = 10
+OWNER_COUNT_VALUE_EXCEPTION = 500_000.0
+OWNER_COUNT_HARD_PASS_VALUE_LO = 1_000_000.0
+OWNER_COUNT_HARD_PASS_VALUE_HI = 2_500_000.0
+OWNER_COUNT_HARD_PASS_TAX_CAP = 200_000.0
 
 # "I don't like to deal in itsy bitsy tiny crummy markets in the middle of
 # nowhere ... you got no liquidity" (ep 019). Scored, because a thin market is a
@@ -209,19 +252,29 @@ def years_delinquent(li: Listing) -> tuple[Optional[float], bool]:
     return yrs, two_plus
 
 
-def delinq_ripeness_points(yrs: Optional[float]) -> int:
+def delinq_ripeness_points(yrs: Optional[float], state: str | None = None) -> int:
     """Monotonic ramp from DELINQ_RIPE_BASE_PTS at DELINQ_RIPE_YEARS up to
     DELINQ_RIPE_PEAK_PTS at DELINQ_RIPE_PEAK_YEARS, then flat. No numeric
     year count (raw.two_year_delinquent said yes but tax_aging_surfaced
     didn't carry a measured value) falls back to the base award -- the old
     behavior for that case, since there's nothing to ramp on.
+
+    `state` looks up DELINQ_RIPE_YEARS_BY_STATE / DELINQ_RIPE_PEAK_YEARS_BY_STATE
+    first and falls back to the module constants -- both override dicts are
+    empty today, so passing a state is currently a no-op. See the comment on
+    those dicts for why we don't hardcode per-state figures yet.
     """
-    if yrs is None or yrs < DELINQ_RIPE_YEARS:
+    key = (state or "").strip().upper()
+    ripe_years = DELINQ_RIPE_YEARS_BY_STATE.get(key, DELINQ_RIPE_YEARS)
+    peak_years = DELINQ_RIPE_PEAK_YEARS_BY_STATE.get(key, DELINQ_RIPE_PEAK_YEARS)
+    if yrs is None or yrs < ripe_years:
         return DELINQ_RIPE_BASE_PTS
-    if yrs >= DELINQ_RIPE_PEAK_YEARS:
+    if yrs >= peak_years:
         return DELINQ_RIPE_PEAK_PTS
-    span = DELINQ_RIPE_PEAK_YEARS - DELINQ_RIPE_YEARS
-    frac = (yrs - DELINQ_RIPE_YEARS) / span
+    span = peak_years - ripe_years
+    if span <= 0:
+        return DELINQ_RIPE_PEAK_PTS
+    frac = (yrs - ripe_years) / span
     return int(round(DELINQ_RIPE_BASE_PTS + frac * (DELINQ_RIPE_PEAK_PTS - DELINQ_RIPE_BASE_PTS)))
 
 
@@ -232,6 +285,18 @@ def _owner_count(li: Listing) -> int:
     owner is roughly a coin flip, so three owners is ~12.5% not ~50%. It cuts both
     ways -- more owners means more risk AND a cheaper entry per share, because a
     disengaged co-heir sells an interest for $500-$2,000.
+
+    KNOWN GAP, left as-is (Dirty Deeds synthesis numeric-rules section): "Count
+    probates, not heirs (three post-deceased heirs each with a spouse and three
+    kids is 12 heirs and 3 probates)." This function has no heir-enumeration or
+    probate-count field to draw on -- there is no scraper anywhere in this repo
+    that lists individual heirs by name (confirmed: no `heirs`/`heir_names` raw
+    key exists) -- so it counts separator-joined NAMES on the county's own
+    owner_name/defendant string, which is already closer to "how many parties
+    does the county show" than to a full heir enumeration. The "et al"/"heirs"
+    branch below is a bare sentinel (unknown-but-many, scored as 4), not a real
+    count, and cannot be corrected into a probate count without new data. Do not
+    reinterpret the sentinel as a literal owner count elsewhere in this module.
     """
     parts = []
     for f in (li.owner_name, li.defendant):
@@ -253,6 +318,34 @@ def _owner_count(li: Listing) -> int:
 def liquidity_tier(li: Listing, msa_tier: dict) -> str:
     key = ((li.county or "").replace(" County", "").strip().lower(), (li.state or "").strip().upper())
     return msa_tier.get(key, "unknown")
+
+
+def _curative_cost_estimate(oc: int, is_probate: bool, is_judicial: bool, deed_chain_summary: dict) -> float:
+    """Three-tier curative estimate (Dirty Deeds synthesis numeric-rules section).
+
+    Tier 1, sub-$1,000: a simple release or affidavit -- no probate signal, no
+    judicial signal. Tier 2, low thousands, usually paid on the HUD at closing
+    rather than out of pocket: "$3,250 per probate ... up to ~$15k for three
+    probates." We do not have a probate-COUNT field (see `_owner_count`'s
+    docstring on the heirs-vs-probates gap), so this scales off owner-count as
+    a bounded proxy, capped at the doc's own 3-probate/~$15k anchor rather than
+    growing unbounded. Tier 3, the ~20% with judicial involvement (named in a
+    tax lawsuit, or a recorded title chain break): this is where the old
+    $10-30k figure actually belongs. Kept at the LOCAL/conservative end of that
+    range -- $18,000 -- not the $30k Texas ceiling the module docstring already
+    flags as unverified for this footprint.
+
+    Replaces the single flat CURATIVE_COST_BASE + owner/chain-break increments
+    this module used before: that flat number topped out at $18,000 for the
+    messiest lead it could describe and never went below $8,000 for a clean
+    one-owner, no-litigation lead either.
+    """
+    if is_judicial or _num((deed_chain_summary or {}).get("chain_breaks")):
+        return CURATIVE_TIER3_JUDICIAL
+    if is_probate:
+        probate_proxy = max(1, min(oc or 1, 5))
+        return min(CURATIVE_TIER2_CAP, CURATIVE_TIER2_PER_PROBATE * probate_proxy)
+    return CURATIVE_TIER1_SIMPLE
 
 
 def score(li: Listing, msa_tier: dict | None = None) -> dict:
@@ -285,14 +378,21 @@ def score(li: Listing, msa_tier: dict | None = None) -> dict:
     # --- ripeness ---------------------------------------------------------
     yrs, two_plus = years_delinquent(li)
     if two_plus:
-        add("delinq_ripe", delinq_ripeness_points(yrs), "delinquent_2yr_plus")
+        add("delinq_ripe", delinq_ripeness_points(yrs, li.state), "delinquent_2yr_plus")
     elif yrs is not None and yrs >= 1:
         add("delinq_early", 6, "delinquent_1yr_early")
 
     # --- arrears size (ep 022's cherry-pick column) -----------------------
+    # Synthesis: "the production dollar filter that actually gets worked:
+    # $10,000+ delinquent AND zero payments in the last 24 months" (ep 034).
+    # We only wire the dollar half -- no scraper yet carries a per-county
+    # last-payment-date (Tier A #6 in the synthesis, "Easy (hold 7 rolls)",
+    # not built) -- so this raises the existing $5,000 tier boundary to match
+    # the quoted $10,000 production number rather than adding an unverifiable
+    # payment-history gate.
     arrears, stated = tax_arrears(li)
     if stated and arrears:
-        add("arrears_stated", 8 if arrears >= 5_000 else 4, "tax_arrears_known")
+        add("arrears_stated", 8 if arrears >= ARREARS_PRODUCTION_FILTER else 4, "tax_arrears_known")
     elif arrears:
         flags.append("arrears_estimated_only")
 
@@ -303,12 +403,31 @@ def score(li: Listing, msa_tier: dict | None = None) -> dict:
     lt = (li.listing_type or "")
     lt = getattr(lt, "value", lt)
     src = (li.source or "").lower()
-    if "tax_foreclos" in src or "tax_suit" in src or (li.case_number and "tax" in src):
+    is_tax_lawsuit = bool("tax_foreclos" in src or "tax_suit" in src or (li.case_number and "tax" in src))
+    if is_tax_lawsuit:
         add("tax_lawsuit", 20, "named_in_tax_lawsuit")
 
     # --- the mess: "the margin lives in the mess" ------------------------
+    # Synthesis: "four or less is the target, 1-5 the buy box, degrade sharply
+    # past 6-7 unless value exceeds roughly $500k, hard pass at 10+ except at
+    # $1M-$2.5M value with taxes under $100-200k." Before this, oc >= 4 was one
+    # flat, unbounded bucket -- a 4-owner lead and a 27-owner lead scored the
+    # identical +14, the opposite of "degrade" and "hard pass." This module
+    # never filters (see docstring), so "hard pass" below means zero bonus
+    # points, not removal.
     oc = _owner_count(li)
-    if oc >= 4:
+    if oc >= OWNER_COUNT_HARD_PASS_AT:
+        if (cad is not None and OWNER_COUNT_HARD_PASS_VALUE_LO <= cad <= OWNER_COUNT_HARD_PASS_VALUE_HI
+                and (arrears is None or arrears < OWNER_COUNT_HARD_PASS_TAX_CAP)):
+            add("many_owners_value_exception", 10, f"multi_owner_~{oc}_value_exception")
+        else:
+            flags.append(f"multi_owner_~{oc}_past_hard_pass_threshold")
+    elif oc >= OWNER_COUNT_DEGRADE_AT:
+        if cad is not None and cad >= OWNER_COUNT_VALUE_EXCEPTION:
+            add("many_owners", 14, f"multi_owner_~{oc}")
+        else:
+            add("many_owners_degraded", 4, f"multi_owner_~{oc}_degraded")
+    elif oc >= 4:
         add("many_owners", 14, f"multi_owner_~{oc}")
     elif oc >= 2:
         add("some_owners", 8, f"multi_owner_{oc}")
@@ -374,14 +493,7 @@ def score(li: Listing, msa_tier: dict | None = None) -> dict:
     margin = _num(calc.get("est_gross_margin")) or _num(raw.get("est_gross_margin"))
     coverage = None
     if margin:
-        # More owners and a broken chain both cost more to cure.
-        cost = CURATIVE_COST_BASE
-        if oc >= 4:
-            cost += 6_000
-        elif oc >= 2:
-            cost += 2_000
-        if _num(summ.get("chain_breaks")):
-            cost += 4_000
+        cost = _curative_cost_estimate(oc, blob_probate, is_tax_lawsuit, summ)
         coverage = margin / cost
         if coverage >= MARGIN_COVERAGE_GOOD:
             add("margin_strong", 15, "margin_covers_curative_4x")
