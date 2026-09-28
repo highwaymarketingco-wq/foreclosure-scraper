@@ -31,18 +31,40 @@ every 2025 PDF ("2025-tax-sale.pdf", "Delinquent-Tax-Sale-2025[-1].pdf") is
 just a 1-2 page sale-date/bidder-registration NOTICE with no parcel table
 (0 rows, correctly), and the CURRENT 2026 list, "TAX-SALE-TAB.pdf" (linked
 from the delinquent-tax/ page as the live list), is a SCANNED-IMAGE PDF --
-pypdf and pdfplumber both extract 0 chars / 0 tables from it (verified: 5
-raster images, no text layer). So this scraper is silently running a year
-stale (2024 data) versus the current 2026 tab, not because of a wall, but
-because the county switched the current-year PDF to an image scan. Closing
-that gap needs OCR (see project_doc_ocr.md's Gemini-first scanned-PDF
-enricher), which is out of scope for a URL/parser fix -- flagged separately
-rather than bolted on here.
+pypdf and pdfplumber both extract 0 chars / 0 tables from it. Closing that
+gap needed OCR (see project_doc_ocr.md's Gemini-first scanned-PDF
+enricher) -- added below (_ocr_pdf_text) as a text-under-40-chars fallback
+that feeds Gemini's transcription straight through the SAME _parse_pdf_text
+regex, rather than porting the whole enrichment_doc_ocr.py per-lead pipeline
+in.
+
+2026-09-28 OCR fallback verified: the wp-json media item's own "modified"
+timestamp is 2026-08-25, and rendering TAX-SALE-TAB.pdf to an image (pymupdf)
+confirms it is NOT the scanned table the "5 raster images" note above assumed
+-- it is a single-page announcement flyer ("THE CHEROKEE COUNTY, SC,
+DELINQUENT TAX SALE IS SCHEDULED FOR MONDAY, NOVEMBER 9, 2026 ... WE DO NOT
+PROVIDE A COPY OF THE LIST IN THE DELINQUENT TAX OFFICE ... DELINQUENT
+PROPERTIES ... WILL BE POSTED ON THIS SITE, THREE WEEKS BEFORE THE SALE
+DATE"). Gemini OCR read it correctly and reported (accurately) that there is
+no parcel table on the page -- 0 rows is the CORRECT answer for this specific
+PDF today, not an OCR failure; same pattern already seen on the (correctly
+zero-row) 2025 notice PDFs and on 2023's identically-worded flyer
+("Delinquent-Tax-Sale-2023.pdf", same "we do not provide a list" text,
+rendered + OCR'd to confirm). The actual 2026 parcel list will not exist at
+this URL until roughly 2026-10-19 (three weeks before the Nov 9 sale).
+The OCR mechanism itself (scanned PDF -> Gemini transcription -> the existing
+row regex) was validated separately against a synthetic image-only PDF built
+with 5 known rows in this exact column layout: all 5 rows round-tripped
+through _ocr_pdf_text() + _parse_pdf_text() with the TMS/owner/description
+values intact. Re-run this scraper after ~2026-10-19 to pick up the real
+2026 list once the county posts it.
 """
 from __future__ import annotations
 
+import asyncio
 import io
 import json
+import os
 import re
 from typing import Iterable
 
@@ -51,6 +73,8 @@ import structlog
 from ...base_scraper import BaseScraper, OUTCOME_OK, OUTCOME_ZERO
 from ...http_client import get_bytes, get_text
 from ...models import Listing, ListingType, PropertyKind
+from ...enrichment_doc_ocr import DOC_OCR_ENABLED
+from ...enrichment_vision import GEMINI_VISION_MODEL, _parse_gemini_keys
 
 log = structlog.get_logger()
 
@@ -114,11 +138,137 @@ def _extract_pdf_text(pdf_bytes: bytes) -> str:
     return "\n".join(parts)
 
 
+# --- OCR fallback for scanned/image tax-sale PDFs ---------------------------
+#
+# 2026-09-28: the CURRENT year's list (e.g. TAX-SALE-TAB.pdf) started shipping
+# as a scanned/raster-image PDF with no text layer -- pypdf and pdfplumber
+# both extract 0 chars from it, so _extract_pdf_text() above silently returns
+# "" and this scraper falls back to whatever older PDF still has real text
+# (the 2024 list), running a year stale forever without ever erroring.
+#
+# This reuses the project's existing Gemini-first scanned-document OCR
+# infrastructure (enrichment_doc_ocr.py / enrichment_vision.py): the same
+# GEMINI_API_KEY_1..N multi-account key rotation, the same google-genai SDK
+# call shape used by enrichment_doc_ocr._gemini_call() (Gemini accepts a raw
+# application/pdf Part directly -- no image conversion needed, and it reads
+# every page/embedded image in one call), and the same FORECLOSURE_DOC_OCR
+# on/off gate (DOC_OCR_ENABLED) so a global OCR kill-switch also covers this
+# path. It does NOT reuse enrichment_doc_ocr's OCR_PROMPT / apply_ocr(),
+# because that prompt extracts ONE owner/address from a single per-property
+# notice -- this PDF is a multi-hundred-row TABLE, so the model is asked to
+# transcribe every row back into the same "<item#> <owner> <TMS> <desc>"
+# layout _parse_pdf_text() already parses, rather than to extract one record.
+_OCR_TRANSCRIBE_PROMPT = (
+    "This is a scanned page (or pages) from a South Carolina county's "
+    "delinquent tax sale list. It is a table with columns, in order: Item "
+    "Number, Owner Name, Map Number (a TMS parcel number formatted like "
+    "099-01-00-022.000), and a Description or address. Transcribe EVERY "
+    "data row exactly as printed in the scanned image -- do not skip any, "
+    "do not summarize, do not correct spelling. Output ONE row per line, "
+    "in exactly this format:\n"
+    "<item number> <owner name> <TMS map number> <description>\n"
+    "Example output line:\n"
+    "1 A AND R PROPERTY MANAGEMENT 099-01-00-022.000 946 N LOGAN ST\n"
+    "Do not include the header row, page numbers, or any commentary/"
+    "markdown/code fences. Output only the transcribed data rows."
+)
+
+# Text extraction below this many characters is treated as "no text layer" --
+# i.e. a scanned/raster PDF worth spending an OCR call on. A handful of stray
+# chars (a stamped date, a page footer pypdf occasionally lifts off a raster
+# page) should not by itself count as "has a text layer".
+_OCR_TEXT_FLOOR = 40
+
+# Per-key vision-call timeout and the hard ceiling for the whole fallback
+# (tried across every configured Gemini key). Bounded well under this
+# scraper's timeout_s so a bad run degrades to "OCR skipped", not a hang.
+_OCR_CALL_TIMEOUT_S = 45.0
+_OCR_TOTAL_TIMEOUT_S = 180.0
+
+
+def _is_quota_error(msg: str) -> bool:
+    m = msg.lower()
+    return any(s in m for s in
+                ("quota", "rate limit", "429", "resource_exhausted",
+                 "exceeded", "too many requests"))
+
+
+async def _ocr_pdf_text(pdf_bytes: bytes) -> str:
+    """OCR a scanned/image-only PDF into transcribed table text via Gemini.
+
+    Rotates across every GEMINI_API_KEY_N configured (same key-loading as the
+    rest of this project's vision/doc-OCR pipeline), moving to the next key
+    on quota exhaustion. Returns "" if no key is configured, the google-genai
+    SDK isn't installed, or every key fails/times out -- callers must treat
+    that as "OCR unavailable" and keep whatever real text was already
+    extracted, never raise.
+    """
+    keys = _parse_gemini_keys()
+    if not keys:
+        log.warning("cherokee_delinquent_tax.ocr_no_gemini_key")
+        return ""
+    try:
+        from google import genai
+        from google.genai import types as gt
+    except ImportError:
+        log.warning("cherokee_delinquent_tax.ocr_sdk_missing",
+                    hint="pip install google-genai")
+        return ""
+
+    model = os.environ.get("DOC_OCR_MODEL", GEMINI_VISION_MODEL)
+
+    async def _one_key(key: str) -> str:
+        client = genai.Client(api_key=key)
+        contents = [
+            gt.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
+            _OCR_TRANSCRIBE_PROMPT,
+        ]
+        resp = await client.aio.models.generate_content(
+            model=model, contents=contents,
+            config=gt.GenerateContentConfig(max_output_tokens=8000),
+        )
+        text = ""
+        try:
+            text = (resp.text or "").strip()
+        except Exception:
+            for cand in getattr(resp, "candidates", []) or []:
+                for p in getattr(getattr(cand, "content", None), "parts", []) or []:
+                    text += getattr(p, "text", "") or ""
+        return text
+
+    async def _try_all_keys() -> str:
+        for key in keys:
+            try:
+                text = await asyncio.wait_for(_one_key(key), timeout=_OCR_CALL_TIMEOUT_S)
+            except asyncio.TimeoutError:
+                log.warning("cherokee_delinquent_tax.ocr_call_timeout", key=key[:8])
+                continue
+            except Exception as exc:
+                msg = str(exc)
+                if _is_quota_error(msg):
+                    log.info("cherokee_delinquent_tax.ocr_quota_exhausted", key=key[:8])
+                else:
+                    log.warning("cherokee_delinquent_tax.ocr_error",
+                                key=key[:8], error=msg[:160])
+                continue
+            if text:
+                return text
+        return ""
+
+    try:
+        return await asyncio.wait_for(_try_all_keys(), timeout=_OCR_TOTAL_TIMEOUT_S)
+    except asyncio.TimeoutError:
+        log.warning("cherokee_delinquent_tax.ocr_total_timeout")
+        return ""
+
+
 class CherokeeDelinquentTaxScraper(BaseScraper):
     slug = "counties_sc.cherokee_delinquent_tax"
     name = "Cherokee SC Delinquent Tax Sale"
     category = "tax_sale"
-    timeout_s = 120.0
+    # 120s -> 300s: leaves headroom for the OCR fallback (up to
+    # _OCR_TOTAL_TIMEOUT_S=180s) on top of the normal wp-json + PDF fetches.
+    timeout_s = 300.0
     expected_min_count = 0  # annual list, may be empty off-season
 
     async def fetch(self) -> Iterable[Listing]:
@@ -172,6 +322,29 @@ class CherokeeDelinquentTaxScraper(BaseScraper):
                 pdf_bytes = await get_bytes(pdf_url, timeout=60)
                 text = _extract_pdf_text(pdf_bytes)
                 rows = _parse_pdf_text(text)
+
+                # OCR fallback: a text layer under _OCR_TEXT_FLOOR chars means
+                # this PDF is scanned/raster (e.g. the county switched the
+                # current tax-sale list to an image scan), not empty of
+                # rows -- pypdf/pdfplumber structurally cannot recover text
+                # that was never embedded. Without this, the scraper silently
+                # falls back to whatever older PDF still has real text and
+                # never errors. See the OCR fallback block above for why this
+                # doesn't reuse enrichment_doc_ocr's single-record prompt.
+                if len(text.strip()) < _OCR_TEXT_FLOOR and DOC_OCR_ENABLED:
+                    log.info("cherokee_delinquent_tax.ocr_fallback_start",
+                             url=pdf_url[-50:], text_chars=len(text.strip()))
+                    ocr_text = await _ocr_pdf_text(pdf_bytes)
+                    if ocr_text:
+                        ocr_rows = _parse_pdf_text(ocr_text)
+                        log.info("cherokee_delinquent_tax.ocr_fallback_parsed",
+                                 url=pdf_url[-50:], rows=len(ocr_rows),
+                                 ocr_chars=len(ocr_text))
+                        rows = ocr_rows
+                    else:
+                        log.warning("cherokee_delinquent_tax.ocr_fallback_empty",
+                                    url=pdf_url[-50:])
+
                 log.info("cherokee_delinquent_tax.pdf_parsed",
                          url=pdf_url[-50:], rows=len(rows))
                 all_rows.extend(rows)
