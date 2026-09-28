@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-09-28T19:28:15.469811Z",
+  "run_time": "2026-09-28T19:53:45.520903Z",
   "total": 217773,
   "by_source": {
     "national.nc_upset_bids": 38,
@@ -421,24 +421,24 @@
         "start": 0,
         "end": 13000,
         "records": 13000,
-        "bytes": 17286634,
-        "sha256": "447161fba83e36d12e331ba5a04364e99e3f65b94a199abf76e7e1eb8ef831b5"
+        "bytes": 17286709,
+        "sha256": "46de33919da407a4ba832ff3d913876411e2e334399fbaf5e75f5cc7fa370c87"
       },
       {
         "name": "listings_part_001.json.gz",
         "start": 13000,
         "end": 26000,
         "records": 13000,
-        "bytes": 10580986,
-        "sha256": "0218b434debd76f7eb7abcba3707f38d3e1e302ad66457396acf9d34b5336504"
+        "bytes": 10578263,
+        "sha256": "13699f68bbc2f1af366811dd05f36b5a3b2579b43afc3834c7420cff787bb2bf"
       },
       {
         "name": "listings_part_002.json.gz",
         "start": 26000,
         "end": 39000,
         "records": 13000,
-        "bytes": 8806931,
-        "sha256": "535279a64e9ef3eafef5842732d635dee6bd85737761685ada82ac892de707d0"
+        "bytes": 8815033,
+        "sha256": "5857ae883774670134218587a19445919dfe9b1c5b1d9669bfc1231db8c7b232"
       },
       {
         "name": "listings_part_003.json.gz",
@@ -518,15 +518,15 @@
         "end": 169000,
         "records": 13000,
         "bytes": 6963026,
-        "sha256": "e82532b48b9a9f525a86fc2e9504df3a3f1c9c330f305d859405003a72265b1b"
+        "sha256": "9cce8c01f42f2f2ec426d87dbf9c3c4d8e1b182e11ff7bac2e4dd52764cf65c2"
       },
       {
         "name": "listings_part_013.json.gz",
         "start": 169000,
         "end": 182000,
         "records": 13000,
-        "bytes": 7270000,
-        "sha256": "0d3371dedfa985be97ca26d5af750cebba54eaa1a2ebb2a2e7964dad739d95c5"
+        "bytes": 7270005,
+        "sha256": "34323ec3536af8653ac2fcb7aacdb17d376b4428ee451034c924807b84d61ac4"
       },
       {
         "name": "listings_part_014.json.gz",
@@ -571,7 +571,7 @@
     "by_county_top"
   ],
   "health_as_of": "2026-09-23T08:47:09.374753Z",
-  "health_age_hours": 130.69,
+  "health_age_hours": 131.11,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-09-23T08:47:09.374753Z",
