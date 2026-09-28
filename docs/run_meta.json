@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-09-27T23:46:37.489006Z",
+  "run_time": "2026-09-28T05:20:17.202759Z",
   "total": 215535,
   "by_source": {
     "national.nc_upset_bids": 38,
@@ -394,7 +394,7 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "owner-name signal + fullmer rank on 215,535 rows (A 3,874 / B 38,983 / C 38,173 / D 134,505)",
+  "notes": "",
   "detail_count": 215535,
   "detail_digest": "8f17a62e23daf008",
   "board_parts": {
@@ -449,8 +449,8 @@
         "start": 65000,
         "end": 78000,
         "records": 13000,
-        "bytes": 13280624,
-        "sha256": "154a576ba24cf69e89b92cbe192073d955c15bb27c2e873b58b350903df29e47"
+        "bytes": 13280619,
+        "sha256": "11d67be3df470225665cf568b584c916bb99105dc39a8d55b253512eb6250e15"
       },
       {
         "name": "listings_part_006.json.gz",
@@ -521,8 +521,8 @@
         "start": 182000,
         "end": 195000,
         "records": 13000,
-        "bytes": 6971309,
-        "sha256": "f09e5aaffaa8c582476325d13806d74c99025557e9519db42946d9b9ec31bf7d"
+        "bytes": 6971322,
+        "sha256": "8f7e20d9e61e93525b694ce4558508edd4075fcb3771b21db843b7f0379ce7e8"
       },
       {
         "name": "listings_part_015.json.gz",
@@ -559,7 +559,7 @@
     "by_county_top"
   ],
   "health_as_of": "2026-09-23T08:47:09.374753Z",
-  "health_age_hours": 110.99,
+  "health_age_hours": 116.55,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-09-23T08:47:09.374753Z",
