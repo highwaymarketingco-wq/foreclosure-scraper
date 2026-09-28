@@ -160,6 +160,27 @@ _ADDR_RE = re.compile(
     r"\b(\d{1,6}\s+[A-Z0-9][\w .'\-]{2,40}?\b(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|"
     r"Avenue|Ave|Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|"
     r"Trail|Trl|Parkway|Pkwy)\b\.?)", re.I)
+# On a notice with no real "commonly known as <address>" clause in the scraped
+# preview text (common — the grid-preview snippet is a truncated excerpt, not
+# the full notice), _ADDR_RE can still fire on a coincidental case-number-looking
+# digit run followed, well past it, by a suffix word that's part of ordinary
+# legal boilerplate rather than a street name (confirmed live 2026-09-28: 36 of
+# 407 board rows for this source carry a "street_address" that is actually a
+# fragment of "NOTICE OF FORECLOSURE SALE ... Deed of Trust ..." text). A real
+# match from this regex is always short (the middle group is capped at 40 chars,
+# plus the digit/space/suffix-word overhead), so anything long, or containing an
+# unmistakable legal-notice phrase, is never a street address — reject it rather
+# than accept a confidently wrong one (this repo's rule throughout: a wrong
+# result is worse than no result).
+_ADDR_MAX_LEN = 60
+_ADDR_BOILERPLATE_RE = re.compile(
+    r"\b(?:NOTICE\s+OF|DEED\s+OF\s+TRUST|POWER\s+OF\s+SALE|UNDER\s+AND\s+BY\s+VIRTUE|"
+    r"SUBSTITUTE\s+TRUSTEE|FORECLOSURE|EXECUTED\s+BY|IN\s+THE\s+MATTER\s+OF|"
+    r"NORTH\s+CAROLINA\s+GENERAL\s+STATUTES?)\b", re.I)
+
+
+def _plausible_address(candidate: str) -> bool:
+    return bool(candidate) and len(candidate) <= _ADDR_MAX_LEN and not _ADDR_BOILERPLATE_RE.search(candidate)
 _MONTHS = (r"January|February|March|April|May|June|July|August|September|"
            r"October|November|December")
 _SALE_DATE_RE = re.compile(
@@ -301,6 +322,9 @@ def _to_listing(notice: dict, slug: str) -> Listing | None:
     case_m = _CASE_RE.search(text) or _CASE_SPACED_RE.search(text)
     parcel_m = _PARCEL_RE.search(text)
     addr_m = None if kind == "estate" else _ADDR_RE.search(text)
+    street_address = pa.clean_text(addr_m.group(1)) if addr_m else None
+    if street_address and not _plausible_address(street_address):
+        street_address = None
     book_m = _BOOK_PAGE_RE.search(text)
     plaintiff_m = _PLAINTIFF_RE.search(text)
     published = notice.get("published_at")
@@ -338,7 +362,7 @@ def _to_listing(notice: dict, slug: str) -> Listing | None:
         state="NC",
         county=county,
         city=(notice.get("city_meta") or "").strip().title() or None,
-        street_address=(pa.clean_text(addr_m.group(1)) if addr_m else None),
+        street_address=street_address,
         parcel_id=(parcel_m.group(1) if parcel_m else None),
         sale_date=_sale_date(text) if kind != "estate" else None,
         foreclosure_process=("tax" if kind in ("tax_lien_ad", "tax_foreclosure")
