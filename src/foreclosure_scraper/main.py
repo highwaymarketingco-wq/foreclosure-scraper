@@ -3177,6 +3177,19 @@ async def run() -> int:
     except Exception:
         log.error("repeat_tax_loss.failed", traceback=traceback.format_exc())
 
+    # LiensNC filing-date vs owner-death-date mismatch (Dirty Deeds Tier B
+    # #24) — a third cross-parcel/cross-listing join over the same `enriched`
+    # list, so it runs alongside owner_cluster/repeat_tax_loss rather than
+    # earlier. Reads raw['probate']/raw['sc_probate_notice'] date_of_death
+    # (both already RAW_KEEP'd) and raw['liensnc'] (also RAW_KEEP'd) — no
+    # network, no new scrape.
+    try:
+        from .enrichment_liensnc_posthumous import enrich_liensnc_posthumous
+        s = enrich_liensnc_posthumous(enriched)
+        if s and s.get("tagged"): enrichment_stats["liensnc_posthumous"] = s
+    except Exception:
+        log.error("liensnc_posthumous.failed", traceback=traceback.format_exc())
+
     # Fullmer deal-economics rank — the buy box from Distressed Property Secrets and
     # the Dirty Deeds interviews, expressed as POINTS. Runs after derived_signals
     # because it reads calc.est_gross_margin, distress_stack.absentee, deed_chain and

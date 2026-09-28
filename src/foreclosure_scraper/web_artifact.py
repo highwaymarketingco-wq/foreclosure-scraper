@@ -1289,6 +1289,12 @@ RAW_KEEP = {
     # published outreach file that reported with_phone=0. Contactability, not lead
     # count, is this engine's real ceiling — so this must survive the publish slim.
     "liensnc_related": "*",
+    # Dirty Deeds Tier B #24 (docs/dirty_deeds_synthesis_2026-09-10.md): LiensNC
+    # filing-date vs owner-death-date mismatch, or the deed owner's own name
+    # already reading as a decedent's estate/heirs at filing time. Registered
+    # BEFORE enrichment_liensnc_posthumous.py's first run — see the RAW_KEEP
+    # audit trail immediately above and below for why that order matters here.
+    "liensnc_posthumous_filing": "*",
     # Fullmer deal-economics rank {rank, why, flags, cad_value, owner_count,
     # liquidity, margin_coverage}. The dashboard sorts and filters on it, so
     # stripping it here would make the whole ranking invisible.
