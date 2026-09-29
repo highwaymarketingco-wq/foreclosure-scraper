@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-09-28T23:20:35.527520Z",
+  "run_time": "2026-09-29T01:27:54.587589Z",
   "total": 217773,
   "by_source": {
     "national.nc_upset_bids": 38,
@@ -406,7 +406,7 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "board-wide owner-mailing contactability enrichment",
+  "notes": "",
   "detail_count": 217773,
   "detail_digest": "1397e48518344b5c",
   "board_parts": {
@@ -429,16 +429,16 @@
         "start": 13000,
         "end": 26000,
         "records": 13000,
-        "bytes": 10622191,
-        "sha256": "f84e656f089f9263e4887cea392b75c966bdb5673eaf5ba45767b102a341b795"
+        "bytes": 10622371,
+        "sha256": "883de6395d9b99d41fc542cf63cb8e956c77dfe3f0eb77dfc86fc3718d8194d8"
       },
       {
         "name": "listings_part_002.json.gz",
         "start": 26000,
         "end": 39000,
         "records": 13000,
-        "bytes": 8835487,
-        "sha256": "a038bcf28b3a954c3f16887bdd7e62d3c45779db66d681f5db9f316fefd1dabb"
+        "bytes": 8847502,
+        "sha256": "2eda44f17daec375ece2f7a679b71ba4acf3d4966b2074524c46538088de0c94"
       },
       {
         "name": "listings_part_003.json.gz",
@@ -571,7 +571,7 @@
     "by_county_top"
   ],
   "health_as_of": "2026-09-23T08:47:09.374753Z",
-  "health_age_hours": 134.56,
+  "health_age_hours": 136.68,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-09-23T08:47:09.374753Z",
