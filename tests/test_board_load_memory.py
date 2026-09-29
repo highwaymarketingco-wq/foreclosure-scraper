@@ -301,3 +301,114 @@ def test_append_new_rows_never_validates_existing_rows_into_listings(big_board, 
         f"1 new row onto {N_ROWS:,} existing ones -- it must never validate ANY row (new rows "
         f"arrive pre-validated; existing rows must never be validated at all)"
     )
+
+
+# ===========================================================================
+# patch_existing_rows() (follow-up to append_new_rows(), 2026-09-29): mutating a SMALL, known
+# subset of EXISTING rows in place -- resolver_backfill_parcel.py's real shape -- should not
+# need load_board()'s full list[Listing] of the OTHER, untouched rows either. These tests are
+# the patch_existing_rows() counterpart of the append_new_rows() section above: same tracemalloc
+# method, same safe synthetic scale (this file's big_board fixture), for the same reason.
+#
+# THE REAL-BOARD-SCALE NUMBERS (synthetic boards sized to the real board's own ~12.7 KB/row
+# average -- NOT this file's fatter _fat_lead() padding, which measured too heavy for a clean
+# comparison at 20K/40K rows -- patched with ~1,200 pending patches, resolver_backfill_parcel.py's
+# real per-checkpoint scale, run as a monitored child process and measured with BOTH RSS (`ps -o
+# rss=` polling) AND macOS's real physical footprint (`sample <pid> 1 -f <file>`, the corrected
+# methodology after load_board()'s RSS-looked-safe-but-footprint-was-11.1-GB incident) are
+# recorded where BOARD_PATCH_MAX_SOURCE_MB is set, in web_artifact.py -- run by hand, once, not
+# as an automated test. Headline finding: patch_existing_rows() measured statistically identical
+# to append_new_rows() at 20,000 rows (2.39x footprint:source, both) and about 17% LESS
+# footprint-efficient at 40,000 rows (2.29x vs append's 1.96x) -- close enough that assuming
+# equality would have been a reasonable guess, but not proven, which is exactly why it earned its
+# own measured ceiling instead.
+# ===========================================================================
+
+def _patch_for(li: Listing) -> dict:
+    """A small, well-typed field update -- resolver_backfill_parcel.py's real shape: a resolved
+    parcel_id plus a small provenance dict merged into raw, keyed by the row's OWN
+    dedupe_key() (computed before any patch, exactly as patch_existing_rows() requires)."""
+    return {li.dedupe_key(): {"parcel_id": "P_PATCHED",
+                              "raw": {"parcel_from_geo": {"source": "test", "lat": 35.0,
+                                                          "lng": -81.0}}}}
+
+
+def test_patch_existing_rows_traces_meaningfully_less_memory_than_load_board_then_write(
+        big_board, tmp_path_factory):
+    docs, size_mb, detail_mb = big_board
+
+    def _old_style_patch() -> int:
+        """The pattern patch_existing_rows() replaces: load the WHOLE existing board as
+        Listings, mutate the one matching row in Python, rewrite the whole board -- the
+        load_board() -> mutate -> write_artifact() shape resolver_backfill_parcel.py used
+        before this fix."""
+        d = _fresh_copy(docs, tmp_path_factory)
+        rows = wa.load_board(d)
+        rows[0].parcel_id = "P_PATCHED"
+        rows[0].raw["parcel_from_geo"] = {"source": "test", "lat": 35.0, "lng": -81.0}
+        wa.write_artifact(rows, {"notes": "old-style patch"}, docs_dir=d)
+        return len(rows)
+
+    def _new_style_patch() -> int:
+        d = _fresh_copy(docs, tmp_path_factory)
+        first = wa.load_board(d)[0]      # read once, off the loop, just to get its identity
+        stats = wa.patch_existing_rows(_patch_for(first), {"notes": "new-style patch"},
+                                       docs_dir=d)
+        return stats["total_after"]
+
+    old_peak, old_total = _traced_peak(_old_style_patch)
+    gc.collect()
+    new_peak, new_total = _traced_peak(_new_style_patch)
+    gc.collect()
+
+    assert old_total == new_total == N_ROWS, "both paths must land the same final board"
+
+    old_mb = old_peak / (1024 * 1024)
+    new_mb = new_peak / (1024 * 1024)
+
+    # _new_style_patch()'s traced peak includes one load_board() call just to fetch the target
+    # row's identity (not part of what patch_existing_rows() itself does -- a real caller like
+    # resolver_backfill_parcel.py already has the identity from its own board_stream-based scan,
+    # never a full load_board()), so this comparison is already handicapped against
+    # patch_existing_rows() and the gap would be wider without that. 0.85 is the same
+    # deliberately loose threshold the append_new_rows() comparison above uses.
+    assert new_mb < old_mb * 0.85, (
+        f"patch_existing_rows() ({new_mb:.0f} MB traced peak) should use meaningfully less "
+        f"memory than load_board()+write_artifact() ({old_mb:.0f} MB traced peak) to mutate ONE "
+        f"existing row on a {size_mb:.0f} MB + {detail_mb:.0f} MB board of {N_ROWS:,} rows -- "
+        f"the improvement did not show up as expected"
+    )
+
+
+def test_patch_existing_rows_never_validates_untouched_rows_into_listings(
+        big_board, tmp_path_factory, monkeypatch):
+    """Structural proof, not just a memory-size inference: patch ONE row on a board of N_ROWS,
+    counting Listing.model_validate() calls. ZERO calls must happen -- patch_existing_rows()
+    applies the patch's field updates directly to the raw dict for the one row that matches
+    (never Listing.model_validate(), per its own docstring) and streams every other row through
+    completely unvalidated. A regression that started validating rows while scanning for a
+    match (e.g. routing the identity check through model_validate() instead of
+    model_construct()) would turn this into N_ROWS calls, not a subtle memory-only change that
+    only shows up on the real 217K-row board."""
+    docs, _, _ = big_board
+    d = _fresh_copy(docs, tmp_path_factory)
+    first = wa.load_board(d)[0]
+    patches = _patch_for(first)
+
+    calls = {"n": 0}
+    orig_validate = Listing.model_validate.__func__
+
+    def counting_validate(cls, *a, **k):
+        calls["n"] += 1
+        return orig_validate(cls, *a, **k)
+
+    monkeypatch.setattr(Listing, "model_validate", classmethod(counting_validate))
+    stats = wa.patch_existing_rows(patches, {"notes": "t"}, docs_dir=d)
+    assert stats["written"] is True
+    assert stats["applied"] == 1
+    assert calls["n"] == 0, (
+        f"patch_existing_rows() called Listing.model_validate() {calls['n']} times while "
+        f"patching 1 row on a board of {N_ROWS:,} -- it must never validate ANY row (the "
+        f"identity check uses model_construct(); the matched patch is applied to the raw dict "
+        f"directly; every other row is streamed through untouched)"
+    )

@@ -265,6 +265,52 @@ BOARD_LOAD_MAX_SOURCE_MB = 1200.0
 # measured efficiency gain.
 BOARD_APPEND_MAX_SOURCE_MB = 2400.0
 
+# --- the patch-only SIZE guard (follow-up to append_new_rows(), 2026-09-29) -----------------
+# patch_existing_rows() (below) is a THIRD separate code path, alongside load_board() and
+# append_new_rows(): like append_new_rows(), it never validates the existing board into
+# Listing objects and never holds a full parsed-dict copy of it either -- each existing row is
+# identity-checked (one dedupe_key() string, cheaper than append_new_rows()'s multi-signature
+# set union), patched in place if it matches a pending patch, then popped (LAZY_DETAIL_KEYS out
+# of raw), re-encoded to JSON bytes, and discarded immediately, one row at a time. It gets its
+# OWN, separately-measured ceiling rather than assuming it inherits append_new_rows()'s: a
+# structurally similar per-row shape is not proof of an identical cost, and BOARD_APPEND_MAX_
+# SOURCE_MB's own history is that "obviously cheaper" assumptions have been wrong here before
+# (skipping Listing.model_validate() ALONE barely helped there; the real win was never holding
+# a full-length list of parsed rows at all, patched or not).
+#
+# MEASURED (2026-09-29), same method as BOARD_APPEND_MAX_SOURCE_MB's own trial: synthetic
+# boards shaped like the real one (write_artifact() with Listing rows padded so combined
+# per-row size lands close to the real board's own measured ~12.7 KB/row average -- deliberately
+# NOT test_board_load_memory.py's _fat_lead()'s own padding, which measured ~35 KB/row here, too
+# fat for a clean comparison; chosen so the trial does not need to touch the real 2.6+ GB
+# production board to get a realistic per-row size), patched with ~1,200 pending patches
+# (resolver_backfill_parcel.py's real per-checkpoint scale) against patch_existing_rows()'s real
+# streaming code path, run as a monitored CHILD PROCESS and measured with BOTH signals the
+# load_board() incident called for: RSS via a polling `ps -o rss=` watchdog, AND macOS's real
+# physical footprint via `sample <pid> 1 -f <file>` (RSS alone undercounts compressed/swapped
+# pages and was measured to look safe on load_board() while the real footprint reached 11.1 GB --
+# see BOARD_LOAD_MAX_SOURCE_MB's comment):
+#     20,000 rows, 312 MiB combined source -> RSS peak 549 MiB, footprint peak 746.5 MiB (2.39x)
+#     40,000 rows, 625 MiB combined source -> RSS peak 1,083 MiB, footprint peak 1,433.6 MiB (2.29x)
+# Directly comparable to BOARD_APPEND_MAX_SOURCE_MB's own two numbers at the SAME two scales
+# (2.39x at 20,000 rows -- identical; 1.96x at 40,000 rows, i.e. append_new_rows() measured about
+# 17% MORE footprint-efficient here): the two paths are close but not proven identical, which is
+# exactly why this got its own trial instead of assuming equality. RSS again undercounted the
+# real cost at this scale (549-1,083 MiB RSS vs 746-1,434 MiB footprint, a 1.3-1.4x gap) --
+# smaller than load_board()'s catastrophic RSS/footprint gap, but the same DIRECTION of error, so
+# still worth having measured both rather than trusting RSS alone.
+#
+# WHAT THE CEILING IS SET TO. Scaling BOARD_APPEND_MAX_SOURCE_MB's own 2,400 MB down by the ~17%
+# relative efficiency gap measured at the 40,000-row (worse-case) point (2,400 / 1.17 ~= 2,051 MB)
+# gives the raw number; 2,000 MB is used instead, a clean figure with real margin below that,
+# deliberately conservative given the 20K/40K measurements did not fully agree with each other on
+# how patch_existing_rows() compares to append_new_rows() (equal at 20K, ~17% worse at 40K) and a
+# larger, real-board-scale trial was not run this session (same caution
+# BOARD_APPEND_MAX_SOURCE_MB's own comment took). The board's current combined source (~2,650 MB)
+# is STILL over this, honestly -- same as append_new_rows() on today's exact board --
+# BOARD_PATCH_ALLOW_LARGE=1 is the deliberate override for a supervised run.
+BOARD_PATCH_MAX_SOURCE_MB = 2000.0
+
 # run_meta health older than this is nulled (audit O4).
 HEALTH_MAX_AGE_HOURS = 48.0
 
@@ -1213,6 +1259,44 @@ def _raise_if_board_too_large_to_append(docs: Path) -> None:
         f"is still proportional to the existing board's size, and this board is over even its "
         f"more generous ceiling. BOARD_APPEND_ALLOW_LARGE=1 overrides for one supervised run; "
         f"BOARD_APPEND_MAX_SOURCE_MB raises the ceiling once a larger size is measured safe on "
+        f"this machine."
+    )
+
+
+def board_patch_size_state(docs_dir: Path | str, *, max_mb: float | None = None) -> dict:
+    """Would patch_existing_rows() be safe to run against this board, judging ONLY by its
+    on-disk size -- the patch-only counterpart of board_load_size_state()/
+    board_append_size_state(), against BOARD_PATCH_MAX_SOURCE_MB's separately measured ceiling.
+    Same shape as the other two: {source_mb, max_mb, ok, reason}; source_mb is None when no
+    board was found (treated as ok -- nothing to patch onto yet)."""
+    n = _board_source_bytes(Path(docs_dir))
+    limit = float(max_mb if max_mb is not None
+                  else os.environ.get("BOARD_PATCH_MAX_SOURCE_MB", BOARD_PATCH_MAX_SOURCE_MB))
+    if n is None:
+        return {"source_mb": None, "max_mb": limit, "ok": True, "reason": ""}
+    source_mb = n / (1024 * 1024)
+    ok = source_mb <= limit
+    reason = "" if ok else f"board source is {source_mb:.0f} MB, over the {limit:.0f} MB ceiling"
+    return {"source_mb": source_mb, "max_mb": limit, "ok": ok, "reason": reason}
+
+
+def _raise_if_board_too_large_to_patch(docs: Path) -> None:
+    """The patch-only counterpart of _raise_if_board_too_large_to_load()/_to_append(): called
+    eagerly by patch_existing_rows() before it does any work. BOARD_PATCH_ALLOW_LARGE=1
+    overrides for one run; BOARD_PATCH_MAX_SOURCE_MB (see its comment above
+    BOARD_LOAD_MAX_SOURCE_MB) is the ceiling."""
+    if os.environ.get("BOARD_PATCH_ALLOW_LARGE", "").strip().lower() in ("1", "true", "yes"):
+        return
+    size_state = board_patch_size_state(docs)
+    if size_state["ok"]:
+        return
+    log.error("board.patch_too_large", **size_state, docs_dir=str(docs))
+    raise BoardLoadTooLarge(
+        f"patch_existing_rows refused to load {docs}: {size_state['reason']}. "
+        f"patch_existing_rows is measurably cheap per row (see BOARD_PATCH_MAX_SOURCE_MB's "
+        f"comment) but is still proportional to the existing board's size, and this board is "
+        f"over its ceiling. BOARD_PATCH_ALLOW_LARGE=1 overrides for one supervised run; "
+        f"BOARD_PATCH_MAX_SOURCE_MB raises the ceiling once a larger size is measured safe on "
         f"this machine."
     )
 
@@ -3984,5 +4068,305 @@ def append_new_rows(new_listings: list[Listing], summary: dict,
 
     log.info("web_artifact.appended", existing=existing_total, added=len(fresh_idx), total=total,
              bytes=listings_path.stat().st_size)
+    stats["written"] = True
+    return stats
+
+
+# ===========================================================================
+# patch_existing_rows: mutate a SMALL, known subset of EXISTING rows in place,
+# without materializing the board (follow-up to append_new_rows(), 2026-09-29).
+# See BOARD_PATCH_MAX_SOURCE_MB's comment for the measurements this is based on.
+# ===========================================================================
+
+class BoardPatchCountMismatch(RuntimeError):
+    """patch_existing_rows() refused: the number of rows streamed off the existing board did
+    not match the board manifest's last-sealed record count for listings.json.
+
+    patch_existing_rows() never adds or removes a row -- every row it streams in is re-emitted
+    exactly once, patched or not -- so its row count is an INVARIANT, not merely an expectation
+    with a tolerance. append_new_rows()/write_artifact() share one _count_guard_and_backup()
+    that only refuses a shrink over 10% (right for a scrape, which legitimately adds or drops
+    rows); a patch pass has no legitimate reason to see ANY difference at all, so this checks
+    for EXACT equality against the manifest, strictly before anything is written. A real
+    mismatch here means the on-disk board and its own manifest already disagree (a torn write,
+    a hand-edited file) -- exactly the corruption verify_manifest()/board_manifest.py --verify
+    exist to catch, just caught here too, before a patch pass could make it worse."""
+
+
+def patch_existing_rows(patches: dict[str, dict], summary: dict,
+                        docs_dir: Path | str = "docs") -> dict:
+    """Mutate a SMALL, known set of EXISTING board rows in place -- set specific fields on the
+    rows matching given identities -- WITHOUT materializing the (potentially hundreds of
+    thousands of) other, untouched rows into Listing objects or even a full parsed-dict list,
+    and without re-validating even the rows actually being touched.
+
+    THE PROBLEM THIS SOLVES. append_new_rows() (above) solved "add a handful of NEW rows"
+    without load_board()'s full materialization. It deliberately left a gap: a script that
+    needs to MUTATE a small, known SUBSET of EXISTING rows -- not add, not remove -- still had
+    no safe path, and had to fall back to load_board() -> mutate the Listing objects in Python
+    -> write_artifact(), which is exactly the double materialization BOARD_LOAD_MAX_SOURCE_MB's
+    ceiling now refuses on this board. scripts/resolver_backfill_parcel.py is the concrete
+    case: each run resolves a parcel_id for roughly 1,000-1,500 leads (a point-in-polygon
+    ArcGIS lookup, one Listing at a time) out of a 217,000+-row board, then needs to land just
+    those onto the board -- it has no reason to touch, hold, or even parse the other 99.5%.
+
+    HOW. `patches` maps Listing.dedupe_key() -- computed by the CALLER from each target row's
+    PRE-patch identity fields (state/county/parcel_id/street_address/zip_code/case_number/
+    source_url; see Listing.dedupe_key()) -- to the field updates to apply to that one row.
+    dedupe_key() is deliberately the NARROW, single-valued identity here, not
+    append_new_rows()'s/board_overlap()'s full _strong_sigs() union: those exist to catch
+    LOOSE, fuzzy same-property matches across independently-scraped candidates (a new row from
+    a different source, with no shared id, describing the same house) so a true duplicate is
+    never added twice -- exactly the dedupe_key() fallback branch _append_row_sigs() itself
+    adds (`("k", li.dedupe_key())`) for when no stronger signature exists. A patch, by
+    contrast, is issued by a caller that already knows EXACTLY which board row it means (it
+    read that row directly off the board to decide what to patch), so the precise, single
+    dedupe_key() match is the SAFER choice here, not a compromise: it patches the row the
+    caller meant, never some unrelated row that happens to share a looser fuzzy signature.
+
+    The existing board is streamed EXACTLY ONCE via _iter_board_records() (the same
+    incremental JSON-array decoder append_new_rows() uses -- never a whole-file json.loads(),
+    never a whole-board list held in memory). For each row: its dedupe_key() is computed from
+    a light Listing.model_construct() of just the identity fields (no pydantic validation, no
+    type coercion -- append_new_rows()'s _append_dict_sigs() trick, reused via the same
+    _APPEND_SIG_FIELDS); if it matches a pending patch, the patch's field updates are applied
+    DIRECTLY to the raw dict -- never Listing.model_validate(), for either the patched rows or
+    the untouched ones: patch values are already simple, well-typed JSON values the caller
+    built (e.g. a parcel_id string, a small provenance dict), so there is nothing left for
+    full-model validation to do that plain dict assignment does not. A `raw` update is MERGED
+    into the row's existing raw dict rather than replacing it -- an existing row's raw commonly
+    carries grade/calc/skip_trace/vision/comps/cama that a patch must never destroy. Every row
+    -- patched or not -- then goes through the exact same lazy-detail pop + re-encode + discard
+    append_new_rows() already uses, so at most one row's parsed dict is ever alive at a time,
+    for however many hundreds of thousands there are.
+
+    COUNT GUARD, STRICTER THAN append_new_rows()'s. A patch pass never adds or removes a row,
+    so on top of the shared _count_guard_and_backup (kept here for its backup-before-overwrite
+    side effect), this checks the streamed row count against the board manifest's own
+    last-sealed record count for listings.json (when a manifest exists) and raises
+    BoardPatchCountMismatch on ANY difference, before anything is written -- narrower than the
+    10%-shrink tolerance append_new_rows()/write_artifact() apply, which is right for a scrape
+    (legitimately adds/drops rows) but wrong for a pass whose entire contract is "same rows,
+    some fields changed."
+
+    WHAT THIS DELIBERATELY DOES NOT DO (same reasoning as append_new_rows(), see its
+    docstring):
+      * Does NOT regenerate listings_slim.json / detail_shards/ -- carried forward unchanged,
+        the same disclosed gap append_new_rows() has.
+      * Does NOT validate patch VALUES against the Listing schema -- a patch is a small,
+        well-typed field update the caller already knows the shape of. A caller that needs
+        full validation (e.g. it is not sure its values are well-typed) should use
+        load_board()/write_artifact() instead.
+      * A dedupe_key() matching MORE than one existing row (only possible if the board already
+        has a duplicate under that key -- dedupe()'s own job is to prevent that) gets the SAME
+        patch applied to every match, not just the first: the same identity is, by this
+        codebase's own definition, the same property, so the same field update is correct for
+        all of them. Counted in `duplicate_key_matches` for visibility; this should be rare
+        and is never silent.
+
+    Returns {existing, patches, matched, applied, not_found, duplicate_key_matches, written,
+    total_after} -- when `patches` is empty, {existing: None, patches: 0, matched: 0,
+    applied: 0, not_found: 0, duplicate_key_matches: 0, written: False, total_after: None}
+    without touching the board at all. When the board has no rows to patch onto yet (no
+    listings.json present), every patch is reported `not_found` and nothing is written --
+    unlike append_new_rows(), a patch pass has no legitimate "first ever write" case, because
+    there is nothing to MUTATE on a board that does not exist.
+
+    Refuses (BoardLockNotHeld) unless the caller holds the board lock, exactly like
+    write_artifact()/append_new_rows(); refuses (BoardChangedSinceLoad) if listings.json
+    changed since this process last loaded it; refuses (BoardLoadTooLarge) if the existing
+    board is over BOARD_PATCH_MAX_SOURCE_MB (BOARD_PATCH_ALLOW_LARGE=1 overrides for one
+    supervised run); refuses (BoardPatchCountMismatch) if the streamed row count does not
+    exactly match the manifest's last-sealed count.
+    """
+    docs = Path(docs_dir)
+    docs.mkdir(parents=True, exist_ok=True)
+    listings_path = docs / "listings.json"
+
+    require_board_lock(docs)
+    _check_not_changed_since_load(listings_path)
+
+    if not patches:
+        return {"existing": None, "patches": 0, "matched": 0, "applied": 0, "not_found": 0,
+                "duplicate_key_matches": 0, "written": False, "total_after": None}
+
+    _raise_if_board_too_large_to_patch(docs)
+
+    if not _board_file_present(listings_path):
+        # Nothing to patch onto. Unlike append_new_rows()'s bootstrap case (a fresh publish is
+        # a legitimate first write), a patch with no board yet is a caller error: there is no
+        # row to MUTATE, so every pending patch is unmatched by definition.
+        return {"existing": 0, "patches": len(patches), "matched": 0, "applied": 0,
+                "not_found": len(patches), "duplicate_key_matches": 0, "written": False,
+                "total_after": 0}
+
+    pending: dict = dict(patches)
+    matched_keys: set = set()
+    dup_keys: set = set()
+
+    # --- ONE streaming pass over the existing board: identity-match + patch + pop + encode ---
+    row_enc = json.JSONEncoder(ensure_ascii=False, default=str)
+    listing_blobs: list[bytes] = []
+    details: list[dict] = []
+    by_state: collections.Counter = collections.Counter()
+    by_source: collections.Counter = collections.Counter()
+    existing_total = 0
+    applied = 0
+    for rec in _iter_board_records(docs):
+        existing_total += 1
+        if isinstance(rec, dict) and pending:
+            light = Listing.model_construct(**{k: rec.get(k) for k in _APPEND_SIG_FIELDS})
+            try:
+                key = light.dedupe_key()
+            except Exception:  # noqa: BLE001 - a row too malformed to key is simply unmatched
+                key = None
+            if key is not None and key in pending:
+                if key in matched_keys:
+                    dup_keys.add(key)
+                matched_keys.add(key)
+                update = pending[key]
+                raw_update = update.get("raw")
+                if isinstance(raw_update, dict):
+                    raw = rec.get("raw")
+                    if not isinstance(raw, dict):
+                        raw = {}
+                        rec["raw"] = raw
+                    raw.update(raw_update)
+                for field, value in update.items():
+                    if field != "raw":
+                        rec[field] = value
+                applied += 1
+        by_state[str(rec.get("state") or "").strip() or "unknown"] += 1
+        by_source[str(rec.get("source") or "").strip() or "unknown"] += 1
+        raw = rec.get("raw")
+        d: dict = {}
+        if isinstance(raw, dict):
+            for k in LAZY_DETAIL_KEYS:
+                if k in raw:
+                    d[k] = raw.pop(k)
+        details.append(d)
+        listing_blobs.append(row_enc.encode(rec).encode("utf-8"))
+
+    not_found = len(pending) - len(matched_keys)
+    stats: dict = {
+        "existing": existing_total, "patches": len(patches), "matched": len(matched_keys),
+        "applied": applied, "not_found": not_found, "duplicate_key_matches": len(dup_keys),
+        "written": False, "total_after": existing_total,
+    }
+    if applied == 0:
+        return stats
+
+    # --- STRICT count guard (this function's OWN, tighter than the shared 10% one below) ---
+    _manifest_now = load_manifest(docs)
+    if _manifest_now:
+        _expected = ((_manifest_now.get("files") or {}).get("listings.json") or {}).get("records")
+        if isinstance(_expected, int) and existing_total != _expected:
+            raise BoardPatchCountMismatch(
+                f"patch_existing_rows refused: streamed {existing_total:,} rows off "
+                f"{listings_path}, but {docs / MANIFEST_NAME} records {_expected:,} for it. "
+                f"A patch pass must never see a different row count than the board's own "
+                f"manifest -- they already disagree, which this must not make worse. Verify "
+                f"with `scripts/board_manifest.py --verify` before retrying."
+            )
+
+    # --- shared backup-before-overwrite (count is unchanged, so the shrink check is a no-op) ---
+    _count_guard_and_backup(docs, listings_path, existing_total, summary)
+
+    # --- write listings.json + gzipped parts (the SAME low-level writers write_artifact/
+    # append_new_rows use) ---
+    total = existing_total
+    _manifest_pre: dict = {
+        "listings.json": {**_write_plain_array(listings_path, listing_blobs), "records": total},
+    }
+    detail_path = docs / "listings_detail.json"
+    detail_count = len(details)
+    detail_bytes = json.dumps(details, ensure_ascii=False, default=str).encode("utf-8")
+    del details
+    _manifest_pre["listings_detail.json"] = {"bytes": len(detail_bytes),
+                                             "sha256": hashlib.sha256(detail_bytes).hexdigest(),
+                                             "records": detail_count}
+    _atomic_write_bytes(detail_path, detail_bytes)
+    _prior_parts = _bp.manifest_parts_block(_bp.read_manifest(docs)) or {}
+    _parts = _bp.write_parts(docs, listing_blobs, hint_rows=_prior_parts.get("rows_per_part"))
+    _parts_block = _bp.make_block(_parts["entries"], rows_per_part=_parts["rows_per_part"],
+                                  cap=_parts["cap"])
+    del listing_blobs
+    import gzip
+    detail_gz = gzip.compress(detail_bytes, compresslevel=9, mtime=0)
+    _manifest_pre["listings_detail.json.gz"] = {"bytes": len(detail_gz),
+                                                "sha256": hashlib.sha256(detail_gz).hexdigest(),
+                                                "records": detail_count}
+    _atomic_write_bytes(docs / "listings_detail.json.gz", detail_gz)
+    detail_digest = hashlib.sha256(detail_gz).hexdigest()[:16]
+    del detail_gz, detail_bytes
+
+    # --- run_meta.json: same shape append_new_rows() writes, minus the fields that need the
+    # slim/shard payload regenerated (which this function deliberately does not do) ---
+    meta_path = docs / "run_meta.json"
+    prior_meta: dict = {}
+    if meta_path.exists():
+        try:
+            prior_meta = json.loads(meta_path.read_text())
+        except Exception:  # noqa: BLE001 - a corrupt prior file must not block the write
+            prior_meta = {}
+        if not isinstance(prior_meta, dict):
+            prior_meta = {}
+    prior_board_block = prior_meta.get("board")
+    if not isinstance(prior_board_block, dict):
+        prior_board_block = None
+    slim_count = prior_board_block.get("count") if prior_board_block else None
+    shard_meta = prior_board_block.get("detail_shards") if prior_board_block else None
+
+    _now = datetime.utcnow()
+    _now_iso = _now.isoformat() + "Z"
+    meta = dict(prior_meta)
+    meta.update({
+        "run_time": _now_iso,
+        "total": total,
+        "by_state": dict(sorted(by_state.items(), key=lambda kv: (-kv[1], kv[0]))),
+        "by_source_on_board": dict(sorted(by_source.items(), key=lambda kv: (-kv[1], kv[0]))),
+        "notes": summary.get("notes", prior_meta.get("notes", "")),
+        "detail_count": detail_count,
+        "detail_digest": detail_digest,
+        "board_parts": _parts_block,
+    })
+    if summary.get("by_source"):
+        meta["by_source"] = summary["by_source"]
+    if prior_board_block is not None:
+        meta["board"] = prior_board_block
+    _apply_health_freshness(meta, prior_meta, summary, _now_iso, _now)
+    _atomic_write_bytes(meta_path, json.dumps(meta, ensure_ascii=False, default=str, indent=2).encode("utf-8"))
+
+    # --- high-water mark: unaffected by a patch pass (total is unchanged by construction), but
+    # kept in the same shape as append_new_rows()/write_artifact() so a reader never sees a gap ---
+    try:
+        _hw_path = docs / "board_highwater.json"
+        _prev_hw = 0
+        if _hw_path.exists():
+            _prev_hw = json.loads(_hw_path.read_text()).get("count", 0)
+        if total > _prev_hw:
+            _atomic_write_bytes(_hw_path, json.dumps({
+                "count": total, "updated_at": _now_iso,
+            }, indent=2).encode("utf-8"))
+            log.info("web_artifact.highwater_updated", old=_prev_hw, new=total)
+    except Exception:  # noqa: BLE001
+        pass
+
+    # THE MANIFEST, last (same reasoning as write_artifact/append_new_rows: everything above is
+    # on disk by now).
+    try:
+        write_manifest(docs, _manifest_pre, meta, slim_count=slim_count, shard_meta=shard_meta,
+                       parts_block=_parts_block)
+    except Exception:  # noqa: BLE001
+        try:
+            (docs / MANIFEST_NAME).unlink(missing_ok=True)
+        except OSError:
+            pass
+        log.error("web_artifact.manifest_failed", exc_info=True)
+    if str(listings_path.resolve()) in _LOAD_STAMPS:
+        _remember_load(docs, listings_path)
+
+    log.info("web_artifact.patched", existing=existing_total, applied=applied, total=total,
+             not_found=not_found, bytes=listings_path.stat().st_size)
     stats["written"] = True
     return stats
