@@ -3203,6 +3203,20 @@ async def run() -> int:
     except Exception:
         log.error("platted_lots.failed", traceback=traceback.format_exc())
 
+    # Divorce decree with no subsequent deed (Dirty Deeds Tier B #20) — a
+    # negative join over raw['resolved_from_name'], which the NAME -> PROPERTY
+    # resolver (enrich_resolve_name_to_property, much earlier in this function)
+    # already wrote for every name-indexed lead it queried, including
+    # divorce_notice rows. MUST run after that resolver call or this join has
+    # nothing to read; it does not itself hit any network. NC only (SC family
+    # court is access-restricted).
+    try:
+        from .enrichment_divorce_no_subsequent_deed import enrich_divorce_no_subsequent_deed
+        s = enrich_divorce_no_subsequent_deed(enriched)
+        if s and s.get("tagged"): enrichment_stats["divorce_no_subsequent_deed"] = s
+    except Exception:
+        log.error("divorce_no_subsequent_deed.failed", traceback=traceback.format_exc())
+
     # Fullmer deal-economics rank — the buy box from Distressed Property Secrets and
     # the Dirty Deeds interviews, expressed as POINTS. Runs after derived_signals
     # because it reads calc.est_gross_margin, distress_stack.absentee, deed_chain and

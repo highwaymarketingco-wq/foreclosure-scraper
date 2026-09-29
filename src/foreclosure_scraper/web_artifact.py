@@ -1304,6 +1304,14 @@ RAW_KEEP = {
     # for analyst review but not the lean payload phones fetch. Add it to
     # both gates if the dashboard should surface it per-row.
     "platted_lots": "*",
+    # Dirty Deeds Tier B #20 (docs/dirty_deeds_synthesis_2026-09-10.md):
+    # divorce judgment where both ex-spouses still clear match_owner against
+    # the same current GIS/tax-roll owner-of-record cell in
+    # raw['resolved_from_name'] -- "still 50/50 on record" with no deed ever
+    # moving the property to one of them alone. Registered BEFORE
+    # enrichment_divorce_no_subsequent_deed.py's first run, same lesson as
+    # liensnc_posthumous_filing/platted_lots immediately above.
+    "divorce_no_subsequent_deed": "*",
     # Fullmer deal-economics rank {rank, why, flags, cad_value, owner_count,
     # liquidity, margin_coverage}. The dashboard sorts and filters on it, so
     # stripping it here would make the whole ranking invisible.
