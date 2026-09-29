@@ -1973,6 +1973,25 @@ async def run() -> int:
         except Exception:
             log.error("nc_case_status.failed", traceback=traceback.format_exc())
 
+    # Foreclosure docket history (Dirty Deeds Tier B #37) — persists this
+    # run's NC eCourts lis-pendens / SC Public Index cases into a sidecar and
+    # flags an owner whose county history already shows 2+ directly-observed
+    # Dismissed/Terminated/Withdrawn cases: a lender filed and failed against
+    # them before. See enrichment_foreclosure_docket_history.py for why this
+    # never infers a dismissal from a case merely disappearing from a later
+    # scrape (two of the four sources are rolling filed-date windows that age
+    # cases out long before a real court dismissal is usually entered).
+    try:
+        from .enrichment_foreclosure_docket_history import (
+            enrich_foreclosure_docket_history,
+        )
+        s = await _await_capped(
+            enrich_foreclosure_docket_history(enriched), "foreclosure_docket_history")
+        if s:
+            enrichment_stats["foreclosure_docket_history"] = s
+    except Exception:
+        log.error("foreclosure_docket_history.failed", traceback=traceback.format_exc())
+
     # Bankruptcy cross-reference — for every existing listing whose defendant
     # matches a recent NC/SC bankruptcy filing, tag raw.bankruptcy with the
     # chapter/court/date/docket. Free with CourtListener token. Strong pre-

@@ -1245,6 +1245,11 @@ RAW_KEEP = {
                                       # jail_booking/incarceration by design, see enrichment_jail_bookings.match_cross_county
     "bop_federal": "*",               # BOP.gov Inmate Locator name match: facility code/name/type, release dates
     "bop_check": "*",                 # answered NO-match stamp for enrichment_bop_federal, same shape as incarceration_check
+    # Dirty Deeds Tier B #37 (2026-09-29): foreclosure docket history sidecar.
+    "repeat_foreclosure_filing": "*",  # foreclosure_docket_history-confirmed 2+ directly-observed
+                                       # Dismissed/Terminated/Withdrawn cases against this owner in this
+                                       # county — never inferred from a case disappearing from a later
+                                       # scrape, see enrichment_foreclosure_docket_history.py
     "distress_stack": "*",
     "strategy_fit": "*",
     "eviction_market": "*",           # LSC county eviction-pressure market signal (context)

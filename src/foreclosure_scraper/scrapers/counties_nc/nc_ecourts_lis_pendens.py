@@ -44,6 +44,7 @@ from typing import Iterable
 
 import structlog
 
+from ... import foreclosure_docket_history as _fdh
 from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
@@ -239,6 +240,50 @@ def _build_search_object(
          "displayOrder": 3, "buckets": location_buckets},
     ]
     return so
+
+
+def _record_docket_history(con, hit: dict, slug: str) -> None:
+    """Persist this hit's case/status into the docket-history sidecar (Tier B
+    #37) BEFORE `_hit_to_listing`'s terminal-status filter can discard it.
+
+    `_hit_to_listing` below intentionally returns None for any hit whose
+    `civilJudgmentStatus` reads Canceled/Satisfied/Dismissed/Vacated/
+    Withdrawn/Expired/Released -- correctly, a dead lien is not an
+    actionable lead. But that means the hit never becomes a Listing, so
+    without this call the fact "this lis pendens was Dismissed" is computed
+    fresh every run and then thrown away, leaving no trace once the status
+    changes. This only tracks FORECLOSURE_CAUSES (not divorce -- a divorce
+    judgment isn't a lender filing) and applies the same DV/50B safety
+    exclusion `_hit_to_listing` uses, as defense in depth, even though a
+    history record (never surfaced as a lead) is lower-stakes than a
+    Listing. Best-effort: never raises, so a sidecar hiccup cannot cost the
+    run any listings.
+    """
+    cause = hit.get("causeOfActionDesc") or ""
+    if cause not in FORECLOSURE_CAUSES:
+        return
+    case_number = (hit.get("caseNumber") or "").strip()
+    county = _strip_court_suffix(hit.get("location") or "")
+    debtors = hit.get("debtors") or []
+    creditors = hit.get("creditors") or []
+    owner_name = "; ".join(d.get("name", "") for d in debtors if d.get("name"))[:300]
+    plaintiff = "; ".join(c.get("name", "") for c in creditors if c.get("name"))[:300]
+    status = hit.get("civilJudgmentStatus")
+    _dv_check_blob = " ".join(filter(None, [
+        cause, hit.get("judgmentType") or "", owner_name, plaintiff]))
+    if _DV50B_RE.search(_dv_check_blob):
+        return
+    if not (case_number and county and owner_name):
+        return
+    try:
+        _fdh.observe_case(
+            con, state="NC", county=county, case_number=case_number,
+            owner_name=owner_name, plaintiff=plaintiff or None, status=status,
+            filed_date=hit.get("orderedDate"), source=slug, commit=False,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log.warning("nc_ecourts.docket_history_record_failed",
+                    case_number=case_number, error=str(exc)[:160])
 
 
 def _hit_to_listing(hit: dict, slug: str) -> Listing | None:
@@ -488,6 +533,23 @@ class NCECourtsLisPendens(BaseScraper):
                 page_from += len(hits)
 
             log.info("nc_ecourts.fetched", total_hits=len(all_hits))
+
+        # Docket-history sidecar (Dirty Deeds Tier B #37) -- record every
+        # foreclosure-cause hit's case/status BEFORE the terminal-status
+        # filter below can discard it. See _record_docket_history's
+        # docstring: this is the only place a Dismissed/Terminated/Withdrawn
+        # NC lis pendens is ever remembered, because such a hit never
+        # becomes a Listing. Best-effort and never fatal to the run.
+        try:
+            _history_con = _fdh.connect()
+            try:
+                for h in all_hits:
+                    _record_docket_history(_history_con, h, self.slug)
+                _history_con.commit()
+            finally:
+                _history_con.close()
+        except Exception as exc:  # noqa: BLE001
+            log.warning("nc_ecourts.docket_history_failed", error=str(exc)[:200])
 
         # Diagnostic: count cause-of-action types BEFORE filtering. Helps
         # identify when NCAOC adds new foreclosure-relevant cause codes
