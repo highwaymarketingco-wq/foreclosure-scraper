@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-09-29T16:08:46.771377Z",
+  "run_time": "2026-09-29T16:45:51.087182Z",
   "total": 217773,
   "by_source": {
     "national.nc_upset_bids": 38,
@@ -571,7 +571,7 @@
     "by_county_top"
   ],
   "health_as_of": "2026-09-23T08:47:09.374753Z",
-  "health_age_hours": 151.36,
+  "health_age_hours": 151.98,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-09-23T08:47:09.374753Z",
