@@ -92,6 +92,25 @@ community_confinement from BOP's own facility-type code. Jails restrict inbound
 mail far more than prisons (synthesis: one jail would only accept a deed packet
 from a licensed attorney in person) -- this field is what would drive an
 outreach-channel decision downstream, though nothing reads it for that yet.
+
+DRY-RUN SIDECAR BUG (fixed 2026-09-29). Reproduced via real before/after run
+logs: `scripts/run_pending_signal_enrichers.py --dry-run` found 590 genuine
+jail_booking_new cross-county matches; the REAL apply pass ~35 minutes later,
+against the same counties, found 0 new matches. Cause: `_load_roster`
+unconditionally called `jail_roster_history.diff_and_record(...)`, which
+commits every fetch's diff to the sidecar regardless of whether the CALLING
+script is a dry run -- so the dry run's own roster fetch got recorded as
+"seen," and the real run's fetch of the same rosters 35 minutes later saw
+`is_new=False` everywhere. Fix: `enrich_jail_bookings`/`_load_roster` now take
+a `dry_run` parameter that reaches `diff_and_record(commit=not dry_run)` --
+mirrors `foreclosure_docket_history.observe_case`'s `commit` parameter,
+already used for the same "compute but don't commit" purpose. A dry run still
+fetches every roster and still computes/reports accurate is_new_booking /
+first_detected_at (so its own printed report is correct); it just never
+persists that diff, so a real run afterward still sees the same bookings as
+new. `scripts/run_pending_signal_enrichers.py` and
+`scripts/catchup_failed_enrichers.py` both now pass their own `--dry-run` flag
+through to this call.
 """
 from __future__ import annotations
 
@@ -413,7 +432,8 @@ async def _search_vendor(vendor: str, target: str, last: str, first: str) -> lis
     return []
 
 
-async def _load_roster(state: str, county: str, vendor: str, target: str):
+async def _load_roster(state: str, county: str, vendor: str, target: str,
+                       dry_run: bool = False):
     if vendor == "zuercher":
         recs = await _fetch_zuercher(target)
     elif vendor == "p2c_centralsquare":
@@ -434,10 +454,19 @@ async def _load_roster(state: str, county: str, vendor: str, target: str):
         # own docstring: an empty `recs` is indistinguishable from a failed
         # fetch, so it must never be read as "the roster emptied out").
         # Best-effort: a sidecar write failure must never block a real match.
+        #
+        # dry_run -> commit=False: still COMPUTE and report accurate is_new /
+        # first_detected_at metadata (so a dry run's own printed counts are
+        # correct), but never persist the diff. Fixes the 2026-09-29 bug where
+        # `run_pending_signal_enrichers.py --dry-run`'s own roster fetch got
+        # diffed-and-recorded as "seen" for real, so a genuine real run
+        # shortly after found 0 new matches for names its dry run had already
+        # consumed -- 590 real jail_booking_new detections lost in one run.
         try:
             con = jail_roster_history.connect()
             try:
-                meta = jail_roster_history.diff_and_record(con, state, county, vendor, recs)
+                meta = jail_roster_history.diff_and_record(
+                    con, state, county, vendor, recs, commit=not dry_run)
             finally:
                 con.close()
             for key, rec in index.items():
@@ -604,12 +633,21 @@ def match_cross_county(listings: list[Listing], rosters: dict) -> list[Listing]:
 
 
 async def enrich_jail_bookings(listings: list[Listing],
-                               max_searches_per_county: int = 200) -> dict:
+                               max_searches_per_county: int = 200,
+                               dry_run: bool = False) -> dict:
     """Match resolved owner names against covered county jail rosters.
 
     Two lanes: BULK rosters (fetched once/run + indexed) and PER-NAME SEARCH
     rosters (Greenville), where we run one last-name lookup per in-scope
     owner (paced, capped per county).
+
+    `dry_run` threads through to `_load_roster` -> `jail_roster_history.
+    diff_and_record(commit=not dry_run)`: the bulk lane still fetches every
+    covered roster and still computes/reports accurate is_new_booking /
+    first_detected_at metadata on the listings it matches (so a caller's
+    dry-run report is correct), but nothing is persisted to the sidecar. The
+    per-name SEARCH_ROSTERS lane never touches jail_roster_history at all, so
+    it needs no dry_run handling.
     """
     bulk_covered = {(s, c) for s, c, _, _ in ROSTERS}
     search_covered = {(s, c): (v, t) for s, c, v, t in SEARCH_ROSTERS}
@@ -627,7 +665,8 @@ async def enrich_jail_bookings(listings: list[Listing],
     bulk_needed = [(s, c, v, t) for s, c, v, t in ROSTERS
                    if any((li.state, _county(li)) == (s, c) for li in listings)]
     rosters = dict(await asyncio.gather(
-        *[_load_roster(s, c, v, t) for s, c, v, t in bulk_needed])) if bulk_needed else {}
+        *[_load_roster(s, c, v, t, dry_run=dry_run)
+          for s, c, v, t in bulk_needed])) if bulk_needed else {}
     counts["matched"] += len(match_rosters(listings, rosters))
 
     # Tyler grids omit booking date + charges; pull them for matched rows only.

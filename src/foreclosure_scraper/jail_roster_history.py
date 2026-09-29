@@ -95,6 +95,7 @@ def connect(path: Path | str | None = None) -> sqlite3.Connection:
 
 def diff_and_record(con: sqlite3.Connection, state: str, county: str, vendor: str,
                     records: Iterable[dict], now: Optional[datetime] = None,
+                    commit: bool = True,
                     ) -> dict[tuple[str, str], dict]:
     """Upsert this fetch's roster rows and report which names are new.
 
@@ -107,6 +108,22 @@ def diff_and_record(con: sqlite3.Connection, state: str, county: str, vendor: st
 
     An empty `records` writes nothing and returns {} -- see module docstring
     on why an empty fetch must never be read as "the roster emptied out."
+
+    `commit` mirrors `foreclosure_docket_history.observe_case`'s parameter of
+    the same name (2026-09-29, same fix class): when False, every INSERT/
+    UPDATE below still runs against `con`, so the returned meta (is_new /
+    first_seen_at / times_seen) is exactly as accurate as a real call -- a
+    dry run can still compute and report what WOULD be new -- but the
+    transaction is never committed here. A caller doing a genuine dry run
+    passes commit=False and then closes `con` without ever calling
+    con.commit() itself; sqlite3 discards an uncommitted transaction on
+    close, so nothing reaches disk (verified: this is NOT "commit on close").
+    This fixes the 2026-09-29 bug where `run_pending_signal_enrichers.py
+    --dry-run` silently persisted this diff for real, so a REAL run shortly
+    after saw `is_new=False` for names its own dry run had just "seen" --
+    590 genuine jail_booking_new detections were lost this way in one run.
+    See `enrichment_jail_bookings._load_roster`'s `dry_run` parameter for the
+    caller side.
     """
     now = now or datetime.now(timezone.utc)
     now_iso = now.replace(microsecond=0).isoformat()
@@ -152,7 +169,8 @@ def diff_and_record(con: sqlite3.Connection, state: str, county: str, vendor: st
             f"UPDATE bookings SET currently_listed=0 WHERE state=? AND county=? AND"
             f" currently_listed=1 AND booking_key NOT IN ({qmarks})",
             (state, county, *seen_keys))
-        con.commit()
+        if commit:
+            con.commit()
     log.info("jail_history.diff", state=state, county=county, vendor=vendor,
              fetched=len(seen_keys), new=sum(1 for m in meta.values() if m["is_new"]))
     return meta

@@ -107,7 +107,7 @@ def _counts(listings) -> dict:
     return out
 
 
-async def _run_one(name: str, listings: list) -> dict:
+async def _run_one(name: str, listings: list, dry_run: bool = False) -> dict:
     if name == "liensnc_posthumous":
         from foreclosure_scraper.enrichment_liensnc_posthumous import enrich_liensnc_posthumous
         return enrich_liensnc_posthumous(listings) or {}
@@ -124,7 +124,11 @@ async def _run_one(name: str, listings: list) -> dict:
         return enrich_notice_service_defect(listings) or {}
     if name == "jail_bookings":
         from foreclosure_scraper.enrichment_jail_bookings import enrich_jail_bookings
-        return await _await_capped(enrich_jail_bookings(listings), "jail_bookings") or {}
+        # dry_run reaches jail_roster_history so a --dry-run pass here cannot
+        # silently consume the sidecar's "new booking" detection for real (see
+        # enrichment_jail_bookings.py's "DRY-RUN SIDECAR BUG" docstring note).
+        return await _await_capped(
+            enrich_jail_bookings(listings, dry_run=dry_run), "jail_bookings") or {}
     if name == "bop_federal":
         from foreclosure_scraper.enrichment_bop_federal import enrich_bop_federal
         return await _await_capped(enrich_bop_federal(listings), "bop_federal") or {}
@@ -164,7 +168,7 @@ async def main() -> int:
         print(f"\n--- {name}", flush=True)
         t1 = time.time()
         try:
-            stats[name] = await _run_one(name, listings)
+            stats[name] = await _run_one(name, listings, dry_run=args.dry_run)
             print(f"    {stats[name]}  ({time.time() - t1:.1f}s)", flush=True)
         except Exception as exc:  # noqa: BLE001 - one enricher must not stop the rest
             print(f"    FAILED: {type(exc).__name__}: {str(exc)[:200]}", flush=True)

@@ -126,3 +126,62 @@ def test_a_missing_sidecar_file_is_created_lazily_not_an_error(tmp_path):
     con = jrh.connect(p)
     assert p.exists()
     assert con.execute("SELECT COUNT(*) FROM bookings").fetchone()[0] == 0
+
+
+# ---- commit=False ("dry run") -- 2026-09-29 fix -------------------------
+#
+# scripts/run_pending_signal_enrichers.py --dry-run found 590 genuine
+# jail_booking_new cross-county matches; the REAL apply pass ~35 minutes
+# later found 0 new matches for the same counties, because the dry run's own
+# roster fetch had already been diffed-and-recorded as "seen." These pin the
+# fix: `commit=False` still computes and reports an accurate diff (so a dry
+# run's own printed report is correct) but never persists it, so a later
+# real call against the same fetch still reports is_new=True.
+
+def test_commit_false_computes_an_accurate_report_but_does_not_persist(tmp_path):
+    db_path = tmp_path / "h.db"
+    con = jrh.connect(db_path)
+    t1 = datetime(2026, 9, 29, 12, 0, tzinfo=timezone.utc)
+    meta = jrh.diff_and_record(con, "NC", "Buncombe", "p2c_centralsquare",
+                               [_rec("SMITH", "JOHN")], now=t1, commit=False)
+    # the report is exactly as accurate as a real (commit=True) call would be
+    m = meta[("SMITH", "JOHN")]
+    assert m["is_new"] is True
+    assert m["first_seen_at"] == t1.replace(microsecond=0).isoformat()
+    assert m["times_seen"] == 1
+    con.close()  # never committed -- sqlite discards the pending transaction
+
+    # a fresh connection to the SAME file sees no trace of the dry run
+    con2 = jrh.connect(db_path)
+    assert con2.execute("SELECT COUNT(*) FROM bookings").fetchone()[0] == 0
+    con2.close()
+
+
+def test_a_real_diff_after_a_commit_false_dry_run_still_reports_new(tmp_path):
+    """The exact 2026-09-29 regression, reproduced at the sidecar layer: a
+    dry-run-style call (commit=False) must not cause a later REAL call
+    (commit=True, the default) against the same fetch to see is_new=False."""
+    db_path = tmp_path / "h.db"
+    t1 = datetime(2026, 9, 29, 9, 0, tzinfo=timezone.utc)
+
+    con = jrh.connect(db_path)
+    dry_meta = jrh.diff_and_record(con, "SC", "Cherokee", "zuercher",
+                                   [_rec("ADAMS", "BRUCE")], now=t1, commit=False)
+    assert dry_meta[("ADAMS", "BRUCE")]["is_new"] is True
+    con.close()
+
+    # ~35 minutes later, matching the real incident's timing
+    t2 = datetime(2026, 9, 29, 9, 35, tzinfo=timezone.utc)
+    con2 = jrh.connect(db_path)
+    real_meta = jrh.diff_and_record(con2, "SC", "Cherokee", "zuercher",
+                                    [_rec("ADAMS", "BRUCE")], now=t2)
+    assert real_meta[("ADAMS", "BRUCE")]["is_new"] is True  # NOT swallowed by the dry run
+    con2.close()
+
+    # and this real call genuinely DID persist -- a third fetch now correctly
+    # sees the name as no longer new, proving commit=True still works as before
+    con3 = jrh.connect(db_path)
+    meta3 = jrh.diff_and_record(con3, "SC", "Cherokee", "zuercher",
+                                [_rec("ADAMS", "BRUCE")], now=t2)
+    assert meta3[("ADAMS", "BRUCE")]["is_new"] is False
+    con3.close()

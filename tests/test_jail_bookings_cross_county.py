@@ -156,3 +156,69 @@ async def test_entity_owned_listing_is_never_flagged_by_either_lane(monkeypatch)
     assert res.get("cross_county", 0) == 0
     assert "jail_booking" not in li.raw
     assert "jail_booking_new" not in li.raw
+
+
+# ---- dry_run -- 2026-09-29 fix -------------------------------------------
+#
+# scripts/run_pending_signal_enrichers.py --dry-run found 590 genuine
+# jail_booking_new cross-county matches (real fresh jail roster data); the
+# REAL (non-dry-run) apply pass ~35 minutes later found 0 new matches for the
+# same counties, because the dry run's own roster fetch had already been
+# diffed-and-recorded into jail_roster_history.db as "seen." These pin the
+# fix end-to-end through enrich_jail_bookings, mirroring
+# test_jail_roster_history.py's lower-level sidecar coverage of the same fix.
+
+@pytest.mark.asyncio
+async def test_dry_run_does_not_persist_to_the_sidecar(monkeypatch):
+    from foreclosure_scraper import jail_roster_history as jrh
+    _patch_zuercher(monkeypatch, {"cherokee-so-sc": [_rec("Adams, Bruce Edward")]})
+    li = _li("SC", "Cherokee", "ADAMS BRUCE")
+    await enrich_jail_bookings([li], dry_run=True)
+    # conftest's autouse _isolate_jail_roster_history fixture redirects
+    # DB_PATH to a throwaway per-test file -- this reads that same file.
+    con = jrh.connect()
+    try:
+        assert con.execute("SELECT COUNT(*) FROM bookings").fetchone()[0] == 0
+    finally:
+        con.close()
+
+
+@pytest.mark.asyncio
+async def test_dry_run_still_computes_and_reports_is_new_booking(monkeypatch):
+    _patch_zuercher(monkeypatch, {"cherokee-so-sc": [_rec("Adams, Bruce Edward")]})
+    li = _li("SC", "Cherokee", "ADAMS BRUCE")
+    res = await enrich_jail_bookings([li], dry_run=True)
+    assert res["matched"] == 1
+    jbk = li.raw["jail_booking"]
+    # accurate report even though nothing was persisted -- this is what makes
+    # a dry run's own printed "590 new matches" count trustworthy
+    assert jbk["is_new_booking"] is True
+    assert jbk["first_detected_at"]
+
+
+@pytest.mark.asyncio
+async def test_real_run_after_a_dry_run_still_detects_the_same_new_booking(monkeypatch):
+    """The exact 2026-09-29 regression, end to end: a --dry-run pass over a
+    roster must not cause the REAL pass minutes later to see the same
+    booking as already-seen (0 new matches)."""
+    _patch_zuercher(monkeypatch, {"cherokee-so-sc": [_rec("Adams, Bruce Edward")]})
+
+    dry_listing = _li("SC", "Cherokee", "ADAMS BRUCE")
+    dry_res = await enrich_jail_bookings([dry_listing], dry_run=True)
+    assert dry_res["matched"] == 1
+    assert dry_listing.raw["jail_booking"]["is_new_booking"] is True
+
+    # A separate listing stands in for "the real apply pass ~35 minutes
+    # later" against the same roster/name -- this time for real.
+    real_listing = _li("SC", "Cherokee", "ADAMS BRUCE")
+    real_res = await enrich_jail_bookings([real_listing], dry_run=False)
+    assert real_res["matched"] == 1
+    assert real_listing.raw["jail_booking"]["is_new_booking"] is True
+
+    # and the real run genuinely DID persist -- a second real run now
+    # correctly sees the name as no longer new (normal idempotence, unbroken
+    # by the fix).
+    third_listing = _li("SC", "Cherokee", "ADAMS BRUCE")
+    third_res = await enrich_jail_bookings([third_listing], dry_run=False)
+    assert third_res["matched"] == 1
+    assert third_listing.raw["jail_booking"]["is_new_booking"] is False

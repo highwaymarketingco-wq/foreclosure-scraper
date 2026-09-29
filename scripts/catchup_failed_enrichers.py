@@ -49,13 +49,18 @@ def _engine_running() -> bool:
     return bool(r.stdout.strip())
 
 
-async def _run_one(name: str, listings: list) -> dict:
+async def _run_one(name: str, listings: list, dry_run: bool = False) -> dict:
     if name == "incarceration":
         from foreclosure_scraper.enrichment_incarceration import enrich_incarceration
         return await enrich_incarceration(listings) or {}
     if name == "jail_bookings":
         from foreclosure_scraper.enrichment_jail_bookings import enrich_jail_bookings
-        return await enrich_jail_bookings(listings) or {}
+        # dry_run reaches jail_roster_history so a --dry-run pass here cannot
+        # silently consume the sidecar's "new booking" detection for real
+        # (2026-09-29 fix -- see enrichment_jail_bookings.py's "DRY-RUN
+        # SIDECAR BUG" docstring note; this script has the same call shape as
+        # run_pending_signal_enrichers.py, which is where the bug was found).
+        return await enrich_jail_bookings(listings, dry_run=dry_run) or {}
     if name == "skip_trace":
         from foreclosure_scraper.enrichment_skip_trace import enrich_with_skip_trace
         await enrich_with_skip_trace(listings)
@@ -95,7 +100,7 @@ async def main() -> int:
     for name in which:
         print(f"\n--- {name}")
         try:
-            stats[name] = await _run_one(name, listings)
+            stats[name] = await _run_one(name, listings, dry_run=args.dry_run)
             print(f"    {stats[name] or 'done'}")
         except Exception as exc:  # noqa: BLE001 - one enricher must not stop the rest
             print(f"    FAILED: {type(exc).__name__}: {str(exc)[:160]}")
