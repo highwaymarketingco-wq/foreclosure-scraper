@@ -17,6 +17,7 @@ a publish that stages some and not others ships a mis-joined board):
 """
 from __future__ import annotations
 
+import collections
 import hashlib
 import itertools
 import json
@@ -193,6 +194,50 @@ BOARD_GATE_FREE_MB = 1024
 # attempted this session). BOARD_LOAD_ALLOW_LARGE=1 remains the deliberate,
 # monitored override for a human who has decided a specific run is worth it.
 BOARD_LOAD_MAX_SOURCE_MB = 1200.0
+
+# --- the append-only SIZE guard (task_0658b33b's follow-up, 2026-09-29) -----
+# append_new_rows() (below) is a SEPARATE code path from load_board()/read_board_records(): it
+# never validates the existing board into Listing objects and never holds a full parsed-dict
+# copy of it either -- each existing row is popped (LAZY_DETAIL_KEYS out of raw), re-encoded to
+# JSON bytes, and discarded immediately, one row at a time, so it is measurably cheaper than
+# either of the two operations BOARD_LOAD_MAX_SOURCE_MB's ceiling was calibrated against. It
+# gets its OWN, separately-measured ceiling rather than reusing that one.
+#
+# MEASURED (2026-09-29), by slicing REAL rows off the actual board with
+# board_parts.iter_plain_rows (never json.loads-ing the whole file) into scratch boards, then
+# running append_new_rows's own streaming pass (pop + encode + discard) against each slice,
+# under /usr/bin/time -l for macOS's real "peak memory footprint" (the same metric
+# BOARD_LOAD_MAX_SOURCE_MB's comment uses, for the same reason: it counts compressed pages RSS
+# does not, so it is the more honest number under this machine's real background memory
+# pressure):
+#     20,000 rows,  312 MiB combined source -> 746 MiB peak footprint  (2.39x)
+#     40,000 rows,  570 MiB combined source -> 1,118 MiB peak footprint (1.96x)
+# compared, on the SAME 40,000-row slice, to load_board()'s existing Listing-based path:
+#     40,000 rows,  570 MiB combined source -> 2,719 MiB peak footprint (4.77x)
+# and to a plain list[dict] materialization (no Listing, but still ONE long-lived list held for
+# the whole pass -- i.e. read_board_records()'s own shape, not append_new_rows's):
+#     40,000 rows,  570 MiB combined source -> 2,791 MiB peak footprint (4.90x)
+# The last two numbers were the real surprise: skipping Listing.model_validate() ALONE barely
+# helps (4.77x vs 4.90x) -- the expensive part is not pydantic, it is holding ANY full-length
+# list of parsed rows alive for the whole pass, dict or Listing. Discarding each row immediately
+# after it is re-encoded to bytes (never appending it to a long-lived list) is what actually
+# cuts the ratio, to under half. This machine's own background load (verified with `top` before
+# every trial: as little as ~100-150 MB physically free, 500 MB-4.5 GB of swap already in use,
+# from the always-on background stack this box also runs) left too little headroom to safely
+# run a 100,000+ row real-data trial this session; a larger trial, and a tighter ceiling, is a
+# reasonable follow-up once that headroom exists.
+#
+# WHAT THE CEILING IS SET TO. Scaling BOARD_LOAD_MAX_SOURCE_MB's own margin (877 MB measured
+# clean, 1,562 MB measured stressed, ceiling set to 1,200 MB) by the ~2.4x efficiency this ratio
+# represents (roughly the midpoint of the two measured ratios above) gives a bit under 2,900 MB;
+# 2,400 MB is used instead, deliberately short of that, as extra margin given the larger,
+# real-board-scale trial above was NOT safe to run this session. The board's current combined
+# source (2,643 MB) is STILL over this, honestly -- append_new_rows refuses on today's exact
+# board too, same as load_board() -- but the gap is now small (2,400 vs 2,643 MB, 9% over)
+# rather than load_board's (1,200 vs 2,643 MB, 120% over), and BOARD_APPEND_ALLOW_LARGE=1 is the
+# deliberate override for a supervised run (plugged in, other apps closed) given the real,
+# measured efficiency gain.
+BOARD_APPEND_MAX_SOURCE_MB = 2400.0
 
 # run_meta health older than this is nulled (audit O4).
 HEALTH_MAX_AGE_HOURS = 48.0
@@ -1103,6 +1148,46 @@ def _raise_if_board_too_large_to_load(docs: Path, *, who: str) -> None:
         f"measurement this ceiling is based on. BOARD_LOAD_ALLOW_LARGE=1 overrides for one "
         f"run; BOARD_LOAD_MAX_SOURCE_MB raises the ceiling once a larger size is measured "
         f"safe on this machine."
+    )
+
+
+def board_append_size_state(docs_dir: Path | str, *, max_mb: float | None = None) -> dict:
+    """Would append_new_rows() be safe to run against this board, judging ONLY by its on-disk
+    size -- the append-only counterpart of board_load_size_state(), against
+    BOARD_APPEND_MAX_SOURCE_MB's separately measured ceiling instead of
+    BOARD_LOAD_MAX_SOURCE_MB's (see that constant's comment for why append_new_rows earns its
+    own, more generous ceiling). Same shape as board_load_size_state(): {source_mb, max_mb, ok,
+    reason}; source_mb is None when no board was found (treated as ok -- nothing to append to
+    yet, a fresh publish)."""
+    n = _board_source_bytes(Path(docs_dir))
+    limit = float(max_mb if max_mb is not None
+                  else os.environ.get("BOARD_APPEND_MAX_SOURCE_MB", BOARD_APPEND_MAX_SOURCE_MB))
+    if n is None:
+        return {"source_mb": None, "max_mb": limit, "ok": True, "reason": ""}
+    source_mb = n / (1024 * 1024)
+    ok = source_mb <= limit
+    reason = "" if ok else f"board source is {source_mb:.0f} MB, over the {limit:.0f} MB ceiling"
+    return {"source_mb": source_mb, "max_mb": limit, "ok": ok, "reason": reason}
+
+
+def _raise_if_board_too_large_to_append(docs: Path) -> None:
+    """The append-only counterpart of _raise_if_board_too_large_to_load(): called eagerly by
+    append_new_rows() before it does any work. BOARD_APPEND_ALLOW_LARGE=1 overrides for one
+    run; BOARD_APPEND_MAX_SOURCE_MB (see its comment above BOARD_LOAD_MAX_SOURCE_MB) is the
+    ceiling."""
+    if os.environ.get("BOARD_APPEND_ALLOW_LARGE", "").strip().lower() in ("1", "true", "yes"):
+        return
+    size_state = board_append_size_state(docs)
+    if size_state["ok"]:
+        return
+    log.error("board.append_too_large", **size_state, docs_dir=str(docs))
+    raise BoardLoadTooLarge(
+        f"append_new_rows refused to load {docs}: {size_state['reason']}. append_new_rows is "
+        f"measurably cheaper than load_board() (see BOARD_APPEND_MAX_SOURCE_MB's comment) but "
+        f"is still proportional to the existing board's size, and this board is over even its "
+        f"more generous ceiling. BOARD_APPEND_ALLOW_LARGE=1 overrides for one supervised run; "
+        f"BOARD_APPEND_MAX_SOURCE_MB raises the ceiling once a larger size is measured safe on "
+        f"this machine."
     )
 
 
@@ -3067,6 +3152,230 @@ def reseal_board(docs_dir: Path | str = "docs", *, resplit: bool = False,
 _BACKUP_KEEP = max(1, int(os.environ.get("BOARD_BACKUP_KEEP", "3")))
 
 
+def _count_guard_and_backup(docs: Path, listings_path: Path, new_count: int, summary: dict) -> int:
+    """BACKUP-BEFORE-OVERWRITE + COUNT GUARD, extracted from write_artifact (2026-09-29) so
+    append_new_rows() can share this exact, incident-hardened logic instead of re-implementing
+    it against a different row-count source and risking a subtly different bug. Pure extraction:
+    same behavior, `new_count` stands in for what was `len(payload)`. See write_artifact's
+    history for the two real data-loss incidents (#16, #22, the 72K-dropped-silently case) this
+    guards against.
+
+    Two data-loss events happened because a script wrote a smaller board (scope filter dropped
+    16K+ leads) and the prior data was gone -- _atomic_write_bytes replaces the file, so the old
+    content is lost.
+
+    This does TWO things before any write:
+      1. COUNT GUARD -- if the new board is >10% smaller than the existing board AND the caller
+         didn't set BOARD_ALLOW_SHRINK, it RAISES. This catches the exact bug that killed
+         53K->37K: a script calling write_artifact with a filtered subset. The caller must
+         either fix their data or explicitly opt in with BOARD_ALLOW_SHRINK=1.
+      2. TIMESTAMPED BACKUP -- copies the existing listings.json + detail to backups/ with a
+         timestamp, so even if the guard is bypassed, the prior board is recoverable. Keeps the
+         last _BACKUP_KEEP backups.
+
+    Returns the accepted intentional-shrink allowance (0 when no board existed yet, or none was
+    claimed), which the caller's high-water-mark update needs to REBASE correctly.
+    """
+    _backup_dir = docs.parent / "backups"
+    _backup_dir.mkdir(parents=True, exist_ok=True)
+    # Set unconditionally: the high-water block below reads it, and on a first run
+    # (no board file yet) the guard block never executes.
+    _accepted_intentional = 0
+    if _board_file_present(listings_path):
+        # --- count guard (high-water mark) ---
+        # Bug fix: the old guard compared against the current on-disk board.
+        # Once a bad 22K run published, the guard's baseline became 22K — so
+        # the NEXT 22K run looked flat and passed. The guard measured
+        # run-over-run drift, not drift from the true high-water mark, so it
+        # structurally could not catch a drop that already landed.
+        #
+        # Fix: compare against a persisted high-water mark
+        # (board_highwater.json), not the last board. A poisoned baseline
+        # can no longer hide the drop.
+        _highwater_path = docs / "board_highwater.json"
+        _highwater_count = None
+        try:
+            if _highwater_path.exists():
+                _hw = json.loads(_highwater_path.read_text())
+                _highwater_count = _hw.get("count")
+        except Exception:  # noqa: BLE001
+            pass
+        # Fallback to on-disk board if no high-water mark exists (first run)
+        if _highwater_count is None:
+            try:
+                _prior_data = read_board_json(listings_path)
+                _highwater_count = len(_prior_data) if isinstance(_prior_data, list) else None
+            except Exception:  # noqa: BLE001
+                pass
+        # Rows the run removed ON PURPOSE because they are not in the buy box
+        # (resolved to an off-footprint county; national/REO rows that never
+        # resolved to one) are not shrink. The guard exists to catch a source
+        # dying silently or a script writing a filtered subset -- it must compare
+        # like with like, or a correct cleanup reads as a catastrophe.
+        #
+        # This is not hypothetical. On 2026-09-08 a 15h run scraped fine, merged
+        # to 80,789, then scope_repass correctly dropped 30,509 off-footprint
+        # rows (mostly statewide-NC LiensNC construction filings whose real
+        # county only resolves during enrichment). Final board 39,088 vs a
+        # high-water of 94,384 that had been set while those very rows were still
+        # unresolved -> 59% "shrink" -> write refused, dashboard not published.
+        # Because the mark only ever moves UP, that was permanent: every honest
+        # run afterwards hit the same wall and the board stayed frozen on a stale
+        # count inflated by rows that were never in the footprint.
+        _intentional = 0
+        try:
+            _intentional = max(0, int(summary.get("off_footprint_removed") or 0))
+        except (TypeError, ValueError):
+            _intentional = 0
+        # Never let the allowance swallow the whole baseline -- a run claiming it
+        # meant to remove everything is exactly the bug this guard is for.
+        _intentional = min(_intentional, int(_highwater_count * 0.6)) if _highwater_count else 0
+        _effective_baseline = max(1, (_highwater_count or 0) - _intentional)
+
+        if _highwater_count is not None and new_count < _effective_baseline:
+            _shrink_pct = (1 - new_count / _effective_baseline) * 100
+            _allow = os.environ.get("BOARD_ALLOW_SHRINK", "").strip()
+            if _shrink_pct > 10 and _allow not in ("1", "true", "yes"):
+                raise RuntimeError(
+                    f"COUNT GUARD: refusing to write {new_count:,} listings "
+                    f"over high-water mark {_highwater_count:,} "
+                    f"(effective baseline {_effective_baseline:,} after "
+                    f"{_intentional:,} intentional off-footprint removals; "
+                    f"{_shrink_pct:.1f}% unexplained shrink). "
+                    f"This has happened before (72K dropped silently). If this "
+                    f"shrink is intentional, set BOARD_ALLOW_SHRINK=1."
+                )
+        # Remember the accepted allowance so the high-water update below can
+        # REBASE rather than keep a baseline that describes a different
+        # population than the one we now publish.
+        _accepted_intentional = _intentional
+        # --- timestamped backup ---
+        _ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        try:
+            import shutil as _sh
+            _sh.copy2(listings_path, _backup_dir / f"listings_{_ts}.json")
+            if (docs / "listings_detail.json").exists():
+                _sh.copy2(docs / "listings_detail.json",
+                          _backup_dir / f"listings_detail_{_ts}.json")
+            elif (docs / "listings_detail.json.gz").exists():
+                _sh.copy2(docs / "listings_detail.json.gz",
+                          _backup_dir / f"listings_detail_{_ts}.json.gz")
+            log.info("web_artifact.backup_saved", path=str(_backup_dir / f"listings_{_ts}.json"))
+        except Exception:  # noqa: BLE001 - backup failure must not block the write
+            log.warning("web_artifact.backup_failed", exc_info=True)
+        # --- prune old backups (keep the newest _BACKUP_KEEP of each) ---
+        # Bug found 2026-09-17: the sibling-cleanup below rsplit() the main
+        # file's stem on "_" to derive a prefix meant to also catch its
+        # listings_detail_<ts>.json(.gz) pair, but "listings_<ts>".rsplit("_",1)[0]
+        # produces "listings_<date>" -- a prefix that never matches
+        # "listings_detail_..." (detail comes right after "listings_", not
+        # after the date). listings_2*.json (main) pruned fine at 10 files;
+        # listings_detail_2*.json never matched ANY prune glob and grew
+        # unbounded -- 214 files / 24GB found live, which drove the disk to
+        # 0 bytes free mid-backfill (tee errors, real corruption risk on the
+        # next atomic write). Prune both patterns independently by their own
+        # recency now, instead of relying on one glob's leftovers to also
+        # catch the other's files.
+        try:
+            for _pattern in ("listings_2*.json", "listings_detail_2*.json*"):
+                _old = sorted(_backup_dir.glob(_pattern),
+                              key=lambda p: p.stat().st_mtime, reverse=True)[_BACKUP_KEEP:]
+                for _f in _old:
+                    _f.unlink(missing_ok=True)
+        except Exception:  # noqa: BLE001
+            pass
+    return _accepted_intentional
+
+
+def _apply_health_freshness(meta: dict, prior_meta: dict, summary: dict, now_iso: str,
+                            now: datetime) -> None:
+    """PRESERVE per-source health across partial writers, extracted from write_artifact
+    (2026-09-29) so append_new_rows() -- which never computes its own source_status, being an
+    additive-only landing rather than a scrape -- carries it forward the identical way instead
+    of reimplementing the staleness math. Mutates `meta` in place.
+
+    Fourteen maintenance scripts (sos_agent_refresh, lrcpwa_refresh, owner_mailing_refresh, the
+    ingest_* family, ...) call write_artifact with a one-key summary like {"notes": "scheduled
+    NC SOS refresh"}. Each one then blanked by_source / source_status / by_state, so
+    run_meta.json - the ONLY per-source health report there is - showed "by_source": {} for days
+    after a full run, and neither the operator nor a dashboard could answer "which sources are
+    actually contributing". Carry the prior run's values forward when this writer did not
+    compute its own, and mark the file so the staleness is visible rather than implied.
+
+    THIS ONLY WORKS IF CALLERS STOP LAUNDERING THE PRIOR FILE BACK IN. health_carried_from is
+    stamped only when a key is ABSENT from `meta`, i.e. only when THIS writer genuinely had
+    nothing to say. Two callers used to read the prior run_meta.json themselves, strip `board`,
+    and hand the rest back as their summary (recompute_valuation.py, patch_vision_gemini's
+    _prior_meta) — so every key arrived already populated, the branch below never fired, and the
+    published file asserted a months-old per-source health report as current. Both now pass only
+    their own notes and let this function do the carrying, which produces the same values plus
+    the label.
+
+    by_state is NOT in this list: it is derived from the board being written, so there is never
+    a stale value to carry.
+
+    AUDIT O4 (2026-09-21): health_carried_from used to be the PRIOR WRITE's run_time, so it
+    always looked minutes old while the per-source status it labelled was 23 days old (the last
+    full run to compute it landed 8/29). Now:
+      health_as_of         when THIS status was computed: stamped when the writer
+                           computed its own source_status, otherwise carried
+                           forward UNCHANGED from the first write that computed it
+      health_carried_from  same instant (kept for existing readers)
+      health_age_hours     now - health_as_of, so nobody has to do the subtraction
+      health_stale         True when the age exceeds HEALTH_MAX_AGE_HOURS (48) or
+                           the origin is unknown
+    and once stale, source_status and errors are NULLED so a consumer sees "unknown" instead of
+    a frozen green board. by_source and by_county_top keep being carried (they are counts,
+    labelled by health_as_of).
+    """
+    _carried: list[str] = []
+    _own_health = bool(summary.get("source_status"))
+    for key in ("by_source", "by_county_top", "source_status", "regressions", "errors"):
+        if not meta.get(key) and prior_meta.get(key):
+            meta[key] = prior_meta[key]
+            _carried.append(key)
+    if _own_health:
+        health_as_of = now_iso
+    else:
+        health_as_of = prior_meta.get("health_as_of") or os.environ.get("BOARD_HEALTH_AS_OF") or None
+    if _carried:
+        meta["health_carried_from"] = health_as_of
+        meta["health_carried_keys"] = _carried
+    meta["health_as_of"] = health_as_of
+    age_h = None
+    if health_as_of:
+        try:
+            _t = datetime.fromisoformat(str(health_as_of).replace("Z", "+00:00")).replace(tzinfo=None)
+            age_h = round(max(0.0, (now - _t).total_seconds() / 3600.0), 2)
+        except ValueError:
+            age_h = None
+    meta["health_age_hours"] = age_h
+    _max_age = float(os.environ.get("HEALTH_MAX_AGE_HOURS", HEALTH_MAX_AGE_HOURS))
+    meta["health_stale"] = bool(age_h is None or age_h > _max_age)
+    if meta["health_stale"] and (meta.get("source_status") or meta.get("errors")):
+        # Unknown origin counts as stale: on the live file this is what stops a
+        # status frozen at 8/29 from posing as current at the first new write.
+        meta["source_status"] = None
+        meta["errors"] = None
+        meta["health_nulled"] = ["source_status", "errors"]
+    # Per-source last-success stamps (audit A2): freshness measured per SOURCE,
+    # not by row last_seen (which a merge or an enrichment pass bumps).
+    _ls = dict(prior_meta.get("source_last_success") or {})
+    if _own_health:
+        for slug, status in (summary.get("source_status") or {}).items():
+            if isinstance(status, str) and status.startswith("OK"):
+                _ls[slug] = now_iso
+    _refreshed = summary.get("source_refreshed")
+    if isinstance(_refreshed, dict):
+        for slug, when in _refreshed.items():
+            _ls[slug] = when if isinstance(when, str) and when else now_iso
+    elif isinstance(_refreshed, (list, tuple, set)):
+        for slug in _refreshed:
+            _ls[str(slug)] = now_iso
+    if _ls:
+        meta["source_last_success"] = dict(sorted(_ls.items()))
+
+
 def write_artifact(
     listings: list[Listing],
     summary: dict,
@@ -3140,131 +3449,10 @@ def write_artifact(
     # truncated 100MB+ file — the prior good file survives. git history is the
     # rollback backup for a completed-but-bad write (the count-drop guard flags
     # those before publish).
-    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    # BACKUP-BEFORE-OVERWRITE + COUNT GUARD
-    #
-    # Two data-loss events (actions #16, #22) happened because a script wrote
-    # a smaller board (scope filter dropped 16K+ leads) and the prior data was
-    # gone — _atomic_write_bytes replaces the file, so the old content is lost.
-    #
-    # This block does TWO things before any write:
-    #   1. COUNT GUARD — if the new board is >10% smaller than the existing
-    #      board AND the caller didn't set BOARD_ALLOW_SHRINK, it RAISES.
-    #      This catches the exact bug that killed 53K→37K: a script calling
-    #      write_artifact with a filtered subset. The caller must either fix
-    #      their data or explicitly opt in with BOARD_ALLOW_SHRINK=1.
-    #   2. TIMESTAMPED BACKUP — copies the existing listings.json + detail
-    #      to backups/ with a timestamp, so even if the guard is bypassed,
-    #      the prior board is recoverable. Keeps the last 10 backups.
-    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    _backup_dir = docs.parent / "backups"
-    _backup_dir.mkdir(parents=True, exist_ok=True)
-    # Set unconditionally: the high-water block below reads it, and on a first run
-    # (no board file yet) the guard block never executes.
-    _accepted_intentional = 0
-    if _board_file_present(listings_path):
-        # --- count guard (high-water mark) ---
-        # Bug fix: the old guard compared against the current on-disk board.
-        # Once a bad 22K run published, the guard's baseline became 22K — so
-        # the NEXT 22K run looked flat and passed. The guard measured
-        # run-over-run drift, not drift from the true high-water mark, so it
-        # structurally could not catch a drop that already landed.
-        #
-        # Fix: compare against a persisted high-water mark
-        # (board_highwater.json), not the last board. A poisoned baseline
-        # can no longer hide the drop.
-        _highwater_path = docs / "board_highwater.json"
-        _highwater_count = None
-        try:
-            if _highwater_path.exists():
-                _hw = json.loads(_highwater_path.read_text())
-                _highwater_count = _hw.get("count")
-        except Exception:  # noqa: BLE001
-            pass
-        # Fallback to on-disk board if no high-water mark exists (first run)
-        if _highwater_count is None:
-            try:
-                _prior_data = read_board_json(listings_path)
-                _highwater_count = len(_prior_data) if isinstance(_prior_data, list) else None
-            except Exception:  # noqa: BLE001
-                pass
-        # Rows the run removed ON PURPOSE because they are not in the buy box
-        # (resolved to an off-footprint county; national/REO rows that never
-        # resolved to one) are not shrink. The guard exists to catch a source
-        # dying silently or a script writing a filtered subset -- it must compare
-        # like with like, or a correct cleanup reads as a catastrophe.
-        #
-        # This is not hypothetical. On 2026-09-08 a 15h run scraped fine, merged
-        # to 80,789, then scope_repass correctly dropped 30,509 off-footprint
-        # rows (mostly statewide-NC LiensNC construction filings whose real
-        # county only resolves during enrichment). Final board 39,088 vs a
-        # high-water of 94,384 that had been set while those very rows were still
-        # unresolved -> 59% "shrink" -> write refused, dashboard not published.
-        # Because the mark only ever moves UP, that was permanent: every honest
-        # run afterwards hit the same wall and the board stayed frozen on a stale
-        # count inflated by rows that were never in the footprint.
-        _intentional = 0
-        try:
-            _intentional = max(0, int(summary.get("off_footprint_removed") or 0))
-        except (TypeError, ValueError):
-            _intentional = 0
-        # Never let the allowance swallow the whole baseline -- a run claiming it
-        # meant to remove everything is exactly the bug this guard is for.
-        _intentional = min(_intentional, int(_highwater_count * 0.6)) if _highwater_count else 0
-        _effective_baseline = max(1, (_highwater_count or 0) - _intentional)
-
-        if _highwater_count is not None and len(payload) < _effective_baseline:
-            _shrink_pct = (1 - len(payload) / _effective_baseline) * 100
-            _allow = os.environ.get("BOARD_ALLOW_SHRINK", "").strip()
-            if _shrink_pct > 10 and _allow not in ("1", "true", "yes"):
-                raise RuntimeError(
-                    f"COUNT GUARD: refusing to write {len(payload):,} listings "
-                    f"over high-water mark {_highwater_count:,} "
-                    f"(effective baseline {_effective_baseline:,} after "
-                    f"{_intentional:,} intentional off-footprint removals; "
-                    f"{_shrink_pct:.1f}% unexplained shrink). "
-                    f"This has happened before (72K dropped silently). If this "
-                    f"shrink is intentional, set BOARD_ALLOW_SHRINK=1."
-                )
-        # Remember the accepted allowance so the high-water update below can
-        # REBASE rather than keep a baseline that describes a different
-        # population than the one we now publish.
-        _accepted_intentional = _intentional
-        # --- timestamped backup ---
-        _ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        try:
-            import shutil as _sh
-            _sh.copy2(listings_path, _backup_dir / f"listings_{_ts}.json")
-            if (docs / "listings_detail.json").exists():
-                _sh.copy2(docs / "listings_detail.json",
-                          _backup_dir / f"listings_detail_{_ts}.json")
-            elif (docs / "listings_detail.json.gz").exists():
-                _sh.copy2(docs / "listings_detail.json.gz",
-                          _backup_dir / f"listings_detail_{_ts}.json.gz")
-            log.info("web_artifact.backup_saved", path=str(_backup_dir / f"listings_{_ts}.json"))
-        except Exception:  # noqa: BLE001 - backup failure must not block the write
-            log.warning("web_artifact.backup_failed", exc_info=True)
-        # --- prune old backups (keep the newest _BACKUP_KEEP of each) ---
-        # Bug found 2026-09-17: the sibling-cleanup below rsplit() the main
-        # file's stem on "_" to derive a prefix meant to also catch its
-        # listings_detail_<ts>.json(.gz) pair, but "listings_<ts>".rsplit("_",1)[0]
-        # produces "listings_<date>" -- a prefix that never matches
-        # "listings_detail_..." (detail comes right after "listings_", not
-        # after the date). listings_2*.json (main) pruned fine at 10 files;
-        # listings_detail_2*.json never matched ANY prune glob and grew
-        # unbounded -- 214 files / 24GB found live, which drove the disk to
-        # 0 bytes free mid-backfill (tee errors, real corruption risk on the
-        # next atomic write). Prune both patterns independently by their own
-        # recency now, instead of relying on one glob's leftovers to also
-        # catch the other's files.
-        try:
-            for _pattern in ("listings_2*.json", "listings_detail_2*.json*"):
-                _old = sorted(_backup_dir.glob(_pattern),
-                              key=lambda p: p.stat().st_mtime, reverse=True)[_BACKUP_KEEP:]
-                for _f in _old:
-                    _f.unlink(missing_ok=True)
-        except Exception:  # noqa: BLE001
-            pass
+    # BACKUP-BEFORE-OVERWRITE + COUNT GUARD (extracted to _count_guard_and_backup, shared with
+    # append_new_rows -- see that function's docstring for the two real incidents it guards
+    # against).
+    _accepted_intentional = _count_guard_and_backup(docs, listings_path, len(payload), summary)
     # The manifest (written LAST) needs each big file's size and sha256. Take them
     # from the bytes already in memory rather than re-reading 1.1 GB from disk.
     _manifest_pre: dict = {
@@ -3391,45 +3579,8 @@ def write_artifact(
         if shard_meta is not None:
             meta["board"]["detail_shards"] = shard_meta
 
-    # PRESERVE per-source health across partial writers.
-    # Fourteen maintenance scripts (sos_agent_refresh, lrcpwa_refresh,
-    # owner_mailing_refresh, the ingest_* family, ...) call write_artifact with a
-    # one-key summary like {"notes": "scheduled NC SOS refresh"}. Each one then
-    # blanked by_source / source_status / by_state, so run_meta.json - the ONLY
-    # per-source health report there is - showed "by_source": {} for days after a
-    # full run, and neither the operator nor a dashboard could answer "which
-    # sources are actually contributing". Carry the prior run's values forward
-    # when this writer did not compute its own, and mark the file so the staleness
-    # is visible rather than implied.
-    #
-    # THIS ONLY WORKS IF CALLERS STOP LAUNDERING THE PRIOR FILE BACK IN.
-    # health_carried_from is stamped only when a key is ABSENT from `meta`, i.e.
-    # only when THIS writer genuinely had nothing to say. Two callers used to
-    # read the prior run_meta.json themselves, strip `board`, and hand the rest
-    # back as their summary (recompute_valuation.py, patch_vision_gemini's
-    # _prior_meta) — so every key arrived already populated, the branch below
-    # never fired, and the published file asserted a months-old per-source
-    # health report as current. Both now pass only their own notes and let this
-    # block do the carrying, which produces the same values plus the label.
-    #
-    # by_state is NOT in this list: it is derived above from the board being
-    # written, so there is never a stale value to carry.
-    #
-    # AUDIT O4 (2026-09-21): health_carried_from used to be the PRIOR WRITE's
-    # run_time, so it always looked minutes old while the per-source status it
-    # labelled was 23 days old (the last full run to compute it landed 8/29).
-    # Now:
-    #   health_as_of         when THIS status was computed: stamped when the writer
-    #                        computed its own source_status, otherwise carried
-    #                        forward UNCHANGED from the first write that computed it
-    #   health_carried_from  same instant (kept for existing readers)
-    #   health_age_hours     now - health_as_of, so nobody has to do the subtraction
-    #   health_stale         True when the age exceeds HEALTH_MAX_AGE_HOURS (48) or
-    #                        the origin is unknown
-    # and once stale, source_status and errors are NULLED so a consumer sees
-    # "unknown" instead of a frozen green board. by_source and by_county_top keep
-    # being carried (they are counts, labelled by health_as_of).
-    _carried: list[str] = []
+    # PRESERVE per-source health across partial writers (extracted to
+    # _apply_health_freshness, shared with append_new_rows -- see its docstring).
     prior_meta: dict = {}
     if meta_path.exists():
         try:
@@ -3438,52 +3589,7 @@ def write_artifact(
             prior_meta = {}
         if not isinstance(prior_meta, dict):
             prior_meta = {}
-    _own_health = bool(summary.get("source_status"))
-    for key in ("by_source", "by_county_top", "source_status",
-                "regressions", "errors"):
-        if not meta.get(key) and prior_meta.get(key):
-            meta[key] = prior_meta[key]
-            _carried.append(key)
-    if _own_health:
-        health_as_of = _now_iso
-    else:
-        health_as_of = prior_meta.get("health_as_of") or os.environ.get("BOARD_HEALTH_AS_OF") or None
-    if _carried:
-        meta["health_carried_from"] = health_as_of
-        meta["health_carried_keys"] = _carried
-    meta["health_as_of"] = health_as_of
-    age_h = None
-    if health_as_of:
-        try:
-            _t = datetime.fromisoformat(str(health_as_of).replace("Z", "+00:00")).replace(tzinfo=None)
-            age_h = round(max(0.0, (_now - _t).total_seconds() / 3600.0), 2)
-        except ValueError:
-            age_h = None
-    meta["health_age_hours"] = age_h
-    _max_age = float(os.environ.get("HEALTH_MAX_AGE_HOURS", HEALTH_MAX_AGE_HOURS))
-    meta["health_stale"] = bool(age_h is None or age_h > _max_age)
-    if meta["health_stale"] and (meta.get("source_status") or meta.get("errors")):
-        # Unknown origin counts as stale: on the live file this is what stops a
-        # status frozen at 8/29 from posing as current at the first new write.
-        meta["source_status"] = None
-        meta["errors"] = None
-        meta["health_nulled"] = ["source_status", "errors"]
-    # Per-source last-success stamps (audit A2): freshness measured per SOURCE,
-    # not by row last_seen (which a merge or an enrichment pass bumps).
-    _ls = dict(prior_meta.get("source_last_success") or {})
-    if _own_health:
-        for slug, status in (summary.get("source_status") or {}).items():
-            if isinstance(status, str) and status.startswith("OK"):
-                _ls[slug] = _now_iso
-    _refreshed = summary.get("source_refreshed")
-    if isinstance(_refreshed, dict):
-        for slug, when in _refreshed.items():
-            _ls[slug] = when if isinstance(when, str) and when else _now_iso
-    elif isinstance(_refreshed, (list, tuple, set)):
-        for slug in _refreshed:
-            _ls[str(slug)] = _now_iso
-    if _ls:
-        meta["source_last_success"] = dict(sorted(_ls.items()))
+    _apply_health_freshness(meta, prior_meta, summary, _now_iso, _now)
     _atomic_write_bytes(meta_path, json.dumps(meta, ensure_ascii=False, default=str, indent=2).encode("utf-8"))
 
     # --- update high-water mark ---
@@ -3544,3 +3650,313 @@ def write_artifact(
 
     log.info("web_artifact.written", listings=len(listings), bytes=listings_path.stat().st_size)
     return listings_path, meta_path
+
+
+# ===========================================================================
+# append_new_rows: land a SMALL number of new rows without materializing the
+# existing board (task_0658b33b, follow-up to audit O13). See
+# BOARD_APPEND_MAX_SOURCE_MB's comment for the measurements this is based on.
+# ===========================================================================
+
+_APPEND_SIG_FIELDS = ("state", "county", "parcel_id", "street_address", "zip_code",
+                     "case_number", "source_url", "listing_type")
+
+
+def _append_row_sigs(li: Listing) -> set:
+    """Same-property signatures for a Listing. Duplicates scripts/run_scoped_scrapers.py's
+    _sigs_of()/board_overlap() exactly (not imported: scripts/ is a collection of entry points,
+    not an importable package this library module should depend on -- the dependency would also
+    point the wrong way). Keep the two in sync if dedupe.py's signature set changes."""
+    from .dedupe import _strong_sigs
+    out = set(_strong_sigs(li))
+    try:
+        out.add(("k", li.dedupe_key()))
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+def _append_dict_sigs(row: dict) -> set:
+    """Same signatures as _append_row_sigs, for a raw board row dict, WITHOUT validating it
+    into a full Listing: a cheap Listing.model_construct() of just the identity fields (no
+    pydantic validation, no type coercion) is enough for _strong_sigs()/dedupe_key(), which
+    only ever read these fields. This is what lets append_new_rows() dedupe the small candidate
+    set against the existing board while only ever streaming it -- the same trick
+    board_overlap() already uses for the SAME purpose in the dry-run path."""
+    light = Listing.model_construct(**{k: row.get(k) for k in _APPEND_SIG_FIELDS})
+    return _append_row_sigs(light)
+
+
+def append_new_rows(new_listings: list[Listing], summary: dict,
+                    docs_dir: Path | str = "docs") -> dict:
+    """Land a SMALL number of new, already-validated Listing objects onto the board WITHOUT
+    fully re-validating or holding in memory the (potentially hundreds of thousands of)
+    existing/untouched rows already on it.
+
+    THE PROBLEM THIS SOLVES. The normal pattern -- load_board() (validates EVERY row into a
+    Listing), mutate/append in Python, write_artifact() (re-serializes EVERY row) -- is exactly
+    right for a full rescrape or an in-place enrichment pass, where every row genuinely might
+    change (run_pending_signal_enrichers.py is that shape: it re-tags EXISTING rows, so it
+    still needs load_board()/write_artifact(), unchanged, still gated by
+    BOARD_LOAD_MAX_SOURCE_MB). It is the wrong tool for "scrape a handful of new listings,
+    check they are not already on the board, add them"
+    (scripts/run_scoped_scrapers.py --apply's real use case): the existing rows never need to
+    be parsed into a mutable Listing, or even held as a parsed dict for the whole pass, at all.
+
+    HOW. `new_listings` is the only thing this function ever validates -- and since callers
+    already hold them as Listing objects (pydantic validated them at construction), that means
+    nothing here re-validates anything; the "validation" already happened before this function
+    was ever called. The existing board is streamed EXACTLY ONCE via _iter_board_records() (the
+    incremental JSON-array decoder from audit O13's streaming fix -- never a whole-file
+    json.loads(), never a whole-board list held in memory): each existing row is popped
+    (LAZY_DETAIL_KEYS out of `raw`, mirroring write_artifact's own round-trip), immediately
+    re-encoded to the exact JSON bytes it would have had, and then the parsed dict is dropped --
+    at most one existing row's parsed dict is alive at a time, for however many hundreds of
+    thousands there are. Only the already-serialized bytes (a list[bytes], not a list[dict] or
+    list[Listing]) and the tiny popped detail dicts (usually {} — most rows have no
+    vision/comps) accumulate for the whole pass.
+
+    MEASURED (BOARD_APPEND_MAX_SOURCE_MB's comment has the numbers): discarding each row's
+    parsed form immediately, rather than keeping ANY full-length list of parsed rows alive
+    (dict or Listing), is what actually cuts the peak footprint -- to roughly HALF of either
+    load_board()'s list[Listing] or a plain list[dict] materialization, on the same real board
+    slices. Skipping Listing.model_validate() by itself was a much smaller win than expected.
+
+    DEDUPE. Additive only: a candidate matching an existing row by any of dedupe.py's strong
+    same-property signatures, or its own dedupe_key(), is skipped (reported in
+    `skipped_by_source`), never appended, and the existing row it matched is never touched. The
+    check is folded into the SAME streaming pass (a lightweight Listing.model_construct() of
+    just the identity fields per existing row -- see _append_dict_sigs -- rather than a second
+    read of the board).
+
+    ADDITIVE-ONLY IS ENFORCED BY CONSTRUCTION, not by fingerprint-diffing before/after the way
+    scripts/run_scoped_scrapers.py's old apply_rows() asserted it (it held all existing rows as
+    Listing objects and hashed each one before and after, to catch a bug in ITS OWN merge step
+    mutating one). Here, existing rows are streamed straight from disk into the rewritten board
+    and never pass through caller code or become a mutable Python object anything else could
+    reach -- there is no code path left that could silently modify one, so there is nothing to
+    diff.
+
+    WHAT THIS DELIBERATELY DOES NOT DO:
+      * Does NOT regenerate the mobile SLIM/detail-shard payloads (listings_slim.json,
+        detail_shards/). Those describe the board as of the last full write_artifact() call and
+        are left untouched here (their manifest entries are re-hashed from disk unchanged,
+        their run_meta.json `board` block is carried forward verbatim) -- regenerating them
+        needs the parsed-dict form of the WHOLE board (see _emit_slim/_emit_detail_shards),
+        which is exactly the cost this function exists to avoid. The desktop dashboard
+        (listings.json + listings_detail.json, read directly) sees new rows immediately; the
+        mobile payload catches up at the next full write_artifact() run. This is a known,
+        disclosed gap: a caller that needs the mobile payload fresh immediately should keep
+        using load_board()/write_artifact().
+      * Does NOT backfill vision/comps/cama from a "prior" identity-keyed board the way
+        write_artifact does for a full rescrape's reordered rows: new rows here are, by
+        definition (they survived the dedupe check above), not already on the board under any
+        identity key, so there is nothing to backfill from, and skipping the check avoids an
+        extra full (non-streaming) read of the board that _load_prior_details_by_key would
+        otherwise do.
+      * Is gated by its OWN size ceiling, BOARD_APPEND_MAX_SOURCE_MB, separate from
+        load_board()'s BOARD_LOAD_MAX_SOURCE_MB -- see that constant's comment for the measured
+        numbers behind both and why they differ.
+
+    Returns {existing, candidates, added, already_on_board, added_by_source, skipped_by_source,
+    total_after, written} -- when new_listings is empty, {existing: None, candidates: 0,
+    added: 0, already_on_board: 0, added_by_source: {}, skipped_by_source: {}, written: False,
+    total_after: None} without touching the board at all (existing/total_after are None because
+    nothing was scanned -- there was nothing to check them against).
+
+    Refuses (BoardLockNotHeld) unless the caller holds the board lock, exactly like
+    write_artifact(); refuses (BoardChangedSinceLoad) if listings.json changed since this
+    process last loaded it; refuses (BoardLoadTooLarge) if the existing board is over
+    BOARD_APPEND_MAX_SOURCE_MB (BOARD_APPEND_ALLOW_LARGE=1 overrides for one supervised run).
+    """
+    docs = Path(docs_dir)
+    docs.mkdir(parents=True, exist_ok=True)
+    listings_path = docs / "listings.json"
+
+    require_board_lock(docs)
+    _check_not_changed_since_load(listings_path)
+
+    if not new_listings:
+        return {"existing": None, "candidates": 0, "added": 0, "already_on_board": 0,
+                "added_by_source": {}, "skipped_by_source": {}, "written": False,
+                "total_after": None}
+
+    _raise_if_board_too_large_to_append(docs)
+
+    new_payload = [_to_dict(li) for li in new_listings]
+    # Diagnostic only (never blocks a write): report on the NEW rows' raw keys, not the whole
+    # board's -- the existing rows were already reported when THEY were first written, and
+    # re-scanning all of them here would need exactly the full parsed-dict pass this function
+    # exists to avoid.
+    _report_slim_drops(new_listings)
+
+    cand_sigs: dict = collections.defaultdict(list)
+    for i, li in enumerate(new_listings):
+        for sig in _append_row_sigs(li):
+            cand_sigs[sig].append(i)
+    hit: dict[int, str] = {}
+
+    # --- ONE streaming pass over the existing board: dedupe-check + pop + encode + count ---
+    # A board that does not exist yet at all (the very first write -- write_artifact() is
+    # normally what bootstraps that, called directly with the full set; append_new_rows()
+    # tolerates it too, rather than making "is there a board yet" the caller's problem) has
+    # nothing to stream: skip straight to writing new_listings as the whole board.
+    row_enc = json.JSONEncoder(ensure_ascii=False, default=str)
+    listing_blobs: list[bytes] = []
+    details: list[dict] = []
+    by_state: collections.Counter = collections.Counter()
+    by_source: collections.Counter = collections.Counter()
+    existing_total = 0
+    _existing_rows = _iter_board_records(docs) if _board_file_present(listings_path) else ()
+    for rec in _existing_rows:
+        existing_total += 1
+        if cand_sigs and isinstance(rec, dict):
+            src = str(rec.get("source") or "?")
+            for sig in _append_dict_sigs(rec):
+                for i in cand_sigs.get(sig, ()):
+                    hit.setdefault(i, src)
+        by_state[str(rec.get("state") or "").strip() or "unknown"] += 1
+        by_source[str(rec.get("source") or "").strip() or "unknown"] += 1
+        raw = rec.get("raw")
+        d: dict = {}
+        if isinstance(raw, dict):
+            for k in LAZY_DETAIL_KEYS:
+                if k in raw:
+                    d[k] = raw.pop(k)
+        details.append(d)
+        listing_blobs.append(row_enc.encode(rec).encode("utf-8"))
+
+    fresh_idx = [i for i in range(len(new_listings)) if i not in hit]
+    skipped_by_source = collections.Counter(
+        new_listings[i].source for i in range(len(new_listings)) if i in hit)
+    added_by_source: collections.Counter = collections.Counter()
+    for i in fresh_idx:
+        rec = new_payload[i]
+        added_by_source[new_listings[i].source] += 1
+        by_state[str(rec.get("state") or "").strip() or "unknown"] += 1
+        by_source[str(rec.get("source") or "").strip() or "unknown"] += 1
+        raw = rec.get("raw")
+        d = {}
+        if isinstance(raw, dict):
+            for k in LAZY_DETAIL_KEYS:
+                if k in raw:
+                    d[k] = raw.pop(k)
+        details.append(d)
+        listing_blobs.append(row_enc.encode(rec).encode("utf-8"))
+
+    total = existing_total + len(fresh_idx)
+    stats: dict = {
+        "existing": existing_total, "candidates": len(new_listings), "added": len(fresh_idx),
+        "already_on_board": len(hit), "written": False,
+        "added_by_source": dict(added_by_source), "skipped_by_source": dict(skipped_by_source),
+        "total_after": total,
+    }
+    if not fresh_idx:
+        return stats
+
+    # --- count guard + timestamped backup (shared with write_artifact) ---
+    _accepted_intentional = _count_guard_and_backup(docs, listings_path, total, summary)
+
+    # --- write listings.json + gzipped parts (the SAME low-level writers write_artifact uses) ---
+    _manifest_pre: dict = {
+        "listings.json": {**_write_plain_array(listings_path, listing_blobs), "records": total},
+    }
+    detail_path = docs / "listings_detail.json"
+    detail_count = len(details)
+    detail_bytes = json.dumps(details, ensure_ascii=False, default=str).encode("utf-8")
+    del details
+    _manifest_pre["listings_detail.json"] = {"bytes": len(detail_bytes),
+                                             "sha256": hashlib.sha256(detail_bytes).hexdigest(),
+                                             "records": detail_count}
+    _atomic_write_bytes(detail_path, detail_bytes)
+    _prior_parts = _bp.manifest_parts_block(_bp.read_manifest(docs)) or {}
+    _parts = _bp.write_parts(docs, listing_blobs, hint_rows=_prior_parts.get("rows_per_part"))
+    _parts_block = _bp.make_block(_parts["entries"], rows_per_part=_parts["rows_per_part"],
+                                  cap=_parts["cap"])
+    del listing_blobs
+    import gzip
+    detail_gz = gzip.compress(detail_bytes, compresslevel=9, mtime=0)
+    _manifest_pre["listings_detail.json.gz"] = {"bytes": len(detail_gz),
+                                                "sha256": hashlib.sha256(detail_gz).hexdigest(),
+                                                "records": detail_count}
+    _atomic_write_bytes(docs / "listings_detail.json.gz", detail_gz)
+    detail_digest = hashlib.sha256(detail_gz).hexdigest()[:16]
+    del detail_gz, detail_bytes
+
+    # --- run_meta.json: same shape write_artifact writes, minus the fields that need the
+    # slim/shard payload regenerated (which this function deliberately does not do) ---
+    meta_path = docs / "run_meta.json"
+    prior_meta: dict = {}
+    if meta_path.exists():
+        try:
+            prior_meta = json.loads(meta_path.read_text())
+        except Exception:  # noqa: BLE001 - a corrupt prior file must not block the write
+            prior_meta = {}
+        if not isinstance(prior_meta, dict):
+            prior_meta = {}
+    prior_board_block = prior_meta.get("board")
+    if not isinstance(prior_board_block, dict):
+        prior_board_block = None
+    slim_count = prior_board_block.get("count") if prior_board_block else None
+    shard_meta = prior_board_block.get("detail_shards") if prior_board_block else None
+
+    _now = datetime.utcnow()
+    _now_iso = _now.isoformat() + "Z"
+    meta = dict(prior_meta)
+    meta.update({
+        "run_time": _now_iso,
+        "total": total,
+        "by_state": dict(sorted(by_state.items(), key=lambda kv: (-kv[1], kv[0]))),
+        "by_source_on_board": dict(sorted(by_source.items(), key=lambda kv: (-kv[1], kv[0]))),
+        "notes": summary.get("notes", prior_meta.get("notes", "")),
+        "detail_count": detail_count,
+        "detail_digest": detail_digest,
+        "board_parts": _parts_block,
+    })
+    if summary.get("by_source"):
+        meta["by_source"] = summary["by_source"]
+    if prior_board_block is not None:
+        # Unchanged by this call -- carried forward verbatim, not recomputed, since this
+        # function never touches the slim/shard files (see the docstring above).
+        meta["board"] = prior_board_block
+    _apply_health_freshness(meta, prior_meta, summary, _now_iso, _now)
+    _atomic_write_bytes(meta_path, json.dumps(meta, ensure_ascii=False, default=str, indent=2).encode("utf-8"))
+
+    # --- update high-water mark (identical logic to write_artifact's) ---
+    try:
+        _hw_path = docs / "board_highwater.json"
+        _prev_hw = 0
+        if _hw_path.exists():
+            _prev_hw = json.loads(_hw_path.read_text()).get("count", 0)
+        if total > _prev_hw:
+            _atomic_write_bytes(_hw_path, json.dumps({
+                "count": total, "updated_at": _now_iso,
+            }, indent=2).encode("utf-8"))
+            log.info("web_artifact.highwater_updated", old=_prev_hw, new=total)
+        elif _accepted_intentional > 0 and total >= _prev_hw - _accepted_intentional:
+            _atomic_write_bytes(_hw_path, json.dumps({
+                "count": total, "updated_at": _now_iso, "rebased_from": _prev_hw,
+                "reason": f"{_accepted_intentional:,} off-footprint rows removed",
+            }, indent=2).encode("utf-8"))
+            log.warning("web_artifact.highwater_rebased", old=_prev_hw, new=total,
+                        off_footprint_removed=_accepted_intentional)
+    except Exception:  # noqa: BLE001
+        pass
+
+    # THE MANIFEST, last (same reasoning as write_artifact: everything above is on disk by now).
+    try:
+        write_manifest(docs, _manifest_pre, meta, slim_count=slim_count, shard_meta=shard_meta,
+                       parts_block=_parts_block)
+    except Exception:  # noqa: BLE001
+        try:
+            (docs / MANIFEST_NAME).unlink(missing_ok=True)
+        except OSError:
+            pass
+        log.error("web_artifact.manifest_failed", exc_info=True)
+    if str(listings_path.resolve()) in _LOAD_STAMPS:
+        _remember_load(docs, listings_path)
+
+    log.info("web_artifact.appended", existing=existing_total, added=len(fresh_idx), total=total,
+             bytes=listings_path.stat().st_size)
+    stats["written"] = True
+    return stats

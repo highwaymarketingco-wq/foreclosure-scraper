@@ -21,16 +21,23 @@ DRY-RUN BY DEFAULT. Nothing is written unless ``--apply`` is given. A dry run:
 
     python scripts/run_scoped_scrapers.py --slugs counties_nc.daily_courier,... --limit 200
 
-APPLY. ``--apply`` takes the board lock, calls ``load_board`` (the ONLY way a board writer may
-read it: it folds the lazy-detail sidecar back in), and ``apply_rows``:
+APPLY. ``--apply`` takes the board lock and calls ``apply_rows_streaming`` (task_0658b33b,
+follow-up to audit O13): it never loads the existing board as ``Listing`` objects at all --
+``web_artifact.append_new_rows`` streams it through as opaque, already-published rows instead
+(the board grew past what ``load_board`` can safely fully materialize on this machine; see
+``BoardLoadTooLarge`` and ``BOARD_APPEND_MAX_SOURCE_MB`` in ``web_artifact.py``). The older,
+``load_board``-based ``apply_rows`` still exists (and is still tested) for a caller that
+genuinely already holds the existing board as ``Listing`` objects for some other reason, but
+``main()``'s own ``--apply`` path no longer uses it:
   * ADDITIVE ONLY. A survivor that matches an existing row (dedupe_key or any strong
     same-property signature from ``dedupe._strong_sigs``) is reported and skipped; no existing
-    row is modified or removed. The function asserts this by fingerprinting every existing
-    row before and after.
+    row is modified or removed. This is enforced by construction (existing rows never become a
+    mutable Python object this script's own code could reach), not by fingerprinting.
   * new rows get only offline enrichment (tax-owed fold, valuation regrade, distress score).
     The network chain (geocode, parcel/GIS, name resolver) is NOT run here; the next
     ``scripts/merge_today_sources.py`` or full run does it.
-  * ``write_artifact`` under ``board_lock`` (same conventions as merge_today_sources).
+  * ``web_artifact.append_new_rows`` under ``board_lock`` (same conventions as
+    merge_today_sources).
 Use ``--save-json`` on the dry run and ``--load-json`` on the apply to land exactly what you
 reviewed without re-scraping (a Rutherford sweep is ~30 minutes of polite requests).
 
@@ -313,6 +320,13 @@ def apply_rows(rows, new_listings, *, docs_dir: Path | str | None = None, write:
                score: bool = True, note: str = "scoped scraper landing") -> dict:
     """Land ``new_listings`` on the board that ``rows`` was loaded from. ADDITIVE ONLY.
 
+    NOTE (task_0658b33b, 2026-09-29): ``main()``'s own ``--apply`` path no longer calls this --
+    see ``apply_rows_streaming`` below, which lands rows via ``web_artifact.append_new_rows``
+    without ever loading the existing board as ``Listing`` objects (the board has grown past
+    what ``load_board`` can safely materialize on this machine). This function is kept, working
+    and tested, for a caller that already holds the existing board as ``Listing`` objects for
+    some other reason and genuinely wants the fingerprint-asserted version.
+
     ``rows``          the existing board as ``Listing`` objects, from ``web_artifact.load_board``
                       (which folds the lazy-detail sidecar back in, so the rewrite keeps it).
     ``new_listings``  surviving rows from ``filter_like_orchestrator``.
@@ -395,6 +409,102 @@ def apply_rows(rows, new_listings, *, docs_dir: Path | str | None = None, write:
         write_artifact(merged, summary, docs_dir=docs)
         stats["written"] = True
     stats["total_after"] = len(merged)
+    return stats
+
+
+def apply_rows_streaming(new_listings, *, docs_dir: Path | str | None = None, write: bool = True,
+                         score: bool = True,
+                         note: str = "scoped scraper landing") -> dict:
+    """The append_new_rows()-based counterpart of apply_rows(), for a board too large for
+    load_board() to safely materialize (audit O13 / task_0658b33b) -- this is now what
+    ``main()``'s ``--apply`` path calls. Same ADDITIVE-ONLY guarantee, same offline-enrichment
+    step (tax-owed fold, valuation regrade, distress score), same stats shape; the one thing
+    that is genuinely different is how "existing rows are untouched" is guaranteed: apply_rows()
+    holds the whole board as Listing objects and asserts it with a per-row fingerprint
+    before/after (a safety net against a bug in ITS OWN merge step); this function never loads
+    the existing board as Listing objects at all, so there is no mutable copy of it a bug HERE
+    could reach -- the guarantee is structural, not asserted (see append_new_rows()'s docstring
+    in web_artifact.py).
+
+    ``new_listings``  surviving rows from ``filter_like_orchestrator`` (or ``--load-json``) --
+                      NOT the existing board; this function never loads that.
+
+    OVERLAP CHECK: ``board_stream.iter_board_rows()`` (already constant-memory -- see that
+    module's docstring; no Listing materialization of the existing board) rather than
+    ``load_board()``. ``append_new_rows()`` then repeats an equivalent, signature-based check of
+    its own during its single streaming write pass, as a defensive second check (not a second
+    source of truth) against a race between this scan and the write -- e.g. another process
+    landing a colliding row in the moment between this scan and the board lock being taken.
+
+    Returns the same keys as apply_rows() (``existing`` and ``total_after`` are ``None`` when
+    ``write=False`` and nothing was fresh, since neither was ever counted in that case -- see
+    ``append_new_rows``'s own no-op return).
+    """
+    from foreclosure_scraper.dedupe import dedupe
+    from foreclosure_scraper.board_stream import iter_board_rows
+    from foreclosure_scraper.web_artifact import append_new_rows
+
+    docs = Path(docs_dir) if docs_dir else DOCS
+    board_path = docs / "listings.json.gz"
+    hit: dict[int, str] = {}
+    if _board_present(str(board_path)):
+        hit = board_overlap(new_listings, iter_board_rows(board_path))
+    fresh = [li for i, li in enumerate(new_listings) if i not in hit]
+    skipped = collections.Counter(li.source for i, li in enumerate(new_listings) if i in hit)
+    try:
+        fresh = dedupe(fresh)
+    except Exception:  # noqa: BLE001
+        pass
+    for li in fresh:
+        if not isinstance(li.raw, dict):
+            li.raw = {}
+        li.raw.setdefault("landed_by", "scripts/run_scoped_scrapers.py")
+
+    stats: dict = {"existing": None, "candidates": len(new_listings), "added": len(fresh),
+                   "already_on_board": len(hit), "written": False, "score": None,
+                   "added_by_source": dict(collections.Counter(li.source for li in fresh)),
+                   "skipped_by_source": dict(skipped), "total_after": None}
+
+    if fresh:
+        # OFFLINE enrichment of the NEW rows only -- identical to apply_rows()'s.
+        from foreclosure_scraper.enrichment_tax_owed import enrich_tax_owed
+        from foreclosure_scraper.valuation import calc as vcalc, grading as vgrade
+        try:
+            stats["tax_owed"] = enrich_tax_owed(fresh)
+        except Exception as exc:  # noqa: BLE001
+            stats["tax_owed"] = f"ERROR {type(exc).__name__}: {str(exc)[:100]}"
+        vfail = 0
+        for li in fresh:
+            try:
+                c = vcalc.compute(li)
+                g = vgrade.grade(li, c)
+                li.raw["calc"] = vcalc.to_dict(c)
+                li.raw["grade"] = vgrade.to_dict(g)
+            except Exception:  # noqa: BLE001
+                vfail += 1
+        stats["valuation_failures"] = vfail
+        if score:
+            try:
+                from foreclosure_scraper.distress_score import score_board
+                stats["score"] = score_board(fresh)
+            except Exception as exc:  # noqa: BLE001
+                stats["score"] = f"SCORE_FAILED {type(exc).__name__}: {str(exc)[:120]}"
+
+    if write:
+        summary = {"notes": f"{note}: +{len(fresh)} rows, existing rows untouched"}
+        append_stats = append_new_rows(fresh, summary, docs_dir=docs)
+        stats["written"] = append_stats["written"]
+        stats["existing"] = append_stats["existing"]
+        stats["total_after"] = append_stats["total_after"]
+        # append_new_rows()'s own overlap check is a safety net (see the docstring above); fold
+        # in anything IT caught that this scan did not, so the reported totals stay honest.
+        if append_stats["already_on_board"]:
+            stats["already_on_board"] += append_stats["already_on_board"]
+            stats["added"] = append_stats["added"]
+            stats["added_by_source"] = append_stats["added_by_source"]
+            for src, n in append_stats["skipped_by_source"].items():
+                skipped[src] += n
+            stats["skipped_by_source"] = dict(skipped)
     return stats
 
 
@@ -516,20 +626,24 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     from foreclosure_scraper.web_artifact import (
-        BoardLockBusy, BoardLoadTooLarge, BoardMemoryPressure, board_lock, load_board)
+        BoardLockBusy, BoardLoadTooLarge, BoardMemoryPressure, board_lock)
     docs = Path(args.docs)
     try:
         with board_lock(owner="run_scoped_scrapers", max_runtime=7200):
-            rows = load_board(docs)
-            print(f"existing board: {len(rows)} rows")
-            stats = apply_rows(rows, all_kept, docs_dir=docs, score=not args.no_score)
+            # task_0658b33b (follow-up to audit O13): apply_rows_streaming() lands the surviving
+            # rows via web_artifact.append_new_rows(), which never loads the existing board as
+            # Listing objects -- load_board() on the current board (2.52 GB / 217,773 rows)
+            # reached a 26.3 GB footprint and never finished (see BoardLoadTooLarge's and
+            # BOARD_APPEND_MAX_SOURCE_MB's docstrings in web_artifact.py for the full history and
+            # the measured, still-separate ceiling append_new_rows() is gated by).
+            stats = apply_rows_streaming(all_kept, docs_dir=docs, score=not args.no_score)
     except (BoardLockBusy, BoardMemoryPressure) as exc:
         print(f"run_scoped_scrapers: not applied: {exc}", file=sys.stderr)
         return 75
     except BoardLoadTooLarge as exc:
-        # audit O13, 2026-09-29: load_board() on the current board (2.52 GB / 217,773
-        # rows) reached a 26.3 GB footprint and never finished. Refuse cleanly rather
-        # than let the caller see a bare traceback from inside the board lock.
+        # append_new_rows() refused: the existing board is over its own (separately measured,
+        # more generous) size ceiling -- see BOARD_APPEND_MAX_SOURCE_MB's comment. Refuse
+        # cleanly rather than let the caller see a bare traceback from inside the board lock.
         print(f"run_scoped_scrapers: not applied: {exc}", file=sys.stderr)
         return 76
     print("APPLIED:", json.dumps(stats, default=str))

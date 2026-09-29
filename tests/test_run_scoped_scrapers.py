@@ -213,6 +213,81 @@ def test_new_rows_get_offline_valuation_and_landed_by_stamp(tmp_path):
 
 
 # --------------------------------------------------------------------------- #
+# apply_rows_streaming: the append_new_rows()-based path main() --apply now uses
+# (task_0658b33b) -- same guarantees as apply_rows() above, but the existing board is never
+# loaded as Listing objects. _seed_board's load_board() call is NOT used here on purpose: these
+# tests only ever hand the scratch board's PATH to apply_rows_streaming, never its rows.
+# --------------------------------------------------------------------------- #
+
+def _seed_only(docs: Path, rows: list[Listing]) -> None:
+    from foreclosure_scraper.web_artifact import write_artifact
+    write_artifact(rows, {"by_source": {}}, docs_dir=docs)
+
+
+def test_apply_rows_streaming_adds_only_new_rows_without_ever_loading_the_board(tmp_path, monkeypatch):
+    docs = tmp_path / "docs"
+    _seed_only(docs, [
+        _li(parcel_id="111", source="counties_nc.rutherford_tax", judgment_amount=5.0),
+        _li(parcel_id="222", source="counties_nc.rutherford_tax", judgment_amount=6.0),
+    ])
+    import foreclosure_scraper.web_artifact as wa
+    monkeypatch.setattr(wa, "load_board",
+                        lambda *a, **k: pytest.fail("apply_rows_streaming must never call load_board"))
+    new = [
+        _li(parcel_id="222", source="counties_nc.rutherford_wildfire_tax", judgment_amount=99.0),  # on board
+        _li(parcel_id="333", source="counties_nc.rutherford_wildfire_tax", judgment_amount=7.0),
+        _li(parcel_id="444", source="counties_nc.rutherford_wildfire_tax", judgment_amount=8.0),
+    ]
+    stats = rss.apply_rows_streaming(new, docs_dir=docs)
+    assert (stats["existing"], stats["candidates"], stats["added"], stats["already_on_board"]) == (2, 3, 2, 1)
+    assert stats["written"] is True and stats["total_after"] == 4
+    assert stats["added_by_source"] == {"counties_nc.rutherford_wildfire_tax": 2}
+    assert stats["skipped_by_source"] == {"counties_nc.rutherford_wildfire_tax": 1}
+
+    from foreclosure_scraper.board_stream import iter_board_rows
+    again = list(iter_board_rows(docs / "listings.json.gz"))
+    assert sorted(r["parcel_id"] for r in again) == ["111", "222", "333", "444"]
+    assert next(r for r in again if r["parcel_id"] == "222")["judgment_amount"] == 6.0  # not overwritten
+
+
+def test_apply_rows_streaming_dry_computation_writes_nothing(tmp_path, monkeypatch):
+    docs = tmp_path / "docs"
+    _seed_only(docs, [_li(parcel_id="1", source="counties_nc.a")])
+    import foreclosure_scraper.web_artifact as wa
+    monkeypatch.setattr(wa, "append_new_rows",
+                        lambda *a, **k: pytest.fail("append_new_rows must not be called with write=False"))
+    stats = rss.apply_rows_streaming([_li(parcel_id="2", source="counties_nc.b")], docs_dir=docs, write=False)
+    assert stats["added"] == 1 and stats["written"] is False
+
+
+def test_apply_rows_streaming_with_nothing_new_writes_nothing(tmp_path):
+    docs = tmp_path / "docs"
+    _seed_only(docs, [_li(parcel_id="1", source="counties_nc.a")])
+    stats = rss.apply_rows_streaming([_li(parcel_id="1", source="counties_nc.b")], docs_dir=docs)
+    assert stats["added"] == 0 and stats["already_on_board"] == 1 and stats["written"] is False
+
+
+def test_apply_rows_streaming_new_rows_get_offline_valuation_and_landed_by_stamp(tmp_path):
+    docs = tmp_path / "docs"
+    _seed_only(docs, [_li(parcel_id="1", source="counties_nc.a")])
+    new = [_li(parcel_id="2", source="counties_nc.rutherford_wildfire_tax", judgment_amount=50.0,
+               raw={"rutherford_wildfire": {"amount_owed": 50.0}})]
+    rss.apply_rows_streaming(new, docs_dir=docs, write=False, score=False)
+    assert new[0].raw["landed_by"] == "scripts/run_scoped_scrapers.py"
+    assert "calc" in new[0].raw and "grade" in new[0].raw
+
+
+def test_apply_rows_streaming_onto_a_board_with_no_prior_scan(tmp_path):
+    """No listings.json.gz/parts exist at all yet (a fresh board) -- board_overlap's own
+    pre-scan must be skipped cleanly (via _board_present) rather than erroring, and
+    append_new_rows() must still bootstrap the very first write."""
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    stats = rss.apply_rows_streaming([_li(parcel_id="1", source="counties_nc.a")], docs_dir=docs)
+    assert stats["added"] == 1 and stats["written"] is True and stats["total_after"] == 1
+
+
+# --------------------------------------------------------------------------- #
 # running scrapers / CLI
 # --------------------------------------------------------------------------- #
 
@@ -333,7 +408,12 @@ def test_board_gate_detects_a_parts_based_board_and_actually_scans_it(monkeypatc
     assert "already on board 1" in text
 
 
-def test_apply_from_saved_json_uses_lock_load_board_and_apply_rows(monkeypatch, tmp_path):
+def test_apply_from_saved_json_uses_lock_and_apply_rows_streaming(monkeypatch, tmp_path):
+    """task_0658b33b: main()'s --apply path no longer calls load_board() at all -- it lands
+    rows via apply_rows_streaming() (append_new_rows()-based), which never materializes the
+    existing board as Listing objects. Supersedes the old
+    test_apply_from_saved_json_uses_lock_load_board_and_apply_rows, which pinned the very
+    load_board() call this migration removes."""
     kept = [_li(source="counties_nc.rutherford_wildfire_tax", parcel_id="55")]
     f = tmp_path / "kept.json"
     f.write_text(json.dumps([li.model_dump(mode="json") for li in kept], default=str))
@@ -347,16 +427,21 @@ def test_apply_from_saved_json_uses_lock_load_board_and_apply_rows(monkeypatch, 
         yield
     monkeypatch.setattr(wa, "board_lock", fake_lock)
     monkeypatch.setattr(wa, "load_board", lambda docs: calls.append("load") or [])
-    monkeypatch.setattr(rss, "apply_rows", lambda rows, new, **k: calls.append(f"apply:{len(new)}") or {"added": len(new)})
+    monkeypatch.setattr(rss, "apply_rows_streaming",
+                        lambda new, **k: calls.append(f"apply_streaming:{len(new)}") or {"added": len(new)})
     rc = rss.main(["--load-json", str(f), "--no-board", "--apply", "--docs", str(tmp_path)])
-    assert rc == 0 and calls == ["lock", "load", "apply:1"]
+    assert rc == 0 and calls == ["lock", "apply_streaming:1"], (
+        "the apply path must go straight from the lock to apply_rows_streaming() -- "
+        "load_board() must never be called")
 
 
-def test_apply_refuses_cleanly_when_the_board_is_too_large_to_load(monkeypatch, tmp_path, capsys):
-    """audit O13, 2026-09-29: load_board() on the real 2.52 GB board reached a 26.3 GB
-    footprint and never finished. web_artifact.load_board() now refuses BEFORE attempting
-    that with BoardLoadTooLarge — this must surface as a clean message and a distinct exit
-    code, not a bare traceback from inside the board lock."""
+def test_apply_refuses_cleanly_when_the_board_is_too_large_to_append(monkeypatch, tmp_path, capsys):
+    """audit O13 / task_0658b33b: append_new_rows() (reached via apply_rows_streaming()) has
+    its own size ceiling (BOARD_APPEND_MAX_SOURCE_MB), separate from load_board()'s. Whichever
+    one fires, main() must surface a clean message and exit 76, not a bare traceback from
+    inside the board lock. Supersedes the old
+    test_apply_refuses_cleanly_when_the_board_is_too_large_to_load, which exercised load_board()
+    specifically -- the apply path no longer calls that function at all."""
     kept = [_li(source="counties_nc.rutherford_wildfire_tax", parcel_id="55")]
     f = tmp_path / "kept.json"
     f.write_text(json.dumps([li.model_dump(mode="json") for li in kept], default=str))
@@ -367,12 +452,12 @@ def test_apply_refuses_cleanly_when_the_board_is_too_large_to_load(monkeypatch, 
     def fake_lock(*a, **k):
         yield
 
-    def fake_load_board(docs):
-        raise wa.BoardLoadTooLarge(f"read_board_records refused to load {docs}: board source "
-                                   f"is 2643 MB, over the 2000 MB ceiling")
+    def fake_apply_streaming(new, **k):
+        raise wa.BoardLoadTooLarge(f"append_new_rows refused to load docs: board source "
+                                   f"is 2643 MB, over the 2400 MB ceiling")
     monkeypatch.setattr(wa, "board_lock", fake_lock)
-    monkeypatch.setattr(wa, "load_board", fake_load_board)
+    monkeypatch.setattr(rss, "apply_rows_streaming", fake_apply_streaming)
     rc = rss.main(["--load-json", str(f), "--no-board", "--apply", "--docs", str(tmp_path)])
     err = capsys.readouterr().err
     assert rc == 76
-    assert "not applied" in err and "over the 2000 MB ceiling" in err
+    assert "not applied" in err and "over the 2400 MB ceiling" in err

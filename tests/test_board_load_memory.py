@@ -51,6 +51,7 @@ from __future__ import annotations
 
 import gc
 import json
+import shutil
 import time
 import tracemalloc
 from pathlib import Path
@@ -188,4 +189,115 @@ def test_open_board_source_rows_is_lazy_not_an_eager_full_read(big_board):
         f"opening the row iterator ({open_s:.4f}s) should be meaningfully cheaper than "
         f"draining {size_mb:.0f} MB through it ({drain_s:.4f}s) -- if it isn't, "
         f"_open_board_source_rows stopped being lazy and is reading the file eagerly again"
+    )
+
+
+# ===========================================================================
+# append_new_rows() (task_0658b33b, follow-up to the fix above): landing a SMALL number of new
+# rows should not need load_board()'s full list[Listing] of the EXISTING rows at all. These
+# tests are the append_new_rows() counterpart of the two above: same tracemalloc method, same
+# safe synthetic scale (this file's big_board fixture), for the same reason (a deterministic,
+# CI-safe number instead of RSS/subprocess measurement that varies under this machine's real
+# background load).
+#
+# THE REAL-BOARD-SCALE NUMBERS (real board slices at 20K/40K rows, via board_parts.iter_plain_rows
+# and macOS's `/usr/bin/time -l` peak-footprint, the same way the load_board() ceiling above was
+# calibrated) are recorded where BOARD_APPEND_MAX_SOURCE_MB is set, in web_artifact.py -- run by
+# hand, once, under close memory monitoring on an 8 GB Mac already under real background load,
+# not as an automated test. The headline finding there: skipping Listing.model_validate() ALONE
+# was a much smaller win than expected (~5.0x peak-footprint:source-size, barely under
+# load_board()'s ~4.4-5.0x); discarding each row's PARSED FORM immediately after re-encoding it
+# to bytes, rather than keeping any full-length list of parsed rows alive at all (dict or
+# Listing), is what actually cuts the ratio to about half. This test's smaller, synthetic scale
+# reproduces that same structural comparison deterministically.
+# ===========================================================================
+
+def _fresh_copy(docs: Path, tmp_path_factory) -> Path:
+    """An independent copy of `docs` so two destructive measurements (each appends to /
+    rewrites its own copy of the board) never share state or interfere with each other or with
+    the other tests sharing the module-scoped big_board fixture."""
+    dst = tmp_path_factory.mktemp("copy") / "docs"
+    shutil.copytree(docs, dst)
+    return dst
+
+
+def _new_lead(pad_len: int = PAD_LEN) -> Listing:
+    pad = "x" * pad_len
+    return Listing(
+        source="src.new", source_url="https://example.test/u_new",
+        listing_type=ListingType.FORECLOSURE_SALE, state="NC", county="Gaston",
+        parcel_id="P_NEW", street_address="1 New St",
+        raw={"grade": {"overall": "A", "notes": pad}},
+    )
+
+
+def test_append_new_rows_traces_meaningfully_less_memory_than_load_board_then_write(
+        big_board, tmp_path_factory):
+    docs, size_mb, detail_mb = big_board
+
+    def _old_style_apply() -> int:
+        """The pattern append_new_rows() replaces: load the WHOLE existing board as Listings,
+        append the new one in Python, rewrite the whole board -- run_scoped_scrapers.py's old
+        apply_rows() -> write_artifact(existing + fresh, ...)."""
+        d = _fresh_copy(docs, tmp_path_factory)
+        rows = wa.load_board(d)
+        wa.write_artifact(rows + [_new_lead()], {"notes": "old-style append"}, docs_dir=d)
+        return len(rows) + 1
+
+    def _new_style_apply() -> int:
+        d = _fresh_copy(docs, tmp_path_factory)
+        stats = wa.append_new_rows([_new_lead()], {"notes": "new-style append"}, docs_dir=d)
+        return stats["total_after"]
+
+    old_peak, old_total = _traced_peak(_old_style_apply)
+    gc.collect()
+    new_peak, new_total = _traced_peak(_new_style_apply)
+    gc.collect()
+
+    assert old_total == new_total == N_ROWS + 1, "both paths must land the same final board"
+
+    old_mb = old_peak / (1024 * 1024)
+    new_mb = new_peak / (1024 * 1024)
+
+    # Loose threshold for the same reason as the load_board() comparison above: this asserts a
+    # real, reproducible improvement without pinning an exact ratio a future unrelated change
+    # could trip. At this synthetic scale the measured margin was much wider than 0.85 (append
+    # never builds a single Listing for the EXISTING rows, where load_board() built N_ROWS of
+    # them) -- 0.85 leaves headroom without making the assertion toothless.
+    assert new_mb < old_mb * 0.85, (
+        f"append_new_rows() ({new_mb:.0f} MB traced peak) should use meaningfully less memory "
+        f"than load_board()+write_artifact() ({old_mb:.0f} MB traced peak) to land ONE new row "
+        f"onto a {size_mb:.0f} MB + {detail_mb:.0f} MB board of {N_ROWS:,} existing rows -- "
+        f"the improvement did not show up as expected"
+    )
+
+
+def test_append_new_rows_never_validates_existing_rows_into_listings(big_board, tmp_path_factory,
+                                                                      monkeypatch):
+    """Structural proof, not just a memory-size inference: patch Listing.model_validate to
+    count its calls, then append one new row to a board of N_ROWS existing ones. ZERO calls
+    must happen -- the new row arrives already validated (a Listing the caller built), so
+    append_new_rows() has no reason to validate it again, and it must never validate any of the
+    N_ROWS existing rows either (that is the actual guarantee this function exists to provide;
+    the memory result above is a consequence of it, not a separate claim). A regression that
+    started re-validating existing rows (e.g. a future edit that routes them through
+    load_board()-style logic by mistake) would turn this into N_ROWS calls, not a subtle
+    memory-only change that only shows up on the real 217K-row board."""
+    docs, _, _ = big_board
+    d = _fresh_copy(docs, tmp_path_factory)
+
+    calls = {"n": 0}
+    orig_validate = Listing.model_validate.__func__
+
+    def counting_validate(cls, *a, **k):
+        calls["n"] += 1
+        return orig_validate(cls, *a, **k)
+
+    monkeypatch.setattr(Listing, "model_validate", classmethod(counting_validate))
+    stats = wa.append_new_rows([_new_lead()], {"notes": "t"}, docs_dir=d)
+    assert stats["written"] is True
+    assert calls["n"] == 0, (
+        f"append_new_rows() called Listing.model_validate() {calls['n']} times while landing "
+        f"1 new row onto {N_ROWS:,} existing ones -- it must never validate ANY row (new rows "
+        f"arrive pre-validated; existing rows must never be validated at all)"
     )
