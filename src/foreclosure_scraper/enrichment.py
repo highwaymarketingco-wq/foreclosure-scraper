@@ -37,7 +37,25 @@ POSITIVE_KEYWORDS = (
     "new roof", "new hvac", "new kitchen", "granite", "hardwood",
     "well maintained", "pristine",
 )
-_ACRES_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(?:acre|ac\b)", re.I)
+#: A bug fixed 2026-09-29: this used to be r"(\d+(?:\.\d+)?)\s*(?:acre|ac\b)", which
+#: requires at least one digit BEFORE the decimal point. SC tax-roll legal text
+#: routinely writes a sub-one-acre figure with no leading zero (".36 AC", ".5 AC",
+#: "LOT 5 BLK 3 .11 AC" -- all three verified live on Bamberg County's own qPayBill
+#: portal, 2026-09-29). Because the old pattern has no anchor before ``\d+`` and no
+#: alternative for a bare leading dot, re.search skips right over the "." and starts
+#: matching at the first digit AFTER it, so it captured only the fractional digits
+#: and read them as a whole number: ".36 AC" -> "36" -> 36.0 acres (should be 0.36),
+#: ".5 AC" -> "5" -> 5.0 (should be 0.5), ".11 AC" -> "11" -> 11.0 (should be 0.11).
+#: The scale of the error therefore was NOT a uniform 100x -- it tracked the number
+#: of digits after the dot (2 digits -> ~100x, 1 digit -> ~10x), which is why a
+#: uniform "divide the board's acreage by 100" theory does not fully explain the
+#: board's Bamberg rows. This landed on the board because Bamberg's own dedicated
+#: "Acres:" field is usually ".00" (the county records no acreage there -- see
+#: qpaybill_delinquent_roll._acres()), so ``enrich()`` below falls back to parsing
+#: the acreage out of the legal-description text via this regex, and got it wrong.
+#: Fix: add ``\d*\.\d+`` as a leading alternative so a bare-dot figure matches (and
+#: captures) its OWN leading dot, which ``float()`` then reads correctly as < 1.
+_ACRES_RE = re.compile(r"(\d*\.\d+|\d+(?:\.\d+)?)\s*(?:acre|ac\b)", re.I)
 
 
 def _flags_from_text(text: str) -> list[str]:
