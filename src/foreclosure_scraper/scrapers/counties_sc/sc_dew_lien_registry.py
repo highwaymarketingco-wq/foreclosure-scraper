@@ -60,7 +60,7 @@ import httpx
 import structlog
 
 from ...base_scraper import BaseScraper
-from ...config import in_scope
+from ...config import in_scope_distressed
 from ...models import Listing, ListingType, PropertyKind
 
 log = structlog.get_logger()
@@ -213,9 +213,9 @@ def _split_address(
     return street, city, state, zipc, county
 
 
-# SC footprint coastal counties (core counties come from config.in_scope). sc_dew
-# emits a board row ONLY for an in-footprint SC debtor — statewide retention
-# previously spawned ~8k address-less rows that bloated the board.
+# Kept as a belt-and-suspenders check after the 2026-09-29 in_scope_distressed fix below
+# (a coastal town resolved via _county_for_city should already normalize to a real SC
+# county name that in_scope_distressed() accepts, but this costs nothing to keep).
 _SC_COASTAL = {"Charleston", "Horry", "Beaufort", "Georgetown", "Colleton"}
 
 
@@ -242,12 +242,23 @@ def _to_listing(row: dict, slug: str) -> Listing | None:
     issued = (row.get("LienIssued") or "").strip()
     if not county and issued and state == "SC" and not any(ch.isdigit() for ch in issued):
         county = issued.title()
-    # Footprint-ONLY emission (2026-06-26): keeping every statewide row "for name
-    # cross-ref" spawned ~8k address-less rows that bloated the board and dragged
-    # enrichment. Now emit a board row only for an in-footprint SC debtor (core +
-    # coastal). Out-of-footprint / countyless liens are dropped here.
+    # COUNTYLESS-only emission (2026-06-26, narrowed 2026-09-29): keeping every
+    # statewide row "for name cross-ref" spawned ~8k address-less rows that bloated
+    # the board and dragged enrichment -- that problem is "no county at all"
+    # (bool(county)), not "county outside the 18-county flip footprint". This used
+    # to gate on config.in_scope() (the narrow flip footprint plus a hand-picked
+    # coastal allowlist), which silently dropped a real, named, in-state lien for
+    # any of the ~139 NC/SC counties outside that footprint -- including the entire
+    # 17-county SC "thin coverage" cluster this source could otherwise help close
+    # (docs/completeness_audit_2026-09-29.md section 3). A TAX_LIEN row is a
+    # DISTRESS SIGNAL, not a flip listing, so it belongs on the broader
+    # in_scope_distressed() gate main.py's own _county_in_scope() already applies
+    # to every other distress-type source (config.in_scope_distressed's docstring,
+    # the 2026-09-15 owner rule: "if its a distressed property its anywhere in nc
+    # and sc"). Emit a board row for any real, named NC/SC county; only a
+    # genuinely countyless row is dropped here.
     cty = (county or "").replace(" County", "").strip().title()
-    in_footprint = state == "SC" and bool(county) and (in_scope(county, "SC") or cty in _SC_COASTAL)
+    in_footprint = state == "SC" and bool(county) and (in_scope_distressed(county, "SC") or cty in _SC_COASTAL)
     if not in_footprint:
         return None
 
