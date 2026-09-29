@@ -344,6 +344,23 @@ _EMAIL_JUNK = re.compile(r"noreply|no-reply|column\.us|enotice|example\.|wordpre
 _FIRM_RE = re.compile(
     r"([A-Z][A-Za-z&,.'\- ]{4,55}(?:PLLC|LLP|LLC|P\.?A\.?|P\.?C\.?|"
     r"Law(?: Firm| Offices?| Group)?|Attorney|Substitute Trustee|Trustee|& Ingle))")
+# The bare "Trustee"/"Attorney" suffixes on _FIRM_RE exist to catch a real name used in
+# apposition ("John Q. Smith, Substitute Trustee"), but every NC power-of-sale notice also
+# carries a LIABILITY-DISCLAIMER clause built from the same words with no name attached
+# ("Neither the Trustee, the Substitute Trustee, nor the Attorney ... will be liable for
+# any lost profits ..."). Verified live 2026-09 against the board (docs/listings.json):
+# two distinct notices produced raw.notice_contact.name == "Neither the Trustee" / "Neither
+# the Trustee, Substitute Trustee, Attorney" -- the disclaimer sentence, not a firm. Reject
+# a candidate that OPENS on one of the generic referring words the disclaimer always starts
+# with; a real firm/attorney name never begins "Neither"/"Nor"/"The Trustee"/"Said Trustee".
+_FIRM_BOILERPLATE_RE = re.compile(
+    r"^(?:neither\b|nor\b|any\s+of\b|said\b|such\b|either\b|"
+    r"the\s+(?:trustee|substitute\s+trustee|attorney)\b)", re.I)
+
+
+def _firm_candidates(matches: list[str]) -> list[str]:
+    """_FIRM_RE hits with the liability-disclaimer boilerplate filtered out."""
+    return [m for m in matches if not _FIRM_BOILERPLATE_RE.match(m.strip())]
 
 # A REAL phone needs a separator or parens — a bare 10-digit string is almost always a
 # parcel PIN / case number in these bodies, never a phone (verified 2026-08-14: the naive
@@ -379,7 +396,7 @@ def _notice_email(text: str) -> dict:
         if _EMAIL_JUNK.search(e) or len(e) > 60:
             continue
         out = {"email": e, "source": "column_notice_body"}
-        fm = _FIRM_RE.findall(text[max(0, m.start() - 180): m.start()])
+        fm = _firm_candidates(_FIRM_RE.findall(text[max(0, m.start() - 180): m.start()]))
         if fm:
             out["name"] = re.sub(r"\s+", " ", fm[-1]).strip()
         break
@@ -398,7 +415,7 @@ def _notice_email(text: str) -> dict:
         out["phone"] = ph
         out.setdefault("contact_role", "trustee/attorney")  # NOT the owner — a case contact
         if "name" not in out:
-            fm = _FIRM_RE.findall(text)
+            fm = _firm_candidates(_FIRM_RE.findall(text))
             if fm:
                 out["name"] = re.sub(r"\s+", " ", fm[-1]).strip()
     return out

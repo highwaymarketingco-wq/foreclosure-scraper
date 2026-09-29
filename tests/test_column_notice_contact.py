@@ -37,3 +37,28 @@ def test_bad_area_or_exchange_rejected():
     assert C._norm_phone("704-133-0199") is None      # exchange starts with 1
     assert C._norm_phone("(704) 333-8107") == "(704) 333-8107"
     assert C._norm_phone("1-828-252-8010") == "(828) 252-8010"  # strips leading 1
+
+
+def test_liability_disclaimer_is_not_mistaken_for_a_firm_name():
+    # Verified live 2026-09 against docs/listings.json: this exact disclaimer sentence
+    # (present in nearly every NC power-of-sale notice) was being captured as
+    # notice_contact.name == "Neither the Trustee, Substitute Trustee, Attorney" — the
+    # boilerplate, not a firm. No real firm/attorney name precedes the phone here, so
+    # `name` must be absent rather than wrong.
+    r = C._notice_email(
+        "Neither the Trustee, the Substitute Trustee, nor the Attorney for the Trustee "
+        "will be liable for any lost profits. Telephone: (910) 864-3068.")
+    assert r["phone"] == "(910) 864-3068"
+    assert r.get("name") is None
+
+
+def test_real_firm_name_still_captured_alongside_disclaimer_boilerplate():
+    # A real notice body carries BOTH the generic disclaimer earlier in the text and the
+    # actual firm name right before the phone/email — the fix must reject the former
+    # without losing the latter.
+    r = C._notice_email(
+        "Neither the Trustee nor the Substitute Trustee will be liable for any lost "
+        "profits. The Hollifield Law Firm, Substitute Trustee, Telephone (828) 255-0098.")
+    assert r["phone"] == "(828) 255-0098"
+    assert r["name"] == "The Hollifield Law Firm, Substitute Trustee"
+    assert not r["name"].lower().startswith("neither")
