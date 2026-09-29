@@ -222,6 +222,20 @@ def _sigs_of(li) -> set:
     return out
 
 
+def _board_present(board_path: str) -> bool:
+    """Is there a board to scan at ``board_path``? True for the legacy single gzip file
+    (``Path(board_path).exists()``) AND for the post-split layout, where the literal
+    ``listings.json.gz`` no longer exists on disk and the board instead lives beside it as
+    ``listings_part_NNN.json.gz`` + ``board.manifest.json`` (see board_parts.py's module
+    docstring). ``board_parts.resolve_source`` is the helper that already knows how to find
+    that parts board from the old single-file path -- ``board_stream.iter_board_rows`` uses
+    it too, so this check and the actual scan agree on what counts as "present"."""
+    from foreclosure_scraper import board_parts
+    if Path(board_path).exists():
+        return True
+    return board_parts.resolve_source(board_path) is not None
+
+
 def board_overlap(candidates, rows: Iterable) -> dict[int, str]:
     """Which candidates are already on the board. ``rows`` is a stream of raw board dicts
     (``board_stream.iter_board_rows``) or of ``Listing`` objects (``apply_rows``); it is
@@ -462,7 +476,7 @@ def main(argv: list[str] | None = None) -> int:
     flat = all_kept if args.load_json else [li for r in per_slug for li in r["kept_rows"]]
     overlap: dict[int, str] = {}
     scanned = False
-    if flat and not args.no_board and Path(args.board).exists():
+    if flat and not args.no_board and _board_present(args.board):
         from foreclosure_scraper.board_stream import iter_board_rows
         overlap = board_overlap(flat, iter_board_rows(args.board))
         scanned = True

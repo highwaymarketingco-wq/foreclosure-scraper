@@ -290,6 +290,49 @@ def test_default_run_is_a_dry_run_and_never_writes_or_locks(monkeypatch, capsys,
     assert len(json.loads(out.read_text())) == 3
 
 
+def test_board_gate_detects_a_parts_based_board_and_actually_scans_it(monkeypatch, capsys, tmp_path):
+    """audit 2026-09-29: docs/listings.json.gz has not existed as a literal file since the board
+    payload split (board_parts.py) -- write_artifact now always writes
+    listings_part_NNN.json.gz + board.manifest.json instead. The old gate,
+    ``Path(args.board).exists()``, never matches that layout, so every dry run silently reported
+    "(board scan skipped)" instead of actually checking for overlap -- looking like every row was
+    new even when most were already on the board (confirmed live 2026-09-29: a
+    counties.column_legal_notices dry run reported "already on board 0" when the true number,
+    recomputed by hand against board_stream.iter_board_rows, was 62 of 172).
+
+    This confirms the fix (_board_present, via board_parts.resolve_source) finds a parts-based
+    board and the overlap scan actually RUNS against it -- not just that nothing crashes: a
+    candidate that matches an existing board row is correctly counted as already-on-board, not
+    new. It also confirms the scan uses the streaming reader, never load_board."""
+    docs = tmp_path / "docs"
+    _seed_board(docs, [_li(parcel_id="1215-531", source="counties_nc.rutherford_tax")])
+    board_path = docs / "listings.json.gz"
+    assert not board_path.exists()                        # split board: no literal single-gz file
+    assert (docs / "board.manifest.json").exists()
+    assert list(docs.glob("listings_part_*.json.gz"))
+
+    # source must be DATELESS_OK (whitelisted in main.py) or filter_like_orchestrator drops both
+    # rows before the board gate ever runs, same as test_dateless_row_is_dropped_unless_whitelisted.
+    slug = "counties_nc.rutherford_wildfire_tax"
+    rows = [
+        _li(parcel_id="1215531", source=slug),    # same parcel as the seeded row
+        _li(parcel_id="999999", source=slug),     # genuinely new
+    ]
+    _patch_registry(monkeypatch, [_FakeScraper(slug, rows)])
+    import foreclosure_scraper.web_artifact as wa
+    monkeypatch.setattr(wa, "write_artifact", lambda *a, **k: pytest.fail("dry run wrote the board"))
+    monkeypatch.setattr(wa, "board_lock", lambda *a, **k: pytest.fail("dry run took the board lock"))
+    monkeypatch.setattr(wa, "load_board", lambda *a, **k: pytest.fail(
+        "the dry-run board gate must use the streaming reader (board_stream.iter_board_rows), "
+        "never load_board"))
+    rc = rss.main(["--slugs", slug, "--board", str(board_path)])
+    text = capsys.readouterr().out
+    assert rc == 0
+    assert "(board scan skipped)" not in text
+    assert "new 1" in text
+    assert "already on board 1" in text
+
+
 def test_apply_from_saved_json_uses_lock_load_board_and_apply_rows(monkeypatch, tmp_path):
     kept = [_li(source="counties_nc.rutherford_wildfire_tax", parcel_id="55")]
     f = tmp_path / "kept.json"
