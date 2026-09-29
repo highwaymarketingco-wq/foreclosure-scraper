@@ -66,6 +66,17 @@ def _resp(body):
     return r
 
 
+def _resp_error(status_code=500):
+    """Simulates a host wall / hard failure at the HTTP layer -- _arc_get
+    treats any non-200 as a hard failure (note_host_hard_failure) and returns
+    None, which _fetch_parcel_polygon_nc / _fetch_roads_near_nc / _check_cemetery
+    must surface as QUERY_FAILED, not as a genuine empty/negative result."""
+    r = MagicMock()
+    r.status_code = status_code
+    r.json = MagicMock(return_value={})
+    return r
+
+
 def _client(handler):
     @asynccontextmanager
     async def _cm(*a, **kw):
@@ -228,10 +239,31 @@ async def test_check_landlocked_sc_state_is_skipped_no_network():
 
 @pytest.mark.asyncio
 async def test_check_landlocked_arcgis_error_does_not_raise():
+    """A token/auth error walls the host (_arc_get -> mark_host_walled) --
+    that is a QUERY FAILURE, not a genuine determination, so the caller must
+    get QUERY_FAILED back (never None, and never a raised exception)."""
     async def get(url, **kw):
         return _resp({"error": {"code": 499, "message": "Token Required"}})
 
-    assert await M._check_landlocked(_stub(get), _listing()) is None
+    assert await M._check_landlocked(_stub(get), _listing()) is M.QUERY_FAILED
+
+
+@pytest.mark.asyncio
+async def test_check_landlocked_roads_query_failure_returns_query_failed():
+    """Parcel resolves cleanly but the ROADS query itself hard-fails (host
+    wall / non-200) -- this must be QUERY_FAILED, never silently treated as
+    'zero roads found nearby' (which would previously have reported a false-
+    positive landlocked candidate purely because the host went down)."""
+    async def get(url, **kw):
+        if url == M.NC1MAP_PARCELS_URL:
+            return _resp({"features": [{
+                "attributes": {"parno": "4605830808", "cntyname": "Lincoln"},
+                "geometry": {"rings": EDGESTONE_RINGS},
+            }]})
+        assert url == M.NC1MAP_ROADS_URL
+        return _resp_error(500)
+
+    assert await M._check_landlocked(_stub(get), _listing()) is M.QUERY_FAILED
 
 
 # ===========================================================================
@@ -301,6 +333,18 @@ async def test_check_cemetery_far_hit_is_dropped():
     assert await M._check_cemetery(_stub(get), li) is None
 
 
+@pytest.mark.asyncio
+async def test_check_cemetery_query_failure_returns_query_failed():
+    """A hard failure (non-200) at the HTTP layer must surface as
+    QUERY_FAILED, distinct from a genuine 'nothing found nearby' None."""
+    li = _listing(county="Gaston", latitude=DALLAS_CENTROID_LAT, longitude=DALLAS_CENTROID_LON)
+
+    async def get(url, **kw):
+        return _resp_error(500)
+
+    assert await M._check_cemetery(_stub(get), li) is M.QUERY_FAILED
+
+
 # ===========================================================================
 # enrich_land_buildability -- top-level gating + idempotency.
 # ===========================================================================
@@ -352,3 +396,111 @@ async def test_enrich_land_buildability_is_idempotent(monkeypatch):
     monkeypatch.setattr(M, "client", _client(get))
     stats = await M.enrich_land_buildability([li])
     assert stats["targets"] == 0
+
+
+@pytest.mark.asyncio
+async def test_enrich_land_buildability_genuine_negative_determination_sets_checked_flag(monkeypatch):
+    """Lincoln county has no cemetery registry entry (a genuine 'not
+    applicable' result) and the parcel genuinely fronts a road (a genuine
+    NEGATIVE landlocked determination) -- both sub-signals reached a real
+    answer, so the row must be retired via the checked flag even though
+    nothing gets written to raw['landlocked'] / raw['cemetery_proximity']
+    (additive-only convention)."""
+    li = _listing()  # Lincoln county, Edgestone coords -- real frontage parcel
+
+    async def get(url, **kw):
+        if url == M.NC1MAP_PARCELS_URL:
+            return _resp({"features": [{
+                "attributes": {"parno": "4605830808", "cntyname": "Lincoln"},
+                "geometry": {"rings": EDGESTONE_RINGS},
+            }]})
+        assert url == M.NC1MAP_ROADS_URL  # Lincoln is unregistered -- no cemetery call
+        return _resp({"features": [{
+            "attributes": {"st_name": "EDGESTONE"},
+            "geometry": {"paths": EDGESTONE_ROAD_PATHS},
+        }]})
+
+    monkeypatch.setattr(M, "client", _client(get))
+    stats = await M.enrich_land_buildability([li])
+
+    assert stats["targets"] == 1
+    assert stats["undetermined"] == 0
+    assert "landlocked" not in li.raw
+    assert "cemetery_proximity" not in li.raw
+    assert li.raw["_land_buildability_checked"] is True
+
+
+@pytest.mark.asyncio
+async def test_enrich_land_buildability_query_failure_leaves_row_eligible_for_retry(monkeypatch):
+    """This is the exact bug reproduced live 2026-09-29: a host-wall / hard-
+    failure (non-200) must NOT set raw['_land_buildability_checked'], so the
+    row remains a target on a LATER run once the host recovers, instead of
+    being silently and permanently excluded from retry."""
+    li = _listing(county="Gaston", latitude=DALLAS_CENTROID_LAT, longitude=DALLAS_CENTROID_LON)
+
+    async def failing_get(url, **kw):
+        return _resp_error(500)
+
+    monkeypatch.setattr(M, "client", _client(failing_get))
+    stats = await M.enrich_land_buildability([li])
+
+    assert stats["targets"] == 1
+    assert stats["undetermined"] == 1
+    assert stats["errors"] == 0
+    assert "_land_buildability_checked" not in li.raw
+    assert "landlocked" not in li.raw
+    assert "cemetery_proximity" not in li.raw
+
+    # Host "recovers" (a fresh process/run) -- this row must still be picked
+    # up as a target, proving the cap/target-selection logic (which filters
+    # on _land_buildability_checked) keeps behaving correctly post-fix.
+    stats2 = await M.enrich_land_buildability([li])
+    assert stats2["targets"] == 1
+
+
+@pytest.mark.asyncio
+async def test_enrich_land_buildability_partial_failure_leaves_checked_flag_unset(monkeypatch):
+    """Cemetery resolves genuinely (a real hit) but the landlocked sub-
+    signal's own query hard-fails -- this is only a PARTIAL determination and
+    must remain eligible for retry, even though a real finding was already
+    written to raw['cemetery_proximity']."""
+    li = _listing(county="Gaston", latitude=DALLAS_CENTROID_LAT, longitude=DALLAS_CENTROID_LON)
+
+    async def get(url, **kw):
+        if url == M._CEMETERY_LAYER_BY_COUNTY[("NC", "Gaston")].url:
+            return _resp({"features": [{
+                "attributes": {"NAME": "Dallas Presbyterian Church Cemetery"},
+                "geometry": {"rings": DALLAS_CEMETERY_RINGS},
+            }]})
+        return _resp_error(500)  # NC1MAP_PARCELS_URL hard-fails
+
+    monkeypatch.setattr(M, "client", _client(get))
+    stats = await M.enrich_land_buildability([li])
+
+    assert stats["cemetery_hit"] == 1
+    assert li.raw["cemetery_proximity"]["cemetery_name"] == "Dallas Presbyterian Church Cemetery"
+    assert stats["undetermined"] == 1
+    assert "_land_buildability_checked" not in li.raw
+
+
+@pytest.mark.asyncio
+async def test_enrich_land_buildability_exception_leaves_checked_flag_unset(monkeypatch):
+    """An unexpected exception inside a sub-check must not mark the row
+    checked -- it counts as both an error and an undetermined row, never a
+    silent permanent skip."""
+    li = _listing()
+
+    async def _boom(c, li):
+        raise RuntimeError("boom")
+
+    async def get(url, **kw):
+        raise AssertionError("should not reach the network")
+
+    monkeypatch.setattr(M, "_check_cemetery", _boom)
+    monkeypatch.setattr(M, "client", _client(get))
+    stats = await M.enrich_land_buildability([li])
+
+    assert stats["targets"] == 1
+    assert stats["errors"] == 1
+    assert stats["undetermined"] == 1
+    assert "_land_buildability_checked" not in li.raw

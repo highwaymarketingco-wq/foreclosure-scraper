@@ -361,6 +361,27 @@ async def _arc_get(c, url: str, params: dict) -> Optional[dict]:
         return None
 
 
+# A sentinel distinct from ``None``: ``_arc_get`` returning ``None`` conflates
+# two very different things for a caller -- "the query ran and genuinely found
+# nothing / was ambiguous" versus "the query never got a real answer" (host
+# walled from a prior circuit-breaker trip, a hard failure/non-200, a token
+# error, a transport error/timeout, or any other exception _arc_get swallows).
+# QUERY_FAILED marks the second case explicitly so it can be told apart from a
+# genuine (if negative or inconclusive) determination. See _check_landlocked /
+# _check_cemetery docstrings and enrich_land_buildability._one -- only a
+# genuine determination (positive, negative, or "not applicable") may set
+# raw['_land_buildability_checked']; QUERY_FAILED must leave the row eligible
+# for retry once the host recovers.
+class _QueryFailed:
+    __slots__ = ()
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid only
+        return "QUERY_FAILED"
+
+
+QUERY_FAILED = _QueryFailed()
+
+
 # ---------------------------------------------------------------------------
 # Landlocked flag (NC only) -- see module docstring for verification.
 # ---------------------------------------------------------------------------
@@ -388,10 +409,13 @@ _ROAD_SEARCH_BUFFER_DEG = 9e-4
 _FRONTAGE_THRESHOLD_M = 30.0
 
 
-async def _fetch_parcel_polygon_nc(c, lat: float, lon: float) -> Optional[dict[str, Any]]:
+async def _fetch_parcel_polygon_nc(c, lat: float, lon: float):
     """{'rings': [...], 'attrs': {...}} for the ONE NC1Map_Parcels feature the
-    tiny envelope around (lat, lon) lands in, or None if it's 0 or 2+ (same
-    ambiguity guard as enrichment_parcel_from_geo._point_query)."""
+    tiny envelope around (lat, lon) lands in; None if the query succeeded but
+    was genuinely ambiguous (0 or 2+ features -- same guard as
+    enrichment_parcel_from_geo._point_query) or had no polygon geometry;
+    QUERY_FAILED if the underlying ArcGIS query itself never got a real
+    answer (host wall / hard failure / token error -- see _arc_get)."""
     d = _ENVELOPE_HALF_DEG
     params = {
         "geometryType": "esriGeometryEnvelope",
@@ -405,7 +429,7 @@ async def _fetch_parcel_polygon_nc(c, lat: float, lon: float) -> Optional[dict[s
     }
     data = await _arc_get(c, NC1MAP_PARCELS_URL, params)
     if data is None:
-        return None
+        return QUERY_FAILED
     feats = data.get("features") or []
     if len(feats) != 1:
         return None
@@ -416,9 +440,12 @@ async def _fetch_parcel_polygon_nc(c, lat: float, lon: float) -> Optional[dict[s
     return {"rings": rings, "attrs": f.get("attributes") or {}}
 
 
-async def _fetch_roads_near_nc(c, rings: list[list[list[float]]]) -> list[dict]:
+async def _fetch_roads_near_nc(c, rings: list[list[list[float]]]):
     """Road FEATURES (dicts with 'paths' and 'st_name') in a buffered envelope
-    around the parcel's own bounding box."""
+    around the parcel's own bounding box -- genuinely empty when the query
+    succeeded and found none; QUERY_FAILED when the underlying ArcGIS query
+    itself never got a real answer (host wall / hard failure -- see
+    _arc_get)."""
     xs = [pt[0] for ring in rings for pt in ring]
     ys = [pt[1] for ring in rings for pt in ring]
     if not xs or not ys:
@@ -436,7 +463,7 @@ async def _fetch_roads_near_nc(c, rings: list[list[list[float]]]) -> list[dict]:
     }
     data = await _arc_get(c, NC1MAP_ROADS_URL, params)
     if data is None:
-        return []
+        return QUERY_FAILED
     out = []
     for f in data.get("features") or []:
         paths = (f.get("geometry") or {}).get("paths") or []
@@ -446,9 +473,14 @@ async def _fetch_roads_near_nc(c, rings: list[list[list[float]]]) -> list[dict]:
     return out
 
 
-async def _check_landlocked(c, li: Listing) -> Optional[dict]:
-    """None when unresolvable (ambiguous parcel, out of state/box); a dict
-    with at least 'candidate' otherwise."""
+async def _check_landlocked(c, li: Listing):
+    """None when not applicable (non-NC, missing lat/lng, out of box) or when
+    the query succeeded but was genuinely inconclusive (ambiguous parcel
+    resolution); QUERY_FAILED when the underlying ArcGIS query itself never
+    got a real answer (host wall / circuit-breaker trip / hard failure --
+    caller must NOT treat this as a determination, see enrich_land_buildability
+    ._one); a dict with at least 'candidate' on a genuine determination
+    (positive or negative)."""
     if li.state != "NC":
         return None
     if li.latitude is None or li.longitude is None:
@@ -457,11 +489,15 @@ async def _check_landlocked(c, li: Listing) -> Optional[dict]:
         return None
 
     parcel = await _fetch_parcel_polygon_nc(c, li.latitude, li.longitude)
+    if parcel is QUERY_FAILED:
+        return QUERY_FAILED
     if not parcel:
         return None
     rings = parcel["rings"]
 
     roads = await _fetch_roads_near_nc(c, rings)
+    if roads is QUERY_FAILED:
+        return QUERY_FAILED
     if not roads:
         return {
             "candidate": True,
@@ -547,7 +583,12 @@ _CEMETERY_LAYER_BY_COUNTY: dict[tuple[str, str], CemeteryLayer] = {
 }
 
 
-async def _check_cemetery(c, li: Listing) -> Optional[dict]:
+async def _check_cemetery(c, li: Listing):
+    """None when not applicable (no registered layer for this county, missing
+    lat/lng) or when the query succeeded but genuinely found nothing within
+    range; QUERY_FAILED when the underlying ArcGIS query itself never got a
+    real answer (host wall / hard failure -- see _arc_get); a dict on a
+    genuine hit."""
     layer = _CEMETERY_LAYER_BY_COUNTY.get((li.state, li.county))
     if not layer:
         return None
@@ -567,8 +608,8 @@ async def _check_cemetery(c, li: Listing) -> Optional[dict]:
         "resultRecordCount": 25, "f": "json",
     }
     data = await _arc_get(c, layer.url, params)
-    if not data:
-        return None
+    if data is None:
+        return QUERY_FAILED
     feats = data.get("features") or []
     if not feats:
         return None
@@ -622,6 +663,20 @@ async def enrich_land_buildability(listings: list[Listing], concurrency: int = 6
     ``_CAP`` (env LAND_BUILDABILITY_CAP) bounds how many NEW leads one run
     queries, keeping concurrent live-GIS load modest per the project's
     memory-safety / politeness constraints.
+
+    raw['_land_buildability_checked'] is set ONLY when both sub-signals
+    reached a genuine determination for this row -- a real positive/negative
+    finding, or a structurally "not applicable" case (wrong state, no
+    registered cemetery layer, ambiguous parcel resolution). It is
+    deliberately NOT set when either _check_landlocked or _check_cemetery
+    returns QUERY_FAILED (the underlying ArcGIS query never got a real answer
+    because a host was walled by the circuit breaker, hit a hard failure/
+    non-200, a token error, or a transport error/timeout -- see _arc_get) or
+    when the row raises an unexpected exception. This keeps a row that failed
+    purely for transient/host-wall reasons eligible for a future run once the
+    host recovers, instead of being silently and permanently excluded from
+    retry (fixed 2026-09-29 -- see QUERY_FAILED above and
+    tests/test_enrichment_land_buildability.py for the reproduction cases).
     """
     targets = [
         li for li in listings
@@ -630,7 +685,10 @@ async def enrich_land_buildability(listings: list[Listing], concurrency: int = 6
         and not (isinstance(li.raw, dict) and li.raw.get("_land_buildability_checked"))
     ][:_CAP]
 
-    stats = {"targets": len(targets), "landlocked_candidate": 0, "cemetery_hit": 0, "errors": 0}
+    stats = {
+        "targets": len(targets), "landlocked_candidate": 0, "cemetery_hit": 0,
+        "errors": 0, "undetermined": 0,
+    }
     if not targets:
         return stats
 
@@ -638,20 +696,36 @@ async def enrich_land_buildability(listings: list[Listing], concurrency: int = 6
 
     async def _one(c, li: Listing) -> None:
         async with sem:
+            cemetery_ok = False
+            landlocked_ok = False
             try:
                 cem = await _check_cemetery(c, li)
-                if cem:
-                    li.raw["cemetery_proximity"] = cem
-                    stats["cemetery_hit"] += 1
+                if cem is QUERY_FAILED:
+                    cemetery_ok = False
+                else:
+                    cemetery_ok = True
+                    if cem:
+                        li.raw["cemetery_proximity"] = cem
+                        stats["cemetery_hit"] += 1
+
                 ll = await _check_landlocked(c, li)
-                if ll and ll.get("candidate"):
-                    li.raw["landlocked"] = ll
-                    stats["landlocked_candidate"] += 1
+                if ll is QUERY_FAILED:
+                    landlocked_ok = False
+                else:
+                    landlocked_ok = True
+                    if ll and ll.get("candidate"):
+                        li.raw["landlocked"] = ll
+                        stats["landlocked_candidate"] += 1
             except Exception:
                 stats["errors"] += 1
                 log.error("land_buildability.row_failed", traceback=traceback.format_exc())
+                cemetery_ok = False
+                landlocked_ok = False
             finally:
-                li.raw["_land_buildability_checked"] = True
+                if cemetery_ok and landlocked_ok:
+                    li.raw["_land_buildability_checked"] = True
+                else:
+                    stats["undetermined"] += 1
 
     async with client(timeout=25.0, headers=_UA) as c:
         await asyncio.gather(*(_one(c, li) for li in targets))
