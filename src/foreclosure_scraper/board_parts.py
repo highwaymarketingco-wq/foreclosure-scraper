@@ -410,6 +410,23 @@ def iter_gz_rows(path, want_text: bool = False) -> Iterator:
             yield item
 
 
+def iter_plain_rows(path, want_text: bool = False) -> Iterator:
+    """Stream the rows of ONE plain (uncompressed) JSON array file -- the third storage form
+    alongside iter_gz_rows (one gzipped file) and iter_rows (many gzipped parts). This is what
+    the LOCAL runner's docs/listings.json actually is once it outgrows nothing needing it
+    compressed on disk: on 2026-09-29 that file was 2,522,564,780 bytes / 217,773 rows, and
+    web_artifact.read_board_records()/load_board() were reading it with
+    json.loads(path.read_text()) -- the file's full decoded text (2.4 GB) and its full parsed
+    list-of-dicts tree alive in memory AT THE SAME TIME, for as long as either stayed
+    referenced (audit O13). Reading in fixed-size text chunks and decoding each top-level
+    array element as soon as it is complete (the same incremental decoder _iter_array already
+    used for gzip streams) means at most one chunk of raw text and one row's parsed dict are
+    ever alive together, regardless of how big the file is."""
+    with open(str(path), "rt", encoding="utf-8") as fh:
+        for item in _iter_array(fh, want_text):
+            yield item
+
+
 def iter_rows(docs, *, verify: bool = True, res: Optional[Resolution] = None,
               want_text: bool = False) -> Iterator:
     """Stream every row of the parts board in order, one row at a time (constant memory).

@@ -18,6 +18,7 @@ a publish that stages some and not others ships a mis-joined board):
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 import os
 import re
@@ -28,6 +29,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
+from typing import Iterator
 
 import structlog
 
@@ -135,23 +137,62 @@ BOARD_LOCK_HEARTBEAT_SECONDS = 60.0
 BOARD_GATE_SWAP_MB = 3072
 BOARD_GATE_FREE_MB = 1024
 
-# --- the board SIZE guard (audit O13, 2026-09-29) ---------------------------
-# Separate from the memory-pressure gate above: refuses read_board_records()
-# BEFORE it fully materializes the board (once as parsed JSON, once as a
-# validated Listing graph -- see BoardLoadTooLarge) when the on-disk source is
-# bigger than this machine has been shown to handle safely. The board measured
-# live on 2026-09-29 -- listings.json 2,522,435,265 bytes (~2,405 MiB) +
-# listings_detail.json 248,977,252 bytes (~237 MiB), 217,773 rows, combined
-# ~2,643 MiB -- is exactly the board a `--apply` run choked on (26.3 GB
-# footprint, 24 minutes, still climbing when killed; independently reproduced
-# by calling load_board() alone against this same board: RSS oscillating under
-# 1.1 GB in a GC-thrashing sawtooth, never completing in 240s). 2,000 MB is
-# comfortably BELOW that combined size on purpose, so this guard actually fires
-# on the board as it stands today rather than only on some future, larger one.
-# Lower it further, or replace this guard entirely, once a real fix (streaming
-# validation, chunked load) lands; raise it only with a measurement showing
-# the new ceiling completes cleanly on this machine.
-BOARD_LOAD_MAX_SOURCE_MB = 2000.0
+# --- the board SIZE guard (audit O13, 2026-09-29; ceiling re-measured same day
+# after the real streaming fix landed -- see _iter_board_records) --------------
+# Separate from the memory-pressure gate above: refuses read_board_records()/
+# load_board() BEFORE starting the load when the on-disk source is bigger than
+# this machine has been shown to handle safely.
+#
+# WHAT WAS FIXED. read_board_records()/load_board() used to json.loads() the
+# whole board file (the file's full decoded TEXT and its full parsed dict/list
+# TREE alive together), then, for load_board(), build a SECOND, completely
+# separate graph of validated Listing objects from it, both alive at once. Against
+# the real board as it stood on 2026-09-29 (217,773 rows, listings.json
+# 2,522,435,265 bytes + listings_detail.json 248,977,252 bytes, combined ~2,643
+# MiB) a `--apply` run using that path hit a 26.3 GB footprint and never finished
+# (killed after 24 minutes, still climbing); load_board() alone reproduced a
+# GC-thrashing sawtooth that never completed in 240s. The fix (this same day)
+# streams both files (board_parts.iter_plain_rows/iter_gz_rows/iter_rows: an
+# incremental JSON-array decoder, never json.loads() of the whole file) and, for
+# load_board(), validates each row into a Listing and lets its raw dict become
+# garbage immediately, so only ONE full graph is ever held, never two.
+#
+# WHAT THE NEW CEILING IS BASED ON. The double-materialization bug above is
+# fixed, but read_board_records()'s/load_board()'s CONTRACT is still "hand back
+# a full, mutable board" -- so peak memory is still proportional to ROW COUNT,
+# and that part is NOT free just because the parsing is streamed. Measured on
+# this machine (2026-09-29) by streaming real slices of the actual board (via
+# board_parts.iter_plain_rows, so slicing itself never held the whole 2.4 GB
+# file either) through the NEW load_board():
+#     20,000 rows,  329 MB combined source -> completed in  2.7s,  ~1.40 GiB peak RSS, ~2.13 GiB peak footprint
+#     60,000 rows,  877 MB combined source -> completed in 10.1s,  ~2.79 GiB peak RSS, ~3.64 GiB peak footprint
+#    100,000 rows, 1562 MB combined source -> completed in 31-44s, ~2.87 GiB peak RSS, ~6.39 GiB peak footprint
+# (peak footprint = macOS's `/usr/bin/time -l` "peak memory footprint", which
+# counts compressed pages RSS does not -- it is the more honest number under
+# real background memory pressure, and it scales far more consistently here:
+# ~4.4x the combined source size at both 60K and 100K rows). Extrapolating that
+# ~4.4x ratio to the FULL board's current 2,643 MiB combined source projects
+# roughly 10-12 GiB of peak footprint to fully materialize it as Listing
+# objects -- more than this 8 GB Mac can safely give up, even with the
+# double-materialization bug gone, WITHOUT risking the exact kind of harm this
+# guard exists to prevent. A fourth, larger real-data trial (approaching the
+# full board) was deliberately NOT run to get a tighter number: this machine
+# was already showing real paging/compression activity at the 100,000-row
+# trial (19.3s of system time, vs. 5.6s at 60,000), and running an even larger
+# one unattended is exactly what this codebase's memory-safety rules say not to
+# do. 1,200 MB is set with a margin above the cleanly-fast 877 MB point and
+# below the 1,562 MB point that already showed real system-wide paging stress.
+#
+# WHAT IS STILL OPEN. This ceiling does NOT cover the full current board -- a
+# `run_scoped_scrapers.py --apply` run against ALL 217,773 rows still refuses
+# here, honestly, because fully materializing that many validated Listings
+# still doesn't fit this machine, not because the load is broken. The actual
+# fix for THAT case is different in kind: avoid re-validating the ~217K
+# existing/untouched rows on every write when only a handful of new rows are
+# being landed (this file's docstring approach (b); flagged as a follow-up, not
+# attempted this session). BOARD_LOAD_ALLOW_LARGE=1 remains the deliberate,
+# monitored override for a human who has decided a specific run is worth it.
+BOARD_LOAD_MAX_SOURCE_MB = 1200.0
 
 # run_meta health older than this is nulled (audit O4).
 HEALTH_MAX_AGE_HOURS = 48.0
@@ -199,6 +240,18 @@ class BoardLoadTooLarge(RuntimeError):
     against the same real board (no scraper involved) reproduced the same
     signature: RSS oscillating under 1.1 GB in a GC-thrashing sawtooth, never
     completing in 240s. See docs/HANDOFF.md / the 2026-09-29 apply-runaway note.
+
+    UPDATE, SAME DAY: the double-materialization this describes (full parsed
+    JSON tree ALONGSIDE a full separate Listing graph) is fixed -- see
+    _iter_board_records's docstring -- so a load that gets past this guard now
+    completes deterministically instead of GC-thrashing. This guard still
+    exists and still fires on the full board, but for a narrower, now-measured
+    reason: read_board_records()'s/load_board()'s contract is a full, mutable
+    board, so peak memory is still proportional to row count even with the
+    parsing streamed, and the current board's row count has been measured (by
+    extrapolation from real, safely-sized trials) to likely need more memory
+    than this 8 GB Mac can safely give up. See BOARD_LOAD_MAX_SOURCE_MB's
+    comment for the real numbers this ceiling is based on.
 
     This is a SIZE check, not a memory-pressure check: it fires even on an idle
     machine with RAM to spare, because the operation itself does not scale to
@@ -926,6 +979,20 @@ def _read_board_json_ex(path: Path | str):
     return json.loads(_gzip.decompress(used.read_bytes()).decode("utf-8")), used
 
 
+def _open_board_source_rows(p: Path) -> tuple[Path, Iterator[dict]]:
+    """(file actually read, streaming row iterator) for a board JSON file -- the same source
+    selection _read_board_json_ex uses (honors the manifest, parts vs. gz vs. plain), except
+    the rows are handed back one at a time instead of as one fully parsed list (audit O13's
+    real fix, 2026-09-29, see _iter_board_records below). The path is resolved and returned
+    immediately (a plain function call); the iterator itself does no work until consumed."""
+    used, role, res = _choose_board_source(p)
+    if role == "parts":
+        return used, _bp.iter_rows(p.parent, res=res)
+    if role == "gz":
+        return used, _bp.iter_gz_rows(used)
+    return used, _bp.iter_plain_rows(used)
+
+
 def read_board_json(path: Path | str):
     """Read a board JSON file, transparently falling back to its ``.gz`` twin.
 
@@ -1014,6 +1081,122 @@ def board_load_size_state(docs_dir: Path | str, *, max_mb: float | None = None) 
     return {"source_mb": source_mb, "max_mb": limit, "ok": ok, "reason": reason}
 
 
+def _raise_if_board_too_large_to_load(docs: Path, *, who: str) -> None:
+    """The BoardLoadTooLarge guard (audit O13, 2026-09-29). Called EAGERLY, as a plain
+    function, by both read_board_records() and load_board() before either does any work --
+    deliberately NOT inside _iter_board_records() below, because a generator function's body
+    does not execute at all until first iterated, so a check placed there would not fire
+    until the caller's first `next()`, which is later than "before attempting the load" for
+    a caller that does setup of its own first. BOARD_LOAD_ALLOW_LARGE=1 overrides for one
+    run; BOARD_LOAD_MAX_SOURCE_MB (see its comment above) is the ceiling, raised once a new
+    approach is measured to handle a given size safely on this machine.
+    """
+    if os.environ.get("BOARD_LOAD_ALLOW_LARGE", "").strip().lower() in ("1", "true", "yes"):
+        return
+    size_state = board_load_size_state(docs)
+    if size_state["ok"]:
+        return
+    log.error("board.load_too_large", **size_state, docs_dir=str(docs))
+    raise BoardLoadTooLarge(
+        f"{who} refused to load {docs}: {size_state['reason']}. See BoardLoadTooLarge's "
+        f"docstring and BOARD_LOAD_MAX_SOURCE_MB's comment in web_artifact.py for the "
+        f"measurement this ceiling is based on. BOARD_LOAD_ALLOW_LARGE=1 overrides for one "
+        f"run; BOARD_LOAD_MAX_SOURCE_MB raises the ceiling once a larger size is measured "
+        f"safe on this machine."
+    )
+
+
+def _safe_row_iter(it: Iterator, *, strict: bool) -> Iterator:
+    """Wrap a sidecar row iterator so a read/parse failure becomes silent exhaustion in
+    non-strict mode -- matching read_board_records()'s original all-or-nothing "the sidecar
+    could not be read reliably, treat it as absent" behavior for a caller with no manifest to
+    hold it to a hard contract, except that here a failure partway through the file keeps the
+    rows already read (a torn sidecar used to lose ALL of it; this is only strictly kinder).
+    BoardIntegrityError always propagates -- a manifest- or run_meta-verified sidecar that is
+    torn is never silently downgraded to "no sidecar", strict or not."""
+    try:
+        for item in it:
+            yield item
+    except BoardIntegrityError:
+        raise
+    except Exception:  # noqa: BLE001
+        if strict:
+            raise
+        return
+
+
+def _iter_board_records(docs: Path) -> Iterator[dict]:
+    """Body of read_board_records(), STREAMED (audit O13's real fix, 2026-09-29): yields each
+    board row (a raw dict) with the lazy-detail sidecar merged into its `raw`, one row at a
+    time, in board order -- never holding the whole parsed listings.json array, or the whole
+    parsed listings_detail.json array, in memory at once.
+
+    THE BUG THIS REPLACES. read_board_records() used to call _read_board_json_ex(), which
+    does json.loads(path.read_text()): the file's full decoded TEXT and its full parsed
+    dict/list TREE were alive together for as long as anything referenced either, and for
+    load_board() specifically that whole tree then stayed alive for the ENTIRE second pass
+    that built a completely separate graph of validated Listing objects. Measured on
+    2026-09-29 against the real board (217,773 rows, 2.52 GB listings.json + 249 MB
+    listings_detail.json): 26.3 GB peak RSS, killed after 24 minutes, still climbing.
+
+    THE FIX. _open_board_source_rows() resolves which file to read exactly as
+    _read_board_json_ex() did (honors the manifest, parts vs. gz vs. plain) but hands back a
+    generator instead of a parsed list; board_parts.iter_plain_rows/iter_gz_rows/iter_rows all
+    decode one top-level JSON-array element at a time from a bounded read buffer, never the
+    whole file. The two streams (listings.json, listings_detail.json) are walked in lockstep
+    with itertools.zip_longest so the sidecar is merged in as each row arrives, with no need
+    to know either stream's length up front.
+
+    WHAT THIS DOES NOT FIX. Whatever the caller builds FROM this generator is still
+    proportional to the ROW COUNT, and that is unavoidable: read_board_records()'s contract is
+    a full list[dict], load_board()'s is a full list[Listing]. See BOARD_LOAD_MAX_SOURCE_MB's
+    comment for what that costs, measured, on this machine. load_board() (below) consumes
+    this generator directly -- validating each row into a Listing and letting the raw dict be
+    garbage the moment it is done with it -- so it never holds a full parsed-dict copy of the
+    board at all, only the one Listing graph it is building.
+    """
+    used, rows_iter = _open_board_source_rows(docs / "listings.json")
+    _remember_load(docs, used)
+    _register_if_held()
+    detail_path = docs / "listings_detail.json"
+    strict = load_manifest(docs) is not None
+    details_iter: Iterator = iter(())
+    if _board_file_present(detail_path):
+        try:
+            _, raw_details_iter = _open_board_source_rows(detail_path)
+        except BoardIntegrityError:
+            raise
+        except Exception:  # noqa: BLE001
+            if strict:
+                raise
+            raw_details_iter = iter(())
+        details_iter = _safe_row_iter(raw_details_iter, strict=strict)
+    _MISSING = object()
+    n = 0
+    for rec, det in itertools.zip_longest(rows_iter, details_iter, fillvalue=_MISSING):
+        if rec is _MISSING:
+            # listings_detail has MORE rows than listings.json: index-alignment is broken.
+            if strict:
+                extra = 1 + sum(1 for _ in details_iter)
+                raise BoardIntegrityError(
+                    f"listings_detail has {n + extra} rows for {n} listings: "
+                    f"the sidecar is index-aligned, so this board is a mixed set")
+            break  # legacy behavior: only listings.json ever drove iteration
+        if det is _MISSING:
+            if strict:
+                extra = 1 + sum(1 for _ in rows_iter)
+                raise BoardIntegrityError(
+                    f"listings_detail has {n} rows for {n + extra} listings: "
+                    f"the sidecar is index-aligned, so this board is a mixed set")
+            # legacy behavior: rows past the end of a short/absent sidecar are yielded as-is
+        elif isinstance(det, dict) and det:
+            raw = rec.get("raw")
+            if isinstance(raw, dict):
+                raw.update(det)
+        yield rec
+        n += 1
+
+
 def read_board_records(docs_dir: Path | str = "docs") -> list[dict]:
     """The published board as RAW dicts, with the lazy-detail sidecar merged
     back into each record's raw. load_board() minus the Listing validation.
@@ -1032,53 +1215,18 @@ def read_board_records(docs_dir: Path | str = "docs") -> list[dict]:
     overwrite a board that changed after this load.
 
     Raises BoardLoadTooLarge BEFORE attempting the load when the on-disk board
-    exceeds BOARD_LOAD_MAX_SOURCE_MB (audit O13) — a full read here means json.load
-    of the whole board PLUS (for load_board() callers) a second, separate
-    Listing-validation pass held in memory at the same time; on 2026-09-29 that
-    combination hit a 26.3 GB footprint and never finished on this 8 GB Mac. This
-    is a size check, independent of board_memory_gate()'s live swap/free check —
-    it can fire on an idle, otherwise-healthy machine. BOARD_LOAD_ALLOW_LARGE=1
-    overrides it for one run; BOARD_LOAD_MAX_SOURCE_MB raises or lowers the ceiling.
+    exceeds BOARD_LOAD_MAX_SOURCE_MB (audit O13). This is a size check, independent
+    of board_memory_gate()'s live swap/free check — it can fire on an idle,
+    otherwise-healthy machine. BOARD_LOAD_ALLOW_LARGE=1 overrides it for one run;
+    BOARD_LOAD_MAX_SOURCE_MB raises or lowers the ceiling.
+
+    Streamed since audit O13's real fix (2026-09-29) — see _iter_board_records — but
+    this function's OWN contract is still a full list[dict], built here with one
+    list(...) call, for the dict-level board writers that need to mutate rows directly.
     """
     docs = Path(docs_dir)
-    if os.environ.get("BOARD_LOAD_ALLOW_LARGE", "").strip().lower() not in ("1", "true", "yes"):
-        size_state = board_load_size_state(docs)
-        if not size_state["ok"]:
-            log.error("board.load_too_large", **size_state, docs_dir=str(docs))
-            raise BoardLoadTooLarge(
-                f"read_board_records refused to load {docs}: {size_state['reason']}. "
-                f"This exact combination (json.load of the whole board, then a separate "
-                f"Listing-validation pass) reached a 26.3 GB footprint and never finished "
-                f"on this machine on 2026-09-29 — see BoardLoadTooLarge's docstring. "
-                f"BOARD_LOAD_ALLOW_LARGE=1 overrides for one run; BOARD_LOAD_MAX_SOURCE_MB "
-                f"raises the ceiling once a real fix (streaming validation, chunked load) "
-                f"is measured to handle this size."
-            )
-    records, used = _read_board_json_ex(docs / "listings.json")
-    _remember_load(docs, used)
-    _register_if_held()
-    detail_path = docs / "listings_detail.json"
-    strict = load_manifest(docs) is not None
-    details: list = []
-    if _board_file_present(detail_path):
-        try:
-            details = read_board_json(detail_path)
-        except BoardIntegrityError:
-            raise
-        except Exception:  # noqa: BLE001
-            if strict:
-                raise
-            details = []
-    if strict and len(details) != len(records):
-        raise BoardIntegrityError(
-            f"listings_detail has {len(details)} rows for {len(records)} listings: "
-            f"the sidecar is index-aligned, so this board is a mixed set")
-    for i, rec in enumerate(records):
-        if i < len(details) and isinstance(details[i], dict) and details[i]:
-            raw = rec.get("raw")
-            if isinstance(raw, dict):
-                raw.update(details[i])
-    return records
+    _raise_if_board_too_large_to_load(docs, who="read_board_records")
+    return list(_iter_board_records(docs))
 
 
 # Rows load_board could not validate on the last call (tests and callers read it).
@@ -1098,8 +1246,13 @@ def load_board(docs_dir: Path | str = "docs", *,
     merges detail[i] back into listing[i].raw first, so the round-trip preserves
     it. Always use this instead of a hand-rolled json.loads loop in a board pass.
 
-    Reads via read_board_json, so it works from either the plain .json (local
-    runner) or the committed .gz (fresh clone / cloud) — see that helper.
+    Streamed since audit O13's real fix (2026-09-29): consumes _iter_board_records()
+    directly, validating each row into a Listing and discarding the raw dict as it
+    goes, rather than materializing read_board_records()'s full list[dict] first and
+    then building a second, separate list[Listing] from it — the double-materialization
+    that reached 26.3 GB against the real board on 2026-09-29 (see BoardLoadTooLarge and
+    _iter_board_records's docstrings). The only full structure load_board() ever holds is
+    the Listing list it returns.
 
     A row that fails validation is DROPPED (the board is rewritten without it), and
     that used to be `except Exception: pass`: no log line, no count. Now every drop
@@ -1109,17 +1262,19 @@ def load_board(docs_dir: Path | str = "docs", *,
     A caller with its own recovery for invalid rows (patch_vision_gemini's
     load_board_no_shrink) passes max_drop_rate=1.0 and re-hydrates the strays itself.
     """
-    recs = read_board_records(docs_dir)
+    docs = Path(docs_dir)
+    _raise_if_board_too_large_to_load(docs, who="load_board")
     out: list[Listing] = []
     dropped: list[tuple[int, str, str, str]] = []
-    for i, rec in enumerate(recs):
+    total = 0
+    for i, rec in enumerate(_iter_board_records(docs)):
+        total = i + 1
         try:
             out.append(Listing.model_validate(rec))
         except Exception as exc:  # noqa: BLE001
             src = str(rec.get("source", "")) if isinstance(rec, dict) else ""
             url = str(rec.get("source_url", ""))[:120] if isinstance(rec, dict) else ""
             dropped.append((i, src, url, f"{type(exc).__name__}: {str(exc)[:160]}"))
-    total = len(recs)
     rate = (len(dropped) / total) if total else 0.0
     LAST_LOAD_STATS.clear()
     LAST_LOAD_STATS.update({"total": total, "loaded": len(out), "dropped": len(dropped),
