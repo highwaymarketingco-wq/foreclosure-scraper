@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-29T21:39:25.151956Z",
-  "total": 217883,
+  "run_time": "2026-09-29T23:20:53.655573Z",
+  "total": 218633,
   "by_source": {
     "national.nc_upset_bids": 38,
     "counties_generic.arcgis_distress.buncombe_unpaid_bills": 773,
@@ -171,11 +171,11 @@
   },
   "by_state": {
     "NC": 135137,
-    "SC": 82746
+    "SC": 83496
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 40170,
-    "counties_sc.qpaybill_delinquent_roll": 30481,
+    "counties_sc.qpaybill_delinquent_roll": 31231,
     "counties_nc.nc_ecourts_lis_pendens": 13563,
     "counties_nc.nc_ptscloud_delinquent_tax": 12678,
     "counties_sc.sc_dew_lien_registry": 8486,
@@ -406,13 +406,13 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "scoped scraper landing: +110 rows, existing rows untouched",
-  "detail_count": 217883,
-  "detail_digest": "8b66e7b650a69840",
+  "notes": "scoped scraper landing: +750 rows, existing rows untouched",
+  "detail_count": 218633,
+  "detail_digest": "d6c8d1d2d45a2a0d",
   "board_parts": {
     "schema": "board-parts-v1",
     "count": 17,
-    "records": 217883,
+    "records": 218633,
     "max_bytes": 25165824,
     "rows_per_part": 13000,
     "files": [
@@ -547,10 +547,10 @@
       {
         "name": "listings_part_016.json.gz",
         "start": 208000,
-        "end": 217883,
-        "records": 9883,
-        "bytes": 1341295,
-        "sha256": "ab9f3e8194764f21b3126950b4f0ffe8beb241ea85366fbeb16d2687106b704a"
+        "end": 218633,
+        "records": 10633,
+        "bytes": 1411429,
+        "sha256": "65675fdd979ced849c425471da7c5ea898f89fd5e1eccd9c871f3ae9d039e04e"
       }
     ]
   },
@@ -571,7 +571,7 @@
     "by_county_top"
   ],
   "health_as_of": "2026-09-23T08:47:09.374753Z",
-  "health_age_hours": 156.87,
+  "health_age_hours": 158.56,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-09-23T08:47:09.374753Z",
