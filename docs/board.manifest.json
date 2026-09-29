@@ -1,9 +1,9 @@
 {
  "schema": "board-manifest-v1",
- "written_at": "2026-09-29T18:46:02.243806Z",
- "run_time": "2026-09-29T18:45:42.348473Z",
- "count": 217773,
- "detail_count": 217773,
+ "written_at": "2026-09-29T21:39:25.995287Z",
+ "run_time": "2026-09-29T21:39:25.151956Z",
+ "count": 217883,
+ "detail_count": 217883,
  "slim_count": 217773,
  "shards": {
   "schema": "shard-v1",
@@ -14,19 +14,19 @@
  },
  "files": {
   "listings.json": {
-   "bytes": 2522564780,
-   "sha256": "73a8bcf7408b7864445f438fdc1bbd2b6a7d88ee6809fdfc97c1392afaeb5043",
-   "records": 217773
+   "bytes": 2522960787,
+   "sha256": "db7483a74de4d1160efc07f012462b10c65fdcdadbacf596dec63f5af54698ad",
+   "records": 217883
   },
   "listings_detail.json": {
-   "bytes": 248977252,
-   "sha256": "12c26de6f9b9b0a58ea0b7c0c9f4c28b8d57c115b26b89abbffe415e3e3b1737",
-   "records": 217773
+   "bytes": 248977692,
+   "sha256": "014e2b6401854a09e73685816931ffa996b214b40f598964d8a40cc43e03a8e4",
+   "records": 217883
   },
   "listings_detail.json.gz": {
-   "bytes": 19368238,
-   "sha256": "1397e48518344b5c9de57930f64bf0e1ad943fe78b3cc27aad1de96ce04faafd",
-   "records": 217773
+   "bytes": 19368239,
+   "sha256": "8b66e7b650a69840d680694e423a925a0451e6fa23d700a5df6e9ad10e4bb19b",
+   "records": 217883
   },
   "listings_slim.json": {
    "bytes": 842737404,
@@ -39,8 +39,8 @@
    "records": 217773
   },
   "run_meta.json": {
-   "bytes": 30869,
-   "sha256": "7159826138c78246a64e8ba6c555311eded8b8925a181bc10c01618f002042c0"
+   "bytes": 30714,
+   "sha256": "9cea1617670f9dfd51234b37fa5258df2a808ae905f32170138b217b8c6d7ec2"
   },
   "listings_part_000.json.gz": {
    "bytes": 17300227,
@@ -155,11 +155,11 @@
    "end": 208000
   },
   "listings_part_016.json.gz": {
-   "bytes": 1315419,
-   "sha256": "f2a44757961516868f994a0e194526f7a0839d79bbf63b97df310a007512841e",
-   "records": 9773,
+   "bytes": 1341295,
+   "sha256": "ab9f3e8194764f21b3126950b4f0ffe8beb241ea85366fbeb16d2687106b704a",
+   "records": 9883,
    "start": 208000,
-   "end": 217773
+   "end": 217883
   },
   "detail_shards/00000.json.gz": {
    "bytes": 3263523,
@@ -1037,7 +1037,7 @@
  "parts": {
   "schema": "board-parts-v1",
   "count": 17,
-  "records": 217773,
+  "records": 217883,
   "max_bytes": 25165824,
   "rows_per_part": 13000,
   "files": [
@@ -1172,10 +1172,10 @@
    {
     "name": "listings_part_016.json.gz",
     "start": 208000,
-    "end": 217773,
-    "records": 9773,
-    "bytes": 1315419,
-    "sha256": "f2a44757961516868f994a0e194526f7a0839d79bbf63b97df310a007512841e"
+    "end": 217883,
+    "records": 9883,
+    "bytes": 1341295,
+    "sha256": "ab9f3e8194764f21b3126950b4f0ffe8beb241ea85366fbeb16d2687106b704a"
    }
   ]
  }

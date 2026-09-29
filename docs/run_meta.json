@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-29T18:45:42.348473Z",
-  "total": 217773,
+  "run_time": "2026-09-29T21:39:25.151956Z",
+  "total": 217883,
   "by_source": {
     "national.nc_upset_bids": 38,
     "counties_generic.arcgis_distress.buncombe_unpaid_bills": 773,
@@ -170,8 +170,8 @@
     "counties_generic.arcgis_distress.rockhill_code_exterior_major": 12
   },
   "by_state": {
-    "NC": 135061,
-    "SC": 82712
+    "NC": 135137,
+    "SC": 82746
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 40170,
@@ -242,6 +242,7 @@
     "counties_sc.terry_howe_auctions": 318,
     "counties_nc.mcdowell_probate": 300,
     "counties_sc.greenville_mie_adverts": 283,
+    "counties.column_legal_notices": 270,
     "counties_sc.sc_probate_net": 261,
     "national.distressed": 260,
     "counties_sc.oconee_forfeited_land": 257,
@@ -253,7 +254,6 @@
     "public_notices.funeral_home_rss": 190,
     "counties_nc.henderson_code_violations": 183,
     "national.courtlistener_adversary": 168,
-    "counties.column_legal_notices": 160,
     "counties_generic.state_contamination.nc_inactive_hazardous": 157,
     "counties_generic.epa_frs.acres": 153,
     "counties_sc.spartan_weekly_legals": 148,
@@ -406,13 +406,13 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "pending signal enrichers (2026-09-29 audit follow-up): liensnc_posthumous, platted_lots, divorce_no_subsequent_deed, notice_service_defect, jail_bookings, bop_federal, land_buildability, foreclosure_docket_history",
-  "detail_count": 217773,
-  "detail_digest": "1397e48518344b5c",
+  "notes": "scoped scraper landing: +110 rows, existing rows untouched",
+  "detail_count": 217883,
+  "detail_digest": "8b66e7b650a69840",
   "board_parts": {
     "schema": "board-parts-v1",
     "count": 17,
-    "records": 217773,
+    "records": 217883,
     "max_bytes": 25165824,
     "rows_per_part": 13000,
     "files": [
@@ -547,10 +547,10 @@
       {
         "name": "listings_part_016.json.gz",
         "start": 208000,
-        "end": 217773,
-        "records": 9773,
-        "bytes": 1315419,
-        "sha256": "f2a44757961516868f994a0e194526f7a0839d79bbf63b97df310a007512841e"
+        "end": 217883,
+        "records": 9883,
+        "bytes": 1341295,
+        "sha256": "ab9f3e8194764f21b3126950b4f0ffe8beb241ea85366fbeb16d2687106b704a"
       }
     ]
   },
@@ -571,7 +571,7 @@
     "by_county_top"
   ],
   "health_as_of": "2026-09-23T08:47:09.374753Z",
-  "health_age_hours": 153.98,
+  "health_age_hours": 156.87,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-09-23T08:47:09.374753Z",
