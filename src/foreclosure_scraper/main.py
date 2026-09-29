@@ -2543,6 +2543,20 @@ async def run() -> int:
     except Exception:
         log.error("commercial_landuse.failed", traceback=traceback.format_exc())
 
+    # Land buildability layer (Dirty Deeds Tier B #35) — landlocked-candidate
+    # flag (NC statewide, parcel-boundary-to-road-centerline distance) and
+    # cemetery proximity (small per-county registry: Buncombe, Gaston). Runs
+    # HERE, after the LAND classification is final (property_kind reclassifiers
+    # above) and before valuation, since it only reads property_kind/lat/lng —
+    # never touches it. Free, pure-HTTP, capped per run (LAND_BUILDABILITY_CAP)
+    # and idempotent, so an interrupted run resumes rather than re-querying.
+    try:
+        from .enrichment_land_buildability import enrich_land_buildability
+        s = await _await_capped(enrich_land_buildability(enriched), "land_buildability")
+        if s: enrichment_stats["land_buildability"] = s
+    except Exception:
+        log.error("land_buildability.failed", traceback=traceback.format_exc())
+
     # RECAP document body fetch — pull the actual motion PDFs (plain text)
     # from CourtListener for adversary-proceeding listings (lift-stay,
     # §363 sale). Adds raw.recap.plain_text which the judgment_amount

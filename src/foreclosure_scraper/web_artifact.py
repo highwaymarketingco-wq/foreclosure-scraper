@@ -1335,6 +1335,16 @@ RAW_KEEP = {
     # column_legal_notices._sc_probate_listing. Registered BEFORE its first
     # run, same lesson as notice_service_defect immediately above.
     "heir_naming_publication": "*",
+    # Dirty Deeds Tier B #35 (docs/dirty_deeds_synthesis_2026-09-10.md): land
+    # buildability layer. "landlocked" = a rank-up CANDIDATE flag (parcel
+    # boundary farther than 30m from every mapped NC OneMap road centerline;
+    # NC only, see enrichment_land_buildability.py for the SC gap).
+    # "cemetery_proximity" = a hit against the small, live-verified per-county
+    # cemetery-layer registry (Buncombe, Gaston). Registered BEFORE
+    # enrichment_land_buildability.py's first run, same lesson as
+    # heir_naming_publication immediately above.
+    "landlocked": "*",
+    "cemetery_proximity": "*",
     # Fullmer deal-economics rank {rank, why, flags, cad_value, owner_count,
     # liquidity, margin_coverage}. The dashboard sorts and filters on it, so
     # stripping it here would make the whole ranking invisible.
