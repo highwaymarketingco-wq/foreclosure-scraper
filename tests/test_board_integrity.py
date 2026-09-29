@@ -504,6 +504,69 @@ def test_the_gate_clears_when_pressure_drops_while_waiting(tmp_path, monkeypatch
 
 
 # ===========================================================================
+# the board SIZE guard (audit O13, 2026-09-29): a `run_scoped_scrapers.py
+# --apply` run against the real 2.52 GB / 217,773-row board hit a 26.3 GB
+# footprint and never finished; load_board() alone reproduced the same
+# GC-thrashing signature with no scraper involved. board_memory_gate() above
+# only samples CURRENT swap/free RAM once, before the load even starts, so it
+# does not protect against this — these tests cover the separate size check.
+# ===========================================================================
+
+def test_board_load_size_state_is_ok_when_no_board_exists_yet(tmp_path):
+    st = wa.board_load_size_state(tmp_path)
+    assert st["ok"] is True and st["source_mb"] is None
+
+
+def test_board_load_size_state_is_ok_for_a_small_board(live):
+    docs = live / "docs"
+    with wa.board_lock(live, owner="t"):
+        _write(docs, n=1)
+    st = wa.board_load_size_state(docs)
+    assert st["ok"] is True and st["source_mb"] is not None and st["source_mb"] < 1.0
+
+
+def test_board_load_size_state_trips_over_a_low_ceiling(live):
+    """Same small board, but with max_mb set low enough that even a few KB trips it —
+    stands in for the real 2.52 GB board without writing gigabytes in a test."""
+    docs = live / "docs"
+    with wa.board_lock(live, owner="t"):
+        _write(docs, n=1)
+    st = wa.board_load_size_state(docs, max_mb=0.0001)
+    assert st["ok"] is False
+    assert "over the 0 MB ceiling" in st["reason"]
+
+
+def test_read_board_records_refuses_over_the_ceiling(live, monkeypatch):
+    docs = live / "docs"
+    with wa.board_lock(live, owner="t"):
+        _write(docs, n=1)
+    monkeypatch.setenv("BOARD_LOAD_MAX_SOURCE_MB", "0.0001")
+    with pytest.raises(wa.BoardLoadTooLarge) as ei:
+        wa.read_board_records(docs)
+    assert "over the 0 MB ceiling" in str(ei.value)
+
+
+def test_load_board_refuses_over_the_ceiling_too(live, monkeypatch):
+    """load_board() calls read_board_records() internally — the guard protects both."""
+    docs = live / "docs"
+    with wa.board_lock(live, owner="t"):
+        _write(docs, n=1)
+    monkeypatch.setenv("BOARD_LOAD_MAX_SOURCE_MB", "0.0001")
+    with pytest.raises(wa.BoardLoadTooLarge):
+        wa.load_board(docs)
+
+
+def test_board_load_allow_large_overrides_the_ceiling_for_one_run(live, monkeypatch):
+    docs = live / "docs"
+    with wa.board_lock(live, owner="t"):
+        _write(docs, n=1)
+    monkeypatch.setenv("BOARD_LOAD_MAX_SOURCE_MB", "0.0001")
+    monkeypatch.setenv("BOARD_LOAD_ALLOW_LARGE", "1")
+    rows = wa.load_board(docs)   # must NOT raise
+    assert len(rows) == 1
+
+
+# ===========================================================================
 # the changed-since-load check follows the file that was actually read
 # ===========================================================================
 

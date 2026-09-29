@@ -307,3 +307,29 @@ def test_apply_from_saved_json_uses_lock_load_board_and_apply_rows(monkeypatch, 
     monkeypatch.setattr(rss, "apply_rows", lambda rows, new, **k: calls.append(f"apply:{len(new)}") or {"added": len(new)})
     rc = rss.main(["--load-json", str(f), "--no-board", "--apply", "--docs", str(tmp_path)])
     assert rc == 0 and calls == ["lock", "load", "apply:1"]
+
+
+def test_apply_refuses_cleanly_when_the_board_is_too_large_to_load(monkeypatch, tmp_path, capsys):
+    """audit O13, 2026-09-29: load_board() on the real 2.52 GB board reached a 26.3 GB
+    footprint and never finished. web_artifact.load_board() now refuses BEFORE attempting
+    that with BoardLoadTooLarge — this must surface as a clean message and a distinct exit
+    code, not a bare traceback from inside the board lock."""
+    kept = [_li(source="counties_nc.rutherford_wildfire_tax", parcel_id="55")]
+    f = tmp_path / "kept.json"
+    f.write_text(json.dumps([li.model_dump(mode="json") for li in kept], default=str))
+    import foreclosure_scraper.web_artifact as wa
+    from contextlib import contextmanager
+
+    @contextmanager
+    def fake_lock(*a, **k):
+        yield
+
+    def fake_load_board(docs):
+        raise wa.BoardLoadTooLarge(f"read_board_records refused to load {docs}: board source "
+                                   f"is 2643 MB, over the 2000 MB ceiling")
+    monkeypatch.setattr(wa, "board_lock", fake_lock)
+    monkeypatch.setattr(wa, "load_board", fake_load_board)
+    rc = rss.main(["--load-json", str(f), "--no-board", "--apply", "--docs", str(tmp_path)])
+    err = capsys.readouterr().err
+    assert rc == 76
+    assert "not applied" in err and "over the 2000 MB ceiling" in err

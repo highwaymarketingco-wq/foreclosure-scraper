@@ -135,6 +135,24 @@ BOARD_LOCK_HEARTBEAT_SECONDS = 60.0
 BOARD_GATE_SWAP_MB = 3072
 BOARD_GATE_FREE_MB = 1024
 
+# --- the board SIZE guard (audit O13, 2026-09-29) ---------------------------
+# Separate from the memory-pressure gate above: refuses read_board_records()
+# BEFORE it fully materializes the board (once as parsed JSON, once as a
+# validated Listing graph -- see BoardLoadTooLarge) when the on-disk source is
+# bigger than this machine has been shown to handle safely. The board measured
+# live on 2026-09-29 -- listings.json 2,522,435,265 bytes (~2,405 MiB) +
+# listings_detail.json 248,977,252 bytes (~237 MiB), 217,773 rows, combined
+# ~2,643 MiB -- is exactly the board a `--apply` run choked on (26.3 GB
+# footprint, 24 minutes, still climbing when killed; independently reproduced
+# by calling load_board() alone against this same board: RSS oscillating under
+# 1.1 GB in a GC-thrashing sawtooth, never completing in 240s). 2,000 MB is
+# comfortably BELOW that combined size on purpose, so this guard actually fires
+# on the board as it stands today rather than only on some future, larger one.
+# Lower it further, or replace this guard entirely, once a real fix (streaming
+# validation, chunked load) lands; raise it only with a measurement showing
+# the new ceiling completes cleanly on this machine.
+BOARD_LOAD_MAX_SOURCE_MB = 2000.0
+
 # run_meta health older than this is nulled (audit O4).
 HEALTH_MAX_AGE_HOURS = 48.0
 
@@ -162,6 +180,31 @@ class BoardLockLost(BoardLockNotHeld):
 
 class BoardMemoryPressure(RuntimeError):
     """The memory gate refused to start a board writer (audit O9)."""
+
+
+class BoardLoadTooLarge(RuntimeError):
+    """read_board_records()/load_board() refused: the on-disk board is bigger than
+    this machine can safely fully materialize (audit O13, 2026-09-29).
+
+    WHY THIS EXISTS. board_memory_gate() (audit O9, just above) only samples
+    CURRENT swap/free RAM once, at board_lock() entry, before the expensive load
+    even starts -- it says nothing about whether the load about to happen will
+    fit. A `run_scoped_scrapers.py --apply` run on 2026-09-29 passed that gate
+    fine (the 8 GB Mac had headroom at lock time) and then load_board() alone --
+    plain json.load of docs/listings.json (217,773 rows, 2.52 GB, up from the
+    ~1.1 GB / 170k rows this codebase's comments and thresholds were written
+    against) PLUS a full separate Listing.model_validate() pass, both held in
+    memory at once -- ran for 24 minutes, reached a 26.3 GB physical footprint
+    and was still climbing when killed; a bounded re-run of load_board() alone
+    against the same real board (no scraper involved) reproduced the same
+    signature: RSS oscillating under 1.1 GB in a GC-thrashing sawtooth, never
+    completing in 240s. See docs/HANDOFF.md / the 2026-09-29 apply-runaway note.
+
+    This is a SIZE check, not a memory-pressure check: it fires even on an idle
+    machine with RAM to spare, because the operation itself does not scale to
+    the board's current size yet, not because anything is currently busy.
+    BOARD_LOAD_ALLOW_LARGE=1 overrides it for one run; BOARD_LOAD_MAX_SOURCE_MB
+    raises (or lowers) the ceiling."""
 
 
 def board_lock_dir(root: Path | str | None = None) -> Path:
@@ -928,6 +971,49 @@ def _register_if_held() -> None:
         pass
 
 
+def _board_source_bytes(docs_dir: Path) -> int | None:
+    """On-disk size of what read_board_records() is about to fully materialize:
+    listings.json (plain, .gz twin, or summed .gz parts) plus listings_detail.json
+    (plain or .gz twin). None when nothing is found (a fresh/empty board — never
+    block that)."""
+    docs = Path(docs_dir)
+    total = 0
+    found = False
+    for name in ("listings.json", "listings_detail.json"):
+        p = docs / name
+        gz = p.with_name(p.name + ".gz")
+        if p.exists():
+            total += p.stat().st_size
+            found = True
+        elif gz.exists():
+            total += gz.stat().st_size
+            found = True
+        elif name == "listings.json" and _bp.has_parts(docs):
+            try:
+                total += sum(part.stat().st_size for part in _bp.list_part_files(docs))
+                found = True
+            except Exception:  # noqa: BLE001
+                pass
+    return total if found else None
+
+
+def board_load_size_state(docs_dir: Path | str, *, max_mb: float | None = None) -> dict:
+    """Would read_board_records()/load_board() be safe to run against this board,
+    judging ONLY by its on-disk size (audit O13) -- never by current memory
+    pressure, that is board_memory_state()'s job. Returns
+    {source_mb, max_mb, ok, reason}; source_mb is None when no board was found
+    (treated as ok — nothing to load yet)."""
+    n = _board_source_bytes(Path(docs_dir))
+    limit = float(max_mb if max_mb is not None
+                  else os.environ.get("BOARD_LOAD_MAX_SOURCE_MB", BOARD_LOAD_MAX_SOURCE_MB))
+    if n is None:
+        return {"source_mb": None, "max_mb": limit, "ok": True, "reason": ""}
+    source_mb = n / (1024 * 1024)
+    ok = source_mb <= limit
+    reason = "" if ok else f"board source is {source_mb:.0f} MB, over the {limit:.0f} MB ceiling"
+    return {"source_mb": source_mb, "max_mb": limit, "ok": ok, "reason": reason}
+
+
 def read_board_records(docs_dir: Path | str = "docs") -> list[dict]:
     """The published board as RAW dicts, with the lazy-detail sidecar merged
     back into each record's raw. load_board() minus the Listing validation.
@@ -944,8 +1030,30 @@ def read_board_records(docs_dir: Path | str = "docs") -> list[dict]:
 
     Records what it read (path, mtime, size) so write_artifact can refuse to
     overwrite a board that changed after this load.
+
+    Raises BoardLoadTooLarge BEFORE attempting the load when the on-disk board
+    exceeds BOARD_LOAD_MAX_SOURCE_MB (audit O13) — a full read here means json.load
+    of the whole board PLUS (for load_board() callers) a second, separate
+    Listing-validation pass held in memory at the same time; on 2026-09-29 that
+    combination hit a 26.3 GB footprint and never finished on this 8 GB Mac. This
+    is a size check, independent of board_memory_gate()'s live swap/free check —
+    it can fire on an idle, otherwise-healthy machine. BOARD_LOAD_ALLOW_LARGE=1
+    overrides it for one run; BOARD_LOAD_MAX_SOURCE_MB raises or lowers the ceiling.
     """
     docs = Path(docs_dir)
+    if os.environ.get("BOARD_LOAD_ALLOW_LARGE", "").strip().lower() not in ("1", "true", "yes"):
+        size_state = board_load_size_state(docs)
+        if not size_state["ok"]:
+            log.error("board.load_too_large", **size_state, docs_dir=str(docs))
+            raise BoardLoadTooLarge(
+                f"read_board_records refused to load {docs}: {size_state['reason']}. "
+                f"This exact combination (json.load of the whole board, then a separate "
+                f"Listing-validation pass) reached a 26.3 GB footprint and never finished "
+                f"on this machine on 2026-09-29 — see BoardLoadTooLarge's docstring. "
+                f"BOARD_LOAD_ALLOW_LARGE=1 overrides for one run; BOARD_LOAD_MAX_SOURCE_MB "
+                f"raises the ceiling once a real fix (streaming validation, chunked load) "
+                f"is measured to handle this size."
+            )
     records, used = _read_board_json_ex(docs / "listings.json")
     _remember_load(docs, used)
     _register_if_held()

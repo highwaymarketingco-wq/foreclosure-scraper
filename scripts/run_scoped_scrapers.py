@@ -501,7 +501,8 @@ def main(argv: list[str] | None = None) -> int:
               "to land the survivors.")
         return 0
 
-    from foreclosure_scraper.web_artifact import BoardLockBusy, BoardMemoryPressure, board_lock, load_board
+    from foreclosure_scraper.web_artifact import (
+        BoardLockBusy, BoardLoadTooLarge, BoardMemoryPressure, board_lock, load_board)
     docs = Path(args.docs)
     try:
         with board_lock(owner="run_scoped_scrapers", max_runtime=7200):
@@ -511,6 +512,12 @@ def main(argv: list[str] | None = None) -> int:
     except (BoardLockBusy, BoardMemoryPressure) as exc:
         print(f"run_scoped_scrapers: not applied: {exc}", file=sys.stderr)
         return 75
+    except BoardLoadTooLarge as exc:
+        # audit O13, 2026-09-29: load_board() on the current board (2.52 GB / 217,773
+        # rows) reached a 26.3 GB footprint and never finished. Refuse cleanly rather
+        # than let the caller see a bare traceback from inside the board lock.
+        print(f"run_scoped_scrapers: not applied: {exc}", file=sys.stderr)
+        return 76
     print("APPLIED:", json.dumps(stats, default=str))
     return 0
 
