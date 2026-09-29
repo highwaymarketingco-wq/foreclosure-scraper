@@ -571,6 +571,130 @@ def _parse_sc_probate(text: str) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# SC quiet-title / constructive-service heir-naming publication
+# (Dirty Deeds Tier B #26, docs/dirty_deeds_synthesis_2026-09-10.md)
+# --------------------------------------------------------------------------- #
+# A rare but real sub-type of Column's SC "Estate (Probate) Filings" noticetype
+# (confirmed live 2026-09-29, 2 unique cases / ~400 notices across the 15-county
+# SC footprint over a 200-day window, each republished 3x): a tax-deed holder
+# (a buyer at a SC delinquent-tax sale) suing under S.C. Code Ann. SS 15-11-10
+# to -50 "to quiet tax title" against the deceased former owner's estate AND
+# heirs. Because the plaintiff could not locate every heir, SC lets it serve by
+# publication -- the caption names every heir it COULD identify individually,
+# then adds a catch-all "unknown Heirs-at-Law or Devisees ... John Doe and Mary
+# Roe" for anyone it could not. That individually-named list is exactly the
+# free, already-paid-for heir search described in the synthesis doc: the filer
+# paid a title company or law firm to run it, then had to publish it.
+#
+# This is NOT the tax-foreclosure-defendant publication service that
+# enrichment_notice_service_defect.py already claims (that is defective SERVICE
+# during the ORIGINAL tax-foreclosure suit against a live owner). This is
+# POST-sale: the tax deed has already been recorded to the plaintiff, and the
+# suit is to clear the chain against the prior owner's heirs. Different case
+# type, different plaintiff, different statute.
+#
+# The caption block repeats itself (case caption, then again in the Guardian ad
+# Litem / Order sections), always ending each decedent's boilerplate clause
+# with "...or by any such designation;" immediately before either the next
+# decedent's boilerplate OR the individually-named heirs. Scan every occurrence
+# (not just the first/last) and keep whatever semicolon-delimited segment looks
+# like a real 2-4 token person name and does NOT match an institutional/
+# boilerplate blocklist -- this is robust to however many decedents/repeats the
+# caption carries and never needs to guess which occurrence is "the" one.
+_QUIET_TITLE_RE = re.compile(r"to\s+quiet\s+(?:tax\s+)?title", re.I)
+_QT_PLAINTIFF_RE = re.compile(
+    r"\d{3,7}\s+([A-Z][A-Za-z0-9,.&'\- ]{2,60}?),\s*Plaintiffs?,?\s*v\.", re.I)
+_QT_PROPERTY_RE = re.compile(
+    r"real\s+property\s+known\s+as\s+([^,]+?),\s*([A-Za-z][A-Za-z ]+?)\s+"
+    r"County,\s*South\s*Caro[\-\s]*lina", re.I)
+_QT_PARCEL_RE = re.compile(r"(?:TMS\s*No\.?|PIN)[:\s]*([0-9][0-9A-Za-z.\-]{4,25})", re.I)
+_QT_HEIRS_OF_RE = re.compile(
+    r"Heirs-?\s*at-?\s*Law\s+of\s+([A-Z][A-Za-z.'\- ]{2,60}?)"
+    r"(?:,|;|\s+aka\b|\s+a/?k/?a\b|\s+Deceased)", re.I)
+_QT_DESIGNATION_RE = re.compile(r"or\s+by\s+any\s+such\s+designation[;,]\s*", re.I)
+_QT_DEFENDANTS_END_RE = re.compile(r"\bDefendants?\.")
+# Rejects institutional/government co-defendants and boilerplate role words that
+# would otherwise pass the bare "2-4 Title-Case tokens" shape test (a bank or
+# a law firm name looks exactly like a person name to a naive regex).
+_QT_NAME_BLOCKLIST = re.compile(
+    r"\b(Bank|Corp|Inc|LLC|LLP|N\.?A\.?|Trust|Association|Company|Co\.|"
+    r"Servicing|Mortgage|Hospital|Medical|Center|City|County|Department|"
+    r"United\s+States|Internal\s+Revenue|Doe|Roe|Estate|Heirs|Devisees|"
+    r"Deceased|Successors|Assigns|Administrator|Representative|Unknown|"
+    r"Court|Office|Revenue|Workforce|Employment|Acceptance|Savings|Loan|"
+    r"Federal|Merger|Guardian|Litem|Order|Notice|Plaintiff)\b", re.I)
+_QT_PERSON_NAME_RE = re.compile(
+    r"^[A-Z][a-zA-Z.'\-]+(?:\s+[A-Z][a-zA-Z.'\-]+){1,3}"
+    r"(?:,?\s*(?:Jr\.?|Sr\.?|III|II|IV))?$")
+
+
+def _extract_named_heirs(t: str) -> list[str]:
+    """The individually-named heirs/devisees from a quiet-title defendant
+    caption. Best-effort: returns [] rather than guessing when the shape
+    doesn't match (never emit a confidently wrong name)."""
+    heirs: list[str] = []
+    for m in _QT_DESIGNATION_RE.finditer(t):
+        start = m.end()
+        end_m = _QT_DEFENDANTS_END_RE.search(t, start, start + 900)
+        end = end_m.start() if end_m else start + 500
+        for seg in t[start:end].split(";"):
+            seg = re.sub(r"^(?:and\s+)", "", seg.strip(), flags=re.I).strip(" .")
+            if not seg or len(seg) > 40:
+                continue
+            if _QT_NAME_BLOCKLIST.search(seg):
+                continue
+            if _QT_PERSON_NAME_RE.match(seg):
+                heirs.append(seg)
+    seen: set[str] = set()
+    out: list[str] = []
+    for h in heirs:
+        k = h.lower()
+        if k not in seen:
+            seen.add(k)
+            out.append(h)
+    return out
+
+
+def _parse_sc_quiet_title(text: str) -> dict | None:
+    """SC quiet-tax-title action naming heirs by publication, or None if this
+    notice body isn't that sub-type (an ordinary Notice to Creditors is by far
+    the common case under the same Column noticetype)."""
+    t = _norm(text)
+    if not _QUIET_TITLE_RE.search(t):
+        return None
+    out: dict = {"is_quiet_title": True}
+    # SC Court of Common Pleas case number (2026-CP-39-00250), NOT the "ES"
+    # probate-court number _SC_CASE looks for -- this is a civil action, filed
+    # in a different court, over the SAME Column noticetype.
+    m = _SC_CASE_RE.search(t)
+    if m:
+        out["case_number"] = f"{m.group(1)}-CP-{m.group(2)}-{m.group(3)}"
+    m = _QT_PLAINTIFF_RE.search(t)
+    if m:
+        out["plaintiff"] = _clean_name(m.group(1))
+    m = _QT_PROPERTY_RE.search(t)
+    if m:
+        out["street_address"] = m.group(1).strip(" .,")
+        out["county"] = m.group(2).strip().title()
+    m = _QT_PARCEL_RE.search(t)
+    if m:
+        out["parcel_id"] = m.group(1).strip().rstrip(".")
+    decedents: list[str] = []
+    seen_dec: set[str] = set()
+    for dm in _QT_HEIRS_OF_RE.finditer(t):
+        name = _clean_name(dm.group(1))
+        if name and name.lower() not in seen_dec:
+            seen_dec.add(name.lower())
+            decedents.append(name)
+    if decedents:
+        out["decedents"] = decedents
+    heirs = _extract_named_heirs(t)
+    if heirs:
+        out["named_heirs"] = heirs
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # NC estate / decedent-notice text parsing  (NC mortality lane)
 # --------------------------------------------------------------------------- #
 # The NC creditor notice is highly templated (verified live 2026-06-26):
@@ -1177,6 +1301,37 @@ class ColumnLegalNotices(BaseScraper):
             probate["personal_representative"] = parsed["personal_representative"]
         if probate:
             raw["probate"] = probate
+
+        # Dirty Deeds Tier B #26: a rare sub-type of this same noticetype is a
+        # SC quiet-tax-title suit naming heirs by publication, not an ordinary
+        # Notice to Creditors. When present it carries a real property address
+        # + parcel + plaintiff this lane otherwise never has (probate notices
+        # are address-less by design) -- so those fields backfill the Listing
+        # here rather than only riding along in raw.
+        county_out = county
+        street_address = None
+        parcel_id = None
+        plaintiff = None
+        case_number = parsed.get("case_number")
+        owner_name = parsed.get("owner_name")
+        qt = _parse_sc_quiet_title(text)
+        if qt:
+            raw["heir_naming_publication"] = qt
+            if qt.get("county"):
+                county_out = qt["county"]
+            street_address = qt.get("street_address")
+            parcel_id = qt.get("parcel_id")
+            plaintiff = qt.get("plaintiff")
+            if qt.get("case_number"):
+                case_number = qt["case_number"]
+            # Prefer the FIRST named decedent over the bare _ESTATE capture --
+            # _ESTATE stops at the first "Heirs" token, which on a multi-decedent
+            # quiet-title caption (co-owned property, both since deceased) can
+            # land mid-name; _QT_HEIRS_OF_RE is anchored on the cleaner
+            # "Heirs-at-Law of <name>" phrasing instead.
+            if qt.get("decedents"):
+                owner_name = qt["decedents"][0]
+
         src_url = it.get("pdfurl") or f"{API_URL}#{it.get('id') or ''}"
         published = self._published_dt(it)
         # Probate leads are address-less by design; the owner-to-GIS enricher
@@ -1187,10 +1342,13 @@ class ColumnLegalNotices(BaseScraper):
             listing_type=ListingType.PROBATE_NOTICE,
             property_kind=PropertyKind.UNKNOWN,
             state="SC",
-            county=county,
-            owner_name=parsed.get("owner_name"),
-            defendant=parsed.get("owner_name"),  # decedent — drives name backfill
-            case_number=parsed.get("case_number"),
+            county=county_out,
+            street_address=street_address,
+            parcel_id=parcel_id,
+            plaintiff=plaintiff,
+            owner_name=owner_name,
+            defendant=owner_name,  # decedent — drives name backfill
+            case_number=case_number,
             description=_norm(text)[:500],
             first_seen=published,
             last_seen=datetime.utcnow(),

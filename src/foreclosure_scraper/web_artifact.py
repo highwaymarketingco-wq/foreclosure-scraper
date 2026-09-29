@@ -1321,6 +1321,14 @@ RAW_KEEP = {
     # enrichment_notice_service_defect.py's first run, same lesson as
     # divorce_no_subsequent_deed immediately above.
     "notice_service_defect": "*",
+    # Dirty Deeds Tier B #26 (docs/dirty_deeds_synthesis_2026-09-10.md): a SC
+    # quiet-tax-title suit's constructive-service publication naming the
+    # decedent's heirs {is_quiet_title, plaintiff, case_number, county,
+    # street_address, parcel_id, decedents[], named_heirs[]} -- someone else's
+    # paid-for heir search, published. Written by
+    # column_legal_notices._sc_probate_listing. Registered BEFORE its first
+    # run, same lesson as notice_service_defect immediately above.
+    "heir_naming_publication": "*",
     # Fullmer deal-economics rank {rank, why, flags, cad_value, owner_count,
     # liquidity, margin_coverage}. The dashboard sorts and filters on it, so
     # stripping it here would make the whole ranking invisible.
