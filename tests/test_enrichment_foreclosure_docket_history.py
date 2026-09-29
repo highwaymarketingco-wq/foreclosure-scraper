@@ -154,3 +154,54 @@ def test_different_owners_in_the_same_county_do_not_cross_contaminate(tmp_path, 
 def test_raw_key_is_registered_in_raw_keep():
     from foreclosure_scraper.web_artifact import RAW_KEEP
     assert "repeat_foreclosure_filing" in RAW_KEEP
+
+
+# ---- dry-run/real-run double persistence -- 2026-09-29 investigation ------
+#
+# Sibling to enrichment_jail_bookings.py's 2026-09-29 fix (commit 1ec77297,
+# "Fix jail-roster sidecar losing 590 signals to dry-run/real-run
+# sequencing"). enrich_foreclosure_docket_history() has NO dry_run parameter:
+# its con.commit() after the record loop runs unconditionally, so a --dry-run
+# invocation of scripts/run_pending_signal_enrichers.py DOES persist real
+# case observations to data/foreclosure_docket_history.db (confirmed live
+# 2026-09-29: this exact dry-run-then-real-run sequence happened for THIS
+# enricher too, ~37 minutes apart -- same job, same script, all 8 STEPS
+# including this one run unconditionally regardless of --dry-run).
+#
+# UNLIKE jail bookings' is_new_booking (a diff against last-known roster
+# state that gets silently swallowed once a dry run marks a name "seen"),
+# repeat_foreclosure_filing depends on repeat_filing_flag's cumulative count
+# of ever_dismissed cases for an owner -- a stateless aggregate, not a diff.
+# That is why no dry_run parameter was added here: this test pins that
+# calling the enrichment function a second time (standing in for the real
+# run, after an earlier "dry run" call already recorded the same targets)
+# still produces the identical, correct flag -- no signal is lost the way
+# jail_booking_new's was.
+
+def test_calling_the_enrichment_twice_does_not_lose_the_repeat_flag(tmp_path, monkeypatch):
+    """Dry-run-then-real-run, reproduced at the enrichment-function layer: two
+    dismissed cases plus a third active one, enriched in ONE call ('dry
+    run'), then fresh Listing objects for the exact same three real-world
+    cases enriched AGAIN in a second call ('real run') -- the second call's
+    flag on the active listing must match the first's, not be silently
+    dropped because the dry run already recorded the two dismissals."""
+    monkeypatch.setattr(fdh, "DB_PATH", tmp_path / "h.db")
+    a = _sc_pi_lis_pendens("2026-CP-42-00001", "Dismissed", "JOHN SMITH")
+    b = _sc_pi_lis_pendens("2026-CP-42-00002", "Dismissed", "JOHN SMITH")
+    c = _sc_pi_lis_pendens("2026-CP-42-00003", "Pending", "JOHN SMITH")
+    dry_counts = _run([a, b, c])
+    assert dry_counts == {"observed": 3, "flagged": 1}
+    assert c.raw["repeat_foreclosure_filing"]["count"] == 2
+
+    # Fresh Listing objects for the SAME real-world cases -- standing in for
+    # the real run's own re-scrape of the same board rows minutes later.
+    a2 = _sc_pi_lis_pendens("2026-CP-42-00001", "Dismissed", "JOHN SMITH")
+    b2 = _sc_pi_lis_pendens("2026-CP-42-00002", "Dismissed", "JOHN SMITH")
+    c2 = _sc_pi_lis_pendens("2026-CP-42-00003", "Pending", "JOHN SMITH")
+    real_counts = _run([a2, b2, c2])
+    assert real_counts == {"observed": 3, "flagged": 1}
+    assert c2.raw["repeat_foreclosure_filing"]["count"] == 2, (
+        "a case recorded by an earlier call must still count toward a later "
+        "call's repeat-filing flag -- this signal is NOT lost the way "
+        "jail_booking_new's is_new gate was (2026-09-29 investigation)"
+    )

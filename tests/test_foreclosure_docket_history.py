@@ -187,6 +187,56 @@ def test_stats_rolls_up_per_state_county(tmp_path):
     assert r["dismissed_cases"] == 1
 
 
+
+# ---- double-observation across separate calls (dry-run + real-run shape) --
+#
+# 2026-09-29 investigation, sibling to jail_roster_history.py's fix in commit
+# 1ec77297 ("Fix jail-roster sidecar losing 590 signals to dry-run/real-run
+# sequencing"). enrich_foreclosure_docket_history() has NO dry_run parameter
+# and its single con.commit() after the observe loop runs unconditionally, so
+# scripts/run_pending_signal_enrichers.py --dry-run DOES persist real case
+# observations to data/foreclosure_docket_history.db here too (confirmed live
+# 2026-09-29: all 16,739 cases in the sidecar show first_seen_at stamped at a
+# dry run's timestamp and times_seen>=2 from the real run's unavoidable
+# re-observation ~37 minutes later -- the same shape as the jail-bookings
+# incident). UNLIKE jail_roster_history.diff_and_record's is_new gate, though,
+# repeat_filing_flag is a stateless aggregate over ALL currently recorded
+# ever_dismissed cases for an owner -- it does not care WHEN or by which call
+# a case was first recorded. These pin that a case recorded by an EARLIER
+# call still counts toward a LATER call's flag computation, so no dry_run
+# parameter is needed here -- see enrichment_foreclosure_docket_history.py's
+# module docstring for the full writeup.
+
+def test_a_case_recorded_by_an_earlier_call_still_counts_toward_a_later_flag(tmp_path):
+    """Simulates dry-run-then-real-run: two SEPARATE observe_case calls (own
+    connections, standing in for two separate script invocations) touch the
+    SAME first case, and the flag check afterward must see it either way."""
+    db_path = tmp_path / "h.db"
+    t1 = datetime(2026, 9, 29, 17, 54, tzinfo=timezone.utc)  # "dry run"
+    t2 = datetime(2026, 9, 29, 18, 31, tzinfo=timezone.utc)  # "real run" ~37m later
+
+    con1 = fdh.connect(db_path)
+    fdh.observe_case(con1, state="SC", county="Pickens", case_number="2026-CP-39-00001",
+                     owner_name="MARY WHITE", status="Dismissed", now=t1)
+    con1.close()
+
+    # A second, later connection (standing in for the real run) re-observes
+    # the SAME first case, then records a fresh second dismissal.
+    con2 = fdh.connect(db_path)
+    fdh.observe_case(con2, state="SC", county="Pickens", case_number="2026-CP-39-00001",
+                     owner_name="MARY WHITE", status="Dismissed", now=t2)
+    fdh.observe_case(con2, state="SC", county="Pickens", case_number="2026-CP-39-00099",
+                     owner_name="MARY WHITE", status="Dismissed", now=t2)
+    flag = fdh.repeat_filing_flag(con2, state="SC", county="Pickens", owner_name="MARY WHITE")
+    con2.close()
+
+    # Both dismissed cases count, regardless of which call first recorded
+    # the first one -- unlike jail_roster_history's is_new diff, nothing here
+    # is "consumed" by the earlier call.
+    assert flag is not None
+    assert flag["count"] == 2
+
+
 def test_is_dismissal_status_matches_the_synthesis_vocabulary_only():
     assert fdh.is_dismissal_status("Dismissed") is True
     assert fdh.is_dismissal_status("Terminated") is True

@@ -37,6 +37,43 @@ the scraper-side recording already captured.
 The three SC sources (`counties_sc.sc_public_index_lis_pendens`,
 `counties_sc.sc_public_index`, `national.sc_public_index`) never discard
 anything, so both recording and flagging happen here for all of them.
+
+DRY-RUN PERSISTENCE -- INVESTIGATED, NOT A BUG (2026-09-29). This function has
+no `dry_run` parameter, and `con.commit()` after the record loop below runs
+unconditionally -- so `scripts/run_pending_signal_enrichers.py --dry-run`
+DOES persist real observations into data/foreclosure_docket_history.db, on
+its own read of the board, exactly like a real run. That is structurally the
+same shape as the bug fixed the same day in `enrichment_jail_bookings.py`
+(commit 1ec77297, "Fix jail-roster sidecar losing 590 signals to dry-run/
+real-run sequencing") and confirmed to have actually happened here too, live:
+the 2026-09-29 sidecar shows all 16,739 cases with `first_seen_at` stamped at
+a dry run's timestamp and `times_seen>=2` from the real run re-observing the
+same targets ~37 minutes later (`scripts/run_pending_signal_enrichers.py`
+runs all 8 STEPS -- including this one -- in a single invocation, so the same
+dry run that surfaced the jail-bookings bug touched this sidecar too).
+
+Despite that, NO SIGNAL IS LOST here, and no fix was made. The difference is
+`repeat_filing_flag`: unlike `jail_roster_history.diff_and_record`'s
+`is_new`/`is_new_booking`, which is a DIFF against last-known roster state
+(so a name marked "seen" by an early dry-run commit is invisible to the real
+run's own diff -- the actual bug), `repeat_filing_flag` is a STATELESS
+aggregate query -- "how many of this owner's currently-recorded cases have
+`ever_dismissed=1` right now" -- run fresh against the sidecar every single
+call. It does not care whether a given dismissed case was recorded by this
+run, a dry run minutes ago, or the scraper-side `observe_case` hook in
+`nc_ecourts_lis_pendens.py`; the real run's own flag computation sees the
+exact same cumulative case history either way and writes the same, correct
+`repeat_foreclosure_filing` payload to the board. See
+`test_calling_the_enrichment_twice_does_not_lose_the_repeat_flag` in
+tests/test_enrichment_foreclosure_docket_history.py (and the sidecar-level
+pin in tests/test_foreclosure_docket_history.py) for a regression test of
+this exact property. The only side effect of the early dry-run commit is
+cosmetic sidecar metadata drift -- `times_seen` inflated by one extra count
+and `first_seen_at` stamped at the dry run's time instead of the real run's
+-- neither of which any code in this repo reads (grepped 2026-09-29), so no
+sidecar cleanup was performed either (contrast with jail_roster_history.db,
+where the lost `is_new` diff required deleting the dry run's wrongly-
+committed rows so the next real run could re-discover them).
 """
 from __future__ import annotations
 
