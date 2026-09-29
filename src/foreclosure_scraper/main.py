@@ -3217,6 +3217,21 @@ async def run() -> int:
     except Exception:
         log.error("divorce_no_subsequent_deed.failed", traceback=traceback.format_exc())
 
+    # Assessor owner-name search used as a notice-defect weapon (Dirty Deeds
+    # Tier B #30) -- a tax-foreclosure defendant served by publication/
+    # alternative service whose name resolves to a real address elsewhere on
+    # the board (raw['owner_mailing'] / raw['resolved_from_name'], both
+    # already populated by the passes above) in the SAME county. Same
+    # dependency as divorce_no_subsequent_deed immediately above: must run
+    # after the name resolver and owner-mailing enrichers, no network of its
+    # own. NC only (SC's tax sale is administrative, no service event).
+    try:
+        from .enrichment_notice_service_defect import enrich_notice_service_defect
+        s = enrich_notice_service_defect(enriched)
+        if s and s.get("tagged"): enrichment_stats["notice_service_defect"] = s
+    except Exception:
+        log.error("notice_service_defect.failed", traceback=traceback.format_exc())
+
     # Fullmer deal-economics rank — the buy box from Distressed Property Secrets and
     # the Dirty Deeds interviews, expressed as POINTS. Runs after derived_signals
     # because it reads calc.est_gross_margin, distress_stack.absentee, deed_chain and

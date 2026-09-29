@@ -1312,6 +1312,15 @@ RAW_KEEP = {
     # enrichment_divorce_no_subsequent_deed.py's first run, same lesson as
     # liensnc_posthumous_filing/platted_lots immediately above.
     "divorce_no_subsequent_deed": "*",
+    # Dirty Deeds Tier B #30 (docs/dirty_deeds_synthesis_2026-09-10.md): a
+    # tax-foreclosure defendant served by publication/alternative service whose
+    # name resolves to a real mailing or situs address in the SAME county's
+    # assessor/GIS data (raw['owner_mailing'] / raw['resolved_from_name'], both
+    # already RAW_KEEP'd above) -- a notice-defect claim, leverage to pull a
+    # pending sale or cloud a tax deed. Registered BEFORE
+    # enrichment_notice_service_defect.py's first run, same lesson as
+    # divorce_no_subsequent_deed immediately above.
+    "notice_service_defect": "*",
     # Fullmer deal-economics rank {rank, why, flags, cad_value, owner_count,
     # liquidity, margin_coverage}. The dashboard sorts and filters on it, so
     # stripping it here would make the whole ranking invisible.
