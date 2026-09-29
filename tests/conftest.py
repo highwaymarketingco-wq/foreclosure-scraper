@@ -10,6 +10,7 @@ breaker.
 import pytest
 
 from foreclosure_scraper import enrichment_arcgis as _arcgis
+from foreclosure_scraper import jail_roster_history as _jail_history
 
 
 @pytest.fixture(autouse=True)
@@ -19,6 +20,17 @@ def _reset_arcgis_breaker():
     yield
     _arcgis._WALLED_HOSTS.clear()
     _arcgis._HOST_FAILS.clear()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_jail_roster_history(monkeypatch, tmp_path_factory):
+    """enrichment_jail_bookings._load_roster writes every fetch to the
+    jail_roster_history sidecar with no opt-out (best-effort, see its own
+    docstring). Without this, any test that exercises it — including ones that
+    predate this sidecar and never asked for one — would create/append to the
+    real data/jail_roster_history.db. Redirect to a throwaway file per test."""
+    monkeypatch.setattr(_jail_history, "DB_PATH",
+                        tmp_path_factory.mktemp("jail_history") / "jail_roster_history.db")
 
 
 @pytest.fixture(autouse=True)

@@ -165,6 +165,10 @@ async def _dac_lookup(http: httpx.AsyncClient, last: str, first: str) -> _Lookup
     if has_last and has_first and 1 <= n_results <= max_results:
         return _Lookup(match={"state": "NC", "source": DAC_SOURCE,
                               "matched_name": f"{first} {last}", "results": n_results,
+                              # NC DAC is the state prison system — never a
+                              # county jail (see enrichment_jail_bookings.py)
+                              # or federal BOP (see enrichment_bop_federal.py).
+                              "facility_type": "prison",
                               "confidence": "name_only_low"},
                        answered=True, candidates=n_results)
     return _Lookup(answered=True, candidates=n_results)
@@ -202,6 +206,8 @@ async def _scdc_lookup(http: httpx.AsyncClient, last: str, first: str) -> _Looku
         return _Lookup(match={"state": "SC", "source": SCDC_SOURCE,
                               "matched_name": f"{first} {last}", "results": len(exact),
                               "scdc_id": str(rec.get("scdcId") or "").strip() or None,
+                              # SC DOC (SCDC) is the state prison system.
+                              "facility_type": "prison",
                               "confidence": "name_only_low"},
                        answered=True, candidates=len(recs))
     return _Lookup(answered=True, candidates=len(recs))

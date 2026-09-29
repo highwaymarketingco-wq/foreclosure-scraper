@@ -1239,6 +1239,12 @@ RAW_KEEP = {
     "notice_contact": "*",            # attributable attorney/trustee email from the legal-notice body
     "incarceration": "*",             # owner matched a state corrections roster (NC DAC) — low-conf stack signal
     "incarceration_check": "*",       # answered NO-match stamp {checked_at, name, source, result}: lets the enricher rotate past checked leads instead of re-querying the same 150
+    # Dirty Deeds Tier B #36 (2026-09-29): jail-roster persistence + BOP.gov federal locator.
+    "jail_booking_new": "*",          # jail_roster_history-confirmed NEW booking in a DIFFERENT county than the
+                                      # listing's own property county (ep 069 "fugitive heir" case) — distinct from
+                                      # jail_booking/incarceration by design, see enrichment_jail_bookings.match_cross_county
+    "bop_federal": "*",               # BOP.gov Inmate Locator name match: facility code/name/type, release dates
+    "bop_check": "*",                 # answered NO-match stamp for enrichment_bop_federal, same shape as incarceration_check
     "distress_stack": "*",
     "strategy_fit": "*",
     "eviction_market": "*",           # LSC county eviction-pressure market signal (context)

@@ -1935,6 +1935,14 @@ async def run() -> int:
             enrichment_stats["jail_bookings"] = await _await_capped(enrich_jail_bookings(enriched), "jail_bookings")
         except Exception:
             log.error("jail_bookings.failed", traceback=traceback.format_exc())
+        # Federal incarceration (BOP.gov Inmate Locator) — the third lane the
+        # state (above) and county-jail rosters both miss entirely.
+        if not os.environ.get("BOP_OFF"):
+            try:
+                from .enrichment_bop_federal import enrich_bop_federal
+                enrichment_stats["bop_federal"] = await _await_capped(enrich_bop_federal(enriched), "bop_federal")
+            except Exception:
+                log.error("bop_federal.failed", traceback=traceback.format_exc())
 
     # NC case-status: two-stage dispatch.
     #   Stage 1 (when NC_ECOURTS_USERNAME/PASSWORD set): authenticated

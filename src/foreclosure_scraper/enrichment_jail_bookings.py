@@ -61,15 +61,49 @@ county is not a Zuercher / P2C / JailTracker tenant.
 
 Sets raw['jail_booking'] (detail) + raw['incarceration'] (so distress_score's
 existing LEGAL incarceration signal, weight 8, picks it up). Free + compliant.
+
+STANDING RE-QUERY (Dirty Deeds Tier B #36, 2026-09-29). Until this change every
+run treated each roster fetch as an independent snapshot: match_rosters skips a
+listing the moment raw['jail_booking'] is truthy, so a name was matched at most
+ONCE, ever, with no durable memory of when it was first seen and no way to
+notice the person later turning up on a DIFFERENT county's roster (the
+synthesis's ep 069 fugitive-heir story -- a saved search re-fires on a booking
+nowhere near the property). `jail_roster_history.py` is the fix: a small SQLite
+sidecar (data/jail_roster_history.db, gitignored like every other sidecar in
+this repo) that remembers every (state, county, name) this module has ever
+fetched. `_load_roster` diffs each fetch against it and tags every roster record
+with `is_new_booking` / `first_detected_at` -- "start the clock at detection"
+for the 6-8 week approved-contact-registration mechanic. `match_cross_county`
+then uses that sidecar-confirmed newness to flag raw['jail_booking_new'] when a
+NEW booking's name matches a listing whose OWN property county is different from
+the booking county -- a distinct signal, deliberately never written into
+raw['jail_booking'] or raw['incarceration'], so it cannot change an existing
+distress_score count or silently re-fire on the same cross-county pairing every
+run forever (it only fires the run a name is new to that county).
+
+FACILITY TYPE (Tier B #36's other ask): every source in ROSTERS/SEARCH_ROSTERS
+is a county SHERIFF jail booking system (P2C, Zuercher, Citizen Connect, Tyler,
+LANSA) -- pre-trial holds and short local sentences, never a state prison or
+federal BOP facility. So `facility_type` here is a constant, source-level
+inference ("jail"), not a per-record lookup; the state-prison lane
+(enrichment_incarceration.py) tags "prison" and the federal lane
+(enrichment_bop_federal.py) derives federal_prison / federal_detention /
+community_confinement from BOP's own facility-type code. Jails restrict inbound
+mail far more than prisons (synthesis: one jail would only accept a deed packet
+from a licensed attorney in person) -- this field is what would drive an
+outreach-channel decision downstream, though nothing reads it for that yet.
 """
 from __future__ import annotations
 
 import asyncio
 import re
+import traceback
 from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
+
+from . import jail_roster_history
 
 from .models import Listing
 from .enrichment_incarceration import _name_parts, _owner_of
@@ -393,6 +427,27 @@ async def _load_roster(state: str, county: str, vendor: str, target: str):
     index: dict[tuple, dict] = {}
     for rec in recs:
         index.setdefault(_norm_key(rec["last"], rec["first"]), rec)
+    if recs:
+        # Diff against the sidecar so every record carries whether THIS is the
+        # first time we have ever seen this name on this county's roster, plus
+        # when. Guarded to never run on an empty fetch (jail_roster_history's
+        # own docstring: an empty `recs` is indistinguishable from a failed
+        # fetch, so it must never be read as "the roster emptied out").
+        # Best-effort: a sidecar write failure must never block a real match.
+        try:
+            con = jail_roster_history.connect()
+            try:
+                meta = jail_roster_history.diff_and_record(con, state, county, vendor, recs)
+            finally:
+                con.close()
+            for key, rec in index.items():
+                m = meta.get(key)
+                if m:
+                    rec["is_new_booking"] = m["is_new"]
+                    rec["first_detected_at"] = m["first_seen_at"]
+        except Exception:  # noqa: BLE001
+            log.warning("jail_history.persist_failed", county=county, vendor=vendor,
+                       traceback=traceback.format_exc())
     log.info("jail.roster", county=county, vendor=vendor, inmates=len(recs))
     return (state, county), index
 
@@ -447,6 +502,15 @@ def _apply_hit(li: Listing, county: str, first: str, last: str, hit: dict) -> No
         # date + charges for this one person.
         "detail_id": hit.get("detail_id"),
         "confidence": "name_only_low",
+        # Every ROSTERS/SEARCH_ROSTERS vendor is a county sheriff jail system —
+        # see module docstring "FACILITY TYPE".
+        "facility_type": "jail",
+        # jail_roster_history.py sidecar metadata: True the run this name was
+        # first ever seen on this county's roster; when the sidecar write
+        # failed (best-effort — see _load_roster) both are None rather than a
+        # guessed value.
+        "is_new_booking": hit.get("is_new_booking"),
+        "first_detected_at": hit.get("first_detected_at"),
     }
     raw.setdefault("incarceration", {
         "state": li.state, "source": f"{county} County jail roster",
@@ -478,6 +542,67 @@ def match_rosters(listings: list[Listing], rosters: dict) -> list[Listing]:
     return matched
 
 
+def _owner_name_index(listings: list[Listing]) -> dict[tuple, list[Listing]]:
+    """(state, norm_last, norm_first) -> every NC/SC listing with that resolved
+    owner, regardless of the listing's own county. Built once per run so
+    match_cross_county can look a roster name up against the WHOLE board
+    instead of just its own county's leads."""
+    idx: dict[tuple, list[Listing]] = {}
+    for li in listings:
+        if li.state not in ("NC", "SC"):
+            continue
+        parts = _name_parts(_owner_of(li) or "")
+        if not parts:
+            continue
+        idx.setdefault((li.state, *_norm_key(*parts)), []).append(li)
+    return idx
+
+
+def match_cross_county(listings: list[Listing], rosters: dict) -> list[Listing]:
+    """Flag a listing whose owner turns up on a covered county's roster that is
+    NOT the listing's own property county — the ep 069 "fugitive heir" case
+    from the Tier B #36 synthesis: a saved search re-fires on a booking nowhere
+    near the property.
+
+    Scoped to bookings jail_roster_history says are brand-new to that county
+    this run (hit["is_new_booking"]), so a name that happens to sit on two
+    counties' rosters permanently does not re-flag on every single run forever
+    — it fires once, the run that pairing first appears, exactly the "standing
+    re-query" the synthesis asks for.
+
+    Writes a SEPARATE key, raw['jail_booking_new'], never raw['jail_booking'] or
+    raw['incarceration'] — this must not change an existing same-county match or
+    silently inflate distress_score's LEGAL incarceration count; it is a new,
+    distinctly-actionable signal on top of what already existed.
+    """
+    owner_idx = _owner_name_index(listings)
+    flagged: list[Listing] = []
+    for (state, county), idx in rosters.items():
+        for (last, first), hit in idx.items():
+            if not hit.get("is_new_booking"):
+                continue
+            for li in owner_idx.get((state, last, first), ()):
+                if _plain_county(li) == county:
+                    continue                                  # same-county lane's job
+                if (li.raw or {}).get("jail_booking_new"):
+                    continue                                  # already flagged this run
+                raw = li.raw if isinstance(li.raw, dict) else {}
+                raw["jail_booking_new"] = {
+                    "county": county, "state": state,
+                    "home_county": _plain_county(li),
+                    "matched_name": f"{first} {last}",
+                    "arrest_date": hit.get("arrest_date"),
+                    "charge": hit.get("charge"),
+                    "facility_type": "jail",
+                    "cross_county": True,
+                    "first_detected_at": hit.get("first_detected_at"),
+                    "confidence": "name_only_low_cross_county",
+                }
+                li.raw = raw
+                flagged.append(li)
+    return flagged
+
+
 async def enrich_jail_bookings(listings: list[Listing],
                                max_searches_per_county: int = 200) -> dict:
     """Match resolved owner names against covered county jail rosters.
@@ -507,6 +632,10 @@ async def enrich_jail_bookings(listings: list[Listing],
 
     # Tyler grids omit booking date + charges; pull them for matched rows only.
     counts["hydrated"] = await _hydrate_tyler_hits(listings)
+
+    # Cross-county re-identification: this run's rosters against every NC/SC
+    # listing on the board, not just leads in that roster's own county.
+    counts["cross_county"] = len(match_cross_county(listings, rosters))
 
     # ---- lane 2: per-name search rosters (one lookup per in-scope owner) ----
     for (state, county), (vendor, target) in search_covered.items():
