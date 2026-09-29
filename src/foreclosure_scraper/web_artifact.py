@@ -193,6 +193,32 @@ BOARD_GATE_FREE_MB = 1024
 # being landed (this file's docstring approach (b); flagged as a follow-up, not
 # attempted this session). BOARD_LOAD_ALLOW_LARGE=1 remains the deliberate,
 # monitored override for a human who has decided a specific run is worth it.
+#
+# REAL FULL-BOARD ATTEMPT, 2026-09-29 (task_0658b33b follow-up), CEILING NOT RAISED.
+# append_new_rows() had just been measured at only 2.46 GB peak RSS against the real board
+# (217,773 -> 217,883 rows, ~2,643 MiB combined source), well under its ~5.3 GB extrapolated
+# estimate -- a reasonable hint that this constant's own 10-12 GiB extrapolation (above) might
+# also be pessimistic. It was not: load_board(), BOARD_LOAD_ALLOW_LARGE=1, run against the real
+# 217,883-row board under an external RSS-polling watchdog (RLIMIT_AS confirmed unusable on this
+# Darwin machine -- raises ValueError outright) capped at 6 GiB RSS / 1800s wall clock. `ps`-
+# reported RSS stayed under ~1.1 GB and oscillated there (400 MB-1.1 GB) for the entire 12+
+# minutes it ran, never tripping the watchdog. A `sample <pid> -f <file>` taken at the 12-minute
+# mark, BUT READING ITS "Physical footprint" LINE rather than the RSS this file's other
+# measurements already knew to distrust, showed 11.1 GB (peak 11.3 GB) -- essentially exactly
+# this constant's own 10-12 GiB extrapolation, and the call stack was parked inside
+# gc_collect_main, called from the zip_longest/gen_iternext chain _iter_board_records uses: the
+# same GC-thrashing signature BoardLoadTooLarge's docstring describes for the pre-streaming bug,
+# just expressed in compressed/swapped pages instead of RSS this time. The run was killed by
+# hand (not by the watchdog, which an RSS-only cap would not have tripped until far too late, if
+# ever, at this ratio); PhysMem freed ~3 GB the instant it died, confirming the footprint was
+# real, not a `sample` artifact. RSS/footprint gap WIDENS with scale -- 2.2x at the 100,000-row
+# trial above, ~5.7x here (2.0 GB RSS per the watchdog's own peak vs. 11.1+ GB footprint) --
+# which is why an RSS-based watchdog cap alone is NOT a sufficient safety net for a load_board()
+# scale experiment; a live `sample`/`/usr/bin/time -l` footprint check is required too. VERDICT:
+# the full board still does not fit this 8 GB Mac even with the streaming fix landed --
+# BOARD_LOAD_MAX_SOURCE_MB stays at 1,200 MB, not raised. The real board (docs/listings.json,
+# docs/listings_detail.json) was never mutated by this attempt -- load_board() only reads;
+# nothing called write_artifact.
 BOARD_LOAD_MAX_SOURCE_MB = 1200.0
 
 # --- the append-only SIZE guard (task_0658b33b's follow-up, 2026-09-29) -----
