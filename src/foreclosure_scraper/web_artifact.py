@@ -1295,6 +1295,15 @@ RAW_KEEP = {
     # BEFORE enrichment_liensnc_posthumous.py's first run — see the RAW_KEEP
     # audit trail immediately above and below for why that order matters here.
     "liensnc_posthumous_filing": "*",
+    # Dirty Deeds Tier A #9 (docs/dirty_deeds_synthesis_2026-09-10.md):
+    # multi_lot (2+ platted lots named in the legal/tax description) and/or
+    # acreage_mismatch (legal-text acreage vs assessor Listing.acreage, >20%
+    # + >0.1ac apart). Registered BEFORE enrichment_platted_lots.py's first
+    # run. Deliberately NOT in _SLIM_RAW or dashboard.js _LEAN_RAW yet, same
+    # position as deed_index/repeat_tax_loss above -- reaches the full board
+    # for analyst review but not the lean payload phones fetch. Add it to
+    # both gates if the dashboard should surface it per-row.
+    "platted_lots": "*",
     # Fullmer deal-economics rank {rank, why, flags, cad_value, owner_count,
     # liquidity, margin_coverage}. The dashboard sorts and filters on it, so
     # stripping it here would make the whole ranking invisible.

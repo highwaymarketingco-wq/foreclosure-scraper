@@ -3190,6 +3190,19 @@ async def run() -> int:
     except Exception:
         log.error("liensnc_posthumous.failed", traceback=traceback.format_exc())
 
+    # Legal-description multi-lot / deeded-vs-assessor acreage mismatch
+    # (Dirty Deeds Tier A #9) — a regex pass over legal_description/
+    # description (already on the row from ~25 county tax scrapers) plus a
+    # compare against Listing.acreage (assessor/GIS). No network, no new
+    # fields upstream. Independent of the other passes above, so position
+    # relative to them does not matter.
+    try:
+        from .enrichment_platted_lots import enrich_platted_lots
+        s = enrich_platted_lots(enriched)
+        if s and s.get("tagged"): enrichment_stats["platted_lots"] = s
+    except Exception:
+        log.error("platted_lots.failed", traceback=traceback.format_exc())
+
     # Fullmer deal-economics rank — the buy box from Distressed Property Secrets and
     # the Dirty Deeds interviews, expressed as POINTS. Runs after derived_signals
     # because it reads calc.est_gross_margin, distress_stack.absentee, deed_chain and

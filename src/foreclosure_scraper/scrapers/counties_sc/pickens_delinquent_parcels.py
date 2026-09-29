@@ -60,6 +60,44 @@ Free + compliant: anonymous ArcGIS REST, no key, no login, no CAPTCHA/WAF.
 Dateless (a delinquency is a standing balance, not a dated sale) -> the slug
 must be in ``main.DATELESS_OK_SOURCES`` or every row is filtered out.
 Gate with FORECLOSURE_PICKENS_DELINQUENT=0.
+
+NEGATIVE FINDING, Dirty Deeds Tier A #14 (docs/dirty_deeds_synthesis_2026-09-10.md):
+    "Multiple tax accounts on one parcel ID with mixed paid/delinquent status
+    (054) -- Where an assessor splits a bill by undivided interest, fractional
+    ownership falls straight off the tax file. Unknown whether any core county
+    does it." Probed LIVE against this county's own dqnt_2024 layer
+    2026-09-28 (read-only ``fetch_layer`` calls, no load_board/write): the
+    layer carries a county-COMPUTED ``Cnt_PARCEL`` field plus a second
+    account column (``ACCOUNTNO``, distinct from ``ACCTNO``) that DOES
+    directly answer this -- Cnt_PARCEL is >1 for 6 of 954 parcels (0.63%) in
+    the 2024 roll, i.e. the mechanism this module's own ``by_pin`` fold (see
+    ``build_listing`` above) would silently collapse DOES occur here.
+
+    But every one of those 6 is a commercial/apartment parcel under an LLC or
+    property-management name (TIGERTOWN INVESTMENTS GROUP LLC, MCKENNEY
+    ENTERPRISES LLC, TIGER DEVELOPMENT II LLC / THE PREISS COMPANY, ...), each
+    with a non-blank PINEXT/SubNo reading as a UNIT or SUITE number ("002",
+    "015", "211", "U06") and a matching unit number in the situs address
+    ("833 OLD GREENVILLE HWY 1130", "104 UNIVERSITY VILLAGE DR E"). That is
+    condominium/multi-unit horizontal-property billing -- one tax account per
+    RENTABLE UNIT under a shared parent PIN -- not the synthesis's fractional/
+    undivided-heir-interest split. STATUS is 'A' on 953 of 954 rows regardless
+    (this is a delinquent-ONLY roll, so "mixed paid/delinquent" cannot be
+    observed here even in principle: a paid sibling account never appears in
+    a delinquent-only extract at all).
+
+    Also checked: no PIN across all 6 Pickens rolls 2020-2025 (2,536 rows
+    scanned) ever carries 2+ DISTINCT non-null ACCTNO or PIN_EXT values --
+    every apparent "multi" reading was the same account under an inconsistent
+    pin_ext ('0' one year, blank the next), not a real second account.
+
+    Conclusion: the mechanical pattern (Cnt_PARCEL>1) is real and present in
+    this county's own data, but the one case class it actually produces here
+    is commercial condo/unit billing, not heirship. NOT a distress signal on
+    this evidence -- not built. If another core county's roll ever shows
+    Cnt_PARCEL>1 (or equivalent) on an INDIVIDUAL owner's name rather than an
+    LLC, that would be the first real instance and would justify the
+    detector the synthesis asks for.
 """
 from __future__ import annotations
 
