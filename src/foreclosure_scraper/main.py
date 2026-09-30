@@ -647,6 +647,18 @@ DATELESS_OK_SOURCES = {
     # item 7): Beaufort's FLC runs through Meares Property Advisors on Proxibid, a
     # second multi-county FLC-auctioneer vendor alongside Terry Howe.
     "counties_sc.beaufort_flc",                   # Beaufort FLC via Meares/Proxibid (dateless)
+    # 2026-09-29 sale-type/no-date audit (docs/extraction_gaps.md): horry_flc's own
+    # docstring already says "DATELESS: the FLC list carries NO auction/sale date --
+    # FLC parcels sell over-the-counter on a rolling basis until redeemed" (same
+    # reasoning as every other _flc source above), but the whitelist entry itself was
+    # never added. distress_score._is_county_owned_inventory() already recognizes the
+    # "horry_flc" slug and scores it correctly (tax_sale signal suppressed, not
+    # penalized), so the scorer was never wrong -- but without this entry,
+    # _active_only() would silently drop every horry_flc row the moment it runs
+    # through the normal pipeline again (the 3 rows currently on the board landed via
+    # a bypass path, not this gate). Verified live 2026-09-29: 3/3 dateless tax_sale
+    # rows on the board are this source.
+    "counties_sc.horry_flc",                      # Horry FLC over-the-counter inventory (dateless)
     "counties_sc.terry_howe_auctions",            # broad real-estate auction catalog; older/overflow posts dateless
     "counties_sc.spartan_weekly_legals",          # current Spartanburg legal notices (sale_date best-effort)
     "counties_nc.nc_rod_logan",                   # recent NOD recordings (date-range limited, current)
