@@ -15,6 +15,10 @@ login/CAPTCHA/WAF defeat):
     The TaxSaleDate is the HISTORICAL sale the parcel was forfeited at (not an
     upcoming auction), so FLC rows are emitted DATELESS (no sale_date) per spec —
     they're standing OTC inventory, a strong owner-in-distress / vacant-land signal.
+    The OpeningBid IS a real, county-published dollar figure (the OTC purchase
+    price, same convention as Oconee's fll_bid) and is routed into
+    raw['georgetown_civicengage']['opening_bid'] so enrichment_tax_owed.py's
+    _SOURCES mapping promotes it into raw['tax_owed'] (kind='flc_opening_bid').
 
 (b) TAX-SALE list  — /408/Tax-Sale
     The "2025 Tax Sale List (PDF)" — delinquent parcels headed to the annual tax
@@ -27,6 +31,20 @@ login/CAPTCHA/WAF defeat):
     unaligned column blocks that extract_text() can't join back to a parcel row,
     so we DON'T fabricate an address from them — name + TMS is the reliable,
     load-bearing pair. Dateless per spec (annual sale date isn't on the list).
+    CONFIRMED 2026-09-29: this PDF carries no dollar figure at all for these
+    rows — a full-text scan of all 24 pages of the live 2025 list found zero
+    "$" characters; the only columns present anywhere are TaxPayerName,
+    TaxMapNumber, CountyItemNumber, PropertyType and PropertyDesc. This is a
+    genuine source-coverage gap (see docs/extraction_gaps.md), not a parser
+    bug — there is no per-parcel balance to extract. Georgetown's own
+    Treasurer page links a live tax-bill-search portal at
+    https://georgetowncountysctax.com/#/ that almost certainly DOES carry
+    the real balance (same d1ebsyxxbc7tep.cloudfront.net CDN and
+    "<county>countysctax.com" naming convention as the four counties already
+    wired into sc_catalis_delinquent_roll.py's CATALIS_COUNTIES), but that
+    CDN answered 403 to every probe in this session -- including to Pickens'
+    already-integrated, previously-working GUID -- so it could not be
+    verified live. See docs/extraction_gaps.md for the follow-up.
 
 (c) MASTER-IN-EQUITY foreclosure-sale rosters  — /223/Foreclosure-Sales
     Monthly "MASTER'S AUCTION LIST" PDFs (one per sale month, labelled "May 2026"
@@ -194,7 +212,15 @@ def parse_flc(text: str, url: str) -> list[Listing]:
             description=re.sub(r"\s+", " ", line)[:300],
             foreclosure_process="tax",
             first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
-            raw={"georgetown_civicengage": {"doc": "flc", "line": line[:200]}},
+            # `opening_bid` is duplicated into the raw block (not just the Listing
+            # field) so enrichment_tax_owed.py's per-source mapping can pick it up
+            # and promote it into raw['tax_owed'] -- the FLC over-the-counter price
+            # IS a real, county-published dollar figure (2026-09-29 audit: this was
+            # captured onto li.opening_bid all along but never reached tax_owed/
+            # amount_owed, because TAX_SALE listings don't qualify for
+            # enrich_amount_owed's opening_bid branch, which is foreclosure-only).
+            raw={"georgetown_civicengage": {"doc": "flc", "opening_bid": bid,
+                                            "line": line[:200]}},
         ))
     return out
 

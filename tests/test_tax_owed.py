@@ -106,3 +106,39 @@ def test_transylvania_tax_balance_owed_is_normalized():
     enrich_tax_owed([li])
     assert li.raw["tax_owed"]["balance"] == 1234.5
     assert li.raw["tax_owed"]["year"] == 2025
+
+
+def test_georgetown_flc_opening_bid_is_normalized():
+    # 2026-09-29 audit: the FLC (Forfeited-Land-Commission) row carries a real,
+    # county-published over-the-counter opening-bid price on li.opening_bid AND
+    # in the raw block (added so this mapping can see it), but before this fix
+    # it never reached raw['tax_owed'] -- the source substring "georgetown_civicengage"
+    # wasn't in _SOURCES.
+    li = _li("counties_sc.georgetown_civicengage", county="Georgetown", state="SC",
+             parcel="01-0442-029-03-00.001", opening_bid=901.77,
+             raw={"georgetown_civicengage": {"doc": "flc", "opening_bid": 901.77,
+                                             "line": "5028 Baker Louise (H) "
+                                                     "01-0442-029-03-00.001 1973 "
+                                                     "12x45 Panoramic 11/1/2021 "
+                                                     "$901.77"}})
+    stats = enrich_tax_owed([li])
+    assert stats["stamped"] == 1
+    assert li.raw["tax_owed"]["balance"] == 901.77
+    assert li.raw["tax_owed"]["kind"] == "flc_opening_bid"
+    assert li.raw["tax_owed"]["basis"] == "own_record"
+
+
+def test_georgetown_tax_sale_doc_has_no_amount_and_is_not_stamped():
+    # The Tax-Sale list (a DIFFERENT doc under the same source/raw-block key) has
+    # no dollar figure at all on Georgetown's public PDF (confirmed live 2026-09-29:
+    # zero "$" characters across all 24 pages) -- the shared raw block key must not
+    # cause a false-positive stamp for these rows.
+    li = _li("counties_sc.georgetown_civicengage", county="Georgetown", state="SC",
+             parcel="05-0017-114-00-00",
+             raw={"georgetown_civicengage": {"doc": "tax", "item": "2024-1010302-0",
+                                             "line": "ANDREWS LARRY A "
+                                                     "05-0017-114-00-00 "
+                                                     "2024-1010302-0"}})
+    stats = enrich_tax_owed([li])
+    assert stats["stamped"] == 0
+    assert "tax_owed" not in li.raw

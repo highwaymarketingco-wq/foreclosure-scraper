@@ -45,6 +45,14 @@ _SOURCES = {
     "york_delinquent_tax": ("york_delinquent_tax", "total_due", "delinquent_tax"),
     "florence_delinquent_tax": ("florence_delinquent_tax", "total_due", "delinquent_tax"),
     "sumter_delinquent_tax": ("sumter_delinquent_tax", "total_due", "delinquent_tax"),
+    # Georgetown's FLC (Forfeited-Land-Commission) rows carry a real, county-published
+    # over-the-counter opening-bid price (same convention as oconee_forfeited_land's
+    # fll_bid, above). The block key is shared by all three Georgetown CivicEngage docs
+    # (FLC/Tax-Sale/MIE) but only FLC rows set "opening_bid", so this entry is a no-op
+    # for the other two -- the Tax-Sale list genuinely carries no dollar figure at all
+    # (confirmed 2026-09-29, see georgetown_civicengage.py's docstring) and MIE rows use
+    # a different raw shape. Added 2026-09-29 auditing the 355-row "no tax amount" gap.
+    "georgetown_civicengage": ("georgetown_civicengage", "opening_bid", "flc_opening_bid"),
 }
 
 # generic amount keys scanned for any other tax/FLC/lien source subdict
