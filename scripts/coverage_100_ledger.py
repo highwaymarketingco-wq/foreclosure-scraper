@@ -51,11 +51,28 @@ from foreclosure_scraper.distress_score import _divorce_signal  # noqa: E402
 # "code_vacancy" evidence even though no code-enforcement/vacancy scraper ever
 # touched it -- the same false-positive class the 2026-09-29 completeness audit
 # separately flagged for `recorded_debt` under "liens" (a real-debt signal any
-# tax/foreclosure source can set, not a lien-registry-specific one; still open,
-# see docs/completeness_audit_2026-09-29-evening.md). `vacant_structure` is the
-# one genuinely code_vacancy-scoped derived signal: it only fires from
+# tax/foreclosure source can set -- distress_score.py fires it off a real
+# raw['tax_owed']['balance'] or any countable raw['amount_owed'], neither of
+# which is lien-registry-specific; fixed below the same way). `vacant_structure`
+# is the one genuinely code_vacancy-scoped derived signal: it only fires from
 # raw['vacancy']/raw['vacant'] being a dict with vacant/boarded_up True, which
 # only hendersonville_vacant_structures.py ever writes.
+#
+# "liens" has the same generic-flag problem `recorded_debt` had for code_vacancy,
+# but no source-name fragment rescues it the way vacant_structure did: the three
+# ROD scrapers that actually discover lien recordings (nc_rod_logan, sc_rod_cott,
+# sc_rod_acclaim) sweep ALL distress recording types for their county/vendor --
+# lis pendens, foreclosure deeds, probate -- and only classify SOME of those rows
+# as a real lien (LIEN/JUDGMENT/MECH/EXECUTION instrument codes). Each already
+# computes that classification precisely via its own `_classify()` and stamps it
+# on the row as `listing_type == "tax_lien"` (ListingType.TAX_LIEN) -- the same
+# field a NC/SC tax-delinquency scraper also happens to use for an unrelated
+# reason (a delinquent PARCEL, not a recorded LIEN instrument), so listing_type
+# alone is not enough either. The precise match is BOTH: the row's source is one
+# of the three ROD scrapers (a sweep of all their recording types) AND its own
+# listing_type says LIEN (that source's own per-row instrument classification,
+# not a generic distress-stack flag). See `_ROD_LIEN_SOURCES` and the `family ==
+# "liens"` branch in family_hits().
 FAMILIES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "tax_delinquent": (("delinquent_tax", "tax_delinquent", "ptscloud", "pdf_delinquent",
                         "csv_delinquent", "multi_year", "qpaybill", "flc"), ("tax_lien",)),
@@ -78,9 +95,23 @@ FAMILIES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
                      ("code_enforcement", "vacant_structure")),
     "bankruptcy": (("bankruptcy", "courtlistener"), ("bankruptcy",)),
     "divorce": (("divorce",), ()),               # + raw['divorce'] stamp, below
-    "liens": (("lien", "judgment", "ucc"), ("recorded_debt",)),
+    # `recorded_debt` dropped (2026-09-30 fix) -- see the module comment above.
+    # Real lien-registry sources (sc_dew_lien_registry, sc_state_tax_lien,
+    # national.nc_sos_ucc, national.liensnc) already match on the "lien" /
+    # "judgment" / "ucc" name fragments; the three ROD sweep-scrapers are
+    # handled by the source+listing_type special case in family_hits().
+    "liens": (("lien", "judgment", "ucc"), ()),
     "incarceration": ((), ("incarceration",)),   # + raw['incarceration'] stamp
 }
+
+# The three ROD "sweep" scrapers: each discovers ALL recent distress recordings
+# for its county/vendor (lis pendens, foreclosure deeds, probate, liens) and
+# classifies every row's instrument code itself (see each module's own
+# `_classify()`). Only a row that source classified as a LIEN
+# (listing_type == "tax_lien") is real lien-registry evidence from them --
+# their lis-pendens/foreclosure-deed/probate rows must not count toward
+# "liens" just because they share a source with a real lien row.
+_ROD_LIEN_SOURCES = ("nc_rod_logan", "sc_rod_cott", "sc_rod_acclaim")
 
 
 def _pos(v) -> bool:
@@ -94,7 +125,7 @@ def _cd(d: dict, k: tuple[str, str]) -> dict:
     return d.setdefault(k, defaultdict(int))
 
 
-def family_hits(source: str | None, raw: dict) -> set[str]:
+def family_hits(source: str | None, raw: dict, listing_type: str | None = None) -> set[str]:
     """Which FAMILIES keys one row counts as evidence for.
 
     A hit requires the row's own source/scraper identity to match a family's
@@ -102,6 +133,13 @@ def family_hits(source: str | None, raw: dict) -> set[str]:
     ever set. It deliberately does NOT match on a generic flag (like
     raw['distressed']) directly -- see the FAMILIES comment for the
     code_vacancy / liens false positives that pattern caused.
+
+    `listing_type` is the row's own top-level ListingType value (e.g.
+    "tax_lien"), needed only for the "liens" special case below -- it is not a
+    distress_stack signal and many unrelated sources (every tax-delinquency
+    scraper) also use listing_type=="tax_lien" for an unrelated reason (a
+    delinquent parcel, not a recorded lien instrument), so it is only
+    meaningful paired with ROD-sweep source identity.
     """
     low = (source or "").lower()
     ds = raw.get("distress_stack") if isinstance(raw.get("distress_stack"), dict) else {}
@@ -114,6 +152,12 @@ def family_hits(source: str | None, raw: dict) -> set[str]:
             hit = hit or (isinstance(dv, dict) and bool(dv.get("case_count")))
         if fam == "incarceration":
             hit = hit or bool(raw.get("incarceration"))
+        if fam == "liens":
+            # One of the three ROD sweep-scrapers, AND that source's own
+            # per-row instrument classification says LIEN -- not a generic
+            # distress-stack flag, and not just "any row from this source"
+            # (their lis-pendens/foreclosure-deed/probate rows must not count).
+            hit = hit or (any(f in low for f in _ROD_LIEN_SOURCES) and listing_type == "tax_lien")
         if hit:
             hits.add(fam)
     return hits
@@ -168,7 +212,7 @@ def main() -> int:
         dv = raw.get("divorce")
         if isinstance(dv, dict) and _divorce_signal(raw):
             c["divorce_scored"] += 1              # recent enough to reach the score
-        for fam in family_hits(r.get("source"), raw):
+        for fam in family_hits(r.get("source"), raw, r.get("listing_type")):
             c["fam:" + fam] += 1
 
     fams = list(FAMILIES)

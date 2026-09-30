@@ -94,6 +94,88 @@ def test_zombie_properties_source_no_longer_counts_as_code_vacancy():
     assert "code_vacancy" not in hits
 
 
+# ---- FAMILIES["liens"]: recorded_debt -> source+listing_type (2026-09-30 fix) -----------
+#
+# recorded_debt (distress_score.py) fires off ANY real raw['tax_owed']['balance'] or
+# countable raw['amount_owed'] -- a real-debt signal, not a lien-registry-specific one.
+# Real lien evidence comes from the three ROD "sweep" scrapers (nc_rod_logan,
+# sc_rod_cott, sc_rod_acclaim), each of which discovers ALL recent distress
+# recordings for its county/vendor (lis pendens, foreclosure deeds, probate, liens)
+# and classifies every row's own instrument code via its own `_classify()`. Only a
+# row that source classified as a LIEN (LIEN/JUDGMENT/MECH/EXECUTION code) is
+# stamped listing_type=="tax_lien" by that source. The fix requires BOTH: the row's
+# source is one of the three ROD scrapers AND its own listing_type says tax_lien --
+# not a bare recorded_debt flag, and not "any row from a ROD source."
+
+
+def test_rod_logan_lien_row_counts_as_liens():
+    """A real nc_rod_logan LIEN/JUDGMENT recording (_classify() -> TAX_LIEN) must
+    count toward the liens family via source+listing_type, with no recorded_debt
+    signal present at all (these ROD scrapers never populate tax_owed/amount_owed)."""
+    raw = {"rod": {"doc_type": "LIEN", "grantor": "SMITH JOHN"}, "logan_rod": True}
+    hits = ledger.family_hits("counties_nc.nc_rod_logan", raw, listing_type="tax_lien")
+    assert "liens" in hits
+
+
+def test_rod_logan_lis_pendens_row_from_same_source_does_not_count_as_liens():
+    """The SAME nc_rod_logan scraper also emits LIS_PENDENS (FCL/S-TR/etc.) and
+    FORECLOSURE_SALE (TR-D/SHF-D/etc.) rows off the same sweep -- those must not
+    count as liens just because they share a source with real lien rows."""
+    raw = {"rod": {"doc_type": "FCL", "grantor": "SMITH JOHN"}, "logan_rod": True}
+    hits = ledger.family_hits("counties_nc.nc_rod_logan", raw, listing_type="lis_pendens")
+    assert "liens" not in hits
+
+
+def test_rod_cott_probate_row_from_same_source_does_not_count_as_liens():
+    """sc_rod_cott also sweeps probate (deed of distribution / death) recordings --
+    those must not count as liens either."""
+    raw = {"rod": {"doc_type": "DOD", "grantor": "JONES MARY"},
+           "cott_rod": True, "relationship_signal": {"kind": "probate", "keyword": "DOD"}}
+    hits = ledger.family_hits("counties_sc.sc_rod_cott", raw, listing_type="probate_notice")
+    assert "liens" not in hits
+
+
+def test_rod_acclaim_lien_row_counts_as_liens():
+    raw = {"rod": {"doc_type": "MECHANICS LIEN", "grantor": "DOE JANE"}, "acclaim_rod": True}
+    hits = ledger.family_hits("counties_sc.sc_rod_acclaim", raw, listing_type="tax_lien")
+    assert "liens" in hits
+
+
+def test_tax_delinquent_row_with_real_balance_is_not_liens_evidence():
+    """The false-positive class recorded_debt caused: a plain tax-delinquency row
+    (Pickens parcel scraper, not a ROD scraper) with a real recorded_debt signal
+    (an actual raw['tax_owed']['balance']) must NOT count as liens -- a real tax
+    balance on a delinquent PARCEL is not a recorded LIEN instrument. It also
+    happens to carry listing_type=="tax_lien" (ListingType.TAX_LIEN is the generic
+    tax-delinquency listing type), which is exactly why listing_type alone --
+    without the ROD source-identity check -- would still be wrong."""
+    raw = {"tax_owed": {"balance": 4200.00},
+           "distress_stack": {"signals": ["recorded_debt", "tax_lien"]}}
+    hits = ledger.family_hits("counties_sc.pickens_delinquent_parcels", raw,
+                               listing_type="tax_lien")
+    assert "liens" not in hits
+    assert "tax_delinquent" in hits
+
+
+def test_mortgage_foreclosure_row_with_countable_judgment_is_not_liens_evidence():
+    """A foreclosure-sale source with a real countable amount_owed (judgment
+    amount) also used to fire recorded_debt -- must not count as liens either."""
+    raw = {"amount_owed": {"value": 185000.0, "is_actual_debt": True},
+           "distress_stack": {"signals": ["recorded_debt", "foreclosure_sale"]}}
+    hits = ledger.family_hits("counties_nc.hutchens_foreclosure_sale", raw,
+                               listing_type="foreclosure_sale")
+    assert "liens" not in hits
+    assert "mortgage_foreclosure" in hits
+
+
+def test_dedicated_lien_registry_source_still_counts_via_name_fragment():
+    """A genuinely lien-specific source (SC DEW Lien Registry) still counts via
+    the "lien" name fragment -- untouched by dropping recorded_debt."""
+    raw = {}
+    hits = ledger.family_hits("counties_sc.sc_dew_lien_registry", raw)
+    assert "liens" in hits
+
+
 # ---- through the streaming board reader, on a tiny synthetic fixture --------------------
 
 
