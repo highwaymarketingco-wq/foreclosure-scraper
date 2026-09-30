@@ -176,6 +176,236 @@ def test_dedicated_lien_registry_source_still_counts_via_name_fragment():
     assert "liens" in hits
 
 
+# ---- FAMILIES["tax_delinquent"]: tax_lien signal -> exclude ROD-lien sources (2026-09-30) -
+#
+# The mirror image of the liens fix above: `tax_lien` (== listing_type, restated as a
+# distress_stack signal) is the generic tax-delinquency listing type for ~25 dedicated
+# scrapers, but the same three ROD sweep scrapers (nc_rod_logan, sc_rod_cott,
+# sc_rod_acclaim) also stamp listing_type=="tax_lien" on a real recorded LIEN/JUDGMENT
+# instrument -- not a delinquent tax parcel. None of the three names carry a
+# tax_delinquent fragment, so dropping the signal-based hit for them only removes the
+# false positive.
+
+
+def test_rod_logan_lien_row_is_not_tax_delinquent_evidence():
+    """A real nc_rod_logan LIEN/JUDGMENT recording must not count as tax_delinquent --
+    it is a private lien, not a delinquent tax parcel."""
+    raw = {"rod": {"doc_type": "LIEN", "grantor": "SMITH JOHN"}, "logan_rod": True}
+    hits = ledger.family_hits("counties_nc.nc_rod_logan", raw, listing_type="tax_lien")
+    assert "tax_delinquent" not in hits
+    assert "liens" in hits          # its real family is untouched
+
+
+def test_rod_cott_lien_row_is_not_tax_delinquent_evidence():
+    raw = {"rod": {"doc_type": "JUDGMENT", "grantor": "DOE JANE"}, "cott_rod": True}
+    hits = ledger.family_hits("counties_sc.sc_rod_cott", raw, listing_type="tax_lien")
+    assert "tax_delinquent" not in hits
+
+
+def test_rod_acclaim_lien_row_is_not_tax_delinquent_evidence():
+    raw = {"rod": {"doc_type": "MECHANICS LIEN", "grantor": "DOE JANE"}, "acclaim_rod": True}
+    hits = ledger.family_hits("counties_sc.sc_rod_acclaim", raw, listing_type="tax_lien")
+    assert "tax_delinquent" not in hits
+
+
+def test_dedicated_tax_delinquent_source_with_tax_lien_signal_still_counts():
+    """A real dedicated tax-delinquency scraper (not a ROD source) with the
+    `tax_lien` signal must still count -- the fix is source-scoped, not blind
+    signal removal."""
+    raw = {"distress_stack": {"signals": ["tax_lien"]}}
+    hits = ledger.family_hits("counties_sc.pickens_delinquent_parcels", raw,
+                               listing_type="tax_lien")
+    assert "tax_delinquent" in hits
+
+
+def test_greenville_hard_distress_tax_lien_row_still_counts_as_tax_delinquent():
+    """greenville_hard_distress.py hardcodes listing_type=TAX_LIEN, but every row it
+    emits is keyed off a real unpaid-tax spine (TOTTAX>0 AND PAIDDATE IS NULL) -- a
+    genuine tax-delinquent parcel, not a ROD source, so it is untouched by the fix."""
+    raw = {"distress_stack": {"signals": ["tax_lien"]}}
+    hits = ledger.family_hits("counties_sc.greenville_hard_distress", raw,
+                               listing_type="tax_lien")
+    assert "tax_delinquent" in hits
+
+
+# ---- FAMILIES["code_vacancy"]: vacant-LAND sources excluded (2026-09-30) ----------------
+#
+# gaston_vacant / lincoln_vacant / transylvania_vacant matched the bare "vacant" name
+# fragment, but all three are vacant-LAND (unimproved lot) parcel feeds -- the opposite
+# condition from code_vacancy (a STRUCTURE with an open code-enforcement / condemned /
+# boarded-up case). None of the three ever sets raw['condemned'] or a code_enforcement
+# block in the real scraper code.
+
+
+def test_gaston_vacant_land_row_is_not_code_vacancy_evidence():
+    raw = {}
+    hits = ledger.family_hits("counties_nc.gaston_vacant", raw)
+    assert "code_vacancy" not in hits
+
+
+def test_lincoln_vacant_land_row_is_not_code_vacancy_evidence():
+    raw = {}
+    hits = ledger.family_hits("counties_nc.lincoln_vacant", raw)
+    assert "code_vacancy" not in hits
+
+
+def test_transylvania_vacant_land_row_is_not_code_vacancy_evidence():
+    raw = {}
+    hits = ledger.family_hits("counties_nc.transylvania_vacant", raw)
+    assert "code_vacancy" not in hits
+
+
+def test_gaston_vacant_row_with_a_real_code_enforcement_signal_still_counts():
+    """The fix only removes the blind name-fragment match -- a genuine
+    code_enforcement signal (e.g. the cross-cutting enrichment_code_enforcement.py
+    city registry separately matching the same address) must still count."""
+    raw = {"distress_stack": {"signals": ["code_enforcement"]}}
+    hits = ledger.family_hits("counties_nc.gaston_vacant", raw)
+    assert "code_vacancy" in hits
+
+
+def test_spartanburg_vacant_structure_registry_still_counts_by_name():
+    """spartanburg_vacant is NOT vacant land -- its "allvacant" layer carries CAMA
+    specs (year_built/beds/baths) that only exist for an improved parcel, so it is
+    a genuine vacant-STRUCTURE registry and keeps matching by name alone."""
+    raw = {}
+    hits = ledger.family_hits("counties_sc.spartanburg_vacant", raw)
+    assert "code_vacancy" in hits
+
+
+def test_lincoln_code_violations_unaffected_by_the_vacant_land_exclusion():
+    """lincoln_code_violations (a real code-enforcement source, distinct from
+    lincoln_vacant) must be untouched -- it matches its own "code_violation"
+    fragment, not "vacant"."""
+    raw = {}
+    hits = ledger.family_hits("counties_nc.lincoln_code_violations", raw)
+    assert "code_vacancy" in hits
+
+
+# ---- FAMILIES["probate_estate"] / ["mortgage_foreclosure"]: hibid_real_estate (2026-09-30) -
+#
+# national.hibid_real_estate is a generic national real-estate AUCTION-category
+# aggregator (its own docstring: "the catch-all net ... estate / distressed / land / tax
+# real estate"), every row typed listing_type==AUCTION. It rode into probate_estate via
+# the "estate" substring in "real_estate" and into mortgage_foreclosure via the generic
+# `auction` signal, with no real evidence for either.
+
+
+def test_hibid_real_estate_row_is_not_probate_estate_evidence():
+    raw = {"distress_stack": {"signals": ["auction"]}}
+    hits = ledger.family_hits("national.hibid_real_estate", raw, listing_type="auction")
+    assert "probate_estate" not in hits
+
+
+def test_hibid_real_estate_row_is_not_mortgage_foreclosure_evidence():
+    raw = {"distress_stack": {"signals": ["auction"]}}
+    hits = ledger.family_hits("national.hibid_real_estate", raw, listing_type="auction")
+    assert "mortgage_foreclosure" not in hits
+
+
+def test_dedicated_estate_sources_still_count_as_probate_estate():
+    """Real estate-scoped sources must be untouched by the hibid exclusion."""
+    assert "probate_estate" in ledger.family_hits("national.estate_sales", {})
+    assert "probate_estate" in ledger.family_hits("counties_nc.nc_heir_estate_parcels", {})
+    assert "probate_estate" in ledger.family_hits("counties_nc.nc_ecourts_estates", {})
+
+
+def test_dedicated_auction_source_still_counts_as_mortgage_foreclosure():
+    """A real dedicated REO/foreclosure-auction platform (not hibid) must still
+    count via the generic `auction` signal -- the fix is source-scoped."""
+    raw = {"distress_stack": {"signals": ["auction"]}}
+    hits = ledger.family_hits("national.govdeals", raw, listing_type="auction")
+    assert "mortgage_foreclosure" in hits
+
+
+# ---- FAMILIES["bankruptcy"]: courtlistener_civil excluded (2026-09-30) ------------------
+#
+# national.courtlistener_civil is a federal CIVIL real-property/foreclosure docket
+# scraper (nature-of-suit 220 Foreclosure / 230 Rent Lease & Ejectment / 240 Torts to
+# Land / 290 Other Real Property), emitting listing_type=LIS_PENDENS -- never bankruptcy.
+# It matched the old bare "courtlistener" fragment, which was meant for
+# courtlistener_bankruptcy (already covered by the "bankruptcy" fragment substring) and
+# courtlistener_adversary (a real bankruptcy-docket source, now its own fragment).
+
+
+def test_courtlistener_civil_row_is_not_bankruptcy_evidence():
+    raw = {}
+    hits = ledger.family_hits("national.courtlistener_civil", raw, listing_type="lis_pendens")
+    assert "bankruptcy" not in hits
+
+
+def test_courtlistener_adversary_row_still_counts_as_bankruptcy():
+    raw = {}
+    hits = ledger.family_hits("national.courtlistener_adversary", raw, listing_type="lis_pendens")
+    assert "bankruptcy" in hits
+
+
+def test_courtlistener_bankruptcy_row_still_counts_as_bankruptcy():
+    raw = {}
+    hits = ledger.family_hits("national.courtlistener_bankruptcy", raw)
+    assert "bankruptcy" in hits
+
+
+# ---- FAMILIES["lis_pendens"]: sweep sources gated on listing_type (2026-09-30) ----------
+#
+# nc_ecourts_lis_pendens classifies by AOC cause of action: a divorce cause becomes
+# DIVORCE_NOTICE and a tax cause becomes TAX_LIEN under the SAME slug. sc_public_index
+# (the BULK civil+criminal sweep) emits UNKNOWN for its General-Sessions criminal rows
+# under the same slug as its real Common-Pleas LIS_PENDENS rows. Both must require the
+# row's own listing_type, not just the source name.
+
+
+def test_nc_ecourts_lis_pendens_divorce_row_is_not_lis_pendens_evidence():
+    raw = {}
+    hits = ledger.family_hits("counties_nc.nc_ecourts_lis_pendens", raw,
+                               listing_type="divorce_notice")
+    assert "lis_pendens" not in hits
+
+
+def test_nc_ecourts_lis_pendens_tax_row_is_not_lis_pendens_evidence():
+    raw = {}
+    hits = ledger.family_hits("counties_nc.nc_ecourts_lis_pendens", raw,
+                               listing_type="tax_lien")
+    assert "lis_pendens" not in hits
+
+
+def test_nc_ecourts_lis_pendens_real_lis_pendens_row_still_counts():
+    raw = {}
+    hits = ledger.family_hits("counties_nc.nc_ecourts_lis_pendens", raw,
+                               listing_type="lis_pendens")
+    assert "lis_pendens" in hits
+
+
+def test_sc_public_index_bulk_criminal_row_is_not_lis_pendens_evidence():
+    """counties_sc.sc_public_index (the bulk civil+criminal sweep) must not count
+    its General-Sessions criminal rows (listing_type UNKNOWN) as lis_pendens."""
+    raw = {}
+    hits = ledger.family_hits("counties_sc.sc_public_index", raw, listing_type="unknown")
+    assert "lis_pendens" not in hits
+
+
+def test_sc_public_index_bulk_civil_row_still_counts_as_lis_pendens():
+    raw = {}
+    hits = ledger.family_hits("counties_sc.sc_public_index", raw, listing_type="lis_pendens")
+    assert "lis_pendens" in hits
+
+
+def test_sc_public_index_lis_pendens_dedicated_sibling_unaffected():
+    """The dedicated, single-type sc_public_index_lis_pendens sibling (CP-Foreclosure-420
+    filter only) must keep matching by name alone, with no listing_type gate -- it is
+    NOT in _LIS_PENDENS_SWEEP_SOURCES (its slug is a different, longer string than the
+    bulk sweep's)."""
+    raw = {}
+    hits = ledger.family_hits("counties_sc.sc_public_index_lis_pendens", raw)
+    assert "lis_pendens" in hits
+
+
+def test_national_sc_public_index_dedicated_source_unaffected():
+    raw = {}
+    hits = ledger.family_hits("national.sc_public_index", raw)
+    assert "lis_pendens" in hits
+
+
 # ---- through the streaming board reader, on a tiny synthetic fixture --------------------
 
 
