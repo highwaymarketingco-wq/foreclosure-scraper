@@ -1156,6 +1156,44 @@ def test_f19_equity_flags_come_from_the_gated_equity_block_and_high_needs_eviden
 
 
 # ===========================================================================
+# F20. Equity from an unresolved location cannot carry a lead to WARM/HOT
+# ===========================================================================
+def test_f20_a_bare_lis_pendens_with_no_address_or_parcel_does_not_reach_warm_on_equity_alone():
+    """BEFORE: a name-only lis_pendens (score 28, no mailing, no other evidence) still got an
+    unevidenced "equity_band": "high" from comps run against a ZIP/county centroid
+    (raw['geo_imprecise'] == 'centroid_snap') -- comps for an unknown house -- and
+    score >= 28 and eq_ok alone reached WARM. Measured live on 2,653 of 39,564 unlocatable
+    board rows (docs/extraction_gaps.md, 2026-09-29)."""
+    unlocatable = L(LT.LIS_PENDENS, parcel=None, street_address=None,
+                     raw={"equity": dict(EQ), "geo_imprecise": "centroid_snap"})
+    ds = ds_of(unlocatable)
+    assert ds["equity_band"] is None
+    assert ds["tier"] == "COLD"
+    # _equity_band() itself is unconditional (F4): other readers (e.g. the card UI) still see
+    # the number, with the caller's own disclaimer -- only the scorer's tier stops trusting it.
+    assert _equity_band(unlocatable) == "high"
+
+
+def test_f20_the_same_lead_with_either_a_street_address_or_a_parcel_is_unaffected():
+    with_parcel = L(LT.LIS_PENDENS, parcel="P200001", raw={"equity": dict(EQ)})
+    assert ds_of(with_parcel)["equity_band"] == "high" and ds_of(with_parcel)["tier"] == "WARM"
+    with_addr = L(LT.LIS_PENDENS, parcel=None, street_address="12 Oak St",
+                  raw={"equity": dict(EQ)})
+    assert ds_of(with_addr)["equity_band"] == "high" and ds_of(with_addr)["tier"] == "WARM"
+
+
+def test_f20_an_unlocatable_lead_can_still_reach_warm_through_a_real_record_route():
+    """The gate only removes the EQUITY route to WARM; the absentee+event and stack>=2 routes,
+    built from records independent of the ARV, are untouched."""
+    li = L(LT.TAX_LIEN, parcel=None, street_address=None,
+           raw={"owner_mailing": dict(MAIL), "equity": dict(EQ),
+                "code_enforcement": {"has_open": True}})
+    ds = ds_of(li)
+    assert ds["equity_band"] is None
+    assert ds["tier"] == "WARM"          # absentee(8) + tax_lien(20) + code_enforcement(14) = stack 2
+
+
+# ===========================================================================
 # A8. liensnc is context-only
 # ===========================================================================
 @pytest.mark.parametrize("source", ["counties_generic.liensnc", "liensnc", "national.liensnc"])

@@ -51,12 +51,18 @@ MATCHING POLICY (tightened over v2 — this data drives outreach):
 
 GATING / COST (it hits county GIS per lead):
   * FORECLOSURE_NAME_RESOLVE (default "1"; set "0" to disable).
-  * FORECLOSURE_NAME_RESOLVE_MAX  per-run cap on leads attempted (default 400).
+  * FORECLOSURE_NAME_RESOLVE_MAX  per-run cap on leads attempted (default 6000;
+    see the constant's own comment for why 400/1200 were both too low).
   * FORECLOSURE_NAME_RESOLVE_BUDGET_S pins the wall-clock budget to a fixed
     number of seconds. Unset, the budget scales with the queue (see
     _budget_for): a big one-time backlog gets a long pass, steady state a short
     one.
-  * Scoped to Western-NC + Upstate-SC core counties only.
+  * NOT actually scoped to a core-county allowlist (2026-09-29 correction: this
+    line used to say "Western-NC + Upstate-SC core counties only" -- _CORE_NC/
+    _CORE_SC below are dead code, unread by _endpoint_plan/_endpoint_cfg/
+    _in_core; the real scope is whatever _endpoint_plan finds wired -- all 100
+    NC counties via NC OneMap, plus 5 pinned SC counties + Anderson's offline
+    roll). See docs/extraction_gaps.md, "Unlocatable" (2026-09-29).
   * Idempotent: a lead already attempted (raw['resolved_from_name']['queried'])
     is skipped on re-runs unless FORECLOSURE_NAME_RESOLVE_FORCE=1.
 
@@ -99,7 +105,12 @@ from .name_normalize import (
 log = structlog.get_logger()
 
 
-# Western-NC + Upstate-SC core (the only counties new-avenue work targets).
+# DEAD CODE (2026-09-29): neither set is read by _endpoint_plan/_endpoint_cfg/
+# _in_core below -- NC OneMap's statewide coverage (added later than these sets)
+# made _CORE_NC obsolete for NC (every county is reachable), and SC's real scope
+# is SC_OWNER_LAYERS/SC_OFFLINE_OWNER_ROLL/SC_NO_FREE_OWNER_SEARCH just below,
+# not this list. Kept (unread) rather than deleted in case a future SC-scoping
+# decision wants a documented starting set; do not assume it gates anything.
 _CORE_NC = {
     "Buncombe", "Henderson", "Cleveland", "Gaston", "Rutherford", "Polk",
     "Transylvania", "McDowell", "Lincoln", "Mitchell", "Burke", "Madison",

@@ -21,8 +21,28 @@ WHY THIS EXISTS
     the same shape as fill_voter_phone.py and the other board maintenance
     scripts.
 
+    2026-09-29 audit of docs/extraction_gaps.md's "Unlocatable" cohort (39,564
+    rows, 18.0% of the board, with no street_address AND no parcel_id) found
+    the SAME failure mode hitting a fourth enricher:
+
+        resolve_name    enrichment_resolve_name_to_property -- the
+                        name -> property backfill for name-only court/
+                        probate/divorce/bankruptcy leads
+
+    enrich_resolve_name_to_property is wired in main.py over 1,300 lines (and
+    dozens of enrichment stages) after gis_enrich, so a run that hangs or is
+    killed anywhere in that earlier stretch -- the documented, chronic failure
+    mode here (docs/project_fc_fullrun_hang.md, project_run_hang_and_knockout.
+    md) -- never reaches it at all, not merely late. Measured live 2026-09-29:
+    0 name_resolve.* events in logs/job_events.jsonl for the entire day, and an
+    offline replay of the resolver's own targeting logic found 26,072 currently
+    -unlocatable rows that already qualify as resolver targets and have simply
+    never been queried. Add it here so it can run against the published board
+    without waiting for (or depending on) a full pipeline pass to survive.
+
 USAGE
     python3 scripts/catchup_failed_enrichers.py [--dry-run] [--only skip_trace]
+    python3 scripts/catchup_failed_enrichers.py --only resolve_name
 
     Refuses to run while the engine holds the board. One writer at a time.
 """
@@ -65,6 +85,13 @@ async def _run_one(name: str, listings: list, dry_run: bool = False) -> dict:
         from foreclosure_scraper.enrichment_skip_trace import enrich_with_skip_trace
         await enrich_with_skip_trace(listings)
         return {}
+    if name == "resolve_name":
+        from foreclosure_scraper.enrichment_resolve_name_to_property import (
+            enrich_resolve_name_to_property,
+        )
+        # dry_run has no meaning for this enricher (it never has one) -- accepted only
+        # so the shared call site above does not need a name-by-name special case.
+        return await enrich_resolve_name_to_property(listings) or {}
     raise ValueError(f"unknown enricher {name!r}")
 
 
@@ -79,12 +106,22 @@ def _phones(listings) -> int:
     return n
 
 
+def _unlocatable(listings) -> int:
+    """Count of leads with neither a street_address nor a parcel_id -- the
+    resolve_name enricher's whole target population (see docs/extraction_gaps.md,
+    "Unlocatable")."""
+    return sum(1 for li in listings
+               if not ((li.street_address or "").strip() or (li.parcel_id or "").strip()))
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--only", action="append",
-                    choices=["incarceration", "jail_bookings", "skip_trace"],
-                    help="run just these (default: all three)")
+                    choices=["incarceration", "jail_bookings", "skip_trace", "resolve_name"],
+                    help="run just these (default: the original three -- resolve_name is "
+                         "opt-in, since it hits live county GIS endpoints and is not a "
+                         "'died mid-run' recovery so much as a standing backlog drain)")
     args = ap.parse_args()
 
     if _engine_running():
@@ -94,7 +131,9 @@ async def main() -> int:
     which = args.only or ["incarceration", "jail_bookings", "skip_trace"]
     listings = load_board()
     before_phones = _phones(listings)
-    print(f"board: {len(listings):,} leads | with a phone before: {before_phones:,}")
+    before_unlocatable = _unlocatable(listings)
+    print(f"board: {len(listings):,} leads | with a phone before: {before_phones:,}"
+          f" | unlocatable (no address/parcel) before: {before_unlocatable:,}")
 
     stats: dict[str, dict] = {}
     for name in which:
@@ -108,6 +147,10 @@ async def main() -> int:
 
     after_phones = _phones(listings)
     print(f"\nwith a phone after: {after_phones:,}  (+{after_phones - before_phones:,})")
+    if "resolve_name" in which:
+        after_unlocatable = _unlocatable(listings)
+        print(f"unlocatable after: {after_unlocatable:,}  "
+              f"(-{before_unlocatable - after_unlocatable:,} resolved to an address/parcel)")
 
     if args.dry_run:
         print("dry run — board not written")

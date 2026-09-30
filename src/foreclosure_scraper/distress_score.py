@@ -1212,7 +1212,23 @@ def _score_group(active: list[Listing], prior_prices: dict, today: date) -> dict
     # `_equity_info` returns None on a contradicted/withheld ARV, so a parcel group whose every
     # listing carries a bad valuation contributes no band and cannot satisfy `eq_ok`. If ONE
     # listing has a clean valuation and another does not, the clean one supplies the band.
-    infos = [_equity_info(li) for li in active]
+    #
+    # F20 (2026-09-29 audit of the "unlocatable" cohort, docs/extraction_gaps.md): a listing
+    # with NEITHER a street_address NOR a parcel_id was never tied to a specific property, so
+    # any ARV on it came from comps run against a ZIP/county centroid (raw['geo_imprecise'] ==
+    # 'centroid_snap') -- comps for AN UNKNOWN HOUSE, not this one. `enrichment_calc`'s own
+    # data_quality block already says so on the card ("no address resolved ... ARV UNVERIFIED
+    # ... no deal verdict is published"), but the scorer read raw['equity'] directly and never
+    # checked location, so a bare lis_pendens (score 28, no mailing, no other evidence) rode a
+    # phantom "equity_band": "high" straight to WARM -- measured live on 2,653 of 39,564
+    # unlocatable board rows (6.7%), nearly all uncontactable and unevidenced.
+    # `_equity_info`/`_equity_band` themselves stay unconditional (other readers, e.g. the card
+    # UI, still publish the number with its own disclaimer) -- only the TIER decision, which
+    # is a spend-money-on-outreach instruction, stops trusting an unresolved listing's equity.
+    # A group keyed by a REAL parcel_id (see `_parcel_key`) can never contain an unlocatable
+    # listing (only a listing with no valid parcel_id falls back to the `id:` singleton key),
+    # so this is a no-op for every ordinarily-grouped parcel and only bites the singletons.
+    infos = [_equity_info(li) for li in active if (li.street_address or li.parcel_id)]
     pick = (next((i for i in infos if i[0] in ("high", "med") and i[1]), None)
             or next((i for i in infos if i[0] in ("high", "med")), None)
             or next((i for i in infos if i[0]), (None, False)))
