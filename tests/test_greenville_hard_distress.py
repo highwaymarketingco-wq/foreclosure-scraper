@@ -273,7 +273,13 @@ def test_both_lanes_merge_into_one_parcel_keyed_lead():
     d = li.raw["greenville_distress"]
     assert d["lanes"] == ["delinquent_tax", "tax_sale_roster"]
     assert d["tax_sale"]["item"] == "11724"
-    assert li.raw["distressed"] is True
+    # 2026-09-30 fix: a tax-sale-with-balance fact is FINANCIAL evidence (already carried by
+    # listing_type=TAX_LIEN + the recorded_debt signal once enrichment_tax_owed normalizes
+    # amount_owed), not physical-condition evidence. It used to also stamp raw['distressed'] =
+    # True, which distress_score.py reads as a PROPERTY tell -- fabricating a second category
+    # (a fake stack of 2) from this one tax fact, the same false-positive class already fixed
+    # for pickens_delinquent_parcels.py's chronic-delinquency flag (F5, 2026-09-21 audit).
+    assert "distressed" not in li.raw
     assert li.parcel_id == _normalize_parcel(PIN_BOTH)
 
 
@@ -285,7 +291,63 @@ def test_probate_match_adds_a_lane_and_never_leaks_extra_personal_data():
     d = li.raw["greenville_distress"]
     assert "probate_decedent_owner" in d["lanes"]
     assert set(d["probate"]) == {"case", "name", "year", "confidence", "party_type", "note"}
-    assert li.raw["distressed"] is True
+    # 2026-09-30 fix: a probate/decedent-name match is LIFE_EVENT evidence, not physical-
+    # condition evidence. It used to stamp the generic raw['distressed'] PROPERTY flag instead
+    # (the same false-positive class already fixed for Pickens' chronic-delinquency flag, F5) --
+    # now it's routed to raw['probate'] (the field distress_score.py actually reads for
+    # LIFE_EVENT credit, same shape sc_public_notices.py / nc_notices_counties.py use).
+    assert "distressed" not in li.raw
+    assert li.raw["probate"] == {"case_number": "2025ES2301111", "decedent": "HARVLEY , JULIE MARIE",
+                                 "match_confidence": "high"}
+
+
+def test_probate_only_parcel_never_sets_the_generic_distressed_flag():
+    """Belt-and-suspenders: a parcel whose ONLY lane is probate (no tax_sale, no
+    delinquent balance) must still never carry raw['distressed'] -- confirms the fix
+    isn't accidentally order- or lane-dependent."""
+    f = _by_pin()[PIN_MOBILE]
+    attrs = dict(f["attributes"], TOTTAX=0, PAIDDATE=None)
+    pro = {"case": "2025ES2301111", "name": "HARVLEY , JULIE MARIE", "year": 2025,
+           "confidence": "medium"}
+    ts = TaxSaleRow(item="1", pin=_normalize_parcel(PIN_MOBILE),
+                    map_number=PIN_MOBILE, owner="HARVLEY JULIE MARIE", amount=500.0)
+    li = build_listing(_normalize_parcel(PIN_MOBILE), attrs, None, tax_sale=ts, probate=pro)
+    assert "distressed" not in li.raw
+
+
+# ------------------------------------------- scoring (distress_score.py) ----
+#
+# The real point of the fix: confirm distress_score.py no longer fabricates a PROPERTY
+# category for these rows. Before the fix, `raw['distressed'] = True` gave every
+# tax-sale-with-balance row a free PROPERTY category on top of its real FINANCIAL one
+# (a fake stack of 2 from a single tax fact), and every probate-match row a PROPERTY
+# category instead of its real LIFE_EVENT one -- the same false-positive class already
+# fixed for pickens_delinquent_parcels.py (F5, 2026-09-21 audit; see
+# tests/test_context_only_distressed.py for that established pattern, mirrored here).
+
+def test_tax_sale_lane_scores_financial_only_no_fake_property_category():
+    from foreclosure_scraper.distress_score import _signals_for
+
+    f = _by_pin()[PIN_BOTH]
+    ts = TaxSaleRow(item="11724", pin=_normalize_parcel(PIN_BOTH),
+                    map_number=PIN_BOTH, owner="MASS MEDIA INC", amount=5987.69)
+    li = build_listing(_normalize_parcel(PIN_BOTH), f["attributes"], f["geometry"], tax_sale=ts)
+    cats = {c for _n, c, _w in _signals_for(li)}
+    assert "PROPERTY" not in cats
+    assert "FINANCIAL" in cats           # listing_type=TAX_LIEN alone is still real evidence
+
+
+def test_probate_lane_scores_life_event_not_property():
+    from foreclosure_scraper.distress_score import _signals_for
+
+    f = _by_pin()[PIN_MOBILE]
+    pro = {"case": "2025ES2301111", "name": "HARVLEY , JULIE MARIE", "year": 2025,
+           "confidence": "high"}
+    li = build_listing(_normalize_parcel(PIN_MOBILE), f["attributes"], None, probate=pro)
+    cats = {c for _n, c, _w in _signals_for(li)}
+    assert "PROPERTY" not in cats
+    assert "LIFE_EVENT" in cats          # the probate match is now correctly credited
+    assert li.raw["probate"]["decedent"] == "HARVLEY , JULIE MARIE"
 
 
 def test_absentee_is_an_attribute_and_never_a_lane():

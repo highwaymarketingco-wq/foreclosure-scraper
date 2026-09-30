@@ -34,6 +34,24 @@ BOARD = REPO / "docs" / "listings.json.gz"
 
 # The distress families that matter for the buy box. A county missing a whole
 # family is a build target, not a data-quality problem.
+#
+# 2026-09-30 audit (scripts/coverage_100_ledger.py's a22dc20c / bf38dd0c fixes, same false-
+# positive class, never propagated here): this script matches purely on SOURCE NAME
+# fragments (no distress_stack signal gate at all), so it inherits the two confirmed
+# over-broad-fragment false positives from that audit directly --
+#   * "zombie" (code_vacancy): zombie_properties.py is a DERIVED stalled-foreclosure signal
+#     (a stale lis pendens that never progressed to sale), not a code-enforcement/vacancy
+#     source -- dropped.
+#   * bare "courtlistener" (bankruptcy): also matches national.courtlistener_civil, a federal
+#     CIVIL real-property/foreclosure docket scraper, never bankruptcy -- narrowed to
+#     "courtlistener_adversary" (the "bankruptcy" fragment already covers
+#     courtlistener_bankruptcy via substring).
+#   * "vacant" (code_vacancy): also matches gaston_vacant / lincoln_vacant /
+#     transylvania_vacant, three county-GIS VACANT-LAND (unimproved lot, no structure)
+#     feeds -- the opposite condition from code_vacancy (a STRUCTURE with an open
+#     code-enforcement/condemned case). Handled below via
+#     `_VACANT_LAND_NOT_CODE_VACANCY_SOURCES` since "vacant" is still the right fragment
+#     for spartanburg_vacant (a genuine vacant-STRUCTURE registry).
 SIGNAL_FAMILIES = {
     "tax_delinquent": ("delinquent_tax", "tax_delinquent", "ptscloud", "pdf_delinquent",
                        "csv_delinquent", "multi_year", "qpaybill", "flc", "tax_sale"),
@@ -49,11 +67,16 @@ SIGNAL_FAMILIES = {
     "lis_pendens": ("lis_pendens", "public_index"),
     "probate_estate": ("probate", "estate", "obitu", "funeral", "deceased"),
     "code_vacancy": ("code_violation", "condemn", "vacant", "min_housing", "demoli",
-                     "zombie", "nuisance"),
-    "bankruptcy": ("bankruptcy", "courtlistener"),
+                     "nuisance"),
+    "bankruptcy": ("bankruptcy", "courtlistener_adversary"),
     "divorce": ("divorce", "marriage", "separation"),
     "liens": ("lien", "judgment", "ucc", "ecourts_judgment"),
 }
+
+# gaston_vacant / lincoln_vacant / transylvania_vacant: county-GIS VACANT-LAND (unimproved
+# lot) feeds, not code-enforcement/vacant-STRUCTURE sources -- see the SIGNAL_FAMILIES
+# comment above and coverage_100_ledger.py's identical `_VACANT_LAND_NOT_CODE_VACANCY_SOURCES`.
+_VACANT_LAND_NOT_CODE_VACANCY_SOURCES = ("gaston_vacant", "lincoln_vacant", "transylvania_vacant")
 
 
 def stream(path: Path):
@@ -68,6 +91,8 @@ def stream(path: Path):
 def _family(source: str) -> str | None:
     low = (source or "").lower()
     for fam, pats in SIGNAL_FAMILIES.items():
+        if fam == "code_vacancy" and any(f in low for f in _VACANT_LAND_NOT_CODE_VACANCY_SOURCES):
+            continue   # vacant LAND, not code_vacancy (see _VACANT_LAND_NOT_CODE_VACANCY_SOURCES)
         if any(p in low for p in pats):
             return fam
     return None

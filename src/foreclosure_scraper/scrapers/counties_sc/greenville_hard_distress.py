@@ -589,8 +589,23 @@ def build_listing(pin: str, attrs: dict, geom: dict | None,
         # Attribute, not a lane. Never counted in the hard-distress total.
         if _is_absentee(mail_street, mail_state, situs):
             raw["absentee_owner"] = True
-    if probate or (tax_sale and tax_owed):
-        raw["distressed"] = True
+    # 2026-09-30 audit (same false-positive class already fixed for
+    # pickens_delinquent_parcels.py's chronic-delinquency flag, F5 2026-09-21): this used
+    # to set raw['distressed'] = True off a probate match OR a tax-sale-with-balance fact.
+    # distress_score._distressed_flag_counts reads raw['distressed'] as PROPERTY (physical-
+    # condition) evidence -- neither a probate/estate match (a LIFE_EVENT fact: the module's
+    # own docstring says "Only signals that mean the owner has an unpaid obligation or a
+    # court event") nor a tax-sale balance (already FINANCIAL via listing_type=TAX_LIEN +
+    # the recorded_debt signal once enrichment_tax_owed normalizes amount_owed) is physical-
+    # condition evidence. Either one fabricated a second (PROPERTY) category on top of the
+    # row's one real event -- a fake stack of 2 from a single fact, the same bug the Pickens
+    # fix already named and removed. Fix: route the probate fact to raw['probate'] (the field
+    # distress_score.py actually reads for LIFE_EVENT credit, same shape as
+    # sc_public_notices.py / nc_notices_counties.py's probate rows) instead of the generic
+    # condition flag; drop the tax_sale branch outright -- it needs no PROPERTY signal at all.
+    if probate:
+        raw["probate"] = {"case_number": probate.get("case"), "decedent": probate.get("name"),
+                          "match_confidence": probate.get("confidence")}
 
     fmv = _money(attrs.get("FAIRMKTVAL"))
     tmv = _money(attrs.get("TAXMKTVAL"))

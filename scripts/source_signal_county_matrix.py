@@ -27,6 +27,35 @@ BOARD = REPO / "docs" / "listings.json.gz"
 
 FLIP_TYPES = {"foreclosure_sale", "auction", "sheriff_sale", "hoa_sale", "reo"}
 
+# 2026-09-30 audit (scripts/coverage_100_ledger.py's a22dc20c / c64d7530 / bf38dd0c fixes,
+# same false-positive class, never propagated to this near-duplicate script): this script
+# matches purely on SOURCE NAME fragments (no distress_stack signal gate), so it inherits
+# several confirmed over-broad-fragment / over-broad-source-identity false positives --
+#   * "zombie" (code_vacancy): zombie_properties.py is a DERIVED stalled-foreclosure signal,
+#     not a code-enforcement/vacancy source -- dropped.
+#   * "vacant" (code_vacancy): also matches gaston_vacant / lincoln_vacant /
+#     transylvania_vacant, three vacant-LAND (unimproved lot) GIS feeds, the opposite
+#     condition from code_vacancy -- excluded below via
+#     `_VACANT_LAND_NOT_CODE_VACANCY_SOURCES` (spartanburg_vacant is a real vacant-
+#     STRUCTURE registry and keeps matching).
+#   * bare "courtlistener" (bankruptcy): also matches national.courtlistener_civil, a
+#     federal CIVIL real-property/foreclosure docket scraper, never bankruptcy -- narrowed
+#     to "courtlistener_adversary" ("bankruptcy" already covers courtlistener_bankruptcy).
+#   * "estate" (probate_estate): also matches national.hibid_real_estate (its own slug is
+#     "real_estate"), a generic AUCTION-category real-estate aggregator with no probate
+#     evidence for any row -- excluded below via `_HIBID_REAL_ESTATE_SOURCE`.
+#   * "rod_acclaim" / "rod_cott" / "rod_logan" (liens_judgments): each of these three ROD
+#     "sweep" scrapers discovers ALL recent distress recordings for its county/vendor (lis
+#     pendens, foreclosure deeds, probate, liens) under ONE slug -- only the rows each
+#     classifies as a real LIEN/JUDGMENT instrument (listing_type=="tax_lien") are liens
+#     evidence; their lis-pendens/foreclosure-deed/probate rows are not. Gated below via
+#     `_ROD_LIEN_FRAGMENTS` + the row's own listing_type, mirroring coverage_100_ledger.py's
+#     `_ROD_LIEN_SOURCES` fix exactly.
+#   * "rod_substitute" (liens_judgments) dropped outright, not just gated: harmless
+#     dead weight, not a live bug -- nc_rod_substitute_trustee.py never emits a LIEN-typed
+#     row at all (always LIS_PENDENS or FORECLOSURE_SALE), and its slug already matches
+#     mortgage_foreclosure's "substitute_trustee" fragment first (mortgage_foreclosure is
+#     checked earlier in this first-match-wins dict), so the fragment was unreachable.
 SIGNAL_FAMILIES = {
     "tax_delinquent": ("delinquent_tax", "tax_delinquent", "ptscloud", "pdf_delinquent",
                        "csv_delinquent", "multi_year", "qpaybill", "flc", "tax_sale",
@@ -40,12 +69,12 @@ SIGNAL_FAMILIES = {
     "lis_pendens": ("lis_pendens", "public_index"),
     "probate_estate": ("probate", "estate", "obitu", "funeral", "deceased"),
     "code_vacancy": ("code_violation", "condemn", "vacant", "min_housing", "demoli",
-                     "zombie", "nuisance", "code_enforcement", "arcgis_distress",
+                     "nuisance", "code_enforcement", "arcgis_distress",
                      "charlotte_open_data", "civicengage"),
-    "bankruptcy": ("bankruptcy", "courtlistener"),
+    "bankruptcy": ("bankruptcy", "courtlistener_adversary"),
     "divorce": ("divorce", "marriage", "separation"),
     "liens_judgments": ("lien", "judgment", "ucc", "ecourts_judgment", "dew_lien",
-                        "rod_acclaim", "rod_cott", "rod_logan", "rod_substitute"),
+                        "rod_acclaim", "rod_cott", "rod_logan"),
     "reo_bank_owned": ("_reo", "homepath", "homesteps", "hubzu", "auction_dot_com",
                         "auction_bank_reo", "gsa_surplus", "cash_buyer", "zillow",
                         "foreclosure_dot_com", "landwatch", "landandfarm", "homeharvest",
@@ -60,10 +89,30 @@ SIGNAL_FAMILIES = {
     "hud_section8": ("hud_reac", "hud_section8"),
 }
 
+# gaston_vacant / lincoln_vacant / transylvania_vacant: county-GIS VACANT-LAND (unimproved
+# lot) feeds, not code-enforcement/vacant-STRUCTURE sources -- see the SIGNAL_FAMILIES
+# comment above and coverage_100_ledger.py's identical `_VACANT_LAND_NOT_CODE_VACANCY_SOURCES`.
+_VACANT_LAND_NOT_CODE_VACANCY_SOURCES = ("gaston_vacant", "lincoln_vacant", "transylvania_vacant")
+# national.hibid_real_estate: generic AUCTION-category real-estate aggregator, no probate
+# evidence -- see the SIGNAL_FAMILIES comment above and coverage_100_ledger.py's identical
+# `_HIBID_REAL_ESTATE_SOURCE`.
+_HIBID_REAL_ESTATE_SOURCE = "hibid_real_estate"
+# The three ROD "sweep" scrapers whose LIEN/JUDGMENT rows are real liens_judgments evidence
+# ONLY when the row's own listing_type says so -- see the SIGNAL_FAMILIES comment above and
+# coverage_100_ledger.py's identical `_ROD_LIEN_SOURCES`.
+_ROD_LIEN_FRAGMENTS = ("rod_acclaim", "rod_cott", "rod_logan")
 
-def _family(source: str) -> str:
+
+def _family(source: str, listing_type: str | None = None) -> str:
     low = (source or "").lower()
     for fam, pats in SIGNAL_FAMILIES.items():
+        if fam == "code_vacancy" and any(f in low for f in _VACANT_LAND_NOT_CODE_VACANCY_SOURCES):
+            continue
+        if fam == "probate_estate" and _HIBID_REAL_ESTATE_SOURCE in low:
+            continue
+        if (fam == "liens_judgments" and any(f in low for f in _ROD_LIEN_FRAGMENTS)
+                and listing_type != "tax_lien"):
+            continue
         if any(p in low for p in pats):
             return fam
     return "other"
@@ -101,7 +150,7 @@ def main() -> int:
         ck = f"{cty},{st}"
         county_state[ck] = st
 
-        fam = _family(r.get("source") or "")
+        fam = _family(r.get("source") or "", ltype)
         src = r.get("source") or "unknown"
         data[bucket][ck][fam][src] += 1
 
