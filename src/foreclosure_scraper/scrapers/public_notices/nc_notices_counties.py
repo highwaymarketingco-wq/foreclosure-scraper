@@ -82,11 +82,28 @@ _RDO_TYPE = {"AND": "ctl00_ContentPlaceHolder1_as1_rdoType_0",   # All Words
              "EXACT": "ctl00_ContentPlaceHolder1_as1_rdoType_2"}  # Exact Phrase
 _RENDER_TIMEOUT_MS = 600_000
 
-#: The 19 NC footprint counties (11 WNC core + 8 coastal added 2026-08-12),
+#: The 20 NC footprint counties (12 WNC core + 8 coastal added 2026-08-12),
 #: in the platform's own label spelling.
 FOOTPRINT: tuple[str, ...] = (
     "Buncombe", "Henderson", "Gaston", "Cleveland", "Rutherford", "Burke",
     "Lincoln", "McDowell", "Polk", "Transylvania", "Mitchell",
+    # Haywood (added 2026-09-30, see docs/HANDOFF.md item 16 / gap_ledger.md):
+    # its own tax_delinquent roll is a genuine dead end (newspaper-only
+    # publication, webtaxpay.com Turnstile-CAPTCHA-walled, ArcGIS tax fields
+    # frozen at 2019/2020). The NCGS 105-369 tax-lien EXACT query specifically
+    # returns 0 live hits for Haywood over the full 365-day lookback (live
+    # httpx probe 2026-09-30, controlled against Buncombe which returned a
+    # real hit on the identical query — this is a confirmed site-side zero,
+    # not a broken request) so that gap stays OPEN. But the OTHER two queries
+    # this scraper already runs are genuinely productive for Haywood: live
+    # probe returned 6 real, dated, case-numbered FORECLOSURE_SALE notices
+    # ("foreclosure", 30-day window) and 10 real NOTICE TO CREDITORS /
+    # PROBATE_NOTICE rows across 3 pages ("notice to creditors" EXACT,
+    # 30-day window) — both with county_meta=Haywood. Added for that real,
+    # confirmed coverage; the tax-lien lane is kept running same as the other
+    # 19 counties (cheap, "misses nothing when absent") in case the ad
+    # eventually publishes.
+    "Haywood",
     # Coastal NC (brought into scope 2026-08-12):
     "Currituck", "Dare", "Hyde", "Carteret", "Onslow", "Pender",
     "New Hanover", "Brunswick",

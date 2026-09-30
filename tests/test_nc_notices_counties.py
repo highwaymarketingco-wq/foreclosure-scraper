@@ -104,6 +104,65 @@ def test_every_listing_is_in_footprint_and_nc(listings):
     assert {li.state for li in listings} == {"NC"}
 
 
+def test_haywood_is_in_footprint_and_classifies_real_rows():
+    """Added 2026-09-30 (docs/HANDOFF.md item 16 / gap_ledger.md). Live httpx
+    probe (no Playwright, no board) confirmed the mechanism against a control
+    (Buncombe) then against Haywood: ticking the real Haywood county checkbox
+    and running this scraper's own "foreclosure" and "notice to creditors"
+    queries returned real, dated, case-numbered rows (publication "Mountaineer,
+    The" / city "Waynesville" — Haywood's county seat). Both fixtures below are
+    the real preview text captured live 2026-09-30, notice_id 982438 and 982818.
+
+    The NCGS 105-369 tax-lien EXACT query specifically returned 0 for Haywood
+    over the full 365-day lookback (confirmed against the live "No public
+    notices found" marker, not a parsing miss) -- so this addition closes real
+    coverage for FORECLOSURE_SALE/PROBATE_NOTICE, not the tax_delinquent gap
+    itself, which stays open per the gap ledger.
+    """
+    assert "Haywood" in M.FOOTPRINT
+
+    foreclosure_row = {
+        "notice_id": "982438",
+        "publication": "Mountaineer, The",
+        "date_text": "Wednesday, September 16, 2026",
+        "published_at": None,
+        "county_meta": "Haywood",
+        "city_meta": "Waynesville",
+        "text": ("26SP000070-430 NOTICE OF SUBSTITUTE TRUSTEE'S FORECLOSURE SALE OF "
+                 "REAL PROPERTY UNDER AND BY VIRTUE of the power and authority "
+                 "contained in that certain Deed of Trust executed and delivered by "
+                 "William O'Brien and Betty Sue McCoy O'Brien dated March 12, 2009 "
+                 "and recorded on April 3, 2009"),
+    }
+    li = M._to_listing(foreclosure_row, _SLUG)
+    assert li is not None
+    assert li.county == "Haywood"
+    assert li.state == "NC"
+    assert li.listing_type is ListingType.FORECLOSURE_SALE
+    assert li.foreclosure_process == "power_of_sale"
+    assert li.case_number == "26SP000070-430"
+    assert li.defendant == "William O'Brien and Betty Sue McCoy O'Brien"
+
+    creditors_row = {
+        "notice_id": "982818",
+        "publication": "Mountaineer, The",
+        "date_text": "Wednesday, September 16, 2026",
+        "published_at": None,
+        "county_meta": "Haywood",
+        "city_meta": "Waynesville",
+        "text": ("NOTICE TO CREDITORS Having qualified as Administrator, Patton "
+                 "Medford Phillips of the Estate of Tammie Denise Phillips, late of "
+                 "Haywood County, State of North Carolina, this is to notify all "
+                 "persons, firms and corporations having claims against the estate "
+                 "to exhibit them to the undersigned in c"),
+    }
+    li2 = M._to_listing(creditors_row, _SLUG)
+    assert li2 is not None
+    assert li2.county == "Haywood"
+    assert li2.listing_type is ListingType.PROBATE_NOTICE
+    assert li2.defendant == "Tammie Denise Phillips"
+
+
 # ------------------------------------------------------- classification ----
 
 def test_classification_covers_all_three_categories(listings):
