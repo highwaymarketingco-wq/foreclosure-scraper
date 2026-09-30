@@ -56,10 +56,31 @@ saved-HTML lane (`scripts/ingest_saved.sh` + `scripts/parse_nc_ecourts_export.py
   owner name + county + type; keep `case_type == "Foreclosure (Special Proceeding)"`.
   Operator tips: bump the results pager to 200/page and filter the Location column (or the
   case-number county suffix, e.g. -660=Onslow) — a bare `26SP*` caps/samples at ~23.
-- **NC SP — the 9 legacy VCAP counties** (Buncombe, Burke, Cleveland, Henderson, Hyde,
-  Mitchell, Polk, Rutherford, Transylvania): NOT on the portal — courthouse public
-  terminal only for the full docket. BUT the trustee's **notice of sale** is legally
-  published, so `ncnotices.com` (already wired) covers the sale-stage subset automatically.
+- **CORRECTED 2026-09-30 (was stale since the 2025-10-13 statewide eCourts completion):
+  "NC SP — the 9 legacy VCAP counties ... NOT on the portal — courthouse public terminal
+  only" is no longer true and should not be re-cited.** `VCAP` = NC AOC's legacy
+  statewide "Civil Case Processing" indexing system (the civil-side counterpart to
+  `CIPRS` for criminal), which the modern Tyler eCourts/Odyssey **Portal**
+  (`portal-nc.tylertech.cloud`) replaced. NC's eCourts rollout reached its final Track
+  10 (13 counties incl. **Rutherford**, Burke, Cleveland, Gaston, Lincoln, McDowell) on
+  **2025-10-13**, completing the conversion in **all 100 NC counties** — confirmed live
+  2026-09-30: a direct query of the open Judgment Search JSON endpoint scoped to
+  "Rutherford District/Superior Court" over a 730-day window returned `totalHits=10710`
+  real judgment hits, so Rutherford is fully indexed in the modern system, not on a
+  courthouse-terminal-only legacy footing. There is no county left in the old "not on
+  the portal" state; drop that framing everywhere it's cited (`docs/extraction_gaps.md`
+  has the full corrected writeup, including that SP/foreclosure case types still don't
+  appear in that Judgment Search index for ANY county — confirmed empirically for
+  Rutherford, 0 of 500 sampled hits — and that Smart Search, the only place SP case
+  detail like upset-bid status lives, now uniformly CAPTCHA-gates all 100 counties,
+  confirmed live via browser 2026-09-30, not a VCAP-specific limitation). The manual
+  operator lane described just above (`parse_nc_ecourts_export.py`) is county-agnostic
+  in code (no hardcoded county allow-list) and now genuinely reaches Rutherford's (and
+  the other 8 ex-VCAP counties') SP dockets the same way it reaches the originally-named
+  10 — only the framing of which counties needed it was stale, not the tool. The
+  trustee's **notice of sale** (`ncnotices.com`, already wired) remains the only fully
+  free, fully automated pre-sale signal statewide; it still rolls off once the sale
+  happens, same as before.
 - **SC senior/disabled exemption** (28 counties, FOIA gap): free MANUAL per-parcel lane —
   county assessor property search / `qpublic.net/sc/scassessors` / SCDOR exempt-property
   portal show the homestead-exemption line on a parcel card. Not bulk-automatable (qPublic
