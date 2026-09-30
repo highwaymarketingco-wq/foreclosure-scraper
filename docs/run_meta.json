@@ -1,6 +1,6 @@
 {
-  "run_time": "2026-09-29T23:20:53.655573Z",
-  "total": 218633,
+  "run_time": "2026-09-30T00:03:59.936692Z",
+  "total": 219530,
   "by_source": {
     "national.nc_upset_bids": 38,
     "counties_generic.arcgis_distress.buncombe_unpaid_bills": 773,
@@ -171,7 +171,7 @@
   },
   "by_state": {
     "NC": 135137,
-    "SC": 83496
+    "SC": 84393
   },
   "by_source_on_board": {
     "counties_generic.liensnc": 40170,
@@ -209,6 +209,7 @@
     "counties.multi_year_delinquent_tax": 1224,
     "counties_sc.charleston_delinquent_tax": 1214,
     "counties_generic.arcgis_distress.spartanburg_infill_eligible": 1075,
+    "counties_sc.dorchester_billtrax_delinquent_tax": 897,
     "counties_generic.arcgis_distress.durham_open_code_violations": 875,
     "national.fannie_homepath": 857,
     "counties_nc.buncombe_delinquent_tax": 845,
@@ -406,13 +407,13 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "scoped scraper landing: +750 rows, existing rows untouched",
-  "detail_count": 218633,
-  "detail_digest": "d6c8d1d2d45a2a0d",
+  "notes": "scoped scraper landing: +897 rows, existing rows untouched",
+  "detail_count": 219530,
+  "detail_digest": "4a708fed3da38991",
   "board_parts": {
     "schema": "board-parts-v1",
     "count": 17,
-    "records": 218633,
+    "records": 219530,
     "max_bytes": 25165824,
     "rows_per_part": 13000,
     "files": [
@@ -547,10 +548,10 @@
       {
         "name": "listings_part_016.json.gz",
         "start": 208000,
-        "end": 218633,
-        "records": 10633,
-        "bytes": 1411429,
-        "sha256": "65675fdd979ced849c425471da7c5ea898f89fd5e1eccd9c871f3ae9d039e04e"
+        "end": 219530,
+        "records": 11530,
+        "bytes": 1521912,
+        "sha256": "5c5a580606f89bc811635bd2336bbfe7e9ae6c89cdd4b11adc0904c6bf5dd47a"
       }
     ]
   },
@@ -571,7 +572,7 @@
     "by_county_top"
   ],
   "health_as_of": "2026-09-23T08:47:09.374753Z",
-  "health_age_hours": 158.56,
+  "health_age_hours": 159.28,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-09-23T08:47:09.374753Z",
