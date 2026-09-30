@@ -368,6 +368,43 @@ BOARD_APPEND_MAX_SOURCE_MB = 2400.0
 # a run against the current (or any larger) board, exactly as before this comment was updated.
 BOARD_PATCH_MAX_SOURCE_MB = 2300.0
 
+# --- the merge-only SIZE guard (follow-up to patch_existing_rows(), 2026-09-30) --------------
+# merge_duplicate_rows() (below) is a FOURTH separate code path: like append_new_rows() and
+# patch_existing_rows(), it streams _iter_board_records() exactly once and never holds a full
+# parsed-dict or Listing copy of the board. Per UNTOUCHED row (the overwhelming majority -- this
+# function exists for a SMALL, known set of duplicate groups, not a board-wide pass) the cost is
+# actually LOWER than patch_existing_rows()'s: patch computes a Listing.model_construct() +
+# dedupe_key() for every single row to test for a match; merge instead computes
+# row_identity_hash() (one sha256 over the row's already-serialized bytes -- the exact bytes
+# this function needs to write out anyway, so the hash is close to free) and does a single dict
+# lookup against the small `merge_groups` key set. Only rows that ARE part of a merge group (at
+# most a few thousand, by this function's own contract -- "a SMALL, KNOWN set") pay
+# Listing.model_validate() + Listing.merge()'s real cost, exactly the way append_new_rows() only
+# pays Listing construction cost for its (also small) `new_listings` argument, never for the
+# existing board it streams past.
+#
+# NOT INDEPENDENTLY MEASURED YET. Unlike BOARD_APPEND_MAX_SOURCE_MB and BOARD_PATCH_MAX_SOURCE_MB
+# (both scaled from real `/usr/bin/time -l` trials, per-path, before being trusted -- see their
+# own comments), this ceiling has had NO dedicated trial: this codebase's own history is that
+# "structurally similar per-row shape is not proof of an identical cost" (BOARD_PATCH_MAX_SOURCE_MB's
+# own comment, written after patch turned out NOT to simply inherit append's number). The
+# per-row reasoning above argues merge_duplicate_rows() is at least as cheap as
+# patch_existing_rows() for the untouched majority of rows, and cheaper by construction for the
+# design chosen here (no Listing objects at all outside the tiny matched set) -- but that is an
+# argument, not a measurement, and this file's own discipline is not to skip the measurement on
+# the strength of an argument alone (see BOARD_PATCH_MAX_SOURCE_MB's "REAL FULL-BOARD PATCH
+# ATTEMPTS" section for what happened the one time reasoning-by-analogy was trusted without
+# updating the ceiling: it undersold the real risk once, at BOARD_LOAD_MAX_SOURCE_MB, before this
+# file's discipline hardened around always measuring the ACTUAL path).
+#
+# WHAT THE CEILING IS SET TO. BOARD_PATCH_MAX_SOURCE_MB's own value (2,300 MB) is inherited
+# UNCHANGED, not scaled up despite the argument above that merge should be cheaper -- deliberately
+# conservative pending a real measured trial (same dual RSS + `sample -f` physical-footprint
+# watchdog every other ceiling in this file was calibrated with). Raise this only after that
+# trial, the same way BOARD_APPEND_MAX_SOURCE_MB and BOARD_PATCH_MAX_SOURCE_MB themselves were
+# only raised after real supervised runs, never on reasoning alone.
+BOARD_MERGE_MAX_SOURCE_MB = 2300.0
+
 # run_meta health older than this is nulled (audit O4).
 HEALTH_MAX_AGE_HOURS = 48.0
 
@@ -1355,6 +1392,45 @@ def _raise_if_board_too_large_to_patch(docs: Path) -> None:
         f"over its ceiling. BOARD_PATCH_ALLOW_LARGE=1 overrides for one supervised run; "
         f"BOARD_PATCH_MAX_SOURCE_MB raises the ceiling once a larger size is measured safe on "
         f"this machine."
+    )
+
+
+def board_merge_size_state(docs_dir: Path | str, *, max_mb: float | None = None) -> dict:
+    """Would merge_duplicate_rows() be safe to run against this board, judging ONLY by its
+    on-disk size -- the merge-only counterpart of board_patch_size_state(), against
+    BOARD_MERGE_MAX_SOURCE_MB's own ceiling (see that constant's comment for why it gets one
+    separate from patch's, and why it currently just inherits patch's number). Same shape as the
+    other three: {source_mb, max_mb, ok, reason}; source_mb is None when no board was found
+    (treated as ok -- nothing to merge onto yet)."""
+    n = _board_source_bytes(Path(docs_dir))
+    limit = float(max_mb if max_mb is not None
+                  else os.environ.get("BOARD_MERGE_MAX_SOURCE_MB", BOARD_MERGE_MAX_SOURCE_MB))
+    if n is None:
+        return {"source_mb": None, "max_mb": limit, "ok": True, "reason": ""}
+    source_mb = n / (1024 * 1024)
+    ok = source_mb <= limit
+    reason = "" if ok else f"board source is {source_mb:.0f} MB, over the {limit:.0f} MB ceiling"
+    return {"source_mb": source_mb, "max_mb": limit, "ok": ok, "reason": reason}
+
+
+def _raise_if_board_too_large_to_merge(docs: Path) -> None:
+    """The merge-only counterpart of _raise_if_board_too_large_to_load()/_to_append()/_to_patch():
+    called eagerly by merge_duplicate_rows() before it does any work. BOARD_MERGE_ALLOW_LARGE=1
+    overrides for one run; BOARD_MERGE_MAX_SOURCE_MB (see its comment above
+    BOARD_LOAD_MAX_SOURCE_MB) is the ceiling."""
+    if os.environ.get("BOARD_MERGE_ALLOW_LARGE", "").strip().lower() in ("1", "true", "yes"):
+        return
+    size_state = board_merge_size_state(docs)
+    if size_state["ok"]:
+        return
+    log.error("board.merge_too_large", **size_state, docs_dir=str(docs))
+    raise BoardLoadTooLarge(
+        f"merge_duplicate_rows refused to load {docs}: {size_state['reason']}. "
+        f"merge_duplicate_rows is measurably cheap per untouched row (see "
+        f"BOARD_MERGE_MAX_SOURCE_MB's comment) but is still proportional to the existing "
+        f"board's size, and this board is over its ceiling. BOARD_MERGE_ALLOW_LARGE=1 overrides "
+        f"for one supervised run; BOARD_MERGE_MAX_SOURCE_MB raises the ceiling once a larger "
+        f"size is measured safe on this machine."
     )
 
 
@@ -4485,5 +4561,481 @@ def patch_existing_rows(patches: dict[str, dict], summary: dict,
 
     log.info("web_artifact.patched", existing=existing_total, applied=applied, total=total,
              not_found=not_found, bytes=listings_path.stat().st_size)
+    stats["written"] = True
+    return stats
+
+
+# ===========================================================================
+# merge_duplicate_rows: fold a SMALL, KNOWN set of duplicate-row GROUPS into one
+# surviving row each and drop the rest -- without materializing the board (follow-up to
+# patch_existing_rows(), 2026-09-30, task: clean up ~1,361 real duplicate rows left behind
+# when a scraper wrote a mailing address instead of a situs address, so dedupe() never
+# recognized the two rows as the same property at scrape time).
+# ===========================================================================
+
+class BoardMergeGroupMismatch(RuntimeError):
+    """merge_duplicate_rows() refused: at least one merge group did not resolve to EXACTLY its
+    expected rows on the CURRENT board -- either an identity key was not found at all (the board
+    changed since the caller computed merge_groups: a later scrape/patch/append touched one of
+    the target rows, or simply re-derived a different hash for it), or an identity key matched
+    MORE than one row (the key is not actually unique, or the same row was hashed twice).
+
+    Unlike patch_existing_rows()'s BoardPatchCountMismatch (which fires on the WHOLE board's row
+    count disagreeing with the manifest), this can fire because of a SINGLE group among many --
+    and the whole call still refuses to write ANYTHING, deliberately: merge_duplicate_rows()
+    changes row count, so a partially-applied merge (some groups folded, others silently
+    skipped) would publish a board whose total is neither the old count nor the count the caller
+    asked for, with no record of which groups actually landed. A small, human-reviewed batch
+    like this should fail loudly and let the caller re-derive merge_groups against the current
+    board, not guess."""
+
+
+# Fields used for row_identity_hash(). Deliberately narrower than a full row dump: every field
+# left OUT here is one this codebase's own targeted backfill/patch scripts are known to touch on
+# an EXISTING row after it is first published (parcel_id: resolver_backfill_parcel.py;
+# owner_name/land_use: enrichment_gis_attrs, documented on the model as GIS-backfilled;
+# latitude/longitude: resolver_backfill_geocode.py; living_sqft: sqft_backfill.py; assessed/
+# market/tax_value, acreage, bedrooms, bathrooms, year_built: various CAMA/qPublic enrichers;
+# raw.* entirely: grade/calc/data_quality/skip_trace/comps/vision/... are recomputed or
+# backfilled by name on a schedule). A key that includes any of those would go stale the moment
+# an unrelated, perfectly legitimate patch run touches one of the two rows in a pending merge
+# group -- which, on this board's own recent history (multiple BOARD_PATCH_ALLOW_LARGE=1 landings
+# most nights), is not a rare edge case. What is left IS the set of fields a scraper writes ONCE,
+# at first_seen, and essentially never revises afterward -- the closest thing this board has to
+# an immutable "as originally scraped" fingerprint for a row.
+_MERGE_HASH_FIELDS = (
+    "source", "source_url", "listing_type", "street_address", "city", "state", "zip_code",
+    "county", "case_number", "plaintiff", "defendant", "trustee", "sale_date", "sale_time",
+    "sale_location", "opening_bid", "judgment_amount", "legal_description",
+)
+
+
+def row_identity_hash(rec: dict) -> str:
+    """A content fingerprint for ONE published board row, stable across re-serialization and
+    independent of position in the file -- the identity-key type merge_duplicate_rows()'s
+    `merge_groups` argument is made of.
+
+    WHY NOT dedupe_key(), source_url, or any single field. This codebase has already measured,
+    more than once, that no single field on this board is safe to trust as a unique row
+    identifier: _identity_keys()'s own docstring records 652 source_urls shared by 19,392 leads
+    (one ArcGIS service URL alone shared by 3,293 rows; county PDF rolls give every lead in the
+    file the same URL), and dedupe_key() is disqualified for a DIFFERENT reason specific to this
+    tool's whole reason for existing -- the 1,361 duplicate rows this was built to clean up have
+    DIFFERENT dedupe_key()s by construction (that is exactly why dedupe() never merged them at
+    scrape time: one copy's street_address was a mailing address, the other's a situs address,
+    so the address branch of dedupe_key() computed two different keys for the same property).
+    Any single field used alone would either collide across unrelated rows (source_url, a bare
+    parcel_id, a bare address) or fail to distinguish the very rows this tool targets
+    (dedupe_key()).
+
+    WHAT THIS DOES INSTEAD. Hashes the JSON encoding of a fixed, deliberately narrow subset of
+    fields (_MERGE_HASH_FIELDS -- see its own comment for exactly which fields and why those):
+    stable "as scraped" identity fields only, excluding every field this codebase's own
+    enrichment/backfill scripts are known to revise on an already-published row. The combination
+    of ~17 fields colliding by chance across two unrelated rows is astronomically less likely
+    than any one of them alone, while still being far more resistant to going stale between "an
+    audit computes merge_groups" and "this function runs" than a full-row hash would be.
+
+    MUST be computed on the row in exactly the form docs/listings*.json PUBLISHES it -- i.e.
+    WITHOUT the lazy-detail sidecar (vision/foreclosure_sold_comps/comps/cama/rent_comps) merged
+    into `raw`. `board_stream.iter_board_rows()` (the safe, constant-memory board reader this
+    codebase's own scripts are required to use for read-only work) already yields rows in
+    exactly this form, so an audit script computing merge_groups from it needs no extra
+    stripping. Internally, merge_duplicate_rows() computes this AFTER popping LAZY_DETAIL_KEYS
+    back out of each streamed row -- the same point in the pass append_new_rows()/
+    patch_existing_rows() re-encode from -- so the two sides always see identical bytes for the
+    same published row.
+
+    Deliberately NOT the row's full JSON encoding: hashing only the narrow field subset (rather
+    than, say, sha256 of the whole `row_enc.encode(rec)` bytes already computed by the caller)
+    means a change to some OTHER field between audit-time and merge-time -- e.g. a resolver
+    backfilling parcel_id, a CAMA enricher filling in assessed_value -- does not silently
+    invalidate this row's identity and turn a real duplicate into a BoardMergeGroupMismatch. A
+    caller that wants maximum freshness regardless should still re-derive merge_groups
+    immediately before calling merge_duplicate_rows(), in the same operator session; this
+    function's field selection only narrows how much intervening activity can break that
+    contract, it does not remove the value of re-deriving it fresh.
+
+    Returns a 32-hex-char (128-bit) prefix of the sha256 hex digest -- short enough to be a
+    cheap dict key for the (at most a few thousand) rows this function ever tracks, long enough
+    that a collision between two DIFFERENT real rows on a ~220K-row board is not a realistic
+    concern (a 128-bit space against a few hundred thousand items is nowhere near its birthday
+    bound)."""
+    enc = json.JSONEncoder(ensure_ascii=False, default=str, sort_keys=True)
+    payload = {k: rec.get(k) for k in _MERGE_HASH_FIELDS}
+    return hashlib.sha256(enc.encode(payload).encode("utf-8")).hexdigest()[:32]
+
+
+def merge_duplicate_rows(merge_groups: list[list[str]], summary: dict,
+                         docs_dir: Path | str = "docs") -> dict:
+    """Fold a SMALL, KNOWN set of duplicate-row GROUPS into one surviving row per group and
+    DROP the rest -- without materializing the (potentially hundreds of thousands of) other,
+    untouched rows into Listing objects or even a full parsed-dict list, and reusing
+    dedupe.py's real Listing.merge() for the fold instead of reimplementing field-precedence
+    rules a second time.
+
+    THE PROBLEM THIS SOLVES. append_new_rows() lands new rows, patch_existing_rows() mutates a
+    known subset of existing rows in place -- neither can REMOVE a row, because neither was
+    built to change the board's row count. The only existing path that can actually delete/merge
+    rows is load_board() -> dedupe() -> write_artifact(), which needs the whole board held as
+    Listing objects twice over (once as parsed input, once as the deduped output) -- exactly the
+    materialization this board's current size (~2.65 GB combined source) no longer fits on this
+    8 GB Mac (scripts/normalize_board_duplicates.py needed ~11 GB peak the one time it ran, back
+    when the board was smaller). A caller that already knows EXACTLY which small set of rows are
+    duplicates (a targeted audit found them, not a full dedupe() re-run) has no reason to touch,
+    hold, or even parse the other 99%+ of the board to fix just those.
+
+    HOW. `merge_groups` is a list of duplicate groups; each group is a list of 2+
+    row_identity_hash() values (see that function's docstring for why a content hash of a
+    narrow, stable field subset -- not dedupe_key(), not source_url, not any single field -- is
+    the safe choice of identity key here). Within a group, index 0 is the KEPT row: the survivor
+    whose identity (source/source_url, and precedence on any field both copies disagree about)
+    the merged row inherits. The remaining entries are DROP rows: their data is folded into the
+    kept row via the REAL Listing.merge() (dedupe.py's own merge semantics -- money fields treat
+    0 as missing, first_seen takes the earliest, last_seen the latest, raw is deep-merged with
+    LATER rows winning on leaf conflicts, also_seen_in gains an attribution entry for each
+    dropped row's source), then omitted from the output entirely. The CALLER decides which
+    member is index 0 -- typically the copy with the correct situs address, since
+    Listing.merge()'s top-level field precedence prefers the KEPT (self) row's own non-null
+    values over an incoming row's on a genuine conflict; picking the row with the wrong
+    (mailing) address as index 0 would keep the wrong address as the published one.
+
+    The existing board is streamed EXACTLY ONCE via _iter_board_records() (the same incremental
+    JSON-array decoder append_new_rows()/patch_existing_rows() use). For each row: LAZY_DETAIL_
+    KEYS are popped from `raw` (mirroring every other write path's round-trip) and
+    row_identity_hash() is computed on the result. A row whose hash is not in ANY pending group
+    is re-encoded and passed straight through, exactly like the other two functions -- this is
+    the overwhelming majority of the board and is never touched, held, or even looked up beyond
+    one dict membership test. A row whose hash IS a group member is held (not yet written) until
+    the whole board has been scanned: every group's members can arrive in any order and from
+    anywhere in the file, so the actual Listing.merge() fold only happens after the full pass
+    confirms every expected member was found EXACTLY once. Folded rows are appended to the
+    output after every untouched row -- board order is not treated as meaningful elsewhere in
+    this codebase's own additive tool (append_new_rows() already appends new rows at the end
+    regardless of geography), so this does the same rather than trying to preserve the kept
+    row's original file position.
+
+    SAFETY INVARIANT (replaces patch_existing_rows()'s exact-count-unchanged guard, which does
+    not apply here -- this function EXISTS to change the count). Before ANYTHING is written:
+      1. `merge_groups` itself is validated (cheap, no I/O): every group has >= 2 members, no
+         key repeats within a group, and no key appears in more than one group (a key needed in
+         two groups is a caller bug -- a transitive duplicate chain that needed ONE group of 3,
+         not two overlapping groups of 2 -- and merging it into two different survivors would be
+         wrong however it were resolved).
+      2. After the streaming pass, EVERY key in EVERY group must have matched EXACTLY ONE row.
+         Zero matches (BoardMergeGroupMismatch) or more than one match for the same key
+         (BoardMergeGroupMismatch) refuses the ENTIRE call -- no partial merge, nothing written.
+      3. The exact row-count arithmetic is asserted, not merely checked to be "roughly close":
+         `total_after == existing_total - sum(len(group) - 1 for group in merge_groups)`, and
+         `len(listing_blobs) == len(details) == total_after`, both by construction (every group
+         contributes exactly one output row, every non-grouped row contributes exactly one) and
+         reconfirmed with a bare assert immediately before writing.
+      4. The existing board's streamed row count is also checked against the board manifest's
+         own last-sealed record count for listings.json (when a manifest exists), the same
+         corruption check patch_existing_rows() runs -- this function must not compound an
+         already-disagreeing board and its manifest.
+
+    WHAT THIS DELIBERATELY DOES NOT DO (same reasoning as append_new_rows()/
+    patch_existing_rows(), see their docstrings):
+      * Does NOT regenerate listings_slim.json / detail_shards/ -- carried forward unchanged,
+        the same disclosed gap the other two streaming writers have.
+      * Does NOT re-run dedupe()'s fuzzy/signature passes over the whole board to FIND
+        duplicates -- merge_groups must already be known. Finding them is a separate, read-only
+        audit step (stream the board with board_stream.iter_board_rows(), group candidates by
+        whatever signal the audit trusts, hash each with row_identity_hash()).
+      * Does NOT touch listings_slim.json's/board's `board` block's `count` -- carried forward
+        from the prior run_meta.json exactly as append_new_rows()/patch_existing_rows() do,
+        since this function never regenerates the slim payload either.
+      * The high-water mark IS allowed to move DOWN here (unlike patch's, which never changes
+        total, so never needed a down case) -- `summary["off_footprint_removed"]` is set to the
+        number of rows this call dropped before `_count_guard_and_backup` runs, reusing that
+        existing "this shrink is intentional, rebase the mark" plumbing (write_artifact's own
+        mechanism -- see `_count_guard_and_backup`'s docstring) rather than inventing a second
+        one. At ~1,361 rows out of ~220,000 (well under 1%), this is also nowhere near the
+        guard's 10%-unexplained-shrink threshold, so BOARD_ALLOW_SHRINK is not expected to be
+        needed for the real cleanup this was built for.
+      * Is gated by its OWN size ceiling, BOARD_MERGE_MAX_SOURCE_MB, separate from the other
+        three -- see that constant's comment for why, and why it currently just inherits
+        BOARD_PATCH_MAX_SOURCE_MB's number pending a dedicated measured trial.
+
+    Returns {existing, groups, rows_targeted, rows_dropped, total_after, written} -- when
+    `merge_groups` is empty, {existing: None, groups: 0, rows_targeted: 0, rows_dropped: 0,
+    written: False, total_after: None} without touching the board at all. When the board has no
+    rows to merge onto yet (no listings.json present), {existing: 0, groups: N, rows_targeted: M,
+    rows_dropped: 0, written: False, total_after: 0} -- like patch_existing_rows(), a merge with
+    no board yet is a caller error, not a bootstrap case.
+
+    Refuses (BoardLockNotHeld) unless the caller holds the board lock, exactly like
+    write_artifact()/append_new_rows()/patch_existing_rows(); refuses (BoardChangedSinceLoad) if
+    listings.json changed since this process last loaded it; refuses (BoardLoadTooLarge) if the
+    existing board is over BOARD_MERGE_MAX_SOURCE_MB (BOARD_MERGE_ALLOW_LARGE=1 overrides for one
+    supervised run); refuses (ValueError) on a malformed `merge_groups` argument (see invariant 1
+    above); refuses (BoardMergeGroupMismatch) if any group fails to resolve to exactly its
+    expected rows on the current board (invariant 2 above).
+    """
+    docs = Path(docs_dir)
+    docs.mkdir(parents=True, exist_ok=True)
+    listings_path = docs / "listings.json"
+
+    require_board_lock(docs)
+    _check_not_changed_since_load(listings_path)
+
+    if not merge_groups:
+        return {"existing": None, "groups": 0, "rows_targeted": 0, "rows_dropped": 0,
+                "written": False, "total_after": None}
+
+    # --- validate merge_groups shape BEFORE any I/O (cheap, catches caller bugs immediately) ---
+    key_to_group: dict[str, int] = {}
+    for gi, group in enumerate(merge_groups):
+        if len(group) < 2:
+            raise ValueError(
+                f"merge group {gi} has fewer than 2 rows ({group!r}) -- nothing to merge")
+        seen_in_group: set = set()
+        for key in group:
+            if key in seen_in_group:
+                raise ValueError(f"merge group {gi} lists identity key {key!r} more than once")
+            seen_in_group.add(key)
+            if key in key_to_group:
+                raise ValueError(
+                    f"identity key {key!r} appears in both group {key_to_group[key]} and group "
+                    f"{gi} -- a row can only belong to ONE merge group. This is usually a "
+                    f"transitive duplicate chain (A~B, B~C) that needs ONE group of 3 "
+                    f"([A, B, C]), not two overlapping groups of 2; resolve the overlap in the "
+                    f"caller before retrying."
+                )
+            key_to_group[key] = gi
+
+    rows_targeted = len(key_to_group)
+
+    if not _board_file_present(listings_path):
+        # Like patch_existing_rows(): nothing to merge onto. Every group is unmatched by
+        # definition -- there is no row to fold.
+        return {"existing": 0, "groups": len(merge_groups), "rows_targeted": rows_targeted,
+                "rows_dropped": 0, "written": False, "total_after": 0}
+
+    _raise_if_board_too_large_to_merge(docs)
+
+    # --- ONE streaming pass: untouched rows pass straight through; group members are held ---
+    row_enc = json.JSONEncoder(ensure_ascii=False, default=str)
+    listing_blobs: list[bytes] = []
+    details: list[dict] = []
+    by_state: collections.Counter = collections.Counter()
+    by_source: collections.Counter = collections.Counter()
+    existing_total = 0
+    # gi -> {identity_key: (row_dict, popped_detail_dict)} -- at most rows_targeted entries
+    # total, across every group; never the whole board.
+    found: dict[int, dict] = collections.defaultdict(dict)
+
+    for rec in _iter_board_records(docs):
+        existing_total += 1
+        raw = rec.get("raw")
+        d: dict = {}
+        if isinstance(raw, dict):
+            for k in LAZY_DETAIL_KEYS:
+                if k in raw:
+                    d[k] = raw.pop(k)
+        gi = None
+        key = None
+        if key_to_group:
+            key = row_identity_hash(rec)
+            gi = key_to_group.get(key)
+        if gi is not None:
+            if key in found[gi]:
+                raise BoardMergeGroupMismatch(
+                    f"identity key {key!r} (merge group {gi}) matched more than one row on the "
+                    f"board -- refusing to guess which one was meant. Nothing written; "
+                    f"re-derive merge_groups against the current board."
+                )
+            found[gi][key] = (rec, d)
+            continue  # held -- may be re-emitted later as part of the group's merged output
+        by_state[str(rec.get("state") or "").strip() or "unknown"] += 1
+        by_source[str(rec.get("source") or "").strip() or "unknown"] += 1
+        details.append(d)
+        listing_blobs.append(row_enc.encode(rec).encode("utf-8"))
+
+    # --- verify EVERY group resolved to EXACTLY its expected rows before computing anything ---
+    _missing: list[tuple[int, str]] = []
+    for gi, group in enumerate(merge_groups):
+        got = found.get(gi, {})
+        for key in group:
+            if key not in got:
+                _missing.append((gi, key))
+    if _missing:
+        _groups_affected = sorted({gi for gi, _ in _missing})
+        raise BoardMergeGroupMismatch(
+            f"{len(_missing)} identity key(s) across {len(_groups_affected)} group(s) were not "
+            f"found on the board -- it likely changed since merge_groups was computed (another "
+            f"scrape/patch/append touched a target row, or its row_identity_hash() shifted). "
+            f"Nothing written. Re-scan the board and re-derive merge_groups before retrying. "
+            f"First few misses: {_missing[:5]}"
+        )
+
+    # --- fold each group with the REAL Listing.merge() logic and append the result ---
+    rows_dropped = 0
+    for gi, group in enumerate(merge_groups):
+        rows_dropped += len(group) - 1
+        kept_rec, kept_det = found[gi][group[0]]
+        if kept_det:
+            kept_rec.setdefault("raw", {}).update(kept_det)
+        kept_li = Listing.model_validate(kept_rec)
+        for key in group[1:]:
+            drop_rec, drop_det = found[gi][key]
+            if drop_det:
+                drop_rec.setdefault("raw", {}).update(drop_det)
+            drop_li = Listing.model_validate(drop_rec)
+            kept_li = kept_li.merge(drop_li)  # dedupe.py's real merge, reused verbatim
+
+        # _to_dict() is the SAME publish transform every other row on this board already went
+        # through once (RAW_KEEP slim, invalid-address nulling, stale-link annotation) -- safe
+        # to re-apply here: both kept_rec.raw and every drop_rec.raw are ALREADY-published,
+        # already-RAW_KEEP-slimmed dicts (each only ever contained allowed keys/subkeys to begin
+        # with), so their deep-merge cannot contain anything _slim_raw() would newly strip;
+        # re-slimming the merged result is a no-op, not a data-loss risk.
+        merged_rec = _to_dict(kept_li)
+        m_raw = merged_rec.get("raw")
+        m_det: dict = {}
+        if isinstance(m_raw, dict):
+            for k in LAZY_DETAIL_KEYS:
+                if k in m_raw:
+                    m_det[k] = m_raw.pop(k)
+        details.append(m_det)
+        listing_blobs.append(row_enc.encode(merged_rec).encode("utf-8"))
+        by_state[str(merged_rec.get("state") or "").strip() or "unknown"] += 1
+        by_source[str(merged_rec.get("source") or "").strip() or "unknown"] += 1
+
+    total = existing_total - rows_dropped
+    # Exact arithmetic, asserted -- not "roughly close" (task's own framing). Both sides are
+    # already true by construction (every group emits exactly one row; every non-grouped row
+    # emits exactly one row); this is a belt-and-suspenders check immediately before writing.
+    assert total == len(listing_blobs) == len(details), (
+        f"merge_duplicate_rows internal invariant broken: total={total}, "
+        f"len(listing_blobs)={len(listing_blobs)}, len(details)={len(details)}"
+    )
+
+    stats: dict = {
+        "existing": existing_total, "groups": len(merge_groups), "rows_targeted": rows_targeted,
+        "rows_dropped": rows_dropped, "written": False, "total_after": total,
+    }
+
+    # --- manifest count check (same corruption guard patch_existing_rows() runs) ---
+    _manifest_now = load_manifest(docs)
+    if _manifest_now:
+        _expected = ((_manifest_now.get("files") or {}).get("listings.json") or {}).get("records")
+        if isinstance(_expected, int) and existing_total != _expected:
+            raise BoardPatchCountMismatch(
+                f"merge_duplicate_rows refused: streamed {existing_total:,} rows off "
+                f"{listings_path}, but {docs / MANIFEST_NAME} records {_expected:,} for it. "
+                f"Verify with `scripts/board_manifest.py --verify` before retrying."
+            )
+
+    # --- shared backup-before-overwrite + count guard. The shrink is intentional (this
+    # function's whole job): flagged via off_footprint_removed so the guard treats it as an
+    # accepted allowance rather than unexplained shrink, and so the high-water mark can rebase
+    # down by exactly this much below. ---
+    _summary = dict(summary)
+    _summary["off_footprint_removed"] = (
+        int(_summary.get("off_footprint_removed") or 0) + rows_dropped
+    )
+    _accepted_intentional = _count_guard_and_backup(docs, listings_path, total, _summary)
+
+    # --- write listings.json + gzipped parts (the SAME low-level writers the other writers use) ---
+    _manifest_pre: dict = {
+        "listings.json": {**_write_plain_array(listings_path, listing_blobs), "records": total},
+    }
+    detail_path = docs / "listings_detail.json"
+    detail_count = len(details)
+    detail_bytes = json.dumps(details, ensure_ascii=False, default=str).encode("utf-8")
+    del details
+    _manifest_pre["listings_detail.json"] = {"bytes": len(detail_bytes),
+                                             "sha256": hashlib.sha256(detail_bytes).hexdigest(),
+                                             "records": detail_count}
+    _atomic_write_bytes(detail_path, detail_bytes)
+    _prior_parts = _bp.manifest_parts_block(_bp.read_manifest(docs)) or {}
+    _parts = _bp.write_parts(docs, listing_blobs, hint_rows=_prior_parts.get("rows_per_part"))
+    _parts_block = _bp.make_block(_parts["entries"], rows_per_part=_parts["rows_per_part"],
+                                  cap=_parts["cap"])
+    del listing_blobs
+    import gzip
+    detail_gz = gzip.compress(detail_bytes, compresslevel=9, mtime=0)
+    _manifest_pre["listings_detail.json.gz"] = {"bytes": len(detail_gz),
+                                                "sha256": hashlib.sha256(detail_gz).hexdigest(),
+                                                "records": detail_count}
+    _atomic_write_bytes(docs / "listings_detail.json.gz", detail_gz)
+    detail_digest = hashlib.sha256(detail_gz).hexdigest()[:16]
+    del detail_gz, detail_bytes
+
+    # --- run_meta.json: same shape append_new_rows()/patch_existing_rows() write ---
+    meta_path = docs / "run_meta.json"
+    prior_meta: dict = {}
+    if meta_path.exists():
+        try:
+            prior_meta = json.loads(meta_path.read_text())
+        except Exception:  # noqa: BLE001 - a corrupt prior file must not block the write
+            prior_meta = {}
+        if not isinstance(prior_meta, dict):
+            prior_meta = {}
+    prior_board_block = prior_meta.get("board")
+    if not isinstance(prior_board_block, dict):
+        prior_board_block = None
+    slim_count = prior_board_block.get("count") if prior_board_block else None
+    shard_meta = prior_board_block.get("detail_shards") if prior_board_block else None
+
+    _now = datetime.utcnow()
+    _now_iso = _now.isoformat() + "Z"
+    meta = dict(prior_meta)
+    meta.update({
+        "run_time": _now_iso,
+        "total": total,
+        "by_state": dict(sorted(by_state.items(), key=lambda kv: (-kv[1], kv[0]))),
+        "by_source_on_board": dict(sorted(by_source.items(), key=lambda kv: (-kv[1], kv[0]))),
+        "notes": summary.get("notes", prior_meta.get("notes", "")),
+        "detail_count": detail_count,
+        "detail_digest": detail_digest,
+        "board_parts": _parts_block,
+    })
+    if summary.get("by_source"):
+        meta["by_source"] = summary["by_source"]
+    if prior_board_block is not None:
+        meta["board"] = prior_board_block
+    _apply_health_freshness(meta, prior_meta, summary, _now_iso, _now)
+    _atomic_write_bytes(meta_path, json.dumps(meta, ensure_ascii=False, default=str, indent=2).encode("utf-8"))
+
+    # --- high-water mark: CAN move down here (unlike patch's), via the same rebase mechanism
+    # write_artifact()/append_new_rows() use for an accepted intentional shrink ---
+    try:
+        _hw_path = docs / "board_highwater.json"
+        _prev_hw = 0
+        if _hw_path.exists():
+            _prev_hw = json.loads(_hw_path.read_text()).get("count", 0)
+        if total > _prev_hw:
+            _atomic_write_bytes(_hw_path, json.dumps({
+                "count": total, "updated_at": _now_iso,
+            }, indent=2).encode("utf-8"))
+            log.info("web_artifact.highwater_updated", old=_prev_hw, new=total)
+        elif _accepted_intentional > 0 and total >= _prev_hw - _accepted_intentional:
+            _atomic_write_bytes(_hw_path, json.dumps({
+                "count": total, "updated_at": _now_iso, "rebased_from": _prev_hw,
+                "reason": f"{_accepted_intentional:,} duplicate rows merged away",
+            }, indent=2).encode("utf-8"))
+            log.warning("web_artifact.highwater_rebased", old=_prev_hw, new=total,
+                        duplicates_merged=_accepted_intentional)
+    except Exception:  # noqa: BLE001
+        pass
+
+    # THE MANIFEST, last (same reasoning as the other three writers).
+    try:
+        write_manifest(docs, _manifest_pre, meta, slim_count=slim_count, shard_meta=shard_meta,
+                       parts_block=_parts_block)
+    except Exception:  # noqa: BLE001
+        try:
+            (docs / MANIFEST_NAME).unlink(missing_ok=True)
+        except OSError:
+            pass
+        log.error("web_artifact.manifest_failed", exc_info=True)
+    if str(listings_path.resolve()) in _LOAD_STAMPS:
+        _remember_load(docs, listings_path)
+
+    log.info("web_artifact.merged", existing=existing_total, groups=len(merge_groups),
+             rows_dropped=rows_dropped, total=total, bytes=listings_path.stat().st_size)
     stats["written"] = True
     return stats
