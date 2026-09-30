@@ -65,6 +65,44 @@ queue so gaps are KNOWN, not surprises. Status: `DONE` / `OPEN`.
 - `DONE` `counties_nc/nc_county_tax_foreclosure` — upset-bid deadline now parsed to datetime + set on typed `upset_bid_deadline` (raw ISO string kept). Runtime-tested; test_nc_county_tax_foreclosure green.
 - `DONE` `national/cash_buyer_deeds` — `excise_tax_stamp`→raw + back-computes NC sale price (stamp×500) into `judgment_amount` only when `consideration_amount` is None (`price_from_stamp` flag). Runtime-verified.
 - `DONE` `national/sheriff_sales` — dead `_UPSET_BID_RE` now sets typed `upset_bid_deadline` (date near the phrase, else sale_date+10d NC statutory window); `plaintiff` + `judgment_amount` promoted from the row (raw `judgment_raw` kept). Runtime-verified.
+- `DONE` **Gaston NC sqft/year_built/value — extraction gap, 2026-09-30.** Sweep of the 4
+  weakest-coverage flip counties (Cherokee SC, Union SC, Oconee SC, Gaston NC) for a
+  CAMA/GIS layer that carries heated sqft but isn't being read. **Cherokee SC**: no
+  county-native ArcGIS at all (qPublic-only) — already the documented dead end, and an
+  on-demand qPublic-card adapter (`assessor_cards/cherokee_sc.py`) already fills
+  `living_sqft` for graded leads there; nothing to do. **Union SC**: re-verified live —
+  the one reachable AGOL layer (`UNION_SC_PARCELS_WFL1/FeatureServer/2`, the one
+  `COUNTY_GIS["SC:Union"]` already queries for owner/mailing) has NO sqft/value/
+  year-built field on it at all (`?f=json` field list: only cadastral MapNumber/
+  ParcelID/CAMA_ID/Name/Address_1-3) — confirmed genuine dead end, not an extraction
+  bug. **Oconee SC**: re-verified live across every reachable layer
+  (`CitizenServe/MapServer/5`, `PARCELDATA_owner/MapServer/1`; `PARCELDATA/0`,
+  `PARCELDATA/1`, `Parcels_OpenData/0` 400 "Invalid URL" — not live services) — none
+  carries sqft, value, or even situs; `TMS_ACRES`/`GIS_ACRES` are land area, not
+  building sqft. Confirmed genuine dead end. **Gaston NC: real extraction gap, found
+  and fixed.** `counties_nc.gaston_vacant` already reads SQFT/YEARBLT off
+  `PublicGIS/Parcels/FeatureServer/11` for its VacantImpro slice, proving the field
+  exists and is populated — but `enrichment_owner_mailing.py`'s `COUNTY_GIS["NC:Gaston"]`
+  entry, which reaches EVERY Gaston lead (not just vacant ones) for owner/mailing,
+  never requested those columns, so the module's own generic, field-name-pattern
+  building-spec/value extractors (`_extract_specs`/`_extract_value` — built in
+  2026-06-19/06-21 for exactly this purpose) had nothing to match. Two-part fix:
+  (1) added an explicit `out_fields` to the Gaston spec carrying `SQFT,YEARBLT,TOTVAL`
+  alongside the original owner/mail/situs/parcel columns; (2) `_SPEC_PATTERNS` didn't
+  recognize the *bare* Esri CAMA abbreviations this layer actually uses (`SQFT` with no
+  living/heated/finished prefix, `YEARBLT` with no "act(ual)" prefix) — added
+  `|sq_?ft` and `|year_?blt` alternatives to the `living_sqft`/`year_built` patterns
+  (fully anchored, so this only ever fires where a spec's own `out_fields` names a
+  field exactly that — verified no other county's spec does today). Live-verified
+  2026-09-30: 91,827 of 118,065 Gaston parcels (77.8%) carry `SQFT>0`; a real sample
+  row returned `SQFT=1102`, `YEARBLT=1972`, `TOTVAL=198260` (not a silent-death empty
+  response). TOTVAL also closes the `market_value`/`tax_value`/`assessed_value` gap
+  for Gaston leads via the same already-existing `_extract_value` priority match
+  (`totval` literal). Tests: `tests/test_gaston_sqft_extraction.py` (offline, no
+  network — regex + spec + extraction-function checks against a live-captured sample
+  row). Not run against the live board (memory-safety: concurrent sessions were
+  active); the fix activates automatically the next time `enrich_owner_mailing` runs
+  for real.
 
 ## IDENTITY / DEDUP KEYS (names, parcels, legal desc dropped)
 - `DONE` **`national/cash_buyer_deeds` — `parcel_id=deed.parcel_id`** now set on the Listing (+ `legal_description=deed.notes`); strongest dedupe key so a cash-buyer row parcel-matches its tax/foreclosure twin. Runtime-verified (populate + None-guard). (`counties_nc/nc_rod_substitute_trustee` half `DONE` below.)

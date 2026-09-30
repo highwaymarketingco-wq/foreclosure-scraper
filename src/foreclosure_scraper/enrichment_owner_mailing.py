@@ -64,10 +64,23 @@ COUNTY_GIS: dict[str, dict] = {
     # server), a 115,066-row copy. The COUNTY's own service is the authority:
     # 117,565 rows, situs 99.97%, mailing state 99.96%. Same column names, so
     # only the URL moves. Layer id is 11 — /FeatureServer/0 is HTTP 500.
+    # 2026-09-30: added an explicit out_fields carrying SQFT/YEARBLT/TOTVAL — the
+    # same layer `counties_nc.gaston_vacant` already reads for its VacantImpro
+    # slice, but this owner/mailing pass (which reaches EVERY Gaston lead, not
+    # just vacant parcels) was never given those columns, so the generic
+    # building-spec/value extractors below (_extract_specs/_extract_value) had
+    # nothing to match even though they support this exact field shape. Verified
+    # live 2026-09-30: 91,827 of 118,065 parcels (77.8%) carry SQFT>0; a sample
+    # non-vacant row returned SQFT=1102, YEARBLT=1972 (real data, not a
+    # silent-death empty response). TOTVAL is the county's tax-assessed total
+    # (matches the "totval" value-priority pattern) — feeds tax_value/
+    # market_value/assessed_value when missing, same as the existing value path.
     "NC:Gaston": {"url": "https://gis.gastoncountync.gov/publicgis/rest/services/PublicGIS/Parcels/FeatureServer/11",
         "owner": ["CURR_NAME1", "CURR_NAME2"],
         "mail": ["CURR_ADDR1", "CURR_ADDR2", "CURR_CITY", "CURR_STATE", "CURR_ZIPCODE"],
-        "mail_state": "CURR_STATE", "situs": ["PHYSSTRADD"], "parcel": "PIN"},
+        "mail_state": "CURR_STATE", "situs": ["PHYSSTRADD"], "parcel": "PIN",
+        "out_fields": "PIN,CURR_NAME1,CURR_NAME2,CURR_ADDR1,CURR_ADDR2,CURR_CITY,"
+                       "CURR_STATE,CURR_ZIPCODE,PHYSSTRADD,SQFT,YEARBLT,TOTVAL"},
     # 2026-08-03 FIELD FIX (URL unchanged). Verified live on real rows:
     #   ADDRESS_1 holds the SECOND OWNER'S NAME ("Rein Lindsay", "Quinn Starr L"),
     #             not an address — it was being concatenated into the mail string.
@@ -430,8 +443,14 @@ async def _scan(http: httpx.AsyncClient, spec: dict, where: str) -> list[dict]:
 # match by field-NAME pattern (not per-county hardcoding) so it works on any
 # layer that has them, and sanity-check values so junk fields don't leak in.
 _SPEC_PATTERNS = {
-    "living_sqft": re.compile(r"^(living_?area|heated_?(sq_?ft|area)|tot(al)?_?liv(ing)?(_?area)?|finish(ed)?_?(sq_?ft|area)|gross_?(sq_?ft|living)|bldg_?sq_?ft|heatedsqft|sqft_?heated|heated_?sf)$", re.I),
-    "year_built": re.compile(r"^(year_?built|yr_?built|act(ual)?_?year_?bl?t|yearbuilt|eff(ective)?_?year_?built)$", re.I),
+    # Bare "sq_?ft" (no living/heated/finished/bldg prefix) was added 2026-09-30
+    # for Gaston NC's PublicGIS/Parcels layer, which names the column plainly
+    # "SQFT" — fully anchored, so it only ever matches a spec whose out_fields
+    # explicitly requests a field with exactly that name (see NC:Gaston below).
+    "living_sqft": re.compile(r"^(living_?area|heated_?(sq_?ft|area)|tot(al)?_?liv(ing)?(_?area)?|finish(ed)?_?(sq_?ft|area)|gross_?(sq_?ft|living)|bldg_?sq_?ft|heatedsqft|sqft_?heated|heated_?sf|sq_?ft)$", re.I),
+    # Bare "year_?blt" (no "act(ual)" prefix) added 2026-09-30 for Gaston NC's
+    # YEARBLT column — a common Esri CAMA abbreviation the old alternatives missed.
+    "year_built": re.compile(r"^(year_?built|yr_?built|act(ual)?_?year_?bl?t|yearbuilt|eff(ective)?_?year_?built|year_?blt)$", re.I),
     "bedrooms":   re.compile(r"^(bed_?rooms?|beds|no_?(of_?)?bed(room)?s?|num_?bed(room)?s?)$", re.I),
     "bathrooms":  re.compile(r"^(full_?baths?|bath_?rooms?|baths|no_?(of_?)?baths?|num_?baths?)$", re.I),
 }
