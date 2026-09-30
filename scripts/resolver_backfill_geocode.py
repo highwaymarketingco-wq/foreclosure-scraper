@@ -52,9 +52,11 @@ import argparse
 import contextlib
 import csv
 import io
+import os
 import re
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -90,6 +92,94 @@ def _light_listing(rec: dict) -> Listing:
 CENSUS_BATCH_URL = "https://geocoding.geo.census.gov/geocoder/geographies/addressbatch"
 BATCH_SIZE = 950
 CHECKPOINT_EVERY = 10  # batches (~9,500 addresses) between board writes
+
+# Hard wall-clock ceiling on the WHOLE Census batch-geocode POST, enforced by
+# _post_with_hard_timeout() below regardless of what httpx's own `timeout=`
+# thinks is happening.
+#
+# Audited 2026-09-30 alongside tonight's resolver_backfill_parcel.py hang fix
+# (commit 02a67221, enrichment_parcel_from_geo._arc_query): this script makes
+# exactly one network call -- the `httpx.post(...)` in geocode_batch_census()
+# below -- and it had the SAME class of gap. httpx's `timeout=180.0` (this
+# installed httpx 0.28.1 / httpcore 1.0.9, same as the async fix) becomes
+# `httpx.Timeout(180.0)`, which applies 180s to connect/write/read/pool
+# INDIVIDUALLY, not to the total request. httpcore issues a fresh
+# `read(timeout=...)` for every chunk of the response body, so a peer that
+# trickles bytes (or a big Census CSV response that answers just often enough
+# to keep resetting that per-chunk clock) never trips it even though the
+# request never finishes -- identical mechanism to the ArcGIS incident, just
+# on the sync transport instead of the async one.
+#
+# This script is SYNCHRONOUS (no asyncio event loop), so there is no
+# asyncio.wait_for() to reach for. The backstop here runs the blocking
+# httpx.post() on a daemon thread and bounds the WAIT with
+# `Thread.join(hard_timeout)`: a genuinely wedged connection leaves that
+# thread running forever (a live blocking socket read cannot be force-killed
+# from outside a Python thread), but `daemon=True` means it can never block
+# process exit, and the caller (geocode_batch_census, then main()'s batch
+# loop) gets control back within hard_timeout no matter what the peer does.
+# See tests/test_geocode_backfill_hard_timeout.py for the trickle-server
+# proof, ported from tests/test_arc_query_hard_timeout.py's async version.
+#
+# Retry logic: NONE for this call, by design already before this audit --
+# geocode_batch_census() catches, logs, and returns an empty match dict on
+# any failure (including the hard-timeout trip added here), and main()'s
+# batch loop just moves on to the next batch. So there was never a
+# retry-amplification risk to fix here, unlike the tenacity-wrapped ArcGIS
+# call.
+#
+# SIGINT: also audited 2026-09-30. This script has no bare `except:` (grep
+# confirmed -- only `except Exception` / `except (ValueError, IndexError)`,
+# neither of which catches KeyboardInterrupt in Python 3) and installs no
+# custom SIGINT handler, so Python's default SIGINT->KeyboardInterrupt
+# delivery applies. Verified empirically against a real trickling peer
+# (test_sigint_kills_a_hung_sync_census_call_within_a_few_seconds, using a
+# 120s hard_timeout so only the signal -- not the backstop above -- could be
+# what stops it): a run blocked in the ACTUAL shipped call path --
+# geocode_batch_census() -> _post_with_hard_timeout()'s main thread sitting
+# in `Thread.join(hard_timeout)` while the daemon thread is itself stuck
+# inside httpx.post()'s blocking read -- IS interrupted by SIGINT within
+# ~1s. `Thread.join()`'s underlying lock-acquire is signal-interruptible in
+# CPython even though the worker thread it's waiting on is not (a
+# KeyboardInterrupt is only ever delivered to the main thread regardless).
+# This is unlike the asyncio case documented in
+# http_client.install_hard_sigint_kill (that gap is specific to unwinding
+# asyncio.run() through cancelled tasks that depend on cooperation from the
+# same hung socket -- there's no event loop here to fail to unwind). No
+# SIGINT hardening was needed.
+CENSUS_HARD_TIMEOUT_S = float(os.environ.get("CENSUS_QUERY_HARD_TIMEOUT_S", "240.0"))
+
+
+def _post_with_hard_timeout(url: str, *, data: dict, files: dict, timeout: float,
+                             hard_timeout: float = CENSUS_HARD_TIMEOUT_S) -> httpx.Response:
+    """httpx.post() with a real total-request wall-clock ceiling.
+
+    Runs the call on a daemon thread and joins with `hard_timeout`. Raises
+    `TimeoutError` if the thread is still alive after that -- the abandoned
+    thread is left to die on its own (or leak for the life of the process;
+    it cannot be force-killed), but daemon=True guarantees it never blocks
+    process exit or a SIGINT-triggered shutdown.
+    """
+    box: dict = {}
+
+    def _run() -> None:
+        try:
+            box["response"] = httpx.post(url, data=data, files=files, timeout=timeout)
+        except BaseException as e:  # noqa: BLE001 - re-raised on the caller's thread below
+            box["error"] = e
+
+    t = threading.Thread(target=_run, daemon=True, name="census-post-hard-timeout")
+    t.start()
+    t.join(hard_timeout)
+    if t.is_alive():
+        raise TimeoutError(
+            f"Census batch geocoder POST exceeded hard_timeout={hard_timeout}s "
+            "(thread abandoned, per-operation httpx timeout did not bound total request)"
+        )
+    if "error" in box:
+        raise box["error"]
+    return box["response"]
+
 
 # County-seat centroids (lat, lon) -- last-resort fallback for rows the
 # Census geocoder can't match, or rows with no address at all but a known
@@ -163,7 +253,14 @@ def geocode_batch_census(addresses: list[str]) -> dict[str, tuple[float, float]]
     try:
         files = {"addressFile": ("addrs.csv", csv_data, "text/csv")}
         data = {"benchmark": "Public_AR_Current", "vintage": "Current_Current", "format": "csv"}
-        r = httpx.post(CENSUS_BATCH_URL, data=data, files=files, timeout=180.0)
+        # hard_timeout passed explicitly (not left to the function's default
+        # parameter) so a module-level override of CENSUS_HARD_TIMEOUT_S --
+        # by an env var read at import time, or by a test monkeypatching the
+        # module attribute -- is actually honoured. A bare default parameter
+        # is bound once at function-definition time and would silently
+        # ignore any later change to the name it was bound from.
+        r = _post_with_hard_timeout(CENSUS_BATCH_URL, data=data, files=files, timeout=180.0,
+                                     hard_timeout=CENSUS_HARD_TIMEOUT_S)
         if r.status_code != 200:
             print(f"  [http {r.status_code}] {r.text[:200]}")
             return results
