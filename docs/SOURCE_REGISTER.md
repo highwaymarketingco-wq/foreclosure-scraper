@@ -2,13 +2,14 @@
 
 Generated 2026-09-28 09:05 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
-**One row hand-added 2026-09-30** (`counties_sc.greenwood_corebtpay_delinquent_tax`,
-in section 2 below) to keep `tests/test_source_docs_current.py` green without
-re-running the generator — which streams the full live board into memory, and
-this session was scoped to stay off the board entirely for memory-safety
-reasons (two other agent sessions were active on an 8GB Mac; see the scraper's
-own commit message). Re-run `scripts/gen_source_register.py` in a later session
-to fold this back into a real regeneration; the counts below include the hand-add.
+**Two rows hand-added 2026-09-30** (`counties_sc.greenwood_corebtpay_delinquent_tax`
+and, later the same day, `counties_nc.gastonia_code_enforcement`, both in section 2
+below) to keep `tests/test_source_docs_current.py` green without re-running the
+generator — which streams the full live board into memory, and both sessions were
+scoped to stay off the board entirely for memory-safety reasons (other agent
+sessions were active on an 8GB Mac; see each scraper's own commit message).
+Re-run `scripts/gen_source_register.py` in a later session to fold these back into
+a real regeneration; the counts below do not include either hand-add.
 
 - Scrapers in the registry: **236**
 - Producing rows on the board: **129**
@@ -174,6 +175,7 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_nc.cumberland_tax_foreclosure` | `https://www.co.cumberland.nc.us/departments/tax/tax-administration/tax-foreclosures` |
 | `counties_nc.gaston_surplus_properties` | `https://www.gastongov.com/709/Surplus-Properties`<br>`https://www.gastongov.com`<br>_+1 more_ |
 | `counties_nc.gaston_tax_foreclosures` | `https://www.gastongov.com/669`<br>`https://www.gastongov.com/671` |
+| `counties_nc.gastonia_code_enforcement` | `https://devsvcs.gastonianc.gov/CodeEnforcement/Locator`<br>`https://devsvcs.gastonianc.gov/CodeEnforcement/LocatorResultsPolygon`<br>_+1 more_ |
 | `counties_nc.henderson_tax` | `https://www.hendersoncountync.gov/tax/page/tax-foreclosure-sales` |
 | `counties_nc.lincoln_code_violations` | `https://arcgisserver.lincolncountync.gov/arcgis/rest/services/` |
 | `counties_nc.mcdowell_tax_foreclosure` | `https://mcdowellnc.gov/departments/tax-collections/` |

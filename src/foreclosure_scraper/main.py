@@ -766,6 +766,11 @@ DATELESS_OK_SOURCES = {
     # Henderson code violations (nuisance, solid waste, vehicle graveyard). A live
     # violation is a standing condition, not a dated event.
     "counties_nc.henderson_code_violations",
+    # Gastonia city code-enforcement (CityView locator). Same shape as Henderson's
+    # code violations above: an open case is a standing condition with no sale
+    # date. Without this entry _active_only() deletes every row this source
+    # produces the first time it actually runs.
+    "counties_nc.gastonia_code_enforcement",
     # Multi-year arrears history (Buncombe 2009-2026, Oconee DT2023-25, Pickens).
     # An arrears record is "owes for N years", which has no sale date by nature.
     "counties.multi_year_delinquent_tax",
