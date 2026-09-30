@@ -1,5 +1,5 @@
 {
-  "run_time": "2026-09-30T14:16:51.398754Z",
+  "run_time": "2026-09-30T15:53:06.264589Z",
   "total": 219143,
   "by_source": {
     "national.nc_upset_bids": 38,
@@ -407,7 +407,7 @@
   "source_status": {},
   "regressions": [],
   "errors": [],
-  "notes": "repair_dedupe_key_collision: 190 rows (93 dedupe_key collisions) fixed with own-row recompute (190) or own-row backup revert (0), undoing the recompute_geo_imprecise_confidence.py patch_existing_rows() cross-contamination",
+  "notes": "re-gate ARV-contradicted rows (models.py Listing.merge() fix): 99 rows patched (money_fixed=98, equity_fixed=100, collisions_skipped=8)",
   "detail_count": 219143,
   "detail_digest": "ca101b1c33ed072f",
   "board_parts": {
@@ -582,8 +582,8 @@
         "start": 190000,
         "end": 199500,
         "records": 9500,
-        "bytes": 2782201,
-        "sha256": "cf516b2e6ad0b86671cad1a019e6d5e76899db23a6793a60bc2217b54fec26b7"
+        "bytes": 2782175,
+        "sha256": "264ec90cd2e5ba3c3dad237aafcd1ea1dde65e0750257d8fdc5230ece451abde"
       },
       {
         "name": "listings_part_021.json.gz",
@@ -606,8 +606,8 @@
         "start": 218500,
         "end": 219143,
         "records": 643,
-        "bytes": 2096182,
-        "sha256": "19b1a085c119c178d96f57342a34854e64c883040794c7165e433ad8423f84b4"
+        "bytes": 2081655,
+        "sha256": "8882d179623e07c868b4c3ca020af024aec8a4d6e88f3eb903fbecc8567ba5fa"
       }
     ]
   },
@@ -628,7 +628,7 @@
     "by_county_top"
   ],
   "health_as_of": "2026-09-23T08:47:09.374753Z",
-  "health_age_hours": 173.5,
+  "health_age_hours": 175.1,
   "health_stale": true,
   "source_last_success": {
     "city_websites.charlotte_open_data": "2026-09-23T08:47:09.374753Z",

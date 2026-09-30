@@ -1,7 +1,7 @@
 {
  "schema": "board-manifest-v1",
- "written_at": "2026-09-30T14:16:53.096749Z",
- "run_time": "2026-09-30T14:16:51.398754Z",
+ "written_at": "2026-09-30T15:53:07.118043Z",
+ "run_time": "2026-09-30T15:53:06.264589Z",
  "count": 219143,
  "detail_count": 219143,
  "slim_count": 217773,
@@ -14,8 +14,8 @@
  },
  "files": {
   "listings.json": {
-   "bytes": 2525964925,
-   "sha256": "207504d4fecf903c895019eaa9bf7e9133a75429513991daf1ca528bf26e0e4c",
+   "bytes": 2525922527,
+   "sha256": "aff0ac0a3e75b484e4590fed739a1e62b7ce442b454019065d3e2f3ed0a69703",
    "records": 219143
   },
   "listings_detail.json": {
@@ -39,8 +39,8 @@
    "records": 217773
   },
   "run_meta.json": {
-   "bytes": 32630,
-   "sha256": "450e3d165e35c828bf28a729ea3a280be260578a50b5f6356bf8618cbceb0a8f"
+   "bytes": 32544,
+   "sha256": "7289ed8e0d48fae9e8e01a7f1ccb2b3a8fae985669890a6088c26ce669e5fcfd"
   },
   "listings_part_000.json.gz": {
    "bytes": 12243763,
@@ -183,8 +183,8 @@
    "end": 190000
   },
   "listings_part_020.json.gz": {
-   "bytes": 2782201,
-   "sha256": "cf516b2e6ad0b86671cad1a019e6d5e76899db23a6793a60bc2217b54fec26b7",
+   "bytes": 2782175,
+   "sha256": "264ec90cd2e5ba3c3dad237aafcd1ea1dde65e0750257d8fdc5230ece451abde",
    "records": 9500,
    "start": 190000,
    "end": 199500
@@ -204,8 +204,8 @@
    "end": 218500
   },
   "listings_part_023.json.gz": {
-   "bytes": 2096182,
-   "sha256": "19b1a085c119c178d96f57342a34854e64c883040794c7165e433ad8423f84b4",
+   "bytes": 2081655,
+   "sha256": "8882d179623e07c868b4c3ca020af024aec8a4d6e88f3eb903fbecc8567ba5fa",
    "records": 643,
    "start": 218500,
    "end": 219143
@@ -1255,8 +1255,8 @@
     "start": 190000,
     "end": 199500,
     "records": 9500,
-    "bytes": 2782201,
-    "sha256": "cf516b2e6ad0b86671cad1a019e6d5e76899db23a6793a60bc2217b54fec26b7"
+    "bytes": 2782175,
+    "sha256": "264ec90cd2e5ba3c3dad237aafcd1ea1dde65e0750257d8fdc5230ece451abde"
    },
    {
     "name": "listings_part_021.json.gz",
@@ -1279,8 +1279,8 @@
     "start": 218500,
     "end": 219143,
     "records": 643,
-    "bytes": 2096182,
-    "sha256": "19b1a085c119c178d96f57342a34854e64c883040794c7165e433ad8423f84b4"
+    "bytes": 2081655,
+    "sha256": "8882d179623e07c868b4c3ca020af024aec8a4d6e88f3eb903fbecc8567ba5fa"
    }
   ]
  }
