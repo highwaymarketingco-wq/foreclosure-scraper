@@ -1705,7 +1705,7 @@ RAW_KEEP = {
     "sc_voter_xref": "*",             # SC phone via NC voter file cross-reference (free, unambiguous match)
     "rod": "*",                       # Gaston NC ROD lien existence (D/T mortgage + adverse liens) by owner name
     "divorce": "*",                   # SC Family-Court divorce / marital-dissolution match on owner party-name (FCCMS)
-    "geo_imprecise": "*",             # out_of_bbox (geo nulled) | centroid_snap (county/town-center fallback)
+    "geo_imprecise": "*",             # out_of_bbox (geo nulled) | centroid_snap/county_centroid/county_centroid_no_addr (no real address, shared fallback point) | census_geocode (REAL resolved address, not a shared point — valuation/calc.py treats it as full precision, see its geo_imprecise_comps comment)
     "stale_case": "*",                # presumed_withdrawn lis-pendens — likely resolved, down-ranked from HOT
     "staleness": "*",                 # staleness_sweep verdict {state: upset_closed|sale_passed|gone_quiet, ...} for dashboard filtering
     "life_events": "*",               # elderly/probate signals: life_estate | estate_probate | multiple_heirs | trust

@@ -1669,8 +1669,52 @@ def _arv_sanity(li: Listing, out: "Calc", arv_conf: str, arv_flags: list[str],
     # city-centroid rather than a real situs (`geo_imprecise`). Nothing in the
     # valuation path read it, yet the comp selector's geographic gate keys on
     # exactly that coordinate — so hundreds of leads share one parcel's comps.
-    if raw.get("geo_imprecise") and comps and any(
-            isinstance(c, dict) and c.get("geo_anchored") for c in comps):
+    #
+    # `geo_imprecise` is not one thing. It is written by two different
+    # producers with two different meanings, and this check used to treat
+    # every non-empty value the same (a plain `if raw.get("geo_imprecise")`):
+    #
+    #   real address, resolved:      `census_geocode` (resolver_backfill_geocode.py,
+    #                                 geocode_catchup.py) — the Census batch
+    #                                 geocoder matched THIS street address and
+    #                                 returned ITS OWN coordinate. Not rooftop-
+    #                                 survey precision, but not a shared point
+    #                                 either: two different addresses on this
+    #                                 tag do not collide.
+    #   no real address, fallback:   `centroid_snap` (enrichment_board_quality.py,
+    #                                 a coordinate collision the OTHER leads
+    #                                 share), `county_centroid` / `county_centroid_no_addr`
+    #                                 (the same two scripts, when the address
+    #                                 either failed to match or never existed)
+    #                                 and `out_of_bbox` (nulled entirely). Every
+    #                                 one of these is a landmark, not a situs —
+    #                                 this is the case the flag and the MEDIUM
+    #                                 cap below were built for.
+    #
+    # Lumping `census_geocode` in with the centroid tags means a lead with a
+    # real, resolved street address was scored exactly like one whose only
+    # location is a county's center point shared by thousands of others: the
+    # comp-selection radius gate that this flag exists to warn about does not
+    # apply to it (comps were drawn around ITS coordinate, not a shared one),
+    # so it should not carry `geo_imprecise_comps` or the MEDIUM confidence
+    # cap on that basis. Measured live 2026-09-30: 66,376 board rows carry
+    # `census_geocode`, 10,575 of them were being flagged here (7,578 of those
+    # capped MEDIUM though nothing else on the lead was uncertain).
+    #
+    # CALIBRATION NOTE (operator judgment call, not re-derived from data): this
+    # treats `census_geocode` as full precision — the same as a lead that was
+    # never flagged at all — rather than inventing a third, in-between
+    # confidence tier. The codebase's existing model here is binary (flagged
+    # imprecise vs. not), most non-flagged rows on the board were never
+    # verified as rooftop-precision either, and a genuine middle tier would
+    # need real calibration data on the Census batch geocoder's error
+    # distribution that nobody has measured. If that measurement is ever done
+    # and says otherwise, this is the line to revisit — not the centroid tags
+    # below it, which stay flagged.
+    _GEO_IMPRECISE_TAG = raw.get("geo_imprecise")
+    _GEO_REAL_ADDRESS_TAGS = ("census_geocode",)   # resolved to THIS address, not a shared point
+    if (_GEO_IMPRECISE_TAG and _GEO_IMPRECISE_TAG not in _GEO_REAL_ADDRESS_TAGS
+            and comps and any(isinstance(c, dict) and c.get("geo_anchored") for c in comps)):
         arv_flags.append("geo_imprecise_comps")
         if arv_conf == "HIGH":
             arv_conf = "MEDIUM"

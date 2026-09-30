@@ -70,3 +70,56 @@ def test_recorded_comps_unaffected_by_scraped_gate():
     # Tier-0 recorded comps return before Tier-1 scraped gating.
     c = calc.compute(_recorded_arv_listing())
     assert c.arv_confidence == "HIGH"
+
+
+# ===========================================================================
+# geo_imprecise tiers (2026-09-30 fix): `census_geocode` is a REAL, resolved
+# street address (Census batch geocoder matched THIS lead's own address and
+# returned ITS OWN coordinate) and must not be treated the same as a bare
+# centroid fallback that thousands of OTHER leads share. Before this fix, a
+# plain `if raw.get("geo_imprecise")` truthiness check lumped every non-empty
+# value together, so a census_geocode lead lost its deal verdict and was
+# capped at MEDIUM confidence for the same reason a leftover-centroid lead
+# was — even though its comps were drawn around its own address, not a
+# shared landmark. See valuation/calc.py's `_GEO_REAL_ADDRESS_TAGS` comment
+# for the full tier breakdown and the calibration judgment call.
+# ===========================================================================
+
+def _tight_anchored_comps():
+    return [{"price_per_sqft": p, "geo_anchored": True} for p in (190, 200, 210)]
+
+
+def test_census_geocode_does_not_trigger_geo_imprecise_comps():
+    """A resolved street address (census_geocode) is not a shared centroid:
+    it must not pick up geo_imprecise_comps or lose HIGH confidence."""
+    li = _scraped(_tight_anchored_comps(), 200)
+    li.raw["geo_imprecise"] = "census_geocode"
+    c = calc.compute(li)
+    assert "geo_imprecise_comps" not in (c.arv_flags or [])
+    assert c.arv_confidence == "HIGH"
+
+
+def test_true_centroid_tags_still_trigger_geo_imprecise_comps():
+    """Regression guard: every tag that means 'no real address, a shared
+    fallback point' must keep the old behavior — flagged and capped MEDIUM."""
+    for tag in ("centroid_snap", "county_centroid", "county_centroid_no_addr",
+                "out_of_bbox"):
+        li = _scraped(_tight_anchored_comps(), 200)
+        li.raw["geo_imprecise"] = tag
+        c = calc.compute(li)
+        assert "geo_imprecise_comps" in (c.arv_flags or []), tag
+        assert c.arv_confidence == "MEDIUM", tag
+
+
+def test_legacy_dict_shaped_geo_imprecise_still_treated_as_imprecise():
+    """Two older gap-fill scripts (fill_final_gaps.py, fill_all_gaps.py) wrote
+    raw['geo_imprecise'] as a DICT ({"state": "centroid_snap", ...}) instead of
+    the bare string every other writer uses. It must still be treated as
+    imprecise (it is never a real-address tag) and, since a dict is
+    unhashable, must not crash a set-membership check — the tier check uses a
+    tuple + `not in`, not a set, specifically so this cannot raise TypeError."""
+    li = _scraped(_tight_anchored_comps(), 200)
+    li.raw["geo_imprecise"] = {"state": "centroid_snap", "source": "state_centroid"}
+    c = calc.compute(li)
+    assert "geo_imprecise_comps" in (c.arv_flags or [])
+    assert c.arv_confidence == "MEDIUM"

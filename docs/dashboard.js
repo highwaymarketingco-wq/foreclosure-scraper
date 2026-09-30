@@ -2274,9 +2274,12 @@ function updateStageCounts() {
 // from the one the row is about. Three of those show up on screen, and each had
 // exactly one honest answer available in data the slim board already carries:
 //
-//   geoTrust()    raw.geo_imprecise — the coordinates are a city/county
-//                 centroid, so anything drawn or measured from them is about a
-//                 landmark 1-2 miles away, not this parcel. 15,608 of 38,500.
+//   geoTrust()    raw.geo_imprecise, EXCEPT the "census_geocode" tag (a real
+//                 resolved address, see the function's own doc comment) — for
+//                 the rest, the coordinates are a city/county centroid, so
+//                 anything drawn or measured from them is about a landmark
+//                 1-2 miles away, not this parcel. 15,608 of 38,500 as
+//                 measured 2026-08-11, before census_geocode existed as a tag.
 //   ownerNames()  three owner strings exist per lead and 16,512 leads have two
 //                 that disagree. One of them was printed, a different one was
 //                 exported and skip-traced, and only the printed one was
@@ -2310,16 +2313,33 @@ function _txt(s) {
  *   {imprecise:false}                       — coordinates came from the address
  *   {imprecise:true, kind, why, radiusMi}   — they did not
  *
- * The engine sets raw.geo_imprecise when it had to fall back to a city or
- * county centroid ("centroid_snap", 15,593 leads) or when the geocode landed
- * outside the county bounding box ("out_of_bbox", 15). Both mean the same thing
- * to anything that draws a pin or measures a distance: the point is a landmark,
- * not the property. calc already refuses to trust comps found this way
- * (geo_imprecise_comps), but nothing on the SCREEN did.
+ * raw.geo_imprecise is not one tag, it is two different producers writing two
+ * different claims (2026-09-30 fix, mirrors the same correction in
+ * valuation/calc.py's geo_imprecise_comps check):
+ *
+ *   "centroid_snap" (enrichment_board_quality.py, a coordinate collision many
+ *   OTHER leads share), "county_centroid" / "county_centroid_no_addr"
+ *   (resolver_backfill_geocode.py / geocode_catchup.py, address match failed
+ *   or never existed) and "out_of_bbox" (nulled entirely) all mean the point
+ *   is a landmark, not this property — a courthouse lawn or a town square
+ *   1-2 miles off. That is the case this function was built for.
+ *
+ *   "census_geocode" (the same two backfill scripts) is different: the Census
+ *   batch geocoder matched THIS lead's own street address and returned ITS
+ *   OWN coordinate. It is not survey/rooftop precision, but it is not a
+ *   shared point either — two different addresses tagged census_geocode do
+ *   not collide the way two centroid_snap leads do. Treating it as imprecise
+ *   hid a real satellite tile / map pin behind the "location not verified"
+ *   placeholder on every one of those leads for no reason; calc.py made the
+ *   same correction on the ARV-confidence side (66,376 board rows carry this
+ *   tag). Calibration judgment, not re-derived from data: this treats
+ *   census_geocode as fully trusted rather than adding a third tier, the same
+ *   call calc.py's fix makes and for the same reason — most never-flagged
+ *   leads on the board were not verified rooftop-precise either.
  */
 function geoTrust(l) {
   const kind = l && l.raw && l.raw.geo_imprecise;
-  if (!kind) return _GEO_OK;
+  if (!kind || kind === "census_geocode") return _GEO_OK;
   if (l._geoTrust !== undefined) return l._geoTrust;
   const out = kind === "out_of_bbox"
     ? { imprecise: true, kind, radiusMi: 5,
