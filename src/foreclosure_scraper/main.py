@@ -731,6 +731,11 @@ DATELESS_OK_SOURCES = {
     # Same reason: a delinquent tax balance is a standing condition with no sale date, so
     # _active_only() would delete every row this source produces.
     "counties_sc.sc_catalis_delinquent_roll",
+    # Dorchester SC BillTrax delinquent-tax roll (added 2026-09-29): same shape as
+    # qpaybill/catalis above — a standing unpaid balance, not a scheduled sale.
+    # Without this entry _active_only() deletes every one of its rows, exactly as
+    # qpaybill_delinquent_roll's own comment above already found once.
+    "counties_sc.dorchester_billtrax_delinquent_tax",
     "counties_nc.nc_its_public_tax",            # Onslow/Graham standing roll, no sale date
     "counties_sc.horry_delinquent_xlsx",        # Horry delinquent list, pay-by deadline not a sale
     "counties_nc.albemarle_observer_tax_lists", # NC annual delinquent lists, no sale date

@@ -1519,6 +1519,19 @@ RAW_KEEP = {
     "skip_trace": "*",   # owner name / mailing address / phone for outreach (free)
     "is_new": "*",       # new-this-run flag (early-access highlight)
     "first_seen_run": "*",
+    # Found while verifying THIS dict for the new Dorchester BillTrax scraper
+    # (2026-09-29): scripts/run_scoped_scrapers.py stamps raw["landed_by"] =
+    # "scripts/run_scoped_scrapers.py" on every row it lands (both apply_rows and
+    # apply_rows_streaming — see its own test_new_rows_get_offline_valuation_and_
+    # landed_by_stamp), but this key was never in RAW_KEEP, so _slim_raw() has
+    # silently dropped it from the full board's published raw at every landing
+    # through this script -- confirmed on the live board's own
+    # web_artifact.slim_dropped_keys log line, which reported 897 rows carrying it
+    # (this landing) after it had already reported 750 in the prior qpaybill/
+    # Edgefield landing (e5922a1f) with nobody registering it. A pre-existing gap
+    # unrelated to this scraper, fixed here rather than left for a future "why is
+    # landed_by empty on every landed row" investigation.
+    "landed_by": "*",
     "outreach": "*",     # owner contact + letter/email/sms drafts + channels
     "crm": "*",          # lead status + notes (persisted across runs)
     "grade": "*",     # A-F per-dimension + overall
@@ -1923,6 +1936,12 @@ RAW_KEEP = {
     # MAILING address -- the field the whole source exists for -- would have been dropped
     # at publish exactly like the 160 keys before it.
     "catalis_roll": "*",
+    # Dorchester SC delinquent real-property tax roll via the county's BillTrax vendor
+    # (counties_sc.dorchester_billtrax_delinquent_tax, added 2026-09-29): parcel/owner/
+    # situs + per-bill-year balances for a county that had zero tax-delinquent coverage.
+    # Registered before the scraper's first live run, learning from every "160 keys
+    # dropped at publish" entry already in this file.
+    "billtrax_dorchester_delinquent_tax": "*",
     "greenville_mie": "*",
     # 2026-09-23: caught by the greenville_tax_distress zero-net-new audit
     # (see that scraper's own docstring, "ZERO-NET-NEW AUDIT"). This module
