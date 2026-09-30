@@ -2872,6 +2872,21 @@ async def run() -> int:
     except Exception:
         log.error("tax_owed.failed", traceback=traceback.format_exc())
 
+    # Promote the real tax_owed balance into amount_owed now that it exists. Must run
+    # AFTER enrich_tax_owed (whose output it reads) and cannot be folded into the
+    # enrich_amount_owed call above, which runs earlier in this pipeline, before the
+    # resolver/enrich_tax_owed have produced raw['tax_owed'] at all. See
+    # enrichment_amount_owed.promote_tax_owed_amount_owed's docstring for the defect
+    # this closes (measured 2026-09-29: 88,331 of 88,959 real-balance leads were
+    # showing nothing or a mislabeled proxy instead of the real county figure).
+    try:
+        from .enrichment_amount_owed import promote_tax_owed_amount_owed
+        s = promote_tax_owed_amount_owed(enriched)
+        if s:
+            enrichment_stats["amount_owed_tax_owed_promotion"] = s
+    except Exception:
+        log.error("amount_owed_tax_owed_promotion.failed", traceback=traceback.format_exc())
+
     # Owner tenure — long-held property = high-equity proxy (the "held 7+ years"
     # filter). Local, from the GIS/CAMA sale year. Feeds grade + outbound segmentation.
     try:
