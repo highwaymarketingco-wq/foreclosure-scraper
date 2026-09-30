@@ -2899,6 +2899,19 @@ async def run() -> int:
     except Exception:
         log.error("amount_owed_tax_owed_promotion.failed", traceback=traceback.format_exc())
 
+    # Bankruptcy + large delinquent-tax-balance combo (Dirty Deeds Tier B #28,
+    # second half). Pure join of two signals that both now exist: must run
+    # AFTER both enrich_with_bankruptcy (much earlier above) and enrich_tax_owed
+    # / promote_tax_owed_amount_owed (just above) so raw['bankruptcy'] and
+    # raw['tax_owed'] are both populated by the time it reads them.
+    try:
+        from .enrichment_bankruptcy_tax_combo import enrich_bankruptcy_tax_combo
+        s = enrich_bankruptcy_tax_combo(enriched)
+        if s:
+            enrichment_stats["bankruptcy_tax_combo"] = s
+    except Exception:
+        log.error("bankruptcy_tax_combo.failed", traceback=traceback.format_exc())
+
     # Owner tenure — long-held property = high-equity proxy (the "held 7+ years"
     # filter). Local, from the GIS/CAMA sale year. Feeds grade + outbound segmentation.
     try:

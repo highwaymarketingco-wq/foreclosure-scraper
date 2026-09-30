@@ -20,7 +20,8 @@ from typing import Any, Optional
 
 __all__ = [
     "to_date", "stamp", "is_stale", "code_enforcement_open", "bankruptcy_lapsed",
-    "custody_ended", "owner_names_a_death", "BK_TTL_DAYS_CH7", "BK_TTL_DAYS_OTHER",
+    "bankruptcy_case_age", "custody_ended", "owner_names_a_death",
+    "BK_TTL_DAYS_CH7", "BK_TTL_DAYS_OTHER", "LONG_OPEN_THRESHOLD_DAYS",
 ]
 
 # A Chapter 7 case is over in roughly four to six months (discharge, then closure), so its
@@ -119,6 +120,40 @@ def bankruptcy_lapsed(bk: Any, today: Optional[date] = None) -> bool:
     chapter = str(bk.get("chapter") or "").strip()
     ttl = BK_TTL_DAYS_CH7 if chapter == "7" else BK_TTL_DAYS_OTHER
     return (today or date.today()) > filed + timedelta(days=ttl)
+
+
+# docs/dirty_deeds_synthesis_2026-09-10.md Tier B #28: "bankruptcies open 10-15 years are
+# the strongest variant" of the bankruptcy signal. `bankruptcy_lapsed` above answers a
+# different question (has the automatic STAY ended -- months for Ch.7, ~3yr for Ch.13);
+# a case can be long since lapsed and STILL show no date_terminated in PACER/RECAP for
+# a decade or more, which is the distinct, rarer signal this answers.
+LONG_OPEN_THRESHOLD_DAYS = 3650  # 10 years — the low end of the "10-15 years" framing
+
+
+def bankruptcy_case_age(bk: Any, today: Optional[date] = None) -> dict:
+    """Case age + "still open after a long time" flag, derived purely from the date_filed
+    (and, when present, date_terminated) a bankruptcy match/docket already carries. Returns
+    {} when date_filed can't be parsed — never invents an age from nothing.
+
+    is_long_open requires BOTH: filed >= LONG_OPEN_THRESHOLD_DAYS ago, AND no
+    date_terminated on record (a case that ran 12 years and then closed on time isn't the
+    "still open" anomaly the synthesis flags — the ones worth surfacing are cases PACER/
+    RECAP has never recorded a closure for, years after they would ordinarily be done).
+    """
+    if not isinstance(bk, dict):
+        return {}
+    filed = to_date(bk.get("date_filed"))
+    if filed is None:
+        return {}
+    t = today or date.today()
+    age_days = (t - filed).days
+    terminated = to_date(bk.get("date_terminated"))
+    is_long_open = age_days >= LONG_OPEN_THRESHOLD_DAYS and terminated is None
+    return {
+        "case_age_days": age_days,
+        "case_age_years": round(age_days / 365.25, 1),
+        "is_long_open": is_long_open,
+    }
 
 
 _RELEASED = ("released", "out of custody", "discharged", "no longer in custody")

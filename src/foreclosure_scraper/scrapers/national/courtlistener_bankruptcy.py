@@ -70,6 +70,7 @@ from ..._bankruptcy_city_to_county import KNOWN_CITIES, bankruptcy_county_for
 from ...base_scraper import BaseScraper
 from ...http_client import client
 from ...models import Listing, ListingType, PropertyKind
+from ...signal_freshness import bankruptcy_case_age
 
 log = structlog.get_logger()
 
@@ -336,6 +337,19 @@ class CourtListenerBankruptcy(BaseScraper):
                         f"— Debtor: {case_name[:160]}"
                     )
 
+                    # Case age / "still open a long time" flag (Tier B #28: "bankruptcies
+                    # open 10-15 years are the strongest variant"). This scraper only ever
+                    # pulls the last LOOKBACK_DAYS=90 days of FILINGS, so is_long_open will
+                    # always be False on rows it emits itself (a case filed 90 days ago
+                    # cannot also be 10 years old) — computed anyway, from data already
+                    # captured, so the field exists and is correct if this scraper's window
+                    # is ever widened. The actual 10-15-year-old discovery path is
+                    # enrichment_bankruptcy.py's long-open cross-reference query, which
+                    # looks at a completely different (old) filing window.
+                    age_flags = bankruptcy_case_age(
+                        {"date_filed": date_filed, "date_terminated": d.get("date_terminated")}
+                    )
+
                     out.append(
                         Listing(
                             source=self.slug,
@@ -368,6 +382,7 @@ class CourtListenerBankruptcy(BaseScraper):
                                     "firm": d.get("firm") or None,
                                     "date_terminated": d.get("date_terminated"),
                                     "pacer_case_id": d.get("pacer_case_id"),
+                                    **age_flags,
                                 },
                             },
                         )

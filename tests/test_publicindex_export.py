@@ -272,6 +272,45 @@ def test_real_lis_pendens_and_magistrate_formats():
     assert cv.raw["sc_public_index"]["subtype"] == "Summons & Complaint"
 
 
+def test_judgment_number_column_is_not_read_as_a_dollar_amount():
+    """Regression test: the real SC Public Index grid's money-shaped column is
+    labeled "Judgment #" (a case reference number assigned once judgment is
+    entered), not a dollar figure -- live-verified 2026-09-29. A bare
+    "judgment" needle used to match that header and _parse_money() would
+    silently coerce a populated reference number into judgment_amount, a
+    field the amount_owed waterfall treats as high-confidence real debt.
+    """
+    html = """
+    <html><body>
+    <table id="ContentPlaceHolder1_SearchResults">
+      <tr>
+        <th>Name</th><th>Party Type</th><th>Case Number</th><th>Filed Date</th>
+        <th>Case Status</th><th>Disposition Date</th><th>Type</th><th>Subtype</th>
+        <th>Judgment #</th><th>Court Agency</th>
+      </tr>
+      <tr class="standardRow">
+        <td>Owen Owner</td><td>Defendant</td>
+        <td title="ACME FINANCE VS Owen Owner"><a>2026CP2304567</a></td>
+        <td>03/10/2026</td><td>Judgment Entered</td><td></td>
+        <td>Common Pleas</td><td>Transcript of Judgment</td>
+        <td>240099</td><td>Common Pleas</td>
+      </tr>
+    </table>
+    </body></html>
+    """
+    listings = parse_publicindex_html(html, default_county="Greenville")
+    assert len(listings) == 1
+    # "240099" sat in the "Judgment #" cell -- must NOT be read as $240,099 of debt.
+    assert listings[0].judgment_amount is None
+
+
+def test_judgment_amount_column_still_works_when_actually_labeled_that_way():
+    """The exact "Judgment Amount" phrase (this module's own synthetic fixture
+    shape, MIXED_HTML above) must still be read as a real dollar figure."""
+    by_case = {li.case_number: li for li in parse_publicindex_html(MIXED_HTML)}
+    assert by_case["2026-CP-23-04567"].judgment_amount == 12345.67
+
+
 def test_lane_override_forces_lane():
     lst = parse_publicindex_html(
         _REAL_HTML, default_county="Spartanburg", lane_override=ListingType.TAX_LIEN

@@ -1634,6 +1634,11 @@ RAW_KEEP = {
     "nod": "*",                       # ROD-discovered Notice of Default
     "bankruptcy": "*",                # CourtListener bankruptcy match on defendant name
     "courtlistener": "*",             # raw bankruptcy docket data when emitted as a listing
+    # Bankruptcy + large delinquent-tax-balance join (Dirty Deeds Tier B #28,
+    # 2026-09-29). Registered BEFORE enrichment_bankruptcy_tax_combo.py's first
+    # run, per this dict's own standing lesson about new keys landing silently
+    # dropped otherwise.
+    "bankruptcy_tax_combo": "*",
     "distressed": "*",                # HomeHarvest distressed-keyword matches
     "epa": "*",                       # EPA ECHO environmental hazards
     "crime": "*",                     # FBI UCR / per-zip crime stats
@@ -2263,8 +2268,14 @@ _SLIM_RAW: dict[str, str | tuple[str, ...]] = {
     "title_risk": ("surviving_senior_debt_risk",),
     "corroboration": ("court_confirmed", "label", "tier", "multi_source"),
     "helene": ("worst_placard", "worst_damage_pct", "damaged_buildings"),
-    "bankruptcy": ("chapter", "date_filed", "case_name", "docket_number", "court"),
-    "courtlistener": ("chapter", "date_filed", "court"),
+    # case_age_days/case_age_years/is_long_open (2026-09-29, Tier B #28): derived purely
+    # from date_filed (+ date_terminated when known) — see signal_freshness.bankruptcy_
+    # case_age. "signal" distinguishes a recent-filing match from a long-open one (a case
+    # filed 10-15 years ago with no recorded closure — the synthesis's "strongest variant").
+    "bankruptcy": ("chapter", "date_filed", "case_name", "docket_number", "court",
+                   "case_age_days", "case_age_years", "is_long_open", "signal"),
+    "courtlistener": ("chapter", "date_filed", "court",
+                       "case_age_days", "case_age_years", "is_long_open"),
     "last_sale": ("date", "amount", "basis"),
     "zillow": ("photo",),
     "gis": ("owner",),
@@ -2318,6 +2329,11 @@ _SLIM_RAW: dict[str, str | tuple[str, ...]] = {
     # at the end of _LEAN_RAW in docs/dashboard.js (test_board_slim pins them equal).
     "bankruptcy_stay": "*",
     "pulled_sale": "*",
+    # APPENDED LAST (2026-09-29, Tier B #28): the bankruptcy+large-delinquent-tax-balance
+    # combo flag (enrichment_bankruptcy_tax_combo.py). Whole block, "*", same reasoning as
+    # the other combo/rank blocks above — a handful of keys, all read together. Mirrors the
+    # matching entry appended at the end of _LEAN_RAW in docs/dashboard.js.
+    "bankruptcy_tax_combo": "*",
 }
 
 

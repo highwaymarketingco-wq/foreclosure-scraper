@@ -213,7 +213,17 @@ def parse_publicindex_html(
     subtype_i = col_idx("subtype", "sub-type", "sub type")
     party_type_i = col_idx("party type")
     name_i = col_idx("name")
-    judgment_i = col_idx("judgment", "judgment amount", "amount")
+    # NOT "judgment" bare, and NOT "amount" bare: live-verified 2026-09-29 against the real
+    # SC Public Index SearchResults grid that its actual money-shaped column is named
+    # "Judgment #" -- a judgment REFERENCE NUMBER, not a dollar figure (confirmed empty on
+    # all 250 live-fetched Pending/Dismissed/Referred To Master rows in one county, since a
+    # case only gets one after judgment is entered). A bare "judgment" needle matches that
+    # header too, and _parse_money() would have silently coerced whatever numeric reference
+    # ever lands there into judgment_amount -- a real dollar-shaped field that
+    # enrichment_amount_owed's waterfall treats as HIGH-confidence actual debt. Matching only
+    # the exact "judgment amount" phrase avoids that false read while still catching a page
+    # that genuinely is labeled that way (this module's own synthetic test fixtures use it).
+    judgment_i = col_idx("judgment amount")
     agency_i = col_idx("court agency", "agency")
 
     seen: set[str] = set()

@@ -462,8 +462,10 @@ const _LEAN_RAW = {
   title_risk: ["surviving_senior_debt_risk"],
   corroboration: ["court_confirmed", "label", "tier", "multi_source"],
   helene: ["worst_placard", "worst_damage_pct", "damaged_buildings"],
-  bankruptcy: ["chapter", "date_filed", "case_name", "docket_number", "court"],
-  courtlistener: ["chapter", "date_filed", "court"],
+  bankruptcy: ["chapter", "date_filed", "case_name", "docket_number", "court",
+               "case_age_days", "case_age_years", "is_long_open", "signal"],
+  courtlistener: ["chapter", "date_filed", "court",
+                  "case_age_days", "case_age_years", "is_long_open"],
   last_sale: ["date", "amount", "basis"],
   zillow: ["photo"],
   gis: ["owner"],
@@ -498,6 +500,10 @@ const _LEAN_RAW = {
   tax_sale_overage: ["amount", "tax_sale_date", "map_number"],
   bankruptcy_stay: "*",
   pulled_sale: "*",
+  // APPENDED LAST (2026-09-29, Tier B #28): bankruptcy + large-delinquent-tax-balance combo
+  // flag. Mirrors the matching entry appended at the end of _SLIM_RAW in web_artifact.py
+  // (tests/test_board_slim.py pins them equal).
+  bankruptcy_tax_combo: "*",
 };
 const _LEAN_RAW_KEYS = Object.keys(_LEAN_RAW);
 const _LEAN_RAW_SCALARS = [
