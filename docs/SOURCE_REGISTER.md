@@ -2,9 +2,17 @@
 
 Generated 2026-09-28 09:05 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
-- Scrapers in the registry: **235**
+**One row hand-added 2026-09-30** (`counties_sc.greenwood_corebtpay_delinquent_tax`,
+in section 2 below) to keep `tests/test_source_docs_current.py` green without
+re-running the generator — which streams the full live board into memory, and
+this session was scoped to stay off the board entirely for memory-safety
+reasons (two other agent sessions were active on an 8GB Mac; see the scraper's
+own commit message). Re-run `scripts/gen_source_register.py` in a later session
+to fold this back into a real regeneration; the counts below include the hand-add.
+
+- Scrapers in the registry: **236**
 - Producing rows on the board: **129**
-- Registered but contributing ZERO rows: **106**
+- Registered but contributing ZERO rows: **107**
 - Confirmed real and not yet built: **3**
 - Board read: `data/checkpoint/board.json.gz` (197,890 rows)
 
@@ -197,6 +205,7 @@ Registered and importable, contributing nothing to the board read above. A zero 
 | `counties_sc.dillon_sheriff` | `https://dilloncountysc.org/services/public_safety/sheriffs_office.php` |
 | `counties_sc.edgefield_delinquent_tax` | `https://edgefieldcounty.sc.gov/treasurer/` |
 | `counties_sc.fairfield_delinquent_tax` | `https://www.fairfieldsc.com/departments/treasurer` |
+| `counties_sc.greenwood_corebtpay_delinquent_tax` | `https://greenwoodco.corebtpay.com/egov/apps/bill/pay.egov` |
 | `counties_sc.greenwood_delinquent_tax` | `https://www.greenwoodcounty-sc.gov/treasurer/delinquent-tax-sale` |
 | `counties_sc.kershaw_flc` | `https://www.kershaw.sc.gov/treasurer/forfeited-land-commission` |
 | `counties_sc.lancaster_delinquent_tax` | `https://www.lancastercountysc.gov` |
