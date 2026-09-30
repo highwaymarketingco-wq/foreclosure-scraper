@@ -155,6 +155,47 @@ def _key(rec) -> str:
         ("street_address", "case_number", "county", "state", "source"))
 
 
+#: A parcel/address key carried by this many OR MORE distinct street addresses is not
+#: describing one property -- it is a fused or placeholder identifier in the SOURCE data
+#: (a master-tract PIN a subdivision's lots all cite before the county assigns individual
+#: ones, a missing-parcel sentinel, a scraper that fell back to a body of water or a lot
+#: description in the parcel field). Same threshold `dedupe.suspicious_parcel_keys()`
+#: already uses for the identical reason, restated here rather than imported: importing
+#: it would mean building a `Listing` per board row just to reach `dedupe_key()`, which is
+#: the whole-board materialization this script's read of listings_slim.json.gz already
+#: avoids paying twice for.
+#:
+#: WHY THIS EXISTS (2026-09-29 audit of a 7,536 "duplicate" reading). Grouping the board's
+#: 217k rows by `_identifier()` found 1,303 groups with 2+ rows. The 20 LARGEST groups
+#: alone (out of 1,303) covered 5,623 of the 8,839 rows in duplicate groups -- three
+#: quarters of the count -- and every one of them was this exact phenomenon, not a real
+#: duplicate:
+#:   parcel:lincoln:3633940779       1,618 rows, 1,580 from counties_nc.lincoln_vacant,
+#:                                   each a DIFFERENT real street (SIGMON ST, W CHILDS ST,
+#:                                   POWER LINE RD, MISTY DAWN LN, GAMBLE DR, ...) -- a
+#:                                   placeholder/garbage parcel_id the scraper emits when it
+#:                                   has no real one.
+#:   parcel:pender:3208-90-5620-0000   216 rows -- the EXACT case dedupe.py's own
+#:                                   suspicious_parcel_keys() docstring names: one
+#:                                   master-tract PIN a subdivision's lots all cite, 216
+#:                                   distinct addresses, already known and deliberately kept
+#:                                   UNMERGED by dedupe()'s house-number guard so the merge
+#:                                   does not silently delete 215 real properties.
+#:   parcel:transylvania:escrow :    163 rows sharing the literal string "escrow :" as a
+#:                                   "parcel id".
+#:   parcel:carteret:bogue sound      71 rows sharing "bogue sound" (a body of water).
+#: `dedupe()` already refuses to merge any of these (that is WHY they are still separate
+#: rows); counting them as "duplicates" here was this check's own false alarm, not a
+#: rediscovery of a defect dedupe() missed. Below the threshold is where the real signal
+#: lives: 2-3 rows sharing a key with the SAME or an absent house number are what an
+#: undedup'd cross-source landing (measured example: `counties_generic.arcgis_distress.
+#: buncombe_unpaid_bills` storing the tax bill's MAILING address in `street_address` --
+#: documented in `scripts/resolve_parcel_from_address.py`'s DENY_SOURCES, "23%: bill
+#: mailing address" -- against `counties.multi_year_delinquent_tax`'s situs address, same
+#: parcel, 206+ pairs) actually looks like, and this check still catches those.
+FUSION_THRESHOLD = 4
+
+
 def invariants(board: list) -> list[dict]:
     """Each entry is a statement that must be true. Breach = a known defect is back."""
     out = []
@@ -194,15 +235,47 @@ def invariants(board: list) -> list[dict]:
                 "must_be": 0, "ok": not bad,
                 "why": "an unflagged $2M+ ARV is indistinguishable from a real one"})
 
-    ids = [i for i in (_identifier(r) for r in board) if i]
-    dupes = len(ids) - len(set(ids))
-    unidentifiable = len(board) - len(ids)
-    out.append({"name": "no duplicate identifiable properties", "count": dupes,
-                "must_be": 0, "ok": dupes == 0,
-                "why": "two rows for one property double-count it in every total "
-                       f"and split its enrichment ({unidentifiable:,} leads carry no "
-                       "parcel/case/url/numbered-address and are excluded — they "
-                       "cannot be judged either way)"})
+    groups: dict[str, list] = {}
+    for r in board:
+        ident = _identifier(r)
+        if ident:
+            groups.setdefault(ident, []).append(r)
+    identified = sum(len(v) for v in groups.values())
+    unidentifiable = len(board) - identified
+
+    dupes = 0
+    fused_keys = 0
+    fused_rows = 0
+    for rows in groups.values():
+        if len(rows) < 2:
+            continue
+        addrs = {str(r.get("street_address") or "").strip().lower() for r in rows}
+        addrs.discard("")
+        if len(addrs) >= FUSION_THRESHOLD:
+            # Many DISTINCT real addresses under one key: the key is fused/placeholder in
+            # the source data, not one property landed twice. dedupe() already refuses to
+            # merge these (see FUSION_THRESHOLD's comment) -- reported below, not counted
+            # as a breach.
+            fused_keys += 1
+            fused_rows += len(rows)
+            continue
+        dupes += len(rows) - 1
+
+    entry = {"name": "no duplicate identifiable properties", "count": dupes,
+             "must_be": 0, "ok": dupes == 0,
+             "why": "two rows for one property double-count it in every total "
+                    f"and split its enrichment ({unidentifiable:,} leads carry no "
+                    "parcel/case/url/numbered-address and are excluded — they "
+                    "cannot be judged either way)"}
+    if fused_keys:
+        entry["fused_keys"] = fused_keys
+        entry["fused_rows"] = fused_rows
+        entry["fused_note"] = (
+            f"{fused_keys:,} parcel/address key(s) shared by {FUSION_THRESHOLD}+ distinct "
+            f"street addresses ({fused_rows:,} rows) excluded from the count above as "
+            "fused/placeholder identifiers, not duplicates -- see FUSION_THRESHOLD's "
+            "comment")
+    out.append(entry)
     return out
 
 
@@ -270,6 +343,8 @@ def main() -> int:
         print(f"  [{mark}] {i['name']:44} {i['count']:>6,} (must be {i['must_be']})")
         if not i["ok"]:
             print(f"         why it matters: {i['why']}")
+        if i.get("fused_keys"):
+            print(f"         excluded as fused/placeholder: {i['fused_note']}")
 
     if mv is None:
         print(f"\nMOVEMENT: no previous board at {args.against} — nothing to compare.")
