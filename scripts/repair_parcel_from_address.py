@@ -70,14 +70,18 @@ REPAIRABLE_SOURCES = frozenset({
     "liensnc",                 # lien filings: the project site
     "sc_dew_lien_registry",    # SC DES lien registry: the facility site
     "nc_ust_incidents",        # NC UST incidents (scrapers/counties_generic/state_contamination.py)
-    "nc_dam_safety",           # NC dam safety (same file)
+    # nc_dam_safety REMOVED 2026-09-30: it now sets its own parcel_id (the dam's NID_ID,
+    # from the same fix that stopped it geocoding the owner's mailing address -- see
+    # resolve_parcel_from_address.py's DENY_SOURCES entry for the full story). A source
+    # whose scraper owns its parcel_id is the opposite of repairable, same as a tax roll's
+    # own parcel_id above -- it also now trips the "never sets a parcel_id" build guard
+    # in tests/test_dq_repair_parcel_from_address.py, which is the check that caught it.
     "sc_ust_registry",         # SC UST registry: the facility site
     "fannie_homepath",         # REO listings: the property
     "brock_scott",             # foreclosure notices: the property address
 })
 #: source tail -> scraper file (relative to src/foreclosure_scraper/scrapers), for the ones not named after their source
-SCRAPER_FILE = {"nc_ust_incidents": "counties_generic/state_contamination.py",
-                "nc_dam_safety": "counties_generic/state_contamination.py"}
+SCRAPER_FILE = {"nc_ust_incidents": "counties_generic/state_contamination.py"}
 
 #: owner_mailing.source values that mean "read from a parcel layer" (the lead's own filing is 'liensnc_filing')
 PARCEL_MAILING_SOURCES = frozenset({None, "", "county_gis", "nc_onemap", "scdot_sc", "sc_assessor_roll",

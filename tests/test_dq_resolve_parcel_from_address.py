@@ -283,6 +283,15 @@ def test_guards_leave_these_leads_alone(caches, registered):
     assert [r.parcel_id for r in rows] == ["9999999"] + [None] * 8
 
 
+def test_nc_dam_safety_is_denied_pending_its_backfill():
+    """state_contamination.py's nc_dam_safety wrote the dam OWNER's mailing address into
+    street_address/city/zip_code (found 2026-09-30 via a >50mi-from-county-seat geocode
+    audit). Fixed at the source, but the live board still carries pre-fix rows with a
+    mailing address masquerading as the dam's situs -- this guard must stay until those
+    are backfilled, same pattern as buncombe_unpaid_bills above."""
+    assert "nc_dam_safety" in R.DENY_SOURCES
+
+
 def test_a_dual_state_county_reads_only_its_own_states_cache(caches, registered):
     caches("Cherokee", [(("NC0001",), "NC OWNER", "5 ELM ST", None, 1.0)], state="NC")
     caches("Cherokee", [(("SC0001",), "SC OWNER", "5 ELM ST", None, 1.0)], state="SC")

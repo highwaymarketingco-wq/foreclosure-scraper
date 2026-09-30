@@ -18,6 +18,9 @@ import repair_parcel_from_address as X  # noqa: E402
 import resolve_parcel_from_address as R  # noqa: E402
 from foreclosure_scraper import parcel_cache as pc  # noqa: E402
 from foreclosure_scraper.models import Listing, ListingType  # noqa: E402
+from foreclosure_scraper.scrapers.counties_generic import (  # noqa: E402
+    state_contamination as _state_contamination,
+)
 
 COLS = "id TEXT, owner TEXT, address TEXT, owner_mailing TEXT, market_value REAL, tax_value REAL, acreage REAL, " \
        "living_sqft REAL, land_use TEXT, sale_price REAL, sale_date TEXT"
@@ -455,7 +458,18 @@ def test_every_repairable_source_has_a_scraper_that_never_sets_a_parcel_id():
     """REPAIRABLE_SOURCES is the safety rule: a source whose scraper sets parcel_id owns that parcel, and a differing
     street on it is a mailing address. If a scraper starts setting parcel_id this fails and the source must come off the list."""
     scrapers = ROOT / "src" / "foreclosure_scraper" / "scrapers"
+    # state_contamination.py holds several distinct Registry configs behind one shared
+    # _to_listing(), which (since 2026-09-30, for nc_dam_safety) can set parcel_id for
+    # SOME registries and not others -- a whole-file text grep can no longer tell those
+    # apart (it would flag every registry in the file the moment any one of them needs a
+    # real id). For a tail backed by one of these registries, check that registry's own
+    # id_field instead of grepping the shared file text.
+    contamination_registries = {r.slug: r for r in _state_contamination.REGISTRIES}
     for tail in sorted(X.REPAIRABLE_SOURCES):
+        if tail in contamination_registries:
+            assert not contamination_registries[tail].id_field, (
+                f"{tail}'s own Registry entry sets id_field: not repairable")
+            continue
         rel = X.SCRAPER_FILE.get(tail)
         files = [scrapers / rel] if rel else list(scrapers.rglob(f"{tail}.py"))
         assert files and files[0].exists(), f"no scraper file found for {tail}"

@@ -82,6 +82,20 @@ DENY_SOURCES = frozenset({
     # percentage for this specific layer, but the schema and the bug are identical, so
     # it gets the same guard for the same reason and stays until the same backfill.
     "buncombe_unpaid_bills_2024",
+    # Same defect, a different registry: state_contamination.py's nc_dam_safety fed
+    # ADDR_LINE1/2 + CITY/ZIP (the dam OWNER's mailing address, e.g. an out-of-state
+    # HOA office) into street_address/city/zip_code as if it were the dam's location.
+    # Found 2026-09-30 via a >50mi-from-declared-county-seat geocode audit (drove
+    # Transylvania's worst offender rate, ~15% of its census-geocoded rows). FIXED AT
+    # THE SOURCE 2026-09-30 (state_contamination.py now uses the layer's own LATITUDE/
+    # LONGITUDE + NID_ID directly; mailing block kept separately in
+    # raw["state_contamination"]["owner_mailing"]) -- but this check runs against the
+    # LIVE BOARD, which still carries the pre-fix rows with a mailing address in
+    # street_address (and, since 2026-09-29's geocode backfill ran on them, a
+    # Census-geocoded coordinate placed on that mailing address instead of the dam's
+    # real county). Not yet backfilled (board is locked by another process as of this
+    # audit). Safe to remove only after that backfill lands.
+    "nc_dam_safety",
     "hud_reac_inspection",            # 31%: apartment-complex addresses, a building of many parcels
     "landwatch",                      # 50%: land-listing address is approximate
     "landandfarm",                    # 59%: land-listing address is approximate

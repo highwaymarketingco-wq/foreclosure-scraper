@@ -66,13 +66,63 @@ def test_a_real_ust_row_maps():
     assert li.foreclosure_process == "contamination"
 
 
-def test_dam_address_is_composed_from_parts():
+def test_dam_uses_its_own_coordinate_not_the_owner_mailing_address():
+    """2026-09-30 fix: ADDR_LINE1/2 + CITY/STATE/ZIP on this layer are the DAM
+    OWNER'S MAILING address (e.g. a property-owners-association's out-of-state
+    office), not the dam's location -- confirmed via a real record ("Betty Kay
+    Lake Dam", Transylvania County, mailing address in Decatur, GA). Feeding that
+    mailing block into street_address (as this scraper used to) meant the
+    Census-geocode backfill geocoded the OWNER's address and placed the dam
+    hundreds of miles from its true (correctly-labeled) county. This layer also
+    publishes the dam's own LATITUDE/LONGITUDE and a real id (NID_ID) -- those
+    must be used directly instead, and the mailing block must never land in
+    street_address/city/zip_code."""
     reg = next(r for r in S.REGISTRIES if r.slug == "nc_dam_safety")
-    li = S._to_listing({"Owner": "C.B. DELLINGER", "ADDR_LINE1": "HWY 150 W",
-                        "ADDR_LINE2": "", "COUNTY": "LINCO", "CITY": "Lincolnton"}, reg)
-    assert li.street_address == "HWY 150 W"
-    assert li.county == "Lincoln"
-    assert li.foreclosure_process == "dam_liability"
+    li = S._to_listing({
+        "Owner": "Sherwood Forest Property Owners Association",
+        "ADDR_LINE1": "417 Clairemont Avenue", "ADDR_LINE2": "Unit 303",
+        "CITY": "Decatur", "STATE": "GA", "ZIP": "30030",
+        "COUNTY": "TRANS", "NID_ID": "NC00190",
+        "LATITUDE": 35.135, "LONGITUDE": -82.6851,
+    }, reg)
+    assert li.county == "Transylvania" and li.foreclosure_process == "dam_liability"
+    # The dam's real location, taken straight from the layer -- not geocoded.
+    assert li.latitude == 35.135 and li.longitude == -82.6851
+    # The owner's out-of-state mailing address must never be mistaken for the
+    # dam's location.
+    assert li.street_address is None
+    assert li.city is None
+    assert li.zip_code is None
+    assert li.parcel_id == "NC00190"
+    assert li.raw["state_contamination"]["owner_mailing"]["CITY"] == "Decatur"
+    assert "owner mailing" in li.description
+
+
+def test_dam_row_survives_on_coordinate_alone_with_no_address_field():
+    """A dam with a real NID_ID/coordinate but no address at all used to be
+    dropped by the old 'if not situs: return None' gate. Losing the lead
+    entirely would be worse than the mislabeled-coordinate bug this fixes."""
+    reg = next(r for r in S.REGISTRIES if r.slug == "nc_dam_safety")
+    li = S._to_listing({"Owner": "Jane Shuttleworth", "COUNTY": "TRANS",
+                        "NID_ID": "NC00196", "LATITUDE": 35.3028,
+                        "LONGITUDE": -82.6358}, reg)
+    assert li is not None
+    assert li.latitude == 35.3028 and li.parcel_id == "NC00196"
+
+
+def test_dam_out_of_range_coordinate_is_dropped_not_trusted():
+    reg = next(r for r in S.REGISTRIES if r.slug == "nc_dam_safety")
+    li = S._to_listing({"Owner": "X", "COUNTY": "TRANS", "NID_ID": "NC1",
+                        "LATITUDE": 999.0, "LONGITUDE": -82.6}, reg)
+    assert li.latitude is None and li.longitude == -82.6
+
+
+def test_a_registry_without_a_coordinate_field_is_unaffected():
+    """The 3 real-situs registries (ust/lur/hazardous) never had lat_field/
+    id_field set and must keep requiring a real address for a lead."""
+    for slug in ("nc_ust_incidents", "nc_land_use_restrictions", "nc_inactive_hazardous"):
+        reg = next(r for r in S.REGISTRIES if r.slug == slug)
+        assert reg.lat_field is None and reg.lon_field is None and reg.id_field is None
 
 
 def test_registries_cover_the_thin_counties():
