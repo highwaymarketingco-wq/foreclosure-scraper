@@ -263,6 +263,21 @@ BOARD_LOAD_MAX_SOURCE_MB = 1200.0
 # rather than load_board's (1,200 vs 2,643 MB, 120% over), and BOARD_APPEND_ALLOW_LARGE=1 is the
 # deliberate override for a supervised run (plugged in, other apps closed) given the real,
 # measured efficiency gain.
+#
+# RECONSIDERED 2026-09-30 (see BOARD_PATCH_MAX_SOURCE_MB's comment for the full writeup): three
+# real, supervised, full-board-scale BOARD_APPEND_ALLOW_LARGE=1 runs landed overnight --
+# 7d7fe05f (source 2,643 MB, peak RSS ~2.46 GiB, no footprint logged), e5922a1f (source 2,644 MB,
+# peak footprint ~3.3 GiB, ratio ~1.28x), and 49ab8c1a (source ~2,653 MB est., peak footprint
+# 4.2 GiB, ratio ~1.62x -- the worst observed). That worst ratio is BETTER (lower) than the 2.39x/
+# 1.96x small-scale synthetic ratios this ceiling was originally derived from, which would argue
+# for raising it; but 4,608 MB (a ~4.5 GiB footprint budget, chosen for the same reason
+# BOARD_PATCH_MAX_SOURCE_MB's comment gives: real margin under the 5.9 GiB watchdog cap tonight's
+# runs actually used) / 1.62 ~= 2,845 MB raw, and applying this file's own ~83% margin convention
+# (2,400 / "under 2,900" from the original derivation) lands within a few percent of the CURRENT
+# 2,400 MB value -- i.e. today's real data does not clearly justify moving this number either way,
+# only three data points exist (all from one overnight session), and the board's current combined
+# source (2,651 MB) is still safely close enough to today's exact ceiling that BOARD_APPEND_
+# ALLOW_LARGE=1 stays required either way. Left at 2,400 MB rather than moved on marginal grounds.
 BOARD_APPEND_MAX_SOURCE_MB = 2400.0
 
 # --- the patch-only SIZE guard (follow-up to append_new_rows(), 2026-09-29) -----------------
@@ -300,16 +315,58 @@ BOARD_APPEND_MAX_SOURCE_MB = 2400.0
 # smaller than load_board()'s catastrophic RSS/footprint gap, but the same DIRECTION of error, so
 # still worth having measured both rather than trusting RSS alone.
 #
-# WHAT THE CEILING IS SET TO. Scaling BOARD_APPEND_MAX_SOURCE_MB's own 2,400 MB down by the ~17%
-# relative efficiency gap measured at the 40,000-row (worse-case) point (2,400 / 1.17 ~= 2,051 MB)
-# gives the raw number; 2,000 MB is used instead, a clean figure with real margin below that,
-# deliberately conservative given the 20K/40K measurements did not fully agree with each other on
-# how patch_existing_rows() compares to append_new_rows() (equal at 20K, ~17% worse at 40K) and a
-# larger, real-board-scale trial was not run this session (same caution
-# BOARD_APPEND_MAX_SOURCE_MB's own comment took). The board's current combined source (~2,650 MB)
-# is STILL over this, honestly -- same as append_new_rows() on today's exact board --
-# BOARD_PATCH_ALLOW_LARGE=1 is the deliberate override for a supervised run.
-BOARD_PATCH_MAX_SOURCE_MB = 2000.0
+# WHAT THE CEILING WAS ORIGINALLY SET TO (2026-09-29). Scaling BOARD_APPEND_MAX_SOURCE_MB's own
+# 2,400 MB down by the ~17% relative efficiency gap measured at the 40,000-row (worse-case) point
+# (2,400 / 1.17 ~= 2,051 MB) gives the raw number; 2,000 MB was used instead, a clean figure with
+# real margin below that, deliberately conservative given the 20K/40K measurements did not fully
+# agree with each other on how patch_existing_rows() compares to append_new_rows() (equal at 20K,
+# ~17% worse at 40K) and a larger, real-board-scale trial was not run that session (same caution
+# BOARD_APPEND_MAX_SOURCE_MB's own comment took).
+#
+# REAL FULL-BOARD PATCH ATTEMPTS, 2026-09-30 (overnight follow-up), CEILING RAISED A LITTLE, NOT
+# REMOVED. Two real, supervised, full-board-scale patch_existing_rows() runs landed since the
+# above was written, both under BOARD_PATCH_ALLOW_LARGE=1 with the dual RSS + `sample -f`
+# physical-footprint watchdog this file's other ceilings require, both exiting clean (code 0, no
+# manual kill):
+#     adacbef5 (23:24): source 2,415 MB -> peak RSS 1.27 GiB, peak footprint 3,584.0 MB (1.484x)
+#     fb30764f (02:12): source ~2,650 MB (board unchanged at 219,530 rows since 49ab8c1a) ->
+#                        peak footprint ~4.0 GiB / 4,096 MiB (~1.546x), watchdog cap 5.9 GiB
+# Two more same-night patch landings, 44d2becd (04:04) and d204cabb (04:59), also ran clean under
+# BOARD_PATCH_ALLOW_LARGE=1 but did not log a paired source/footprint number in their commit
+# messages, so they are NOT used as measurement data points here -- only the two above are.
+# Worst real ratio measured (~1.546x, fb30764f) is BETTER (lower) than the 2026-09-29 small-scale
+# synthetic trial's worse-case 17%-over-append assumption -- at real full-board scale,
+# patch_existing_rows() is close to append_new_rows()'s own real worst ratio (1.62x, 49ab8c1a in
+# BOARD_APPEND_MAX_SOURCE_MB's comment), not meaningfully worse the way the 40K-row synthetic
+# trial predicted. That justifies raising this ceiling somewhat.
+#
+# It does NOT justify raising it to clear the current board outright, for two reasons. First,
+# sample size: two real data points (vs. append's three), both from the SAME overnight session,
+# is not enough to retire the margin discipline this file uses everywhere else. Second, and more
+# important: BOARD_LOAD_MAX_SOURCE_MB's own 2026-09-29 real-full-board attempt is the direct
+# precedent for what happens when a ceiling gets raised on the strength of a successful supervised
+# run -- that attempt ALSO succeeded under its watchdog (RSS never exceeded ~1.1 GB) and the
+# ceiling was STILL correctly left unraised, because the real physical footprint (11.1-11.3 GB,
+# read via `sample -f`, not `ps`) told a completely different story than RSS did. The lesson there
+# was not "load_board() is uniquely bad" -- it was that a size-based ceiling cannot see the
+# machine's ACTUAL memory pressure at the moment a run starts, only its own file-size proxy for
+# it, and this machine's real headroom fluctuates independently of board size: the successful
+# adacbef5 patch run itself started at only 267-550 MB free / ~73.5% swap used, and a live check
+# on 2026-09-30 while writing this comment showed conditions already WORSE than that (79 MB free,
+# 84% of 5,120 MB swap used) with no patch process running at all -- just this machine's normal
+# background stack. A higher static ceiling would not have made either moment safer; the watchdog
+# and the human decision behind BOARD_PATCH_ALLOW_LARGE=1 are what actually kept every run above
+# this ceiling safe tonight, not the ceiling's number, and that is the actual reason it stays
+# required rather than being widened away.
+#
+# WHAT THE CEILING IS SET TO NOW. Applying the corrected ratio relationship (patch now measured
+# ~4.6% cheaper than append's own worst real ratio, 1.546 vs 1.62, not 17% worse) to
+# BOARD_APPEND_MAX_SOURCE_MB's 2,400 MB gives ~2,502 MB raw (2,400 * 1.62 / 1.546); 2,300 MB is
+# used instead, short of that for the sample-size and headroom-volatility reasons above. The
+# board's current combined source (2,651 MB, verified 2026-09-30) is STILL over this, deliberately
+# -- BOARD_PATCH_ALLOW_LARGE=1 plus the dual RSS/footprint watchdog remains the required path for
+# a run against the current (or any larger) board, exactly as before this comment was updated.
+BOARD_PATCH_MAX_SOURCE_MB = 2300.0
 
 # run_meta health older than this is nulled (audit O4).
 HEALTH_MAX_AGE_HOURS = 48.0
