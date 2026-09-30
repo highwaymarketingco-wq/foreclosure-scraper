@@ -1,5 +1,6 @@
-"""Fast re-Vision patch: apply Gemini Vision to the CURRENT docs/listings.json
-without re-running the full pipeline, then recompute calc + grade + rewrite.
+"""Fast re-Vision patch: apply Gemini Vision to the CURRENT board without
+re-running the full pipeline, then recompute calc + grade for the leads it
+actually touched.
 
 Use when the scraped/enriched data is fresh but Vision needs (re)running on a
 different provider/config. Honors VISION_PROVIDER / VISION_MAX_LISTINGS /
@@ -9,14 +10,72 @@ parallel stream per key.
   GEMINI_API_KEY_1=.. GEMINI_API_KEY_2=.. VISION_PROVIDER=gemini \
     VISION_MAX_LISTINGS=800 uv run python scripts/patch_vision_gemini.py
 
+BOARD I/O REWRITE (2026-09-30, same pattern as resolver_backfill_parcel.py's/
+resolver_backfill_geocode.py's 2026-09-29 rewrites and
+recompute_geo_imprecise_confidence.py's 2026-09-30 targeted-patch shape):
+this used to call load_board() to build the WHOLE board (217K+ rows) as
+`listings`, run vision + recompute calc/grade "onto every lead" (the vast
+majority of which vision never touches), then write_artifact(listings, ...) —
+the whole board re-validated and re-serialized to land what one run actually
+changes (up to VISION_MAX_LISTINGS, historically far fewer once the photo
+filter and wall-clock budget apply). That is exactly the double
+materialization BOARD_LOAD_MAX_SOURCE_MB / read_board_records() now refuse on
+this board's real size (2,651+ MB, over the 1,200 MB ceiling) -- this script
+was, in practice, BLOCKED, failing every scheduled 09:30 run since 2026-09-30.
+
+THE ACTUAL TARGET POPULATION IS SMALL, EVEN THOUGH "un-scored" ISN'T.
+needs_vision() (daily-incremental: no vision yet, OR only a low-quality
+ollama-provider vision) has historically matched ~150K-190K of ~217K rows --
+nearly the whole board, because most rows were scraped without ever getting a
+Vision pass. But enrich_with_vision() ITSELF immediately re-filters that down
+to rows with a usable photo (`_has_real_image`) before doing anything else,
+UNLESS VISION_INCLUDE_NO_PHOTO=1 -- and historically that survivor set is
+~4,500-5,000 rows, not ~190K (see e.g. 2026-09-26's log: 190,903 un-scored, of
+which only 4,884 had a photo). A basemap-only row can only ever return a null
+condition_tier, so it was never useful cargo for enrich_with_vision() to carry
+around -- it was only IN the old `unscored` list because load_board() had
+already paid to materialize the whole board anyway.
+
+So: this streams the board WITH the lazy-detail sidecar merged
+(web_artifact._iter_board_records -- "vision" is a LAZY_DETAIL_KEY, so a
+plain slim read would see zero vision reports and re-grade the same head of
+the list forever, exactly as the old docstring warned), and for each row does
+a CHEAP dict/light-Listing check (needs_vision, then _has_real_image) before
+ever calling Listing.model_validate() -- only the (bounded, historically
+~4,500-row) survivor set is ever fully validated into a real Listing.
+VISION_INCLUDE_NO_PHOTO=1 is the one config this streaming rewrite does NOT
+support (it would require materializing the full ~190K-row "un-scored" set,
+the exact cost this rewrite exists to avoid) -- it is refused outright with a
+clear message rather than silently processing a truncated set.
+
+enrich_with_vision(candidates, max_listings=cap) itself is UNCHANGED -- same
+call, same internal filtering/sorting/capping/circuit-breaker. After it
+returns, calc/grade are recomputed (calc.compute()/grading.grade() are pure
+per-row functions of one Listing's own raw dict, confirmed by
+recompute_geo_imprecise_confidence.py's own investigation) ONLY for the
+candidates this run's vision pass actually touched (detected by object-
+identity: _apply()/_record_ungraded() always assign a NEW dict to
+li.raw["vision"]/li.raw["vision_unscored"], never mutate the old one in
+place) -- not "every lead" as before, which was a no-op for ~216K+ rows every
+single run. Every touched row's changed raw keys (vision, vision_unscored,
+condition_tier, condition_source, calc, grade) land in ONE
+web_artifact.patch_existing_rows() call.
+
+DISCLOSED GAP: patch_existing_rows()'s raw update MERGES keys in, it cannot
+DELETE one -- so a stale raw["vision_fetch_failed"] marker that _apply()
+pops on a fresh score (cosmetic bookkeeping only; _needs_vision() already
+short-circuits on raw["vision"] before ever consulting that marker, per its
+own docstring) is not cleared by this script's patch. Functionally inert,
+unlike the fields above.
+
 BOARD I/O CONTRACT (do not regress):
-  read  -> web_artifact.load_board(), which merges the lazy-detail sidecar
-           (docs/listings_detail.json) back into each lead's raw. "vision" is a
-           LAZY_DETAIL_KEY, so a plain json.loads of the slim listings.json sees
-           ZERO vision reports and this pass re-grades the same head of the list
-           every single day instead of advancing coverage.
-  write -> web_artifact.write_artifact(), which re-splits the sidecar and emits
-           the .gz twins. Hand-writing listings.json silently wipes the sidecar.
+  read  -> web_artifact._iter_board_records(), which merges the lazy-detail
+           sidecar (docs/listings_detail.json) back into each row's raw AS IT
+           STREAMS, never holding the whole board in memory at once.
+  write -> web_artifact.patch_existing_rows(), which mutates only the rows
+           this run's vision pass actually touched, streaming everything else
+           through unchanged. Never write listings.json by hand -- it silently
+           wipes the sidecar.
 """
 from __future__ import annotations
 
@@ -28,94 +87,34 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from foreclosure_scraper.models import Listing, ListingType, PropertyKind
-from foreclosure_scraper.enrichment_vision import (
+from foreclosure_scraper.models import Listing  # noqa: E402
+from foreclosure_scraper.enrichment_vision import (  # noqa: E402
     _distress_tier, _has_real_image, enrich_with_vision, vision_max_seconds,
 )
-from foreclosure_scraper.valuation import calc as valuation_calc
-from foreclosure_scraper.valuation import grading as valuation_grading
-from foreclosure_scraper.publish import board_seal_pathspec
-from foreclosure_scraper.web_artifact import (
-    BoardLockBusy, board_lock, load_board, read_board_records, write_artifact,
+from foreclosure_scraper.valuation import calc as valuation_calc  # noqa: E402
+from foreclosure_scraper.valuation import grading as valuation_grading  # noqa: E402
+from foreclosure_scraper.publish import board_seal_pathspec  # noqa: E402
+from foreclosure_scraper.web_artifact import (  # noqa: E402
+    BoardLockBusy, _iter_board_records, board_lock, patch_existing_rows,
 )
-from foreclosure_scraper.publish import manifest_pathspec, push_deferred, push_with_retries
+from foreclosure_scraper.publish import manifest_pathspec, push_deferred, push_with_retries  # noqa: E402
 
-DOCS = Path(__file__).resolve().parent.parent / "docs"
+REPO = Path(__file__).resolve().parent.parent
+DOCS = REPO / "docs"
 
-
-def _hydrate(d: dict) -> Listing | None:
-    """Lenient record -> Listing. Drops unknown keys and coerces the two enum
-    fields, so a record that strict Listing.model_validate rejects can still be
-    recovered instead of being dropped from the published board."""
-    fields = {k: v for k, v in d.items() if k in Listing.model_fields}
-    if isinstance(fields.get("listing_type"), str):
-        try:
-            fields["listing_type"] = ListingType(fields["listing_type"])
-        except ValueError:
-            fields.pop("listing_type", None)
-    if isinstance(fields.get("property_kind"), str):
-        try:
-            fields["property_kind"] = PropertyKind(fields["property_kind"])
-        except ValueError:
-            fields.pop("property_kind", None)
-    try:
-        li = Listing.model_validate(fields)
-    except Exception:
-        return None
-    li.raw = d.get("raw") or {}
-    return li
-
-
-def load_board_no_shrink(docs: Path | str = DOCS) -> tuple[list[Listing], int]:
-    """load_board() plus a hard never-shrink guarantee.
-
-    load_board() silently skips any record that fails Listing.model_validate.
-    Publishing a board with fewer leads than it had is a far worse bug than the
-    stale-coverage one this script exists to fix, so when the counts disagree we
-    re-load every record through the lenient hydrator and keep the strays.
-
-    Returns (listings, n_records_on_disk) so the caller can hard-guard the write.
-
-    The record count and the recovery pass both come from read_board_records(),
-    which is load_board()'s own sidecar merge without the validation step — so
-    the two can no longer disagree about what "the board" is, and both work from
-    the committed .gz on a checkout where the uncompressed twin (gitignored,
-    >100MB) is absent. A local copy of that merge used to live here and read
-    docs/listings.json unconditionally.
-    """
-    docs = Path(docs)
-    records = read_board_records(docs)
-    n_records = len(records)
-    # max_drop_rate=1.0: load_board FAILS above a 0.1% drop rate by default (audit O3), but
-    # this function IS the recovery path for invalid rows, so it must be allowed to see them.
-    board = load_board(docs, max_drop_rate=1.0)
-    if len(board) == n_records:
-        return board, n_records
-    print(f"[{time.strftime('%H:%M:%S')}] load_board dropped "
-          f"{n_records - len(board)} invalid record(s) — recovering them leniently "
-          f"so the published board cannot shrink", flush=True)
-    recovered: list[Listing] = []
-    for rec in records:
-        try:
-            recovered.append(Listing.model_validate(rec))
-            continue
-        except Exception:  # noqa: BLE001
-            pass
-        li = _hydrate(rec)
-        if li is not None:
-            recovered.append(li)
-    return recovered, n_records
+#: raw keys a vision + recompute pass can possibly touch -- anything else on a
+#: candidate's raw is left exactly as it streamed in (patch_existing_rows()
+#: merges this subset into the row's existing raw, never replaces it).
+_PATCHABLE_RAW_KEYS = ("vision", "vision_unscored", "condition_tier", "condition_source",
+                       "calc", "grade")
 
 
 def needs_vision(li: Listing) -> bool:
     """Daily-incremental target test: score listings that DON'T already have
     vision — PLUS ones only scored by the local Ollama floor (low quality), so a
-    real provider upgrades them once fresh API quota is available. Each run thus
-    advances coverage AND quality over the week as free quotas reset.
-
-    Only correct when `li` came through load_board(): vision lives in the lazy
-    sidecar, so a listing hydrated from the slim listings.json always looks
-    un-scored.
+    real provider upgrades them once fresh API quota is available. Unchanged from
+    the pre-rewrite version; only correct when `li.raw` carries the merged
+    lazy-detail sidecar (vision lives there), which _iter_board_records() guarantees.
     """
     vis = (li.raw or {}).get("vision")
     if not vis:
@@ -123,126 +122,151 @@ def needs_vision(li: Listing) -> bool:
     return vis.get("_provider") == "ollama"
 
 
-async def main() -> int:
-    # THE LOCK, held across load_board -> vision -> write_artifact -> publish.
+def _collect_candidates(docs: Path):
+    """Stream the board WITH the lazy-detail sidecar merged, and return
+    (candidates, total_rows, unscored_total) where `candidates` are the (bounded)
+    real Listings this run might actually vision-score: needs_vision() AND a usable
+    photo (_has_real_image). Only these are ever fully Listing.model_validate()'d;
+    every other row is discarded the moment the cheap checks rule it out.
+    """
+    candidates: list[Listing] = []
+    total_rows = 0
+    unscored_total = 0
+    for rec in _iter_board_records(docs):
+        total_rows += 1
+        raw = rec.get("raw") if isinstance(rec.get("raw"), dict) else {}
+        # cheap pre-check (no validation) before paying for a full Listing
+        light = Listing.model_construct(raw=raw)
+        if not needs_vision(light):
+            continue
+        unscored_total += 1
+        if not _has_real_image(light):
+            continue
+        try:
+            li = Listing.model_validate(rec)
+        except Exception:  # noqa: BLE001 - a malformed row must not crash the whole pass
+            continue
+        candidates.append(li)
+    return candidates, total_rows, unscored_total
+
+
+def main() -> int:
+    # THE LOCK, held across the streaming read -> vision -> patch -> publish.
     #
     # This was the longest-held board in the system: VISION_MAX_SECONDS used to
     # default to 14400 (4h; now 90 min, see enrichment_vision.vision_max_seconds),
-    # so a board loaded at 09:33 was still being written back at 13:36 — straight
-    # over the noon lrcpwa pass and the 2pm SOS pass, both of which had already
-    # published. On 2026-08-10 that reverted 1,064 resolved
-    # parcels, 343 county values and 410 absentee tags, and nothing errored.
+    # so a board loaded at 09:33 was still being written back at 13:36. The
+    # streaming rewrite does not change this lock-holding shape -- the lock still
+    # covers the whole pass -- but the board no longer needs to be fully
+    # materialized to do it.
     #
     # Reentrant: run_daily_vision.sh already holds this lock when it invokes
     # this script, and passes it down through FORECLOSURE_BOARD_LOCK_HELD.
     try:
-        with board_lock(Path(__file__).resolve().parent.parent,
-                        owner="patch_vision_gemini.py"):
-            return await _run()
+        with board_lock(REPO, owner="patch_vision_gemini.py"):
+            return asyncio.run(_run())
     except BoardLockBusy as exc:
         print(f"{exc} — skipping this vision pass.", flush=True)
         return 0
 
 
 async def _run() -> int:
-    # Read through load_board so the lazy-detail sidecar (vision/comps/cama) is
-    # merged into raw BEFORE needs_vision() runs — otherwise every lead looks
-    # un-scored and the pass re-grades the same head of the list forever.
-    listings, n_records = load_board_no_shrink(DOCS)
-    print(f"[{time.strftime('%H:%M:%S')}] loaded {len(listings)} listings "
-          f"({n_records} records on disk, lazy-detail sidecar merged)", flush=True)
+    if os.environ.get("VISION_INCLUDE_NO_PHOTO", "0") == "1":
+        # That config needs enrich_with_vision() to see the FULL un-scored population
+        # (historically ~150K-190K rows), which is the exact whole-board
+        # materialization this rewrite exists to avoid. Refuse cleanly rather than
+        # silently run a truncated (photo-only) pass under a flag that promised more.
+        print("VISION_INCLUDE_NO_PHOTO=1 is not supported by this streaming pass "
+              "(it needs the full un-scored population in memory -- the same cost "
+              "load_board() refuses on this board's real size). Unset it, or run "
+              "the legacy load_board()-based path deliberately with "
+              "BOARD_LOAD_ALLOW_LARGE=1 if this is genuinely needed.", file=sys.stderr, flush=True)
+        return 3
+
+    candidates, total_rows, unscored_total = _collect_candidates(DOCS)
+    already = total_rows - unscored_total
+    n_hot = sum(1 for li in candidates if _distress_tier(li) == "HOT")
+    n_warm = sum(1 for li in candidates if _distress_tier(li) == "WARM")
+    print(f"[{time.strftime('%H:%M:%S')}] scanned {total_rows} board rows (sidecar merged) | "
+          f"{already} already vision-scored; {unscored_total} un-scored, of which "
+          f"{len(candidates)} have a photo ({n_hot} HOT, {n_warm} WARM). Running "
+          f"{os.environ.get('VISION_PROVIDER','?')} vision (wall clock "
+          f"{vision_max_seconds():.0f}s) on the photo rows, HOT then WARM first…", flush=True)
 
     cap = int(os.environ.get("VISION_MAX_LISTINGS", "800"))
-    unscored = [li for li in listings if needs_vision(li)]
-    already = len(listings) - len(unscored)
-    # Only rows with a real photo can be graded (a basemap-only row can only return a
-    # null tier), and enrich_with_vision scores HOT, then WARM, first (see
-    # enrichment_vision._vpri). Say both in the log so a run's reach is visible.
-    with_photo = [li for li in unscored if _has_real_image(li)]
-    n_hot = sum(1 for li in with_photo if _distress_tier(li) == "HOT")
-    n_warm = sum(1 for li in with_photo if _distress_tier(li) == "WARM")
-    print(f"[{time.strftime('%H:%M:%S')}] {already} already vision-scored; "
-          f"{len(unscored)} un-scored, of which {len(with_photo)} have a photo "
-          f"({n_hot} HOT, {n_warm} WARM). Running {os.environ.get('VISION_PROVIDER','?')} "
-          f"vision (cap {cap}, wall clock {vision_max_seconds():.0f}s) on the photo rows, "
-          f"HOT then WARM first…", flush=True)
+    # Snapshot identity + "had vision" BEFORE the pass so the actually-touched subset
+    # can be detected afterward by object-identity: _apply()/_record_ungraded() always
+    # assign a NEW dict to raw["vision"]/raw["vision_unscored"], never mutate in place.
+    before_vision_obj = {id(li): li.raw.get("vision") for li in candidates}
+    before_had_vision = {id(li): bool(li.raw.get("vision")) for li in candidates}
+    before_had_unscored = {id(li): ("vision_unscored" in li.raw) for li in candidates}
+
     t0 = time.time()
-    # Hard wall-clock cap: a single hung worker (stuck network await) must NOT
-    # stall the whole run forever. enrich_with_vision applies results to each
-    # listing in place as it goes, so on timeout we still keep partial progress
-    # and proceed to write/publish what was scored. +120s grace so
-    # the pool's own internal VISION_MAX_SECONDS deadline fires first. The default
-    # is now 90 minutes (was 4h: the pass held the board lock for hours to score a
-    # few hundred rows, 2026-09-21 ops audit finding O6); VISION_MAX_SECONDS=0
-    # means unlimited, in which case there is no outer cap either (the old
-    # `0 + 120` armed a 2-minute kill instead).
-    #
-    # YIELD STOP (audit O6) lives inside enrich_with_vision's watchdog, where it can see the
-    # worker pool and stop it gracefully (in-flight calls finish, partial progress is kept):
-    #   * live_workers <= VISION_YIELD_LIVE_MIN (2) for VISION_YIELD_LIVE_S (900 s), or
-    #   * scored/hour < VISION_MIN_SCORED_PER_HOUR (100) over the trailing VISION_YIELD_WINDOW_S
-    #     (900 s), measured after a VISION_YIELD_WARMUP_S (1200 s) warm-up.
-    # VISION_YIELD_STOP=0 turns both off. The wrapper's VISION_MAX_SECONDS (5400) is the same
-    # default as vision_max_seconds(), so the two never disagree.
     _budget = vision_max_seconds()
     hard_cap = (_budget + 120) if _budget > 0 else None
     try:
         await asyncio.wait_for(
-            enrich_with_vision(unscored, max_listings=cap), timeout=hard_cap)
+            enrich_with_vision(candidates, max_listings=cap), timeout=hard_cap)
     except asyncio.TimeoutError:
         print(f"[{time.strftime('%H:%M:%S')}] vision pass hit hard cap ({(hard_cap or 0):.0f}s) "
               f"— writing partial progress", flush=True)
     print(f"[{time.strftime('%H:%M:%S')}] vision pass done in {int(time.time()-t0)}s", flush=True)
 
-    # Recompute calc + grade (condition_tier may have changed) onto every lead.
-    scored = 0
-    for li in listings:
+    touched = [li for li in candidates
+              if li.raw.get("vision") is not before_vision_obj[id(li)]
+              or (("vision_unscored" in li.raw) and not before_had_unscored[id(li)])]
+
+    # Recompute calc + grade (condition_tier may have changed) -- ONLY for rows this
+    # run's vision pass actually touched. calc.compute()/grade.grade() are pure
+    # functions of one Listing's own raw dict, so recomputing an untouched candidate
+    # (or a row not in `candidates` at all) would be a byte-identical no-op; scoping
+    # to `touched` just skips paying for that no-op instead of guaranteeing anything
+    # different than the old "every lead" loop did.
+    for li in touched:
+        if not isinstance(li.raw, dict):
+            li.raw = {}
         try:
             c = valuation_calc.compute(li)
             g = valuation_grading.grade(li, c)
-            if not isinstance(li.raw, dict):
-                li.raw = {}
             li.raw["calc"] = valuation_calc.to_dict(c)
             li.raw["grade"] = valuation_grading.to_dict(g)
-        except Exception:
+        except Exception:  # noqa: BLE001
             pass
-        if (li.raw or {}).get("vision"):
-            scored += 1
 
-    # Never publish a shrunken board. If anything above lost leads, bail BEFORE
-    # the write — a stale board beats a truncated one.
-    if len(listings) < n_records:
-        print(f"[{time.strftime('%H:%M:%S')}] ABORT: would publish {len(listings)} of "
-              f"{n_records} records — refusing to shrink the board", flush=True)
-        return 2
+    newly_gained = sum(1 for li in touched
+                       if not before_had_vision[id(li)] and li.raw.get("vision"))
+    scored_now_estimate = already + newly_gained  # see module docstring: exact, not approximate
 
-    # PASS ONLY WHAT THIS RUN ACTUALLY COMPUTED.
-    #
-    # _prior_meta() used to live here: it read the prior docs/run_meta.json and
-    # handed by_source / by_state / source_status / regressions / errors straight
-    # back as this pass's summary. That looks like preservation and is actually
-    # laundering — write_artifact stamps health_carried_from /
-    # health_carried_keys ONLY when a key is ABSENT from the summary it is
-    # handed, so re-supplying them made the carry-forward branch dead code and
-    # the published file asserted a months-old per-source health report as
-    # current, unlabelled. Measured on the live board: by_state summed 36,060
-    # against a 38,500 board (2,440 leads, 6.3%, unaccounted) and no
-    # health_carried_from appeared anywhere in the file.
-    #
-    # write_artifact carries the same values forward from the same file and
-    # labels them; by_state and by_source_on_board it derives from the board
-    # being written, so those come out current instead of carried.
-    summary = {"notes": (f"daily vision pass: {scored} of {len(listings)} listings "
-                         f"have a vision report")}
-    write_artifact(listings, summary, docs_dir=DOCS)
-    print(f"[{time.strftime('%H:%M:%S')}] wrote {DOCS/'listings.json'} + sidecar — "
-          f"{len(listings)} listings, {scored} total now have vision", flush=True)
+    pending_patches: dict[str, dict] = {}
+    for li in touched:
+        patch_raw = {k: li.raw[k] for k in _PATCHABLE_RAW_KEYS if k in li.raw}
+        if not patch_raw:
+            continue
+        try:
+            key = li.dedupe_key()
+        except Exception:  # noqa: BLE001
+            continue
+        pending_patches[key] = {"raw": patch_raw}
+
+    print(f"[{time.strftime('%H:%M:%S')}] touched {len(touched)}/{len(candidates)} candidates "
+          f"this run; {newly_gained} newly gained a vision report", flush=True)
+
+    if not pending_patches:
+        print(f"[{time.strftime('%H:%M:%S')}] nothing to patch this run", flush=True)
+        return 0
+
+    summary = {"notes": (f"daily vision pass: {scored_now_estimate} of {total_rows} listings "
+                         f"have a vision report (+{newly_gained} this run)")}
+    stats = patch_existing_rows(pending_patches, summary, docs_dir=DOCS)
+    print(f"[{time.strftime('%H:%M:%S')}] patched {stats['applied']}/{len(pending_patches)} rows "
+          f"(existing board: {stats['existing']:,}) — vision now ≈{scored_now_estimate} "
+          f"of {total_rows} listings", flush=True)
 
     # Publish to the GitHub Pages dashboard (docs/ doesn't touch workflows,
     # so the normal token can push it).
     if os.environ.get("PATCH_PUBLISH", "1") == "1":
         import subprocess
-        root = str(Path(__file__).parent.parent)
+        root = str(REPO)
         try:
             # Commit only the .gz twins the dashboard fetches. The uncompressed
             # listings.json/.detail.json are gitignored (they exceed GitHub's
@@ -250,28 +274,17 @@ async def _run() -> int:
             # the .gz. Naming a gitignored path in `git add` fails the whole add,
             # so it must NOT appear here.
             # listings_slim.json.gz is the mobile payload write_artifact() emits.
-            # It is appended ONLY IF IT EXISTS: a pathspec matching no file makes
-            # `git add` exit 128 and stage NOTHING AT ALL, which would silently
-            # stop publishing the dashboard entirely on a checkout where the slim
-            # emitter has not run yet.
-            # the board = every listings_part_NNN.json.gz + the manifest that lists them
+            # patch_existing_rows() does NOT regenerate it (disclosed gap, same as
+            # append_new_rows()) -- it is appended ONLY IF IT EXISTS/tracked, same
+            # gate as before, so a stale-but-present slim file still gets staged
+            # (and carried forward unchanged) rather than silently dropped from the
+            # commit.
             pub = [*board_seal_pathspec(root), "docs/listings_detail.json.gz",
                    "docs/run_meta.json"]
-            # ...but "exists" alone is the wrong gate once it IS tracked: the
-            # emitter deletes both slim files if projection fails, and that
-            # DELETION has to be staged or phones keep being served the last
-            # published slim beside a board that has moved on. The 128-exit only
-            # fires when the path is absent AND untracked, so test for both.
             if (DOCS / "listings_slim.json.gz").exists() or subprocess.run(
                     ["git", "ls-files", "--error-unmatch", "docs/listings_slim.json.gz"],
                     cwd=root, capture_output=True).returncode == 0:
                 pub.append("docs/listings_slim.json.gz")
-            # docs/detail_shards/ is the per-lead detail payload phones fetch,
-            # emitted by the same write_artifact() call. Same gate, same reasons
-            # — a DIRECTORY pathspec behaves identically: absent AND untracked
-            # exits 128 and stages nothing, while `git add <dir>` on a tracked
-            # directory stages deletions inside it, which is how the emitter's
-            # remove-the-directory failure path reaches the live site.
             if (DOCS / "detail_shards").is_dir() or subprocess.run(
                     ["git", "ls-files", "--error-unmatch", "docs/detail_shards"],
                     cwd=root, capture_output=True).returncode == 0:
@@ -283,7 +296,7 @@ async def _run() -> int:
             r = subprocess.run(["git", "diff", "--staged", "--quiet"], cwd=root)
             if r.returncode != 0:  # there are changes
                 subprocess.run(["git", "commit", "-q", "-m",
-                                f"daily vision: {scored} listings scored ({time.strftime('%Y-%m-%d')})"],
+                                f"daily vision: {newly_gained} listings scored ({time.strftime('%Y-%m-%d')})"],
                                cwd=root, check=False)
                 if push_deferred():
                     # run_daily_vision.sh sets BOARD_PUSH_DEFERRED=1: it releases the board lock
@@ -300,4 +313,4 @@ async def _run() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(asyncio.run(main()))
+    sys.exit(main())
