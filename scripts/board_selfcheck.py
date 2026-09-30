@@ -193,6 +193,12 @@ def _key(rec) -> str:
 #: documented in `scripts/resolve_parcel_from_address.py`'s DENY_SOURCES, "23%: bill
 #: mailing address" -- against `counties.multi_year_delinquent_tax`'s situs address, same
 #: parcel, 206+ pairs) actually looks like, and this check still catches those.
+#: FIXED AT THE SOURCE 2026-09-29 (arcgis_distress_layers.py now builds situs from
+#: house_num/street_name/street_type, same as multi_year_delinquent_tax, and keeps the
+#: mailing address in raw["owner_mailing"] instead): NEW rows from this source will not
+#: reproduce this pair. The ~206+19 rows already on the board from before the fix are
+#: NOT backfilled by that change and still need the separate load_board()+dedupe()+
+#: write_artifact() normalize pass already flagged as follow-up work.
 FUSION_THRESHOLD = 4
 
 

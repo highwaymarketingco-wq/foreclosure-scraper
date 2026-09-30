@@ -49,6 +49,7 @@ PRIVACY
 from __future__ import annotations
 
 import os
+import re
 from datetime import datetime, timezone
 from typing import Iterable, NamedTuple, Optional
 
@@ -88,6 +89,21 @@ class Layer(NamedTuple):
     detail: Optional[str] = None       # violation description / bill id
     process: Optional[str] = None
     source_page: Optional[str] = None  # human-facing page for source_url
+    #: Some layers (Buncombe's bill tables) carry the TAXPAYER'S MAILING address
+    #: on columns separate from situs (address_line1/city/state/postal_code here,
+    #: NOT the property's own city/state/zip). Joined in order, blanks dropped,
+    #: and written to raw["owner_mailing"] rather than to street_address/city/zip_
+    #: -- see multi_year_delinquent_tax.py, which reads this exact Buncombe schema
+    #: the same way. Absentee-owner signal, never the property's own address.
+    mailing_parts: tuple[str, ...] = ()
+    #: Field holding the mailing address's state abbreviation, for absentee /
+    #: out-of-state detection (mail_state != the layer's own `state`).
+    mail_state: Optional[str] = None
+    #: raw["owner_mailing"]["source"] tag. Defaults to the layer slug, but a value
+    #: from scripts/repair_parcel_from_address.py's PARCEL_MAILING_SOURCES (e.g.
+    #: "county_tax_roll", what multi_year_delinquent_tax.py tags this exact Buncombe
+    #: table with) lets that repair path recognize the block as parcel-layer-sourced.
+    mailing_source: Optional[str] = None
     #: Field holding the AMOUNT OWED (a tax bill, a lien). Stored as
     #: raw["arcgis_distress"]["amount_owed"], the key enrichment_tax_owed's generic scan
     #: already reads, so the balance reaches raw["tax_owed"] and the debt-aware ranking.
@@ -101,6 +117,24 @@ LAYERS: tuple[Layer, ...] = (
     # ADVERTISEMENT PDF. This layer is the live unpaid-bill file behind it and
     # carries 675 parcels the PDF does not, plus assessed value and deed refs.
     # real_value>0 is what separates real property from the 6,873 vehicle rows.
+    #
+    # SITUS FIX (2026-09-29, project_buncombe_unpaid_bills_situs_fix): address_line1/
+    # city/state/postal_code is the TAXPAYER'S MAILING address, not the property's --
+    # verified live: e.g. owner RADIFY ASHEVILLE LLC carries address_line1="249 Main
+    # Ave S Ste 107 Pmb 362", city/state "North Bend WA" while the actual parcel sits
+    # at 155 Tunnel Rd, Asheville NC (house_num/street_name/street_type). This is the
+    # exact schema counties.multi_year_delinquent_tax already reads correctly for
+    # this same Buncombe table (see its _buncombe_situs) -- situs comes from
+    # house_num/street_direction/street_name/street_type, and the mailing block is
+    # kept separate (mailing_parts/mail_state below) so absentee/out-of-state signal
+    # isn't lost, just no longer asserted as the property's own address. Previously
+    # this layer wrote the mailing address into street_address/city/zip_, which is
+    # why its rows failed to merge against the same parcel's multi_year_delinquent_tax
+    # row -- dedupe's house-number guard correctly refused to fuse two different
+    # streets. See scripts/resolve_parcel_from_address.py's DENY_SOURCES comment for
+    # the historical characterization of this bug; that entry stays in place because
+    # rows already published under the old (mailing-as-situs) behavior are still on
+    # the board and have not been backfilled.
     Layer(
         slug="buncombe_unpaid_bills",
         state="NC", county="Buncombe",
@@ -109,11 +143,14 @@ LAYERS: tuple[Layer, ...] = (
         listing_type=ListingType.TAX_LIEN,
         where="real_value>0",
         fields=("bill", "pin", "owner1_last_name", "owner1_first_name",
-                "address_line1", "city", "state", "postal_code",
+                "house_num", "street_direction", "street_name", "street_type",
+                "address_line1", "address_line2", "city", "state", "postal_code",
                 "real_value", "total_value", "levy_year", "acres",
                 "deed_book", "deed_page", "total_due", "tax_due"),
         parcel="pin", owner_last="owner1_last_name", owner_first="owner1_first_name",
-        situs="address_line1", city="city", zip_="postal_code",
+        situs_parts=("house_num", "street_direction", "street_name", "street_type"),
+        mailing_parts=("address_line1", "address_line2", "city", "state", "postal_code"),
+        mail_state="state", mailing_source="county_tax_roll",
         value="total_value", detail="bill", process="tax",
         source_page="https://www.buncombecounty.org/governing/depts/tax/",
     ),
@@ -158,6 +195,10 @@ LAYERS: tuple[Layer, ...] = (
     # The 2026 file on the same org was REJECTED: 103,191 real-property rows is
     # the entire current-year unpaid levy, i.e. everyone who has not paid yet,
     # not delinquency. Do not add it.
+    # Same table shape and same mailing-vs-situs bug as buncombe_unpaid_bills above
+    # (verified live 2026-09-29 against this specific 2024 service too, e.g. owner
+    # SKIDMORE DAVID's mailing is "4418 Eastern St, New Orleans LA" while the parcel
+    # sits at "359 Lower Grassy Branch Rd" in Buncombe) -- same fix, same reasoning.
     Layer(
         slug="buncombe_unpaid_bills_2024",
         state="NC", county="Buncombe",
@@ -166,10 +207,13 @@ LAYERS: tuple[Layer, ...] = (
         listing_type=ListingType.TAX_LIEN,
         where="real_value>0",
         fields=("bill", "pin", "owner1_last_name", "owner1_first_name",
-                "address_line1", "city", "postal_code", "real_value",
-                "total_value", "levy_year"),
+                "house_num", "street_direction", "street_name", "street_type",
+                "address_line1", "address_line2", "city", "state", "postal_code",
+                "real_value", "total_value", "levy_year"),
         parcel="pin", owner_last="owner1_last_name", owner_first="owner1_first_name",
-        situs="address_line1", city="city", zip_="postal_code",
+        situs_parts=("house_num", "street_direction", "street_name", "street_type"),
+        mailing_parts=("address_line1", "address_line2", "city", "state", "postal_code"),
+        mail_state="state", mailing_source="county_tax_roll",
         value="total_value", detail="bill", process="tax",
         source_page="https://www.buncombecounty.org/governing/depts/tax/",
     ),
@@ -604,6 +648,21 @@ def _clean(v) -> Optional[str]:
     return s or None
 
 
+#: "No house number assigned" sentinels NC layers write in the house-number slot
+#: of an otherwise real road ("0 TIPTON HILL RD", "99999 MEADOW RD") -- the same
+#: convention web_artifact._PLACEHOLDER_HOUSE_NUM_RE and
+#: enrichment_parcel_from_geo._NC_NO_NUMBER_SENTINELS guard against elsewhere in
+#: this codebase. `situs_parts`' first element is documented as the house-number
+#: column, so it is the only one checked.
+_HOUSE_NUM_SENTINEL_RE = re.compile(r"^(?:0+|9{4,})$")
+
+
+def _norm_addr(s: str | None) -> str:
+    if not s:
+        return ""
+    return " ".join(s.lower().replace(",", " ").split())
+
+
 def _num(v) -> Optional[float]:
     try:
         f = float(str(v).replace(",", "").replace("$", "").strip())
@@ -634,7 +693,12 @@ def _raw_block(a: dict, lay: Layer) -> dict:
 def _to_listing(a: dict, lay: Layer) -> Optional[Listing]:
     situs = _clean(a.get(lay.situs)) if lay.situs else None
     if not situs and lay.situs_parts:
-        bits = [_clean(a.get(p)) for p in lay.situs_parts]
+        bits = []
+        for i, p in enumerate(lay.situs_parts):
+            v = _clean(a.get(p))
+            if i == 0 and v and _HOUSE_NUM_SENTINEL_RE.match(v):
+                v = None                # "0"/"99999" no-address-assigned sentinel
+            bits.append(v)
         situs = " ".join(b for b in bits if b) or None
     parcel = _clean(a.get(lay.parcel)) if lay.parcel else None
     if not (situs or parcel):
@@ -643,6 +707,23 @@ def _to_listing(a: dict, lay: Layer) -> Optional[Listing]:
     detail = _clean(a.get(lay.detail)) if lay.detail else None
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     bits = [b for b in (owner, situs, detail) if b]
+    raw: dict = {"arcgis_distress": _raw_block(a, lay)}
+    if lay.mailing_parts:
+        mail_bits = [_clean(a.get(p)) for p in lay.mailing_parts]
+        mailing = " ".join(b for b in mail_bits if b) or None
+        if mailing:
+            mail_state = _clean(a.get(lay.mail_state)) if lay.mail_state else None
+            mail_state = (mail_state or "").upper()[:2] or None
+            raw["owner_mailing"] = {
+                "owner": owner,
+                "mailing": mailing,
+                "situs": situs,
+                "parcel_id": parcel,
+                "mail_state": mail_state,
+                "absentee": bool(situs and _norm_addr(situs) not in _norm_addr(mailing)),
+                "out_of_state": bool(mail_state and mail_state != lay.state),
+                "source": lay.mailing_source or lay.slug,
+            }
     return Listing(
         source=f"counties_generic.arcgis_distress.{lay.slug}",
         source_url=lay.source_page or lay.url,
@@ -658,7 +739,7 @@ def _to_listing(a: dict, lay: Layer) -> Optional[Listing]:
         foreclosure_process=lay.process,
         description=f"{lay.county} {lay.state} — {' | '.join(bits)}"[:300],
         first_seen=now, last_seen=now,
-        raw={"arcgis_distress": _raw_block(a, lay)},
+        raw=raw,
     )
 
 

@@ -68,7 +68,20 @@ SOURCE_TAG = "parcel_cache_situs_address"
 DENY_SOURCES = frozenset({
     "nc_county_pdf_delinquent_tax",   # 7%: the street is the taxpayer's mailing address
     "nc_ptscloud_delinquent_tax",     # 44%: taxpayer mailing address
-    "buncombe_unpaid_bills",          # 23%: bill mailing address
+    # 23% measured 2026-09-21: bill mailing address. FIXED AT THE SOURCE 2026-09-29
+    # (arcgis_distress_layers.py now builds street_address from house_num/street_name/
+    # street_type instead of address_line1, verified live; mailing kept separately in
+    # raw["owner_mailing"]) -- but the entry stays. This check runs against the LIVE
+    # BOARD, which still carries the ~206+19 rows this source wrote before the fix
+    # (mailing-as-situs), and those have not been backfilled (needs a full
+    # load_board()+dedupe()+write_artifact() normalize pass, tracked separately). Safe
+    # to remove only after that backfill lands.
+    "buncombe_unpaid_bills",
+    # Same table, same pre-fix defect, verified live 2026-09-29 -- missed by the
+    # 2026-09-21 audit above (added 2026-08-05, predates that audit). No measured
+    # percentage for this specific layer, but the schema and the bug are identical, so
+    # it gets the same guard for the same reason and stays until the same backfill.
+    "buncombe_unpaid_bills_2024",
     "hud_reac_inspection",            # 31%: apartment-complex addresses, a building of many parcels
     "landwatch",                      # 50%: land-listing address is approximate
     "landandfarm",                    # 59%: land-listing address is approximate

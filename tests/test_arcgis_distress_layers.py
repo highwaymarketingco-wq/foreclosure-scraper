@@ -116,19 +116,74 @@ def test_row_without_address_or_parcel_is_dropped():
 
 
 def test_buncombe_row_maps_to_a_usable_lead():
+    """Live-verified shape (2026-09-29): address_line1/city/state/postal_code is the
+    TAXPAYER'S MAILING address, e.g. owner ROBINSON LORA's bill is mailed to "28 Dode
+    Whitaker Rd, Fairview NC" while her actual parcel sits at "42 Dode Whitaker Rd" per
+    house_num/street_name/street_type -- same street, different house, a real
+    absentee-adjacent case, not a typo. street_address must come from the situs
+    columns, not address_line1 (that bug is what DENY_SOURCES / board_selfcheck.py
+    document as the buncombe_unpaid_bills vs multi_year_delinquent_tax fusion gap)."""
     lay = next(x for x in M.LAYERS if x.slug == "buncombe_unpaid_bills")
     li = M._to_listing({
         "bill": "0003018081-2025-2025-0000-00", "pin": "9686-54-0826-00000",
         "owner1_last_name": "ROBINSON", "owner1_first_name": "LORA",
-        "address_line1": "28 DODE WHITAKER RD", "city": "ASHEVILLE",
-        "postal_code": "28804", "total_value": 374100.0, "real_value": 374100.0,
+        "house_num": "42", "street_direction": None, "street_name": "DODE WHITAKER RD",
+        "street_type": None,
+        "address_line1": "28 DODE WHITAKER RD", "city": "FAIRVIEW", "state": "NC",
+        "postal_code": "28730", "total_value": 374100.0, "real_value": 374100.0,
     }, lay)
     assert li.owner_name == "ROBINSON, LORA"
     assert li.parcel_id == "9686-54-0826-00000"
-    assert li.street_address == "28 DODE WHITAKER RD"
+    assert li.street_address == "42 DODE WHITAKER RD"
     assert li.tax_value == 374100.0
     assert li.county == "Buncombe" and li.state == "NC"
     assert li.foreclosure_process == "tax"
+    # city/zip_code are left unset -- this layer has no genuine situs city/zip column,
+    # only the mailing one, and asserting the mailing city as the property's own would
+    # be wrong for an absentee/out-of-state owner (see the out-of-state test below).
+    assert li.city is None and li.zip_code is None
+
+
+def test_buncombe_mailing_address_is_kept_separate_not_asserted_as_situs():
+    """The mailing block still reaches the board (useful absentee/out-of-state signal)
+    but under raw['owner_mailing'], never as street_address/city/zip_code. Live-verified
+    2026-09-29: owner RADIFY ASHEVILLE LLC's bill mails to North Bend, WA while the
+    parcel is 155 Tunnel Rd, Asheville NC -- an out-of-state absentee LLC landlord."""
+    lay = next(x for x in M.LAYERS if x.slug == "buncombe_unpaid_bills")
+    li = M._to_listing({
+        "pin": "0000000000000", "owner1_last_name": "RADIFY ASHEVILLE LLC",
+        "house_num": "155", "street_name": "TUNNEL RD",
+        "address_line1": "249 MAIN AVE S STE 107 PMB 362", "city": "NORTH BEND",
+        "state": "WA", "postal_code": "98045", "real_value": 200000.0,
+    }, lay)
+    assert li.street_address == "155 TUNNEL RD"
+    om = li.raw["owner_mailing"]
+    assert om["situs"] == "155 TUNNEL RD"
+    assert om["mailing"] == "249 MAIN AVE S STE 107 PMB 362 NORTH BEND WA 98045"
+    assert om["mail_state"] == "WA"
+    assert om["out_of_state"] is True
+    assert om["absentee"] is True
+    # Tagged like multi_year_delinquent_tax.py tags this same Buncombe table, so
+    # repair_parcel_from_address.py's PARCEL_MAILING_SOURCES recognizes the block.
+    assert om["source"] == "county_tax_roll"
+
+
+def test_buncombe_house_number_sentinel_is_dropped_not_joined_in():
+    """NC layers write '0' or '99999' in the house-number slot to mean 'no address
+    assigned' -- a real sentinel, not a real number (same convention as
+    web_artifact._PLACEHOLDER_HOUSE_NUM_RE / enrichment_parcel_from_geo.
+    _NC_NO_NUMBER_SENTINELS). Live-verified 2026-09-29 (owner GENEVA SUMNER, house_num
+    '0', street NEW COVENANT DR). Joining it in verbatim would produce '0 NEW COVENANT
+    DR', a different (fake) address from the '0'-less situs multi_year_delinquent_tax
+    emits for the same parcel, defeating the whole point of the fix."""
+    lay = next(x for x in M.LAYERS if x.slug == "buncombe_unpaid_bills")
+    li = M._to_listing({
+        "pin": "1111111111111", "owner1_last_name": "SUMNER",
+        "house_num": "0", "street_name": "NEW COVENANT DR",
+        "address_line1": "7776 SUTTER RD", "city": "GREENSBORO", "state": "NC",
+        "postal_code": "27455", "real_value": 50000.0,
+    }, lay)
+    assert li.street_address == "NEW COVENANT DR"
 
 
 def test_buncombe_filter_excludes_personal_property():
