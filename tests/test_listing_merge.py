@@ -179,3 +179,102 @@ def test_deep_merge_dict_none_doesnt_overwrite():
 def test_deep_merge_dict_handles_non_dict_b():
     out = _deep_merge_dict({"x": 1}, "not a dict")  # noqa
     assert out == {"x": 1}
+
+
+# ---- re-gate after merge (a deep-merge union can resurrect a withheld figure) ----
+#
+# _deep_merge_dict can only overwrite or add a key that BOTH sides name; a key one
+# side has already dropped (calc.to_dict()/withhold_equity both drop a gated field's
+# key rather than writing None) is invisible to it. So merging an older, un-gated
+# copy of a lead (max_bid_70/wholesale_mao/equity still published) with a freshly
+# re-graded copy of the SAME lead (ARV now flagged contradicted, those fields
+# correctly absent) used to keep the stale, ungated values -- board_selfcheck.py's
+# "no {field} on a contradicted ARV" invariants (97/43/100 rows on the live board,
+# 2026-09-30) caught exactly this. Listing.merge() now re-runs the same trust gate
+# every other raw['calc']/raw['equity'] producer goes through.
+
+def _contradicted_calc(**extra) -> dict:
+    d = {"arv_expected": 378_000.0,
+         "arv_flags": ["anchor_not_independent", "arv_land_sqft_mismatch"]}
+    d.update(extra)
+    return d
+
+
+def test_merge_strips_stale_max_bid_and_wholesale_mao_on_contradicted_arv():
+    old = _li(street_address="30 Henbit Way", raw={
+        "calc": {"arv_expected": 378_000.0, "arv_flags": [],
+                 "max_bid_70": 70_000.0, "wholesale_mao": 60_000.0,
+                 "deal_status": "PASS"},
+    })
+    new = _li(source="test_b", source_url="https://b.example.com/x",
+               street_address="30 Henbit Way",
+               raw={"calc": _contradicted_calc()})
+    merged = old.merge(new)
+    calc = merged.raw["calc"]
+    assert "max_bid_70" not in calc
+    assert "wholesale_mao" not in calc
+    assert "deal_status" not in calc
+    assert calc["arv_flags"] == ["anchor_not_independent", "arv_land_sqft_mismatch"]
+
+
+def test_merge_strips_stale_equity_on_contradicted_arv():
+    old = _li(street_address="30 Henbit Way", raw={
+        "calc": {"arv_expected": 378_000.0, "arv_flags": []},
+        "equity": {"value": 125_100.0, "pct": 0.998},
+    })
+    new = _li(source="test_b", source_url="https://b.example.com/x",
+               street_address="30 Henbit Way",
+               raw={"calc": _contradicted_calc(),
+                    "equity": {"withheld": True, "withheld_reason": "...",
+                               "arv_trust": "contradicted",
+                               "arv_flags": ["anchor_not_independent",
+                                             "arv_land_sqft_mismatch"]}})
+    merged = old.merge(new)
+    eq = merged.raw["equity"]
+    assert eq.get("value") is None
+    assert eq["withheld"] is True
+    assert eq["arv_trust"] == "contradicted"
+
+
+def test_merge_regate_is_order_independent():
+    """The stale copy can be either side of the merge — self or other."""
+    fresh = _li(street_address="30 Henbit Way", raw={"calc": _contradicted_calc()})
+    stale = _li(source="test_b", source_url="https://b.example.com/x",
+                street_address="30 Henbit Way",
+                raw={"calc": {"arv_expected": 378_000.0, "arv_flags": [],
+                               "max_bid_70": 70_000.0, "wholesale_mao": 60_000.0}})
+    merged = stale.merge(fresh)
+    assert "max_bid_70" not in merged.raw["calc"]
+    assert "wholesale_mao" not in merged.raw["calc"]
+
+
+def test_merge_leaves_clean_merge_untouched():
+    """No false positive: an ordinary (non-contradicted) merge keeps its money."""
+    a = _li(street_address="1 Main St", raw={
+        "calc": {"arv_expected": 200_000.0, "arv_flags": [],
+                 "max_bid_70": 130_000.0, "wholesale_mao": 120_000.0,
+                 "deal_status": "GREAT"},
+        "equity": {"value": 100_000.0, "pct": 0.5},
+        "gis": {"roof": "shingle"},
+    })
+    b = _li(source="test_b", source_url="https://b.example.com/x",
+            street_address="1 Main St",
+            raw={"calc": {"arv_expected": 200_000.0, "arv_flags": [],
+                          "max_bid_70": 130_000.0, "wholesale_mao": 120_000.0,
+                          "deal_status": "GREAT"},
+                 "gis": {"year_built": 1990}})
+    merged = a.merge(b)
+    assert merged.raw["calc"]["max_bid_70"] == 130_000.0
+    assert merged.raw["calc"]["wholesale_mao"] == 120_000.0
+    assert merged.raw["calc"]["deal_status"] == "GREAT"
+    assert merged.raw["equity"]["value"] == 100_000.0
+    assert merged.raw["gis"] == {"roof": "shingle", "year_built": 1990}
+
+
+def test_merge_regate_no_equity_key_is_a_noop():
+    """A lead with no raw['equity'] at all merges cleanly (no KeyError/crash)."""
+    a = _li(street_address="1 Main St", raw={"calc": _contradicted_calc()})
+    b = _li(source="test_b", source_url="https://b.example.com/x",
+            street_address="1 Main St", raw={"calc": _contradicted_calc()})
+    merged = a.merge(b)
+    assert "equity" not in merged.raw or merged.raw["equity"] is None

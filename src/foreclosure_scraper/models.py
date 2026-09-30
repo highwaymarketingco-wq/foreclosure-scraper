@@ -148,6 +148,43 @@ def _deep_merge_dict(a: dict, b: dict) -> dict:
     return out
 
 
+def _regate_merged_valuation(li: "Listing") -> None:
+    """Re-run the ARV trust gate on a just-merged lead's raw['calc'] / raw['equity'].
+
+    Only Listing.merge() calls this, right after `_deep_merge_dict` folds two copies
+    of one property's `raw` dict together -- see the comment at that call site for
+    why a dict-key union can resurrect a derived figure (max_bid_70, wholesale_mao,
+    equity) that one side had already, correctly, withheld.
+
+    The imports are LOCAL (not module-level) on purpose: valuation.grading imports
+    Listing for type hints, and enrichment_equity imports Listing too, so either one
+    importing this module at load time would be circular. Both are safe to import
+    here because this function only runs when merge() is actually CALLED, by which
+    point models.py has already finished defining Listing.
+    """
+    raw = li.raw if isinstance(li.raw, dict) else None
+    if not isinstance(raw, dict):
+        return
+
+    from .valuation.grading import ARV_TRUST_BLOCKS_DERIVED, gate_calc_dict
+
+    calc = raw.get("calc")
+    if isinstance(calc, dict):
+        gate_calc_dict(calc)
+
+    # equity is not a Calc field (enrichment_equity.py runs as its own later pass and
+    # writes raw['equity'] itself), so gate_calc_dict can't reach it -- same reason
+    # grading.py's own "GATED ELSEWHERE" note gives for why the writer-side gate lives
+    # in enrichment_equity, not here. Re-derive trust from the calc block ABOVE (now
+    # itself re-gated, so this reads the merge's real, final arv_flags) and reuse the
+    # one shared withholding function/prose so this can't drift from the normal path.
+    from .enrichment_equity import equity_arv_trust, withhold_equity
+
+    level, flags = equity_arv_trust(li)
+    if level in ARV_TRUST_BLOCKS_DERIVED:
+        withhold_equity(li, level, flags)
+
+
 def _normalize_case(case: str | None) -> str:
     """Strip every non-alphanumeric char, lowercase. So '24 SP 123',
     '24-SP-123', '24SP123', '2024-SP-00123' → '24sp123' / '2024sp00123'.
@@ -407,6 +444,25 @@ class Listing(BaseModel):
 
         # Deep-merge raw (preserves nested subkeys instead of clobbering)
         out.raw = _deep_merge_dict(self.raw, other.raw)
+
+        # Re-apply the ARV trust gate to whatever survived the merge. _deep_merge_dict
+        # unions DICT KEYS: it can overwrite or add a key either side names, but a key
+        # ABSENT from a dict is invisible to it, so it can never delete one. calc.to_dict()
+        # / the equity withheld-marker both drop a gated field's key entirely rather than
+        # writing None -- that is precisely what lets the dashboard/CSV render nothing for
+        # a withheld figure (see grading.apply_arv_trust_gate's docstring). So a merge
+        # between a freshly-gated copy of a lead (arv now flagged contradicted, max_bid_70/
+        # wholesale_mao/equity correctly absent) and an older, un-gated copy of the SAME
+        # lead (last written before the contradiction was detected, or before whatever code
+        # change taught the gate about this flag) resurrects the withheld figure: the old
+        # copy's key is still there, the new copy has no key to overwrite it with, so the
+        # union keeps the stale one. This is exactly the "money computed from another
+        # property's record" bug 48187218 closed for a fresh compute()+grade() pass, minus
+        # the merge path -- dedupe() (three call sites) and merge_duplicate_rows() both
+        # fold duplicate/multi-source copies of one property through this same method, so
+        # fixing it once here reaches all of them, the same "one seam" apply_arv_trust_gate
+        # already relies on for every OTHER producer of raw['calc'].
+        _regate_merged_valuation(out)
 
         # Multi-source attribution — keep EVERY source AND its link so the operator can open each
         # source for one property (e.g. ROD + assessor + law-firm), instead of hunting them down
