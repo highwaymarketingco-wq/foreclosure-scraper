@@ -17,8 +17,34 @@ long run doesn't lose work if interrupted.
 Census batch geocoder: free, no key, 950 addresses/request (Census 1000
 limit, stay under). ~112 batches for the ~105K addressable backlog.
 
+BOARD I/O REWRITE (2026-09-30, same pattern as resolver_backfill_parcel.py's
+2026-09-29 rewrite and run_dew_lien_enrichment.py): this ran exactly once,
+2026-09-15 (commit 81886a89, 58,559 Census-matched + 50,475 county-centroid,
+against a 175,518-row / ~1.04 GB board) via load_board()/write_artifact() --
+correct at the time. It has not run since, and re-running it as originally
+written would now be refused or OOM this 8 GB Mac: the board has grown to
+219,530+ rows, an estimated ~1.3 GB uncompressed source, over
+BOARD_LOAD_MAX_SOURCE_MB's 1,200 MB load_board() ceiling (see
+web_artifact.py; resolver_backfill_parcel.py's own docstring measured an
+11.1 GB physical footprint trying to load a same-sized board). That ceiling,
+not a code bug in the geocoding logic itself, is the entire reason this
+population re-accumulated: every row landed by a new scraper since 9/15
+that never got a coordinate (liensnc, nc_ecourts_lis_pendens,
+nc_ptscloud_delinquent_tax, sc_public_index, and others) has had no safe way
+to reach this script's Census-geocoding logic.
+
+Fix: targets are collected by streaming the published board
+(board_stream.iter_board_rows(), read-only, no lazy-detail sidecar -- this
+enricher needs none of comps/vision/cama) instead of load_board(), and each
+checkpoint lands via web_artifact.patch_existing_rows() (task_0658b33b
+pattern) instead of write_artifact() with the whole board. The Census
+batch-geocoding logic itself (geocode_batch_census, COUNTY_SEATS fallback,
+_clean's embedded-newline guard) is UNCHANGED.
+
     python scripts/resolver_backfill_geocode.py --dry-run
-    python scripts/resolver_backfill_geocode.py
+    python scripts/resolver_backfill_geocode.py --limit 950   # small verified batch
+    BOARD_PATCH_ALLOW_LARGE=1 scripts/with_board_lock.sh resolver_backfill_geocode -- \\
+        .venv/bin/python scripts/resolver_backfill_geocode.py
 """
 from __future__ import annotations
 
@@ -27,6 +53,7 @@ import contextlib
 import csv
 import io
 import re
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -36,7 +63,29 @@ import httpx
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "src"))
 
-from foreclosure_scraper.web_artifact import board_lock, load_board, write_artifact  # noqa: E402
+from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
+from foreclosure_scraper.models import Listing  # noqa: E402
+from foreclosure_scraper.web_artifact import board_lock, patch_existing_rows  # noqa: E402
+
+#: Same identity fields web_artifact._APPEND_SIG_FIELDS keys patches on --
+#: kept as a local literal rather than importing a private symbol (same
+#: choice run_dew_lien_enrichment.py and resolver_backfill_parcel.py made).
+_SIG_FIELDS = ("state", "county", "parcel_id", "street_address", "zip_code",
+              "case_number", "source_url", "listing_type")
+
+CHECKPOINT_EVERY = 10  # batches (~9,500 addresses) between board writes
+
+
+def _engine_running() -> bool:
+    r = subprocess.run(
+        ["pgrep", "-f", "--",
+         r"run_local\.sh|-m foreclosure_scraper|merge_today_sources|resolver_backfill|load_board"],
+        capture_output=True, text=True)
+    return bool(r.stdout.strip())
+
+
+def _light_listing(rec: dict) -> Listing:
+    return Listing.model_construct(**{k: rec.get(k) for k in _LIGHT_FIELDS})
 
 CENSUS_BATCH_URL = "https://geocoding.geo.census.gov/geocoder/geographies/addressbatch"
 BATCH_SIZE = 950
@@ -146,21 +195,59 @@ def centroid_fallback(li) -> tuple[float, float] | None:
     return COUNTY_SEATS.get(key)
 
 
+_LIGHT_FIELDS = tuple(set(_SIG_FIELDS) | {"city"})
+
+
+def _collect_targets(docs: Path) -> tuple[list[tuple[str, object]], list[tuple[str, object]]]:
+    """Board rows missing lat/lon, split into (key, Listing) pairs for the geocodable set
+    (has a street address) and the centroid-only set (no address at all) -- WITHOUT
+    load_board()'s full-board materialization (refused/OOM risk on this board's real size; see
+    BOARD_LOAD_MAX_SOURCE_MB in web_artifact.py). Streams the published board read-only
+    (board_stream.iter_board_rows()) and only ever builds a lightweight, unvalidated Listing
+    (Listing.model_construct(), same trick resolver_backfill_parcel.py/run_dew_lien_enrichment.py
+    use) for the rows that actually lack a coordinate -- the same pattern as those two scripts'
+    2026-09-29 rewrites. `key` is each row's PRE-mutation dedupe_key(), captured before
+    latitude/longitude are ever set, so the eventual patch lands on the exact row it was read
+    from.
+    """
+    with_addr: list[tuple[str, object]] = []
+    without_addr: list[tuple[str, object]] = []
+    for rec in iter_board_rows(docs / "listings.json.gz"):
+        lat, lon = rec.get("latitude"), rec.get("longitude")
+        if lat and lon:
+            continue
+        li = _light_listing(rec)
+        # city isn't in _SIG_FIELDS but build_address_string()/centroid_fallback() need it --
+        # _light_listing() already pulled every _LIGHT_FIELDS key via model_construct below.
+        try:
+            key = li.dedupe_key()
+        except Exception:  # noqa: BLE001 - a row too malformed to key is simply skipped
+            continue
+        if build_address_string(li):
+            with_addr.append((key, li))
+        else:
+            without_addr.append((key, li))
+    return with_addr, without_addr
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=None, help="Cap total addresses processed (testing)")
+    ap.add_argument("--skip-centroid-only", action="store_true",
+                     help="Skip the no-address centroid-only pass (testing the Census tier alone)")
     args = ap.parse_args()
 
+    if _engine_running():
+        print("engine/backfill/another loader is running -- refusing to touch the board",
+              file=sys.stderr)
+        return 1
+
+    docs = REPO / "docs"
     lock = contextlib.nullcontext() if args.dry_run else board_lock(REPO, owner="resolver_backfill_geocode")
     with lock:
-        rows = load_board(REPO / "docs")
-        print(f"board rows: {len(rows):,}")
-
-        no_geo = [li for li in rows if not li.latitude or not li.longitude]
-        with_addr = [li for li in no_geo if build_address_string(li)]
-        without_addr = [li for li in no_geo if not build_address_string(li)]
-        print(f"missing lat/lon: {len(no_geo):,} "
+        with_addr, without_addr = _collect_targets(docs)
+        print(f"missing lat/lon: {len(with_addr) + len(without_addr):,} "
               f"({len(with_addr):,} geocodable, {len(without_addr):,} centroid-only)")
 
         if args.limit:
@@ -168,66 +255,68 @@ def main() -> int:
             print(f"--limit applied: processing {len(with_addr):,} addresses")
 
         geocoded = centroided = failed = 0
+        pending_patches: dict[str, dict] = {}
         batches = [with_addr[i:i + BATCH_SIZE] for i in range(0, len(with_addr), BATCH_SIZE)]
         for bi, batch in enumerate(batches, 1):
-            pairs = [(li, build_address_string(li)) for li in batch]
-            addresses = [addr for _, addr in pairs]
+            triples = [(key, li, build_address_string(li)) for key, li in batch]
+            addresses = [addr for _, _, addr in triples]
             print(f"batch {bi}/{len(batches)}: {len(addresses)} addresses...", flush=True)
             results = geocode_batch_census(addresses)
             print(f"  matched: {len(results)}/{len(addresses)}", flush=True)
 
-            for li, addr in pairs:
+            for key, li, addr in triples:
                 if addr in results:
                     lat, lon = results[addr]
-                    li.latitude, li.longitude = lat, lon
-                    if not isinstance(li.raw, dict):
-                        li.raw = {}
-                    li.raw["geo_imprecise"] = "census_geocode"
+                    pending_patches[key] = {"latitude": lat, "longitude": lon,
+                                            "raw": {"geo_imprecise": "census_geocode"}}
                     geocoded += 1
                 else:
                     c = centroid_fallback(li)
                     if c:
-                        li.latitude, li.longitude = c
-                        if not isinstance(li.raw, dict):
-                            li.raw = {}
-                        li.raw["geo_imprecise"] = "county_centroid"
+                        pending_patches[key] = {"latitude": c[0], "longitude": c[1],
+                                                "raw": {"geo_imprecise": "county_centroid"}}
                         centroided += 1
                     else:
                         failed += 1
 
-            if bi % CHECKPOINT_EVERY == 0 and not args.dry_run:
-                write_artifact(rows, {"resolver_backfill_geocode_checkpoint": geocoded + centroided},
-                               docs_dir=REPO / "docs")
-                print(f"  [checkpoint] wrote board at batch {bi}/{len(batches)} "
+            if bi % CHECKPOINT_EVERY == 0 and not args.dry_run and pending_patches:
+                stats = patch_existing_rows(
+                    pending_patches, {"resolver_backfill_geocode_checkpoint": geocoded + centroided},
+                    docs_dir=docs)
+                print(f"  [checkpoint] patched {stats['applied']}/{len(pending_patches)} rows "
+                      f"at batch {bi}/{len(batches)} "
                       f"({geocoded} geocoded, {centroided} centroided so far)", flush=True)
+                pending_patches = {}
 
             if bi < len(batches):
                 time.sleep(2)
 
-        for li in without_addr:
-            c = centroid_fallback(li)
-            if c:
-                li.latitude, li.longitude = c
-                if not isinstance(li.raw, dict):
-                    li.raw = {}
-                li.raw["geo_imprecise"] = "county_centroid_no_addr"
-                centroided += 1
-            else:
-                failed += 1
+        if not args.skip_centroid_only:
+            for key, li in without_addr:
+                c = centroid_fallback(li)
+                if c:
+                    pending_patches[key] = {"latitude": c[0], "longitude": c[1],
+                                            "raw": {"geo_imprecise": "county_centroid_no_addr"}}
+                    centroided += 1
+                else:
+                    failed += 1
 
         print(f"\n=== RESULTS ===")
         print(f"census geocoded: {geocoded:,}")
         print(f"centroid fallback: {centroided:,}")
         print(f"failed (no data): {failed:,}")
-        still_missing = sum(1 for li in rows if not li.latitude or not li.longitude)
-        print(f"still missing lat/lon board-wide: {still_missing:,}")
 
         if args.dry_run:
             print("\nDRY RUN — nothing written.")
             return 0
 
-        write_artifact(rows, {"resolver_backfill_geocode": geocoded + centroided}, docs_dir=REPO / "docs")
-        print(f"\nwrote board: {len(rows):,} rows")
+        if pending_patches:
+            stats = patch_existing_rows(pending_patches, {"resolver_backfill_geocode": geocoded + centroided},
+                                        docs_dir=docs)
+            print(f"\npatched {stats['applied']}/{len(pending_patches)} rows "
+                  f"(existing board: {stats['existing']:,})")
+        else:
+            print("\nnothing to patch this run")
         return 0
 
 
