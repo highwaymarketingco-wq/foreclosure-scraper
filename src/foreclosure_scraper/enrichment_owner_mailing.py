@@ -151,23 +151,45 @@ COUNTY_GIS: dict[str, dict] = {
         "owner": ["current_owner"], "mail": ["owner_street", "owner_citystate", "owner_zip"],
         "situs": [], "parcel": "pin", "order_by": "pin",
         "out_fields": "pin,current_owner,owner_street,owner_citystate,owner_zip,deed_book,deed_page,proval_acres"},
-    # 2026-08-03 NEW. Anderson had no COUNTY_GIS entry at all: it fell through to
-    # the statewide SCDOT layer, which is now token-walled, leaving the local bulk
-    # roll (sc_parcel_mailing) as the ONLY path — and that path is dark on any host
+    # 2026-08-03 NEW, 2026-09-30 SCHEMA-DRIFT FIX (this session). Anderson had no
+    # COUNTY_GIS entry at all until 2026-08-03: it fell through to the statewide
+    # SCDOT layer, which is now token-walled, leaving the local bulk roll
+    # (sc_parcel_mailing) as the ONLY path — and that path is dark on any host
     # whose SQLite cache is missing or stale. This is the live spine behind it.
     # The service lives on the CITY of Anderson server under a folder named
-    # "WaterUtilities", but the layer is LocalGovernment.DBO.Parcels_County and is
-    # verified parcel/assessment data, NOT utility customers: TMS, OWNER (owner of
-    # record), OWNER_ADDR (taxpayer mailing), PHYS_ADDR (situs), MRKT_VALUE,
-    # SALE_PRICE/SALE_YEAR, PREV_OWNER, DBOOK/DPAGE. There is no phone, e-mail,
-    # account, meter or customer column on it. 114,516 rows; OWNER + OWNER_ADDR on
-    # 113,699; PHYS_ADDR on 100,985; MRKT_VALUE>0 on 112,641.
-    # CITY is "CITY  STATE" ("ANDERSON  SC"), same as SCDOT, so mail_state is
-    # recovered from the mailing tail rather than a discrete column.
+    # "WaterUtilities", but the layer is LocalGovernment.DBO.Parcels_County —
+    # verified parcel/assessment data, NOT utility customers.
+    #   2026-09-30: re-verified live (independent GET against
+    # .../FeatureServer/0?f=json, plus a live /query) and found the 2026-08-03
+    # field list above no longer matches: OWNER, OWNER_ADDR, CITY, ZIPCODE and
+    # PREV_OWNER DO NOT EXIST on the schema today (drifted since then). The live
+    # field list is: TMS, TAX_DIST, DBOOK, DPAGE, PARENT, DIMENSIONS, PHYS_ADDR,
+    # SALE_PRICE, MRKT_VALUE, SALE_YEAR, JOINFLD, DESCRIPTIO, TAXOWNSTR, CPLAT,
+    # RATIO, ACPASS_LOOKUP. TAXOWNSTR is the only owner-shaped column left and is
+    # confirmed always-null live (same masking enrichment_arcgis.py's
+    # SC_GIS["Anderson"] pinned independently today, commit 55f6d2a1) — it is
+    # deliberately NOT wired as `owner` here, same reasoning as there: it would
+    # only ever resolve to empty, and risks false-matching a real owner column
+    # on some other county later if added to a shared alias list. PHYS_ADDR
+    # (situs) and MRKT_VALUE/SALE_PRICE/SALE_YEAR/DBOOK/DPAGE ARE live and
+    # non-null (confirmed live 2026-09-30: TMS 2140004023 → PHYS_ADDR
+    # "413 WYATT RD", MRKT_VALUE 364280, TAXOWNSTR null).
+    #   Because ArcGIS silently DROPS an unknown outFields name instead of
+    # erroring (still HTTP 200; the field is just absent from the response),
+    # querying the old OWNER/OWNER_ADDR/CITY/ZIPCODE fields never surfaced as a
+    # visible failure — `owner`/`mailing` below just came back "", which used
+    # to trip _build_result's "no owner and no mailing -> discard" gate and
+    # silently threw away every real situs+value hit this spec found. Anderson
+    # is now wired situs+value-only (owner/mail left empty on purpose), matching
+    # SC_GIS["Anderson"]'s shape, and _build_result's gate now also accepts a
+    # situs-only or value-only match so this county's real data flows again.
+    # Real Anderson owner names still come only from the offline
+    # sc_parcel_mailing bulk roll (see _from_bulk_roll above), unaffected by
+    # this change — that roll is tried before this live spec on every lookup.
     "SC:Anderson": {"url": "https://gis.cityofandersonsc.com/arcgis/rest/services/WaterUtilities/County_Parcels/FeatureServer/0",
-        "owner": ["OWNER"], "mail": ["OWNER_ADDR", "CITY", "ZIPCODE"],
+        "owner": [], "mail": [],
         "situs": ["PHYS_ADDR"], "parcel": "TMS",
-        "out_fields": "TMS,OWNER,OWNER_ADDR,CITY,ZIPCODE,PHYS_ADDR,MRKT_VALUE,SALE_PRICE,SALE_YEAR,PREV_OWNER,DBOOK,DPAGE"},
+        "out_fields": "TMS,PHYS_ADDR,MRKT_VALUE,SALE_PRICE,SALE_YEAR,DBOOK,DPAGE"},
     "SC:Laurens": {"url": "https://laurenscountygis.org/arcgis/rest/services/Pebble/TaxParcel/MapServer/5",
         "owner": ["Owner"], "mail": ["Mailing_Address", "Mailing_City_State_ZIP"],
         "situs": ["Property_Address"], "parcel": "TMS"},
@@ -713,7 +735,26 @@ def _build_result(li: Listing, spec: dict, attrs: dict) -> Optional[dict]:
         m = re.search(r"\b([A-Z]{2})\b(?:\s+\d{5}(?:-\d{4})?)?\s*$", mailing.upper())
         if m:
             mail_state = m.group(1)
-    if not owner and not mailing:
+    value = _extract_value(attrs)
+    # Discard only when the matched row carries NOTHING usable. This attrs dict
+    # only exists because _match_attrs already found a genuine parcel (by
+    # parcel-id LIKE, or a house-number-verified situs match) — so a real situs
+    # or a real appraised value on it is useful evidence on its own, not just
+    # owner/mailing. This used to be "if not owner and not mailing: return
+    # None", which silently threw away every situs+value hit for a county
+    # whose owner/mail fields come back empty — whether that's a genuine
+    # server-side redaction (SC:Anderson's TAXOWNSTR is always null) or a
+    # schema drift that makes the configured field names stop existing (which
+    # is exactly what had been happening to SC:Anderson's OWNER/OWNER_ADDR/
+    # CITY/ZIPCODE since 2026-08-03: ArcGIS drops an unknown outFields name
+    # silently, HTTP 200, instead of erroring). Widened for every county, not
+    # just Anderson: for every OTHER spec, a matched row with no owner, no
+    # mailing, no situs and no value was already returning None here (the
+    # widened clauses are only ever False for them when the old single clause
+    # was also False), so this is not a behavior change for a county whose
+    # owner-or-mailing gate is doing real work — it only rescues the case this
+    # gate used to blanket-discard.
+    if not owner and not mailing and not situs and not value:
         return None
     # absentee = owner mails from somewhere other than the property; out_of_state
     # = mails from a different state. Prefer the GIS situs; fall back to the
@@ -724,7 +765,7 @@ def _build_result(li: Listing, spec: dict, attrs: dict) -> Optional[dict]:
             "absentee": _is_absentee(prop_addr, mailing),
             "out_of_state": bool(mail_state and li.state and mail_state != li.state),
             "source": spec.get("source_label", "county_gis"),
-            "_specs": _extract_specs(attrs), "_value": _extract_value(attrs),
+            "_specs": _extract_specs(attrs), "_value": value,
             "_distress": _extract_distress(attrs)}
 
 

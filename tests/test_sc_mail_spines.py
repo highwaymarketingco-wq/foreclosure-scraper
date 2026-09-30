@@ -13,6 +13,17 @@ Also pins the two shared-matcher fixes these counties exposed:
     situs ('SPRINGSIDE  300 SPRINGSIDE CIR', '535  PORTER RD') always failed —
     flagging owner-occupants as absentee, worth +8 distress and a HOT gate.
 
+2026-09-30: Anderson's fixture (sc_anderson_county_parcels.json) was rebuilt
+from a fresh live query after finding the spec's OWNER/OWNER_ADDR/CITY/ZIPCODE/
+PREV_OWNER field names had drifted off the schema (confirmed independently
+live, cross-referenced against enrichment_arcgis.py's SC_GIS["Anderson"] from
+commit 55f6d2a1). Anderson is now wired situs+value-only in COUNTY_GIS (no
+`owner`/`mail` fields at all — TAXOWNSTR is the only owner-shaped column and is
+confirmed always-null), and the old owner/mailing-focused Anderson tests below
+are replaced with tests pinning: (a) the situs+value-only shape, and (b) that
+_build_result's gate no longer discards a matched row just because owner and
+mailing are both empty.
+
 PRIVACY: all three specs enumerate outFields; none uses `*`, and none of these
 layers carries a phone / e-mail / account / SSN / DOB column.
 """
@@ -88,10 +99,16 @@ def test_oconee_points_at_the_assessor_table_not_the_owner_less_parcel_layer():
 
 def test_anderson_spine_is_wired_and_is_a_parcel_layer_not_a_utility_table():
     assert "County_Parcels/FeatureServer/0" in ANDERSON["url"]
-    assert ANDERSON["owner"] == ["OWNER"]
-    assert ANDERSON["mail"] == ["OWNER_ADDR", "CITY", "ZIPCODE"]
+    # situs+value ONLY (2026-09-30): OWNER/OWNER_ADDR/CITY/ZIPCODE no longer
+    # exist on the live schema -- TAXOWNSTR is the only owner-shaped column
+    # left and is confirmed always-null, so it is deliberately not wired here
+    # (same call enrichment_arcgis.py's SC_GIS["Anderson"] made).
+    assert ANDERSON["owner"] == []
+    assert ANDERSON["mail"] == []
     assert ANDERSON["situs"] == ["PHYS_ADDR"]
     assert ANDERSON["parcel"] == "TMS"
+    assert "OWNER" not in ANDERSON["out_fields"]  # would silently no-op if requested
+    assert "MRKT_VALUE" in ANDERSON["out_fields"]
 
 
 # ------------------------------------------------------------ result building
@@ -116,27 +133,62 @@ def test_pickens_zip_plus_four_is_not_mailed_as_a_nine_digit_run_on():
     assert res2["mailing"].endswith("29657-9243")                 # ZIP was 296579243
 
 
-def test_anderson_row_yields_mailing_situs_market_value_and_prior_owner():
+def test_anderson_row_yields_situs_and_market_value_with_no_owner_or_mailing():
+    # 2026-09-30: live-verified — OWNER/OWNER_ADDR/CITY/ZIPCODE/PREV_OWNER no
+    # longer exist on this layer's schema, so owner/mailing are genuinely
+    # unavailable here (not a bug in this test's fixture). The row must still
+    # resolve — this is the core fix: before it, the empty owner+mailing
+    # tripped the gate and the whole row (including situs and value) was
+    # silently discarded.
     li = Lead(county="Anderson", state="SC", street_address="300 Springside Cir")
     res = _build_result(li, ANDERSON, _rows("sc_anderson_county_parcels.json")[0])
-    assert res["owner"] == "CLEM MELISSA L + PAUL J"
-    assert res["mailing"] == "300 SPRINGSIDE CIR ANDERSON SC 29625"
-    assert res["mail_state"] == "SC"          # CITY is 'ANDERSON  SC', no state column
+    assert res is not None, "situs+value match must not be discarded for missing owner/mailing"
+    assert res["owner"] is None
+    assert res["mailing"] is None
+    assert res["situs"].startswith("SPRINGSIDE")
+    assert "300 SPRINGSIDE CIR" in res["situs"]
     assert res["parcel_id"] == "692401005"
     assert res["_value"] == 225270.0          # MRKT_VALUE feeds the proxy-ARV
-    assert res["_distress"]["previous_owner"].startswith("MARTIN MELISSA L")
+    assert "previous_owner" not in res["_distress"]  # PREV_OWNER no longer queried
+    assert res["absentee"] is False           # no mailing to compare -> never flagged
+    assert res["out_of_state"] is False
 
 
-def test_anderson_zip_plus_four_is_hyphenated():
-    res = _build_result(Lead(county="Anderson", state="SC"), ANDERSON,
-                        _rows("sc_anderson_county_parcels.json")[1])
-    assert res["mailing"].endswith("29625-5449")   # ZIPCODE was '296255449'
+def test_anderson_value_only_match_also_survives_the_gate():
+    # A synthetic row with a real value but a blank/garbage situs string (e.g. a
+    # layer quirk, or a lead with no street_address to match on so only the
+    # parcel-id path ran) must still count as a match -- value alone is
+    # sufficient evidence, mirroring the situs-alone case above.
+    attrs = {"TMS": "692401099", "PHYS_ADDR": "   ", "MRKT_VALUE": 198000,
+             "SALE_PRICE": 150000, "SALE_YEAR": 2021, "DBOOK": "1", "DPAGE": "2",
+             "TAXOWNSTR": None}
+    res = _build_result(Lead(county="Anderson", state="SC"), ANDERSON, attrs)
+    assert res is not None
+    assert res["owner"] is None
+    assert res["mailing"] is None
+    assert not res["situs"]                   # blank/whitespace-only situs
+    assert res["_value"] == 198000.0
+
+
+def test_anderson_row_with_nothing_usable_is_still_discarded():
+    # The gate widening must not turn into "always accept a match": a row with
+    # no owner, no mailing, no situs and no extractable value is genuinely
+    # useless and should still be dropped.
+    attrs = {"TMS": "692401099", "PHYS_ADDR": "", "MRKT_VALUE": None}
+    assert _build_result(Lead(county="Anderson", state="SC"), ANDERSON, attrs) is None
 
 
 # ------------------------------------------------------------------- absentee
 
-def test_subdivision_prefixed_situs_does_not_fake_an_absentee_owner():
-    # Anderson PHYS_ADDR carries the subdivision name ahead of the house number.
+def test_anderson_absentee_is_never_flagged_now_that_it_has_no_mailing_field():
+    # Anderson's subdivision-prefixed situs ('SPRINGSIDE  300 SPRINGSIDE CIR')
+    # used to be compared against a real OWNER_ADDR/CITY/ZIPCODE mailing string
+    # (the token-subset regression this file originally pinned); that mailing
+    # path no longer exists on the live schema, so absentee is trivially False
+    # here (no mailing to compare against at all). The subdivision-prefix
+    # token-subset logic itself is still pinned directly below
+    # (test_absentee_subset_rule_needs_a_house_number_and_a_street_word) and by
+    # Pickens' padded-situs case, so the original regression stays covered.
     res = _build_result(Lead(county="Anderson", state="SC"), ANDERSON,
                         _rows("sc_anderson_county_parcels.json")[0])
     assert res["situs"].startswith("SPRINGSIDE")
