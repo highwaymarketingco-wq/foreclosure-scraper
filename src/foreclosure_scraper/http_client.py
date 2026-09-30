@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import os
 import random
+import signal
 import time
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
@@ -40,6 +41,46 @@ from tenacity import (
 )
 
 log = structlog.get_logger()
+
+
+def install_hard_sigint_kill(reason: str = "") -> None:
+    """Make Ctrl-C / SIGINT always stop THIS process within a beat, even if it is
+    wedged inside a hung network call.
+
+    Diagnosed 2026-09-30 on ``scripts/resolver_backfill_parcel.py``: a chunk
+    stalled with a TCP connection to an ArcGIS host sitting ESTABLISHED,
+    unchanged, for 4.5+ minutes (see ``enrichment_parcel_from_geo._arc_query``'s
+    ``asyncio.wait_for`` hardening for the matching network-side fix — httpx's
+    per-operation ``read`` timeout resets on every chunk received, so a peer
+    that trickles bytes slowly enough never trips it even though the request
+    never finishes). SIGINT sent to that run did **not** produce a clean
+    ``KeyboardInterrupt``-based shutdown even after 18s; SIGTERM was needed.
+
+    Root cause of the SIGINT gap: Python's default SIGINT handler only raises
+    ``KeyboardInterrupt`` at the next bytecode boundary the interpreter reaches,
+    and unwinding it cleanly out of ``asyncio.run()`` requires cancelling and
+    then AWAITING every in-flight task — including the one stuck on that same
+    hung socket, whose cancellation depends on cooperation from code that, by
+    definition, was not cooperating. SIGTERM worked only because SIGTERM's
+    default disposition terminates the process at the OS level without any of
+    that — it does not need the interpreter's cooperation at all.
+
+    This installs a SIGINT handler that gets the same unconditional effect:
+    skip all Python/asyncio-level cleanup and exit at the OS level immediately
+    (``os._exit`` — no atexit hooks, no exception unwinding, nothing that can
+    itself get stuck). This is safe for a process that holds
+    ``web_artifact.board_lock()``: that lock already treats an abruptly-killed
+    holder as stale via its heartbeat + max_runtime check, the same recovery
+    path a SIGKILL or a laptop losing power already goes through. The only
+    thing lost is whatever progress this run had not yet checkpointed.
+    """
+    def _on_sigint(signum, frame):  # noqa: ARG001 - signal handler signature
+        print(f"\nSIGINT — stopping now{f' ({reason})' if reason else ''}; "
+              "any unwritten checkpoint is not saved.", flush=True)
+        os._exit(130)  # 128 + SIGINT, the conventional shell exit code
+
+    signal.signal(signal.SIGINT, _on_sigint)
+
 
 # A small pool of REAL current desktop browser UAs. One is chosen per process
 # (so a run looks like a single consistent browser) and varies run-to-run, so a

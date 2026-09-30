@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from typing import Any, Optional
 
 import httpx
@@ -170,20 +171,56 @@ class _ArcHardError(Exception):
     counting toward the host breaker (see _arc_query)."""
 
 
-async def _arc_query(c, layer_query_url: str, params: dict) -> Optional[list]:
+# Hard wall-clock ceiling for a SINGLE ArcGIS query attempt, enforced by
+# asyncio.wait_for() below regardless of what httpx's own timeout thinks is
+# happening. Env-tunable so a test can shrink it instead of waiting out the
+# real 25s default.
+#
+# Diagnosed 2026-09-30 (a resolver_backfill_parcel.py run against real data):
+# chunk 2 stalled with a TCP connection to an ArcGIS host sitting ESTABLISHED,
+# unchanged, for 4.5+ minutes — 2-10x past this module's own documented
+# worst case (25s timeout x 3 tenacity retries = 80-160s). Root cause: httpx's
+# `timeout=` (and the client's httpx.Timeout(read=..., connect=..., pool=...)
+# in http_client.client()) bounds each individual connect/write/read
+# *operation*, not the total request. httpcore issues a FRESH
+# `read(timeout=...)` call for every chunk of a response it parses
+# (httpcore/_async/http11.py's `_receive_event`, called in a loop by
+# `_receive_response_body`) — so a peer that trickles data (or answers just
+# often enough to keep resetting that per-chunk clock) without ever
+# completing the response defeats the configured timeout entirely: no
+# exception is ever raised, no matter how long it runs. The prior code also
+# passed a redundant `timeout=25.0` on this specific call, which silently
+# widened the client's tuned connect=8s/pool=8s hardening (see
+# http_client.client()'s HTTP_CONNECT_TIMEOUT/HTTP_POOL_TIMEOUT) back up to
+# 25s on every ArcGIS request — removed below so that hardening applies here
+# too.
+_ARC_HARD_TIMEOUT_S = float(os.environ.get("ARC_QUERY_HARD_TIMEOUT_S", "25.0"))
+
+
+async def _arc_query(
+    c, layer_query_url: str, params: dict, *, hard_timeout: float = _ARC_HARD_TIMEOUT_S
+) -> Optional[list]:
     """GET an ArcGIS /query and return its feature list (None on any failure).
     ArcGIS reports failure as HTTP 200 + an `error` key, so status alone is not
     enough — a token-required response looks exactly like an empty result set.
 
     Retries up to 3 times (short exponential-jitter backoff) on a transport
-    error or a non-200 status before counting it toward the host breaker.
-    Diagnosed 2026-09-28: NC OneMap tripped its 8-consecutive-failures breaker
-    mid-run despite answering ~1,766 leads cleanly just before (55% hit rate)
-    and probing healthy again minutes later — the signature of a short-lived
-    blip, not a dead host, and this call had zero retry cushioning unlike
-    get_text() elsewhere in this codebase. A genuine token/auth wall (SCDOT-
-    class) still trips the host on its FIRST occurrence, unaffected by this
-    retry (that branch never raises, so AsyncRetrying never sees it)."""
+    error, a non-200 status, or a `hard_timeout` trip before counting it
+    toward the host breaker. Diagnosed 2026-09-28: NC OneMap tripped its
+    8-consecutive-failures breaker mid-run despite answering ~1,766 leads
+    cleanly just before (55% hit rate) and probing healthy again minutes
+    later — the signature of a short-lived blip, not a dead host, and this
+    call had zero retry cushioning unlike get_text() elsewhere in this
+    codebase. A genuine token/auth wall (SCDOT-class) still trips the host on
+    its FIRST occurrence, unaffected by this retry (that branch never raises,
+    so AsyncRetrying never sees it).
+
+    Every attempt is wrapped in `asyncio.wait_for(..., hard_timeout)` — a
+    backstop that doesn't care what httpx's own timeout thinks is happening
+    (see the module-level comment on `_ARC_HARD_TIMEOUT_S` for why that
+    matters). `hard_timeout` is a parameter, not just the module constant, so
+    a test can exercise a real hung endpoint without waiting out the real
+    default."""
     # Generic per-host breaker: skip a host that's already been tripped (token
     # wall or repeated timeouts) instead of re-hitting it for every lead.
     if host_walled(layer_query_url):
@@ -192,11 +229,19 @@ async def _arc_query(c, layer_query_url: str, params: dict) -> Optional[list]:
         async for attempt in AsyncRetrying(
             stop=stop_after_attempt(3),
             wait=wait_exponential_jitter(initial=1, max=8),
-            retry=retry_if_exception_type((httpx.TransportError, httpx.TimeoutException, _ArcHardError)),
+            retry=retry_if_exception_type(
+                (httpx.TransportError, httpx.TimeoutException, TimeoutError, _ArcHardError)
+            ),
             reraise=True,
         ):
             with attempt:
-                r = await c.get(layer_query_url, params=params, timeout=25.0)
+                # No per-call `timeout=` on c.get(): let the client's own
+                # httpx.Timeout (connect/pool/read/write all set — see
+                # http_client.client()) apply, and let asyncio.wait_for be the
+                # ONE hard ceiling on total attempt duration.
+                r = await asyncio.wait_for(
+                    c.get(layer_query_url, params=params), timeout=hard_timeout
+                )
                 if r.status_code != 200:
                     raise _ArcHardError(f"HTTP {r.status_code}")
                 data = r.json()
@@ -210,7 +255,7 @@ async def _arc_query(c, layer_query_url: str, params: dict) -> Optional[list]:
                     return None
                 note_host_ok(layer_query_url)
                 return data.get("features") or []
-    except (_ArcHardError, httpx.TransportError, httpx.TimeoutException):
+    except (_ArcHardError, httpx.TransportError, httpx.TimeoutException, TimeoutError):
         note_host_hard_failure(layer_query_url)
         return None
     except Exception:  # noqa: BLE001  (anything else — still a HARD failure)

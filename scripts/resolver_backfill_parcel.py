@@ -60,6 +60,7 @@ sys.path.insert(0, str(REPO / "src"))
 
 from foreclosure_scraper.board_stream import iter_board_rows  # noqa: E402
 from foreclosure_scraper.enrichment_parcel_from_geo import _in_box, enrich_parcel_from_geo  # noqa: E402
+from foreclosure_scraper.http_client import install_hard_sigint_kill  # noqa: E402
 from foreclosure_scraper.models import Listing  # noqa: E402
 from foreclosure_scraper.web_artifact import board_lock, patch_existing_rows  # noqa: E402
 
@@ -93,6 +94,13 @@ def _collect_targets(docs: Path) -> list[Listing]:
 
 
 def main() -> int:
+    # Diagnosed 2026-09-30: a real run wedged on a hung ArcGIS connection (see
+    # enrichment_parcel_from_geo._ARC_HARD_TIMEOUT_S for the network-side fix),
+    # and Ctrl-C did not stop it cleanly even after 18s -- only SIGTERM did.
+    # This guarantees the process is always killable within a beat regardless
+    # of what's wedged inside asyncio/httpx.
+    install_hard_sigint_kill(reason="resolver_backfill_parcel")
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--limit", type=int, default=None, help="Cap total targets processed (testing)")

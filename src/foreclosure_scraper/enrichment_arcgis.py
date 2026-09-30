@@ -681,13 +681,22 @@ async def _detect_addr_field(c: httpx.AsyncClient, base_url: str) -> str | None:
     else:
         layer_url = base_url.rsplit("/query", 1)[0]
         try:
-            r = await c.get(layer_url, params={"f": "json"}, timeout=15.0)
+            # asyncio.wait_for is a hard wall-clock backstop on top of httpx's own
+            # timeout=: httpx/httpcore's timeout only bounds each individual
+            # connect/read/write operation, not the total request, so a peer that
+            # trickles data slowly enough (without ever finishing) can hang past
+            # it indefinitely — see enrichment_parcel_from_geo._arc_query's
+            # _ARC_HARD_TIMEOUT_S comment for the live incident this guards
+            # against (an ArcGIS connection stuck ESTABLISHED for 4.5+ minutes).
+            r = await asyncio.wait_for(
+                c.get(layer_url, params={"f": "json"}, timeout=15.0), timeout=15.0
+            )
             if r.status_code != 200:
                 return None
             data = r.json()
             fields = [f["name"] for f in data.get("fields", []) if "name" in f]
             _FIELD_CACHE[base_url] = fields
-        except (httpx.HTTPError, ValueError):
+        except (httpx.HTTPError, ValueError, TimeoutError):
             return None
     # Match against known candidates (case-insensitive). A candidate that is an
     # owner-mailing field on THIS layer is skipped so situs always wins.
@@ -760,7 +769,12 @@ async def _arcgis_query(
             "f": "json",
         }
         try:
-            r = await c.get(base_url, params=params, timeout=20.0)
+            # See _detect_addr_field's comment above: httpx's timeout= alone does
+            # not bound the total request, only each individual operation — the
+            # wait_for is the actual ceiling.
+            r = await asyncio.wait_for(
+                c.get(base_url, params=params, timeout=20.0), timeout=20.0
+            )
             if r.status_code != 200:
                 continue
             data = r.json()
@@ -794,7 +808,7 @@ async def _arcgis_query(
                 out.append(attrs)
             if out:
                 return out
-        except (httpx.HTTPError, ValueError):
+        except (httpx.HTTPError, ValueError, TimeoutError):
             continue
     return []
 
@@ -840,7 +854,9 @@ async def _wfs_query(
             "count": "8",
         }
         try:
-            r = await c.get(cfg["url"], params=params, timeout=30.0)
+            r = await asyncio.wait_for(
+                c.get(cfg["url"], params=params, timeout=30.0), timeout=30.0
+            )
             if r.status_code != 200:
                 continue
             data = r.json()
@@ -854,7 +870,7 @@ async def _wfs_query(
                 out.append(attrs)
             if out:
                 return out
-        except (httpx.HTTPError, ValueError):
+        except (httpx.HTTPError, ValueError, TimeoutError):
             continue
     return []
 
@@ -1202,7 +1218,9 @@ async def enrich(listings: list[Listing], concurrency: int = 8) -> list[Listing]
                             "f": "json",
                         }
                         try:
-                            r = await c.get(onemap_url, params=params, timeout=20.0)
+                            r = await asyncio.wait_for(
+                                c.get(onemap_url, params=params, timeout=20.0), timeout=20.0
+                            )
                             if r.status_code == 200:
                                 data = r.json()
                                 if "error" not in data:
