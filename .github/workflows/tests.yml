@@ -1,0 +1,80 @@
+name: Tests
+
+# THE GAP THIS CLOSES. Six other workflows exist in this directory (pages,
+# weekly, patch-listings, patch-run-scrapers, porsche-refresh, repo-size) and
+# not one of them runs pytest. docs/HANDOFF.md and docs/audit_operations_2026-09-21.md
+# both repeated an unverified claim that "CI runs only on pull requests" — false on
+# both halves: no workflow anywhere in this repo has ever had a `pull_request`
+# trigger, and none invoke pytest. The real state, confirmed 2026-09-30: the
+# ~6,000-test suite (6153 collected, 6094 passed + 59 skipped, 0 failed) has been
+# enforced by nothing except a human running it by hand. A broken test could be
+# committed and pushed with nothing catching it before the next person happened to
+# run the suite. This workflow is that catch.
+#
+# WHY PUSH-TO-MAIN AND NOT JUST PULL_REQUEST. Most commits in this repo land
+# directly on main (no branch protection exists), so a pull_request-only trigger
+# would miss almost everything. The porsche-refresh bot does open real PRs
+# (`bot/porsche-refresh-*`), so both triggers matter here — pull_request gives that
+# bot's PRs a visible status check, push covers the direct-to-main commits that are
+# the normal path.
+#
+# WHY NO NETWORK-DEPENDENT TESTS RUN HERE. tests/conftest.py already isolates every
+# test from the real board, the real board lock and the real jail-roster db
+# (BOARD_MEM_GATE=off, scratch JOB_EVENTS_FILE, etc). Tests that hit a live county
+# site or launch a real headless browser are already gated behind
+# RUN_NETWORK_TESTS=1 / RUN_LIVE=1 env vars that default unset — this workflow does
+# not set them, so those tests skip here exactly as they do in a bare local run
+# with no flags. Verified 2026-09-30: the full local suite passes with 0 failures
+# and those env vars unset.
+#
+# TIMEOUT. The full suite measured 576s (pytest-reported) / 592s wall-clock
+# locally on 2026-09-30 — consistent with the ~500-700s range recent local runs
+# have shown. 25 minutes gives roughly 2.5x headroom over that for a colder cache,
+# a slower runner, or `uv sync` needing to resolve instead of hitting the lock
+# exactly (mirrors the margin weekly.yml uses for its own timeout).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      # Matches .python-version and pyproject.toml's requires-python (>=3.12) —
+      # the same interpreter the operator's local .venv runs on.
+      - name: Pin Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync --frozen || uv sync
+
+      - name: Run test suite
+        run: uv run python -m pytest -q
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Test run" >> "$GITHUB_STEP_SUMMARY"
+          echo "Full suite (network/live-browser tests skip by default — set" \
+               "RUN_NETWORK_TESTS=1 / RUN_LIVE=1 locally to include them)." \
+               >> "$GITHUB_STEP_SUMMARY"
