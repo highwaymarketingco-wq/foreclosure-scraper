@@ -107,7 +107,7 @@ Two platforms, not one.
 | `RESTORE.md` | restoring a bad board and the Mac itself |
 | `ops_fixes_2026-09-21.md` | the operations fixes, patches to apply, what remains |
 | `AUDIT_2026-09-21.md`, `audit_operations_2026-09-21.md`, `audit_signal_logic_2026-09-21.md` | the audits |
-| `SOURCE_REGISTER.md` | every source with URL, gate, cost, cadence (regenerated 2026-08-20; 205 scrapers then, 209 logged on 8/28) |
+| `SOURCE_REGISTER.md` | every source with URL, gate, cost, cadence (regenerated 2026-08-20; 205 scrapers then, 209 logged on 8/28) — **generated, not hand-written**; after adding a scraper run `.venv/bin/python scripts/gen_source_register.py` (touches the board read-only) or `tests/test_source_docs_current.py` will fail on the next full-suite run. Nothing in CI or `.git/hooks/pre-commit` runs pytest today (the hook is size-gate only), so this drifts silently until someone runs the suite by hand — see 2026-09-30 fix for `counties_sc.dorchester_billtrax_delinquent_tax`, which shipped in 4f2c3186 without a register entry. |
 | `COUNTY_SYSTEMS_REGISTRY.md` | 146 counties x 4 systems |
 | `ROD_PORTAL_ACCESS.md` | both recorder platforms, request recipes |
 | `MASTER_GAPS_WALLS_AND_MANUAL_LANES.md` | what cannot be done and why (see its 2026-09-21 correction block) |

@@ -2,8 +2,8 @@
 
 Generated 2026-09-28 09:05 UTC by `scripts/gen_source_register.py`. **Re-run it instead of editing this file** — the built half is read from the live registry and the live board, so hand edits are overwritten and go stale.
 
-- Scrapers in the registry: **234**
-- Producing rows on the board: **128**
+- Scrapers in the registry: **235**
+- Producing rows on the board: **129**
 - Registered but contributing ZERO rows: **106**
 - Confirmed real and not yet built: **3**
 - Board read: `data/checkpoint/board.json.gz` (197,890 rows)
@@ -45,6 +45,7 @@ Live row counts are what the source actually contributed to the board read above
 | `national.hud_reac_inspection` | 1,260 | Mecklenburg NC (134), Richland SC (83), Wake NC (82) | `https://www.hud.gov/sites/default/files/Housing/documents/MF-Inspection-Report.xls```<br>`https://www.hud.gov/sites/default/files/Housing/documents/`<br>`https://www.hud.gov/stat/mfh/inspection-scores` |
 | `counties_sc.charleston_delinquent_tax` | 1,217 | Charleston SC (1217) | `https://charlestoncounty.gov/departments/delinquent-tax/`<br>`https://www.charlestoncounty.gov/departments/delinquent-tax/files/RP-Tax-Sale-Listing.pdf`<br>`https://www.charlestoncounty.gov/departments/delinquent-tax/files/MH-Tax-Sale-Listing.pdf` |
 | `public_notices.nc_notices_counties` | 925 | Buncombe NC (242), Gaston NC (121), Brunswick NC (83) | `https://www.ncnotices.com/Search.aspx`<br>`https://www.ncnotices.com/Details.aspx?ID={` |
+| `counties_sc.dorchester_billtrax_delinquent_tax` | 897 | Dorchester SC (897) | `https://dorchestercountyscdelinquenttaxapi.billtrax.com`<br>`https://dorchestercountyscdelinquenttax.billtrax.com/` |
 | `national.fannie_homepath` | 874 | Spartanburg SC (343), Laurens SC (122), Anderson SC (100) | `https://homepath.fanniemae.com/cfl/property-inventory/search`<br>`https://homepath.fanniemae.com/`<br>`https://homepath.fanniemae.com/property/{uuid` |
 | `counties_nc.buncombe_delinquent_tax` | 828 | Buncombe NC (828) | `https://media.buncombenc.gov/common/tax/buncombe-county-tax-department-advertisement-of-tax-liens.pdf`<br>`https://media.buncombenc.gov/common/tax/` |
 | `counties_sc.sc_public_notices` | 824 | Cherokee SC (142), Charleston SC (135), Pickens SC (128) | `https://www.scpublicnotices.com/Search.aspx`<br>`https://www.scpublicnotices.com/Details.aspx?ID={n[` |
