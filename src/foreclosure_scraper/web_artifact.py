@@ -2080,6 +2080,16 @@ RAW_KEEP = {
     # Registered before the scraper's first live run, learning from every "160 keys
     # dropped at publish" entry already in this file.
     "billtrax_dorchester_delinquent_tax": "*",
+    # Greenwood County SC delinquent real-property tax roll via the county's CORE/eGov
+    # payment portal (counties_sc.greenwood_corebtpay_delinquent_tax, added 2026-09-30,
+    # commit e38c1ec9): parcel_id/owner/service_address/bills/total_due -- the same shape
+    # as billtrax_dorchester_delinquent_tax above, for a county whose only prior coverage
+    # (greenwood_delinquent_tax) is the ANNUAL tax-SALE list, not this STANDING roll.
+    # Registered before the scraper is wired into main.py/the board (deliberately deferred
+    # for memory-safety reasons -- see the commit message), so this key never actually
+    # reached publish yet, but test_every_scraper_raw_key_survives_publish correctly flags
+    # it now regardless of wiring status, same posture as every other entry in this file.
+    "greenwood_corebtpay_delinquent_tax": "*",
     "greenville_mie": "*",
     # 2026-09-23: caught by the greenville_tax_distress zero-net-new audit
     # (see that scraper's own docstring, "ZERO-NET-NEW AUDIT"). This module
