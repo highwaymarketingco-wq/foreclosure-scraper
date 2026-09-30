@@ -23,16 +23,26 @@ from foreclosure_scraper.enrichment_arcgis import SC_GIS
 BUILT = {"Spartanburg", "Laurens", "Pickens", "Colleton", "Beaufort",
          "Georgetown", "Charleston"}
 
+#: Situs + value/deed/sale resolve live, but owner is a confirmed genuine
+#: dead end (server-side masked, not a naming mismatch) — re-verified
+#: 2026-09-30 on BOTH public Anderson ArcGIS hosts (TAXOWNSTR always-null,
+#: 10/10 + 8/8 live samples). Still worth having in SC_GIS: value/deed/sale/
+#: parcel_id fill correctly via the address-LIKE path; owner never will, and
+#: must keep coming from the offline sc_parcel_mailing bulk roll instead.
+SITUS_ONLY = {"Anderson"}
+
 #: Probed live and confirmed to have NO free county-native owner+situs path.
 #: They must NOT be in SC_GIS (adding a broken endpoint silently returns 0 rows).
 #: See docs/walls_register.md.
-WALLED = {"Cherokee", "Union", "Oconee", "Anderson"}
+WALLED = {"Cherokee", "Union", "Oconee"}
 
 
 def test_sc_gis_has_exactly_the_built_counties():
-    assert set(SC_GIS) == BUILT, (
-        f"SC_GIS drifted. Expected {sorted(BUILT)}, got {sorted(SC_GIS)}. "
-        "If adding a county, validate owner+situs resolve live first."
+    expected = BUILT | SITUS_ONLY
+    assert set(SC_GIS) == expected, (
+        f"SC_GIS drifted. Expected {sorted(expected)}, got {sorted(SC_GIS)}. "
+        "If adding a county, validate owner+situs (or document why owner "
+        "can't resolve, like Anderson) live first."
     )
 
 
@@ -74,6 +84,21 @@ def test_autodetect_counties_have_no_pin():
         assert SC_GIS[c].get("addr_field") is None, f"{c} should auto-detect situs"
 
 
+def test_anderson_situs_is_pinned_to_phys_addr():
+    assert SC_GIS["Anderson"]["addr_field"] == "PHYS_ADDR"
+
+
+def test_anderson_owner_field_is_deliberately_not_aliased():
+    # TAXOWNSTR is Anderson's only owner-shaped column and is always-null
+    # server-side (re-verified 2026-09-30 on both public Anderson hosts). It
+    # must stay OUT of FIELD_ALIASES["owner_name"] -- adding it would never
+    # resolve anything for Anderson and risks a false match on some other
+    # county's real owner field down the line.
+    from foreclosure_scraper.enrichment_arcgis import FIELD_ALIASES
+
+    assert "TAXOWNSTR" not in FIELD_ALIASES["owner_name"]
+
+
 @pytest.mark.skipif(
     os.environ.get("RUN_NETWORK_TESTS") != "1",
     reason="hits live county GIS — set RUN_NETWORK_TESTS=1 to enable",
@@ -98,3 +123,33 @@ def test_owner_and_situs_resolve_live(county: str):
     owner, situs = asyncio.run(check())
     assert owner, f"{county}: owner field not detected on live layer"
     assert situs, f"{county}: situs field not detected on live layer"
+
+
+@pytest.mark.skipif(
+    os.environ.get("RUN_NETWORK_TESTS") != "1",
+    reason="hits live county GIS — set RUN_NETWORK_TESTS=1 to enable",
+)
+def test_anderson_situs_resolves_live_but_not_owner():
+    # Anderson is the one SC_GIS entry that is situs+value only. This pins
+    # that live behavior so a silent schema fix (owner unmasked) or a silent
+    # regression (situs breaks too) both get noticed instead of assumed.
+    import asyncio
+
+    import httpx
+
+    from foreclosure_scraper import enrichment_address_owner_v2 as v2
+
+    async def check() -> tuple:
+        async with httpx.AsyncClient(
+            headers={"User-Agent": "Mozilla/5.0"}, timeout=25.0, verify=False
+        ) as c:
+            url = SC_GIS["Anderson"]["url"]
+            owner = await v2._detect_owner_field_v2(c, url)
+            situs = await v2._detect_site_field(c, url)
+            return owner, situs
+
+    owner, situs = asyncio.run(check())
+    assert situs, "Anderson: situs field no longer detected on live layer"
+    # Not asserting `not owner` here: the auto-detector may still guess a
+    # field name (e.g. TAXOWNSTR) even though it's always empty. The real
+    # guard against that is test_anderson_owner_field_is_deliberately_not_aliased.

@@ -156,7 +156,9 @@ _GEORGETOWN_CONCAT = "__concat:StreetNumber+StreetName__"
 # addr_field=None -> situs auto-detects via FIELD_ALIASES; a pinned string -> the
 # situs column to LIKE-match (for layers whose field name isn't in the aliases).
 # Endpoints probed live 2026-08-12 (docs/sc_gis_endpoints_*.md). Counties with no
-# free county-native owner+situs path are in docs/walls_register.md.
+# free county-native owner+situs path are in docs/walls_register.md. One entry
+# (Anderson, added 2026-09-30) is situs+value only, not owner+situs — see its
+# inline comment below; owner is confirmed masked server-side there.
 SC_GIS: dict[str, dict[str, Any]] = {
     "Spartanburg": {
         "url": "https://maps.spartanburgcounty.org/server/rest/services/GIS/CAMA_Parcels/FeatureServer/0/query",
@@ -195,8 +197,48 @@ SC_GIS: dict[str, dict[str, Any]] = {
         "url": "https://gisccapps.charlestoncounty.org/arcgis/rest/services/GIS_VIEWER/New_Parcel_Search/MapServer/61/query",
         "addr_field": None,
     },
+    "Anderson": {
+        # SITUS + VALUE ONLY — owner is a confirmed genuine dead end here (see
+        # below), unlike every other SC_GIS entry which resolves both.
+        # Re-verified live 2026-09-30 (this session). Two public Anderson
+        # ArcGIS hosts publish the SAME schema (both are mirrors of the same
+        # county CAMA extract, "LocalGovernment.DBO.Parcels_County"):
+        #   gis.cityofandersonsc.com/.../WaterUtilities/County_Parcels/FeatureServer/0
+        #   propertyviewer.andersoncountysc.org/.../NewPropertyViewer/MapServer/5
+        # Fields on both: TMS, TAX_DIST, DBOOK, DPAGE, PHYS_ADDR, SALE_PRICE,
+        # MRKT_VALUE, SALE_YEAR, TAXOWNSTR, CPLAT, RATIO, ACPASS_LOOKUP (+
+        # JOINFLD/DESCRIPTIO/PARENT/DIMENSIONS). PHYS_ADDR (real situs, e.g.
+        # "413 WYATT RD"), MRKT_VALUE, SALE_PRICE/SALE_YEAR and DBOOK/DPAGE are
+        # all live, non-null, and LIKE-match correctly (verified: 5/5 "WYATT RD"
+        # query hits, plausible values $46,500-$510,570). All already covered
+        # by FIELD_ALIASES (PHYS_ADDR/MRKT_VALUE/DBOOK/DPAGE/SALE_YEAR/
+        # SALE_PRICE) so no new aliases were needed.
+        #   OWNER IS GENUINELY MASKED, confirmed independently on BOTH hosts
+        # today: TAXOWNSTR is the only owner-shaped column and is always-null
+        # (10/10 and 8/8 live samples respectively) — this is server-side
+        # redaction, not a naming mismatch. TAXOWNSTR is deliberately NOT added
+        # to FIELD_ALIASES's owner_name list (it would only ever resolve to
+        # empty here and the alias would risk false-matching another county's
+        # real owner-ish field later). Real Anderson owner names come only from
+        # the offline sc_parcel_mailing bulk roll
+        # (enrichment_owner_mailing.SC_OFFLINE_OWNER_ROLL) — unaffected by this
+        # change.
+        #   NOTE: enrichment_owner_mailing.COUNTY_GIS["SC:Anderson"] still
+        # queries OWNER/OWNER_ADDR/CITY/ZIPCODE/PREV_OWNER — those columns no
+        # longer exist on the live schema (schema drift since the 2026-08-03
+        # comment there). ArcGIS silently drops unknown outFields instead of
+        # erroring, so that lookup now always returns owner="" AND mailing="",
+        # which trips _build_result's "if not owner and not mailing: return
+        # None" gate — the situs/value/deed it DOES match gets silently
+        # discarded every time. Flagged separately for cleanup; not touched
+        # here (out of this session's scope, and not needed for this SC_GIS
+        # fix — this resolver is independent of that one).
+        "url": "https://gis.cityofandersonsc.com/arcgis/rest/services/WaterUtilities/County_Parcels/FeatureServer/0/query",
+        "addr_field": "PHYS_ADDR",
+    },
     # WALLED (no free county-native owner+situs) — see docs/walls_register.md:
-    #   Cherokee, Union (WAF-403), Oconee (owner only, no situs), Anderson (owner masked).
+    #   Cherokee, Union (WAF-403), Oconee (owner has no situs; situs points
+    #   exist on unlinked E911 layers with no parcel key to join on).
 }
 
 
