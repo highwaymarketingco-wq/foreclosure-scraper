@@ -37,6 +37,25 @@ from foreclosure_scraper.distress_score import _divorce_signal  # noqa: E402
 
 # family -> (source-name fragments, distress_stack signal names). A lead counts
 # toward a family if ANY of them matches.
+#
+# The signal-name half must be a signal that ONLY ever fires from a source that
+# genuinely belongs to the family -- not a generic cross-cutting stamp that many
+# unrelated sources can set. `distressed_condition` used to sit on code_vacancy:
+# it looks family-specific ("a distressed structure") but distress_score.py
+# actually sets it from raw['distressed'], which is stamped by bulk CAMA
+# assessor-condition enrichment (enrichment_cama_condition.py /
+# enrichment_sc_cama.py / enrichment_owner_mailing.py's condition-column scan)
+# on ANY row in ANY county with a "Poor"/"Unsound" appraiser condition code,
+# regardless of which scraper produced that row. A tax-delinquent lead in a
+# county with a bulk condition layer (e.g. Buncombe) got counted as
+# "code_vacancy" evidence even though no code-enforcement/vacancy scraper ever
+# touched it -- the same false-positive class the 2026-09-29 completeness audit
+# separately flagged for `recorded_debt` under "liens" (a real-debt signal any
+# tax/foreclosure source can set, not a lien-registry-specific one; still open,
+# see docs/completeness_audit_2026-09-29-evening.md). `vacant_structure` is the
+# one genuinely code_vacancy-scoped derived signal: it only fires from
+# raw['vacancy']/raw['vacant'] being a dict with vacant/boarded_up True, which
+# only hendersonville_vacant_structures.py ever writes.
 FAMILIES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "tax_delinquent": (("delinquent_tax", "tax_delinquent", "ptscloud", "pdf_delinquent",
                         "csv_delinquent", "multi_year", "qpaybill", "flc"), ("tax_lien",)),
@@ -47,9 +66,16 @@ FAMILIES: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "lis_pendens": (("lis_pendens", "public_index"), ("lis_pendens",)),
     "probate_estate": (("probate", "estate", "obitu", "funeral", "deceased"),
                        ("probate", "probate_notice", "probate_deed")),
+    # "zombie" dropped from the fragments (audit false-positive #2): zombie_properties.py
+    # is a DERIVED stalled-foreclosure signal (a stale lis pendens that never progressed
+    # to sale) -- it is not a code-enforcement/vacancy source and has no physical-condition
+    # evidence at all. Only the 6 real dedicated scrapers match now: gaston_vacant,
+    # henderson_code_violations, hendersonville_vacant_structures, lincoln_code_violations,
+    # lincoln_vacant, transylvania_vacant (NC) + spartanburg_vacant, spartanburg_condemned,
+    # spartanburg_city_condemned (SC) + city_websites.asheville_min_housing (Buncombe).
     "code_vacancy": (("code_violation", "condemn", "vacant", "min_housing", "demoli",
-                      "zombie", "nuisance", "code_enforcement"),
-                     ("code_enforcement", "distressed_condition")),
+                      "nuisance", "code_enforcement"),
+                     ("code_enforcement", "vacant_structure")),
     "bankruptcy": (("bankruptcy", "courtlistener"), ("bankruptcy",)),
     "divorce": (("divorce",), ()),               # + raw['divorce'] stamp, below
     "liens": (("lien", "judgment", "ucc"), ("recorded_debt",)),
@@ -66,6 +92,31 @@ def _pos(v) -> bool:
 
 def _cd(d: dict, k: tuple[str, str]) -> dict:
     return d.setdefault(k, defaultdict(int))
+
+
+def family_hits(source: str | None, raw: dict) -> set[str]:
+    """Which FAMILIES keys one row counts as evidence for.
+
+    A hit requires the row's own source/scraper identity to match a family's
+    name fragments, OR a distress_stack signal that only that family's sources
+    ever set. It deliberately does NOT match on a generic flag (like
+    raw['distressed']) directly -- see the FAMILIES comment for the
+    code_vacancy / liens false positives that pattern caused.
+    """
+    low = (source or "").lower()
+    ds = raw.get("distress_stack") if isinstance(raw.get("distress_stack"), dict) else {}
+    sigs = set(ds.get("signals") or [])
+    hits: set[str] = set()
+    for fam, (frags, snames) in FAMILIES.items():
+        hit = any(f in low for f in frags) or any(s in sigs for s in snames)
+        if fam == "divorce":
+            dv = raw.get("divorce")
+            hit = hit or (isinstance(dv, dict) and bool(dv.get("case_count")))
+        if fam == "incarceration":
+            hit = hit or bool(raw.get("incarceration"))
+        if hit:
+            hits.add(fam)
+    return hits
 
 
 def main() -> int:
@@ -114,20 +165,11 @@ def main() -> int:
         if _pos(to.get("balance")) or (_pos(ao.get("value")) and ao.get("is_actual_debt") is True):
             c["debt_actual"] += 1
 
-        low = (r.get("source") or "").lower()
-        ds = raw.get("distress_stack") if isinstance(raw.get("distress_stack"), dict) else {}
-        sigs = set(ds.get("signals") or [])
-        for fam, (frags, snames) in FAMILIES.items():
-            hit = any(f in low for f in frags) or any(s in sigs for s in snames)
-            if fam == "divorce":
-                dv = raw.get("divorce")
-                hit = hit or (isinstance(dv, dict) and bool(dv.get("case_count")))
-                if isinstance(dv, dict) and _divorce_signal(raw):
-                    c["divorce_scored"] += 1          # recent enough to reach the score
-            if fam == "incarceration":
-                hit = hit or bool(raw.get("incarceration"))
-            if hit:
-                c["fam:" + fam] += 1
+        dv = raw.get("divorce")
+        if isinstance(dv, dict) and _divorce_signal(raw):
+            c["divorce_scored"] += 1              # recent enough to reach the score
+        for fam in family_hits(r.get("source"), raw):
+            c["fam:" + fam] += 1
 
     fams = list(FAMILIES)
     pct = lambda n, d: f"{100 * n / d:.0f}%" if d else "-"
