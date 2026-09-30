@@ -64,6 +64,7 @@ Four files a running job owns are shipped as patches, not applied: `run_daily_vi
 6. Owner decisions still open: public repo and owner PII (audit O8); the memory gate mode; whether the vision backends are replaced or retired (only about 13% of rows have a vision score; the pool collapses from 21 workers to 1 in 40 minutes).
 7. Route the scripts that write `docs/listings.json` directly (listed in `docs/ops_fixes_2026-09-21.md`, section 2) through `write_artifact`.
 8. The first full run on a 170k board is a supervised test (plugged in, other apps closed). It has never completed since the count-guard fix.
+9. **(2026-09-30) `recompute_valuation.py` needs a supervised run for the `geo_imprecise` ARV-confidence fix.** `valuation/calc.py`'s `geo_imprecise_comps` check used to treat `census_geocode` (a real, resolved address) the same as a bare county centroid, capping ~10,575 leads at MEDIUM confidence and withholding their verdict for no reason (commit `39a588ce`). The code is fixed and tested, but is NOT yet live on the published board: `scripts/recompute_valuation.py --dry-run` (tried today) hit `load_board`'s 1200 MB ceiling — this board's source is 2654 MB, well past it (see item 5, the payload split, still unmerged). Run it once that ceiling is raised or the split lands, same supervised conditions as item 8 (plugged in, nothing else touching the board).
 
 ## Blocked / not worth building (as of 2026-08-20; not re-verified on 2026-09-21)
 
