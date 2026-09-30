@@ -8,11 +8,33 @@ stream, 2026-08-12+). Each entry: what, how it fails, date probed, workaround.
 
 | Source / path | How it fails | Probed | Workaround |
 |---|---|---|---|
-| **SCDOT `SC_Parcels` MapServer** (`smpesri.scdot.org/.../GISMapping/SC_Parcels/MapServer`) — the shared owner/situs resolver for ALL 11 in-scope SC counties | HTTP **200** with body `{"error":{"code":499,"message":"Token Required"}}` on both the service root and any layer query. Silent — looks alive to a status check. | 2026-08-12 | Replace with per-county county-native ArcGIS parcel endpoints (this work stream). |
+| **SCDOT `SC_Parcels` MapServer** (`smpesri.scdot.org/.../GISMapping/SC_Parcels/MapServer`) — the shared owner/situs resolver for ALL 11 in-scope SC counties, and (via `enrichment_owner_mailing.SCDOT_SC_BASE`) the owner-MAILING-address fallback for all 46 SC counties statewide | HTTP **200** with body `{"error":{"code":499,"message":"Token Required","details":[]}}` on both the service root and any layer query. Silent — looks alive to a status check. | 2026-08-12, re-confirmed 2026-09-28 (commit `80fca14d`) and again 2026-09-30 (direct bounded probe, 4 live requests, all <0.5s — no hang, no rate-limit, no 5xx) | Replace with per-county county-native ArcGIS parcel endpoints (this work stream). |
 | **Pickens County qPayBill portal — does not exist** (re-probed for the tax-balance-join gap, `docs/extraction_gaps.md`) | No `pickens*.qpaybill.com` subdomain resolves. 5 patterns tried (`pickenscountytreasurer`, `pickenstreasurer`, `pickenscountysctax`, `pickenscounty`, `pickenssctax`) — every one `curl` NXDOMAIN, while known-good counties on the same vendor (`oconeesctax`, `spartanburgcountytax`) resolve and return HTTP 200 in the same check. Matches `enrichment_qpaybill_tax.py`'s 2026-07-01 finding ("Pickens = no bulk portal (qPublic per-parcel card only)") — still true, not stale. | 2026-09-29 | Not needed: Pickens gets its own real delinquent-tax balance from the county's own free ArcGIS FeatureServer roll (`pickens_delinquent_parcels.py`), no qPayBill dependency. |
 | **Georgetown County — no qPayBill/Catalis subdomain, no real per-parcel tax balance captured** | 5 qPayBill subdomain guesses unreachable/NXDOMAIN; `georgetown_civicengage` (355 board rows) carries no real `raw['tax_owed']` for ANY row (0/355) — worse than every other tax source measured in the same pass. | 2026-09-29 | None found. Genuinely open — needs its own source investigation (the county's own delinquent-tax list, if one is machine-readable), separate from the amount_owed-routing fix below. |
 
 **Obsolete wall, corrected 2026-09-29 (kept for history):** memory `project_qpaybill_tax` and the pre-2026-09-29 `docs/extraction_gaps.md` line described a "parcel-mismatch" wall blocking a qPayBill balance JOIN from Spartanburg onto Pickens/Oconee/other SC counties. That join was never built that way in the end — `counties_sc.qpaybill_delinquent_roll` (live since 2026-09-10, 29 counties) queries qPayBill directly and emits its own Listings with qPayBill's own id as `parcel_id`, so there is no cross-source parcel-FORMAT join to mismatch. Oconee has been covered this way since 2026-09-10 (re-confirmed live above). The REAL, much larger defect turned out to be downstream of every tax source, not qPayBill-specific: `enrichment_amount_owed.py`'s waterfall ran before `enrichment_tax_owed.py` in `main.py` and could never see the real balance the latter computes. Fixed same day — see `docs/extraction_gaps.md`'s DATA-QUALITY VALIDATOR section for the full writeup and numbers.
+
+**SCDOT wall, precise nature (re-verified 2026-09-30):** this is a deliberate,
+service-level ArcGIS auth restriction, not a rate limit, IP block, or outage.
+`smpesri.scdot.org/arcgis/rest/info` reports `isTokenBasedSecurity: true` with
+`tokenServicesUrl` pointing at SCDOT's own ArcGIS Enterprise Portal
+(`smpesri.scdot.org/portal` — an agency-internal portal, not public ArcGIS
+Online; no self-service sign-up path found, and none was attempted per the
+compliance line). The restriction is selective, not server-wide: the same
+host's unauthenticated `/rest/services` catalog lists other services fine
+(`SC_Address_Locator`, `EGIS_Imagery`, `Bridges`, `SC_Contours`, etc.), and
+`SC_Parcels` itself doesn't even appear in the anonymous `GISMapping` folder
+listing — standard ArcGIS Server behavior for a service whose sharing is set
+to non-public, consistent with a real, configured decision rather than a bug
+or a transient block. Separately, `docs/wall_status.json`'s `scdot_parcels`
+entry (written by `scripts/reprobe_walls.py`) had been pointing at an
+unrelated AGOL-hosted FeatureServer item
+(`services2.arcgis.com/.../SC_Parcels/FeatureServer/0`) that no scraper or
+enricher ever calls and that 404s with a *different* error
+(`{"error":{"code":400,"message":"Invalid URL"}}`) — cosmetic (nothing reads
+`wall_status.json` to gate scraping behavior) but it meant that monitor could
+never detect a real SCDOT re-open. Fixed 2026-09-30: the script now probes
+the real production URL (`SCDOT_BASE`).
 
 ## SC county-native GIS resolution (SCDOT replacement) — probed live 2026-08-12
 

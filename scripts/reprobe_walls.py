@@ -61,7 +61,18 @@ WALLS = {
     'nc_sos':                  ('https://www.sosnc.gov/online_services/search/by_title/_Business_Registration', 'A', 'Cloudflare; stealth-only'),
     'propwire':                ('https://propwire.com/', 'A', 'DataDome'),
     'kofile_oconee_rod':       ('https://oconee.sc.publicsearch.us/', 'A', 'robots.txt Disallow: / — belongs in bucket A, not BUILD_NOW'),
-    'scdot_parcels':           ('https://services2.arcgis.com/XZg2efAbaieYAXmu/arcgis/rest/services/SC_Parcels/FeatureServer/0?f=json', 'A', 'went token-required; watch for re-open'),
+    # Fixed 2026-09-30: this entry was probing an unrelated, already-dead AGOL
+    # FeatureServer item (services2.arcgis.com/.../SC_Parcels/FeatureServer/0,
+    # which 404s with {"error":{"code":400,"message":"Invalid URL"}} and was never
+    # the endpoint any scraper/enricher calls) instead of the real production
+    # dependency — SCDOT's own ArcGIS Server at smpesri.scdot.org
+    # (enrichment_arcgis.SCDOT_BASE / enrichment_owner_mailing.SCDOT_SC_BASE).
+    # With the old URL this check could never detect a real re-open. Re-verified
+    # live 2026-09-30: the correct URL still returns HTTP 200 +
+    # {"error":{"code":499,"message":"Token Required"}} on the service root and
+    # on every layer query (tested layers 4 Anderson, 23 Greenville) — genuine,
+    # unchanged token wall, not a rate limit or outage. See docs/walls_register.md.
+    'scdot_parcels':           ('https://smpesri.scdot.org/arcgis/rest/services/GISMapping/SC_Parcels/MapServer?f=json', 'A', 'went token-required; watch for re-open'),
 
     # --- Live production sources. Early warning if one silently dies. ---
     'hutchens':                ('https://sales.hutchenslawfirm.com/NCfcSalesList.aspx', 'LIVE', 'largest NC trustee feed'),
