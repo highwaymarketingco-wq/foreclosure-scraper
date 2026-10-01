@@ -304,15 +304,31 @@ ARV_VERDICT_FIELDS = ("deal_status", "deal_message", "haircut_needed")
 #     Measured on the live board: 1,252 leads published an equity figure on a
 #     contradicted ARV and 113 more on a WITHHELD one — leads whose max bid,
 #     ROI, profit, verdict and letter were all withheld, still showing
-#     "Equity $1,920,000 (97%)" in green. It cannot be gated here because
+#     "Equity $1,920,000 (97%)" in green. It cannot be COMPUTED here because
 #     enrichment_equity.py runs at main.py:2329, AFTER valuation at :2287, and
-#     writes raw['equity'] itself — at grade() time there is nothing to blank.
-#     The gate therefore lives at the writer: enrichment_equity.enrich_equity()
-#     calls arv_trust() and publishes a `withheld` marker instead of a figure on
+#     writes raw['equity'] itself — on a lead's FIRST pass through grade()
+#     there is no equity figure yet to blank. The gate therefore lives
+#     primarily at the writer: enrichment_equity.enrich_equity() calls
+#     arv_trust() and publishes a `withheld` marker instead of a figure on
 #     contradicted/withheld, and distress_score._equity_band() makes the SAME
 #     call (not a test of the marker) so a board carried over from a run that
-#     predates this cannot rank on a stale one either. Same rule, same function,
-#     three call sites, one shared constant: ARV_TRUST_BLOCKS_DERIVED below.
+#     predates this cannot rank on a stale one either.
+#
+#     But a SECOND pass through grade() is exactly what a targeted recompute
+#     is (lrcpwa_refresh.py, sqft_backfill.py, and ~20 other scripts all run
+#     compute()+grade() over some subset of an already-equity-bearing board),
+#     and on that pass raw['equity'] already exists and can go stale: calc's
+#     own money fields get re-gated for free (this function runs every time),
+#     but nothing told the SEPARATE equity pass to re-run too. Measured twice
+#     on the live board, 2026-10-01: 9 rows, then 671, publishing equity off
+#     an ARV that had just been re-graded CONTRADICTED. grade() now calls
+#     `_regate_equity_after_grade` right after this function returns, which
+#     re-derives trust from THIS call's own `c` and strips (never computes) a
+#     stale figure the same way `models._regate_merged_valuation` already does
+#     for the merge path. Same rule, same shared function
+#     (`enrichment_equity.withhold_equity`), one more caller:
+#     ARV_TRUST_BLOCKS_DERIVED below is still the one constant all of them
+#     share.
 #
 #   `distress_stack.tier` — not gated directly, and deliberately. Withholding
 #     the equity band already removes the only ARV-derived term in the tier
@@ -505,6 +521,56 @@ def apply_arv_trust_gate(c: "_calc.Calc", opening_bid=None) -> str:
         if note not in c.notes:
             c.notes.append(note)
     return level
+
+
+def _regate_equity_after_grade(li: Listing, level: str, c: "_calc.Calc") -> None:
+    """Strip a stale raw['equity'] the moment THIS grade() call's own trust
+    level lands on a tier the gate blocks derived money on.
+
+    Called from `grade()` only, right after `apply_arv_trust_gate` -- see the
+    comment at that call site for the incident this closes (two separate
+    2026-10-01 backfills, 9 rows then 671, both needed because a targeted
+    calc/grade recompute left raw['equity'] computed under the OLD,
+    not-yet-contradicted arv_flags). This is the equity-side twin of
+    `models._regate_merged_valuation`, which already does the same thing for
+    the merge path (fixed a40f3689) -- same rule, same shared function, now
+    reached from the OTHER place arv_flags changes.
+
+    Deliberately reads `c` (the Calc object `apply_arv_trust_gate` just
+    mutated), not `li.raw['calc']`: the caller has not necessarily written
+    `to_dict(c)` into `li.raw['calc']` yet (main.py does that one line after
+    `grade()` returns), so re-deriving trust from the stale serialized dict
+    here could disagree with the `level` this very call just computed. `level`
+    is passed in directly for exactly that reason -- one trust decision, not
+    two independent ones that happen to usually agree.
+
+    Scoped to a no-op everywhere this does not apply, by construction:
+      - `level` not in ARV_TRUST_BLOCKS_DERIVED (the common case -- ok/weak)
+        -> return before touching anything. The vast majority of grade()
+        calls never reach the import below.
+      - `li.raw` not a dict (no enrichment has run yet, or a bare/synthetic
+        Listing) -> return. Mirrors `_regate_merged_valuation`'s own guard;
+        grade() must not be the first thing to turn `li.raw` into a dict.
+      - `li.raw['equity']` absent or already withheld (no `value`) ->
+        `withhold_equity` itself no-ops (one isinstance check + one dict
+        .get()) and returns False. Covers both "never had equity" (the
+        overwhelming majority of CONTRADICTED rows on a normal run, since
+        calc and equity are usually computed in the same pass) and "already
+        withheld by an earlier call" (idempotent: calling this twice on the
+        same contradicted row costs one no-op dict read the second time).
+
+    Local import: valuation.grading is imported BY enrichment_equity (for
+    ARV_TRUST_BLOCKS_DERIVED / arv_trust), so a module-level import the other
+    way would be circular. Safe here because it only executes once grade() is
+    actually called, by which point both modules have finished loading --
+    same pattern models.py uses for this exact pair of imports.
+    """
+    if level not in ARV_TRUST_BLOCKS_DERIVED:
+        return
+    if not isinstance(li.raw, dict):
+        return
+    from ..enrichment_equity import withhold_equity
+    withhold_equity(li, level, sorted(getattr(c, "arv_flags", None) or []))
 
 
 def gate_calc_dict(calc: dict) -> str:
@@ -824,7 +890,23 @@ def grade(li: Listing, c: _calc.Calc | None = None) -> Grade:
     # ROI, which would quietly stop unrating exactly the rows this is about.
     _pre_roi = getattr(c, "roi_pct", None)
     _pre_arv = getattr(c, "arv_expected", None)
-    apply_arv_trust_gate(c, opening_bid=li.opening_bid)
+    _trust_level = apply_arv_trust_gate(c, opening_bid=li.opening_bid)
+    # Equity incident 2026-10-01 (9 rows, then 671): a targeted recompute (any
+    # script that runs compute()+grade() over a SUBSET of the board, e.g.
+    # lrcpwa_refresh.py's per-row pass) can flip `c.arv_flags` into
+    # ARV_FLAGS_CONTRADICTED on a lead whose raw['equity'] was computed and
+    # published by an EARLIER, separate enrich_equity() pass. Nothing about
+    # recomputing calc/grade touches raw['equity'] — it is a different pass,
+    # over a different field, run by a different script most of the time — so
+    # the stale figure survived every call site except Listing.merge() (fixed
+    # a40f3689), which is the one place that already happened to re-derive
+    # trust after mutating raw. grade() is the other (much larger) half of the
+    # same seam: see this function's own comment above for why EVERY compute()
+    # caller in the repo already lands here. Closing it here, instead of in
+    # each of the ~20+ scripts that call compute()+grade(), means a future
+    # script gets this for free the same way it already gets the calc-side
+    # gate for free.
+    _regate_equity_after_grade(li, _trust_level, c)
 
     fs, fn = _financial_score(li, c)
     ps, pn = _property_score(li)

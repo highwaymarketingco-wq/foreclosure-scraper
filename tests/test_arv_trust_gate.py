@@ -243,3 +243,129 @@ def test_an_unrecognised_flag_fails_safe():
     assert grading.apply_arv_trust_gate(c) == "weak"
     assert c.deal_status is None
     assert c.max_bid_70 == 180000.0
+
+
+# ---------------------------------------------------------------------------
+# 6. EQUITY RE-GATE ON grade() — the other half of the merge fix (a40f3689)
+#
+# Two live-board incidents, both 2026-10-01 (backfills 5616f840/00beac83 for 9
+# rows, 533d8e58 for 671): a targeted recompute script (lrcpwa_refresh.py's
+# per-row pass is the confirmed culprit for the 671; the shape generalises to
+# sqft_backfill.py, fill_sqft.py and every other script that calls
+# compute()+grade() over a SUBSET of the board) flipped c.arv_flags into
+# ARV_FLAGS_CONTRADICTED. calc's own money fields were correctly nulled by
+# apply_arv_trust_gate (that part was never broken) — but raw['equity'] had
+# been computed and published by an earlier, separate enrich_equity() pass,
+# and nothing told it to re-run. Listing.merge() got the equivalent fix in
+# a40f3689 (_regate_merged_valuation); grading.grade() is the other, much
+# larger seam the same staleness can enter through, fixed here.
+# ---------------------------------------------------------------------------
+
+def test_grade_strips_stale_equity_when_recompute_newly_contradicts():
+    """The exact incident shape: raw['equity'] already holds a real figure from
+    an earlier enrich_equity() pass; THIS grade() call is the first time the
+    ARV is contradicted, and no caller here ever calls enrich_equity() or
+    withhold_equity() directly — grade() alone must be enough."""
+    li = _li(property_kind=PropertyKind.SINGLE_FAMILY, opening_bid=60000.0,
+             raw={"equity": {"value": 125_000.0, "pct": 0.42,
+                              "arv_used": 300000.0, "confidence": "medium"}})
+    c = _calc(["arv_land_sqft_mismatch"])
+    grading.grade(li, c)
+    eq = li.raw["equity"]
+    assert eq.get("value") is None, "stale equity survived a newly-contradicted ARV"
+    assert eq.get("pct") is None
+    assert eq["withheld"] is True
+    assert eq["arv_trust"] == "contradicted"
+    assert "arv_land_sqft_mismatch" in eq["arv_flags"]
+
+
+def test_grade_strips_stale_equity_on_a_withheld_arv_too():
+    """ARV_TRUST_BLOCKS_DERIVED covers both contradicted AND withheld —
+    equity must follow calc's money fields on either tier."""
+    li = _li(raw={"equity": {"value": 50_000.0, "pct": 0.3}})
+    c = _calc([], arv_expected=None, arv_low=None, arv_high=None,
+              arv_withheld=400000.0)
+    grading.grade(li, c)
+    assert li.raw["equity"].get("value") is None
+    assert li.raw["equity"]["arv_trust"] == "withheld"
+
+
+def test_grade_does_not_touch_equity_on_weak_evidence():
+    """WEAK keeps the dollars (same rule max_bid_70 follows) — equity is not a
+    special case that gets blanked more aggressively than the money it mirrors."""
+    li = _li(raw={"equity": {"value": 75_000.0, "pct": 0.4}})
+    c = _calc(["anchor_not_independent"])
+    grading.grade(li, c)
+    assert li.raw["equity"] == {"value": 75_000.0, "pct": 0.4}
+
+
+def test_grade_leaves_a_clean_leads_equity_completely_untouched():
+    """A row that is never contradicted must not even have its equity block
+    re-derived — same discipline as 'a clean lead is completely untouched'
+    above, extended to the new call."""
+    li = _li(property_kind=PropertyKind.SINGLE_FAMILY, opening_bid=100000.0,
+             raw={"equity": {"value": 90_000.0, "pct": 0.3}})
+    before = dict(li.raw["equity"])
+    c = _calc([])
+    grading.grade(li, c)
+    assert li.raw["equity"] == before
+
+
+def test_grade_is_a_no_op_on_an_already_withheld_equity():
+    """A second recompute pass over an already-contradicted, already-withheld
+    row (e.g. two targeted backfills touching the same lead) must not error,
+    re-derive, or change the marker — withhold_equity's own idempotence,
+    exercised from the grade() call site."""
+    li = _li(raw={"equity": {"value": 10_000.0, "pct": 0.1}})
+    grading.grade(li, _calc(["bid_proxy_arv"]))
+    first = dict(li.raw["equity"])
+    grading.grade(li, _calc(["bid_proxy_arv"]))  # fresh Calc, same flag
+    assert li.raw["equity"] == first
+
+
+def test_grade_equity_regate_needs_no_raw_dict_to_not_crash():
+    """A bare/synthetic Listing with raw=None (built via model_construct, the
+    same way the live backfill scripts build light Listings — plain
+    Listing(raw=None) fails pydantic validation, which is itself evidence this
+    only happens on a model_construct()-built object) must not make grade()
+    crash, and must not have grade() invent a raw dict as a side effect —
+    mirrors models._regate_merged_valuation's own guard."""
+    base = dict(source="counties_sc.test", source_url="http://x",
+                listing_type=ListingType.FORECLOSURE_SALE, state="SC",
+                county="Spartanburg", first_seen=datetime.utcnow(),
+                last_seen=datetime.utcnow())
+    li = Listing.model_construct(raw=None, **base)
+    grading.grade(li, _calc(["bid_proxy_arv"]))
+    assert li.raw is None
+
+
+def test_merge_and_grade_regate_paths_agree():
+    """The two equity-regate call sites — Listing.merge()'s
+    _regate_merged_valuation (a40f3689) and grade()'s _regate_equity_after_grade
+    (this change) — share one function (enrichment_equity.withhold_equity) and
+    must reach an identical marker for an identical calc block, proving the
+    merge-path fix still works after this change and that neither path drifted
+    from the other."""
+    # Path 1: grade(), freshly contradicted, equity already published.
+    li_graded = _li(raw={"equity": {"value": 55_000.0, "pct": 0.2}})
+    grading.grade(li_graded, _calc(["arv_above_anchor"]))
+
+    # Path 2: merge() folding an un-gated old copy into a re-graded new one
+    # (the a40f3689 shape, reproduced verbatim).
+    old = Listing(source="test_a", source_url="https://a.example.com/x",
+                  listing_type=ListingType.FORECLOSURE_SALE,
+                  first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
+                  street_address="1 Shared Rd",
+                  raw={"calc": {"arv_expected": 300000.0, "arv_flags": []},
+                       "equity": {"value": 55_000.0, "pct": 0.2}})
+    new = Listing(source="test_b", source_url="https://b.example.com/x",
+                  listing_type=ListingType.FORECLOSURE_SALE,
+                  first_seen=datetime.utcnow(), last_seen=datetime.utcnow(),
+                  street_address="1 Shared Rd",
+                  raw={"calc": vcalc.to_dict(_calc(["arv_above_anchor"]))})
+    li_merged = old.merge(new)
+
+    assert li_graded.raw["equity"].get("value") is None
+    assert li_merged.raw["equity"].get("value") is None
+    assert (li_graded.raw["equity"]["arv_trust"]
+            == li_merged.raw["equity"]["arv_trust"] == "contradicted")
