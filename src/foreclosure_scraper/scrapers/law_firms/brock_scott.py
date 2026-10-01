@@ -1,15 +1,34 @@
-"""Brock & Scott — WordPress + Search & Filter Pro trustee-sale archive (NC + SC).
+"""Brock & Scott — WordPress trustee-sale archive (NC + SC).
 
-Verified live 2026-07-31:
+SITE REDESIGN FOUND AND FIXED 2026-10-01. The site migrated off the
+Search & Filter Pro `article.foreclosure_search` card markup documented
+below to a plain `<table>` and, more importantly, off the `?sf_paged={N}`
+query-string pagination to WordPress's standard `/page/{N}/` path
+pagination. Both changes were silent: `?sf_paged={N}` still returns HTTP 200
+with a full, well-formed page every time, but it is now completely IGNORED —
+confirmed live, pages 1/2/3/10 with the old query param all return the
+IDENTICAL first 20 rows. Since the old code also keyed its end-of-list
+termination on "zero `article.foreclosure_search` found", and the new markup
+has zero of those on every page including page 1, `fetch()` had been
+returning 0 Listings on every run for some unmeasured period before this fix
+(this source had NO test file to catch it). Live-verified 2026-10-01 against
+the real `/page/{N}/` pagination: NC 192 rows across 10 pages (9x20 + 1x12,
+matching the page's own "NC (192)" state-filter facet count), SC 59 rows.
+
+The 8 columns themselves are UNCHANGED (still the exact fields below), just
+in a `<table><tbody><tr><td>` now instead of 8 `.forecol` divs — the header
+row is `<thead><tr><th>...</th></tr></thead>` and is read to build a
+field->index map (same drift-tolerant approach as the sibling
+`law_firms/hutchens.py`) rather than trusting fixed indices:
+  County | Sale Date | State | Court SP # | Case # |
+  Address | Opening Bid Amt. | Book Page
+
+Verified live 2026-07-31 (now superseded by the above):
   /foreclosure-sales/?_sft_foreclosure_state={nc|sc}&sf_paged={N}
 Static HTML, no Cloudflare, no disclaimer gate, 10 `article.foreclosure_search`
 per page. NC = 179 rows / 18 pages. SC = 103 rows / 11 pages. A page past the end
 returns 0 articles (not a 404 and not a silent wrap to page 1), so an empty page
 is the terminator.
-
-Each article carries 8 `.forecol` cells, each a label <p> + value <p>:
-  0 County | 1 Sale Date | 2 State | 3 Court SP # | 4 Case # |
-  5 Address | 6 Opening Bid Amount | 7 Book Page
 
 Field notes that the parser depends on:
   * Address is "<street><2+ spaces><city>, <State Name> <zip>" and the state is
@@ -111,48 +130,82 @@ def _split_book_page(raw_bp: str | None) -> tuple[str | None, str | None]:
     return text or None, None
 
 
-def _parse_article(art, state_hint: str, slug: str) -> Listing | None:
-    # State + county come from the article's class attribute, which is more
-    # reliable than the cell text (it is what the site's own filter keys on).
-    cls = art.attributes.get("class", "")
-    county_m = re.search(r"foreclosure_county-([a-z0-9\-]+)", cls)
-    state_m = re.search(r"foreclosure_state-([a-z]{2})", cls)
-    post_m = re.search(r"post-(\d+)", cls)
-    county = normalize_county(county_m.group(1).replace("-", " ")) if county_m else None
-    state = (state_m.group(1) if state_m else state_hint).upper()
+#: Table header label -> canonical field. Drift-tolerant header-driven mapping
+#: (same approach as the sibling law_firms/hutchens.py) rather than fixed
+#: column indices, since this table already replaced one markup generation.
+_HEADER_MAP = {
+    "county": "county",
+    "sale date": "sale_date",
+    "state": "state",
+    "court sp #": "court_case",
+    "case #": "firm_file_no",
+    "address": "address",
+    "opening bid amt.": "bid",
+    "book page": "book_page",
+}
 
-    cols = art.css(".forecol")
-    if len(cols) < 6:
+
+def _norm_header(label: str) -> str:
+    # Strip the sort-arrow glyph ("Sale Date▲") and collapse whitespace.
+    return re.sub(r"[^\w .#/]", "", label).strip().lower()
+
+
+def _table_header_indices(table) -> dict[str, int]:
+    thead = table.css_first("thead")
+    ths = thead.css("th") if thead else []
+    out: dict[str, int] = {}
+    for idx, th in enumerate(ths):
+        field = _HEADER_MAP.get(_norm_header(th.text(strip=True)))
+        if field and field not in out:
+            out[field] = idx
+    return out
+
+
+def _parse_row(tr, cols: dict[str, int], state_hint: str, slug: str, page_url: str) -> Listing | None:
+    cells = tr.css("td")
+    if len(cells) < 6:
         return None
 
-    def col_value(idx: int) -> str | None:
-        if idx >= len(cols):
+    def cell_text(field: str) -> str | None:
+        idx = cols.get(field)
+        if idx is None or idx >= len(cells):
             return None
-        ps = cols[idx].css("p")
-        if len(ps) >= 2:
-            return ps[1].text(strip=True) or None
-        return (ps[0].text(strip=True) or None) if ps else None
+        return cells[idx].text(strip=True) or None
 
-    if county is None:
-        county = normalize_county(col_value(0))
+    county = normalize_county(cell_text("county"))
+    state = (cell_text("state") or state_hint).upper()
+    court_case = cell_text("court_case")      # NC SP # / SC CP docket — the COURT number
+    firm_file_no = cell_text("firm_file_no")  # Brock & Scott internal file number
+    street, city, zip_code = _split_address(cell_text("address") or "")
+    opening_bid = _parse_money(cell_text("bid"))
+    book, page = _split_book_page(cell_text("book_page"))
 
-    sale_date_raw = col_value(1)
-    court_case = col_value(3)      # NC SP # / SC CP docket — the COURT number
-    firm_file_no = col_value(4)    # Brock & Scott internal file number
-    street, city, zip_code = _split_address(col_value(5) or "")
-    opening_bid = _parse_money(col_value(6))
-    book, page = _split_book_page(col_value(7))
-
+    # The sale-date cell is <time datetime="2026-09-30">09/30/2026 <span
+    # class="sale-time">· 1:30 PM</span></time> — the datetime attribute is
+    # machine-readable and more reliable than re-parsing the display text.
     sale_date = None
     sale_time = None
-    if sale_date_raw:
-        # "07/30/2026 - 02:00:00 PM"
-        date_part, _, time_part = sale_date_raw.partition(" - ")
-        sale_time = time_part.strip() or None
-        try:
-            sale_date = dateparser.parse(date_part.strip() or sale_date_raw)
-        except (ValueError, TypeError, OverflowError):
-            sale_date = None
+    date_idx = cols.get("sale_date")
+    time_el = cells[date_idx].css_first("time") if date_idx is not None and date_idx < len(cells) else None
+    if time_el is not None:
+        iso = time_el.attributes.get("datetime")
+        if iso:
+            try:
+                sale_date = dateparser.parse(iso)
+            except (ValueError, TypeError, OverflowError):
+                sale_date = None
+        span = time_el.css_first(".sale-time")
+        if span:
+            sale_time = span.text(strip=True).lstrip("·").strip() or None
+    if sale_date is None:
+        raw_date = cell_text("sale_date")
+        if raw_date:
+            date_part, _, time_part = raw_date.partition("·")
+            sale_time = sale_time or (time_part.strip() or None)
+            try:
+                sale_date = dateparser.parse(date_part.strip() or raw_date)
+            except (ValueError, TypeError, OverflowError):
+                sale_date = None
 
     desc_bits = [
         f"Brock & Scott trustee sale — court case {court_case}" if court_case
@@ -164,11 +217,10 @@ def _parse_article(art, state_hint: str, slug: str) -> Listing | None:
     ]
     description = ", ".join(b for b in desc_bits if b)
 
-    # A row has no per-property detail link, so anchor source_url on the post id
-    # to keep it unique + stable (the fragment is never sent to the server).
-    detail = f"{BASE}?_sft_foreclosure_state={state.lower()}"
-    if post_m:
-        detail = f"{detail}#post-{post_m.group(1)}"
+    # A row has no per-property detail link or stable id in the new markup;
+    # anchor source_url on the court case number (unique, meaningful, and the
+    # fragment is never sent to the server) instead of the old wp post id.
+    detail = f"{page_url}#case-{court_case}" if court_case else page_url
 
     listing = Listing(
         source=slug,
@@ -209,9 +261,20 @@ class BrockScott(BaseScraper):
     timeout_s = 600.0
     expected_min_count = 20
 
+    @staticmethod
+    def _page_url(state: str, page: int) -> str:
+        """Page 1 is the bare query URL; page N>1 uses WordPress's standard
+        `/page/{N}/` PATH pagination. The old `?sf_paged={N}` query param is
+        now silently ignored by the site (confirmed live 2026-10-01: it
+        returns HTTP 200 with a full page every time, but always page 1's
+        rows) -- this is the real, working scheme."""
+        if page <= 1:
+            return f"{BASE}?_sft_foreclosure_state={state}"
+        return f"{BASE}page/{page}/?_sft_foreclosure_state={state}"
+
     async def _page(self, state: str, page: int) -> HTMLParser | None:
         """Fetch one page with retry. None means the page hard-failed."""
-        url = f"{BASE}?_sft_foreclosure_state={state}&sf_paged={page}"
+        url = self._page_url(state, page)
         for attempt in range(PAGE_ATTEMPTS):
             try:
                 html = await get_text(url, timeout=45.0)
@@ -267,11 +330,14 @@ class BrockScott(BaseScraper):
                     # instead of truncating the state like the old `break` did.
                     failed_pages.append(f"{state}:{page}")
                     continue
-                articles = tree.css("article.foreclosure_search")
-                if not articles:
+                table = tree.css_first("table")
+                rows = table.css("tbody tr") if table else []
+                if not rows:
                     break
-                for art in articles:
-                    li = _parse_article(art, state, self.slug)
+                cols = _table_header_indices(table)
+                page_url = self._page_url(state, page)
+                for tr in rows:
+                    li = _parse_row(tr, cols, state, self.slug, page_url)
                     if li is None:
                         continue
                     total += 1
