@@ -79,6 +79,90 @@ def test_listing_type_and_process_are_tax_sale():
 
 
 # --------------------------------------------------------------------------
+# Multi-owner / heirs continuation lines (found live 2026-10-01: 622 of 2,795
+# raw PDF lines, 22%, had no leading item#/TMS at all -- pypdf's flattened
+# column text repeats the situs on each ADDITIONAL co-owner's own line below
+# the matched row, which used to be silently dropped since it fails _ROW_RE).
+# --------------------------------------------------------------------------
+
+_HEIRS_TEXT = (
+    "ITEM #  MAP #            DELINQUENT TAXPAYER NAME(S)        SITUS / DESCRIPTION\n"
+    "83195   7-12-16-070.01   ALEXANDER JOHN W ETAL WILSON ANNE M MARION AVE\n"
+    "OELAND MARTHA ALEXANDER MARION AVE\n"
+    "MCCUTHEN JAMES JR MARION AVE\n"
+    "WILSON ANNE M MARION AVE\n"
+    "EDWARDS HANNA ALEXANDER MARION AVE\n"
+    "83196   7-09-13-120.00   ALEXANDER JUANITA M                110 ASHLEY ST\n"
+)
+
+
+def test_continuation_lines_attach_as_additional_owners_on_the_prior_row():
+    """Real live PDF example (item 83195): the anchor row has no house number,
+    so the pre-existing split_name_situs fallback (unrelated to this fix)
+    over-captures "WILSON ANNE M MARION AVE" as street_address rather than
+    just "MARION AVE" -- which means the suffix-strip this fix applies can't
+    cleanly match most of the 4 heir continuation lines, which are kept whole
+    (still-correct, just not de-duplicated against the street name). One of
+    the 4 ("WILSON ANNE M MARION AVE") exactly matches the anchor row's own
+    over-captured street_address text and is correctly treated as already
+    represented rather than appended again. 3 of 4 are recovered as distinct
+    additional owners -- before this fix, all 4 were silently dropped."""
+    rows = mod.parse_list(_HEIRS_TEXT, "http://example/test.pdf")
+    heirs_row = next(r for r in rows if r.parcel_id == "7-12-16-070.01")
+    extra = heirs_row.raw["spartanburg_delinquent_tax"]["additional_owners"]
+    assert len(extra) == 3
+    assert all("MARION AVE" in name for name in extra)
+    assert any("OELAND MARTHA ALEXANDER" in name for name in extra)
+    assert any("MCCUTHEN JAMES JR" in name for name in extra)
+    assert any("EDWARDS HANNA ALEXANDER" in name for name in extra)
+    # The next real row is unaffected and gets no stray additional_owners key.
+    next_row = next(r for r in rows if r.parcel_id == "7-09-13-120.00")
+    assert "additional_owners" not in next_row.raw["spartanburg_delinquent_tax"]
+
+
+def test_continuation_line_suffix_stripped_when_it_cleanly_matches_known_situs():
+    """When the anchor row DOES have a clean house-number situs (the common
+    case), the continuation line's repeated situs is stripped so
+    additional_owners holds just the name."text"""
+    text = (
+        "ITEM #  MAP #            DELINQUENT TAXPAYER NAME(S)        SITUS / DESCRIPTION\n"
+        "83121   7-16-06-003.00   ABRAIRA ANTONIO TRUSTEE 143 IVY ST\n"
+        "MONDO CORP RETIREMENT FUND 143 IVY ST\n"
+    )
+    rows = mod.parse_list(text, "http://example/test.pdf")
+    row = rows[0]
+    assert row.street_address == "143 IVY ST"
+    assert row.raw["spartanburg_delinquent_tax"]["additional_owners"] == ["MONDO CORP RETIREMENT FUND"]
+
+
+def test_continuation_lines_do_not_create_new_listings():
+    rows = mod.parse_list(_HEIRS_TEXT, "http://example/test.pdf")
+    assert len(rows) == 2  # 2 matched item# rows, not 6
+
+
+def test_primary_owner_name_and_street_address_unchanged_by_heirs_fix():
+    rows = mod.parse_list(_HEIRS_TEXT, "http://example/test.pdf")
+    heirs_row = next(r for r in rows if r.parcel_id == "7-12-16-070.01")
+    assert heirs_row.owner_name == "ALEXANDER JOHN W ETAL"
+    assert heirs_row.defendant == heirs_row.owner_name
+
+
+def test_continuation_line_after_a_deduped_row_is_not_attached_anywhere():
+    """A continuation line following a dropped exact-duplicate row must not
+    silently attach to whatever the PREVIOUS distinct listing happened to
+    be — that would misattribute an heir to the wrong parcel."""
+    text = (
+        _HEIRS_TEXT.split("83196")[0]  # the heirs row + its 4 continuation lines
+        + "83195   7-12-16-070.01   ALEXANDER JOHN W ETAL WILSON ANNE M MARION AVE\n"
+        + "A STRAY CONTINUATION LINE MARION AVE\n"
+    )
+    rows = mod.parse_list(text, "http://example/test.pdf")
+    assert len(rows) == 1  # exact dup (same item#+TMS) not double-counted
+    extra = rows[0].raw["spartanburg_delinquent_tax"]["additional_owners"]
+    assert "A STRAY CONTINUATION LINE" not in extra
+
+
+# --------------------------------------------------------------------------
 # fetch() retry/backoff around a transient block
 # (regression coverage for the 2026-09-23 BLOCKED incident)
 # --------------------------------------------------------------------------

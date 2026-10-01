@@ -174,48 +174,87 @@ def _pdf_text(data: bytes) -> str:
 
 
 def parse_list(text: str, url: str) -> list[Listing]:
-    """Parse the tax-sale list PDF text into one Listing per delinquent parcel."""
+    """Parse the tax-sale list PDF text into one Listing per delinquent parcel.
+
+    Audited 2026-10-01: 622 of 2,795 raw PDF lines (22%) carry NO leading
+    item#/TMS at all -- live-verified these are CONTINUATION lines for a
+    multi-owner (heirs/co-owner) parcel, not separate properties: pypdf's
+    column-flattened text repeats the situs on each additional owner's own
+    line below the matched row (e.g. item 83195, TMS 7-12-16-070.01 is
+    followed by 4 more "<name> MARION AVE" lines, all 4 more heirs of the
+    SAME property, that used to be silently dropped entirely). Heirs'
+    properties with many co-owners are exactly the probate/estate distress
+    signal this engine exists to surface, and each extra heir name is another
+    skip-trace contact path -- so these are now attached to the PRECEDING
+    matched Listing as additional owners, rather than lost. owner_name /
+    defendant (read by the name->parcel resolver and most enrichers) are left
+    as the single best-effort name from the primary row, unchanged, to avoid
+    destabilizing anything that assumes one clean name there; the full list
+    lives in raw so a probate/heir enricher can use it.
+    """
     out: list[Listing] = []
     seen: set[str] = set()
     year = datetime.utcnow().year
     redemption = datetime(year, 12, 31)  # ~12-mo SC redemption off the Dec sale
+    last: Listing | None = None
     for raw_line in (text or "").splitlines():
         line = re.sub(r"\s{2,}", " ", raw_line.strip())
+        if not line:
+            continue
         m = _ROW_RE.match(line)
         if not m:
+            if line.upper().startswith("ITEM #"):
+                continue  # header/repeated-header line, not a continuation
+            if last is None:
+                continue
+            # The continuation line repeats the SAME situs the anchor row
+            # already captured correctly (with a house number to anchor on) --
+            # strip that known-good trailing text rather than re-deriving a
+            # situs with no house number to anchor on, which over-greedily
+            # swallowed leading words of the owner name in testing (e.g.
+            # "MONDO CORP RETIREMENT FUND FOREST ST" mis-split as owner
+            # "MONDO" + situs "CORP RETIREMENT FUND FOREST ST").
+            cont_name = line.strip()
+            if last.street_address and cont_name.upper().endswith(last.street_address.upper()):
+                cont_name = cont_name[: -len(last.street_address)].strip()
+            if not cont_name:
+                continue
+            blob = last.raw["spartanburg_delinquent_tax"]  # type: ignore[index]
+            blob.setdefault("additional_owners", []).append(cont_name)
             continue
+
         item_no, tms, rest = m.group(1), m.group(2), m.group(3).strip()
         name, situs = split_name_situs(rest)
         key = f"{tms}|{item_no}"
         if key in seen:
+            last = None  # don't attach stray continuation lines to a dropped dup
             continue
         seen.add(key)
-        out.append(
-            Listing(
-                source="counties_sc.spartanburg_delinquent_tax",
-                source_url=url,
-                listing_type=ListingType.TAX_SALE,
-                property_kind=PropertyKind.UNKNOWN,
-                state="SC",
-                county="Spartanburg",
-                street_address=situs,
-                owner_name=name,
-                defendant=name,
-                parcel_id=tms,
-                redemption_deadline=redemption,
-                foreclosure_process="tax",
-                description=re.sub(r"\s+", " ", line)[:300],
-                first_seen=datetime.utcnow(),
-                last_seen=datetime.utcnow(),
-                raw={
-                    "spartanburg_delinquent_tax": {
-                        "item_no": item_no,
-                        "tms": tms,
-                        "row": line[:200],
-                    }
-                },
-            )
+        last = Listing(
+            source="counties_sc.spartanburg_delinquent_tax",
+            source_url=url,
+            listing_type=ListingType.TAX_SALE,
+            property_kind=PropertyKind.UNKNOWN,
+            state="SC",
+            county="Spartanburg",
+            street_address=situs,
+            owner_name=name,
+            defendant=name,
+            parcel_id=tms,
+            redemption_deadline=redemption,
+            foreclosure_process="tax",
+            description=re.sub(r"\s+", " ", line)[:300],
+            first_seen=datetime.utcnow(),
+            last_seen=datetime.utcnow(),
+            raw={
+                "spartanburg_delinquent_tax": {
+                    "item_no": item_no,
+                    "tms": tms,
+                    "row": line[:200],
+                }
+            },
         )
+        out.append(last)
     return out
 
 
