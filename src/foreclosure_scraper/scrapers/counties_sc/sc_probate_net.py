@@ -115,14 +115,29 @@ def _is_case_number(text: str, marriage: bool) -> bool:
     return bool(t[:4].isdigit() and "ES" in t.upper())
 
 
-def _pr_from_parties(party_table) -> tuple[str | None, dict | None]:
-    """Pull the Personal Representative (name + mailing address) from a
-    case's gvParties sub-grid. Returns (pr_name, pr_address_dict)."""
+#: Party "Type" values that identify the attorney of record (a distinct row
+#: from the PR in the same gvParties grid -- live-verified 2026-10-01: a
+#: Charleston Probate case's sub-grid carries BOTH a "PERSONAL REPRESENTATIVE"
+#: row AND an "Attorney" row, each with its own full mailing address. Only the
+#: PR was ever read; the attorney (HERMES sec 8's explicit "attorney/trustee"
+#: field) was dropped on the floor.
+_ATTORNEY_TYPES = ("attorney",)
+
+
+def _pr_from_parties(party_table) -> tuple[str | None, dict | None, str | None, dict | None]:
+    """Pull the Personal Representative AND the attorney of record (name +
+    mailing address each) from a case's gvParties sub-grid.
+
+    Returns (pr_name, pr_address_dict, attorney_name, attorney_address_dict).
+    For a marriage license grid there is no PR/Attorney Type value, so the
+    first two elements fall back to the first party row (the spouse) and the
+    attorney pair is always (None, None) there -- unchanged prior behavior.
+    """
     if party_table is None:
-        return None, None
+        return None, None, None, None
     rows = party_table.css("tr")
     if len(rows) < 2:
-        return None, None
+        return None, None, None, None
     header = [c.text(strip=True).lower() for c in rows[0].css("th, td")]
 
     def idx(*names: str) -> int | None:
@@ -147,6 +162,8 @@ def _pr_from_parties(party_table) -> tuple[str | None, dict | None]:
         return cells[i].text(strip=True) if i is not None and i < len(cells) else ""
 
     first_pr = None  # fall back to the first party if no explicit PR found
+    pr_result: tuple[str, dict] | None = None
+    attorney_result: tuple[str, dict] | None = None
     for tr in rows[1:]:
         cells = tr.css("td")
         if not cells:
@@ -171,9 +188,15 @@ def _pr_from_parties(party_table) -> tuple[str | None, dict | None]:
         }
         if first_pr is None:
             first_pr = (name, addr)
-        if any(t in ptype for t in _PR_TYPES):
-            return name, addr
-    return first_pr if first_pr else (None, None)
+        if pr_result is None and any(t in ptype for t in _PR_TYPES):
+            pr_result = (name, addr)
+        if attorney_result is None and any(t in ptype for t in _ATTORNEY_TYPES):
+            attorney_result = (name, addr)
+        # Keep scanning remaining rows regardless: a grid can carry both a PR
+        # row and an attorney row, and we want both, not just the first match.
+    pr_name, pr_addr = pr_result if pr_result else (first_pr if first_pr else (None, None))
+    atty_name, atty_addr = attorney_result if attorney_result else (None, None)
+    return pr_name, pr_addr, atty_name, atty_addr
 
 
 def _parse_probate(html: str, county: str, state: str) -> list[Listing]:
@@ -213,7 +236,7 @@ def _parse_probate(html: str, county: str, state: str) -> list[Listing]:
 
         party_table = party_tables[case_i] if case_i < len(party_tables) else None
         case_i += 1
-        pr_name, pr_addr = _pr_from_parties(party_table)
+        pr_name, pr_addr, atty_name, atty_addr = _pr_from_parties(party_table)
 
         desc = f"SC probate estate {case_number} ({county} County)"
         if case_name:
@@ -233,6 +256,13 @@ def _parse_probate(html: str, county: str, state: str) -> list[Listing]:
                 county=county,
                 owner_name=case_name,       # decedent — owner->GIS enricher fills the property
                 defendant=pr_name or party, # the Personal Representative / contact
+                # HERMES sec 8 explicitly calls out attorney/trustee as a
+                # required field; the gvParties sub-grid carries a distinct
+                # Attorney row (name + full mailing address) beside the PR
+                # row. `trustee` is this codebase's standing convention for
+                # the attorney/firm handling a case (see law_firms/* and the
+                # master-in-equity scrapers).
+                trustee=atty_name or None,
                 case_number=case_number,
                 description=desc[:500],
                 first_seen=datetime.utcnow(),
@@ -245,6 +275,7 @@ def _parse_probate(html: str, county: str, state: str) -> list[Listing]:
                     "appointment_date": appt_date or None,
                     "status": status,
                     "personal_representative": pr_addr,
+                    "attorney": atty_addr,
                 }},
             )
         )
@@ -283,7 +314,7 @@ def _parse_marriage(html: str, county: str, state: str) -> list[Listing]:
 
         party_table = party_tables[case_i] if case_i < len(party_tables) else None
         case_i += 1
-        spouse_name, spouse_addr = _pr_from_parties(party_table)
+        spouse_name, spouse_addr, _atty_name, _atty_addr = _pr_from_parties(party_table)
 
         desc = f"SC marriage license {license_number} ({county} County)"
         if couple:
