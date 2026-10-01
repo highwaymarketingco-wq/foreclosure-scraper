@@ -38,6 +38,21 @@ _ROW = re.compile(
 # owner name = trailing "SURNAME, FIRST ..." (addresses rarely contain a comma)
 _OWNER = re.compile(r"([A-Z][A-Za-z'.\-]+,\s+.+)$")
 
+# Street-suffix anchor: when the owner is a multi-word company name ("MARCLAR
+# INVESTMENT, LLC", "WK PEBBLES, LLC"), _OWNER's single-word-before-the-comma
+# match only grabs the LAST company word ("INVESTMENT", "PEBBLES") and leaves
+# the first word(s) ("MARCLAR", "WK") misattributed to the address — found
+# live 2026-10-01. Anchoring on the LAST street-suffix token instead (the
+# address always ends in one; the owner text never contains one) correctly
+# keeps the whole company name together. Tried first; falls back to _OWNER
+# for the (more common) plain "LASTNAME, FIRST" person-owner rows it already
+# handles correctly.
+_ADDR_SUFFIX_ANCHOR = re.compile(
+    r"\b(?:ST|STREET|RD|ROAD|DR|DRIVE|LN|LANE|CT|COURT|BLVD|BOULEVARD|HWY|"
+    r"HIGHWAY|AVE|AVENUE|CIR|CIRCLE|WAY|PL|PLACE|TRL|TRAIL|PKWY|PARKWAY|TER|"
+    r"TERRACE|EXT|EXTENSION|LOOP|BND|BEND|XING|CROSSING|PATH|ROW)\.?(?=\s)"
+)
+
 
 def _money(s: str) -> float | None:
     try:
@@ -62,14 +77,38 @@ def parse_flc_pdf(pdf_bytes: bytes) -> list[Listing]:
                     continue
                 seen.add(tms)
                 owner = address = None
+                # Try the street-suffix anchor first (keeps a multi-word
+                # company name like "MARCLAR INVESTMENT, LLC" intact; see the
+                # _ADDR_SUFFIX_ANCHOR comment). Only trust it when a comma
+                # follows somewhere after the suffix (confirms the remainder
+                # really is "<owner>, <rest>" and not a coincidental match).
+                anchor_end = None
+                for sm in _ADDR_SUFFIX_ANCHOR.finditer(blob):
+                    if "," in blob[sm.end():]:
+                        anchor_end = sm.end()
                 om = _OWNER.search(blob)
-                if om:
+                if anchor_end is not None:
+                    address = blob[:anchor_end].strip() or None
+                    owner = blob[anchor_end:].strip().lstrip(".").strip() or None
+                    situs = address
+                elif om:
                     owner = om.group(1).strip()
                     address = blob[: om.start()].strip() or None
+                    # A clean owner-comma split means `address` IS the situs
+                    # text, house-number-led or not: Spartanburg's FLC list
+                    # carries plenty of real situs with no house number at all
+                    # (e.g. "S. GRIFFIN MILL CT.", "W.O. EZELL BLVD" — both
+                    # confirmed live 2026-10-01). The old code required a
+                    # leading digit here and silently nulled both of these out.
+                    situs = address
                 else:
+                    # No clean comma split: `blob` is the WHOLE owner+address
+                    # text with no reliable boundary, so only trust it as a
+                    # situs when it happens to be house-number-led (the one
+                    # shape we can tell apart from a bare owner name with no
+                    # comma at all).
                     address = blob
-                # only keep a street_address that looks like a real situs (leading number)
-                situs = address if address and re.match(r"^\d", address) else None
+                    situs = address if address and re.match(r"^\d", address) else None
                 out.append(Listing(
                     source="counties_sc.spartanburg_flc",
                     source_url=PDF_URL,

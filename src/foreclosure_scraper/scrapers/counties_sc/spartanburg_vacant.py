@@ -97,6 +97,20 @@ def _clean(v: Any) -> str | None:
     return re.sub(r"\s+", " ", str(v)).strip() or None
 
 
+def _num(v: Any) -> float | None:
+    if v in (None, "", " ", 0, "0"):
+        return None
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _int(v: Any) -> int | None:
+    n = _num(v)
+    return int(n) if n is not None else None
+
+
 def _mailing(a: dict) -> str | None:
     parts = [a.get("StreetAddr"), a.get("City"), a.get("State"), a.get("Zip")]
     out = " ".join(str(p).strip() for p in parts if p not in (None, "", " "))
@@ -228,6 +242,23 @@ class SpartanburgVacant(BaseScraper):
                     absentee = _is_absentee(a)
                     cond = (a.get("ConditionF") or "").strip().upper()
                     poor = cond in _POOR_COND
+                    # CAMA specs were already being computed into
+                    # raw['cama_specs'] below but never promoted to the
+                    # top-level Listing fields valuation/calc.py actually
+                    # reads (living_sqft/year_built/bedrooms/bathrooms) — found
+                    # 2026-10-01 by checking who reads raw['cama_specs'] (only
+                    # web_artifact.py's RAW_KEEP, nothing in valuation). Mirrors
+                    # the sibling spartanburg_condemned.py scraper's existing
+                    # convention of promoting living_sqft/year_built.
+                    living_sqft = _num(a.get("LivingArea"))
+                    year_built = _int(a.get("YearBuilt"))
+                    bedrooms = _num(a.get("BedRooms"))
+                    full_baths = _num(a.get("FullBaths"))
+                    half_baths = _num(a.get("HalfBaths"))
+                    bathrooms = None
+                    if full_baths is not None or half_baths is not None:
+                        bathrooms = (full_baths or 0) + 0.5 * (half_baths or 0)
+                        bathrooms = bathrooms or None
                     pt = parcel_centroid(f.get("geometry"))
                     if pt:
                         geo = {"latitude": pt[0], "longitude": pt[1]}
@@ -250,8 +281,13 @@ class SpartanburgVacant(BaseScraper):
                         city="Spartanburg",
                         street_address=situs,
                         parcel_id=parcel,
+                        owner_name=owner,
                         defendant=owner,
                         sale_date=None,
+                        living_sqft=living_sqft,
+                        year_built=year_built,
+                        bedrooms=bedrooms,
+                        bathrooms=bathrooms,
                         **geo,
                         description=(f"Vacant property (Spartanburg City registry) owned by {owner}"
                                      + (" — absentee owner" if absentee else "")),
