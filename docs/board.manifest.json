@@ -1,7 +1,7 @@
 {
  "schema": "board-manifest-v1",
- "written_at": "2026-10-01T14:49:32.051378Z",
- "run_time": "2026-10-01T14:49:31.339213Z",
+ "written_at": "2026-10-01T15:30:04.352406Z",
+ "run_time": "2026-10-01T15:30:03.638856Z",
  "count": 219143,
  "detail_count": 219143,
  "slim_count": 217773,
@@ -14,8 +14,8 @@
  },
  "files": {
   "listings.json": {
-   "bytes": 2525948529,
-   "sha256": "dd2275c12036a46d77926ff7c7c4e842122ac82d05a49a0c1cd56bbe884b868c",
+   "bytes": 2526345296,
+   "sha256": "8dd8ceecc0005aecfac1ec430914e48d21f86139889b85a69d0375f6a77cba30",
    "records": 219143
   },
   "listings_detail.json": {
@@ -40,18 +40,18 @@
   },
   "run_meta.json": {
    "bytes": 32545,
-   "sha256": "e4439d3594b01e2064d514ba6f2acf7c062a456800239c0292cdf2e469366d98"
+   "sha256": "e63b09f39121df754245c1e60fdb09416aeeac858d290b612040ef136668b97c"
   },
   "listings_part_000.json.gz": {
-   "bytes": 12243763,
-   "sha256": "130ae067b79987e4dd39b2ee24a20029d14b6643f3d12b5882acf320bc8199b1",
+   "bytes": 12265844,
+   "sha256": "4b1fd5f6cfc262e0b420a61b50a5c04f13d5616945de5ba0d26e1d84808c9164",
    "records": 9500,
    "start": 0,
    "end": 9500
   },
   "listings_part_001.json.gz": {
-   "bytes": 8283788,
-   "sha256": "da4a63cd9b29c397c1c67e0ce2824a1c4a36ecac3880356a13ee230b897eb084",
+   "bytes": 8286044,
+   "sha256": "151bb9e6cf65aaf9a72a2eba5dee313bb4aa4b98950a1955e921ad904a4ba0df",
    "records": 9500,
    "start": 9500,
    "end": 19000
@@ -1095,16 +1095,16 @@
     "start": 0,
     "end": 9500,
     "records": 9500,
-    "bytes": 12243763,
-    "sha256": "130ae067b79987e4dd39b2ee24a20029d14b6643f3d12b5882acf320bc8199b1"
+    "bytes": 12265844,
+    "sha256": "4b1fd5f6cfc262e0b420a61b50a5c04f13d5616945de5ba0d26e1d84808c9164"
    },
    {
     "name": "listings_part_001.json.gz",
     "start": 9500,
     "end": 19000,
     "records": 9500,
-    "bytes": 8283788,
-    "sha256": "da4a63cd9b29c397c1c67e0ce2824a1c4a36ecac3880356a13ee230b897eb084"
+    "bytes": 8286044,
+    "sha256": "151bb9e6cf65aaf9a72a2eba5dee313bb4aa4b98950a1955e921ad904a4ba0df"
    },
    {
     "name": "listings_part_002.json.gz",
