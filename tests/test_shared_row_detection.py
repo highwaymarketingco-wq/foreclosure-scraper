@@ -455,9 +455,21 @@ def test_past_sale_never_sets_sold_confirmed():
 
 
 def test_truthful_past_sale_status_is_left_verbatim():
+    """A status that already tells the truth about a past sale ('cancelled', not
+    'active') must not be rewritten to 'sale_date_passed' by the step-2b block.
+
+    UPDATED 2026-10-01 (extraction_gaps.md: "auction_status 'status:'-prefix +
+    newline leaks (25) -> strip in a normalizer"): the source's literal "status:
+    cancelled" (label-and-value glued together by the scraper that produced it)
+    is now itself cleaned to "cancelled" by step 2's normalization, which runs
+    BEFORE this truthful-status check. "left verbatim" has always meant "not
+    overwritten to sale_date_passed by step 2b" -- it never meant the raw,
+    label-prefixed source string had to survive unchanged, and a bare
+    "cancelled" is the more useful value on the board either way.
+    """
     li = _past_sale(40, "status: cancelled")
     enrich_board_quality([li])
-    assert li.auction_status == "status: cancelled"
+    assert li.auction_status == "cancelled"
 
 
 def test_past_sale_reaches_the_board_through_qa_flags():

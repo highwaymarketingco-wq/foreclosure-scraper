@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import collections
 import copy
+import re
 from datetime import date, datetime
 
 from .distress_score import sale_date_is_event
@@ -180,10 +181,19 @@ def enrich_board_quality(listings, today: "date | None" = None) -> dict:
                 raw["geo_imprecise"] = "centroid_snap"
                 stats["centroid_flagged"] += 1
 
-        # 2. auction_status normalization.
+        # 2. auction_status normalization. Some sources carry the field's own
+        #    on-page LABEL into the value ("status: active", from a scraper
+        #    that grabbed a "Status: <value>" cell/line whole) or an embedded
+        #    newline (a multi-line cell joined without a separator, e.g.
+        #    "active\nupset period"). Both are cosmetic on a value that is
+        #    otherwise correct, so strip them here rather than chase every
+        #    source: a leading "status" label (with or without a colon) is
+        #    dropped, and internal whitespace/newlines collapse to single
+        #    spaces, before the existing empty/casing normalization below.
         st = getattr(li, "auction_status", None)
         if isinstance(st, str):
-            norm = st.strip().lower()
+            norm = re.sub(r"\s+", " ", st).strip().lower()
+            norm = re.sub(r"^status\s*:?\s*", "", norm).strip()
             if norm in ("", "none", "null", "n/a"):
                 li.auction_status = None
                 stats["status_nulled"] += 1
