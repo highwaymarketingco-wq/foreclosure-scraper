@@ -121,6 +121,21 @@ def _now() -> datetime:
     return datetime.utcnow()
 
 
+def _status_class(status: str | None) -> str | None:
+    """Map the grid's free-text sale-status cell onto a terminal token, or
+    None when the sale is still pending."""
+    s = (status or "").lower()
+    if not s:
+        return None
+    if "cancel" in s:
+        return "cancelled"
+    if "redeem" in s:
+        return "redeemed"
+    if "sold" in s:
+        return "sold"
+    return s or None
+
+
 def _parse_sales_table(html: str) -> list[Listing]:
     """Parse the Ninja-Tables grid of SCHEDULED in-house auction sales.
 
@@ -149,6 +164,18 @@ def _parse_sales_table(html: str) -> list[Listing]:
         kind = _PROPERTY_KIND.get(ptype_raw.strip().lower(), PropertyKind.UNKNOWN)
         case_no = _text(_cell(row, "courtfile")) or None
         our_file = _text(_cell(row, "ourfile")) or None
+        # 2026-10-01 (per-source extraction audit, HERMES sec 8): the grid
+        # carries an 11th column, ninja_clmn_nm_salestatus, that was never
+        # read -- every scheduled-table row landed with Listing.auction_status
+        # unset, even once a sale actually closes (the sibling inline parser
+        # below DOES set auction_status="pending" for its own rows, so this
+        # path was the odd one out). The live page's current rows are all
+        # blank (no sale has closed yet), confirmed by also fixing the
+        # identical gap in counties_nc.cleveland_tax_foreclosure.py, which
+        # scrapes this same URL/grid -- see that file's commit for the
+        # live-verification detail.
+        sale_status_raw = _text(_cell(row, "salestatus")) or None
+        status_class = _status_class(sale_status_raw)
 
         # Pair parcels with addresses. When counts match (>1), emit one Listing
         # per parcel; otherwise emit a single row (first parcel, joined address).
@@ -174,6 +201,7 @@ def _parse_sales_table(html: str) -> list[Listing]:
                     sale_date=sale_date,
                     case_number=case_no,
                     opening_bid=opening_bid,
+                    auction_status=status_class,
                     description=(
                         f"Cleveland County in-house tax foreclosure sale — "
                         f"{ptype_raw or 'property'}; opening bid "
@@ -187,6 +215,8 @@ def _parse_sales_table(html: str) -> list[Listing]:
                         "close_date": close_date or None,
                         "current_bid": current_bid,
                         "property_type": ptype_raw or None,
+                        "sale_status_raw": sale_status_raw,
+                        "status_class": status_class,
                     }},
                 )
             )

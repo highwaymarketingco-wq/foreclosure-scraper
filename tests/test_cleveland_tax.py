@@ -170,3 +170,43 @@ def test_empty_and_no_grid():
     assert _parse_sales_table("") == []
     assert _parse_sales_table("<html><body>no grid here</body></html>") == []
     assert parse("<html><body>nothing</body></html>") == []
+
+
+# ---------------------------------------------------------------------------
+# ninja_clmn_nm_salestatus (audit 2026-10-01, docs/HERMES.md sec 8): the grid
+# carries an 11th column that was never read, so Listing.auction_status stayed
+# unset on every scheduled-table row even once a sale closed. Today's live
+# page has no closed sales to sample (all blank -- see SAMPLE above, which
+# mirrors that), so this fixture synthesizes the populated case to prove the
+# extraction + classification actually works once the county fills it in.
+# ---------------------------------------------------------------------------
+SAMPLE_WITH_STATUS = SAMPLE.replace(
+    '<td class="ninja_column_10 ninja_clmn_nm_salestatus">&nbsp;</td>\n'
+    '  </tr>\n'
+    '  <tr class="ninja_table_row">\n'
+    '    <td class="ninja_column_0 ninja_clmn_nm_county">Cleveland</td>\n'
+    '    <td class="ninja_column_1 ninja_clmn_nm_address">124 Galilee Church Rd, Kings Mountain</td>',
+    '<td class="ninja_column_10 ninja_clmn_nm_salestatus">Sale Closed-Property Sold</td>\n'
+    '  </tr>\n'
+    '  <tr class="ninja_table_row">\n'
+    '    <td class="ninja_column_0 ninja_clmn_nm_county">Cleveland</td>\n'
+    '    <td class="ninja_column_1 ninja_clmn_nm_address">124 Galilee Church Rd, Kings Mountain</td>',
+    1,
+)
+
+
+def test_sale_status_column_is_blank_on_todays_live_shape():
+    rows = _parse_sales_table(SAMPLE)
+    assert all(r.auction_status is None for r in rows)
+    assert all(r.raw["cleveland_tax"]["sale_status_raw"] is None for r in rows)
+
+
+def test_sale_status_column_is_captured_and_classified_once_populated():
+    rows = _parse_sales_table(SAMPLE_WITH_STATUS)
+    sold = next(r for r in rows if r.case_number == "25CV003791-220")
+    assert sold.auction_status == "sold"
+    assert sold.raw["cleveland_tax"]["sale_status_raw"] == "Sale Closed-Property Sold"
+    assert sold.raw["cleveland_tax"]["status_class"] == "sold"
+    # Unaffected rows are still blank.
+    untouched = next(r for r in rows if r.case_number == "25CV003450-220")
+    assert untouched.auction_status is None

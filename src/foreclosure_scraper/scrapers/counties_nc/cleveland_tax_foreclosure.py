@@ -137,6 +137,23 @@ def _now() -> datetime:
     return datetime.utcnow()
 
 
+def _status_class(status: str | None) -> str | None:
+    """Map the grid's free-text sale-status cell onto a terminal token, or
+    None when the sale is still pending (matches gaston_tax_foreclosures's
+    convention; 'cancelled' is checked before 'sold' for the same reason:
+    a cancelled sale can still say "Sale" somewhere in its text)."""
+    s = (status or "").lower()
+    if not s:
+        return None
+    if "cancel" in s:
+        return "cancelled"
+    if "redeem" in s:
+        return "redeemed"
+    if "sold" in s:
+        return "sold"
+    return s or None
+
+
 def _parse_sales_table(html: str) -> list[Listing]:
     """Parse the Ninja-Tables grid of SCHEDULED in-house auction sales."""
     out: list[Listing] = []
@@ -159,6 +176,19 @@ def _parse_sales_table(html: str) -> list[Listing]:
         kind = _PROPERTY_KIND.get(ptype_raw.strip().lower(), PropertyKind.UNKNOWN)
         case_no = _text(_cell(row, "courtfile")) or None
         our_file = _text(_cell(row, "ourfile")) or None
+        # 2026-10-01 (per-source extraction audit, HERMES sec 8): the grid
+        # carries an 11th column, ninja_clmn_nm_salestatus, that was never
+        # read at all -- every row in this scraper landed with
+        # Listing.auction_status unset, even once a sale actually closes.
+        # Live-verified 2026-10-01: today's 4 active rows are all blank
+        # (expected -- none has sold yet), but the column exists specifically
+        # to carry "Sold"/"Cancelled"/"Redeemed" once a sale resolves (the
+        # same lifecycle gaston_tax_foreclosures.py already tracks), so
+        # leaving it unread would silently drop that status the moment it
+        # IS populated -- the exact "looks fine until it isn't" failure mode
+        # CLAUDE.md calls out.
+        sale_status_raw = _text(_cell(row, "salestatus")) or None
+        status_class = _status_class(sale_status_raw)
 
         # An "upset bidding ends" close date, if the page states one.
         upset_deadline = _date(close_date) if close_date else None
@@ -189,6 +219,7 @@ def _parse_sales_table(html: str) -> list[Listing]:
                     case_number=case_no,
                     opening_bid=opening_bid,
                     upset_bid_deadline=upset_deadline,
+                    auction_status=status_class,
                     description=(
                         f"Cleveland County in-house tax foreclosure sale — "
                         f"{ptype_raw or 'property'}; opening bid "
@@ -202,6 +233,8 @@ def _parse_sales_table(html: str) -> list[Listing]:
                         "close_date": close_date or None,
                         "current_bid": current_bid,
                         "property_type": ptype_raw or None,
+                        "sale_status_raw": sale_status_raw,
+                        "status_class": status_class,
                     }},
                 )
             )
