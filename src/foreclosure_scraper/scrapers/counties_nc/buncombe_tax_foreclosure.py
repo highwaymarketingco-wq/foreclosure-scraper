@@ -161,9 +161,33 @@ class BuncombeTaxForeclosure(BaseScraper):
                 r = await c.get(PDF_URL, headers={"User-Agent": "Mozilla/5.0"})
                 r.raise_for_status()
                 data = r.content
+                last_modified = r.headers.get("last-modified")
         except Exception as exc:  # never raise
             log.warning("buncombe_tax_fcl.fetch_failed", error=str(exc)[:180])
             return []
+
+        # Audited 2026-10-01: Last-Modified on this PDF read Feb 2022 (confirmed
+        # genuinely frozen, not a caching artifact — the county's REAL current
+        # inventory moved to the Trumba calendar `counties_nc.buncombe_tax`
+        # scrapes; cross-checking case numbers found 3 of 4 records here no
+        # longer appear on that live feed at all, i.e. very likely long since
+        # resolved). The document can come back to life any time the county
+        # republishes it (per HERMES's "DEAD means dead the day it was probed,
+        # not forever" — this is NOT disabled), so this doesn't drop rows; it
+        # stamps how stale the SOURCE DOCUMENT ITSELF is (independent of any one
+        # record's own sale_date, which enrichment_board_quality's
+        # sale_date_passed grace window already separately downranks) so an
+        # operator or a future audit sees the staleness without re-probing.
+        doc_age_days: int | None = None
+        if last_modified:
+            try:
+                from email.utils import parsedate_to_datetime
+                lm_dt = parsedate_to_datetime(last_modified)
+                if lm_dt.tzinfo is not None:
+                    lm_dt = lm_dt.replace(tzinfo=None)
+                doc_age_days = (datetime.utcnow() - lm_dt).days
+            except (TypeError, ValueError):
+                doc_age_days = None
 
         try:
             records = _parse_pdf(data)
@@ -193,6 +217,8 @@ class BuncombeTaxForeclosure(BaseScraper):
                     "bid_kind": rec.get("bid_kind"),
                     "redeemed": redeemed,
                     "block": rec.get("block", "")[:500],
+                    "source_last_modified": last_modified,
+                    "source_doc_age_days": doc_age_days,
                 }
             }
             if redeemed:
