@@ -1919,6 +1919,7 @@ RAW_KEEP = {
     "actual_sold_price": "*",         # Real hammer price (Pickens MIE results PDFs etc.)
     "pickens_mie": "*",               # Pickens MIE results PDF parse provenance
     "anderson_mie_results": "*",      # Anderson MIE Sale-Results parse provenance
+    "anderson_mie": "*",              # Anderson MIE Sale-List (upcoming) parse provenance: legal_description, sale_notes
     "spartanburg_pdf": "*",           # Spartanburg MIE PDF parse provenance (now includes is_results_pdf)
     "assessor_card": "*",             # on-demand per-parcel card: recorded sale price + history + sqft source
     "pulled_sale": "*",               # cross-run withdrawn/pulled-sale aging counter

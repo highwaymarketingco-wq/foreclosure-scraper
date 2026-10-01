@@ -39,10 +39,16 @@ ANDERSON_SOLD_RE = re.compile(
 ANDERSON_NON_SALE_RE = re.compile(r"\b(WD|WD/BR|BR\b|withdrawn)", re.I)
 CASE_RE = re.compile(r"\b\d{2,4}-\d{3,5}\b")
 ADDR_RE = re.compile(
-    r"(\d+\s+[A-Z][\w .'\-]+(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
-    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\.?)",
+    r"(\d+\s+[A-Z][\w .'\-]+?\b(?:Road|Rd|Street|St|Drive|Dr|Lane|Ln|Avenue|Ave|"
+    r"Highway|Hwy|Boulevard|Blvd|Circle|Cir|Court|Ct|Way|Place|Pl|Trail|Trl|Parkway|Pkwy)\b\.?)",
     re.I,
 )
+# Deed-book / plat-book reference, e.g. "PB98@684", "PS2873@4", "PB1038@1&2".
+_PLAT_REF = re.compile(r"\b([A-Z]{1,3}\d{1,5}@[\dA-Za-z&\-]+)\b")
+_MH_RE = re.compile(r"\bMH\b|mobile\s+home", re.I)
+# The caption line ("Plaintiff v. Defendant, et al."); everything between its
+# end and the street address is the DESCRIPTION column (lot/acreage + plat ref).
+_CAPTION_RE = re.compile(r"([A-Z][\w &.,'\-]{3,80}?)\s+v\.\s+([A-Z][\w &.,'\-]{3,80})", re.I)
 ATTORNEY_LEGEND = {
     "B&S": "Brock & Scott",
     "BCP": "Bell Carrington Price & Gregg",
@@ -56,6 +62,30 @@ ATTORNEY_LEGEND = {
 
 MONTHS = {"january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
           "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12}
+
+
+_ET_AL_RE = re.compile(r"\bet\s+al\.?,?", re.I)
+
+
+def _legal_description(chunk: str,
+                        addr_m: "re.Match[str] | None") -> tuple[str | None, PropertyKind]:
+    """The DESCRIPTION column (lot/acreage + plat-book@page) sits between the
+    '...et al.' end of the caption and the street address on both the
+    Sale-List and Sale-Results PDFs. Neither was captured before — it is the
+    strongest free-text legal description these rows carry, and a 'MH' /
+    'Mobile Home' token in it is the only mobile-home signal on the page.
+    The caption's defendant can wrap onto multiple PDF-extracted lines
+    ("...Berry-\\nBurns, et al."), so anchor on the literal 'et al.' marker
+    rather than the (necessarily single-line) plaintiff/defendant regex."""
+    etal_m = _ET_AL_RE.search(chunk)
+    cap_m = _CAPTION_RE.search(chunk) if not etal_m else None
+    start = etal_m.end() if etal_m else (cap_m.end() if cap_m else 0)
+    end = addr_m.start() if addr_m else len(chunk)
+    if end <= start:
+        return None, PropertyKind.UNKNOWN
+    desc = re.sub(r"\s+", " ", chunk[start:end]).strip(" ,.-")
+    kind = PropertyKind.MOBILE if (desc and _MH_RE.search(desc)) else PropertyKind.UNKNOWN
+    return (desc or None), kind
 
 
 def _extract_pdf_text(data: bytes) -> str:
@@ -113,12 +143,13 @@ def _parse_results_pdf(text: str, source_url: str, slug: str,
         m = re.search(r"([A-Z][\w &.,'-]{3,80}?)\s+v\.\s+([A-Z][\w &.,'-]{3,80})", chunk)
         if m:
             plaintiff, defendant = m.group(1).strip(), m.group(2).strip().split("\n")[0]
+        legal_desc, mh_kind = _legal_description(chunk, addr_m)
 
         out.append(Listing(
             source=slug,
             source_url=source_url,
             listing_type=ListingType.FORECLOSURE_SALE,
-            property_kind=PropertyKind.UNKNOWN,
+            property_kind=mh_kind,
             street_address=addr_m.group(1) if addr_m else None,
             state="SC",
             county="Anderson",
@@ -128,6 +159,7 @@ def _parse_results_pdf(text: str, source_url: str, slug: str,
             trustee=atty,
             sale_date=sale_date,
             opening_bid=price,
+            legal_description=legal_desc,
             description=chunk[:500],
             first_seen=datetime.utcnow(),
             last_seen=datetime.utcnow(),
@@ -151,7 +183,21 @@ def _parse_pdf(text: str, source_url: str, slug: str) -> list[Listing]:
     cutoff = today - timedelta(days=2)
 
     # Each row: case# | atty | "Plaintiff v. Defendant" | description (lot, plat, address) | notes
-    chunks = re.split(r"(?=\b\d{2}-\d{3,5}\s+[A-Z]{1,4}\b)", text)
+    #
+    # BUG FIXED: this used to split on "<case#> <atty-code>" requiring the
+    # attorney column to be a short ALL-CAPS code (B&S, BCP, RPL...). Real
+    # Sale-List PDFs also carry full-name attorneys (Cox, Driscoll, Hutchens,
+    # Nourie, Shook) that don't match that shape, so the split silently
+    # failed between those rows and swallowed every following row — up to
+    # 16 of 17 parcels on one live PDF — into the PRECEDING chunk's text,
+    # never emitted as their own Listing. _parse_results_pdf's own docstring
+    # already names the fix ("splitting on the numbered-row-with-case-number
+    # marker is more robust") but it was never ported back here. Live-verified
+    # 2026-10-01 against the live October 6 2026 Sale List (17 real rows): the
+    # old split produced only 2 usable chunks (one case number recovered per
+    # merged blob); this split produces 16 (the 17th is a short page-footer
+    # fragment with no case number, correctly dropped).
+    chunks = re.split(r"(?=\b\d+\.\s+\d{2}-\d{3,5}\b)", text)
     for chunk in chunks:
         chunk = chunk.strip()
         if len(chunk) < 30:
@@ -173,13 +219,21 @@ def _parse_pdf(text: str, source_url: str, slug: str) -> list[Listing]:
         m = re.search(r"([A-Z][\w &.,'-]{3,80}?)\s+v\.\s+([A-Z][\w &.,'-]{3,80})", chunk)
         if m:
             plaintiff, defendant = m.group(1).strip(), m.group(2).strip().split("\n")[0]
+        legal_desc, mh_kind = _legal_description(chunk, addr_m)
+        # Trailing special-condition notes ("SUBJECT TO FIRST MORTGAGE",
+        # "BIDDING TO REOPEN IN 30 DAYS") sit after the address, before the
+        # next numbered row — real signal, previously dropped entirely.
+        notes = None
+        if addr_m:
+            tail = re.sub(r"\s+", " ", chunk[addr_m.end():]).strip(" ,.-")
+            notes = tail or None
 
         out.append(
             Listing(
                 source=slug,
                 source_url=source_url,
                 listing_type=ListingType.FORECLOSURE_SALE,
-                property_kind=PropertyKind.UNKNOWN,
+                property_kind=mh_kind,
                 street_address=addr_m.group(1) if addr_m else None,
                 state="SC",
                 county="Anderson",
@@ -187,9 +241,18 @@ def _parse_pdf(text: str, source_url: str, slug: str) -> list[Listing]:
                 plaintiff=plaintiff,
                 defendant=defendant,
                 trustee=atty,
+                legal_description=legal_desc,
                 description=chunk[:500],
                 first_seen=datetime.utcnow(),
                 last_seen=datetime.utcnow(),
+                raw={
+                    "anderson_mie": {
+                        "source_pdf": source_url,
+                        "raw_chunk_excerpt": chunk[:400],
+                        "legal_description": legal_desc,
+                        "sale_notes": notes,
+                    },
+                },
             )
         )
     return out
